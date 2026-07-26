@@ -1,0 +1,440 @@
+/*
+  studio-engine MOTION / EFFECT primitives — the shared animation + visual-effect
+  layer. Seven reusable primitives, consolidated from the per-app copies that
+  drifted across mcritchie-studio (MS) and turf-monster (TM):
+
+    .studio-border-glow   mask-composite rainbow border glow  (extracted, MS)
+    .spinner              one canonical border spinner        (reconciled, MS+TM)
+    .loading-dots         three bouncing dots                 (extracted, TM)
+    .sheen                sweep-of-light across any element   (reconciled, TM)
+    .ping                 expanding pulse ring                (extracted, TM)
+    .fade-edge            static mask-image edge fade         (authored fresh)
+    .progress-meter       dual-layer color-flip progress bar  (authored fresh)
+
+  ─────────────────────────────────────────────────────────────────────────────
+  OPT-IN — this layer does NOT auto-bundle.
+
+  tailwindcss-rails' `tailwindcss:engines` task (Tailwindcss::Engines.bundle)
+  generates a `builds/tailwind/<engine>.css` entry ONLY for the file named
+  exactly `engine.css`. This file is `engine-motion.css`, so that matcher skips
+  it BY CONSTRUCTION — it never rides the auto-generated `studio_engine.css`
+  entry that `engine.css` uses, and consumers must adopt it deliberately.
+
+  Adopt with ONE line in the consuming app's app/assets/tailwind/application.css,
+  AFTER `@import "tailwindcss";` (and after your `../builds/tailwind/studio_engine`
+  import so the theme role vars are in scope):
+
+      @import "STUDIO_ENGINE_PATH/app/assets/tailwind/studio_engine/engine-motion.css";
+
+  Resolve STUDIO_ENGINE_PATH the same way config/tailwind.config.js already
+  resolves the shared preset — `bundle show studio-engine`. A one-time helper the
+  app-side de-fork task can wire (mirrors the engines contract):
+
+      # config/tailwind.config.js already computes this:
+      #   const studioPath = execSync('bundle show studio-engine').toString().trim()
+      # emit an absolute @import into your app CSS (or a tiny generated entry).
+
+  App-side wiring + removing the forked local copies lands in the follow-up
+  adoption task; until then the MS/TM local copies stay canonical.
+
+  ─────────────────────────────────────────────────────────────────────────────
+  DESIGN RULES
+
+  - Plain `.class` + `@keyframes`, NOT `@utility`. A Tailwind v4 `@utility`
+    redeclaration is ADDITIVE (both definitions emit), which is the wrong shape
+    for net-new primitives a consumer might transiently co-load with a local
+    copy. Plain classes sidestep that entirely.
+  - Color flows through the 7-role theme CSS custom properties emitted by
+    studio_theme_css_tag (`--color-cta`, `--color-surface`, `--color-inset`,
+    `--color-text`, `--color-border-strong`, `--color-primary`, ...), so every
+    primitive restyles itself in dark AND light mode with zero extra work.
+  - Every tuning knob (duration, size, color, %, delay) is a CSS custom property
+    with a sensible themed default, so a caller retunes via `style="--x: ..."`
+    or a `:root` override WITHOUT forking the rule.
+  - Namespacing: the two extracted primitives keep their source names
+    (`.studio-border-glow`, `.loading-dots`) so the follow-up de-fork is a pure
+    delete-the-local-copy swap with no view churn; their gem rules are byte-
+    compatible with the app copies, so a transient co-load is a harmless
+    duplicate. The reconciled/fresh primitives use fresh generic names
+    (`.spinner`, `.sheen`, `.ping`, `.fade-edge`, `.progress-meter`) that no app
+    class currently uses. Animation names that would clash with a Tailwind
+    built-in of DIFFERENT content are namespaced (`ping-pulse`, not `ping`);
+    `spin` is kept because it is byte-identical to Tailwind's built-in.
+*/
+
+/* =============================================================================
+   1. studio-border-glow — mask-composite rainbow border glow
+   Extracted verbatim from mcritchie-studio app/assets/tailwind/application.css.
+   A ::before draws the crisp animated rainbow border (masked to the padding
+   ring via mask-composite), a ::after draws a blurred halo of the same gradient.
+
+   Usage:  <div class="studio-border-glow rounded-xl"> ... </div>
+   Tune:   --studio-border-glow-duration / -opacity / -halo-opacity /
+           -halo-blur / -angle / -offset / -gradient
+   ========================================================================== */
+.studio-border-glow {
+  --studio-border-glow-opacity: 0.82;
+  --studio-border-glow-halo-opacity: 0.28;
+  --studio-border-glow-halo-blur: 18px;
+  --studio-border-glow-angle: 45deg;
+  --studio-border-glow-offset: 0%;
+  --studio-border-glow-duration: 20s;
+  --studio-border-glow-animation: studioBorderGlowSteam var(--studio-border-glow-duration) linear infinite;
+  --studio-border-glow-gradient:
+    linear-gradient(
+      var(--studio-border-glow-angle, 45deg),
+      #fb0094,
+      #00c4ff,
+      #34d399,
+      #fbbf24,
+      #ff2d55,
+      #fb0094,
+      #00c4ff,
+      #34d399,
+      #fbbf24,
+      #ff2d55
+    );
+  isolation: isolate;
+  position: relative;
+}
+
+.studio-border-glow::before,
+.studio-border-glow::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border-radius: inherit;
+  background: var(--studio-border-glow-gradient);
+  background-size: 400%;
+  animation: var(--studio-border-glow-animation);
+}
+
+.studio-border-glow::before {
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  inset: -2px;
+  z-index: -1;
+  padding: 2px;
+  opacity: var(--studio-border-glow-opacity);
+}
+
+.studio-border-glow::after {
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  inset: -10px;
+  z-index: -2;
+  padding: 10px;
+  filter: blur(var(--studio-border-glow-halo-blur));
+  opacity: var(--studio-border-glow-halo-opacity);
+  transform: translateZ(0);
+}
+
+@keyframes studioBorderGlowSteam {
+  0% {
+    background-position: var(--studio-border-glow-offset, 0%) 0;
+  }
+  100% {
+    background-position: calc(var(--studio-border-glow-offset, 0%) + 400%) 0;
+  }
+}
+
+/* =============================================================================
+   2. spinner — one canonical border spinner
+   Reconciles MS .hb-spinner / .aa-spinner (heartbeat.css) and TM .cta-spinner /
+   hold-spinner into a single generic border spinner. Sized + colored entirely
+   through CSS vars; defaults to the CTA role so it reads on any surface.
+
+   Usage:  <span class="spinner"></span>
+           <span class="spinner" style="--spinner-size: 2rem"></span>
+           on a colored button:  <span class="spinner" style="--spinner-color: currentColor"></span>
+   Tune:   --spinner-size / --spinner-thickness / --spinner-track /
+           --spinner-color / --spinner-speed
+   ========================================================================== */
+.spinner {
+  display: inline-block;
+  width: var(--spinner-size, 1rem);
+  height: var(--spinner-size, 1rem);
+  border: var(--spinner-thickness, 2px) solid var(--spinner-track, var(--color-border-strong));
+  border-top-color: var(--spinner-color, var(--color-cta));
+  border-radius: 9999px;
+  animation: spin var(--spinner-speed, 0.7s) linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =============================================================================
+   3. loading-dots — three bouncing dots
+   Extracted verbatim from turf-monster (the modal card-header "we're working on
+   it" idiom). Emit exactly three child <span>s.
+
+   Usage:  <span class="loading-dots"><span></span><span></span><span></span></span>
+   Tune:   --loading-dots-color / --loading-dots-size / --loading-dots-gap /
+           --loading-dots-speed
+   ========================================================================== */
+.loading-dots {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--loading-dots-gap, 6px);
+}
+
+.loading-dots span {
+  width: var(--loading-dots-size, 8px);
+  height: var(--loading-dots-size, 8px);
+  border-radius: 9999px;
+  background: var(--loading-dots-color, var(--color-primary));
+  animation: loading-dots-bounce var(--loading-dots-speed, 1.2s) ease-in-out infinite both;
+}
+
+.loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+.loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+.loading-dots span:nth-child(3) { animation-delay: 0s; }
+
+@keyframes loading-dots-bounce {
+  0%, 80%, 100% { transform: translateY(0)    scale(0.85); opacity: 0.45; }
+  40%           { transform: translateY(-6px) scale(1);    opacity: 1;    }
+}
+
+/* =============================================================================
+   4. sheen — a sweep-of-light across any element
+   Reconciles TM's badge-sheen-sweep (a one-shot diagonal wink) and seedsShimmer
+   (a repeating sweep) into one wrapper primitive. A ::after paints a moving band
+   of light clipped to the element's own radius. One-shot by default; add
+   .sheen--loop for a continuous shimmer.
+
+   Usage:  <span class="sheen"> ... </span>           (one wink on render)
+           <span class="sheen sheen--loop"> ... </span> (continuous)
+   Tune:   --sheen-color / --sheen-duration / --sheen-delay / --sheen-width
+   ========================================================================== */
+.sheen {
+  position: relative;
+  overflow: hidden;
+}
+
+.sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent calc(50% - var(--sheen-width, 15%)),
+    var(--sheen-color, rgba(255, 255, 255, 0.45)) 50%,
+    transparent calc(50% + var(--sheen-width, 15%))
+  );
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  background-position: 200% 0;
+  animation: sheen-sweep var(--sheen-duration, 2.5s) ease-in-out var(--sheen-delay, 0s) 1 both;
+}
+
+.sheen.sheen--loop::after {
+  animation-iteration-count: infinite;
+}
+
+@keyframes sheen-sweep {
+  from { background-position:  200% 0; }
+  to   { background-position: -100% 0; }
+}
+
+/* =============================================================================
+   5. ping — an expanding pulse ring
+   Extracted from TM's chat-live-ping ("Live" radar ping). A ring that scales up
+   and fades, richer than Tailwind's animate-ping. Place it as a sibling ring
+   behind a solid dot, or use the wrapper form for a dot + ring in one element.
+
+   Usage (ring only):  <span class="ping"></span>
+   Usage (dot + ring): <span class="ping ping--dot"></span>
+   Tune:   --ping-color / --ping-size / --ping-scale / --ping-speed /
+           --ping-opacity
+   NB: keyframe is `ping-pulse` (NOT `ping`) — Tailwind's built-in `ping`
+       keyframe has different content, so we namespace to avoid an override.
+   ========================================================================== */
+.ping {
+  display: inline-block;
+  width: var(--ping-size, 0.625rem);
+  height: var(--ping-size, 0.625rem);
+  border-radius: 9999px;
+  background: var(--ping-color, var(--color-cta));
+  animation: ping-pulse var(--ping-speed, 1.8s) cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Dot + ring: a solid center dot with the expanding ring animating behind it. */
+.ping.ping--dot {
+  position: relative;
+  animation: none;
+}
+
+.ping.ping--dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: var(--ping-color, var(--color-cta));
+  animation: ping-pulse var(--ping-speed, 1.8s) cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes ping-pulse {
+  0%        { transform: scale(1);                        opacity: var(--ping-opacity, 0.6); }
+  70%, 100% { transform: scale(var(--ping-scale, 2.6));   opacity: 0; }
+}
+
+/* =============================================================================
+   6. fade-edge — static mask-image edge fade (authored fresh)
+   Softens the edge of a scroll container so content fades out instead of hard-
+   clipping. Pure mask, no animation. Directional variants; -x / -y fade both
+   ends of an axis.
+
+   Usage:  <div class="fade-edge-b overflow-y-auto"> ...long content... </div>
+           <div class="fade-edge-y overflow-y-auto"> ... </div>
+   Tune:   --fade-edge-size  (how far the fade reaches in from the edge)
+   ========================================================================== */
+.fade-edge-t,
+.fade-edge-b,
+.fade-edge-l,
+.fade-edge-r,
+.fade-edge-x,
+.fade-edge-y {
+  --fade-edge-size: 2rem;
+}
+
+.fade-edge-t {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-edge-size));
+          mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-edge-size));
+}
+.fade-edge-b {
+  -webkit-mask-image: linear-gradient(to top, transparent 0, #000 var(--fade-edge-size));
+          mask-image: linear-gradient(to top, transparent 0, #000 var(--fade-edge-size));
+}
+.fade-edge-l {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-edge-size));
+          mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-edge-size));
+}
+.fade-edge-r {
+  -webkit-mask-image: linear-gradient(to left, transparent 0, #000 var(--fade-edge-size));
+          mask-image: linear-gradient(to left, transparent 0, #000 var(--fade-edge-size));
+}
+.fade-edge-y {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-edge-size), #000 calc(100% - var(--fade-edge-size)), transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-edge-size), #000 calc(100% - var(--fade-edge-size)), transparent 100%);
+}
+.fade-edge-x {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-edge-size), #000 calc(100% - var(--fade-edge-size)), transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-edge-size), #000 calc(100% - var(--fade-edge-size)), transparent 100%);
+}
+
+/* =============================================================================
+   7. progress-meter — dual-layer color-flip progress bar (authored fresh)
+   The label reads correctly over BOTH the track and the fill: two identical,
+   pixel-aligned text layers stack, and the FILL layer (with its on-fill label
+   color) is revealed only over the filled width via clip-path. Where fill covers
+   the label you see the on-fill color; where the track shows through you see the
+   on-track color — the text flips color exactly at the fill boundary. Drive fill
+   with the --progress custom property.
+
+   Usage:
+     <div class="progress-meter" style="--progress: 62%">
+       <div class="progress-meter-track"><span class="progress-meter-label">62%</span></div>
+       <div class="progress-meter-fill"><span class="progress-meter-label">62%</span></div>
+     </div>
+   Indeterminate (no known %): add .progress-meter--indeterminate.
+   Tune:   --progress / --progress-fill / --progress-track /
+           --progress-label / --progress-label-on-fill /
+           --progress-height / --progress-radius
+   ========================================================================== */
+.progress-meter {
+  position: relative;
+  height: var(--progress-height, 1.5rem);
+  border-radius: var(--progress-radius, 9999px);
+  overflow: hidden;
+  background: var(--progress-track, var(--color-inset));
+}
+
+.progress-meter-track,
+.progress-meter-fill {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress-meter-track {
+  background: var(--progress-track, var(--color-inset));
+}
+
+.progress-meter-fill {
+  background: var(--progress-fill, var(--color-cta));
+  /* Reveal the fill layer only across the filled width. */
+  clip-path: inset(0 calc(100% - var(--progress, 0%)) 0 0);
+  transition: clip-path 0.35s ease;
+}
+
+.progress-meter-label {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.progress-meter-track .progress-meter-label {
+  color: var(--progress-label, var(--color-text));
+}
+
+.progress-meter-fill .progress-meter-label {
+  color: var(--progress-label-on-fill, #fff);
+}
+
+/* Indeterminate: sweep the fill band across the bar. */
+.progress-meter--indeterminate .progress-meter-fill {
+  clip-path: none;
+  width: 40%;
+  inset: 0 auto 0 0;
+  animation: progress-indeterminate 1.4s ease-in-out infinite;
+}
+
+.progress-meter--indeterminate .progress-meter-label {
+  display: none;
+}
+
+@keyframes progress-indeterminate {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
+/* =============================================================================
+   Reduced-motion: honor the user preference. Animated primitives settle into a
+   sensible static resting state; the static primitives (fade-edge) are unaffected.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .studio-border-glow::before,
+  .studio-border-glow::after,
+  .spinner,
+  .loading-dots span,
+  .sheen::after,
+  .ping,
+  .ping.ping--dot::after,
+  .progress-meter--indeterminate .progress-meter-fill {
+    animation: none;
+  }
+
+  .loading-dots span { opacity: 0.85; }
+  .sheen::after { display: none; }
+}
