@@ -145,6 +145,30 @@ class ComponentCssTest < Minitest::Test
     assert_includes html, "Card body"
   end
 
+  # btn-secondary and btn-neutral are TOKEN-DRIVEN so consumers retune them via
+  # --btn-* custom properties instead of forking the @utility (which is additive
+  # in Tailwind v4). The defaults must keep the theme-role fallbacks so a consumer
+  # that sets no tokens is visually unchanged (and the theme-var test still holds).
+  def test_secondary_and_neutral_variants_are_token_overridable_with_role_defaults
+    secondary = css[/@utility btn-secondary \{.*?\n\}/m]
+    refute_nil secondary, "expected an @utility btn-secondary block"
+    assert_includes secondary, "var(--btn-secondary-bg, var(--color-success))",
+      "btn-secondary base must be token-overridable, defaulting to the success role"
+    assert_includes secondary, "var(--btn-secondary-bg-hover,",
+      "btn-secondary hover fill must be token-overridable"
+    assert_includes secondary, "var(--btn-secondary-hover-filter, brightness(0.9))",
+      "btn-secondary hover filter must be token-overridable, defaulting to brightness(0.9)"
+
+    neutral = css[/@utility btn-neutral \{.*?\n\}/m]
+    refute_nil neutral, "expected an @utility btn-neutral block"
+    assert_includes neutral, "var(--btn-neutral-bg, var(--color-surface-alt))",
+      "btn-neutral base must be token-overridable, defaulting to the surface-alt role"
+    assert_includes neutral, "var(--btn-neutral-bg-hover, var(--color-surface))",
+      "btn-neutral hover fill must be token-overridable, defaulting to the surface role"
+    assert_includes neutral, "var(--btn-neutral-hover-filter, none)",
+      "btn-neutral hover filter must be token-overridable, defaulting to none"
+  end
+
   private
 
   def view
