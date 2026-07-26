@@ -62,6 +62,33 @@
 
 /* -- Button system (standardized across all Studio apps) ------------------- */
 
+/*
+  Overridable variants — token contract.
+
+  Most filled variants sit on a theme role and darken on hover. Two of them
+  (btn-secondary, btn-neutral) are TOKEN-DRIVEN so a consuming app can retune
+  them WITHOUT redeclaring the @utility — a local `@utility` redeclaration is
+  ADDITIVE in Tailwind v4 (both definitions emit and the engine's rules leak in),
+  so forking is not a clean override. Set these on :root in the consumer's CSS:
+
+    --btn-secondary-bg            base fill      (default: var(--color-success))
+    --btn-secondary-bg-hover      hover fill     (default: same as base)
+    --btn-secondary-hover-filter  hover filter   (default: brightness(0.9))
+    --btn-neutral-bg              base fill      (default: var(--color-surface-alt))
+    --btn-neutral-bg-hover        hover fill     (default: var(--color-surface))
+    --btn-neutral-hover-filter    hover filter   (default: none)
+
+  With no tokens set, the compiled result is visually identical to the previous
+  hard-coded rules. Example — turf-monster's violet secondary + brightness neutral:
+
+    :root {
+      --btn-secondary-bg: #8e82fe; --btn-secondary-bg-hover: #7b6ef6;
+      --btn-secondary-hover-filter: none;
+      --btn-neutral-bg-hover: var(--color-surface-alt);
+      --btn-neutral-hover-filter: brightness(1.3);
+    }
+*/
+
 @utility btn {
   @apply inline-flex items-center justify-center font-bold rounded-lg transition px-6 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed;
   &:focus-visible {
@@ -78,14 +105,17 @@
   }
 }
 
-/* NOTE: btn-secondary and btn-success compile to IDENTICAL declarations (both
-   sit on var(--color-success)) — an intentional hub-canonical alias, kept as
-   two names so existing markup in every consumer keeps working. */
+/* btn-secondary DEFAULTS to the success role — with no tokens set it compiles
+   like btn-success, preserving the hub-canonical alias every consumer relies on.
+   It is token-overridable (see the contract above) so an app whose secondary
+   action diverges from success (turf-monster's violet) retunes it via
+   --btn-secondary-* instead of forking the @utility. */
 @utility btn-secondary {
   @apply text-white;
-  background-color: var(--color-success);
+  background-color: var(--btn-secondary-bg, var(--color-success));
   &:hover {
-    filter: brightness(0.9);
+    background-color: var(--btn-secondary-bg-hover, var(--btn-secondary-bg, var(--color-success)));
+    filter: var(--btn-secondary-hover-filter, brightness(0.9));
   }
 }
 
@@ -130,10 +160,16 @@
   }
 }
 
+/* btn-neutral DEFAULTS to the surface-alt base / surface hover pair, token-
+   overridable the same way (--btn-neutral-*): turf-monster keeps its
+   brightness(1.3) hover by setting --btn-neutral-hover-filter and pinning
+   --btn-neutral-bg-hover back to the base so the fill does not change. */
 @utility btn-neutral {
-  @apply bg-surface-alt text-heading border border-strong;
+  @apply text-heading border border-strong;
+  background-color: var(--btn-neutral-bg, var(--color-surface-alt));
   &:hover {
-    @apply bg-surface;
+    background-color: var(--btn-neutral-bg-hover, var(--color-surface));
+    filter: var(--btn-neutral-hover-filter, none);
   }
 }
 
