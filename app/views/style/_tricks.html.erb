@@ -205,9 +205,10 @@
     <div class="space-y-1">
       <h3 class="text-xl font-bold text-heading">Effects</h3>
       <p class="text-muted text-sm">
-        The four <code class="font-mono text-2xs">engine-motion.css</code> visual-effect primitives beyond motion -
-        gradient text, a themed glow halo, frosted glass, and a conic wash. Each is themed through the
-        role tokens and tunable via CSS-var knobs.
+        The <code class="font-mono text-2xs">engine-motion.css</code> visual-effect primitives beyond motion -
+        gradient text, a soft glow halo, a single-color rotating <strong>selection glow</strong>
+        (ported from Turf Monster's selected-team-card ring), frosted glass, and a conic wash. Each is
+        themed through the role tokens and tunable via CSS-var knobs.
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -227,6 +228,15 @@
           <button type="button" class="btn btn-primary studio-glow">Launch</button>
           <span class="studio-glow studio-glow--pulse inline-flex h-12 w-12 items-center justify-center rounded-full text-white font-extrabold"
                 style="background: var(--color-cta); --studio-glow-color: var(--color-success)">10</span>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/specimen",
+            locals: { klass: ".studio-team-glow  (knob: --studio-team-glow-color)",
+                      usage: %(<div class="studio-team-glow rounded-xl bg-surface p-5">Selected</div>\n<div class="studio-team-glow rounded-xl bg-surface p-5" style="--studio-team-glow-color: #E11D48">Ravens</div>) } do %>
+        <div class="flex flex-wrap items-center justify-center gap-6">
+          <div class="studio-team-glow rounded-xl bg-surface border border-subtle px-5 py-4 text-sm font-semibold text-heading text-center">Selected</div>
+          <div class="studio-team-glow rounded-xl bg-surface border border-subtle px-5 py-4 text-sm font-semibold text-heading text-center" style="--studio-team-glow-color: #E11D48">Ravens</div>
         </div>
       <% end %>
 

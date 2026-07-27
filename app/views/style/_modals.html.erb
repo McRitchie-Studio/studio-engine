@@ -26,6 +26,25 @@
 <%
   web3_on     = Studio.feature?(:web3)
   leveling_on = Studio.feature?(:leveling)
+
+  # Auth method-toggle defaults — mirror the app's Studio.auth_method? config;
+  # Solana Wallet also needs the web3 capability, so it defaults OFF on an app
+  # (like McRitchie Studio) that ships web3 off.
+  ml_default = Studio.auth_method?(:magic_link)
+  g_default  = Studio.auth_method?(:google)
+  w_default  = Studio.auth_method?(:wallet) && web3_on
+
+  # Active-card glow-match expression builder: yields an Alpine boolean that is
+  # true when $store.dsModals.current() is THIS specimen's modal (id + optional
+  # step, or imageUrl presence for the two crop-photo variants). Bound reactively
+  # so the glow follows the step machine as a modal advances.
+  ds_glow = lambda do |id, step: nil, image: nil|
+    cur  = "$store.dsModals.current()"
+    expr = "#{cur} && #{cur}.id === '#{id}'"
+    expr += " && (#{cur}.props.step || 'credentials') === '#{step}'" if step
+    expr += (image ? " && !!#{cur}.props.imageUrl" : " && !#{cur}.props.imageUrl") unless image.nil?
+    expr
+  end
 %>
 <section id="modals" class="space-y-10" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)"
          x-data="{}" @ds-modal-close.window="$store.dsModals.close()">
@@ -34,7 +53,11 @@
     <p class="text-muted text-sm">
       The shared modal host and the reusable modal partials, ported from Turf
       Monster into the engine. Each tile is a <strong>visual representation, not
-      to scale</strong> &mdash; click one to open the real full-size modal.
+      to scale</strong> &mdash; <strong>click a whole card</strong> to open the real
+      modal (Enter/Space work too). The header <strong>Copy</strong> yields an
+      agent-ready reference you can paste into a chat; option <strong>toggles</strong>
+      configure the modal before you open it; and the card that matches the open
+      modal + step <strong>glows</strong>, following the step machine as it advances.
     </p>
   </div>
 
@@ -321,53 +344,70 @@
         The sign-in step machine
         (<code class="font-mono text-2xs">style/modals/_auth</code>) — one modal,
         internal steps <code class="font-mono text-2xs">credentials &rarr;
-        magic-link-sent &rarr; magic-link-resent</code>. Google shows its waiting
-        state, Solana slides to the wallet picker, and the email link genuinely
-        advances the machine behind the <code class="font-mono text-2xs">postMagicLink</code> stub.
+        magic-link-sent &rarr; magic-link-resent</code>. Toggle the methods below a
+        card, then open it to watch them gate the modal. The live card
+        <strong>glows</strong>, and the glow follows the step machine as you advance.
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('auth', { step: 'credentials', picksRequired: 6 })" } do %>
-        <button type="button" class="group flex flex-col items-center gap-2"
-                @click="$store.dsModals.open('auth', { step: 'credentials', picksRequired: 6 })">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Sign in</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2 text-center">
-            <span class="block h-2 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-            <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
-            <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
-            <span class="block h-6 w-full rounded" style="background: var(--color-cta); opacity: .5"></span>
-          </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+      <%# Sign in — method toggles + the credentials-step glow. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Sign in",
+            reference: %(the Auth "Sign in" modal (studio-engine style/modals/_auth, step 'credentials') — open with $store.dsModals.open('auth', { step: 'credentials', picksRequired: 6 }); toggle methods via props.methods { magicLink, google, wallet } + props.terms),
+            card_data: "opts: { magicLink: #{ml_default}, google: #{g_default}, wallet: #{w_default}, terms: true }",
+            open_expr: "$store.dsModals.open('auth', { step: 'credentials', picksRequired: 6, methods: { magicLink: opts.magicLink, google: opts.google, wallet: opts.wallet }, terms: opts.terms })",
+            glow_when: ds_glow.call("auth", step: "credentials"),
+            toggles: [
+              { model: "opts.magicLink", label: "Magic Link" },
+              { model: "opts.google",    label: "Google" },
+              { model: "opts.wallet",    label: "Solana Wallet" },
+              { model: "opts.terms",     label: "Terms" }
+            ] } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2 text-center">
+          <span class="block h-2 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+          <span class="block h-6 w-full rounded" style="background: var(--color-cta); opacity: .5"></span>
+        </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('auth', { step: 'magic-link-sent', sentEmail: 'you@example.com' })" } do %>
-        <button type="button" class="group flex flex-col items-center gap-2"
-                @click="$store.dsModals.open('auth', { step: 'magic-link-sent', sentEmail: 'you@example.com' })">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Magic link sent</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-            <div class="text-2xl leading-none">📬</div>
-            <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-            <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
-          </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Magic link sent",
+            reference: %(the Auth "Magic link sent" step (style/modals/_auth, step 'magic-link-sent') — open with $store.dsModals.open('auth', { step: 'magic-link-sent', sentEmail: 'you@example.com' })),
+            open_expr: "$store.dsModals.open('auth', { step: 'magic-link-sent', sentEmail: 'you@example.com' })",
+            glow_when: ds_glow.call("auth", step: "magic-link-sent") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">📬</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+        </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('auth', { step: 'redirect', icon: '📍', title: 'One more step', message: 'Taking you there.', url: null })" } do %>
-        <button type="button" class="group flex flex-col items-center gap-2"
-                @click="$store.dsModals.open('auth', { step: 'redirect', icon: '📍', title: 'One more step', message: 'Taking you there.', url: null })">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Redirect (drain)</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-            <div class="text-2xl leading-none">📍</div>
-            <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-            <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+      <%# NEW — the magic-link-resent step (the resend confirmation slide). %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Magic link resent",
+            reference: %(the Auth "Magic link resent" step (style/modals/_auth, step 'magic-link-resent') — open with $store.dsModals.open('auth', { step: 'magic-link-resent', sentEmail: 'you@example.com' })),
+            open_expr: "$store.dsModals.open('auth', { step: 'magic-link-resent', sentEmail: 'you@example.com' })",
+            glow_when: ds_glow.call("auth", step: "magic-link-resent") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-primary) 15%, transparent)">
+            <svg class="w-4 h-4" style="color: var(--color-primary)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
           </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Redirect (drain)",
+            reference: %(the Auth "Redirect" step (style/modals/_auth, step 'redirect', drain CTA) — open with $store.dsModals.open('auth', { step: 'redirect', icon: '📍', title: 'One more step', message: 'Taking you there.', url: null })),
+            open_expr: "$store.dsModals.open('auth', { step: 'redirect', icon: '📍', title: 'One more step', message: 'Taking you there.', url: null })",
+            glow_when: ds_glow.call("auth", step: "redirect") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">📍</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
       <% end %>
     </div>
   </section>
@@ -388,47 +428,43 @@
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('crop-photo', { imageUrl: '…' })" } do %>
-        <button type="button" class="group flex flex-col items-center gap-2"
-                @click="$store.dsModals.open('crop-photo', { imageUrl: '/icon.png', aspectRatio: 1 })">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Crop photo</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-            <div class="mx-auto w-20 h-20 rounded-lg border-2 flex items-center justify-center" style="border-color: var(--color-cta)">
-              <span class="text-muted text-2xs">Crop area</span>
-            </div>
-            <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+      <%# Image upload FIRST — the empty picker (crop-photo opened with no imageUrl). %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Image upload",
+            reference: %(the Profile "Image upload" modal (studio-engine studio/modals/_crop_photo as the empty picker) — open with $store.dsModals.open('crop-photo', {})),
+            open_expr: "$store.dsModals.open('crop-photo', {})",
+            glow_when: ds_glow.call("crop-photo", image: false) } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-20 h-20 rounded-lg border-2 border-dashed flex items-center justify-center" style="border-color: var(--color-border-strong)">
+            <span class="text-2xl leading-none">⬆️</span>
           </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+          <span class="block h-1.5 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+        </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('crop-photo', {})" } do %>
-        <button type="button" class="group flex flex-col items-center gap-2"
-                @click="$store.dsModals.open('crop-photo', {})">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Image upload</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-            <div class="mx-auto w-20 h-20 rounded-lg border-2 border-dashed flex items-center justify-center" style="border-color: var(--color-border-strong)">
-              <span class="text-2xl leading-none">⬆️</span>
-            </div>
-            <span class="block h-1.5 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+      <%# Crop photo SECOND — the cropper mounted on a chosen image. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Crop photo",
+            reference: %(the Profile "Crop photo" modal (studio/modals/_crop_photo + studio/_cropper_assets) — open with $store.dsModals.open('crop-photo', { imageUrl: '/icon.png', aspectRatio: 1 })),
+            open_expr: "$store.dsModals.open('crop-photo', { imageUrl: '/icon.png', aspectRatio: 1 })",
+            glow_when: ds_glow.call("crop-photo", image: true) } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-20 h-20 rounded-lg border-2 flex items-center justify-center" style="border-color: var(--color-cta)">
+            <span class="text-muted text-2xs">Crop area</span>
           </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('saving', { title: 'Saving…' })" } do %>
-        <button type="button" class="group flex flex-col items-center gap-2"
-                @click="$store.dsModals.open('saving', { title: 'Saving…' })">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Saving card</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-            <div class="mx-auto w-8 h-8 rounded-full border-4 animate-spin" style="border-color: color-mix(in srgb, var(--color-cta) 30%, transparent); border-top-color: var(--color-cta)"></div>
-            <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Saving card",
+            reference: %(the Profile "Saving" card (studio/modals/_saving loading state) — open with $store.dsModals.open('saving', { title: 'Saving…' })),
+            open_expr: "$store.dsModals.open('saving', { title: 'Saving…' })",
+            glow_when: ds_glow.call("saving") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-8 h-8 rounded-full border-4 animate-spin" style="border-color: color-mix(in srgb, var(--color-cta) 30%, transparent); border-top-color: var(--color-cta)"></div>
+          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+        </div>
       <% end %>
     </div>
   </section>
@@ -454,72 +490,63 @@
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('wallet-connect')", disabled: !web3_on, openable: true } do %>
-        <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('wallet-connect')">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Connect wallet</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
-            <span class="block h-2 w-20 rounded" style="background: var(--color-text); opacity: .18"></span>
-            <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
-            <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
-          </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Connect wallet",
+            reference: %(the Web3 "Connect wallet" picker (studio-engine style/modals/_wallet_connect) — open with $store.dsModals.open('wallet-connect')),
+            open_expr: "$store.dsModals.open('wallet-connect')",
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
+          <span class="block h-2 w-20 rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+        </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('onchain-tx', { state: 'processing' })", disabled: !web3_on, openable: true } do %>
-        <button type="button" class="group flex flex-col items-center gap-2"
-                @click="$store.dsModals.open('onchain-tx', { state: 'processing', title: 'Confirming on-chain', message: 'Waiting for the wallet signature…' })">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">On-chain tx · processing</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-            <div class="loading-dots mx-auto"><span></span><span></span><span></span></div>
-            <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "On-chain tx · processing",
+            reference: %(the Web3 "On-chain tx" modal, processing state (style/modals/_onchain_tx via $store.dsSolanaModal) — open with $store.dsModals.open('onchain-tx', { state: 'processing', title: 'Confirming on-chain', message: 'Waiting for the wallet signature…' })),
+            open_expr: "$store.dsModals.open('onchain-tx', { state: 'processing', title: 'Confirming on-chain', message: 'Waiting for the wallet signature…' })",
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="loading-dots mx-auto"><span></span><span></span><span></span></div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+        </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('onchain-tx', { state: 'success', txSignature: '…' })", disabled: !web3_on, openable: true } do %>
-        <button type="button" class="group flex flex-col items-center gap-2"
-                @click="$store.dsModals.open('onchain-tx', { state: 'success', txSignature: '5xTrDemoSignature1234567890', successTitle: 'Mint complete', successSubtitle: 'Your on-chain action confirmed.', ctaLabel: 'View wallet', ctaHref: null })">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">On-chain tx · success</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-            <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-success) 15%, transparent)">
-              <svg class="w-4 h-4" style="color: var(--color-success)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-            </div>
-            <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "On-chain tx · success",
+            reference: %(the Web3 "On-chain tx" modal, generic-success state (style/modals/_onchain_tx + studio/modals/blocks/_onchain_success) — open with $store.dsModals.open('onchain-tx', { state: 'success', txSignature: '…', successTitle: 'Mint complete' })),
+            open_expr: "$store.dsModals.open('onchain-tx', { state: 'success', txSignature: '5xTrDemoSignature1234567890', successTitle: 'Mint complete', successSubtitle: 'Your on-chain action confirmed.', ctaLabel: 'View wallet', ctaHref: null })",
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-success) 15%, transparent)">
+            <svg class="w-4 h-4" style="color: var(--color-success)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
           </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+        </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('onchain-tx', { state: 'error' })", disabled: !web3_on, openable: true } do %>
-        <button type="button" class="group flex flex-col items-center gap-2"
-                @click="$store.dsModals.open('onchain-tx', { state: 'error', title: 'Couldn\'t confirm', errorMessage: 'The transaction was rejected. Give it another try.' })">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">On-chain tx · error</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-            <div class="text-2xl leading-none">⚠️</div>
-            <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "On-chain tx · error",
+            reference: %(the Web3 "On-chain tx" modal, error state (style/modals/_onchain_tx) — open with $store.dsModals.open('onchain-tx', { state: 'error', title: "Couldn't confirm", errorMessage: 'The transaction was rejected. Give it another try.' })),
+            open_expr: "$store.dsModals.open('onchain-tx', { state: 'error', title: 'Could not confirm', errorMessage: 'The transaction was rejected. Give it another try.' })",
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">⚠️</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+        </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('wallet-deposit', { neededCents, usdcCents })", disabled: !web3_on, openable: true } do %>
-        <button type="button" class="group flex flex-col items-center gap-2"
-                @click="$store.dsModals.open('wallet-deposit', { neededCents: 500, usdcCents: 120, usdtCents: 0, address: 'Fo1L5demoWALLETaddr9xQ2' })">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Wallet deposit</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-            <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-            <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
-            <span class="block h-5 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
-          </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Wallet deposit",
+            reference: %(the Web3 "Wallet deposit" top-up card (style/modals/_wallet_deposit) — open with $store.dsModals.open('wallet-deposit', { neededCents: 500, usdcCents: 120, usdtCents: 0, address: 'Fo1L5…' })),
+            open_expr: "$store.dsModals.open('wallet-deposit', { neededCents: 500, usdcCents: 120, usdtCents: 0, address: 'Fo1L5demoWALLETaddr9xQ2' })",
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+          <span class="block h-5 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+        </div>
       <% end %>
     </div>
   </section>
@@ -536,60 +563,52 @@
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('ds-processing')" } do %>
-        <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-processing')">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Processing</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-            <div class="mx-auto w-6 h-6 rounded-full border-2 animate-spin" style="border-color: color-mix(in srgb, var(--color-cta) 30%, transparent); border-top-color: var(--color-cta)"></div>
-            <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-            <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
-          </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Processing",
+            reference: %(the "Processing" card block (studio/modals/blocks/_processing_card) — open with $store.dsModals.open('ds-processing')),
+            open_expr: "$store.dsModals.open('ds-processing')" } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-6 h-6 rounded-full border-2 animate-spin" style="border-color: color-mix(in srgb, var(--color-cta) 30%, transparent); border-top-color: var(--color-cta)"></div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+        </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('ds-success')" } do %>
-        <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-success')">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Success</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-            <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-success) 15%, transparent)">
-              <svg class="w-4 h-4" style="color: var(--color-success)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-            </div>
-            <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-            <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Success",
+            reference: %(the "Success" card block (studio/modals/blocks/_success_card, entry-confirmed style) — open with $store.dsModals.open('ds-success')),
+            open_expr: "$store.dsModals.open('ds-success')" } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-success) 15%, transparent)">
+            <svg class="w-4 h-4" style="color: var(--color-success)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
           </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('ds-error')" } do %>
-        <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-error')">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Error / retry</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-            <div class="text-2xl leading-none">⚠️</div>
-            <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-            <span class="block h-4 w-20 mx-auto rounded border" style="border-color: var(--color-border-strong)"></span>
-          </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Error / retry",
+            reference: %(the "Error" card block (studio/modals/blocks/_error_card) — open with $store.dsModals.open('ds-error')),
+            open_expr: "$store.dsModals.open('ds-error')" } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">⚠️</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-4 w-20 mx-auto rounded border" style="border-color: var(--color-border-strong)"></span>
+        </div>
       <% end %>
 
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('ds-countdown')" } do %>
-        <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-countdown')">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Countdown</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-            <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-            <div class="w-full rounded-full overflow-hidden" style="height: 6px; background: rgba(128,128,128,0.2)">
-              <div style="height: 100%; width: 60%; border-radius: 9999px; background: var(--color-cta)"></div>
-            </div>
-            <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Countdown",
+            reference: %(the "Countdown" progress block (studio/modals/blocks/_progress_countdown) — open with $store.dsModals.open('ds-countdown')),
+            open_expr: "$store.dsModals.open('ds-countdown')" } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <div class="w-full rounded-full overflow-hidden" style="height: 6px; background: rgba(128,128,128,0.2)">
+            <div style="height: 100%; width: 60%; border-radius: 9999px; background: var(--color-cta)"></div>
           </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+          <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+        </div>
       <% end %>
     </div>
   </section>
@@ -608,23 +627,21 @@
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
       <% [
-           ["template-wizard",  "Wizard",  "🧭"],
-           ["template-form",    "Form",    "📝"],
-           ["template-action",  "Action",  "❓"],
-           ["template-status",  "Status",  "⏳"],
-           ["template-success", "Success", "✅"]
-         ].each do |id, label, glyph| %>
-        <%= render layout: "style/specimen",
-              locals: { klass: "$store.dsModals.open('#{id}')" } do %>
-          <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('<%= id %>')">
-            <span class="text-2xs font-semibold uppercase tracking-wider text-muted"><%= label %></span>
-            <div class="pointer-events-none w-32 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-              <div class="text-2xl leading-none"><%= glyph %></div>
-              <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-              <span class="block h-4 w-full rounded" style="background: var(--color-cta); opacity: .6"></span>
-            </div>
-            <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-          </button>
+           ["template-wizard",  "Wizard",  "🧭", "studio/modals/templates/_wizard"],
+           ["template-form",    "Form",    "📝", "studio/modals/templates/_form"],
+           ["template-action",  "Action",  "❓", "studio/modals/templates/_action"],
+           ["template-status",  "Status",  "⏳", "studio/modals/templates/_status"],
+           ["template-success", "Success", "✅", "studio/modals/templates/_success"]
+         ].each do |id, label, glyph, partial| %>
+        <%= render layout: "style/modal_specimen", locals: {
+              label:     label,
+              reference: %(the "#{label}" modal template (#{partial}) — open with $store.dsModals.open('#{id}')),
+              open_expr: "$store.dsModals.open('#{id}')" } do %>
+          <div class="pointer-events-none w-32 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+            <div class="text-2xl leading-none"><%= glyph %></div>
+            <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+            <span class="block h-4 w-full rounded" style="background: var(--color-cta); opacity: .6"></span>
+          </div>
         <% end %>
       <% end %>
     </div>
@@ -650,17 +667,16 @@
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "style/specimen",
-            locals: { klass: "$store.dsModals.open('levelup')", disabled: !leveling_on, openable: true } do %>
-        <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('levelup')">
-          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Level up</span>
-          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-            <div class="text-2xl leading-none">🎉</div>
-            <span class="inline-flex h-8 w-8 items-center justify-center rounded-full text-white text-sm font-extrabold" style="background: var(--color-cta)">10</span>
-            <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
-          </div>
-          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
-        </button>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Level up",
+            reference: %(the Rewards "Level up" celebration (studio/modals/blocks/_success_card with the sheen + studio-glow badge) — open with $store.dsModals.open('levelup')),
+            open_expr: "$store.dsModals.open('levelup')",
+            disabled: !leveling_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">🎉</div>
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-full text-white text-sm font-extrabold" style="background: var(--color-cta)">10</span>
+          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
       <% end %>
     </div>
   </section>

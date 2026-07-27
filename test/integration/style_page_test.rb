@@ -268,9 +268,10 @@ class StylePageTest < ActiveSupport::TestCase
   # and the specimens open the real modal at a step.
   test "the Auth modal ports the credentials step machine + its blocks" do
     html = render_index
-    # Opened at a step, with picksRequired, exactly like the real modal.
-    assert_includes html, "$store.dsModals.open('auth', { step: 'credentials', picksRequired: 6 })",
-      "the Sign in specimen opens the auth modal at the credentials step"
+    # Opened at the credentials step with picksRequired AND the method config the
+    # specimen toggles feed (methods { magicLink, google, wallet } + terms).
+    assert_includes html, "$store.dsModals.open('auth', { step: 'credentials', picksRequired: 6, methods:",
+      "the Sign in specimen opens the auth modal at the credentials step with method config"
     assert_includes html, "$store.dsModals.open('auth', { step: 'magic-link-sent'",
       "a 'magic link sent' variant specimen is wired"
     # The step machine itself.
@@ -285,6 +286,89 @@ class StylePageTest < ActiveSupport::TestCase
       "the magic-link CTA no-ops behind the postMagicLink stub"
     assert_includes html, "data-age-attestation",
       "the auth modal renders the legal-age attestation"
+  end
+
+  # --- 6c. Modals QoL: conversational copy, toggles, whole-card click, glow ----
+
+  # Item 1 — the specimen header carries an agent-ready CONVERSATIONAL reference
+  # (a sentence naming the modal + how to open it), not a raw JS blob copy.
+  test "modal specimens copy a conversational reference from the header" do
+    html = render_index
+    assert_includes html, "Copy an agent-ready reference to this modal",
+      "the header Copy affordance is present"
+    assert_includes html, %(the Auth "Sign in" modal (studio-engine style/modals/_auth, step 'credentials')),
+      "the reference names the modal + partial + step as a sentence"
+    assert_includes html, "$refs.ref.textContent",
+      "Copy reads the reference text, not a raw snippet"
+  end
+
+  # Items 2 + 3 — whole card is the trigger (role=button + keyboard), and the Auth
+  # specimen carries the method toggles that gate the modal.
+  test "modal specimens are whole-card clickable and carry option toggles" do
+    html = render_index
+    assert_includes html, 'role="button"',
+      "the whole specimen card is a button"
+    assert_includes html, "@keydown.enter.prevent",
+      "Enter opens the modal (keyboard accessible)"
+    assert_includes html, "@keydown.space.prevent",
+      "Space opens the modal (keyboard accessible)"
+    %w[opts.magicLink opts.google opts.wallet opts.terms].each do |model|
+      assert_includes html, %(x-model="#{model}"),
+        "the Auth specimen has the #{model} option toggle"
+    end
+    %w[Magic\ Link Google Solana\ Wallet Terms].each do |lbl|
+      assert_includes html, lbl, "the toggle row labels #{lbl}"
+    end
+  end
+
+  # Item 2 (gating) — the ported auth modal actually GATES each method + terms on
+  # props, so the toggles configure a live open.
+  test "the auth modal gates each credential method + terms via props" do
+    html = render_index
+    assert_includes html, "methodOn('google')", "Google is gated"
+    assert_includes html, "methodOn('wallet')", "Solana wallet is gated"
+    assert_includes html, "methodOn('magicLink')", "magic link is gated"
+    assert_includes html, "termsOn()", "the age-attestation terms block is gated"
+    assert_includes html, "_methodDefaults", "method defaults come from Studio.auth_method?"
+  end
+
+  # Item 4 — the magic-link-resent step has its own specimen.
+  test "the Magic link resent step has its own specimen" do
+    html = render_index
+    assert_includes html, "$store.dsModals.open('auth', { step: 'magic-link-resent'",
+      "a magic-link-resent specimen opens that step"
+  end
+
+  # Items 5 + 6 — the active-card glow follows the step machine off the store, and
+  # Profile lists Image upload BEFORE Crop photo.
+  test "the active-card glow is wired off the store, and Profile orders upload before crop" do
+    html = render_index
+    assert_includes html, "--studio-team-glow-opacity",
+      "cards fade the ported glow via the opacity var"
+    assert_includes html, "$store.dsModals.current().props.step || 'credentials'",
+      "the glow matches the current modal + step reactively"
+    upload_at = html.index("Image upload")
+    crop_at   = html.index("Crop photo")
+    refute_nil upload_at
+    refute_nil crop_at
+    assert upload_at < crop_at, "Profile must list Image upload before Crop photo"
+  end
+
+  # Item 7 — the single-color team glow ships in engine-motion.css and renders as
+  # its own Tricks specimen, alongside the rainbow border glow (both in the bag).
+  test "the studio-team-glow primitive ships in engine-motion.css and Tricks" do
+    css = File.read("app/assets/tailwind/studio_engine/engine-motion.css")
+    assert_includes css, ".studio-team-glow", "the team glow class is ported"
+    assert_includes css, "--studio-team-glow-color", "the glow color is a CSS var (default CTA)"
+    assert_includes css, "@keyframes studio-team-glow-spin", "the single-color ring rotation ships"
+    refute_match(/rgba\(var\(--color-[^)]+-rgb\)/, css,
+      "the port keeps the modern slash-rgb form, never legacy rgba(var(--*-rgb))")
+
+    html = render_index
+    assert_includes html, "studio-team-glow rounded-xl",
+      "Tricks renders a studio-team-glow specimen"
+    assert_includes html, "studio-border-glow",
+      "the rainbow border glow specimen is still in the bag"
   end
 
   # PROFILE — crop / upload ACTUALLY open: cropper_assets is rendered on the

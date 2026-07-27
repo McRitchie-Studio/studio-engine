@@ -505,6 +505,78 @@
 }
 
 /* =============================================================================
+   9b. studio-team-glow — single-color rotating "selected card" ring glow
+   Ported from turf-monster's per-team selected-card glow (.holo-border-glow):
+   a single-color conic-gradient ring rotates around the element's edge, with a
+   blurred bloom twin behind it. DISTINCT from .studio-border-glow (an animated
+   RAINBOW border) and .studio-glow (a static soft box-shadow halo) — this is the
+   "this card is selected / live" ring, tinted one color.
+
+   The color is a CSS var (default the CTA role, so purple on McRitchie Studio),
+   just like TM's per-team --glow-c. The wedge is swept by animating a registered
+   @property angle (rotating the GRADIENT, not the element — so no oversized-child
+   clipping trick is needed). Opacity is a var (--studio-team-glow-opacity) with a
+   transition, so a consumer can fade the glow in/out (the living style guide
+   slides it between step cards as a modal's step machine advances).
+
+   Host needs an opaque background (the ring shows only around the edge) and must
+   NOT be clipped by an overflow-hidden ancestor near its border.
+
+   Usage:  <div class="studio-team-glow rounded-xl bg-surface p-5">Selected</div>
+           red glow:  style="--studio-team-glow-color: #E11D48"
+   Tune:   --studio-team-glow-color / -opacity / -speed / -thickness / -bloom
+   ========================================================================== */
+@property --studio-team-glow-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.studio-team-glow {
+  --studio-team-glow-color: var(--color-cta);
+  --studio-team-glow-opacity: 1;
+  --studio-team-glow-speed: 4s;
+  --studio-team-glow-thickness: 4px;
+  --studio-team-glow-bloom: 10px;
+  position: relative;
+  isolation: isolate;
+}
+.studio-team-glow::before,
+.studio-team-glow::after {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--studio-team-glow-thickness));
+  border-radius: inherit;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--studio-team-glow-opacity);
+  transition: opacity 0.4s ease;
+  /* Two opposed wedges so two stretches of the ring glow at once. */
+  background: conic-gradient(
+    from var(--studio-team-glow-angle),
+    transparent 0%,
+    var(--studio-team-glow-color) 12%,
+    transparent 33%,
+    transparent 50%,
+    var(--studio-team-glow-color) 62%,
+    transparent 83%
+  );
+  animation: studio-team-glow-spin var(--studio-team-glow-speed) linear infinite;
+}
+.studio-team-glow::after {
+  /* Blurred bloom twin, a touch larger. */
+  inset: calc(-1 * (var(--studio-team-glow-thickness) + 4px));
+  z-index: -2;
+  filter: blur(var(--studio-team-glow-bloom)) saturate(1.35);
+}
+@keyframes studio-team-glow-spin {
+  to { --studio-team-glow-angle: 360deg; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-team-glow::before,
+  .studio-team-glow::after { animation: none; }
+}
+
+/* =============================================================================
    10. surface-glass — frosted translucent glass panel (authored fresh)
    A translucent, blurred surface for overlay chrome (modal shells, sticky bars,
    toasts floated over content). The tint is the surface role mixed toward
