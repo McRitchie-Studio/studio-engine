@@ -1,0 +1,60 @@
+<%#  admin/style - the living style guide.
+     A bare content wrapper (no `layout` call): it renders inside each host's
+     application.html.erb, inheriting that app's navbar and theme, so every
+     specimen restyles per app and in dark or light automatically.
+
+     Four sections, reached by the sticky section nav below and rendered as
+     sibling partials: Theme is the landing section (the color foundation - it
+     owns the role tokens/swatches, the folded-in /admin/theme editor, and the
+     live preview), then Modals (the shared host + engine card blocks), Tricks
+     (the button/surface/motion/effect/leveling primitives, framed as a board of
+     copy-paste-for-an-agent snippets), and Tasks (the shared board primitive).
+
+     Specimens use ONLY the engine's own classes (engine.css component layer plus
+     engine-motion.css motion/effect/leveling layer), so a consumer that bundles
+     engine.css and imports engine-motion.css styles them for real. The primitive
+     CSS is NOT inlined here - the consumer's Tailwind build provides it. Page
+     chrome uses the engine's own .card / .label-upper / theme tokens. %>
+<%
+  sections = [
+    ["theme",  "Theme"],
+    ["modals", "Modals"],
+    ["tricks", "Tricks"],
+    ["tasks",  "Tasks"]
+  ]
+%>
+<div class="max-w-6xl mx-auto px-4 pb-16">
+  <header class="space-y-2 pt-8 pb-6">
+    <p class="label-upper">studio-engine &middot; v<%= Studio::VERSION %></p>
+    <h1 class="text-3xl font-bold text-heading">Style</h1>
+    <p class="text-body max-w-2xl">
+      A living gallery of the shared UI primitives, rendered live in this app's
+      theme. Everything below is styled by the engine's own
+      <code class="font-mono text-2xs bg-inset px-1.5 py-0.5 rounded">engine.css</code>
+      and
+      <code class="font-mono text-2xs bg-inset px-1.5 py-0.5 rounded">engine-motion.css</code>
+      layers - toggle this app between light and dark and every specimen follows.
+    </p>
+  </header>
+
+  <%# Section nav — sticky under the host navbar (--nav-h, 0 fallback). A pill per
+      section; the row scrolls horizontally on narrow screens, its edges softened
+      by the .fade-edge-x primitive. Order leads with Theme (the color foundation). %>
+  <nav class="sticky z-20 -mx-4 px-4 py-3 bg-surface border-y border-subtle"
+       style="top: var(--nav-h, 0px)" aria-label="Style guide sections">
+    <div class="fade-edge-x overflow-x-auto">
+      <div class="flex items-center gap-2 min-w-max">
+        <% sections.each do |anchor, label| %>
+          <a href="#<%= anchor %>" class="btn btn-neutral btn-sm"><%= label %></a>
+        <% end %>
+      </div>
+    </div>
+  </nav>
+
+  <div class="space-y-16 pt-10">
+    <%= render "style/theme" %>
+    <%= render "style/modals" %>
+    <%= render "style/tricks" %>
+    <%= render "style/tasks" %>
+  </div>
+</div>

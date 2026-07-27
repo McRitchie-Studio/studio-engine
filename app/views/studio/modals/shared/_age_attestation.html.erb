@@ -1,0 +1,34 @@
+<%#
+  Legal-age attestation checkbox — underwriting compliance for skill-based
+  contests. Ported from turf-monster into the engine. Binds x-model into the
+  caller's Alpine scope; the caller gates its CTAs on that property. The SERVER
+  is the real boundary — every signup endpoint rejects new account creation
+  without the attestation.
+
+  Unlike the turf-monster original, this engine partial does NOT self-gate on an
+  AppFlags flag — a consumer that wants the attestation renders it; one that
+  doesn't simply omits the render. Callers that omit it initialize their
+  ageAttested Alpine state to true so every CTA gate passes.
+
+  Locals (all optional):
+    x_model     — Alpine model target (default "ageAttested")
+    error_model — Alpine error-flag target (default "ageError")
+%>
+<%
+  x_model     = local_assigns.fetch(:x_model, "ageAttested")
+  error_model = local_assigns.fetch(:error_model, "ageError")
+%>
+<div>
+  <label class="flex items-start gap-2.5 text-xs text-secondary leading-snug cursor-pointer select-none">
+    <input type="checkbox" x-model="<%= x_model %>" @change="<%= error_model %> = false"
+           data-age-attestation
+           class="mt-0.5 w-4 h-4 shrink-0 rounded accent-primary cursor-pointer">
+    <span>
+      I confirm I am of legal age to participate in skill-based contests in my
+      state (18+ in most states; 19+ in AL/NE; 21+ in IA/MA/VA).
+    </span>
+  </label>
+  <p x-show="<%= error_model %>" x-cloak class="text-xs text-red-400 mt-1.5 ml-6">
+    Please confirm you are of legal age to continue.
+  </p>
+</div>

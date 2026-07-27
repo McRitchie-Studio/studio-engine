@@ -8,6 +8,11 @@
   store registration, and the window.StudioModals.holdAtLeast(ms)
   helper. The animation keyframes ship inline in the style block
   below, so consumers need no extra CSS to get the full behavior.
+  A canonical copy of the SAME keyframes also lives in the shared
+  motion layer (app/assets/tailwind/studio_engine/engine-motion.css)
+  for pages that drive a modal host WITHOUT rendering this partial —
+  e.g. the living style guide's page-scoped dsModals host. The two are
+  byte-identical; keep them in sync if you retune a curve or duration.
   Consumer integration example and API reference: the "Modal host"
   section of the gem README.
 %>

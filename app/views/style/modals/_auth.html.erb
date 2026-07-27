@@ -1,0 +1,252 @@
+<%#
+  Auth wizard — the design-system port of turf-monster's modals/_auth. The
+  canonical sign-in step machine, faithful to the real modal's UX, wired to the
+  living style guide's page-scoped host ($store.dsModals) so it opens live on any
+  app (including McRitchie Studio) without an auth backend.
+
+  Steps (opened at any step via open('auth', { step, ... })):
+    credentials       — Google + Solana + email magic-link request
+    magic-link-sent   — "check your inbox" after the email request
+    magic-link-resent — success confirmation after a resend (directional slide)
+    redirect          — countdown auto-redirect (drain CTA demo)
+
+  What differs from the production modal: the tokens / USDC funding sub-flow is
+  dropped (that is contest-entry-specific), and every credential CTA runs behind
+  a page stub — window.postMagicLink resolves { success: true } so the magic-link
+  step machine advances for real; Google briefly shows its waiting state then
+  resets; Solana swaps to the wallet-connect picker (a real ported specimen).
+  No real auth happens — the demo shows the real UI.
+
+  CRITICAL: rendered inside <template x-if="id==='auth'"> — Alpine requires a
+  SINGLE root, so everything lives inside the outer <div>. The x-data is a
+  double-quoted attribute: keep it free of double-quotes and backticks.
+%>
+<div x-data="{
+       email: '',
+       ageAttested: false,
+       ageError: false,
+       googleTimer: null,
+       attested() {
+         if (!this.termsOn()) return true;
+         if (this.ageAttested) { this.ageError = false; return true; }
+         this.ageError = true;
+         return false;
+       },
+       get props() {
+         var c = Alpine.store('dsModals').current();
+         return (c && c.props) || {};
+       },
+       // Method configuration — which credential methods render. props.methods
+       // overrides per-key; unset keys fall back to the app's Studio.auth_method?
+       // (wallet also needs the web3 capability). props.terms gates the age
+       // attestation. This standardizes the engine auth modal as method-configurable.
+       _methodDefaults: { magicLink: <%= Studio.auth_method?(:magic_link) %>, google: <%= Studio.auth_method?(:google) %>, wallet: <%= Studio.auth_method?(:wallet) && Studio.feature?(:web3) %> },
+       _termsDefault: true,
+       methodOn(m) {
+         var v = this.props.methods;
+         return (v && typeof v[m] === 'boolean') ? v[m] : !!this._methodDefaults[m];
+       },
+       termsOn() {
+         var t = this.props.terms;
+         return (typeof t === 'boolean') ? t : this._termsDefault;
+       },
+       get isCredentialsStep() {
+         var s = this.props.step;
+         if (!s) return true;
+         if (s === 'redirect' || s === 'magic-link-sent' || s === 'magic-link-resent') return false;
+         return true;
+       },
+       loginGoogle() {
+         if (!this.attested()) return;
+         var p = this.props;
+         if (!p || p.submitting) return;
+         p.googleError = '';
+         p.submitting = 'google';
+         var self = this;
+         this.googleTimer = setTimeout(function () {
+           var pp = self.props;
+           if (pp) pp.submitting = null;
+         }, 1200);
+       },
+       openWalletHub() {
+         if (!this.attested()) return;
+         Alpine.store('dsModals').swap('wallet-connect', { backTo: 'auth', ageAttested: true });
+       },
+       async submitMagicLink() {
+         if (!this.attested()) return;
+         var p = this.props;
+         if (!p || p.submitting) return;
+         p.formError = '';
+         if (!this.email) { p.formError = 'Enter your email.'; return; }
+         p.submitting = 'magic-link';
+         try {
+           var data = await window.postMagicLink(this.email, { ageAttested: true });
+           if (!data || !data.success) { p.formError = (data && data.error) || 'Could not send the link. Try again.'; p.submitting = null; return; }
+           Alpine.store('dsModals').advance({ step: 'magic-link-sent', sentEmail: this.email, submitting: null, formError: '' });
+         } catch (e) {
+           var p2 = this.props;
+           if (p2) { p2.formError = 'Network error. Try again.'; p2.submitting = null; }
+         }
+       },
+       _resendTimer: null,
+       startResendCooldown(seconds) {
+         var self = this;
+         var p = this.props;
+         if (!p) return;
+         p.resendCooldown = seconds || 60;
+         if (this._resendTimer) clearInterval(this._resendTimer);
+         this._resendTimer = setInterval(function () {
+           var pp = self.props;
+           if (!pp) { clearInterval(self._resendTimer); self._resendTimer = null; return; }
+           pp.resendCooldown = (pp.resendCooldown || 0) - 1;
+           if (pp.resendCooldown <= 0) {
+             pp.resendCooldown = 0;
+             clearInterval(self._resendTimer);
+             self._resendTimer = null;
+           }
+         }, 1000);
+       },
+       async resendMagicLink() {
+         var p = this.props;
+         if (!p || p.submitting || (p.resendCooldown || 0) > 0) return;
+         p.resendError = '';
+         p.submitting = 'magic-link';
+         try {
+           var data = await window.postMagicLink(p.sentEmail, { ageAttested: true });
+           if (data && data.success) {
+             Alpine.store('dsModals').advance({ step: 'magic-link-resent' });
+             this.startResendCooldown(60);
+           } else {
+             p.resendError = (data && data.error) || 'Could not resend — wait a moment and try again.';
+           }
+         } catch (e) {
+           p.resendError = 'Could not resend — check your connection and try again.';
+         }
+         p.submitting = null;
+       },
+       destroy() {
+         if (this._resendTimer) { clearInterval(this._resendTimer); this._resendTimer = null; }
+         if (this.googleTimer) { clearTimeout(this.googleTimer); this.googleTimer = null; }
+       }
+     }"
+     class="relative">
+
+  <%# === CREDENTIALS STEP ================================================== %>
+  <div x-show="isCredentialsStep" x-cloak>
+      <div class="relative mb-3 -mt-2">
+        <h3 class="text-heading font-bold text-lg leading-tight text-center pt-1">Sign in</h3>
+        <button @click="$store.dsModals.close()"
+                class="absolute top-0 right-0 -mr-2 text-secondary hover:text-heading text-xl leading-none"
+                aria-label="Close">&times;</button>
+      </div>
+      <%= render "studio/modals/blocks/progress_pill", current: 1, total: 3 %>
+      <p class="text-xs text-secondary mb-4 text-center"
+         x-text="'Your ' + ((props && props.picksRequired) || 6) + ' picks are saved — sign in to submit your lineup.'"></p>
+
+      <div class="mb-4" x-show="termsOn()">
+        <%= render "studio/modals/shared/age_attestation" %>
+      </div>
+
+      <%# The credential CTAs gate on props.submitting. It MUST be coerced with
+          !! — on a fresh open the modal is opened with { step, picksRequired }
+          and no submitting key, and x-bind:disabled on a reactive-undefined value
+          renders as disabled=true (verified live), which would inert the whole
+          form. !!props.submitting yields a real boolean so the form is enabled
+          until a CTA actually sets submitting. Keep the !! on every gate below. %>
+      <%# 1. Google — opens a popup in production; here it shows the waiting state.
+          Gated on methodOn('google') so the specimen's toggles configure it. %>
+      <button @click="loginGoogle()"
+              x-show="methodOn('google')"
+              :disabled="!!props.submitting"
+              class="btn btn-neutral btn-lg w-full gap-3 mb-3 disabled:cursor-wait">
+        <span x-show="props.submitting !== 'google'" class="inline-flex"><%= render "components/google_logo" %></span>
+        <span x-show="props.submitting === 'google'" class="spinner" aria-hidden="true"></span>
+        <span x-text="props.submitting === 'google' ? 'Waiting for Google…' : 'Google'"></span>
+      </button>
+      <template x-if="props.googleError">
+        <p class="text-red-400 text-xs -mt-2 mb-3" x-text="props.googleError"></p>
+      </template>
+
+      <%# 2. Solana — progresses to the Connect Wallet picker modal. Gated on
+          methodOn('wallet') (default OFF where web3 is off, e.g. McRitchie Studio). %>
+      <button @click="openWalletHub()" x-show="methodOn('wallet')" :disabled="!!props.submitting"
+              class="btn btn-neutral btn-lg w-full gap-3 mb-3 disabled:cursor-wait">
+        <svg width="18" height="14" viewBox="0 0 397 311" fill="none" x-show="props.submitting !== 'wallet'" aria-hidden="true">
+          <defs><linearGradient id="auth-solana-grad" x1="361" y1="-9" x2="153" y2="389" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#00FFA3"/><stop offset="1" stop-color="#DC1FFF"/>
+          </linearGradient></defs>
+          <path d="M65 234c2-2 6-4 9-4h317c6 0 9 7 5 11l-63 63c-2 2-6 4-9 4H6c-6 0-9-7-5-11l64-63z" fill="url(#auth-solana-grad)"/>
+          <path d="M65 4c2-2 6-4 9-4h317c6 0 9 7 5 11l-63 63c-2 2-6 4-9 4H6c-6 0-9-7-5-11L65 4z" fill="url(#auth-solana-grad)"/>
+          <path d="M333 119c-2-2-6-4-9-4H7c-6 0-9 7-5 11l63 63c2 2 6 4 9 4h317c6 0 9-7 5-11l-63-63z" fill="url(#auth-solana-grad)"/>
+        </svg>
+        <span x-show="props.submitting === 'wallet'" class="spinner" aria-hidden="true"></span>
+        <span x-text="props.submitting === 'wallet' ? 'Connecting…' : 'Solana'"></span>
+      </button>
+
+      <%# "or" divider — only when magic-link AND a social method are both on. %>
+      <div class="relative my-4" x-show="methodOn('magicLink') && (methodOn('google') || methodOn('wallet'))">
+        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-strong"></div></div>
+        <div class="relative flex justify-center text-sm"><span class="bg-surface px-3 text-secondary">or</span></div>
+      </div>
+
+      <%# 3. Email magic link — no password. postMagicLink stub advances the step.
+          Gated on methodOn('magicLink'). %>
+      <form @submit.prevent="submitMagicLink()" novalidate x-show="methodOn('magicLink')">
+        <div class="mb-3">
+          <label class="block text-xs text-secondary mb-1 font-medium">Email</label>
+          <%= render "studio/modals/shared/email_field",
+                name: nil, x_model: "email",
+                placeholder: "you@example.com", required: true,
+                disabled_expr: "!!props.submitting" %>
+        </div>
+        <template x-if="props.formError">
+          <p class="text-red-400 text-xs mb-3" x-text="props.formError"></p>
+        </template>
+        <button type="submit" :disabled="!!props.submitting"
+                class="btn btn-neutral btn-lg w-full gap-2 disabled:cursor-wait">
+          <span x-show="props.submitting === 'magic-link'" class="spinner" aria-hidden="true"></span>
+          <span x-text="props.submitting === 'magic-link' ? 'Sending link…' : 'Email Link'"></span>
+        </button>
+        <p class="text-xs text-muted text-center mt-2">No password needed — we'll email you a one-tap link.</p>
+      </form>
+  </div>
+
+  <%# === MAGIC-LINK-SENT STEP ============================================== %>
+  <template x-if="props.step === 'magic-link-sent'">
+    <div>
+      <%= render "studio/modals/blocks/card_header", icon_emoji: '📬', title: 'Check your inbox' do %>
+        We emailed <span class="text-heading font-medium break-all" x-text="props.sentEmail"></span>
+        a one-tap sign-in link. Check your email and
+        <span class="text-heading font-semibold">Click the Magic Link</span> to continue.
+      <% end %>
+      <%= render "studio/modals/auth/resend_footer", modal_store: "dsModals" %>
+    </div>
+  </template>
+
+  <%# === MAGIC-LINK-RESENT STEP =========================================== %>
+  <template x-if="props.step === 'magic-link-resent'">
+    <div>
+      <%= render "studio/modals/blocks/card_header", icon_color: 'primary', title: 'Link Resent!' do %>
+        We just resent <span class="text-heading font-medium break-all" x-text="props.sentEmail"></span>
+        a one-tap sign-in link. Check your email and
+        <span class="text-heading font-semibold">Click the Magic Link</span> to continue.
+      <% end %>
+      <%= render "studio/modals/auth/resend_footer", modal_store: "dsModals" %>
+    </div>
+  </template>
+
+  <%# === REDIRECT STEP ===================================================== %>
+  <template x-if="props.step === 'redirect'">
+    <div>
+      <%= render "studio/modals/blocks/card_header",
+            icon_emoji_key: "props.icon || '📍'",
+            title_key:      "props.title || 'Heading out'",
+            subtitle_key:   "props.message || 'Taking you to the next step.'" %>
+      <%= render "studio/modals/blocks/cta_redirect",
+            href_key:         "props.url",
+            label_key:        "props.cta || 'Go now'",
+            duration_seconds: 5,
+            modal_store:      "dsModals" %>
+    </div>
+  </template>
+</div>

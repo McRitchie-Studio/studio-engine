@@ -1,0 +1,52 @@
+<%#
+  Generic on-chain transaction success card — the default-fallback success
+  state for any Solana transaction that isn't a domain-specific celebration
+  (faucet mint, on-chain rename, contest creation). Ported from turf-monster.
+
+  Same visual spine as a rich entry card (card_header at :lg with the primary
+  check pill + branded Solana tx link) MINUS the enrichments: no seeds bar, no
+  level-up, no auto-redirect drain. The CTA is a plain optional link; when no
+  cta label/href is supplied the card degrades to just the Dismiss link.
+
+  Single root: content lives in one <div> so Alpine's <template x-if> clones it
+  whole.
+
+  Locals:
+    tx_signature_key — Alpine expression returning the tx hash (link mounts when truthy)
+    title_key        — Alpine expression returning the headline
+    subtitle_key     — Alpine expression returning the sub-headline
+    cta_label_key    — Alpine expression returning the CTA label (button mounts when truthy)
+    cta_href_key     — Alpine expression returning the CTA href
+    cluster_param    — explorer cluster query, forwarded to solana_tx_link. Default "".
+    modal_store      — Alpine store name backing close(). Default "modals".
+%>
+<%
+  tx_signature_key = local_assigns.fetch(:tx_signature_key)
+  title_key        = local_assigns.fetch(:title_key)
+  subtitle_key     = local_assigns.fetch(:subtitle_key)
+  cta_label_key    = local_assigns.fetch(:cta_label_key)
+  cta_href_key     = local_assigns.fetch(:cta_href_key)
+  cluster_param    = local_assigns.fetch(:cluster_param, "")
+  modal_store      = local_assigns.fetch(:modal_store, "modals")
+%>
+<div>
+  <%= render "studio/modals/blocks/card_header",
+        size: :lg,
+        icon_color: 'primary',
+        title_key:    title_key,
+        subtitle_key: subtitle_key %>
+
+  <%= render "studio/modals/blocks/solana_tx_link",
+        tx_signature_key: tx_signature_key, cluster_param: cluster_param %>
+
+  <template x-if="(<%= cta_label_key %>)">
+    <a :href="(<%= cta_href_key %>) || '#'"
+       class="btn btn-primary btn-lg w-full no-underline"
+       x-text="<%= cta_label_key %>"></a>
+  </template>
+
+  <button @click="$store.<%= modal_store %>.close()"
+          class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+    Dismiss
+  </button>
+</div>

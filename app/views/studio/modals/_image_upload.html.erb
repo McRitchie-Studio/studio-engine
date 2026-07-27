@@ -26,6 +26,11 @@
   function cropPhotoModal(opts) {
     opts = opts || {};
     return {
+      // Which Alpine store this modal is mounted in. Defaults to 'modals' (the
+      // shared host); the living style guide passes { store: 'dsModals' } so the
+      // crop-photo modal opens on its page-scoped host without colliding with
+      // the app-level shared host.
+      _storeName: opts.store || 'modals',
       cropper: null,
       imageUrl: null,
       fromParent: false,
@@ -46,7 +51,7 @@
       dispatch: false,
 
       init() {
-        var current = this.$store.modals.current();
+        var current = this.$store[this._storeName].current();
         var props = (current && current.props) || {};
         if (props.aspectRatio) this.aspectRatio = props.aspectRatio;
         if (props.maxWidth) this.maxWidth = props.maxWidth;
@@ -77,8 +82,14 @@
           });
           // Cropping in progress — lock the modal (no click-outside / escape) so
           // an accidental click doesn't discard the crop. Cancel still works.
-          var cur = self.$store.modals.current();
-          if (cur && cur.props) cur.props.dismissible = false;
+          // Also reflect the crop sub-state onto the store entry (cropReady) so
+          // an external observer can tell the picker state apart from the crop
+          // state — the modal's own `imageUrl` is LOCAL x-data and never lands on
+          // props, so props alone can't distinguish them. The living style guide
+          // reads this to move its active-card glow from the Image Upload card to
+          // the Crop Photo card the moment an image is loaded (picker -> cropper).
+          var cur = self.$store[self._storeName].current();
+          if (cur && cur.props) { cur.props.dismissible = false; cur.props.cropReady = true; }
         });
       },
 
@@ -112,7 +123,7 @@
 
       cancel() {
         if (this.cropper) { this.cropper.destroy(); this.cropper = null; }
-        this.$store.modals.close();
+        this.$store[this._storeName].close();
       },
 
       confirm() {
@@ -134,7 +145,7 @@
           // dispatch mode: the opener's host owns the post-confirm flow
           // (processing modal -> success toast), so don't pop the stack here.
           // fromParent (no dispatch): close the modal now.
-          if (!self.dispatch) self.$store.modals.close();
+          if (!self.dispatch) self.$store[self._storeName].close();
         }, "image/png");
       }
     };
