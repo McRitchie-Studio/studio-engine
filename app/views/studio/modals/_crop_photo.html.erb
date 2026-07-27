@@ -21,8 +21,12 @@
 
   Single root: lives inside the host's <template x-if>, so only the outer
   div is the top-level element here.
+
+  Local: store — Alpine store name this modal is mounted in. Default "modals".
+  The living style guide passes store: "dsModals" for its page-scoped host.
 %>
-<div x-data="cropPhotoModal()">
+<% crop_store = local_assigns.fetch(:store, "modals") %>
+<div x-data="cropPhotoModal({ store: '<%= crop_store %>' })">
   <h3 class="text-heading font-bold text-lg text-center mb-4">Crop Photo</h3>
 
   <template x-if="error">

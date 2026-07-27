@@ -1,0 +1,45 @@
+<%# === Template: STATUS modal ======================================
+    Small-title in-flight card for short async work — server save, poll,
+    side-effect that finishes in a second or two. card_header default :md keeps
+    the title subordinate to the spinner. For end-state celebrations use the
+    success template. Ported from turf-monster; the demo cycles loading → error
+    at 1.6s so a viewer can step through both states.
+
+    Local: modal_store — Alpine store name backing close(). Default "modals". %>
+<% modal_store = local_assigns.fetch(:modal_store, "modals") %>
+<div x-data="{
+       state: 'loading',
+       start() {
+         this.state = 'loading';
+         var self = this;
+         setTimeout(function() { self.state = 'error'; }, 1600);
+       }
+     }"
+     x-init="start()">
+  <template x-if="state === 'loading'">
+    <div>
+      <%= render "studio/modals/blocks/card_header",
+            spinner: true,
+            title: "Working on it…",
+            subtitle: "Status template — small-title in-flight card for short async work." %>
+      <button @click="$store.<%= modal_store %>.close()"
+              class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+        Cancel
+      </button>
+    </div>
+  </template>
+
+  <template x-if="state === 'error'">
+    <div>
+      <%= render "studio/modals/blocks/card_header",
+            icon: :error,
+            title: "Something went wrong",
+            subtitle: "Surface the real error message here. Try Again should re-run the failed op." %>
+      <button @click="start()" class="btn btn-primary btn-lg w-full">Try Again</button>
+      <button @click="$store.<%= modal_store %>.close()"
+              class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+        Cancel
+      </button>
+    </div>
+  </template>
+</div>

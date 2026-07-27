@@ -1,0 +1,56 @@
+<%#
+  Wallet deposit / top-up modal — design-system port of turf-monster's
+  modals/_wallet_deposit, wired to the living style guide's page-scoped host
+  ($store.dsModals). Single-card design (no step machinery): the shortfall
+  math, a "Pay with Card" CTA, and a copy-your-address self-fund row.
+
+  Self-contained: the production Stripe form + CDP onramp button are replaced
+  with a neutral demo CTA, and the wallet address reads from props (a demo
+  value) rather than $store.session. Opened via
+  open('wallet-deposit', { neededCents, usdcCents, usdtCents, address }).
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div x-data="{ get props() { return (Alpine.store('dsModals').current() || {}).props || {} } }"
+     class="relative">
+
+  <button @click="$store.dsModals.close()"
+          class="absolute top-0 right-0 -mt-2 -mr-2 text-secondary hover:text-heading text-xl leading-none z-10"
+          aria-label="Close">&times;</button>
+
+  <div class="text-center pt-1 mb-3">
+    <h3 class="text-heading font-bold text-lg leading-tight">Top Up Your Wallet</h3>
+  </div>
+  <p class="text-xs text-secondary mb-4 text-center">
+    You need $<span class="font-mono" x-text="((props.neededCents || 0) / 100).toFixed(2)"></span>
+    to enter.
+    You have $<span class="font-mono" x-text="((props.usdcCents || 0) / 100).toFixed(2)"></span> USDC
+    + $<span class="font-mono" x-text="((props.usdtCents || 0) / 100).toFixed(2)"></span> USDT.
+  </p>
+
+  <div class="space-y-3">
+    <%# Demo pay CTA — the production modal posts to Stripe checkout in a new
+        tab; here it just closes (no real payment). %>
+    <button type="button" @click="$store.dsModals.close()" class="btn btn-primary btn-lg w-full">
+      Pay with Card
+    </button>
+
+    <%# Send-to-address — self-fund from another wallet. Address from props. %>
+    <div class="border-t border-strong pt-3" x-data="{ copied: false }">
+      <p class="text-xs text-secondary text-center mb-2">Or send USDC/USDT to your wallet:</p>
+      <div class="flex items-center gap-2">
+        <code class="flex-1 px-2 py-1 bg-surface rounded text-xs font-mono truncate"
+              x-text="props.address || 'Fo1L5…demo…9xQ2'"></code>
+        <button type="button"
+                @click="navigator.clipboard && navigator.clipboard.writeText(props.address || ''); copied = true; setTimeout(() => copied = false, 1500)"
+                class="btn btn-sm">
+          <span x-text="copied ? 'Copied' : 'Copy'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <p class="text-center text-xs text-muted mt-4">
+    Come back here once your deposit lands &mdash; we'll refresh the balance.
+  </p>
+</div>

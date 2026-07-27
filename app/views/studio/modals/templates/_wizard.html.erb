@@ -1,0 +1,75 @@
+<%# === Template: WIZARD modal ======================================
+    Multi-step flow with a segmented progress pill + centered header. Use for
+    onboarding, checkout journeys, anything that breaks into 2-4 screens. Ported
+    from turf-monster.
+
+    Visual identity (distinct from form/action/status): centered title above the
+    pill; N-segment pill (filled = primary, upcoming = inset+subtle); single
+    primary CTA pulling forward; Back as a subtle link, hidden on step 1.
+
+    Local: modal_store — Alpine store name backing close(). Default "modals". %>
+<% modal_store = local_assigns.fetch(:modal_store, "modals") %>
+<div x-data="{ step: 1, total: 3 }">
+  <div class="relative mb-3 -mt-2">
+    <h3 class="text-heading font-bold text-lg leading-tight text-center pt-1">Wizard Template</h3>
+    <button type="button" @click="$store.<%= modal_store %>.close()"
+            class="absolute top-0 right-0 -mr-2 text-secondary hover:text-heading text-xl leading-none"
+            aria-label="Close">&times;</button>
+  </div>
+
+  <%# Inline x-for pill — the demo's step counter lives in local x-data, so the
+      static-ERB progress_pill block doesn't fit. Real wizards driven by props
+      can render studio/modals/blocks/progress_pill directly. %>
+  <div class="flex items-center justify-center gap-1.5 mx-auto max-w-[200px] mb-6">
+    <template x-for="i in total" :key="i">
+      <div class="h-1.5 flex-1 rounded-full transition-colors duration-300"
+           :class="step >= i ? 'bg-primary' : 'bg-inset border border-subtle'"></div>
+    </template>
+  </div>
+
+  <template x-if="step === 1">
+    <div class="text-center space-y-3 min-h-[120px]">
+      <h4 class="text-heading font-semibold text-base">Welcome</h4>
+      <p class="text-sm text-secondary">
+        First step — collect any prerequisites or intro context here. Replace this
+        block with whatever your wizard's opening screen needs.
+      </p>
+    </div>
+  </template>
+
+  <template x-if="step === 2">
+    <div class="text-center space-y-3 min-h-[120px]">
+      <h4 class="text-heading font-semibold text-base">Configure</h4>
+      <p class="text-sm text-secondary">
+        Middle step(s) — forms, selections, anything that needs user input. Each step
+        gets its own <code class="text-xs bg-inset px-1 rounded">&lt;template x-if&gt;</code> block.
+      </p>
+    </div>
+  </template>
+
+  <template x-if="step === 3">
+    <div class="text-center space-y-3 min-h-[120px]">
+      <h4 class="text-heading font-semibold text-base">Confirm</h4>
+      <p class="text-sm text-secondary">
+        Final step — show the summary + primary commit action. The Finish button
+        below typically calls your real submit handler then closes the modal.
+      </p>
+    </div>
+  </template>
+
+  <button type="button"
+          @click="step < total ? step++ : $store.<%= modal_store %>.close()"
+          class="btn btn-primary btn-lg w-full mt-2"
+          x-text="step === total ? 'Finish' : 'Next'"></button>
+  <button type="button"
+          x-show="step > 1"
+          @click="step--"
+          class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+    &larr; Back
+  </button>
+  <button type="button"
+          @click="$store.<%= modal_store %>.close()"
+          class="block mx-auto mt-2 text-xs text-muted hover:text-heading transition">
+    Close
+  </button>
+</div>

@@ -1,0 +1,120 @@
+<%#  Modal specimen card for the living style guide (admin/style) Modals section.
+
+     Unlike the generic style/_specimen (Tricks), a modal specimen is INTERACTIVE:
+
+       - the WHOLE card is the trigger (role=button, Enter/Space) — click it to
+         open the real modal with the current toggle config (item 3).
+       - the header carries a small Copy that yields a CONVERSATIONAL reference
+         an agent can act on (not a raw JS blob) — the operator references this
+         page when chatting (item 1).
+       - an optional row of option toggles lets the user configure the modal
+         before opening; their clicks/keys do NOT bubble to the card open (item 2).
+       - an optional active-card GLOW (.studio-team-glow) that reactively lights
+         when this card represents the currently-open modal + step, and slides to
+         the next card as the step machine advances (items 5/6). The glow rides an
+         un-clipped wrapper (the card itself is overflow-hidden), mirroring TM's
+         holo-wrap / holo-card split, and fades via --studio-team-glow-opacity so
+         it transitions smoothly between cards.
+
+     Locals:
+       label      (String, required) - the specimen name (header, uppercase).
+       reference  (String, required) - the conversational copy text.
+       open_expr  (String, required) - Alpine expression run to open the modal.
+                  May read `opts.*` from card_data (the toggle state).
+       card_data  (String, optional) - INNER x-data (no braces), merged after
+                  copiedRef. E.g. "opts: { magicLink: true, google: true }".
+       glow_when  (String, optional) - Alpine boolean expr; truthy => active glow.
+       toggles    (Array<Hash{model:,label:}>, optional) - option checkboxes bound
+                  into the card x-data (e.g. { model: 'opts.google', label: 'Google' }).
+       disabled   (Boolean, optional) - capability off: greyed + badged.
+       openable   (Boolean, optional) - with disabled, keep it clickable (preview).
+       disabled_label (String, optional) - the flag text.
+     Block: the mini-mock stage (a not-to-scale visual representation). %>
+<%
+  label          = local_assigns.fetch(:label)
+  # Developer-authored reference sentence, rendered as hidden text content (the
+  # Copy button reads textContent). html_safe keeps its quotes literal in the
+  # markup; it holds no HTML-special chars.
+  reference      = local_assigns.fetch(:reference).to_s.html_safe
+  # open_expr / glow_when are developer-authored Alpine expressions (not user
+  # input); mark html_safe so their single quotes render literally into the
+  # attribute rather than as &#39; (cleaner HTML; the browser decodes either way).
+  open_expr      = local_assigns.fetch(:open_expr).to_s.html_safe
+  card_data      = local_assigns.fetch(:card_data, "").to_s.strip
+  glow_when      = local_assigns[:glow_when]&.to_s&.html_safe
+  toggles        = local_assigns[:toggles] || []
+  disabled       = local_assigns[:disabled]
+  openable       = local_assigns[:openable]
+  disabled_label = local_assigns[:disabled_label].presence || "disabled on this app"
+  clickable      = !(disabled && !openable)
+  inner_cls      = openable ? "opacity-60 grayscale" : "opacity-40 grayscale select-none pointer-events-none"
+  card_x_data    = "{ copiedRef: false#{card_data.present? ? ", #{card_data}" : ''} }"
+%>
+<%# Wrapper — carries the active-card glow (un-clipped) + the shared x-data. %>
+<%# h-full so the card stretches to its grid row's tallest (per-row equal
+    height via the grid's default align-items: stretch). %>
+<div class="relative h-full<%= " studio-team-glow rounded-xl" if glow_when %>"
+     x-data="<%= card_x_data %>"
+     <% if glow_when %>:style="{ '--studio-team-glow-opacity': (<%= glow_when %>) ? '0.95' : '0' }"<% end %>>
+  <article
+      class="card overflow-hidden flex flex-col h-full<%= " opacity-95" if disabled %><%= " cursor-pointer" if clickable %>"
+      <%= 'aria-disabled="true"'.html_safe if disabled %>
+      <% if clickable %>
+        role="button" tabindex="0"
+        @click="<%= open_expr %>"
+        @keydown.enter.prevent="<%= open_expr %>"
+        @keydown.space.prevent="<%= open_expr %>"
+        aria-label="Open the <%= label %> modal"
+      <% end %>>
+
+    <%# Header — the centered TITLE is itself the copy control (a button + a small
+        clipboard icon that flips to a check). @click.stop + @keydown.stop keep the
+        copy from bubbling to the card's open handler: clicking the title copies
+        and does NOT open; clicking anywhere else on the card still opens. The
+        button activates on Enter/Space natively (firing @click.stop = copy). %>
+    <div class="flex items-center justify-center px-3 pt-3">
+      <button type="button"
+              class="inline-flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider text-muted hover:text-heading transition"
+              title="Copy an agent-ready reference to this modal"
+              aria-label="Copy an agent-ready reference to this modal"
+              @click.stop="navigator.clipboard?.writeText($refs.ref.textContent.trim()); copiedRef = true; setTimeout(() => copiedRef = false, 1400)"
+              @keydown.stop>
+        <span><%= label %></span>
+        <svg x-show="!copiedRef" class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+        <svg x-show="copiedRef" x-cloak class="w-3 h-3 shrink-0" style="color: var(--color-success)" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+        </svg>
+        <span class="sr-only" x-text="copiedRef ? 'Copied' : ''"></span>
+      </button>
+    </div>
+    <span x-ref="ref" class="hidden"><%= reference %></span>
+
+    <%# Stage — the not-to-scale mini-mock. %>
+    <div class="relative flex flex-1 flex-wrap items-center justify-center gap-4 p-6 min-h-32">
+      <% if disabled %>
+        <span class="absolute top-2 right-2 badge z-10" style="color: var(--color-warning); border-color: var(--color-warning)"><%= disabled_label %></span>
+        <div class="flex flex-wrap items-center justify-center gap-4 <%= inner_cls %>"><%= yield %></div>
+      <% else %>
+        <%= yield %>
+      <% end %>
+      <% if clickable %>
+        <span class="pointer-events-none absolute bottom-2 right-2 text-2xs text-secondary opacity-70">Open &nearr;</span>
+      <% end %>
+    </div>
+
+    <%# Toggles — configure the modal before opening (clicks/keys stay local). %>
+    <% if toggles.any? %>
+      <div class="border-t border-subtle px-3 py-2.5 flex flex-wrap gap-x-4 gap-y-1.5"
+           @click.stop @keydown.stop>
+        <% toggles.each do |tg| %>
+          <label class="flex items-center gap-1.5 text-2xs text-secondary cursor-pointer select-none">
+            <input type="checkbox" x-model="<%= tg[:model] %>" class="w-3.5 h-3.5 rounded accent-primary cursor-pointer">
+            <span><%= tg[:label] %></span>
+          </label>
+        <% end %>
+      </div>
+    <% end %>
+  </article>
+</div>

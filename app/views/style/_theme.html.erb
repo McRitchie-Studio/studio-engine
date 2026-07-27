@@ -1,0 +1,222 @@
+<%#  Theme section of the living style guide (admin/style) — the LANDING section.
+     Theme owns "the colors": it leads with the 7 role tokens/swatches (moved here
+     from the Tricks section), then folds in the /admin/theme editor as a second
+     entry point and a live dark/light preview.
+
+     Save-in-place: unlike the standalone /admin/theme page (which redirects to
+     itself on save), THIS section intercepts Save + Regenerate and submits them
+     via fetch — the page never navigates away, the live preview stays put, and
+     the outcome is a toast. The standalone page's own redirect is unchanged.
+
+     Rendered in two contexts:
+       * live in the host app (StyleController sets @theme_setting + @theme_defaults)
+         so custom saved colors and the CSRF token are present.
+       * in the guard test as a bare template (no controller, no DB) so every
+         DB / request-scoped read is guarded and degrades to config defaults. %>
+<%
+  # Reference the model directly (guarded): in the minimal dummy app it may not
+  # autoload, so fall back to the known role list + identity column mapping.
+  roles = begin
+    ThemeSetting::ROLES
+  rescue StandardError
+    %i[primary dark light success warning danger accent]
+  end
+  defaults = (Studio.respond_to?(:theme_config) ? Studio.theme_config : {}) || {}
+  setting  = local_assigns[:theme_setting] || (@theme_setting if defined?(@theme_setting))
+
+  db_col_for = ->(role) {
+    begin
+      ThemeSetting.db_column_for(role)
+    rescue StandardError
+      role
+    end
+  }
+
+  current_hex = ->(role) {
+    db_val = setting ? setting.read_attribute(db_col_for.call(role)) : nil
+    (db_val.presence if db_val.respond_to?(:presence)) || defaults[role] || "#888888"
+  }
+
+  # Seed the live-preview editor with role -> hex, resolved from saved values.
+  seed_colors = roles.index_with { |role| current_hex.call(role) }
+
+  # The 7 role tokens read live off the resolved theme (cta/text/border-strong
+  # are the semantic names — there is no --color-heading var).
+  token_swatches = [
+    ["--color-cta",           "CTA / primary"],
+    ["--color-surface",       "Surface"],
+    ["--color-success",       "Success"],
+    ["--color-danger",        "Danger"],
+    ["--color-warning",       "Warning"],
+    ["--color-text",          "Heading / text"],
+    ["--color-border-strong", "Border (strong)"]
+  ]
+
+  csrf_ok = respond_to?(:protect_against_forgery?) && protect_against_forgery?
+%>
+<section id="theme" class="space-y-8" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)"
+         x-data="dsThemeEditor(<%= seed_colors.to_json %>)">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="space-y-1">
+      <h2 class="text-2xl font-bold text-heading">Theme</h2>
+      <p class="text-muted text-sm max-w-2xl">
+        The color foundation. The 7-role system, editable here and at
+        <code class="font-mono text-2xs">/admin/theme</code>. Edits preview live; Save writes them
+        and Regenerate clears the theme cache. Both persist <strong>in place</strong> — the page never
+        leaves. Every specimen on this page restyles from these roles.
+      </p>
+    </div>
+    <form action="/admin/theme/regenerate" method="post" accept-charset="UTF-8" @submit.prevent="regenerate($event)">
+      <% if csrf_ok %>
+        <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>" autocomplete="off">
+      <% end %>
+      <button type="submit" class="btn btn-outline btn-sm" :disabled="saving">Regenerate cache</button>
+    </form>
+  </div>
+
+  <%# ---- The colors — the role tokens/swatches (Theme owns these) ---------- %>
+  <div class="space-y-3">
+    <p class="label-upper">The colors — 7 role tokens</p>
+    <p class="text-muted text-sm max-w-2xl">
+      Read live off this app's theme via <code class="font-mono text-2xs">var(--color-*)</code>. Change
+      the app or its light/dark mode and every swatch (and every specimen on this page) follows.
+    </p>
+    <div class="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+      <% token_swatches.each do |var, label| %>
+        <div class="card overflow-hidden">
+          <div class="h-16 border-b border-subtle" style="background: var(<%= var %>)"></div>
+          <div class="p-3 space-y-0.5">
+            <p class="text-sm text-heading font-medium"><%= label %></p>
+            <code class="font-mono text-2xs text-muted break-all"><%= var %></code>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <%# ---- Role-color editor (posts to /admin/theme, intercepted in place) - %>
+    <form action="/admin/theme" method="post" accept-charset="UTF-8" class="card p-6 space-y-4"
+          @submit.prevent="saveTheme($event)">
+      <input type="hidden" name="_method" value="patch" autocomplete="off">
+      <% if csrf_ok %>
+        <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>" autocomplete="off">
+      <% end %>
+      <h3 class="text-lg font-bold text-heading">Role colors</h3>
+
+      <% roles.each do |role| %>
+        <% db_col = db_col_for.call(role) %>
+        <% has_custom = setting && setting.read_attribute(db_col).present? %>
+        <div class="flex items-center gap-4">
+          <input type="color"
+                 :value="colors.<%= role %>"
+                 @input="colors.<%= role %> = $event.target.value; updatePreview()"
+                 class="w-10 h-10 rounded cursor-pointer border border-subtle shrink-0"
+                 style="padding: 1px"
+                 aria-label="<%= role.to_s.titleize %> color">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-heading font-medium text-sm"><%= role.to_s.titleize %></span>
+              <% if has_custom %><span class="text-xs text-muted">(custom)</span><% end %>
+            </div>
+            <input type="text"
+                   name="theme_setting[<%= db_col %>]"
+                   x-model="colors.<%= role %>"
+                   @input="updatePreview()"
+                   class="text-xs text-secondary font-mono bg-transparent border-0 border-b border-dashed border-subtle w-24 outline-none"
+                   spellcheck="false">
+          </div>
+          <% if defaults[role] %>
+            <button type="button" class="text-xs text-muted hover:text-heading transition shrink-0"
+                    @click="colors.<%= role %> = '<%= defaults[role] %>'; updatePreview()"
+                    title="Reset to default (<%= defaults[role] %>)">Reset</button>
+          <% end %>
+        </div>
+      <% end %>
+
+      <div class="pt-4 border-t border-subtle">
+        <button type="submit" class="btn btn-primary" :disabled="saving"
+                x-text="saving ? 'Saving…' : 'Save theme'">Save theme</button>
+      </div>
+    </form>
+
+    <%# ---- Live dark/light preview (Alpine, updates as you edit) ----------- %>
+    <div class="space-y-3">
+      <p class="label-upper">Preview</p>
+      <p class="text-muted text-sm">A live dark/light mock — it tracks the editor as you type, before you save.</p>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div class="rounded-xl border border-subtle overflow-hidden">
+          <div class="px-3 py-1.5 bg-surface-alt"><span class="text-2xs font-bold uppercase tracking-wider text-secondary">Dark</span></div>
+          <div class="p-4" :style="{ backgroundColor: colors.dark }">
+            <p class="font-bold text-sm mb-2" style="color: #ffffff">Heading</p>
+            <div class="flex gap-2">
+              <button type="button" class="rounded-lg px-2.5 py-1 text-2xs font-bold text-white" :style="{ backgroundColor: colors.primary }">Primary</button>
+              <button type="button" class="rounded-lg px-2.5 py-1 text-2xs font-bold text-white" :style="{ backgroundColor: colors.success }">Accent</button>
+            </div>
+          </div>
+        </div>
+        <div class="rounded-xl border border-subtle overflow-hidden">
+          <div class="px-3 py-1.5 bg-surface-alt"><span class="text-2xs font-bold uppercase tracking-wider text-secondary">Light</span></div>
+          <div class="p-4" :style="{ backgroundColor: colors.light }">
+            <p class="font-bold text-sm mb-2" style="color: #0f172a">Heading</p>
+            <div class="flex gap-2">
+              <button type="button" class="rounded-lg px-2.5 py-1 text-2xs font-bold text-white" :style="{ backgroundColor: colors.primary }">Primary</button>
+              <button type="button" class="rounded-lg px-2.5 py-1 text-2xs font-bold text-white" :style="{ backgroundColor: colors.success }">Accent</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Live-preview editor for the Style-guide Theme section. Seeded from the
+    // server-resolved role colors; updates the themeable role vars on the
+    // document as you type so every specimen on the page restyles instantly.
+    // The <input name> fields still carry the real values.
+    //
+    // Save-in-place: Save + Regenerate submit via fetch and stay on THIS page —
+    // preventDefault stops the browser navigating to /admin/theme (which is what
+    // bounced the operator off this section), the live preview persists, and the
+    // outcome is a toast (the engine's shared _flash toast primitive). The
+    // <form> POST still degrades gracefully if Alpine never loads.
+    function dsThemeEditor(seed) {
+      return {
+        colors: Object.assign({ primary: '#000', dark: '#0f172a', light: '#ffffff',
+                                success: '#4BAF50', warning: '#FF7C47', danger: '#EF4444',
+                                accent: '#6366F1' }, seed || {}),
+        saving: false,
+        updatePreview() {
+          var d = document.documentElement.style;
+          d.setProperty('--color-cta', this.colors.primary);
+          if (this.colors.success) d.setProperty('--color-success', this.colors.success);
+          if (this.colors.warning) d.setProperty('--color-warning', this.colors.warning);
+          if (this.colors.danger)  d.setProperty('--color-danger', this.colors.danger);
+        },
+        persist(form, label) {
+          if (this.saving) return;
+          this.saving = true;
+          // Send the form's REAL method (the editor carries _method=patch) so we
+          // never depend on Rack::MethodOverride parsing a multipart fetch body.
+          var data = new FormData(form);
+          var override = data.get('_method');
+          var method = override ? String(override).toUpperCase() : 'POST';
+          if (override) data.delete('_method');
+          fetch(form.action, { method: method, body: data })
+            .then(function (res) {
+              if (!res.ok) throw new Error('HTTP ' + res.status);
+              return res;
+            })
+            .then((function () { this.toast('notice', label, 'Saved in place — the page stayed put.'); }).bind(this))
+            .catch((function (err) { this.toast('alert', 'Save failed', String((err && err.message) || err)); }).bind(this))
+            .finally((function () { this.saving = false; }).bind(this));
+        },
+        toast(type, title, message) {
+          window.dispatchEvent(new CustomEvent('toast', { detail: { type: type, title: title, message: message } }));
+        },
+        saveTheme(e) { this.persist(e.target, 'Theme saved'); },
+        regenerate(e) { this.persist(e.target, 'Theme cache cleared'); }
+      };
+    }
+  </script>
+</section>

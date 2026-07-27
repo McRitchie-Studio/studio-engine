@@ -1,0 +1,83 @@
+<%#
+  Shared modal card header — icon pill + title + subtext. Owns the visual top
+  of every success / confirmation / status modal so the header style stays
+  aligned across the family. Each callsite slots its own action area (button,
+  link, hold button) BELOW this header. Ported from turf-monster into the engine
+  (studio-engine v0.18) so the shared modal blocks live in one place.
+
+  Locals (all optional except title/title_key):
+    title:          static title string
+    title_key:      Alpine expression for the title (x-text). Priority over title.
+    subtitle:       static subtext string
+    subtitle_key:   Alpine expression for the subtext (x-text). Priority over subtitle.
+    icon_color:     color token for the default check — 'primary' (default),
+                    'success', 'warning', 'mint'.
+    icon_emoji:     large emoji (text-5xl, no pill) instead of the default check.
+    icon_emoji_key: Alpine expression returning the emoji (x-text). Priority
+                    over icon_emoji.
+    icon:           :error — X mark in a red pill (hard error states).
+                    :external_tab — diagonal arrow pill (action in another tab).
+    spinner:        truthy — three bouncing dots instead of the check pill,
+                    for processing / loading states.
+    size:           :md (default) OR :lg (celebration end-state, text-3xl title).
+
+  Block: if given, the block's content replaces the subtitle area. Explicit
+  subtitle locals are checked BEFORE block_given? — a partial's block_given? can
+  read TRUE off the layout yield even with no block passed (see the engine's
+  Rails-partial block_given? note), so lead with the locals.
+%>
+<%
+  icon_color = local_assigns[:icon_color] || 'primary'
+  size       = local_assigns[:size] || :md
+  pill_class = size == :lg ? 'w-14 h-14' : 'w-12 h-12'
+  svg_class  = size == :lg ? 'w-7 h-7'   : 'w-6 h-6'
+  title_cls  = size == :lg ? 'text-3xl font-bold text-heading mb-2' : 'text-lg font-bold text-heading mb-2'
+  sub_cls    = size == :lg ? 'text-sm text-secondary mb-4'          : 'text-xs text-secondary mb-5'
+%>
+<div class="text-center">
+  <% if local_assigns[:spinner] %>
+    <div class="mx-auto <%= pill_class %> flex items-center justify-center mb-4">
+      <div class="loading-dots">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </div>
+  <% elsif local_assigns[:icon] == :error %>
+    <div class="mx-auto <%= pill_class %> rounded-full bg-red-500/15 flex items-center justify-center mb-4">
+      <svg class="<%= svg_class %> text-red-400" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </div>
+  <% elsif local_assigns[:icon] == :external_tab %>
+    <div class="mx-auto <%= pill_class %> rounded-full bg-<%= icon_color %>/15 flex items-center justify-center mb-4">
+      <svg class="<%= svg_class %> text-<%= icon_color %>" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/>
+      </svg>
+    </div>
+  <% elsif local_assigns[:icon_emoji_key] %>
+    <div class="text-5xl mb-4 leading-none" x-text="<%= icon_emoji_key %>"></div>
+  <% elsif local_assigns[:icon_emoji] %>
+    <div class="text-5xl mb-4 leading-none"><%= icon_emoji %></div>
+  <% else %>
+    <div class="mx-auto <%= pill_class %> rounded-full bg-<%= icon_color %>/15 flex items-center justify-center mb-4">
+      <svg class="<%= svg_class %> text-<%= icon_color %>" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+      </svg>
+    </div>
+  <% end %>
+
+  <% if local_assigns[:title_key] %>
+    <h3 class="<%= title_cls %>" x-text="<%= title_key %>"></h3>
+  <% elsif local_assigns[:title] %>
+    <h3 class="<%= title_cls %>"><%= title %></h3>
+  <% end %>
+
+  <% if local_assigns[:subtitle_key] %>
+    <p class="<%= sub_cls %>" x-text="<%= subtitle_key %>"></p>
+  <% elsif local_assigns[:subtitle] %>
+    <p class="<%= sub_cls %>"><%= subtitle %></p>
+  <% elsif block_given? %>
+    <p class="<%= sub_cls %>"><%= yield %></p>
+  <% end %>
+</div>
