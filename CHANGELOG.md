@@ -2,6 +2,24 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.16.0 — 2026-07-26
+
+### Added
+
+- **Motion / effect primitive layer** — a new, OPT-IN stylesheet at
+  `app/assets/tailwind/studio_engine/engine-motion.css` consolidating seven
+  reusable animation + visual-effect primitives that had drifted across the MS
+  and TM apps: `.studio-border-glow` (mask-composite rainbow border),
+  `.spinner` (one canonical border spinner), `.loading-dots` (three bouncing
+  dots), `.sheen` (sweep-of-light), `.ping` (expanding pulse ring),
+  `.fade-edge` (static mask-image edge fade), and `.progress-meter` (a
+  dual-layer color-flip progress bar). Plain `.class` + `@keyframes` (not
+  `@utility`), themed through the 7-role CSS custom properties, every knob a
+  tunable CSS var. It does NOT auto-bundle: `tailwindcss:engines` only
+  generates an entry for the file literally named `engine.css`, so consumers
+  adopt this layer deliberately with a single `@import` (see the file header).
+  App-side de-fork of the local copies is a follow-up task.
+
 ## 0.14.0 — 2026-07-22
 
 ### Added
