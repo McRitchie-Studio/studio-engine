@@ -2,6 +2,29 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.17.0 — 2026-07-27
+
+### Added
+
+- **`admin/design_system` — the living style guide (first slice).** A new
+  admin-gated page (`DesignSystemController#index`, route
+  `admin_design_system_path`) that renders the engine's shared UI primitives
+  live in the host app's theme. The route is propagated to every consumer by
+  `Studio.routes`, and the view is a bare content wrapper that renders inside
+  each host's `application.html.erb`, inheriting that app's navbar + theme. This
+  slice ships the **Style** section — a grouped, live gallery where each
+  specimen shows the rendered primitive, its class name, and a copyable usage
+  snippet: **Buttons** (`.btn` + every role variant + `.btn-sm` / `.btn-lg`
+  sizes), **Surfaces / text / form** (`.card`, `.card-hover`, `.badge`,
+  `.input-field`, `.empty-state`, `.label-upper`), the seven **Motion**
+  primitives from `engine-motion.css` (`.studio-border-glow`, `.spinner`,
+  `.loading-dots`, `.sheen`, `.ping`, `.fade-edge-*`, `.progress-meter`) each
+  with tunable CSS-var knobs demonstrated, and the seven **Theme tokens** as
+  swatches read live off `var(--color-*)`. Specimens use ONLY the engine's own
+  classes, so a consumer that bundles `engine.css` and imports
+  `engine-motion.css` styles them for real (nothing is inlined). The Modals,
+  Theme, and Tasks sections are later slices.
+
 ## 0.16.0 — 2026-07-26
 
 ### Added
