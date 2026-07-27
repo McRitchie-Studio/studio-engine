@@ -2,6 +2,45 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.18.0 — 2026-07-27
+
+### Added
+
+- **Capability features — `Studio.features` / `Studio.feature?(name)`.** A new
+  coarse app-capability switch mirroring the `auth_methods` / `auth_method?`
+  pattern. `mattr_accessor :features` defaults to `[]` (every capability OFF);
+  an app opts in from `config/initializers/studio.rb`, e.g.
+  `config.features = %i[leveling web3]`, and code gates a surface with
+  `Studio.feature?(:leveling)`. Distinct from `auth_methods` (which sign-in
+  methods): features gate whole product surfaces. `feature?` tolerates String or
+  Symbol entries and any Enumerable, so `feature?("web3")` and `feature?(:web3)`
+  agree.
+
+- **`engine-motion.css` — four EFFECT primitives.** Beyond the seven motion
+  primitives, a new visual-effect family (same design rules: plain classes,
+  themed CSS-var knobs, namespaced keyframes): `.text-gradient` (gradient-clipped
+  text fill), `.studio-glow` / `.studio-glow--pulse` (a soft themed glow halo,
+  distinct from the animated rainbow-border `.studio-border-glow`),
+  `.surface-glass` (a frosted, translucent glass panel for overlay chrome via
+  `backdrop-filter` + `color-mix`), and `.conic-surface` (a slow rotating
+  conic-gradient ambient wash). All themed through the role tokens; the animated
+  ones honor `prefers-reduced-motion`.
+
+### Changed
+
+- **`admin/design_system` — full four-section page.** The living style guide is
+  now four sections reached by a sticky section nav (`Style · Modals · Theme ·
+  Tasks`), rendered as sibling partials (`_style`, `_modals`, `_theme`,
+  `_tasks`). **Style** is fully built: it keeps Buttons / Surfaces-text-form /
+  the seven Motion primitives / Theme tokens, and adds an **Effects** group (the
+  four new effect primitives) and a **Leveling** group gated by
+  `Studio.feature?(:leveling)`. Capability-gated specimens render
+  "disabled-but-present" on hosts with the feature off (the `_specimen`
+  `disabled:` local greys + flags the specimen without hiding it) — McRitchie
+  Studio ships leveling off, so its leveling specimens preview greyed and
+  flagged. **Modals / Theme / Tasks** are tasteful "next slice" stub cards this
+  build leaves as real partials for a later slice to fill.
+
 ## 0.17.0 — 2026-07-27
 
 ### Added

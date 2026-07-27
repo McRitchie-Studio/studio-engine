@@ -2,13 +2,29 @@
      Reusable chrome around ONE primitive:
        stage - the rendered primitive (yielded from the caller block)
        meta  - its class name and a copyable usage snippet
-     locals: klass (String, required) and usage (String, optional).
+     locals:
+       klass          (String, required) - the class label shown under the stage
+       usage          (String, optional) - a copyable usage snippet
+       disabled       (Boolean, optional) - render "disabled but present": the
+                       primitive stays visible + previewable but is muted/greyed
+                       and flagged, for a capability the host app has turned off
+                       (Studio.feature? is false). NOT hidden.
+       disabled_label (String, optional) - the flag text (default below).
      Rendered via `render layout: "design_system/specimen"` so the caller's
      block becomes the staged primitive. Checks local_assigns (never
      block_given?) so a shared partial does not inherit the host layout yield. %>
-<article class="card overflow-hidden flex flex-col">
-  <div class="flex flex-1 flex-wrap items-center justify-center gap-4 p-6 bg-surface-alt min-h-32">
-    <%= yield %>
+<%
+  disabled       = local_assigns[:disabled]
+  disabled_label = local_assigns[:disabled_label].presence || "disabled on this app"
+%>
+<article class="card overflow-hidden flex flex-col<%= " opacity-95" if disabled %>" <%= 'aria-disabled="true"'.html_safe if disabled %>>
+  <div class="relative flex flex-1 flex-wrap items-center justify-center gap-4 p-6 bg-surface-alt min-h-32">
+    <% if disabled %>
+      <span class="absolute top-2 right-2 badge z-10" style="color: var(--color-warning); border-color: var(--color-warning)"><%= disabled_label %></span>
+      <div class="flex flex-wrap items-center justify-center gap-4 opacity-40 grayscale select-none pointer-events-none"><%= yield %></div>
+    <% else %>
+      <%= yield %>
+    <% end %>
   </div>
   <div class="border-t border-subtle p-3 space-y-2">
     <code class="block font-mono text-2xs text-heading break-all"><%= local_assigns[:klass] %></code>

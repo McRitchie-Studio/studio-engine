@@ -9,9 +9,9 @@ require "minitest/autorun"
 require "active_support/test_case"
 require "action_view"
 
-# [component] Guard for the admin/design_system living style guide (slice A:
-# shell + Style section). Four load-bearing properties, each exercised (not just
-# declared):
+# [component] Guard for the admin/design_system living style guide (four-section
+# page: Style built, Modals/Theme/Tasks stubbed). Load-bearing properties, each
+# exercised (not just declared):
 #
 #   1. Studio.routes draws admin_design_system_path -> design_system#index into
 #      every consuming host (this is what makes the page reachable in MS + TM).
@@ -20,10 +20,15 @@ require "action_view"
 #      logged-in non-admin to root, and lets an admin through.
 #   3. DesignSystemController wires that gate as a before_action.
 #   4. The view is a bare content wrapper that REFERENCES every primitive family
-#      (buttons, surfaces/text/form, the seven motion primitives, the theme
-#      tokens). The dummy app does not compile the engine CSS, so the specimens
-#      are unstyled here by design — this asserts the classes are referenced, the
-#      contract a consumer's Tailwind build then styles for real.
+#      (buttons, surfaces/text/form, the seven motion primitives, the four effect
+#      primitives, the theme tokens) and wires the four-section nav (Style /
+#      Modals / Theme / Tasks) with matching anchor targets; Modals/Theme/Tasks
+#      render as stub cards this build. The dummy app does not compile the engine
+#      CSS, so the specimens are unstyled here by design — this asserts the
+#      classes are referenced, the contract a consumer's Tailwind build styles.
+#   5. Studio.feature?(name) gates capability specimens. Off by default, so the
+#      Leveling group renders "disabled-but-present" — present + flagged, never
+#      hidden — on a host (like MS) that has :leveling off.
 class DesignSystemPageTest < ActiveSupport::TestCase
   def routes
     Rails.application.routes.url_helpers
@@ -121,6 +126,14 @@ class DesignSystemPageTest < ActiveSupport::TestCase
     --color-warning --color-text --color-border-strong
   ].freeze
 
+  # The four EFFECT primitives added to engine-motion.css — real engine classes
+  # the Effects group specimens, so they belong in the referenced-class contract.
+  REQUIRED_EFFECT_CLASSES = %w[
+    text-gradient studio-glow surface-glass conic-surface
+  ].freeze
+
+  SECTION_ANCHORS = %w[style modals theme tasks].freeze
+
   def render_index
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
     view.render(template: "design_system/index")
@@ -146,6 +159,67 @@ class DesignSystemPageTest < ActiveSupport::TestCase
     REQUIRED_THEME_TOKENS.each do |token|
       assert_includes html, token,
         "the theme-tokens section must read var(#{token}) so the swatch restyles per app"
+    end
+  end
+
+  test "the Style section references the four effect primitives" do
+    html = render_index
+    REQUIRED_EFFECT_CLASSES.each do |klass|
+      assert_includes html, klass,
+        "the Effects group must render a specimen using .#{klass}"
+    end
+  end
+
+  test "the section nav links all four sections to matching anchor targets" do
+    html = render_index
+    SECTION_ANCHORS.each do |anchor|
+      assert_includes html, %(href="##{anchor}"),
+        "the section nav must link to ##{anchor}"
+      assert_includes html, %(id="#{anchor}"),
+        "section ##{anchor} must exist as an anchor target"
+    end
+  end
+
+  test "Modals / Theme / Tasks render as stub cards this build" do
+    html = render_index
+    assert_equal 3, html.scan('data-stub="true"').size,
+      "each of the three later sections renders exactly one stub card"
+    assert_includes html, "This section lands in the next build."
+  end
+
+  # --- 5. the capability-feature flag + disabled-but-present gating -----------
+
+  test "Studio.feature? is false by default and true once opted in" do
+    original = Studio.features
+    begin
+      Studio.features = []
+      refute Studio.feature?(:leveling), "features default to [] (all off)"
+
+      Studio.features = %i[leveling web3]
+      assert Studio.feature?(:leveling), "an opted-in feature reads true"
+      assert Studio.feature?("web3"), "feature? accepts a String too"
+      refute Studio.feature?(:missing), "a feature not opted in reads false"
+    ensure
+      Studio.features = original
+    end
+  end
+
+  test "with :leveling OFF the leveling specimens render disabled-but-present" do
+    original = Studio.features
+    begin
+      Studio.features = [] # MS default: leveling off
+      html = render_index
+
+      assert_includes html, "Leveling",
+        "the leveling sub-section heading is present"
+      assert_includes html, "level-badge-10",
+        "the representative leveling specimen stays present, not hidden"
+      assert_includes html, "disabled on this app",
+        "the disabled-but-present specimen is flagged"
+      assert_includes html, 'aria-disabled="true"',
+        "the disabled specimen is marked for assistive tech"
+    ensure
+      Studio.features = original
     end
   end
 end

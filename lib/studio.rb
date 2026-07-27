@@ -33,6 +33,20 @@ module Studio
   # contract check — see validate_user_contract!).
   mattr_accessor :auth_methods, default: %i[magic_link google wallet]
 
+  # ---- Capability features --------------------------------------------------
+  # Coarse app-level capability switches an app opts into. Distinct from
+  # auth_methods (which sign-in methods the login views render) — these gate
+  # whole product surfaces (e.g. :web3 on-chain features, :leveling XP/levels).
+  # Default [] means every capability is OFF; an app turns on what it ships in
+  # config/initializers/studio.rb:
+  #
+  #   Studio.configure { |config| config.features = %i[leveling web3] }
+  #
+  # Gate a surface with Studio.feature?(:leveling). The admin/design_system page
+  # uses this to render capability-gated specimens "disabled but present" on
+  # apps with the feature off (e.g. McRitchie Studio, which ships neither).
+  mattr_accessor :features, default: []
+
   # Magic-link (passwordless email) tuning. token_name keys the MessageVerifier
   # purpose; bump it to invalidate every outstanding link. See MagicLink service.
   mattr_accessor :magic_link_ttl,        default: 15.minutes
@@ -150,6 +164,14 @@ module Studio
   # True when the given sign-in method is enabled for this app.
   def self.auth_method?(method)
     auth_methods.include?(method.to_sym)
+  end
+
+  # True when the given capability feature is enabled for this app. Mirrors
+  # auth_method? — apps opt in via config.features in their initializer (see the
+  # Studio.features accessor). Tolerates String or Symbol entries and any
+  # Enumerable (Array or Set), so `feature?("web3")` and `feature?(:web3)` agree.
+  def self.feature?(name)
+    features.any? { |f| f.to_sym == name.to_sym }
   end
 
   # True when the engine login should render a PASSWORD field/form: passwords are enabled

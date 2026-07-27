@@ -1,8 +1,11 @@
 /*
   studio-engine MOTION / EFFECT primitives — the shared animation + visual-effect
-  layer. Seven reusable primitives, consolidated from the per-app copies that
-  drifted across mcritchie-studio (MS) and turf-monster (TM):
+  layer. Eleven reusable primitives in two families. The MOTION seven were
+  consolidated from the per-app copies that drifted across mcritchie-studio (MS)
+  and turf-monster (TM); the EFFECT four are the reusable visual treatments the
+  admin/design_system page showcases beyond motion.
 
+  Motion:
     .studio-border-glow   mask-composite rainbow border glow  (extracted, MS)
     .spinner              one canonical border spinner        (reconciled, MS+TM)
     .loading-dots         three bouncing dots                 (extracted, TM)
@@ -10,6 +13,12 @@
     .ping                 expanding pulse ring                (extracted, TM)
     .fade-edge            static mask-image edge fade         (authored fresh)
     .progress-meter       dual-layer color-flip progress bar  (authored fresh)
+
+  Effect:
+    .text-gradient        gradient-clipped text fill          (authored fresh)
+    .studio-glow          soft themed glow halo               (authored fresh)
+    .surface-glass        frosted translucent glass panel     (authored fresh)
+    .conic-surface        slow rotating conic-gradient wash   (authored fresh)
 
   ─────────────────────────────────────────────────────────────────────────────
   OPT-IN — this layer does NOT auto-bundle.
@@ -420,8 +429,133 @@
 }
 
 /* =============================================================================
+   EFFECT family — static (and one slow-animated) visual treatments, beyond the
+   seven motion primitives above. Same design rules: plain classes, themed knobs
+   with sensible defaults, namespaced keyframes.
+   ========================================================================== */
+
+/* =============================================================================
+   8. text-gradient — gradient-clipped text fill (authored fresh)
+   Paints text with a themed gradient instead of a flat color via
+   background-clip: text. Defaults to a CTA -> danger sweep; retune the two stops
+   or replace the whole gradient image. Static — no animation. Apply to the text
+   element itself (a heading, a span); it needs a bold/large glyph to read well.
+
+   Usage:  <h1 class="text-gradient">Headline</h1>
+   Tune:   --text-gradient-from / --text-gradient-to / --text-gradient-angle /
+           --text-gradient-image (override the whole gradient)
+   ========================================================================== */
+.text-gradient {
+  --text-gradient-from: var(--color-cta);
+  --text-gradient-to: var(--color-danger);
+  --text-gradient-angle: 90deg;
+  --text-gradient-image: linear-gradient(
+    var(--text-gradient-angle),
+    var(--text-gradient-from),
+    var(--text-gradient-to)
+  );
+  background-image: var(--text-gradient-image);
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* =============================================================================
+   9. studio-glow — soft themed glow halo (authored fresh)
+   A single-color bloom around any element via box-shadow, tinted with the CTA
+   role by default. Static; add .studio-glow--pulse to breathe. Distinct from
+   .studio-border-glow (an animated rainbow BORDER ring) — this is a plain halo
+   for emphasis on a button, avatar, or card.
+
+   Usage:  <button class="btn btn-primary studio-glow">Launch</button>
+   Tune:   --studio-glow-color / --studio-glow-size / --studio-glow-spread /
+           --studio-glow-opacity / --studio-glow-speed (pulse only)
+   ========================================================================== */
+.studio-glow {
+  --studio-glow-color: var(--color-cta);
+  --studio-glow-size: 1.4rem;
+  --studio-glow-spread: -0.2rem;
+  --studio-glow-opacity: 0.6;
+  box-shadow: 0 0 var(--studio-glow-size) var(--studio-glow-spread)
+    color-mix(in srgb, var(--studio-glow-color) calc(var(--studio-glow-opacity) * 100%), transparent);
+}
+
+.studio-glow--pulse {
+  animation: studio-glow-pulse var(--studio-glow-speed, 2.4s) ease-in-out infinite;
+}
+
+@keyframes studio-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 var(--studio-glow-size) var(--studio-glow-spread)
+      color-mix(in srgb, var(--studio-glow-color) calc(var(--studio-glow-opacity) * 100%), transparent);
+  }
+  50% {
+    box-shadow: 0 0 calc(var(--studio-glow-size) * 2) calc(var(--studio-glow-spread) + 0.2rem)
+      color-mix(in srgb, var(--studio-glow-color) calc(var(--studio-glow-opacity) * 100%), transparent);
+  }
+}
+
+/* =============================================================================
+   10. surface-glass — frosted translucent glass panel (authored fresh)
+   A translucent, blurred surface for overlay chrome (modal shells, sticky bars,
+   toasts floated over content). The tint is the surface role mixed toward
+   transparent, so it reads in dark AND light; backdrop-filter blurs whatever
+   sits behind it. Give it a radius + padding at the call site.
+
+   Usage:  <div class="surface-glass rounded-xl p-4"> ... </div>
+   Tune:   --surface-glass-tint / --surface-glass-opacity / --surface-glass-blur /
+           --surface-glass-saturate / --surface-glass-border
+   ========================================================================== */
+.surface-glass {
+  --surface-glass-tint: var(--color-surface);
+  --surface-glass-opacity: 0.6;
+  --surface-glass-blur: 12px;
+  --surface-glass-saturate: 1.4;
+  background: color-mix(in srgb, var(--surface-glass-tint) calc(var(--surface-glass-opacity) * 100%), transparent);
+  -webkit-backdrop-filter: blur(var(--surface-glass-blur)) saturate(var(--surface-glass-saturate));
+          backdrop-filter: blur(var(--surface-glass-blur)) saturate(var(--surface-glass-saturate));
+  border: 1px solid var(--surface-glass-border, color-mix(in srgb, var(--color-border-strong) 70%, transparent));
+}
+
+/* =============================================================================
+   11. conic-surface — slow rotating conic-gradient wash (authored fresh)
+   A subtle animated ambient background for hero panels / empty states: a conic
+   gradient sweeps between two themed stops (CTA -> surface by default) on a slow
+   rotation. The gradient lives on a ::before that rotates, so content kept above
+   it stays crisp. The element's radius clips the wash; give it one.
+
+   Usage:  <div class="conic-surface rounded-2xl p-8"> ...content... </div>
+   Tune:   --conic-surface-from / --conic-surface-to / --conic-surface-duration
+   ========================================================================== */
+.conic-surface {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.conic-surface::before {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  z-index: -1;
+  background: conic-gradient(
+    from 0deg,
+    var(--conic-surface-from, var(--color-cta)),
+    var(--conic-surface-to, var(--color-surface)),
+    var(--conic-surface-from, var(--color-cta))
+  );
+  animation: conic-surface-spin var(--conic-surface-duration, 16s) linear infinite;
+}
+
+@keyframes conic-surface-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* =============================================================================
    Reduced-motion: honor the user preference. Animated primitives settle into a
-   sensible static resting state; the static primitives (fade-edge) are unaffected.
+   sensible static resting state; the static primitives (fade-edge, text-gradient,
+   surface-glass) are unaffected.
    ========================================================================== */
 @media (prefers-reduced-motion: reduce) {
   .studio-border-glow::before,
@@ -431,7 +565,9 @@
   .sheen::after,
   .ping,
   .ping.ping--dot::after,
-  .progress-meter--indeterminate .progress-meter-fill {
+  .progress-meter--indeterminate .progress-meter-fill,
+  .studio-glow--pulse,
+  .conic-surface::before {
     animation: none;
   }
 
