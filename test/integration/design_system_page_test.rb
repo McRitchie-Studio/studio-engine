@@ -9,8 +9,8 @@ require "minitest/autorun"
 require "active_support/test_case"
 require "action_view"
 
-# [component] Guard for the admin/design_system living style guide (four-section
-# page: Style built, Modals/Theme/Tasks stubbed). Load-bearing properties, each
+# [component] Guard for the admin/design_system living style guide — all four
+# sections built (Style / Modals / Theme / Tasks). Load-bearing properties, each
 # exercised (not just declared):
 #
 #   1. Studio.routes draws admin_design_system_path -> design_system#index into
@@ -22,13 +22,17 @@ require "action_view"
 #   4. The view is a bare content wrapper that REFERENCES every primitive family
 #      (buttons, surfaces/text/form, the seven motion primitives, the four effect
 #      primitives, the theme tokens) and wires the four-section nav (Style /
-#      Modals / Theme / Tasks) with matching anchor targets; Modals/Theme/Tasks
-#      render as stub cards this build. The dummy app does not compile the engine
-#      CSS, so the specimens are unstyled here by design — this asserts the
-#      classes are referenced, the contract a consumer's Tailwind build styles.
+#      Modals / Theme / Tasks) with matching anchor targets. The dummy app does
+#      not compile the engine CSS, so specimens are unstyled here by design —
+#      this asserts the classes/contract a consumer's Tailwind build styles.
 #   5. Studio.feature?(name) gates capability specimens. Off by default, so the
-#      Leveling group renders "disabled-but-present" — present + flagged, never
-#      hidden — on a host (like MS) that has :leveling off.
+#      Leveling (Style) and web3 + leveling (Modals) groups render
+#      "disabled-but-present" — present + flagged, never hidden — on a host
+#      (like MS) that has those capabilities off.
+#   6. Modals wires a page-scoped store (dsModals) whose Open affordances push the
+#      real engine card blocks (processing/success/error/countdown) full-size.
+#   7. Theme folds the /admin/theme role-color editor into the page.
+#   8. Tasks renders the shared board-primitive demonstrator on the stage-* spine.
 class DesignSystemPageTest < ActiveSupport::TestCase
   def routes
     Rails.application.routes.url_helpers
@@ -180,11 +184,83 @@ class DesignSystemPageTest < ActiveSupport::TestCase
     end
   end
 
-  test "Modals / Theme / Tasks render as stub cards this build" do
+  test "Modals / Theme / Tasks are built (no leftover stub cards)" do
     html = render_index
-    assert_equal 3, html.scan('data-stub="true"').size,
-      "each of the three later sections renders exactly one stub card"
-    assert_includes html, "This section lands in the next build."
+    assert_equal 0, html.scan('data-stub="true"').size,
+      "the wave-2 sections replace the stub cards"
+    refute_includes html, "This section lands in the next build."
+  end
+
+  # --- 6. Modals: page-scoped store opens the real engine card blocks --------
+
+  # The status archetypes each wire an Open onto the self-contained dsModals
+  # store, and the real engine block partials render as that modal's content.
+  test "the Modals section wires live engine-block modals via the dsModals store" do
+    html = render_index
+    assert_includes html, 'id="modals"'
+    assert_includes html, "Alpine.store('dsModals'",
+      "the Modals section registers its own page-scoped modal store"
+    %w[ds-processing ds-success ds-error ds-countdown].each do |id|
+      assert_includes html, "$store.dsModals.open('#{id}')",
+        "the gallery must wire an Open for the #{id} specimen"
+    end
+    # The genuine engine card blocks are reused as the modal content, not mocked.
+    assert_includes html, "Entry confirmed", "ds-success renders the real success card block"
+    assert_includes html, "Something went wrong. Give it another try.",
+      "ds-error renders the real error card block"
+  end
+
+  # web3 (wallet-connect, on-chain-tx) and leveling (level-up) are standardized as
+  # engine modal specimens but render disabled-but-present when the host has the
+  # capability off — present + flagged, never hidden.
+  test "with :web3 and :leveling OFF the capability modal specimens are disabled-but-present" do
+    original = Studio.features
+    begin
+      Studio.features = [] # MS default: web3 + leveling off
+      html = render_index
+
+      %w[ds-wallet-connect ds-onchain-tx ds-levelup].each do |id|
+        assert_includes html, "$store.dsModals.open('#{id}')",
+          "the #{id} specimen stays present, not hidden"
+      end
+      assert_includes html, "disabled on this app",
+        "the capability specimens are flagged disabled"
+      assert_includes html, 'aria-disabled="true"',
+        "the disabled specimens are marked for assistive tech"
+    ensure
+      Studio.features = original
+    end
+  end
+
+  # --- 7. Theme: the /admin/theme editor folded into the page ----------------
+
+  test "the Theme section folds in the admin/theme role-color editor" do
+    html = render_index
+    assert_includes html, 'id="theme"'
+    assert_includes html, 'action="/admin/theme"',
+      "the editor posts to the admin_theme route"
+    assert_includes html, 'action="/admin/theme/regenerate"',
+      "the regenerate control posts to the admin_theme_regenerate route"
+    assert_includes html, 'name="theme_setting[primary]"',
+      "the editor renders the role-color inputs"
+    assert_includes html, "dsThemeEditor(",
+      "the live-preview editor factory is wired"
+  end
+
+  # --- 8. Tasks: the shared board-primitive demonstrator ---------------------
+
+  test "the Tasks section renders the board demonstrator on the stage-* spine" do
+    html = render_index
+    assert_includes html, 'id="tasks"'
+    # The stage-* palette is the board spine — the demo names the stage roles.
+    %w[stage-fresh stage-shipped stage-closed].each do |stage|
+      assert_includes html, stage,
+        "the Tasks demo must render the #{stage} palette role"
+    end
+    assert_includes html, "cursor-grab",
+      "the demo cards show the drag / rank affordance"
+    assert_includes html, "What every board inherits",
+      "the standard-vs-custom sketch is present"
   end
 
   # --- 5. the capability-feature flag + disabled-but-present gating -----------

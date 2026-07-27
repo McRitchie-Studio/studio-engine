@@ -1,17 +1,369 @@
-<%#  Modals section of the living style guide - STUB. Wave 2 fills this with live
-     specimens of the shared modal host, hold-to-confirm flows, and the reusable
-     modal cards (studio-engine v0.4.5+). Left as a real partial so the section
-     nav + anchor already work. %>
-<section id="modals" class="space-y-5" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
+<%#  Modals section of the living style guide (admin/design_system).
+
+     A gallery of the shared modal host + reusable modal cards. Each specimen is
+     a small, faithful mock (visual representation, not to scale); clicking one
+     opens the REAL full-size modal built from the engine block partials.
+
+     Why a page-scoped store (dsModals) instead of the shared $store.modals: the
+     shared host is rendered once by the HOST app layout with an unconditional
+     x-if on current(), and only its own modal ids are registered there. Pushing
+     a novel specimen id onto the shared stack would make that host paint an
+     empty card behind ours. So this section owns a tiny, self-contained store
+     and overlay, and reuses the genuine engine block partials as the content.
+
+     web3 (wallet-connect, on-chain-tx) and leveling (level-up) are standardized
+     here as engine specimens but rendered through the wave-1 _specimen disabled:
+     local. On an app with the capability off (McRitchie Studio) they are greyed
+     and badged yet still present; on an app with it on they open live. %>
+<%
+  web3_on     = Studio.feature?(:web3)
+  leveling_on = Studio.feature?(:leveling)
+%>
+<section id="modals" class="space-y-10" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)"
+         x-data="{}" @ds-modal-close.window="$store.dsModals.close()">
   <div class="space-y-1">
     <h2 class="text-2xl font-bold text-heading">Modals</h2>
-    <p class="text-muted text-sm">The shared modal host, hold-to-confirm flows, and the reusable modal cards.</p>
-  </div>
-  <div class="card p-8 text-center space-y-3" data-stub="true">
-    <span class="badge" style="color: var(--color-cta); border-color: var(--color-cta)">Next slice</span>
-    <p class="text-heading font-semibold">This section lands in the next build.</p>
-    <p class="text-muted text-sm max-w-md mx-auto">
-      Wave 2 fills it with live specimens of the modal host, hold modals, and the card blocks.
+    <p class="text-muted text-sm">
+      The shared modal host and the reusable card blocks, grouped by theme and type. Each
+      tile is a <strong>visual representation, not to scale</strong> &mdash; click one to open the
+      real modal.
     </p>
   </div>
+
+  <%# Page-scoped modal animation. Distinct class names (ds-modal-*) so the
+      section never collides with, or depends on, the host's inline keyframes. %>
+  <style>
+    body.ds-modal-open { overflow: hidden; }
+    @keyframes ds-modal-in {
+      0%   { opacity: 0; transform: scale(0.86) translateY(12px); }
+      55%  { opacity: 1; transform: scale(1.04) translateY(-3px); }
+      80%  {              transform: scale(0.99) translateY(1px);  }
+      100% { opacity: 1; transform: scale(1) translateY(0);        }
+    }
+    @keyframes ds-modal-out {
+      0%   { opacity: 1; transform: scale(1) translateY(0);       }
+      100% { opacity: 0; transform: scale(0.92) translateY(4px);  }
+    }
+    @keyframes ds-backdrop-in  { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes ds-backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+    .ds-modal-in     { animation: ds-modal-in 320ms cubic-bezier(0.34, 1.4, 0.5, 1) both; }
+    .ds-modal-out    { animation: ds-modal-out 200ms cubic-bezier(0.6, -0.2, 0.7, 0.4) forwards; }
+    .ds-backdrop-in  { animation: ds-backdrop-in 180ms ease-out both; }
+    .ds-backdrop-out { animation: ds-backdrop-out 200ms ease-in forwards; }
+    @media (prefers-reduced-motion: reduce) {
+      .ds-modal-in, .ds-modal-out, .ds-backdrop-in, .ds-backdrop-out {
+        animation-duration: 80ms; animation-timing-function: linear;
+      }
+    }
+  </style>
+
+  <%# Self-contained modal store. Idempotent registration, mirrors the essentials
+      of the real host store (open / close / current + a close animation delay). %>
+  <script>
+    (function () {
+      document.addEventListener('alpine:init', function () {
+        if (Alpine.store('dsModals')) return;
+        Alpine.store('dsModals', {
+          stack: [],
+          current: function () { return this.stack.length ? this.stack[this.stack.length - 1] : null; },
+          open: function (id, props) {
+            this.stack.push({ id: id, props: props || {}, _closing: false });
+            document.body.classList.add('ds-modal-open');
+          },
+          close: function () {
+            var entry = this.current();
+            if (!entry || entry._closing) return;
+            entry._closing = true;
+            var self = this;
+            setTimeout(function () {
+              var i = self.stack.indexOf(entry);
+              if (i >= 0) self.stack.splice(i, 1);
+              if (!self.stack.length) document.body.classList.remove('ds-modal-open');
+            }, 200);
+          },
+          cardClass: function () {
+            var c = this.current();
+            return c && c._closing ? 'ds-modal-out' : 'ds-modal-in';
+          },
+          backdropClass: function () {
+            var c = this.current();
+            return c && c._closing ? 'ds-backdrop-out' : 'ds-backdrop-in';
+          }
+        });
+      });
+    })();
+  </script>
+
+  <%# The overlay: one backdrop + card, with every specimen's real content
+      registered as a single-root template gated on the current modal id. %>
+  <template x-if="$store.dsModals.current()">
+    <%# surface-glass frosts the live page behind the modal; the inline dark
+        scrim keeps the host's rgba(0,0,0,0.6) overlay (inline beats the class). %>
+    <div class="surface-glass fixed inset-0 z-[120] flex items-center justify-center p-4"
+         :class="$store.dsModals.backdropClass()"
+         style="background: rgba(0,0,0,0.6); border: 0"
+         role="dialog" aria-modal="true"
+         @keydown.escape.window="$store.dsModals.current() && $store.dsModals.current().props.dismissible !== false && $store.dsModals.close()"
+         @click.self="$store.dsModals.current() && $store.dsModals.current().props.dismissible !== false && $store.dsModals.close()">
+      <div class="bg-surface rounded-xl border border-subtle shadow-2xl p-6 max-w-sm w-full"
+           :class="$store.dsModals.cardClass()">
+
+        <template x-if="$store.dsModals.current() && $store.dsModals.current().id === 'ds-processing'">
+          <div><%= render "studio/modals/blocks/processing_card",
+                    title: "Confirming entry", message: "Talking to the server…" %></div>
+        </template>
+
+        <template x-if="$store.dsModals.current() && $store.dsModals.current().id === 'ds-success'">
+          <div><%= render "studio/modals/blocks/success_card",
+                    title: "Entry confirmed", message: "You're in — good luck!",
+                    icon_color: "success", cta_label: "Continue", cta_event: "ds-modal-close" do %><% end %></div>
+        </template>
+
+        <template x-if="$store.dsModals.current() && $store.dsModals.current().id === 'ds-error'">
+          <div><%= render "studio/modals/blocks/error_card",
+                    title: "Couldn't connect", icon_emoji: "⚠️",
+                    message: "Something went wrong. Give it another try.",
+                    cta_label: "Try again", cta_event: "ds-modal-close",
+                    secondary_label: "Dismiss", secondary_event: "ds-modal-close" %></div>
+        </template>
+
+        <template x-if="$store.dsModals.current() && $store.dsModals.current().id === 'ds-countdown'">
+          <div x-data="{ n: 5, t: 5, timer: null }"
+               x-init="timer = setInterval(() => { if (n > 0) { n--; } else { clearInterval(timer); } }, 1000)">
+            <div class="text-center mb-4">
+              <p class="text-heading font-bold text-lg mb-1">Heading to the lobby</p>
+              <p class="text-secondary text-xs">Sit tight — this happens automatically.</p>
+            </div>
+            <%= render "studio/modals/blocks/progress_countdown", current_key: "n", total_key: "t" %>
+            <button type="button" class="btn btn-outline btn-sm w-full mt-4"
+                    @click="$store.dsModals.close()">Cancel</button>
+          </div>
+        </template>
+
+        <%# Web3 representative — a wallet picker built from engine primitives. %>
+        <template x-if="$store.dsModals.current() && $store.dsModals.current().id === 'ds-wallet-connect'">
+          <div class="text-center">
+            <h3 class="text-heading font-bold text-lg mb-1">Connect a wallet</h3>
+            <p class="text-secondary text-xs mb-5">Choose a Solana wallet to continue.</p>
+            <div class="space-y-2">
+              <button type="button" class="btn btn-neutral w-full justify-between" @click="$store.dsModals.close()">
+                <span>Phantom</span><span class="badge" style="color: var(--color-success); border-color: var(--color-success)">Detected</span>
+              </button>
+              <button type="button" class="btn btn-neutral w-full justify-between" @click="$store.dsModals.close()">
+                <span>Solflare</span><span class="text-muted text-xs">Install</span>
+              </button>
+            </div>
+            <button type="button" class="mt-4 text-xs text-secondary hover:text-heading underline underline-offset-2"
+                    @click="$store.dsModals.close()">Cancel</button>
+          </div>
+        </template>
+
+        <%# Web3 representative — an on-chain transaction, mid-flight. %>
+        <template x-if="$store.dsModals.current() && $store.dsModals.current().id === 'ds-onchain-tx'">
+          <div><%= render "studio/modals/blocks/processing_card",
+                    title: "Confirming on-chain", message: "Waiting for the wallet signature…",
+                    color: "success" %></div>
+        </template>
+
+        <%# Leveling representative — a level-up celebration using engine effects. %>
+        <template x-if="$store.dsModals.current() && $store.dsModals.current().id === 'ds-levelup'">
+          <div><%= render "studio/modals/blocks/success_card",
+                    title: "Level 10!", message: "You leveled up.", icon_emoji: "🎉",
+                    large_title: true, cta_label: "Nice", cta_event: "ds-modal-close" do %>
+            <div class="flex items-center justify-center">
+              <span class="sheen sheen--loop studio-glow studio-glow--pulse inline-flex h-14 w-14 items-center justify-center rounded-full text-white text-lg font-extrabold"
+                    style="background: var(--color-cta); --studio-glow-color: var(--color-success)">10</span>
+            </div>
+          <% end %></div>
+        </template>
+
+      </div>
+    </div>
+  </template>
+
+  <%# ---- System and status (live engine blocks) --------------------------- %>
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <h3 class="text-xl font-bold text-heading">System &amp; status</h3>
+      <p class="text-muted text-sm">
+        The reusable card blocks under <code class="font-mono text-2xs">studio/modals/blocks/</code> &mdash;
+        the studio-canonical processing, success, error, and countdown states.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <%= render layout: "design_system/specimen",
+            locals: { klass: "$store.dsModals.open('ds-processing')" } do %>
+        <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-processing')">
+          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Processing</span>
+          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+            <div class="mx-auto w-6 h-6 rounded-full border-2 animate-spin" style="border-color: color-mix(in srgb, var(--color-cta) 30%, transparent); border-top-color: var(--color-cta)"></div>
+            <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+            <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+          </div>
+          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
+        </button>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: "$store.dsModals.open('ds-success')" } do %>
+        <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-success')">
+          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Success</span>
+          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+            <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-success) 15%, transparent)">
+              <svg class="w-4 h-4" style="color: var(--color-success)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+            <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+          </div>
+          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
+        </button>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: "$store.dsModals.open('ds-error')" } do %>
+        <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-error')">
+          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Error / retry</span>
+          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+            <div class="text-2xl leading-none">⚠️</div>
+            <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+            <span class="block h-4 w-20 mx-auto rounded border" style="border-color: var(--color-border-strong)"></span>
+          </div>
+          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
+        </button>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: "$store.dsModals.open('ds-countdown')" } do %>
+        <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-countdown')">
+          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Countdown</span>
+          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+            <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+            <div class="w-full rounded-full overflow-hidden" style="height: 6px; background: rgba(128,128,128,0.2)">
+              <div style="height: 100%; width: 60%; border-radius: 9999px; background: var(--color-cta)"></div>
+            </div>
+            <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+          </div>
+          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
+        </button>
+      <% end %>
+    </div>
+  </section>
+
+  <%# ---- Profile (host-wired engine modals) ------------------------------- %>
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <h3 class="text-xl font-bold text-heading">Profile</h3>
+      <p class="text-muted text-sm">
+        The avatar / photo modals ship from the engine
+        (<code class="font-mono text-2xs">studio/modals/_crop_photo</code>,
+        <code class="font-mono text-2xs">studio/modals/_image_upload</code>). They open through the host's
+        shared modal stack and load cropper.js, so they are shown here as engine specimens.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%= render layout: "design_system/specimen",
+            locals: { klass: "studio/modals/_crop_photo",
+                      disabled_label: "host-wired", disabled: true } do %>
+        <div class="w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Crop photo</span>
+          <div class="mx-auto w-20 h-20 rounded-lg border-2 border-dashed flex items-center justify-center" style="border-color: var(--color-border-strong)">
+            <span class="text-muted text-2xs">Drop image</span>
+          </div>
+          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: "studio/modals/_image_upload",
+                      disabled_label: "host-wired", disabled: true } do %>
+        <div class="w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Image upload</span>
+          <div class="mx-auto w-20 h-20 rounded-lg border-2 border-dashed flex items-center justify-center" style="border-color: var(--color-border-strong)">
+            <span class="text-2xl leading-none">⬆️</span>
+          </div>
+          <span class="block h-1.5 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <%# ---- Web3 (capability-gated: Studio.feature?(:web3)) ------------------- %>
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <div class="flex flex-wrap items-center gap-3">
+        <h3 class="text-xl font-bold text-heading">Web3</h3>
+        <% if web3_on %>
+          <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">enabled on this app</span>
+        <% else %>
+          <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">disabled on this app</span>
+        <% end %>
+      </div>
+      <p class="text-muted text-sm">
+        Wallet + on-chain modals, standardized into the engine and gated by
+        <code class="font-mono text-2xs">Studio.feature?(:web3)</code>. Web3 is
+        <strong><%= web3_on ? "on" : "off" %></strong> here, so these render
+        <%= web3_on ? "live and open on click" : "disabled-but-present — greyed and badged, never hidden" %>.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%= render layout: "design_system/specimen",
+            locals: { klass: "$store.dsModals.open('ds-wallet-connect')", disabled: !web3_on } do %>
+        <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-wallet-connect')">
+          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Connect wallet</span>
+          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
+            <span class="block h-2 w-20 rounded" style="background: var(--color-text); opacity: .18"></span>
+            <span class="block h-5 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+            <span class="block h-5 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+          </div>
+          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
+        </button>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: "$store.dsModals.open('ds-onchain-tx')", disabled: !web3_on } do %>
+        <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-onchain-tx')">
+          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">On-chain tx</span>
+          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+            <div class="mx-auto w-6 h-6 rounded-full border-2 animate-spin" style="border-color: color-mix(in srgb, var(--color-success) 30%, transparent); border-top-color: var(--color-success)"></div>
+            <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+            <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+          </div>
+          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
+        </button>
+      <% end %>
+    </div>
+  </section>
+
+  <%# ---- Rewards / leveling (capability-gated: Studio.feature?(:leveling)) - %>
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <div class="flex flex-wrap items-center gap-3">
+        <h3 class="text-xl font-bold text-heading">Rewards</h3>
+        <% if leveling_on %>
+          <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">enabled on this app</span>
+        <% else %>
+          <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">disabled on this app</span>
+        <% end %>
+      </div>
+      <p class="text-muted text-sm">
+        The level-up celebration, gated by <code class="font-mono text-2xs">Studio.feature?(:leveling)</code>.
+        Leveling is <strong><%= leveling_on ? "on" : "off" %></strong> here, so this renders
+        <%= leveling_on ? "live" : "disabled-but-present" %>.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%= render layout: "design_system/specimen",
+            locals: { klass: "$store.dsModals.open('ds-levelup')", disabled: !leveling_on } do %>
+        <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-levelup')">
+          <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Level up</span>
+          <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+            <div class="text-2xl leading-none">🎉</div>
+            <span class="inline-flex h-8 w-8 items-center justify-center rounded-full text-white text-sm font-extrabold" style="background: var(--color-cta)">10</span>
+            <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+          </div>
+          <span class="text-2xs text-secondary group-hover:text-heading">Open &nearr;</span>
+        </button>
+      <% end %>
+    </div>
+  </section>
 </section>

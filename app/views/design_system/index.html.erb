@@ -5,8 +5,10 @@
 
      The page is four sections - Style, Modals, Theme, Tasks - reached by the
      sticky section nav below and rendered as sibling partials (_style, _modals,
-     _theme, _tasks). Style is fully built; Modals / Theme / Tasks are stubs this
-     build fills in a later slice.
+     _theme, _tasks). All four are built: Style (primitives), Modals (the shared
+     host + engine card blocks, with a page-scoped store for the live open),
+     Theme (the 7-role editor folded in from /admin/theme), and Tasks (the shared
+     board primitive demonstrator).
 
      Specimens use ONLY the engine's own classes (engine.css component layer plus
      engine-motion.css motion/effect layer), so a consumer that bundles engine.css

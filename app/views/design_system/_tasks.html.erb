@@ -1,16 +1,112 @@
-<%#  Tasks section of the living style guide - STUB. Wave 2 fills this with the
-     task cards, stage badges, and board status chips. Left as a real partial so
-     the section nav + anchor already work. %>
-<section id="tasks" class="space-y-5" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
+<%#  Tasks section of the living style guide (admin/design_system).
+
+     A DEMONSTRATOR of the shared board primitive — the columns, cards, stage
+     badges, and drag/rank affordance that every board (McRitchie Studio's
+     /deployments is the top-of-line) builds from. It is a static sketch, not a
+     backend-wired sortable board; the point is to show the standard so custom
+     boards can adopt it. The stage-* badge palette (components/_badge) is the
+     spine. %>
+<%
+  # The shared pipeline palette: each column maps to a stage-* badge scheme.
+  board_columns = [
+    { key: "stage-fresh",      label: "Fresh",      count: 2 },
+    { key: "stage-shaping",    label: "Shaping",    count: 1 },
+    { key: "stage-structured", label: "Structured", count: 1 },
+    { key: "stage-refined",    label: "Refined",    count: 1 },
+    { key: "stage-shipped",    label: "Shipped",    count: 1 }
+  ]
+
+  demo_cards = {
+    "stage-fresh" => [
+      { title: "Expand design system page", repo: "studio-engine", who: "SH" },
+      { title: "Coinflow buy rail",         repo: "turf-monster",  who: "JA" }
+    ],
+    "stage-shaping"    => [{ title: "Navbar RPC preload",   repo: "turf-monster",  who: "CA" }],
+    "stage-structured" => [{ title: "Magic-link TTL bump",  repo: "studio-engine", who: "SH" }],
+    "stage-refined"    => [{ title: "Release ticker card",  repo: "mcritchie",     who: "AV" }],
+    "stage-shipped"    => [{ title: "SES email backend",    repo: "mcritchie",     who: "ST" }]
+  }
+%>
+<section id="tasks" class="space-y-8" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
   <div class="space-y-1">
     <h2 class="text-2xl font-bold text-heading">Tasks</h2>
-    <p class="text-muted text-sm">Task cards, the stage badges, and the board's status chips.</p>
-  </div>
-  <div class="card p-8 text-center space-y-3" data-stub="true">
-    <span class="badge" style="color: var(--color-cta); border-color: var(--color-cta)">Next slice</span>
-    <p class="text-heading font-semibold">This section lands in the next build.</p>
-    <p class="text-muted text-sm max-w-md mx-auto">
-      Wave 2 fills it with live task cards, the stage-* badge palette, and the board status chips.
+    <p class="text-muted text-sm max-w-2xl">
+      The shared board primitive that every board builds from &mdash; columns, cards, the
+      <code class="font-mono text-2xs">stage-*</code> badge palette, and the drag / rank affordance.
+      McRitchie Studio's <code class="font-mono text-2xs">/deployments</code> board is the top-of-line;
+      this is a static demonstrator (full extraction lands in a later phase).
     </p>
+  </div>
+
+  <%# ---- The board ------------------------------------------------------- %>
+  <div class="fade-edge-x overflow-x-auto pb-2">
+    <div class="flex gap-4 min-w-max">
+      <% board_columns.each do |col| %>
+        <div class="w-56 flex-none" data-stage="<%= col[:key] %>">
+          <div class="mb-3 px-1 flex items-center gap-2">
+            <h3 class="text-sm font-bold text-heading uppercase tracking-wider"><%= col[:label] %></h3>
+            <%= render "components/badge", text: col[:count].to_s, scheme: col[:key] %>
+          </div>
+          <div class="rounded-xl border-2 border-dashed border-subtle min-h-40 p-2 space-y-2">
+            <% (demo_cards[col[:key]] || []).each do |c| %>
+              <div class="card p-3 space-y-2 cursor-grab active:cursor-grabbing" draggable="true">
+                <div class="flex items-start gap-2">
+                  <span class="text-muted select-none leading-none" aria-hidden="true">⠿</span>
+                  <p class="text-sm font-semibold text-heading leading-snug flex-1"><%= c[:title] %></p>
+                </div>
+                <div class="flex items-center justify-between gap-2">
+                  <%= render "components/badge", text: c[:repo], scheme: "neutral" %>
+                  <span class="inline-flex h-6 w-6 items-center justify-center rounded-full text-2xs font-bold text-white shrink-0" style="background: var(--color-cta)"><%= c[:who] %></span>
+                </div>
+              </div>
+            <% end %>
+            <div class="flex items-center justify-center h-16 text-muted text-xs">Drop tasks here</div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ---- The stage palette ---------------------------------------------- %>
+  <div class="space-y-3">
+    <p class="label-upper">Stage palette — the pipeline spine</p>
+    <div class="flex flex-wrap gap-2">
+      <% %w[stage-fresh stage-shaping stage-structured stage-refined stage-cohered stage-shipped stage-closed].each do |stage| %>
+        <span data-stage="<%= stage %>"><%= render "components/badge", text: stage.sub("stage-", ""), scheme: stage %></span>
+      <% end %>
+    </div>
+    <p class="text-muted text-xs">
+      Seven stage roles from <code class="font-mono text-2xs">components/_badge</code>. Every pipeline
+      (tasks, deployments, and any future board) draws its columns from this one palette, so a card
+      reads the same wherever it lives.
+    </p>
+  </div>
+
+  <%# ---- Standard vs custom -------------------------------------------- %>
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div class="card p-5 space-y-2">
+      <div class="flex items-center gap-2">
+        <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">Shared</span>
+        <p class="text-heading font-semibold text-sm">What every board inherits</p>
+      </div>
+      <ul class="text-secondary text-sm space-y-1 list-disc list-inside">
+        <li>Column layout + horizontal scroll with faded edges</li>
+        <li>The <code class="font-mono text-2xs">stage-*</code> badge palette + count chips</li>
+        <li>Card chrome (<code class="font-mono text-2xs">.card</code>) and the drag / rank handle</li>
+        <li>Empty-column drop state</li>
+      </ul>
+    </div>
+    <div class="card p-5 space-y-2">
+      <div class="flex items-center gap-2">
+        <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">Custom</span>
+        <p class="text-heading font-semibold text-sm">What each board sets</p>
+      </div>
+      <ul class="text-secondary text-sm space-y-1 list-disc list-inside">
+        <li>Which stages become columns</li>
+        <li>The card body — fields, chips, avatars, live timers</li>
+        <li>Filters (agent, app) and header actions</li>
+        <li>Live-update wiring (Turbo Streams on the deploy board)</li>
+      </ul>
+    </div>
   </div>
 </section>

@@ -8,5 +8,14 @@
 class DesignSystemController < ApplicationController
   before_action :require_admin
 
-  def index; end
+  # Load the live theme so the Theme section (folded in from /admin/theme) shows
+  # this app's saved colors + the CSRF-protected editor. Best-effort: the section
+  # renders from Studio.theme_config defaults when no ThemeSetting row exists, so
+  # a load hiccup must not take the whole living-style-guide page down.
+  def index
+    @theme_setting  = ThemeSetting.current if defined?(ThemeSetting)
+    @theme_defaults = Studio.theme_config  if Studio.respond_to?(:theme_config)
+  rescue StandardError => e
+    Rails.logger.warn("[design_system] theme preload skipped: #{e.message}")
+  end
 end
