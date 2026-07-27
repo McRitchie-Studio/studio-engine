@@ -1,0 +1,232 @@
+<%#  admin/design_system - the living style guide (slice A: shell + Style section).
+     A bare content wrapper (no `layout` call): it renders inside each host's
+     application.html.erb, inheriting that app's navbar and theme, so every
+     specimen restyles per app and in dark or light automatically.
+
+     Specimens use ONLY the engine's own classes (engine.css component layer plus
+     engine-motion.css motion layer), so a consumer that bundles engine.css and
+     imports engine-motion.css styles them for real. The primitive CSS is NOT
+     inlined here - the consumer's Tailwind build provides it. Page chrome uses
+     the engine's own .card / .label-upper / theme tokens. %>
+<%
+  button_variants = {
+    "primary"   => "Primary",
+    "secondary" => "Secondary",
+    "success"   => "Success",
+    "danger"    => "Danger",
+    "warning"   => "Warning",
+    "neutral"   => "Neutral",
+    "outline"   => "Outline",
+    "google"    => "Continue with Google"
+  }
+
+  # The 7 theme role tokens, read LIVE off the host theme so each swatch restyles
+  # per app and in dark/light. Names verified against Studio::ThemeResolver
+  # (the heading role reads --color-text; there is no --color-heading var).
+  theme_tokens = [
+    ["--color-cta",           "CTA / primary action"],
+    ["--color-surface",       "Surface"],
+    ["--color-success",       "Success"],
+    ["--color-danger",        "Danger"],
+    ["--color-warning",       "Warning"],
+    ["--color-text",          "Heading / text"],
+    ["--color-border-strong", "Border (strong)"]
+  ]
+%>
+<div class="max-w-6xl mx-auto px-4 py-8 space-y-14">
+  <header class="space-y-2">
+    <p class="label-upper">studio-engine &middot; v<%= Studio::VERSION %></p>
+    <h1 class="text-3xl font-bold text-heading">Design System</h1>
+    <p class="text-body max-w-2xl">
+      A living gallery of the shared UI primitives, rendered live in this app's
+      theme. Everything below is styled by the engine's own
+      <code class="font-mono text-2xs bg-inset px-1.5 py-0.5 rounded">engine.css</code>
+      and
+      <code class="font-mono text-2xs bg-inset px-1.5 py-0.5 rounded">engine-motion.css</code>
+      layers - toggle this app between light and dark and every specimen follows.
+    </p>
+  </header>
+
+  <!-- Buttons -->
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <h2 class="text-xl font-bold text-heading">Buttons</h2>
+      <p class="text-muted text-sm">
+        <code class="font-mono text-2xs">.btn</code> base plus one role variant, and the
+        <code class="font-mono text-2xs">.btn-sm</code> / <code class="font-mono text-2xs">.btn-lg</code> sizes.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <% button_variants.each do |name, label| %>
+        <%= render layout: "design_system/specimen",
+              locals: { klass: ".btn .btn-#{name}",
+                        usage: %(<button class="btn btn-#{name}">#{label}</button>) } do %>
+          <button type="button" class="btn btn-<%= name %>"><%= label %></button>
+        <% end %>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: ".btn-sm / .btn (default) / .btn-lg",
+                      usage: %(<button class="btn btn-primary btn-sm">Small</button>\n<button class="btn btn-primary">Default</button>\n<button class="btn btn-primary btn-lg">Large</button>) } do %>
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <button type="button" class="btn btn-primary btn-sm">Small</button>
+          <button type="button" class="btn btn-primary">Default</button>
+          <button type="button" class="btn btn-primary btn-lg">Large</button>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <!-- Surfaces, text and form -->
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <h2 class="text-xl font-bold text-heading">Surfaces, text &amp; form</h2>
+      <p class="text-muted text-sm">Cards, badges, inputs, the empty state, and the uppercase meta label.</p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%= render layout: "design_system/specimen",
+            locals: { klass: ".card", usage: %(<div class="card p-5">...</div>) } do %>
+        <div class="card p-5 text-sm text-body w-full max-w-xs text-center">Surface card</div>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: ".card-hover", usage: %(<div class="card-hover p-5">...</div>) } do %>
+        <div class="card-hover p-5 text-sm text-body w-full max-w-xs text-center">Hover me</div>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: ".badge", usage: %(<span class="badge">Neutral</span>) } do %>
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <span class="badge text-body">Neutral</span>
+          <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">Success</span>
+          <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">Warning</span>
+          <span class="badge" style="color: var(--color-danger); border-color: var(--color-danger)">Danger</span>
+        </div>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: ".input-field", usage: %(<input class="input-field" placeholder="you@example.com">) } do %>
+        <input type="text" class="input-field" placeholder="you@example.com" aria-label="Sample input">
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: ".label-upper", usage: %(<p class="label-upper">Section label</p>) } do %>
+        <p class="label-upper">Section label</p>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: ".empty-state", usage: %(<div class="empty-state">Nothing here yet</div>) } do %>
+        <div class="empty-state w-full max-w-xs text-sm text-muted">Nothing here yet</div>
+      <% end %>
+    </div>
+  </section>
+
+  <!-- Motion primitives -->
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <h2 class="text-xl font-bold text-heading">Motion primitives</h2>
+      <p class="text-muted text-sm">
+        The seven <code class="font-mono text-2xs">engine-motion.css</code> primitives. Each knob is a themeable
+        CSS variable - tune it inline with <code class="font-mono text-2xs">style="--knob: value"</code>.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%= render layout: "design_system/specimen",
+            locals: { klass: ".studio-border-glow (rounded-xl wrapper)",
+                      usage: %(<div class="studio-border-glow rounded-xl">...</div>) } do %>
+        <div class="studio-border-glow rounded-xl p-5 bg-surface text-center text-sm text-heading">Border glow</div>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: ".spinner  (knob: --spinner-size)",
+                      usage: %(<span class="spinner"></span>\n<span class="spinner" style="--spinner-size: 2rem"></span>) } do %>
+        <span class="spinner"></span>
+        <span class="spinner" style="--spinner-size: 1.6rem"></span>
+        <span class="spinner" style="--spinner-size: 2.4rem; --spinner-thickness: 3px"></span>
+        <button type="button" class="btn btn-primary">
+          <span class="spinner" style="--spinner-color: currentColor; --spinner-track: rgba(255,255,255,.35)"></span>
+          <span class="ml-2">Saving</span>
+        </button>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: ".loading-dots  (3 span children)",
+                      usage: %(<span class="loading-dots"><span></span><span></span><span></span></span>) } do %>
+        <span class="loading-dots"><span></span><span></span><span></span></span>
+        <span class="loading-dots" style="--loading-dots-size: 12px; --loading-dots-color: var(--color-cta)"><span></span><span></span><span></span></span>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: ".sheen .sheen--loop",
+                      usage: %(<span class="sheen sheen--loop">...</span>) } do %>
+        <span class="sheen sheen--loop badge text-body">Level 5 unlocked</span>
+        <span class="sheen sheen--loop card px-4 py-2 text-sm text-body" style="--sheen-duration: 3s">Sheen sweep</span>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: ".ping .ping--dot  (knob: --ping-color)",
+                      usage: %(<span class="ping ping--dot"></span>) } do %>
+        <span class="ping ping--dot"></span>
+        <span class="ping ping--dot" style="--ping-color: var(--color-success)"></span>
+        <span class="ping ping--dot" style="--ping-color: var(--color-danger); --ping-size: 0.9rem"></span>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: ".fade-edge-{t,b,l,r,x,y}  (knob: --fade-edge-size)",
+                      usage: %(<div class="fade-edge-y overflow-y-auto">...long content...</div>) } do %>
+        <div class="fade-edge-y overflow-y-auto h-32 w-full max-w-xs bg-surface rounded-lg p-3 text-sm text-body space-y-2">
+          <p>Scroll me - the top and bottom edges dissolve.</p>
+          <p>The mask softens content near either end of the container.</p>
+          <p>No JavaScript, no gradient overlay - just a mask-image.</p>
+          <p>It masks the element itself, so it works over any background.</p>
+          <p>Keep scrolling to watch the fade track the edge.</p>
+        </div>
+      <% end %>
+
+      <%= render layout: "design_system/specimen",
+            locals: { klass: ".progress-meter  (knob: --progress)",
+                      usage: %(<div class="progress-meter" style="--progress: 62%">\n  <div class="progress-meter-track"><span class="progress-meter-label">62%</span></div>\n  <div class="progress-meter-fill"><span class="progress-meter-label">62%</span></div>\n</div>) } do %>
+        <div class="w-full max-w-xs space-y-3">
+          <div class="progress-meter" style="--progress: 25%">
+            <div class="progress-meter-track"><span class="progress-meter-label">25%</span></div>
+            <div class="progress-meter-fill"><span class="progress-meter-label">25%</span></div>
+          </div>
+          <div class="progress-meter" style="--progress: 62%">
+            <div class="progress-meter-track"><span class="progress-meter-label">62%</span></div>
+            <div class="progress-meter-fill"><span class="progress-meter-label">62%</span></div>
+          </div>
+          <div class="progress-meter" style="--progress: 88%; --progress-fill: var(--color-success)">
+            <div class="progress-meter-track"><span class="progress-meter-label">88% complete</span></div>
+            <div class="progress-meter-fill"><span class="progress-meter-label">88% complete</span></div>
+          </div>
+          <div class="progress-meter progress-meter--indeterminate">
+            <div class="progress-meter-track"></div>
+            <div class="progress-meter-fill"></div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <!-- Theme tokens -->
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <h2 class="text-xl font-bold text-heading">Theme tokens</h2>
+      <p class="text-muted text-sm">
+        The 7 role colors, read live off this app's theme via <code class="font-mono text-2xs">var(--color-*)</code>.
+        Change the app or its light/dark mode and every swatch (and every specimen above) follows.
+      </p>
+    </div>
+    <div class="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+      <% theme_tokens.each do |var, label| %>
+        <div class="card overflow-hidden">
+          <div class="h-16 border-b border-subtle" style="background: var(<%= var %>)"></div>
+          <div class="p-3 space-y-0.5">
+            <p class="text-sm text-heading font-medium"><%= label %></p>
+            <code class="font-mono text-2xs text-muted break-all"><%= var %></code>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </section>
+</div>
