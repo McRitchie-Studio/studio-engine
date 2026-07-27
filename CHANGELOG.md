@@ -26,20 +26,48 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   conic-gradient ambient wash). All themed through the role tokens; the animated
   ones honor `prefers-reduced-motion`.
 
+- **`engine-motion.css` — the LEVELING family (Turf Monster's level badges).**
+  The polished `.level-badge` ladder is lifted verbatim into the engine so any
+  consumer with `Studio.feature?(:leveling)` ships it: the `.level-badge` base +
+  `.level-badge-1 … .level-badge-10` tiers (outline starter → filled green →
+  lifted/glowed/beveled → two-tone → mint → animated mint → holographic Level 10
+  with the 8-stop 400% gradient), the `.level-up-pop` pop + glow burst, the
+  `.nav-level-pop` nav bounce, and the `.badge-with-sheen` one-shot sheen wrapper
+  (ported from TM's `@utility` to a plain class, this layer's convention). The
+  tiers theme off `--color-primary-500-rgb` (emitted by `studio_theme_css_tag`)
+  so they restyle per app; the fixed mint accent is a `--level-mint` /
+  `--level-mint-rgb` knob (`#06d6a0` default). The port uses the modern slash
+  form `rgb(var(...) / a)` throughout — fixing TM's `levelGlow`, which shipped
+  the legacy `rgba(var(--…-rgb), a)` form that silently drops for a
+  space-separated var. The animated tiers honor `prefers-reduced-motion`.
+
 ### Changed
 
-- **`admin/design_system` — full four-section page.** The living style guide is
-  now four sections reached by a sticky section nav (`Style · Modals · Theme ·
-  Tasks`), rendered as sibling partials (`_style`, `_modals`, `_theme`,
-  `_tasks`). **Style** is fully built: it keeps Buttons / Surfaces-text-form /
-  the seven Motion primitives / Theme tokens, and adds an **Effects** group (the
-  four new effect primitives) and a **Leveling** group gated by
-  `Studio.feature?(:leveling)`. Capability-gated specimens render
-  "disabled-but-present" on hosts with the feature off (the `_specimen`
-  `disabled:` local greys + flags the specimen without hiding it) — McRitchie
-  Studio ships leveling off, so its leveling specimens preview greyed and
-  flagged. **Modals / Theme / Tasks** are tasteful "next slice" stub cards this
-  build leaves as real partials for a later slice to fill.
+- **`admin/style` — the living style guide (renamed from `admin/design_system`).**
+  The page moves to `/admin/style` (`StyleController#index`, helper
+  `admin_style_path`); `/admin/design_system` now **redirects** there and keeps
+  its `admin_design_system_path` helper resolving, so a shipped host sidebar link
+  keeps working. Four sections reached by a sticky section nav, reordered to lead
+  with the color foundation: **Theme (landing) · Modals · Tricks · Tasks**
+  (anchors `#theme · #modals · #tricks · #tasks`), rendered as sibling partials
+  (`_theme`, `_modals`, `_tricks`, `_tasks`).
+  - **Theme** now owns "the colors": it leads with the 7 role tokens/swatches
+    (moved out of the old Style section), folds in the `/admin/theme` editor, and
+    keeps a live dark/light preview. Save + Regenerate now persist **in place** —
+    they submit via `fetch` and `preventDefault` the navigation (the old form
+    posted to `theme_settings#update`, which redirected to `/admin/theme` and
+    bounced the operator off the page), the live preview stays, and the outcome
+    is a toast (the shared `_flash` toast primitive). The standalone
+    `/admin/theme` page's own redirect is unchanged.
+  - **Tricks** (the old "Style" section) is reframed as a board of copy-paste-for-
+    an-agent style tricks: each specimen surfaces its class name prominently with
+    a one-click copy plus the copyable usage snippet. It keeps the Buttons /
+    Surfaces-text-form / Motion / Effects groups, and its **Leveling** group now
+    renders the REAL `.level-badge` tiers (all ten + a chip context + a
+    `.level-up-pop` demo), gated by `Studio.feature?(:leveling)` — greyed and
+    flagged "disabled-but-present" on hosts (like McRitchie Studio) with leveling
+    off, never hidden.
+  - **Modals** is unchanged this pass (its real modal port lands next).
 
 ## 0.17.0 — 2026-07-27
 

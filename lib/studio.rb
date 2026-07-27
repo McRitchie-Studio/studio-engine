@@ -42,9 +42,9 @@ module Studio
   #
   #   Studio.configure { |config| config.features = %i[leveling web3] }
   #
-  # Gate a surface with Studio.feature?(:leveling). The admin/design_system page
-  # uses this to render capability-gated specimens "disabled but present" on
-  # apps with the feature off (e.g. McRitchie Studio, which ships neither).
+  # Gate a surface with Studio.feature?(:leveling). The admin/style page uses this
+  # to render capability-gated specimens "disabled but present" on apps with the
+  # feature off (e.g. McRitchie Studio, which ships neither).
   mattr_accessor :features, default: []
 
   # Magic-link (passwordless email) tuning. token_name keys the MessageVerifier
@@ -346,7 +346,11 @@ module Studio
       patch "admin/theme",            to: "theme_settings#update",     as: :admin_theme_update
       post  "admin/theme/regenerate", to: "theme_settings#regenerate", as: :admin_theme_regenerate
       get   "admin/schema",           to: "schema#index",              as: :admin_schema
-      get   "admin/design_system",    to: "design_system#index",       as: :admin_design_system
+      # The living style guide. Canonical at /admin/style (StyleController#index);
+      # /admin/design_system redirects here but KEEPS its admin_design_system_path
+      # helper so a shipped host sidebar link on the old helper still resolves.
+      get   "admin/style",            to: "style#index",               as: :admin_style
+      get   "admin/design_system",    to: redirect("/admin/style"),    as: :admin_design_system
 
       # Admin-managed transactional-email banner images (Studio::EmailImage).
       # index lists each managed email variant + its current banner; update

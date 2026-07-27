@@ -1,4 +1,4 @@
-<%#  Modals section of the living style guide (admin/design_system).
+<%#  Modals section of the living style guide (admin/style).
 
      A gallery of the shared modal host + reusable modal cards. Each specimen is
      a small, faithful mock (visual representation, not to scale); clicking one
@@ -191,7 +191,7 @@
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <%= render layout: "design_system/specimen",
+      <%= render layout: "style/specimen",
             locals: { klass: "$store.dsModals.open('ds-processing')" } do %>
         <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-processing')">
           <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Processing</span>
@@ -204,7 +204,7 @@
         </button>
       <% end %>
 
-      <%= render layout: "design_system/specimen",
+      <%= render layout: "style/specimen",
             locals: { klass: "$store.dsModals.open('ds-success')" } do %>
         <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-success')">
           <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Success</span>
@@ -219,7 +219,7 @@
         </button>
       <% end %>
 
-      <%= render layout: "design_system/specimen",
+      <%= render layout: "style/specimen",
             locals: { klass: "$store.dsModals.open('ds-error')" } do %>
         <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-error')">
           <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Error / retry</span>
@@ -232,7 +232,7 @@
         </button>
       <% end %>
 
-      <%= render layout: "design_system/specimen",
+      <%= render layout: "style/specimen",
             locals: { klass: "$store.dsModals.open('ds-countdown')" } do %>
         <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-countdown')">
           <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Countdown</span>
@@ -261,7 +261,7 @@
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "design_system/specimen",
+      <%= render layout: "style/specimen",
             locals: { klass: "studio/modals/_crop_photo",
                       disabled_label: "host-wired", disabled: true } do %>
         <div class="w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
@@ -273,7 +273,7 @@
         </div>
       <% end %>
 
-      <%= render layout: "design_system/specimen",
+      <%= render layout: "style/specimen",
             locals: { klass: "studio/modals/_image_upload",
                       disabled_label: "host-wired", disabled: true } do %>
         <div class="w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
@@ -306,7 +306,7 @@
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "design_system/specimen",
+      <%= render layout: "style/specimen",
             locals: { klass: "$store.dsModals.open('ds-wallet-connect')", disabled: !web3_on } do %>
         <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-wallet-connect')">
           <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Connect wallet</span>
@@ -319,7 +319,7 @@
         </button>
       <% end %>
 
-      <%= render layout: "design_system/specimen",
+      <%= render layout: "style/specimen",
             locals: { klass: "$store.dsModals.open('ds-onchain-tx')", disabled: !web3_on } do %>
         <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-onchain-tx')">
           <span class="text-2xs font-semibold uppercase tracking-wider text-muted">On-chain tx</span>
@@ -352,7 +352,7 @@
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "design_system/specimen",
+      <%= render layout: "style/specimen",
             locals: { klass: "$store.dsModals.open('ds-levelup')", disabled: !leveling_on } do %>
         <button type="button" class="group flex flex-col items-center gap-2" @click="$store.dsModals.open('ds-levelup')">
           <span class="text-2xs font-semibold uppercase tracking-wider text-muted">Level up</span>

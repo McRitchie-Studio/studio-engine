@@ -9,44 +9,62 @@ require "minitest/autorun"
 require "active_support/test_case"
 require "action_view"
 
-# [component] Guard for the admin/design_system living style guide — all four
-# sections built (Style / Modals / Theme / Tasks). Load-bearing properties, each
-# exercised (not just declared):
+# [component] Guard for the admin/style living style guide (renamed from
+# admin/design_system). Load-bearing properties, each exercised (not just
+# declared):
 #
-#   1. Studio.routes draws admin_design_system_path -> design_system#index into
-#      every consuming host (this is what makes the page reachable in MS + TM).
+#   1. Studio.routes draws admin_style_path -> style#index, AND keeps the legacy
+#      admin_design_system_path helper resolving as a redirect to /admin/style
+#      (a shipped host sidebar still links the old helper).
 #   2. The require_admin gate the controller relies on (from the already-included
 #      Studio::ErrorHandling concern) redirects a logged-out visitor AND a
 #      logged-in non-admin to root, and lets an admin through.
-#   3. DesignSystemController wires that gate as a before_action.
+#   3. StyleController wires that gate as a before_action.
 #   4. The view is a bare content wrapper that REFERENCES every primitive family
-#      (buttons, surfaces/text/form, the seven motion primitives, the four effect
-#      primitives, the theme tokens) and wires the four-section nav (Style /
-#      Modals / Theme / Tasks) with matching anchor targets. The dummy app does
-#      not compile the engine CSS, so specimens are unstyled here by design —
-#      this asserts the classes/contract a consumer's Tailwind build styles.
+#      (buttons, surfaces/text/form, motion, effect), wires the four-section nav
+#      in order (Theme landing / Modals / Tricks / Tasks) with matching anchor
+#      targets, and keeps the color role tokens in the Theme section (Theme owns
+#      "the colors"). The dummy app does not compile the engine CSS, so specimens
+#      are unstyled here by design — this asserts the classes/contract.
 #   5. Studio.feature?(name) gates capability specimens. Off by default, so the
-#      Leveling (Style) and web3 + leveling (Modals) groups render
-#      "disabled-but-present" — present + flagged, never hidden — on a host
-#      (like MS) that has those capabilities off.
+#      Leveling (Tricks) and web3 + leveling (Modals) groups render
+#      "disabled-but-present" — present + flagged, never hidden.
 #   6. Modals wires a page-scoped store (dsModals) whose Open affordances push the
 #      real engine card blocks (processing/success/error/countdown) full-size.
-#   7. Theme folds the /admin/theme role-color editor into the page.
+#   7. Theme folds the /admin/theme role-color editor into the page AND persists
+#      Save + Regenerate IN PLACE (fetch, no navigation).
 #   8. Tasks renders the shared board-primitive demonstrator on the stage-* spine.
-class DesignSystemPageTest < ActiveSupport::TestCase
+#   9. The Tricks Leveling group renders the REAL .level-badge tiers, and
+#      engine-motion.css ships the ported ladder (modern slash-rgb form).
+class StylePageTest < ActiveSupport::TestCase
   def routes
     Rails.application.routes.url_helpers
   end
 
-  # --- 1. route drawn into every host ----------------------------------------
+  # --- 1. route drawn into every host (+ legacy redirect) --------------------
 
-  test "Studio.routes draws /admin/design_system -> design_system#index" do
+  test "Studio.routes draws /admin/style -> style#index" do
+    assert_equal "/admin/style", routes.admin_style_path
+
+    route = Rails.application.routes.routes.find { |r| r.name == "admin_style" }
+    refute_nil route, "expected a named admin_style route"
+    assert_equal "style", route.defaults[:controller]
+    assert_equal "index", route.defaults[:action]
+  end
+
+  test "the legacy admin_design_system helper survives as a redirect to /admin/style" do
+    # The helper must still resolve — MS's shipped sidebar links admin_design_system_path.
     assert_equal "/admin/design_system", routes.admin_design_system_path
 
     route = Rails.application.routes.routes.find { |r| r.name == "admin_design_system" }
-    refute_nil route, "expected a named admin_design_system route"
-    assert_equal "design_system", route.defaults[:controller]
-    assert_equal "index",         route.defaults[:action]
+    refute_nil route, "the admin_design_system helper must survive the rename"
+
+    # It is now a redirect (no controller#action dispatch).
+    endpoint = route.app
+    endpoint = endpoint.app while endpoint.respond_to?(:app) &&
+                                 !endpoint.is_a?(ActionDispatch::Routing::Redirect)
+    assert endpoint.is_a?(ActionDispatch::Routing::Redirect),
+      "admin_design_system must be a redirect to /admin/style, not a controller action"
   end
 
   # --- 2. the require_admin gate actually gates ------------------------------
@@ -99,7 +117,7 @@ class DesignSystemPageTest < ActiveSupport::TestCase
 
   # --- 3. the real controller wires the gate ---------------------------------
 
-  test "DesignSystemController wires require_admin as a before_action" do
+  test "StyleController wires require_admin as a before_action" do
     # The controller inherits the host ApplicationController; the dummy app ships
     # none, so stand one in (mirroring the host contract: < ActionController::Base
     # + the shared error-handling concern) and let Zeitwerk autoload the real
@@ -108,12 +126,12 @@ class DesignSystemPageTest < ActiveSupport::TestCase
       include Studio::ErrorHandling
     }) unless Object.const_defined?(:ApplicationController)
 
-    filters = DesignSystemController._process_action_callbacks.map(&:filter)
+    filters = StyleController._process_action_callbacks.map(&:filter)
     assert_includes filters, :require_admin,
-      "DesignSystemController must gate index with before_action :require_admin"
-    assert DesignSystemController.method_defined?(:index) ||
-           DesignSystemController.private_method_defined?(:index),
-      "DesignSystemController must define the index action"
+      "StyleController must gate index with before_action :require_admin"
+    assert StyleController.method_defined?(:index) ||
+           StyleController.private_method_defined?(:index),
+      "StyleController must define the index action"
   end
 
   # --- 4. the view references every primitive family -------------------------
@@ -136,16 +154,17 @@ class DesignSystemPageTest < ActiveSupport::TestCase
     text-gradient studio-glow surface-glass conic-surface
   ].freeze
 
-  SECTION_ANCHORS = %w[style modals theme tasks].freeze
+  # Theme is the landing section; the section order the nav pills follow.
+  SECTION_ANCHORS = %w[theme modals tricks tasks].freeze
 
   def render_index
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
-    view.render(template: "design_system/index")
+    view.render(template: "style/index")
   end
 
   test "the view is a bare content wrapper (no host layout of its own)" do
     html = render_index
-    assert_includes html, "Design System", "expected the page heading"
+    assert_includes html, "Style", "expected the page heading"
     refute_includes html, "<html", "a bare content wrapper must not emit its own <html> shell"
     refute_includes html, "<body", "a bare content wrapper must not emit its own <body> shell"
   end
@@ -154,19 +173,11 @@ class DesignSystemPageTest < ActiveSupport::TestCase
     html = render_index
     REQUIRED_CLASSES.each do |klass|
       assert_includes html, klass,
-        "the Style gallery must render a specimen using .#{klass}"
+        "the Tricks gallery must render a specimen using .#{klass}"
     end
   end
 
-  test "the view reads the 7 theme role tokens live" do
-    html = render_index
-    REQUIRED_THEME_TOKENS.each do |token|
-      assert_includes html, token,
-        "the theme-tokens section must read var(#{token}) so the swatch restyles per app"
-    end
-  end
-
-  test "the Style section references the four effect primitives" do
+  test "the Tricks section references the four effect primitives" do
     html = render_index
     REQUIRED_EFFECT_CLASSES.each do |klass|
       assert_includes html, klass,
@@ -184,17 +195,33 @@ class DesignSystemPageTest < ActiveSupport::TestCase
     end
   end
 
-  test "Modals / Theme / Tasks are built (no leftover stub cards)" do
+  test "the sections render in order: Theme (landing), Modals, Tricks, Tasks" do
     html = render_index
-    assert_equal 0, html.scan('data-stub="true"').size,
-      "the wave-2 sections replace the stub cards"
-    refute_includes html, "This section lands in the next build."
+    positions = SECTION_ANCHORS.map { |id| html.index(%(id="#{id}")) }
+    refute_includes positions, nil, "every section anchor must be present"
+    assert_equal positions, positions.sort,
+      "sections must appear in order Theme, Modals, Tricks, Tasks"
+  end
+
+  test "the color role tokens live in the Theme section, not Tricks" do
+    html = render_index
+    theme_start  = html.index('id="theme"')
+    modals_start = html.index('id="modals"')
+    refute_nil theme_start
+    refute_nil modals_start
+    theme_slice = html[theme_start...modals_start] # Theme first, Modals second
+    REQUIRED_THEME_TOKENS.each do |token|
+      assert_includes theme_slice, token,
+        "Theme owns the color role token #{token} (moved out of Tricks)"
+    end
+    assert_includes theme_slice, "The colors",
+      "Theme leads with the colors block"
+    refute_includes html, "Theme tokens",
+      "the Tricks section no longer carries a 'Theme tokens' sub-section"
   end
 
   # --- 6. Modals: page-scoped store opens the real engine card blocks --------
 
-  # The status archetypes each wire an Open onto the self-contained dsModals
-  # store, and the real engine block partials render as that modal's content.
   test "the Modals section wires live engine-block modals via the dsModals store" do
     html = render_index
     assert_includes html, 'id="modals"'
@@ -204,15 +231,13 @@ class DesignSystemPageTest < ActiveSupport::TestCase
       assert_includes html, "$store.dsModals.open('#{id}')",
         "the gallery must wire an Open for the #{id} specimen"
     end
-    # The genuine engine card blocks are reused as the modal content, not mocked.
     assert_includes html, "Entry confirmed", "ds-success renders the real success card block"
     assert_includes html, "Something went wrong. Give it another try.",
       "ds-error renders the real error card block"
   end
 
-  # web3 (wallet-connect, on-chain-tx) and leveling (level-up) are standardized as
-  # engine modal specimens but render disabled-but-present when the host has the
-  # capability off — present + flagged, never hidden.
+  # web3 (wallet-connect, on-chain-tx) and leveling (level-up) render
+  # disabled-but-present when the host has the capability off.
   test "with :web3 and :leveling OFF the capability modal specimens are disabled-but-present" do
     original = Studio.features
     begin
@@ -232,7 +257,7 @@ class DesignSystemPageTest < ActiveSupport::TestCase
     end
   end
 
-  # --- 7. Theme: the /admin/theme editor folded into the page ----------------
+  # --- 7. Theme: the /admin/theme editor folded in + save-in-place -----------
 
   test "the Theme section folds in the admin/theme role-color editor" do
     html = render_index
@@ -247,12 +272,23 @@ class DesignSystemPageTest < ActiveSupport::TestCase
       "the live-preview editor factory is wired"
   end
 
+  test "the Theme section persists Save + Regenerate IN PLACE (no navigation)" do
+    html = render_index
+    assert_includes html, "@submit.prevent",
+      "the Theme forms are intercepted so the page does not navigate away"
+    assert_includes html, "saveTheme($event)",
+      "Save is intercepted in place"
+    assert_includes html, "regenerate($event)",
+      "Regenerate is intercepted in place"
+    assert_includes html, "fetch(form.action",
+      "the section submits via fetch and stays put"
+  end
+
   # --- 8. Tasks: the shared board-primitive demonstrator ---------------------
 
   test "the Tasks section renders the board demonstrator on the stage-* spine" do
     html = render_index
     assert_includes html, 'id="tasks"'
-    # The stage-* palette is the board spine — the demo names the stage roles.
     %w[stage-fresh stage-shipped stage-closed].each do |stage|
       assert_includes html, stage,
         "the Tasks demo must render the #{stage} palette role"
@@ -280,7 +316,7 @@ class DesignSystemPageTest < ActiveSupport::TestCase
     end
   end
 
-  test "with :leveling OFF the leveling specimens render disabled-but-present" do
+  test "with :leveling OFF the Tricks leveling specimens render disabled-but-present" do
     original = Studio.features
     begin
       Studio.features = [] # MS default: leveling off
@@ -289,7 +325,7 @@ class DesignSystemPageTest < ActiveSupport::TestCase
       assert_includes html, "Leveling",
         "the leveling sub-section heading is present"
       assert_includes html, "level-badge-10",
-        "the representative leveling specimen stays present, not hidden"
+        "the leveling specimen stays present, not hidden"
       assert_includes html, "disabled on this app",
         "the disabled-but-present specimen is flagged"
       assert_includes html, 'aria-disabled="true"',
@@ -297,5 +333,33 @@ class DesignSystemPageTest < ActiveSupport::TestCase
     ensure
       Studio.features = original
     end
+  end
+
+  # --- 9. the REAL level-badge tiers render + the engine ships the ladder -----
+
+  test "the Tricks Leveling group renders the real level-badge tiers" do
+    html = render_index
+    (1..10).each do |lvl|
+      assert_includes html, "level-badge-#{lvl}",
+        "the Leveling group must render tier .level-badge-#{lvl}"
+    end
+    assert_includes html, "level-up-pop",
+      "the Leveling group must render the .level-up-pop burst demo"
+  end
+
+  test "engine-motion.css ships the ported level-badge ladder in the modern rgb form" do
+    css = File.read("app/assets/tailwind/studio_engine/engine-motion.css")
+    assert_includes css, ".level-badge {", "the .level-badge base is ported"
+    (1..10).each do |lvl|
+      assert_includes css, ".level-badge-#{lvl}", "tier .level-badge-#{lvl} is ported"
+    end
+    assert_includes css, "@keyframes level-holographic", "the L10 holographic keyframe is ported"
+    assert_includes css, "@keyframes level-shimmer",     "the L9 shimmer keyframe is ported"
+    assert_includes css, ".level-up-pop",  "the level-up burst is ported"
+    assert_includes css, ".badge-with-sheen", "the sheen wrapper is ported as a plain class"
+    # The port must NOT reintroduce TM's broken legacy rgba(var(--*-rgb), a) form —
+    # a space-separated rgb var is invalid inside legacy rgba() and silently drops.
+    refute_match(/rgba\(var\(--color-[^)]+-rgb\)/, css,
+      "space-separated rgb vars must use the modern slash form rgb(var(...) / a)")
   end
 end
