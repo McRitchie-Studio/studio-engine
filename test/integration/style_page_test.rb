@@ -395,12 +395,29 @@ class StylePageTest < ActiveSupport::TestCase
       "cropper.js is loaded on the page"
     assert_includes html, "$store.dsModals.open('crop-photo', { imageUrl:",
       "the Crop photo specimen opens the crop state"
-    assert_includes html, "$store.dsModals.open('crop-photo', {})",
-      "the Image upload specimen opens the empty picker"
+    assert_includes html, "$store.dsModals.open('crop-photo', { cropReady: false })",
+      "the Image upload specimen opens the empty picker (picker sub-state)"
     # The crop modal + saving card mount on the page-scoped store, not the
     # app-level shared host.
     assert_includes html, "cropPhotoModal({ store: 'dsModals' })",
       "the crop modal is mounted on the page-scoped dsModals host"
+  end
+
+  # The two Profile specimens open the SAME modal id (crop-photo) but must glow
+  # the RIGHT card: the glow discriminates on the crop sub-state (props.cropReady),
+  # which the crop factory sets true when the cropper mounts — so the glow moves
+  # from Image upload (picker) to Crop photo (cropping) as an image is loaded.
+  test "the Profile glow distinguishes crop-photo picker vs crop sub-state" do
+    html = render_index
+    # Image upload glows only in the picker sub-state; Crop photo only in crop.
+    assert_includes html, "$store.dsModals.current().id === 'crop-photo' && !$store.dsModals.current().props.cropReady",
+      "Image upload glows only when crop-photo is the empty picker"
+    assert_includes html, "$store.dsModals.current().id === 'crop-photo' && !!$store.dsModals.current().props.cropReady",
+      "Crop photo glows only when crop-photo has an image loaded"
+    # The crop factory reflects the sub-state onto the store so the glow can react.
+    factory = File.read("app/views/studio/modals/_image_upload.html.erb")
+    assert_includes factory, "cur.props.cropReady = true",
+      "mountCropper sets cropReady on the store entry (picker -> cropper transition)"
   end
 
   # web3 (wallet-connect, on-chain-tx, wallet-deposit) and leveling (level-up)

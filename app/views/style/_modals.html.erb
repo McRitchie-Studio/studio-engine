@@ -35,14 +35,17 @@
   w_default  = Studio.auth_method?(:wallet) && web3_on
 
   # Active-card glow-match expression builder: yields an Alpine boolean that is
-  # true when $store.dsModals.current() is THIS specimen's modal (id + optional
-  # step, or imageUrl presence for the two crop-photo variants). Bound reactively
-  # so the glow follows the step machine as a modal advances.
-  ds_glow = lambda do |id, step: nil, image: nil|
+  # true when $store.dsModals.current() is THIS specimen's modal. It discriminates
+  # by sub-state so two specimens that open the SAME modal id still glow the right
+  # card: `step:` for the auth step machine, and `crop:` for the two crop-photo
+  # variants (:picker vs :crop). The crop sub-state rides props.cropReady — the
+  # crop factory sets it true when the cropper mounts (on a direct image OR after
+  # an in-modal pick), so the glow moves picker -> cropper as the flow advances.
+  ds_glow = lambda do |id, step: nil, crop: nil|
     cur  = "$store.dsModals.current()"
     expr = "#{cur} && #{cur}.id === '#{id}'"
     expr += " && (#{cur}.props.step || 'credentials') === '#{step}'" if step
-    expr += (image ? " && !!#{cur}.props.imageUrl" : " && !#{cur}.props.imageUrl") unless image.nil?
+    expr += (crop == :crop ? " && !!#{cur}.props.cropReady" : " && !#{cur}.props.cropReady") unless crop.nil?
     expr
   end
 %>
@@ -428,12 +431,14 @@
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%# Image upload FIRST — the empty picker (crop-photo opened with no imageUrl). %>
+      <%# Image upload FIRST — the empty picker (crop-photo opened with no imageUrl).
+          cropReady: false is the defined starting sub-state; the crop factory
+          flips it true once an image is picked, moving the glow to Crop photo. %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Image upload",
             reference: %(the Profile "Image upload" modal (studio-engine studio/modals/_crop_photo as the empty picker) — open with $store.dsModals.open('crop-photo', {})),
-            open_expr: "$store.dsModals.open('crop-photo', {})",
-            glow_when: ds_glow.call("crop-photo", image: false) } do %>
+            open_expr: "$store.dsModals.open('crop-photo', { cropReady: false })",
+            glow_when: ds_glow.call("crop-photo", crop: :picker) } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
           <div class="mx-auto w-20 h-20 rounded-lg border-2 border-dashed flex items-center justify-center" style="border-color: var(--color-border-strong)">
             <span class="text-2xl leading-none">⬆️</span>
@@ -442,12 +447,14 @@
         </div>
       <% end %>
 
-      <%# Crop photo SECOND — the cropper mounted on a chosen image. %>
+      <%# Crop photo SECOND — the cropper mounted on a chosen image. cropReady:
+          true glows this card immediately on a direct open (the factory also sets
+          it when the cropper mounts). %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Crop photo",
             reference: %(the Profile "Crop photo" modal (studio/modals/_crop_photo + studio/_cropper_assets) — open with $store.dsModals.open('crop-photo', { imageUrl: '/icon.png', aspectRatio: 1 })),
-            open_expr: "$store.dsModals.open('crop-photo', { imageUrl: '/icon.png', aspectRatio: 1 })",
-            glow_when: ds_glow.call("crop-photo", image: true) } do %>
+            open_expr: "$store.dsModals.open('crop-photo', { imageUrl: '/icon.png', aspectRatio: 1, cropReady: true })",
+            glow_when: ds_glow.call("crop-photo", crop: :crop) } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
           <div class="mx-auto w-20 h-20 rounded-lg border-2 flex items-center justify-center" style="border-color: var(--color-cta)">
             <span class="text-muted text-2xs">Crop area</span>

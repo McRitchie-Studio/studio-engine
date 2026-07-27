@@ -82,8 +82,14 @@
           });
           // Cropping in progress — lock the modal (no click-outside / escape) so
           // an accidental click doesn't discard the crop. Cancel still works.
+          // Also reflect the crop sub-state onto the store entry (cropReady) so
+          // an external observer can tell the picker state apart from the crop
+          // state — the modal's own `imageUrl` is LOCAL x-data and never lands on
+          // props, so props alone can't distinguish them. The living style guide
+          // reads this to move its active-card glow from the Image Upload card to
+          // the Crop Photo card the moment an image is loaded (picker -> cropper).
           var cur = self.$store[self._storeName].current();
-          if (cur && cur.props) cur.props.dismissible = false;
+          if (cur && cur.props) { cur.props.dismissible = false; cur.props.cropReady = true; }
         });
       },
 
