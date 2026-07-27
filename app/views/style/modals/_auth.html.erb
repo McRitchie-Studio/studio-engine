@@ -132,9 +132,15 @@
         <%= render "studio/modals/shared/age_attestation" %>
       </div>
 
+      <%# The credential CTAs gate on props.submitting. It MUST be coerced with
+          !! — on a fresh open the modal is opened with { step, picksRequired }
+          and no submitting key, and x-bind:disabled on a reactive-undefined value
+          renders as disabled=true (verified live), which would inert the whole
+          form. !!props.submitting yields a real boolean so the form is enabled
+          until a CTA actually sets submitting. Keep the !! on every gate below. %>
       <%# 1. Google — opens a popup in production; here it shows the waiting state. %>
       <button @click="loginGoogle()"
-              :disabled="props.submitting"
+              :disabled="!!props.submitting"
               class="btn btn-neutral btn-lg w-full gap-3 mb-3 disabled:cursor-wait">
         <span x-show="props.submitting !== 'google'" class="inline-flex"><%= render "components/google_logo" %></span>
         <span x-show="props.submitting === 'google'" class="spinner" aria-hidden="true"></span>
@@ -145,7 +151,7 @@
       </template>
 
       <%# 2. Solana — progresses to the Connect Wallet picker modal. %>
-      <button @click="openWalletHub()" :disabled="props.submitting"
+      <button @click="openWalletHub()" :disabled="!!props.submitting"
               class="btn btn-neutral btn-lg w-full gap-3 mb-3 disabled:cursor-wait">
         <svg width="18" height="14" viewBox="0 0 397 311" fill="none" x-show="props.submitting !== 'wallet'" aria-hidden="true">
           <defs><linearGradient id="auth-solana-grad" x1="361" y1="-9" x2="153" y2="389" gradientUnits="userSpaceOnUse">
@@ -171,12 +177,12 @@
           <%= render "studio/modals/shared/email_field",
                 name: nil, x_model: "email",
                 placeholder: "you@example.com", required: true,
-                disabled_expr: "props.submitting" %>
+                disabled_expr: "!!props.submitting" %>
         </div>
         <template x-if="props.formError">
           <p class="text-red-400 text-xs mb-3" x-text="props.formError"></p>
         </template>
-        <button type="submit" :disabled="props.submitting"
+        <button type="submit" :disabled="!!props.submitting"
                 class="btn btn-neutral btn-lg w-full gap-2 disabled:cursor-wait">
           <span x-show="props.submitting === 'magic-link'" class="spinner" aria-hidden="true"></span>
           <span x-text="props.submitting === 'magic-link' ? 'Sending link…' : 'Email Link'"></span>
