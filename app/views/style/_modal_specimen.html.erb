@@ -51,11 +51,13 @@
   card_x_data    = "{ copiedRef: false#{card_data.present? ? ", #{card_data}" : ''} }"
 %>
 <%# Wrapper — carries the active-card glow (un-clipped) + the shared x-data. %>
-<div class="relative<%= " studio-team-glow rounded-xl" if glow_when %>"
+<%# h-full so the card stretches to its grid row's tallest (per-row equal
+    height via the grid's default align-items: stretch). %>
+<div class="relative h-full<%= " studio-team-glow rounded-xl" if glow_when %>"
      x-data="<%= card_x_data %>"
      <% if glow_when %>:style="{ '--studio-team-glow-opacity': (<%= glow_when %>) ? '0.95' : '0' }"<% end %>>
   <article
-      class="card overflow-hidden flex flex-col<%= " opacity-95" if disabled %><%= " cursor-pointer" if clickable %>"
+      class="card overflow-hidden flex flex-col h-full<%= " opacity-95" if disabled %><%= " cursor-pointer" if clickable %>"
       <%= 'aria-disabled="true"'.html_safe if disabled %>
       <% if clickable %>
         role="button" tabindex="0"
@@ -65,15 +67,26 @@
         aria-label="Open the <%= label %> modal"
       <% end %>>
 
-    <%# Header — name + conversational reference Copy (never bubbles to open). %>
-    <div class="flex items-center justify-between gap-2 px-3 pt-3">
-      <span class="text-2xs font-semibold uppercase tracking-wider text-muted"><%= label %></span>
+    <%# Header — the centered TITLE is itself the copy control (a button + a small
+        clipboard icon that flips to a check). @click.stop + @keydown.stop keep the
+        copy from bubbling to the card's open handler: clicking the title copies
+        and does NOT open; clicking anywhere else on the card still opens. The
+        button activates on Enter/Space natively (firing @click.stop = copy). %>
+    <div class="flex items-center justify-center px-3 pt-3">
       <button type="button"
-              class="btn btn-neutral btn-sm shrink-0"
+              class="inline-flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider text-muted hover:text-heading transition"
+              title="Copy an agent-ready reference to this modal"
               aria-label="Copy an agent-ready reference to this modal"
-              @click.stop="navigator.clipboard?.writeText($refs.ref.textContent.trim()); copiedRef = true; setTimeout(() => copiedRef = false, 1200)"
+              @click.stop="navigator.clipboard?.writeText($refs.ref.textContent.trim()); copiedRef = true; setTimeout(() => copiedRef = false, 1400)"
               @keydown.stop>
-        <span x-text="copiedRef ? 'Copied' : 'Copy'">Copy</span>
+        <span><%= label %></span>
+        <svg x-show="!copiedRef" class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+        <svg x-show="copiedRef" x-cloak class="w-3 h-3 shrink-0" style="color: var(--color-success)" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+        </svg>
+        <span class="sr-only" x-text="copiedRef ? 'Copied' : ''"></span>
       </button>
     </div>
     <span x-ref="ref" class="hidden"><%= reference %></span>

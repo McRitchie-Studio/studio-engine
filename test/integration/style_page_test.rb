@@ -300,6 +300,20 @@ class StylePageTest < ActiveSupport::TestCase
       "the reference names the modal + partial + step as a sentence"
     assert_includes html, "$refs.ref.textContent",
       "Copy reads the reference text, not a raw snippet"
+    # The TITLE itself is the copy control (centered) — the standalone "Copy"
+    # text button is gone, and the copy click/keys don't bubble to card-open.
+    refute_includes html, %(x-text="copiedRef ? 'Copied' : 'Copy'"),
+      "the standalone Copy text button was removed (title is the control)"
+    assert_includes html, "@keydown.stop",
+      "the title-copy control stops keydown from bubbling to the card open"
+  end
+
+  # Item 2b — equal-height cards: each specimen card stretches to its grid row
+  # (h-full over a flex column), so a tall card no longer leaves siblings short.
+  test "specimen cards stretch to equal height per row (h-full flex column)" do
+    html = render_index
+    assert_includes html, "flex flex-col h-full",
+      "specimen cards use a full-height flex column so a grid row equalizes height"
   end
 
   # Items 2 + 3 — whole card is the trigger (role=button + keyboard), and the Auth
