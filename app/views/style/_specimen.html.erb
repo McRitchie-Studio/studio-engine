@@ -10,19 +10,29 @@
                        primitive stays visible + previewable but is muted/greyed
                        and flagged, for a capability the host app has turned off
                        (Studio.feature? is false). NOT hidden.
+       openable       (Boolean, optional) - only meaningful with disabled. When
+                       true, the greyed specimen KEEPS its click affordance so a
+                       capability that is off on this app can still open its
+                       modal as a preview (web3 modals). When false (default) the
+                       disabled content is inert (pointer-events-none), for a
+                       static specimen that is purely illustrative when off.
        disabled_label (String, optional) - the flag text (default below).
      Rendered via `render layout: "style/specimen"` so the caller's block becomes
      the staged primitive. Checks local_assigns (never block_given?) so a shared
      partial does not inherit the host layout yield. %>
 <%
   disabled       = local_assigns[:disabled]
+  openable       = local_assigns[:openable]
   disabled_label = local_assigns[:disabled_label].presence || "disabled on this app"
+  # Openable disabled specimens stay clickable (web3 preview): drop the inertia
+  # utilities and lift the opacity a touch so the trigger reads as tappable.
+  inner_cls = openable ? "opacity-60 grayscale" : "opacity-40 grayscale select-none pointer-events-none"
 %>
 <article class="card overflow-hidden flex flex-col<%= " opacity-95" if disabled %>" <%= 'aria-disabled="true"'.html_safe if disabled %>>
   <div class="relative flex flex-1 flex-wrap items-center justify-center gap-4 p-6 bg-surface-alt min-h-32">
     <% if disabled %>
       <span class="absolute top-2 right-2 badge z-10" style="color: var(--color-warning); border-color: var(--color-warning)"><%= disabled_label %></span>
-      <div class="flex flex-wrap items-center justify-center gap-4 opacity-40 grayscale select-none pointer-events-none"><%= yield %></div>
+      <div class="flex flex-wrap items-center justify-center gap-4 <%= inner_cls %>"><%= yield %></div>
     <% else %>
       <%= yield %>
     <% end %>

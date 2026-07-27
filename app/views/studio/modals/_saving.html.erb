@@ -1,7 +1,11 @@
 <%# Generic "saving" loading card, opened by window.submitFormWithProgress with
     a { title } prop while a Turbo form uploads. Register it in your modal-host
-    block alongside crop-photo. Single root for the host's <template x-if>. %>
+    block alongside crop-photo. Single root for the host's <template x-if>.
+
+    Local: store — Alpine store name backing the title read. Default "modals".
+    The living style guide passes store: "dsModals" for its page-scoped host. %>
+<% saving_store = local_assigns.fetch(:store, "modals") %>
 <div>
   <%= render "studio/modals/blocks/processing_card",
-        title_key: "$store.modals.current()?.props?.title || 'Saving…'" %>
+        title_key: "$store.#{saving_store}.current()?.props?.title || 'Saving…'" %>
 </div>

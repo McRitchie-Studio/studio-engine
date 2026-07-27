@@ -1,0 +1,23 @@
+<%#
+  Segmented progress pill — N rounded bars in a row, the first `current`
+  filled in primary, the rest muted outlines. Drops into any wizard-style modal
+  step to show position in a multi-step flow. Ported from turf-monster.
+
+  Locals:
+    current — 1-indexed step number to fill up to (current: 2, total: 3 fills
+              2/3). Required.
+    total   — total segment count. Default 3.
+%>
+<%
+  current = local_assigns.fetch(:current)
+  total   = local_assigns.fetch(:total, 3)
+%>
+<div class="flex items-center justify-center gap-1.5 mx-auto max-w-[200px] mb-4">
+  <% total.times do |i| %>
+    <% if (i + 1) <= current %>
+      <div class="h-1.5 flex-1 rounded-full bg-primary"></div>
+    <% else %>
+      <div class="h-1.5 flex-1 rounded-full bg-inset border border-subtle"></div>
+    <% end %>
+  <% end %>
+</div>

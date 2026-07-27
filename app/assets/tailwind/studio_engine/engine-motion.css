@@ -877,3 +877,107 @@
   .loading-dots span { opacity: 0.85; }
   .sheen::after { display: none; }
 }
+
+/* =============================================================================
+   8. Modal host motion — the studio modal card + backdrop animation layer.
+   Ported verbatim from turf-monster app/assets/tailwind/application.css (the
+   modal system migrated into the engine). Drives the shared modal host and the
+   living style guide's page-scoped host (dsModals): the store binds the
+   .modal-card-{mount,unmount,shake-in,swap-*} + .modal-backdrop-{mount,unmount}
+   classes; the card open/close use spring curves so the modal POPS in with a
+   small overshoot and POPS out with a tiny anticipation windup. Backdrop stays
+   a clean fade. Durations are synchronized with the store's close/swap timeouts
+   (CLOSE_ANIM_MS 220, SWAP_IN_MS 220) so a keyframe plays fully before the DOM
+   unmounts. Bump both together if you retune.
+   ========================================================================== */
+
+/* Scroll lock applied by the store's _sync() when the stack is non-empty. */
+body.modal-open { overflow: hidden; }
+
+/* Drain-bar keyframe — a translucent overlay sweeping a CTA button over its
+   countdown (studio/modals/blocks/_cta_redirect + _success_card cta_drain). */
+@keyframes studio-modal-drain {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+/* Card mount / unmount + backdrop fade. */
+@keyframes modal-card-in {
+  0%   { opacity: 0; transform: scale(0.86) translateY(12px); }
+  55%  { opacity: 1; transform: scale(1.04) translateY(-3px); }
+  80%  {              transform: scale(0.99) translateY(1px);  }
+  100% { opacity: 1; transform: scale(1) translateY(0);        }
+}
+@keyframes modal-card-out {
+  0%   { opacity: 1; transform: scale(1) translateY(0);       }
+  25%  { opacity: 1; transform: scale(1.03) translateY(-2px); }
+  100% { opacity: 0; transform: scale(0.92) translateY(4px);  }
+}
+@keyframes modal-backdrop-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+
+.modal-card-mount       { animation: modal-card-in     320ms cubic-bezier(0.34, 1.4, 0.5, 1) both; }
+.modal-card-unmount     { animation: modal-card-out    220ms cubic-bezier(0.6, -0.2, 0.7, 0.4) forwards; }
+.modal-backdrop-mount   { animation: modal-backdrop-in 180ms ease-out both; }
+.modal-backdrop-unmount { animation: modal-backdrop-out 200ms ease-in forwards; }
+
+/* Named entrance "shake" — Discord-style "not quite yet" nope. Registered as
+   enterAnim: 'shake'; duration MUST match the store registry ms (600). */
+@keyframes modal-card-shake-in {
+  0%   { opacity: 0; transform: scale(0.92) translateX(0);    }
+  22%  { opacity: 1; transform: scale(1)    translateX(-11px); }
+  37%  {             transform: scale(1)    translateX(9px);   }
+  52%  {             transform: scale(1)    translateX(-7px);  }
+  67%  {             transform: scale(1)    translateX(5px);   }
+  82%  {             transform: scale(1)    translateX(-3px);  }
+  100% { opacity: 1; transform: scale(1)    translateX(0);    }
+}
+.modal-card-shake-in { animation: modal-card-shake-in 600ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+
+/* Inter-modal swap — directional slide for wizard forward-flow feel. Forward:
+   leaving card exits stage-right, new one enters from the left. */
+@keyframes modal-card-slide-out-right {
+  from { opacity: 1; transform: translateX(0) scale(1); }
+  to   { opacity: 0; transform: translateX(48px) scale(0.98); }
+}
+@keyframes modal-card-slide-in-left {
+  from { opacity: 0; transform: translateX(-48px) scale(0.98); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+.modal-card-swap-out { animation: modal-card-slide-out-right 220ms cubic-bezier(0.4, 0, 1, 1) forwards; }
+.modal-card-swap-in  { animation: modal-card-slide-in-left   220ms cubic-bezier(0, 0, 0.2, 1) both; }
+
+/* Back-direction pair — exits stage-left, enters from the right. */
+@keyframes modal-card-slide-out-left {
+  from { opacity: 1; transform: translateX(0) scale(1); }
+  to   { opacity: 0; transform: translateX(-48px) scale(0.98); }
+}
+@keyframes modal-card-slide-in-right {
+  from { opacity: 0; transform: translateX(48px) scale(0.98); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+.modal-card-swap-out-back { animation: modal-card-slide-out-left 220ms cubic-bezier(0.4, 0, 1, 1) forwards; }
+.modal-card-swap-in-back  { animation: modal-card-slide-in-right 220ms cubic-bezier(0, 0, 0.2, 1) both; }
+
+/* Vestibular safety — drop the spring/slide, just fade fast. */
+@media (prefers-reduced-motion: reduce) {
+  .modal-card-mount,
+  .modal-card-unmount,
+  .modal-card-shake-in,
+  .modal-card-swap-out,
+  .modal-card-swap-in,
+  .modal-card-swap-out-back,
+  .modal-card-swap-in-back,
+  .modal-backdrop-mount,
+  .modal-backdrop-unmount {
+    animation-duration: 80ms;
+    animation-timing-function: linear;
+  }
+  @keyframes modal-card-shake-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes modal-card-in  { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes modal-card-out { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes modal-card-slide-out-right { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes modal-card-slide-in-left   { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes modal-card-slide-out-left  { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes modal-card-slide-in-right  { from { opacity: 0; } to { opacity: 1; } }
+}

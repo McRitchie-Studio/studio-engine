@@ -236,22 +236,98 @@ class StylePageTest < ActiveSupport::TestCase
       "ds-error renders the real error card block"
   end
 
-  # web3 (wallet-connect, on-chain-tx) and leveling (level-up) render
-  # disabled-but-present when the host has the capability off.
-  test "with :web3 and :leveling OFF the capability modal specimens are disabled-but-present" do
+  # --- 6b. the ported Turf Monster modals register + open ---------------------
+
+  # The page-scoped host (dsModals) mirrors the shared host's full API — the
+  # in-modal step machine relies on advance() and the directional swap().
+  test "the dsModals store exposes the full host API (open/swap/advance/close)" do
+    html = render_index
+    %w[open: swap: advance: close: cardClasses: current:].each do |method|
+      assert_includes html, method,
+        "the page-scoped modal store must define #{method}"
+    end
+    assert_includes html, "modal-card-mount",
+      "cardClasses drives the ported enter animation classes"
+    assert_includes html, "dsSolanaModal",
+      "the on-chain-tx modal reads through the dsSolanaModal proxy"
+  end
+
+  # Every ported modal registers a single-root <template x-if> on its id in the
+  # page overlay.
+  test "the overlay registers the ported modal ids" do
+    html = render_index
+    %w[auth crop-photo saving wallet-connect onchain-tx wallet-deposit
+       template-wizard template-form template-action template-status
+       template-success].each do |id|
+      assert_includes html, "$store.dsModals.current().id === '#{id}'",
+        "the overlay must register the #{id} modal"
+    end
+  end
+
+  # The AUTH suite — the #1 gap. Its bespoke step machine + blocks are present,
+  # and the specimens open the real modal at a step.
+  test "the Auth modal ports the credentials step machine + its blocks" do
+    html = render_index
+    # Opened at a step, with picksRequired, exactly like the real modal.
+    assert_includes html, "$store.dsModals.open('auth', { step: 'credentials', picksRequired: 6 })",
+      "the Sign in specimen opens the auth modal at the credentials step"
+    assert_includes html, "$store.dsModals.open('auth', { step: 'magic-link-sent'",
+      "a 'magic link sent' variant specimen is wired"
+    # The step machine itself.
+    assert_includes html, "isCredentialsStep",
+      "the auth partial carries the credentials-step guard"
+    %w[magic-link-sent magic-link-resent].each do |step|
+      assert_includes html, "props.step === '#{step}'",
+        "the auth step machine handles the #{step} step"
+    end
+    # The magic-link CTA runs behind the stub, and the age gate is exercised.
+    assert_includes html, "window.postMagicLink",
+      "the magic-link CTA no-ops behind the postMagicLink stub"
+    assert_includes html, "data-age-attestation",
+      "the auth modal renders the legal-age attestation"
+  end
+
+  # PROFILE — crop / upload ACTUALLY open: cropper_assets is rendered on the
+  # page (loading cropper.js + the factory) and the specimens open crop-photo.
+  test "the Profile crop/upload modals are wired to open live" do
+    html = render_index
+    assert_includes html, "cropPhotoModal",
+      "studio/cropper_assets is rendered so the crop factory is defined"
+    assert_includes html, "cropperjs",
+      "cropper.js is loaded on the page"
+    assert_includes html, "$store.dsModals.open('crop-photo', { imageUrl:",
+      "the Crop photo specimen opens the crop state"
+    assert_includes html, "$store.dsModals.open('crop-photo', {})",
+      "the Image upload specimen opens the empty picker"
+    # The crop modal + saving card mount on the page-scoped store, not the
+    # app-level shared host.
+    assert_includes html, "cropPhotoModal({ store: 'dsModals' })",
+      "the crop modal is mounted on the page-scoped dsModals host"
+  end
+
+  # web3 (wallet-connect, on-chain-tx, wallet-deposit) and leveling (level-up)
+  # render disabled-but-present-yet-openable when the host has the capability
+  # off: greyed + badged, but the trigger keeps its click affordance (a preview
+  # you can still open), never inert.
+  test "with :web3 and :leveling OFF the capability modal specimens are disabled-but-present-yet-openable" do
     original = Studio.features
     begin
       Studio.features = [] # MS default: web3 + leveling off
       html = render_index
 
-      %w[ds-wallet-connect ds-onchain-tx ds-levelup].each do |id|
-        assert_includes html, "$store.dsModals.open('#{id}')",
-          "the #{id} specimen stays present, not hidden"
+      # The ported modal ids stay present with a working Open affordance.
+      %w[wallet-connect onchain-tx wallet-deposit levelup].each do |id|
+        assert_includes html, "$store.dsModals.open('#{id}'",
+          "the #{id} specimen stays present + openable, not hidden"
       end
       assert_includes html, "disabled on this app",
         "the capability specimens are flagged disabled"
       assert_includes html, 'aria-disabled="true"',
         "the disabled specimens are marked for assistive tech"
+      # Openable treatment: the greyed content keeps pointer events (opacity-60
+      # grayscale), NOT the inert opacity-40 + pointer-events-none variant.
+      assert_includes html, "opacity-60 grayscale",
+        "a disabled-but-openable specimen keeps its click affordance"
     ensure
       Studio.features = original
     end

@@ -1,0 +1,25 @@
+<%# === Template: ACTION modal ======================================
+    One-question dialog: centered icon pill + title + subtitle + primary /
+    secondary CTAs. Use for confirmations, alerts, destructive prompts.
+    Composes card_header for the top chunk. Ported from turf-monster.
+
+    Variants: pass icon :error / :external_tab / icon_emoji / spinner OR
+    icon_color :primary / :success / :warning to card_header.
+
+    Local: modal_store — Alpine store name backing close(). Default "modals". %>
+<% modal_store = local_assigns.fetch(:modal_store, "modals") %>
+<div x-data>
+  <%= render "studio/modals/blocks/card_header",
+        size: :lg,
+        icon: :error,
+        title: "Action Template",
+        subtitle: "A centered confirmation card with a primary + secondary CTA. Best for one-question dialogs and destructive prompts." %>
+
+  <button @click="$store.<%= modal_store %>.close()" class="btn btn-danger btn-lg w-full">
+    Confirm Action
+  </button>
+  <button @click="$store.<%= modal_store %>.close()"
+          class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+    Cancel
+  </button>
+</div>

@@ -1,0 +1,25 @@
+<%# === Template: FORM modal ======================================
+    Starting point for any modal that captures input — settings, edit forms,
+    rename dialogs. Wraps content in the shared shell for a consistent title row
+    + close ×. Ported from turf-monster.
+
+    Local: modal_store — Alpine store name backing close(). Default "modals". %>
+<% modal_store = local_assigns.fetch(:modal_store, "modals") %>
+<div x-data="{ value: '' }">
+  <%= render layout: "studio/modals/blocks/shell", locals: { title: "Form Template", modal_store: modal_store } do %>
+    <p class="text-sm text-muted mb-4">
+      Title row + close × come from <code class="text-xs bg-inset px-1 rounded">studio/modals/blocks/shell</code>.
+      Slot in whatever inputs + primary CTA your form needs.
+    </p>
+
+    <form @submit.prevent="$store.<%= modal_store %>.close()" class="space-y-4">
+      <textarea x-model="value"
+                rows="3"
+                placeholder="Type something…"
+                class="input-field w-full resize-none"></textarea>
+      <button type="submit" class="btn btn-primary btn-lg w-full" :disabled="!value.trim()">
+        Save
+      </button>
+    </form>
+  <% end %>
+</div>

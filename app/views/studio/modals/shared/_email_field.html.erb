@@ -1,0 +1,70 @@
+<%#
+  Email input for the modal family — a themed <input type="email"> that either
+  posts through its own `name` or feeds an enclosing x-model. Ported from
+  turf-monster; the live client-side validity decorator (window.emailValidator)
+  is intentionally NOT a dependency here so the engine partial is self-contained
+  — the server stays the real boundary. A consumer that ships emailValidator can
+  pass validator: true to opt back into the right-edge spinner / check / X.
+
+  Locals (all optional, sensible defaults via local_assigns.fetch):
+    name          — input name attr (default "email"; pass nil/false to omit,
+                    e.g. a modal that dispatches its x-model value instead)
+    id            — input id attr (default: the name)
+    value         — prefill value (default "")
+    placeholder   — (default "you@example.com")
+    required      — (default false)
+    autocomplete  — (default "email")
+    autofocus     — (default false)
+    input_class   — base input classes (default "input-field")
+    x_model       — Alpine x-model target resolved in an ENCLOSING scope
+    x_ref         — Alpine x-ref name
+    disabled_expr — Alpine :disabled expression (e.g. "props.submitting")
+    validator     — when true, wraps in x-data="emailValidator()" and paints the
+                    right-edge validity indicator (consumer must ship the factory)
+%>
+<%
+  name          = local_assigns.fetch(:name, "email")
+  field_id      = local_assigns.fetch(:id, name)
+  field_value   = local_assigns.fetch(:value, "")
+  placeholder   = local_assigns.fetch(:placeholder, "you@example.com")
+  required      = local_assigns.fetch(:required, false)
+  autocomplete  = local_assigns.fetch(:autocomplete, "email")
+  autofocus     = local_assigns.fetch(:autofocus, false)
+  input_class   = local_assigns.fetch(:input_class, "input-field")
+  x_model       = local_assigns.fetch(:x_model, nil)
+  x_ref         = local_assigns.fetch(:x_ref, nil)
+  disabled_expr = local_assigns.fetch(:disabled_expr, nil)
+  validator     = local_assigns.fetch(:validator, false)
+%>
+<div class="relative"<%= ' x-data="emailValidator()"'.html_safe if validator %>>
+  <input type="email" inputmode="email"
+         class="<%= input_class %><%= ' pr-10' if validator %>"
+         <% if validator %>:class="{ 'email-reject': _rejecting }"<% end %>
+         placeholder="<%= placeholder %>"
+         autocomplete="<%= autocomplete %>"
+         <%= "required" if required %>
+         <%= "autofocus" if autofocus %>
+         <% if name %>name="<%= name %>"<% end %>
+         <% if field_id %>id="<%= field_id %>"<% end %>
+         value="<%= field_value %>"
+         <% if x_model %>x-model="<%= x_model %>"<% end %>
+         <% if x_ref %>x-ref="<%= x_ref %>"<% end %>
+         <% if disabled_expr %>:disabled="<%= disabled_expr %>"<% end %>
+         <% if validator %>@input="onInput($event)" @change="onInput($event)" @blur="onBlur($event)"<% end %>>
+
+  <% if validator %>
+    <%# Right-edge validity indicator — consumer's emailValidator drives status.
+        pointer-events-none so it never eats a click on the input behind it. %>
+    <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+      <span x-show="status === 'loading'" x-cloak class="spinner text-secondary" aria-hidden="true"></span>
+      <svg x-show="status === 'valid'" x-cloak xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+           style="color: var(--color-success)" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+      </svg>
+      <svg x-show="status === 'invalid'" x-cloak xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"
+           style="color: var(--color-danger)" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+      </svg>
+    </div>
+  <% end %>
+</div>

@@ -1,0 +1,62 @@
+<%#
+  On-chain transaction modal — design-system port of turf-monster's
+  modals/_onchain_tx, wired to the living style guide's page-scoped host. Reads
+  display state from $store.dsSolanaModal (a stateless proxy over $store.dsModals
+  that keeps the show/success/error API stable — the same façade shape the real
+  app ships). The proxy's methods push/pop the dsModals stack so this partial
+  renders when opened.
+
+  Three states — processing / success / error — cover the whole non-domain-
+  specific tx flow. The DS preview always uses the GENERIC success card
+  (studio/modals/blocks/_onchain_success); the rich contest-entry celebration
+  (seeds bar + level-up + lobby drain) is turf-specific and stays in the
+  consumer app.
+
+  Single root: content lives inside one <div> so Alpine's <template x-if> clones
+  it whole.
+%>
+<div x-data="{
+       init() {
+         this.$watch('$store.dsSolanaModal.state', function(val) {
+           if (val === 'success') {
+             setTimeout(function() {
+               try { if (window.fireSuccessConfetti) window.fireSuccessConfetti(); } catch (_) {}
+             }, 100);
+           }
+         });
+       }
+     }">
+
+  <%# === PROCESSING ====================================================== %>
+  <template x-if="$store.dsSolanaModal.state === 'processing'">
+    <%= render "studio/modals/blocks/card_header",
+          spinner: true,
+          title_key:    "$store.dsSolanaModal.title",
+          subtitle_key: "$store.dsSolanaModal.message" %>
+  </template>
+
+  <%# === SUCCESS (generic) =============================================== %>
+  <template x-if="$store.dsSolanaModal.state === 'success'">
+    <%= render "studio/modals/blocks/onchain_success",
+        tx_signature_key: "$store.dsSolanaModal.txSignature",
+        title_key:        "$store.dsSolanaModal.successTitle",
+        subtitle_key:     "$store.dsSolanaModal.successSubtitle",
+        cta_label_key:    "$store.dsSolanaModal.ctaLabel",
+        cta_href_key:     "$store.dsSolanaModal.ctaHref",
+        modal_store:      "dsModals" %>
+  </template>
+
+  <%# === ERROR =========================================================== %>
+  <template x-if="$store.dsSolanaModal.state === 'error'">
+    <div>
+      <%= render "studio/modals/blocks/card_header",
+            icon: :error,
+            title_key:    "$store.dsSolanaModal.title",
+            subtitle_key: "$store.dsSolanaModal.errorMessage" %>
+      <button @click="$store.dsSolanaModal.close()"
+              class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+        Close
+      </button>
+    </div>
+  </template>
+</div>
