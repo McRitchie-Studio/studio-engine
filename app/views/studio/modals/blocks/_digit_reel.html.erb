@@ -20,13 +20,22 @@
     transition (String)   — Alpine expr for the CSS transition (or "'none'")
     width      (String)   — CSS width of the clip window, e.g. "2ch" / "3.2ch"
     cell_em    (Numeric?) — cell height in em + translate multiplier (default 1)
-    pad        (Bool?)    — zero-pad cell numbers to 2 digits (default false) %>
+    pad        (Bool?)    — zero-pad cell numbers to 2 digits (default false)
+    transition (String?)  — Alpine expr for the slide transition when track_class
+                            is NOT used (default "'none'"). Inline, so a caller can
+                            snap on rollover; NOT reachable by reduced-motion CSS.
+    track_class(String?)  — a CSS class that owns the slide transition. When set,
+                            the reel binds ONLY the transform inline and the class
+                            supplies the transition — so a reduced-motion @media
+                            rule can cancel it (the seeds bar uses this). %>
 <%
-  cell_em = local_assigns.fetch(:cell_em, 1)
-  pad     = local_assigns.fetch(:pad, false)
+  cell_em     = local_assigns.fetch(:cell_em, 1)
+  pad         = local_assigns.fetch(:pad, false)
+  track_class = local_assigns[:track_class]
+  transition  = local_assigns.fetch(:transition, "'none'")
 %>
 <span style="display:inline-block;overflow:hidden;height:<%= cell_em %>em;line-height:<%= cell_em %>em;width:<%= width %>;text-align:right;">
-  <span class="block" :style="{ transform: 'translateY(-' + (<%= value %> * <%= cell_em %>) + 'em)', transition: <%= transition %> }">
+  <span class="block<%= " #{track_class}" if track_class %>" :style="{ transform: 'translateY(-' + (<%= value %> * <%= cell_em %>) + 'em)'<%= track_class ? "" : ", transition: #{transition}" %> }">
     <% (0..max).each do |n| %><span class="block" style="height:<%= cell_em %>em;line-height:<%= cell_em %>em;"><%= pad ? format("%02d", n) : n %></span><% end %>
   </span>
 </span>

@@ -78,9 +78,12 @@
 
   <%# The bar (hidden once the level-up swaps to the reward line). Single root. %>
   <template x-if="!showFreeEntryBadge">
-    <div class="relative">
+    <%# --seeds-fill-dur cascades to the bar (.seeds-bar-continuous) AND the reel
+        (.seeds-reel-track) so both share the exact 1.9s fill; the transition
+        PROPERTY itself lives on the classes so reduced-motion can cancel it. %>
+    <div class="relative" style="--seeds-fill-dur: 1.9s;">
       <div class="seeds-bar-continuous flex gap-1.5"
-           style="height: 22px; transition: --bar-progress 1.9s cubic-bezier(0.16, 1, 0.3, 1);"
+           style="height: 22px;"
            :style="{ '--bar-progress': (displaySeeds / <%= seeds_per_level %> * 100) }">
         <template x-for="i in 5" :key="i">
           <div class="flex-1 relative overflow-hidden rounded-md"
@@ -93,15 +96,17 @@
                  style="background-image: linear-gradient(90deg, color-mix(in srgb, var(--color-cta) 30%, transparent), color-mix(in srgb, var(--color-cta) 60%, transparent)); background-size: 500% 100%; background-repeat: no-repeat;"></div>
             <div class="seeds-shimmer absolute top-0 bottom-0 pointer-events-none"
                  :style="{ left: -(i - 1) * 100 + '%', width: '500%' }"
-                 style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 50%, transparent 100%); animation: seedsShimmer 2.5s ease-in-out 0.4s 1 both;"></div>
+                 style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 50%, transparent 100%);"></div>
           </div>
         </template>
       </div>
       <div class="absolute inset-y-0 right-2 flex items-center pointer-events-none">
         <span class="inline-flex items-baseline gap-1 font-mono font-bold text-sm" style="color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.7);">
+          <%# track_class hands the reel a class-based transition (reduced-motion
+              reachable) instead of an inline one; duration via --seeds-fill-dur. %>
           <%= render "studio/modals/blocks/digit_reel",
                 value: "displaySeeds", max: seeds_per_level, width: "3.2ch", cell_em: 1.25,
-                transition: "'transform 1.9s cubic-bezier(0.16, 1, 0.3, 1)'" %>
+                track_class: "seeds-reel-track" %>
           <span class="text-[10px] font-normal opacity-90">seeds</span>
         </span>
       </div>

@@ -85,8 +85,10 @@ class ModalCapabilityGatingTest < ActiveSupport::TestCase
       html = render_index
       assert_includes html, "seeds-bar-continuous",
         "the :leveling seeds bar mounts in the _success_card yield"
-      assert_includes html, "seedsShimmer",
-        "the seeds bar ships its shimmer sweep"
+      assert_includes html, "seeds-shimmer",
+        "the seeds bar ships its shimmer sweep (class-driven)"
+      assert_includes html, "seeds-reel-track",
+        "the rolling digit reel uses the class-based (reduced-motion-reachable) track"
       # The rolling digit reel + its unit label render inside the bar.
       assert_includes html, ">seeds<",
         "the seeds counter renders its unit label"
@@ -127,5 +129,57 @@ class ModalCapabilityGatingTest < ActiveSupport::TestCase
       assert_includes html, "disabled on this app"
       assert_includes html, "opacity-60 grayscale"
     end
+  end
+
+  # --- 6. reduced-motion is EFFECTIVE, not merely declared -------------------
+  # Carl's blocker: inline `style="transition/animation: …"` beats a class rule
+  # on specificity, so the @media(prefers-reduced-motion) override could never
+  # win. Guard the fix mutation-first: the motion PROPERTY lives on the classes
+  # (reachable by the @media block), NOT in the view's inline styles.
+
+  ENGINE_ROOT   = File.expand_path("../..", __dir__)
+  SEEDS_BAR_ERB = File.join(ENGINE_ROOT, "app/views/studio/modals/blocks/_seeds_bar.html.erb")
+  DIGIT_REEL_ERB = File.join(ENGINE_ROOT, "app/views/studio/modals/blocks/_digit_reel.html.erb")
+  MOTION_CSS    = File.join(ENGINE_ROOT, "app/assets/tailwind/studio_engine/engine-motion.css")
+
+  test "seeds motion lives on classes so reduced-motion can cancel it (not inline)" do
+    css = File.read(MOTION_CSS)
+    # The three motion properties live on classes.
+    assert_match(/\.seeds-bar-continuous\s*\{[^}]*transition:\s*--bar-progress/m, css,
+      "the bar fill transition lives on .seeds-bar-continuous")
+    assert_match(/\.seeds-reel-track\s*\{[^}]*transition:\s*transform/m, css,
+      "the reel slide transition lives on .seeds-reel-track")
+    assert_match(/\.seeds-shimmer\s*\{[^}]*animation:\s*seedsShimmer/m, css,
+      "the shimmer animation lives on .seeds-shimmer")
+
+    # The reduced-motion block cancels ALL THREE — reachable because they are
+    # class-based. These literal cancel rules live only in the reduced-motion
+    # @media block; a regressor that drops any of them reddens here.
+    assert_includes css, "@media (prefers-reduced-motion: reduce)"
+    assert_includes css, ".seeds-bar-continuous { transition: none; }"
+    assert_includes css, ".seeds-reel-track { transition: none; }"
+    assert_includes css, ".seeds-shimmer { animation: none; }"
+  end
+
+  test "the seeds view keeps motion OUT of inline styles (the specificity bug)" do
+    bar  = File.read(SEEDS_BAR_ERB)
+    reel = File.read(DIGIT_REEL_ERB)
+
+    # A plain (non-Alpine) inline style attribute must not carry the motion —
+    # that is exactly what beat the reduced-motion override.
+    refute_match(/style="[^"]*transition:\s*--bar-progress/, bar,
+      "the bar fill transition must NOT be an inline style (it would beat reduced-motion)")
+    refute_match(/style="[^"]*animation:\s*seedsShimmer/, bar,
+      "the shimmer animation must NOT be an inline style (it would beat reduced-motion)")
+
+    # The fix is in place: the fill-duration knob is inline, motion is class-based.
+    assert_includes bar, "--seeds-fill-dur",
+      "the view sets the fill-duration knob inline while the property stays class-based"
+    assert_includes bar, %(track_class: "seeds-reel-track"),
+      "the reel is rendered with the class-based track (no inline transition)"
+
+    # The reel omits its inline transition when a track_class is supplied.
+    assert_match(/track_class\s*\?\s*""\s*:/, reel,
+      "the digit reel drops its inline transition when track_class is used")
   end
 end
