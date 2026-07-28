@@ -553,4 +553,31 @@ class StylePageTest < ActiveSupport::TestCase
     refute_match(/rgba\(var\(--color-[^)]+-rgb\)/, css,
       "space-separated rgb vars must use the modern slash form rgb(var(...) / a)")
   end
+
+  # --- 10. the Confetti & pulse Tricks group renders all three specimens -------
+
+  test "the Tricks Confetti & pulse group renders both confetti effects + the pulse" do
+    html = render_index
+    assert_includes html, "Confetti &amp; pulse",
+      "the Tricks section carries a Confetti & pulse group heading"
+
+    # Confetti card-burst — the callable is named prominently AND wired to a live
+    # 'fire it' demo that aims at the specimen card.
+    assert_includes html, "window.studioConfetti.burst(el)",
+      "the burst specimen surfaces the window.studioConfetti.burst call name"
+    assert_includes html, "window.studioConfetti.burst($refs.burstCard)",
+      "the burst specimen has a live 'Fire burst' demo aimed at the card"
+
+    # Confetti side-cannons — named + a live 'fire it' demo.
+    assert_includes html, "window.studioConfetti.cannons()",
+      "the cannons specimen surfaces the window.studioConfetti.cannons call name"
+    assert_includes html, "Fire cannons",
+      "the cannons specimen has a live 'Fire cannons' demo button"
+
+    # Pulsing button — the .pulse-cta class specimen rides a real .btn.
+    assert_includes html, "btn btn-primary pulse-cta",
+      "the pulse specimen renders a real .btn with .pulse-cta"
+    assert_includes html, ".pulse-cta",
+      "the pulse specimen surfaces the .pulse-cta class name"
+  end
 end

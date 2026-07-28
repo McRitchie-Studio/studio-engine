@@ -2,6 +2,49 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.22.0 — 2026-07-28
+
+A Tricks batch for the living style guide — three celebration/attention effects
+lifted from Turf Monster into engine primitives, all demoed on `/admin/style`.
+Additive only: no existing shared primitive changes its defaults, so MS and TM
+render identically on the bump.
+
+### Added
+
+- **`window.studioConfetti` — a zero-dependency, no-CDN confetti effect.**
+  canvas-confetti (v1.9.3, MIT) is now **vendored into the engine**
+  (`app/assets/javascripts/studio/canvas_confetti.js`) and shipped through the
+  asset pipeline instead of loaded from a CDN — CSP-safe (same-origin `:self`),
+  zero per-app dependency. `studio/studio_confetti.js` builds two callable
+  effects on top, both honoring `prefers-reduced-motion: reduce`:
+  - **`studioConfetti.burst(target)`** — the radial card-burst that explodes from
+    *behind* a card/modal, emanating from its center. Aim it with a DOM element,
+    a selector, or an `{x, y}` origin (0..1 viewport space); defaults to screen
+    center. Ported from turf-monster's `fireConfettiFromModal`.
+  - **`studioConfetti.cannons()`** — the full-screen "you joined a contest"
+    celebration: a center burst plus left + right side-cannons firing inward.
+    Same choreography as the engine head's `window.fireSuccessConfetti`.
+
+- **`.pulse-cta` — an attention pulse/glow for a CTA button**
+  (`engine-motion.css`). A gentle scale + expanding fading ring on a loop, themed
+  off the CTA role token (`--pulse-cta-color`, default `--color-cta`) so it
+  restyles per app, reduced-motion aware. Ported from turf-monster's
+  "Change Username" quest CTA (`.quest-pulse`). Named `.pulse-cta` (not
+  `.btn-pulse`) so it stays a plain motion-layer effect, not a `.btn` component
+  variant the `engine.css` contract would demand.
+
+- **Three `/admin/style` Tricks specimens** — a "Confetti & pulse" group renders
+  all three live: a "Fire burst" and "Fire cannons" demo (each surfacing the
+  `window.studioConfetti.*` call name + a copyable snippet) and the `.pulse-cta`
+  button.
+
+### Changed
+
+- The engine head (`layouts/studio/_head.html.erb`) now loads the **vendored**
+  canvas-confetti via `javascript_include_tag` rather than the jsDelivr CDN.
+  `window.fireSuccessConfetti` is unchanged and rides the same global — behavior
+  is identical, only the script source moves from CDN to a bundled engine asset.
+
 ## 0.21.0 — 2026-07-27
 
 Phase 2 of the studio-engine modal convergence: homes the entry-time age-gate DOB
