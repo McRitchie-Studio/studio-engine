@@ -15,10 +15,12 @@
      and registers all specimen content itself.
 
      Groups: Auth (the sign-in step machine), Profile (crop / upload, opened
-     through studio/cropper_assets), Web3 (wallet-connect / on-chain-tx / deposit,
+     through studio/cropper_assets), Web3 (wallet-connect with engine-owned inline
+     brand icons / on-chain-tx / deposit / the generic entry-confirmed celebration,
      gated by Studio.feature?(:web3) — disabled-but-present-yet-openable when off),
      System and status (the reusable card blocks), Templates (the copy-from
-     archetypes), and Rewards (level-up, gated by :leveling).
+     archetypes), and Rewards (level-up + the entry-confirmed seeds bar + the
+     Free Entry Earned reward, gated by :leveling).
 
      The modal motion (modal-card-* / modal-backdrop-* keyframes + studio-modal-
      drain + body.modal-open) ships in engine-motion.css, so a consumer that
@@ -273,6 +275,15 @@
         <template x-if="$store.dsModals.current().id === 'wallet-deposit'">
           <div><%= render "style/modals/wallet_deposit" %></div>
         </template>
+        <%# entry-confirmed — the engine celebration composed via _success_card's
+            yield. One registration serves the generic (web3) + seeds (leveling)
+            specimens; the seeds bar self-gates on Studio.feature?(:leveling). %>
+        <template x-if="$store.dsModals.current().id === 'entry-confirmed'">
+          <div><%= render "studio/modals/blocks/entry_confirmed",
+                    modal_store: "dsModals",
+                    cta_label: "Contest Lobby ⚔️",
+                    free_entry_label: "Free Entry Earned 🎟️" %></div>
+        </template>
 
         <%# --- System and status (reusable card blocks) --- %>
         <template x-if="$store.dsModals.current().id === 'ds-processing'">
@@ -331,6 +342,12 @@
                     style="background: var(--color-cta); --studio-glow-color: var(--color-success)">10</span>
             </div>
           <% end %></div>
+        </template>
+        <%# free-entry-earned — the standalone level-up reward modal (:leveling). %>
+        <template x-if="$store.dsModals.current().id === 'free-entry-earned'">
+          <div><%= render "studio/modals/blocks/free_entry_earned",
+                    modal_store: "dsModals",
+                    subtitle: "You leveled up! A Free Entry lands in your account soon. Keep leveling for more." %></div>
         </template>
 
       </div>
@@ -494,6 +511,10 @@
         <code class="font-mono text-2xs">Studio.feature?(:web3)</code>. Web3 is
         <strong><%= web3_on ? "on" : "off" %></strong> here, so these render
         <%= web3_on ? "live." : "greyed and badged — but STILL openable as a preview." %>
+        The Connect-wallet picker ships its <strong>Phantom / Solflare / Backpack
+        brand marks inline from the engine</strong>
+        (<code class="font-mono text-2xs">studio/modals/blocks/_wallet_brand_sprite</code>),
+        so every app inherits them with no per-app icon files.
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -553,6 +574,25 @@
           <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
           <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
           <span class="block h-5 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+        </div>
+      <% end %>
+
+      <%# Entry confirmed — the GENERIC web3 celebration (tx link + heading + drain
+          CTA). seedsEarned: 0 so no seeds bar even where leveling is on: this card
+          demos the clean success a web3-only app gets. The seeds variant lives in
+          Rewards below (gated by :leveling). %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Entry confirmed",
+            reference: %(the Web3 "Entry confirmed" celebration (studio/modals/blocks/_entry_confirmed, composed via _success_card's yield — branded tx link + heading + drain CTA; the seeds bar is gated off by :leveling and stays hidden here) — open with $store.dsModals.open('entry-confirmed', { txSignature: '…', lobbyUrl: null, seedsEarned: 0 })),
+            open_expr: "$store.dsModals.open('entry-confirmed', { txSignature: '5xTrDemoSignature1234567890abcXYZ', lobbyUrl: null, seedsEarned: 0, seedsTotal: 40 })",
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-primary) 15%, transparent)">
+            <svg class="w-4 h-4" style="color: var(--color-primary)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-14 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
         </div>
       <% end %>
     </div>
@@ -668,9 +708,16 @@
         <% end %>
       </div>
       <p class="text-muted text-sm">
-        The level-up celebration, gated by <code class="font-mono text-2xs">Studio.feature?(:leveling)</code>.
-        Leveling is <strong><%= leveling_on ? "on" : "off" %></strong> here, so this renders
+        The seeds bar + level-up celebrations, gated by
+        <code class="font-mono text-2xs">Studio.feature?(:leveling)</code> — an
+        app-level setting <strong>independent of :web3</strong> (some apps have
+        Solana but no leveling). Leveling is <strong><%= leveling_on ? "on" : "off" %></strong>
+        here, so these render
         <%= leveling_on ? "live." : "greyed and badged — but STILL openable as a preview." %>
+        The seed counts, level, and free entry are <strong>app-supplied props</strong>
+        (<code class="font-mono text-2xs">seedsEarned</code>,
+        <code class="font-mono text-2xs">seedsTotal</code>, …) — the engine renders
+        the bar, the app feeds the numbers.
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -683,6 +730,43 @@
           <div class="text-2xl leading-none">🎉</div>
           <span class="inline-flex h-8 w-8 items-center justify-center rounded-full text-white text-sm font-extrabold" style="background: var(--color-cta)">10</span>
           <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+
+      <%# Entry + seeds — the SAME _entry_confirmed card, now with seedsEarned
+          crossing a level so the :leveling seeds bar mounts in the _success_card
+          yield and plays the 4-phase level-up (fill → pop → drain → refill), then
+          swaps to the Free Entry Earned reward line. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Entry + seeds level-up",
+            reference: %(the Rewards "Entry + seeds" celebration (studio/modals/blocks/_entry_confirmed — the :leveling seeds bar + Free Entry Earned reward injected into _success_card's yield) — open with $store.dsModals.open('entry-confirmed', { txSignature: '…', lobbyUrl: null, seedsEarned: 30, seedsTotal: 100 })),
+            open_expr: "$store.dsModals.open('entry-confirmed', { txSignature: '5xTrDemoSignature1234567890abcXYZ', lobbyUrl: null, seedsEarned: 30, seedsTotal: 100 })",
+            disabled: !leveling_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-primary) 15%, transparent)">
+            <svg class="w-4 h-4" style="color: var(--color-primary)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <div class="flex gap-1">
+            <span class="flex-1 h-2.5 rounded" style="background: var(--color-cta)"></span>
+            <span class="flex-1 h-2.5 rounded" style="background: var(--color-cta); opacity:.6"></span>
+            <span class="flex-1 h-2.5 rounded" style="background: var(--color-cta); opacity:.25"></span>
+            <span class="flex-1 h-2.5 rounded" style="background: var(--color-text); opacity:.12"></span>
+            <span class="flex-1 h-2.5 rounded" style="background: var(--color-text); opacity:.12"></span>
+          </div>
+          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+
+      <%# Free Entry Earned — the standalone level-up reward modal (:leveling). %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Free Entry Earned",
+            reference: %(the Rewards "Free Entry Earned" level-up modal (studio/modals/blocks/_free_entry_earned) — open with $store.dsModals.open('free-entry-earned', { level: 3 })),
+            open_expr: "$store.dsModals.open('free-entry-earned', { level: 3 })",
+            disabled: !leveling_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">🎉</div>
+          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
         </div>
       <% end %>
     </div>

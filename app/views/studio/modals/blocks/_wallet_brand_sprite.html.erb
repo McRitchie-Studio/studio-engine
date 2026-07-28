@@ -1,0 +1,51 @@
+<%#
+  Wallet brand-icon sprite — inline SVG marks for the wallets the Connect-Wallet
+  picker knows about (Phantom, Solflare, Backpack), OWNED BY THE ENGINE so every
+  consumer inherits crisp brand icons with ZERO per-app asset files. Before this,
+  the picker referenced app-served PNGs (/wallet-phantom.png, ...), so a fresh app
+  that had not copied those into its own public/ showed 404 letter tiles (P/S/B).
+
+  Render this ONCE inside a picker's single root, then reference a mark by name:
+
+    <svg class="w-9 h-9"><use href="#se-wallet-phantom"></use></svg>
+
+  or, in an Alpine x-for over detected wallets, resolve the id from the name:
+
+    <use :href="'#se-wallet-' + brandIcon(w.name)"></use>   (brandIcon() lowercases
+    the name and returns it only for a known brand, else null → letter fallback).
+
+  The sprite is visually hidden (zero-box, absolute) and aria-hidden; only the
+  <use> references paint. Each <symbol> carries its own viewBox + brand fills, so
+  a <use> scales into whatever box the outer <svg> sizes. Marks are geometric
+  interpretations of the official brand icons (Phantom purple ghost, Solflare
+  yellow S, Backpack red pack); the letter tile stays the fallback for any wallet
+  not in this set.
+%>
+<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"
+     style="position:absolute;width:0;height:0;overflow:hidden" data-wallet-brand-sprite>
+  <%# Phantom — light-purple tile, cream ghost with two purple eye holes (the
+      official ghost path; fill-rule evenodd cuts the eyes so the tile shows). %>
+  <symbol id="se-wallet-phantom" viewBox="0 0 128 128">
+    <rect width="128" height="128" rx="28" fill="#AB9FF2"/>
+    <path fill="#FFFDF8" fill-rule="evenodd" d="M110.584 64.9142H99.142C99.142 41.7651 80.173 23 56.7724 23C33.6612 23 14.8716 41.3057 14.4118 64.0583C13.936 87.577 36.2456 108 60.0197 108H63.0263C83.9754 108 112.069 91.6259 116.459 71.7107C117.27 68.033 114.351 64.9142 110.584 64.9142ZM39.7689 65.9482C39.7689 69.0453 37.2384 71.5758 34.1413 71.5758C31.0442 71.5758 28.5137 69.0453 28.5137 65.9482V56.8554C28.5137 53.7583 31.0442 51.2278 34.1413 51.2278C37.2384 51.2278 39.7689 53.7583 39.7689 56.8554V65.9482ZM59.3312 65.9482C59.3312 69.0453 56.8007 71.5758 53.7036 71.5758C50.6065 71.5758 48.076 69.0453 48.076 65.9482V56.8554C48.076 53.7583 50.6065 51.2278 53.7036 51.2278C56.8007 51.2278 59.3312 53.7583 59.3312 56.8554V65.9482Z"/>
+  </symbol>
+
+  <%# Solflare — bright-yellow tile, bold black S crossed by a diagonal slash. %>
+  <symbol id="se-wallet-solflare" viewBox="0 0 100 100">
+    <rect width="100" height="100" rx="24" fill="#FFEC1F"/>
+    <path d="M67 37c-3-7-11-11-20-11-10 0-17 5-17 13 0 7 5 11 16 14l8 2c9 2 13 5 13 11 0 8-8 13-18 13-9 0-16-3-19-10"
+          fill="none" stroke="#131313" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M27 76 73 24" fill="none" stroke="#131313" stroke-width="8" stroke-linecap="round"/>
+  </symbol>
+
+  <%# Backpack — red tile, white pack: handle arch, rounded body with a red buckle
+      ring, and a rounded lower pocket band. %>
+  <symbol id="se-wallet-backpack" viewBox="0 0 100 100">
+    <rect width="100" height="100" rx="24" fill="#E33E3F"/>
+    <path d="M39 32v-3a11 11 0 0 1 22 0v3" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+    <rect x="23" y="31" width="54" height="31" rx="15" fill="#fff"/>
+    <circle cx="50" cy="46" r="8" fill="#E33E3F"/>
+    <circle cx="50" cy="46" r="3.5" fill="#fff"/>
+    <rect x="23" y="66" width="54" height="13" rx="6.5" fill="#fff"/>
+  </symbol>
+</svg>
