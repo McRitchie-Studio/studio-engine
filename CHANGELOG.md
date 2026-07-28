@@ -2,6 +2,67 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.19.0 — 2026-07-27
+
+Phase 1 of the studio-engine modal convergence: the engine now OWNS the wallet
+brand icons, homes the entry-confirmed celebration, and gates the web3/leveling
+enrichments behind the two independent capability flags.
+
+### Added
+
+- **Wallet brand icons ship inline from the engine** — new
+  `studio/modals/blocks/_wallet_brand_sprite` emits a hidden inline-SVG sprite
+  with the Phantom (purple ghost), Solflare (yellow S), and Backpack (red pack)
+  marks as `<symbol>`s. The Connect-wallet picker resolves a mark by name
+  (`brandIcon(name)` → `<use href="#se-wallet-…">`) and falls back to a letter
+  tile only for an unknown wallet. Every consumer inherits crisp brand icons
+  with **zero per-app asset files** — before this, the picker referenced
+  app-served PNGs (`/wallet-phantom.png`, …), so a fresh app that had not copied
+  those into its own `public/` showed 404 letter tiles.
+
+- **Entry-confirmed celebration — `studio/modals/blocks/_entry_confirmed`.** The
+  canonical "you're in" card, homed in the engine and composed via the
+  `_success_card` **yield slot** (its documented purpose): `_success_card` owns
+  the web3 spine (the `:lg` check header, branded Solana tx link, drain CTA with
+  auto-redirect, confetti), and `_entry_confirmed` injects the leveling
+  enrichment into its block. All numbers are **app-supplied** via Alpine
+  expressions (default `props.*`): `txSignature`, `lobbyUrl`, `seedsEarned`,
+  `seedsTotal`. Turf-specific copy (CTA label, reward text, seeds-per-level) is
+  parameterized, not baked in.
+
+- **Seeds progress bar — `studio/modals/blocks/_seeds_bar` +
+  `_digit_reel`.** Ported from Turf Monster and generalized: the animated
+  5-segment fill with a 4-phase level-up sequence (fill → level pop → drain →
+  refill) and the rolling-digit counter. The `--bar-progress` registered custom
+  property, `.seeds-bar-continuous`, and the `seedsShimmer` keyframe ship in
+  `engine-motion.css` (reduced-motion aware).
+
+- **Free Entry Earned modal — `studio/modals/blocks/_free_entry_earned`.** The
+  standalone level-up reward modal, parameterized (store, icon, title, copy).
+
+- **Living style guide** gains an engine-owned wallet-icon picker, an
+  "Entry confirmed" (web3) specimen, and "Entry + seeds level-up" +
+  "Free Entry Earned" (leveling) specimens, so the gated variants demo correctly
+  (generic-success vs seeds vs free-entry).
+
+### Capability gating
+
+- **`:web3`** gates the generic entry-confirmed success (branded tx link +
+  heading + CTA), alongside the existing wallet / on-chain / deposit modals.
+- **`:leveling`** — independent of `:web3` — gates the seeds bar and the Free
+  Entry Earned reward. `_entry_confirmed` self-gates its block on
+  `Studio.feature?(:leveling)`, so a **web3-only app (leveling off) gets the
+  clean success card automatically** — no seeds, no free entry.
+
+### Unchanged
+
+- Backward compatible: every addition is additive/optional (new locals default
+  to today's behavior). The shared `_success_card`, `_card_header`,
+  `_cta_redirect`, and the other blocks are untouched in default behavior, so
+  existing McRitchie Studio and Turf Monster consumers render identically. No
+  engine view-primitive gains any signing / key material — signing stays an
+  app-supplied callback seam.
+
 ## 0.18.0 — 2026-07-27
 
 ### Added

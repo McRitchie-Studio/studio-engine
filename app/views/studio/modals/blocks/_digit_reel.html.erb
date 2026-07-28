@@ -1,0 +1,32 @@
+<%#
+  Rolling-digit reel — a vertical stack of the values 0..max clipped to a single
+  cell, translated by -(value * cell_em)em so it slides as `value` changes. The
+  shared core behind rotating counters (a single 0–100 reel for the seeds bar,
+  per-unit em cells for countdowns). Ported from turf-monster; app-agnostic (only
+  Alpine expressions + locals — no app models or helpers).
+
+  Renders INSIDE a parent Alpine x-data scope: `value` and `transition` are Alpine
+  *expressions* evaluated there (e.g. "displaySeeds"; "'transform 1.9s ...'"). This
+  owns only the clip window + reel mechanics — colour, font, and any unit letter
+  live on the caller's wrapper.
+
+  Cells are em-sized, so the reel scales with the inherited font size; cell_em is
+  both the cell height (em) and the translate multiplier, so a value of N lands
+  cell N exactly under the window.
+
+  Locals:
+    value      (String)   — Alpine expr for the current value (drives translate)
+    max        (Integer)  — highest cell; renders cells 0..max
+    transition (String)   — Alpine expr for the CSS transition (or "'none'")
+    width      (String)   — CSS width of the clip window, e.g. "2ch" / "3.2ch"
+    cell_em    (Numeric?) — cell height in em + translate multiplier (default 1)
+    pad        (Bool?)    — zero-pad cell numbers to 2 digits (default false) %>
+<%
+  cell_em = local_assigns.fetch(:cell_em, 1)
+  pad     = local_assigns.fetch(:pad, false)
+%>
+<span style="display:inline-block;overflow:hidden;height:<%= cell_em %>em;line-height:<%= cell_em %>em;width:<%= width %>;text-align:right;">
+  <span class="block" :style="{ transform: 'translateY(-' + (<%= value %> * <%= cell_em %>) + 'em)', transition: <%= transition %> }">
+    <% (0..max).each do |n| %><span class="block" style="height:<%= cell_em %>em;line-height:<%= cell_em %>em;"><%= pad ? format("%02d", n) : n %></span><% end %>
+  </span>
+</span>

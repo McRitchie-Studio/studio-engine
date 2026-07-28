@@ -1,0 +1,120 @@
+<%#
+  Seeds progress bar — the leveling celebration's animated 5-segment fill + rolling
+  digit reel, with a 4-phase level-up sequence (fill to full → level pop → drain to
+  empty → refill toward the next level). Ported from turf-monster's entry-confirmed
+  inline bar and generalized: seed counts / level are APP-SUPPLIED (Alpine
+  expressions), and Turf-specific copy is a parameter. The engine renders the bar;
+  the app feeds the numbers.
+
+  Capability: this is a :leveling primitive. Callers render it only under
+  Studio.feature?(:leveling) (the engine's _entry_confirmed does exactly that), so
+  a web3-only app (leveling off) never mounts it.
+
+  Single root: the outer <div> is one element so a <template x-if> clones it whole.
+
+  Locals:
+    seeds_earned_key — Alpine expr: seeds awarded this event (drives whether a
+                       level was crossed). Required.
+    seeds_total_key  — Alpine expr: the user's new total seeds. Required.
+    seeds_per_level  — Integer: seeds per level (default 100). The bar fills to
+                       (total % per_level) / per_level; a crossed multiple triggers
+                       the level-up flourish.
+    free_entry_label — String shown when a level is crossed (default
+                       "Free Entry Earned 🎟️"). Parameterized so the reward copy
+                       is not hardcoded to any one app.
+
+  The co-located x-data owns its own _timers array; destroy() clears every pending
+  setTimeout so a mid-celebration modal close leaks nothing.
+%>
+<%
+  seeds_earned_key = local_assigns.fetch(:seeds_earned_key)
+  seeds_total_key  = local_assigns.fetch(:seeds_total_key)
+  seeds_per_level  = local_assigns.fetch(:seeds_per_level, 100)
+  free_entry_label = local_assigns.fetch(:free_entry_label, "Free Entry Earned 🎟️")
+%>
+<div x-data="{
+       displaySeeds: 0,
+       displayLevel: 1,
+       levelingUp: false,
+       showFreeEntryBadge: false,
+       _timers: [],
+       init() {
+         var self = this;
+         var perLevel = <%= seeds_per_level %>;
+         var total = (<%= seeds_total_key %>) || 0;
+         var earned = (<%= seeds_earned_key %>) || 0;
+         var oldSeeds = Math.max(0, total - earned);
+         var oldLevel = Math.floor(oldSeeds / perLevel) + 1;
+         var newLevel = Math.floor(total / perLevel) + 1;
+         var oldToward = oldSeeds % perLevel;
+         var newToward = total % perLevel;
+         self.displaySeeds = oldToward;
+         self.displayLevel = oldLevel;
+         var schedule = function (fn, ms) { self._timers.push(setTimeout(fn, ms)); };
+         schedule(function () {
+           if (newLevel > oldLevel) {
+             self.levelingUp = true;
+             self.displaySeeds = perLevel;
+             schedule(function () {
+               self.displayLevel = newLevel;
+               self.showFreeEntryBadge = true;
+             }, 1900);
+             schedule(function () { self.displaySeeds = 0; }, 3400);
+             schedule(function () {
+               self.displaySeeds = newToward;
+               self.levelingUp = false;
+             }, 3600);
+           } else {
+             self.displaySeeds = newToward;
+           }
+         }, 2000);
+       },
+       destroy() {
+         this._timers.forEach(clearTimeout);
+         this._timers = [];
+       }
+     }"
+     class="mx-auto mb-1" style="max-width: 100%;">
+
+  <%# The bar (hidden once the level-up swaps to the reward line). Single root. %>
+  <template x-if="!showFreeEntryBadge">
+    <div class="relative">
+      <div class="seeds-bar-continuous flex gap-1.5"
+           style="height: 22px; transition: --bar-progress 1.9s cubic-bezier(0.16, 1, 0.3, 1);"
+           :style="{ '--bar-progress': (displaySeeds / <%= seeds_per_level %> * 100) }">
+        <template x-for="i in 5" :key="i">
+          <div class="flex-1 relative overflow-hidden rounded-md"
+               style="background: rgb(var(--color-primary-500-rgb) / 0.06); border: 1.5px solid rgb(var(--color-primary-500-rgb) / 0.2);">
+            <div class="absolute inset-0 pointer-events-none"
+                 :style="{
+                   backgroundPosition: ((i - 1) * 25) + '% 0',
+                   clipPath: 'inset(0 calc(100% - clamp(0%, calc((var(--bar-progress) - ' + ((i - 1) * 20) + ') * 5%), 100%)) 0 0)'
+                 }"
+                 style="background-image: linear-gradient(90deg, color-mix(in srgb, var(--color-cta) 30%, transparent), color-mix(in srgb, var(--color-cta) 60%, transparent)); background-size: 500% 100%; background-repeat: no-repeat;"></div>
+            <div class="seeds-shimmer absolute top-0 bottom-0 pointer-events-none"
+                 :style="{ left: -(i - 1) * 100 + '%', width: '500%' }"
+                 style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 50%, transparent 100%); animation: seedsShimmer 2.5s ease-in-out 0.4s 1 both;"></div>
+          </div>
+        </template>
+      </div>
+      <div class="absolute inset-y-0 right-2 flex items-center pointer-events-none">
+        <span class="inline-flex items-baseline gap-1 font-mono font-bold text-sm" style="color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.7);">
+          <%= render "studio/modals/blocks/digit_reel",
+                value: "displaySeeds", max: seeds_per_level, width: "3.2ch", cell_em: 1.25,
+                transition: "'transform 1.9s cubic-bezier(0.16, 1, 0.3, 1)'" %>
+          <span class="text-[10px] font-normal opacity-90">seeds</span>
+        </span>
+      </div>
+    </div>
+  </template>
+
+  <%# Level-up reward — a plain text line sized to the same 22px height as the bar
+      it replaces, so the card does not shift when the bar swaps to this. Single
+      root. Copy is caller-parameterized (free_entry_label). %>
+  <template x-if="showFreeEntryBadge">
+    <div class="level-up-pop flex items-center justify-center w-full font-bold text-sm"
+         style="height: 22px; color: var(--color-cta);">
+      <span><%= free_entry_label %></span>
+    </div>
+  </template>
+</div>

@@ -1,0 +1,46 @@
+<%#
+  Free-entry-earned — the standalone level-up celebration modal. Pops when a user
+  crosses a seed level (the reward for leveling). Ported from turf-monster and
+  generalized: the store, icon, title, and reward copy are all parameters, so no
+  app-specific string is baked in.
+
+  Capability: a :leveling primitive — a caller opens it only under
+  Studio.feature?(:leveling).
+
+  Single root: the outer <div> is one element so a <template x-if> clones it whole.
+
+  Locals (all optional):
+    modal_store  — Alpine store name backing props/close. Default "modals".
+    icon_emoji   — celebration glyph. Default "🎉".
+    title_key    — Alpine expr for the headline. Default shows "Level N" from
+                   props.level, else "Free Entry Earned".
+    subtitle     — static reward copy. Default a generic level-up line.
+    subtitle_key — Alpine expr for the reward copy (priority over subtitle).
+    close_label  — dismiss link text. Default "Close".
+%>
+<%
+  modal_store  = local_assigns.fetch(:modal_store, "modals")
+  icon_emoji   = local_assigns.fetch(:icon_emoji, "🎉")
+  title_key    = local_assigns.fetch(:title_key, "props.level ? ('Level ' + props.level) : 'Free Entry Earned'")
+  subtitle     = local_assigns.fetch(:subtitle, "You leveled up and earned a reward. Keep earning more with each level.")
+  subtitle_key = local_assigns[:subtitle_key]
+  close_label  = local_assigns.fetch(:close_label, "Close")
+
+  ch_locals = { size: :lg, icon_emoji: icon_emoji, title_key: title_key }
+  if subtitle_key
+    ch_locals[:subtitle_key] = subtitle_key
+  else
+    ch_locals[:subtitle] = subtitle
+  end
+%>
+<%# Confetti on mount — prefer a free-entry-specific burst if the host defined one,
+    else the shared success confetti; both are optional (guarded). %>
+<div x-data="{ get props() { var c = $store.<%= modal_store %>.current(); return (c && c.props) || {}; } }"
+     x-init="setTimeout(function () { try { (window.fireFreeEntryConfetti || window.fireSuccessConfetti || function(){})(); } catch (e) {} }, 120)">
+  <%= render "studio/modals/blocks/card_header", ch_locals %>
+
+  <button type="button" @click="$store.<%= modal_store %>.close()"
+          class="block mx-auto mt-4 text-sm text-secondary hover:text-heading transition">
+    <%= close_label %>
+  </button>
+</div>
