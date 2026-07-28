@@ -14,7 +14,10 @@
      card behind ours. So this section owns a tiny, self-contained store + overlay
      and registers all specimen content itself.
 
-     Groups: Auth (the sign-in step machine), Profile (crop / upload, opened
+     Groups: Auth (the sign-in step machine), Eligibility and entry (the
+     app-supplied-policy age-gate DOB primitive, gated by Studio.feature?(:age_gate),
+     plus the app-specific entry-tokens purchase flow documented via engine chrome),
+     Profile (crop / upload, opened
      through studio/cropper_assets), Web3 (wallet-connect with engine-owned inline
      brand icons / on-chain-tx / deposit / the generic entry-confirmed celebration,
      gated by Studio.feature?(:web3) — disabled-but-present-yet-openable when off),
@@ -28,6 +31,7 @@
 <%
   web3_on     = Studio.feature?(:web3)
   leveling_on = Studio.feature?(:leveling)
+  age_gate_on = Studio.feature?(:age_gate)
 
   # Auth method-toggle defaults — mirror the app's Studio.auth_method? config;
   # Solana Wallet also needs the web3 capability, so it defaults OFF on an app
@@ -51,8 +55,17 @@
     expr
   end
 %>
+<%# DEMO flow wiring (style-page only): the age-gate primitive fires an
+    'age-verified' window event on a successful confirm — its designed handoff
+    hook, the same one a production app listens for to resume the entry. Here the
+    style page plays that "app": on age-verified it opens the entry-token purchase
+    modal, so the DS walks eligibility to purchase in sequence. The engine
+    primitive is untouched; its real submit still posts to the app-supplied
+    submit_url. Kept on the section (always mounted) so it fires even as the
+    age-gate card closes. %>
 <section id="modals" class="space-y-10" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)"
-         x-data="{}" @ds-modal-close.window="$store.dsModals.close()">
+         x-data="{}" @ds-modal-close.window="$store.dsModals.close()"
+         @age-verified.window="$store.dsModals.open('entry-tokens', { step: 'picker' })">
   <div class="space-y-1">
     <h2 class="text-2xl font-bold text-heading">Modals</h2>
     <p class="text-muted text-sm">
@@ -237,6 +250,11 @@
       defines the factory inline; no importmap change). %>
   <%= render "studio/cropper_assets" %>
 
+  <%# ageVerifyModal factory — rendered here at page level (never inside the
+      overlay template, where a cloned script would not run) so the age-gate
+      specimen opens live. A consumer app renders this in its layout the same way. %>
+  <%= render "studio/age_verify_assets" %>
+
   <%# ---- The overlay: one backdrop + card; every specimen's real content is a
       single-root <template x-if> gated on the current modal id. Faithful to the
       shared host — backdrop fade, scroll lock, escape + click-self dismissal
@@ -255,6 +273,14 @@
         <%# --- Auth suite --- %>
         <template x-if="$store.dsModals.current().id === 'auth'">
           <div><%= render "style/modals/auth" %></div>
+        </template>
+
+        <%# --- Eligibility + entry --- %>
+        <template x-if="$store.dsModals.current().id === 'age-verify'">
+          <div><%= render "style/modals/age_verify" %></div>
+        </template>
+        <template x-if="$store.dsModals.current().id === 'entry-tokens'">
+          <div><%= render "style/modals/entry_tokens" %></div>
         </template>
 
         <%# --- Profile (real engine partials, opened on dsModals) --- %>
@@ -427,6 +453,68 @@
           <div class="text-2xl leading-none">📍</div>
           <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
           <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <%# ===================================================================== %>
+  <%# 1b. ELIGIBILITY + ENTRY %>
+  <%# ===================================================================== %>
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <div class="flex flex-wrap items-center gap-3">
+        <h3 class="text-xl font-bold text-heading">Eligibility &amp; entry</h3>
+        <% if age_gate_on %>
+          <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">age gate on</span>
+        <% else %>
+          <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">age gate off</span>
+        <% end %>
+      </div>
+      <p class="text-muted text-sm">
+        The pre-entry gate and the entry-purchase flow. The <strong>age gate</strong>
+        (<code class="font-mono text-2xs">studio/modals/blocks/_age_verify</code>) is a
+        NEW engine primitive gated by
+        <code class="font-mono text-2xs">Studio.feature?(:age_gate)</code> &mdash; a DOB
+        modal whose minimum age, jurisdiction label, endpoint, and legal copy are all
+        <strong>app-supplied</strong> (the engine hardcodes no policy). It is the heavier
+        sibling of the <code class="font-mono text-2xs">shared/_age_attestation</code>
+        checkbox inside Sign in above &mdash; <strong>run one or the other</strong>. The
+        <strong>entry-tokens</strong> flow is <strong>app-specific</strong> (payments
+        product): documented here composing engine chrome, but the packs, rails, and
+        the on-chain mint stay app-owned.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%# Age gate — engine primitive, gated on :age_gate (disabled-but-present). %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Age gate (DOB)",
+            reference: %(the "Age gate" DOB modal (studio-engine studio/modals/blocks/_age_verify) — a NEW engine primitive; the app supplies min_age / state / submit_url / fine_print and the engine hardcodes no legal policy. In this demo, Confirm & Continue advances to the Entry tokens purchase (page-level dsModals wiring on the primitive's 'age-verified' hook; the primitive's real submit posts to submit_url). Open with $store.dsModals.open('age-verify')),
+            open_expr: "$store.dsModals.open('age-verify')",
+            glow_when: ds_glow.call("age-verify"),
+            disabled: !age_gate_on, openable: true, disabled_label: "age gate off" } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2 text-center">
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <div class="grid grid-cols-3 gap-1">
+            <span class="h-6 rounded border" style="border-color: var(--color-border-strong)"></span>
+            <span class="h-6 rounded border" style="border-color: var(--color-border-strong)"></span>
+            <span class="h-6 rounded border" style="border-color: var(--color-border-strong)"></span>
+          </div>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+
+      <%# Entry tokens — app-specific flow, documented (not capability-gated). %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Entry tokens",
+            reference: %(the "Entry tokens" purchase flow (app-specific — documented in the engine style guide composing studio/modals/blocks chrome). The packs, pricing, rails, and on-chain mint stay app-owned. Open with $store.dsModals.open('entry-tokens', { step: 'picker' })),
+            open_expr: "$store.dsModals.open('entry-tokens', { step: 'picker' })",
+            glow_when: ds_glow.call("entry-tokens") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
+          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+          <span class="block h-6 w-full rounded border" style="border-color: var(--color-primary)"></span>
+          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
         </div>
       <% end %>
     </div>

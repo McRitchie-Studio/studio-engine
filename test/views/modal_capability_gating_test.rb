@@ -64,6 +64,16 @@ class ModalCapabilityGatingTest < ActiveSupport::TestCase
       "the engine picker must not reference an app-served wallet PNG"
     refute_includes html, "/wallet-solflare.png"
     refute_includes html, "/wallet-backpack.png"
+
+    # Each mark embeds the wallet's OFFICIAL brand asset inline (a base64 PNG
+    # data-URI, byte-matching what the wallet ships) — not a hand-drawn path that
+    # drifts from the brand. The old inaccurate Phantom ghost path is gone.
+    %w[se-wallet-phantom se-wallet-solflare se-wallet-backpack].each do |sym|
+      assert_match(%r{id="#{sym}".*?data:image/png;base64}m, html,
+        "the #{sym} mark embeds its real brand asset inline")
+    end
+    refute_includes html, "M110.584 64.9142",
+      "the inaccurate hand-drawn Phantom ghost path is gone"
   end
 
   # --- 2. :web3 gates the generic entry-confirmed success --------------------

@@ -1,0 +1,106 @@
+<%#
+  Age-gate DOB modal — engine primitive. Collects a real date of birth
+  (Month / Day / Year), shows a live "too young" hint, and submits. Homed in the
+  engine as the heavier sibling of studio/modals/shared/_age_attestation (the
+  lighter one-checkbox legal attestation). RUN ONE OR THE OTHER, not both: the
+  attestation is a signup-time "I confirm I'm of legal age" checkbox; this is an
+  entry-time DOB gate that a server can recompute and stamp.
+
+  CRITICAL — the engine hardcodes NO legal policy. It renders the modal UI, the
+  DOB fields, and the submit; everything legal is app-supplied:
+
+    min_age     (Integer, REQUIRED) — the app's minimum age. There is NO engine
+                default (18 is itself a policy value); the app resolves it from
+                its own policy against its own server-detected jurisdiction.
+    submit_url  (String, REQUIRED)  — the app endpoint the DOB POSTs to. The
+                app owns the authoritative recompute + DOB persistence; the modal
+                only shows the response.
+    state       (String, optional)  — a PASSIVE jurisdiction label for the copy
+                (e.g. "CA"). Server-detected upstream; the modal never detects
+                geography and never offers an editable state field (a spoofable
+                client state must not be able to lower the bar). Blank => the
+                jurisdiction clause is dropped.
+    title       (String, optional)  — modal title. Default "Verify your age".
+    intro       (String, optional)  — the lead sentence after the age line.
+    fine_print  (String, optional)  — the app's legal / jurisdiction copy (e.g.
+                its per-state age table). The engine ships only a neutral,
+                policy-free default; the app passes its real copy here.
+    modal_store (String, optional)  — Alpine store backing close(). Default "modals".
+    demo        (Boolean, optional) — style-guide preview: resolve locally, no POST.
+
+  Requires window.ageVerifyModal — render studio/_age_verify_assets once at
+  layout level (the factory can't ship inside this template; a cloned script
+  never runs). Single root element (modal-host template mount rule).
+%>
+<%
+  min_age     = local_assigns.fetch(:min_age)
+  submit_url  = local_assigns.fetch(:submit_url)
+  state       = local_assigns[:state].to_s.strip
+  title       = local_assigns.fetch(:title, "Verify your age")
+  intro       = local_assigns.fetch(:intro, "Enter your date of birth to confirm you're eligible — we only ask once.")
+  fine_print  = local_assigns.fetch(:fine_print, "We use your date of birth only to confirm eligibility.")
+  modal_store = local_assigns.fetch(:modal_store, "modals")
+  demo        = local_assigns.fetch(:demo, false)
+%>
+<div x-data="ageVerifyModal({ minAge: <%= min_age.to_i %>, state: '<%= j state %>', url: '<%= j submit_url %>', store: '<%= j modal_store %>', demo: <%= demo ? 'true' : 'false' %> })">
+  <%= render layout: "studio/modals/blocks/shell", locals: { title: title, modal_store: modal_store } do %>
+    <p class="text-sm text-muted mb-4">
+      You must be <span class="text-heading font-semibold"><%= min_age %>+</span><%= state.present? ? " in #{state}" : "" %>.
+      <%= intro %>
+    </p>
+
+    <%# Month / Day / Year selectors %>
+    <div class="grid grid-cols-3 gap-2 mb-4">
+      <div>
+        <label class="label-upper block mb-1">Month</label>
+        <select x-model="month" @change="onMonthChange()" class="input-field !px-3 !py-2.5 text-sm appearance-none cursor-pointer">
+          <option value="" disabled>Month</option>
+          <template x-for="m in months" :key="m.n">
+            <option :value="m.n" x-text="m.label"></option>
+          </template>
+        </select>
+      </div>
+      <div>
+        <label class="label-upper block mb-1">Day</label>
+        <select x-model="day" @change="error = ''" class="input-field !px-3 !py-2.5 text-sm appearance-none cursor-pointer">
+          <option value="" disabled>Day</option>
+          <template x-for="d in dayOptions" :key="d">
+            <option :value="d" x-text="d"></option>
+          </template>
+        </select>
+      </div>
+      <div>
+        <label class="label-upper block mb-1">Year</label>
+        <select x-model="year" @change="onMonthChange()" class="input-field !px-3 !py-2.5 text-sm appearance-none cursor-pointer">
+          <option value="" disabled>Year</option>
+          <template x-for="y in years" :key="y">
+            <option :value="y" x-text="y"></option>
+          </template>
+        </select>
+      </div>
+    </div>
+
+    <%# Live too-young hint — shown once a full date is picked and it fails the
+        app-supplied bar, so the user sees the problem before submitting. %>
+    <template x-if="complete && computedAge !== null && minAge && computedAge < minAge">
+      <p class="text-red-400 text-sm mb-3" x-text="'You must be ' + minAge + '+' + (stateCode ? ' in ' + stateCode : '') + '.'"></p>
+    </template>
+
+    <%# Server error (invalid date, or the authoritative too-young check). %>
+    <template x-if="error">
+      <p class="text-red-400 text-sm mb-3" x-text="error"></p>
+    </template>
+
+    <button type="button" @click="submit()"
+            class="btn btn-primary btn-lg w-full"
+            :disabled="!complete || submitting || (computedAge !== null && minAge && computedAge < minAge)">
+      <span x-show="!submitting">Confirm &amp; Continue</span>
+      <span x-show="submitting" class="inline-flex items-center justify-center gap-2" style="display: none;">
+        <span class="cta-spinner" aria-hidden="true"></span>
+        Verifying…
+      </span>
+    </button>
+
+    <p class="text-[11px] text-muted text-center mt-3 leading-snug"><%= fine_print %></p>
+  <% end %>
+</div>
