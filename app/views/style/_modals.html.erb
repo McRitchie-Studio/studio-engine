@@ -632,286 +632,7 @@
   </section>
 
   <%# ===================================================================== %>
-  <%# 3. WEB3 — gated by Studio.feature?(:web3); off = disabled-but-present-yet-openable %>
-  <%# ===================================================================== %>
-  <section class="space-y-5">
-    <div class="space-y-1">
-      <div class="flex flex-wrap items-center gap-3">
-        <h3 class="text-xl font-bold text-heading">Web3</h3>
-        <% if web3_on %>
-          <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">enabled on this app</span>
-        <% else %>
-          <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">disabled on this app</span>
-        <% end %>
-      </div>
-      <p class="text-muted text-sm">
-        Wallet + on-chain modals, ported into the engine and gated by
-        <code class="font-mono text-2xs">Studio.feature?(:web3)</code>. Web3 is
-        <strong><%= web3_on ? "on" : "off" %></strong> here, so these render
-        <%= web3_on ? "live." : "greyed and badged — but STILL openable as a preview." %>
-        The Connect-wallet picker ships its <strong>Phantom / Solflare / Backpack
-        brand marks inline from the engine</strong>
-        (<code class="font-mono text-2xs">studio/modals/blocks/_wallet_brand_sprite</code>),
-        so every app inherits them with no per-app icon files.
-      </p>
-    </div>
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Connect wallet",
-            reference: %(the Web3 "Connect wallet" picker (studio-engine style/modals/_wallet_connect) — open with $store.dsModals.open('wallet-connect')),
-            open_expr: "$store.dsModals.open('wallet-connect')",
-            disabled: !web3_on, openable: true } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
-          <span class="block h-2 w-20 rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
-          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
-        </div>
-      <% end %>
-
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "On-chain tx · processing",
-            reference: %(the Web3 "On-chain tx" modal, processing state (style/modals/_onchain_tx via $store.dsSolanaModal) — open with $store.dsModals.open('onchain-tx', { state: 'processing', title: 'Confirming on-chain', message: 'Waiting for the wallet signature…' })),
-            open_expr: "$store.dsModals.open('onchain-tx', { state: 'processing', title: 'Confirming on-chain', message: 'Waiting for the wallet signature…' })",
-            disabled: !web3_on, openable: true } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <div class="loading-dots mx-auto"><span></span><span></span><span></span></div>
-          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-        </div>
-      <% end %>
-
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "On-chain tx · success",
-            reference: %(the Web3 "On-chain tx" modal, generic-success state (style/modals/_onchain_tx + studio/modals/blocks/_onchain_success) — open with $store.dsModals.open('onchain-tx', { state: 'success', txSignature: '…', successTitle: 'Mint complete' })),
-            open_expr: "$store.dsModals.open('onchain-tx', { state: 'success', txSignature: '5xTrDemoSignature1234567890', successTitle: 'Mint complete', successSubtitle: 'Your on-chain action confirmed.', ctaLabel: 'View wallet', ctaHref: null })",
-            disabled: !web3_on, openable: true } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-success) 15%, transparent)">
-            <svg class="w-4 h-4" style="color: var(--color-success)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-          </div>
-          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-        </div>
-      <% end %>
-
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "On-chain tx · error",
-            reference: %(the Web3 "On-chain tx" modal, error state (style/modals/_onchain_tx) — open with $store.dsModals.open('onchain-tx', { state: 'error', title: "Couldn't confirm", errorMessage: 'The transaction was rejected. Give it another try.' })),
-            open_expr: "$store.dsModals.open('onchain-tx', { state: 'error', title: 'Could not confirm', errorMessage: 'The transaction was rejected. Give it another try.' })",
-            disabled: !web3_on, openable: true } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <div class="text-2xl leading-none">⚠️</div>
-          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-        </div>
-      <% end %>
-
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Wallet deposit",
-            reference: %(the Web3 "Wallet deposit" top-up card (style/modals/_wallet_deposit) — open with $store.dsModals.open('wallet-deposit', { neededCents: 500, usdcCents: 120, usdtCents: 0, address: 'Fo1L5…' })),
-            open_expr: "$store.dsModals.open('wallet-deposit', { neededCents: 500, usdcCents: 120, usdtCents: 0, address: 'Fo1L5demoWALLETaddr9xQ2' })",
-            disabled: !web3_on, openable: true } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
-          <span class="block h-5 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
-        </div>
-      <% end %>
-
-      <%# Entry confirmed — the GENERIC web3 celebration (tx link + heading + drain
-          CTA). seedsEarned: 0 so no seeds bar even where leveling is on: this card
-          demos the clean success a web3-only app gets. The seeds variant lives in
-          Rewards below (gated by :leveling). %>
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Entry confirmed",
-            reference: %(the Web3 "Entry confirmed" celebration (studio/modals/blocks/_entry_confirmed, composed via _success_card's yield — branded tx link + heading + drain CTA; the seeds bar is gated off by :leveling and stays hidden here) — open with $store.dsModals.open('entry-confirmed', { txSignature: '…', lobbyUrl: null, seedsEarned: 0 })),
-            open_expr: "$store.dsModals.open('entry-confirmed', { txSignature: '5xTrDemoSignature1234567890abcXYZ', lobbyUrl: null, seedsEarned: 0, seedsTotal: 40 })",
-            disabled: !web3_on, openable: true } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-primary) 15%, transparent)">
-            <svg class="w-4 h-4" style="color: var(--color-primary)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-          </div>
-          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="block h-1.5 w-14 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
-          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
-        </div>
-      <% end %>
-    </div>
-  </section>
-
-  <%# ===================================================================== %>
-  <%# 4. SYSTEM AND STATUS (reusable card blocks) %>
-  <%# ===================================================================== %>
-  <section class="space-y-5">
-    <div class="space-y-1">
-      <h3 class="text-xl font-bold text-heading">System &amp; status</h3>
-      <p class="text-muted text-sm">
-        The reusable card blocks under <code class="font-mono text-2xs">studio/modals/blocks/</code> &mdash;
-        the studio-canonical processing, success, error, and countdown states.
-      </p>
-    </div>
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Processing",
-            reference: %(the "Processing" card block (studio/modals/blocks/_processing_card) — open with $store.dsModals.open('ds-processing')),
-            open_expr: "$store.dsModals.open('ds-processing')" } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <div class="mx-auto w-6 h-6 rounded-full border-2 animate-spin" style="border-color: color-mix(in srgb, var(--color-cta) 30%, transparent); border-top-color: var(--color-cta)"></div>
-          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
-        </div>
-      <% end %>
-
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Success",
-            reference: %(the "Success" card block (studio/modals/blocks/_success_card, entry-confirmed style) — open with $store.dsModals.open('ds-success')),
-            open_expr: "$store.dsModals.open('ds-success')" } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-success) 15%, transparent)">
-            <svg class="w-4 h-4" style="color: var(--color-success)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-          </div>
-          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
-        </div>
-      <% end %>
-
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Error / retry",
-            reference: %(the "Error" card block (studio/modals/blocks/_error_card) — open with $store.dsModals.open('ds-error')),
-            open_expr: "$store.dsModals.open('ds-error')" } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <div class="text-2xl leading-none">⚠️</div>
-          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="block h-4 w-20 mx-auto rounded border" style="border-color: var(--color-border-strong)"></span>
-        </div>
-      <% end %>
-
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Countdown",
-            reference: %(the "Countdown" progress block (studio/modals/blocks/_progress_countdown) — open with $store.dsModals.open('ds-countdown')),
-            open_expr: "$store.dsModals.open('ds-countdown')" } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <div class="w-full rounded-full overflow-hidden" style="height: 6px; background: rgba(128,128,128,0.2)">
-            <div style="height: 100%; width: 60%; border-radius: 9999px; background: var(--color-cta)"></div>
-          </div>
-          <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
-        </div>
-      <% end %>
-    </div>
-  </section>
-
-  <%# ===================================================================== %>
-  <%# 5. TEMPLATES (copy-from archetypes) %>
-  <%# ===================================================================== %>
-  <section class="space-y-5">
-    <div class="space-y-1">
-      <h3 class="text-xl font-bold text-heading">Templates</h3>
-      <p class="text-muted text-sm">
-        Reusable archetypes under <code class="font-mono text-2xs">studio/modals/templates/</code> &mdash;
-        the copy-from reference cards for a new modal (wizard, form, action,
-        status, success).
-      </p>
-    </div>
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-      <% [
-           ["template-wizard",  "Wizard",  "🧭", "studio/modals/templates/_wizard"],
-           ["template-form",    "Form",    "📝", "studio/modals/templates/_form"],
-           ["template-action",  "Action",  "❓", "studio/modals/templates/_action"],
-           ["template-status",  "Status",  "⏳", "studio/modals/templates/_status"],
-           ["template-success", "Success", "✅", "studio/modals/templates/_success"]
-         ].each do |id, label, glyph, partial| %>
-        <%= render layout: "style/modal_specimen", locals: {
-              label:     label,
-              reference: %(the "#{label}" modal template (#{partial}) — open with $store.dsModals.open('#{id}')),
-              open_expr: "$store.dsModals.open('#{id}')" } do %>
-          <div class="pointer-events-none w-32 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-            <div class="text-2xl leading-none"><%= glyph %></div>
-            <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-            <span class="block h-4 w-full rounded" style="background: var(--color-cta); opacity: .6"></span>
-          </div>
-        <% end %>
-      <% end %>
-    </div>
-  </section>
-
-  <%# ===================================================================== %>
-  <%# 6. REWARDS / leveling (gated by Studio.feature?(:leveling)) %>
-  <%# ===================================================================== %>
-  <section class="space-y-5">
-    <div class="space-y-1">
-      <div class="flex flex-wrap items-center gap-3">
-        <h3 class="text-xl font-bold text-heading">Rewards</h3>
-        <% if leveling_on %>
-          <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">enabled on this app</span>
-        <% else %>
-          <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">disabled on this app</span>
-        <% end %>
-      </div>
-      <p class="text-muted text-sm">
-        The seeds bar + level-up celebrations, gated by
-        <code class="font-mono text-2xs">Studio.feature?(:leveling)</code> — an
-        app-level setting <strong>independent of :web3</strong> (some apps have
-        Solana but no leveling). Leveling is <strong><%= leveling_on ? "on" : "off" %></strong>
-        here, so these render
-        <%= leveling_on ? "live." : "greyed and badged — but STILL openable as a preview." %>
-        The seed counts, level, and free entry are <strong>app-supplied props</strong>
-        (<code class="font-mono text-2xs">seedsEarned</code>,
-        <code class="font-mono text-2xs">seedsTotal</code>, …) — the engine renders
-        the bar, the app feeds the numbers.
-      </p>
-    </div>
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Level up",
-            reference: %(the Rewards "Level up" celebration (studio/modals/blocks/_success_card with the sheen + studio-glow badge) — open with $store.dsModals.open('levelup')),
-            open_expr: "$store.dsModals.open('levelup')",
-            disabled: !leveling_on, openable: true } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <div class="text-2xl leading-none">🎉</div>
-          <span class="inline-flex h-8 w-8 items-center justify-center rounded-full text-white text-sm font-extrabold" style="background: var(--color-cta)">10</span>
-          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
-        </div>
-      <% end %>
-
-      <%# Entry + seeds — the SAME _entry_confirmed card, now with seedsEarned
-          crossing a level so the :leveling seeds bar mounts in the _success_card
-          yield and plays the 4-phase level-up (fill → pop → drain → refill), then
-          swaps to the Free Entry Earned reward line. %>
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Entry + seeds level-up",
-            reference: %(the Rewards "Entry + seeds" celebration (studio/modals/blocks/_entry_confirmed — the :leveling seeds bar + Free Entry Earned reward injected into _success_card's yield) — open with $store.dsModals.open('entry-confirmed', { txSignature: '…', lobbyUrl: null, seedsEarned: 30, seedsTotal: 100 })),
-            open_expr: "$store.dsModals.open('entry-confirmed', { txSignature: '5xTrDemoSignature1234567890abcXYZ', lobbyUrl: null, seedsEarned: 30, seedsTotal: 100 })",
-            disabled: !leveling_on, openable: true } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-primary) 15%, transparent)">
-            <svg class="w-4 h-4" style="color: var(--color-primary)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-          </div>
-          <div class="flex gap-1">
-            <span class="flex-1 h-2.5 rounded" style="background: var(--color-cta)"></span>
-            <span class="flex-1 h-2.5 rounded" style="background: var(--color-cta); opacity:.6"></span>
-            <span class="flex-1 h-2.5 rounded" style="background: var(--color-cta); opacity:.25"></span>
-            <span class="flex-1 h-2.5 rounded" style="background: var(--color-text); opacity:.12"></span>
-            <span class="flex-1 h-2.5 rounded" style="background: var(--color-text); opacity:.12"></span>
-          </div>
-          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
-        </div>
-      <% end %>
-
-      <%# Free Entry Earned — the standalone level-up reward modal (:leveling). %>
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Free Entry Earned",
-            reference: %(the Rewards "Free Entry Earned" level-up modal (studio/modals/blocks/_free_entry_earned) — open with $store.dsModals.open('free-entry-earned', { level: 3 })),
-            open_expr: "$store.dsModals.open('free-entry-earned', { level: 3 })",
-            disabled: !leveling_on, openable: true } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <div class="text-2xl leading-none">🎉</div>
-          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="block h-1.5 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
-        </div>
-      <% end %>
-    </div>
-  </section>
-
-  <%# ===================================================================== %>
-  <%# 7. PROFILE LEVELING — change username + join newsletter (per-card toggles) %>
+  <%# 3. PROFILE LEVELING — change username + join newsletter (per-card toggles) %>
   <%# ===================================================================== %>
   <%# Each specimen card carries its OWN Leveling toggle (like the Auth "Sign in"
       card's method checkboxes) — the card's opts.leveling flows into its open() as
@@ -1028,4 +749,284 @@
       <% end %>
     </div>
   </section>
+
+  <%# ===================================================================== %>
+  <%# 4. WEB3 — gated by Studio.feature?(:web3); off = disabled-but-present-yet-openable %>
+  <%# ===================================================================== %>
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <div class="flex flex-wrap items-center gap-3">
+        <h3 class="text-xl font-bold text-heading">Web3</h3>
+        <% if web3_on %>
+          <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">enabled on this app</span>
+        <% else %>
+          <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">disabled on this app</span>
+        <% end %>
+      </div>
+      <p class="text-muted text-sm">
+        Wallet + on-chain modals, ported into the engine and gated by
+        <code class="font-mono text-2xs">Studio.feature?(:web3)</code>. Web3 is
+        <strong><%= web3_on ? "on" : "off" %></strong> here, so these render
+        <%= web3_on ? "live." : "greyed and badged — but STILL openable as a preview." %>
+        The Connect-wallet picker ships its <strong>Phantom / Solflare / Backpack
+        brand marks inline from the engine</strong>
+        (<code class="font-mono text-2xs">studio/modals/blocks/_wallet_brand_sprite</code>),
+        so every app inherits them with no per-app icon files.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Connect wallet",
+            reference: %(the Web3 "Connect wallet" picker (studio-engine style/modals/_wallet_connect) — open with $store.dsModals.open('wallet-connect')),
+            open_expr: "$store.dsModals.open('wallet-connect')",
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
+          <span class="block h-2 w-20 rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "On-chain tx · processing",
+            reference: %(the Web3 "On-chain tx" modal, processing state (style/modals/_onchain_tx via $store.dsSolanaModal) — open with $store.dsModals.open('onchain-tx', { state: 'processing', title: 'Confirming on-chain', message: 'Waiting for the wallet signature…' })),
+            open_expr: "$store.dsModals.open('onchain-tx', { state: 'processing', title: 'Confirming on-chain', message: 'Waiting for the wallet signature…' })",
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="loading-dots mx-auto"><span></span><span></span><span></span></div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "On-chain tx · success",
+            reference: %(the Web3 "On-chain tx" modal, generic-success state (style/modals/_onchain_tx + studio/modals/blocks/_onchain_success) — open with $store.dsModals.open('onchain-tx', { state: 'success', txSignature: '…', successTitle: 'Mint complete' })),
+            open_expr: "$store.dsModals.open('onchain-tx', { state: 'success', txSignature: '5xTrDemoSignature1234567890', successTitle: 'Mint complete', successSubtitle: 'Your on-chain action confirmed.', ctaLabel: 'View wallet', ctaHref: null })",
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-success) 15%, transparent)">
+            <svg class="w-4 h-4" style="color: var(--color-success)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "On-chain tx · error",
+            reference: %(the Web3 "On-chain tx" modal, error state (style/modals/_onchain_tx) — open with $store.dsModals.open('onchain-tx', { state: 'error', title: "Couldn't confirm", errorMessage: 'The transaction was rejected. Give it another try.' })),
+            open_expr: "$store.dsModals.open('onchain-tx', { state: 'error', title: 'Could not confirm', errorMessage: 'The transaction was rejected. Give it another try.' })",
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">⚠️</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Wallet deposit",
+            reference: %(the Web3 "Wallet deposit" top-up card (style/modals/_wallet_deposit) — open with $store.dsModals.open('wallet-deposit', { neededCents: 500, usdcCents: 120, usdtCents: 0, address: 'Fo1L5…' })),
+            open_expr: "$store.dsModals.open('wallet-deposit', { neededCents: 500, usdcCents: 120, usdtCents: 0, address: 'Fo1L5demoWALLETaddr9xQ2' })",
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+          <span class="block h-5 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+        </div>
+      <% end %>
+
+      <%# Entry confirmed — the GENERIC web3 celebration (tx link + heading + drain
+          CTA). seedsEarned: 0 so no seeds bar even where leveling is on: this card
+          demos the clean success a web3-only app gets. The seeds variant lives in
+          Rewards below (gated by :leveling). %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Entry confirmed",
+            reference: %(the Web3 "Entry confirmed" celebration (studio/modals/blocks/_entry_confirmed, composed via _success_card's yield — branded tx link + heading + drain CTA; the seeds bar is gated off by :leveling and stays hidden here) — open with $store.dsModals.open('entry-confirmed', { txSignature: '…', lobbyUrl: null, seedsEarned: 0 })),
+            open_expr: "$store.dsModals.open('entry-confirmed', { txSignature: '5xTrDemoSignature1234567890abcXYZ', lobbyUrl: null, seedsEarned: 0, seedsTotal: 40 })",
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-primary) 15%, transparent)">
+            <svg class="w-4 h-4" style="color: var(--color-primary)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-14 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <%# ===================================================================== %>
+  <%# 5. SYSTEM AND STATUS (reusable card blocks) %>
+  <%# ===================================================================== %>
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <h3 class="text-xl font-bold text-heading">System &amp; status</h3>
+      <p class="text-muted text-sm">
+        The reusable card blocks under <code class="font-mono text-2xs">studio/modals/blocks/</code> &mdash;
+        the studio-canonical processing, success, error, and countdown states.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Processing",
+            reference: %(the "Processing" card block (studio/modals/blocks/_processing_card) — open with $store.dsModals.open('ds-processing')),
+            open_expr: "$store.dsModals.open('ds-processing')" } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-6 h-6 rounded-full border-2 animate-spin" style="border-color: color-mix(in srgb, var(--color-cta) 30%, transparent); border-top-color: var(--color-cta)"></div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Success",
+            reference: %(the "Success" card block (studio/modals/blocks/_success_card, entry-confirmed style) — open with $store.dsModals.open('ds-success')),
+            open_expr: "$store.dsModals.open('ds-success')" } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-success) 15%, transparent)">
+            <svg class="w-4 h-4" style="color: var(--color-success)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Error / retry",
+            reference: %(the "Error" card block (studio/modals/blocks/_error_card) — open with $store.dsModals.open('ds-error')),
+            open_expr: "$store.dsModals.open('ds-error')" } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">⚠️</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-4 w-20 mx-auto rounded border" style="border-color: var(--color-border-strong)"></span>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Countdown",
+            reference: %(the "Countdown" progress block (studio/modals/blocks/_progress_countdown) — open with $store.dsModals.open('ds-countdown')),
+            open_expr: "$store.dsModals.open('ds-countdown')" } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <div class="w-full rounded-full overflow-hidden" style="height: 6px; background: rgba(128,128,128,0.2)">
+            <div style="height: 100%; width: 60%; border-radius: 9999px; background: var(--color-cta)"></div>
+          </div>
+          <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <%# ===================================================================== %>
+  <%# 6. TEMPLATES (copy-from archetypes) %>
+  <%# ===================================================================== %>
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <h3 class="text-xl font-bold text-heading">Templates</h3>
+      <p class="text-muted text-sm">
+        Reusable archetypes under <code class="font-mono text-2xs">studio/modals/templates/</code> &mdash;
+        the copy-from reference cards for a new modal (wizard, form, action,
+        status, success).
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <% [
+           ["template-wizard",  "Wizard",  "🧭", "studio/modals/templates/_wizard"],
+           ["template-form",    "Form",    "📝", "studio/modals/templates/_form"],
+           ["template-action",  "Action",  "❓", "studio/modals/templates/_action"],
+           ["template-status",  "Status",  "⏳", "studio/modals/templates/_status"],
+           ["template-success", "Success", "✅", "studio/modals/templates/_success"]
+         ].each do |id, label, glyph, partial| %>
+        <%= render layout: "style/modal_specimen", locals: {
+              label:     label,
+              reference: %(the "#{label}" modal template (#{partial}) — open with $store.dsModals.open('#{id}')),
+              open_expr: "$store.dsModals.open('#{id}')" } do %>
+          <div class="pointer-events-none w-32 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+            <div class="text-2xl leading-none"><%= glyph %></div>
+            <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+            <span class="block h-4 w-full rounded" style="background: var(--color-cta); opacity: .6"></span>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  </section>
+
+  <%# ===================================================================== %>
+  <%# 7. REWARDS / leveling (gated by Studio.feature?(:leveling)) %>
+  <%# ===================================================================== %>
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <div class="flex flex-wrap items-center gap-3">
+        <h3 class="text-xl font-bold text-heading">Rewards</h3>
+        <% if leveling_on %>
+          <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">enabled on this app</span>
+        <% else %>
+          <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">disabled on this app</span>
+        <% end %>
+      </div>
+      <p class="text-muted text-sm">
+        The seeds bar + level-up celebrations, gated by
+        <code class="font-mono text-2xs">Studio.feature?(:leveling)</code> — an
+        app-level setting <strong>independent of :web3</strong> (some apps have
+        Solana but no leveling). Leveling is <strong><%= leveling_on ? "on" : "off" %></strong>
+        here, so these render
+        <%= leveling_on ? "live." : "greyed and badged — but STILL openable as a preview." %>
+        The seed counts, level, and free entry are <strong>app-supplied props</strong>
+        (<code class="font-mono text-2xs">seedsEarned</code>,
+        <code class="font-mono text-2xs">seedsTotal</code>, …) — the engine renders
+        the bar, the app feeds the numbers.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Level up",
+            reference: %(the Rewards "Level up" celebration (studio/modals/blocks/_success_card with the sheen + studio-glow badge) — open with $store.dsModals.open('levelup')),
+            open_expr: "$store.dsModals.open('levelup')",
+            disabled: !leveling_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">🎉</div>
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-full text-white text-sm font-extrabold" style="background: var(--color-cta)">10</span>
+          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+
+      <%# Entry + seeds — the SAME _entry_confirmed card, now with seedsEarned
+          crossing a level so the :leveling seeds bar mounts in the _success_card
+          yield and plays the 4-phase level-up (fill → pop → drain → refill), then
+          swaps to the Free Entry Earned reward line. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Entry + seeds level-up",
+            reference: %(the Rewards "Entry + seeds" celebration (studio/modals/blocks/_entry_confirmed — the :leveling seeds bar + Free Entry Earned reward injected into _success_card's yield) — open with $store.dsModals.open('entry-confirmed', { txSignature: '…', lobbyUrl: null, seedsEarned: 30, seedsTotal: 100 })),
+            open_expr: "$store.dsModals.open('entry-confirmed', { txSignature: '5xTrDemoSignature1234567890abcXYZ', lobbyUrl: null, seedsEarned: 30, seedsTotal: 100 })",
+            disabled: !leveling_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-primary) 15%, transparent)">
+            <svg class="w-4 h-4" style="color: var(--color-primary)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <div class="flex gap-1">
+            <span class="flex-1 h-2.5 rounded" style="background: var(--color-cta)"></span>
+            <span class="flex-1 h-2.5 rounded" style="background: var(--color-cta); opacity:.6"></span>
+            <span class="flex-1 h-2.5 rounded" style="background: var(--color-cta); opacity:.25"></span>
+            <span class="flex-1 h-2.5 rounded" style="background: var(--color-text); opacity:.12"></span>
+            <span class="flex-1 h-2.5 rounded" style="background: var(--color-text); opacity:.12"></span>
+          </div>
+          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+
+      <%# Free Entry Earned — the standalone level-up reward modal (:leveling). %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Free Entry Earned",
+            reference: %(the Rewards "Free Entry Earned" level-up modal (studio/modals/blocks/_free_entry_earned) — open with $store.dsModals.open('free-entry-earned', { level: 3 })),
+            open_expr: "$store.dsModals.open('free-entry-earned', { level: 3 })",
+            disabled: !leveling_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">🎉</div>
+          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
 </section>
