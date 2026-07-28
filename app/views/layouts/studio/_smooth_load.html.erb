@@ -1,0 +1,15 @@
+<%# Smooth-load convention (opt-in via Studio.smooth_load) — the next page
+    materializes behind the current one, then presents itself. Turbo 8 sees the
+    view-transition meta and wraps its body swap in document.startViewTransition;
+    browsers without support get the instant swap. no-preview stops application
+    visits from painting a stale cache snapshot before the fresh response — the
+    current page holds until the new one is ready, so navigation renders exactly
+    once. Restoration visits (back/forward) still restore instantly from cache.
+    Transition styling ships in engine.css ("Smooth-load convention" block);
+    pin an app's sticky header with the .vt-pinned-header utility (exactly one
+    element per page — a duplicate view-transition-name silently disables the
+    whole transition). %>
+<% if Studio.smooth_load %>
+  <meta name="view-transition" content="same-origin">
+  <meta name="turbo-cache-control" content="no-preview">
+<% end %>
