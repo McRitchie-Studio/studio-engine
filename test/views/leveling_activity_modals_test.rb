@@ -28,10 +28,11 @@ require "nokogiri"
 #      contract (submit_url + an opaque finalize_hook). Asserted against the
 #      RENDERED output (ERB doc-comments are stripped), plus a source-level check
 #      that no chain *code* token leaked.
-#   C. The living style guide ships the "Profile Leveling" section: ONE live
-#      leveling toggle and FOUR walked cards (Change Username -> Great Username ->
-#      Join Newsletter -> Subscribed!) — the two "updated" cards open the same id
-#      straight at the celebrate state (props.celebrate), each openable and glowing.
+#   C. The living style guide ships the "Profile Leveling" section: FOUR walked
+#      cards (Change Username -> Great Username -> Join Newsletter -> Subscribed!),
+#      each carrying its OWN per-card leveling toggle (like the Auth card's method
+#      checkboxes) — the two "updated" cards open the same id straight at the
+#      celebrate state (props.celebrate), each openable and glowing.
 class LevelingActivityModalsTest < ActiveSupport::TestCase
   ENGINE_ROOT           = File.expand_path("../..", __dir__)
   CHANGE_USERNAME_ERB   = File.join(ENGINE_ROOT, "app/views/studio/modals/blocks/_change_username.html.erb")
@@ -90,7 +91,7 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
 
   test "change-username renders form + seeds celebration + plain confirm, runtime-gated, no quest counter" do
     html = render_change_username(current_username: "picker", submit_url: "/u",
-                                  leveling: true, level_label: "Level 1",
+                                  leveling: true,
                                   confirm_subtitle: "Your username has been updated.")
 
     # The action itself (the form view).
@@ -107,7 +108,10 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
       "the seeds celebration is gated on celebrate AND the reactive leveling"
     assert_includes html, "seeds-bar-continuous", "the seeds celebration markup is present"
     assert_includes html, "Great Username", "the celebration headline renders"
-    assert_includes html, "Level 1", "the level chip renders"
+    # The "Level N" pill was dropped from the celebrate view; the seeds bar stays.
+    refute_includes html, "Level 1", "the celebration carries no 'Level N' chip (dropped)"
+    refute_match(/local_assigns\.fetch\(:level_label/, File.read(LEVELING_ACTIVITY_ERB),
+      "the primitive no longer accepts a level_label local")
 
     # The plain confirmation — the MS shape, gated celebrate && !leveling.
     assert_includes html, 'x-if="celebrate && !leveling"',
@@ -125,8 +129,8 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
   # driven by the reactive getter (asserted below), verified live in the preview.
 
   test "the three views render regardless of the Ruby leveling default (fork removed)" do
-    on  = render_change_username(current_username: "picker", submit_url: "/u", leveling: true,  level_label: "Level 1")
-    off = render_change_username(current_username: "picker", submit_url: "/u", leveling: false, level_label: "Level 1")
+    on  = render_change_username(current_username: "picker", submit_url: "/u", leveling: true)
+    off = render_change_username(current_username: "picker", submit_url: "/u", leveling: false)
 
     [on, off].each do |html|
       assert_includes html, 'x-if="celebrate && leveling"',  "seeds celebration is runtime-gated in both defaults"
@@ -244,24 +248,29 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
       "the factory must ship at page level so the modals open live"
   end
 
-  test "the Profile Leveling section walks FOUR cards behind ONE toggle (no -plain twins, no quest counter)" do
+  test "the Profile Leveling section walks FOUR cards with PER-CARD toggles (no -plain twins, no quest counter)" do
     html = render_index
 
-    # The section renamed + the single live toggle that drives leveling.
+    # The section renamed. Leveling is now PER-CARD (like the Auth card's method
+    # checkboxes), not one section-wide toggle: the old section x-model/$watch are
+    # gone and each card ships its own opts.leveling checkbox.
     assert_includes html, "Profile Leveling", "the section is renamed to Profile Leveling"
     refute_includes html, "Leveling activities", "the old section title is gone"
-    assert_includes html, 'x-model="leveling"', "the section ships ONE live leveling toggle"
-    assert_includes html, "$watch('leveling'", "toggling patches an open modal so the flip is live"
+    refute_includes html, 'x-model="leveling"', "the single section-wide leveling toggle is removed"
+    refute_includes html, "$watch('leveling'", "no section-level $watch patches an open modal anymore"
+    assert_operator html.scan('x-model="opts.leveling"').size, :>=, 4,
+      "each of the four cards ships its OWN opts.leveling checkbox"
 
-    # FOUR walked cards — the two inputs open the form, the two "updated" cards open
-    # the SAME id straight at the celebrate state (props.celebrate), like Auth steps.
-    assert_includes html, "$store.dsModals.open('change-username', { demo: true, leveling: leveling })",
-      "the Change Username card opens the form with the section's live leveling"
-    assert_includes html, "$store.dsModals.open('change-username', { demo: true, leveling: leveling, celebrate: true, seedsEarned: 25, seedsTotal: 25 })",
+    # FOUR walked cards — each opens with ITS OWN card toggle (opts.leveling); the
+    # two "updated" cards open the SAME id straight at the celebrate state
+    # (props.celebrate), like Auth steps.
+    assert_includes html, "$store.dsModals.open('change-username', { demo: true, leveling: opts.leveling })",
+      "the Change Username card opens the form with its own card toggle"
+    assert_includes html, "$store.dsModals.open('change-username', { demo: true, leveling: opts.leveling, celebrate: true, seedsEarned: 25, seedsTotal: 25 })",
       "the Great Username card opens change-username straight at the celebrate state"
-    assert_includes html, "$store.dsModals.open('join-newsletter', { demo: true, leveling: leveling })",
-      "the Join Newsletter card opens the form with the section's live leveling"
-    assert_includes html, "$store.dsModals.open('join-newsletter', { demo: true, leveling: leveling, celebrate: true, seedsEarned: 25, seedsTotal: 100 })",
+    assert_includes html, "$store.dsModals.open('join-newsletter', { demo: true, leveling: opts.leveling })",
+      "the Join Newsletter card opens the form with its own card toggle"
+    assert_includes html, "$store.dsModals.open('join-newsletter', { demo: true, leveling: opts.leveling, celebrate: true, seedsEarned: 25, seedsTotal: 100 })",
       "the Subscribed! card opens join-newsletter straight at the celebrate state"
 
     # The card labels for the walked flow.

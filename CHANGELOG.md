@@ -11,9 +11,9 @@ ids (`change-username` + `change-username-plain`, `quest-activity` +
 `quest-activity-plain`), because the primitive read `leveling` from a Ruby local
 at render time. Now the primitive reads `leveling` at RUNTIME from the modal
 store's `props.leveling`, so ONE id per activity flips the Turf Monster shape
-(a "Level N" pill + seeds celebration + Free Entry Token progress) ↔ the McRitchie
-Studio shape (plain input + Save, then a simple confirmation) live as a single
-leveling toggle moves.
+(the seeds celebration + Free Entry Token progress) ↔ the McRitchie Studio shape
+(plain input + Save, then a simple confirmation) live as its per-card leveling
+toggle moves.
 
 ### Changed
 
@@ -23,7 +23,8 @@ leveling toggle moves.
   (`celebrate && leveling`, TM), and a **plain confirmation**
   (`celebrate && !leveling`, MS). The `leveling` local becomes the render-time
   fallback only. **The "Quest N of N" counter pill is removed** — the profile
-  modals do not carry one; the "Level N" pill + seeds bar stay. All existing seams
+  modals do not carry one. **The "Level N" pill is also dropped** from the
+  celebration (no consumer used it); the seeds bar stays. All existing seams
   are preserved unchanged (`submit_url`, `finalize_hook`, `saved_event`,
   `modal_store`, `demo`, seeds/level props), so Turf Monster's live usage and the
   opaque save-callback contract are unaffected (TM ships no `props.leveling` and
@@ -40,22 +41,22 @@ leveling toggle moves.
   suppressed, so a host app's follow-on handler (e.g. Turf Monster's
   `quest-success` on `studio:username-saved`) can't stack a second modal over the
   demo's own celebrate view.
-- **`/admin/style`** — "Leveling activities" → **"Profile Leveling"**: one live
-  `Leveling` toggle drives the whole section (`$watch` patches an open modal so the
-  flip is live across all cards), and the section walks **four** cards —
-  **Change Username → Great Username**, then **Join the Newsletter → Subscribed!** —
-  each "updated" card opening its modal straight at the success state, mirroring
-  Turf Monster's real copy, seeds, level, and Free Entry Token progress. No quest
-  counter.
+- **`/admin/style`** — "Leveling activities" → **"Profile Leveling"**: **each
+  specimen card carries its OWN `Leveling` toggle** (like the Auth card's method
+  checkboxes), flipping THAT card between the Turf Monster and McRitchie Studio
+  shape at open — so you can preview Change Username leveling-on beside Great
+  Username leveling-off. The section walks **four** cards — **Change Username →
+  Great Username**, then **Join the Newsletter → Subscribed!** — each "updated"
+  card opening its modal straight at the success state, mirroring Turf Monster's
+  real copy, seeds, and Free Entry Token progress. No quest counter, no Level pill.
 
 ### Added
 
 - **`_leveling_activity` locals** (all optional, additive): `consent_label` (a
-  consent checkbox that gates the action — the newsletter join), `level_label` (a
-  "Level N" chip on the celebration), `confirm_subtitle` (subtext on the MS-shape
-  plain confirmation), `next_label` / `next_open` (a "Next Quest" button that walks
-  to the next activity), and `demo_seeds_earned` / `demo_seeds_total` (style-guide-
-  only seed payload tuning).
+  consent checkbox that gates the action — the newsletter join), `confirm_subtitle`
+  (subtext on the MS-shape plain confirmation), `next_label` / `next_open` (a
+  "Next Quest" button that walks to the next activity), and `demo_seeds_earned` /
+  `demo_seeds_total` (style-guide-only seed payload tuning).
 
 ## 0.24.1 — 2026-07-28
 

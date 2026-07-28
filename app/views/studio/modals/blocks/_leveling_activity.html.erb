@@ -54,7 +54,6 @@
                   modal id flips TM <-> MS as a toggle moves.
     consent_label (String) — render a consent checkbox that gates the action until
                   ticked (the newsletter join). Omit for no checkbox.
-    level_label   (String) — a small "Level N" chip on the celebration. Omit = none.
     confirm_subtitle (String) — subtext on the MS-shape (leveling off) plain
                   confirmation. Omit = none.
     next_label / next_open — an optional "Next Quest" button on the celebration;
@@ -95,11 +94,10 @@
   modal_store        = local_assigns.fetch(:modal_store, "modals")
   demo               = local_assigns.fetch(:demo, false)
   # consent_label — render a consent checkbox that gates the action (newsletter
-  # join). level_label — a small "Level N" chip on the celebration. next_label /
-  # next_open — an optional "Next Quest" button in the celebration (next_open is a
-  # developer-authored Alpine expression). demo_seeds_* — style-guide-only tuning.
+  # join). next_label / next_open — an optional "Next Quest" button in the
+  # celebration (next_open is a developer-authored Alpine expression). demo_seeds_*
+  # — style-guide-only tuning.
   consent_label      = local_assigns.fetch(:consent_label, nil)
-  level_label        = local_assigns.fetch(:level_label, nil)
   next_label         = local_assigns.fetch(:next_label, nil)
   next_open          = local_assigns[:next_open].presence&.to_s&.html_safe
   # confirm_subtitle — the MS-shape (leveling off) plain-confirmation subtext.
@@ -171,11 +169,6 @@
       animates from the freshly-saved payload. Single root. %>
   <template x-if="celebrate && leveling">
     <div>
-      <% if level_label.present? %>
-        <div class="mb-3 text-center">
-          <span class="inline-block text-[10px] font-semibold uppercase tracking-wide text-primary bg-primary/10 px-2 py-0.5 rounded-full"><%= level_label %></span>
-        </div>
-      <% end %>
       <%= render "studio/modals/blocks/card_header",
             size: :lg, icon_emoji: icon_emoji,
             title: celebrate_title, subtitle: celebrate_subtitle %>

@@ -387,9 +387,9 @@
         <%# --- Profile Leveling: change username + join newsletter --- %>
         <%# ONE id per activity — opened at the form OR (with props.celebrate) at the
             "updated" state, exactly like the Auth cards open a given step. The
-            primitive reads props.leveling at RUNTIME, so the section's leveling
-            toggle flips TM (Level + seeds celebration) <-> MS (plain confirmation)
-            live — no more `-plain` twins, and no "Quest N of N" counter. All
+            primitive reads props.leveling at RUNTIME, so each card's own Leveling
+            toggle flips TM (the seeds celebration) <-> MS (plain confirmation) at
+            open — no more `-plain` twins, and no "Quest N of N" counter. All
             demo:true (the save resolves locally); the on-chain-accurate copy is an
             app-authored description (the engine default stays neutral). The two
             activities walk in sequence via the celebration's "Next Quest"
@@ -401,7 +401,6 @@
                     submit_url: "#demo-change-username",
                     description: "Your username is stored on-chain. Changes are saved via your managed wallet.",
                     cta_label: "Save", saved_label: "Saved",
-                    level_label: "Level 1",
                     demo_seeds_earned: 25, demo_seeds_total: 25,
                     free_entry_label: "Free Entry Token 🎟️",
                     confirm_subtitle: "Your username has been updated.",
@@ -420,7 +419,6 @@
                     icon_emoji: "🌱",
                     celebrate_title: "Subscribed!",
                     celebrate_subtitle: "You're on the list. We'll keep the sports news and contest updates coming.",
-                    level_label: "Level 2",
                     demo_seeds_earned: 25, demo_seeds_total: 100,
                     free_entry_label: "Free Entry Token 🎟️",
                     confirm_subtitle: "You're on the list.",
@@ -913,19 +911,17 @@
   </section>
 
   <%# ===================================================================== %>
-  <%# 7. PROFILE LEVELING — change username + join newsletter (ONE live toggle) %>
+  <%# 7. PROFILE LEVELING — change username + join newsletter (per-card toggles) %>
   <%# ===================================================================== %>
-  <%# The section owns a LIVE leveling toggle. `leveling` (default on) flows into
-      each card's open() as props.leveling, and $watch patches an already-open modal
-      so the flip is live across ALL FOUR cards. Checked = TM shape (a Level pill +
-      the seeds celebration + Free Entry Token); unchecked = MS shape (plain
-      input/Save + a simple confirmation). ONE primitive, ONE id per activity, no
+  <%# Each specimen card carries its OWN Leveling toggle (like the Auth "Sign in"
+      card's method checkboxes) — the card's opts.leveling flows into its open() as
+      props.leveling, so the card opens at the TM shape (checked, the default) or the
+      MS shape (unchecked). Independent per card: preview Change Username leveling-on
+      beside Great Username leveling-off. ONE primitive, ONE id per activity, no
       "Quest N of N" counter — the with/without fork is gone. The two "updated"
       cards open the same modal id straight at the celebrate state (props.celebrate),
       exactly like the Auth cards open a given step. %>
-  <section class="space-y-5"
-           x-data="{ leveling: true, sync() { var c = $store.dsModals.current(); if (c && c.props && (c.id === 'change-username' || c.id === 'join-newsletter')) c.props.leveling = this.leveling; } }"
-           x-init="$watch('leveling', () => sync())">
+  <section class="space-y-5">
     <div class="space-y-1">
       <div class="flex flex-wrap items-center gap-3">
         <h3 class="text-xl font-bold text-heading">Profile Leveling</h3>
@@ -942,11 +938,13 @@
         specialization). Walk all four states — <strong>Change Username &rarr; Great
         Username</strong>, then <strong>Join the Newsletter &rarr; Subscribed!</strong>
         — each "updated" card opens its modal straight at the success state, just like
-        the Auth cards open a given step. The single <strong>Leveling</strong> toggle
-        flips the whole flow live: <strong>on</strong> is the Turf Monster shape (a
-        <strong>Level</strong> pill + the seeds bar + Free Entry Token progress);
-        <strong>off</strong> is the McRitchie Studio shape (plain input + Save, then a
-        simple confirmation). Same modal id either way — the primitive reads
+        the Auth cards open a given step. Each card carries its <strong>own Leveling
+        toggle</strong> (like the Auth card's method checkboxes): <strong>checked</strong>
+        is the Turf Monster shape (the seeds bar + Free Entry Token progress),
+        <strong>unchecked</strong> is the McRitchie Studio shape (plain input + Save,
+        then a simple confirmation). Flip a card's toggle, then open it — so you can
+        preview Change Username leveling-on beside Great Username leveling-off. Same
+        modal id either way — the primitive reads
         <code class="font-mono text-2xs">leveling</code> at runtime, so there is no
         with/without fork and <strong>no "Quest N of N" counter</strong>. The save is an
         <strong>app-supplied callback</strong>
@@ -955,13 +953,6 @@
         <strong>no wallet, signing, or on-chain write lives in the engine</strong>.
         (These demos resolve locally.)
       </p>
-      <%# The live leveling toggle — same checkbox mechanism as the Auth method
-          toggles, scoped to the whole section. %>
-      <label class="inline-flex items-center gap-2 text-sm text-secondary cursor-pointer select-none pt-1">
-        <input type="checkbox" x-model="leveling" class="w-4 h-4 rounded accent-primary cursor-pointer">
-        <span class="font-medium text-heading">Leveling</span>
-        <span class="text-2xs text-muted" x-text="leveling ? '(Turf Monster shape)' : '(McRitchie Studio shape)'"></span>
-      </label>
     </div>
     <%# The walk, left to right: Change Username -> Great Username -> Join Newsletter
         -> Subscribed. The two "updated" cards open the same id at props.celebrate. %>
@@ -970,7 +961,9 @@
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Change Username",
             reference: %(the Profile Leveling "Change Username" activity (studio-engine studio/modals/blocks/_change_username) — the input state. Reads leveling at runtime; the on-chain save is an app-supplied callback (submit_url + an opaque finalize_hook), the engine is UI only. Open with $store.dsModals.open('change-username', { demo: true, leveling: true })),
-            open_expr: "$store.dsModals.open('change-username', { demo: true, leveling: leveling })",
+            card_data: "opts: { leveling: true }",
+            toggles:   [{ model: "opts.leveling", label: "Leveling" }],
+            open_expr: "$store.dsModals.open('change-username', { demo: true, leveling: opts.leveling })",
             glow_when: ds_glow.call("change-username", celebrate: false) } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
           <span class="block h-2 w-16 rounded" style="background: var(--color-text); opacity: .18"></span>
@@ -982,13 +975,14 @@
       <%# 2. Great Username — the updated (celebrate) state, opened directly. %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Great Username",
-            reference: %(the Profile Leveling "Great Username" updated state (studio/modals/blocks/_change_username opened at props.celebrate) — leveling ON shows the Level pill + seeds celebration (Level 1, plus 25, Free Entry Token) + Next Quest; leveling OFF shows the plain "Saved" confirmation. Open with $store.dsModals.open('change-username', { demo: true, leveling: true, celebrate: true, seedsEarned: 25, seedsTotal: 25 })),
-            open_expr: "$store.dsModals.open('change-username', { demo: true, leveling: leveling, celebrate: true, seedsEarned: 25, seedsTotal: 25 })",
+            reference: %(the Profile Leveling "Great Username" updated state (studio/modals/blocks/_change_username opened at props.celebrate) — leveling ON shows the seeds celebration (plus 25, Free Entry Token) + Next Quest; leveling OFF shows the plain "Saved" confirmation. Toggle this card's Leveling checkbox to switch, then open. Open with $store.dsModals.open('change-username', { demo: true, leveling: true, celebrate: true, seedsEarned: 25, seedsTotal: 25 })),
+            card_data: "opts: { leveling: true }",
+            toggles:   [{ model: "opts.leveling", label: "Leveling" }],
+            open_expr: "$store.dsModals.open('change-username', { demo: true, leveling: opts.leveling, celebrate: true, seedsEarned: 25, seedsTotal: 25 })",
             glow_when: ds_glow.call("change-username", celebrate: true) } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
           <div class="text-2xl leading-none">🌱</div>
-          <span x-show="leveling" class="inline-block text-[8px] font-semibold uppercase rounded-full px-1.5 py-0.5" style="color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent)">Level 1</span>
-          <div x-show="leveling" class="flex gap-1">
+          <div x-show="opts.leveling" class="flex gap-1">
             <span class="flex-1 h-2 rounded" style="background: var(--color-cta)"></span>
             <span class="flex-1 h-2 rounded" style="background: var(--color-cta); opacity:.5"></span>
             <span class="flex-1 h-2 rounded" style="background: var(--color-text); opacity:.12"></span>
@@ -1001,7 +995,9 @@
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Join Newsletter",
             reference: %(the Profile Leveling "Join the Newsletter" activity (studio-engine studio/modals/blocks/_leveling_activity) — the input state: a consent checkbox + Subscribe. Reads leveling at runtime. Open with $store.dsModals.open('join-newsletter', { demo: true, leveling: true })),
-            open_expr: "$store.dsModals.open('join-newsletter', { demo: true, leveling: leveling })",
+            card_data: "opts: { leveling: true }",
+            toggles:   [{ model: "opts.leveling", label: "Leveling" }],
+            open_expr: "$store.dsModals.open('join-newsletter', { demo: true, leveling: opts.leveling })",
             glow_when: ds_glow.call("join-newsletter", celebrate: false) } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
           <span class="text-lg leading-none">📬</span>
@@ -1013,15 +1009,16 @@
       <%# 4. Subscribed! — the updated (celebrate) state, opened directly. %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Subscribed!",
-            reference: %(the Profile Leveling "Subscribed!" updated state (studio/modals/blocks/_leveling_activity opened at props.celebrate) — leveling ON shows the Level pill + seeds celebration (Level 2, Free Entry Token) + Next Quest; leveling OFF shows the plain "Subscribed" confirmation. Open with $store.dsModals.open('join-newsletter', { demo: true, leveling: true, celebrate: true, seedsEarned: 25, seedsTotal: 100 })),
-            open_expr: "$store.dsModals.open('join-newsletter', { demo: true, leveling: leveling, celebrate: true, seedsEarned: 25, seedsTotal: 100 })",
+            reference: %(the Profile Leveling "Subscribed!" updated state (studio/modals/blocks/_leveling_activity opened at props.celebrate) — leveling ON shows the seeds celebration (Free Entry Token) + Next Quest; leveling OFF shows the plain "Subscribed" confirmation. Toggle this card's Leveling checkbox to switch, then open. Open with $store.dsModals.open('join-newsletter', { demo: true, leveling: true, celebrate: true, seedsEarned: 25, seedsTotal: 100 })),
+            card_data: "opts: { leveling: true }",
+            toggles:   [{ model: "opts.leveling", label: "Leveling" }],
+            open_expr: "$store.dsModals.open('join-newsletter', { demo: true, leveling: opts.leveling, celebrate: true, seedsEarned: 25, seedsTotal: 100 })",
             glow_when: ds_glow.call("join-newsletter", celebrate: true) } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
           <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-success) 15%, transparent)">
             <svg class="w-4 h-4" style="color: var(--color-success)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
           </div>
-          <span x-show="leveling" class="inline-block text-[8px] font-semibold uppercase rounded-full px-1.5 py-0.5" style="color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent)">Level 2</span>
-          <div x-show="leveling" class="flex gap-1">
+          <div x-show="opts.leveling" class="flex gap-1">
             <span class="flex-1 h-2 rounded" style="background: var(--color-cta)"></span>
             <span class="flex-1 h-2 rounded" style="background: var(--color-cta); opacity:.6"></span>
             <span class="flex-1 h-2 rounded" style="background: var(--color-cta); opacity:.3"></span>
