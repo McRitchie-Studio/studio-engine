@@ -146,6 +146,12 @@ class StudioTest < Minitest::Test
     refute Studio.local_email_capture?
   end
 
+  # Studio.local_tool_enabled? — the gate under the developer-desk tools — is
+  # unit-tested in test/integration/local_review_endpoint_test.rb instead of
+  # here. This suite runs without Rails, so it exercises the hand-written mirror
+  # of the Studio module in test_helper.rb; a gate asserted against the mirror
+  # would pass while the shipped lib/studio.rb was broken.
+
   def test_local_email_capture_turns_on_for_agent_worktree
     ENV["AGENT_WORKTREE"] = "1"
     assert Studio.local_email_capture?
