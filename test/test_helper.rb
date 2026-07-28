@@ -40,6 +40,8 @@ module Studio
   mattr_accessor :wallet_address_method, default: nil
   mattr_accessor :theme_logos,         default: []
   mattr_accessor :sticky_table_headers, default: false
+  mattr_accessor :smooth_load,          default: false
+  mattr_accessor :nav_spinner_min_ms,   default: 2500
 
   mattr_accessor :theme_primary,  default: "#8E82FE"
   mattr_accessor :theme_dark,     default: "#1A1535"

@@ -2,6 +2,40 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.24.0 — 2026-07-28
+
+The **smooth-load convention**, opt-in per app. Pages materialize behind the
+current one and present themselves with a view transition — navigation renders
+exactly once, with no stale-preview flash. Modifies an existing primitive:
+`layouts/studio/_head` gains the convention partial and a configurable nav
+spinner minimum.
+
+**One ungated visual change on the bump, opt-in or not:** `.turbo-progress-bar`
+in `engine.css` restyles every consumer's Turbo progress bar from Turbo's
+default blue to the app's theme CTA color (3px, `var(--color-cta)` — defined in
+both themes by the theme resolver, and the rule wins Turbo's injected-first
+stylesheet cascade). Everything else is inert until an app sets
+`Studio.smooth_load = true`.
+
+### Added
+
+- **Smooth-load convention (opt-in)** — `Studio.smooth_load` (default OFF)
+  renders `layouts/studio/_smooth_load` from `_head`: the `view-transition`
+  meta (Turbo 8 wraps page swaps in `document.startViewTransition`) plus
+  `turbo-cache-control: no-preview`, so the next page materializes behind the
+  current one and presents itself — navigation renders exactly once. An app
+  with known multi-second pages should fix those before opting in (no-preview
+  holds the old page until the fresh response arrives).
+- **`Studio.nav_spinner_min_ms`** — the nav spinner's minimum display time,
+  previously hardcoded to 2500 in `_head`. Default unchanged (2500); smooth-load
+  apps typically drop it to ~300 so fast loads never linger on a spinner.
+- **Smooth-load CSS in `engine.css`** — root fade-out / rise-in view-transition
+  keyframes (inert until the metas render), the `.vt-pinned-header` opt-in
+  utility (exactly one per page — a duplicate `view-transition-name` silently
+  disables the transition), the theme-colored `.turbo-progress-bar` noted
+  above, and a `prefers-reduced-motion` kill switch app e2e suites can lean on
+  (`reducedMotion: "reduce"`).
+
 ## 0.23.0 — 2026-07-28
 
 Phase D, slice 1 — the **board primitive**. The three near-identical McRitchie

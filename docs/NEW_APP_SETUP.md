@@ -110,6 +110,12 @@ Studio.configure do |config|
     { file: "logo.png",    title: "Auth Logo" },
   ]
   config.theme_primary = "#8E82FE"             # pick your brand color
+  # Smooth-load convention (default OFF): view-transition page swaps + a
+  # single render per navigation. Opt in only once every page answers fast —
+  # no-preview holds the old page until the fresh response arrives. Pair with
+  # `vt-pinned-header` on the sticky header (exactly one per page).
+  # config.smooth_load = true
+  # config.nav_spinner_min_ms = 300            # default 2500
 end
 ```
 
