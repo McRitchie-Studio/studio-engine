@@ -104,6 +104,27 @@ class EngineMotionCssTest < Minitest::Test
       "engine.css must NOT @import engine-motion.css — the motion layer is opt-in")
   end
 
+  def test_pulse_cta_ships_class_keyframe_role_token_and_reduced_motion
+    # The class + its namespaced keyframe both ship.
+    assert_match(/\.pulse-cta\b/, css,
+      "engine-motion.css must define the .pulse-cta attention primitive")
+    assert_match(/@keyframes\s+pulse-cta\b/, css,
+      "the .pulse-cta primitive must ship its @keyframes pulse-cta")
+    assert_includes css, "animation: pulse-cta var(--pulse-cta-speed",
+      ".pulse-cta must reference its own keyframe via a tunable speed knob"
+    # Themed off a ROLE token by default (CTA), not TM's hardcoded green — so it
+    # restyles per app.
+    assert_includes css, "--pulse-cta-color: var(--color-cta)",
+      ".pulse-cta defaults its color to the CTA role token (themeable per app)"
+    # Reduced-motion safety: the pulse no-ops under prefers-reduced-motion.
+    assert_includes css, ".pulse-cta { animation: none; }",
+      ".pulse-cta must be disabled under prefers-reduced-motion"
+    # It must NOT be named btn-* — that collides with the engine.css .btn component
+    # contract (ComponentCssTest), and this is a plain motion-layer effect.
+    refute_match(/\.btn-pulse\b/, css,
+      "the pulse must stay .pulse-cta, not a .btn-* component variant")
+  end
+
   def test_gem_packages_the_stylesheet
     spec = Gem::Specification.load(File.expand_path("../../studio-engine.gemspec", __dir__))
     assert_includes spec.files, "app/assets/tailwind/studio_engine/engine-motion.css",

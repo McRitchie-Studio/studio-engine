@@ -259,6 +259,52 @@
     </div>
   </section>
 
+  <!-- Confetti & pulse -->
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <h3 class="text-xl font-bold text-heading">Confetti &amp; pulse</h3>
+      <p class="text-muted text-sm max-w-2xl">
+        Celebration effects lifted from Turf Monster into the engine. Confetti is
+        <code class="font-mono text-2xs">window.studioConfetti</code> - a zero-dependency,
+        no-CDN effect (canvas-confetti is vendored into the engine and shipped through the
+        asset pipeline). Two callable variants, both honoring
+        <code class="font-mono text-2xs">prefers-reduced-motion</code>. The pulse is the
+        <code class="font-mono text-2xs">.pulse-cta</code> attention beat. Fire the confetti
+        with the buttons below.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%= render layout: "style/specimen",
+            locals: { klass: "window.studioConfetti.burst(el)",
+                      usage: %(window.studioConfetti.burst(cardEl)\n// radial burst from behind a card/modal, from its center) } do %>
+        <div x-data="{}" class="flex flex-col items-center gap-3 py-2">
+          <div x-ref="burstCard" class="card px-5 py-4 text-sm font-semibold text-heading text-center">Success!</div>
+          <button type="button" class="btn btn-primary btn-sm"
+                  @click="window.studioConfetti && window.studioConfetti.burst($refs.burstCard)">Fire burst</button>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/specimen",
+            locals: { klass: "window.studioConfetti.cannons()",
+                      usage: %(window.studioConfetti.cannons()\n// left + right side-cannons, full-screen celebration) } do %>
+        <div x-data="{}" class="flex flex-col items-center gap-3 py-2">
+          <p class="text-sm font-semibold text-heading text-center">You joined a contest!</p>
+          <button type="button" class="btn btn-success btn-sm"
+                  @click="window.studioConfetti && window.studioConfetti.cannons()">Fire cannons</button>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/specimen",
+            locals: { klass: ".pulse-cta  (knobs: --pulse-cta-color / -speed / -scale)",
+                      usage: %(<button class="btn btn-primary pulse-cta">Change Username</button>\n<button class="btn btn-success pulse-cta" style="--pulse-cta-color: var(--color-success)">Go</button>) } do %>
+        <div class="flex flex-wrap items-center justify-center gap-4">
+          <button type="button" class="btn btn-primary pulse-cta">Change Username</button>
+          <button type="button" class="btn btn-success pulse-cta" style="--pulse-cta-color: var(--color-success)">Go</button>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
   <!-- Leveling (capability-gated: Studio.feature?(:leveling)) -->
   <section class="space-y-5">
     <div class="space-y-1">

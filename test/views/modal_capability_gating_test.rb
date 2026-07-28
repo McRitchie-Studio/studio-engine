@@ -38,6 +38,21 @@ class ModalCapabilityGatingTest < ActiveSupport::TestCase
     Studio.features = original
   end
 
+  # The entry-confirmed modal's rendered fragment (sliced between the stable
+  # overlay id markers that bracket it). The flag-gating assertions below target
+  # THAT card specifically: as of 0.22 the Modals section also ships the
+  # Leveling-activities gallery, which renders the leveling-activity primitive
+  # BOTH ways via an explicit `leveling:` override to showcase each mode — so
+  # seeds chrome now appears on the page independent of the app flag. Scoping to
+  # entry-confirmed keeps its "seeds bar is :leveling-gated" contract precise.
+  def entry_confirmed_fragment(html)
+    start = html.index("id === 'entry-confirmed'")
+    return "" unless start
+    rest = html[start..]
+    stop = rest.index("id === 'ds-processing'")
+    stop ? rest[0...stop] : rest
+  end
+
   # --- 1. wallet brand icons ship inline, engine-owned -----------------------
 
   test "the wallet picker ships engine-owned inline brand marks, not app PNGs" do
@@ -93,6 +108,8 @@ class ModalCapabilityGatingTest < ActiveSupport::TestCase
   test "with :leveling ON the seeds bar mounts inside the entry-confirmed card" do
     with_features(%i[web3 leveling]) do
       html = render_index
+      assert_includes entry_confirmed_fragment(html), "seeds-bar-continuous",
+        "the :leveling seeds bar mounts INSIDE the entry-confirmed card (scoping is not vacuous)"
       assert_includes html, "seeds-bar-continuous",
         "the :leveling seeds bar mounts in the _success_card yield"
       assert_includes html, "seeds-shimmer",
@@ -108,7 +125,7 @@ class ModalCapabilityGatingTest < ActiveSupport::TestCase
   test "with :leveling OFF the seeds bar is ABSENT even when :web3 is ON" do
     with_features(%i[web3]) do
       html = render_index
-      refute_includes html, "seeds-bar-continuous",
+      refute_includes entry_confirmed_fragment(html), "seeds-bar-continuous",
         "a web3-only app (leveling off) gets the clean success card — no seeds bar"
     end
   end
@@ -116,8 +133,8 @@ class ModalCapabilityGatingTest < ActiveSupport::TestCase
   test "with both flags OFF the seeds bar is absent but icons stay inline" do
     with_features([]) do
       html = render_index
-      refute_includes html, "seeds-bar-continuous",
-        "leveling off => no seeds bar"
+      refute_includes entry_confirmed_fragment(html), "seeds-bar-continuous",
+        "leveling off => no seeds bar in the entry-confirmed card"
       # Brand icons are not capability-gated — they always ship inline.
       assert_includes html, %(id="se-wallet-phantom"),
         "wallet brand marks ship regardless of capability flags"
