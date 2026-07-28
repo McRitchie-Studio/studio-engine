@@ -23,7 +23,7 @@ module Studio
     private
 
     def require_local_development!
-      head :not_found if Rails.env.production? || !request.local?
+      head :not_found unless Studio.local_tool_enabled?(request_local: request.local?)
     end
 
     def delivery_records

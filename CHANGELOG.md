@@ -45,6 +45,22 @@ enrichments behind the two independent capability flags.
   "Free Entry Earned" (leveling) specimens, so the gated variants demo correctly
   (generic-success vs seeds vs free-entry).
 
+- **`GET /_studio/local_review` — the local half of the board's WAITING APPROVAL
+  button.** A magic link signs the recipient into the app that MINTED it: the
+  token lives in that app's store, and `return_to` is sanitized to a same-origin
+  PATH. So a link minted by the production task board could only ever land on
+  production — the operator clicked "review this locally" and arrived, signed in,
+  on `mcritchie.studio`. The board now redirects here instead, to the local
+  server named by the task's `local_url`, which mints in its OWN database and
+  lands the operator signed-in on the page under review
+  (`?email=<who>&return_to=<path>`).
+
+  Like the local email inbox it sits beside, this is a developer-desk tool that
+  hands out sign-in material without authenticating anyone, so it is bound to the
+  same floor: the route is drawn outside production only, and every request is
+  re-checked against `Studio.local_tool_enabled?` — production or non-loopback
+  gets a bare 404.
+
 ### Capability gating
 
 - **`:web3`** gates the generic entry-confirmed success (branded tx link +
@@ -53,6 +69,20 @@ enrichments behind the two independent capability flags.
   Entry Earned reward. `_entry_confirmed` self-gates its block on
   `Studio.feature?(:leveling)`, so a **web3-only app (leveling off) gets the
   clean success card automatically** — no seeds, no free entry.
+
+### Changed
+
+- **`Studio.local_tool_enabled?(request_local:)`** — one spelling of the
+  developer-desk floor (not production, loopback only), now shared by
+  `Studio::LocalEmailsController` and `Studio::LocalReviewsController` so a tool
+  added later cannot quietly ship a weaker gate.
+
+- **`Studio::MagicLinkIssuing`** — the mint (`issue_magic_link`) and the URL that
+  consumes it (`magic_link_url_for`) are two halves of one decision
+  (`Studio.magic_link_store`), extracted from `MagicLinksController` and
+  `UserMailer` into a shared concern. Handing out the wrong URL for the store
+  yields "invalid or expired" on a link that was valid; they can no longer drift
+  apart. No behavior change for either existing caller.
 
 ### Unchanged
 
