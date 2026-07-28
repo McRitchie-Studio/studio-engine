@@ -2,6 +2,27 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.24.1 — 2026-07-28
+
+Bug fix — the **`/admin/style` specimen glow failed OPEN**. Every glow-capable
+specimen card (`style/_modal_specimen`) carries the `.studio-team-glow` class
+statically, and the "only the active card glows" behavior rode entirely on a
+reactive Alpine `:style` overriding the primitive's CSS default of
+`--studio-team-glow-opacity: 1` (visible) down to `0`. Before Alpine hydrates —
+or if it never loads — all 13 reactive-glow cards (Auth, Eligibility, Profile,
+Leveling) painted their ring at once. The steady state was correct (the glow
+follows the step machine), so this surfaced as a flash-of-all-glow on load.
+
+### Fixed
+
+- **`style/_modal_specimen`** now renders a **static inline
+  `style="--studio-team-glow-opacity: 0"`** on the glow wrapper beside the
+  reactive `:style`, so the ring is OFF at first paint (fail-closed) regardless
+  of Alpine timing. The reactive binding still drives `0 ↔ 0.95` with the 0.4s
+  cross-fade, so the active-card glow and its slide between step cards are
+  unchanged. The `engine-motion.css` `.studio-team-glow` default is untouched
+  (the always-on Tricks demos depend on it).
+
 ## 0.24.0 — 2026-07-28
 
 The **smooth-load convention**, opt-in per app. Pages materialize behind the

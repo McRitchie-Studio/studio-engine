@@ -55,7 +55,12 @@
     height via the grid's default align-items: stretch). %>
 <div class="relative h-full<%= " studio-team-glow rounded-xl" if glow_when %>"
      x-data="<%= card_x_data %>"
-     <% if glow_when %>:style="{ '--studio-team-glow-opacity': (<%= glow_when %>) ? '0.95' : '0' }"<% end %>>
+     <%# Fail-closed default: a STATIC inline 0 out-specifies the primitive's CSS
+         default (--studio-team-glow-opacity of 1) so the ring is OFF at first
+         paint, BEFORE Alpine hydrates the reactive :style below. Without it every
+         glow card shows its ring until Alpine boots (the fail-open flash). The
+         :style then drives 0 to 0.95 with the 0.4s cross-fade. Keep BOTH. %>
+     <% if glow_when %>style="--studio-team-glow-opacity: 0" :style="{ '--studio-team-glow-opacity': (<%= glow_when %>) ? '0.95' : '0' }"<% end %>>
   <article
       class="card overflow-hidden flex flex-col h-full<%= " opacity-95" if disabled %><%= " cursor-pointer" if clickable %>"
       <%= 'aria-disabled="true"'.html_safe if disabled %>
