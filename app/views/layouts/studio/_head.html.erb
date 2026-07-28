@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <%= csrf_meta_tags %>
 <%= csp_meta_tag %>
+<%= render "layouts/studio/smooth_load" %>
 <link rel="icon" type="image/png" href="/favicon.png">
 
 <%= yield :head %>
@@ -46,9 +47,10 @@
 </script>
 <script>
   // Nav spinner — scale morph between theme toggle and loading spinner
-  // Minimum display time prevents quick flashes
+  // Minimum display time prevents quick flashes; per-app via
+  // Studio.nav_spinner_min_ms (smooth-load apps drop it to ~300).
   window._navSpinnerShownAt = 0;
-  window._navSpinnerMinMs = 2500;
+  window._navSpinnerMinMs = <%= Studio.nav_spinner_min_ms.to_i %>;
   window.showNavSpinner = function() {
     window._navSpinnerShownAt = Date.now();
     document.querySelectorAll('.nav-toggle-icon').forEach(function(e) { e.style.opacity = '0'; e.style.transform = 'scale(0) rotate(90deg)'; });
