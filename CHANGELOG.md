@@ -2,7 +2,38 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
-## 0.25.0 — 2026-07-28
+## 0.25.1 — 2026-07-28
+
+**Fix the Profile Leveling save-close regression 0.25.0 introduced.** The 0.25.0
+rebuild made `_finishSaved` ALWAYS advance to the engine's own updated view (the
+seeds celebration or the plain confirmation), on the belief that Turf Monster's
+live usage was "unaffected." It was not: TM's change-username modal
+(`leveling: false`, `saved_event: "studio:username-saved"`) drives its OWN
+post-save follow-on — its listener runs `completeQuest` and closes/swaps. With
+the engine now also advancing to its own confirm view, the next quest step
+("Send Your First Message") rendered TWICE at once — once in the post-save modal
+dialog, once in the inline quest card behind it — which TM's Playwright e2e
+caught as a strict-mode double-render (`quest_ladder_web2`, `quest_ladder_web3`,
+and the web3 step-dedup contract). In 0.24 a `leveling: false` modal rendered no
+celebrate view and let the app close it, so the step rendered once.
+
+### Fixed
+
+- **`studio/_leveling_activity_assets`** (factory) — `_finishSaved` now CLOSES on
+  save (fires the `saved_event`, then stops — the 0.24 contract) instead of
+  advancing to the engine's own confirm/celebrate WHEN the consuming app drives
+  its own follow-on. A new `appDrivenFollowOn` getter is that signal: a **non-demo**
+  caller that wired its OWN (non-default) `saved_event` owns the after-save UI, so
+  the engine yields (it never force-closes — the app's listener owns close-vs-swap,
+  which TM relies on: close on the contest page, swap to `quest-success` on
+  `/account`). **Demo** previews (`/admin/style`) and **standalone** callers on the
+  DEFAULT `saved_event` are unchanged — they still advance to the seeds celebration
+  (TM shape) or the plain confirmation (MS shape), and the "Great Username" /
+  "Subscribed!" specimen cards still open straight at their celebrate state via
+  `props.celebrate`. No consumer change is required; TM's existing wiring restores
+  its own contract.
+
+
 
 **Profile Leveling** — the `/admin/style` "Leveling activities" section is rebuilt
 into a single toggle-driven "Profile Leveling" flow, and the with-leveling /
