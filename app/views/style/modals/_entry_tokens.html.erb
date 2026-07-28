@@ -1,0 +1,123 @@
+<%#
+  Living style guide specimen — the entry-token purchase flow. This documents an
+  APP-SPECIFIC flow (Turf Monster's "Get Entry Tokens"); the engine deliberately
+  does NOT own the packs, pricing, or payment rails. The specimen composes only
+  engine CHROME (studio/modals/blocks/shell, card_header, progress_pill) and
+  represents the packs as an illustrative demo — the app owns the payment logic
+  and the on-chain mint.
+
+  Opened on the page-scoped dsModals host with an internal step machine on
+  props.step: picker -> confirming -> minted. Single-root templates throughout.
+
+  On-chain model (documented, not owned here): an entry token is a PROGRAM-OWNED
+  prepaid entry credit recorded on-chain (a per-token account), NOT a fungible
+  SPL token held in the user's wallet. Two distinct on-chain moments: (1) MINT at
+  purchase, server-signed after the payment clears — not on the buyer's click;
+  (2) CONSUME at entry, when the app's hold-to-confirm gesture spends one token to
+  create the contest entry.
+%>
+<%
+  # Illustrative packs only — a real app reads these from its own config
+  # (e.g. StripePurchase.available_packs), and they vary by funding mode.
+  demo_packs = [
+    { tokens: 1,  price: "$5",  note: nil },
+    { tokens: 3,  price: "$12", note: "Popular" },
+    { tokens: 10, price: "$35", note: "Best value" }
+  ]
+%>
+<div x-data="{
+       get props() { var c = Alpine.store('dsModals').current(); return (c && c.props) || {}; },
+       buy(count, balance) {
+         Alpine.store('dsModals').advance({ step: 'confirming', mintedCount: count, mintedBalance: balance });
+         setTimeout(function () {
+           var c = Alpine.store('dsModals').current();
+           if (c && c.id === 'entry-tokens') Alpine.store('dsModals').advance({ step: 'minted' });
+         }, 1300);
+       }
+     }" class="relative">
+
+  <%# Shared close — top-right, above whichever step is active. %>
+  <button @click="$store.dsModals.close()"
+          class="absolute top-0 right-0 -mt-2 -mr-2 text-secondary hover:text-heading text-xl leading-none z-10"
+          aria-label="Close">&times;</button>
+
+  <%# ===== PICKER ===== %>
+  <template x-if="(props.step || 'picker') === 'picker'">
+    <div>
+      <div class="text-center pt-1 mb-3">
+        <h3 class="text-heading font-bold text-lg leading-tight">Get Entry Tokens</h3>
+      </div>
+      <%= render "studio/modals/blocks/progress_pill", current: 2, total: 3 %>
+      <p class="text-xs text-secondary mb-4 text-center">
+        1 token = 1 contest entry. Pick a pack to finish.
+      </p>
+
+      <div class="space-y-2.5">
+        <% demo_packs.each do |pack| %>
+          <button type="button"
+                  @click="buy(<%= pack[:tokens] %>, '<%= pack[:tokens] %>')"
+                  class="w-full flex items-center justify-between gap-3 rounded-lg border border-strong bg-inset px-4 py-3 text-left hover:border-primary transition">
+            <span class="flex items-center gap-2">
+              <span class="text-heading font-semibold"><%= pack[:tokens] %> token<%= "s" unless pack[:tokens] == 1 %></span>
+              <% if pack[:note] %>
+                <span class="badge" style="color: var(--color-primary); border-color: var(--color-primary)"><%= pack[:note] %></span>
+              <% end %>
+            </span>
+            <span class="text-heading font-mono font-bold"><%= pack[:price] %></span>
+          </button>
+        <% end %>
+      </div>
+
+      <%# Rails — token-funded only. The picker documents which rails mint tokens.
+          The USDC-direct path is intentionally NOT a pack here (it's a separate
+          rail that transfers USDC and mints no token). %>
+      <div class="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted">
+        <span>Pay by card</span>
+        <span aria-hidden="true">&middot;</span>
+        <span>PayPal / Venmo</span>
+      </div>
+      <p class="text-center text-2xs text-muted mt-1">USDC-direct entry is a separate rail — it funds an entry with no token.</p>
+
+      <%# The seam callout — what the engine owns vs what the app owns. %>
+      <div class="mt-4 rounded-lg border border-subtle bg-surface p-3 text-2xs text-secondary leading-snug">
+        <p class="text-heading font-semibold mb-1">App-specific flow, engine chrome</p>
+        <p class="mb-1">
+          The engine supplies only the shell, header, and progress pill. The packs,
+          pricing, payment rails, and the on-chain mint are <strong>app-owned</strong> —
+          this specimen represents them as a demo.
+        </p>
+        <p>
+          On-chain, an entry token is a <strong>prepaid entry credit recorded on-chain</strong>
+          (not a transferable token held in your wallet): minted server-side once payment
+          clears, then <strong>consumed</strong> when the app's hold-to-confirm creates the entry.
+        </p>
+      </div>
+    </div>
+  </template>
+
+  <%# ===== CONFIRMING (mint-at-purchase) ===== %>
+  <template x-if="props.step === 'confirming'">
+    <div x-init="setTimeout(function () { var c = Alpine.store('dsModals').current(); if (c && c.id === 'entry-tokens') Alpine.store('dsModals').advance({ step: 'minted' }); }, 1300)">
+      <%= render "studio/modals/blocks/card_header",
+            spinner: true,
+            title: "Confirming your purchase…",
+            subtitle: "Payment cleared — a server job mints one prepaid entry credit per token on-chain." %>
+    </div>
+  </template>
+
+  <%# ===== MINTED (ready to consume at entry) ===== %>
+  <template x-if="props.step === 'minted'">
+    <div>
+      <%= render "studio/modals/blocks/card_header",
+            icon_color: 'primary',
+            title_key: "(props.mintedCount === 1 ? 'Entry Token Minted' : 'Entry Tokens Minted')" do %>
+        You now have <span class="font-bold text-primary font-mono" x-text="props.mintedBalance"></span> available.
+      <% end %>
+      <p class="text-xs text-secondary text-center mb-4 leading-snug">
+        In the app, holding to confirm now <strong>consumes one token on-chain</strong> to
+        create your contest entry, then resolves to the shared Entry Confirmed card.
+      </p>
+      <button @click="$store.dsModals.close()" class="btn btn-primary btn-lg w-full">Done</button>
+    </div>
+  </template>
+</div>
