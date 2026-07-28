@@ -172,4 +172,23 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
     assert_includes html, "studio-team-glow rounded-xl",
       "the glow rides the un-clipped wrapper, as on the other specimens"
   end
+
+  # --- E. the DEMO walks the flow: age-gate confirm -> entry-token purchase ---
+  # The wiring lives on the STYLE side: the page listens for the primitive's
+  # 'age-verified' handoff hook and opens the purchase modal. The engine
+  # primitive stays flow-agnostic — its real submit posts to the app submit_url.
+
+  test "the style page advances the age-gate demo to the entry-token purchase" do
+    html = render_index
+    assert_match(/@age-verified\.window="[^"]*\$store\.dsModals\.open\('entry-tokens'/, html,
+      "confirming the age-gate demo advances to the entry-tokens purchase modal")
+  end
+
+  test "the age-gate engine primitive carries no demo flow/advance logic" do
+    src = File.read(AGE_VERIFY_ERB)
+    ["entry-tokens", "age-verified", "advance(", "swap(", "dsModals"].each do |needle|
+      refute_includes src, needle,
+        "the engine primitive must stay flow-agnostic (no #{needle} in the primitive)"
+    end
+  end
 end

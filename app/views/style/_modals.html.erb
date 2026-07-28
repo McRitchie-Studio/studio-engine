@@ -55,8 +55,17 @@
     expr
   end
 %>
+<%# DEMO flow wiring (style-page only): the age-gate primitive fires an
+    'age-verified' window event on a successful confirm — its designed handoff
+    hook, the same one a production app listens for to resume the entry. Here the
+    style page plays that "app": on age-verified it opens the entry-token purchase
+    modal, so the DS walks eligibility to purchase in sequence. The engine
+    primitive is untouched; its real submit still posts to the app-supplied
+    submit_url. Kept on the section (always mounted) so it fires even as the
+    age-gate card closes. %>
 <section id="modals" class="space-y-10" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)"
-         x-data="{}" @ds-modal-close.window="$store.dsModals.close()">
+         x-data="{}" @ds-modal-close.window="$store.dsModals.close()"
+         @age-verified.window="$store.dsModals.open('entry-tokens', { step: 'picker' })">
   <div class="space-y-1">
     <h2 class="text-2xl font-bold text-heading">Modals</h2>
     <p class="text-muted text-sm">
@@ -480,7 +489,7 @@
       <%# Age gate — engine primitive, gated on :age_gate (disabled-but-present). %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Age gate (DOB)",
-            reference: %(the "Age gate" DOB modal (studio-engine studio/modals/blocks/_age_verify) — a NEW engine primitive; the app supplies min_age / state / submit_url / fine_print and the engine hardcodes no legal policy. Open with $store.dsModals.open('age-verify')),
+            reference: %(the "Age gate" DOB modal (studio-engine studio/modals/blocks/_age_verify) — a NEW engine primitive; the app supplies min_age / state / submit_url / fine_print and the engine hardcodes no legal policy. In this demo, Confirm & Continue advances to the Entry tokens purchase (page-level dsModals wiring on the primitive's 'age-verified' hook; the primitive's real submit posts to submit_url). Open with $store.dsModals.open('age-verify')),
             open_expr: "$store.dsModals.open('age-verify')",
             glow_when: ds_glow.call("age-verify"),
             disabled: !age_gate_on, openable: true, disabled_label: "age gate off" } do %>
