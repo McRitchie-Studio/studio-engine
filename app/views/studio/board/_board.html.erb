@@ -1,0 +1,151 @@
+<%#
+  studio/board — the shared kanban / depth-chart board shell. An ADDITIVE engine
+  primitive (Phase D): the SortableJS drag-reorder, optimistic cross-column move →
+  revert → toast, and count/live wiring that the three near-identical McRitchie
+  Studio boards (tasks / news / content) and the depth chart each hand-rolled,
+  lifted into one place. Renders a horizontal row of columns, each a drop zone the
+  vendored SortableJS + window.studioBoard factory (studio/_board_assets, rendered
+  once at layout level — a <script> inside this component template would never run)
+  wires.
+
+  UI ONLY and NEUTRAL: no model, no routes, no domain. The app supplies its columns,
+  its card partial, and its endpoints. Custom behavior attaches by LISTENING to the
+  DOM events the factory dispatches on window — `studio:board-moved`,
+  `studio:board-reordered`, `studio:card-added` (detail `{ record, from, to }`) —
+  never by patching the factory. Heavier per-app animation defers OPAQUELY to a
+  `fx:` module (window[<name>]) and to `on_move_hook:` / `on_drop_hook:` fns.
+
+  The identity contract every card + zone must satisfy is emitted by
+  studio/board/_column (the `.kanban-dropzone`) and studio/board/_card_shell (the
+  `.kanban-card`) — an app may hand-roll a bespoke card as long as it matches.
+
+  locals:
+    columns:          (req) [{ key:, label:, cards:, count:, badge_class:,
+                      collapsible:, hidden:, header_extra: }]. `cards` are records
+                      passed to `card_partial`; `count` defaults to cards.size.
+    card_partial:     (req) partial rendered per card (e.g. "tasks/task_card").
+    card_as:          local the record binds to in card_partial. Default :card.
+    card_locals:      per-card extra locals — a Proc ->(record){ Hash } or a Hash.
+    reorder_url:      POST endpoint the drag-reorder saves the new order to.
+    reorder_payload:  :slugs | :ids — the key the ordered id list POSTs under.
+                      Default :slugs.
+    move_url:         PATCH template for a cross-column move, ":id" → the card's id
+                      (e.g. "/tasks/:id.json"). nil disallows moves (reorder only).
+    move_param:       { resource:, attr: } → PATCH body { resource => { attr => zone } }.
+                      nil disallows moves.
+    group:            SortableJS group — a shared string allows cross-column drags;
+                      false keeps drags within a zone (the depth-chart shape).
+                      Default "studio-board".
+    id_attr:          card id data-attr + dom-id suffix. Default "slug".
+    zone_attr:        column/zone data-attr. Default "stage".
+    handle:           drag-handle selector (nil = whole card draggable).
+    filter:           SortableJS filter (undraggable els). Default ".kanban-empty".
+    zone_selector:    the drop-zone selector. Default ".kanban-dropzone".
+    draggable:        the card selector. Default ".kanban-card".
+    empty_selector:   the empty-state selector (revert anchor + count toggle).
+                      Default ".kanban-empty"; nil for a board with no empty state.
+    live_channel:     Turbo Stream channel for live updates (nil = static board).
+    optimistic:       revert + red-ring flash a failed move. Default true.
+    toasts:           show the toast host (false = window.alert on error). Default true.
+    empty_label:      empty-zone text. Default "Drop here".
+    header_slot:      raw HTML rendered above the columns (pass html_safe content).
+    above_board_slot: raw HTML rendered between the header and the columns.
+    fx:               window[<name>] module the factory defers add/exit anims to.
+    on_move_hook:     window[<name>] opaque fn, called with { record, from, to }.
+    on_drop_hook:     window[<name>] opaque fn, called with { ids, zone }.
+    demo:             style-guide preview — drag works locally, no network POST.
+%>
+<%
+  columns          = local_assigns.fetch(:columns)
+  card_partial     = local_assigns.fetch(:card_partial)
+  card_as          = local_assigns.fetch(:card_as, :card)
+  card_locals      = local_assigns.fetch(:card_locals, nil)
+  reorder_url      = local_assigns.fetch(:reorder_url, "")
+  reorder_payload  = local_assigns.fetch(:reorder_payload, :slugs).to_s
+  move_url         = local_assigns.fetch(:move_url, nil)
+  move_param       = local_assigns.fetch(:move_param, nil)
+  group            = local_assigns.fetch(:group, "studio-board")
+  id_attr          = local_assigns.fetch(:id_attr, "slug").to_s
+  zone_attr        = local_assigns.fetch(:zone_attr, "stage").to_s
+  handle           = local_assigns.fetch(:handle, nil)
+  sort_filter      = local_assigns.fetch(:filter, ".kanban-empty")
+  zone_selector    = local_assigns.fetch(:zone_selector, ".kanban-dropzone")
+  draggable_sel    = local_assigns.fetch(:draggable, ".kanban-card")
+  empty_selector   = local_assigns.fetch(:empty_selector, ".kanban-empty")
+  dom_id_prefix    = local_assigns.fetch(:dom_id_prefix, "card-")
+  live_channel     = local_assigns.fetch(:live_channel, nil)
+  optimistic       = local_assigns.fetch(:optimistic, true)
+  toasts           = local_assigns.fetch(:toasts, true)
+  empty_label      = local_assigns.fetch(:empty_label, "Drop here")
+  header_slot      = local_assigns.fetch(:header_slot, nil)
+  above_board_slot = local_assigns.fetch(:above_board_slot, nil)
+  fx               = local_assigns.fetch(:fx, nil)
+  on_move_hook     = local_assigns.fetch(:on_move_hook, nil)
+  on_drop_hook     = local_assigns.fetch(:on_drop_hook, nil)
+  demo             = local_assigns.fetch(:demo, false)
+
+  board_opts = {
+    zoneSelector:   zone_selector,
+    draggable:      draggable_sel,
+    emptySelector:  empty_selector,
+    group:          (group == false ? false : group.to_s),
+    handle:         handle,
+    filter:         sort_filter,
+    idAttr:         id_attr,
+    zoneAttr:       zone_attr,
+    domIdPrefix:    dom_id_prefix,
+    moveUrl:        move_url,
+    moveParam:      (move_param ? { resource: move_param[:resource].to_s, attr: move_param[:attr].to_s } : nil),
+    reorderUrl:     reorder_url,
+    reorderPayload: reorder_payload,
+    optimistic:     !!optimistic,
+    toasts:         !!toasts,
+    live:           live_channel.present?,
+    demo:           !!demo,
+    fx:             fx,
+    onMoveHook:     on_move_hook,
+    onDropHook:     on_drop_hook,
+    labels:         columns.each_with_object({}) { |c, h| h[c[:key].to_s] = (c[:label] || c[:key]).to_s if c[:key] }
+  }
+%>
+<section class="studio-board" data-test="studio-board" x-data="studioBoard(<%= board_opts.to_json %>)">
+  <% if live_channel.present? %><%= turbo_stream_from live_channel %><% end %>
+
+  <% if header_slot %><div class="studio-board-header mb-4"><%= header_slot %></div><% end %>
+  <% if above_board_slot %><%= above_board_slot %><% end %>
+
+  <div class="flex flex-col gap-4 overflow-x-visible pb-4 sm:flex-row sm:overflow-x-auto">
+    <% columns.each do |column| %>
+      <%= render "studio/board/column",
+            column: column,
+            zone_attr: zone_attr,
+            dom_id_prefix: dom_id_prefix,
+            zone_selector_class: zone_selector.delete_prefix("."),
+            empty_selector_class: (empty_selector || "kanban-empty").delete_prefix("."),
+            empty_label: empty_label,
+            card_partial: card_partial,
+            card_as: card_as,
+            card_locals: card_locals %>
+    <% end %>
+  </div>
+
+  <% if toasts %>
+    <div class="studio-board-toasts fixed top-4 right-4 z-50 space-y-2" data-test="studio-board-toasts">
+      <template x-for="toast in toasts" :key="toast.id">
+        <div x-show="toast.visible"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 translate-x-8"
+             x-transition:enter-end="opacity-100 translate-x-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 translate-x-0"
+             x-transition:leave-end="opacity-0 translate-x-8"
+             class="bg-surface border rounded-lg px-4 py-2.5 text-sm font-medium shadow-lg backdrop-blur-sm"
+             :style="toast.type === 'success'
+                       ? 'border-color: var(--color-success); color: var(--color-success)'
+                       : 'border-color: var(--color-danger); color: var(--color-danger)'">
+          <span x-text="toast.message"></span>
+        </div>
+      </template>
+    </div>
+  <% end %>
+</section>

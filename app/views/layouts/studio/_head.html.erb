@@ -28,6 +28,12 @@
     is unchanged and rides the same global. %>
 <%= javascript_include_tag "studio/canvas_confetti", "data-turbo-track": "reload" %>
 <%= javascript_include_tag "studio/studio_confetti", "data-turbo-track": "reload" %>
+<%# SortableJS is VENDORED into the engine (studio/sortable.js) and shipped through
+    the asset pipeline — no CDN, CSP-safe (same-origin :self). Defines the global
+    `Sortable`; the studio/board primitive (studio/_board_assets -> window.studioBoard)
+    drives it for drag-reorder kanban AND depth-chart boards. Loaded here (deferred)
+    so any board consumer has it with zero per-app wiring, mirroring canvas_confetti. %>
+<%= javascript_include_tag "studio/sortable", defer: true, "data-turbo-track": "reload" %>
 <script>
   window.fireSuccessConfetti = function() {
     if (typeof confetti === 'undefined') return;

@@ -1,0 +1,80 @@
+<%#
+  studio/board/column — ONE board column: the header (label + count), the drop
+  zone (the SortableJS target), its cards, and the empty state. Emits the ZONE half
+  of the board identity contract:
+
+    id="dropzone-<key>"           (window.studioBoard.updateCounts reads this)
+    class="kanban-dropzone …"     (the SortableJS + live-observe target)
+    data-<zone_attr>="<key>"      (the column key a dropped card moves TO)
+
+  Cards emit the other half (see studio/board/_card_shell). Rendered by
+  studio/board/_board; not usually rendered directly.
+
+  locals:
+    column:               (req) { key:, label:, cards:, count:, badge_class:,
+                          collapsible:, hidden:, header_extra: }. `cards` are the
+                          records passed to the card partial; `count` defaults to
+                          cards.size; `badge_class` picks a components/_badge scheme
+                          for the count (else a plain neutral count chip).
+    zone_attr:            data-attr name for the zone. Default "stage".
+    dom_id_prefix:        card dom-id prefix, forwarded to the cards. Default "card-".
+    zone_selector_class:  the drop-zone class. Default "kanban-dropzone".
+    empty_selector_class: the empty-state class. Default "kanban-empty".
+    empty_label:          empty-zone text. Default "Drop here".
+    card_partial:         (req) partial rendered per card.
+    card_as:              local the record binds to in card_partial. Default :card.
+    card_locals:          per-card extra locals — a Proc ->(record){ Hash } or Hash.
+%>
+<%
+  column               = local_assigns.fetch(:column)
+  zone_attr            = local_assigns.fetch(:zone_attr, "stage")
+  dom_id_prefix        = local_assigns.fetch(:dom_id_prefix, "card-")
+  zone_selector_class  = local_assigns.fetch(:zone_selector_class, "kanban-dropzone")
+  empty_selector_class = local_assigns.fetch(:empty_selector_class, "kanban-empty")
+  empty_label          = local_assigns.fetch(:empty_label, "Drop here")
+  card_partial         = local_assigns.fetch(:card_partial)
+  card_as              = local_assigns.fetch(:card_as, :card)
+  card_locals          = local_assigns.fetch(:card_locals, nil)
+
+  key          = column[:key].to_s
+  label        = column[:label] || key
+  cards        = column[:cards] || []
+  count        = column.fetch(:count) { cards.size }
+  badge_class  = column[:badge_class]
+  collapsible  = column[:collapsible]
+  hidden       = column[:hidden]
+  header_extra = column[:header_extra]
+
+  # Merge the per-card hook (Proc or Hash) with the record binding.
+  resolve_locals = lambda do |record|
+    extra = card_locals.respond_to?(:call) ? card_locals.call(record) : (card_locals || {})
+    { card_as => record }.merge(extra || {})
+  end
+%>
+<div class="studio-board-column w-full flex-none sm:flex-1 sm:min-w-[190px]"
+     data-board-column="<%= key %>"
+     <% if collapsible %>data-board-collapsible="true"<% end %>
+     <% if hidden %>x-cloak style="display:none"<% end %>>
+  <div class="mb-3 px-1 flex items-center gap-2">
+    <h3 class="text-sm font-bold text-heading uppercase tracking-wider"><%= label %></h3>
+    <% if badge_class %>
+      <%= render "components/badge", text: count.to_s, scheme: badge_class, data_board_count: key %>
+    <% else %>
+      <span class="stage-count inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold bg-surface-alt text-secondary border border-subtle"
+            data-board-count="<%= key %>"><%= count %></span>
+    <% end %>
+    <% if header_extra %><%= header_extra %><% end %>
+  </div>
+
+  <div id="dropzone-<%= key %>"
+       data-<%= zone_attr %>="<%= key %>"
+       class="<%= zone_selector_class %> rounded-xl border-2 border-dashed border-subtle min-h-40 p-2 space-y-2 transition-colors duration-150 sm:min-h-[calc(100vh-220px)]">
+    <% cards.each do |record| %>
+      <%= render partial: card_partial, locals: resolve_locals.call(record) %>
+    <% end %>
+    <div class="<%= empty_selector_class %> flex items-center justify-center h-24 text-muted text-sm"
+         <% if cards.any? %>style="display: none"<% end %>>
+      <%= empty_label %>
+    </div>
+  </div>
+</div>
