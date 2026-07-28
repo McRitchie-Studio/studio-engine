@@ -37,6 +37,10 @@
                   if none); it owns EVERY app-side detail of that step.
     savedEvent    DOM event dispatched on success, carrying the app payload, so
                   the app can run its own follow-on. Default "studio:activity-saved".
+                  A non-demo caller that supplies its OWN (non-default) saved_event
+                  is declaring it drives that follow-on: the engine then CLOSES on
+                  save (fires the event, stops) rather than rendering its own
+                  confirm/celebrate, so the app's follow-on never renders twice.
     store         Alpine modal store name backing close(). Default "modals".
     leveling      the render-time DEFAULT for the seeds celebration. The live
                   value is read at RUNTIME from the modal store's current
@@ -56,6 +60,11 @@
 <script>
   (function () {
     if (window.levelingActionModal) return;
+    // The default saved event. A non-demo caller that wires its OWN (non-default)
+    // saved_event is declaring it drives the post-save follow-on itself — see the
+    // appDrivenFollowOn getter, which then makes the engine close on save instead of
+    // rendering its own confirm/celebrate.
+    var DEFAULT_SAVED_EVENT = "studio:activity-saved";
     window.levelingActionModal = function (opts) {
       opts = opts || {};
       return {
@@ -66,7 +75,7 @@
         submitUrl: opts.submitUrl || "",
         finalizeUrl: opts.finalizeUrl || "",
         finalizeHook: opts.finalizeHook || "",
-        savedEvent: opts.savedEvent || "studio:activity-saved",
+        savedEvent: opts.savedEvent || DEFAULT_SAVED_EVENT,
         store: opts.store || "modals",
         // leveling is a RUNTIME getter (below) reading props.leveling off the modal
         // store, so ONE modal id flips TM <-> MS shape live as a section toggle
@@ -129,6 +138,21 @@
           return v !== (this.original || "").trim();
         },
 
+        // appDrivenFollowOn — a real (non-demo) consumer that wired its OWN saved_event
+        // owns the after-save UI: its listener runs the follow-on (e.g. Turf Monster's
+        // completeQuest / quest-success on 'studio:username-saved'), including whether
+        // to close, swap, or advance. For those the engine must NOT advance to its own
+        // confirm/celebrate on save — that double-renders the app's follow-on step
+        // (once in this dialog, once in the app's own inline card: the strict-mode
+        // double-render TM's e2e caught). The engine yields: it fires the saved event,
+        // then STOPS (the 0.24 contract), letting the app drive. Demo previews (self-
+        // contained) and standalone callers on the DEFAULT event keep the engine's own
+        // confirm/celebrate.
+        get appDrivenFollowOn() {
+          if (this.demo) return false;
+          return this.savedEvent !== DEFAULT_SAVED_EVENT;
+        },
+
         _dispatch: function (payload) {
           // In demo mode (the /admin/style preview) do NOT fire the app-facing
           // saved event: the host app may listen for it and open its OWN follow-on
@@ -149,10 +173,19 @@
           this.progressLabel = "";
           if (this.hasInput) this.original = (this.value || "").trim();
           this._dispatch(payload);
-          // Always advance to the updated state; the view gate (celebrate &&
-          // leveling vs celebrate && !leveling) picks the seeds celebration (TM)
-          // or the plain confirmation (MS). Seeds are set either way — only the
-          // leveling view reads them.
+          // App-driven follow-on: the consumer wired its own saved_event and owns
+          // what comes next (its listener advances/closes/swaps). Dispatch fired
+          // above; STOP here — the 0.24 contract — instead of advancing to the
+          // engine's own confirm/celebrate, which would render the app's follow-on
+          // step twice. The engine never force-closes here: the app's listener owns
+          // close-vs-swap (TM closes on the contest page, swaps to quest-success on
+          // /account), so a force-close would clobber that swap.
+          if (this.appDrivenFollowOn) return;
+          // Otherwise (a demo preview, or a standalone caller on the DEFAULT event
+          // with no app follow-on): advance to the updated state; the view gate
+          // (celebrate && leveling vs celebrate && !leveling) picks the seeds
+          // celebration (TM shape) or the plain confirmation (MS shape). Seeds are
+          // set either way — only the leveling view reads them.
           this.seedsEarned = parseInt(payload.seeds_earned, 10) || 0;
           this.seedsTotal = parseInt(payload.seeds_total, 10) || 0;
           this.celebrate = true;
