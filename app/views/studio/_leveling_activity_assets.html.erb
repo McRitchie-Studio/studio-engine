@@ -85,6 +85,24 @@
         seedsEarned: 0,
         seedsTotal: 0,
 
+        // Open directly AT the updated/celebrate state — the specimen's "updated"
+        // cards (Great Username / Subscribed!) open the same modal id pre-advanced,
+        // exactly like the Auth cards open a given step. props.celebrate mounts the
+        // modal already saved, with the seed payload the celebration animates from.
+        // leveling (a getter) then decides at runtime whether that state renders the
+        // seeds celebration (TM) or the plain confirmation (MS).
+        init: function () {
+          var s = (window.Alpine && Alpine.store) ? Alpine.store(this.store) : null;
+          var cur = (s && typeof s.current === "function") ? s.current() : null;
+          var p = (cur && cur.props) || {};
+          if (p.celebrate) {
+            this.seedsEarned = parseInt(p.seedsEarned, 10) || 0;
+            this.seedsTotal = parseInt(p.seedsTotal, 10) || 0;
+            this.saved = true;
+            this.celebrate = true;
+          }
+        },
+
         // leveling — resolved at RUNTIME from the modal store's current props, so a
         // single modal id flips TM (seeds/level/quest) <-> MS (plain save) live as
         // the section's leveling toggle moves. Falls back to the render-time default
@@ -122,11 +140,13 @@
           this.progressLabel = "";
           if (this.hasInput) this.original = (this.value || "").trim();
           this._dispatch(payload);
-          if (this.leveling) {
-            this.seedsEarned = parseInt(payload.seeds_earned, 10) || 0;
-            this.seedsTotal = parseInt(payload.seeds_total, 10) || 0;
-            this.celebrate = true;
-          }
+          // Always advance to the updated state; the view gate (celebrate &&
+          // leveling vs celebrate && !leveling) picks the seeds celebration (TM)
+          // or the plain confirmation (MS). Seeds are set either way — only the
+          // leveling view reads them.
+          this.seedsEarned = parseInt(payload.seeds_earned, 10) || 0;
+          this.seedsTotal = parseInt(payload.seeds_total, 10) || 0;
+          this.celebrate = true;
         },
 
         _post: function (url, body) {

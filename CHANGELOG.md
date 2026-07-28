@@ -11,34 +11,45 @@ ids (`change-username` + `change-username-plain`, `quest-activity` +
 `quest-activity-plain`), because the primitive read `leveling` from a Ruby local
 at render time. Now the primitive reads `leveling` at RUNTIME from the modal
 store's `props.leveling`, so ONE id per activity flips the Turf Monster shape
-(quest pill, seeds, level, Free Entry Token progress) ↔ the McRitchie Studio shape
-(plain input + Save) live as a single leveling toggle moves.
+(a "Level N" pill + seeds celebration + Free Entry Token progress) ↔ the McRitchie
+Studio shape (plain input + Save, then a simple confirmation) live as a single
+leveling toggle moves.
 
 ### Changed
 
-- **`studio/modals/blocks/_leveling_activity`** — the leveling chrome (quest pill,
-  seeds celebration) is now ALWAYS rendered and gated by the reactive `leveling`
-  getter (`x-show="leveling"`, `x-if="celebrate && leveling"`) instead of dropped
-  at ERB time. The `leveling` local becomes the render-time fallback only. All
-  existing seams are preserved unchanged (`submit_url`, `finalize_hook`,
-  `saved_event`, `modal_store`, `demo`, seeds/level props), so Turf Monster's live
-  usage and the opaque save-callback contract are unaffected (TM ships no
-  `props.leveling` and keeps its `:leveling`-capability default).
+- **`studio/modals/blocks/_leveling_activity`** — three views now, all ALWAYS
+  rendered and gated by the reactive `leveling` getter instead of dropped at ERB
+  time: the **form** (`!celebrate`), the **seeds celebration**
+  (`celebrate && leveling`, TM), and a **plain confirmation**
+  (`celebrate && !leveling`, MS). The `leveling` local becomes the render-time
+  fallback only. **The "Quest N of N" counter pill is removed** — the profile
+  modals do not carry one; the "Level N" pill + seeds bar stay. All existing seams
+  are preserved unchanged (`submit_url`, `finalize_hook`, `saved_event`,
+  `modal_store`, `demo`, seeds/level props), so Turf Monster's live usage and the
+  opaque save-callback contract are unaffected (TM ships no `props.leveling` and
+  keeps its `:leveling`-capability default).
 - **`studio/_leveling_activity_assets`** (factory) — `leveling` is a runtime getter
-  reading `props.leveling` off the modal store (falling back to `_levelingDefault`).
+  reading `props.leveling` off the modal store (falling back to `_levelingDefault`);
+  an `init` hook opens the modal directly at the updated state via `props.celebrate`
+  (the "updated" cards open the same id pre-advanced, like the Auth step cards);
+  `_finishSaved` always advances to the updated state (the view gate picks
+  celebration vs plain confirmation).
 - **`/admin/style`** — "Leveling activities" → **"Profile Leveling"**: one live
   `Leveling` toggle drives the whole section (`$watch` patches an open modal so the
-  flip is live), and the four cards collapse to a walked flow of two activities —
-  **Change Username → "Great Username"** then **Join the Newsletter → "Subscribed!"**
-  — mirroring Turf Monster's real copy, seeds, level, and Free Entry Token progress.
+  flip is live across all cards), and the section walks **four** cards —
+  **Change Username → Great Username**, then **Join the Newsletter → Subscribed!** —
+  each "updated" card opening its modal straight at the success state, mirroring
+  Turf Monster's real copy, seeds, level, and Free Entry Token progress. No quest
+  counter.
 
 ### Added
 
 - **`_leveling_activity` locals** (all optional, additive): `consent_label` (a
   consent checkbox that gates the action — the newsletter join), `level_label` (a
-  "Level N" chip on the celebration), `next_label` / `next_open` (a "Next Quest"
-  button that walks to the next activity), and `demo_seeds_earned` /
-  `demo_seeds_total` (style-guide-only seed payload tuning).
+  "Level N" chip on the celebration), `confirm_subtitle` (subtext on the MS-shape
+  plain confirmation), `next_label` / `next_open` (a "Next Quest" button that walks
+  to the next activity), and `demo_seeds_earned` / `demo_seeds_total` (style-guide-
+  only seed payload tuning).
 
 ## 0.24.1 — 2026-07-28
 

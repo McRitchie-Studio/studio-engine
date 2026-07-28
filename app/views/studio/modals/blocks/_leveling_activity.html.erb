@@ -1,16 +1,19 @@
 <%#
-  Leveling-activity modal — the engine primitive behind TM's quest/leveling
+  Leveling-activity modal — the engine primitive behind TM's profile-leveling
   activities (change username, join newsletter, and the rest). ONE primitive,
-  TWO modes, decided by the app's :leveling capability:
+  three views (form / seeds celebration / plain confirm), TWO modes decided by the
+  app's :leveling capability:
 
-    leveling ON  — the full quest framing: a "Quest N of N" pill, and on success
-                   the seeds celebration (progress bar + level-up + Free Entry).
-    leveling OFF — the plain action modal: just the action + Save, and a Saved
-                   state on success. No quest pill, no seeds. (This is the
-                   McRitchie-Studio shape: MS has no leveling, TM does.)
+    leveling ON  — the action, then on success the seeds celebration: a "Level N"
+                   pill + the seeds progress bar (level-up + Free Entry Token).
+    leveling OFF — the plain action, then a simple confirmation on success (a
+                   "Saved" / "Subscribed" card). No Level pill, no seeds. (This is
+                   the McRitchie-Studio shape: MS has no leveling, TM does.)
+
+  There is NO "Quest N of N" counter — the profile modals do not carry one.
 
   Same primitive; the flag decides — and it decides at RUNTIME. The leveling chrome
-  (quest pill, seeds celebration) is ALWAYS rendered and gated by the reactive
+  (Level pill, seeds celebration) is ALWAYS rendered and gated by the reactive
   leveling getter (which reads props.leveling off the modal store, falling back to
   this local), so ONE modal id flips TM <-> MS live as a toggle moves — no more
   `-plain` duplicate ids. The leveling chrome is engine-owned UI — it is NOT
@@ -40,7 +43,6 @@
     finalize_hook (String) — window async fn name for the step (omit if none).
     saved_event   (String) — DOM event dispatched on success. Default
                   "studio:activity-saved".
-    quest_label   (String) — the "Quest N of N" pill text (leveling only).
     icon_emoji    (String) — celebration glyph. Default "🌱".
     celebrate_title    (String) — celebration headline. Default "Activity complete".
     celebrate_subtitle (String) — celebration subtext.
@@ -53,6 +55,8 @@
     consent_label (String) — render a consent checkbox that gates the action until
                   ticked (the newsletter join). Omit for no checkbox.
     level_label   (String) — a small "Level N" chip on the celebration. Omit = none.
+    confirm_subtitle (String) — subtext on the MS-shape (leveling off) plain
+                  confirmation. Omit = none.
     next_label / next_open — an optional "Next Quest" button on the celebration;
                   next_open is a developer-authored Alpine expression (e.g. swap to
                   the next activity). Both required to render the button.
@@ -81,7 +85,6 @@
   finalize_url       = local_assigns.fetch(:finalize_url, "")
   finalize_hook      = local_assigns.fetch(:finalize_hook, "")
   saved_event        = local_assigns.fetch(:saved_event, "studio:activity-saved")
-  quest_label        = local_assigns.fetch(:quest_label, nil)
   icon_emoji         = local_assigns.fetch(:icon_emoji, "🌱")
   celebrate_title    = local_assigns.fetch(:celebrate_title, "Activity complete")
   celebrate_subtitle = local_assigns.fetch(:celebrate_subtitle, "Nice — you earned seeds. Keep completing quests to earn a Free Entry.")
@@ -98,6 +101,8 @@
   level_label        = local_assigns.fetch(:level_label, nil)
   next_label         = local_assigns.fetch(:next_label, nil)
   next_open          = local_assigns[:next_open].presence&.to_s&.html_safe
+  # confirm_subtitle — the MS-shape (leveling off) plain-confirmation subtext.
+  confirm_subtitle   = local_assigns.fetch(:confirm_subtitle, nil)
   demo_seeds_earned  = local_assigns.fetch(:demo_seeds_earned, nil)
   demo_seeds_total   = local_assigns.fetch(:demo_seeds_total, nil)
 %>
@@ -122,15 +127,6 @@
   <template x-if="!celebrate">
     <div>
       <%= render layout: "studio/modals/blocks/shell", locals: { title: title, modal_store: modal_store } do %>
-        <%# Quest pill — leveling-only chrome. Always RENDERED (so a runtime toggle
-            can reveal it), visibility driven by the reactive leveling getter;
-            x-cloak keeps it hidden until Alpine resolves that (no MS-shape flash). %>
-        <% if quest_label.present? %>
-          <div class="mb-3" x-show="leveling" x-cloak>
-            <span class="inline-block text-[10px] font-semibold uppercase tracking-wide text-primary bg-primary/10 px-2 py-0.5 rounded-full whitespace-nowrap"><%= quest_label %></span>
-          </div>
-        <% end %>
-
         <% if description.present? %>
           <p class="text-sm text-muted mb-4"><%= description %></p>
         <% end %>
@@ -197,6 +193,22 @@
       <button type="button" @click="$store.<%= modal_store %>.close()"
               class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
         Close
+      </button>
+    </div>
+  </template>
+
+  <%# PLAIN CONFIRM VIEW — the MS shape (leveling off) after an update: a simple
+      confirmation, NO seeds / Level / celebration chrome. Gated celebrate &&
+      !leveling, so the single leveling toggle flips this <-> the seeds celebration
+      above, live. Single root. %>
+  <template x-if="celebrate && !leveling">
+    <div>
+      <%= render "studio/modals/blocks/card_header",
+            size: :lg, icon_color: "success",
+            title: saved_label, subtitle: confirm_subtitle %>
+      <button type="button" @click="$store.<%= modal_store %>.close()"
+              class="btn btn-primary btn-lg w-full">
+        Done
       </button>
     </div>
   </template>
