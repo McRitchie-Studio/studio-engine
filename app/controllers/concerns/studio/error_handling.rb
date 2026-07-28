@@ -202,11 +202,38 @@ module Studio
       raise e
     end
 
-    # Layer 1: Catch-all for RecordNotFound — 404 redirect, no logging.
+    # Layer 1: RecordNotFound — a real 404, never an ErrorLog row.
+    #
+    # This method was unreachable from the initial commit until the rescue_from
+    # order was fixed (see the note in `included`), so its HTML branch had never
+    # actually run. It redirected to root, which means making the handler
+    # reachable would have silently converted every 404 in every consuming app
+    # into a homepage bounce — caught by turf's
+    # Admin::ModelsControllerTest#test_unknown_model_key_returns_not_found, which
+    # rightly expects an unknown admin model key to 404 rather than land the
+    # operator on the marketing page.
+    #
+    # Consumers have been served Rails' standard 404 all along (an unhandled
+    # RecordNotFound maps to :not_found via rescue_responses). That is the
+    # observable behaviour worth preserving; the bug being fixed here is the
+    # ErrorLog pollution and the "Something went wrong" copy, not the status
+    # code. So: same 404 the apps already return, minus the error row.
     def handle_not_found(exception)
       respond_to do |format|
-        format.html { redirect_to root_path, alert: "Not found" }
         format.json { render json: { error: "Not found" }, status: :not_found }
+        format.any { render_not_found_page }
+      end
+    end
+
+    # Prefer the host's own public/404.html so each app keeps its own branding;
+    # fall back to a bare 404 for a host that ships none.
+    def render_not_found_page
+      page = Rails.public_path.join("404.html")
+
+      if page.exist?
+        render file: page, status: :not_found, layout: false
+      else
+        head :not_found
       end
     end
 

@@ -27,17 +27,24 @@ class ErrorHandlingRescueOrderTest < ActiveSupport::TestCase
   # Includes the concern exactly as a host ApplicationController does. The two
   # overrides stand in for the concern's I/O so dispatch is observable without a
   # real request and without an error_logs table (the dummy app has no schema).
+  #
+  # The 404 STATUS itself is proven end-to-end by the consuming apps, whose
+  # suites run against this engine commit in consumer-CI — turf's
+  # Admin::ModelsControllerTest#test_unknown_model_key_returns_not_found asserts
+  # an unknown key still returns 404 rather than redirecting to root.
   class ProbeController < ActionController::Base
     include Studio::ErrorHandling
 
-    attr_reader :error_logged, :responded
+    attr_reader :error_logged, :not_found_handled
 
     def create_error_log(_exception)
       @error_logged = true
     end
 
+    # handle_not_found's only I/O — recording the call proves the dispatch
+    # landed here rather than in the catch-all.
     def respond_to(*)
-      @responded = true
+      @not_found_handled = true
     end
   end
 
@@ -46,7 +53,7 @@ class ErrorHandlingRescueOrderTest < ActiveSupport::TestCase
 
     controller.rescue_with_handler(ActiveRecord::RecordNotFound.new("no such record"))
 
-    assert controller.responded,
+    assert controller.not_found_handled,
            "expected handle_not_found to render a not-found response; the StandardError " \
            "catch-all shadowed it instead"
     refute controller.error_logged,
