@@ -21,6 +21,7 @@
     .studio-glow          soft themed glow halo               (authored fresh)
     .surface-glass        frosted translucent glass panel     (authored fresh)
     .conic-surface        slow rotating conic-gradient wash   (authored fresh)
+    .pulse-cta            attention pulse/glow for a CTA       (ported, TM)
 
   Leveling:
     .level-badge(-1..-10) progressive level pill ladder       (ported, TM)
@@ -1110,4 +1111,50 @@ body.modal-open { overflow: hidden; }
   @keyframes modal-card-slide-in-left   { from { opacity: 0; } to { opacity: 1; } }
   @keyframes modal-card-slide-out-left  { from { opacity: 1; } to { opacity: 0; } }
   @keyframes modal-card-slide-in-right  { from { opacity: 0; } to { opacity: 1; } }
+}
+
+/* =============================================================================
+   12. pulse-cta — attention pulse/glow for a CTA button
+   A gentle "look at me" beat: the element scales up a hair while an expanding,
+   fading ring radiates from its edge, then rests, on a loop. Ported from turf-
+   monster's "Change Username" quest CTA (.quest-pulse), re-themed off the CTA
+   role token so it restyles per app (purple on McRitchie Studio) rather than TM's
+   hardcoded green. Drop it on a .btn (or any element with a solid background); for
+   a green "go" pulse set --pulse-cta-color: var(--color-success) at the call site.
+   Named pulse-cta (not btn-pulse) so it stays a plain motion-layer effect, not a
+   .btn component variant the engine.css component contract would demand.
+
+   Usage:  <button class="btn btn-primary pulse-cta">Change Username</button>
+           green pulse:  style="--pulse-cta-color: var(--color-success)"
+   Tune:   --pulse-cta-color / --pulse-cta-speed / --pulse-cta-scale /
+           --pulse-cta-ring / --pulse-cta-strength
+   ========================================================================== */
+.pulse-cta {
+  --pulse-cta-color: var(--color-cta);
+  --pulse-cta-speed: 3s;
+  --pulse-cta-scale: 1.03;
+  --pulse-cta-ring: 10px;
+  --pulse-cta-strength: 0.5;
+  animation: pulse-cta var(--pulse-cta-speed) ease-out infinite;
+}
+@keyframes pulse-cta {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--pulse-cta-color) calc(var(--pulse-cta-strength) * 100%), transparent);
+  }
+  10% {
+    transform: scale(var(--pulse-cta-scale));
+    box-shadow: 0 0 0 calc(var(--pulse-cta-ring) * 0.6) color-mix(in srgb, var(--pulse-cta-color) calc(var(--pulse-cta-strength) * 50%), transparent);
+  }
+  22% {
+    transform: scale(1);
+    box-shadow: 0 0 0 var(--pulse-cta-ring) color-mix(in srgb, var(--pulse-cta-color) 0%, transparent);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--pulse-cta-color) 0%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse-cta { animation: none; }
 }
