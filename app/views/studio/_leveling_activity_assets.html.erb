@@ -45,7 +45,9 @@
                   props omits it (TM's live path) the default stands.
     hasConsent    true renders a consent checkbox that gates the action until
                   ticked (the newsletter join).
-    demo          style-guide preview: resolve locally, skip the network POST.
+    demo          style-guide preview: resolve locally, skip the network POST, and
+                  suppress the app-facing saved event (so a host app's follow-on
+                  handler can't stack a second modal over the demo's own state).
     seedsPerLevel seeds per level for the celebration bar. Default 100.
     demoSeedsEarned / demoSeedsTotal  demo-only seed payload (defaults to a
                   level-crossing 30 / seedsPerLevel) so each activity's
@@ -128,6 +130,13 @@
         },
 
         _dispatch: function (payload) {
+          // In demo mode (the /admin/style preview) do NOT fire the app-facing
+          // saved event: the host app may listen for it and open its OWN follow-on
+          // modal (e.g. Turf Monster swaps to 'quest-success' on
+          // 'studio:username-saved'), which would stack a SECOND modal over the
+          // demo's own celebrate view — the reported duplicate. The demo resolves
+          // locally and is self-contained, so it must not drive real app follow-ons.
+          if (this.demo) return;
           try {
             window.dispatchEvent(new CustomEvent(this.savedEvent, { detail: payload || {} }));
           } catch (e) {}
@@ -147,6 +156,19 @@
           this.seedsEarned = parseInt(payload.seeds_earned, 10) || 0;
           this.seedsTotal = parseInt(payload.seeds_total, 10) || 0;
           this.celebrate = true;
+          // Reflect the advance onto the store's LIVE current props so the specimen
+          // glow (which reads props.celebrate) transfers from the input card to the
+          // updated card — exactly like the Auth glow follows props.step as its
+          // machine advances. Without this, the glow stays on the input card.
+          this._syncCelebrate(true);
+        },
+
+        // Mirror the component's celebrate onto the current modal store entry's
+        // props, the reactive source the specimen glow_when reads.
+        _syncCelebrate: function (value) {
+          var s = (window.Alpine && Alpine.store) ? Alpine.store(this.store) : null;
+          var cur = (s && typeof s.current === "function") ? s.current() : null;
+          if (cur && cur.props) cur.props.celebrate = !!value;
         },
 
         _post: function (url, body) {

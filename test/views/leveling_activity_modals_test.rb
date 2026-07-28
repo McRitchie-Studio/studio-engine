@@ -152,6 +152,21 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
     assert_includes js, "p.celebrate", "init reads props.celebrate to open directly at the updated state"
   end
 
+  # A save must (a) TRANSFER the specimen glow from the input card to the updated
+  # card — like the Auth glow follows props.step — and (b) NOT open a second modal.
+  test "a save advances props.celebrate (glow follows) and a demo save fires no app event (no double modal)" do
+    js = render_factory
+    # (a) glow follows: _finishSaved mirrors celebrate onto the LIVE store props,
+    # which is exactly the reactive source the specimen glow_when reads.
+    assert_includes js, "cur.props.celebrate",
+      "_finishSaved mirrors celebrate onto the store props so the glow transfers input -> updated"
+    # (b) no double modal: in demo mode the app-facing saved event is suppressed, so
+    # a host follow-on (e.g. Turf Monster's quest-success on studio:username-saved)
+    # cannot stack a SECOND modal over the demo's own celebrate view.
+    assert_includes js, "if (this.demo) return",
+      "the demo save suppresses the app-facing saved event (no host follow-on stacks a modal)"
+  end
+
   # --- A3. the generic activity: consent checkbox + runtime-gated views --------
 
   test "the generic leveling_activity gates its chrome at runtime + supports a consent checkbox" do

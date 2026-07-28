@@ -63,7 +63,8 @@
     demo_seeds_earned / demo_seeds_total — style-guide-only seed payload for the
                   demo save (defaults to a level-crossing 30 / seeds_per_level).
     modal_store   (String) — Alpine store name backing close(). Default "modals".
-    demo          (Boolean) — style-guide preview: resolve locally, no POST.
+    demo          (Boolean) — style-guide preview: resolve locally, no POST, and
+                  no app-facing saved event (no host follow-on can stack a modal).
 
   Single root element (the modal host mounts this through its own template x-if).
 %>

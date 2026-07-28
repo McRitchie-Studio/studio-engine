@@ -33,7 +33,13 @@ leveling toggle moves.
   an `init` hook opens the modal directly at the updated state via `props.celebrate`
   (the "updated" cards open the same id pre-advanced, like the Auth step cards);
   `_finishSaved` always advances to the updated state (the view gate picks
-  celebration vs plain confirmation).
+  celebration vs plain confirmation) AND mirrors `celebrate` onto the live store
+  `props.celebrate`, so the active-card **glow follows the flow** — it transfers
+  from the input card to the updated card as the modal advances, exactly like the
+  Auth glow follows `props.step`. In **demo** mode the app-facing saved event is
+  suppressed, so a host app's follow-on handler (e.g. Turf Monster's
+  `quest-success` on `studio:username-saved`) can't stack a second modal over the
+  demo's own celebrate view.
 - **`/admin/style`** — "Leveling activities" → **"Profile Leveling"**: one live
   `Leveling` toggle drives the whole section (`$watch` patches an open modal so the
   flip is live across all cards), and the section walks **four** cards —
