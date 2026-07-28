@@ -2,6 +2,63 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.21.0 — 2026-07-27
+
+Phase 2 of the studio-engine modal convergence: homes the entry-time age-gate DOB
+modal as a policy-free engine primitive, and documents the app-specific entry-token
+purchase flow as a living-style-guide specimen.
+
+### Added
+
+- **Age-gate DOB modal — `studio/modals/blocks/_age_verify`.** The entry-time
+  date-of-birth gate (Month / Day / Year + a live "too young" hint + submit),
+  homed in the engine as the heavier sibling of the existing
+  `studio/modals/shared/_age_attestation` checkbox. **Run one or the other:** the
+  attestation is a signup-time "I confirm I'm of legal age" checkbox; this is an
+  entry-time DOB gate a server can recompute and stamp.
+
+  **The engine hardcodes NO legal policy** — the whole seam is app-supplied:
+  `min_age` (REQUIRED, with **no engine default** — 18 is itself a policy value),
+  `submit_url` (the app owns the authoritative recompute + DOB persistence),
+  `state` (an optional PASSIVE jurisdiction label — the modal never detects
+  geography and never offers an editable state field, so a spoofed client state
+  can't lower the bar), and `fine_print` (the app's per-jurisdiction legal copy;
+  the engine ships only a neutral, policy-free default). The per-state age table
+  that the app's policy encodes never enters the engine.
+
+- **`ageVerifyModal` factory — `studio/_age_verify_assets`.** The Alpine data for
+  the DOB modal, shipped at page level (a `<script>` cloned out of a modal-host
+  template never runs). A consumer renders it once in its layout, like the shared
+  alpine factories; mirrors how `studio/_cropper_assets` homes `cropPhotoModal`.
+  The factory carries zero policy — no age default, no state table; the client
+  age math is UX only, the server recompute stays authoritative.
+
+- **Living style guide — new "Eligibility & entry" group.** Adds two specimens to
+  the `/admin/style` Modals section:
+  - The **age-gate** specimen, opened with a clearly-labelled DEMO policy (21+ in
+    CA) that documents the app-supplied seam, gated by
+    `Studio.feature?(:age_gate)` — disabled-but-present-yet-openable when off,
+    like the web3 specimens.
+  - The **entry-tokens** specimen — the app-specific purchase flow
+    (picker → confirming → minted) documented by composing engine chrome
+    (`shell`, `card_header`, `progress_pill`) with illustrative demo packs. The
+    engine does NOT own the packs, pricing, rails, or the on-chain mint. The copy
+    reflects the real on-chain model: an entry token is a **prepaid entry credit
+    recorded on-chain** (not a wallet-held SPL token), **minted server-side** once
+    payment clears and **consumed** when the app's hold-to-confirm creates the
+    entry.
+
+### Capability gating
+
+- **`:age_gate`** — a new, independent capability flag gating the age-gate
+  specimen (and the intended consumer mount). Off by default; a consumer opts in
+  via `config.features`.
+
+### Unchanged
+
+- Backward compatible: every addition is additive/optional. Nothing existing
+  changes behaviour, and the lighter `_age_attestation` checkbox is untouched.
+
 ## 0.20.0 — 2026-07-27
 
 Phase 1 of the studio-engine modal convergence: the engine now OWNS the wallet
