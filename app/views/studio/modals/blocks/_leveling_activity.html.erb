@@ -9,8 +9,12 @@
                    state on success. No quest pill, no seeds. (This is the
                    McRitchie-Studio shape: MS has no leveling, TM does.)
 
-  Same primitive; the flag decides. The leveling chrome (quest pill, seeds bar) is
-  engine-owned UI — it is NOT on-chain.
+  Same primitive; the flag decides — and it decides at RUNTIME. The leveling chrome
+  (quest pill, seeds celebration) is ALWAYS rendered and gated by the reactive
+  leveling getter (which reads props.leveling off the modal store, falling back to
+  this local), so ONE modal id flips TM <-> MS live as a toggle moves — no more
+  `-plain` duplicate ids. The leveling chrome is engine-owned UI — it is NOT
+  on-chain.
 
   CRITICAL BOUNDARY — UI ONLY. There is NO wallet, signing, key, or on-chain write
   anywhere in this primitive. The actual save is an APP-SUPPLIED callback: the
@@ -42,9 +46,18 @@
     celebrate_subtitle (String) — celebration subtext.
     free_entry_label   (String) — level-up reward line. Default "Free Entry Earned 🎟️".
     seeds_per_level    (Integer) — seeds per level. Default 100.
-    leveling      (Boolean) — override the :leveling gate. Defaults to
-                  Studio.feature?(:leveling); the style guide passes both to show
-                  each mode.
+    leveling      (Boolean) — the RENDER-TIME DEFAULT for the :leveling gate
+                  (defaults to Studio.feature?(:leveling)). The LIVE value is read
+                  at runtime from the modal store's props.leveling, so a single
+                  modal id flips TM <-> MS as a toggle moves.
+    consent_label (String) — render a consent checkbox that gates the action until
+                  ticked (the newsletter join). Omit for no checkbox.
+    level_label   (String) — a small "Level N" chip on the celebration. Omit = none.
+    next_label / next_open — an optional "Next Quest" button on the celebration;
+                  next_open is a developer-authored Alpine expression (e.g. swap to
+                  the next activity). Both required to render the button.
+    demo_seeds_earned / demo_seeds_total — style-guide-only seed payload for the
+                  demo save (defaults to a level-crossing 30 / seeds_per_level).
     modal_store   (String) — Alpine store name backing close(). Default "modals".
     demo          (Boolean) — style-guide preview: resolve locally, no POST.
 
@@ -77,6 +90,16 @@
   leveling           = local_assigns.fetch(:leveling, Studio.feature?(:leveling))
   modal_store        = local_assigns.fetch(:modal_store, "modals")
   demo               = local_assigns.fetch(:demo, false)
+  # consent_label — render a consent checkbox that gates the action (newsletter
+  # join). level_label — a small "Level N" chip on the celebration. next_label /
+  # next_open — an optional "Next Quest" button in the celebration (next_open is a
+  # developer-authored Alpine expression). demo_seeds_* — style-guide-only tuning.
+  consent_label      = local_assigns.fetch(:consent_label, nil)
+  level_label        = local_assigns.fetch(:level_label, nil)
+  next_label         = local_assigns.fetch(:next_label, nil)
+  next_open          = local_assigns[:next_open].presence&.to_s&.html_safe
+  demo_seeds_earned  = local_assigns.fetch(:demo_seeds_earned, nil)
+  demo_seeds_total   = local_assigns.fetch(:demo_seeds_total, nil)
 %>
 <div x-data="levelingActionModal({
        hasInput: <%= input ? 'true' : 'false' %>,
@@ -88,16 +111,22 @@
        savedEvent: '<%= j saved_event %>',
        store: '<%= j modal_store %>',
        leveling: <%= leveling ? 'true' : 'false' %>,
+       hasConsent: <%= consent_label.present? ? 'true' : 'false' %>,
        demo: <%= demo ? 'true' : 'false' %>,
-       seedsPerLevel: <%= seeds_per_level.to_i %>
+       seedsPerLevel: <%= seeds_per_level.to_i %>,
+       demoSeedsEarned: <%= demo_seeds_earned.present? ? demo_seeds_earned.to_i : 'null' %>,
+       demoSeedsTotal: <%= demo_seeds_total.present? ? demo_seeds_total.to_i : 'null' %>
      })">
 
   <%# FORM VIEW — the action. Single root inside the template. %>
   <template x-if="!celebrate">
     <div>
       <%= render layout: "studio/modals/blocks/shell", locals: { title: title, modal_store: modal_store } do %>
-        <% if leveling && quest_label.present? %>
-          <div class="mb-3">
+        <%# Quest pill — leveling-only chrome. Always RENDERED (so a runtime toggle
+            can reveal it), visibility driven by the reactive leveling getter;
+            x-cloak keeps it hidden until Alpine resolves that (no MS-shape flash). %>
+        <% if quest_label.present? %>
+          <div class="mb-3" x-show="leveling" x-cloak>
             <span class="inline-block text-[10px] font-semibold uppercase tracking-wide text-primary bg-primary/10 px-2 py-0.5 rounded-full whitespace-nowrap"><%= quest_label %></span>
           </div>
         <% end %>
@@ -120,6 +149,12 @@
                    <%= "title=\"#{pattern_title}\"".html_safe if pattern_title.present? %>
                    autofocus>
           <% end %>
+          <% if consent_label.present? %>
+            <label class="flex items-center gap-2 text-xs text-secondary select-none cursor-pointer">
+              <input type="checkbox" x-model="consent" class="rounded border-subtle text-primary cursor-pointer">
+              <span><%= consent_label %></span>
+            </label>
+          <% end %>
           <button type="submit" class="btn btn-primary btn-lg w-full" :disabled="saving || !changed">
             <span x-show="!saving" x-text="changed ? '<%= j cta_label %>' : '<%= j saved_label %>'"><%= cta_label %></span>
             <span x-show="saving" class="inline-flex items-center justify-center gap-2" style="display: none;">
@@ -132,28 +167,37 @@
     </div>
   </template>
 
-  <%# CELEBRATION VIEW — leveling ONLY. Rendered at ERB time only when leveling is
-      on, so a leveling-off modal ships NO seeds chrome at all (not merely
-      unmounted). Mounts once celebrate flips true so the seeds bar animates from
-      the freshly-saved payload. Single root. %>
-  <% if leveling %>
-    <template x-if="celebrate">
-      <div>
-        <%= render "studio/modals/blocks/card_header",
-              size: :lg, icon_emoji: icon_emoji,
-              title: celebrate_title, subtitle: celebrate_subtitle %>
-
-        <div class="mb-5">
-          <%= render "studio/modals/blocks/seeds_bar",
-                seeds_earned_key: "seedsEarned", seeds_total_key: "seedsTotal",
-                seeds_per_level: seeds_per_level, free_entry_label: free_entry_label %>
+  <%# CELEBRATION VIEW — leveling-only chrome. ALWAYS rendered now (so a runtime
+      leveling toggle can reveal it); the x-if gates on BOTH celebrate AND the
+      reactive leveling getter, so an MS-shape modal (leveling off) shows the plain
+      saved state and never this. Mounts once celebrate flips true so the seeds bar
+      animates from the freshly-saved payload. Single root. %>
+  <template x-if="celebrate && leveling">
+    <div>
+      <% if level_label.present? %>
+        <div class="mb-3 text-center">
+          <span class="inline-block text-[10px] font-semibold uppercase tracking-wide text-primary bg-primary/10 px-2 py-0.5 rounded-full"><%= level_label %></span>
         </div>
+      <% end %>
+      <%= render "studio/modals/blocks/card_header",
+            size: :lg, icon_emoji: icon_emoji,
+            title: celebrate_title, subtitle: celebrate_subtitle %>
 
-        <button type="button" @click="$store.<%= modal_store %>.close()"
-                class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
-          Close
-        </button>
+      <div class="mb-5">
+        <%= render "studio/modals/blocks/seeds_bar",
+              seeds_earned_key: "seedsEarned", seeds_total_key: "seedsTotal",
+              seeds_per_level: seeds_per_level, free_entry_label: free_entry_label %>
       </div>
-    </template>
-  <% end %>
+
+      <% if next_label.present? && next_open.present? %>
+        <button type="button" @click="<%= next_open %>" class="btn btn-primary btn-lg w-full">
+          <%= next_label %>
+        </button>
+      <% end %>
+      <button type="button" @click="$store.<%= modal_store %>.close()"
+              class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+        Close
+      </button>
+    </div>
+  </template>
 </div>

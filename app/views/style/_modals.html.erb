@@ -256,7 +256,7 @@
   <%= render "studio/age_verify_assets" %>
 
   <%# levelingActionModal factory — page level (never inside the overlay template,
-      where a cloned script would not run) so the change-username + quest-activity
+      where a cloned script would not run) so the change-username + join-newsletter
       specimens open live. A consumer app renders this in its layout the same way. %>
   <%= render "studio/leveling_activity_assets" %>
 
@@ -381,47 +381,47 @@
                     subtitle: "You leveled up! A Free Entry lands in your account soon. Keep leveling for more." %></div>
         </template>
 
-        <%# --- Leveling activities: change username + quest activity --- %>
-        <%# Each id renders the SAME engine primitive with an EXPLICIT leveling:
-            flag, so BOTH modes stay visible here regardless of this app's real
-            :leveling setting. All demo:true — the save resolves locally (no
-            backend), and the on-chain-accurate copy is passed as an app-authored
-            description (the engine default stays neutral). %>
+        <%# --- Profile Leveling: change username + join newsletter --- %>
+        <%# ONE id per activity now. The primitive reads props.leveling at RUNTIME,
+            so the section's leveling toggle flips TM (seeds / level / quest) <-> MS
+            (plain input + save) live — no more `-plain` twins. All demo:true (the
+            save resolves locally), and the on-chain-accurate copy is an
+            app-authored description (the engine default stays neutral). The
+            section's open() passes props.leveling; `leveling: true` here is only
+            the render-time fallback. The two activities walk in sequence via the
+            celebration's "Next Quest" (Username -> Newsletter -> close). %>
         <template x-if="$store.dsModals.current().id === 'change-username'">
           <div><%= render "studio/modals/blocks/change_username",
                     modal_store: "dsModals", demo: true, leveling: true,
                     current_username: "turfmonster",
                     submit_url: "#demo-change-username",
                     description: "Your username is stored on-chain. Changes are saved via your managed wallet.",
-                    quest_label: "Quest 1 of 4" %></div>
+                    cta_label: "Save",
+                    quest_label: "Quest 1 of 2",
+                    level_label: "Level 1",
+                    demo_seeds_earned: 25, demo_seeds_total: 25,
+                    free_entry_label: "Free Entry Token 🎟️",
+                    next_label: "Next Quest",
+                    next_open: "$store.dsModals.swap('join-newsletter', { demo: true, leveling: true })" %></div>
         </template>
-        <template x-if="$store.dsModals.current().id === 'change-username-plain'">
-          <div><%= render "studio/modals/blocks/change_username",
-                    modal_store: "dsModals", demo: true, leveling: false,
-                    current_username: "mcritchie",
-                    submit_url: "#demo-change-username",
-                    description: "Choose the name shown across your account." %></div>
-        </template>
-        <template x-if="$store.dsModals.current().id === 'quest-activity'">
+        <template x-if="$store.dsModals.current().id === 'join-newsletter'">
           <div><%= render "studio/modals/blocks/leveling_activity",
                     modal_store: "dsModals", demo: true, leveling: true,
-                    submit_url: "#demo-quest",
+                    submit_url: "#demo-newsletter",
                     title: "Join the Newsletter",
-                    description: "Sports news and contest updates — complete the quest for seeds.",
-                    input: true, input_type: "email", placeholder: "you@example.com",
+                    description: "Sports news and contest updates — and 25 seeds for joining.",
+                    input: false,
+                    consent_label: "Email me sports news and contest updates.",
                     cta_label: "Subscribe", saved_label: "Subscribed", saving_label: "Subscribing…",
-                    quest_label: "Quest 2 of 4",
-                    icon_emoji: "📬", celebrate_title: "You're in",
-                    celebrate_subtitle: "Nice — you earned seeds for joining. Keep completing quests to earn a Free Entry." %></div>
-        </template>
-        <template x-if="$store.dsModals.current().id === 'quest-activity-plain'">
-          <div><%= render "studio/modals/blocks/leveling_activity",
-                    modal_store: "dsModals", demo: true, leveling: false,
-                    submit_url: "#demo-quest",
-                    title: "Join the Newsletter",
-                    description: "Sports news and contest updates.",
-                    input: true, input_type: "email", placeholder: "you@example.com",
-                    cta_label: "Subscribe", saved_label: "Subscribed", saving_label: "Subscribing…" %></div>
+                    quest_label: "Quest 2 of 2",
+                    icon_emoji: "🌱",
+                    celebrate_title: "Subscribed!",
+                    celebrate_subtitle: "You're on the list. We'll keep the sports news and contest updates coming.",
+                    level_label: "Level 2",
+                    demo_seeds_earned: 25, demo_seeds_total: 100,
+                    free_entry_label: "Free Entry Token 🎟️",
+                    next_label: "Next Quest",
+                    next_open: "$store.dsModals.close()" %></div>
         </template>
 
       </div>
@@ -909,12 +909,19 @@
   </section>
 
   <%# ===================================================================== %>
-  <%# 7. LEVELING ACTIVITIES — change username + quest activities %>
+  <%# 7. PROFILE LEVELING — change username + join newsletter (ONE live toggle) %>
   <%# ===================================================================== %>
-  <section class="space-y-5">
+  <%# The section owns a LIVE leveling toggle. `leveling` (default on) flows into
+      each activity's open() as props.leveling, and $watch patches an already-open
+      modal so the flip is live. Checked = TM shape (quest pill, seeds, level, Free
+      Entry Token); unchecked = MS shape (plain input + Save). ONE primitive, ONE
+      id per activity — the with/without fork is gone. %>
+  <section class="space-y-5"
+           x-data="{ leveling: true, sync() { var c = $store.dsModals.current(); if (c && c.props && (c.id === 'change-username' || c.id === 'join-newsletter')) c.props.leveling = this.leveling; } }"
+           x-init="$watch('leveling', () => sync())">
     <div class="space-y-1">
       <div class="flex flex-wrap items-center gap-3">
-        <h3 class="text-xl font-bold text-heading">Leveling activities</h3>
+        <h3 class="text-xl font-bold text-heading">Profile Leveling</h3>
         <% if leveling_on %>
           <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">leveling on</span>
         <% else %>
@@ -922,78 +929,58 @@
         <% end %>
       </div>
       <p class="text-muted text-sm">
-        The quest/leveling action modals
-        (<code class="font-mono text-2xs">studio/modals/blocks/_change_username</code>,
-        <code class="font-mono text-2xs">studio/modals/blocks/_leveling_activity</code>),
-        migrated from Turf Monster. ONE primitive, <strong>two modes</strong>, decided
-        by <code class="font-mono text-2xs">Studio.feature?(:leveling)</code>:
-        <strong>leveling on</strong> adds the quest pill + the seeds level-up
-        celebration; <strong>leveling off</strong> is the plain action modal (just
-        the input + Save + a Saved state — the McRitchie Studio shape). Each modal is
-        shown <strong>both ways</strong> below (the specimens pass an explicit
-        <code class="font-mono text-2xs">leveling:</code> so both render regardless of
-        this app's flag). The actual save is an <strong>app-supplied callback</strong>:
-        the modal POSTs to <code class="font-mono text-2xs">submit_url</code> and, for
-        an app that needs a wallet step, delegates it opaquely to an app-supplied
-        <code class="font-mono text-2xs">finalize_hook</code> — <strong>no wallet,
-        signing, or on-chain write lives in the engine</strong>. (These demos resolve
-        the save locally.)
+        The profile leveling flow, ported from Turf Monster as ONE primitive
+        (<code class="font-mono text-2xs">studio/modals/blocks/_leveling_activity</code>,
+        with <code class="font-mono text-2xs">_change_username</code> as its username
+        specialization). Walk the two quests below — <strong>Change Username</strong>
+        then <strong>Join the Newsletter</strong>. The single <strong>Leveling</strong>
+        toggle flips the whole flow live: <strong>on</strong> is the Turf Monster shape
+        (quest pill, seeds, level, and Free Entry Token progress on complete);
+        <strong>off</strong> is the McRitchie Studio shape (plain input + Save, no
+        leveling UI). Same modal id either way — the primitive reads
+        <code class="font-mono text-2xs">leveling</code> at runtime, so there is no
+        more with/without fork. The save is an <strong>app-supplied callback</strong>
+        (<code class="font-mono text-2xs">submit_url</code> + an opaque
+        <code class="font-mono text-2xs">finalize_hook</code> for a wallet step) —
+        <strong>no wallet, signing, or on-chain write lives in the engine</strong>.
+        (These demos resolve locally.)
       </p>
+      <%# The live leveling toggle — same checkbox mechanism as the Auth method
+          toggles, scoped to the whole section. %>
+      <label class="inline-flex items-center gap-2 text-sm text-secondary cursor-pointer select-none pt-1">
+        <input type="checkbox" x-model="leveling" class="w-4 h-4 rounded accent-primary cursor-pointer">
+        <span class="font-medium text-heading">Leveling</span>
+        <span class="text-2xs text-muted" x-text="leveling ? '(Turf Monster shape)' : '(McRitchie Studio shape)'"></span>
+      </label>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%# Change username — leveling ON: quest pill + seeds celebration on save. %>
+      <%# Change Username — quest 1. Opens with the section's live leveling. %>
       <%= render layout: "style/modal_specimen", locals: {
-            label:     "Change username (leveling)",
-            reference: %(the "Change username" modal WITH leveling (studio-engine studio/modals/blocks/_change_username, leveling: true) — quest pill + seeds level-up celebration on save. The on-chain save is an app-supplied callback (submit_url + an opaque finalize_hook); the engine is UI only. Open with $store.dsModals.open('change-username')),
-            open_expr: "$store.dsModals.open('change-username')",
+            label:     "Change Username",
+            reference: %(the Profile Leveling "Change Username" quest (studio-engine studio/modals/blocks/_change_username) — quest 1 of 2. Reads leveling at runtime: on gives the quest pill + "Great Username" seeds celebration (Level 1, plus 25, Free Entry Token progress); off is the plain input + Save. The on-chain save is an app-supplied callback (submit_url + an opaque finalize_hook); the engine is UI only. Open with $store.dsModals.open('change-username', { demo: true, leveling: true }) — pass leveling to pick the shape),
+            open_expr: "$store.dsModals.open('change-username', { demo: true, leveling: leveling })",
             glow_when: ds_glow.call("change-username") } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
           <div class="flex items-center justify-between gap-2">
             <span class="block h-2 w-16 rounded" style="background: var(--color-text); opacity: .18"></span>
-            <span class="text-[8px] font-semibold uppercase rounded-full px-1.5 py-0.5" style="color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent)">Quest 1/4</span>
+            <span x-show="leveling" class="text-[8px] font-semibold uppercase rounded-full px-1.5 py-0.5" style="color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent)">Quest 1/2</span>
           </div>
           <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
           <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
         </div>
       <% end %>
 
-      <%# Change username — leveling OFF: the plain MS-style action + Save. %>
+      <%# Join the Newsletter — quest 2. Consent checkbox + Subscribe. %>
       <%= render layout: "style/modal_specimen", locals: {
-            label:     "Change username (plain)",
-            reference: %(the "Change username" modal WITHOUT leveling (studio-engine studio/modals/blocks/_change_username, leveling: false) — the plain McRitchie Studio shape: input + Save, then a Saved state. No quest pill, no seeds. Same primitive, flag off. Open with $store.dsModals.open('change-username-plain')),
-            open_expr: "$store.dsModals.open('change-username-plain')",
-            glow_when: ds_glow.call("change-username-plain") } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
-          <span class="block h-2 w-16 rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
-          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
-        </div>
-      <% end %>
-
-      <%# Quest activity — leveling ON: generic quest (newsletter join) + seeds. %>
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Quest activity (leveling)",
-            reference: %(a generic quest activity WITH leveling (studio-engine studio/modals/blocks/_leveling_activity, leveling: true) — here a "Join the Newsletter" quest: quest pill + seeds celebration on complete. Covers join-newsletter / send-message and the rest as ONE parameterized primitive. Open with $store.dsModals.open('quest-activity')),
-            open_expr: "$store.dsModals.open('quest-activity')",
-            glow_when: ds_glow.call("quest-activity") } do %>
+            label:     "Join Newsletter",
+            reference: %(the Profile Leveling "Join the Newsletter" quest (studio-engine studio/modals/blocks/_leveling_activity) — quest 2 of 2, a consent checkbox + Subscribe. Reads leveling at runtime: on gives the quest pill + "Subscribed!" seeds celebration (Level 2, Free Entry Token); off is a plain Subscribe. Open with $store.dsModals.open('join-newsletter', { demo: true, leveling: true }) — pass leveling to pick the shape),
+            open_expr: "$store.dsModals.open('join-newsletter', { demo: true, leveling: leveling })",
+            glow_when: ds_glow.call("join-newsletter") } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
           <div class="flex items-center justify-between gap-2">
             <span class="text-lg leading-none">📬</span>
-            <span class="text-[8px] font-semibold uppercase rounded-full px-1.5 py-0.5" style="color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent)">Quest 2/4</span>
+            <span x-show="leveling" class="text-[8px] font-semibold uppercase rounded-full px-1.5 py-0.5" style="color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent)">Quest 2/2</span>
           </div>
-          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
-          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
-        </div>
-      <% end %>
-
-      <%# Quest activity — leveling OFF: the plain action (no quest, no seeds). %>
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Quest activity (plain)",
-            reference: %(the SAME generic activity WITHOUT leveling (studio-engine studio/modals/blocks/_leveling_activity, leveling: false) — a plain "Join the Newsletter" action: input + Subscribe, then Subscribed. No quest pill, no seeds. Open with $store.dsModals.open('quest-activity-plain')),
-            open_expr: "$store.dsModals.open('quest-activity-plain')",
-            glow_when: ds_glow.call("quest-activity-plain") } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
-          <span class="text-lg leading-none">📬</span>
           <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
           <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
         </div>
