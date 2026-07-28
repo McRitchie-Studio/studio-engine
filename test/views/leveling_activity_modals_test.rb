@@ -8,24 +8,31 @@ require_relative "../dummy/config/environment"
 require "minitest/autorun"
 require "active_support/test_case"
 require "action_view"
+require "nokogiri"
 
-# [component] Guard for engine 0.22's Phase-3 modal convergence — the
-# quest/leveling activity modals migrated from Turf Monster:
+# [component] Guard for the Profile Leveling flow — the quest/leveling activity
+# modals migrated from Turf Monster, now a SINGLE toggle-driven flow (no more
+# with-leveling / without-leveling fork):
 #
-#   A. ONE primitive, TWO modes. studio/modals/blocks/_leveling_activity (and its
-#      _change_username specialization) renders BOTH the full quest framing (quest
-#      pill + seeds level-up celebration) when leveling is ON, and the plain action
-#      modal (input + Save + Saved, no quest/seeds) when leveling is OFF. The mode
-#      is decided by a `leveling` local (defaulting to Studio.feature?(:leveling)).
+#   A. ONE primitive, ONE modal id, THREE runtime-gated views. Both
+#      studio/modals/blocks/_leveling_activity and its _change_username
+#      specialization ALWAYS render the form (!celebrate), the seeds celebration
+#      (celebrate && leveling, TM) and the plain confirmation (celebrate &&
+#      !leveling, MS), gated by the reactive `leveling` getter which reads
+#      props.leveling off the modal store. So one modal id flips TM <-> MS live as
+#      a toggle moves — the `-plain` duplicate ids are gone, and there is NO "Quest
+#      N of N" counter. The render-time `leveling` local is only the fallback.
 #   B. The CRITICAL BOUNDARY — the primitive is UI ONLY. The on-chain save is an
 #      APP-SUPPLIED callback: the rendered modal + its factory carry NO wallet /
 #      signing / on-chain vocabulary, and the factory exposes a domain-neutral
 #      contract (submit_url + an opaque finalize_hook). Asserted against the
-#      RENDERED output (ERB doc-comments are stripped, so this catches only
-#      vocabulary that actually reaches the UI/JS), plus a source-level check that
-#      no chain *code* token leaked.
-#   C. The living style guide ships both modals, each shown BOTH ways, wired +
-#      openable with the active-card glow.
+#      RENDERED output (ERB doc-comments are stripped), plus a source-level check
+#      that no chain *code* token leaked.
+#   C. The living style guide ships the "Profile Leveling" section: FOUR walked
+#      cards (Change Username -> Great Username -> Join Newsletter -> Subscribed!),
+#      each carrying its OWN per-card leveling toggle (like the Auth card's method
+#      checkboxes) — the two "updated" cards open the same id straight at the
+#      celebrate state (props.celebrate), each openable and glowing.
 class LevelingActivityModalsTest < ActiveSupport::TestCase
   ENGINE_ROOT           = File.expand_path("../..", __dir__)
   CHANGE_USERNAME_ERB   = File.join(ENGINE_ROOT, "app/views/studio/modals/blocks/_change_username.html.erb")
@@ -77,56 +84,111 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
     Studio.features = original
   end
 
-  # --- A1. change-username WITH leveling — quest pill + seeds chrome present ----
+  # --- A1. three RUNTIME-GATED views: form / seeds celebration / plain confirm ---
+  # The celebration and the MS confirmation are ALWAYS rendered and gated by the
+  # reactive leveling (so a toggle flips them live), never dropped at ERB time.
+  # There is NO "Quest N of N" counter.
 
-  test "change-username renders the quest pill + seeds celebration when leveling is ON" do
+  test "change-username renders form + seeds celebration + plain confirm, runtime-gated, no quest counter" do
     html = render_change_username(current_username: "picker", submit_url: "/u",
-                                  leveling: true, quest_label: "Quest 1 of 4")
-    # The action itself.
+                                  leveling: true,
+                                  confirm_subtitle: "Your username has been updated.")
+
+    # The action itself (the form view).
     assert_includes html, "Change Username", "the modal title renders"
     assert_includes html, "levelingActionModal(", "the shared factory backs the modal"
     assert_includes html, 'x-model="value"', "the username input renders"
     assert_includes html, "changed ? 'Save'", "the Save/Saved button renders"
-    # The leveling framing.
-    assert_includes html, "Quest 1 of 4", "the quest pill renders when leveling is on"
-    assert_includes html, "seeds-bar-continuous", "the seeds celebration mounts when leveling is on"
+
+    # No quest counter anywhere — the profile modals do not carry one.
+    refute_match(/Quest\s+\d+\s+(of|\/)\s*\d+/i, html, "there must be no 'Quest N of N' counter")
+
+    # The seeds celebration — gated on BOTH celebrate AND the reactive leveling (TM).
+    assert_includes html, 'x-if="celebrate && leveling"',
+      "the seeds celebration is gated on celebrate AND the reactive leveling"
+    assert_includes html, "seeds-bar-continuous", "the seeds celebration markup is present"
     assert_includes html, "Great Username", "the celebration headline renders"
-    assert_includes html, "leveling: true", "the factory is told leveling is on"
+    # The "Level N" pill was dropped from the celebrate view; the seeds bar stays.
+    refute_includes html, "Level 1", "the celebration carries no 'Level N' chip (dropped)"
+    refute_match(/local_assigns\.fetch\(:level_label/, File.read(LEVELING_ACTIVITY_ERB),
+      "the primitive no longer accepts a level_label local")
+
+    # The plain confirmation — the MS shape, gated celebrate && !leveling.
+    assert_includes html, 'x-if="celebrate && !leveling"',
+      "the plain confirmation is gated celebrate && !leveling (MS shape)"
+    assert_includes html, "Your username has been updated.", "the plain confirmation subtext renders"
+
+    # The factory is TOLD the render-time default, but resolves leveling at runtime.
+    assert_includes html, "leveling: true", "the factory receives the render-time default"
   end
 
-  # --- A2. change-username WITHOUT leveling — plain action, no quest/seeds ------
+  # --- A2. ONE template, three views — the fork is gone, no quest counter --------
+  # The views no longer depend on the Ruby leveling flag at ERB time: rendering
+  # with leveling:false STILL emits the SAME gated celebration + plain-confirm
+  # markup, only the factory's fallback default differs. The live TM<->MS flip is
+  # driven by the reactive getter (asserted below), verified live in the preview.
 
-  test "change-username renders the plain action modal when leveling is OFF" do
-    html = render_change_username(current_username: "picker", submit_url: "/u",
-                                  leveling: false, quest_label: "Quest 1 of 4")
-    # The action still renders.
-    assert_includes html, "Change Username"
-    assert_includes html, 'x-model="value"', "the input still renders in plain mode"
-    assert_includes html, "changed ? 'Save'", "the Save/Saved button still renders"
-    # The leveling framing is ABSENT — not merely unmounted.
-    refute_includes html, "seeds-bar-continuous", "no seeds celebration when leveling is off"
-    refute_includes html, "Quest 1 of 4", "no quest pill when leveling is off"
-    refute_includes html, "Great Username", "no celebration headline when leveling is off"
-    assert_includes html, "leveling: false", "the factory is told leveling is off"
+  test "the three views render regardless of the Ruby leveling default (fork removed)" do
+    on  = render_change_username(current_username: "picker", submit_url: "/u", leveling: true)
+    off = render_change_username(current_username: "picker", submit_url: "/u", leveling: false)
+
+    [on, off].each do |html|
+      assert_includes html, 'x-if="celebrate && leveling"',  "seeds celebration is runtime-gated in both defaults"
+      assert_includes html, 'x-if="celebrate && !leveling"', "plain confirmation is runtime-gated in both defaults"
+      assert_includes html, "seeds-bar-continuous", "seeds markup is present in both defaults (one template)"
+      refute_match(/Quest\s+\d+\s+(of|\/)\s*\d+/i, html, "no quest counter in either default")
+    end
+
+    assert_includes on,  "leveling: true",  "leveling:true sets the on default"
+    assert_includes off, "leveling: false", "leveling:false sets the off default"
   end
 
-  # --- A3. the generic quest activity renders both ways too --------------------
+  test "the factory resolves leveling at RUNTIME + opens at the celebrate state via props" do
+    js = render_factory
+    assert_includes js, "get leveling()",
+      "leveling is a runtime getter, not a fixed value — one id flips live"
+    assert_includes js, "props.leveling",
+      "the getter reads props.leveling off the modal store (the toggle's source of truth)"
+    assert_includes js, "_levelingDefault",
+      "the getter falls back to the render-time default (TM's live path is unaffected)"
+    # Opening AT the updated state — the 'updated' cards open the same id pre-advanced.
+    assert_includes js, "init: function", "the factory has an init hook"
+    assert_includes js, "p.celebrate", "init reads props.celebrate to open directly at the updated state"
+  end
 
-  test "the generic leveling_activity renders quest chrome on, and plain off" do
-    on = render_leveling_activity(submit_url: "/q", leveling: true, input: true,
-                                  title: "Join the Newsletter", quest_label: "Quest 2 of 4",
-                                  cta_label: "Subscribe")
-    assert_includes on, "Join the Newsletter"
-    assert_includes on, "Quest 2 of 4", "the quest pill renders when leveling is on"
-    assert_includes on, "seeds-bar-continuous", "the seeds celebration mounts when leveling is on"
-    assert_includes on, "changed ? 'Subscribe'", "the configurable CTA renders"
+  # A save must (a) TRANSFER the specimen glow from the input card to the updated
+  # card — like the Auth glow follows props.step — and (b) NOT open a second modal.
+  test "a save advances props.celebrate (glow follows) and a demo save fires no app event (no double modal)" do
+    js = render_factory
+    # (a) glow follows: _finishSaved mirrors celebrate onto the LIVE store props,
+    # which is exactly the reactive source the specimen glow_when reads.
+    assert_includes js, "cur.props.celebrate",
+      "_finishSaved mirrors celebrate onto the store props so the glow transfers input -> updated"
+    # (b) no double modal: in demo mode the app-facing saved event is suppressed, so
+    # a host follow-on (e.g. Turf Monster's quest-success on studio:username-saved)
+    # cannot stack a SECOND modal over the demo's own celebrate view.
+    assert_includes js, "if (this.demo) return",
+      "the demo save suppresses the app-facing saved event (no host follow-on stacks a modal)"
+  end
 
-    off = render_leveling_activity(submit_url: "/q", leveling: false, input: true,
-                                   title: "Join the Newsletter", quest_label: "Quest 2 of 4",
-                                   cta_label: "Subscribe")
-    assert_includes off, "Join the Newsletter"
-    refute_includes off, "Quest 2 of 4", "no quest pill when leveling is off"
-    refute_includes off, "seeds-bar-continuous", "no seeds celebration when leveling is off"
+  # --- A3. the generic activity: consent checkbox + runtime-gated views --------
+
+  test "the generic leveling_activity gates its chrome at runtime + supports a consent checkbox" do
+    html = render_leveling_activity(submit_url: "/q", leveling: true, input: false,
+                                    title: "Join the Newsletter",
+                                    consent_label: "Email me sports news and contest updates.",
+                                    cta_label: "Subscribe", saved_label: "Subscribed",
+                                    celebrate_title: "Subscribed!")
+    assert_includes html, "Join the Newsletter"
+    assert_includes html, 'x-if="celebrate && leveling"',  "the seeds celebration is runtime-gated"
+    assert_includes html, 'x-if="celebrate && !leveling"', "the plain confirmation is runtime-gated"
+    assert_includes html, "changed ? 'Subscribe'", "the configurable CTA renders"
+    refute_match(/Quest\s+\d+\s+(of|\/)\s*\d+/i, html, "no quest counter")
+    # The consent checkbox renders and binds consent, which the factory gates on.
+    assert_includes html, 'x-model="consent"', "the consent checkbox renders + binds consent"
+    assert_includes html, "Email me sports news and contest updates.", "the consent label renders"
+    assert_includes render_factory, "this.hasConsent && !this.consent",
+      "the factory gates the action until consent is ticked"
   end
 
   test "a no-input activity omits the text field (a plain action button)" do
@@ -136,12 +198,9 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
     assert_includes html, "changed ? 'Send'", "the action button still renders"
   end
 
-  # --- B1. the on-chain save is an APP-SUPPLIED callback (the seam) ------------
+  # --- B1..B4. the on-chain save is an APP-SUPPLIED callback (the seam) --------
 
   test "the primitive is UI-only — no on-chain vocabulary reaches the rendered modal" do
-    # Rendered with the engine's own neutral defaults (no app-authored on-chain
-    # description). ERB doc-comments are stripped on render, so anything caught
-    # here is vocabulary that actually reached the UI.
     html = render_change_username(current_username: "picker", submit_url: "/u", leveling: true).downcase
     ONCHAIN_RENDERED_NEEDLES.each do |needle|
       refute_includes html, needle, "the rendered modal must carry no on-chain vocabulary (#{needle})"
@@ -157,7 +216,6 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
       refute_includes down, needle, "the factory JS must carry no on-chain vocabulary (#{needle})"
     end
     refute_match(/\bsign(ed|ing|ature)?\b/, down, "the factory JS must not sign anything")
-    # The app-supplied-callback seam IS present, and domain-neutral.
     assert_includes js, "submitUrl", "the factory POSTs to an app-supplied submit_url"
     assert_includes js, "needs_step", "the factory reacts to the neutral needs_step status"
     assert_includes js, "finalizeHook", "the second step is delegated to an app-supplied hook"
@@ -182,7 +240,7 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
     assert_match(/submit_url/, error.message)
   end
 
-  # --- C. the living style guide ships both modals, each BOTH ways ------------
+  # --- C. the living style guide ships the Profile Leveling section ------------
 
   test "the style page ships the levelingActionModal factory at page level" do
     html = render_index
@@ -190,25 +248,54 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
       "the factory must ship at page level so the modals open live"
   end
 
-  test "both modals register + stay openable, each in both modes" do
+  test "the Profile Leveling section walks FOUR cards with PER-CARD toggles (no -plain twins, no quest counter)" do
     html = render_index
-    %w[change-username change-username-plain quest-activity quest-activity-plain].each do |id|
-      assert_includes html, "$store.dsModals.current().id === '#{id}'",
-        "the overlay registers the #{id} modal"
-      assert_includes html, "$store.dsModals.open('#{id}')",
-        "the #{id} specimen is wired + openable"
+
+    # The section renamed. Leveling is now PER-CARD (like the Auth card's method
+    # checkboxes), not one section-wide toggle: the old section x-model/$watch are
+    # gone and each card ships its own opts.leveling checkbox.
+    assert_includes html, "Profile Leveling", "the section is renamed to Profile Leveling"
+    refute_includes html, "Leveling activities", "the old section title is gone"
+    refute_includes html, 'x-model="leveling"', "the single section-wide leveling toggle is removed"
+    refute_includes html, "$watch('leveling'", "no section-level $watch patches an open modal anymore"
+    assert_operator html.scan('x-model="opts.leveling"').size, :>=, 4,
+      "each of the four cards ships its OWN opts.leveling checkbox"
+
+    # FOUR walked cards — each opens with ITS OWN card toggle (opts.leveling); the
+    # two "updated" cards open the SAME id straight at the celebrate state
+    # (props.celebrate), like Auth steps.
+    assert_includes html, "$store.dsModals.open('change-username', { demo: true, leveling: opts.leveling })",
+      "the Change Username card opens the form with its own card toggle"
+    assert_includes html, "$store.dsModals.open('change-username', { demo: true, leveling: opts.leveling, celebrate: true, seedsEarned: 25, seedsTotal: 25 })",
+      "the Great Username card opens change-username straight at the celebrate state"
+    assert_includes html, "$store.dsModals.open('join-newsletter', { demo: true, leveling: opts.leveling })",
+      "the Join Newsletter card opens the form with its own card toggle"
+    assert_includes html, "$store.dsModals.open('join-newsletter', { demo: true, leveling: opts.leveling, celebrate: true, seedsEarned: 25, seedsTotal: 100 })",
+      "the Subscribed! card opens join-newsletter straight at the celebrate state"
+
+    # The card labels for the walked flow.
+    %w[Change\ Username Great\ Username Join\ Newsletter Subscribed!].each do |label|
+      assert_includes html, ">#{label}<", "the '#{label}' card renders in the walk"
     end
-    # The leveling section renders, and the leveling-on specimen carries the quest
-    # chrome (the plain twin does not).
-    assert_includes html, "Leveling activities", "the new style-guide section renders"
-    assert_includes html, "Quest 1 of 4", "the leveling-on change-username demo shows the quest pill"
+
+    # No quest counter anywhere on the page (mocks + modals).
+    refute_match(/Quest\s+\d+\s*(of|\/)\s*\d+/i, html, "there must be no 'Quest N of N' counter")
+
+    # The retired `-plain` twins are gone.
+    %w[change-username-plain quest-activity quest-activity-plain].each do |id|
+      refute_includes html, "id === '#{id}'", "the retired #{id} modal must not register"
+    end
   end
 
-  test "the leveling-activity specimen cards wire the active-card glow" do
+  test "the Profile Leveling cards wire the glow, discriminating input vs updated of the same id" do
     html = render_index
-    %w[change-username change-username-plain quest-activity quest-activity-plain].each do |id|
-      assert_includes html, "$store.dsModals.current() && $store.dsModals.current().id === '#{id}'",
-        "the #{id} specimen card must glow when its modal is current"
+    # Each id has TWO cards (form + celebrate); the glow discriminates on
+    # props.celebrate so the right card lights.
+    %w[change-username join-newsletter].each do |id|
+      assert_includes html, "$store.dsModals.current().id === '#{id}' && !$store.dsModals.current().props.celebrate",
+        "the #{id} INPUT card glows only when its modal is at the form"
+      assert_includes html, "$store.dsModals.current().id === '#{id}' && !!$store.dsModals.current().props.celebrate",
+        "the #{id} UPDATED card glows only when its modal is at the celebrate state"
     end
   end
 end

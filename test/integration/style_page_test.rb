@@ -8,6 +8,7 @@ require_relative "../dummy/config/environment"
 require "minitest/autorun"
 require "active_support/test_case"
 require "action_view"
+require "nokogiri"
 
 # [component] Guard for the admin/style living style guide (renamed from
 # admin/design_system). Load-bearing properties, each exercised (not just
@@ -367,6 +368,44 @@ class StylePageTest < ActiveSupport::TestCase
     refute_nil upload_at
     refute_nil crop_at
     assert upload_at < crop_at, "Profile must list Image upload before Crop photo"
+  end
+
+  # Regression — the glow must FAIL CLOSED. Every glow-capable specimen card
+  # carries .studio-team-glow statically, and the primitive's CSS default is
+  # --studio-team-glow-opacity: 1 (visible). So the "only the active card glows"
+  # behavior rode entirely on the reactive Alpine :style dimming inactive cards to
+  # 0 — which means before Alpine hydrates (or if it never loads) ALL reactive-glow
+  # cards paint their ring at once (the fail-open flash). The fix renders a STATIC
+  # inline --studio-team-glow-opacity: 0 beside the reactive :style so the ring is
+  # OFF at first paint. Assert the RENDERED attributes on real glow-card elements
+  # (not a source substring), and that the reactive 0<->0.95 fade still drives.
+  test "specimen glow cards default to opacity 0 (fail-closed) and keep the reactive fade" do
+    doc = Nokogiri::HTML.fragment(render_index)
+    # A specimen glow card = .studio-team-glow that ALSO carries the reactive
+    # :style binding (this is what distinguishes it from the always-on Tricks demos).
+    glow_cards = doc.css(".studio-team-glow").select do |el|
+      el[":style"].to_s.include?("--studio-team-glow-opacity")
+    end
+    refute_empty glow_cards,
+      "expected specimen glow cards wired with the reactive :style binding"
+
+    glow_cards.each do |card|
+      assert_equal "--studio-team-glow-opacity: 0", card["style"].to_s.strip,
+        "a specimen glow card must render a STATIC inline --studio-team-glow-opacity: 0 " \
+        "so the ring is OFF at first paint (fail-closed, before Alpine hydrates)"
+      assert_match(/\?\s*'0\.95'\s*:\s*'0'/, card[":style"].to_s,
+        "the reactive :style must still drive the glow 0.95 (active) / 0 (inactive) for the cross-fade")
+    end
+
+    # The always-on Tricks demos (.studio-team-glow WITHOUT the reactive binding)
+    # must NOT get the fail-closed override — they are meant to glow on sight.
+    always_on = doc.css(".studio-team-glow").reject do |el|
+      el[":style"].to_s.include?("--studio-team-glow-opacity")
+    end
+    always_on.each do |demo|
+      refute_includes demo["style"].to_s, "--studio-team-glow-opacity: 0",
+        "the always-on Tricks glow demos must stay visible (no fail-closed override)"
+    end
   end
 
   # Item 7 — the single-color team glow ships in engine-motion.css and renders as

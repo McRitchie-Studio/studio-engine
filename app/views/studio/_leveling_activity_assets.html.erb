@@ -38,9 +38,20 @@
     savedEvent    DOM event dispatched on success, carrying the app payload, so
                   the app can run its own follow-on. Default "studio:activity-saved".
     store         Alpine modal store name backing close(). Default "modals".
-    leveling      true shows the seeds celebration on success (a UI flourish).
-    demo          style-guide preview: resolve locally, skip the network POST.
+    leveling      the render-time DEFAULT for the seeds celebration. The live
+                  value is read at RUNTIME from the modal store's current
+                  props.leveling (this.leveling getter), so one modal id flips
+                  TM (celebration) <-> MS (plain save) as a toggle moves; when
+                  props omits it (TM's live path) the default stands.
+    hasConsent    true renders a consent checkbox that gates the action until
+                  ticked (the newsletter join).
+    demo          style-guide preview: resolve locally, skip the network POST, and
+                  suppress the app-facing saved event (so a host app's follow-on
+                  handler can't stack a second modal over the demo's own state).
     seedsPerLevel seeds per level for the celebration bar. Default 100.
+    demoSeedsEarned / demoSeedsTotal  demo-only seed payload (defaults to a
+                  level-crossing 30 / seedsPerLevel) so each activity's
+                  celebration can showcase a chosen state.
 %>
 <script>
   (function () {
@@ -57,9 +68,17 @@
         finalizeHook: opts.finalizeHook || "",
         savedEvent: opts.savedEvent || "studio:activity-saved",
         store: opts.store || "modals",
-        leveling: !!opts.leveling,
+        // leveling is a RUNTIME getter (below) reading props.leveling off the modal
+        // store, so ONE modal id flips TM <-> MS shape live as a section toggle
+        // moves. _levelingDefault is the render-time fallback (TM ships no
+        // props.leveling and relies on its :leveling capability default).
+        _levelingDefault: !!opts.leveling,
+        hasConsent: !!opts.hasConsent,
+        consent: false,
         demo: !!opts.demo,
         seedsPerLevel: parseInt(opts.seedsPerLevel, 10) || 100,
+        demoSeedsEarned: parseInt(opts.demoSeedsEarned, 10),
+        demoSeedsTotal: parseInt(opts.demoSeedsTotal, 10),
         saving: false,
         error: "",
         saved: false,
@@ -68,9 +87,42 @@
         seedsEarned: 0,
         seedsTotal: 0,
 
+        // Open directly AT the updated/celebrate state — the specimen's "updated"
+        // cards (Great Username / Subscribed!) open the same modal id pre-advanced,
+        // exactly like the Auth cards open a given step. props.celebrate mounts the
+        // modal already saved, with the seed payload the celebration animates from.
+        // leveling (a getter) then decides at runtime whether that state renders the
+        // seeds celebration (TM) or the plain confirmation (MS).
+        init: function () {
+          var s = (window.Alpine && Alpine.store) ? Alpine.store(this.store) : null;
+          var cur = (s && typeof s.current === "function") ? s.current() : null;
+          var p = (cur && cur.props) || {};
+          if (p.celebrate) {
+            this.seedsEarned = parseInt(p.seedsEarned, 10) || 0;
+            this.seedsTotal = parseInt(p.seedsTotal, 10) || 0;
+            this.saved = true;
+            this.celebrate = true;
+          }
+        },
+
+        // leveling — resolved at RUNTIME from the modal store's current props, so a
+        // single modal id flips TM (seeds/level/quest) <-> MS (plain save) live as
+        // the section's leveling toggle moves. Falls back to the render-time default
+        // when props does not set it (TM's live path), so existing callers are
+        // unaffected.
+        get leveling() {
+          var s = (window.Alpine && Alpine.store) ? Alpine.store(this.store) : null;
+          var cur = (s && typeof s.current === "function") ? s.current() : null;
+          var p = cur && cur.props;
+          if (p && typeof p.leveling === "boolean") return p.leveling;
+          return this._levelingDefault;
+        },
+
         // Actionable while there is a real change to save (input activities) or
-        // until the one-shot action has fired (no-field activities).
+        // until the one-shot action has fired (no-field activities). A consent
+        // checkbox (the newsletter join) additionally gates the action until ticked.
         get changed() {
+          if (this.hasConsent && !this.consent) return false;
           if (!this.hasInput) return !this.saved;
           var v = (this.value || "").trim();
           if (v.length < this.minLength) return false;
@@ -78,6 +130,13 @@
         },
 
         _dispatch: function (payload) {
+          // In demo mode (the /admin/style preview) do NOT fire the app-facing
+          // saved event: the host app may listen for it and open its OWN follow-on
+          // modal (e.g. Turf Monster swaps to 'quest-success' on
+          // 'studio:username-saved'), which would stack a SECOND modal over the
+          // demo's own celebrate view — the reported duplicate. The demo resolves
+          // locally and is self-contained, so it must not drive real app follow-ons.
+          if (this.demo) return;
           try {
             window.dispatchEvent(new CustomEvent(this.savedEvent, { detail: payload || {} }));
           } catch (e) {}
@@ -90,11 +149,26 @@
           this.progressLabel = "";
           if (this.hasInput) this.original = (this.value || "").trim();
           this._dispatch(payload);
-          if (this.leveling) {
-            this.seedsEarned = parseInt(payload.seeds_earned, 10) || 0;
-            this.seedsTotal = parseInt(payload.seeds_total, 10) || 0;
-            this.celebrate = true;
-          }
+          // Always advance to the updated state; the view gate (celebrate &&
+          // leveling vs celebrate && !leveling) picks the seeds celebration (TM)
+          // or the plain confirmation (MS). Seeds are set either way — only the
+          // leveling view reads them.
+          this.seedsEarned = parseInt(payload.seeds_earned, 10) || 0;
+          this.seedsTotal = parseInt(payload.seeds_total, 10) || 0;
+          this.celebrate = true;
+          // Reflect the advance onto the store's LIVE current props so the specimen
+          // glow (which reads props.celebrate) transfers from the input card to the
+          // updated card — exactly like the Auth glow follows props.step as its
+          // machine advances. Without this, the glow stays on the input card.
+          this._syncCelebrate(true);
+        },
+
+        // Mirror the component's celebrate onto the current modal store entry's
+        // props, the reactive source the specimen glow_when reads.
+        _syncCelebrate: function (value) {
+          var s = (window.Alpine && Alpine.store) ? Alpine.store(this.store) : null;
+          var cur = (s && typeof s.current === "function") ? s.current() : null;
+          if (cur && cur.props) cur.props.celebrate = !!value;
         },
 
         _post: function (url, body) {
@@ -115,10 +189,14 @@
           this.error = "";
           var self = this;
           if (this.demo) {
-            // Style-guide preview: no backend. Resolve to a level-crossing payload
-            // so the leveling celebration demonstrates its full flourish.
+            // Style-guide preview: no backend. Resolve to a per-activity seed
+            // payload (defaulting to a level-crossing one) so the celebration
+            // demonstrates its flourish — Username stays at Level 1 (+25), the
+            // Newsletter crosses a level to reveal the Free Entry Token line.
+            var de = isNaN(self.demoSeedsEarned) ? 30 : self.demoSeedsEarned;
+            var dt = isNaN(self.demoSeedsTotal) ? self.seedsPerLevel : self.demoSeedsTotal;
             setTimeout(function () {
-              self._finishSaved({ seeds_earned: 30, seeds_total: self.seedsPerLevel });
+              self._finishSaved({ seeds_earned: de, seeds_total: dt });
             }, 600);
             return;
           }
