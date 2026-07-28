@@ -205,6 +205,18 @@ module Studio
     magic_link_store == :database && draw_link_routes
   end
 
+  # The floor every developer-desk tool sits on: the local email inbox
+  # (Studio::LocalEmailsController) and the local-review mint
+  # (Studio::LocalReviewsController). Both hand out sign-in material without
+  # authenticating anyone, so both are OFF in production and OFF for any request
+  # that did not come from the loopback interface. One spelling, so a tool added
+  # later cannot quietly ship a weaker gate. Pass request.local? in.
+  def self.local_tool_enabled?(request_local:)
+    return false if defined?(Rails) && Rails.respond_to?(:env) && Rails.env.production?
+
+    !!request_local
+  end
+
   def self.local_email_capture?
     return false if defined?(Rails) && Rails.respond_to?(:env) && Rails.env.production?
     return !!local_email_capture unless local_email_capture.nil?
@@ -299,8 +311,12 @@ module Studio
       get  "auth/:provider/callback", to: "omniauth_callbacks#create"
       get  "auth/failure", to: "omniauth_callbacks#failure"
 
+      # Developer-desk tools. Drawn outside production, and each controller
+      # re-checks Studio.local_tool_enabled? per request (loopback only) — the
+      # route being absent is the outer gate, not the only one.
       unless defined?(Rails) && Rails.env.production?
         get "_studio/local_emails", to: "studio/local_emails#index", as: :studio_local_emails
+        get "_studio/local_review", to: "studio/local_reviews#show",  as: :studio_local_review
       end
 
       # Passwordless email (magic link). Helpers: magic_link_request_path (POST

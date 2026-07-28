@@ -15,6 +15,7 @@
 # sign_in_existing / sign_up_new building blocks.
 class MagicLinksController < ApplicationController
   include Studio::LinkConsumption
+  include Studio::MagicLinkIssuing
 
   skip_before_action :require_authentication
   layout false, only: :confirm
@@ -57,18 +58,8 @@ class MagicLinksController < ApplicationController
     redirect_to login_path, alert: "That sign-in link is invalid or has expired. Request a fresh one below."
   end
 
-  private
-
-  # Mint a token in the configured store. Default :signed keeps the legacy
-  # stateless MessageVerifier link (URL: /magic_link/<token>); :database mints a
-  # Studio::Link row (URL: /l/<token>) — the short, unified scheme. The mailer
-  # builds the matching URL (see UserMailer#magic_link). sign_in_existing /
-  # sign_up_new / safe_path come from Studio::LinkConsumption.
-  def issue_magic_link(email, return_to)
-    if Studio.magic_link_store == :database
-      Studio::Link.create_magic_link(email: email, return_to: return_to).token
-    else
-      MagicLink.generate(email: email, return_to: return_to)
-    end
-  end
+  # issue_magic_link (mint in the configured store) comes from
+  # Studio::MagicLinkIssuing, shared with UserMailer — which builds the URL that
+  # consumes it — so the mint and its landing URL cannot drift apart.
+  # sign_in_existing / sign_up_new / safe_path come from Studio::LinkConsumption.
 end
