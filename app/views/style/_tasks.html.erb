@@ -1,13 +1,52 @@
 <%#  Tasks section of the living style guide (admin/style).
 
-     A DEMONSTRATOR of the shared board primitive — the columns, cards, stage
-     badges, and drag/rank affordance that every board (McRitchie Studio's
-     /deployments is the top-of-line) builds from. It is a static sketch, not a
-     backend-wired sortable board; the point is to show the standard so custom
-     boards can adopt it. The stage-* badge palette (components/_badge) is the
-     spine. %>
+     The shared board primitive, LIVE. Phase D lifted the columns / cards / drag +
+     optimistic move / reorder that the three near-identical McRitchie Studio boards
+     (tasks / news / content) each hand-rolled into one engine primitive
+     (studio/board/_board + the window.studioBoard factory + vendored SortableJS).
+     The first block below renders that real primitive with `demo: true` — you can
+     DRAG a card between columns and the move animates + toasts, but nothing POSTs.
+     The blocks under it stay a static reference: the stage-* badge palette
+     (components/_badge) that is the pipeline spine, and the standard-vs-custom
+     split of what a board inherits vs sets. %>
 <%
-  # The shared pipeline palette: each column maps to a stage-* badge scheme.
+  # LIVE specimen — the real studio/board/_board primitive, demo mode. Plain Hash
+  # records (the style guide has no models); each card id becomes id="card-<id>".
+  # Each demo card carries its current `zone` (the column it sits in) — in a real
+  # board the record knows its own stage; here the Hash does.
+  live_board_columns = [
+    { key: "designed",  label: "Designed",  badge_class: "stage-fresh",
+      cards: [
+        { id: "engine-board-primitive", zone: "designed", title: "Engine board primitive", repo: "studio-engine", who: "SH" },
+        { id: "coinflow-buy-rail",      zone: "designed", title: "Coinflow buy rail",      repo: "turf-monster",  who: "JA" }
+      ] },
+    { key: "building",  label: "Building",  badge_class: "stage-shaping",
+      cards: [{ id: "navbar-rpc-preload", zone: "building", title: "Navbar RPC preload", repo: "turf-monster", who: "CA" }] },
+    { key: "submitted", label: "Submitted", badge_class: "stage-structured",
+      cards: [{ id: "magic-link-ttl-bump", zone: "submitted", title: "Magic-link TTL bump", repo: "studio-engine", who: "SH" }] },
+    { key: "shipped",   label: "Shipped",   badge_class: "stage-shipped",
+      cards: [{ id: "ses-email-backend", zone: "shipped", title: "SES email backend", repo: "mcritchie", who: "ST" }] }
+  ]
+
+  # Copy-paste-for-an-agent usage. Built by array-join, NOT a heredoc: a heredoc as
+  # the last expression of an ERB scriptlet trips Erubi, and literal ERB tags in the
+  # body would close the tag. Plain render() calls read clearly for an agent.
+  board_usage_snippet = [
+    "# once at layout level (a <script> in the board template never runs):",
+    'render "studio/board_assets"',
+    "",
+    "# then the board itself:",
+    'render "studio/board/board",',
+    "  columns: @columns,            # [{ key:, label:, cards:, badge_class: }]",
+    '  card_partial: "tasks/task_card",',
+    "  reorder_url: tasks_reorder_path,        # POST { slugs: [...], zone: }",
+    '  move_url: "/tasks/:id.json",            # PATCH { task: { stage: } }',
+    '  move_param: { resource: "task", attr: "stage" },',
+    '  live_channel: "deployments"'
+  ].join("\n")
+
+  # The static reference palette below (unchanged): each column maps to a stage-*
+  # badge scheme.
   board_columns = [
     { key: "stage-fresh",      label: "Fresh",      count: 2 },
     { key: "stage-shaping",    label: "Shaping",    count: 1 },
@@ -32,13 +71,45 @@
     <h2 class="text-2xl font-bold text-heading">Tasks</h2>
     <p class="text-muted text-sm max-w-2xl">
       The shared board primitive that every board builds from &mdash; columns, cards, the
-      <code class="font-mono text-2xs">stage-*</code> badge palette, and the drag / rank affordance.
-      McRitchie Studio's <code class="font-mono text-2xs">/deployments</code> board is the top-of-line;
-      this is a static demonstrator (full extraction lands in a later phase).
+      <code class="font-mono text-2xs">stage-*</code> badge palette, and the drag / optimistic
+      move + reorder. McRitchie Studio's <code class="font-mono text-2xs">/deployments</code> board is
+      the top-of-line; the specimen below is the <strong>real</strong>
+      <code class="font-mono text-2xs">studio/board/board</code> primitive in
+      <code class="font-mono text-2xs">demo: true</code> mode &mdash; drag a card, no save.
     </p>
   </div>
 
-  <%# ---- The board ------------------------------------------------------- %>
+  <%# ---- The LIVE primitive (demo mode) --------------------------------- %>
+  <%# Render the factory once (a <script> in the board template would never run), then
+      the board. demo: true → drag animates + toasts locally, nothing POSTs. %>
+  <%= render "studio/board_assets" %>
+  <div class="space-y-3">
+    <div class="flex items-center gap-2">
+      <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">Live</span>
+      <p class="label-upper"><code class="font-mono text-2xs">studio/board/board</code> &middot; demo &mdash; drag a card between columns</p>
+    </div>
+    <%= render "studio/board/board",
+          demo: true,
+          columns: live_board_columns,
+          card_partial: "style/board/demo_card",
+          card_as: :card,
+          reorder_url: "#",
+          move_url: "#",
+          move_param: { resource: "task", attr: "stage" },
+          group: "studio-board-demo",
+          empty_label: "Drop tasks here" %>
+    <div class="relative" x-data="{ copied: false }">
+      <pre class="bg-inset text-body text-2xs rounded-lg px-3 py-2 pr-16 overflow-x-auto"><code x-ref="boardUsage"><%= board_usage_snippet %></code></pre>
+      <button type="button"
+              class="btn btn-neutral btn-sm absolute top-2 right-2"
+              aria-label="Copy usage snippet"
+              @click="navigator.clipboard?.writeText($refs.boardUsage.innerText); copied = true; setTimeout(() => copied = false, 1200)">
+        <span x-text="copied ? 'Copied' : 'Copy'">Copy</span>
+      </button>
+    </div>
+  </div>
+
+  <%# ---- The static reference sketch ------------------------------------- %>
   <div class="fade-edge-x overflow-x-auto pb-2">
     <div class="flex gap-4 min-w-max">
       <% board_columns.each do |col| %>

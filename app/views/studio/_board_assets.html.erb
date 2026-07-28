@@ -1,0 +1,341 @@
+<%#
+  studioBoard factory — the Alpine data behind the engine board primitive
+  (studio/board/_board). Ships here at PAGE level on purpose: a <script> inside the
+  board component template would be cloned/re-parsed and never run, so a consumer
+  renders THIS once in its layout (like studio/_leveling_activity_assets homes
+  levelingActionModal and studio/_age_verify_assets homes ageVerifyModal), and the
+  board anywhere below just references window.studioBoard. SortableJS is loaded
+  globally by layouts/studio/_head (vendored, no CDN); this factory drives it.
+
+  ONE factory drives BOTH board shapes — it reads its selectors and behavior from
+  opts, so the kanban cross-column board (group + move PATCH + toasts + counts) and
+  the within-lane depth chart (group:false, a drag handle, reorder-only) are the
+  same code with different opts. See studio/board/_board for the full opts contract.
+
+  CRITICAL BOUNDARY — this factory is UI ONLY. It PATCHes an app-supplied move_url,
+  POSTs an app-supplied reorder_url, and reacts to a neutral JSON contract; it holds
+  ZERO domain logic. Custom behavior attaches by LISTENING to the dispatched
+  window events (studio:board-moved / :board-reordered / :card-added), and heavier
+  animation is delegated OPAQUELY to a window[fx] module + window[hook] fns the
+  engine never inspects.
+%>
+<script>
+  (function () {
+    if (window.studioBoard) return;
+
+    window.studioBoard = function (opts) {
+      opts = opts || {};
+      return {
+        // --- config (from opts) --------------------------------------------
+        zoneSelector:   opts.zoneSelector || ".kanban-dropzone",
+        cardSelector:   opts.draggable || ".kanban-card",
+        emptySelector:  opts.emptySelector || null,
+        groupName:      (opts.group === false ? null : (opts.group || "studio-board")),
+        handle:         opts.handle || null,
+        sortFilter:     opts.filter || ".kanban-empty",
+        idAttr:         opts.idAttr || "slug",
+        zoneAttr:       opts.zoneAttr || "stage",
+        domIdPrefix:    opts.domIdPrefix || "card-",
+        moveUrl:        opts.moveUrl || null,
+        moveParam:      opts.moveParam || null,
+        reorderUrl:     opts.reorderUrl || "",
+        reorderPayload: opts.reorderPayload || "slugs",
+        optimistic:     opts.optimistic !== false,
+        toastsEnabled:  opts.toasts !== false,
+        live:           !!opts.live,
+        demo:           !!opts.demo,
+        fxName:         opts.fx || null,
+        onMoveHook:     opts.onMoveHook || null,
+        onDropHook:     opts.onDropHook || null,
+        labels:         opts.labels || {},
+
+        // --- state ---------------------------------------------------------
+        toasts: [],
+
+        // --- init ----------------------------------------------------------
+        init: function () {
+          // Set data-alpine-ready in $nextTick, NOT synchronously: x-init runs while
+          // Alpine is still walking this subtree, so inner @click handlers are not
+          // bound yet. $nextTick fires after the directive walk, so the flag then
+          // means "the board is fully wired and interactive" — the documented init
+          // flake fix carried over from the MS kanbanBoard.
+          var self = this;
+          this.$nextTick(function () {
+            self.$el.dataset.alpineReady = "true";
+            self.initSortables();
+            if (self.live) {
+              self.observeLive();
+              if (!self.fx()) self.installExitStreamFallback();
+            }
+          });
+        },
+
+        fx: function () { return this.fxName ? window[this.fxName] : null; },
+        cardId: function (el) { return el ? el.getAttribute("data-" + this.idAttr) : null; },
+        zoneKey: function (el) { return el ? el.getAttribute("data-" + this.zoneAttr) : null; },
+        label: function (zone) { return this.labels[zone] || zone; },
+
+        // --- SortableJS wiring ---------------------------------------------
+        initSortables: function () {
+          if (typeof Sortable === "undefined") return;
+          var self = this;
+          document.querySelectorAll(this.zoneSelector).forEach(function (zone) {
+            var cfg = {
+              animation: 150,
+              ghostClass: "opacity-30",
+              draggable: self.cardSelector,
+              filter: self.sortFilter,
+              onStart: function () { window.__studioBoardDragging = true; },
+              onEnd: function (evt) {
+                self.handleSortEnd(evt);
+                requestAnimationFrame(function () { window.__studioBoardDragging = false; });
+              }
+            };
+            if (self.groupName) cfg.group = self.groupName; // omit ⇒ within-zone only
+            if (self.handle) cfg.handle = self.handle;
+            Sortable.create(zone, cfg);
+          });
+        },
+
+        // A cross-column drop moves the card (PATCH); a same-zone drop is a pure
+        // reorder and must NEVER PATCH the zone. Source the from/to from the
+        // DROPZONES (evt.from / evt.to), never the card, so an in-place reorder
+        // can't mismove.
+        handleSortEnd: function (evt) {
+          var self = this;
+          var card = evt.item;
+          var fromZone = evt.from;
+          var toZone = evt.to;
+          var id = this.cardId(card);
+          var moved = fromZone !== toZone;
+
+          var afterMove = function (ok) {
+            if (moved && !ok) return; // reverted — leave the order alone
+            self.saveOrder(toZone);
+            self.updateCounts();
+          };
+
+          if (moved) {
+            Promise.resolve(this.applyMove(card, fromZone, toZone, id)).then(afterMove);
+          } else {
+            afterMove(true);
+          }
+        },
+
+        // Cross-column move: PATCH the zone attr; optimistic revert on failure.
+        applyMove: function (card, fromZone, toZone, id) {
+          var self = this;
+          var newZone = this.zoneKey(toZone);
+          var fromKey = this.zoneKey(fromZone);
+
+          // Moves not configured (or a within-zone board): a cross-zone drop is
+          // disallowed — snap back so a stray drag can't silently mismove. In demo
+          // mode with no move endpoint, still reflect the move locally.
+          if (!this.moveUrl || !this.moveParam) {
+            if (this.demo) {
+              this.setCardZone(card, newZone);
+              this.emit("board-moved", id, fromKey, newZone);
+              return true;
+            }
+            this.revert(card, fromZone);
+            return false;
+          }
+
+          if (this.demo) {
+            this.setCardZone(card, newZone);
+            this.toast("Moved to " + this.label(newZone), "success");
+            this.emit("board-moved", id, fromKey, newZone);
+            this.hook(this.onMoveHook, { record: id, from: fromKey, to: newZone });
+            return true;
+          }
+
+          var url = this.moveUrl.replace(":id", encodeURIComponent(id));
+          var body = {};
+          body[this.moveParam.resource] = {};
+          body[this.moveParam.resource][this.moveParam.attr] = newZone;
+
+          return this.request(url, "PATCH", body).then(function (resp) {
+            if (!resp.ok) {
+              return resp.json().catch(function () { return {}; }).then(function (err) {
+                throw new Error(err.error || ("Failed (" + resp.status + ")"));
+              });
+            }
+            self.setCardZone(card, newZone);
+            self.toast("Moved to " + self.label(newZone), "success");
+            self.emit("board-moved", id, fromKey, newZone);
+            self.hook(self.onMoveHook, { record: id, from: fromKey, to: newZone });
+            return true;
+          }).catch(function (e) {
+            if (self.optimistic) self.revert(card, fromZone);
+            self.toast((e && e.message) || "Move failed", "error");
+            self.updateCounts();
+            return false;
+          });
+        },
+
+        // Save the destination column's order. Reads the ordered id list and POSTs
+        // it under the neutral payload key (`slugs` | `ids`) plus the advisory zone.
+        saveOrder: function (toZone) {
+          var self = this;
+          var ids = Array.prototype.slice
+            .call(toZone.querySelectorAll(this.cardSelector))
+            .map(function (c) { return self.cardId(c); });
+          var zone = this.zoneKey(toZone);
+          this.emit("board-reordered", null, zone, zone, { ids: ids, zone: zone });
+          this.hook(this.onDropHook, { ids: ids, zone: zone });
+          if (this.demo || !this.reorderUrl) return;
+          var payload = {};
+          payload[this.reorderPayload] = ids;
+          payload.zone = zone;
+          this.request(this.reorderUrl, "POST", payload).catch(function () {
+            // Order save failed — positions are stale but the board stays functional.
+          });
+        },
+
+        setCardZone: function (card, zone) { card.setAttribute("data-" + this.zoneAttr, zone); },
+
+        // Revert a failed move: drop the card back into its SOURCE zone (which
+        // always exists) above the empty state, and flash a red ring.
+        revert: function (card, fromZone) {
+          var anchor = this.emptySelector ? fromZone.querySelector(this.emptySelector) : null;
+          fromZone.insertBefore(card, anchor);
+          card.classList.add("ring-2", "ring-red-500");
+          setTimeout(function () { card.classList.remove("ring-2", "ring-red-500"); }, 1500);
+        },
+
+        updateCounts: function () {
+          var self = this;
+          document.querySelectorAll("[data-board-count]").forEach(function (badge) {
+            var key = badge.getAttribute("data-board-count");
+            var zone = document.getElementById("dropzone-" + key);
+            if (!zone) return;
+            var count = zone.querySelectorAll(self.cardSelector).length;
+            badge.textContent = count;
+            if (self.emptySelector) {
+              var empty = zone.querySelector(self.emptySelector);
+              if (empty) empty.style.display = count === 0 ? "flex" : "none";
+            }
+          });
+        },
+
+        // --- live updates (Turbo Streams) ----------------------------------
+        // The board subscribes via turbo_stream_from(live_channel); Turbo patches the
+        // DOM on every broadcast. This observer adds the flourish Turbo doesn't: a
+        // fade/scale-in on each patched-in card (deferred to window[fx] when present)
+        // and a count refresh after any column change.
+        observeLive: function () {
+          var self = this;
+          var onChange = function (mutations) {
+            for (var i = 0; i < mutations.length; i++) {
+              mutations[i].addedNodes.forEach(function (node) {
+                if (node.nodeType === 1 && node.matches && node.matches(self.cardSelector)) {
+                  var fx = self.fx();
+                  if (fx && fx.onAdd) { fx.onAdd(node); } else { self.animateIn(node); }
+                  self.emit("card-added", self.cardId(node), null, self.zoneKey(node.parentElement));
+                }
+              });
+            }
+            self.updateCounts();
+          };
+          document.querySelectorAll(this.zoneSelector).forEach(function (zone) {
+            new MutationObserver(onChange).observe(zone, { childList: true });
+          });
+        },
+
+        animateIn: function (el) {
+          el.style.opacity = "0";
+          el.style.transform = "scale(0.96)";
+          el.classList.add("ring-2", "ring-primary");
+          requestAnimationFrame(function () {
+            el.style.transition = "opacity 300ms ease, transform 300ms ease";
+            el.style.opacity = "";
+            el.style.transform = "";
+          });
+          setTimeout(function () { el.classList.remove("ring-2", "ring-primary"); el.style.transition = ""; }, 900);
+        },
+
+        // Archive re-parent / delete exit animation via a Turbo `remove` stream
+        // carrying data-exit-action. Installed only when no fx module owns exits.
+        installExitStreamFallback: function () {
+          if (window.__studioBoardExitFallback) return;
+          window.__studioBoardExitFallback = true;
+          var self = this;
+          document.addEventListener("turbo:before-stream-render", function (event) {
+            var stream = event.target;
+            if (stream.getAttribute("action") !== "remove") return;
+            var target = stream.getAttribute("target") || "";
+            var exitAction = stream.dataset.exitAction;
+            if (target.indexOf(self.domIdPrefix) !== 0 || !exitAction) return;
+            var renderNow = event.detail.render;
+            event.detail.render = function (el) {
+              var card = document.getElementById(target);
+              if (!card) { renderNow(el); return; }
+              self.animateCardExit(card, exitAction).then(function () {
+                renderNow(el);
+                self.updateCounts();
+              });
+            };
+          });
+        },
+
+        animateCardExit: function (card, kind) {
+          if (!card || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return Promise.resolve();
+          card.style.pointerEvents = "none";
+          var frames = kind === "archive"
+            ? [{ opacity: 1, transform: "translateY(0) scale(1)" }, { opacity: 0, transform: "translateY(18px) scale(0.86)" }]
+            : [{ opacity: 1, transform: "scale(1)" }, { opacity: 0, transform: "scale(0.6)" }];
+          var anim = card.animate(frames, {
+            duration: kind === "archive" ? 500 : 420,
+            easing: "cubic-bezier(.35,0,.2,1)",
+            fill: "forwards"
+          });
+          return anim.finished.catch(function () {});
+        },
+
+        // --- toasts --------------------------------------------------------
+        toast: function (message, type) {
+          if (!this.toastsEnabled) {
+            if (type === "error" && typeof window.alert === "function") window.alert(message);
+            return;
+          }
+          var self = this;
+          var id = Date.now() + Math.random();
+          this.toasts.push({ id: id, message: message, type: type, visible: true });
+          setTimeout(function () {
+            var t = self.toasts.find(function (x) { return x.id === id; });
+            if (t) t.visible = false;
+            setTimeout(function () {
+              self.toasts = self.toasts.filter(function (x) { return x.id !== id; });
+            }, 300);
+          }, 3000);
+        },
+
+        // --- helpers -------------------------------------------------------
+        request: function (url, method, body) {
+          var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || "";
+          var fetcher = window.authedFetch || window.fetch;
+          return fetcher(url, {
+            method: method,
+            headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf, "Accept": "application/json" },
+            body: JSON.stringify(body || {})
+          });
+        },
+
+        // The primary extension seam — apps LISTEN for these on window and attach
+        // confetti / swipe / cart / analytics, never patching this factory.
+        emit: function (name, record, from, to, extra) {
+          try {
+            var detail = Object.assign({ record: record, from: from, to: to }, extra || {});
+            window.dispatchEvent(new CustomEvent("studio:" + name, { detail: detail }));
+          } catch (e) {}
+        },
+
+        hook: function (hookName, detail) {
+          if (!hookName) return;
+          var fn = window[hookName];
+          if (typeof fn === "function") { try { fn(detail); } catch (e) {} }
+        }
+      };
+    };
+  })();
+</script>
