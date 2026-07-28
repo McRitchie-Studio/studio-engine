@@ -27,6 +27,7 @@
     .level-up-pop         level-up pop + glow burst           (ported, TM)
     .nav-level-pop        nav level-up bounce                 (ported, TM)
     .badge-with-sheen     one-shot diagonal sheen wrapper     (ported, TM)
+    .seeds-bar-continuous 5-segment lockstep progress fill    (ported, TM)
 
   ─────────────────────────────────────────────────────────────────────────────
   OPT-IN — this layer does NOT auto-bundle.
@@ -925,6 +926,63 @@
   .badge-with-sheen::after {
     animation: none;
   }
+}
+
+/* =============================================================================
+   SEEDS BAR — the continuous 5-segment progress fill behind the leveling
+   entry-confirmed celebration (studio/modals/blocks/_seeds_bar). Ported from
+   turf-monster. ONE registered custom property (--bar-progress) drives all five
+   segment clip-paths in lockstep off a SINGLE transition curve, instead of five
+   chained ones. .seeds-bar-continuous parks it at 0 and eases changes;
+   seedsShimmer is the light sweep that rides across the filled bar. The whole
+   family is capability-gated at the view layer by Studio.feature?(:leveling), so
+   an app with leveling off never renders a bar and these classes idle unused.
+   ========================================================================== */
+
+/* Registered custom property — makes --bar-progress interpolatable so a single
+   transition animates all five segment widths together (one ease, not five). */
+@property --bar-progress {
+  syntax: "<number>";
+  initial-value: 0;
+  inherits: true;
+}
+
+/* The motion PROPERTIES (transition / animation) live on these classes — NOT on
+   the view's inline style — precisely so the reduced-motion override below can
+   reach and cancel them. An inline `style="transition: …"` beats a class rule on
+   specificity, so a class-based @media override could never win against it; the
+   view keeps only the dynamic values inline (the Alpine-bound transform /
+   --bar-progress, and the fill duration knob --seeds-fill-dur). */
+.seeds-bar-continuous {
+  --bar-progress: 0;
+  transition: --bar-progress var(--seeds-fill-dur, 1.2s) cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* The rolling digit reel's slide — same fill duration as the bar (via the shared
+   --seeds-fill-dur knob) so the counter tracks the fill. Class-based so
+   reduced-motion can cancel it (the view binds only the transform inline). */
+.seeds-reel-track {
+  transition: transform var(--seeds-fill-dur, 1.2s) cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Light sweep across a filled segment. The five segments stagger a shared band
+   (via per-segment offsets in the view) so it reads as one continuous wave. */
+.seeds-shimmer {
+  animation: seedsShimmer 2.5s ease-in-out 0.4s 1 both;
+}
+
+@keyframes seedsShimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+/* Reduced-motion: drop the interpolation + shimmer; the bar, reel, and shimmer
+   all snap to their resting value. Reachable because the motion lives on the
+   classes above, not on inline styles. */
+@media (prefers-reduced-motion: reduce) {
+  .seeds-bar-continuous { transition: none; }
+  .seeds-reel-track { transition: none; }
+  .seeds-shimmer { animation: none; }
 }
 
 /* =============================================================================

@@ -1,0 +1,86 @@
+<%#
+  Entry-confirmed celebration — the canonical "you're in" card for an on-chain
+  (or entry-token-funded) entry. Homed in the engine and composed via the
+  _success_card YIELD SLOT (its documented purpose): _success_card owns the web3
+  spine — the :lg check header, the branded Solana tx link, the drain CTA with
+  auto-redirect, and the confetti — and this partial injects the LEVELING
+  enrichment (the seeds bar + level-up reward) into its block.
+
+  Capability gating (the two flags are independent):
+    * The generic success (heading + branded tx link + CTA) is a web3 celebration;
+      a caller renders this only in a :web3 context.
+    * The seeds bar + "Free Entry Earned" reward render ONLY under
+      Studio.feature?(:leveling). A web3-only app (leveling OFF) gets the clean
+      success card — no seeds, no free entry — automatically, because this partial
+      self-gates the block on the flag.
+
+  All numbers are APP-SUPPLIED via Alpine expressions (defaulting to props.*): the
+  engine renders the card, the app feeds txSignature / lobbyUrl / seedsEarned /
+  seedsTotal. The reward copy + CTA label + seeds-per-level are parameters, so no
+  Turf-specific string is baked in.
+
+  Single root: the outer <div> is one element so a <template x-if> clones it whole.
+
+  Locals (all optional; sensible props.* / static defaults):
+    modal_store      — Alpine store name backing props/close. Default "modals".
+    title_key        — Alpine expr for the headline. Default "props.title || 'Good Luck'".
+    subtitle         — static sub-headline. Default "Entry Confirmed".
+    subtitle_key     — Alpine expr for the sub-headline (priority over subtitle).
+    tx_signature_key — Alpine expr for the Solana tx hash. Default "props.txSignature".
+    cluster_param    — explorer cluster query (e.g. "?cluster=devnet"). Default "".
+    lobby_url_key    — Alpine expr for the CTA href + auto-redirect. Default "props.lobbyUrl".
+    cta_label        — primary CTA text. Default "Continue".
+    seeds_earned_key — Alpine expr: seeds awarded this entry. Default "props.seedsEarned".
+    seeds_total_key  — Alpine expr: new seeds total. Default "props.seedsTotal".
+    seeds_per_level  — Integer seeds per level. Default 100.
+    free_entry_label — reward copy on a level-up. Default "Free Entry Earned 🎟️".
+%>
+<%
+  modal_store      = local_assigns.fetch(:modal_store, "modals")
+  title_key        = local_assigns.fetch(:title_key, "props.title || 'Good Luck'")
+  subtitle         = local_assigns.fetch(:subtitle, "Entry Confirmed")
+  subtitle_key     = local_assigns[:subtitle_key]
+  tx_signature_key = local_assigns.fetch(:tx_signature_key, "props.txSignature")
+  cluster_param    = local_assigns.fetch(:cluster_param, "")
+  lobby_url_key    = local_assigns.fetch(:lobby_url_key, "props.lobbyUrl")
+  cta_label        = local_assigns.fetch(:cta_label, "Continue")
+  seeds_earned_key = local_assigns.fetch(:seeds_earned_key, "props.seedsEarned")
+  seeds_total_key  = local_assigns.fetch(:seeds_total_key, "props.seedsTotal")
+  seeds_per_level  = local_assigns.fetch(:seeds_per_level, 100)
+  free_entry_label = local_assigns.fetch(:free_entry_label, "Free Entry Earned 🎟️")
+
+  sc_locals = {
+    large_title:           true,
+    icon_color:            "primary",
+    title_key:             title_key,
+    tx_signature_key:      tx_signature_key,
+    tx_solana:             true,
+    cta_label:             cta_label,
+    cta_href_key:          lobby_url_key,
+    cta_drain:             true,
+    auto_redirect_url_key: lobby_url_key,
+    confetti:              true
+  }
+  if subtitle_key
+    sc_locals[:message_key] = subtitle_key
+  else
+    sc_locals[:message] = subtitle
+  end
+%>
+<%# props getter + clusterParam live on the root scope so _success_card's nested
+    Alpine expressions (props.txSignature, props.lobbyUrl, clusterParam) resolve up
+    the scope chain. clusterParam feeds _success_card's branded tx-link URL. %>
+<div x-data="{ get props() { var c = $store.<%= modal_store %>.current(); return (c && c.props) || {}; }, clusterParam: '<%= cluster_param %>' }">
+  <%= render "studio/modals/blocks/success_card", sc_locals do %>
+    <% if Studio.feature?(:leveling) %>
+      <%# Leveling enrichment — mounts only when this entry awarded seeds. %>
+      <template x-if="(<%= seeds_earned_key %>) > 0">
+        <%= render "studio/modals/blocks/seeds_bar",
+              seeds_earned_key: seeds_earned_key,
+              seeds_total_key:  seeds_total_key,
+              seeds_per_level:  seeds_per_level,
+              free_entry_label: free_entry_label %>
+      </template>
+    <% end %>
+  <% end %>
+</div>

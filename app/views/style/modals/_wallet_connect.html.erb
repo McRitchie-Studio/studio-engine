@@ -9,15 +9,19 @@
   wallet list; pick() runs a brief connecting state then closes (no real
   connect). Opened via open('wallet-connect', {...}) or swap()ed to from auth.
 
+  Brand icons ship inline from the engine (studio/modals/blocks/_wallet_brand_sprite,
+  rendered once below): brandIcon(name) resolves a known wallet to its <symbol>
+  id, and an unknown wallet falls back to a letter tile. No per-app PNG files.
+
   Single root: the outer <div> is the host's required root.
 %>
 <div x-data="{
        get props() { var c = Alpine.store('dsModals').current(); return (c && c.props) || {}; },
        wallets: [],
        installs: [
-         { name: 'Phantom',  url: 'https://phantom.app/download',  icon: '/wallet-phantom.png' },
-         { name: 'Solflare', url: 'https://solflare.com/download', icon: '/wallet-solflare.png' },
-         { name: 'Backpack', url: 'https://backpack.app/downloads', icon: '/wallet-backpack.png' }
+         { name: 'Phantom',  url: 'https://phantom.app/download' },
+         { name: 'Solflare', url: 'https://solflare.com/download' },
+         { name: 'Backpack', url: 'https://backpack.app/downloads' }
        ],
        connecting: false,
        picking: '',
@@ -37,6 +41,10 @@
        },
        refresh() {
          this.wallets = (window.walletProvider && window.walletProvider.available && window.walletProvider.available()) || [];
+       },
+       brandIcon(name) {
+         var n = ('' + name).toLowerCase();
+         return ['phantom', 'solflare', 'backpack'].indexOf(n) >= 0 ? n : null;
        },
        get isMobile() { return !!(window.walletProvider && window.walletProvider.isMobile && window.walletProvider.isMobile()); },
        hasWallet(name) {
@@ -71,6 +79,9 @@
      }"
      class="relative">
 
+  <%# Engine-owned brand-icon sprite — one copy; the <use> refs below paint it. %>
+  <%= render "studio/modals/blocks/wallet_brand_sprite" %>
+
   <div class="relative mb-4">
     <h3 class="text-heading font-bold text-lg text-center pt-1">Connect Wallet</h3>
     <button @click="$store.dsModals.close()"
@@ -89,7 +100,14 @@
     <template x-for="w in wallets" :key="w.name">
       <button type="button" @click="pick(w.name)" :disabled="connecting"
               class="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-alt border border-strong hover:bg-surface transition text-left disabled:opacity-60 disabled:cursor-wait">
-        <span class="w-9 h-9 rounded-lg bg-inset flex items-center justify-center text-sm font-bold text-heading" x-text="w.name.slice(0,1)"></span>
+        <template x-if="brandIcon(w.name)">
+          <span class="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+            <svg class="w-9 h-9" aria-hidden="true"><use :href="'#se-wallet-' + brandIcon(w.name)"></use></svg>
+          </span>
+        </template>
+        <template x-if="!brandIcon(w.name)">
+          <span class="w-9 h-9 rounded-lg bg-inset flex items-center justify-center text-sm font-bold text-heading shrink-0" x-text="w.name.slice(0,1)"></span>
+        </template>
         <span class="font-semibold text-heading" x-text="w.name"></span>
         <span class="ml-auto flex items-center gap-2">
           <span x-show="picking === w.name" class="inline-flex items-center gap-1.5 text-xs text-secondary"><span class="spinner" aria-hidden="true"></span>Connecting…</span>
@@ -105,7 +123,14 @@
     <template x-for="i in missingInstalls" :key="i.name">
       <a :href="i.url" target="_blank" rel="noopener noreferrer"
          class="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-alt border border-strong hover:bg-surface transition no-underline">
-        <span class="w-9 h-9 rounded-lg bg-inset flex items-center justify-center text-sm font-bold text-muted" x-text="i.name.slice(0,1)"></span>
+        <template x-if="brandIcon(i.name)">
+          <span class="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+            <svg class="w-9 h-9" aria-hidden="true"><use :href="'#se-wallet-' + brandIcon(i.name)"></use></svg>
+          </span>
+        </template>
+        <template x-if="!brandIcon(i.name)">
+          <span class="w-9 h-9 rounded-lg bg-inset flex items-center justify-center text-sm font-bold text-muted shrink-0" x-text="i.name.slice(0,1)"></span>
+        </template>
         <span class="font-semibold text-heading" x-text="i.name"></span>
         <span class="ml-auto flex items-center gap-2">
           <span class="text-xs text-muted uppercase tracking-wide">Install</span>
@@ -119,7 +144,9 @@
     <%# Mobile (no extension) — deep-link into the Phantom app. %>
     <button x-show="isMobile" type="button" @click="deepLink()"
             class="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-alt border border-strong hover:bg-surface transition text-left">
-      <span class="w-9 h-9 rounded-lg bg-inset flex items-center justify-center text-sm font-bold text-heading">P</span>
+      <span class="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+        <svg class="w-9 h-9" aria-hidden="true"><use href="#se-wallet-phantom"></use></svg>
+      </span>
       <span class="font-semibold text-heading">Open in Phantom app</span>
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="ml-auto w-4 h-4 text-muted">
         <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
