@@ -202,39 +202,33 @@ module Studio
       raise e
     end
 
-    # Layer 1: RecordNotFound — a real 404, never an ErrorLog row.
+    # Layer 1: RecordNotFound — Rails' own 404, never an ErrorLog row.
     #
-    # This method was unreachable from the initial commit until the rescue_from
-    # order was fixed (see the note in `included`), so its HTML branch had never
-    # actually run. It redirected to root, which means making the handler
-    # reachable would have silently converted every 404 in every consuming app
-    # into a homepage bounce — caught by turf's
-    # Admin::ModelsControllerTest#test_unknown_model_key_returns_not_found, which
-    # rightly expects an unknown admin model key to 404 rather than land the
-    # operator on the marketing page.
+    # This handler exists for exactly ONE reason: to stop `handle_unexpected_error`
+    # from claiming a RecordNotFound and writing an ErrorLog row for it. It
+    # deliberately renders NOTHING and re-raises, which hands the exception to
+    # `ActionDispatch::PublicExceptions` — the same path an app with no rescue_from
+    # at all takes. Registering the handler and re-raising is therefore not a
+    # no-op: matching here is what keeps the catch-all's `create_error_log` from
+    # running (a raise inside a rescue_from handler propagates out; Rescuable does
+    # not re-dispatch it into another handler).
     #
-    # Consumers have been served Rails' standard 404 all along (an unhandled
-    # RecordNotFound maps to :not_found via rescue_responses). That is the
-    # observable behaviour worth preserving; the bug being fixed here is the
-    # ErrorLog pollution and the "Something went wrong" copy, not the status
-    # code. So: same 404 the apps already return, minus the error row.
+    # Why nothing is rendered here. The method was unreachable from the initial
+    # commit until the rescue_from order was fixed (see the note in `included`),
+    # so whatever it did had never actually run — consumers have been served
+    # Rails' standard 404 all along. Anything rendered here would therefore be a
+    # NEW fleet-wide behaviour, not a restoration: an earlier attempt at this fix
+    # rendered public/404.html and silently flipped `Accept: */*` clients (curl,
+    # uptime monitors, crawlers, link previewers) from `404 text/html` to
+    # `404 application/json`, changed the JSON body shape, and dropped the
+    # DebugExceptions backtrace in development. Re-raising keeps every one of
+    # those intact, along with `public/404.<locale>.html` and any
+    # `config.exceptions_app` a host configures.
+    #
+    # The bug being fixed is the ErrorLog pollution and the "Something went wrong"
+    # copy — never the status code, the format, or the body.
     def handle_not_found(exception)
-      respond_to do |format|
-        format.json { render json: { error: "Not found" }, status: :not_found }
-        format.any { render_not_found_page }
-      end
-    end
-
-    # Prefer the host's own public/404.html so each app keeps its own branding;
-    # fall back to a bare 404 for a host that ships none.
-    def render_not_found_page
-      page = Rails.public_path.join("404.html")
-
-      if page.exist?
-        render file: page, status: :not_found, layout: false
-      else
-        head :not_found
-      end
+      raise exception
     end
 
     # Layer 1: Catch-all for unexpected errors — log + friendly response.

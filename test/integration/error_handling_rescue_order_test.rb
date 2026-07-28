@@ -14,60 +14,73 @@ require "active_support/test_case"
 #
 # That regression is invisible to an ordinary request test, which is why it
 # survived from the initial commit: handle_unexpected_error re-raises in dev and
-# test (error_handling.rb), so locally a shadowed RecordNotFound just propagates
-# like an untrapped error. It only manifests in QA and production, as a
-# "Something went wrong" page plus a stray ErrorLog row on every 404, in every
-# consuming app at once.
+# test, so a shadowed RecordNotFound just propagates like an untrapped error and
+# LOOKS correct locally. It only manifests in QA and production, as a "Something
+# went wrong" page plus a stray ErrorLog row on every 404, in every consuming app
+# at once.
 #
-# These tests therefore assert the DISPATCH and its side effect — which handler
-# ActiveSupport actually selects, and whether the error-log writer runs — rather
-# than the order the source happens to be written in. Reordering the two
-# rescue_from lines turns them red; reformatting them does not.
+# So the discriminator here is NOT "does it raise" — both handlers raise. It is
+# **which handler claimed the exception**, observed through its one side effect:
+# the catch-all writes an ErrorLog row, handle_not_found never does. That is the
+# actual contract, and it is what these tests assert.
+#
+# The 404 STATUS, format, and body are deliberately NOT asserted here, because
+# handle_not_found deliberately renders nothing — it re-raises to
+# ActionDispatch::PublicExceptions, so the response is Rails' own and belongs to
+# the consuming app. The consumer-CI suites cover it end to end: turf's
+# Admin::ModelsControllerTest#test_unknown_model_key_returns_not_found asserts an
+# unknown key still returns 404.
 class ErrorHandlingRescueOrderTest < ActiveSupport::TestCase
-  # Includes the concern exactly as a host ApplicationController does. The two
-  # overrides stand in for the concern's I/O so dispatch is observable without a
-  # real request and without an error_logs table (the dummy app has no schema).
-  #
-  # The 404 STATUS itself is proven end-to-end by the consuming apps, whose
-  # suites run against this engine commit in consumer-CI — turf's
-  # Admin::ModelsControllerTest#test_unknown_model_key_returns_not_found asserts
-  # an unknown key still returns 404 rather than redirecting to root.
+  # Includes the concern exactly as a host ApplicationController does. The single
+  # override stands in for the concern's only observable side effect, so handler
+  # selection is visible without an error_logs table (the dummy app has no schema).
   class ProbeController < ActionController::Base
     include Studio::ErrorHandling
 
-    attr_reader :error_logged, :not_found_handled
+    attr_reader :error_logged
 
     def create_error_log(_exception)
       @error_logged = true
     end
+  end
 
-    # handle_not_found's only I/O — recording the call proves the dispatch
-    # landed here rather than in the catch-all.
-    def respond_to(*)
-      @not_found_handled = true
+  test "RecordNotFound is claimed by handle_not_found — no ErrorLog row, and it propagates" do
+    controller = ProbeController.new
+
+    # It must still reach the app as a RecordNotFound: handle_not_found re-raises
+    # so Rails renders its own 404. A handler that rendered instead would swallow
+    # this and fail here.
+    assert_raises(ActiveRecord::RecordNotFound) do
+      controller.rescue_with_handler(ActiveRecord::RecordNotFound.new("no such record"))
     end
-  end
 
-  test "RecordNotFound dispatches to the not-found handler, not the catch-all" do
-    controller = ProbeController.new
-
-    controller.rescue_with_handler(ActiveRecord::RecordNotFound.new("no such record"))
-
-    assert controller.not_found_handled,
-           "expected handle_not_found to render a not-found response; the StandardError " \
-           "catch-all shadowed it instead"
+    # THE regression assertion. If the rescue_from order is ever flipped back, the
+    # StandardError catch-all claims this instead and logs it — which is precisely
+    # the fleet-wide bug (an ErrorLog row on every 404).
     refute controller.error_logged,
-           "a 404 must not write an ErrorLog row — that is the fleet-wide symptom of the shadowing"
+           "a 404 must not write an ErrorLog row — handle_not_found was shadowed by the " \
+           "StandardError catch-all, which is the bug this ordering fixes"
   end
 
-  test "an unexpected error still dispatches to the catch-all" do
+  test "an unexpected error is still claimed by the catch-all — logged, then re-raised in test env" do
     controller = ProbeController.new
 
-    # handle_unexpected_error logs, then re-raises in dev/test by design.
     assert_raises(ArgumentError) do
       controller.rescue_with_handler(ArgumentError.new("boom"))
     end
 
-    assert controller.error_logged, "expected handle_unexpected_error to capture the error"
+    assert controller.error_logged,
+           "handle_unexpected_error must still capture genuine errors; narrowing the " \
+           "catch-all would lose the ErrorLog trail"
+  end
+
+  test "a RecordNotFound subclass is also claimed by handle_not_found" do
+    subclass = Class.new(ActiveRecord::RecordNotFound)
+    controller = ProbeController.new
+
+    assert_raises(subclass) { controller.rescue_with_handler(subclass.new("gone")) }
+
+    refute controller.error_logged,
+           "rescue_from matches subclasses, so a RecordNotFound descendant must not log either"
   end
 end
