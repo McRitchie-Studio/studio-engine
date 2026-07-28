@@ -2,6 +2,62 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.25.0 — 2026-07-28
+
+**Profile Leveling** — the `/admin/style` "Leveling activities" section is rebuilt
+into a single toggle-driven "Profile Leveling" flow, and the with-leveling /
+without-leveling FORK is killed. Previously each activity shipped as TWO modal
+ids (`change-username` + `change-username-plain`, `quest-activity` +
+`quest-activity-plain`), because the primitive read `leveling` from a Ruby local
+at render time. Now the primitive reads `leveling` at RUNTIME from the modal
+store's `props.leveling`, so ONE id per activity flips the Turf Monster shape
+(the seeds celebration + Free Entry Token progress) ↔ the McRitchie Studio shape
+(plain input + Save, then a simple confirmation) live as its per-card leveling
+toggle moves.
+
+### Changed
+
+- **`studio/modals/blocks/_leveling_activity`** — three views now, all ALWAYS
+  rendered and gated by the reactive `leveling` getter instead of dropped at ERB
+  time: the **form** (`!celebrate`), the **seeds celebration**
+  (`celebrate && leveling`, TM), and a **plain confirmation**
+  (`celebrate && !leveling`, MS). The `leveling` local becomes the render-time
+  fallback only. **The "Quest N of N" counter pill is removed** — the profile
+  modals do not carry one. **The "Level N" pill is also dropped** from the
+  celebration (no consumer used it); the seeds bar stays. All existing seams
+  are preserved unchanged (`submit_url`, `finalize_hook`, `saved_event`,
+  `modal_store`, `demo`, seeds/level props), so Turf Monster's live usage and the
+  opaque save-callback contract are unaffected (TM ships no `props.leveling` and
+  keeps its `:leveling`-capability default).
+- **`studio/_leveling_activity_assets`** (factory) — `leveling` is a runtime getter
+  reading `props.leveling` off the modal store (falling back to `_levelingDefault`);
+  an `init` hook opens the modal directly at the updated state via `props.celebrate`
+  (the "updated" cards open the same id pre-advanced, like the Auth step cards);
+  `_finishSaved` always advances to the updated state (the view gate picks
+  celebration vs plain confirmation) AND mirrors `celebrate` onto the live store
+  `props.celebrate`, so the active-card **glow follows the flow** — it transfers
+  from the input card to the updated card as the modal advances, exactly like the
+  Auth glow follows `props.step`. In **demo** mode the app-facing saved event is
+  suppressed, so a host app's follow-on handler (e.g. Turf Monster's
+  `quest-success` on `studio:username-saved`) can't stack a second modal over the
+  demo's own celebrate view.
+- **`/admin/style`** — "Leveling activities" → **"Profile Leveling"**: **each
+  specimen card carries its OWN `Leveling` toggle** (like the Auth card's method
+  checkboxes), flipping THAT card between the Turf Monster and McRitchie Studio
+  shape at open — so you can preview Change Username leveling-on beside Great
+  Username leveling-off. The section walks **four** cards — **Change Username →
+  Great Username**, then **Join the Newsletter → Subscribed!** — each "updated"
+  card opening its modal straight at the success state, mirroring Turf Monster's
+  real copy, seeds, and Free Entry Token progress. No quest counter, no Level pill.
+
+### Added
+
+- **`_leveling_activity` locals** (all optional, additive): `consent_label` (a
+  consent checkbox that gates the action — the newsletter join), `confirm_subtitle`
+  (subtext on the MS-shape plain confirmation), `next_label` / `next_open` (a
+  "Next Quest" button that walks to the next activity), and `demo_seeds_earned` /
+  `demo_seeds_total` (style-guide-only seed payload tuning).
+
 ## 0.24.1 — 2026-07-28
 
 Bug fix — the **`/admin/style` specimen glow failed OPEN**. Every glow-capable
