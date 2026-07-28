@@ -2,6 +2,40 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.19.0 — 2026-07-27
+
+### Added
+
+- **`GET /_studio/local_review` — the local half of the board's WAITING APPROVAL
+  button.** A magic link signs the recipient into the app that MINTED it: the
+  token lives in that app's store, and `return_to` is sanitized to a same-origin
+  PATH. So a link minted by the production task board could only ever land on
+  production — the operator clicked "review this locally" and arrived, signed in,
+  on `mcritchie.studio`. The board now redirects here instead, to the local
+  server named by the task's `local_url`, which mints in its OWN database and
+  lands the operator signed-in on the page under review
+  (`?email=<who>&return_to=<path>`).
+
+  Like the local email inbox it sits beside, this is a developer-desk tool that
+  hands out sign-in material without authenticating anyone, so it is bound to the
+  same floor: the route is drawn outside production only, and every request is
+  re-checked against `Studio.local_tool_enabled?` — production or non-loopback
+  gets a bare 404.
+
+### Changed
+
+- **`Studio.local_tool_enabled?(request_local:)`** — one spelling of the
+  developer-desk floor (not production, loopback only), now shared by
+  `Studio::LocalEmailsController` and `Studio::LocalReviewsController` so a tool
+  added later cannot quietly ship a weaker gate.
+
+- **`Studio::MagicLinkIssuing`** — the mint (`issue_magic_link`) and the URL that
+  consumes it (`magic_link_url_for`) are two halves of one decision
+  (`Studio.magic_link_store`), extracted from `MagicLinksController` and
+  `UserMailer` into a shared concern. Handing out the wrong URL for the store
+  yields "invalid or expired" on a link that was valid; they can no longer drift
+  apart. No behavior change for either existing caller.
+
 ## 0.18.0 — 2026-07-27
 
 ### Added

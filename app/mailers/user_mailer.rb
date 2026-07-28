@@ -1,4 +1,10 @@
 class UserMailer < ApplicationMailer
+  # magic_link_url_for — the URL that consumes the token, matched to
+  # Studio.magic_link_store. Shared with the issuers that MINT the token
+  # (MagicLinksController, Studio::LocalReviewsController) so the two halves
+  # cannot drift apart.
+  include Studio::MagicLinkIssuing
+
   # Branded shell (banner + card) for engine-sent UserMailer emails. An app with
   # its own UserMailer + branded_mailer layout (e.g. turf-monster) overrides both.
   layout "branded_mailer"
@@ -17,14 +23,5 @@ class UserMailer < ApplicationMailer
     @banner_url = Studio::EmailImage.url(:magic_link) # admin-managed; nil renders bannerless
     @banner_alt = "Your #{@app_name} sign-in link"
     mail(to: email, subject: "Your #{@app_name} sign-in link")
-  end
-
-  private
-
-  # Match the emailed URL to Studio.magic_link_store: the short /l/<token> for
-  # the :database scheme, the legacy /magic_link/<token> for :signed. The
-  # request side (MagicLinksController#issue_magic_link) mints the matching token.
-  def magic_link_url_for(token)
-    Studio.magic_link_via_l_route? ? link_url(token: token) : magic_link_url(token: token)
   end
 end
