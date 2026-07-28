@@ -25,6 +25,20 @@ module Studio
   mattr_accessor :theme_logos,         default: []
   mattr_accessor :sticky_table_headers, default: false
 
+  # ---- Smooth-load convention ---------------------------------------------
+  # Opt-in per app: renders the view-transition + no-preview metas so Turbo 8
+  # page swaps materialize behind the current page and present with a view
+  # transition (layouts/studio/_smooth_load). OFF by default — an app with
+  # known multi-second pages should fix those before opting in, because
+  # no-preview holds the old page until the fresh response arrives.
+  mattr_accessor :smooth_load,          default: false
+
+  # Minimum ms the nav spinner stays visible once shown (_head.html.erb).
+  # Apps wrapping multi-second operations in the spinner (e.g. Solana RPC)
+  # keep the high default to avoid flicker; smooth-load apps typically drop
+  # this to ~300 so fast loads never linger on a spinner.
+  mattr_accessor :nav_spinner_min_ms,   default: 2500
+
   # ---- Authentication ------------------------------------------------------
   # Which sign-in methods this app offers. The shared login/signup views render
   # a button/field per enabled method (gate with Studio.auth_method?). Order is

@@ -42,6 +42,16 @@ Studio.configure do |config|
   )
   config.theme_primary = "#4BAF50"   # Override default violet
   config.theme_logos = ["logo.svg"]
+
+  # Smooth-load convention (default OFF). Renders the view-transition +
+  # no-preview metas: Turbo page swaps materialize behind the current page and
+  # present with a view transition, exactly one render per navigation. Fix any
+  # multi-second pages BEFORE opting in — no-preview holds the old page until
+  # the fresh response arrives.
+  config.smooth_load = true
+  # Nav spinner minimum display (default 2500). Smooth-load apps typically
+  # drop to ~300; keep the high floor if multi-second ops ride the spinner.
+  config.nav_spinner_min_ms = 300
 end
 ```
 
@@ -113,6 +123,18 @@ as binding session-token checks to `true_user` or disabling wallet-only
 privileges while impersonating.
 
 ## UI Primitives
+
+### Smooth-load header pin — `.vt-pinned-header`
+
+When `Studio.smooth_load` is on, put `vt-pinned-header` on the app's sticky
+header: it gets its own named view-transition group, so page content
+transitions beneath a navbar that stays put (or smoothly morphs heights).
+**Exactly one element per page** — a duplicate `view-transition-name` makes
+the browser silently skip the whole transition, with no error and no animation.
+
+```erb
+<header class="sticky top-0 vt-pinned-header ...">
+```
 
 Render `components/emoji_swap` inside a link or button with the `group` class to
 slide between two emoji on hover and keyboard focus. The CSS ships through
