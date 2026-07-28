@@ -1,0 +1,174 @@
+<%#
+  levelingActionModal factory — the Alpine data behind the engine leveling-activity
+  modals (studio/modals/blocks/_leveling_activity and its _change_username
+  specialization). Ships here, at PAGE level, on purpose: the modal partial mounts
+  inside a modal host's single-root template, and a script cloned out of a template
+  never runs. So a consumer renders THIS once in its layout (like the other shared
+  Alpine factories), and the modal partial anywhere below just references
+  window.levelingActionModal. Mirrors how studio/_age_verify_assets homes the
+  ageVerifyModal factory.
+
+  CRITICAL BOUNDARY — this factory is UI ONLY. It POSTs to an app-supplied
+  submitUrl and reacts to a NEUTRAL JSON contract; it holds ZERO on-chain logic,
+  no wallet taxonomy, no signing. Any second step some apps need (e.g. a wallet
+  approval) is delegated OPAQUELY: the engine hands the app-returned "challenge"
+  blob to an app-supplied window[finalizeHook] and POSTs back whatever opaque
+  "proof" the app returns. The engine never inspects, parses, or decodes either
+  blob, so the whole wallet dance stays in the app.
+
+  Wire contract (submitUrl + finalizeUrl responses are JSON):
+    POST submitUrl { value } -> one of:
+      { status: "saved",     seeds_earned?, seeds_total? }   done
+      { status: "needs_step", challenge, token }             app step required
+      { status: "error",     message }                       show message
+    when needs_step and a finalizeHook is wired:
+      proof = await window[finalizeHook](challenge, { token, onProgress })
+      POST finalizeUrl { token, proof } -> { status: "saved" | "error", ... }
+
+  opts: { hasInput, initialValue, minLength, submitUrl, finalizeUrl, finalizeHook,
+          savedEvent, store, leveling, demo, seedsPerLevel }.
+    hasInput      true renders + validates a single-line input; false is a
+                  no-field activity (a plain "Complete" action).
+    initialValue  seed value for the input (a plain string; never a model).
+    minLength     client-only min length for the input (0 = none).
+    submitUrl     app endpoint the action POSTs to (the app owns persistence).
+    finalizeUrl   app endpoint for the opaque second step (omit if none).
+    finalizeHook  name of a window async fn the app supplies for the step (omit
+                  if none); it owns EVERY app-side detail of that step.
+    savedEvent    DOM event dispatched on success, carrying the app payload, so
+                  the app can run its own follow-on. Default "studio:activity-saved".
+    store         Alpine modal store name backing close(). Default "modals".
+    leveling      true shows the seeds celebration on success (a UI flourish).
+    demo          style-guide preview: resolve locally, skip the network POST.
+    seedsPerLevel seeds per level for the celebration bar. Default 100.
+%>
+<script>
+  (function () {
+    if (window.levelingActionModal) return;
+    window.levelingActionModal = function (opts) {
+      opts = opts || {};
+      return {
+        hasInput: !!opts.hasInput,
+        value: opts.initialValue || "",
+        original: opts.initialValue || "",
+        minLength: parseInt(opts.minLength, 10) || 0,
+        submitUrl: opts.submitUrl || "",
+        finalizeUrl: opts.finalizeUrl || "",
+        finalizeHook: opts.finalizeHook || "",
+        savedEvent: opts.savedEvent || "studio:activity-saved",
+        store: opts.store || "modals",
+        leveling: !!opts.leveling,
+        demo: !!opts.demo,
+        seedsPerLevel: parseInt(opts.seedsPerLevel, 10) || 100,
+        saving: false,
+        error: "",
+        saved: false,
+        celebrate: false,
+        progressLabel: "",
+        seedsEarned: 0,
+        seedsTotal: 0,
+
+        // Actionable while there is a real change to save (input activities) or
+        // until the one-shot action has fired (no-field activities).
+        get changed() {
+          if (!this.hasInput) return !this.saved;
+          var v = (this.value || "").trim();
+          if (v.length < this.minLength) return false;
+          return v !== (this.original || "").trim();
+        },
+
+        _dispatch: function (payload) {
+          try {
+            window.dispatchEvent(new CustomEvent(this.savedEvent, { detail: payload || {} }));
+          } catch (e) {}
+        },
+
+        _finishSaved: function (payload) {
+          payload = payload || {};
+          this.saving = false;
+          this.saved = true;
+          this.progressLabel = "";
+          if (this.hasInput) this.original = (this.value || "").trim();
+          this._dispatch(payload);
+          if (this.leveling) {
+            this.seedsEarned = parseInt(payload.seeds_earned, 10) || 0;
+            this.seedsTotal = parseInt(payload.seeds_total, 10) || 0;
+            this.celebrate = true;
+          }
+        },
+
+        _post: function (url, body) {
+          var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || "";
+          var fetcher = window.authedFetch || window.fetch;
+          return fetcher(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf, "Accept": "application/json" },
+            body: JSON.stringify(body || {})
+          }).then(function (r) {
+            return r.json().then(function (j) { return { ok: r.ok, body: j || {} }; });
+          });
+        },
+
+        save: function () {
+          if (this.saving || !this.changed) return;
+          this.saving = true;
+          this.error = "";
+          var self = this;
+          if (this.demo) {
+            // Style-guide preview: no backend. Resolve to a level-crossing payload
+            // so the leveling celebration demonstrates its full flourish.
+            setTimeout(function () {
+              self._finishSaved({ seeds_earned: 30, seeds_total: self.seedsPerLevel });
+            }, 600);
+            return;
+          }
+          var body = this.hasInput ? { value: (this.value || "").trim() } : {};
+          this._post(this.submitUrl, body)
+            .then(function (res) { return self._handle(res); })
+            .catch(function (e) {
+              self.error = (e && e.message) || "Something went wrong. Please try again.";
+              self.saving = false;
+            });
+        },
+
+        _handle: function (res) {
+          var body = (res && res.body) || {};
+          var status = body.status || (res && res.ok ? "saved" : "error");
+          if (status === "saved") { this._finishSaved(body); return; }
+          if (status === "needs_step") { return this._step(body); }
+          this.error = body.message || "Something went wrong. Please try again.";
+          this.saving = false;
+        },
+
+        // The opaque second step. The engine hands the app's "challenge" blob to
+        // the app-supplied hook and POSTs back the app's "proof" blob — it inspects
+        // neither, so every app-side detail of the step stays in the app.
+        _step: function (body) {
+          var hook = this.finalizeHook && window[this.finalizeHook];
+          var self = this;
+          if (typeof hook !== "function") {
+            this.error = "This step isn't available.";
+            this.saving = false;
+            return;
+          }
+          return Promise.resolve(
+            hook(body.challenge, {
+              token: body.token,
+              onProgress: function (label) { self.progressLabel = label || ""; }
+            })
+          ).then(function (proof) {
+            return self._post(self.finalizeUrl, { token: body.token, proof: proof });
+          }).then(function (res) {
+            var rb = (res && res.body) || {};
+            var status = rb.status || (res && res.ok ? "saved" : "error");
+            if (status === "saved") { self._finishSaved(rb); }
+            else { self.error = rb.message || "Couldn't complete the step."; self.saving = false; }
+          }).catch(function (e) {
+            self.error = (e && e.message) || "Couldn't complete the step.";
+            self.saving = false;
+          });
+        }
+      };
+    };
+  })();
+</script>
