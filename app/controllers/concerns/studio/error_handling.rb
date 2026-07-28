@@ -3,8 +3,15 @@ module Studio
     extend ActiveSupport::Concern
 
     included do
-      rescue_from ActiveRecord::RecordNotFound, with: :handle_not_found
+      # ORDER IS LOAD-BEARING — ActiveSupport::Rescuable resolves handlers with
+      # `reverse_each`, so the LAST matching rescue_from registered wins. The
+      # catch-all must therefore be declared FIRST and the specific handlers
+      # after it, or StandardError shadows every one of them: RecordNotFound
+      # rendered "Something went wrong" and wrote an ErrorLog row on every 404,
+      # fleet-wide, while handle_not_found sat unreachable. Add new specific
+      # handlers BELOW this line, never above it.
       rescue_from StandardError, with: :handle_unexpected_error
+      rescue_from ActiveRecord::RecordNotFound, with: :handle_not_found
 
       before_action :require_authentication
 
