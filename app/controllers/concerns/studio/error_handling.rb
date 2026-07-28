@@ -3,8 +3,15 @@ module Studio
     extend ActiveSupport::Concern
 
     included do
-      rescue_from ActiveRecord::RecordNotFound, with: :handle_not_found
+      # ORDER IS LOAD-BEARING — ActiveSupport::Rescuable resolves handlers with
+      # `reverse_each`, so the LAST matching rescue_from registered wins. The
+      # catch-all must therefore be declared FIRST and the specific handlers
+      # after it, or StandardError shadows every one of them: RecordNotFound
+      # rendered "Something went wrong" and wrote an ErrorLog row on every 404,
+      # fleet-wide, while handle_not_found sat unreachable. Add new specific
+      # handlers BELOW this line, never above it.
       rescue_from StandardError, with: :handle_unexpected_error
+      rescue_from ActiveRecord::RecordNotFound, with: :handle_not_found
 
       before_action :require_authentication
 
@@ -195,12 +202,33 @@ module Studio
       raise e
     end
 
-    # Layer 1: Catch-all for RecordNotFound — 404 redirect, no logging.
+    # Layer 1: RecordNotFound — Rails' own 404, never an ErrorLog row.
+    #
+    # This handler exists for exactly ONE reason: to stop `handle_unexpected_error`
+    # from claiming a RecordNotFound and writing an ErrorLog row for it. It
+    # deliberately renders NOTHING and re-raises, which hands the exception to
+    # `ActionDispatch::PublicExceptions` — the same path an app with no rescue_from
+    # at all takes. Registering the handler and re-raising is therefore not a
+    # no-op: matching here is what keeps the catch-all's `create_error_log` from
+    # running (a raise inside a rescue_from handler propagates out; Rescuable does
+    # not re-dispatch it into another handler).
+    #
+    # Why nothing is rendered here. The method was unreachable from the initial
+    # commit until the rescue_from order was fixed (see the note in `included`),
+    # so whatever it did had never actually run — consumers have been served
+    # Rails' standard 404 all along. Anything rendered here would therefore be a
+    # NEW fleet-wide behaviour, not a restoration: an earlier attempt at this fix
+    # rendered public/404.html and silently flipped `Accept: */*` clients (curl,
+    # uptime monitors, crawlers, link previewers) from `404 text/html` to
+    # `404 application/json`, changed the JSON body shape, and dropped the
+    # DebugExceptions backtrace in development. Re-raising keeps every one of
+    # those intact, along with `public/404.<locale>.html` and any
+    # `config.exceptions_app` a host configures.
+    #
+    # The bug being fixed is the ErrorLog pollution and the "Something went wrong"
+    # copy — never the status code, the format, or the body.
     def handle_not_found(exception)
-      respond_to do |format|
-        format.html { redirect_to root_path, alert: "Not found" }
-        format.json { render json: { error: "Not found" }, status: :not_found }
-      end
+      raise exception
     end
 
     # Layer 1: Catch-all for unexpected errors — log + friendly response.
