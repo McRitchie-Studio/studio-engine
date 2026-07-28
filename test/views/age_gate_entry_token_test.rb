@@ -156,4 +156,20 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
       refute_includes html, "age gate off", "an enabled specimen shows no disabled flag"
     end
   end
+
+  # --- D. the new specimen cards wire the active-card glow --------------------
+  # Each new card must light (studio-team-glow) when ITS modal is current, like
+  # the Auth / Profile specimens — the age-gate card was the odd one out.
+
+  test "the age-gate + entry-token specimen cards wire the active-card glow" do
+    html = render_index
+    assert_includes html, "--studio-team-glow-opacity",
+      "the specimens carry the active-card glow opacity var"
+    %w[age-verify entry-tokens].each do |id|
+      assert_includes html, "$store.dsModals.current() && $store.dsModals.current().id === '#{id}'",
+        "the #{id} specimen card must glow when its modal is the current one"
+    end
+    assert_includes html, "studio-team-glow rounded-xl",
+      "the glow rides the un-clipped wrapper, as on the other specimens"
+  end
 end

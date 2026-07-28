@@ -482,6 +482,7 @@
             label:     "Age gate (DOB)",
             reference: %(the "Age gate" DOB modal (studio-engine studio/modals/blocks/_age_verify) — a NEW engine primitive; the app supplies min_age / state / submit_url / fine_print and the engine hardcodes no legal policy. Open with $store.dsModals.open('age-verify')),
             open_expr: "$store.dsModals.open('age-verify')",
+            glow_when: ds_glow.call("age-verify"),
             disabled: !age_gate_on, openable: true, disabled_label: "age gate off" } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2 text-center">
           <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
@@ -498,7 +499,8 @@
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Entry tokens",
             reference: %(the "Entry tokens" purchase flow (app-specific — documented in the engine style guide composing studio/modals/blocks chrome). The packs, pricing, rails, and on-chain mint stay app-owned. Open with $store.dsModals.open('entry-tokens', { step: 'picker' })),
-            open_expr: "$store.dsModals.open('entry-tokens', { step: 'picker' })" } do %>
+            open_expr: "$store.dsModals.open('entry-tokens', { step: 'picker' })",
+            glow_when: ds_glow.call("entry-tokens") } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
           <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
           <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
