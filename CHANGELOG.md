@@ -36,6 +36,16 @@ stylesheet cascade). Everything else is inert until an app sets
   above, and a `prefers-reduced-motion` kill switch app e2e suites can lean on
   (`reducedMotion: "reduce"`).
 
+### Fixed
+
+- **`rescue_from` order in `Studio::ErrorHandling`** — `RecordNotFound` now
+  resolves to `handle_not_found` (Rescuable matches last-registered first, so
+  the catch-all must register first). A missing record renders a real 404 from
+  `public/404.html` and **creates no ErrorLog row**; previously it was shadowed
+  by the catch-all, logged as an unexpected error, and soft-404'd (302 to root)
+  in production HTML. Per-host behavior changes only as each app bumps to this
+  release.
+
 ## 0.23.0 — 2026-07-28
 
 Phase D, slice 1 — the **board primitive**. The three near-identical McRitchie
