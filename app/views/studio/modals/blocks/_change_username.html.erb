@@ -1,0 +1,46 @@
+<%#
+  Change-username modal — a named engine primitive, and a thin specialization of
+  studio/modals/blocks/_leveling_activity with username defaults. TWO modes via
+  the :leveling flag (quest pill + seeds celebration when on; plain input + Save +
+  Saved when off).
+
+  CRITICAL BOUNDARY — UI ONLY. The engine renders the input, the Save button, the
+  saved state, and the optional leveling chrome. The actual username SAVE is an
+  APP-SUPPLIED callback: the modal POSTs to submit_url and, if the app returns a
+  second step, delegates it opaquely to an app-supplied finalize_hook (the app's
+  managed-wallet write). No wallet, signing, keys, or on-chain writes live here.
+
+  Locals (beyond _leveling_activity's):
+    current_username (String, REQUIRED) — seed value for the input (a plain
+                     string; never current_user — no model coupling in the engine).
+    submit_url       (String, REQUIRED) — app endpoint the username POSTs to.
+    description      (String) — app-authored lead copy. Pass the wallet-aware line
+                     here (e.g. "Your username is stored on-chain. Changes are
+                     saved via your managed wallet") — the engine default stays
+                     neutral so no on-chain assumption is baked in.
+
+  Everything else (finalize_url, finalize_hook, saved_event, quest_label,
+  leveling, modal_store, demo, celebration copy) passes straight through.
+%>
+<%
+  current_username = local_assigns.fetch(:current_username)
+
+  username_locals = local_assigns.except(:current_username).reverse_merge(
+    title:              "Change Username",
+    description:        "Pick a name that's right for you.",
+    input:              true,
+    initial_value:      current_username.to_s,
+    min_length:         3,
+    max_length:         30,
+    pattern:            "[a-zA-Z0-9_-]+",
+    pattern_title:      "3-30 characters — letters, numbers, hyphens, and underscores",
+    placeholder:        "username",
+    cta_label:          "Save",
+    saved_label:        "Saved",
+    saved_event:        "studio:username-saved",
+    icon_emoji:         "🌱",
+    celebrate_title:    "Great Username",
+    celebrate_subtitle: "Nice — you earned seeds for updating your profile. Keep completing quests to earn a Free Entry."
+  )
+%>
+<%= render "studio/modals/blocks/leveling_activity", username_locals %>
