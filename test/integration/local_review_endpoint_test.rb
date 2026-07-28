@@ -45,6 +45,12 @@ class LocalReviewEndpointTest < ActionDispatch::IntegrationTest
   def setup
     @orig_store = Studio.magic_link_store
     MagicLink.cache = ActiveSupport::Cache::MemoryStore.new # real single-use tracking
+    # Force the route set to DRAW here, under the test env. Rails 8.1 draws
+    # lazily, and the dev-only routes are drawn `unless Rails.env.production?` —
+    # so a test that flips Rails.env before the first draw would strand the whole
+    # process with those routes missing. CI caught exactly that (green locally on
+    # one seed, 404s on another); this pins the draw before any env games.
+    Rails.application.routes.url_helpers.login_path
   end
 
   def teardown
@@ -158,17 +164,14 @@ class LocalReviewEndpointTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  test "production gets nothing even from loopback" do
-    original = Rails.env
-    begin
-      Rails.env = "production"
-      get "/_studio/local_review", params: { email: OPERATOR, return_to: "/admin/style" }
-    ensure
-      Rails.env = original
-    end
-
-    assert_response :not_found
-  end
+  # Production is asserted at the GATE (above), not by driving a request under a
+  # flipped Rails.env: in production the route is never drawn in the first place
+  # (lib/studio.rb draws the developer-desk block `unless Rails.env.production?`),
+  # so such a request would be testing route absence while pretending to test the
+  # controller — and flipping the env under a live app is what poisoned the
+  # lazily-drawn route set for every later test in the process. The composition
+  # that matters is proven either side of the seam: the before_action calls the
+  # gate (the non-loopback 404 above), and the gate refuses production.
 
 
   # The route itself is drawn only outside production — the outer gate. Assert
