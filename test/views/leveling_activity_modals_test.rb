@@ -171,6 +171,56 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
       "the demo save suppresses the app-facing saved event (no host follow-on stacks a modal)"
   end
 
+  # --- REGRESSION GUARD (0.25.1): app-driven save CLOSES; no double-render --------
+  # 0.25.0 made _finishSaved ALWAYS advance to the engine's own confirm/celebrate.
+  # But a consuming app that drives its OWN post-save follow-on (Turf Monster's
+  # change-username: non-demo + a custom saved_event) then rendered its next step
+  # TWICE — once in this dialog, once in its own inline card — which TM's Playwright
+  # e2e caught as a strict-mode double-render. The engine must instead CLOSE on save
+  # (fire the event, then STOP — the 0.24 contract) for the app-driven case, while
+  # demo and standalone (default-event) callers still advance to celebrate.
+
+  test "an app-driven save (non-demo + custom saved_event) closes instead of celebrating; demo/standalone still advance" do
+    js = render_factory
+
+    # The discriminator getter reads BOTH signals: demo short-circuits to false
+    # (demo always celebrates), and a NON-default saved_event marks the caller
+    # app-driven (it owns its own follow-on).
+    assert_includes js, "get appDrivenFollowOn()",
+      "the factory exposes the app-driven-follow-on discriminator"
+    assert_includes js, %(var DEFAULT_SAVED_EVENT = "studio:activity-saved"),
+      "the default saved event is the single source of truth the discriminator compares against"
+    assert_match(/get appDrivenFollowOn\(\)\s*\{[^}]*if \(this\.demo\) return false;[^}]*this\.savedEvent !== DEFAULT_SAVED_EVENT/m, js,
+      "appDrivenFollowOn is false for demo and true only for a non-default saved_event")
+
+    # _finishSaved CLOSES on the app-driven path: the celebrate advance is GUARDED by
+    # an early return on appDrivenFollowOn, so an app-driven save never sets celebrate.
+    finish = js[/_finishSaved: function[^{]*\{(.+?)\n        \},/m, 1]
+    assert finish, "the factory defines _finishSaved"
+    guard_at   = finish.index("if (this.appDrivenFollowOn) return")
+    advance_at = finish.index("this.celebrate = true")
+    assert guard_at,   "_finishSaved returns early when the app drives its own follow-on"
+    assert advance_at, "_finishSaved still has a celebrate advance for the non-app-driven path"
+    assert_operator guard_at, :<, advance_at,
+      "the app-driven early-return GUARDS the celebrate advance (app-driven closes; demo/standalone celebrate)"
+  end
+
+  # The two real sides of the discriminator are pinned by actual callers: the engine
+  # change-username ships a custom saved_event, so a real (non-demo) TM-shape caller
+  # is app-driven and closes on save; the /admin/style specimen stays demo, so it
+  # still advances to the celebrate state.
+  test "change_username wires a custom saved_event (app-driven) while the style specimen stays demo" do
+    cu = render_change_username(current_username: "picker", submit_url: "/u", leveling: false)
+    assert_includes cu, "savedEvent: 'studio:username-saved'",
+      "change_username wires a custom saved_event — the signal that the app drives its own follow-on"
+    refute_includes cu, "demo: true",
+      "a plain change_username render is non-demo, so it is app-driven and closes on save"
+
+    html = render_index
+    assert_includes html, "$store.dsModals.open('change-username', { demo: true",
+      "the /admin/style Change Username specimen opens in demo mode, so it still advances to celebrate"
+  end
+
   # --- A3. the generic activity: consent checkbox + runtime-gated views --------
 
   test "the generic leveling_activity gates its chrome at runtime + supports a consent checkbox" do
