@@ -8,7 +8,7 @@ require_relative "../dummy/config/environment"
 require "minitest/autorun"
 require "active_support/test_case"
 
-# [component] Guard for the board primitive's rank/reorder read-model:
+# [unit] Guard for the board primitive's rank/reorder read-model:
 #   Studio::Board::Rankable  — the 100-gap ranking (board_ordered scope,
 #     set_initial_position, reposition! in both directions), the exact math the
 #     three MS kanban boards (tasks / news / content) hand-rolled per-controller.
@@ -172,5 +172,92 @@ class BoardReorderableTest < ActiveSupport::TestCase
 
     assert_equal :unprocessable_entity, probe.rendered[:status]
     assert_equal "ids required", probe.rendered[:json][:error]
+  end
+end
+
+# --- Reorderable ERROR-LOG WIRING (backend write discipline) -----------------
+
+# The shared reorder action must run the restamp INSIDE rescue_and_log so a failure
+# lands in ErrorLog (the MS original's behavior). These probes stand in a
+# rescue_and_log that mimics Studio::ErrorHandling's (yield; on error record +
+# re-raise), so the wiring is exercised BEHAVIORALLY — that the wrapper is on the
+# happy path, and that a raised restamp is logged AND still 422s — not by reading
+# the concern's source.
+class BoardReorderLoggedProbe
+  include Studio::Board::Reorderable
+  board_reorderable model: BoardWidget, id_attr: :id, param: :ids
+
+  attr_accessor :params, :rendered, :logged
+
+  def initialize
+    @logged = []
+  end
+
+  def render(opts)
+    @rendered = opts
+  end
+
+  # Mirrors Studio::ErrorHandling#rescue_and_log: run the block; on error capture
+  # (here: append to @logged, standing in for ErrorLog) and RE-RAISE to the caller.
+  def rescue_and_log(target: nil)
+    yield
+  rescue StandardError => e
+    @logged << e
+    raise e
+  end
+end
+
+# A model whose restamp raises, to drive the error/logging path. Accepts the
+# positional + keyword args reposition! is called with, so it raises the intended
+# error rather than an arity error.
+class BoardReorderBoomModel
+  def self.reposition!(*, **)
+    raise "reorder boom"
+  end
+end
+
+class BoardReorderBoomProbe < BoardReorderLoggedProbe
+  board_reorderable model: BoardReorderBoomModel, id_attr: :id, param: :ids
+end
+
+class BoardReorderableLoggingTest < ActiveSupport::TestCase
+  def setup
+    BoardWidget.delete_all
+  end
+
+  test "the happy-path restamp runs THROUGH rescue_and_log (no error logged, success rendered)" do
+    a = BoardWidget.create!(stage: "x", position: 1)
+    b = BoardWidget.create!(stage: "x", position: 2)
+
+    probe = BoardReorderLoggedProbe.new
+    probe.params = { ids: [a.id, b.id] }
+    probe.reorder
+
+    assert_empty probe.logged, "a clean reorder logs nothing"
+    assert_equal({ success: true }, probe.rendered[:json])
+    assert_equal 200, a.reload.position, "the restamp still ran (inside the logged block)"
+  end
+
+  test "a failed restamp is captured by rescue_and_log AND re-raised to the 422 net" do
+    probe = BoardReorderBoomProbe.new
+    probe.params = { ids: [1, 2] }
+    probe.reorder
+
+    assert_equal 1, probe.logged.size, "the failure is logged (ErrorLog path) — not swallowed silently"
+    assert_equal "reorder boom", probe.logged.first.message
+    assert_equal :unprocessable_entity, probe.rendered[:status], "and re-raised to the outer 422"
+    assert_equal "reorder boom", probe.rendered[:json][:error]
+  end
+
+  test "reorder degrades gracefully when the host lacks rescue_and_log" do
+    # BoardReorderableProbe does NOT define rescue_and_log — the respond_to? guard
+    # must fall back to a bare restamp + 422, never a NoMethodError.
+    a = BoardWidget.create!(stage: "x", position: 1)
+    probe = BoardReorderableProbe.new
+    probe.params = { ids: [a.id] }
+    probe.reorder
+
+    assert_equal({ success: true }, probe.rendered[:json])
+    assert_equal 100, a.reload.position
   end
 end

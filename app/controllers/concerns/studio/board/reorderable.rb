@@ -4,11 +4,14 @@ module Studio
   module Board
     # Shared `reorder` action for board controllers. The three McRitchie Studio
     # kanban controllers (tasks / news / content) each carried a BYTE-IDENTICAL
-    # `reorder` — guard the incoming id array, restamp the column with 100-gaps,
-    # render `{ success: true }`, rescue to a 422. This concern is that action,
-    # neutral: the including controller declares its model, id column, and the
-    # incoming param, and the ranking rule itself is delegated to the model's
-    # Studio::Board::Rankable#reposition! (one place owns the 100-gap math).
+    # `reorder` — guard the incoming id array, restamp the column with 100-gaps
+    # INSIDE `rescue_and_log` (so a failure lands in ErrorLog — backend write
+    # discipline), render `{ success: true }`, and rescue to a 422. This concern is
+    # that action, neutral: the including controller declares its model, id column,
+    # and the incoming param, and the ranking rule itself is delegated to the model's
+    # Studio::Board::Rankable#reposition! (one place owns the 100-gap math). This is
+    # THE designated shared write action, so it owns the ErrorLog logging here rather
+    # than leaving each host to re-add it.
     #
     #   class TasksController < ApplicationController
     #     include Studio::Board::Reorderable
@@ -45,7 +48,12 @@ module Studio
 
       # POST — restamp a column from its DOM-ordered id list. Neutral param
       # (`slugs` or `ids`), 100-gap, DESC by default. Mirrors the MS hand-rolled
-      # loop and its 422-on-error / "slugs required" guard exactly.
+      # `reorder` exactly, INCLUDING its ErrorLog logging: the restamp runs inside
+      # `rescue_and_log(target: nil)` (Studio::ErrorHandling), which captures a
+      # failure to ErrorLog and RE-RAISES to the outer 422 net below — the "every
+      # write path logs" discipline, owned here since this is the one shared write
+      # action. `respond_to?` guards it so a host whose ApplicationController somehow
+      # lacks the concern still degrades to a bare restamp + 422 (no NoMethodError).
       def reorder
         model = self.class.board_reorder_model
         raise "board_reorderable model not configured" unless model
@@ -54,7 +62,11 @@ module Studio
         ids = params[param]
         return render(json: { error: "#{param} required" }, status: :unprocessable_entity) unless ids.is_a?(Array)
 
-        board_reorder_apply(model, ids)
+        if respond_to?(:rescue_and_log)
+          rescue_and_log(target: nil) { board_reorder_apply(model, ids) }
+        else
+          board_reorder_apply(model, ids)
+        end
         render json: { success: true }
       rescue StandardError => e
         render json: { error: e.message }, status: :unprocessable_entity

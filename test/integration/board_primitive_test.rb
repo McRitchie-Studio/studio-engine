@@ -9,7 +9,7 @@ require "minitest/autorun"
 require "active_support/test_case"
 require "action_view"
 
-# [component] Guard for the board primitive's MARKUP contract — the data-* identity
+# [integration] Guard for the board primitive's MARKUP contract — the data-* identity
 # every board card + zone must emit so window.studioBoard can move/reorder it, and
 # the /admin/style demo specimen that renders the real primitive. Renders the
 # partials through a bare ActionView (the dummy compiles no engine CSS, so this
@@ -108,9 +108,15 @@ class BoardPrimitiveTest < ActiveSupport::TestCase
     assert_includes html, "/tasks/:id.json", "the move template flows into the factory opts"
   end
 
-  # --- a same-zone reorder must never PATCH the zone (guard lives in the factory) --
-
-  test "the factory sources from/to from the dropzones so an in-place reorder never mismoves" do
+  # --- factory source-presence checks (NOT behavioral) -----------------------
+  # HONEST SCOPE: these are SOURCE-SUBSTRING assertions on the factory JS, not
+  # behavioral ones — the engine has no JS/system harness, so the factory is never
+  # executed here. They guard that the load-bearing lines stay present (the
+  # same-zone-never-PATCH guard, the flake-fix init ordering, the event seam); they
+  # do NOT prove runtime behavior. The genuine effect-assertions in this suite are
+  # the Ruby rank math (board_rankable_test) and the rendered-markup contract above.
+  # Promote these to real behavioral coverage when a JS/system-test harness lands.
+  test "the factory keeps the load-bearing guard lines present in source" do
     factory = File.read("app/views/studio/_board_assets.html.erb")
     assert_includes factory, "var moved = fromZone !== toZone",
       "a move is decided by the DROPZONES, not the card"
