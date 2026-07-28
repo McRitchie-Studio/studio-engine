@@ -1,0 +1,47 @@
+<%#
+  studio/board/card_shell — OPTIONAL chrome that emits the board CARD half of the
+  identity contract, so a card partial can `render layout: "studio/board/card_shell"`
+  around its own body instead of hand-rolling the wrapper. It emits:
+
+    id="<dom_id_prefix><id>"      (default id="card-<id>")
+    data-<id_attr>="<id>"         (default data-slug — window.studioBoard reads this)
+    data-<zone_attr>="<zone>"     (default data-stage — the card's current column)
+    class="kanban-card <extra>"   (the SortableJS draggable + live-observe hook)
+
+  Apps may SKIP this and hand-roll a bespoke card, as long as it satisfies the same
+  contract (that is the point of the primitive — the contract, not this exact
+  markup). UI only; no domain, no persistence.
+
+  Checks local_assigns (never block_given?) for its locals, but always yields the
+  caller block — it is only ever used as a `render layout:` wrapper.
+
+  locals:
+    id:            (req) the card id value (a slug / record id).
+    zone:          (req) the card's current column/zone key.
+    id_attr:       data-attr name for the id. Default "slug".
+    zone_attr:     data-attr name for the zone. Default "stage".
+    dom_id_prefix: dom-id prefix. Default "card-".
+    card_class:    the required base class. Default "kanban-card".
+    class:         extra classes appended after card_class.
+    style:         inline style string.
+    attrs:         Hash of extra root attributes ({ "x-data" => "…", "data-foo" => 1 }),
+                   values are HTML-escaped — the rebase seam for a card that carries
+                   its own Alpine/data-* on the root.
+%>
+<%
+  id            = local_assigns.fetch(:id)
+  zone          = local_assigns.fetch(:zone)
+  id_attr       = local_assigns.fetch(:id_attr, "slug")
+  zone_attr     = local_assigns.fetch(:zone_attr, "stage")
+  dom_id_prefix = local_assigns.fetch(:dom_id_prefix, "card-")
+  card_class    = local_assigns.fetch(:card_class, "kanban-card")
+  extra_class   = local_assigns.fetch(:class, nil)
+  inline_style  = local_assigns.fetch(:style, nil)
+  root_attrs    = local_assigns.fetch(:attrs, {}) || {}
+%>
+<div id="<%= dom_id_prefix %><%= id %>"
+     class="<%= [card_class, extra_class].compact.join(" ") %>"
+     data-<%= id_attr %>="<%= id %>"
+     data-<%= zone_attr %>="<%= zone %>"
+     <% root_attrs.each do |name, value| %><%= name %>="<%= value %>" <% end %>
+     <% if inline_style %>style="<%= inline_style %>"<% end %>><%= yield %></div>

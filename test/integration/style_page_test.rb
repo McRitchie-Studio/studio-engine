@@ -33,7 +33,8 @@ require "action_view"
 #      real engine card blocks (processing/success/error/countdown) full-size.
 #   7. Theme folds the /admin/theme role-color editor into the page AND persists
 #      Save + Regenerate IN PLACE (fetch, no navigation).
-#   8. Tasks renders the shared board-primitive demonstrator on the stage-* spine.
+#   8. Tasks mounts the LIVE studio/board primitive (demo mode) over the static
+#      stage-* palette reference.
 #   9. The Tricks Leveling group renders the REAL .level-badge tiers, and
 #      engine-motion.css ships the ported ladder (modern slash-rgb form).
 class StylePageTest < ActiveSupport::TestCase
@@ -475,19 +476,30 @@ class StylePageTest < ActiveSupport::TestCase
       "the section submits via fetch and stays put"
   end
 
-  # --- 8. Tasks: the shared board-primitive demonstrator ---------------------
+  # --- 8. Tasks: the LIVE board primitive + the static reference -------------
 
-  test "the Tasks section renders the board demonstrator on the stage-* spine" do
+  test "the Tasks section renders the LIVE board primitive over the stage-* reference" do
     html = render_index
     assert_includes html, 'id="tasks"'
+
+    # Phase D: the section now mounts the REAL studio/board primitive in demo mode
+    # (drag works, no POST), not just a static sketch.
+    assert_includes html, 'data-test="studio-board"',
+      "the Tasks section mounts the real studio/board primitive"
+    assert_includes html, "studioBoard(",
+      "the board is wired to the page-level studioBoard factory"
+    assert_includes html, 'id="card-engine-board-primitive"',
+      "the specimen renders real demo cards through the card-shell contract"
+
+    # The static reference palette is kept beneath the live primitive.
     %w[stage-fresh stage-shipped stage-closed].each do |stage|
       assert_includes html, stage,
-        "the Tasks demo must render the #{stage} palette role"
+        "the Tasks reference must render the #{stage} palette role"
     end
     assert_includes html, "cursor-grab",
       "the demo cards show the drag / rank affordance"
     assert_includes html, "What every board inherits",
-      "the standard-vs-custom sketch is present"
+      "the standard-vs-custom reference is present"
   end
 
   # --- 5. the capability-feature flag + disabled-but-present gating -----------

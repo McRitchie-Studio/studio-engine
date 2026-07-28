@@ -1,4 +1,4 @@
-<%# locals: (text:, scheme: "neutral") %>
+<%# locals: (text:, scheme: "neutral", data_board_count: nil) %>
 <%#
   Stage roles (stage-fresh ... stage-closed) form a shared pipeline palette
   used by News and Content (and any future pipelines). Mapping:
@@ -32,4 +32,6 @@
     else                         "bg-surface-alt text-body border-subtle"
     end
 %>
-<span class="badge <%= scheme_classes %>"><%= text %></span>
+<%# data_board_count wires the badge as a studio/board count target (updateCounts sets
+    its textContent) — additive + opt-in, so every existing caller renders identically. %>
+<span class="badge <%= scheme_classes %>"<% if local_assigns[:data_board_count] %> data-board-count="<%= data_board_count %>"<% end %>><%= text %></span>

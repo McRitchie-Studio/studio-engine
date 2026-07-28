@@ -2,6 +2,65 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.23.0 — 2026-07-28
+
+Phase D, slice 1 — the **board primitive**. The three near-identical McRitchie
+Studio kanban boards (tasks / news / content) each hand-rolled the SAME SortableJS
+init, the SAME optimistic move → revert → toast, and a BYTE-IDENTICAL `reorder`
+controller action; the depth chart hand-rolled a within-lane variant. This slice
+lifts that convergence into a neutral engine primitive, following the same seam as
+the leveling modals and tricks (documented `local_assigns.fetch` locals → a
+page-level Alpine factory in an `_assets` partial → capability / `fx` / event hooks
+→ a `demo:` local for `/admin/style` → vendored JS).
+
+**Purely additive — new engine files only, no existing primitive's default
+changes. MS and TM render identically on the bump** (they do not use
+`studio/board/*` yet; the board rebases are separate later deploys).
+
+### Added
+
+- **`studio/board/_board`** — the board shell: a row of columns (drop zones), an
+  optional live `turbo_stream_from`, and a toast host. Documented `local_assigns`
+  locals: `columns:` `card_partial:` `card_as:` `card_locals:` `reorder_url:`
+  `reorder_payload:` (`:slugs` | `:ids`) `move_url:` `move_param:` `group:`
+  (`false` = within-zone) `id_attr:` `zone_attr:` `handle:` `filter:`
+  `zone_selector:` `draggable:` `empty_selector:` `live_channel:` `optimistic:`
+  `toasts:` `empty_label:` `header_slot:` `above_board_slot:` `fx:` `on_move_hook:`
+  `on_drop_hook:` `demo:`.
+- **`studio/board/_column`** — one column: header + count badge + the
+  `.kanban-dropzone` (`id="dropzone-<key>"`, `data-<zone_attr>`) + `.kanban-empty`
+  empty state (the ZONE half of the identity contract).
+- **`studio/board/_card_shell`** — OPTIONAL `render layout:` chrome that emits the
+  CARD half of the contract (`id="card-<id>"`, `.kanban-card`, `data-<id_attr>`,
+  `data-<zone_attr>`). Apps may hand-roll a bespoke card that satisfies the same
+  contract instead.
+- **`studioBoard(opts)` factory — `studio/_board_assets`.** The Alpine data behind
+  the board, shipped at page level (a `<script>` cloned from a component template
+  never runs), like `levelingActionModal`. ONE factory drives BOTH shapes — it
+  reads `group` / `handle` / `filter` / `draggable` / `id_attr` / `zone_attr` from
+  opts, so the cross-column kanban and the within-lane depth chart are the same
+  code. Owns `initSortables`, `handleSortEnd` (cross-column move → PATCH →
+  optimistic revert + red-ring + toast; a same-zone drop NEVER PATCHes the zone),
+  `saveOrder` (reorder POST), `updateCounts`, `observeLive`,
+  `installExitStreamFallback`, `animateIn`, and toasts. Preserves the
+  `$nextTick` → `data-alpine-ready` init ordering (a documented flake fix). The
+  primary extension seam is the dispatched window events
+  `studio:board-moved` / `:board-reordered` / `:card-added` (detail
+  `{ record, from, to }`) — apps LISTEN, never patch the factory.
+- **SortableJS v1.15.6 (MIT) VENDORED** — `app/assets/javascripts/studio/sortable.js`,
+  added to `config.assets.precompile` and loaded (deferred) by
+  `layouts/studio/_head`, mirroring the vendored canvas-confetti. CSP-safe, no CDN;
+  any board consumer gets `Sortable` with zero per-app wiring.
+- **`Studio::Board::Rankable`** — the shared 100-gap rank read-model: a
+  `board_ordered` scope (`position DESC NULLS LAST, created_at DESC`),
+  `set_initial_position` (max + 100 within the zone), and `reposition!(ids, gap:,
+  direction: :desc | :asc)`.
+- **`Studio::Board::Reorderable`** — the shared `reorder` controller action,
+  neutral param, delegating the 100-gap restamp to `Rankable#reposition!`.
+- **`/admin/style` Board specimen** — the Tasks section now renders the REAL
+  `studio/board/board` primitive in `demo: true` mode (drag works, no POST),
+  above the static stage-palette reference.
+
 ## 0.22.0 — 2026-07-28
 
 Two additive batches for the living style guide, converged under one release.
