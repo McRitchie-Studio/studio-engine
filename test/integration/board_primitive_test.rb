@@ -8,6 +8,8 @@ require_relative "../dummy/config/environment"
 require "minitest/autorun"
 require "active_support/test_case"
 require "action_view"
+require "cgi"
+require "json"
 
 # [integration] Guard for the board primitive's MARKUP contract — the data-* identity
 # every board card + zone must emit so window.studioBoard can move/reorder it, and
@@ -25,6 +27,15 @@ class BoardPrimitiveTest < ActiveSupport::TestCase
 
   def render_board(locals)
     view.render(partial: "studio/board/board", locals: locals)
+  end
+
+  # Extract the studioBoard(...) opts the board serialized into its x-data and parse
+  # them back to a Hash — an EFFECT assertion on the real serialization (HTML-escaped
+  # JSON), not a substring proxy. The inner quotes render as &quot;, so unescape first.
+  def board_opts_hash(html)
+    raw = html[/x-data="studioBoard\((.+?)\)"/m, 1]
+    refute_nil raw, "the board must serialize studioBoard opts into x-data"
+    JSON.parse(CGI.unescapeHTML(raw))
   end
 
   DEFAULT_LOCALS = {
@@ -158,5 +169,170 @@ class BoardPrimitiveTest < ActiveSupport::TestCase
     head = File.read("app/views/layouts/studio/_head.html.erb")
     assert_includes head, 'javascript_include_tag "studio/sortable"',
       "the head loads the vendored sortable (no CDN)"
+  end
+
+  # ==========================================================================
+  # 0.28.0 — the five additive board-chrome hooks the /tasks pilot surfaced.
+  # Every test asserts the RENDERED EFFECT, and each closes with the mirror
+  # assertion that the 0.27.0 default rendering is unchanged (additive + opt-in).
+  # ==========================================================================
+
+  NEUTRAL_COUNT_CLASSES = "bg-surface-alt text-secondary border border-subtle"
+
+  # --- gap 2: a per-column count_class colours the neutral count chip --------
+
+  test "gap 2 — count_class emits a raw colour class on the count chip" do
+    html = render_board(DEFAULT_LOCALS.merge(
+      columns: [{ key: "designed", label: "Designed",
+                  count_class: "bg-blue-500/10 text-blue-500 border border-blue-500/30",
+                  cards: [{ id: "a", zone: "designed", title: "A", repo: "x", who: "SH" }] }]
+    ))
+
+    # The colour lands ON the count chip (the stage-count span, keyed for updateCounts).
+    assert_match(/stage-count[^"]*text-blue-500[^"]*"\s+data-board-count="designed"/, html,
+      "the count chip carries the raw count_class colour")
+    refute_includes html, NEUTRAL_COUNT_CLASSES,
+      "count_class REPLACES the neutral chip colours (no double-painting)"
+  end
+
+  test "gap 2 backward-compat — no count_class renders the exact 0.27.0 neutral chip" do
+    html = render_board(DEFAULT_LOCALS.merge(
+      columns: [{ key: "designed", label: "Designed",
+                  cards: [{ id: "a", zone: "designed", title: "A", repo: "x", who: "SH" }] }]
+    ))
+    assert_includes html, NEUTRAL_COUNT_CLASSES,
+      "with no count_class the chip keeps the 0.27.0 neutral colours"
+  end
+
+  # --- gap 5: bindable visibility, per-board min-width, a kickoff slot --------
+
+  test "gap 5 — show_expr emits a bindable x-show (+ x-cloak) on the column" do
+    html = render_board(DEFAULT_LOCALS.merge(
+      columns: [{ key: "archived", label: "Archived", show_expr: "state.showArchived",
+                  cards: [{ id: "a", zone: "archived", title: "A", repo: "x", who: "SH" }] }]
+    ))
+    assert_match(/data-board-column="archived"[^>]*x-show="state\.showArchived"/m, html,
+      "the toggle-able column binds visibility to the board state")
+    assert_match(/data-board-column="archived"[^>]*x-cloak/m, html,
+      "x-cloak rides along so it can't flash before Alpine boots")
+  end
+
+  test "gap 5 — min_width overrides the column min-width, default stays sm:min-w-[190px]" do
+    custom = render_board(DEFAULT_LOCALS.merge(
+      columns: [{ key: "designed", label: "Designed", min_width: "sm:min-w-[22rem]",
+                  cards: [{ id: "a", zone: "designed", title: "A", repo: "x", who: "SH" }] }]
+    ))
+    assert_includes custom, "sm:min-w-[22rem]", "min_width sets the column width"
+    refute_includes custom, "sm:min-w-[190px]", "the custom width replaces the default"
+
+    default = render_board(DEFAULT_LOCALS.merge(columns: columns_fixture))
+    assert_includes default, "sm:min-w-[190px]", "with no min_width the 0.27.0 default holds"
+  end
+
+  test "gap 5 — kickoff renders a fixed-height slot under the header" do
+    html = render_board(DEFAULT_LOCALS.merge(
+      columns: [{ key: "designed", label: "Designed",
+                  kickoff: "<span class='kick-chip'>go</span>".html_safe,
+                  cards: [{ id: "a", zone: "designed", title: "A", repo: "x", who: "SH" }] }]
+    ))
+    assert_includes html, "studio-board-kickoff", "the kickoff slot wrapper renders"
+    assert_includes html, "kick-chip", "the kickoff content renders inside the slot"
+
+    plain = render_board(DEFAULT_LOCALS.merge(columns: columns_fixture))
+    refute_includes plain, "studio-board-kickoff", "no kickoff ⇒ no slot (0.27.0)"
+  end
+
+  # --- gap 1: a board_state home + header slot for chrome --------------------
+
+  test "gap 1 — board_state seeds the studioBoard state bag" do
+    html = render_board(DEFAULT_LOCALS.merge(
+      columns: columns_fixture,
+      board_state: { showArchived: false, hiddenApps: [] }
+    ))
+    opts = board_opts_hash(html)
+    assert_equal({ "showArchived" => false, "hiddenApps" => [] }, opts["state"],
+      "the chrome state is serialized onto the studioBoard scope")
+  end
+
+  test "gap 1 — header_slot renders chrome above the columns" do
+    html = render_board(DEFAULT_LOCALS.merge(
+      columns: columns_fixture,
+      header_slot: "<div class='my-chrome-toggle'>Toggle</div>".html_safe
+    ))
+    assert_includes html, "studio-board-header", "the header slot wrapper renders"
+    assert_includes html, "my-chrome-toggle", "the chrome markup renders in the header"
+    assert_operator html.index("my-chrome-toggle"), :<, html.index('id="dropzone-'),
+      "the header sits ABOVE the columns"
+  end
+
+  test "gap 1 backward-compat — no board_state ⇒ state opt is absent (null)" do
+    html = render_board(DEFAULT_LOCALS.merge(columns: columns_fixture))
+    assert_nil board_opts_hash(html)["state"], "an unset board_state serializes as null"
+  end
+
+  # --- gap 3: archive_zone re-parents an exiting card instead of removing ----
+
+  test "gap 3 — archive_zone is serialized so the exit path re-parents" do
+    html = render_board(DEFAULT_LOCALS.merge(columns: columns_fixture, archive_zone: "archived"))
+    assert_equal "archived", board_opts_hash(html)["archiveZone"],
+      "the archive re-parent target rides the studioBoard opts"
+  end
+
+  test "gap 3 backward-compat — no archive_zone ⇒ archiveZone opt is null (remove)" do
+    html = render_board(DEFAULT_LOCALS.merge(columns: columns_fixture))
+    assert_nil board_opts_hash(html)["archiveZone"],
+      "with no archive_zone the card is removed on exit (0.27.0)"
+  end
+
+  # --- gaps 3 + 4 + 1: the factory JS carries the load-bearing exit/state lines
+  # SOURCE-substring scope (same honest limit as the guard-lines test above: the
+  # engine runs no JS harness, so the factory is never executed here). These guard
+  # that the re-parent branch, the exit marker, resetCardExit, and the state helpers
+  # stay present; the EFFECT that they are WIRED is proven by the opts tests above.
+
+  test "gap 4 — animateCardExit stamps the observable data-exit-action marker in source" do
+    factory = File.read("app/views/studio/_board_assets.html.erb")
+    assert_includes factory, "card.dataset.exitAction = kind",
+      "the exit path marks WHICH exit is running (observable; e2e asserts it)"
+  end
+
+  test "gap 3 — the fallback re-parents to the archive dropzone in source" do
+    factory = File.read("app/views/studio/_board_assets.html.erb")
+    assert_includes factory, 'document.getElementById("dropzone-" + self.archiveZone)',
+      "an archive exit resolves the archive column's dropzone"
+    assert_includes factory, "zone.insertBefore(card, anchor)",
+      "the card is re-parented into the archive column, not removed"
+    assert_includes factory, "resetCardExit",
+      "the re-parented card's exit animation is cleared so it is visible again"
+  end
+
+  test "gap 1 — the factory exposes the chrome-state helpers in source" do
+    factory = File.read("app/views/studio/_board_assets.html.erb")
+    assert_includes factory, "state: (opts.state", "the state bag is seeded from opts"
+    assert_includes factory, "toggleState:", "a boolean-flag toggle helper is exposed"
+    assert_includes factory, "toggleInState:", "a list-membership toggle helper is exposed"
+    assert_includes factory, "listHas:", "a list-membership read helper is exposed"
+  end
+
+  # --- the /admin/style specimen demonstrates the enriched chrome LIVE --------
+
+  test "the /admin/style Tasks section renders the enriched 0.28.0 chrome specimen" do
+    html = view.render(template: "style/index")
+
+    assert_includes html, "studio-board-chrome",
+      "the enriched specimen mounts as its own demo board"
+    assert_includes html, 'data-test="chrome-archived-toggle"',
+      "the header_slot toggle (no outer wrapper) is present"
+    assert_includes html, 'x-show="state.showArchived"',
+      "the archived column binds visibility to the shared board state"
+    assert_includes html, "studio-board-kickoff", "a column kickoff slot is demonstrated"
+    assert_includes html, "text-blue-500", "a coloured count chip (count_class) is demonstrated"
+    assert_includes html, 'id="dropzone-archived"',
+      "the archive re-parent target column is on the board"
+
+    # The original 0.27.0 demo specimen is untouched — both coexist.
+    assert_includes html, 'id="card-engine-board-primitive"',
+      "the first (0.27.0) demo specimen still renders"
+    assert_includes html, "studio-board-demo", "the first specimen keeps its own demo group"
   end
 end
