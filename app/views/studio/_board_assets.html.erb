@@ -51,6 +51,10 @@
         // gap 3: the column key a data-exit-action="archive" remove re-parents INTO
         // (its #dropzone-<key>) rather than deleting the card. null ⇒ 0.27.0 removal.
         archiveZone:    opts.archiveZone || null,
+        // DG4: selector for PINNED cards (a locked depth-chart starter). When set,
+        // locked cards are filtered from dragging AND a drag can't cross one, so a
+        // pinned card keeps its slot while the rest reflow. null ⇒ every card drags.
+        lockedSelector: opts.lockedSelector || null,
 
         // --- state ---------------------------------------------------------
         toasts: [],
@@ -104,7 +108,9 @@
               animation: 150,
               ghostClass: "opacity-30",
               draggable: self.cardSelector,
-              filter: self.sortFilter,
+              // DG4: locked cards join the undraggable filter so a pinned entry
+              // can't be picked up (empty state was already filtered).
+              filter: self.lockedSelector ? (self.sortFilter + ", " + self.lockedSelector) : self.sortFilter,
               onStart: function () { window.__studioBoardDragging = true; },
               onEnd: function (evt) {
                 self.handleSortEnd(evt);
@@ -113,6 +119,13 @@
             };
             if (self.groupName) cfg.group = self.groupName; // omit ⇒ within-zone only
             if (self.handle) cfg.handle = self.handle;
+            if (self.lockedSelector) {
+              // DG4: pin locked cards — refuse a move that would cross a locked
+              // sibling, so a dragged card can't leapfrog a pinned starter.
+              cfg.onMove = function (evt) {
+                return !(evt.related && evt.related.matches && evt.related.matches(self.lockedSelector));
+              };
+            }
             Sortable.create(zone, cfg);
           });
         },

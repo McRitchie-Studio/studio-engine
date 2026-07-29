@@ -28,21 +28,31 @@ module Studio
       extend ActiveSupport::Concern
 
       included do
-        class_attribute :board_reorder_model,     instance_accessor: false
-        class_attribute :board_reorder_id_attr,   instance_accessor: false, default: :slug
-        class_attribute :board_reorder_param,     instance_accessor: false, default: :slugs
-        class_attribute :board_reorder_gap,       instance_accessor: false, default: 100
-        class_attribute :board_reorder_direction, instance_accessor: false, default: :desc
+        class_attribute :board_reorder_model,       instance_accessor: false
+        class_attribute :board_reorder_id_attr,     instance_accessor: false, default: :slug
+        class_attribute :board_reorder_param,       instance_accessor: false, default: :slugs
+        class_attribute :board_reorder_gap,         instance_accessor: false, default: 100
+        class_attribute :board_reorder_direction,   instance_accessor: false, default: :desc
+        # DG1/DG2/DG4 — optional column + lock config. Defaults keep the exact 0.28.0
+        # kanban reorder: rank by the model's board_rank_attr, no lock skip. A depth
+        # chart passes gap: 1, direction: :asc (1..N depths) + skip_locked: true.
+        class_attribute :board_reorder_rank_attr,   instance_accessor: false, default: nil
+        class_attribute :board_reorder_skip_locked, instance_accessor: false, default: false
+        class_attribute :board_reorder_lock_attr,   instance_accessor: false, default: :locked
       end
 
       class_methods do
         # Configure the reorder action for this controller's board.
-        def board_reorderable(model:, id_attr: :slug, param: :slugs, gap: 100, direction: :desc)
-          self.board_reorder_model     = model
-          self.board_reorder_id_attr   = id_attr
-          self.board_reorder_param     = param
-          self.board_reorder_gap       = gap
-          self.board_reorder_direction = direction
+        def board_reorderable(model:, id_attr: :slug, param: :slugs, gap: 100, direction: :desc,
+                              rank_attr: nil, skip_locked: false, lock_attr: :locked)
+          self.board_reorder_model       = model
+          self.board_reorder_id_attr     = id_attr
+          self.board_reorder_param       = param
+          self.board_reorder_gap         = gap
+          self.board_reorder_direction   = direction
+          self.board_reorder_rank_attr   = rank_attr
+          self.board_reorder_skip_locked = skip_locked
+          self.board_reorder_lock_attr   = lock_attr
         end
       end
 
@@ -72,23 +82,59 @@ module Studio
         render json: { error: e.message }, status: :unprocessable_entity
       end
 
+      # POST — flip a card's lock flag (DG4). A locked entry is a pinned card the
+      # reorder skips (a confirmed depth-chart starter). Config-gated on the
+      # board_reorderable model + lock_attr; mirrors the MS depth-chart toggle_lock,
+      # INCLUDING its rescue_and_log(target: record) backend-write discipline, and
+      # the same respond_to? degrade the reorder action uses. Route it however the
+      # app names the endpoint (e.g. `post "…/:id/toggle_lock"`).
+      def board_toggle_lock
+        model = self.class.board_reorder_model
+        raise "board_reorderable model not configured" unless model
+
+        id_attr   = self.class.board_reorder_id_attr
+        lock_attr = self.class.board_reorder_lock_attr
+        record    = model.find_by(id_attr => params[:id])
+        return render(json: { error: "not found" }, status: :not_found) unless record
+
+        flip = -> { record.update!(lock_attr => !record.public_send(lock_attr)) }
+        if respond_to?(:rescue_and_log)
+          rescue_and_log(target: record) { flip.call }
+        else
+          flip.call
+        end
+        render json: { ok: true, locked: record.public_send(lock_attr) }
+      rescue StandardError => e
+        render json: { error: e.message }, status: :unprocessable_entity
+      end
+
       private
 
       # Delegate to the model's Rankable#reposition! when available (the shared
-      # 100-gap rule), else fall back to the same per-id update_all loop inline so
-      # a model that only carries a `position` column still reorders.
+      # rank rule), else fall back to the same per-id update_all loop inline so a
+      # model that only carries a rank column still reorders. Threads the DG1 rank
+      # column and DG4 lock-skip config through both paths.
       def board_reorder_apply(model, ids)
-        id_attr   = self.class.board_reorder_id_attr
-        gap       = self.class.board_reorder_gap
-        direction = self.class.board_reorder_direction
+        id_attr     = self.class.board_reorder_id_attr
+        gap         = self.class.board_reorder_gap
+        direction   = self.class.board_reorder_direction
+        rank_attr   = self.class.board_reorder_rank_attr
+        skip_locked = self.class.board_reorder_skip_locked
+        lock_attr   = self.class.board_reorder_lock_attr
 
         if model.respond_to?(:reposition!)
-          model.reposition!(ids, gap: gap, direction: direction, id_attr: id_attr)
+          kwargs = { gap: gap, direction: direction, id_attr: id_attr,
+                     skip_locked: skip_locked, lock_attr: lock_attr }
+          kwargs[:rank_attr] = rank_attr if rank_attr
+          model.reposition!(ids, **kwargs)
         else
+          rank_col = rank_attr || :position
           length = ids.length
           ids.each_with_index do |id, index|
             rank = direction.to_sym == :asc ? (index + 1) * gap : (length - index) * gap
-            model.where(id_attr => id).update_all(position: rank)
+            rel  = model.where(id_attr => id)
+            rel  = rel.where.not(lock_attr => true) if skip_locked
+            rel.update_all(rank_col => rank)
           end
         end
       end

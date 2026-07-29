@@ -33,13 +33,29 @@
     4. An Archived column that a stage→archived broadcast should re-parent INTO
        (not delete) is named by the board's `archive_zone:`.
 
+  TWO-LEVEL GRID (DG3, the depth-chart shape) — a board whose columns group into
+  labelled SECTIONS laid out as a grid (offense/defense/special_teams, each a grid
+  of position lanes) passes `groups:` instead of a flat `columns:` row. Each group
+  renders a header + a responsive grid of its columns (the same studio/board/column,
+  layout: "grid"). Omit `groups:` and the board renders the 0.28.0 flat row unchanged.
+
   locals:
-    columns:          (req) [{ key:, label:, cards:, count:, badge_class:,
-                      count_class:, collapsible:, hidden:, show_expr:, min_width:,
-                      kickoff:, header_extra: }]. `cards` are records passed to
-                      `card_partial`; `count` defaults to cards.size. See
+    columns:          (req unless `groups:`) [{ key:, label:, cards:, count:,
+                      badge_class:, count_class:, collapsible:, hidden:, show_expr:,
+                      min_width:, kickoff:, header_extra: }]. `cards` are records
+                      passed to `card_partial`; `count` defaults to cards.size. See
                       studio/board/_column for the additive per-column hooks
                       (count_class / show_expr / min_width / kickoff).
+    groups:           DG3 — [{ key:, label:, cols_class:, columns: [<column hash>] }]
+                      renders a two-level side→position GRID: each group is a labelled
+                      section whose `columns` lay out in a grid (`cols_class` overrides
+                      the responsive default). Takes precedence over the flat `columns`
+                      row; the factory's labels merge across every group's columns.
+    locked_selector:  DG4 — CSS selector for PINNED cards (default ".kanban-locked",
+                      emitted by studio/board/_card_shell `locked: true`). When set,
+                      the studioBoard factory filters those cards from dragging and
+                      won't let a drag cross them, so a locked starter stays put. nil
+                      keeps every card draggable (0.28.0).
     card_partial:     (req) partial rendered per card (e.g. "tasks/task_card").
     card_as:          local the record binds to in card_partial. Default :card.
     card_locals:      per-card extra locals — a Proc ->(record){ Hash } or a Hash.
@@ -78,7 +94,11 @@
     demo:             style-guide preview — drag works locally, no network POST.
 %>
 <%
-  columns          = local_assigns.fetch(:columns)
+  groups           = local_assigns.fetch(:groups, nil)   # DG3: two-level side→position grid
+  columns          = local_assigns.fetch(:columns, nil)
+  # The factory's label map + the flat fallback both need every column; a grouped
+  # board flattens its groups' columns, a flat board uses `columns` directly.
+  all_columns      = groups ? groups.flat_map { |g| Array(g[:columns]) } : (columns || [])
   card_partial     = local_assigns.fetch(:card_partial)
   card_as          = local_assigns.fetch(:card_as, :card)
   card_locals      = local_assigns.fetch(:card_locals, nil)
@@ -103,6 +123,7 @@
   above_board_slot = local_assigns.fetch(:above_board_slot, nil)
   board_state      = local_assigns.fetch(:board_state, nil)   # gap 1: chrome-state home
   archive_zone     = local_assigns.fetch(:archive_zone, nil)  # gap 3: exit re-parent target
+  locked_selector  = local_assigns.fetch(:locked_selector, nil) # DG4: pinned-card selector
   fx               = local_assigns.fetch(:fx, nil)
   on_move_hook     = local_assigns.fetch(:on_move_hook, nil)
   on_drop_hook     = local_assigns.fetch(:on_drop_hook, nil)
@@ -128,10 +149,11 @@
     demo:           !!demo,
     state:          (board_state.is_a?(Hash) ? board_state : nil),
     archiveZone:    (archive_zone ? archive_zone.to_s : nil),
+    lockedSelector: (locked_selector ? locked_selector.to_s : nil),
     fx:             fx,
     onMoveHook:     on_move_hook,
     onDropHook:     on_drop_hook,
-    labels:         columns.each_with_object({}) { |c, h| h[c[:key].to_s] = (c[:label] || c[:key]).to_s if c[:key] }
+    labels:         all_columns.each_with_object({}) { |c, h| h[c[:key].to_s] = (c[:label] || c[:key]).to_s if c[:key] }
   }
 %>
 <section class="studio-board" data-test="studio-board" x-data="studioBoard(<%= board_opts.to_json %>)">
@@ -140,20 +162,49 @@
   <% if header_slot %><div class="studio-board-header mb-4"><%= header_slot %></div><% end %>
   <% if above_board_slot %><%= above_board_slot %><% end %>
 
-  <div class="flex flex-col gap-4 overflow-x-visible pb-4 sm:flex-row sm:overflow-x-auto">
-    <% columns.each do |column| %>
-      <%= render "studio/board/column",
-            column: column,
-            zone_attr: zone_attr,
-            dom_id_prefix: dom_id_prefix,
-            zone_selector_class: zone_selector.delete_prefix("."),
-            empty_selector_class: (empty_selector || "kanban-empty").delete_prefix("."),
-            empty_label: empty_label,
-            card_partial: card_partial,
-            card_as: card_as,
-            card_locals: card_locals %>
-    <% end %>
-  </div>
+  <% if groups %>
+    <%# DG3: two-level side→position grid — each group a labelled section, its
+        columns in a responsive grid (the same studio/board/column, layout: grid). %>
+    <div class="studio-board-grid space-y-8">
+      <% groups.each do |group| %>
+        <section class="studio-board-group" data-board-group="<%= group[:key] %>">
+          <% if group[:label] %>
+            <h2 class="mb-3 text-xs font-bold uppercase tracking-widest text-secondary"><%= group[:label] %></h2>
+          <% end %>
+          <div class="grid gap-4 <%= group[:cols_class] || "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4" %>">
+            <% Array(group[:columns]).each do |column| %>
+              <%= render "studio/board/column",
+                    column: column,
+                    layout: "grid",
+                    zone_attr: zone_attr,
+                    dom_id_prefix: dom_id_prefix,
+                    zone_selector_class: zone_selector.delete_prefix("."),
+                    empty_selector_class: (empty_selector || "kanban-empty").delete_prefix("."),
+                    empty_label: empty_label,
+                    card_partial: card_partial,
+                    card_as: card_as,
+                    card_locals: card_locals %>
+            <% end %>
+          </div>
+        </section>
+      <% end %>
+    </div>
+  <% else %>
+    <div class="flex flex-col gap-4 overflow-x-visible pb-4 sm:flex-row sm:overflow-x-auto">
+      <% (columns || []).each do |column| %>
+        <%= render "studio/board/column",
+              column: column,
+              zone_attr: zone_attr,
+              dom_id_prefix: dom_id_prefix,
+              zone_selector_class: zone_selector.delete_prefix("."),
+              empty_selector_class: (empty_selector || "kanban-empty").delete_prefix("."),
+              empty_label: empty_label,
+              card_partial: card_partial,
+              card_as: card_as,
+              card_locals: card_locals %>
+      <% end %>
+    </div>
+  <% end %>
 
   <% if toasts %>
     <div class="studio-board-toasts fixed top-4 right-4 z-50 space-y-2" data-test="studio-board-toasts">

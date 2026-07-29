@@ -7,11 +7,15 @@
   id_attr / zone_attr flow through from the board so the same partial demonstrates
   the primitive under both the default and a custom attribute naming.
 %>
+<%# A locked card (DG4) flows `locked: true` to the card-shell — it gains the
+    .kanban-locked class the factory filters from dragging, and shows a 🔒 in place
+    of the drag glyph so the pinned state reads at a glance. %>
 <%= render layout: "studio/board/card_shell",
       locals: { id: card[:id], zone: card[:zone], id_attr: id_attr, zone_attr: zone_attr,
-                class: "card p-3 space-y-2 cursor-grab active:cursor-grabbing" } do %>
+                locked: card[:locked],
+                class: "card p-3 space-y-2 #{card[:locked] ? "cursor-default opacity-90" : "cursor-grab active:cursor-grabbing"}" } do %>
   <div class="flex items-start gap-2">
-    <span class="text-muted select-none leading-none" aria-hidden="true">⠿</span>
+    <span class="text-muted select-none leading-none" aria-hidden="true"><%= card[:locked] ? "🔒" : "⠿" %></span>
     <p class="text-sm font-semibold text-heading leading-snug flex-1"><%= card[:title] %></p>
   </div>
   <div class="flex items-center justify-between gap-2">

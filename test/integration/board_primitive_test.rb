@@ -335,4 +335,100 @@ class BoardPrimitiveTest < ActiveSupport::TestCase
       "the first (0.27.0) demo specimen still renders"
     assert_includes html, "studio-board-demo", "the first specimen keeps its own demo group"
   end
+
+  # ==========================================================================
+  # 0.29.0 — DG: the four depth-chart gaps. Every test asserts the RENDERED
+  # EFFECT and closes with the mirror that the 0.28.0 default is unchanged.
+  # ==========================================================================
+
+  def groups_fixture
+    [
+      { key: "offense", label: "Offense", cols_class: "grid-cols-2",
+        columns: [
+          { key: "QB", label: "QB", cards: [{ id: "qb1", zone: "QB", title: "QB1", repo: "d1", who: "1" }] },
+          { key: "RB", label: "RB", cards: [{ id: "rb1", zone: "RB", title: "RB1", repo: "d1", who: "1" }] } ] },
+      { key: "defense", label: "Defense",
+        columns: [
+          { key: "CB", label: "CB", cards: [{ id: "cb1", zone: "CB", title: "CB1", repo: "d1", who: "1" }] } ] }
+    ]
+  end
+
+  # --- DG3: a two-level side→position grid via `groups:` ---------------------
+
+  test "DG3 — groups render labelled sections, each a grid of its position lanes" do
+    html = render_board(DEFAULT_LOCALS.merge(
+      groups: groups_fixture, zone_attr: "position", card_locals: { zone_attr: "position" }
+    ))
+
+    assert_includes html, 'data-board-group="offense"', "each side is a labelled section"
+    assert_includes html, 'data-board-group="defense"'
+    assert_includes html, ">Offense<", "the group label renders"
+    assert_includes html, "grid gap-4 grid-cols-2", "offense uses its cols_class grid"
+    assert_includes html, "grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4",
+      "a group without cols_class falls back to the responsive default"
+    # the identity contract still holds inside the grid
+    assert_includes html, 'id="dropzone-QB"'
+    assert_includes html, 'id="dropzone-CB"'
+    assert_includes html, 'data-position="QB"'
+    # the grid columns drop the flat-row width utilities
+    refute_includes html, "sm:flex-1", "a grid lane is sized by the cell, not flex-1"
+    # the factory's label map merges across EVERY group's columns
+    opts = board_opts_hash(html)
+    assert_equal "QB", opts["labels"]["QB"]
+    assert_equal "CB", opts["labels"]["CB"], "labels reach into every group"
+  end
+
+  test "DG3 backward-compat — no groups renders the 0.28.0 flat row" do
+    html = render_board(DEFAULT_LOCALS.merge(columns: columns_fixture))
+    refute_includes html, "studio-board-group", "a flat board has no group sections"
+    assert_includes html, "sm:flex-row", "it keeps the horizontal flex row"
+    assert_includes html, "sm:flex-1", "and the flex-1 columns"
+  end
+
+  # --- DG4: per-card lock (contract + factory opt) ---------------------------
+
+  test "DG4 — a locked card carries .kanban-locked + data-locked; lockedSelector rides the opts" do
+    html = render_board(DEFAULT_LOCALS.merge(
+      columns: [{ key: "QB", label: "QB", cards: [
+        { id: "starter", zone: "QB", title: "Starter", repo: "d1", who: "1", locked: true },
+        { id: "backup",  zone: "QB", title: "Backup",  repo: "d2", who: "2" } ] }],
+      zone_attr: "position", card_locals: { zone_attr: "position" },
+      locked_selector: ".kanban-locked"
+    ))
+
+    assert_match(/id="card-starter"[^>]*kanban-locked/m, html, "the pinned card carries .kanban-locked")
+    assert_match(/id="card-starter"[^>]*data-locked="true"/m, html, "and the data-locked marker")
+    refute_match(/id="card-backup"[^>]*kanban-locked/m, html, "an unlocked card does NOT")
+    assert_equal ".kanban-locked", board_opts_hash(html)["lockedSelector"],
+      "the factory is told which cards to pin"
+  end
+
+  test "DG4 backward-compat — no locked_selector ⇒ lockedSelector opt is null" do
+    html = render_board(DEFAULT_LOCALS.merge(columns: columns_fixture))
+    assert_nil board_opts_hash(html)["lockedSelector"], "every card stays draggable (0.28.0)"
+  end
+
+  test "DG4 — the factory keeps the lock filter + pin guard present in source" do
+    factory = File.read("app/views/studio/_board_assets.html.erb")
+    assert_includes factory, "self.lockedSelector ? (self.sortFilter",
+      "locked cards join the undraggable filter"
+    assert_includes factory, "cfg.onMove = function",
+      "a drag can't cross a locked sibling (the pin guard)"
+  end
+
+  # --- the /admin/style specimen demonstrates the depth-chart shape LIVE ------
+
+  test "the /admin/style Tasks section renders the depth-chart grid+lock specimen (0.29.0)" do
+    html = view.render(template: "style/index")
+
+    assert_includes html, 'data-board-group="offense"', "the specimen renders side sections"
+    assert_includes html, 'data-board-group="defense"'
+    assert_includes html, 'id="dropzone-QB"', "position lanes render as columns in the grid"
+    assert_match(/id="card-dc-qb1"[^>]*kanban-locked/m, html, "the starter is pinned (locked)")
+    assert_includes html, 'data-position="QB"', "the lane zone_attr is position"
+
+    # All three board specimens coexist on the page.
+    assert_includes html, 'id="card-engine-board-primitive"', "the 0.27.0 demo specimen stays"
+    assert_includes html, "studio-board-chrome", "the 0.28.0 chrome specimen stays"
+  end
 end

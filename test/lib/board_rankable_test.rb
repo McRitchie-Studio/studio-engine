@@ -25,10 +25,28 @@ ActiveRecord::Schema.define do
     t.integer :position
     t.timestamps
   end
+
+  # The depth-chart shape (0.29.0 / DG): ranks by a `depth` column (1 = starter),
+  # its `position` column holds a lane-code STRING, and it pins locked starters.
+  create_table :depth_widgets, force: true do |t|
+    t.string  :position        # a lane code (QB/RB) — NOT the rank
+    t.string  :position_group  # the zone the record ranks within
+    t.integer :depth           # the rank column (1 = starter, on top)
+    t.boolean :locked, default: false
+    t.timestamps
+  end
 end
 
 class BoardWidget < ActiveRecord::Base
   include Studio::Board::Rankable
+  before_create :set_initial_position
+end
+
+class DepthWidget < ActiveRecord::Base
+  include Studio::Board::Rankable
+  self.board_zone_attr  = :position_group
+  self.board_rank_attr  = :depth   # DG1: rank by depth, not position
+  self.board_rank_order = :asc     # DG1: depth 1 sits on top
   before_create :set_initial_position
 end
 
@@ -131,6 +149,84 @@ class BoardRankableTest < ActiveSupport::TestCase
   end
 end
 
+# --- 0.29.0 / DG — the four depth-chart gaps (Rankable half) ------------------
+# Each asserts the RENDERED EFFECT of a configured (depth-chart-shaped) model, with
+# a backward-compat check that the default (:position/:desc/no-lock) is unchanged.
+class BoardRankableDepthChartTest < ActiveSupport::TestCase
+  def setup
+    DepthWidget.delete_all
+  end
+
+  # --- DG1: rank by a configured column, in a configured direction -----------
+
+  test "DG1 — board_ordered ranks by board_rank_attr in board_rank_order (depth ASC)" do
+    c = DepthWidget.create!(position: "QB", position_group: "QB", depth: 3)
+    a = DepthWidget.create!(position: "QB", position_group: "QB", depth: 1) # starter
+    b = DepthWidget.create!(position: "QB", position_group: "QB", depth: 2)
+
+    # depth 1 (the starter) sorts to the TOP under :asc.
+    assert_equal [a.id, b.id, c.id], DepthWidget.board_ordered.pluck(:id)
+    sql = DepthWidget.board_ordered.to_sql
+    assert_match(/["`]?depth["`]?\s+ASC/i, sql, "orders by the configured column + direction")
+    assert_includes sql, "NULLS LAST"
+    # The kanban default is unchanged: BoardWidget still orders position DESC.
+    assert_includes BoardWidget.board_ordered.to_sql, "DESC"
+  end
+
+  test "DG1 — reposition! and set_initial_position write the rank column, not position" do
+    a = DepthWidget.create!(position: "RB", position_group: "RB", depth: 5)
+    b = DepthWidget.create!(position: "RB", position_group: "RB", depth: 6)
+
+    DepthWidget.reposition!([a.id, b.id], gap: 1, direction: :asc, id_attr: :id)
+
+    assert_equal 1, a.reload.depth, "the rank lands in :depth"
+    assert_equal 2, b.reload.depth
+    assert_equal "RB", a.position, "the string `position` lane is left untouched"
+
+    fresh = DepthWidget.new(position: "WR", position_group: "WR")
+    fresh.set_initial_position
+    assert_equal 100, fresh.depth, "the genesis seed writes to :depth"
+    assert_equal "WR", fresh.position, "and never clobbers the string lane"
+  end
+
+  # --- DG2: sequential 1..N ranks --------------------------------------------
+
+  test "DG2 — reposition! gap:1 direction:asc stamps sequential 1..N (not 100-gaps)" do
+    ids = [50, 51, 52].map { |d| DepthWidget.create!(position: "QB", position_group: "QB", depth: d).id }
+
+    DepthWidget.reposition!(ids, gap: 1, direction: :asc, id_attr: :id)
+
+    assert_equal [1, 2, 3], ids.map { |id| DepthWidget.find(id).depth },
+      "the DOM-top entry is depth 1, each next +1"
+  end
+
+  # --- DG4: skip_locked pins a card ------------------------------------------
+
+  test "DG4 — reposition! skip_locked leaves a pinned entry's rank untouched" do
+    a = DepthWidget.create!(position: "QB", position_group: "QB", depth: 1, locked: true) # pinned starter
+    b = DepthWidget.create!(position: "QB", position_group: "QB", depth: 2, locked: false)
+    c = DepthWidget.create!(position: "QB", position_group: "QB", depth: 3, locked: false)
+
+    # A drag tries to pull c above the locked starter. The pin holds: a stays depth 1,
+    # the unlocked cards take the remaining sequential slots.
+    DepthWidget.reposition!([a.id, c.id, b.id], gap: 1, direction: :asc, id_attr: :id, skip_locked: true)
+
+    assert_equal 1, a.reload.depth, "the locked starter keeps its depth"
+    assert_equal 2, c.reload.depth, "unlocked cards reflow into 1..N around it"
+    assert_equal 3, b.reload.depth
+  end
+
+  test "DG4 backward-compat — without skip_locked EVERY row restamps (0.28.0)" do
+    a = DepthWidget.create!(position: "QB", position_group: "QB", depth: 1, locked: true)
+    b = DepthWidget.create!(position: "QB", position_group: "QB", depth: 2, locked: false)
+
+    DepthWidget.reposition!([b.id, a.id], gap: 1, direction: :asc, id_attr: :id) # no skip_locked
+
+    assert_equal 1, b.reload.depth, "the DOM-top card is depth 1"
+    assert_equal 2, a.reload.depth, "a locked card is NOT skipped when skip_locked is off"
+  end
+end
+
 # --- Reorderable — the shared controller action ------------------------------
 
 # A bare probe including the concern (no ActionController needed): the concern only
@@ -144,6 +240,60 @@ class BoardReorderableProbe
 
   def render(opts)
     @rendered = opts
+  end
+end
+
+# The depth-chart reorder config (DG1/DG2/DG4): 1..N depths, ascending, lock-skip.
+class DepthReorderProbe
+  include Studio::Board::Reorderable
+  board_reorderable model: DepthWidget, id_attr: :id, param: :ids,
+                    gap: 1, direction: :asc, skip_locked: true
+
+  attr_accessor :params, :rendered
+
+  def render(opts)
+    @rendered = opts
+  end
+end
+
+class BoardReorderableDepthChartTest < ActiveSupport::TestCase
+  def setup
+    DepthWidget.delete_all
+  end
+
+  test "DG4 — board_reorderable threads gap/direction/skip_locked through the restamp" do
+    a = DepthWidget.create!(position: "QB", position_group: "QB", depth: 1, locked: true)
+    b = DepthWidget.create!(position: "QB", position_group: "QB", depth: 2, locked: false)
+
+    probe = DepthReorderProbe.new
+    probe.params = { ids: [a.id, b.id] }
+    probe.reorder
+
+    assert_equal({ success: true }, probe.rendered[:json])
+    assert_equal 1, a.reload.depth, "the pinned entry is skipped (still depth 1)"
+    assert_equal 2, b.reload.depth, "the unlocked entry takes its sequential slot"
+  end
+
+  test "DG4 — board_toggle_lock flips the lock flag and renders it" do
+    a = DepthWidget.create!(position: "QB", position_group: "QB", depth: 1, locked: false)
+
+    probe = DepthReorderProbe.new
+    probe.params = { id: a.id }
+    probe.board_toggle_lock
+
+    assert_equal({ ok: true, locked: true }, probe.rendered[:json])
+    assert a.reload.locked, "the flag is set on"
+
+    probe.board_toggle_lock
+    assert_equal false, a.reload.locked, "a second toggle clears it"
+  end
+
+  test "DG4 — board_toggle_lock 404s an unknown id" do
+    probe = DepthReorderProbe.new
+    probe.params = { id: 999_999 }
+    probe.board_toggle_lock
+
+    assert_equal :not_found, probe.rendered[:status]
   end
 end
 
