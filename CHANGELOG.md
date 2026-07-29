@@ -2,6 +2,54 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.26.1 — 2026-07-28
+
+**Fix the `/admin/style` Design System page breaking when reached via Turbo Drive
+navigation (the admin sidebar "Design System" link).** Reached by a direct page
+load the page was fine; reached by an in-app Turbo visit its modals would not open
+on a card click and EVERY specimen glow ring lit at once. Both symptoms were one
+cause: the page-scoped `dsModals` (and `dsSolanaModal`) Alpine store was registered
+ONLY inside a `document.addEventListener('alpine:init', …)` handler in the page
+body. Alpine loads via a deferred CDN `<script>` in the engine head and fires
+`alpine:init` exactly once, on the first full-document load; Turbo Drive advance
+visits swap `<body>` without reloading that head script, so `alpine:init` never
+fires again — and because the registration lives only in the `/admin/style` body,
+it was absent during that one `alpine:init`. The specimen cards' `x-data` still
+re-initialize on the Turbo body swap (Alpine's MutationObserver), so their
+`@click="$store.dsModals.open(…)"`, `:style` glow bindings, and the host's
+`<template x-if="$store.dsModals.current()…">` all evaluated against an undefined
+store and threw `Cannot read properties of undefined (reading 'current')` — no
+modal opened, and the throwing `:style` wiped each card's static inline
+`--studio-team-glow-opacity: 0`, so the CSS default of `1` relit all rings.
+
+### Fixed
+
+- **`style/_modals`** — the `dsModals` + `dsSolanaModal` registration is now a
+  named `registerDsModals()` invoked through the same dual-guard the engine
+  already uses for `studio/modals/_image_upload`'s `cropPhotoModal`:
+  `if (window.Alpine) registerDsModals(); else document.addEventListener('alpine:init', registerDsModals);`.
+  On a Turbo visit Alpine has already started, so the store registers immediately
+  (the body script re-runs on every Turbo render) and `$store.dsModals` is defined
+  before the cards' bindings evaluate; on a first load Alpine has not booted yet,
+  so it still defers to `alpine:init`. The `if (Alpine.store('dsModals')) return;`
+  idempotency guard is unchanged, so a later `alpine:init` is a no-op. No consumer
+  change is required — `/admin/style` is an engine page.
+- **Docs** — `style/_modal_specimen`'s fail-closed comment now records that the
+  static inline `--studio-team-glow-opacity: 0` guards the ring only while
+  `$store.dsModals` is DEFINED (a throwing `:style` wipes the inline value) — the
+  refinement of 0.24.1's "regardless of Alpine timing" claim that this bug exposed.
+
+### Swept
+
+- Audited every engine `Alpine.store(...)` / `Alpine.data(...)` registration for
+  the same Turbo-visit fragility. `dsModals`/`dsSolanaModal` (`style/_modals`) was
+  the only page-scoped registration missing the guard. `studio/modals/_image_upload`
+  (`cropPhotoModal`) already carries it; the shared modal host (`studio/modals/_host`
+  → `modals`) and the theme/devMode stores (`layouts/studio/_head`) are app-wide
+  bootstrap rendered on the first full load, so their single `alpine:init`
+  registration persists across Turbo visits (verified: `$store.modals` stays
+  defined after a Turbo nav).
+
 ## 0.26.0 — 2026-07-28
 
 **The engine navbar pins itself under smooth-load, and the smooth-load CSS is
@@ -143,6 +191,12 @@ follows the step machine), so this surfaced as a flash-of-all-glow on load.
   cross-fade, so the active-card glow and its slide between step cards are
   unchanged. The `engine-motion.css` `.studio-team-glow` default is untouched
   (the always-on Tricks demos depend on it).
+
+  > **Refined in 0.26.1:** "regardless of Alpine timing" holds only while
+  > `$store.dsModals` is defined. On a Turbo Drive visit the store went
+  > unregistered, the reactive `:style` threw, and Alpine wiped this inline
+  > default — relighting every ring. 0.26.1 dual-guards the store registration so
+  > it survives Turbo visits, restoring the fail-closed guarantee.
 
 ## 0.24.0 — 2026-07-28
 
