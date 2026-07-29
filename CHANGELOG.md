@@ -2,6 +2,43 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.29.0 — 2026-07-29
+
+**The four depth-chart gaps folded into the `studio/board` primitive (Phase D), so
+the MS depth chart can rebase onto it like `/tasks`, news, and content did.** The
+0.28.0 primitive fit the near-identical kanban boards; the depth chart is more
+custom — it ranks by a `depth` column (1 = starter) while its `position` column
+holds a lane-code string, lays its lanes out in a two-level side→position grid, and
+pins locked starters. Each capability is **additive and opt-in — every hook omitted
+renders and ranks exactly as 0.28.0**, so `/tasks`, news, and content are untouched.
+
+### Added
+
+- **DG1 — configurable rank column + sort direction** (`Studio::Board::Rankable`):
+  `board_rank_attr` (default `:position`) and `board_rank_order` (default `:desc`)
+  thread through `board_ordered`, `board_next_position`, `set_initial_position`, and
+  `reposition!`. A depth chart sets `board_rank_attr = :depth`, `board_rank_order =
+  :asc` (depth 1 on top). The order fragment quotes the column and whitelists the
+  ASC/DESC literal — never user input.
+- **DG2 — sequential 1..N ranks**: `reposition!(ids, gap: 1, direction: :asc)` stamps
+  `1, 2, 3, … N` (the depth numbers) instead of the 100-gapped default.
+- **DG3 — two-level side→position grid**: `studio/board/_board` accepts `groups:`
+  (`[{ key:, label:, cols_class:, columns: [...] }]`) and renders each group as a
+  labelled section whose lanes lay out in a responsive grid; `studio/board/_column`
+  gains `layout: "grid"` (drops the flex-row width utilities so the grid cell sizes
+  the column). Omit `groups:` for the unchanged flat row.
+- **DG4 — per-card lock/pin**: `reposition!(skip_locked: true, lock_attr: :locked)`
+  leaves a pinned entry's rank untouched; `Studio::Board::Reorderable` gains the
+  matching `board_reorderable(rank_attr:, skip_locked:, lock_attr:)` config plus a
+  `board_toggle_lock` action (config-gated, `rescue_and_log(target:)` discipline,
+  `{ ok:, locked: }`); `studio/board/_card_shell` accepts `locked: true` (adds
+  `.kanban-locked` + `data-locked`); the `studioBoard` factory takes a
+  `lockedSelector` opt that filters locked cards from dragging and refuses a move
+  that would cross one, so a pinned starter keeps its slot while the rest reflow.
+- **`/admin/style`** gains a third live board specimen — the depth-chart shape:
+  Offense/Defense sections, position lanes in a grid, within-lane reorder, and 🔒
+  pinned starters.
+
 ## 0.27.0 — 2026-07-28
 
 **Two coordinated modal flows on the `/admin/style` Design System page — a walked

@@ -24,6 +24,11 @@
     card_class:    the required base class. Default "kanban-card".
     class:         extra classes appended after card_class.
     style:         inline style string.
+    locked:        DG4 — a PINNED card the reorder skips (a confirmed depth-chart
+                   starter). Adds the `.kanban-locked` class the studioBoard factory
+                   filters from dragging + the `data-locked="true"` marker; false
+                   (default) renders identically to before. Purely a hook — the lock
+                   glyph/visual lives in the app's card body.
     attrs:         Hash of extra root attributes ({ "x-data" => "…", "data-foo" => 1 }),
                    values are HTML-escaped — the rebase seam for a card that carries
                    its own Alpine/data-* on the root.
@@ -37,11 +42,14 @@
   card_class    = local_assigns.fetch(:card_class, "kanban-card")
   extra_class   = local_assigns.fetch(:class, nil)
   inline_style  = local_assigns.fetch(:style, nil)
+  locked        = local_assigns.fetch(:locked, false)
   root_attrs    = local_assigns.fetch(:attrs, {}) || {}
+  classes       = [card_class, ("kanban-locked" if locked), extra_class].compact.join(" ")
 %>
 <div id="<%= dom_id_prefix %><%= id %>"
-     class="<%= [card_class, extra_class].compact.join(" ") %>"
+     class="<%= classes %>"
      data-<%= id_attr %>="<%= id %>"
      data-<%= zone_attr %>="<%= zone %>"
+     <% if locked %>data-locked="true"<% end %>
      <% root_attrs.each do |name, value| %><%= name %>="<%= value %>" <% end %>
      <% if inline_style %>style="<%= inline_style %>"<% end %>><%= yield %></div>
