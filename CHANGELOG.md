@@ -2,6 +2,55 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.27.0 — 2026-07-28
+
+**Two coordinated modal flows on the `/admin/style` Design System page — a walked
+"Web3 Contest" wallet → on-chain flow and an extended "Contest entry & eligibility"
+flow — plus a reusable minimum-visible-duration convention for load modals.** All
+specimens are DEMO chrome (`demo: true`, no real signing); the engine gains only
+view/chrome primitives and keeps custodial keys, wallet/multisig signing,
+`Solana::Config`, and every on-chain write app-side.
+
+### Added
+
+- **Minimum-visible-duration convention** — `studio/modals/_load_convention`
+  ships `window.StudioModals.holdAtLeast(minMs)` + a standard
+  `MIN_LOAD_MS` (1400) as a SINGLE definition, rendered by both the shared modal
+  host (`studio/modals/_host`, which drops its inline copy) and the style page.
+  A load spinner holds for at least `min_duration`, longer if the real async runs
+  longer — `resolveAt = max(min_duration, actual_completion)`; in demo mode
+  `min_duration` doubles as the auto-resolve timer. `_processing_card` gains
+  `min_duration` + `resolve_expr` locals so a demo load card self-advances.
+- **Web3 Contest** section (renamed from "Web3") — a walked flow with
+  glow-follows-the-flow continuity: Connect Wallet → Processing on-chain
+  transaction → On-chain success. The Processing card is a load modal with a demo
+  success/error toggle (unchecked resolves to success, checked to error), both
+  resolved states built. Picking a wallet swaps to Processing, which auto-resolves
+  after the min-load duration.
+- **Contest entry & eligibility** section (renamed from "Eligibility & entry",
+  moved directly under Web3 Contest) — the entry flow extended to
+  Entry tokens → Payment processing → Entry Tokens Minted → Contest enter
+  processing → Contest entered, with the glow following the step machine. Keeps
+  the Age gate + Entry tokens cards. The section states the honest web2/web3 map:
+  the token mint is web2-only (web3 funds USDC on-chain directly, no token); the
+  paths diverge at the funding front-end and the entry-submit endpoint, then
+  converge on the same on-chain Entry PDA and the same "Entry Confirmed" card.
+
+### Changed
+
+- **`studio/modals/_host`** — the `holdAtLeast` helper now lives in the shared
+  `_load_convention` partial (same API, byte-identical behavior) so the host and
+  the DS page share one definition instead of drifting copies.
+- **`style/modals/_entry_tokens`** — the confirming step uses the min-load
+  convention instead of a hardcoded timeout, and the step machine gains
+  `entering` + `entered` so hold-to-confirm walks through the on-chain consume to
+  the shared Entry Confirmed finish.
+- **`style/modals/_onchain_tx`** — a processing modal opened with `demoResolve`
+  auto-resolves to success (or error when `demoError`) after the min-load
+  duration, honoring the convention.
+- The Modals-section glow helper discriminates the on-chain-tx `state` and a
+  configurable step default, so the glow tracks a walked flow across modal ids.
+
 ## 0.26.1 — 2026-07-28
 
 **Fix the `/admin/style` Design System page breaking when reached via Turbo Drive

@@ -42,18 +42,22 @@
 
   # Active-card glow-match expression builder: yields an Alpine boolean that is
   # true when $store.dsModals.current() is THIS specimen's modal. It discriminates
-  # by sub-state so two specimens that open the SAME modal id still glow the right
-  # card: `step:` for the auth step machine, and `crop:` for the two crop-photo
-  # variants (:picker vs :crop). The crop sub-state rides props.cropReady — the
-  # crop factory sets it true when the cropper mounts (on a direct image OR after
-  # an in-modal pick), so the glow moves picker -> cropper as the flow advances.
-  ds_glow = lambda do |id, step: nil, crop: nil, celebrate: nil|
+  # by sub-state so specimens that open the SAME modal id still glow the right
+  # card, and so the glow FOLLOWS a walked flow as the step machine advances:
+  #   step:         the auth / entry-tokens step machine (step_default is the
+  #                 modal's own default step — 'credentials' for auth, 'picker'
+  #                 for entry-tokens).
+  #   state:        the on-chain-tx state (processing / success / error) — lets the
+  #                 glow track Connect Wallet -> Processing -> On-chain success.
+  #   crop:         the two crop-photo variants (:picker vs :crop), on props.cropReady.
+  #   celebrate:    the input specimen (form) vs the "updated" (celebrate) specimen
+  #                 of the SAME leveling modal id.
+  ds_glow = lambda do |id, step: nil, step_default: "credentials", crop: nil, celebrate: nil, state: nil|
     cur  = "$store.dsModals.current()"
     expr = "#{cur} && #{cur}.id === '#{id}'"
-    expr += " && (#{cur}.props.step || 'credentials') === '#{step}'" if step
+    expr += " && (#{cur}.props.step || '#{step_default}') === '#{step}'" if step
+    expr += " && #{cur}.props.state === '#{state}'" if state
     expr += (crop == :crop ? " && !!#{cur}.props.cropReady" : " && !#{cur}.props.cropReady") unless crop.nil?
-    # celebrate discriminates the input specimen (form) from the "updated" specimen
-    # (celebrate) of the SAME leveling modal id, mirroring the step/crop sub-states.
     expr += (celebrate ? " && !!#{cur}.props.celebrate" : " && !#{cur}.props.celebrate") unless celebrate.nil?
     expr
   end
@@ -263,6 +267,13 @@
     })();
   </script>
 
+  <%# The minimum-visible-duration convention (window.StudioModals.holdAtLeast +
+      MIN_LOAD_MS) — the SAME single definition the shared modal host renders, so
+      the demo load modals here (payment/entry processing, on-chain tx, saving)
+      honor resolveAt = max(min_duration, actual) and auto-resolve after
+      min_duration in demo mode. A consumer app already has it via the host. %>
+  <%= render "studio/modals/load_convention" %>
+
   <%# Cropper.js + the cropPhotoModal factory — makes the Profile crop / upload
       modals openable on this page (loads cropper.js via <script defer> and
       defines the factory inline; no importmap change). %>
@@ -310,8 +321,11 @@
         <template x-if="$store.dsModals.current().id === 'crop-photo'">
           <div><%= render "studio/modals/crop_photo", store: "dsModals" %></div>
         </template>
+        <%# saving — the demo passes resolve_expr so the spinner self-terminates
+            after min_duration (a real app's Turbo submit drives + closes it). %>
         <template x-if="$store.dsModals.current().id === 'saving'">
-          <div><%= render "studio/modals/saving", store: "dsModals" %></div>
+          <div><%= render "studio/modals/saving", store: "dsModals",
+                    resolve_expr: "$store.dsModals.close()" %></div>
         </template>
 
         <%# --- Web3 --- %>
@@ -335,9 +349,12 @@
         </template>
 
         <%# --- System and status (reusable card blocks) --- %>
+        <%# ds-processing demos the min-duration convention on the canonical block:
+            resolve_expr auto-swaps to the success card after min_duration. %>
         <template x-if="$store.dsModals.current().id === 'ds-processing'">
           <div><%= render "studio/modals/blocks/processing_card",
-                    title: "Confirming entry", message: "Talking to the server…" %></div>
+                    title: "Confirming entry", message: "Talking to the server…",
+                    resolve_expr: "$store.dsModals.swap('ds-success')" %></div>
         </template>
         <template x-if="$store.dsModals.current().id === 'ds-success'">
           <div><%= render "studio/modals/blocks/success_card",
@@ -524,68 +541,6 @@
   </section>
 
   <%# ===================================================================== %>
-  <%# 1b. ELIGIBILITY + ENTRY %>
-  <%# ===================================================================== %>
-  <section class="space-y-5">
-    <div class="space-y-1">
-      <div class="flex flex-wrap items-center gap-3">
-        <h3 class="text-xl font-bold text-heading">Eligibility &amp; entry</h3>
-        <% if age_gate_on %>
-          <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">age gate on</span>
-        <% else %>
-          <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">age gate off</span>
-        <% end %>
-      </div>
-      <p class="text-muted text-sm">
-        The pre-entry gate and the entry-purchase flow. The <strong>age gate</strong>
-        (<code class="font-mono text-2xs">studio/modals/blocks/_age_verify</code>) is a
-        NEW engine primitive gated by
-        <code class="font-mono text-2xs">Studio.feature?(:age_gate)</code> &mdash; a DOB
-        modal whose minimum age, jurisdiction label, endpoint, and legal copy are all
-        <strong>app-supplied</strong> (the engine hardcodes no policy). It is the heavier
-        sibling of the <code class="font-mono text-2xs">shared/_age_attestation</code>
-        checkbox inside Sign in above &mdash; <strong>run one or the other</strong>. The
-        <strong>entry-tokens</strong> flow is <strong>app-specific</strong> (payments
-        product): documented here composing engine chrome, but the packs, rails, and
-        the on-chain mint stay app-owned.
-      </p>
-    </div>
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%# Age gate — engine primitive, gated on :age_gate (disabled-but-present). %>
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Age gate (DOB)",
-            reference: %(the "Age gate" DOB modal (studio-engine studio/modals/blocks/_age_verify) — a NEW engine primitive; the app supplies min_age / state / submit_url / fine_print and the engine hardcodes no legal policy. In this demo, Confirm & Continue advances to the Entry tokens purchase (page-level dsModals wiring on the primitive's 'age-verified' hook; the primitive's real submit posts to submit_url). Open with $store.dsModals.open('age-verify')),
-            open_expr: "$store.dsModals.open('age-verify')",
-            glow_when: ds_glow.call("age-verify"),
-            disabled: !age_gate_on, openable: true, disabled_label: "age gate off" } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2 text-center">
-          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <div class="grid grid-cols-3 gap-1">
-            <span class="h-6 rounded border" style="border-color: var(--color-border-strong)"></span>
-            <span class="h-6 rounded border" style="border-color: var(--color-border-strong)"></span>
-            <span class="h-6 rounded border" style="border-color: var(--color-border-strong)"></span>
-          </div>
-          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
-        </div>
-      <% end %>
-
-      <%# Entry tokens — app-specific flow, documented (not capability-gated). %>
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Entry tokens",
-            reference: %(the "Entry tokens" purchase flow (app-specific — documented in the engine style guide composing studio/modals/blocks chrome). The packs, pricing, rails, and on-chain mint stay app-owned. Open with $store.dsModals.open('entry-tokens', { step: 'picker' })),
-            open_expr: "$store.dsModals.open('entry-tokens', { step: 'picker' })",
-            glow_when: ds_glow.call("entry-tokens") } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
-          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
-          <span class="block h-6 w-full rounded border" style="border-color: var(--color-primary)"></span>
-          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
-        </div>
-      <% end %>
-    </div>
-  </section>
-
-  <%# ===================================================================== %>
   <%# 2. PROFILE — crop / upload, live via cropper_assets %>
   <%# ===================================================================== %>
   <section class="space-y-5">
@@ -766,12 +721,13 @@
   </section>
 
   <%# ===================================================================== %>
-  <%# 4. WEB3 — gated by Studio.feature?(:web3); off = disabled-but-present-yet-openable %>
+  <%# 2. WEB3 CONTEST — the walked wallet -> on-chain flow (glow follows it). %>
+  <%# Gated by :web3; off = disabled-but-present-yet-openable. %>
   <%# ===================================================================== %>
   <section class="space-y-5">
     <div class="space-y-1">
       <div class="flex flex-wrap items-center gap-3">
-        <h3 class="text-xl font-bold text-heading">Web3</h3>
+        <h3 class="text-xl font-bold text-heading">Web3 Contest</h3>
         <% if web3_on %>
           <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">enabled on this app</span>
         <% else %>
@@ -779,21 +735,31 @@
         <% end %>
       </div>
       <p class="text-muted text-sm">
-        Wallet + on-chain modals, ported into the engine and gated by
+        The wallet + on-chain modals, ported into the engine and gated by
         <code class="font-mono text-2xs">Studio.feature?(:web3)</code>. Web3 is
         <strong><%= web3_on ? "on" : "off" %></strong> here, so these render
         <%= web3_on ? "live." : "greyed and badged — but STILL openable as a preview." %>
-        The Connect-wallet picker ships its <strong>Phantom / Solflare / Backpack
-        brand marks inline from the engine</strong>
+        The first three cards are a <strong>walked flow</strong> &mdash;
+        <strong>Connect Wallet &rarr; Processing on-chain transaction &rarr; On-chain
+        success</strong> &mdash; and the live card <strong>glows</strong>, following the
+        flow as it advances (open Connect Wallet and pick a wallet to watch it walk).
+        The <strong>Processing</strong> card is a load modal: its
+        <strong>success/error toggle</strong> chooses whether it resolves to success
+        or the error state, after the <strong>minimum-visible duration</strong>
+        (<code class="font-mono text-2xs">studio/modals/_load_convention</code>). The
+        Connect-wallet picker ships its <strong>Phantom / Solflare / Backpack brand
+        marks inline from the engine</strong>
         (<code class="font-mono text-2xs">studio/modals/blocks/_wallet_brand_sprite</code>),
         so every app inherits them with no per-app icon files.
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%# 1. Connect wallet — the walk's entry; picking a wallet swaps to Processing. %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Connect wallet",
-            reference: %(the Web3 "Connect wallet" picker (studio-engine style/modals/_wallet_connect) — open with $store.dsModals.open('wallet-connect')),
+            reference: %(the Web3 Contest "Connect wallet" picker (studio-engine style/modals/_wallet_connect) — the walk's entry: picking a wallet runs a brief connecting state then swaps to the on-chain Processing modal. Open with $store.dsModals.open('wallet-connect')),
             open_expr: "$store.dsModals.open('wallet-connect')",
+            glow_when: ds_glow.call("wallet-connect"),
             disabled: !web3_on, openable: true } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
           <span class="block h-2 w-20 rounded" style="background: var(--color-text); opacity: .18"></span>
@@ -802,10 +768,14 @@
         </div>
       <% end %>
 
+      <%# 2. Processing — the load modal; the success/error toggle picks the resolution. %>
       <%= render layout: "style/modal_specimen", locals: {
-            label:     "On-chain tx · processing",
-            reference: %(the Web3 "On-chain tx" modal, processing state (style/modals/_onchain_tx via $store.dsSolanaModal) — open with $store.dsModals.open('onchain-tx', { state: 'processing', title: 'Confirming on-chain', message: 'Waiting for the wallet signature…' })),
-            open_expr: "$store.dsModals.open('onchain-tx', { state: 'processing', title: 'Confirming on-chain', message: 'Waiting for the wallet signature…' })",
+            label:     "Processing on-chain tx",
+            reference: %(the Web3 Contest "Processing" on-chain load modal (style/modals/_onchain_tx via $store.dsSolanaModal) — holds the spinner at least MIN_LOAD_MS, then auto-resolves to success (or the error state when the toggle is set). Open with $store.dsModals.open('onchain-tx', { state: 'processing', demoResolve: true, demoError: false })),
+            card_data: "opts: { demoError: false }",
+            toggles:   [{ model: "opts.demoError", label: "Resolve to error" }],
+            open_expr: "$store.dsModals.open('onchain-tx', { state: 'processing', title: 'Confirming on-chain', message: 'Waiting for the wallet signature…', demoResolve: true, demoError: opts.demoError })",
+            glow_when: ds_glow.call("onchain-tx", state: "processing"),
             disabled: !web3_on, openable: true } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
           <div class="loading-dots mx-auto"><span></span><span></span><span></span></div>
@@ -813,10 +783,12 @@
         </div>
       <% end %>
 
+      <%# 3. On-chain success — the resolved success end-state (the walk's finish). %>
       <%= render layout: "style/modal_specimen", locals: {
-            label:     "On-chain tx · success",
-            reference: %(the Web3 "On-chain tx" modal, generic-success state (style/modals/_onchain_tx + studio/modals/blocks/_onchain_success) — open with $store.dsModals.open('onchain-tx', { state: 'success', txSignature: '…', successTitle: 'Mint complete' })),
+            label:     "On-chain success",
+            reference: %(the Web3 Contest "On-chain success" state (style/modals/_onchain_tx + studio/modals/blocks/_onchain_success) — the resolved success card the walk lands on. Open with $store.dsModals.open('onchain-tx', { state: 'success', txSignature: '…', successTitle: 'Mint complete' })),
             open_expr: "$store.dsModals.open('onchain-tx', { state: 'success', txSignature: '5xTrDemoSignature1234567890', successTitle: 'Mint complete', successSubtitle: 'Your on-chain action confirmed.', ctaLabel: 'View wallet', ctaHref: null })",
+            glow_when: ds_glow.call("onchain-tx", state: "success"),
             disabled: !web3_on, openable: true } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
           <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-success) 15%, transparent)">
@@ -826,10 +798,12 @@
         </div>
       <% end %>
 
+      <%# On-chain error — the resolved error end-state (the toggle's other branch). %>
       <%= render layout: "style/modal_specimen", locals: {
-            label:     "On-chain tx · error",
-            reference: %(the Web3 "On-chain tx" modal, error state (style/modals/_onchain_tx) — open with $store.dsModals.open('onchain-tx', { state: 'error', title: "Couldn't confirm", errorMessage: 'The transaction was rejected. Give it another try.' })),
+            label:     "On-chain error",
+            reference: %(the Web3 Contest "On-chain error" state (style/modals/_onchain_tx) — the resolved error card the Processing toggle resolves to. Open with $store.dsModals.open('onchain-tx', { state: 'error', title: "Couldn't confirm", errorMessage: 'The transaction was rejected. Give it another try.' })),
             open_expr: "$store.dsModals.open('onchain-tx', { state: 'error', title: 'Could not confirm', errorMessage: 'The transaction was rejected. Give it another try.' })",
+            glow_when: ds_glow.call("onchain-tx", state: "error"),
             disabled: !web3_on, openable: true } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
           <div class="text-2xl leading-none">⚠️</div>
@@ -837,9 +811,10 @@
         </div>
       <% end %>
 
+      <%# Wallet deposit — standalone top-up card (not part of the walk). %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Wallet deposit",
-            reference: %(the Web3 "Wallet deposit" top-up card (style/modals/_wallet_deposit) — open with $store.dsModals.open('wallet-deposit', { neededCents: 500, usdcCents: 120, usdtCents: 0, address: 'Fo1L5…' })),
+            reference: %(the Web3 Contest "Wallet deposit" top-up card (style/modals/_wallet_deposit) — open with $store.dsModals.open('wallet-deposit', { neededCents: 500, usdcCents: 120, usdtCents: 0, address: 'Fo1L5…' })),
             open_expr: "$store.dsModals.open('wallet-deposit', { neededCents: 500, usdcCents: 120, usdtCents: 0, address: 'Fo1L5demoWALLETaddr9xQ2' })",
             disabled: !web3_on, openable: true } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
@@ -855,7 +830,7 @@
           Rewards below (gated by :leveling). %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Entry confirmed",
-            reference: %(the Web3 "Entry confirmed" celebration (studio/modals/blocks/_entry_confirmed, composed via _success_card's yield — branded tx link + heading + drain CTA; the seeds bar is gated off by :leveling and stays hidden here) — open with $store.dsModals.open('entry-confirmed', { txSignature: '…', lobbyUrl: null, seedsEarned: 0 })),
+            reference: %(the Web3 Contest "Entry confirmed" celebration (studio/modals/blocks/_entry_confirmed, composed via _success_card's yield — branded tx link + heading + drain CTA; the seeds bar is gated off by :leveling and stays hidden here) — open with $store.dsModals.open('entry-confirmed', { txSignature: '…', lobbyUrl: null, seedsEarned: 0 })),
             open_expr: "$store.dsModals.open('entry-confirmed', { txSignature: '5xTrDemoSignature1234567890abcXYZ', lobbyUrl: null, seedsEarned: 0, seedsTotal: 40 })",
             disabled: !web3_on, openable: true } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
@@ -864,6 +839,144 @@
           </div>
           <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
           <span class="block h-1.5 w-14 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <%# ===================================================================== %>
+  <%# 3. CONTEST ENTRY & ELIGIBILITY — moved directly under Web3 Contest. The %>
+  <%# walked entry flow (glow follows), plus the honest web2/web3 map. %>
+  <%# ===================================================================== %>
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <div class="flex flex-wrap items-center gap-3">
+        <h3 class="text-xl font-bold text-heading">Contest entry &amp; eligibility</h3>
+        <% if age_gate_on %>
+          <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">age gate on</span>
+        <% else %>
+          <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">age gate off</span>
+        <% end %>
+      </div>
+      <p class="text-muted text-sm">
+        The pre-entry gate and the full entry flow. The <strong>age gate</strong>
+        (<code class="font-mono text-2xs">studio/modals/blocks/_age_verify</code>) is an
+        engine primitive gated by
+        <code class="font-mono text-2xs">Studio.feature?(:age_gate)</code> &mdash; a DOB
+        modal whose minimum age, jurisdiction label, endpoint, and legal copy are all
+        <strong>app-supplied</strong> (the engine hardcodes no policy). The entry flow is
+        a <strong>walked sequence</strong> &mdash; <strong>Entry tokens &rarr; Payment
+        processing &rarr; Entry Tokens Minted &rarr; Contest enter processing &rarr;
+        Contest entered</strong> &mdash; and the live card <strong>glows</strong>,
+        following the step machine (the two load steps honor the same min-duration
+        convention as Web3 Contest above).
+      </p>
+      <%# The web2/web3 finding — a real divergence, stated honestly, not invented. %>
+      <div class="mt-2 rounded-lg border border-subtle bg-surface p-3 text-xs text-secondary leading-snug">
+        <p class="text-heading font-semibold mb-1">Web2 vs web3 — the honest map</p>
+        <p class="mb-1">
+          The two funding paths <strong>diverge at the front-end and the entry-submit
+          endpoint, then converge</strong>. <strong>Web2</strong> (card / Stripe /
+          Coinflow / PayPal) mints one prepaid entry token per credit on-chain after
+          payment clears, then <strong>consumes</strong> one token to enter.
+          <strong>Web3</strong> (wallet / USDC on-chain) funds USDC directly and
+          <strong>mints no token</strong> &mdash; the mint&nbsp;&rarr;&nbsp;consume prelude
+          is web2-only.
+        </p>
+        <p>
+          Both create the <strong>same on-chain Entry PDA</strong> and resolve to the
+          <strong>same “Entry Confirmed” card</strong>. The walk below demos the web2
+          path end-to-end; web3 skips the mint and joins at
+          <strong>enter&nbsp;&rarr;&nbsp;entered</strong>.
+        </p>
+      </div>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%# Age gate — engine primitive, gated on :age_gate (disabled-but-present). %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Age gate (DOB)",
+            reference: %(the "Age gate" DOB modal (studio-engine studio/modals/blocks/_age_verify) — an engine primitive; the app supplies min_age / state / submit_url / fine_print and the engine hardcodes no legal policy. In this demo, Confirm & Continue advances to the Entry tokens purchase (page-level dsModals wiring on the primitive's 'age-verified' hook; the primitive's real submit posts to submit_url). Open with $store.dsModals.open('age-verify')),
+            open_expr: "$store.dsModals.open('age-verify')",
+            glow_when: ds_glow.call("age-verify"),
+            disabled: !age_gate_on, openable: true, disabled_label: "age gate off" } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2 text-center">
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <div class="grid grid-cols-3 gap-1">
+            <span class="h-6 rounded border" style="border-color: var(--color-border-strong)"></span>
+            <span class="h-6 rounded border" style="border-color: var(--color-border-strong)"></span>
+            <span class="h-6 rounded border" style="border-color: var(--color-border-strong)"></span>
+          </div>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+
+      <%# 1. Entry tokens — the picker (walk's entry). Picking a pack advances. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Entry tokens",
+            reference: %(the "Entry tokens" picker (app-specific — documented composing studio/modals/blocks chrome). The packs, pricing, rails, and on-chain mint stay app-owned. Picking a pack walks Payment processing -> Minted -> enter -> entered. Open with $store.dsModals.open('entry-tokens', { step: 'picker' })),
+            open_expr: "$store.dsModals.open('entry-tokens', { step: 'picker' })",
+            glow_when: ds_glow.call("entry-tokens", step: "picker", step_default: "picker") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
+          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+          <span class="block h-6 w-full rounded border" style="border-color: var(--color-primary)"></span>
+          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+        </div>
+      <% end %>
+
+      <%# 2. Payment processing — the mint-at-purchase load step (web2). %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Payment processing",
+            reference: %(the "Payment processing" step (entry-tokens step 'confirming') — "Confirming your purchase…" over "Payment cleared — a server job mints one prepaid entry credit per token on-chain." A load modal; honors the min-duration convention then auto-advances to Entry Tokens Minted. Open with $store.dsModals.open('entry-tokens', { step: 'confirming', mintedCount: 3, mintedBalance: '3' })),
+            open_expr: "$store.dsModals.open('entry-tokens', { step: 'confirming', mintedCount: 3, mintedBalance: '3' })",
+            glow_when: ds_glow.call("entry-tokens", step: "confirming", step_default: "picker") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="loading-dots mx-auto"><span></span><span></span><span></span></div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+        </div>
+      <% end %>
+
+      <%# 3. Entry Tokens Minted — ready to consume at entry (hold to confirm). %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Entry Tokens Minted",
+            reference: %(the "Entry Tokens Minted" step (entry-tokens step 'minted') — "You now have N available." Holding to confirm consumes one token on-chain to create the contest entry (advances to Contest enter processing). Open with $store.dsModals.open('entry-tokens', { step: 'minted', mintedCount: 3, mintedBalance: '3' })),
+            open_expr: "$store.dsModals.open('entry-tokens', { step: 'minted', mintedCount: 3, mintedBalance: '3' })",
+            glow_when: ds_glow.call("entry-tokens", step: "minted", step_default: "picker") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-primary) 15%, transparent)">
+            <span class="text-sm font-bold" style="color: var(--color-primary)">3</span>
+          </div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+
+      <%# 4. Contest enter processing — the on-chain consume load step. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Contest enter processing",
+            reference: %(the "Contest enter processing" step (entry-tokens step 'entering') — "Confirming your entry…" over "Consuming one token on-chain to create your contest entry." A load modal; honors the min-duration convention then auto-advances to Contest entered. Open with $store.dsModals.open('entry-tokens', { step: 'entering' })),
+            open_expr: "$store.dsModals.open('entry-tokens', { step: 'entering' })",
+            glow_when: ds_glow.call("entry-tokens", step: "entering", step_default: "picker") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="loading-dots mx-auto"><span></span><span></span><span></span></div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+        </div>
+      <% end %>
+
+      <%# 5. Contest entered — the shared Entry Confirmed finish (web2 + web3 converge). %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Contest entered",
+            reference: %(the "Contest entered" success (entry-tokens step 'entered') — "Good Luck / Entry Confirmed" with the branded on-chain tx link and a Contest Lobby CTA. The SAME finish both web2 and web3 entries converge on. Open with $store.dsModals.open('entry-tokens', { step: 'entered', txSignature: '…' })),
+            open_expr: "$store.dsModals.open('entry-tokens', { step: 'entered', txSignature: '5xTrDemoEntrySignature1234567890abc' })",
+            glow_when: ds_glow.call("entry-tokens", step: "entered", step_default: "picker") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="mx-auto w-7 h-7 rounded-full flex items-center justify-center" style="background: color-mix(in srgb, var(--color-success) 15%, transparent)">
+            <svg class="w-4 h-4" style="color: var(--color-success)" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
           <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
         </div>
       <% end %>

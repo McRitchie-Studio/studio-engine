@@ -1,10 +1,16 @@
 <%#
   Reusable processing / loading card. Spinner + title + optional message.
-  Pair with window.StudioModals.holdAtLeast(ms) on the caller side to
-  enforce a minimum visible duration — without that the spinner can
-  flash by when the operation finishes faster than ~1s and the user
-  registers "did anything happen?" instead of "ok, processing →
-  success".
+
+  Minimum-visible-duration convention (studio/modals/_load_convention):
+  a load spinner must show for AT LEAST a floor, but longer if the real async
+  runs longer — resolveAt = max(min_duration, actual_completion) — so it never
+  flashes past the user ("did anything happen?") yet never cuts a slow op short.
+  Two ways to honor it:
+    • REAL async — the caller stamps window.StudioModals.holdAtLeast(min_duration)
+      when this card appears, then resolves in its completion callback.
+    • DEMO / auto-resolve — pass `resolve_expr`: this card self-schedules that
+      Alpine expression after `min_duration` (min_duration doubles as the demo's
+      auto-resolve timer), via the same holdAtLeast floor.
 
   Locals — pass static strings OR `_key` variants for Alpine-driven
   text that updates as state mutates (e.g. live store reads):
@@ -15,6 +21,10 @@
     size:          spinner size — 'sm', 'md' (default), 'lg'
     color:         color token for the spinner — 'primary' (default),
                    'success', 'warning'
+    min_duration:  minimum visible ms (default 1400, mirrors
+                   StudioModals.MIN_LOAD_MS). The convention's floor.
+    resolve_expr:  Alpine expression run after min_duration to advance the flow
+                   (demo auto-resolve). Omit for a real spinner the caller drives.
 
   One of `title` or `title_key` is required.
 %>
@@ -27,8 +37,12 @@
     'lg' => 'w-16 h-16 border-4'
   }
   spinner_class = sizes[size] || sizes['md']
+  # min_duration mirrors StudioModals.MIN_LOAD_MS (the JS default) so the Ruby and
+  # JS sides of the convention agree on the same floor.
+  min_duration = local_assigns[:min_duration] || 1400
+  resolve_expr = local_assigns[:resolve_expr]
 %>
-<div class="text-center py-6">
+<div class="text-center py-6"<%= " x-data=\"{}\" x-init=\"window.StudioModals.holdAtLeast(#{min_duration}).then(() => { #{resolve_expr} })\"".html_safe if resolve_expr %>>
   <div class="mx-auto <%= spinner_class %> rounded-full border-<%= color %>/30 border-t-<%= color %> animate-spin mb-5"></div>
   <% if local_assigns[:title_key] %>
     <p class="text-base font-bold text-heading mb-1" x-text="<%= title_key %>"></p>

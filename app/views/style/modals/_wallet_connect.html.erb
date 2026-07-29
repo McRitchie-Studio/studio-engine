@@ -60,7 +60,18 @@
          if (!this.attested()) return;
          this.connecting = true; this.picking = name; this.error = '';
          var self = this;
-         setTimeout(function () { self.connecting = false; self.picking = ''; Alpine.store('dsModals').close(); }, 1100);
+         // DEMO walk continuity: a picked wallet runs a brief connecting state,
+         // then swaps to the on-chain tx modal in its processing state, which
+         // auto-resolves to on-chain success (demoResolve). So the glow follows
+         // Connect Wallet -> Processing -> On-chain success. (No real connect.)
+         setTimeout(function () {
+           self.connecting = false; self.picking = '';
+           Alpine.store('dsModals').swap('onchain-tx', {
+             state: 'processing', demoResolve: true, demoError: false,
+             title: 'Confirming on-chain',
+             message: 'Waiting for the wallet signature…'
+           });
+         }, 1100);
        },
        deepLink() {
          if (!this.attested()) return;

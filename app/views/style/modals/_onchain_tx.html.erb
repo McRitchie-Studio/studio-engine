@@ -24,6 +24,30 @@
              }, 100);
            }
          });
+         // Demo auto-resolve (min-load convention): a processing modal opened with
+         // demoResolve holds its spinner at least MIN_LOAD_MS, then advances to
+         // success — or to error when demoError is set (the Processing specimen's
+         // success/error toggle). Guarded to the still-open, still-processing modal.
+         var entry = Alpine.store('dsModals').current();
+         if (!entry || entry.id !== 'onchain-tx' || !entry.props ||
+             entry.props.state !== 'processing' || !entry.props.demoResolve) return;
+         var minMs = entry.props.minDuration ||
+                     (window.StudioModals && window.StudioModals.MIN_LOAD_MS) || 1400;
+         window.StudioModals.holdAtLeast(minMs).then(function () {
+           var cur = Alpine.store('dsModals').current();
+           if (!cur || cur.id !== 'onchain-tx' || cur.props.state !== 'processing') return;
+           if (entry.props.demoError) {
+             Alpine.store('dsModals').advance({ state: 'error',
+               title: 'Could not confirm',
+               errorMessage: 'The transaction was rejected. Give it another try.' });
+           } else {
+             Alpine.store('dsModals').advance({ state: 'success',
+               txSignature: '5xTrDemoSignature1234567890abcXYZ',
+               successTitle: 'Mint complete',
+               successSubtitle: 'Your on-chain action confirmed.',
+               ctaLabel: 'View wallet', ctaHref: null });
+           }
+         });
        }
      }">
 
