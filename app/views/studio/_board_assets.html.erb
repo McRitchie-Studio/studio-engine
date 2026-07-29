@@ -48,9 +48,16 @@
         onMoveHook:     opts.onMoveHook || null,
         onDropHook:     opts.onDropHook || null,
         labels:         opts.labels || {},
+        // gap 3: the column key a data-exit-action="archive" remove re-parents INTO
+        // (its #dropzone-<key>) rather than deleting the card. null ⇒ 0.27.0 removal.
+        archiveZone:    opts.archiveZone || null,
 
         // --- state ---------------------------------------------------------
         toasts: [],
+        // gap 1: board-level chrome state lives HERE, on the studioBoard scope, so a
+        // board's header_slot controls + column show_expr bind to it directly — no
+        // bespoke outer Alpine wrapper. Seeded from board_state; {} when omitted.
+        state: (opts.state && typeof opts.state === "object") ? opts.state : {},
 
         // --- init ----------------------------------------------------------
         init: function () {
@@ -74,6 +81,19 @@
         cardId: function (el) { return el ? el.getAttribute("data-" + this.idAttr) : null; },
         zoneKey: function (el) { return el ? el.getAttribute("data-" + this.zoneAttr) : null; },
         label: function (zone) { return this.labels[zone] || zone; },
+
+        // --- board-chrome state helpers (gap 1) ----------------------------
+        // Generic, domain-free operations over `state` so a board's header_slot /
+        // column show_expr drive filters + toggles without a bespoke wrapper.
+        toggleState: function (key) { this.state[key] = !this.state[key]; },
+        listHas: function (key, val) {
+          return Array.isArray(this.state[key]) && this.state[key].indexOf(val) !== -1;
+        },
+        toggleInState: function (key, val) {
+          if (!Array.isArray(this.state[key])) this.state[key] = [];
+          var i = this.state[key].indexOf(val);
+          if (i === -1) { this.state[key].push(val); } else { this.state[key].splice(i, 1); }
+        },
 
         // --- SortableJS wiring ---------------------------------------------
         initSortables: function () {
@@ -271,6 +291,21 @@
               var card = document.getElementById(target);
               if (!card) { renderNow(el); return; }
               self.animateCardExit(card, exitAction).then(function () {
+                // gap 3: an `archive` exit RE-PARENTS the card into the archive
+                // column (#dropzone-<archiveZone>) instead of vanishing, when the
+                // board named one and it exists. Everything else falls through to
+                // Turbo's remove (the 0.27.0 behavior).
+                if (exitAction === "archive" && self.archiveZone) {
+                  var zone = document.getElementById("dropzone-" + self.archiveZone);
+                  if (zone) {
+                    var anchor = self.emptySelector ? zone.querySelector(self.emptySelector) : null;
+                    zone.insertBefore(card, anchor);
+                    self.setCardZone(card, self.archiveZone);
+                    self.resetCardExit(card);
+                    self.updateCounts();
+                    return; // keep the card in the archive column — do NOT remove it
+                  }
+                }
                 renderNow(el);
                 self.updateCounts();
               });
@@ -279,7 +314,13 @@
         },
 
         animateCardExit: function (card, kind) {
-          if (!card || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return Promise.resolve();
+          if (!card) return Promise.resolve();
+          // gap 4: stamp an observable marker for WHICH exit is running (archive vs
+          // delete). Set before the reduced-motion guard so the marker is present
+          // even when the animation itself is skipped — the re-parent branch and any
+          // e2e both key off it.
+          card.dataset.exitAction = kind;
+          if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return Promise.resolve();
           card.style.pointerEvents = "none";
           var frames = kind === "archive"
             ? [{ opacity: 1, transform: "translateY(0) scale(1)" }, { opacity: 0, transform: "translateY(18px) scale(0.86)" }]
@@ -290,6 +331,18 @@
             fill: "forwards"
           });
           return anim.finished.catch(function () {});
+        },
+
+        // Clear an exit animation + its marker so a re-parented card is fully
+        // visible again in the archive column (used by the gap-3 re-parent path).
+        resetCardExit: function (card) {
+          if (!card) return;
+          card.getAnimations({ subtree: false }).forEach(function (a) { a.cancel(); });
+          delete card.dataset.exitAction;
+          card.style.pointerEvents = "";
+          card.style.opacity = "";
+          card.style.transform = "";
+          card.style.filter = "";
         },
 
         // --- toasts --------------------------------------------------------

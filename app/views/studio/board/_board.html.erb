@@ -19,10 +19,27 @@
   studio/board/_column (the `.kanban-dropzone`) and studio/board/_card_shell (the
   `.kanban-card`) — an app may hand-roll a bespoke card as long as it matches.
 
+  CHROME COMPOSITION (the recipe that replaces a bespoke outer Alpine wrapper) —
+  a board with filters / toggles no longer needs to wrap this primitive in its own
+  x-data component. Everything the chrome needs lives ON the studioBoard scope:
+    1. `board_state:` seeds a reactive bag on the factory (`state`). Pass the
+       chrome's flags/lists, e.g. { showArchived: false, hiddenApps: [] }.
+    2. `header_slot:` (and `above_board_slot:`) render INSIDE the studioBoard
+       section, so their controls bind straight to that state and the generic
+       helpers the factory exposes: `toggleState('showArchived')`,
+       `toggleInState('hiddenApps', repo)`, `listHas('hiddenApps', repo)`.
+    3. A toggle-able column reads the same state via its `show_expr:`
+       (e.g. show_expr: "state.showArchived"); cards x-show off `listHas(...)`.
+    4. An Archived column that a stage→archived broadcast should re-parent INTO
+       (not delete) is named by the board's `archive_zone:`.
+
   locals:
     columns:          (req) [{ key:, label:, cards:, count:, badge_class:,
-                      collapsible:, hidden:, header_extra: }]. `cards` are records
-                      passed to `card_partial`; `count` defaults to cards.size.
+                      count_class:, collapsible:, hidden:, show_expr:, min_width:,
+                      kickoff:, header_extra: }]. `cards` are records passed to
+                      `card_partial`; `count` defaults to cards.size. See
+                      studio/board/_column for the additive per-column hooks
+                      (count_class / show_expr / min_width / kickoff).
     card_partial:     (req) partial rendered per card (e.g. "tasks/task_card").
     card_as:          local the record binds to in card_partial. Default :card.
     card_locals:      per-card extra locals — a Proc ->(record){ Hash } or a Hash.
@@ -50,6 +67,11 @@
     empty_label:      empty-zone text. Default "Drop here".
     header_slot:      raw HTML rendered above the columns (pass html_safe content).
     above_board_slot: raw HTML rendered between the header and the columns.
+    board_state:      Hash seeding the factory's reactive `state` bag (board-level
+                      chrome: filter/toggle flags + lists). nil ⇒ empty {}.
+    archive_zone:     column key a `remove` exit-stream marked data-exit-action=
+                      "archive" RE-PARENTS the card into (its #dropzone-<key>),
+                      instead of deleting it. nil ⇒ the card is removed (0.27.0).
     fx:               window[<name>] module the factory defers add/exit anims to.
     on_move_hook:     window[<name>] opaque fn, called with { record, from, to }.
     on_drop_hook:     window[<name>] opaque fn, called with { ids, zone }.
@@ -79,6 +101,8 @@
   empty_label      = local_assigns.fetch(:empty_label, "Drop here")
   header_slot      = local_assigns.fetch(:header_slot, nil)
   above_board_slot = local_assigns.fetch(:above_board_slot, nil)
+  board_state      = local_assigns.fetch(:board_state, nil)   # gap 1: chrome-state home
+  archive_zone     = local_assigns.fetch(:archive_zone, nil)  # gap 3: exit re-parent target
   fx               = local_assigns.fetch(:fx, nil)
   on_move_hook     = local_assigns.fetch(:on_move_hook, nil)
   on_drop_hook     = local_assigns.fetch(:on_drop_hook, nil)
@@ -102,6 +126,8 @@
     toasts:         !!toasts,
     live:           live_channel.present?,
     demo:           !!demo,
+    state:          (board_state.is_a?(Hash) ? board_state : nil),
+    archiveZone:    (archive_zone ? archive_zone.to_s : nil),
     fx:             fx,
     onMoveHook:     on_move_hook,
     onDropHook:     on_drop_hook,
