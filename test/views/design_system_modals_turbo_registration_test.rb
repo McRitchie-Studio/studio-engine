@@ -13,7 +13,7 @@ require "tempfile"
 # [component] Regression guard for the /admin/style page-scoped modal store
 # (dsModals) surviving Turbo Drive navigation.
 #
-# THE BUG (fixed 0.25.2): the dsModals + dsSolanaModal stores were registered
+# THE BUG (fixed 0.26.1): the dsModals + dsSolanaModal stores were registered
 # ONLY inside a `document.addEventListener('alpine:init', ...)` handler in the
 # page body. Alpine loads via a deferred CDN <script> in the engine head and
 # fires alpine:init exactly ONCE — on the first full-document load. A Turbo Drive

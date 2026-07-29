@@ -2,7 +2,7 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
-## 0.25.2 — 2026-07-28
+## 0.26.1 — 2026-07-28
 
 **Fix the `/admin/style` Design System page breaking when reached via Turbo Drive
 navigation (the admin sidebar "Design System" link).** Reached by a direct page
@@ -49,6 +49,40 @@ modal opened, and the throwing `:style` wiped each card's static inline
   bootstrap rendered on the first full load, so their single `alpine:init`
   registration persists across Turbo visits (verified: `$store.modals` stays
   defined after a Turbo nav).
+
+## 0.26.0 — 2026-07-28
+
+**The engine navbar pins itself under smooth-load, and the smooth-load CSS is
+fully engine-owned.** Since 0.24 the `vt-pinned-header` pin was opt-in but the
+engine's own `layouts/_navbar` never carried it, so a host that wanted the
+pinned-header transition had to SHADOW the whole partial just to add one class
+(acquisition-studio did exactly that — the known override-drift trap). The
+navbar now self-pins when `Studio.smooth_load` is on, and the engine also ships
+the `studio-header` cross-fade suppression that mcritchie-studio and
+turf-monster had been carrying app-side as a bridge. **Consumer cleanup this
+version unlocks:** acquisition-studio deletes its entire
+`app/views/layouts/_navbar.html.erb` override; mcritchie-studio and
+turf-monster delete their app-side `::view-transition-old(studio-header)` /
+`::view-transition-new(studio-header) { animation: none; }` bridge blocks.
+
+### Changed
+
+- **`layouts/_navbar`** — the sticky header adds `vt-pinned-header` itself when
+  `Studio.smooth_load` is on, non-preview branch ONLY (preview renders can
+  repeat per page, and a duplicate `view-transition-name` silently disables
+  every transition). With the flag off nothing extra renders, so a plain gem
+  bump changes no opted-out app.
+- **`engine.css`** — new `::view-transition-old(studio-header)` /
+  `::view-transition-new(studio-header) { animation: none; }` rule beside the
+  smooth-load block: it suppresses the UA-default ~250ms plus-lighter
+  cross-fade between the header's two snapshots, which double-drew the wordmark
+  and buttons on any navigation from a scrolled page (collapsed header →
+  expanded at top). Lifts the identical bridge rule the hub and turf-monster
+  carried app-side.
+- **`engine.css`** — `.turbo-progress-bar` background becomes
+  `var(--color-cta, #0076ff)`: the fallback (Turbo's own default blue) keeps
+  the bar visible in a layout that never renders the runtime theme block
+  (`studio_theme_css_tag`), where `--color-cta` is unset.
 
 ## 0.25.1 — 2026-07-28
 
@@ -158,10 +192,10 @@ follows the step machine), so this surfaced as a flash-of-all-glow on load.
   unchanged. The `engine-motion.css` `.studio-team-glow` default is untouched
   (the always-on Tricks demos depend on it).
 
-  > **Refined in 0.25.2:** "regardless of Alpine timing" holds only while
+  > **Refined in 0.26.1:** "regardless of Alpine timing" holds only while
   > `$store.dsModals` is defined. On a Turbo Drive visit the store went
   > unregistered, the reactive `:style` threw, and Alpine wiped this inline
-  > default — relighting every ring. 0.25.2 dual-guards the store registration so
+  > default — relighting every ring. 0.26.1 dual-guards the store registration so
   > it survives Turbo visits, restoring the fail-closed guarantee.
 
 ## 0.24.0 — 2026-07-28

@@ -8,6 +8,14 @@
 %>
 <% show_user = local_assigns.fetch(:show_logged_in, logged_in?) %>
 <% is_preview = local_assigns.fetch(:preview, false) %>
+<%# Smooth-load self-pin (engine 0.26): when the app opts into Studio.smooth_load,
+    the sticky header names itself as the shared view-transition group
+    (vt-pinned-header) so page content transitions beneath a navbar that stays
+    put — hosts no longer shadow this partial just to add the class. Non-preview
+    branch ONLY: preview renders can repeat per page, and a duplicate
+    view-transition-name silently disables every transition. With the flag off,
+    nothing extra renders. %>
+<% pin_header = Studio.smooth_load && !is_preview %>
 <% balance_html = local_assigns.fetch(:balance_html, nil) %>
 <% extra_icons_html = local_assigns.fetch(:extra_icons_html, nil) %>
 <% show_logout_link = local_assigns.fetch(:show_logout_link, false) %>
@@ -19,7 +27,7 @@
 %>
 
 <header x-data="{ scrolled: false }" <%= '@scroll.window="scrolled = scrolled ? (window.scrollY > 5) : (window.scrollY > 60)"'.html_safe unless is_preview %>
-        class="<%= is_preview ? 'bg-page' : 'sticky top-0 z-50 bg-page transition-shadow duration-300' %>"
+        class="<%= is_preview ? 'bg-page' : "#{'vt-pinned-header ' if pin_header}sticky top-0 z-50 bg-page transition-shadow duration-300" %>"
         :class="scrolled && 'shadow-lg border-b border-subtle is-scrolled'">
   <style>
     .user-nav-col { width: 14rem; }
