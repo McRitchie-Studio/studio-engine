@@ -1,17 +1,17 @@
 # Studio Engine
 
-Shared Rails engine for McRitchie apps. Provides authentication, error handling, dynamic theming, and common concerns used by [McRitchie Studio](https://app.mcritchie.studio) and [Turf Monster](https://app.turfmonster.media).
+Shared Rails engine for McRitchie apps. Provides authentication, error handling, dynamic theming, and common concerns used by [McRitchie Studio](https://mcritchie.studio) and [Turf Monster](https://turfmonster.media).
 
-> **Part of the McRitchie ecosystem** — see [`ECOSYSTEM.md`](https://github.com/amcritchie/mcritchie-studio/blob/main/docs/ECOSYSTEM.md) for the 5-repo map; [`house-burn-down.md`](https://github.com/amcritchie/mcritchie-studio/blob/main/docs/agents/system/house-burn-down.md) for fresh-Mac recovery.
+> **Part of the McRitchie ecosystem** — see [`ECOSYSTEM.md`](https://github.com/amcritchie/mcritchie-studio/blob/main/docs/ECOSYSTEM.md) for the repo map; [`house-burn-down.md`](https://github.com/amcritchie/mcritchie-studio/blob/main/docs/agents/system/house-burn-down.md) for fresh-Mac recovery.
 
 ## Installation
 
 ```ruby
 # Gemfile — install from RubyGems (recommended)
-gem "studio-engine", "~> 0.6"
+gem "studio-engine", "~> 0.11"
 ```
 
-Then `bundle install`. The current release is **v0.6.1**; see [`CHANGELOG.md`](./CHANGELOG.md) for the history.
+Then `bundle install`. The current release is **v0.11.0**; see [`CHANGELOG.md`](./CHANGELOG.md) for the history.
 
 > Published to RubyGems as of v0.4.0 (2026-05-17). New installs should use the RubyGems form, which the consumer Rails apps (`mcritchie-studio`, `turf-monster`) already use.
 

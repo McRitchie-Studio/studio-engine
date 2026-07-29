@@ -18,7 +18,9 @@ Pick the next available app range in McRitchie Studio's port registry (`mcritchi
 - 3000-3099 = McRitchie Studio
 - 3100-3199 = Turf Monster
 - 3200-3299 = Tax Studio (planned/reserved)
-- 3300-3399 = next candidate range unless the registry says otherwise
+- 3300-3399 = Rolio (reserved)
+- 3400-3499 = Chain Ops (planned)
+- 3500-3599 = next candidate range unless the registry says otherwise
 
 Use the first port in the range as the primary callback-ready server. Reserve the rest for worktrees and parallel test stacks.
 
@@ -26,7 +28,7 @@ Use the first port in the range as the primary callback-ready server. Reserve th
 
 ```ruby
 # Studio engine
-gem "studio-engine", "~> 0.6"
+gem "studio-engine", "~> 0.11"
 
 # CSS
 gem "tailwindcss-rails", "~> 4.5"

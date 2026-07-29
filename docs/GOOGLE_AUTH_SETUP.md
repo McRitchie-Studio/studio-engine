@@ -115,9 +115,13 @@ Add the callback URL for your new app:
 
 | App | Port | Dev URI | Prod URI |
 |-----|------|---------|----------|
-| McRitchie Studio | 3000 | `http://localhost:3000/auth/google_oauth2/callback` | `https://app.mcritchie.studio/auth/google_oauth2/callback` |
-| Turf Monster | 3100 | `http://localhost:3100/auth/google_oauth2/callback` | `https://app.turfmonster.media/auth/google_oauth2/callback` |
+| McRitchie Studio | 3000 | `http://localhost:3000/auth/google_oauth2/callback` | `https://mcritchie.studio/auth/google_oauth2/callback` |
+| Turf Monster | 3100 | `http://localhost:3100/auth/google_oauth2/callback` | `https://turfmonster.media/auth/google_oauth2/callback` |
 | Tax Studio | 3200 | `http://localhost:3200/auth/google_oauth2/callback` | `https://tax.mcritchie.studio/auth/google_oauth2/callback` |
+
+Keep legacy callback aliases such as `https://app.mcritchie.studio/...` and
+`https://app.turfmonster.media/...` registered only while provider dashboards or
+old links still need them.
 
 ### 6. Routes (already handled)
 

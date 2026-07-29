@@ -14,7 +14,7 @@
 #
 # How it works:
 #   1. Checks out this engine PR/commit into ./studio
-#   2. Checks out the consumer repo into ./<consumer>
+#   2. Checks out the consumer repo into ./<repo>
 #   3. Rewrites the consumer's Gemfile `studio-engine` entry to
 #      `path: "../studio"`
 #      (matches the local engine HEAD, not whatever tag the consumer pinned)
@@ -79,7 +79,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: amcritchie/${{ matrix.repo }}
-          path: ${{ matrix.consumer }}
+          path: ${{ matrix.repo }}
           token: ${{ secrets.CONSUMER_REPO_TOKEN || github.token }}
           fetch-depth: 0
 
@@ -90,10 +90,10 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.3.11
-          working-directory: ${{ matrix.consumer }}
+          working-directory: ${{ matrix.repo }}
 
       - name: Point consumer Gemfile at this engine commit
-        working-directory: ${{ matrix.consumer }}
+        working-directory: ${{ matrix.repo }}
         run: |
           # Replace the `gem "studio-engine", ...` line with a local path ref.
           sed -i.bak 's|^gem "studio-engine".*|gem "studio-engine", path: "../studio"|' Gemfile
@@ -102,7 +102,7 @@ jobs:
 
       - name: Generate test-only Solana admin key
         if: ${{ matrix.needs_solana_admin_key }}
-        working-directory: ${{ matrix.consumer }}
+        working-directory: ${{ matrix.repo }}
         run: |
           admin_key="$(bundle exec ruby -e 'require "solana_studio"; kp = Solana::Keypair.generate; print Solana::Keypair.encode_base58(kp.to_bytes)')"
           echo "::add-mask::$admin_key"
@@ -110,7 +110,7 @@ jobs:
 
       - name: Generate test-only Rails credentials
         if: ${{ matrix.needs_rails_credentials }}
-        working-directory: ${{ matrix.consumer }}
+        working-directory: ${{ matrix.repo }}
         run: |
           master_key="$(ruby -e 'require "securerandom"; print SecureRandom.hex(16)')"
           secret_key_base="$(ruby -e 'require "securerandom"; print SecureRandom.hex(64)')"
@@ -122,7 +122,7 @@ jobs:
           bundle exec rails runner 'raise "missing test secret_key_base" if Rails.application.credentials.secret_key_base.blank?'
 
       - name: Prepare test DB + run tests
-        working-directory: ${{ matrix.consumer }}
+        working-directory: ${{ matrix.repo }}
         env:
           RAILS_ENV: test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
