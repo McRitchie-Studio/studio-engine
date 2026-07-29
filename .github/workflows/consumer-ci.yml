@@ -1,6 +1,6 @@
 # Consumer CI — runs the consumer Rails apps' test suites against THIS engine
 # commit, so a PR/merge that breaks `mcritchie_studio`, `turf_monster`, or
-# `acquisition_studio` fails here instead of silently after a
+# `mcritchie_industries` fails here instead of silently after a
 # `bundle update studio-engine` on the consumer side.
 #
 # This workflow covers the CONSUMERS only. The engine's OWN suite runs in the
@@ -52,8 +52,12 @@ jobs:
             needs_rails_credentials: true
             needs_solana_admin_key: true
             needs_tailwind_build: false
-          - consumer: acquisition_studio
-            repo: acquisition-studio
+          # Successor to the retired acquisition-studio prototype's lane. The
+          # checkout token (CONSUMER_REPO_TOKEN) is the agent.github classic
+          # PAT with `repo` scope — account-scoped, so it covers ALL private
+          # amcritchie repos, this one included; no new secret needed.
+          - consumer: mcritchie_industries
+            repo: mcritchie-industries
             managed_wallet_encryption_key: ""
             needs_rails_credentials: false
             needs_solana_admin_key: false
@@ -130,7 +134,7 @@ jobs:
           CI_SECRET_KEY_BASE="$secret_key_base" bundle exec ruby -e 'require "active_support/encrypted_file"; require "yaml"; encrypted = ActiveSupport::EncryptedFile.new(content_path: "config/credentials.yml.enc", key_path: "config/master.key", env_key: "RAILS_MASTER_KEY", raise_if_missing_key: true); encrypted.write({ "secret_key_base" => ENV.fetch("CI_SECRET_KEY_BASE") }.to_yaml)'
           bundle exec rails runner 'raise "missing test secret_key_base" if Rails.application.credentials.secret_key_base.blank?'
 
-      # acquisition_studio's integration tests render engine-contract pages
+      # mcritchie_industries' integration tests render engine-contract pages
       # that import the compiled Tailwind stylesheet; without this build every
       # page render 500s ("tailwind.css is not present in the asset pipeline").
       - name: Build Tailwind CSS
