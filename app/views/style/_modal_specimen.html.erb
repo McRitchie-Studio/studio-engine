@@ -59,7 +59,14 @@
          default (--studio-team-glow-opacity of 1) so the ring is OFF at first
          paint, BEFORE Alpine hydrates the reactive :style below. Without it every
          glow card shows its ring until Alpine boots (the fail-open flash). The
-         :style then drives 0 to 0.95 with the 0.4s cross-fade. Keep BOTH. %>
+         :style then drives 0 to 0.95 with the 0.4s cross-fade. Keep BOTH.
+         CAVEAT: this fail-closed default holds only while $store.dsModals is
+         DEFINED. glow_when dereferences the store; if the store is missing the
+         reactive :style THROWS, and Alpine's style bind wipes this inline value
+         on the way, so the CSS default of 1 relights every ring. That is exactly
+         the Turbo-nav store gap fixed in 0.25.2 (style/_modals dual-guards the
+         dsModals registration so it survives Turbo visits, not just first load).
+         So the guarantee is: static inline 0 PLUS a registered dsModals. %>
      <% if glow_when %>style="--studio-team-glow-opacity: 0" :style="{ '--studio-team-glow-opacity': (<%= glow_when %>) ? '0.95' : '0' }"<% end %>>
   <article
       class="card overflow-hidden flex flex-col h-full<%= " opacity-95" if disabled %><%= " cursor-pointer" if clickable %>"
