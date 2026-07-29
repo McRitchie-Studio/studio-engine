@@ -1,0 +1,55 @@
+<%#
+  Minimum-visible-duration convention for load / processing modals.
+
+  A load modal shows its spinner for AT LEAST a minimum duration so it never
+  flashes past the user (registering "did anything happen?" instead of
+  "processing → done"), but LONGER whenever the real async takes longer:
+
+      resolveAt = max(min_duration, actual_completion)
+
+  This ships the convention on window.StudioModals, defined ONCE here and
+  rendered by BOTH the shared modal host (studio/modals/_host) and the living
+  style guide (style/_modals) — so every consumer app and the /admin/style demo
+  page share a single definition:
+
+    MIN_LOAD_MS  — the standard default minimum (1400 ms). A caller may pass its
+                   own, but reach for this so every load modal feels consistent.
+
+    holdAtLeast(minMs) — returns a thenable whose .then(cb) fires cb at
+                   max(minMs, elapsed-since-this-call). Two usages:
+
+                     REAL async — stamp the moment the loading view appears, then
+                     resolve in the async completion, so a slow op is never cut
+                     short and a fast one still honors the spinner:
+                       var hold = StudioModals.holdAtLeast(StudioModals.MIN_LOAD_MS);
+                       doWork().then(function () { hold.then(showSuccess); });
+
+                     DEMO (no real work) — call .then immediately and minMs
+                     DOUBLES as the auto-resolve timer: the demo advances after
+                     min_duration exactly:
+                       StudioModals.holdAtLeast(StudioModals.MIN_LOAD_MS).then(advance);
+
+  Idempotent (|| guards): never clobber a definition an app already shipped, and
+  safe to render more than once on a page.
+%>
+<script>
+  (function () {
+    window.StudioModals = window.StudioModals || {};
+    // Standard minimum-visible duration for a load spinner, in ms. ~1200–1500
+    // reads as "processing → done"; below ~1s the spinner flashes and reads as a
+    // glitch. Callers may override per-modal, but default to this for consistency.
+    window.StudioModals.MIN_LOAD_MS = window.StudioModals.MIN_LOAD_MS || 1400;
+    // holdAtLeast(minMs).then(cb) — cb fires at max(minMs, elapsed-since-call).
+    // Stamp the moment a loading view becomes visible; the anti-flicker floor.
+    window.StudioModals.holdAtLeast = window.StudioModals.holdAtLeast || function (minMs) {
+      var startedAt = Date.now();
+      return {
+        then: function (callback) {
+          var remaining = Math.max(0, minMs - (Date.now() - startedAt));
+          if (remaining === 0) { callback(); return; }
+          setTimeout(callback, remaining);
+        }
+      };
+    };
+  })();
+</script>

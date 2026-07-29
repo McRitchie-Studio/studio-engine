@@ -2,10 +2,17 @@
     a { title } prop while a Turbo form uploads. Register it in your modal-host
     block alongside crop-photo. Single root for the host's <template x-if>.
 
-    Local: store — Alpine store name backing the title read. Default "modals".
-    The living style guide passes store: "dsModals" for its page-scoped host. %>
+    Locals:
+      store        — Alpine store name backing the title read. Default "modals".
+                     The living style guide passes store: "dsModals".
+      resolve_expr — optional demo auto-resolve (min-load convention). The real
+                     Turbo submit drives the spinner and closes on completion, so
+                     apps omit this; the /admin/style demo passes an expression
+                     (e.g. close) so the specimen self-terminates after min_duration
+                     instead of spinning forever. %>
 <% saving_store = local_assigns.fetch(:store, "modals") %>
 <div>
   <%= render "studio/modals/blocks/processing_card",
-        title_key: "$store.#{saving_store}.current()?.props?.title || 'Saving…'" %>
+        title_key: "$store.#{saving_store}.current()?.props?.title || 'Saving…'",
+        resolve_expr: local_assigns[:resolve_expr] %>
 </div>

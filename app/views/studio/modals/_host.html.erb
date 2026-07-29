@@ -153,24 +153,6 @@
 
 <script>
   (function() {
-    // === StudioModals helpers ===========================================
-    //
-    // holdAtLeast(ms) — pair with the _processing_card block. Stamp the
-    // moment a loading view becomes visible, then await the minimum
-    // before swapping to success so the spinner doesn't flash past the
-    // user when the operation finishes fast.
-    window.StudioModals = window.StudioModals || {};
-    window.StudioModals.holdAtLeast = function(minMs) {
-      var startedAt = Date.now();
-      return {
-        then: function(callback) {
-          var remaining = Math.max(0, minMs - (Date.now() - startedAt));
-          if (remaining === 0) { callback(); return; }
-          setTimeout(callback, remaining);
-        }
-      };
-    };
-
     // === Modal animation registry ======================================
     //
     // The single place to define + tune named entrance / exit animations
@@ -489,6 +471,14 @@
     document.addEventListener('turbo:before-cache', clearStaleModals);
   })();
 </script>
+
+<%# The minimum-visible-duration convention (window.StudioModals.holdAtLeast +
+    MIN_LOAD_MS) — the SINGLE source, shared with the /admin/style demo page.
+    Pair it with the _processing_card block so a load spinner never flashes past
+    the user. Rendered AFTER the store <script> above so the store stays the
+    host's first <script> (a Node behavior harness extracts that first script).
+    See studio/modals/_load_convention for the full contract. %>
+<%= render "studio/modals/load_convention" %>
 
 <template x-if="$store.modals.current()">
   <%# Backdrop + card use CSS keyframe animations (NOT Alpine
