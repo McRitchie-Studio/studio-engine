@@ -266,6 +266,111 @@ class StylePageTest < ActiveSupport::TestCase
     end
   end
 
+  # --- 6c. Web3 Contest + Contest entry & eligibility flows -------------------
+
+  # The Modals sub-sections rename ("Web3" -> "Web3 Contest", "Eligibility &
+  # entry" -> "Contest entry & eligibility") and reorder (entry sits DIRECTLY
+  # under Web3 Contest).
+  def modals_subheadings(html)
+    modals_start = html.index('id="modals"')
+    tricks_start = html.index('id="tricks"')
+    refute_nil modals_start, "the Modals section anchor must exist"
+    refute_nil tricks_start, "the Tricks section anchor must exist"
+    slice = html[modals_start...tricks_start]
+    slice.scan(%r{text-xl font-bold text-heading">([^<]+)</h3>}).flatten
+  end
+
+  test "the Modals sub-sections rename Web3 Contest + Contest entry, in the right order" do
+    headings = modals_subheadings(render_index)
+
+    web3     = headings.index("Web3 Contest")
+    entry    = headings.index("Contest entry &amp; eligibility")
+    leveling = headings.index("Profile Leveling")
+
+    refute_nil web3,  "the Web3 section is renamed to Web3 Contest"
+    refute_nil entry, "the section is renamed to Contest entry & eligibility"
+    refute_nil leveling, "Profile Leveling still present"
+
+    refute_includes headings, "Web3", "the bare 'Web3' heading is gone (renamed to Web3 Contest)"
+    refute_includes headings, "Eligibility &amp; entry", "the old heading is gone"
+
+    assert_operator leveling, :<, web3, "Web3 Contest follows Profile Leveling"
+    assert_equal web3 + 1, entry,
+      "Contest entry & eligibility sits DIRECTLY under Web3 Contest (no section between)"
+  end
+
+  test "the Web3 Contest walk + Contest entry flow wire every specimen Open affordance" do
+    html = render_index
+
+    # Web3 Contest walk: Connect Wallet -> Processing -> On-chain success/error.
+    assert_includes html, "$store.dsModals.open('wallet-connect')"
+    assert_includes html, "$store.dsModals.open('onchain-tx', { state: 'processing'"
+    assert_includes html, "$store.dsModals.open('onchain-tx', { state: 'success'"
+    assert_includes html, "$store.dsModals.open('onchain-tx', { state: 'error'"
+    # Picking a wallet continues the walk (swaps to the processing modal).
+    assert_includes html, "Alpine.store('dsModals').swap('onchain-tx'"
+
+    # Contest entry flow: Entry tokens -> Payment processing -> Minted -> enter -> entered.
+    %w[picker confirming minted entering entered].each do |step|
+      assert_includes html, "$store.dsModals.open('entry-tokens', { step: '#{step}'",
+        "the entry flow wires an Open for the #{step} step"
+    end
+  end
+
+  test "the Processing card success/error toggle flips the resolved on-chain state" do
+    html = render_index
+
+    # The per-card toggle (like the leveling toggle) — a checkbox bound to opts.demoError.
+    assert_includes html, %(x-model="opts.demoError"), "the Processing card carries a demoError toggle"
+    assert_includes html, "Resolve to error", "the toggle is labeled"
+    # The toggle flows into the open() call as demoError.
+    assert_includes html, "demoError: opts.demoError"
+
+    # The on-chain-tx modal branches on demoError: checked -> error, unchecked -> success.
+    assert_includes html, "entry.props.demoError", "the auto-resolve reads the demoError flag"
+    assert_includes html, "advance({ state: 'error'", "checked resolves to the error state"
+    assert_includes html, "advance({ state: 'success'", "unchecked resolves to the success state"
+  end
+
+  test "the minimum-visible-duration convention ships and the demo load modals honor it" do
+    html = render_index
+
+    # The single convention definition (rendered by the page + the shared host).
+    assert_includes html, "window.StudioModals.holdAtLeast", "holdAtLeast helper ships"
+    assert_includes html, "MIN_LOAD_MS = window.StudioModals.MIN_LOAD_MS || 1400",
+      "the standard default min duration ships"
+    # resolveAt = max(min_duration, actual): the anti-flicker floor math.
+    assert_includes html, "Math.max(0, minMs - (Date.now() - startedAt))",
+      "holdAtLeast waits the remainder of the floor"
+
+    # _processing_card's reusable prop: the retrofit demos self-resolve after the floor.
+    assert_includes html, "window.StudioModals.holdAtLeast(1400).then",
+      "_processing_card schedules the demo auto-resolve via the floor"
+    assert_includes html, "$store.dsModals.swap('ds-success')",
+      "the System Processing specimen auto-advances to success (retrofit)"
+    assert_includes html, "$store.dsModals.close()",
+      "the Saving specimen self-terminates after the floor (retrofit)"
+
+    # The entry-flow load steps use the convention (not a hardcoded timeout).
+    assert_includes html, "window.StudioModals.holdAtLeast(window.StudioModals.MIN_LOAD_MS)",
+      "the entry-tokens load steps hold at least MIN_LOAD_MS"
+    assert_includes html, "autoAdvance('confirming', { step: 'minted' })",
+      "Confirming your purchase advances via the convention"
+    assert_includes html, "Confirming your purchase…"
+    assert_includes html, "Consuming one token on-chain to create your contest entry",
+      "the Contest enter processing step copy is present"
+  end
+
+  test "the Contest entry section states the honest web2/web3 map" do
+    html = render_index
+
+    # The engine represents the REAL divergence: the token mint is web2-only.
+    assert_includes html, "Web2 vs web3", "the section names the web2/web3 map"
+    assert_includes html, "mints no token", "web3 funds USDC directly and mints no token"
+    assert_includes html, "same on-chain Entry PDA", "both paths converge on the Entry PDA"
+    assert_includes html, "web2-only", "the note frames the mint/consume prelude as web2-only"
+  end
+
   # The AUTH suite — the #1 gap. Its bespoke step machine + blocks are present,
   # and the specimens open the real modal at a step.
   test "the Auth modal ports the credentials step machine + its blocks" do
