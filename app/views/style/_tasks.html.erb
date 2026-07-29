@@ -172,6 +172,54 @@
           empty_label: "Drop tasks here" %>
   </div>
 
+  <%# ---- The DEPTH-CHART shape (0.29.0 / DG) ----------------------------- %>
+  <%# The two-level side→position GRID + per-card lock the depth chart needs, all
+      additive: groups: renders labelled sections (Offense/Defense) whose position
+      lanes lay out in a grid (not the flat row); group: false keeps a drag WITHIN
+      its lane; zone_attr "position" is the lane; 🔒 starters carry `locked: true`
+      so the factory filters them from dragging (locked_selector) and a drag can't
+      cross them. reorder is 1..N (depth) — demonstrated statically here (demo). %>
+  <%
+    dc_groups = [
+      { key: "offense", label: "Offense", cols_class: "grid-cols-2 sm:grid-cols-3",
+        columns: [
+          { key: "QB", label: "QB", cards: [
+            { id: "dc-qb1", zone: "QB", title: "Starter QB", repo: "depth 1", who: "1", locked: true },
+            { id: "dc-qb2", zone: "QB", title: "Backup QB",  repo: "depth 2", who: "2" },
+            { id: "dc-qb3", zone: "QB", title: "3rd string", repo: "depth 3", who: "3" } ] },
+          { key: "RB", label: "RB", cards: [
+            { id: "dc-rb1", zone: "RB", title: "RB1", repo: "depth 1", who: "1" },
+            { id: "dc-rb2", zone: "RB", title: "RB2", repo: "depth 2", who: "2" } ] },
+          { key: "WR", label: "WR", cards: [
+            { id: "dc-wr1", zone: "WR", title: "WR1", repo: "depth 1", who: "1" } ] } ] },
+      { key: "defense", label: "Defense", cols_class: "grid-cols-2 sm:grid-cols-3",
+        columns: [
+          { key: "EDGE", label: "EDGE", cards: [
+            { id: "dc-edge1", zone: "EDGE", title: "EDGE1", repo: "depth 1", who: "1" },
+            { id: "dc-edge2", zone: "EDGE", title: "EDGE2", repo: "depth 2", who: "2" } ] },
+          { key: "CB", label: "CB", cards: [
+            { id: "dc-cb1", zone: "CB", title: "Starter CB", repo: "depth 1", who: "1", locked: true },
+            { id: "dc-cb2", zone: "CB", title: "CB2",        repo: "depth 2", who: "2" } ] } ] }
+    ]
+  %>
+  <div class="space-y-3">
+    <div class="flex items-center gap-2">
+      <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">Grid + Lock</span>
+      <p class="label-upper"><code class="font-mono text-2xs">studio/board/board</code> &middot; DG (0.29.0) &mdash; two-level side&rarr;position grid, reorder within a lane, &#128274; pinned starters stay put</p>
+    </div>
+    <%= render "studio/board/board",
+          demo: true,
+          groups: dc_groups,
+          card_partial: "style/board/demo_card",
+          card_as: :card,
+          reorder_url: "#",
+          group: false,
+          zone_attr: "position",
+          locked_selector: ".kanban-locked",
+          card_locals: { zone_attr: "position" },
+          empty_label: "&mdash;".html_safe %>
+  </div>
+
   <%# ---- The static reference sketch ------------------------------------- %>
   <div class="fade-edge-x overflow-x-auto pb-2">
     <div class="flex gap-4 min-w-max">

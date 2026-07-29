@@ -31,6 +31,10 @@
                             kickoff:     raw HTML rendered in a fixed-height slot
                               under the header row (a per-column kickoff chip);
                               nil renders nothing.
+    layout:               DG3 — "row" (default) sizes the column for the horizontal
+                          flex row (flex-1 + min_width); "grid" drops those so a
+                          two-level side→position GRID cell owns the sizing. Any
+                          other value behaves as "row".
     zone_attr:            data-attr name for the zone. Default "stage".
     dom_id_prefix:        card dom-id prefix, forwarded to the cards. Default "card-".
     zone_selector_class:  the drop-zone class. Default "kanban-dropzone".
@@ -42,6 +46,7 @@
 %>
 <%
   column               = local_assigns.fetch(:column)
+  layout               = local_assigns.fetch(:layout, "row").to_s
   zone_attr            = local_assigns.fetch(:zone_attr, "stage")
   dom_id_prefix        = local_assigns.fetch(:dom_id_prefix, "card-")
   zone_selector_class  = local_assigns.fetch(:zone_selector_class, "kanban-dropzone")
@@ -70,6 +75,9 @@
   # The neutral count chip's colour classes: an opt-in raw class, else the 0.27.0
   # neutral default. The layout classes are shared; only the colour band varies.
   count_color  = count_class || "bg-surface-alt text-secondary border border-subtle"
+  # DG3: in a grid the cell owns the sizing, so drop the flex-row width utilities;
+  # "row" (default) keeps the exact 0.28.0 flex-1 + min-width column.
+  width_class  = layout == "grid" ? "w-full" : "w-full flex-none sm:flex-1 #{min_width}"
 
   # Merge the per-card hook (Proc or Hash) with the record binding.
   resolve_locals = lambda do |record|
@@ -77,7 +85,7 @@
     { card_as => record }.merge(extra || {})
   end
 %>
-<div class="studio-board-column w-full flex-none sm:flex-1 <%= min_width %>"
+<div class="studio-board-column <%= width_class %>"
      data-board-column="<%= key %>"
      <% if collapsible %>data-board-collapsible="true"<% end %>
      <% if show_expr %>x-show="<%= show_expr %>" x-cloak<% end %>

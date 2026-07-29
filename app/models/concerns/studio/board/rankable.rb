@@ -21,7 +21,9 @@ module Studio
     #
     #   class DepthChartEntry < ApplicationRecord
     #     include Studio::Board::Rankable
-    #     self.board_zone_attr = :position_group   # a lane, not a kanban stage
+    #     self.board_zone_attr = :position     # a lane (QB/RB/…), not a kanban stage
+    #     self.board_rank_attr = :depth        # rank by depth; `position` is a string
+    #     self.board_rank_order = :asc         # depth 1 (the starter) sits on top
     #   end
     module Rankable
       extend ActiveSupport::Concern
@@ -31,19 +33,37 @@ module Studio
         # boards (stage); a within-lane board overrides it, and `nil` ranks globally.
         class_attribute :board_zone_attr, instance_accessor: false, default: :stage
 
-        # Board order: highest `position` first (freshest/top card wins), NULLS last,
-        # then newest by created_at as a stable tiebreak. Arel.sql: the fragment is a
-        # fixed literal, not user input.
-        scope :board_ordered, -> { order(Arel.sql("position DESC NULLS LAST, created_at DESC")) }
+        # The column the board RANKS BY. Default :position — the three MS kanban
+        # boards and the 100-gap read-model. A board whose rank lives in another
+        # column overrides it: the depth chart ranks by `depth` while its `position`
+        # column holds a lane-code STRING, so every ranking read/write below follows
+        # `board_rank_attr` rather than a hardcoded `position`.
+        class_attribute :board_rank_attr, instance_accessor: false, default: :position
+
+        # The board_ordered sort direction for the rank column. :desc (default) puts
+        # the HIGHEST rank on top — the kanban freshest-first shape; :asc puts the
+        # LOWEST on top so depth 1 (the starter) sits at the top of its lane.
+        class_attribute :board_rank_order, instance_accessor: false, default: :desc
+
+        # Board order: the rank column first (direction per board_rank_order), NULLS
+        # last, then newest by created_at as a stable tiebreak. The column name is a
+        # quoted identifier and the direction a whitelisted ASC/DESC literal — never
+        # user input — so the Arel.sql fragment is injection-safe.
+        scope :board_ordered, lambda {
+          dir = board_rank_order.to_s.casecmp("asc").zero? ? "ASC" : "DESC"
+          col = connection.quote_column_name(board_rank_attr)
+          order(Arel.sql("#{col} #{dir} NULLS LAST, created_at DESC"))
+        }
       end
 
-      # Seed the genesis rank on create: max(position) within this record's zone plus
-      # a 100 gap. A no-op when `position` is already set, so an explicit rank is
+      # Seed the genesis rank on create: max(rank column) within this record's zone
+      # plus a 100 gap. A no-op when the rank is already set, so an explicit rank is
       # never clobbered. Wire from the host via `before_create :set_initial_position`.
       def set_initial_position
-        return if position.present?
+        rank_attr = self.class.board_rank_attr
+        return if public_send(rank_attr).present?
 
-        self.position = self.class.board_next_position(zone_value_for_rank)
+        public_send("#{rank_attr}=", self.class.board_next_position(zone_value_for_rank))
       end
 
       # This record's zone value (nil when the model ranks globally).
@@ -58,7 +78,7 @@ module Studio
         # from here, so the 100-gap rule lives in one place.
         def board_next_position(zone_value = nil, gap: 100)
           scope = board_zone_attr && zone_value ? where(board_zone_attr => zone_value) : all
-          (scope.maximum(:position) || 0) + gap
+          (scope.maximum(board_rank_attr) || 0) + gap
         end
 
         # Restamp a column top-to-bottom in ONE pass. `ids` arrive in DOM order (top
@@ -69,12 +89,23 @@ module Studio
         # (first id smallest) for an ascending board. This is exactly the per-id
         # `update_all(position: ...)` loop the MS tasks/news/content reorder actions
         # each ran by hand, lifted into the model. Returns the ids it stamped.
-        def reposition!(ids, gap: 100, direction: :desc, id_attr: primary_key)
+        #
+        # DG2 — SEQUENTIAL 1..N RANKS: `gap: 1, direction: :asc` stamps 1, 2, 3, … N
+        # (the depth chart's depth numbers, 1 = starter), not the 100-gapped default.
+        # DG1 — a board that ranks by another column passes `rank_attr:` (defaults to
+        # the model's `board_rank_attr`, so a configured model needs nothing here).
+        # DG4 — `skip_locked: true` leaves a PINNED entry untouched: its rank column is
+        # not written, so a locked starter keeps its depth while the others reflow
+        # around it. The lock flag column is `lock_attr` (default :locked).
+        def reposition!(ids, gap: 100, direction: :desc, id_attr: primary_key,
+                        rank_attr: board_rank_attr, skip_locked: false, lock_attr: :locked)
           ids = Array(ids)
           length = ids.length
           ids.each_with_index do |id, index|
             rank = direction.to_sym == :asc ? (index + 1) * gap : (length - index) * gap
-            where(id_attr => id).update_all(position: rank)
+            rel  = where(id_attr => id)
+            rel  = rel.where.not(lock_attr => true) if skip_locked
+            rel.update_all(rank_attr => rank)
           end
           ids
         end
