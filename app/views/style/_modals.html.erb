@@ -107,7 +107,10 @@
         isAvailable: function () { return false; }
       };
 
-      document.addEventListener('alpine:init', function () {
+      // Register the page-scoped dsModals + dsSolanaModal stores. Named (not an
+      // inline alpine:init callback) so the dual-guard at the end can invoke it
+      // directly on a Turbo visit, when alpine:init will not fire again.
+      function registerDsModals() {
         if (Alpine.store('dsModals')) return;
 
         // Enter/exit animation registry — keys map to a CSS class (engine-
@@ -244,7 +247,19 @@
           get ctaLabel()        { return this._read('ctaLabel', ''); },
           get ctaHref()         { return this._read('ctaHref', ''); }
         });
-      });
+      }
+
+      // Alpine's deferred CDN <script> fires alpine:init exactly ONCE, on the
+      // first full-document load. Turbo Drive advance visits swap the document
+      // body without reloading that head script, so alpine:init never fires
+      // again — and
+      // because this dsModals registration lives ONLY in the /admin/style body,
+      // it was absent during that one alpine:init. Registering here on the
+      // Turbo-visit path (Alpine already started) keeps $store.dsModals defined,
+      // so the specimen cards' @click / :style / <template x-if> don't throw.
+      // Mirrors studio/modals/_image_upload's cropPhotoModal guard.
+      if (window.Alpine) { registerDsModals(); }
+      else { document.addEventListener('alpine:init', registerDsModals); }
     })();
   </script>
 

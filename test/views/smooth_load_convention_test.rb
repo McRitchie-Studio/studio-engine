@@ -35,6 +35,17 @@ class SmoothLoadConventionTest < ActiveSupport::TestCase
     view.render(partial: "layouts/studio/smooth_load")
   end
 
+  # Renders the engine navbar logged-out with just the helpers it touches.
+  # logged_in? must exist even with show_logged_in passed: the partial reads it
+  # via fetch's eager default argument, not a lazy block.
+  def render_navbar(preview: false)
+    v = view
+    v.define_singleton_method(:logged_in?) { false }
+    v.define_singleton_method(:root_path)  { "/" }
+    v.define_singleton_method(:login_path) { "/login" }
+    v.render(partial: "layouts/navbar", locals: { show_logged_in: false, preview: preview })
+  end
+
   def with_smooth_load(value)
     original = Studio.smooth_load
     Studio.smooth_load = value
@@ -80,5 +91,46 @@ class SmoothLoadConventionTest < ActiveSupport::TestCase
     assert_includes css, "view-transition-name: studio-header"
     assert_includes css, ".turbo-progress-bar"
     assert_includes css, "prefers-reduced-motion"
+  end
+
+  # --- engine navbar self-pin (engine 0.26) -------------------------------
+  #
+  # The engine's own layouts/_navbar carries vt-pinned-header when the app
+  # opts into smooth_load, so hosts stop shadowing the partial just to add
+  # the class. Non-preview only: preview renders can repeat per page, and a
+  # duplicate view-transition-name silently disables every transition.
+
+  test "navbar self-pins exactly once when smooth_load is on" do
+    html = with_smooth_load(true) { render_navbar }
+
+    assert_equal 1, html.scan("vt-pinned-header").size
+  end
+
+  test "navbar emits no pin when smooth_load is off" do
+    html = with_smooth_load(false) { render_navbar }
+
+    assert_equal 0, html.scan("vt-pinned-header").size
+  end
+
+  test "preview navbar never pins even with smooth_load on" do
+    html = with_smooth_load(true) { render_navbar(preview: true) }
+
+    assert_equal 0, html.scan("vt-pinned-header").size
+  end
+
+  test "engine.css suppresses the header cross-fade and falls back the bar color" do
+    css = File.read(CSS_PATH)
+
+    # The studio-header group's UA cross-fade suppression (formerly the
+    # app-side bridge rule in mcritchie-studio and turf-monster) — bind
+    # animation: none to the studio-header selectors specifically, not just
+    # anywhere in the file.
+    assert_match(
+      /::view-transition-old\(studio-header\),\s*\n::view-transition-new\(studio-header\)\s*\{\s*\n\s*animation:\s*none;\s*\n\}/,
+      css
+    )
+    # Turbo's own default blue keeps the bar visible without the runtime
+    # theme block.
+    assert_includes css, "background: var(--color-cta, #0076ff)"
   end
 end
