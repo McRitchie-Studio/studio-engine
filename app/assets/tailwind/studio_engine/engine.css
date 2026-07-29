@@ -221,12 +221,28 @@
   view-transition-name: studio-header;
 }
 
+/* Suppress the UA default on the pinned header's own group: without this the
+   browser runs its ~250ms plus-lighter cross-fade between the header's old and
+   new snapshots, and on any navigation from a scrolled page (collapsed header
+   → expanded at top) the wordmark and buttons draw TWICE, offset by the height
+   delta, until the blend settles. animation: none shows the incoming header
+   immediately while the group box still morphs its height. Engine-owned as of
+   0.26.0 — this lifts the identical bridge rule mcritchie-studio and
+   turf-monster carried app-side; consumers delete their copies when adopting
+   this version. */
+::view-transition-old(studio-header),
+::view-transition-new(studio-header) {
+  animation: none;
+}
+
 /* Turbo's progress bar is the slow-load feedback under no-preview (the old
    page holds until the fresh response). Theme it so every app's bar matches
-   its brand instead of Turbo's default. */
+   its brand instead of Turbo's default. The fallback (#0076ff, Turbo's own
+   default blue) keeps the bar visible in a layout that never renders the
+   runtime theme block (studio_theme_css_tag), where --color-cta is unset. */
 .turbo-progress-bar {
   height: 3px;
-  background: var(--color-cta);
+  background: var(--color-cta, #0076ff);
 }
 
 /* Reduced motion: keep the single-render swap, drop the choreography. Also

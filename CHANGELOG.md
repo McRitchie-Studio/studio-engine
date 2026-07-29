@@ -2,6 +2,40 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.26.0 — 2026-07-28
+
+**The engine navbar pins itself under smooth-load, and the smooth-load CSS is
+fully engine-owned.** Since 0.24 the `vt-pinned-header` pin was opt-in but the
+engine's own `layouts/_navbar` never carried it, so a host that wanted the
+pinned-header transition had to SHADOW the whole partial just to add one class
+(acquisition-studio did exactly that — the known override-drift trap). The
+navbar now self-pins when `Studio.smooth_load` is on, and the engine also ships
+the `studio-header` cross-fade suppression that mcritchie-studio and
+turf-monster had been carrying app-side as a bridge. **Consumer cleanup this
+version unlocks:** acquisition-studio deletes its entire
+`app/views/layouts/_navbar.html.erb` override; mcritchie-studio and
+turf-monster delete their app-side `::view-transition-old(studio-header)` /
+`::view-transition-new(studio-header) { animation: none; }` bridge blocks.
+
+### Changed
+
+- **`layouts/_navbar`** — the sticky header adds `vt-pinned-header` itself when
+  `Studio.smooth_load` is on, non-preview branch ONLY (preview renders can
+  repeat per page, and a duplicate `view-transition-name` silently disables
+  every transition). With the flag off nothing extra renders, so a plain gem
+  bump changes no opted-out app.
+- **`engine.css`** — new `::view-transition-old(studio-header)` /
+  `::view-transition-new(studio-header) { animation: none; }` rule beside the
+  smooth-load block: it suppresses the UA-default ~250ms plus-lighter
+  cross-fade between the header's two snapshots, which double-drew the wordmark
+  and buttons on any navigation from a scrolled page (collapsed header →
+  expanded at top). Lifts the identical bridge rule the hub and turf-monster
+  carried app-side.
+- **`engine.css`** — `.turbo-progress-bar` background becomes
+  `var(--color-cta, #0076ff)`: the fallback (Turbo's own default blue) keeps
+  the bar visible in a layout that never renders the runtime theme block
+  (`studio_theme_css_tag`), where `--color-cta` is unset.
+
 ## 0.25.1 — 2026-07-28
 
 **Fix the Profile Leveling save-close regression 0.25.0 introduced.** The 0.25.0
