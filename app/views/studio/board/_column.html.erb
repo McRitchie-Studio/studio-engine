@@ -12,10 +12,25 @@
 
   locals:
     column:               (req) { key:, label:, cards:, count:, badge_class:,
-                          collapsible:, hidden:, header_extra: }. `cards` are the
+                          count_class:, collapsible:, hidden:, show_expr:,
+                          min_width:, kickoff:, header_extra: }. `cards` are the
                           records passed to the card partial; `count` defaults to
                           cards.size; `badge_class` picks a components/_badge scheme
                           for the count (else a plain neutral count chip).
+                          Additive board-chrome hooks (all opt-in, all default to
+                          the 0.27.0 rendering when omitted):
+                            count_class: raw class string colouring the neutral
+                              count chip (e.g. a task_stage_count_classes value).
+                              Ignored when badge_class is set. Default neutral chip.
+                            show_expr:   Alpine x-show expression for a toggle-able
+                              column (binds against the board's studioBoard scope,
+                              e.g. "state.showArchived"). Adds x-cloak so it can't
+                              flash before Alpine boots. Independent of `hidden:`.
+                            min_width:   the column's sm min-width utility class.
+                              Default "sm:min-w-[190px]".
+                            kickoff:     raw HTML rendered in a fixed-height slot
+                              under the header row (a per-column kickoff chip);
+                              nil renders nothing.
     zone_attr:            data-attr name for the zone. Default "stage".
     dom_id_prefix:        card dom-id prefix, forwarded to the cards. Default "card-".
     zone_selector_class:  the drop-zone class. Default "kanban-dropzone".
@@ -41,9 +56,20 @@
   cards        = column[:cards] || []
   count        = column.fetch(:count) { cards.size }
   badge_class  = column[:badge_class]
+  # gap 2: an opt-in raw class colouring the neutral count chip; nil keeps the
+  # exact 0.27.0 neutral chip classes.
+  count_class  = column[:count_class]
   collapsible  = column[:collapsible]
   hidden       = column[:hidden]
+  # gap 5: a bindable visibility expr (x-show), a per-board min-width, and a
+  # per-column kickoff slot — each nil/absent renders identically to 0.27.0.
+  show_expr    = column[:show_expr]
+  min_width    = column[:min_width] || "sm:min-w-[190px]"
+  kickoff      = column[:kickoff]
   header_extra = column[:header_extra]
+  # The neutral count chip's colour classes: an opt-in raw class, else the 0.27.0
+  # neutral default. The layout classes are shared; only the colour band varies.
+  count_color  = count_class || "bg-surface-alt text-secondary border border-subtle"
 
   # Merge the per-card hook (Proc or Hash) with the record binding.
   resolve_locals = lambda do |record|
@@ -51,20 +77,28 @@
     { card_as => record }.merge(extra || {})
   end
 %>
-<div class="studio-board-column w-full flex-none sm:flex-1 sm:min-w-[190px]"
+<div class="studio-board-column w-full flex-none sm:flex-1 <%= min_width %>"
      data-board-column="<%= key %>"
      <% if collapsible %>data-board-collapsible="true"<% end %>
+     <% if show_expr %>x-show="<%= show_expr %>" x-cloak<% end %>
      <% if hidden %>x-cloak style="display:none"<% end %>>
   <div class="mb-3 px-1 flex items-center gap-2">
     <h3 class="text-sm font-bold text-heading uppercase tracking-wider"><%= label %></h3>
     <% if badge_class %>
       <%= render "components/badge", text: count.to_s, scheme: badge_class, data_board_count: key %>
     <% else %>
-      <span class="stage-count inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold bg-surface-alt text-secondary border border-subtle"
+      <span class="stage-count inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold <%= count_color %>"
             data-board-count="<%= key %>"><%= count %></span>
     <% end %>
     <% if header_extra %><%= header_extra %><% end %>
   </div>
+
+  <%# gap 5: per-column kickoff slot — a fixed-height row under the header so every
+      column's dropzone starts at the same y (no height jog) when only some carry a
+      chip. Renders nothing when the column passes no kickoff. %>
+  <% if kickoff %>
+    <div class="studio-board-kickoff mt-2 min-h-[26px]"><%= kickoff %></div>
+  <% end %>
 
   <div id="dropzone-<%= key %>"
        data-<%= zone_attr %>="<%= key %>"

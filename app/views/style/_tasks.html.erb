@@ -109,6 +109,69 @@
     </div>
   </div>
 
+  <%# ---- The ENRICHED board chrome (0.28.0) ------------------------------ %>
+  <%# One specimen that exercises the five additive hooks the /tasks pilot surfaced,
+      all opt-in: (1) board_state + header_slot chrome home, (2) a coloured count
+      chip via count_class, (3) archive_zone exit re-parent, (4) the exit marker,
+      (5) a toggle-able column (show_expr) + a per-column kickoff slot + min_width.
+      No outer Alpine wrapper: the Show/Hide-archived toggle in header_slot and the
+      archived column's show_expr both bind to the SAME studioBoard state. %>
+  <% chrome_header = capture do %>
+    <div class="flex items-center gap-3 flex-wrap">
+      <button type="button"
+              class="px-3 py-1.5 rounded-lg text-sm font-medium transition border border-subtle"
+              :class="state.showArchived ? 'bg-primary text-white border-primary' : 'bg-surface text-secondary hover:text-heading'"
+              @click="toggleState('showArchived')"
+              data-test="chrome-archived-toggle">
+        <span x-text="state.showArchived ? 'Hide archived' : 'Show archived'">Show archived</span>
+      </button>
+      <span class="label-upper"><code class="font-mono text-2xs">header_slot</code> chrome &middot; binds to <code class="font-mono text-2xs">state.showArchived</code> &mdash; no outer wrapper</span>
+    </div>
+  <% end %>
+  <% chrome_kickoff = capture do %>
+    <span class="inline-flex items-center gap-1 rounded border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-primary">kickoff slot</span>
+  <% end %>
+  <%
+    # Per-column count_class colours (raw classes, the task_stage_count_classes shape),
+    # a kickoff chip + widened min_width on Designed, and a toggle-able Archived column
+    # (show_expr) the board re-parents into (archive_zone).
+    chrome_columns = [
+      { key: "designed", label: "Designed",
+        count_class: "bg-blue-500/10 text-blue-500 border border-blue-500/30",
+        kickoff: chrome_kickoff, min_width: "sm:min-w-[15rem]",
+        cards: [{ id: "chrome-count-color", zone: "designed", title: "Coloured count chip", repo: "studio-engine", who: "SH" }] },
+      { key: "building", label: "Building",
+        count_class: "bg-yellow-500/10 text-yellow-400 border border-yellow-500/30",
+        cards: [{ id: "chrome-bindable-col", zone: "building", title: "Bindable columns", repo: "turf-monster", who: "CA" }] },
+      { key: "shipped", label: "Shipped",
+        count_class: "bg-emerald-500/10 text-emerald-500 border border-emerald-500/30",
+        cards: [{ id: "chrome-exit-marker", zone: "shipped", title: "Exit re-parent marker", repo: "mcritchie", who: "ST" }] },
+      { key: "archived", label: "Archived",
+        count_class: "bg-gray-500/10 text-gray-400 border border-gray-500/30",
+        show_expr: "state.showArchived",
+        cards: [{ id: "chrome-archived-card", zone: "archived", title: "Archived (re-parent target)", repo: "mcritchie", who: "ST" }] }
+    ]
+  %>
+  <div class="space-y-3">
+    <div class="flex items-center gap-2">
+      <span class="badge" style="color: var(--color-primary); border-color: var(--color-primary)">Enriched</span>
+      <p class="label-upper"><code class="font-mono text-2xs">studio/board/board</code> &middot; 0.28.0 chrome &mdash; coloured counts, toggle-able column, archive re-parent</p>
+    </div>
+    <%= render "studio/board/board",
+          demo: true,
+          columns: chrome_columns,
+          card_partial: "style/board/demo_card",
+          card_as: :card,
+          reorder_url: "#",
+          move_url: "#",
+          move_param: { resource: "task", attr: "stage" },
+          group: "studio-board-chrome",
+          board_state: { showArchived: false },
+          archive_zone: "archived",
+          header_slot: chrome_header,
+          empty_label: "Drop tasks here" %>
+  </div>
+
   <%# ---- The static reference sketch ------------------------------------- %>
   <div class="fade-edge-x overflow-x-auto pb-2">
     <div class="flex gap-4 min-w-max">
@@ -162,9 +225,11 @@
       </div>
       <ul class="text-secondary text-sm space-y-1 list-disc list-inside">
         <li>Column layout + horizontal scroll with faded edges</li>
-        <li>The <code class="font-mono text-2xs">stage-*</code> badge palette + count chips</li>
+        <li>The <code class="font-mono text-2xs">stage-*</code> badge palette + count chips (colour via <code class="font-mono text-2xs">count_class</code>)</li>
         <li>Card chrome (<code class="font-mono text-2xs">.card</code>) and the drag / rank handle</li>
         <li>Empty-column drop state</li>
+        <li>Chrome-state home (<code class="font-mono text-2xs">board_state</code> + <code class="font-mono text-2xs">header_slot</code>) &mdash; filters/toggles without an outer wrapper</li>
+        <li>Toggle-able columns (<code class="font-mono text-2xs">show_expr</code>), a kickoff slot, and archive re-parent (<code class="font-mono text-2xs">archive_zone</code>)</li>
       </ul>
     </div>
     <div class="card p-5 space-y-2">
@@ -175,7 +240,7 @@
       <ul class="text-secondary text-sm space-y-1 list-disc list-inside">
         <li>Which stages become columns</li>
         <li>The card body — fields, chips, avatars, live timers</li>
-        <li>Filters (agent, app) and header actions</li>
+        <li>Filter/toggle logic + header actions, composed onto the shared chrome state</li>
         <li>Live-update wiring (Turbo Streams on the deploy board)</li>
       </ul>
     </div>
