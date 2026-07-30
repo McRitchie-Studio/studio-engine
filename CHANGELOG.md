@@ -2,6 +2,24 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.29.1 — 2026-07-29
+
+**`Studio::Board::Rankable#reposition!` is now atomic — a mid-loop failure can no
+longer strand a partial restamp.** The per-id `update_all` restamp loop ran with no
+transaction, so if any one write raised (a constraint violation, a dropped
+connection) the cards already stamped kept their new rank while the rest kept the
+old — the read model left half-reordered. The loop body now runs inside a single
+`transaction`, so a failure rolls back every rank write in the pass. Purely
+additive: the success path is byte-identical, and `skip_locked` / `rank_attr` /
+`gap` / `direction` semantics are unchanged, so all four boards (tasks / news /
+content / depth-chart) reorder exactly as before.
+
+### Fixed
+
+- **`Studio::Board::Rankable#reposition!` wraps its restamp loop in a transaction**
+  so a mid-loop `update_all` failure rolls back the whole column instead of leaving
+  a partial restamp. No behavior change on the clean path.
+
 ## 0.29.0 — 2026-07-29
 
 **The four depth-chart gaps folded into the `studio/board` primitive (Phase D), so

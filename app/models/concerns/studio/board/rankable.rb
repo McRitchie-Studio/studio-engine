@@ -97,15 +97,23 @@ module Studio
         # DG4 — `skip_locked: true` leaves a PINNED entry untouched: its rank column is
         # not written, so a locked starter keeps its depth while the others reflow
         # around it. The lock flag column is `lock_attr` (default :locked).
+        #
+        # ATOMIC: the whole restamp runs in ONE transaction, so a mid-loop failure
+        # (a raised update_all — e.g. a constraint violation or a dropped connection)
+        # rolls back EVERY rank write in the pass. The read model never survives a
+        # partial restamp where some cards moved and others kept their old rank. The
+        # success path is unchanged — a clean pass commits exactly as before.
         def reposition!(ids, gap: 100, direction: :desc, id_attr: primary_key,
                         rank_attr: board_rank_attr, skip_locked: false, lock_attr: :locked)
           ids = Array(ids)
           length = ids.length
-          ids.each_with_index do |id, index|
-            rank = direction.to_sym == :asc ? (index + 1) * gap : (length - index) * gap
-            rel  = where(id_attr => id)
-            rel  = rel.where.not(lock_attr => true) if skip_locked
-            rel.update_all(rank_attr => rank)
+          transaction do
+            ids.each_with_index do |id, index|
+              rank = direction.to_sym == :asc ? (index + 1) * gap : (length - index) * gap
+              rel  = where(id_attr => id)
+              rel  = rel.where.not(lock_attr => true) if skip_locked
+              rel.update_all(rank_attr => rank)
+            end
           end
           ids
         end
