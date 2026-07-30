@@ -37,6 +37,21 @@ ActiveRecord::Schema.define do
   end
 end
 
+# 0.29.1 — a CHECK-guarded table for the reposition! ATOMICITY test. `position`
+# may never be 200 — the 2nd DESC rank in a 3-id restamp — so the loop's SECOND
+# update_all raises AFTER the first already wrote 300. reposition!'s transaction
+# must then roll the first write back (no partial restamp). Raw DDL because SQLite
+# can only attach a CHECK at CREATE TABLE time (no ALTER TABLE ADD CONSTRAINT).
+ActiveRecord::Base.connection.execute(<<~SQL)
+  CREATE TABLE guarded_widgets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    stage varchar,
+    position integer CHECK (position <> 200),
+    created_at datetime(6),
+    updated_at datetime(6)
+  )
+SQL
+
 class BoardWidget < ActiveRecord::Base
   include Studio::Board::Rankable
   before_create :set_initial_position
@@ -48,6 +63,13 @@ class DepthWidget < ActiveRecord::Base
   self.board_rank_attr  = :depth   # DG1: rank by depth, not position
   self.board_rank_order = :asc     # DG1: depth 1 sits on top
   before_create :set_initial_position
+end
+
+# 0.29.1 — the CHECK-guarded model (position may never be 200). No
+# set_initial_position: the atomicity test always passes explicit positions, so the
+# genesis seed can never accidentally stamp a forbidden 200 on create.
+class GuardedWidget < ActiveRecord::Base
+  include Studio::Board::Rankable
 end
 
 class BoardRankableTest < ActiveSupport::TestCase
@@ -146,6 +168,49 @@ class BoardRankableTest < ActiveSupport::TestCase
     ensure
       BoardWidget.board_zone_attr = original
     end
+  end
+end
+
+# --- 0.29.1 — reposition! is ATOMIC (transaction rollback) -------------------
+# A mid-loop rank-write failure must roll back the WHOLE column — never strand a
+# partial restamp where some cards moved and the rest kept their old rank.
+# GuardedWidget's table rejects position 200 (the 2nd DESC rank for 3 ids), so the
+# loop's 2nd update_all raises AFTER the 1st already wrote 300.
+class BoardRankableAtomicTest < ActiveSupport::TestCase
+  def setup
+    GuardedWidget.delete_all
+  end
+
+  test "reposition! rolls the whole column back when a mid-loop rank write fails" do
+    a = GuardedWidget.create!(stage: "x", position: 1)
+    b = GuardedWidget.create!(stage: "x", position: 2)
+    c = GuardedWidget.create!(stage: "x", position: 3)
+
+    # DESC 3-id restamp targets 300, 200, 100. The 200 write violates the CHECK and
+    # raises AFTER 300 is already written — exactly the mid-loop failure the fix guards.
+    assert_raises(ActiveRecord::StatementInvalid) do
+      GuardedWidget.reposition!([a.id, b.id, c.id], id_attr: :id)
+    end
+
+    # The transaction rolled back EVERY write: the first row is NOT stranded at 300.
+    # (Without the transaction it would reload as 300 — the partial-restamp bug.)
+    assert_equal 1, a.reload.position, "the first row's 300 write rolled back"
+    assert_equal 2, b.reload.position, "the failing row is untouched"
+    assert_equal 3, c.reload.position, "the never-reached row is untouched"
+  end
+
+  test "reposition! still commits the full restamp on the clean path" do
+    a = GuardedWidget.create!(stage: "x", position: 1)
+    b = GuardedWidget.create!(stage: "x", position: 2)
+    c = GuardedWidget.create!(stage: "x", position: 3)
+
+    # gap 10 dodges the forbidden 200 (30, 20, 10 all commit): the wrapped loop is a
+    # no-op on the success path — the restamp still lands normally.
+    GuardedWidget.reposition!([a.id, b.id, c.id], gap: 10, id_attr: :id)
+
+    assert_equal 30, a.reload.position
+    assert_equal 20, b.reload.position
+    assert_equal 10, c.reload.position
   end
 end
 
