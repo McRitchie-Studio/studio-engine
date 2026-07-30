@@ -278,7 +278,7 @@ module Studio
 
       See the USER_CONTRACT.md doc in the studio-engine repo for the full
       contract + a minimal compliant example:
-        https://github.com/amcritchie/studio-engine/blob/main/docs/USER_CONTRACT.md
+        https://github.com/McRitchie-Studio/studio-engine/blob/main/docs/USER_CONTRACT.md
 
       To bypass this check temporarily, set Studio.validate_user_contract = false
       in config/initializers/studio.rb.
