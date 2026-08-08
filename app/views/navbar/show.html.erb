@@ -15,7 +15,7 @@
   .navbar-preview.is-mobile .hidden.md\:flex { display: none !important; }
   .navbar-preview.is-mobile .hidden.md\:block { display: none !important; }
   .navbar-preview.is-mobile .flex.md\:hidden { display: flex !important; }
-  .navbar-preview.is-mobile .user-nav-col { padding-left: 0 !important; padding-right: 1rem !important; }
+  .navbar-preview.is-mobile .user-nav-col, .navbar-preview.is-mobile .user-nav-fit { padding-left: 0 !important; padding-right: 1rem !important; }
   .navbar-preview.is-mobile .nav-title { flex-direction: column !important; gap: 0 !important; line-height: 1.15 !important; }
   .navbar-preview.is-mobile .nav-title span:first-child { margin-bottom: -4px !important; }
   .navbar-preview.is-mobile .nav-title span:last-child { font-size: 1.5rem !important; }
@@ -26,15 +26,18 @@
   .navbar-preview.bp-tiny .nav-title span:last-child { font-size: 1.3rem !important; }
   .navbar-preview.bp-tiny .nav-logo-link { gap: 0.25rem !important; }
   .navbar-preview.bp-tiny .user-nav-col { width: 14rem !important; }
+  .navbar-preview.bp-tiny .user-nav-fit { max-width: 14rem !important; }
   .navbar-preview.bp-tiny .username-cap { max-width: 5rem !important; }
 
   /* Small (400-767px) */
   .navbar-preview.bp-small .nav-title { font-size: 1.25rem !important; }
   .navbar-preview.bp-small .user-nav-col { width: 15rem !important; }
+  .navbar-preview.bp-small .user-nav-fit { max-width: 15rem !important; }
   .navbar-preview.bp-small .username-cap { max-width: 6rem !important; }
 
   /* Desktop (768px+) */
   .navbar-preview.is-desktop .user-nav-col { width: 20rem !important; }
+  .navbar-preview.is-desktop .user-nav-fit { max-width: 20rem !important; }
   .navbar-preview.is-desktop .username-cap { max-width: 7rem !important; }
 
   /* Transitions for scrolled toggle */

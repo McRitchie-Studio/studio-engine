@@ -25,6 +25,18 @@ gear, not two); public-only sections keep the dropdown. Resolution rules live
 in `lib/studio/sidebar_sections.rb` (pure Ruby, unit-tested); docs in
 `NEW_APP_SETUP.md` §4/§13 and `NAVBAR_SETUP.md`.
 
+**Off-chain apps lose the user nav's dead space.** The default second row
+(wallet address + level progress bar) renders only when it has something to
+show — a wallet, a server level, or the `show_logout_link` link. A plain
+app's signed-in nav collapses to one line instead of an empty progress strip.
+The engine navbar's fixed-width `.user-nav-col` (reserved to seat a balance)
+likewise applies only when `balance_html` is passed; without one the column
+becomes `.user-nav-fit` (shrink-to-fit, `max-width` capped for username
+truncation). turf-monster's dense nav is untouched: its users carry wallet +
+level, and it ships its own navbar. Pinned by
+`test/integration/user_nav_collapse_render_test.rb` and the user_nav view
+tests.
+
 ## 0.29.0 — 2026-07-29
 
 **The four depth-chart gaps folded into the `studio/board` primitive (Phase D), so
