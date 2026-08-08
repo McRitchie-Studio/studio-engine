@@ -97,7 +97,7 @@
   <div class="flex md:hidden items-center gap-3 px-4 py-1.5 border-t border-subtle bg-surface-alt">
     <span class="ml-auto flex items-center gap-3">
       <%= render "components/link_sidebar_trigger" if sidebar_active %>
-      <%= render "components/admin_dropdown" %>
+      <%= render "components/admin_dropdown" unless sidebar_active && studio_sidebar_replaces_admin_menu? %>
       <%= render "components/theme_toggle_morph" %>
     </span>
   </div>

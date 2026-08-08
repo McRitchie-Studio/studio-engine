@@ -10,4 +10,13 @@ module StudioSidebarHelper
   def studio_sidebar?
     studio_sidebar_sections.any?
   end
+
+  # The admin dropdown and the sidebar trigger share the cog glyph — showing
+  # both reads as a double gear. When the viewer's resolved sections carry an
+  # admin-flagged entry, the sidebar IS the admin menu (its title says so) and
+  # the engine components skip the dropdown. Declaring only public sections
+  # keeps the dropdown, so admins never lose Theme/Navbar/Error Logs.
+  def studio_sidebar_replaces_admin_menu?
+    studio_sidebar_sections.any? { |section| section[:admin] }
+  end
 end

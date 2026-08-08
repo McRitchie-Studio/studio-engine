@@ -19,8 +19,11 @@ pre-init rule. **Upgrade-safe by default:** `sidebar_sections` defaults to
 `[]`, which renders nothing — existing consumers see zero change until they
 opt in (pinned by `test/integration/sidebar_navbar_render_test.rb`). The
 `html { overflow-x: clip }` slide guard ships inside the sidebar partial, not
-globally. Resolution rules live in `lib/studio/sidebar_sections.rb` (pure
-Ruby, unit-tested); docs in `NEW_APP_SETUP.md` §4/§13 and `NAVBAR_SETUP.md`.
+globally. When the viewer's resolved sections carry an `admin: true` entry,
+the sidebar replaces the engine admin dropdown (both use the cog glyph — one
+gear, not two); public-only sections keep the dropdown. Resolution rules live
+in `lib/studio/sidebar_sections.rb` (pure Ruby, unit-tested); docs in
+`NEW_APP_SETUP.md` §4/§13 and `NAVBAR_SETUP.md`.
 
 ## 0.29.0 — 2026-07-29
 

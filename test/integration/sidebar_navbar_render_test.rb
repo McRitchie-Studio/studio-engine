@@ -23,6 +23,26 @@ class SidebarNavbarRenderHostController < ActionController::Base
   def root_path = "/"
 end
 
+# Logged-in admin variant for the double-gear rule: the user-nav icon rail
+# renders both the sidebar trigger and the admin dropdown, which share the
+# cog glyph.
+class SidebarAdminHostController < SidebarNavbarRenderHostController
+  helper_method :current_user, :admin?
+
+  class StubUser
+    def display_name = "Admin User"
+    def avatar = @avatar ||= Class.new { def attached? = false }.new
+    def avatar_color = "#0ea5e9"
+    def avatar_initials = "AU"
+  end
+
+  def logged_in? = true
+
+  def admin? = true
+
+  def current_user = @current_user ||= StubUser.new
+end
+
 class SidebarNavbarRenderTest < ActiveSupport::TestCase
   SECTIONS = [
     { title: "Site", links: [{ label: "Home", href: "/", emoji: "🏠" }] }
@@ -50,6 +70,28 @@ class SidebarNavbarRenderTest < ActiveSupport::TestCase
     refute_includes html, "data-link-sidebar-trigger"
     refute_includes html, "studio-link-sidebar"
     refute_includes html, "__studioLinkSidebarBridge"
+  end
+
+  test "sidebar with an admin section replaces the admin dropdown" do
+    Studio.sidebar_sections = SECTIONS + [
+      { title: "Ops", admin: true, links: [{ label: "Errors", href: "/error_logs", emoji: "🚨" }] }
+    ]
+
+    html = SidebarAdminHostController.render(inline: %(<%= render "layouts/navbar" %>))
+
+    assert_includes html, "data-link-sidebar-trigger"
+    refute_includes html, %(title="Admin"),
+                    "the admin dropdown must yield to the sidebar's admin menu (double gear)"
+  end
+
+  test "sidebar with only public sections keeps the admin dropdown" do
+    Studio.sidebar_sections = SECTIONS
+
+    html = SidebarAdminHostController.render(inline: %(<%= render "layouts/navbar" %>))
+
+    assert_includes html, "data-link-sidebar-trigger"
+    assert_includes html, %(title="Admin"),
+                    "admins keep the dropdown when the sidebar carries no admin section"
   end
 
   test "preview renders skip the sidebar even with sections declared" do

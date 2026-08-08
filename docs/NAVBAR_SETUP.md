@@ -21,7 +21,9 @@ If your app doesn't create its own `app/views/layouts/_navbar.html.erb`, the eng
   the mobile sub-navbar, plus the slide-out panels rendered after the header.
   With the default empty sections none of it renders, and `preview: true`
   renders always skip it (the `/admin/navbar` preview repeats the partial;
-  the panels carry page-unique ids).
+  the panels carry page-unique ids). When the viewer's sections include an
+  `admin: true` entry, the sidebar replaces the admin dropdown — both use the
+  cog glyph, and two gears side by side read as a duplicate.
 
 ## How to Override
 

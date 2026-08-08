@@ -56,7 +56,9 @@
         <%= studio_nav_slot.call(balance_slot, balance_html) %>
         <div class="flex items-center gap-2 ml-auto self-end">
           <%= studio_nav_slot.call(extra_icons_slot, extra_icons_html) %>
-          <%= render "components/admin_dropdown" %>
+          <%# Skipped when the link sidebar carries the admin menu — two cog
+              glyphs side by side read as a double gear. %>
+          <%= render "components/admin_dropdown" unless respond_to?(:studio_sidebar_replaces_admin_menu?) && studio_sidebar_replaces_admin_menu? %>
           <%= render "components/theme_toggle_morph" %>
         </div>
         <% account_link = defined?(account_path) ? account_path : "#" %>
@@ -167,7 +169,7 @@
       <%= render "components/avatar", user: current_user, size: "nav" %>
     <% end %>
   <% else %>
-    <%= render "components/admin_dropdown" %>
+    <%= render "components/admin_dropdown" unless respond_to?(:studio_sidebar_replaces_admin_menu?) && studio_sidebar_replaces_admin_menu? %>
     <%= render "components/theme_toggle_morph" %>
     <div class="flex items-center gap-3 ml-auto">
       <%= link_to "Log in", login_path, class: "text-heading hover:text-primary text-sm font-semibold transition" %>
