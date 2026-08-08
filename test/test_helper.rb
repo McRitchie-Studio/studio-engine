@@ -15,6 +15,7 @@ require "active_support/core_ext/object/blank"
 # We skip requiring "studio/engine" since that needs a full Rails app.
 require_relative "../lib/studio/version"
 require_relative "../lib/studio/color_scale"
+require_relative "../lib/studio/environment_banner"
 require_relative "../lib/studio/theme_resolver"
 require_relative "../lib/studio/ui_primitives"
 require_relative "../lib/studio/email"

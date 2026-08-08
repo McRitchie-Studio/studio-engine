@@ -1,6 +1,7 @@
 require "studio/version"
 require "studio/engine"
 require "studio/color_scale"
+require "studio/environment_banner"
 require "studio/theme_resolver"
 require "studio/ui_primitives"
 require "studio/username_generator"
@@ -236,6 +237,40 @@ module Studio
     return !!local_email_capture unless local_email_capture.nil?
 
     env_truthy?(ENV["LOCAL_EMAIL_CAPTURE"]) || env_truthy?(ENV["AGENT_WORKTREE"])
+  end
+
+  # ---- Shared environment banner ------------------------------------------
+  # Rules live in Studio::EnvironmentBanner (pure Ruby, unit-tested); these are
+  # the Rails-aware entry points `studio/banners/_environment` calls. A host
+  # renders that ONE partial instead of hand-rolling its own strip.
+
+  # True for a stable QA app: Rails-production, but a non-production review
+  # target that must identify itself as one. Keyed off QA_ENV, the signal the
+  # release conductor already sets on every QA app.
+  def self.qa_environment?
+    EnvironmentBanner.qa_environment?
+  end
+
+  def self.show_environment_banner?(rails_env: rails_env_name)
+    EnvironmentBanner.show?(rails_env: rails_env, qa_environment: qa_environment?)
+  end
+
+  def self.environment_banner_message(rails_env: rails_env_name, extra: [])
+    EnvironmentBanner.message(rails_env: rails_env, qa_environment: qa_environment?, extra: extra)
+  end
+
+  # Whether the local email inbox is actually REACHABLE for this request, which
+  # is the only honest reason to render a link to it. Deliberately the same
+  # gate the controller enforces (local_tool_enabled?), so the banner can never
+  # advertise a page that answers 404 — QA gets a status chip instead.
+  def self.local_inbox_reachable?(request_local:)
+    local_tool_enabled?(request_local: request_local)
+  end
+
+  def self.rails_env_name
+    return "development" unless defined?(Rails) && Rails.respond_to?(:env)
+
+    Rails.env.to_s
   end
 
   def self.user_wallet_address(user)
