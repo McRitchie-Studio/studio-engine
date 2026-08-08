@@ -45,6 +45,24 @@ ActiveRecord::Schema.define do
   end
   add_index :studio_links, :token, unique: true
 
+  # A stand-in for the real table, used only to prove the MissingTable guard
+  # stands ASIDE for a statement failure that is not a missing table. It carries
+  # every column the mint writes, plus one the database requires and the mint
+  # never sets — so the INSERT reaches the adapter and fails there, with the
+  # table very much existing. Declared here with the rest of the schema so no
+  # test ever has to drop or alter a shared table to reach that branch.
+  create_table :studio_links_probe, force: true do |t|
+    t.string   :token, null: false
+    t.string   :kind, null: false
+    t.string   :linkable_type
+    t.bigint   :linkable_id
+    t.json     :metadata
+    t.datetime :expires_at
+    t.datetime :consumed_at
+    t.string   :required_by_the_database, null: false
+    t.timestamps
+  end
+
   create_table :users, force: true do |t|
     t.string   :email, null: false
     t.string   :name
@@ -439,43 +457,42 @@ class StudioLinkBurnTest < ActiveSupport::TestCase
   # this is reachable by a plain `bundle update` with nobody having adopted
   # anything. Without the guard it surfaces as a bare adapter error on a real
   # person's sign-in; the point of the test is that the message names the fix.
-  test "minting without the table names the missing migration" do
-    connection = ActiveRecord::Base.connection
-    connection.drop_table(:studio_links)
-
-    error = assert_raises(Studio::Link::MissingTable) do
-      Studio::Link.create_magic_link(email: EMAIL)
+  #
+  # Both branches are probed through a THROWAWAY SUBCLASS pointed at a different
+  # table, never by dropping or altering the real one. An earlier draft did drop
+  # it and restore it in `ensure`, which corrupted whichever tests happened to
+  # run afterwards — green on most seeds, five failures on 62338. Sharing a
+  # schema across a process means a test that edits it is not isolated, however
+  # carefully it tidies up.
+  def probe_link_class(table)
+    Class.new(Studio::Link) do
+      self.table_name = table
+      def self.name = "ProbeLink"
     end
-    assert_includes error.message, "studio_links"
-    assert_includes error.message, "db/migrate", "the message must point at the migration to copy"
-  ensure
-    connection.create_table(:studio_links, force: true) do |t|
-      t.string   :token, null: false
-      t.string   :kind, null: false
-      t.string   :linkable_type
-      t.bigint   :linkable_id
-      t.json     :metadata
-      t.datetime :expires_at
-      t.datetime :consumed_at
-      t.timestamps
-    end
-    connection.add_index(:studio_links, :token, unique: true)
   end
 
-  # ...and never swallows a failure that is NOT a missing table. Asserted by
-  # breaking something else entirely: a column the mint writes.
-  test "an unrelated statement failure is re-raised untouched" do
-    connection = ActiveRecord::Base.connection
-    connection.remove_column(:studio_links, :metadata)
-
-    error = assert_raises(ActiveRecord::StatementInvalid) do
-      Studio::Link.create_magic_link(email: EMAIL)
+  test "minting without the table names the missing migration" do
+    error = assert_raises(Studio::Link::MissingTable) do
+      probe_link_class("studio_links_never_migrated").create_magic_link(email: EMAIL)
     end
+
+    assert_includes error.message, "studio_links"
+    assert_includes error.message, "db/migrate", "the message must point at the migration to copy"
+  end
+
+  # ...and never swallows a failure that is NOT a missing table. Probed against
+  # studio_links_probe, which exists and carries a NOT NULL column the mint
+  # never sets, so the insert fails at the adapter for a reason the guard has no
+  # business claiming.
+  test "an unrelated statement failure is re-raised untouched" do
+    error = assert_raises(ActiveRecord::StatementInvalid) do
+      probe_link_class("studio_links_probe").create_magic_link(email: EMAIL)
+    end
+
     refute_kind_of Studio::Link::MissingTable, error,
                    "the table exists, so the guard must stand aside"
-  ensure
-    connection.add_column(:studio_links, :metadata, :json)
-    Studio::Link.reset_column_information
+    assert_match(/required_by_the_database/, error.message,
+                 "the ORIGINAL failure must survive, not be reworded")
   end
 
   test "minting normalizes the email, sanitizes return_to, and sets the TTL" do
