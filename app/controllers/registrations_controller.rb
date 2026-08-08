@@ -1,4 +1,6 @@
 class RegistrationsController < ApplicationController
+  include Studio::MagicLinkIssuing
+
   skip_before_action :require_authentication
 
   def new
@@ -13,7 +15,7 @@ class RegistrationsController < ApplicationController
     unless Studio.auth_method?(:password)
       email = (params.dig(:user, :email) || params[:email]).to_s.strip.downcase
       if email.match?(URI::MailTo::EMAIL_REGEXP)
-        token = MagicLink.generate(email: email)
+        token = issue_magic_link(email, nil)
         Studio::Email.deliver(UserMailer, :magic_link, email, token, to: email)
       end
       return redirect_to login_path, notice: "Check your inbox — we just emailed you a sign-in link."

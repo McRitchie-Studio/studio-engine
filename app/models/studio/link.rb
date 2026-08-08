@@ -106,6 +106,34 @@ module Studio
       self
     end
 
+    # The non-raising sibling of #consume!, and the one the click flow uses.
+    # Returns whether THIS caller won the burn — false for a link that was
+    # already used, has expired, or lost the atomic race to a concurrent click.
+    #
+    # Why a boolean and not the exception: "the link was dead" is not an error
+    # here, it is one of the two normal outcomes, and the branch it feeds
+    # (Studio::LinkResolution) needs the answer as data. Reloads on a loss so
+    # the caller reads the row's settled state (consumed_at / expires_at) rather
+    # than the copy it held before the race.
+    def burn
+      consume!
+      true
+    rescue InvalidToken
+      reload
+      false
+    end
+
+    # How a failed burn should be described. Only meaningful once #burn has
+    # returned false (or on a link that was never burned at all).
+    def dead_status
+      return :used if single_use? && consumed?
+      return :expired if expired?
+
+      # Neither flag is set but the burn did not land: a concurrent click won
+      # it between our read and our write. Same story for the reader.
+      :used
+    end
+
     def single_use?
       Studio::LinkToken.single_use?(kind)
     end

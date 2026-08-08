@@ -36,7 +36,6 @@ Studio.configure do |config|
   config.welcome_message = ->(user) { "Welcome, #{user.display_name}!" }
   config.auth_methods = %i[magic_link google]
   config.registration_params = [:name, :email]
-  config.magic_link_token_name = "magic_link_my_app_v1"
   config.mailer_from = Studio.mailer_from_for_transport(
     ses_from: "My App <team@example.com>"
   )

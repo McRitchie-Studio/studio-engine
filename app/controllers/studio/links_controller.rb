@@ -1,6 +1,6 @@
 module Studio
-  # The unified short-token link entry point — GET/POST /l/<token>. Dispatches by
-  # Studio::Link#kind:
+  # The short-token link entry point — GET/POST /l/<token>, the only magic-link
+  # door the engine draws. Dispatches by Studio::Link#kind:
   #
   #   magic_link → scanner-safe confirm interstitial (GET, inert) that auto-POSTs
   #                to #consume, the ONLY place the single-use token is burned +
@@ -8,6 +8,10 @@ module Studio
   #   referral   → idempotent: capture attribution into a cookie + redirect to
   #                the link's target (or root). Reusable + safe to prefetch, so
   #                GET does the work (no POST step).
+  #
+  # Every decision about what a magic-link click DOES lives in
+  # Studio::LinkConsumption / Studio::LinkResolution, not here — including the
+  # invariant that a dead link leaves the visitor's session untouched.
   #
   # Namespaced (not top-level Links) because mcritchie-studio already owns a
   # public /links linktree (top-level LinksController). Apps needing richer
@@ -25,30 +29,24 @@ module Studio
       response.set_header("Referrer-Policy", "strict-origin")
       @link = Studio::Link.find_by(token: params[:token])
 
-      case @link&.kind
-      when "magic_link"
-        @token = params[:token]
-        render :confirm
-      when "referral"
+      if @link&.kind == "referral"
         capture_referral(@link)
-        redirect_to(@link.target || root_path)
-      else
-        redirect_to login_path, alert: "That link is invalid or has expired. Request a fresh one below."
+        return redirect_to(@link.target || root_path)
       end
+
+      # A magic link, or a token with no row behind it. preview_magic_link is
+      # inert — it never burns — and settles a dead link itself rather than
+      # sending the visitor through a spinner that only POSTs to learn the same.
+      @token = params[:token]
+      render :confirm if preview_magic_link(@link&.kind == "magic_link" ? @link : nil) == :live
     end
 
     # POST /l/:token — authoritative magic-link consume. Only magic_link kinds are
-    # consumable here; referral links are reusable and handled entirely on GET.
+    # consumable here; referral links are reusable and handled entirely on GET,
+    # so a referral token scoped out below reads as an unknown token.
     def consume
       response.set_header("Referrer-Policy", "strict-origin")
-      link = Studio::Link.find_by(token: params[:token])
-      raise Studio::Link::InvalidToken, "not a magic link" unless link&.kind == "magic_link"
-
-      link.consume! # burns the single-use token; raises if already used / expired
-      user = User.find_by(email: link.email)
-      user ? sign_in_existing(user, link) : sign_up_new(link)
-    rescue Studio::Link::InvalidToken
-      redirect_to login_path, alert: "That sign-in link is invalid or has expired. Request a fresh one below."
+      consume_magic_link(Studio::Link.magic_links.find_by(token: params[:token]))
     end
 
     private

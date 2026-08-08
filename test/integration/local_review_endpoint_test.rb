@@ -11,10 +11,26 @@ require "action_dispatch"
 require "action_dispatch/testing/integration"
 
 # Drive the real dummy app through the full router → controller stack. (Not
-# rails/test_help: that boots the fixture/schema machinery, and this dummy app
-# carries no schema — this suite deliberately proves the endpoint with no
-# database in reach.)
+# rails/test_help: that boots the fixture machinery this suite has no use for.
+# The schema it does need is declared below, in the file that needs it.)
 ActionDispatch::IntegrationTest.app = Rails.application
+
+# The mint writes a real Studio::Link row, so the suite needs the table. The
+# consuming apps own this schema in production (db/migrate/…_create_studio_links).
+ActiveRecord::Schema.verbose = false
+ActiveRecord::Schema.define do
+  create_table :studio_links, force: true do |t|
+    t.string   :token, null: false
+    t.string   :kind, null: false
+    t.string   :linkable_type
+    t.bigint   :linkable_id
+    t.json     :metadata
+    t.datetime :expires_at
+    t.datetime :consumed_at
+    t.timestamps
+  end
+  add_index :studio_links, :token, unique: true
+end
 
 # The dummy app carries no controllers of its own; the engine's controllers
 # inherit the HOST's ApplicationController, so define the minimal base a host
@@ -30,8 +46,8 @@ end
 # endpoint mints rather than by matching a URL shape:
 #
 #   1. It mints a REAL, consumable sign-in token for the supplied email and
-#      lands on the URL that consumes it in THIS app's store — the store/URL
-#      pairing that Studio::MagicLinkIssuing exists to keep aligned.
+#      lands on the URL that consumes it — the mint/URL pairing that
+#      Studio::MagicLinkIssuing exists to keep aligned.
 #   2. The review page rides along as return_to, so the consume lands the
 #      operator ON the page under review — the whole point of the button.
 #   3. An off-origin return_to is dropped, not followed (no open redirect out
@@ -43,8 +59,7 @@ class LocalReviewEndpointTest < ActionDispatch::IntegrationTest
   OPERATOR = "amcritchie@gmail.com"
 
   def setup
-    @orig_store = Studio.magic_link_store
-    MagicLink.cache = ActiveSupport::Cache::MemoryStore.new # real single-use tracking
+    Studio::Link.delete_all
     # Force the route set to DRAW here, under the test env. Rails 8.1 draws
     # lazily, and the dev-only routes are drawn `unless Rails.env.production?` —
     # so a test that flips Rails.env before the first draw would strand the whole
@@ -53,84 +68,53 @@ class LocalReviewEndpointTest < ActionDispatch::IntegrationTest
     Rails.application.routes.url_helpers.login_path
   end
 
-  def teardown
-    Studio.magic_link_store = @orig_store
-    MagicLink.cache = nil
-  end
-
   # --- 1 + 2. a real token, on the matching URL, carrying the review page ----
 
-  test "mints a consumable signed token and lands on the URL that consumes it" do
-    Studio.magic_link_store = :signed
-
+  test "mints a real short token and lands on the URL that consumes it" do
     get "/_studio/local_review", params: { email: OPERATOR, return_to: "/admin/style" }
 
     assert_response :redirect
     path = URI.parse(response.location).path
-    assert_match %r{\A/magic_link/}, path,
-      "a :signed token is only consumable at /magic_link/<token>, so that is where it must land"
+    assert_match %r{\A/l/[A-Za-z0-9_-]{16}\z}, path,
+      "a Studio::Link row is consumable at the short /l/<token>, and nowhere else"
 
-    token = path.split("/").last
-    result = MagicLink.consume(token) # the real service — proves the token is valid, not just shaped
-    assert_equal OPERATOR, result.email
-    assert_equal "/admin/style", result.return_to,
+    # Consume the row the endpoint actually wrote — proves the token is live,
+    # not merely well shaped.
+    link = Studio::Link.consume!(path.split("/").last)
+    assert_equal OPERATOR, link.email
+    assert_equal "/admin/style", link.return_to,
       "the page under review must survive as return_to, or the button lands on the wrong page"
-  end
-
-  test "a :database app lands on the short /l/<token> its store consumes" do
-    Studio.magic_link_store = :database
-    seen = {}
-
-    # No stub library here (minitest 6 dropped minitest/mock) and no database
-    # behind the dummy app — so stand a double in front of the mint and put it
-    # back afterwards.
-    with_link_mint(->(**kwargs) { seen = kwargs; Struct.new(:token).new("db-token-xyz") }) do
-      get "/_studio/local_review", params: { email: OPERATOR, return_to: "/admin/style" }
-    end
-
-    assert_equal OPERATOR, seen[:email]
-    assert_equal "/admin/style", seen[:return_to]
-    assert_equal "/l/db-token-xyz", URI.parse(response.location).path,
-      "a Studio::Link row is consumable at /l/<token>, never at /magic_link/<token>"
   end
 
   # --- 3. no open redirect rides out on a sign-in link ------------------------
 
   test "an off-origin return_to is dropped, not carried" do
-    Studio.magic_link_store = :signed
-
     get "/_studio/local_review", params: { email: OPERATOR, return_to: "http://evil.test/steal" }
 
-    token = URI.parse(response.location).path.split("/").last
-    assert_nil MagicLink.consume(token).return_to,
+    assert_nil minted_link.return_to,
       "an absolute URL must collapse to nil so the consume falls back to a safe local default"
   end
 
   test "a protocol-relative return_to is dropped too" do
-    Studio.magic_link_store = :signed
-
     get "/_studio/local_review", params: { email: OPERATOR, return_to: "//evil.test/steal" }
 
-    token = URI.parse(response.location).path.split("/").last
-    assert_nil MagicLink.consume(token).return_to
+    assert_nil minted_link.return_to
   end
 
   # --- a missing/garbled email mints nothing ---------------------------------
 
   test "a blank email mints nothing and sends the operator to login" do
-    Studio.magic_link_store = :signed
-
     get "/_studio/local_review", params: { return_to: "/admin/style" }
 
     assert_equal "/login", URI.parse(response.location).path
+    assert_equal 0, Studio::Link.count
   end
 
   test "a malformed email mints nothing" do
-    Studio.magic_link_store = :signed
-
     get "/_studio/local_review", params: { email: "not-an-email", return_to: "/admin/style" }
 
     assert_equal "/login", URI.parse(response.location).path
+    assert_equal 0, Studio::Link.count
   end
 
   # --- 4. the developer-desk floor -------------------------------------------
@@ -187,14 +171,10 @@ class LocalReviewEndpointTest < ActionDispatch::IntegrationTest
 
   private
 
-  # No stub library (minitest 6 dropped minitest/mock) — stand a double in front
-  # of the mint and put the original back.
-  def with_link_mint(callable)
-    singleton = Studio::Link.singleton_class
-    original = singleton.instance_method(:create_magic_link)
-    singleton.send(:define_method, :create_magic_link) { |**kwargs| callable.call(**kwargs) }
-    yield
-  ensure
-    singleton.send(:define_method, :create_magic_link, original)
+  # The row the endpoint just wrote. setup empties the table, so there is
+  # exactly one — assert that rather than assuming it.
+  def minted_link
+    assert_equal 1, Studio::Link.count, "expected the endpoint to mint exactly one link"
+    Studio::Link.last
   end
 end

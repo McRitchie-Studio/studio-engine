@@ -9,6 +9,7 @@ require "studio/username_generator"
 require "studio/s3"
 require "studio/image_cache"
 require "studio/link_token"
+require "studio/link_resolution"
 require "studio/email"
 require "studio/email_smoke"
 require "studio/mail_transport"
@@ -80,18 +81,31 @@ module Studio
   #   end
   mattr_accessor :sidebar_sections, default: []
 
-  # Magic-link (passwordless email) tuning. token_name keys the MessageVerifier
-  # purpose; bump it to invalidate every outstanding link. See MagicLink service.
-  mattr_accessor :magic_link_ttl,        default: 15.minutes
+  # How long a freshly minted magic link stays live.
+  mattr_accessor :magic_link_ttl, default: 15.minutes
+
+  # RETIRED (0.31.0) — kept only so an initializer that still sets it boots.
+  # It named the MessageVerifier purpose for the old :signed store, which no
+  # longer exists. Delete the line from your initializer.
   mattr_accessor :magic_link_token_name, default: "magic_link_v1"
 
-  # Where magic-link tokens are stored / which URL scheme they use.
-  #   :signed   (default) — stateless MessageVerifier MagicLink service; URL is
-  #             /magic_link/<long token>. No table needed. Back-compat default.
-  #   :database — a Studio::Link row; URL is the short /l/<token>. Requires the
-  #             studio_links table (install the reference migration). The
-  #             unified scheme both apps move to.
-  mattr_accessor :magic_link_store, default: :signed
+  # RETIRED (0.31.0) — magic links are ALWAYS Studio::Link rows now, so this
+  # reads :database and nothing else. Assigning :signed raises rather than
+  # silently downgrading: that store minted a ~350-character MessageVerifier
+  # blob whose EXPIRED form cannot be decoded, so an app on it could not tell
+  # whose dead link it was holding — which is exactly the fact
+  # Studio::LinkResolution needs to leave a live session alone. Requires the
+  # studio_links table (db/migrate/20260620000001_create_studio_links.rb).
+  mattr_reader :magic_link_store, default: :database
+
+  def self.magic_link_store=(value)
+    return if value.to_sym == :database
+
+    raise ArgumentError,
+          "Studio.magic_link_store = #{value.inspect} is retired (studio-engine 0.31.0). " \
+          "Magic links are Studio::Link rows served at /l/<token>. Install the studio_links " \
+          "migration and delete this line from config/initializers/studio.rb."
+  end
 
   # Whether Studio.routes draws the magic_link + solana wallet routes. An app that
   # already defines its own auth routes (e.g. turf-monster, which has battle-tested
@@ -229,13 +243,13 @@ module Studio
     false
   end
 
-  # True when the emailed/inbox magic-link URL is the short /l/<token> — i.e.
-  # magic links are Studio::Link rows AND this app draws the /l routes. False =
-  # the legacy /magic_link/<token> path: the :signed store, OR an app on the
-  # :database store that keeps its own /magic_link route (e.g. turf-monster,
-  # whose /l is already its landing-page namespace).
+  # True when the emailed/inbox magic-link URL is the short /l/<token> — the
+  # standard. False means this app draws its own token route instead and owns
+  # the matching consume: turf-monster keeps /magic_link/<token> because /l is
+  # already its landing-page namespace. Either way the TOKEN is the same short
+  # Studio::Link token; only the path in front of it differs.
   def self.magic_link_via_l_route?
-    magic_link_store == :database && draw_link_routes
+    draw_link_routes
   end
 
   # The floor every developer-desk tool sits on: the local email inbox
@@ -393,18 +407,15 @@ module Studio
         get "_studio/local_review", to: "studio/local_reviews#show",  as: :studio_local_review
       end
 
-      # Passwordless email (magic link). Helpers: magic_link_request_path (POST
-      # to request a link), magic_link_path(token) / magic_link_url(token:)
-      # for the emailed GET confirmation page, and magic_link_consume_path(token)
-      # for the scanner-safe POST consume. The token is a URL-safe
-      # MessageVerifier blob but the constraint guards against a stray "."
-      # segment.
+      # Passwordless email (magic link) — the REQUEST half only. Helper:
+      # magic_link_request_path (POST an email address, get a link mailed).
+      #
+      # The token-bearing half moved to /l/<token> below (0.31.0). There is one
+      # token format now — a short Studio::Link row — and one place that burns
+      # it, so the old /magic_link/:token confirm+consume pair would have been a
+      # second door onto the same lock.
       if Studio.draw_auth_routes && Studio.auth_method?(:magic_link)
-        post "magic_link",        to: "magic_links#create",   as: :magic_link_request
-        get  "magic_link/:token", to: "magic_links#confirm",  as: :magic_link,
-             constraints: { token: %r{[^/]+} }
-        post "magic_link/:token", to: "magic_links#consume",  as: :magic_link_consume,
-             constraints: { token: %r{[^/]+} }
+        post "magic_link", to: "magic_links#create", as: :magic_link_request
       end
 
       # Unified short-token links — /l/<token> for magic sign-in links + referral

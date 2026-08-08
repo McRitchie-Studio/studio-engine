@@ -18,10 +18,19 @@ module Studio
     # they are deliberately NOT single-use.
     SINGLE_USE_KINDS = %w[magic_link].freeze
 
-    # 96 bits of entropy → ~16 URL-safe chars (e.g. "PP-PDbEj5V3-aNh4"). Short
-    # enough to keep the URL clean, far too large to brute-force — especially
-    # for single-use, expiring magic links. Matches turf-monster's proven format.
-    TOKEN_BYTES = 12
+    # THE HOUSE TOKEN STANDARD: 12 random bytes → exactly 16 URL-safe
+    # characters (e.g. "PP-PDbEj5V3-aNh4"). 96 bits of entropy — short enough
+    # that the whole link fits on one line of an email, far too large to
+    # brute-force, especially for a single-use token that expires in minutes.
+    #
+    # 16 sits mid-range in the house bound of 10-20 characters (TOKEN_LENGTH_
+    # BOUNDS), which is the number a reader should sanity-check a link against.
+    # urlsafe_base64 emits 4 characters per 3 bytes with no padding, so the
+    # length is exact, not approximate — every token is the same width.
+    TOKEN_BYTES  = 12
+    TOKEN_LENGTH = 16
+    TOKEN_LENGTH_BOUNDS = (10..20).freeze
+    TOKEN_FORMAT = /\A[A-Za-z0-9_-]+\z/
 
     module_function
 

@@ -96,7 +96,6 @@ Studio.configure do |config|
   config.welcome_message = ->(user) { "Welcome to X App, #{user.display_name}!" }
   config.auth_methods = %i[magic_link google]  # add :wallet or :password only when needed
   config.registration_params = [:name, :email]
-  config.magic_link_token_name = "magic_link_x_app_v1"
   config.mailer_from = Studio.mailer_from_for_transport(
     ses_from: "X App <team@example.com>"
   )
@@ -356,8 +355,14 @@ Rails.application.routes.draw do
 end
 ```
 
-`Studio.routes(self)` draws `POST /magic_link`, `GET /magic_link/:token`, and
-`POST /magic_link/:token` when `Studio.auth_methods` includes `:magic_link`.
+`Studio.routes(self)` draws `POST /magic_link` (request a link) when
+`Studio.auth_methods` includes `:magic_link`, and `GET`/`POST /l/:token` (the
+scanner-safe confirm page and the consume that burns the token) whenever
+`Studio.draw_link_routes` is on. **A magic link needs the `studio_links`
+table** — copy the engine's reference migration
+(`db/migrate/20260620000001_create_studio_links.rb`) into the app before
+enabling `:magic_link`.
+
 The stock engine sign-in view now renders from `Studio.auth_methods`: a
 passwordless app gets the magic-link request form (posting to
 `magic_link_request_path`) and the Google button (`/auth/google_oauth2`) out of
