@@ -434,6 +434,50 @@ class StudioLinkBurnTest < ActiveSupport::TestCase
     assert_nil referral.reload.consumed_at
   end
 
+  # An app that enabled :magic_link but never installed the table. Every
+  # consumer pins the engine `~> 0.x`, which admits any release below 1.0, so
+  # this is reachable by a plain `bundle update` with nobody having adopted
+  # anything. Without the guard it surfaces as a bare adapter error on a real
+  # person's sign-in; the point of the test is that the message names the fix.
+  test "minting without the table names the missing migration" do
+    connection = ActiveRecord::Base.connection
+    connection.drop_table(:studio_links)
+
+    error = assert_raises(Studio::Link::MissingTable) do
+      Studio::Link.create_magic_link(email: EMAIL)
+    end
+    assert_includes error.message, "studio_links"
+    assert_includes error.message, "db/migrate", "the message must point at the migration to copy"
+  ensure
+    connection.create_table(:studio_links, force: true) do |t|
+      t.string   :token, null: false
+      t.string   :kind, null: false
+      t.string   :linkable_type
+      t.bigint   :linkable_id
+      t.json     :metadata
+      t.datetime :expires_at
+      t.datetime :consumed_at
+      t.timestamps
+    end
+    connection.add_index(:studio_links, :token, unique: true)
+  end
+
+  # ...and never swallows a failure that is NOT a missing table. Asserted by
+  # breaking something else entirely: a column the mint writes.
+  test "an unrelated statement failure is re-raised untouched" do
+    connection = ActiveRecord::Base.connection
+    connection.remove_column(:studio_links, :metadata)
+
+    error = assert_raises(ActiveRecord::StatementInvalid) do
+      Studio::Link.create_magic_link(email: EMAIL)
+    end
+    refute_kind_of Studio::Link::MissingTable, error,
+                   "the table exists, so the guard must stand aside"
+  ensure
+    connection.add_column(:studio_links, :metadata, :json)
+    Studio::Link.reset_column_information
+  end
+
   test "minting normalizes the email, sanitizes return_to, and sets the TTL" do
     link = Studio::Link.create_magic_link(email: "  Mixed@Case.COM ", return_to: "//evil.test")
 

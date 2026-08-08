@@ -18,6 +18,11 @@ module Studio
 
     class InvalidToken < StandardError; end
 
+    # The app enabled :magic_link but never installed the table. Raised in place
+    # of a bare PG::UndefinedTable so the first person to hit it reads the fix
+    # instead of an adapter error — see mint!.
+    class MissingTable < StandardError; end
+
     belongs_to :linkable, polymorphic: true, optional: true
 
     validates :kind, inclusion: { in: Studio::LinkToken::KINDS }
@@ -76,6 +81,16 @@ module Studio
 
       # create! with a fresh random token, retrying the (astronomically rare)
       # unique-index collision a couple of times before surfacing the error.
+      #
+      # The MissingTable rescue exists because every consumer pins the engine as
+      # `~> 0.x`, which admits any release below 1.0 — so an app that never
+      # installed this table picks up the row store on its next `bundle update`
+      # whether or not anyone adopted it deliberately. Its boot is fine (nothing
+      # touches the table until someone signs in), and the failure then lands as
+      # a bare PG::UndefinedTable on a real person's sign-in. Naming the fix
+      # there is the difference between a five-minute repair and an outage
+      # nobody can read. The check is `table_exists?`, not a message match, so
+      # it holds on any adapter and never swallows an unrelated failure.
       def mint!(attrs)
         3.times do
           return create!(attrs.merge(token: Studio::LinkToken.generate))
@@ -83,6 +98,13 @@ module Studio
           next
         end
         create!(attrs.merge(token: Studio::LinkToken.generate))
+      rescue ActiveRecord::StatementInvalid
+        raise if table_exists?
+
+        raise MissingTable,
+              "studio-engine magic links need the studio_links table, and #{Studio.app_name} has no " \
+              "such table. Copy the engine's reference migration " \
+              "(db/migrate/20260620000001_create_studio_links.rb) into db/migrate and run it."
       end
     end
 

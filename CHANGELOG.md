@@ -50,6 +50,15 @@ new behavior turns on. A `Studio::Link` row keeps the email past expiry.
   whether THIS caller won the atomic single-use race, plus `#dead_status`
   (`:used` / `:expired`) for the message. Winning the burn IS the proof the link
   was live; a prior `live?` read is not.
+- **`Studio::Link::MissingTable`** — a named error, pointing at the migration to
+  copy, in place of a bare `PG::UndefinedTable`. Every consumer pins the engine
+  `~> 0.x`, which admits any release below 1.0, so an app that never installed
+  the table picks up the row store on its next `bundle update` with nobody
+  having adopted anything deliberately. Its boot stays clean (nothing touches
+  the table until someone signs in), so without this the failure lands as an
+  unreadable adapter error on a real person's sign-in. Guarded by
+  `table_exists?`, not a message match, so it holds on any adapter and never
+  swallows an unrelated statement failure.
 - **`Studio::LinkToken::TOKEN_LENGTH` / `TOKEN_LENGTH_BOUNDS` / `TOKEN_FORMAT`** —
   the house standard, now asserted rather than described: every token is exactly
   16 URL-safe characters, inside a 10-20 character bound.
