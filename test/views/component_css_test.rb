@@ -26,7 +26,7 @@ class ComponentCssTest < Minitest::Test
 
   # The class-name families this stylesheet owns. Tokens of these shapes found
   # in a class reference in the engine's views/helpers must be @utility-defined.
-  COMPONENT_FAMILY = /\A(?:card(?:-[a-z0-9-]+)?|badge|input-field|empty-state|json-debug|label-upper|btn(?:-[a-z0-9-]+)?)\z/
+  COMPONENT_FAMILY = /\A(?:card(?:-[a-z0-9-]+)?|badge|input-field|empty-state|json-debug|label-upper|studio-link-sidebar-layer|btn(?:-[a-z0-9-]+)?)\z/
 
   # A class REFERENCE is a class attribute — `class="..."` in ERB/HTML or
   # `class: "..."` in a Ruby options hash — never prose. Tokenizing raw file
@@ -62,6 +62,7 @@ class ComponentCssTest < Minitest::Test
 
   def test_core_component_classes_are_defined
     %w[card card-hover badge input-field empty-state json-debug label-upper
+       studio-link-sidebar-layer
        btn btn-primary btn-secondary btn-outline btn-danger btn-warning
        btn-success btn-google btn-neutral btn-sm btn-lg].each do |name|
       assert_includes defined_utilities, name, "@utility #{name} missing from engine.css"

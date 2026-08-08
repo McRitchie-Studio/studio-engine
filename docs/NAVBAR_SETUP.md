@@ -16,6 +16,14 @@ If your app doesn't create its own `app/views/layouts/_navbar.html.erb`, the eng
 - Empty desktop nav section (no links)
 - User nav (when logged in) or theme toggle + login button (when logged out)
 - Mobile sub-navbar with admin dropdown + theme toggle
+- **Link sidebar** (when `Studio.sidebar_sections` is declared — see
+  `NEW_APP_SETUP.md` section 4): a trigger button in the desktop icon rail and
+  the mobile sub-navbar, plus the slide-out panels rendered after the header.
+  With the default empty sections none of it renders, and `preview: true`
+  renders always skip it (the `/admin/navbar` preview repeats the partial;
+  the panels carry page-unique ids). When the viewer's sections include an
+  `admin: true` entry, the sidebar replaces the admin dropdown — both use the
+  cog glyph, and two gears side by side read as a duplicate.
 
 ## How to Override
 
