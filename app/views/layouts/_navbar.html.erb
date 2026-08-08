@@ -31,6 +31,10 @@
         :class="scrolled && 'shadow-lg border-b border-subtle is-scrolled'">
   <style>
     .user-nav-col { width: 14rem; }
+    /* No balance content → no reserved column. The nav hugs its icons and
+       name (max-width still caps username truncation) instead of floating
+       in the balance's empty seat. */
+    .user-nav-fit { max-width: 20rem; }
     .nav-title { display: flex; gap: 0.25em; align-items: baseline; }
     @media (min-width: 400px) { .user-nav-col { width: 15rem; } }
     @media (min-width: 768px) { .user-nav-col { width: 20rem; } }
@@ -69,8 +73,10 @@
         </nav>
       </div>
     </div>
-    <%# Right side: user nav (matches sidebar width) %>
-    <div class="user-nav-col flex-shrink-0 pl-0 pr-4 md:px-4">
+    <%# Right side: user nav. The fixed column (matches sidebar width) exists
+        to seat a balance in the top row; with no balance content it shrinks
+        to fit. %>
+    <div class="<%= balance_html.present? ? 'user-nav-col' : 'user-nav-fit' %> flex-shrink-0 pl-0 pr-4 md:px-4">
       <% if show_user %>
         <%= render "components/user_nav", balance_html: balance_html, extra_icons_html: extra_icons_html, show_logout_link: show_logout_link %>
       <% else %>
