@@ -153,6 +153,26 @@ class UserNavTest < Minitest::Test
     node
   end
 
+  # --- off-chain collapse -----------------------------------------------
+
+  def test_offchain_user_without_logout_link_gets_no_second_row
+    # StubUser has no :level and no :truncated_solana; without
+    # show_logout_link the default second row would be an empty progress
+    # strip — it must not render at all (the turf nav fills it, a plain
+    # app's nav collapses to one line).
+    html = render_nav
+
+    refute_includes html, "seedsNavbar", "empty default second row must collapse"
+    refute_includes html, "navbar-replay-level"
+  end
+
+  def test_show_logout_link_keeps_the_second_row_for_offchain_users
+    html = render_nav(show_logout_link: true)
+
+    assert_includes html, "seedsNavbar"
+    assert_includes html, "Log out"
+  end
+
   # Minimal user double covering everything the partial (and the nested
   # avatar partial) reads. No :level and no :truncated_solana, so the
   # default second row takes the show_logout_link branch like the hub.
