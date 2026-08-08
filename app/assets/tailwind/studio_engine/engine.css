@@ -181,6 +181,24 @@
   @apply px-8 py-3 text-base rounded-xl shadow-sm;
 }
 
+/* -- Link sidebar (out-of-the-box navigation) ------------------------------
+   Paired with components/_link_sidebar + _link_sidebar_trigger and the
+   Studio.sidebar_sections config. The layer sits above the sticky header
+   (z-50) and the modal host. Inert without the panel in the DOM, so apps
+   that declare no sections are unaffected. */
+
+@utility studio-link-sidebar-layer {
+  z-index: 10000;
+}
+
+/* Alpine's pre-init cloak. Engine partials (sidebar panels, dropdowns, the
+   modal host) mark themselves x-cloak so they stay hidden until Alpine boots
+   and x-show takes over. Engine-owned so every consumer gets the rule without
+   carrying the one-liner app-side; a duplicate app copy is harmless. */
+[x-cloak] {
+  display: none !important;
+}
+
 /* -- Smooth-load convention ------------------------------------------------
    Paired with layouts/studio/_smooth_load.html.erb (the Studio.smooth_load
    metas that opt Turbo into document.startViewTransition). These rules are

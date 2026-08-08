@@ -19,6 +19,17 @@
 <% balance_html = local_assigns.fetch(:balance_html, nil) %>
 <% extra_icons_html = local_assigns.fetch(:extra_icons_html, nil) %>
 <% show_logout_link = local_assigns.fetch(:show_logout_link, false) %>
+<%# Out-of-the-box navigation (engine 0.30): when the host declares
+    Studio.sidebar_sections, the navbar mounts the link-sidebar trigger in its
+    icon rails and renders the slide-out panels after the header. With no
+    sections (the default) all of this is skipped — the navbar is unchanged.
+    Preview renders skip it too: the /admin/navbar page renders this partial
+    repeatedly and the panels carry page-unique ids. %>
+<% sidebar_active = !is_preview && respond_to?(:studio_sidebar?) && studio_sidebar? %>
+<% if sidebar_active %>
+  <% sidebar_trigger_desktop = capture { render "components/link_sidebar_trigger", class_name: "hidden md:inline-flex" } %>
+  <% extra_icons_html = safe_join([extra_icons_html, sidebar_trigger_desktop].compact) %>
+<% end %>
 <%
   words = Studio.app_name.split
   last_word = words.pop
@@ -75,6 +86,7 @@
         <%= render "components/user_nav", balance_html: balance_html, extra_icons_html: extra_icons_html, show_logout_link: show_logout_link %>
       <% else %>
         <div class="flex items-center justify-end gap-3">
+          <%= sidebar_trigger_desktop if sidebar_active %>
           <span class="hidden md:flex"><%= render "components/theme_toggle_morph" %></span>
           <%= link_to "Log in", login_path, class: "btn btn-primary" %>
         </div>
@@ -84,8 +96,13 @@
   <%# Mobile sub-navbar: compact row hidden on desktop — apps should override to add links %>
   <div class="flex md:hidden items-center gap-3 px-4 py-1.5 border-t border-subtle bg-surface-alt">
     <span class="ml-auto flex items-center gap-3">
+      <%= render "components/link_sidebar_trigger" if sidebar_active %>
       <%= render "components/admin_dropdown" %>
       <%= render "components/theme_toggle_morph" %>
     </span>
   </div>
 </header>
+<%# The panels mount OUTSIDE the header: the sticky header's backdrop-filter
+    creates a containing block, which would pin a fixed panel to the header
+    instead of the viewport. %>
+<%= render "components/link_sidebar" if sidebar_active %>

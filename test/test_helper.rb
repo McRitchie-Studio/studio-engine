@@ -15,6 +15,7 @@ require "active_support/core_ext/object/blank"
 # We skip requiring "studio/engine" since that needs a full Rails app.
 require_relative "../lib/studio/version"
 require_relative "../lib/studio/color_scale"
+require_relative "../lib/studio/sidebar_sections"
 require_relative "../lib/studio/theme_resolver"
 require_relative "../lib/studio/ui_primitives"
 require_relative "../lib/studio/email"
@@ -42,6 +43,7 @@ module Studio
   mattr_accessor :sticky_table_headers, default: false
   mattr_accessor :smooth_load,          default: false
   mattr_accessor :nav_spinner_min_ms,   default: 2500
+  mattr_accessor :sidebar_sections,     default: []
 
   mattr_accessor :theme_primary,  default: "#8E82FE"
   mattr_accessor :theme_dark,     default: "#1A1535"
@@ -60,6 +62,10 @@ module Studio
 
   def self.configure
     yield self
+  end
+
+  def self.sidebar_sections_for(view)
+    SidebarSections.resolve(sidebar_sections, view)
   end
 
   def self.mailer_from_for_transport(env: ENV, ses_from:, resend_from: nil)

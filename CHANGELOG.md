@@ -2,6 +2,26 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## Unreleased
+
+**The hub's link sidebar becomes the engine's out-of-the-box navigation.** New
+apps get a default navigation surface without forking the navbar: declare
+`Studio.sidebar_sections` (a static Array or a callable receiving the view
+context; sections flagged `admin: true` show to admins only) and the engine
+navbar mounts a trigger in its desktop icon rail and mobile sub-navbar, then
+renders the slide-out link panels after the header. The family ships as
+`components/_link_sidebar` (dual desktop/mobile panels + the engine-owned
+Alpine `sidebars` store bridge, Turbo- and bfcache-safe), the generic
+`components/_sidebar_panel` shell, and `components/_link_sidebar_trigger` —
+all lifted from the mcritchie-studio hub. `engine.css` gains the
+`studio-link-sidebar-layer` stacking utility and the Alpine `[x-cloak]`
+pre-init rule. **Upgrade-safe by default:** `sidebar_sections` defaults to
+`[]`, which renders nothing — existing consumers see zero change until they
+opt in (pinned by `test/integration/sidebar_navbar_render_test.rb`). The
+`html { overflow-x: clip }` slide guard ships inside the sidebar partial, not
+globally. Resolution rules live in `lib/studio/sidebar_sections.rb` (pure
+Ruby, unit-tested); docs in `NEW_APP_SETUP.md` §4/§13 and `NAVBAR_SETUP.md`.
+
 ## 0.29.0 — 2026-07-29
 
 **The four depth-chart gaps folded into the `studio/board` primitive (Phase D), so

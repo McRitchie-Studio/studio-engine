@@ -3,6 +3,7 @@ require "studio/engine"
 require "studio/color_scale"
 require "studio/theme_resolver"
 require "studio/ui_primitives"
+require "studio/sidebar_sections"
 require "studio/username_generator"
 require "studio/s3"
 require "studio/image_cache"
@@ -60,6 +61,23 @@ module Studio
   # to render capability-gated specimens "disabled but present" on apps with the
   # feature off (e.g. McRitchie Studio, which ships neither).
   mattr_accessor :features, default: []
+
+  # ---- Sidebar navigation ----
+  # Out-of-the-box navigation: the engine navbar mounts a link-sidebar trigger
+  # and slide-out panel when the host declares sections here. The default []
+  # renders NOTHING, so existing consumers see no change on upgrade until they
+  # opt in. Accepts a static Array of section hashes or a callable (receives
+  # the view context) for dynamic sections — route helpers, logged_in? walls.
+  # Sections flagged admin: true render only for admin? viewers. Shape and
+  # resolution rules: lib/studio/sidebar_sections.rb.
+  #
+  #   Studio.configure do |config|
+  #     config.sidebar_sections = ->(view) {
+  #       [ { title: "Site", links: [
+  #             { label: "Home", href: view.root_path, emoji: "🏠" } ] } ]
+  #     }
+  #   end
+  mattr_accessor :sidebar_sections, default: []
 
   # Magic-link (passwordless email) tuning. token_name keys the MessageVerifier
   # purpose; bump it to invalidate every outstanding link. See MagicLink service.
@@ -307,6 +325,13 @@ module Studio
     entry ||= logos.find { |l| l[:title] == "Navbar Logo" }
     entry ||= logos.first
     entry ? "/#{entry[:file]}" : nil
+  end
+
+  # Sidebar sections resolved for a view context: a callable config is called
+  # with the view, keys symbolize, and admin-only sections drop for non-admin
+  # viewers. Rendering gates on `.any?`, so [] keeps the navbar untouched.
+  def self.sidebar_sections_for(view)
+    SidebarSections.resolve(sidebar_sections, view)
   end
 
   def self.env_truthy?(value)
