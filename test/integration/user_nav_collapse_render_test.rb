@@ -38,6 +38,13 @@ class UserNavCollapseRenderTest < ActiveSupport::TestCase
     refute_includes html, "seedsNavbar", "empty second row must collapse"
     assert_match(/class="user-nav-fit /, html)
     refute_match(/class="user-nav-col /, html, "no balance → no fixed-width column")
+
+    # The fit column is flex-shrink-0: without media-stepped max-width clamps
+    # mirroring .user-nav-col, a long nowrap username sizes it past a narrow
+    # viewport (Carl's review catch on PR #70).
+    assert_includes html, ".user-nav-fit { max-width: 14rem; }"
+    assert_match(/min-width: 400px.*\.user-nav-fit \{ max-width: 15rem; \}/, html)
+    assert_match(/min-width: 768px.*\.user-nav-fit \{ max-width: 20rem; \}/, html)
   end
 
   test "a balance keeps the fixed-width column" do

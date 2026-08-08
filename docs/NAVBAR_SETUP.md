@@ -89,7 +89,7 @@ These classes are available for preview CSS targeting:
 - `.nav-title` — the brand title h1
 - `.nav-logo-link` — the link wrapping logo + title
 - `.user-nav-col` — the right-side user nav column (fixed width, seats a balance)
-- `.user-nav-fit` — the same column when no `balance_html` is passed: shrink-to-fit, max-width capped
+- `.user-nav-fit` — the same column when no `balance_html` is passed: shrink-to-fit, with media-stepped `max-width` clamps (14/15/20rem) mirroring `.user-nav-col`
 
 ## Responsive Breakpoint System
 

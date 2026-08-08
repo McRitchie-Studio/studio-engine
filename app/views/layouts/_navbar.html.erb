@@ -32,12 +32,13 @@
   <style>
     .user-nav-col { width: 14rem; }
     /* No balance content → no reserved column. The nav hugs its icons and
-       name (max-width still caps username truncation) instead of floating
-       in the balance's empty seat. */
-    .user-nav-fit { max-width: 20rem; }
+       name instead of floating in the balance's empty seat. max-width steps
+       mirror the col's clamps: the item is flex-shrink-0, so without them a
+       long nowrap username sizes the column past a narrow viewport. */
+    .user-nav-fit { max-width: 14rem; }
     .nav-title { display: flex; gap: 0.25em; align-items: baseline; }
-    @media (min-width: 400px) { .user-nav-col { width: 15rem; } }
-    @media (min-width: 768px) { .user-nav-col { width: 20rem; } }
+    @media (min-width: 400px) { .user-nav-col { width: 15rem; } .user-nav-fit { max-width: 15rem; } }
+    @media (min-width: 768px) { .user-nav-col { width: 20rem; } .user-nav-fit { max-width: 20rem; } }
     @media (max-width: 767px) {
       .nav-title { font-size: 1.25rem !important; flex-direction: column; gap: 0; line-height: 1.15; transition: font-size 0.3s; }
       .nav-title span:first-child { margin-bottom: -4px; }
