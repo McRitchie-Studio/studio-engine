@@ -1,8 +1,10 @@
 require "studio/version"
 require "studio/engine"
 require "studio/color_scale"
+require "studio/environment_banner"
 require "studio/theme_resolver"
 require "studio/ui_primitives"
+require "studio/sidebar_sections"
 require "studio/username_generator"
 require "studio/s3"
 require "studio/image_cache"
@@ -60,6 +62,23 @@ module Studio
   # to render capability-gated specimens "disabled but present" on apps with the
   # feature off (e.g. McRitchie Studio, which ships neither).
   mattr_accessor :features, default: []
+
+  # ---- Sidebar navigation ----
+  # Out-of-the-box navigation: the engine navbar mounts a link-sidebar trigger
+  # and slide-out panel when the host declares sections here. The default []
+  # renders NOTHING, so existing consumers see no change on upgrade until they
+  # opt in. Accepts a static Array of section hashes or a callable (receives
+  # the view context) for dynamic sections — route helpers, logged_in? walls.
+  # Sections flagged admin: true render only for admin? viewers. Shape and
+  # resolution rules: lib/studio/sidebar_sections.rb.
+  #
+  #   Studio.configure do |config|
+  #     config.sidebar_sections = ->(view) {
+  #       [ { title: "Site", links: [
+  #             { label: "Home", href: view.root_path, emoji: "🏠" } ] } ]
+  #     }
+  #   end
+  mattr_accessor :sidebar_sections, default: []
 
   # Magic-link (passwordless email) tuning. token_name keys the MessageVerifier
   # purpose; bump it to invalidate every outstanding link. See MagicLink service.
@@ -238,6 +257,40 @@ module Studio
     env_truthy?(ENV["LOCAL_EMAIL_CAPTURE"]) || env_truthy?(ENV["AGENT_WORKTREE"])
   end
 
+  # ---- Shared environment banner ------------------------------------------
+  # Rules live in Studio::EnvironmentBanner (pure Ruby, unit-tested); these are
+  # the Rails-aware entry points `studio/banners/_environment` calls. A host
+  # renders that ONE partial instead of hand-rolling its own strip.
+
+  # True for a stable QA app: Rails-production, but a non-production review
+  # target that must identify itself as one. Keyed off QA_ENV, the signal the
+  # release conductor already sets on every QA app.
+  def self.qa_environment?
+    EnvironmentBanner.qa_environment?
+  end
+
+  def self.show_environment_banner?(rails_env: rails_env_name)
+    EnvironmentBanner.show?(rails_env: rails_env, qa_environment: qa_environment?)
+  end
+
+  def self.environment_banner_message(rails_env: rails_env_name, extra: [])
+    EnvironmentBanner.message(rails_env: rails_env, qa_environment: qa_environment?, extra: extra)
+  end
+
+  # Whether the local email inbox is actually REACHABLE for this request, which
+  # is the only honest reason to render a link to it. Deliberately the same
+  # gate the controller enforces (local_tool_enabled?), so the banner can never
+  # advertise a page that answers 404 — QA gets a status chip instead.
+  def self.local_inbox_reachable?(request_local:)
+    local_tool_enabled?(request_local: request_local)
+  end
+
+  def self.rails_env_name
+    return "development" unless defined?(Rails) && Rails.respond_to?(:env)
+
+    Rails.env.to_s
+  end
+
   def self.user_wallet_address(user)
     return nil unless user
 
@@ -278,7 +331,7 @@ module Studio
 
       See the USER_CONTRACT.md doc in the studio-engine repo for the full
       contract + a minimal compliant example:
-        https://github.com/amcritchie/studio-engine/blob/main/docs/USER_CONTRACT.md
+        https://github.com/McRitchie-Studio/studio-engine/blob/main/docs/USER_CONTRACT.md
 
       To bypass this check temporarily, set Studio.validate_user_contract = false
       in config/initializers/studio.rb.
@@ -307,6 +360,13 @@ module Studio
     entry ||= logos.find { |l| l[:title] == "Navbar Logo" }
     entry ||= logos.first
     entry ? "/#{entry[:file]}" : nil
+  end
+
+  # Sidebar sections resolved for a view context: a callable config is called
+  # with the view, keys symbolize, and admin-only sections drop for non-admin
+  # viewers. Rendering gates on `.any?`, so [] keeps the navbar untouched.
+  def self.sidebar_sections_for(view)
+    SidebarSections.resolve(sidebar_sections, view)
   end
 
   def self.env_truthy?(value)

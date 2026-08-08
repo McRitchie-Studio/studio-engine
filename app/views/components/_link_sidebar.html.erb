@@ -1,0 +1,179 @@
+<%# The link sidebar — the engine's out-of-the-box navigation panel (lifted
+    from the mcritchie-studio hub). Renders the host's Studio.sidebar_sections
+    as a slide-out link tree in dual desktop/mobile panels, and carries its
+    own store bridge so a single render is self-sufficient. Render it once,
+    outside any sticky/backdrop-filter header (a fixed panel inside one
+    positions against the header, not the viewport); the engine navbar does
+    this automatically when sections are declared. %>
+<% sections = studio_sidebar_sections %>
+<% sidebar_admin = respond_to?(:admin?) && admin? %>
+<% close_action = "$store.sidebars.linkTreeOpen = false" %>
+
+<style>
+  /* Clip horizontal overflow so the off-canvas start/end frame of the slide
+     never flashes a scrollbar. `clip` (not `hidden`) does not create a scroll
+     container, so sticky headers keep working. Scoped here — not engine.css —
+     so apps that declare no sections get zero global CSS change. */
+  html { overflow-x: clip; }
+</style>
+
+<script>
+  // Store bridge (engine-owned): registers the Alpine `sidebars` store and
+  // keeps it healthy across Turbo navigations and bfcache restores. The
+  // panel's open/closed state is driven ENTIRELY by the store flag via
+  // x-show + x-transition — this bridge only flips the flag, never `display`
+  // directly, because an imperative display:none bakes an inline style that
+  // makes Alpine skip its enter transition (the panel pops instead of
+  // sliding). On turbo:before-cache / bfcache the flag drops so a restored
+  // page is closed. The document-level capture handlers make the trigger
+  // work even for clicks that land before Alpine initializes.
+  (function () {
+    function ensureLinkSidebarStore() {
+      if (!window.Alpine) return null;
+
+      var sidebars = Alpine.store('sidebars');
+      if (!sidebars) {
+        Alpine.store('sidebars', { linkTreeOpen: false });
+        return Alpine.store('sidebars');
+      }
+
+      if (typeof sidebars.linkTreeOpen === 'undefined') {
+        sidebars.linkTreeOpen = false;
+      }
+
+      return sidebars;
+    }
+
+    function setLinkSidebarOpen(open) {
+      var sidebars = ensureLinkSidebarStore();
+      if (sidebars) sidebars.linkTreeOpen = open;
+    }
+
+    function closeLinkSidebar() {
+      setLinkSidebarOpen(false);
+    }
+
+    function handleLinkSidebarClick(event) {
+      var closeTrigger = event.target.closest('[data-link-sidebar-close]');
+      if (closeTrigger) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        closeLinkSidebar();
+        return;
+      }
+
+      var trigger = event.target.closest('[data-link-sidebar-trigger], [data-username-display], [data-profile-image-toggle]');
+      if (trigger && trigger.matches('[aria-controls~="studio-link-sidebar"]')) {
+        var sidebars = ensureLinkSidebarStore();
+        if (!sidebars) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        sidebars.linkTreeOpen = !sidebars.linkTreeOpen;
+        return;
+      }
+
+      var sidebars = ensureLinkSidebarStore();
+      if (!sidebars || !sidebars.linkTreeOpen) return;
+      if (event.target.closest('#studio-link-sidebar, #studio-link-sidebar-mobile')) return;
+
+      closeLinkSidebar();
+    }
+
+    function handleLinkSidebarKeydown(event) {
+      if (event.key === 'Escape') closeLinkSidebar();
+    }
+
+    if (!window.__studioLinkSidebarBridge) {
+      window.__studioLinkSidebarBridge = true;
+      document.addEventListener('alpine:init', ensureLinkSidebarStore);
+      document.addEventListener('turbo:load', ensureLinkSidebarStore);
+      document.addEventListener('turbo:before-cache', closeLinkSidebar);
+      window.addEventListener('pageshow', function (event) {
+        if (event.persisted) closeLinkSidebar();
+      });
+      document.addEventListener('click', handleLinkSidebarClick, true);
+      document.addEventListener('keydown', handleLinkSidebarKeydown, true);
+    }
+
+    ensureLinkSidebarStore();
+  })();
+</script>
+
+<% body_html = capture do %>
+  <nav class="flex-1 min-h-0 overflow-y-auto py-2" aria-label="Studio links">
+    <% sections.each do |section| %>
+      <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
+        <span><%= section[:title] %></span>
+        <% if section[:admin] %>
+          <span class="rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-mono text-primary">ADMIN</span>
+        <% end %>
+      </div>
+
+      <% section[:links].each do |link| %>
+        <% target = link[:target].presence %>
+        <%= link_to link[:href],
+              class: "group flex items-start gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition",
+              target: target,
+              rel: target == "_blank" ? "noopener" : nil,
+              "@click": close_action do %>
+          <% if link[:hover_emoji].present? %>
+            <%= render "components/emoji_swap",
+                  base: link[:emoji],
+                  hover: link[:hover_emoji],
+                  class_name: "text-lg leading-none" %>
+          <% else %>
+            <span class="text-lg leading-none flex-shrink-0"><%= link[:emoji] %></span>
+          <% end %>
+          <span class="min-w-0">
+            <span class="block font-medium truncate"><%= link[:label] %></span>
+            <% if link[:desc].present? %>
+              <span class="block text-xs text-muted leading-snug mt-0.5"><%= link[:desc] %></span>
+            <% end %>
+          </span>
+        <% end %>
+      <% end %>
+    <% end %>
+  </nav>
+<% end %>
+
+<% footer_html = capture do %>
+  <% if logged_in? %>
+    <div class="border-t border-subtle p-2">
+      <%= link_to logout_path,
+            class: "flex items-center gap-3 rounded-md px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition",
+            "@click": close_action do %>
+        <span>👋</span><span>Log out</span>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>
+
+<%= render "components/sidebar_panel",
+      id: "studio-link-sidebar",
+      title: sidebar_admin ? "Admin Menu" : "Links",
+      open: "$store.sidebars.linkTreeOpen",
+      body_html: body_html,
+      footer_html: footer_html,
+      close_action: close_action,
+      outside_action: close_action,
+      escape_action: close_action,
+      display_class: "hidden md:flex",
+      role: "navigation",
+      aria_label: sidebar_admin ? "Admin menu" : "Links menu" %>
+
+<%= render "components/sidebar_panel",
+      id: "studio-link-sidebar-mobile",
+      title: sidebar_admin ? "Admin Menu" : "Links",
+      open: "$store.sidebars.linkTreeOpen",
+      body_html: body_html,
+      footer_html: footer_html,
+      close_action: close_action,
+      outside_action: close_action,
+      escape_action: close_action,
+      display_class: "flex md:hidden",
+      width_class: "w-full",
+      role: "navigation",
+      aria_label: sidebar_admin ? "Admin menu" : "Links menu" %>

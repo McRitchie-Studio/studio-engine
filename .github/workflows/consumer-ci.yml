@@ -1,6 +1,6 @@
 # Consumer CI — runs the consumer Rails apps' test suites against THIS engine
 # commit, so a PR/merge that breaks `mcritchie_studio`, `turf_monster`, or
-# `acquisition_studio` fails here instead of silently after a
+# `mcritchie_industries` fails here instead of silently after a
 # `bundle update studio-engine` on the consumer side.
 #
 # This workflow covers the CONSUMERS only. The engine's OWN suite runs in the
@@ -8,10 +8,13 @@
 # board here means the engine's own tests ran.
 #
 # Operator setup (one-time, in studio repo Settings → Secrets and variables → Actions):
-#   CONSUMER_REPO_TOKEN — personal access token (classic) with `repo` scope,
-#                         so actions/checkout can clone the consumer repos if
-#                         they're private. Skip this secret if all consumer
-#                         repos are public.
+#   MCRITCHIE_AGENT_APP_ID      — the `mcritchie-agent` GitHub App's numeric id.
+#   MCRITCHIE_AGENT_PRIVATE_KEY — that app's private key (the .pem contents).
+#   The "Mint consumer checkout token" step exchanges them for a short-lived
+#   installation token scoped to the McRitchie-Studio org, so actions/checkout
+#   can clone the private consumer repos. Fine-grained PATs died with the
+#   2026-07-29 org migration (they cannot call the check-runs API at all), and
+#   the classic CONSUMER_REPO_TOKEN PAT retired with them.
 #
 # How it works:
 #   1. Checks out this engine PR/commit into ./studio
@@ -52,8 +55,12 @@ jobs:
             needs_rails_credentials: true
             needs_solana_admin_key: true
             needs_tailwind_build: false
-          - consumer: acquisition_studio
-            repo: acquisition-studio
+          # Successor to the retired acquisition-studio prototype's lane. The
+          # checkout token is minted from the `mcritchie-agent` GitHub App —
+          # org-scoped, so it covers ALL private McRitchie-Studio repos, this
+          # one included; no per-repo secret needed.
+          - consumer: mcritchie_industries
+            repo: mcritchie-industries
             managed_wallet_encryption_key: ""
             needs_rails_credentials: false
             needs_solana_admin_key: false
@@ -79,6 +86,18 @@ jobs:
         with:
           path: studio
 
+      # UNCONDITIONAL by design: every consumer repo is private under the
+      # McRitchie-Studio org, so a failed mint must fail the job loudly here
+      # rather than let the checkout limp along on github.token (which cannot
+      # see the private consumers anyway).
+      - name: Mint consumer checkout token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.MCRITCHIE_AGENT_APP_ID }}
+          private-key: ${{ secrets.MCRITCHIE_AGENT_PRIVATE_KEY }}
+          owner: McRitchie-Studio
+
       # fetch-depth: 0 IS LOAD-BEARING — do not "optimize" it back to the default.
       # The hub's e2e quarantine ratchet (test/lib/e2e_quarantine_ratchet_test.rb)
       # reads its baseline from `origin/release` inside THIS checkout; the default
@@ -87,9 +106,9 @@ jobs:
       - name: Checkout ${{ matrix.consumer }}
         uses: actions/checkout@v4
         with:
-          repository: amcritchie/${{ matrix.repo }}
+          repository: McRitchie-Studio/${{ matrix.repo }}
           path: ${{ matrix.consumer }}
-          token: ${{ secrets.CONSUMER_REPO_TOKEN || github.token }}
+          token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
 
       - name: Install system packages
@@ -130,7 +149,7 @@ jobs:
           CI_SECRET_KEY_BASE="$secret_key_base" bundle exec ruby -e 'require "active_support/encrypted_file"; require "yaml"; encrypted = ActiveSupport::EncryptedFile.new(content_path: "config/credentials.yml.enc", key_path: "config/master.key", env_key: "RAILS_MASTER_KEY", raise_if_missing_key: true); encrypted.write({ "secret_key_base" => ENV.fetch("CI_SECRET_KEY_BASE") }.to_yaml)'
           bundle exec rails runner 'raise "missing test secret_key_base" if Rails.application.credentials.secret_key_base.blank?'
 
-      # acquisition_studio's integration tests render engine-contract pages
+      # mcritchie_industries' integration tests render engine-contract pages
       # that import the compiled Tailwind stylesheet; without this build every
       # page render 500s ("tailwind.css is not present in the asset pipeline").
       - name: Build Tailwind CSS

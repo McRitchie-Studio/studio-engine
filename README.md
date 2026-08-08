@@ -2,7 +2,7 @@
 
 Shared Rails engine for McRitchie apps. Provides authentication, error handling, dynamic theming, and common concerns used by [McRitchie Studio](https://app.mcritchie.studio) and [Turf Monster](https://app.turfmonster.media).
 
-> **Part of the McRitchie ecosystem** — see [`ECOSYSTEM.md`](https://github.com/amcritchie/mcritchie-studio/blob/main/docs/ECOSYSTEM.md) for the 5-repo map; [`house-burn-down.md`](https://github.com/amcritchie/mcritchie-studio/blob/main/docs/agents/system/house-burn-down.md) for fresh-Mac recovery.
+> **Part of the McRitchie ecosystem** — see [`ECOSYSTEM.md`](https://github.com/McRitchie-Studio/mcritchie-studio/blob/main/docs/ECOSYSTEM.md) for the 5-repo map; [`house-burn-down.md`](https://github.com/McRitchie-Studio/mcritchie-studio/blob/main/docs/agents/system/house-burn-down.md) for fresh-Mac recovery.
 
 ## Installation
 
@@ -280,4 +280,4 @@ For short local experiments, temporarily point a consumer Gemfile at `path: "../
 Use the docs in [`docs/`](./docs) for engine setup, release, email transport,
 and host-app contracts. Current cross-repo setup, ports, credentials, and
 workflow guidance live in McRitchie Studio's
-[`docs/agents/`](https://github.com/amcritchie/mcritchie-studio/tree/main/docs/agents).
+[`docs/agents/`](https://github.com/McRitchie-Studio/mcritchie-studio/tree/main/docs/agents).

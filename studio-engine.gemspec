@@ -7,15 +7,15 @@ Gem::Specification.new do |spec|
   spec.email       = ["studio-engine@mcritchie.studio"]
   spec.summary     = "Shared Rails engine providing auth, SSO, error logging, theming, and S3-backed image caching"
   spec.description = "Studio Engine is a non-isolated Rails engine that ships an opinionated authentication + SSO contract, a polymorphic ErrorLog model, a Sluggable concern, a 7-role dynamic theme system with CSS-custom-property generation, and an S3-backed ImageCache. Used in production across the McRitchie Studio + Turf Monster apps."
-  spec.homepage    = "https://github.com/amcritchie/studio-engine"
+  spec.homepage    = "https://github.com/McRitchie-Studio/studio-engine"
   spec.license     = "MIT"
   spec.required_ruby_version = ">= 3.0"
 
   spec.metadata = {
-    "homepage_uri"    => "https://github.com/amcritchie/studio-engine",
-    "source_code_uri" => "https://github.com/amcritchie/studio-engine/tree/main",
-    "bug_tracker_uri" => "https://github.com/amcritchie/studio-engine/issues",
-    "changelog_uri"   => "https://github.com/amcritchie/studio-engine/blob/main/CHANGELOG.md"
+    "homepage_uri"    => "https://github.com/McRitchie-Studio/studio-engine",
+    "source_code_uri" => "https://github.com/McRitchie-Studio/studio-engine/tree/main",
+    "bug_tracker_uri" => "https://github.com/McRitchie-Studio/studio-engine/issues",
+    "changelog_uri"   => "https://github.com/McRitchie-Studio/studio-engine/blob/main/CHANGELOG.md"
   }
 
   spec.files = Dir["lib/**/*", "app/**/*", "config/**/*", "db/**/*", "tailwind/**/*", "Gemfile", "studio-engine.gemspec", "README.md", "CHANGELOG.md", "LICENSE"]

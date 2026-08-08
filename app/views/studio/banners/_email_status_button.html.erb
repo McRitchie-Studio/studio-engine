@@ -1,4 +1,15 @@
-<% details = email_delivery_banner_details %>
+<%
+  details = email_delivery_banner_details
+
+  # Link the inbox only where it actually answers. Studio::LocalEmailsController
+  # gates on the SAME call, so this can never advertise a 404: on QA (Rails
+  # production, remote requests) the button degrades to a non-link status chip
+  # that still reports the connector and whether mail is sending or captured.
+  inbox_reachable = Studio.local_inbox_reachable?(
+    request_local: (respond_to?(:request) && request ? request.local? : false)
+  )
+  tooltip = inbox_reachable ? details.fetch(:tooltip) : "#{details.fetch(:tooltip)} · Inbox: local only"
+%>
 
 <% content = capture do %>
   <span>Email</span>
@@ -16,8 +27,16 @@
   <% end %>
 <% end %>
 
-<%= render "studio/banners/button",
-           href: "/_studio/local_emails",
-           label: "Email",
-           content: content,
-           tooltip: details.fetch(:tooltip) %>
+<% if inbox_reachable %>
+  <%= render "studio/banners/button",
+             href: Studio::EnvironmentBanner::INBOX_PATH,
+             label: "Email",
+             content: content,
+             tooltip: tooltip %>
+<% else %>
+  <%= render "studio/banners/button",
+             as: :status,
+             label: "Email",
+             content: content,
+             tooltip: tooltip %>
+<% end %>
