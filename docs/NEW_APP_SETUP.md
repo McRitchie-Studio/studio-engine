@@ -176,18 +176,29 @@ an auto-submitting POST form to `/auth/google_oauth2`, not redirect with GET.
 ### Engine migrations — install these FIRST
 
 The engine ships its own migrations (the email outbox, `Studio::Link`,
-`Studio::Enumeral`). Install them with the standard Rails engine task, which
-copies each one into the app with a `.studio.rb` suffix and a provenance
-comment naming the original timestamp:
+`Studio::Enumeral`, and an `image_caches` column relaxation). Copy them in with
+the standard Rails engine task — note the task is `studio_engine:`, not
+`studio:`, and each copied file lands with a `.studio_engine.rb` suffix and a
+provenance comment naming the original timestamp:
 
 ```bash
-bin/rails studio:install:migrations
+bin/rails studio_engine:install:migrations
+```
+
+**Then review what it copied before migrating.** These are *reference*
+migrations for optional engine features, and installing them blindly can break
+your app: `allow_null_image_cache_owner` runs `change_column_null :image_caches`
+and **fails outright on any app without an `image_caches` table**. Delete the
+copies your app has no use for and keep the rest:
+
+```bash
+ls db/migrate/*.studio_engine.rb   # decide, then delete what doesn't apply
 bin/rails db:migrate
 ```
 
-**Do not skip this, and re-run it after every engine upgrade.** The outbox
-table (`studio_email_deliveries`) is the one that bites: `Studio::Email.deliver`
-records mail only when the table EXISTS, and falls back to a plain async
+**Do not skip the outbox, and re-run this after every engine upgrade.**
+`studio_email_deliveries` is the one that bites: `Studio::Email.deliver` records
+mail only when the table EXISTS, and falls back to a plain async
 `deliver_later` when it doesn't — silently, with no error. An app missing the
 migration therefore drops every captured email and shows an
 always-empty `/_studio/local_emails`. That was a real bug in

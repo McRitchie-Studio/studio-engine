@@ -2,6 +2,27 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.30.1 — 2026-08-08
+
+**`NEW_APP_SETUP.md` § 5 gave a command that does not exist.** 0.30.0 documented
+the engine migration install as `bin/rails studio:install:migrations`; the real
+task is **`studio_engine:install:migrations`**, and the copied files land with a
+`.studio_engine.rb` suffix, not `.studio.rb`. The wrong spelling was inferred
+from a consumer file that had been hand-copied rather than generated, and it
+fails loudly (`Unrecognized command`) for anyone who follows the guide.
+
+**The same section's advice was also unsafe.** "Install the engine migrations"
+read as blanket guidance, but the task copies FOUR *reference* migrations and
+`allow_null_image_cache_owner` runs `change_column_null :image_caches` — which
+**fails outright on any app without an `image_caches` table**. The section now
+tells you to review what was copied and keep only what applies, which is what
+moms-app actually had to do.
+
+### Fixed
+
+- `NEW_APP_SETUP.md` § 5: correct task name, correct file suffix, and an
+  explicit review-before-migrate step with the failure mode named.
+
 ## 0.30.0 — 2026-08-08
 
 **The hub's link sidebar becomes the engine's out-of-the-box navigation.** New
@@ -94,7 +115,7 @@ are **unchanged** — their production hard-close still stands, which is also wh
 - **`NEW_APP_SETUP.md` § 9 no longer ships a hand-rolled banner to copy** — it
   renders the shared partial, and documents the QA/email reality.
 - **`NEW_APP_SETUP.md` § 5 now installs the engine migrations FIRST**
-  (`bin/rails studio:install:migrations`). Omitting them is silent:
+  (`bin/rails studio_engine:install:migrations` — corrected in 0.30.1). Omitting them is silent:
   `Studio::Email.deliver` records mail only when `studio_email_deliveries` exists
   and otherwise falls back to a plain `deliver_later`, so the app drops every
   captured email and shows an empty inbox. Exactly the mcritchie-industries bug,
