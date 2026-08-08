@@ -2,6 +2,8 @@
   label = local_assigns[:label]
   content = local_assigns[:content] || label
   href = local_assigns[:href]
+  # :link · :button · :status — a status chip carries the same chrome but is
+  # inert (no href, no click), for facts we can report but not navigate to.
   as = local_assigns.fetch(:as, href.present? ? :link : :button).to_sym
   method = local_assigns[:method]
   tooltip = local_assigns[:tooltip]
@@ -36,7 +38,7 @@
     "background:#{default_background}",
     "border:1px solid #{default_border}",
     "color:#{default_color}",
-    "cursor:pointer",
+    "cursor:#{as == :status ? "default" : "pointer"}",
     "font:inherit",
     "font-weight:700",
     "text-decoration:none",
@@ -73,7 +75,13 @@
   end
 %>
 
-<% if as == :button %>
+<%# `tag.span(hash) { }` would read the hash as CONTENT and drop every attribute
+    on the floor — the options must be splatted as keywords when a block is given. %>
+<% if as == :status %>
+  <%= tag.span(**attrs.merge(role: "status", tabindex: "0")) do %>
+    <%= content %><%= tooltip_content if tooltip.present? %>
+  <% end %>
+<% elsif as == :button %>
   <%= button_tag attrs.merge(type: "button") do %>
     <%= content %><%= tooltip_content if tooltip.present? %>
   <% end %>

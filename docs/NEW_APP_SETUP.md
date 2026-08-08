@@ -173,6 +173,32 @@ an auto-submitting POST form to `/auth/google_oauth2`, not redirect with GET.
 
 ## 5. Database Migrations
 
+### Engine migrations — install these FIRST
+
+The engine ships its own migrations (the email outbox, `Studio::Link`,
+`Studio::Enumeral`). Install them with the standard Rails engine task, which
+copies each one into the app with a `.studio.rb` suffix and a provenance
+comment naming the original timestamp:
+
+```bash
+bin/rails studio:install:migrations
+bin/rails db:migrate
+```
+
+**Do not skip this, and re-run it after every engine upgrade.** The outbox
+table (`studio_email_deliveries`) is the one that bites: `Studio::Email.deliver`
+records mail only when the table EXISTS, and falls back to a plain async
+`deliver_later` when it doesn't — silently, with no error. An app missing the
+migration therefore drops every captured email and shows an
+always-empty `/_studio/local_emails`. That was a real bug in
+mcritchie-industries, fixed 2026-08-08.
+
+Verify the install rather than trusting it:
+
+```ruby
+Studio::EmailDelivery.available?  # => true
+```
+
 ### Users
 
 ```ruby
@@ -353,17 +379,7 @@ bespoke layout. Use Turf Monster's `/signin` flow as the full-featured reference
   </head>
 
   <body x-data class="bg-page text-body min-h-screen" :class="{ 'dev-mode': $store.devMode }">
-    <%% unless Rails.env.production? %>
-      <div style="background:#eab308; color:#000; font-size:12px; font-weight:700; padding:2px 12px; position:relative;">
-        <%%= Rails.env.capitalize %> Environment
-        <span style="position:absolute; right:8px; top:50%; transform:translateY(-50%);">
-          <button @click="$store.devMode = !$store.devMode; localStorage.setItem('devMode', $store.devMode)"
-                  class="rounded cursor-pointer"
-                  style="font-size:10px; font-weight:700; padding:1px 6px;"
-                  :style="$store.devMode ? 'background:rgba(0,0,0,0.4); color:#fff;' : 'background:rgba(0,0,0,0.2); color:#000;'">DEV MODE</button>
-        </span>
-      </div>
-    <%% end %>
+    <%= render "studio/banners/environment" %>
     <%= render "layouts/navbar" %>
 
     <div class="max-w-7xl mx-auto px-4 py-6">
@@ -374,7 +390,33 @@ bespoke layout. Use Turf Monster's `/signin` flow as the full-featured reference
 </html>
 ```
 
-**Dev banner**: Yellow bar hidden in production, shows environment name + DEV MODE toggle. Uses inline styles (not Tailwind classes) to avoid compilation issues across apps. The `devMode` Alpine store is initialized by the engine's `_head.html.erb`. The `dev-mode` body class can be used for dev-only UI toggles.
+**Environment banner**: one render call, no conditional around it. Earlier
+versions of this guide pasted a hand-rolled yellow `<div>` here, and every app
+that copied it drifted — different show rules, different labels, and no link to
+the local email inbox. `studio/banners/environment` now owns all three
+decisions:
+
+| Decision | Rule |
+|---|---|
+| Whether it appears | Every environment except real production. A QA app (Rails production + `QA_ENV=true`) is a review target, so it appears there too. |
+| What it says | `"<Env> Environment"`, or `"QA Environment · Non-production"` on QA. Add segments with `extra:`. |
+| Whether the inbox links | Only where `/_studio/local_emails` actually resolves — the same gate the controller enforces. Off-box (QA) the button degrades to an inert status chip, never a dead link. |
+
+Locals, all optional: `preview:` (suppress inside a navbar-preview render — a
+duplicate `vt-pinned-header` silently kills view transitions), `extra:`
+(message segments), `devnet:` (chip), `environment_label:` (override the whole
+message).
+
+The banner uses inline styles rather than Tailwind classes so it renders
+identically across apps with different CSS builds. The `devMode` Alpine store is
+initialized by the engine's `_head.html.erb`, and the `dev-mode` body class
+drives dev-only UI.
+
+**QA and email, stated plainly:** on QA the inbox page is unreachable and email
+capture is off, both because `Rails.env.production?` hard-closes
+`Studio.local_tool_enabled?` / `Studio.local_email_capture?`. QA sends real
+mail through the real transport. Setting `LOCAL_EMAIL_CAPTURE=1` on a QA dyno
+does nothing.
 
 ### `app/views/layouts/_navbar.html.erb`
 

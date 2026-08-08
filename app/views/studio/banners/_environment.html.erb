@@ -1,18 +1,43 @@
+<%#
+  The ONE environment banner every Studio app renders. Host layouts render this
+  partial and nothing else — it decides FOR ITSELF whether to appear, what to
+  say, and whether the local inbox is linkable. See docs/NEW_APP_SETUP.md § 9.
+
+  Locals (all optional):
+    preview           — true inside a navbar-preview render; suppresses the
+                        banner so a preview copy can't duplicate live chrome.
+    environment_label — override the whole message (rare; prefer `extra`).
+    extra             — extra message segments, joined with " · " (e.g. "Devnet").
+    devnet            — renders a DEVNET chip beside the buttons.
+%>
 <%
-  environment_label = local_assigns.fetch(:environment_label, "#{Rails.env.capitalize} Environment")
-  devnet = local_assigns.fetch(:devnet, false)
+  preview           = local_assigns.fetch(:preview, false)
+  devnet            = local_assigns.fetch(:devnet, false)
+  extra             = Array(local_assigns.fetch(:extra, []))
+  qa_environment    = Studio.qa_environment?
+
+  # On QA the devnet fact belongs in the message (the chip's contrast is built
+  # for the dev strip); everywhere else it stays a chip beside the buttons.
+  message_extra     = devnet && qa_environment ? extra + ["Devnet"] : extra
+  show_devnet_chip  = devnet && !qa_environment
+
+  environment_label = local_assigns.fetch(:environment_label) do
+    Studio.environment_banner_message(extra: message_extra)
+  end
 %>
 
-<% actions = capture do %>
-  <% if devnet %>
-    <span class="rounded" style="font-size:10px; font-weight:700; padding:1px 6px; background:rgba(0,0,0,0.2);">DEVNET</span>
+<% if !preview && Studio.show_environment_banner? %>
+  <% actions = capture do %>
+    <% if show_devnet_chip %>
+      <span class="rounded" style="font-size:10px; font-weight:700; padding:1px 6px; background:rgba(0,0,0,0.2);">DEVNET</span>
+    <% end %>
+    <%= render "studio/banners/dev_mode_button" %>
+    <%= render "studio/banners/email_status_button" %>
   <% end %>
-  <%= render "studio/banners/dev_mode_button" %>
-  <%= render "studio/banners/email_status_button" %>
-<% end %>
 
-<%= render "studio/banners/app_banner",
-           tone: :environment,
-           density: :normal,
-           message: environment_label,
-           actions: actions %>
+  <%= render "studio/banners/app_banner",
+             tone: :environment,
+             density: :normal,
+             message: environment_label,
+             actions: actions %>
+<% end %>

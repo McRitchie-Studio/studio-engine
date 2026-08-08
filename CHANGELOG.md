@@ -37,6 +37,71 @@ level, and it ships its own navbar. Pinned by
 `test/integration/user_nav_collapse_render_test.rb` and the user_nav view
 tests.
 
+## 0.30.0 — 2026-08-08
+
+**The dev/QA environment banner is now an engine standard a host adopts with ONE
+render call, and it carries the Local Inbox link.** Every app hand-rolled its own
+yellow "&lt;Env&gt; Environment" strip — this gem's own `NEW_APP_SETUP.md` § 9 shipped
+the `<div>` to copy — so no two apps agreed on when it showed or what it said, and
+none of them linked `/_studio/local_emails`. The engine already had the pieces
+(`studio/banners/_environment` and friends); it just could not decide *whether* to
+render, so no host could use it. It can now:
+
+```erb
+<%= render "studio/banners/environment" %>
+```
+
+No `unless Rails.env.production?` around it, no host `show_environment_banner?`,
+no forked buttons. The partial owns all three decisions — whether it appears
+(everywhere except real production; a QA app is Rails-production but a review
+target, so `QA_ENV=true` re-opens it), what it says (`"QA Environment ·
+Non-production"` on QA), and whether the inbox is linkable.
+
+**The inbox link tells the truth.** `Studio.local_inbox_reachable?` consults the
+SAME gate `Studio::LocalEmailsController` enforces, so the banner can never
+advertise a page that answers 404. Where the viewer resolves (a developer desk)
+you get a link; where it does not (QA — Rails-production, remote requests) the
+button degrades to an inert `role="status"` chip that still reports the connector
+and whether mail is sending or captured. This generalizes the degradation
+turf-monster had already built for itself.
+
+Purely additive. `Studio.local_tool_enabled?` and `Studio.local_email_capture?`
+are **unchanged** — their production hard-close still stands, which is also why
+`LOCAL_EMAIL_CAPTURE=1` on a QA dyno does nothing and QA still sends real mail.
+
+### Added
+
+- **`studio/banners/environment` self-gates** and accepts `preview:` (suppress
+  inside a navbar-preview render — a duplicate `vt-pinned-header` silently kills
+  view transitions), `extra:` (message segments), `devnet:`, and
+  `environment_label:`.
+- **`Studio::EnvironmentBanner`** — the show/label rules as dependency-free Ruby,
+  unit-tested directly so the suite exercises the shipped code, not a copy.
+- **`Studio.qa_environment?` / `.show_environment_banner?` /
+  `.environment_banner_message` / `.local_inbox_reachable?` / `.rails_env_name`.**
+  `qa_environment?` reads the existing `QA_ENV` the release conductor already sets
+  on every QA app — no new variable.
+- **`studio/banners/button` gained `as: :status`** — the same chrome, inert, for a
+  fact we can report but not navigate to.
+
+### Fixed
+
+- **`studio/banners/button` dropped every attribute on a block render.**
+  `tag.span(hash) { }` reads the hash as CONTENT, so the options never reached the
+  tag. Splatted as keywords now. Latent until `as: :status` became the first block
+  path to use it.
+
+### Docs
+
+- **`NEW_APP_SETUP.md` § 9 no longer ships a hand-rolled banner to copy** — it
+  renders the shared partial, and documents the QA/email reality.
+- **`NEW_APP_SETUP.md` § 5 now installs the engine migrations FIRST**
+  (`bin/rails studio:install:migrations`). Omitting them is silent:
+  `Studio::Email.deliver` records mail only when `studio_email_deliveries` exists
+  and otherwise falls back to a plain `deliver_later`, so the app drops every
+  captured email and shows an empty inbox. Exactly the mcritchie-industries bug,
+  fixed 2026-08-08.
+
 ## 0.29.0 — 2026-07-29
 
 **The four depth-chart gaps folded into the `studio/board` primitive (Phase D), so
