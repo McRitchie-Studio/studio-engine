@@ -2,7 +2,7 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
-## Unreleased
+## 0.30.0 — 2026-08-08
 
 **The hub's link sidebar becomes the engine's out-of-the-box navigation.** New
 apps get a default navigation surface without forking the navbar: declare
@@ -36,8 +36,6 @@ truncation). turf-monster's dense nav is untouched: its users carry wallet +
 level, and it ships its own navbar. Pinned by
 `test/integration/user_nav_collapse_render_test.rb` and the user_nav view
 tests.
-
-## 0.30.0 — 2026-08-08
 
 **The dev/QA environment banner is now an engine standard a host adopts with ONE
 render call, and it carries the Local Inbox link.** Every app hand-rolled its own
