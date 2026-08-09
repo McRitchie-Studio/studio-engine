@@ -146,6 +146,22 @@ class ComponentCssTest < Minitest::Test
     assert_includes html, "Card body"
   end
 
+  # btn-primary's LABEL is token-driven: a light brand primary fails contrast
+  # under the hardcoded white label, so consumers set --btn-primary-fg (and
+  # --btn-primary-fg-hover when the darker hover fill flips the readable
+  # choice). Defaults must compile to white so tokenless consumers are
+  # visually unchanged.
+  def test_primary_label_is_token_overridable_with_white_default
+    primary = css[/@utility btn-primary \{.*?\n\}/m]
+    refute_nil primary, "expected an @utility btn-primary block"
+    assert_includes primary, "var(--btn-primary-fg, #fff)",
+      "btn-primary label must be token-overridable, defaulting to white"
+    assert_includes primary, "var(--btn-primary-fg-hover, var(--btn-primary-fg, #fff))",
+      "btn-primary hover label must fall back to the rest label, then white"
+    refute_includes primary, "text-white",
+      "the hardcoded white label is exactly what the tokens replace"
+  end
+
   # btn-secondary and btn-neutral are TOKEN-DRIVEN so consumers retune them via
   # --btn-* custom properties instead of forking the @utility (which is additive
   # in Tailwind v4). The defaults must keep the theme-role fallbacks so a consumer
