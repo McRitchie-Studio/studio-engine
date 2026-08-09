@@ -15,11 +15,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   *Lint:* the generated `.rubocop.yml` inherits `rubocop-rails-omakase`, which
   enforces `[ a, b ]`, while scaffolded code routinely writes `[a, b]` — so a new
   app is usually born with a red `lint` lane. Run `bin/rubocop -a` before the
-  first commit. The house has no single answer on those cops (the hub disables
-  them; turf-monster and mcritchie-industries keep the defaults) — the section
-  says pick deliberately and leave the lane GREEN. moms-app carried 25 offences
-  across five releases because its first run was red and stayed red, which means
-  nothing downstream could tell a new break from the standing one.
+  first commit, and either format to the cop or disable it deliberately. The
+  section tabulates which apps did which; this entry deliberately states no
+  per-app claim, because the CHANGELOG publishes to RubyGems and would go stale
+  the moment an app changed its mind.
 
   *CI:* the generated workflow installs `libpq-dev` and `libvips` and nothing
   else. An app that shells out to any other binary must add it to the install step

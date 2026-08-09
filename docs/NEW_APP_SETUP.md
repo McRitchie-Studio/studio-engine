@@ -531,14 +531,16 @@ bin/rubocop -a      # autocorrects the Layout cops
 bin/rubocop         # must print "no offenses detected" before your first PR
 ```
 
-**Most of the house disables the bracket cops** — mcritchie-studio in
-`.rubocop.yml`, turf-monster via an inherited `.rubocop_todo.yml` (658 suppressed
-offences). mcritchie-industries keeps the omakase defaults, and moms-app chose to
-autocorrect to them rather than opt out. So 2 of 3 opt out, and either answer is
-defensible; the template ships the override commented out for exactly this
-reason.
+**Most of the house keeps the cop and formats to it**; two apps opt out. Surveyed
+2026-08-09 — note that a `.rubocop.yml` may disable the cop indirectly through
+`inherit_from`, so follow that line before concluding anything:
 
-What is NOT defensible is a red lane nobody owns: moms-app carried 25 offences across five
+| Opts OUT of `Layout/SpaceInsideArrayLiteralBrackets` | Keeps it |
+|---|---|
+| mcritchie-studio (`.rubocop.yml:6`), turf-monster (`.rubocop_todo.yml:59`, 658 suppressed offences) | mcritchie-industries · moms-app · rolio · acquisition-studio · chain-ops |
+
+Either answer is defensible — the template ships the override commented out for
+exactly this reason. What is NOT defensible is a red lane nobody owns: moms-app carried 25 offences across five
 releases because its first CI run was red and stayed red, so nothing downstream
 could tell a new break from the standing one.
 
@@ -583,19 +585,31 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
 end
 ```
 
-**The mechanic is in the generator, so any app can inherit it:** railties emits
-`ci.yml` with the `system-test` job unconditionally, while the `test/system` +
-`application_system_test_case` scaffolding sits behind a `devcontainer?` guard
-(`railties app_generator.rb:257-262`). Generate without it and you get the job
-without the tests.
+**The mechanic is in the generator:** on Rails 8, `test/system` and
+`application_system_test_case.rb` are scaffolded only behind a `devcontainer?`
+guard (`railties app_generator.rb:257-262`, 8.1.3.1 — Rails 7.2 has no such guard),
+while the CI template emits the `test:system` invocation regardless. A plain
+`rails new` as in § 1 therefore hands you the lane without the tests.
 
-Whether it bites you depends on what you do next, and the house has taken all
-three routes: turf-monster ships no `system-test` job at all; mcritchie-industries
-deleted the job and left a `test/system/.keep` so other tooling stops tripping;
-moms-app kept the job and gave it real tests. Any of the three is fine.
+Surveyed 2026-08-09, and the honest picture is not three tidy options — **almost
+nobody has system tests, and the usual workaround makes the lane lie:**
 
-What is NOT fine is keeping the job with nothing behind it — a lane that is always
-red stops distinguishing a new break from the standing one.
+| Posture | Apps | What the lane actually reports |
+|---|---|---|
+| Real system tests | mcritchie-studio (7), rolio (2) | a true verdict |
+| No tests, `test/system/.keep` committed | turf-monster, mcritchie-industries, chain-ops | **permanently GREEN while testing nothing** — `.keep` suppresses the LoadError |
+| No tests, no `.keep` | moms-app, before this was fixed | permanently RED (`cannot load such file -- test/system`) |
+
+Every one of those apps runs `test:system` in CI (e.g. `turf-monster/.github/workflows/ci.yml:115`,
+`chain-ops/.github/workflows/ci.yml:93`).
+
+The `.keep` is worth understanding before you copy it. It converts an honest red
+into a **green that means nothing**, and a green lane nobody questions is harder
+to notice than a red one. moms-app's red at least announced itself.
+
+So: give the lane real tests, or delete the job outright. Choosing `.keep` is
+choosing a lane that reports success for a suite that does not exist — do it
+knowingly, and never as a way to make a red go away.
 
 Pick assertions the cheaper tiers genuinely cannot make. A system test earns its
 cost through the real browser — JS actually executing, a redirect actually
