@@ -16,9 +16,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   enforces `[ a, b ]`, while scaffolded code routinely writes `[a, b]` — so a new
   app is usually born with a red `lint` lane. Run `bin/rubocop -a` before the
   first commit, and either format to the cop or disable it deliberately. The
-  section tabulates which apps did which; this entry deliberately states no
-  per-app claim, because the CHANGELOG publishes to RubyGems and would go stale
-  the moment an app changed its mind.
+  section tabulates which apps did which, stamped with the `origin/main` ref it
+  was surveyed at; that table lives in the guide rather than here because
+  `studio-engine.gemspec:21` packages this CHANGELOG but excludes `docs/`, so the
+  guide can be corrected without an erratum and this file cannot.
 
   *CI:* the generated workflow installs `libpq-dev` and `libvips` and nothing
   else. An app that shells out to any other binary must add it to the install step

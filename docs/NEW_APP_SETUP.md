@@ -532,8 +532,9 @@ bin/rubocop         # must print "no offenses detected" before your first PR
 ```
 
 **Most of the house keeps the cop and formats to it**; two apps opt out. Surveyed
-2026-08-09 — note that a `.rubocop.yml` may disable the cop indirectly through
-`inherit_from`, so follow that line before concluding anything:
+against `origin/main` on 2026-08-09 — note that a `.rubocop.yml` may disable the
+cop indirectly through `inherit_from`, so follow that line before concluding
+anything:
 
 | Opts OUT of `Layout/SpaceInsideArrayLiteralBrackets` | Keeps it |
 |---|---|
@@ -591,25 +592,35 @@ guard (`railties app_generator.rb:257-262`, 8.1.3.1 — Rails 7.2 has no such gu
 while the CI template emits the `test:system` invocation regardless. A plain
 `rails new` as in § 1 therefore hands you the lane without the tests.
 
-Surveyed 2026-08-09, and the honest picture is not three tidy options — **almost
-nobody has system tests, and the usual workaround makes the lane lie:**
+Surveyed against `origin/main` on 2026-08-09 — refs given so you can re-check
+rather than trust this table, and **so you can tell a stale answer from a current
+one.** Every app below runs `test:system` in CI (e.g.
+`turf-monster/.github/workflows/ci.yml:115`, `chain-ops/.github/workflows/ci.yml:93`);
+acquisition-studio has no `ci.yml` at all.
 
-| Posture | Apps | What the lane actually reports |
-|---|---|---|
-| Real system tests | mcritchie-studio (7), rolio (2) | a true verdict |
-| No tests, `test/system/.keep` committed | turf-monster, mcritchie-industries, chain-ops | **permanently GREEN while testing nothing** — `.keep` suppresses the LoadError |
-| No tests, no `.keep` | moms-app, before this was fixed | permanently RED (`cannot load such file -- test/system`) |
+| App (`origin/main`) | `test/system/*_test.rb` | `.keep` | What the lane reports |
+|---|---|---|---|
+| mcritchie-studio `92e3e284` | 7 | yes | a true verdict |
+| rolio `f40ca94` | 2 | yes | a true verdict |
+| mcritchie-industries `847254e` | 1 | yes | a true verdict |
+| moms-app `80648fe` | 1 | no | a true verdict |
+| turf-monster `da1dc87` | **0** | yes | **permanently GREEN, testing nothing** |
+| chain-ops `d44060f` | **0** | yes | **permanently GREEN, testing nothing** |
 
-Every one of those apps runs `test:system` in CI (e.g. `turf-monster/.github/workflows/ci.yml:115`,
-`chain-ops/.github/workflows/ci.yml:93`).
+So most apps do have real system tests. The trap is the pair that do not: a
+committed `test/system/.keep` makes `bin/rails test:system` glob an existing
+directory, find zero tests, and exit **green** — where an absent directory would
+raise `cannot load such file` and go red.
 
-The `.keep` is worth understanding before you copy it. It converts an honest red
-into a **green that means nothing**, and a green lane nobody questions is harder
-to notice than a red one. moms-app's red at least announced itself.
+**And the `.keep` may not have been anyone's decision.** Rails 7.2's generator
+creates it unconditionally (`railties 7.2.3.1 app_generator.rb:254-255`), so a
+7.2-era app inherits a green-forever lane without choosing one. Do not read those
+two rows as a deliberate posture; read them as what happens by default.
 
-So: give the lane real tests, or delete the job outright. Choosing `.keep` is
-choosing a lane that reports success for a suite that does not exist — do it
-knowingly, and never as a way to make a red go away.
+Check your own lane before you trust it: `git ls-files test/system`. If the answer
+is `.keep` alone, that lane has never tested anything. Give it real tests or delete
+the job — what you must not do is leave a green that means nothing, because an
+unquestioned green hides far better than a red.
 
 Pick assertions the cheaper tiers genuinely cannot make. A system test earns its
 cost through the real browser — JS actually executing, a redirect actually
