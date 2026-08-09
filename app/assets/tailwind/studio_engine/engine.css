@@ -71,6 +71,8 @@
   ADDITIVE in Tailwind v4 (both definitions emit and the engine's rules leak in),
   so forking is not a clean override. Set these on :root in the consumer's CSS:
 
+    --btn-primary-fg              label color    (default: #fff)
+    --btn-primary-fg-hover        hover label    (default: same as --btn-primary-fg)
     --btn-secondary-bg            base fill      (default: var(--color-success))
     --btn-secondary-bg-hover      hover fill     (default: same as base)
     --btn-secondary-hover-filter  hover filter   (default: brightness(0.9))
@@ -97,10 +99,18 @@
   }
 }
 
+/* btn-primary's label is token-overridable like btn-secondary's fill: a light
+   brand primary (e.g. industries' furnace orange) fails contrast under a white
+   label, so such apps set --btn-primary-fg (and, when the darker hover fill
+   flips the readable choice, --btn-primary-fg-hover) instead of fighting the
+   @utility with unlayered overrides. Defaults resolve to the same white as
+   before (a literal #fff — the engine's both-modes guard bars raw
+   --color-white references, which only exist in Tailwind's compiled theme). */
 @utility btn-primary {
-  @apply text-white;
+  color: var(--btn-primary-fg, #fff);
   background-color: var(--color-cta);
   &:hover {
+    color: var(--btn-primary-fg-hover, var(--btn-primary-fg, #fff));
     background-color: var(--color-cta-hover);
   }
 }

@@ -314,3 +314,68 @@ class ThemeResolverAccentTest < Minitest::Test
     assert_equal "#F72585", resolver.light_mode_vars["--color-accent"]
   end
 end
+
+class ThemeResolverInkContrastTest < Minitest::Test
+  # Property, and this time actually the property: the derived inks must clear
+  # WCAG targets on EVERY emitted background, for a swept space of bases —
+  # the fleet, the reviewer's counterexamples (each broke the old fixed-blend
+  # derivation with a green suite), and a grayscale sweep of the sane domain
+  # for each mode. The theme editor accepts arbitrary hexes, so this is an
+  # operator-reachable input space, not a hypothetical one.
+  FLEET_DARK = %w[#1A1535 #0D1A63 #0f172a #10101f].freeze
+  COUNTEREXAMPLES = %w[#374151 #1e3a8a #312e81 #134e4a].freeze
+  # Above ~#555555 even pure white cannot reach 4.5:1 on the lifted surface —
+  # that is not a dark theme any more. The invariant holds on the real domain;
+  # brighter bases degrade to the clamp (pinned below).
+  DARK_SWEEP = (0x00..0x55).step(0x11).map { |v| format("#%02x%02x%02x", v, v, v) }.freeze
+  LIGHT_SWEEP = (0xaa..0xff).step(0x11).map { |v| format("#%02x%02x%02x", v, v, v) }.freeze
+  FLEET_LIGHT = %w[#f8fafc #ffffff].freeze
+
+  def test_dark_mode_inks_clear_targets_on_every_emitted_background
+    (FLEET_DARK + COUNTEREXAMPLES + DARK_SWEEP).each do |base|
+      vars = Studio::ThemeResolver.new(dark: base).dark_mode_vars
+      backgrounds = vars.values_at("--color-page", "--color-surface", "--color-surface-alt", "--color-inset")
+
+      backgrounds.each do |bg|
+        assert_operator contrast(vars["--color-text-muted"], bg), :>=, 3.0,
+          "muted must clear 3:1 on #{bg} for base #{base}"
+        assert_operator contrast(vars["--color-text-secondary"], bg), :>=, 4.5,
+          "secondary must clear 4.5:1 on #{bg} for base #{base}"
+      end
+
+      assert_operator luminance(vars["--color-text-muted"]), :<=, luminance(vars["--color-text-secondary"]),
+        "the ink ladder must stay monotonic (muted <= secondary) for base #{base}"
+    end
+  end
+
+  def test_pathological_dark_base_clamps_to_best_achievable_ink
+    vars = Studio::ThemeResolver.new(dark: "#999999").dark_mode_vars
+
+    assert_equal "#ffffff", vars["--color-text-secondary"].downcase,
+      "an unreachable target must clamp at pure white, not loop"
+  end
+
+  def test_light_mode_inks_clear_targets_on_every_emitted_background
+    (FLEET_LIGHT + LIGHT_SWEEP).each do |base|
+      vars = Studio::ThemeResolver.new(light: base).light_mode_vars
+      backgrounds = vars.values_at("--color-page", "--color-surface", "--color-surface-alt", "--color-inset")
+
+      backgrounds.each do |bg|
+        assert_operator contrast(vars["--color-text-muted"], bg), :>=, 3.0,
+          "muted must clear 3:1 on #{bg} for base #{base}"
+        assert_operator contrast(vars["--color-text-secondary"], bg), :>=, 4.5,
+          "secondary must clear 4.5:1 on #{bg} for base #{base}"
+      end
+    end
+  end
+
+  private
+
+  def contrast(hex_a, hex_b)
+    Studio::ColorScale.contrast_ratio(hex_a, hex_b)
+  end
+
+  def luminance(hex)
+    Studio::ColorScale.relative_luminance(hex)
+  end
+end
