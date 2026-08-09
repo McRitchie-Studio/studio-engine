@@ -30,13 +30,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   as a code defect rather than a missing package. moms-app's `BookStitcher` shells
   out to `ffmpeg`, its README had listed `ffmpeg` as a requirement all along, and
   the requirement was simply never told to CI.
-- **`NEW_APP_SETUP.md` § 15 also covers the system-test lane that never runs.**
-  `rails new` generates a `system-test` CI job and the capybara/selenium gems, but
-  not `test/system/` or `application_system_test_case.rb` — so a fresh app's lane
-  dies on `cannot load such file -- test/system` having executed nothing. The
-  mechanic lives in the generator — `ci.yml` is emitted unconditionally while the
-  `test/system` scaffolding sits behind a `devcontainer?` guard — so any app can
-  inherit it; the section records all three routes the house has taken.
+- **`NEW_APP_SETUP.md` § 15 also covers the system-test lane that tests nothing.**
+  `rails new` wires a `test:system` CI invocation and the capybara/selenium gems,
+  and what you get behind it depends on your Rails version. On **7.2**
+  (`app_generator.rb:254-258`) `test/system/.keep` and
+  `application_system_test_case.rb` are created **unconditionally**, so the lane
+  runs, finds zero tests, and reports **GREEN** — a pass that means nothing. On
+  **8.1** (`:257-262`) that scaffolding sits behind a
+  `devcontainer? && depends_on_system_test?` guard, so a plain `rails new` gets the
+  invocation without the directory and the lane goes **RED** on
+  `cannot load such file -- test/system`. Either way the lane is not testing your
+  app; the green one is the harder to notice. The section tabulates where each
+  house app actually stands.
 - **§ 16 Verify** no longer asks you to confirm a "yellow Development Environment
   bar" — that hand-rolled strip was replaced by the shared environment banner in
   0.30.0, so the checklist now names the banner, DEV MODE, and the Local Inbox link.

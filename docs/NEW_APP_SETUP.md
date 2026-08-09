@@ -564,8 +564,17 @@ engine supports both (`studio-engine.gemspec:24` — `rails >= 7.2, < 8.2`):
 | railties 8.1 (`ci.yml.tt:120`, `:193`) | separate `test` and `system-test` | **two** — updating one and not the other is the common miss |
 | railties 7.2 (`ci.yml.tt:103`, `:131`) | one job running `test test:system` together | one, and it already includes `google-chrome-stable` |
 
-Check yours rather than assuming: `grep -c 'apt-get install' .github/workflows/ci.yml`.
-Of the six apps here with a `ci.yml`, only moms-app has the two-job layout.
+Check yours rather than assuming — and count install steps, not jobs, because an
+app may have added lanes of its own beyond what the generator emitted:
+
+```bash
+grep -n 'apt-get install' .github/workflows/ci.yml   # every step you must update
+```
+
+mcritchie-studio answers **2** at `92e3e284` (`:124` for its `playwright` lane and
+`:274` for `test`) despite not having the generated `test`/`system-test` split —
+which is the point: the number you need is however many install steps your file
+actually has.
 
 The failure mode is misleading: the test that exercises the missing binary raises
 inside its own setup, so the lane reads as a code defect rather than a missing
@@ -623,7 +632,8 @@ directory, find zero tests, and exit **green** — where an absent directory wou
 raise `cannot load such file` and go red.
 
 **And the `.keep` may not have been anyone's decision.** Rails 7.2's generator
-creates it unconditionally (`railties 7.2.3.1 app_generator.rb:254-255`), so a
+creates it — and `application_system_test_case.rb` with it — unconditionally
+(`railties 7.2.3.1 app_generator.rb:254-258`), so a
 7.2-era app inherits a green-forever lane without choosing one. Do not read those
 two rows as a deliberate posture; read them as what happens by default.
 
