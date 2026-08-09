@@ -109,12 +109,18 @@ capture/test mode; do not use that as provider proof.
 
 ## Durable Delivery
 
-New apps should install the engine migration before relying on durable delivery:
+New apps should install the engine migrations before relying on durable delivery:
 
 ```bash
-bin/rails railties:install:migrations
+bin/rails studio_engine:install:migrations
 bin/rails db:migrate
 ```
+
+Scope it to `studio_engine:` rather than `railties:` — the latter copies the
+migrations of **every** railtie in the bundle, which is far more than you asked
+for. Install the full engine set and re-run after each upgrade; the details, and
+why you should not delete copies you think you don't need, are in
+[`NEW_APP_SETUP.md`](NEW_APP_SETUP.md) § 5.
 
 The table is `studio_email_deliveries`; the model is `Studio::EmailDelivery`.
 Use the facade from app code:

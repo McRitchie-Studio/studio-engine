@@ -49,7 +49,7 @@ class Studio::ThemeResolverTest < Minitest::Test
       --color-text --color-text-body --color-text-secondary --color-text-muted
       --color-border --color-border-strong --color-shadow
       --color-cta --color-cta-hover
-      --color-success --color-warning --color-danger
+      --color-success --color-warning --color-danger --color-accent
     ]
     expected_keys.each do |key|
       assert vars.key?(key), "Missing dark mode var: #{key}"
@@ -141,7 +141,7 @@ class Studio::ThemeResolverTest < Minitest::Test
       --color-text --color-text-body --color-text-secondary --color-text-muted
       --color-border --color-border-strong --color-shadow
       --color-cta --color-cta-hover
-      --color-success --color-warning --color-danger
+      --color-success --color-warning --color-danger --color-accent
     ]
     expected_keys.each do |key|
       assert vars.key?(key), "Missing light mode var: #{key}"
@@ -295,5 +295,22 @@ class Studio::ThemeResolverTest < Minitest::Test
     vars = resolver.primary_palette_vars
     assert_equal "#4BAF50", vars["--color-primary-500"]
     assert_equal "#4BAF50", vars["--color-primary"]
+  end
+end
+
+class ThemeResolverAccentTest < Minitest::Test
+  # The accent ROLE existed end-to-end (config -> ThemeSetting.accent2 ->
+  # resolved_colors) but the resolver never emitted a variable, so
+  # config.theme_accent painted nothing and apps hardcoded the hex instead.
+  def test_accent_emits_in_both_modes_from_config
+    resolver = Studio::ThemeResolver.new(accent: "#2845D6")
+    assert_equal "#2845D6", resolver.dark_mode_vars["--color-accent"]
+    assert_equal "#2845D6", resolver.light_mode_vars["--color-accent"]
+  end
+
+  def test_accent_defaults_match_the_theme_role_default
+    resolver = Studio::ThemeResolver.new({})
+    assert_equal "#F72585", resolver.dark_mode_vars["--color-accent"]
+    assert_equal "#F72585", resolver.light_mode_vars["--color-accent"]
   end
 end

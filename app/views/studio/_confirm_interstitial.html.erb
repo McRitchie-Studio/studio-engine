@@ -1,9 +1,10 @@
 <%#
   Shared scanner-safe sign-in interstitial. The GET that renders this is inert;
   the page auto-POSTs the CSRF-protected form to `consume_path` (the only place
-  a single-use token is burned). Used by both MagicLinksController#confirm
-  (consume_path: magic_link_consume_path) and Studio::LinksController#show
-  (consume_path: link_consume_path). Rendered with layout false (full document).
+  a single-use token is burned). Rendered by Studio::LinksController#show
+  (consume_path: link_consume_path) — the engine's only token door since 0.31.0
+  — and by any app drawing its own token route. Rendered with layout false
+  (full document).
 
   Local: consume_path — the POST target that burns the token + signs in.
 %>

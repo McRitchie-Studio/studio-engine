@@ -11,12 +11,19 @@ module Studio
   # discriminator. Replaces the engine's stateless MessageVerifier MagicLink
   # service for mcritchie-studio so both apps share one short-token scheme.
   #
-  # Like Studio::EmailDelivery, the table lives in each consumer app (copy the
-  # reference migration in db/migrate); this model is shipped by the gem.
+  # Like Studio::EmailDelivery, the table lives in each consumer app — installed
+  # by `bin/rails studio_engine:install:migrations`, never hand-copied (a hand
+  # copy collides with the task's own copy on `class CreateStudioLinks`). This
+  # model is shipped by the gem.
   class Link < ApplicationRecord
     self.table_name = "studio_links"
 
     class InvalidToken < StandardError; end
+
+    # The app enabled :magic_link but never installed the table. Raised in place
+    # of a bare PG::UndefinedTable so the first person to hit it reads the fix
+    # instead of an adapter error — see mint!.
+    class MissingTable < StandardError; end
 
     belongs_to :linkable, polymorphic: true, optional: true
 
@@ -76,6 +83,16 @@ module Studio
 
       # create! with a fresh random token, retrying the (astronomically rare)
       # unique-index collision a couple of times before surfacing the error.
+      #
+      # The MissingTable rescue exists because every consumer pins the engine as
+      # `~> 0.x`, which admits any release below 1.0 — so an app that never
+      # installed this table picks up the row store on its next `bundle update`
+      # whether or not anyone adopted it deliberately. Its boot is fine (nothing
+      # touches the table until someone signs in), and the failure then lands as
+      # a bare PG::UndefinedTable on a real person's sign-in. Naming the fix
+      # there is the difference between a five-minute repair and an outage
+      # nobody can read. The check is `table_exists?`, not a message match, so
+      # it holds on any adapter and never swallows an unrelated failure.
       def mint!(attrs)
         3.times do
           return create!(attrs.merge(token: Studio::LinkToken.generate))
@@ -83,6 +100,14 @@ module Studio
           next
         end
         create!(attrs.merge(token: Studio::LinkToken.generate))
+      rescue ActiveRecord::StatementInvalid
+        raise if table_exists?
+
+        raise MissingTable,
+              "studio-engine magic links need the studio_links table, and #{Studio.app_name} has no " \
+              "such table. Run `bin/rails studio_engine:install:migrations && bin/rails db:migrate` " \
+              "(install ALL of them). Do not hand-copy the migration — it collides with the task's " \
+              "own copy on `class CreateStudioLinks`."
       end
     end
 
@@ -104,6 +129,34 @@ module Studio
         raise InvalidToken, "link expired"
       end
       self
+    end
+
+    # The non-raising sibling of #consume!, and the one the click flow uses.
+    # Returns whether THIS caller won the burn — false for a link that was
+    # already used, has expired, or lost the atomic race to a concurrent click.
+    #
+    # Why a boolean and not the exception: "the link was dead" is not an error
+    # here, it is one of the two normal outcomes, and the branch it feeds
+    # (Studio::LinkResolution) needs the answer as data. Reloads on a loss so
+    # the caller reads the row's settled state (consumed_at / expires_at) rather
+    # than the copy it held before the race.
+    def burn
+      consume!
+      true
+    rescue InvalidToken
+      reload
+      false
+    end
+
+    # How a failed burn should be described. Only meaningful once #burn has
+    # returned false (or on a link that was never burned at all).
+    def dead_status
+      return :used if single_use? && consumed?
+      return :expired if expired?
+
+      # Neither flag is set but the burn did not land: a concurrent click won
+      # it between our read and our write. Same story for the reader.
+      :used
     end
 
     def single_use?
