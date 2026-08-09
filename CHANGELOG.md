@@ -2,7 +2,53 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
-## 0.32.0 — Unreleased
+## 0.32.1 — Unreleased
+
+**Setup-guide corrections.** Docs only — no code, no behavior change.
+
+### Docs
+
+- **`NEW_APP_SETUP.md` § 15 "Lint And CI" — the two things a fresh app gets wrong
+  by default.** Both surface as a red CI lane on the app's first push and both
+  read like code defects when they aren't.
+
+  *Lint:* the generated `.rubocop.yml` inherits `rubocop-rails-omakase`, which
+  enforces `[ a, b ]`, while scaffolded code routinely writes `[a, b]` — so a new
+  app is usually born with a red `lint` lane. Run `bin/rubocop -a` before the
+  first commit, and either format to the cop or disable it deliberately. The
+  section tabulates which apps did which, stamped with the `origin/main` ref it
+  was surveyed at; that table lives in the guide rather than here because
+  `studio-engine.gemspec:21` packages this CHANGELOG but excludes `docs/`, so the
+  guide can be corrected without an erratum and this file cannot.
+
+  *CI:* the generated workflow installs a short fixed list and nothing else, so an
+  app that shells out to any other binary must add it to the install step in EVERY
+  test-running job. How many jobs that is depends on your Rails version — 8.1
+  generates separate `test` and `system-test` jobs with separate install steps,
+  7.2 a single job running both suites — and the guide tabulates both. The
+  failure is misleading: the test raises inside its own setup, so the lane reads
+  as a code defect rather than a missing package. moms-app's `BookStitcher` shells
+  out to `ffmpeg`, its README had listed `ffmpeg` as a requirement all along, and
+  the requirement was simply never told to CI.
+- **`NEW_APP_SETUP.md` § 15 also covers the system-test lane that tests nothing.**
+  `rails new` wires a `test:system` CI invocation and the capybara/selenium gems,
+  and what you get behind it depends on your Rails version. On **7.2**
+  (`app_generator.rb:254-258`, called at `:459` under `depends_on_system_test?` —
+  true for a plain `rails new`) `test/system/.keep` and
+  `application_system_test_case.rb` are created, so the lane
+  runs, finds zero tests, and reports **GREEN** — a pass that means nothing. On
+  **8.1** (`:257-262`) that scaffolding sits behind a
+  `devcontainer? && depends_on_system_test?` guard, so a plain `rails new` gets the
+  invocation without the directory and the lane goes **RED** on
+  `cannot load such file -- test/system`. Either way the lane is not testing your
+  app; the green one is the harder to notice. The section tabulates where each
+  house app actually stands.
+- **§ 16 Verify** no longer asks you to confirm a "yellow Development Environment
+  bar" — that hand-rolled strip was replaced by the shared environment banner in
+  0.30.0, so the checklist now names the banner, DEV MODE, and the Local Inbox link.
+
+
+## 0.32.0 — 2026-08-09
 
 **Readable ink on every theme, and the `btn-primary` label joins the token
 contract.** (The token work merged after 0.31.0 was cut, so both land here.)
@@ -135,6 +181,7 @@ Do these two in this order; they do not commute.
    `consume_magic_link` / `preview_magic_link` and overriding hooks. In
    particular, move any `reset_session` into `sign_in_existing` only — the
    `:continue` path must not reach it.
+
 ## 0.30.1 — 2026-08-08
 
 **`NEW_APP_SETUP.md` § 5 gave a command that does not exist.** 0.30.0 documented
