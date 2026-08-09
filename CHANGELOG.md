@@ -37,8 +37,7 @@ in the migration, and § 5 now says the simple thing: **install all of them.**
   re-running the task against a real consumer.
 - `NEW_APP_SETUP.md` § 5: correct task name, correct file suffix, and — now that
   the migration guards itself — the simple instruction to install ALL of them and
-  re-run after each upgrade, replacing the self-contradicting advice to delete
-  copies you don't need.
+  re-run after each upgrade.
 - `EMAIL_TRANSPORT.md`: was pointing at `railties:install:migrations`, which
   copies the migrations of EVERY railtie in the bundle. Scoped to `studio_engine:`.
 
