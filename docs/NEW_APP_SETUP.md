@@ -559,6 +559,40 @@ package. moms-app's `BookStitcher` shells out to `ffmpeg`; its suite failed on
 fixture generation, and the app's README had listed `ffmpeg` as a requirement the
 whole time — the requirement was documented for humans and never told to CI.
 
+### System tests — the job exists; the tests do not
+
+`rails new` generates a **`system-test` CI job** and puts `capybara` +
+`selenium-webdriver` in the Gemfile, but it does **not** create `test/system/` or
+`test/application_system_test_case.rb`. So a fresh app's system-test lane dies on:
+
+```
+cannot load such file -- <app>/test/system (LoadError)
+```
+
+It has never run a test, and it never will until you give it content. Create both,
+and add at least one real system test:
+
+```ruby
+# test/application_system_test_case.rb
+require "test_helper"
+
+class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
+  driven_by :selenium, using: :headless_chrome, screen_size: [ 1400, 1400 ]
+end
+```
+
+**This is the most transferable of the three traps** — every app scaffolds with
+the same job and the same missing directory, so every app starts with a lane that
+reports failure while testing nothing. Deleting the job is the honest alternative
+if you truly have no system tests; what you must not do is leave a permanently red
+lane, because a lane that is always red stops distinguishing a new break from the
+standing one.
+
+Pick assertions the cheaper tiers genuinely cannot make. A system test earns its
+cost through the real browser — JS actually executing, a redirect actually
+followed — so asserting only server-rendered markup here duplicates an integration
+test at many times the runtime.
+
 ## 16. Verify
 
 ```bash

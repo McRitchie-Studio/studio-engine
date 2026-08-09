@@ -2,7 +2,44 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
-## 0.32.0 — Unreleased
+## 0.32.1 — Unreleased
+
+**Setup-guide corrections.** Docs only — no code, no behavior change.
+
+### Docs
+
+- **`NEW_APP_SETUP.md` § 15 "Lint And CI" — the two things a fresh app gets wrong
+  by default.** Both surface as a red CI lane on the app's first push and both
+  read like code defects when they aren't.
+
+  *Lint:* the generated `.rubocop.yml` inherits `rubocop-rails-omakase`, which
+  enforces `[ a, b ]`, while scaffolded code routinely writes `[a, b]` — so a new
+  app is usually born with a red `lint` lane. Run `bin/rubocop -a` before the
+  first commit. The house has no single answer on those cops (the hub disables
+  them; turf-monster and mcritchie-industries keep the defaults) — the section
+  says pick deliberately and leave the lane GREEN. moms-app carried 25 offences
+  across five releases because its first run was red and stayed red, which means
+  nothing downstream could tell a new break from the standing one.
+
+  *CI:* the generated workflow installs `libpq-dev` and `libvips` and nothing
+  else. An app that shells out to any other binary must add it to the install step
+  in EVERY test-running job — the workflow has separate `test` and `system-test`
+  jobs with separate install steps, and updating one is the common miss. The
+  failure is misleading: the test raises inside its own setup, so the lane reads
+  as a code defect rather than a missing package. moms-app's `BookStitcher` shells
+  out to `ffmpeg`, its README had listed `ffmpeg` as a requirement all along, and
+  the requirement was simply never told to CI.
+- **`NEW_APP_SETUP.md` § 15 also covers the system-test lane that never runs.**
+  `rails new` generates a `system-test` CI job and the capybara/selenium gems, but
+  not `test/system/` or `application_system_test_case.rb` — so a fresh app's lane
+  dies on `cannot load such file -- test/system` having executed nothing. Every app
+  scaffolds with the same hole, which makes it the most transferable of the three.
+- **§ 16 Verify** no longer asks you to confirm a "yellow Development Environment
+  bar" — that hand-rolled strip was replaced by the shared environment banner in
+  0.30.0, so the checklist now names the banner, DEV MODE, and the Local Inbox link.
+
+
+## 0.32.0 — 2026-08-09
 
 **Readable ink on every theme, and the `btn-primary` label joins the token
 contract.** (The token work merged after 0.31.0 was cut, so both land here.)
@@ -136,32 +173,6 @@ Do these two in this order; they do not commute.
    particular, move any `reset_session` into `sign_in_existing` only — the
    `:continue` path must not reach it.
 
-### Docs
-
-- **`NEW_APP_SETUP.md` § 15 "Lint And CI" — the two things a fresh app gets wrong
-  by default.** Both surface as a red CI lane on the app's first push and both
-  read like code defects when they aren't.
-
-  *Lint:* the generated `.rubocop.yml` inherits `rubocop-rails-omakase`, which
-  enforces `[ a, b ]`, while scaffolded code routinely writes `[a, b]` — so a new
-  app is usually born with a red `lint` lane. Run `bin/rubocop -a` before the
-  first commit. The house has no single answer on those cops (the hub disables
-  them; turf-monster and mcritchie-industries keep the defaults) — the section
-  says pick deliberately and leave the lane GREEN. moms-app carried 25 offences
-  across five releases because its first run was red and stayed red, which means
-  nothing downstream could tell a new break from the standing one.
-
-  *CI:* the generated workflow installs `libpq-dev` and `libvips` and nothing
-  else. An app that shells out to any other binary must add it to the install step
-  in EVERY test-running job — the workflow has separate `test` and `system-test`
-  jobs with separate install steps, and updating one is the common miss. The
-  failure is misleading: the test raises inside its own setup, so the lane reads
-  as a code defect rather than a missing package. moms-app's `BookStitcher` shells
-  out to `ffmpeg`, its README had listed `ffmpeg` as a requirement all along, and
-  the requirement was simply never told to CI.
-- **§ 16 Verify** no longer asks you to confirm a "yellow Development Environment
-  bar" — that hand-rolled strip was replaced by the shared environment banner in
-  0.30.0, so the checklist now names the banner, DEV MODE, and the Local Inbox link.
 ## 0.30.1 — 2026-08-08
 
 **`NEW_APP_SETUP.md` § 5 gave a command that does not exist.** 0.30.0 documented
