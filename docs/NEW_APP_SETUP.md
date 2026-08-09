@@ -514,14 +514,59 @@ that glob gets silently unstyled engine partials.
 
 Add a nav link in McRitchie Studio only after the app is registered in `mcritchie-studio/config/satellites.yml`. If the app participates in one-way SSO, point the link at `/sso_login`; otherwise point at the app root or a public landing page.
 
-## 15. Verify
+## 15. Lint And CI
+
+Two things a fresh app gets wrong by default. Both fail as a RED CI lane on the
+app's very first push, and both look like code defects when they aren't.
+
+### Lint — run it before your first commit
+
+The generated `.rubocop.yml` inherits `rubocop-rails-omakase`, which enforces
+`[ a, b ]` (spaces inside array brackets). Hand-written and scaffolded code
+routinely uses `[a, b]`, so a brand-new app is usually born with a red `lint`
+lane:
+
+```bash
+bin/rubocop -a      # autocorrects the Layout cops
+bin/rubocop         # must print "no offenses detected" before your first PR
+```
+
+The house has no single answer on those cops and that is fine — but **pick
+deliberately and leave the lane green.** mcritchie-studio disables
+`Layout/SpaceInsideArrayLiteralBrackets` and `Layout/SpaceInsideHashLiteralBraces`
+(the template shows the override, commented out); turf-monster and
+mcritchie-industries keep the omakase defaults and format to them. What is not an
+option is a red lane nobody owns: moms-app carried 25 offences across five
+releases because its first CI run was red and stayed red, so nothing downstream
+could tell a new break from the standing one.
+
+### CI — declare your system dependencies
+
+The generated workflow installs `libpq-dev` and `libvips` and nothing else:
+
+```yaml
+- name: Install packages
+  run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev libvips
+```
+
+**If your app shells out to any other binary, add it to that step in EVERY job
+that runs tests** (the workflow has separate `test` and `system-test` jobs, each
+with its own install step — updating one and not the other is the common miss).
+
+The failure mode is misleading: the test that exercises the missing binary raises
+inside its own setup, so the lane reads as a code defect rather than a missing
+package. moms-app's `BookStitcher` shells out to `ffmpeg`; its suite failed on
+fixture generation, and the app's README had listed `ffmpeg` as a requirement the
+whole time — the requirement was documented for humans and never told to CI.
+
+## 16. Verify
 
 ```bash
 bin/rails server -p {PORT}
 ```
 
 - [ ] Homepage loads with navbar, logo, brand title
-- [ ] Dev banner shows yellow "Development Environment" bar with DEV MODE toggle
+- [ ] Environment banner shows "Development Environment" + DEV MODE + the Local Inbox link (§ 9)
 - [ ] Dark/light mode toggle works
 - [ ] `/signin` (or the app's chosen auth page) shows logo + enabled auth methods
 - [ ] Legacy `/login` and `/signup` GETs redirect to `/signin`, if using the unified auth pattern
