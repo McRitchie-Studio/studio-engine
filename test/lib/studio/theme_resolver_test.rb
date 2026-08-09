@@ -316,36 +316,66 @@ class ThemeResolverAccentTest < Minitest::Test
 end
 
 class ThemeResolverInkContrastTest < Minitest::Test
-  # Property, not spellings: the derived dark-mode inks must clear WCAG
-  # contrast on the surfaces the SAME resolver emits, for every dark base
-  # actually shipped in the fleet (engine default, industries navy, slate,
-  # near-black). A hardcoded gray was 2.14:1 on the navy theme's surface.
-  FLEET_DARK_BASES = %w[#1A1535 #0D1A63 #0f172a #10101f].freeze
+  # Property, and this time actually the property: the derived inks must clear
+  # WCAG targets on EVERY emitted background, for a swept space of bases —
+  # the fleet, the reviewer's counterexamples (each broke the old fixed-blend
+  # derivation with a green suite), and a grayscale sweep of the sane domain
+  # for each mode. The theme editor accepts arbitrary hexes, so this is an
+  # operator-reachable input space, not a hypothetical one.
+  FLEET_DARK = %w[#1A1535 #0D1A63 #0f172a #10101f].freeze
+  COUNTEREXAMPLES = %w[#374151 #1e3a8a #312e81 #134e4a].freeze
+  # Above ~#555555 even pure white cannot reach 4.5:1 on the lifted surface —
+  # that is not a dark theme any more. The invariant holds on the real domain;
+  # brighter bases degrade to the clamp (pinned below).
+  DARK_SWEEP = (0x00..0x55).step(0x11).map { |v| format("#%02x%02x%02x", v, v, v) }.freeze
+  LIGHT_SWEEP = (0xaa..0xff).step(0x11).map { |v| format("#%02x%02x%02x", v, v, v) }.freeze
+  FLEET_LIGHT = %w[#f8fafc #ffffff].freeze
 
-  def test_dark_mode_muted_and_secondary_clear_contrast_on_emitted_surfaces
-    FLEET_DARK_BASES.each do |base|
+  def test_dark_mode_inks_clear_targets_on_every_emitted_background
+    (FLEET_DARK + COUNTEREXAMPLES + DARK_SWEEP).each do |base|
       vars = Studio::ThemeResolver.new(dark: base).dark_mode_vars
-      surface = vars["--color-surface"]
+      backgrounds = vars.values_at("--color-page", "--color-surface", "--color-surface-alt", "--color-inset")
 
-      assert_operator contrast(vars["--color-text-muted"], surface), :>=, 3.0,
-        "muted ink must clear 3:1 on the surface for base #{base}"
-      assert_operator contrast(vars["--color-text-secondary"], surface), :>=, 4.5,
-        "secondary ink must clear 4.5:1 on the surface for base #{base}"
-      assert_operator contrast(vars["--color-text-muted"], vars["--color-page"]), :>=, 3.0,
-        "muted ink must clear 3:1 on the page for base #{base}"
+      backgrounds.each do |bg|
+        assert_operator contrast(vars["--color-text-muted"], bg), :>=, 3.0,
+          "muted must clear 3:1 on #{bg} for base #{base}"
+        assert_operator contrast(vars["--color-text-secondary"], bg), :>=, 4.5,
+          "secondary must clear 4.5:1 on #{bg} for base #{base}"
+      end
+
+      assert_operator luminance(vars["--color-text-muted"]), :<=, luminance(vars["--color-text-secondary"]),
+        "the ink ladder must stay monotonic (muted <= secondary) for base #{base}"
+    end
+  end
+
+  def test_pathological_dark_base_clamps_to_best_achievable_ink
+    vars = Studio::ThemeResolver.new(dark: "#999999").dark_mode_vars
+
+    assert_equal "#ffffff", vars["--color-text-secondary"].downcase,
+      "an unreachable target must clamp at pure white, not loop"
+  end
+
+  def test_light_mode_inks_clear_targets_on_every_emitted_background
+    (FLEET_LIGHT + LIGHT_SWEEP).each do |base|
+      vars = Studio::ThemeResolver.new(light: base).light_mode_vars
+      backgrounds = vars.values_at("--color-page", "--color-surface", "--color-surface-alt", "--color-inset")
+
+      backgrounds.each do |bg|
+        assert_operator contrast(vars["--color-text-muted"], bg), :>=, 3.0,
+          "muted must clear 3:1 on #{bg} for base #{base}"
+        assert_operator contrast(vars["--color-text-secondary"], bg), :>=, 4.5,
+          "secondary must clear 4.5:1 on #{bg} for base #{base}"
+      end
     end
   end
 
   private
 
   def contrast(hex_a, hex_b)
-    la, lb = [luminance(hex_a), luminance(hex_b)].sort.reverse
-    (la + 0.05) / (lb + 0.05)
+    Studio::ColorScale.contrast_ratio(hex_a, hex_b)
   end
 
   def luminance(hex)
-    r, g, b = hex.delete("#").scan(/../).map { |c| c.to_i(16) / 255.0 }
-    lin = [r, g, b].map { |c| c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055)**2.4 }
-    (0.2126 * lin[0]) + (0.7152 * lin[1]) + (0.0722 * lin[2])
+    Studio::ColorScale.relative_luminance(hex)
   end
 end
