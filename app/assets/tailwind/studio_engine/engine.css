@@ -103,7 +103,9 @@
    brand primary (e.g. industries' furnace orange) fails contrast under a white
    label, so such apps set --btn-primary-fg (and, when the darker hover fill
    flips the readable choice, --btn-primary-fg-hover) instead of fighting the
-   @utility with unlayered overrides. Defaults compile exactly as before. */
+   @utility with unlayered overrides. Defaults resolve to the same white as
+   before (a literal #fff — the engine's both-modes guard bars raw
+   --color-white references, which only exist in Tailwind's compiled theme). */
 @utility btn-primary {
   color: var(--btn-primary-fg, #fff);
   background-color: var(--color-cta);

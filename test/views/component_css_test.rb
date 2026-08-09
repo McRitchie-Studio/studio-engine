@@ -154,10 +154,20 @@ class ComponentCssTest < Minitest::Test
   def test_primary_label_is_token_overridable_with_white_default
     primary = css[/@utility btn-primary \{.*?\n\}/m]
     refute_nil primary, "expected an @utility btn-primary block"
-    assert_includes primary, "var(--btn-primary-fg, #fff)",
-      "btn-primary label must be token-overridable, defaulting to white"
-    assert_includes primary, "var(--btn-primary-fg-hover, var(--btn-primary-fg, #fff))",
-      "btn-primary hover label must fall back to the rest label, then white"
+
+    # Scope rest vs hover: the hover chain CONTAINS the rest token as a
+    # substring, so a whole-block assert_includes would stay green even if the
+    # rest declaration were hardcoded back to white (verified mutant).
+    rest = primary[/\A.*?(?=\s*&:hover)/m]
+    hover = primary[/&:hover \{.*?\n  \}/m]
+    assert_match(/^\s*color: var\(--btn-primary-fg, #fff\);\s*$/, rest,
+      "btn-primary REST label must be token-overridable, defaulting to white")
+    assert_match(/^\s*color: var\(--btn-primary-fg-hover, var\(--btn-primary-fg, #fff\)\);\s*$/, hover,
+      "btn-primary HOVER label must fall back to the rest label, then white")
+    assert_equal 1, rest.scan(/^\s*(?:color:|@apply )/).size,
+      "nothing may re-declare the rest label after the token"
+    assert_equal 1, hover.scan(/^\s*(?:color:|@apply )/).size,
+      "nothing may re-declare the hover label after the token"
     refute_includes primary, "text-white",
       "the hardcoded white label is exactly what the tokens replace"
   end
