@@ -183,25 +183,24 @@ provenance comment naming the original timestamp:
 
 ```bash
 bin/rails studio_engine:install:migrations
-```
-
-**Then review what it copied before migrating.** These are *reference*
-migrations for optional engine features, and installing them blindly can break
-your app: `allow_null_image_cache_owner` runs `change_column_null :image_caches`
-and **fails outright on any app without an `image_caches` table**. Delete the
-copies your app has no use for and keep the rest:
-
-```bash
-ls db/migrate/*.studio_engine.rb   # decide, then delete what doesn't apply
 bin/rails db:migrate
 ```
 
-**Do not skip the outbox, and re-run this after every engine upgrade.**
-`studio_email_deliveries` is the one that bites: `Studio::Email.deliver` records
-mail only when the table EXISTS, and falls back to a plain async
-`deliver_later` when it doesn't — silently, with no error. An app missing the
-migration therefore drops every captured email and shows an
-always-empty `/_studio/local_emails`. That was a real bug in
+**Install all of them, and re-run both commands after every engine upgrade.**
+Every engine migration is safe on every app: the ones that create tables add a
+table you may not use yet, and the one that ALTERS an app-owned table
+(`allow_null_image_cache_owner`) no-ops when that table is absent.
+
+Do **not** try to slim the set down by deleting copies you think you don't need.
+`install:migrations` builds its skip-list from the files **present**, so a
+deleted copy is re-copied with a fresh timestamp on your next upgrade — deletion
+is not durable, which is why the guard lives in the migration instead.
+
+The outbox is the one that bites if you skip the step entirely:
+`Studio::Email.deliver` records mail only when `studio_email_deliveries` EXISTS,
+and falls back to a plain async `deliver_later` when it doesn't — silently, with
+no error. An app missing the migration therefore drops every captured email and
+shows an always-empty `/_studio/local_emails`. That was a real bug in
 mcritchie-industries, fixed 2026-08-08.
 
 Verify the install rather than trusting it:
