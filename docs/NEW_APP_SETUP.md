@@ -540,9 +540,9 @@ bin/rubocop         # must print "no offenses detected" before your first PR
 | mcritchie-studio (`.rubocop.yml:6`), turf-monster (`.rubocop_todo.yml:59`, 658 suppressed offences) | mcritchie-industries · moms-app · rolio · acquisition-studio · chain-ops |
 
 Either answer is defensible — the template ships the override commented out for
-exactly this reason. What is NOT defensible is a red lane nobody owns: moms-app carried 25 offences across five
-releases because its first CI run was red and stayed red, so nothing downstream
-could tell a new break from the standing one.
+exactly this reason. What is NOT defensible is a red lane nobody owns: moms-app's
+`lint` lane was red from its very first CI run and stayed red, so by the time it
+mattered nothing downstream could tell a new break from the standing one.
 
 ### CI — declare your system dependencies
 
