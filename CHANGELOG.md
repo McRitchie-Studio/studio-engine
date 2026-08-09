@@ -2,6 +2,18 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.32.2 — 2026-08-09
+
+**Two public-page navigation fixes** (found by the industries sidebar-adoption
+review on the app's one public page): `components/_admin_dropdown` now renders
+only for `admin?` viewers — it used to offer `/admin/theme` and `/error_logs`
+links to signed-out strangers wherever the navbar mounted it; and
+`components/_link_sidebar_trigger` no longer hardcodes `inline-flex` after the
+caller's `class_name`, which beat `hidden md:inline-flex` in the cascade and
+rendered the desktop trigger on mobile beside the real one. Callers now own
+the display class (bare renders default to `inline-flex`). Regression view
+tests pin both.
+
 ## 0.32.1 — Unreleased
 
 **Setup-guide corrections.** Docs only — no code, no behavior change.
