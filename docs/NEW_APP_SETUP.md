@@ -176,21 +176,38 @@ an auto-submitting POST form to `/auth/google_oauth2`, not redirect with GET.
 ### Engine migrations — install these FIRST
 
 The engine ships its own migrations (the email outbox, `Studio::Link`,
-`Studio::Enumeral`). Install them with the standard Rails engine task, which
-copies each one into the app with a `.studio.rb` suffix and a provenance
-comment naming the original timestamp:
+`Studio::Enumeral`, and an `image_caches` column relaxation). Copy them in with
+the standard Rails engine task — note the task is `studio_engine:`, not
+`studio:`, and each copied file lands with a `.studio_engine.rb` suffix and a
+provenance comment naming the original timestamp:
 
 ```bash
-bin/rails studio:install:migrations
+bin/rails studio_engine:install:migrations
 bin/rails db:migrate
 ```
 
-**Do not skip this, and re-run it after every engine upgrade.** The outbox
-table (`studio_email_deliveries`) is the one that bites: `Studio::Email.deliver`
-records mail only when the table EXISTS, and falls back to a plain async
-`deliver_later` when it doesn't — silently, with no error. An app missing the
-migration therefore drops every captured email and shows an
-always-empty `/_studio/local_emails`. That was a real bug in
+**Install all of them, and re-run both commands after every engine upgrade.**
+Every engine migration is safe on every app: the ones that create tables add a
+table you may not use yet, and the one that ALTERS an app-owned table
+(`allow_null_image_cache_owner`) no-ops when that table is absent
+(studio-engine >= 0.30.1).
+
+One limit worth knowing: `install:migrations` skips **by migration name**, so an
+app already holding an older copy of a migration never receives an updated one
+from a later engine release — re-running brings you NEW migrations, not revised
+versions of ones you already have. If a release note says a migration changed,
+replace your copy by hand.
+
+Do **not** try to slim the set down by deleting copies you think you don't need.
+`install:migrations` builds its skip-list from the files **present**, so a
+deleted copy is re-copied with a fresh timestamp on your next upgrade — deletion
+is not durable, which is why the guard lives in the migration instead.
+
+The outbox is the one that bites if you skip the step entirely:
+`Studio::Email.deliver` records mail only when `studio_email_deliveries` EXISTS,
+and falls back to a plain async `deliver_later` when it doesn't — silently, with
+no error. An app missing the migration therefore drops every captured email and
+shows an always-empty `/_studio/local_emails`. That was a real bug in
 mcritchie-industries, fixed 2026-08-08.
 
 Verify the install rather than trusting it:
