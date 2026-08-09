@@ -32,8 +32,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **`NEW_APP_SETUP.md` § 15 also covers the system-test lane that never runs.**
   `rails new` generates a `system-test` CI job and the capybara/selenium gems, but
   not `test/system/` or `application_system_test_case.rb` — so a fresh app's lane
-  dies on `cannot load such file -- test/system` having executed nothing. Every app
-  scaffolds with the same hole, which makes it the most transferable of the three.
+  dies on `cannot load such file -- test/system` having executed nothing. The
+  mechanic lives in the generator — `ci.yml` is emitted unconditionally while the
+  `test/system` scaffolding sits behind a `devcontainer?` guard — so any app can
+  inherit it; the section records all three routes the house has taken.
 - **§ 16 Verify** no longer asks you to confirm a "yellow Development Environment
   bar" — that hand-rolled strip was replaced by the shared environment banner in
   0.30.0, so the checklist now names the banner, DEV MODE, and the Local Inbox link.

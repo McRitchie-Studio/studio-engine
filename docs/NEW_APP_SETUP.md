@@ -531,12 +531,14 @@ bin/rubocop -a      # autocorrects the Layout cops
 bin/rubocop         # must print "no offenses detected" before your first PR
 ```
 
-The house has no single answer on those cops and that is fine — but **pick
-deliberately and leave the lane green.** mcritchie-studio disables
-`Layout/SpaceInsideArrayLiteralBrackets` and `Layout/SpaceInsideHashLiteralBraces`
-(the template shows the override, commented out); turf-monster and
-mcritchie-industries keep the omakase defaults and format to them. What is not an
-option is a red lane nobody owns: moms-app carried 25 offences across five
+**Most of the house disables the bracket cops** — mcritchie-studio in
+`.rubocop.yml`, turf-monster via an inherited `.rubocop_todo.yml` (658 suppressed
+offences). mcritchie-industries keeps the omakase defaults, and moms-app chose to
+autocorrect to them rather than opt out. So 2 of 3 opt out, and either answer is
+defensible; the template ships the override commented out for exactly this
+reason.
+
+What is NOT defensible is a red lane nobody owns: moms-app carried 25 offences across five
 releases because its first CI run was red and stayed red, so nothing downstream
 could tell a new break from the standing one.
 
@@ -581,12 +583,19 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
 end
 ```
 
-**This is the most transferable of the three traps** — every app scaffolds with
-the same job and the same missing directory, so every app starts with a lane that
-reports failure while testing nothing. Deleting the job is the honest alternative
-if you truly have no system tests; what you must not do is leave a permanently red
-lane, because a lane that is always red stops distinguishing a new break from the
-standing one.
+**The mechanic is in the generator, so any app can inherit it:** railties emits
+`ci.yml` with the `system-test` job unconditionally, while the `test/system` +
+`application_system_test_case` scaffolding sits behind a `devcontainer?` guard
+(`railties app_generator.rb:257-262`). Generate without it and you get the job
+without the tests.
+
+Whether it bites you depends on what you do next, and the house has taken all
+three routes: turf-monster ships no `system-test` job at all; mcritchie-industries
+deleted the job and left a `test/system/.keep` so other tooling stops tripping;
+moms-app kept the job and gave it real tests. Any of the three is fine.
+
+What is NOT fine is keeping the job with nothing behind it — a lane that is always
+red stops distinguishing a new break from the standing one.
 
 Pick assertions the cheaper tiers genuinely cannot make. A system test earns its
 cost through the real browser — JS actually executing, a redirect actually
