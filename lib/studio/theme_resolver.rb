@@ -48,7 +48,8 @@ module Studio
         "--color-cta-hover"      => ColorScale.darken(primary, 0.30),
         "--color-success"        => colors[:success] || "#4BAF50",
         "--color-warning"        => colors[:warning] || "#FF7C47",
-        "--color-danger"         => colors[:danger] || "#EF4444"
+        "--color-danger"         => colors[:danger] || "#EF4444",
+        "--color-accent"         => colors[:accent] || "#F72585"
       }
     end
 
@@ -92,7 +93,8 @@ module Studio
         "--color-cta-hover"      => ColorScale.darken(primary, 0.30),
         "--color-success"        => colors[:success] || "#4BAF50",
         "--color-warning"        => colors[:warning] || "#FF7C47",
-        "--color-danger"         => colors[:danger] || "#EF4444"
+        "--color-danger"         => colors[:danger] || "#EF4444",
+        "--color-accent"         => colors[:accent] || "#F72585"
       }
     end
   end

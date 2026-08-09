@@ -80,7 +80,12 @@ module Studio
       set_app_session(user)
       # Clicking the link proves email ownership, so verify any account that
       # reached here without it (e.g. a Google/wallet-only signup).
-      verify_email_ownership(user)
+      #
+      # rescue_and_log because this is a WRITE, and the session is already
+      # established above it: a consumer app with an extra User validation would
+      # otherwise turn a routine sign-in into a 500 the visitor sees while
+      # actually signed in, with nothing in ErrorLog to explain it.
+      rescue_and_log(target: user) { verify_email_ownership(user) }
       redirect_to(link_destination(:return_to, result), notice: "Signed in. Welcome back!")
     end
 
@@ -114,7 +119,10 @@ module Studio
     # side this is indistinguishable from following a plain link, which is the
     # entire point.
     def link_continue(result, _outcome)
-      verify_email_ownership(current_user)
+      # Same write, same guard as sign_in_existing — and here the stakes are
+      # sharper still: this path exists to be invisible, so an unlogged 500 on a
+      # re-click would be the loudest thing about it.
+      rescue_and_log(target: current_user) { verify_email_ownership(current_user) }
       redirect_to link_destination(:return_to, result)
     end
 

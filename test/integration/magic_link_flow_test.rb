@@ -477,7 +477,11 @@ class StudioLinkBurnTest < ActiveSupport::TestCase
     end
 
     assert_includes error.message, "studio_links"
-    assert_includes error.message, "db/migrate", "the message must point at the migration to copy"
+    assert_includes error.message, "studio_engine:install:migrations",
+                    "the message must name the command that installs the table"
+    refute_includes error.message, "db/migrate/20260620000001",
+                    "it must NOT tell anyone to hand-copy the migration — that collides with " \
+                    "the rake task's own copy on `class CreateStudioLinks`"
   end
 
   # ...and never swallows a failure that is NOT a missing table. Probed against
@@ -513,8 +517,8 @@ class MagicLinkStoreRetirementTest < ActiveSupport::TestCase
     error = assert_raises(ArgumentError) { Studio.magic_link_store = :signed }
 
     assert_includes error.message, "retired"
-    assert_includes error.message, "studio_links",
-                    "the error must name the migration the app is missing, not just refuse"
+    assert_includes error.message, "studio_engine:install:migrations",
+                    "the error must name the command that fixes it, not just refuse"
     assert_equal :database, Studio.magic_link_store, "the refusal must not leave a half-set value"
   end
 
@@ -530,6 +534,23 @@ class MagicLinkStoreRetirementTest < ActiveSupport::TestCase
 
     assert_raises(ArgumentError) { Studio.magic_link_store = "signed" }
     assert_raises(ArgumentError) { Studio.magic_link_store = :redis }
+  end
+
+  # A non-symbolizable value must still reach the EXPLANATION. `value.to_sym`
+  # raises NoMethodError on nil (and on an Integer), which aborts the setter
+  # three lines before the message that tells the operator what to do — so the
+  # one person who needs the instruction is the one who never sees it.
+  test "a value that cannot be symbolized still raises the explanation" do
+    [nil, 0, []].each do |value|
+      error = assert_raises(ArgumentError, "#{value.inspect} must reach the ArgumentError") do
+        Studio.magic_link_store = value
+      end
+      assert_includes error.message, "retired", "the message must survive, not just the raise"
+      assert_includes error.message, "studio_engine:install:migrations",
+                      "and it must name the command that installs the table"
+    end
+  ensure
+    Studio.magic_link_store = :database
   end
 
   test "the /l route is the standard, and an app can still own its own path" do

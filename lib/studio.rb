@@ -95,16 +95,25 @@ module Studio
   # blob whose EXPIRED form cannot be decoded, so an app on it could not tell
   # whose dead link it was holding — which is exactly the fact
   # Studio::LinkResolution needs to leave a live session alone. Requires the
-  # studio_links table (db/migrate/20260620000001_create_studio_links.rb).
+  # studio_links table, installed by `bin/rails studio_engine:install:migrations`
+  # (never hand-copied — a hand copy collides with the task's own copy on
+  # `class CreateStudioLinks`).
   mattr_reader :magic_link_store, default: :database
 
+  # `to_s.to_sym`, not `to_sym`: this runs from an initializer, and nil or an
+  # Integer would raise NoMethodError — swallowing the explanation below with a
+  # message that says nothing about what to do. A blank falls through to the
+  # raise instead, so the operator reads the actual instruction.
   def self.magic_link_store=(value)
-    return if value.to_sym == :database
+    return if value.to_s.to_sym == :database
 
     raise ArgumentError,
           "Studio.magic_link_store = #{value.inspect} is retired (studio-engine 0.31.0). " \
-          "Magic links are Studio::Link rows served at /l/<token>. Install the studio_links " \
-          "migration and delete this line from config/initializers/studio.rb."
+          "Magic links are Studio::Link rows served at /l/<token>. Delete this line from " \
+          "config/initializers/studio.rb, then install the table with " \
+          "`bin/rails studio_engine:install:migrations && bin/rails db:migrate` — in that " \
+          "order, because this raise fires while the initializer loads and no rake task can " \
+          "boot until the line is gone."
   end
 
   # Whether Studio.routes draws the magic_link + solana wallet routes. An app that

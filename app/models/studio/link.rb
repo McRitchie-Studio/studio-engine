@@ -11,8 +11,10 @@ module Studio
   # discriminator. Replaces the engine's stateless MessageVerifier MagicLink
   # service for mcritchie-studio so both apps share one short-token scheme.
   #
-  # Like Studio::EmailDelivery, the table lives in each consumer app (copy the
-  # reference migration in db/migrate); this model is shipped by the gem.
+  # Like Studio::EmailDelivery, the table lives in each consumer app — installed
+  # by `bin/rails studio_engine:install:migrations`, never hand-copied (a hand
+  # copy collides with the task's own copy on `class CreateStudioLinks`). This
+  # model is shipped by the gem.
   class Link < ApplicationRecord
     self.table_name = "studio_links"
 
@@ -103,8 +105,9 @@ module Studio
 
         raise MissingTable,
               "studio-engine magic links need the studio_links table, and #{Studio.app_name} has no " \
-              "such table. Copy the engine's reference migration " \
-              "(db/migrate/20260620000001_create_studio_links.rb) into db/migrate and run it."
+              "such table. Run `bin/rails studio_engine:install:migrations && bin/rails db:migrate` " \
+              "(install ALL of them). Do not hand-copy the migration — it collides with the task's " \
+              "own copy on `class CreateStudioLinks`."
       end
     end
 

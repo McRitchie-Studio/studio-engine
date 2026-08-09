@@ -96,16 +96,65 @@ new behavior turns on. A `Studio::Link` row keeps the email past expiry.
 
 ### Consumer migration (required)
 
-1. Install the `studio_links` table if the app lacks it — copy
-   `db/migrate/20260620000001_create_studio_links.rb`.
-2. Delete `config.magic_link_store` and `config.magic_link_token_name` from
-   `config/initializers/studio.rb`. A leftover `= :signed` raises at boot.
+**Until step 2 lands, the app's magic-link sign-in is broken** — no
+`studio_links` table means the first mint raises `Studio::Link::MissingTable`.
+Do these two in this order; they do not commute.
+
+1. Delete `config.magic_link_store` and `config.magic_link_token_name` from
+   `config/initializers/studio.rb`. **First**, because a leftover `= :signed`
+   raises while the initializer loads — and `Studio.configure` yields during
+   boot, so no rake task (including the migration install below) can run until
+   the line is gone.
+2. Install the `studio_links` table with `bin/rails
+   studio_engine:install:migrations && bin/rails db:migrate` — install ALL of
+   them, per `docs/NEW_APP_SETUP.md` § 5. Do **not** hand-copy the migration:
+   the task installs it as `<timestamp>_create_studio_links.studio_engine.rb`, a
+   hand copy keeps its own name, and both declare `class CreateStudioLinks`, so
+   `db:migrate` dies on `ActiveRecord::DuplicateMigrationNameError`.
 3. Replace any `MagicLink.generate` / `MagicLink.consume` call (including in
    test helpers) with `Studio::Link.create_magic_link` / `Studio::Link#burn`.
 4. An app overriding the link controllers gets the new behavior by calling
    `consume_magic_link` / `preview_magic_link` and overriding hooks. In
    particular, move any `reset_session` into `sign_in_existing` only — the
    `:continue` path must not reach it.
+## 0.30.1 — 2026-08-08
+
+**`NEW_APP_SETUP.md` § 5 gave a command that does not exist.** 0.30.0 documented
+the engine migration install as `bin/rails studio:install:migrations`; the real
+task is **`studio_engine:install:migrations`**, and the copied files land with a
+`.studio_engine.rb` suffix, not `.studio.rb`. The wrong spelling was inferred
+from a consumer file that had been hand-copied rather than generated, and it
+fails loudly (`Unrecognized command`) for anyone who follows the guide.
+
+**And one of the copied migrations could fail the whole run.** The task copies
+FOUR *reference* migrations, and `allow_null_image_cache_owner` runs
+`change_column_null :image_caches` — which raised on any app without that table,
+taking the entire `db:migrate` down with it. moms-app hit exactly that.
+
+The obvious answer — "review what was copied and delete what doesn't apply" — is
+wrong, and this release does NOT tell you to do it. `install:migrations` builds
+its skip-list from the files **present**, so a deleted copy comes back with a
+fresh timestamp on your next upgrade and fails again. The guard therefore lives
+in the migration, and § 5 now says the simple thing: **install all of them.**
+
+### Fixed
+
+- **`allow_null_image_cache_owner` no longer fails `db:migrate` on an app without
+  an `image_caches` table.** It ALTERS an app-owned table the engine cannot assume
+  exists, and unguarded it raised and took the whole migration run down with it.
+  It now no-ops when the table is absent, and still relaxes the owner columns when
+  it is present — both halves pinned by
+  `test/integration/image_cache_migration_guard_test.rb`.
+
+  Deleting the copied migration was never a workaround: `install:migrations`
+  builds its skip-list from the files **present**, so a deleted copy is re-copied
+  with a fresh timestamp on the next upgrade and fails again. Verified by
+  re-running the task against a real consumer.
+- `NEW_APP_SETUP.md` § 5: correct task name, correct file suffix, and — now that
+  the migration guards itself — the simple instruction to install ALL of them and
+  re-run after each upgrade.
+- `EMAIL_TRANSPORT.md`: was pointing at `railties:install:migrations`, which
+  copies the migrations of EVERY railtie in the bundle. Scoped to `studio_engine:`.
 
 ## 0.30.0 — 2026-08-08
 
@@ -199,7 +248,9 @@ are **unchanged** — their production hard-close still stands, which is also wh
 - **`NEW_APP_SETUP.md` § 9 no longer ships a hand-rolled banner to copy** — it
   renders the shared partial, and documents the QA/email reality.
 - **`NEW_APP_SETUP.md` § 5 now installs the engine migrations FIRST**
-  (`bin/rails studio:install:migrations`). Omitting them is silent:
+  (~~`bin/rails studio:install:migrations`~~ — **erratum, 0.30.1:** that command
+  does not exist; the correct task is `studio_engine:install:migrations`).
+  Omitting them is silent:
   `Studio::Email.deliver` records mail only when `studio_email_deliveries` exists
   and otherwise falls back to a plain `deliver_later`, so the app drops every
   captured email and shows an empty inbox. Exactly the mcritchie-industries bug,
