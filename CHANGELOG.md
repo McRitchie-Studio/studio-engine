@@ -2,6 +2,24 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.32.0 — Unreleased
+
+**Readable ink on every theme, and the `btn-primary` label joins the token
+contract.** (The token work merged after 0.31.0 was cut, so both land here.)
+
+Dark- and light-mode `--color-text-muted` / `--color-text-secondary` no longer
+hardcode slate grays: they derive from the theme base by a bounded contrast
+search (`ColorScale.contrast_ratio` is new public API) that walks the blend
+until the ink clears 3:1 / 4.5:1 on every emitted background — for any
+operator-picked base, not just the fleet's. Fixed grays measured as low as
+2.05:1 on themed surfaces.
+
+Consumers can now also set `--btn-primary-fg` (and `--btn-primary-fg-hover`
+for the darker hover fill) on `:root` exactly like the existing
+`--btn-secondary-*` tokens; a light brand primary (McRitchie Industries'
+furnace orange) fails WCAG under the hardcoded white label. Defaults resolve
+to the same white as before, so tokenless consumers are unchanged.
+
 ## 0.31.0 — 2026-08-08
 
 **One magic-link token format, one door, and a click that stops breaking your
