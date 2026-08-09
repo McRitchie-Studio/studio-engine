@@ -11,12 +11,16 @@ task is **`studio_engine:install:migrations`**, and the copied files land with a
 from a consumer file that had been hand-copied rather than generated, and it
 fails loudly (`Unrecognized command`) for anyone who follows the guide.
 
-**The same section's advice was also unsafe.** "Install the engine migrations"
-read as blanket guidance, but the task copies FOUR *reference* migrations and
-`allow_null_image_cache_owner` runs `change_column_null :image_caches` — which
-**fails outright on any app without an `image_caches` table**. The section now
-tells you to review what was copied and keep only what applies, which is what
-moms-app actually had to do.
+**And one of the copied migrations could fail the whole run.** The task copies
+FOUR *reference* migrations, and `allow_null_image_cache_owner` runs
+`change_column_null :image_caches` — which raised on any app without that table,
+taking the entire `db:migrate` down with it. moms-app hit exactly that.
+
+The obvious answer — "review what was copied and delete what doesn't apply" — is
+wrong, and this release does NOT tell you to do it. `install:migrations` builds
+its skip-list from the files **present**, so a deleted copy comes back with a
+fresh timestamp on your next upgrade and fails again. The guard therefore lives
+in the migration, and § 5 now says the simple thing: **install all of them.**
 
 ### Fixed
 

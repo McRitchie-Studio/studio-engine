@@ -189,7 +189,14 @@ bin/rails db:migrate
 **Install all of them, and re-run both commands after every engine upgrade.**
 Every engine migration is safe on every app: the ones that create tables add a
 table you may not use yet, and the one that ALTERS an app-owned table
-(`allow_null_image_cache_owner`) no-ops when that table is absent.
+(`allow_null_image_cache_owner`) no-ops when that table is absent
+(studio-engine >= 0.30.1).
+
+One limit worth knowing: `install:migrations` skips **by migration name**, so an
+app already holding an older copy of a migration never receives an updated one
+from a later engine release — re-running brings you NEW migrations, not revised
+versions of ones you already have. If a release note says a migration changed,
+replace your copy by hand.
 
 Do **not** try to slim the set down by deleting copies you think you don't need.
 `install:migrations` builds its skip-list from the files **present**, so a
