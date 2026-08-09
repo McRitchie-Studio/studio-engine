@@ -21,10 +21,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `studio-engine.gemspec:21` packages this CHANGELOG but excludes `docs/`, so the
   guide can be corrected without an erratum and this file cannot.
 
-  *CI:* the generated workflow installs `libpq-dev` and `libvips` and nothing
-  else. An app that shells out to any other binary must add it to the install step
-  in EVERY test-running job — the workflow has separate `test` and `system-test`
-  jobs with separate install steps, and updating one is the common miss. The
+  *CI:* the generated workflow installs a short fixed list and nothing else, so an
+  app that shells out to any other binary must add it to the install step in EVERY
+  test-running job. How many jobs that is depends on your Rails version — 8.1
+  generates separate `test` and `system-test` jobs with separate install steps,
+  7.2 a single job running both suites — and the guide tabulates both. The
   failure is misleading: the test raises inside its own setup, so the lane reads
   as a code defect rather than a missing package. moms-app's `BookStitcher` shells
   out to `ffmpeg`, its README had listed `ffmpeg` as a requirement all along, and
