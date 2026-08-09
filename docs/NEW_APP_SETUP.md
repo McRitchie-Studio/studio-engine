@@ -96,7 +96,6 @@ Studio.configure do |config|
   config.welcome_message = ->(user) { "Welcome to X App, #{user.display_name}!" }
   config.auth_methods = %i[magic_link google]  # add :wallet or :password only when needed
   config.registration_params = [:name, :email]
-  config.magic_link_token_name = "magic_link_x_app_v1"
   config.mailer_from = Studio.mailer_from_for_transport(
     ses_from: "X App <team@example.com>"
   )
@@ -176,21 +175,38 @@ an auto-submitting POST form to `/auth/google_oauth2`, not redirect with GET.
 ### Engine migrations — install these FIRST
 
 The engine ships its own migrations (the email outbox, `Studio::Link`,
-`Studio::Enumeral`). Install them with the standard Rails engine task, which
-copies each one into the app with a `.studio.rb` suffix and a provenance
-comment naming the original timestamp:
+`Studio::Enumeral`, and an `image_caches` column relaxation). Copy them in with
+the standard Rails engine task — note the task is `studio_engine:`, not
+`studio:`, and each copied file lands with a `.studio_engine.rb` suffix and a
+provenance comment naming the original timestamp:
 
 ```bash
-bin/rails studio:install:migrations
+bin/rails studio_engine:install:migrations
 bin/rails db:migrate
 ```
 
-**Do not skip this, and re-run it after every engine upgrade.** The outbox
-table (`studio_email_deliveries`) is the one that bites: `Studio::Email.deliver`
-records mail only when the table EXISTS, and falls back to a plain async
-`deliver_later` when it doesn't — silently, with no error. An app missing the
-migration therefore drops every captured email and shows an
-always-empty `/_studio/local_emails`. That was a real bug in
+**Install all of them, and re-run both commands after every engine upgrade.**
+Every engine migration is safe on every app: the ones that create tables add a
+table you may not use yet, and the one that ALTERS an app-owned table
+(`allow_null_image_cache_owner`) no-ops when that table is absent
+(studio-engine >= 0.30.1).
+
+One limit worth knowing: `install:migrations` skips **by migration name**, so an
+app already holding an older copy of a migration never receives an updated one
+from a later engine release — re-running brings you NEW migrations, not revised
+versions of ones you already have. If a release note says a migration changed,
+replace your copy by hand.
+
+Do **not** try to slim the set down by deleting copies you think you don't need.
+`install:migrations` builds its skip-list from the files **present**, so a
+deleted copy is re-copied with a fresh timestamp on your next upgrade — deletion
+is not durable, which is why the guard lives in the migration instead.
+
+The outbox is the one that bites if you skip the step entirely:
+`Studio::Email.deliver` records mail only when `studio_email_deliveries` EXISTS,
+and falls back to a plain async `deliver_later` when it doesn't — silently, with
+no error. An app missing the migration therefore drops every captured email and
+shows an always-empty `/_studio/local_emails`. That was a real bug in
 mcritchie-industries, fixed 2026-08-08.
 
 Verify the install rather than trusting it:
@@ -324,8 +340,9 @@ end
 ```
 
 Passwordless apps should not assign throwaway passwords. Email proof comes from
-`MagicLink.consume`; Google proof comes from OmniAuth and any host-level token
-validation you add.
+consuming a magic link — `Studio::LinkConsumption#consume_magic_link`, which
+burns the row via `Studio::Link#burn`; Google proof comes from OmniAuth and any
+host-level token validation you add.
 
 ## 7. Application Controller
 
@@ -356,8 +373,17 @@ Rails.application.routes.draw do
 end
 ```
 
-`Studio.routes(self)` draws `POST /magic_link`, `GET /magic_link/:token`, and
-`POST /magic_link/:token` when `Studio.auth_methods` includes `:magic_link`.
+`Studio.routes(self)` draws `POST /magic_link` (request a link) when
+`Studio.auth_methods` includes `:magic_link`, and `GET`/`POST /l/:token` (the
+scanner-safe confirm page and the consume that burns the token) whenever
+`Studio.draw_link_routes` is on. **A magic link needs the `studio_links`
+table**, which section 5's `bin/rails studio_engine:install:migrations` already
+copies — run that (and `db:migrate`) before enabling `:magic_link`. Do **not**
+hand-copy the engine's `create_studio_links` migration on top: the rake task
+installs it as `<timestamp>_create_studio_links.studio_engine.rb`, a hand copy
+keeps its own name, and both declare `class CreateStudioLinks` — so
+`db:migrate` dies on `ActiveRecord::DuplicateMigrationNameError`.
+
 The stock engine sign-in view now renders from `Studio.auth_methods`: a
 passwordless app gets the magic-link request form (posting to
 `magic_link_request_path`) and the Google button (`/auth/google_oauth2`) out of

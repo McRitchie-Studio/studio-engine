@@ -20,6 +20,24 @@ class StudioLinkTokenTest < Minitest::Test
     assert_equal 12, Studio::LinkToken::TOKEN_BYTES
   end
 
+  # The house standard the operator set: a magic-link token is 10-20 URL-safe
+  # characters, so the whole link fits on one line. Asserted against real mints
+  # (not just the constants) and over enough of them to catch a generator whose
+  # width varies — the old MessageVerifier blob ran to ~350 characters and grew
+  # with its payload, which is the failure this bound exists to forbid.
+  def test_every_minted_token_sits_inside_the_house_length_bound
+    lengths = Array.new(200) { Studio::LinkToken.generate }.map do |token|
+      assert_match Studio::LinkToken::TOKEN_FORMAT, token, "token must be URL-safe"
+      token.length
+    end
+
+    assert_equal [Studio::LinkToken::TOKEN_LENGTH], lengths.uniq,
+                 "every token must be exactly #{Studio::LinkToken::TOKEN_LENGTH} characters — " \
+                 "a varying width means the payload rides in the token again"
+    assert_includes Studio::LinkToken::TOKEN_LENGTH_BOUNDS, Studio::LinkToken::TOKEN_LENGTH,
+                    "the standard must stay inside the 10-20 character house bound"
+  end
+
   def test_kinds
     assert_equal %w[magic_link referral], Studio::LinkToken::KINDS
     assert Studio::LinkToken.kind?("magic_link")

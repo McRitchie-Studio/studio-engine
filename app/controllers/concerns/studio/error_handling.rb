@@ -189,13 +189,18 @@ module Studio
       raise e
     rescue StandardError => e
       error_log = create_error_log(e)
+      # `slug` is NOT in the engine's User contract (REQUIRED_USER_INSTANCE_METHODS
+      # is admin? + display_name), and `target` is routinely a User. Unguarded,
+      # the LOGGER raises NoMethodError and MASKS the original exception — the
+      # exact inverse of what this method exists to do. The name is a convenience
+      # column; its absence must never cost the record.
       if target
         error_log.target = target
-        error_log.target_name = target.slug
+        error_log.target_name = target.slug if target.respond_to?(:slug)
       end
       if parent
         error_log.parent = parent
-        error_log.parent_name = parent.slug
+        error_log.parent_name = parent.slug if parent.respond_to?(:slug)
       end
       error_log.save!
       @_error_logged = true

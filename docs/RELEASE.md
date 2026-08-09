@@ -67,6 +67,23 @@ git tag v<version>
 git push origin main --tags
 ```
 
+### Correcting a released entry — annotate, don't rewrite
+
+A published `CHANGELOG.md` entry is copy-from material: people paste commands out
+of it, so a wrong one has to be corrected rather than left standing on grounds of
+historical purity. Correct it **in place as an annotated erratum** — keep the
+original text struck through, name what was wrong, and point at the version that
+fixed it:
+
+```markdown
+(~~`bin/rails studio:install:migrations`~~ — **erratum, 0.30.1:** that command
+does not exist; the correct task is `studio_engine:install:migrations`).
+```
+
+Never silently replace the original wording: a reader who copied the old command
+needs to recognize what they took. The fix itself still gets its own entry under
+the new version.
+
 ## Consumer Adoption
 
 Adopt the engine release in consumers after RubyGems shows the new version:
