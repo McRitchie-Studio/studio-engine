@@ -96,7 +96,6 @@ Studio.configure do |config|
   config.welcome_message = ->(user) { "Welcome to X App, #{user.display_name}!" }
   config.auth_methods = %i[magic_link google]  # add :wallet or :password only when needed
   config.registration_params = [:name, :email]
-  config.magic_link_token_name = "magic_link_x_app_v1"
   config.mailer_from = Studio.mailer_from_for_transport(
     ses_from: "X App <team@example.com>"
   )
@@ -341,8 +340,9 @@ end
 ```
 
 Passwordless apps should not assign throwaway passwords. Email proof comes from
-`MagicLink.consume`; Google proof comes from OmniAuth and any host-level token
-validation you add.
+consuming a magic link — `Studio::LinkConsumption#consume_magic_link`, which
+burns the row via `Studio::Link#burn`; Google proof comes from OmniAuth and any
+host-level token validation you add.
 
 ## 7. Application Controller
 
@@ -373,8 +373,17 @@ Rails.application.routes.draw do
 end
 ```
 
-`Studio.routes(self)` draws `POST /magic_link`, `GET /magic_link/:token`, and
-`POST /magic_link/:token` when `Studio.auth_methods` includes `:magic_link`.
+`Studio.routes(self)` draws `POST /magic_link` (request a link) when
+`Studio.auth_methods` includes `:magic_link`, and `GET`/`POST /l/:token` (the
+scanner-safe confirm page and the consume that burns the token) whenever
+`Studio.draw_link_routes` is on. **A magic link needs the `studio_links`
+table**, which section 5's `bin/rails studio_engine:install:migrations` already
+copies — run that (and `db:migrate`) before enabling `:magic_link`. Do **not**
+hand-copy the engine's `create_studio_links` migration on top: the rake task
+installs it as `<timestamp>_create_studio_links.studio_engine.rb`, a hand copy
+keeps its own name, and both declare `class CreateStudioLinks` — so
+`db:migrate` dies on `ActiveRecord::DuplicateMigrationNameError`.
+
 The stock engine sign-in view now renders from `Studio.auth_methods`: a
 passwordless app gets the magic-link request form (posting to
 `magic_link_request_path`) and the Google button (`/auth/google_oauth2`) out of

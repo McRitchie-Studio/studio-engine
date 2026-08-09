@@ -35,6 +35,18 @@ module Dummy
     config.logger = ActiveSupport::Logger.new(IO::NULL)
     config.log_level = :fatal
 
+    # What a real app puts in config/environments/test.rb. The dummy has no
+    # environments directory, so it goes here. Forgery protection stays ON in
+    # every other environment — the consume POST is CSRF-protected in the
+    # apps; what the suites below prove is that the token-burning door is
+    # POST-only and the GET beside it is inert.
+    config.action_controller.allow_forgery_protection = false if Rails.env.test?
+
+    # Let an unhandled exception reach the test instead of being rendered as a
+    # 500 debug page. Without this, a real bug reads as "expected 3XX, got 500"
+    # with the cause nowhere in the output.
+    config.action_dispatch.show_exceptions = :none if Rails.env.test?
+
     # The engine's `studio.assets` initializer does
     # `app.config.assets.precompile += [...]`. This dummy has no asset-pipeline
     # gem (sprockets / propshaft), so seed a config.assets shim with an Array
