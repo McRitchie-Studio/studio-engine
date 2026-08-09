@@ -22,6 +22,13 @@ token cannot be decoded, so a `:signed` app could not tell whose dead link it
 was holding — and "is this the visitor's own link?" is the question the whole
 new behavior turns on. A `Studio::Link` row keeps the email past expiry.
 
+**Also in 0.31.0: the `btn-primary` label joins the token contract.** A light
+brand primary (McRitchie Industries' furnace orange) fails WCAG under the
+hardcoded white label; consumers can now set `--btn-primary-fg` (and
+`--btn-primary-fg-hover` for the darker hover fill) on `:root` exactly like the
+existing `--btn-secondary-*` tokens. Defaults still resolve to the same
+white as before, so tokenless consumers are unchanged.
+
 ### Added
 
 - **`Studio::LinkResolution`** — the click decision table as one pure,
