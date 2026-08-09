@@ -33,8 +33,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **`NEW_APP_SETUP.md` § 15 also covers the system-test lane that tests nothing.**
   `rails new` wires a `test:system` CI invocation and the capybara/selenium gems,
   and what you get behind it depends on your Rails version. On **7.2**
-  (`app_generator.rb:254-258`) `test/system/.keep` and
-  `application_system_test_case.rb` are created **unconditionally**, so the lane
+  (`app_generator.rb:254-258`, called at `:459` under `depends_on_system_test?` —
+  true for a plain `rails new`) `test/system/.keep` and
+  `application_system_test_case.rb` are created, so the lane
   runs, finds zero tests, and reports **GREEN** — a pass that means nothing. On
   **8.1** (`:257-262`) that scaffolding sits behind a
   `devcontainer? && depends_on_system_test?` guard, so a plain `rails new` gets the
