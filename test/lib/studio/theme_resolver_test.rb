@@ -314,3 +314,38 @@ class ThemeResolverAccentTest < Minitest::Test
     assert_equal "#F72585", resolver.light_mode_vars["--color-accent"]
   end
 end
+
+class ThemeResolverInkContrastTest < Minitest::Test
+  # Property, not spellings: the derived dark-mode inks must clear WCAG
+  # contrast on the surfaces the SAME resolver emits, for every dark base
+  # actually shipped in the fleet (engine default, industries navy, slate,
+  # near-black). A hardcoded gray was 2.14:1 on the navy theme's surface.
+  FLEET_DARK_BASES = %w[#1A1535 #0D1A63 #0f172a #10101f].freeze
+
+  def test_dark_mode_muted_and_secondary_clear_contrast_on_emitted_surfaces
+    FLEET_DARK_BASES.each do |base|
+      vars = Studio::ThemeResolver.new(dark: base).dark_mode_vars
+      surface = vars["--color-surface"]
+
+      assert_operator contrast(vars["--color-text-muted"], surface), :>=, 3.0,
+        "muted ink must clear 3:1 on the surface for base #{base}"
+      assert_operator contrast(vars["--color-text-secondary"], surface), :>=, 4.5,
+        "secondary ink must clear 4.5:1 on the surface for base #{base}"
+      assert_operator contrast(vars["--color-text-muted"], vars["--color-page"]), :>=, 3.0,
+        "muted ink must clear 3:1 on the page for base #{base}"
+    end
+  end
+
+  private
+
+  def contrast(hex_a, hex_b)
+    la, lb = [luminance(hex_a), luminance(hex_b)].sort.reverse
+    (la + 0.05) / (lb + 0.05)
+  end
+
+  def luminance(hex)
+    r, g, b = hex.delete("#").scan(/../).map { |c| c.to_i(16) / 255.0 }
+    lin = [r, g, b].map { |c| c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055)**2.4 }
+    (0.2126 * lin[0]) + (0.7152 * lin[1]) + (0.0722 * lin[2])
+  end
+end

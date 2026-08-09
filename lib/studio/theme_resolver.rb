@@ -39,8 +39,13 @@ module Studio
         "--color-inset"          => ColorScale.darken(dark_base, 0.43),
         "--color-text"           => "#ffffff",
         "--color-text-body"      => "#e2e8f0",
-        "--color-text-secondary" => "#94a3b8",
-        "--color-text-muted"     => "#64748b",
+        # Derived, not hardcoded: fixed slate grays fail WCAG on themes whose
+        # dark base lifts the surface (a hardcoded #64748b measured 2.14:1 on
+        # a navy theme's surface). Lightening the base itself keeps the ink
+        # theme-tinted and >= 3:1 (muted) / >= 4.5:1 (secondary) on --color-surface
+        # for every dark base in the fleet — property-tested in theme_resolver_test.
+        "--color-text-secondary" => ColorScale.lighten(dark_base, 0.70),
+        "--color-text-muted"     => ColorScale.lighten(dark_base, 0.55),
         "--color-border"         => ColorScale.with_opacity(border_rgb, 0.2),
         "--color-border-strong"  => ColorScale.with_opacity(border_rgb, 0.4),
         "--color-shadow"         => "transparent",
