@@ -30,10 +30,10 @@ module Studio
       email = Studio::LinkToken.normalize_email(params[:email])
       return redirect_to(login_path, alert: MISSING_EMAIL) unless email.match?(URI::MailTo::EMAIL_REGEXP)
 
-      # return_to is passed through raw: BOTH stores sanitize it to a same-origin
-      # path on the way in (Studio::Link.create_magic_link and MagicLink.generate
-      # each call Studio::LinkToken.sanitize_path). Re-sanitizing here would be a
-      # second spelling of a rule that already has one owner — and a mutation run
+      # return_to is passed through raw: the store sanitizes it to a same-origin
+      # path on the way in (Studio::Link.create_magic_link calls
+      # Studio::LinkToken.sanitize_path). Re-sanitizing here would be a second
+      # spelling of a rule that already has one owner — and a mutation run
       # confirmed it guards nothing the store does not already guard.
       token = issue_magic_link(email, params[:return_to])
       redirect_to magic_link_url_for(token), allow_other_host: false

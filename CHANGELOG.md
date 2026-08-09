@@ -2,6 +2,121 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.31.0 — 2026-08-08
+
+**One magic-link token format, one door, and a click that stops breaking your
+session.** Two operator-reported faults, one root: the engine shipped two
+magic-link stores side by side, and the legacy one could not support the
+behavior the other needed.
+
+The links themselves were the visible half — a `:signed` app mailed a
+~350-character `MessageVerifier` blob at `/magic_link/<token>`, wrapping four
+lines of an email. The invisible half was worse: **clicking a link a second time
+dumped a signed-in visitor on the login page.** Their cookie survived, but the
+destination said otherwise, and the destination is what people believe. Every
+dead token — used, expired, or unrecognized — funnelled into the same
+`redirect_to login_path, alert:` no matter who was holding a session.
+
+Fixing the second required retiring the first. An EXPIRED `MessageVerifier`
+token cannot be decoded, so a `:signed` app could not tell whose dead link it
+was holding — and "is this the visitor's own link?" is the question the whole
+new behavior turns on. A `Studio::Link` row keeps the email past expiry.
+
+### Added
+
+- **`Studio::LinkResolution`** — the click decision table as one pure,
+  dependency-free module (`lib/studio/link_resolution.rb`), so every cell is
+  unit-testable without a controller or a database. Three inputs (did this
+  caller burn the link, whose email it carries, who is signed in) resolve to one
+  of three actions:
+
+  |                  | nobody signed in | the link's own user | somebody else    |
+  |------------------|------------------|---------------------|------------------|
+  | **live** (burned)| `:authenticate`  | `:continue`         | `:authenticate`  |
+  | **used/expired** | `:dead` → login  | `:dead` → return_to | `:dead` → home   |
+  | **unknown token**| `:dead` → login  | —                   | `:dead` → home   |
+
+  The invariant running through it: **a dead link never touches the session.**
+- **`:continue`** — a second click on your own still-live link burns the token
+  (so a forwarded email stays unusable) and then does nothing else. It
+  deliberately does NOT re-authenticate: a host that rotates the session on
+  sign-in would otherwise charge a re-click every scrap of session state the
+  visitor had built up. From their side it is indistinguishable from following a
+  plain link, which is the point.
+- **Dead-link notices name the address and the reason** ("That sign-in link for
+  x@y.com has expired.") and, when a session is open, say so plainly ("You are
+  still signed in as a@b.com") instead of implying a logout that never happened.
+- **`Studio::Link#burn`** — the non-raising sibling of `#consume!`, returning
+  whether THIS caller won the atomic single-use race, plus `#dead_status`
+  (`:used` / `:expired`) for the message. Winning the burn IS the proof the link
+  was live; a prior `live?` read is not.
+- **`Studio::Link::MissingTable`** — a named error, pointing at the migration to
+  copy, in place of a bare `PG::UndefinedTable`. Every consumer pins the engine
+  `~> 0.x`, which admits any release below 1.0, so an app that never installed
+  the table picks up the row store on its next `bundle update` with nobody
+  having adopted anything deliberately. Its boot stays clean (nothing touches
+  the table until someone signs in), so without this the failure lands as an
+  unreadable adapter error on a real person's sign-in. Guarded by
+  `table_exists?`, not a message match, so it holds on any adapter and never
+  swallows an unrelated statement failure.
+- **`Studio::LinkToken::TOKEN_LENGTH` / `TOKEN_LENGTH_BOUNDS` / `TOKEN_FORMAT`** —
+  the house standard, now asserted rather than described: every token is exactly
+  16 URL-safe characters, inside a 10-20 character bound.
+- **`Studio::LinkConsumption`** gains the whole flow (`preview_magic_link` for
+  the inert GET, `consume_magic_link` for the burning POST) plus overridable
+  hooks: `link_continue`, `link_dead`, `link_login_path`, `link_home_path`.
+  Apps customize by overriding a hook, never by re-deciding.
+- **Two new suites**: `test/lib/studio/link_resolution_test.rb` (the table, cell
+  by cell, with the dead-link invariant swept across all nine cells) and
+  `test/integration/magic_link_flow_test.rb` (the same flow through a real HTTP
+  round trip against a real database — token burn, session cookie, scanner
+  prefetch, account switch, open-redirect refusal, and the burn race).
+
+### Changed
+
+- **`Studio.magic_link_store` now reads `:database` and nothing else.** Assigning
+  `:signed` **raises at boot** with the migration to install, rather than
+  silently downgrading — an app that booted anyway would mint rows against a
+  table it never migrated and 500 on a real person's sign-in.
+- **`Studio.magic_link_via_l_route?`** follows `draw_link_routes` alone.
+- **`RegistrationsController`** mints through `Studio::MagicLinkIssuing` like
+  every other issuer, instead of calling the store directly.
+
+### Removed
+
+- **`MagicLink`** (`app/services/magic_link.rb`), the stateless MessageVerifier
+  service, and its jti-in-Rails.cache replay guard.
+- **`GET`/`POST /magic_link/:token`** and `MagicLinksController#confirm` /
+  `#consume`. `POST /magic_link` (request a link) stays. The token-bearing door
+  is `/l/<token>`, and only that.
+- **`app/views/magic_links/confirm.html.erb`** — the `/l` interstitial
+  (`studio/links/confirm`) renders the same shared body.
+- **`Studio.magic_link_token_name`** is vestigial: the accessor remains so an
+  un-updated initializer still boots, but nothing reads it. Delete the line.
+
+### Consumer migration (required)
+
+**Until step 2 lands, the app's magic-link sign-in is broken** — no
+`studio_links` table means the first mint raises `Studio::Link::MissingTable`.
+Do these two in this order; they do not commute.
+
+1. Delete `config.magic_link_store` and `config.magic_link_token_name` from
+   `config/initializers/studio.rb`. **First**, because a leftover `= :signed`
+   raises while the initializer loads — and `Studio.configure` yields during
+   boot, so no rake task (including the migration install below) can run until
+   the line is gone.
+2. Install the `studio_links` table with `bin/rails
+   studio_engine:install:migrations && bin/rails db:migrate` — install ALL of
+   them, per `docs/NEW_APP_SETUP.md` § 5. Do **not** hand-copy the migration:
+   the task installs it as `<timestamp>_create_studio_links.studio_engine.rb`, a
+   hand copy keeps its own name, and both declare `class CreateStudioLinks`, so
+   `db:migrate` dies on `ActiveRecord::DuplicateMigrationNameError`.
+3. Replace any `MagicLink.generate` / `MagicLink.consume` call (including in
+   test helpers) with `Studio::Link.create_magic_link` / `Studio::Link#burn`.
+4. An app overriding the link controllers gets the new behavior by calling
+   `consume_magic_link` / `preview_magic_link` and overriding hooks. In
+   particular, move any `reset_session` into `sign_in_existing` only — the
+   `:continue` path must not reach it.
 ## 0.30.1 — 2026-08-08
 
 **`NEW_APP_SETUP.md` § 5 gave a command that does not exist.** 0.30.0 documented
