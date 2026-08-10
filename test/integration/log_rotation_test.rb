@@ -25,7 +25,7 @@ require "fileutils"
 # The `opt_out` case is the mutation control: same 17 MB log, engine cap
 # switched off, and it must NOT rotate. Without it, "rotated: true" would also
 # be satisfied by Rails' own 100 MB default and this file would prove nothing.
-class LogRotationTest < Minitest::Test
+class LogRotationBootTest < Minitest::Test
   MB = 1024 * 1024
   PROBE = File.expand_path("../support/log_rotation_probe.rb", __dir__)
   ENGINE_ROOT = File.expand_path("../..", __dir__)
@@ -78,7 +78,7 @@ class LogRotationTest < Minitest::Test
   def test_a_host_can_choose_its_own_cap
     result = probe(env: "development", seed: 3 * MB, scenario: "custom_size")
 
-    assert_equal 2 * MB, result["cap"], "config.x.studio_log_file_size should win"
+    assert_equal 2 * MB, result["cap"], "Studio.local_log_max_bytes should win over the engine default"
     assert result["rotated"], "a 3 MB log must rotate under a host-chosen 2 MB cap"
   end
 

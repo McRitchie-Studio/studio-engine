@@ -1,4 +1,5 @@
 require "studio/version"
+require "studio/log_rotation"
 require "studio/engine"
 require "studio/color_scale"
 require "studio/environment_banner"

@@ -1,14 +1,7 @@
+require_relative "log_rotation"
+
 module Studio
   class Engine < ::Rails::Engine
-    # Byte caps for the host app's LOCAL log files. Deliberate values, not
-    # defaults: Rails' own `config.load_defaults "7.1"` sets log_file_size to
-    # 100 MB for development AND test, and keeps one rotated sibling — so a
-    # stock app carries up to ~400 MB of log per checkout, times every worktree.
-    # 16 MB still holds a full day of local request logs; 8 MB covers a whole
-    # test run. Raising these is a decision, not a default.
-    DEVELOPMENT_LOG_MAX_BYTES = 16 * 1024 * 1024
-    TEST_LOG_MAX_BYTES        = 8 * 1024 * 1024
-
     # Cap the local (development + test) log files, for every host app and
     # every future one, with nobody running anything.
     #
@@ -28,27 +21,22 @@ module Studio
     # (declared `before: :load_environment_hook`), so the host's own choices are
     # already visible here; and it keeps Railtie's implicit `after: <previous
     # initializer>` chaining from dragging `studio.assets` forward with us.
+    # WHICH cap (and whether to touch anything at all) is Studio::LogRotation's
+    # decision — Rails-free, and unit-tested a branch at a time.
+    #
+    # The host's escape hatch, `Studio.local_log_max_bytes`, is read here rather
+    # than from config.x.<key>: an unset config.x key returns an empty
+    # ActiveSupport::OrderedOptions, NOT nil, so `config.x.foo || default`
+    # silently assigns the OrderedOptions and rotation then dies inside a
+    # rescued comparison. The behavioral test caught that; a config read-back
+    # would have called it green.
     initializer "studio.logger", before: :initialize_logger, after: :load_environment_hook do |app|
-      # Local envs only. Production (and QA, which boots as production) sends
-      # its stream to STDOUT for the platform to take; never touch that.
-      next unless Rails.env.local?
-      # A host that named its own logger has already decided. Leave it alone.
-      next if app.config.logger
-      # Host escape hatch. Set from config/application.rb (after `require
-      # "studio"`) or config/environments/*.rb — both load before this runs,
-      # whereas config/initializers/studio.rb does not:
-      #   Studio.local_log_max_bytes = false          # opt out entirely
-      #   Studio.local_log_max_bytes = 64.megabytes   # choose your own cap
-      #
-      # Deliberately NOT config.x.<key>: an unset config.x key returns an empty
-      # ActiveSupport::OrderedOptions, not nil, so `config.x.foo || default`
-      # silently assigns the OrderedOptions and rotation dies in a rescued
-      # comparison. Caught by the behavioral test, invisible to a config read-back.
-      next if Studio.local_log_max_bytes == false
-
-      app.config.log_file_size =
-        Studio.local_log_max_bytes ||
-        (Rails.env.test? ? TEST_LOG_MAX_BYTES : DEVELOPMENT_LOG_MAX_BYTES)
+      cap = Studio::LogRotation.cap_for(
+        env: Rails.env,
+        host_logger: app.config.logger,
+        override: Studio.local_log_max_bytes
+      )
+      app.config.log_file_size = cap if cap
     end
 
     initializer "studio.assets" do |app|
