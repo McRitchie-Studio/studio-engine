@@ -181,8 +181,11 @@ module Studio
   # address on a public page. The local stack answers the question instead: it
   # is the machine the reviewer is sitting at.
   #
-  # nil (the default) means "derive": the first admin in this database, by id.
-  # Set it explicitly on a desk whose operator is not the first seeded admin.
+  # nil (the default) means "derive": the first user in this database already
+  # holding local_review_role, by id — falling back to "admin" when that setting
+  # is itself nil. So a desk that switches local_review_role OFF has no role to
+  # derive FROM and should name its operator here explicitly, as should a desk
+  # whose operator is not the first seeded account at that role.
   mattr_accessor :local_review_email, default: nil
 
   # Theme role colors (7 roles)

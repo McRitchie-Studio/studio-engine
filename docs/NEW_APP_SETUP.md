@@ -446,11 +446,11 @@ does nothing.
 
 **Local review** (`/_studio/local_review`) sits on that same floor and needs no
 setup — it is the local half of the task board's WAITING APPROVAL button. The
-board redirects here with the operator's **production** email; this endpoint
-provisions that account and mints a sign-in link that lands on the page under
-review. Because those pages are usually admin-gated and the address is one a
-fresh worktree database has never seen, the account is provisioned at
-`Studio.local_review_role` (default `"admin"`) — otherwise the sign-in succeeds
+board redirects here; this endpoint provisions the reviewer's account and mints
+a sign-in link that lands on the page under review. Because those pages are
+usually admin-gated, and the reviewer's address is his **production** one — an
+address a fresh worktree database has never seen — the account is provisioned at
+`Studio.local_review_role` (default `"admin"`); otherwise the sign-in succeeds
 and `require_admin` drops the reviewer on `/`. Set it to `nil` if your review
 pages are not admin-gated:
 
@@ -458,10 +458,14 @@ pages are not admin-gated:
 config.local_review_role = nil # provision the account, leave its role alone
 ```
 
-`?email=` is optional. The board's CTA is a public, sign-in-free redirect and
-sends none, so the local stack decides who to sign in: `Studio.local_review_email`
-if set, else the **first admin in this database, by id**. A desk with no admin
-mints nothing rather than guessing.
+`?email=` is optional, and an explicit one always wins. A board that sends none
+— its CTA is a public, sign-in-free redirect, so an address in that URL would be
+published — leaves the local stack to decide who signs in:
+`Studio.local_review_email` if set, else the first user **already holding
+`Studio.local_review_role`**, by id (that query falls back to `"admin"` when the
+setting is `nil`). A desk with nobody at that role mints nothing rather than
+guessing — so an app that sets `local_review_role = nil` should name its
+operator explicitly instead of relying on the derive.
 
 ```ruby
 config.local_review_email = "someone@example.com" # nil (default) = derive

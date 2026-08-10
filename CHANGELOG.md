@@ -36,9 +36,10 @@ is still provisioned (that is what avoids `sign_up_new`), but its role is left
 to the host's own `configure_new_user`.
 
 **The endpoint also answers "who is sitting at this desk?" when the caller names
-nobody.** `?email=` is now optional. With none, the reviewer resolves to
-`Studio.local_review_email`, and failing that to the **first admin in this
-database, by id**:
+nobody.** `?email=` is now optional, and an explicit one still wins. With none,
+the reviewer resolves to `Studio.local_review_email`, and failing that to the
+**first user already holding `Studio.local_review_role`, by id** (that query
+falls back to `"admin"` when the setting is `nil`):
 
 ```ruby
 config.local_review_email = "someone@example.com" # nil (default) = derive
@@ -48,8 +49,10 @@ This exists so the board's WAITING APPROVAL CTA can be a **public, sign-in-free
 redirect**. Requiring a board session to click it is what broke one-click review
 in the first place; sending an email in that public URL would publish the
 operator's address. The local stack is the machine the reviewer is sitting at,
-so it is the right place to decide. A desk with no admin to derive mints nothing
-and says so, rather than guessing — and never promotes a non-admin into the role.
+so it is the right place to decide. A desk with nobody at that role mints
+nothing and says so, rather than guessing: the derive only ever picks someone
+who ALREADY holds the role, so it never promotes a stranger into it. (The
+`?email=` path does promote the account it is handed — that is the point of it.)
 
 **The floor is unchanged, and now asserted rather than assumed.** The endpoint
 grants a role, so both gates in front of it are tested directly: the
