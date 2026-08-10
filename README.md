@@ -24,7 +24,7 @@ Then `bundle install`. The current release is **v0.6.1**; see [`CHANGELOG.md`](.
 - **Operator tooling**: Shared `studio/banners/environment` banner with Dev Mode + email connector controls, `studio/banners/impersonation`, and an opt-in `Studio::Impersonation` concern for Act As session conventions.
 - **Sluggable concern**: `before_save :set_slug` with `to_param` for human-readable URLs
 - **ThemeSetting model**: Per-app DB overrides with fallback to config defaults
-- **Transactional emails**: `Studio::EmailImage` registry + the shared `/admin/emails` page. Every app inherits the standard emails and their artwork on day one, and can register its own workflows and upload its own banners. See [Transactional emails](#transactional-emails).
+- **Transactional emails**: `Studio::EmailCatalog` — every email an app sends, its type, a live preview, and its banner — plus the shared `/admin/emails` page. Every app inherits the standard emails and their artwork on day one, and can register its own workflows and upload its own banners. See [Transactional emails](#transactional-emails).
 
 ## Configuration
 
@@ -293,11 +293,12 @@ its helper names; drawing them there raises at route-load and kills every route
 in the app. The gate covers only the page — the registry and the inherited
 defaults are always on.
 
-### The registry
+### The catalog
 
-A registered email is mostly symbolic of a workflow — a key, a label, a
-description. The only real asset is its image. The engine pre-registers the two
-every Studio app sends, so a new app inherits both without declaring anything:
+A registered email carries a key, a label, a description, what **type** it is,
+how to build a **live preview** of it, and its banner image. The engine
+pre-registers the two every Studio app sends, so a new app inherits both without
+declaring anything:
 
 | Key | Label |
 |-----|-------|
@@ -310,11 +311,34 @@ A host adds its own workflows from an initializer, mirroring
 ```ruby
 # config/initializers/studio_emails.rb
 Rails.application.config.to_prepare do
-  Studio::EmailImage.register("winnings", label: "Contest winnings",
-                              description: "Sent when a player wins a contest.")
-  Studio::EmailImage.register("wallet_export", label: "Wallet export")
+  Studio::EmailCatalog.register("winnings",
+    label: "Contest winnings",
+    description: "Sent when a player wins a contest.",
+    type: :transactional,                                  # or :marketing
+    preview: -> { ContestMailer.winnings(Entry.where.not(rank: nil).first) })
+
+  Studio::EmailCatalog.register("wallet_export", label: "Wallet export")
 end
 ```
+
+Every keyword is optional, and omitting one on a re-register **keeps** the
+existing value — attach a preview to an inherited email, or relabel it, without
+restating its artwork. An unknown `type` falls back to `:transactional` rather
+than raising.
+
+> `Studio::EmailImage` is the old name for this module and still works as a
+> delegating shim. It is deprecated; prefer `Studio::EmailCatalog`.
+
+### Live preview
+
+`preview:` is any callable returning a `Mail`. It powers `/admin/emails/:key`,
+which renders the real email in an iframe from `/admin/emails/:key/raw`.
+
+Builders run **only** on that page — listing the emails never executes one — and
+every call is contained. A builder that raises yields no preview, records why,
+and shows the reason in the frame. One broken builder costs one preview, not the
+manager. That matters because a builder runs against whatever sample data an
+environment happens to hold, which is exactly the thing that rots.
 
 Re-registering an inherited key updates it in place and keeps its position, so
 relabeling `magic_link` does not reorder the page or drop its default artwork.
@@ -322,7 +346,7 @@ relabeling `magic_link` does not reorder the page or drop its default artwork.
 ### Resolution — inherit, then own
 
 ```
-Studio::EmailImage.url(:magic_link)
+Studio::EmailCatalog.url(:magic_link)
   1. this app's ImageCache row  (its own S3 bucket)   -> app-owned override
   2. the engine's default gem asset                   -> inherited default
   3. nil                                              -> sends bannerless
@@ -344,7 +368,7 @@ Three accessors, and picking the wrong one changes what real people receive:
 | `preview_url(key)` | own → inherited default (root-relative) | the admin page |
 
 `url` deliberately does **not** resolve to the default. `turf-monster`'s mailer
-reads `Studio::EmailImage.url(:magic_link) || email_banner_url("magic-link-banner.jpg")`
+reads `Studio::EmailCatalog.url(:magic_link) || email_banner_url("magic-link-banner.jpg")`
 — making `url` resolve would turn that `||` into dead code and swap its committed
 branded banner for the engine placeholder in live email.
 
@@ -353,7 +377,7 @@ class UserMailer < ApplicationMailer
   layout "branded_mailer"
 
   def magic_link(email, token)
-    @banner_url = Studio::EmailImage.resolved_url(:magic_link) # nil renders bannerless
+    @banner_url = Studio::EmailCatalog.resolved_url(:magic_link) # nil renders bannerless
     # ...
   end
 end

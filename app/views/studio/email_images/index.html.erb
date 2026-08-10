@@ -37,8 +37,8 @@
           override, so it announced "No image yet" for an email that was visibly
           sending a banner from a committed repo asset. Even on its way out it
           should tell the truth about what ships. %>
-      <% current_url = Studio::EmailImage.preview_url(variant) %>
-      <% inherited = current_url.present? && Studio::EmailImage.source(variant) == :default %>
+      <% current_url = Studio::EmailCatalog.preview_url(variant) %>
+      <% inherited = current_url.present? && Studio::EmailCatalog.source(variant) == :default %>
       <section class="rounded-xl border border-subtle p-5">
         <h2 class="font-semibold mb-3"><%= label %></h2>
 

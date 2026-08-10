@@ -38,13 +38,13 @@ class EmailsPageTest < ActiveSupport::TestCase
   end
 
   def setup
-    Studio::EmailImage.reset!
+    Studio::EmailCatalog.reset!
     @stubs = []
   end
 
   def teardown
     @stubs.reverse_each { |mod, name, original| mod.define_singleton_method(name, original) }
-    Studio::EmailImage.reset!
+    Studio::EmailCatalog.reset!
   end
 
   def stub_module(mod, name, &replacement)
@@ -168,8 +168,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   test "the legacy page reports the live image, not just the override" do
     source = File.read(File.expand_path("../../app/views/studio/email_images/index.html.erb", __dir__))
 
-    assert_includes source, "Studio::EmailImage.preview_url(variant)"
-    refute_includes source, "Studio::EmailImage.url(variant)",
+    assert_includes source, "Studio::EmailCatalog.preview_url(variant)"
+    refute_includes source, "Studio::EmailCatalog.url(variant)",
       "the legacy page's original bug was reading ONLY the override, so it claimed " \
       "'No image yet' about an email that was visibly sending a repo-asset banner"
   end
@@ -177,7 +177,7 @@ class EmailsPageTest < ActiveSupport::TestCase
   # --- 2. the inherited defaults really ship in the gem ----------------------
 
   test "every standard email's default asset is a file that ships in the gem" do
-    Studio::EmailImage::STANDARD.each do |attrs|
+    Studio::EmailCatalog::STANDARD.each do |attrs|
       asset = attrs[:default_asset]
       path = File.expand_path("../../app/assets/images/#{asset}", __dir__)
       assert File.file?(path),
@@ -250,7 +250,7 @@ class EmailsPageTest < ActiveSupport::TestCase
     # The rows link admin_email_path; a bare ActionView::Base carries no route
     # helpers, so mix the app's in rather than stubbing the URLs away.
     view.singleton_class.include(Rails.application.routes.url_helpers)
-    view.assign(entries: Studio::EmailImage.entries, uploads_available: uploads_available)
+    view.assign(entries: Studio::EmailCatalog.entries, uploads_available: uploads_available)
     view.render(template: "studio/emails/index")
   end
 
@@ -293,14 +293,14 @@ class EmailsPageTest < ActiveSupport::TestCase
   end
 
   test "the table shows the NAME and the LIVE IMAGE of every registered email" do
-    stub_module(Studio::EmailImage, :record) { |_key| nil }
-    stub_module(Studio::EmailImage, :default_asset_path) { |key| "/assets/#{key}.png" }
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |key| "/assets/#{key}.png" }
 
     doc = Nokogiri::HTML(render_index)
     rows = doc.css("tbody tr")
 
-    assert_equal Studio::EmailImage.entries.size, rows.size, "one row per registered email"
-    Studio::EmailImage.entries.each do |entry|
+    assert_equal Studio::EmailCatalog.entries.size, rows.size, "one row per registered email"
+    Studio::EmailCatalog.entries.each do |entry|
       row = rows.find { |r| r.text.include?(entry.label) }
       refute_nil row, "expected a row named #{entry.label}"
       refute_empty row.css("img"), "#{entry.key}'s row must show its live image, not just its name"
@@ -308,8 +308,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   end
 
   test "a row says its image is the INHERITED default when the app uploaded nothing" do
-    stub_module(Studio::EmailImage, :record) { |_key| nil }
-    stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
 
     html = render_index
     assert_includes html, "Inherited default"
@@ -320,8 +320,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   test "a row says the image is APP-OWNED once this app uploaded its own" do
     row = Object.new
     row.define_singleton_method(:url) { "https://turf-monster-dev.s3.amazonaws.com/email_banners/magic_link-ab12.png" }
-    stub_module(Studio::EmailImage, :record) { |key| key.to_s == "magic_link" ? row : nil }
-    stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/default.png" }
+    stub_module(Studio::EmailCatalog, :record) { |key| key.to_s == "magic_link" ? row : nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/default.png" }
 
     html = render_index
     assert_includes html, "#{Studio.app_name}&#39;s own"
@@ -331,8 +331,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   end
 
   test "an email with no image at all is labelled distinctly from an inherited one" do
-    stub_module(Studio::EmailImage, :record) { |_key| nil }
-    stub_module(Studio::EmailImage, :default_asset_path) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| nil }
 
     html = render_index
     assert_includes html, "No image"
@@ -340,8 +340,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   end
 
   test "upload runs through the shared crop modal, never a bare file input" do
-    stub_module(Studio::EmailImage, :record) { |_key| nil }
-    stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
 
     html = render_index
     assert_includes html, "imageUploadHost(", "each row hosts the shared cropper uploader"
@@ -354,8 +354,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   end
 
   test "the crop and saving modals mount on a PAGE-SCOPED store" do
-    stub_module(Studio::EmailImage, :record) { |_key| nil }
-    stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
 
     html = render_index
     # mcritchie-industries and moms-app render no shared modal host at all, so
@@ -367,8 +367,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   end
 
   test "an app with no object storage renders read-only and explains why" do
-    stub_module(Studio::EmailImage, :record) { |_key| nil }
-    stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
 
     html = render_index(uploads_available: false)
 
