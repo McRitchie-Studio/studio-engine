@@ -444,6 +444,38 @@ capture is off, both because `Rails.env.production?` hard-closes
 mail through the real transport. Setting `LOCAL_EMAIL_CAPTURE=1` on a QA dyno
 does nothing.
 
+**Local review** (`/_studio/local_review`) sits on that same floor and needs no
+setup — it is the local half of the task board's WAITING APPROVAL button. The
+board redirects here; this endpoint provisions the reviewer's account and mints
+a sign-in link that lands on the page under review. Because those pages are
+usually admin-gated, and the reviewer's address is his **production** one — an
+address a fresh worktree database has never seen — the account is provisioned at
+`Studio.local_review_role` (default `"admin"`); otherwise the sign-in succeeds
+and `require_admin` drops the reviewer on `/`. Set it to `nil` if your review
+pages are not admin-gated:
+
+```ruby
+config.local_review_role = nil # provision the account, leave its role alone
+```
+
+`?email=` is optional, and an explicit one always wins. A board that sends none
+— its CTA is a public, sign-in-free redirect, so an address in that URL would be
+published — leaves the local stack to decide who signs in:
+`Studio.local_review_email` if set, else the first user **already holding
+`Studio.local_review_role`**, by id (that query falls back to `"admin"` when the
+setting is `nil`). A desk with nobody at that role mints nothing rather than
+guessing — so an app that sets `local_review_role = nil` should name its
+operator explicitly instead of relying on the derive.
+
+```ruby
+config.local_review_email = "someone@example.com" # nil (default) = derive
+```
+
+When you send a page for review, verify the WHOLE hop rather than the page:
+mint → confirm → POST consume → follow, and check the final URL is the review
+path **and** that it answered `200`. A bare `curl /admin/whatever` returning
+`302` only proves the logged-out gate works.
+
 ### `app/views/layouts/_navbar.html.erb`
 
 Copy from the engine base and add your nav links to the desktop `<nav>` and mobile sub-navbar sections. See [NAVBAR_SETUP.md](NAVBAR_SETUP.md).
