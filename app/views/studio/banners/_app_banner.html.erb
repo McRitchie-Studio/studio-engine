@@ -4,19 +4,32 @@
   message = local_assigns.fetch(:message)
   actions = local_assigns[:actions]
 
+  # Branded off the app's OWN theme tokens rather than hardcoded hexes, so a host
+  # that retunes --color-warning / --color-danger gets a banner that matches it.
+  # The gradient is a translucent black wash over the token — deliberately not
+  # color-mix(), which would need a modern-browser floor for pure decoration, and
+  # deliberately not two hardcoded stops, which cannot follow a themed colour.
   tones = {
     environment: {
-      background: "linear-gradient(90deg, #9d174d 0%, #f72585 100%)",
+      background: "linear-gradient(90deg, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0.04) 100%), " \
+                  "var(--color-warning, #FF7C47)",
       color: "#ffffff",
       shadow: "0 2px 8px rgba(0,0,0,0.25)"
     },
     impersonation: {
-      background: "linear-gradient(90deg, #b91c1c 0%, #d97706 100%)",
+      background: "linear-gradient(90deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.06) 100%), " \
+                  "var(--color-danger, #EF4444)",
       color: "#ffffff",
       shadow: "0 2px 8px rgba(0,0,0,0.25)"
     }
   }
 
+  # INTRINSIC height — content decides, and studio/banners/_stack MEASURES the
+  # result. An earlier cut declared a fixed height so the stack could compute its
+  # total server-side; that was rejected deliberately, because it cannot express
+  # a bar that needs to be taller, or two bars stacked, without every consuming
+  # app being reworked. The apps should respond to what the bar needs, not the
+  # other way round.
   density_styles = {
     compact: "font-size:12px; font-weight:700; padding:2px 12px;",
     normal: "font-size:14px; font-weight:700; padding:8px 16px;"
