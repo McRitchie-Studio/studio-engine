@@ -3,11 +3,14 @@
     desktop icon rail and one in the mobile sub-navbar row). The click is
     handled twice on purpose: the Alpine @click for normal operation, and the
     document-level capture bridge in _link_sidebar for pre-Alpine clicks. %>
-<% extra_classes = local_assigns.fetch(:class_name, "") %>
+<%# The caller OWNS the display class: a hardcoded inline-flex here beats a
+    caller's `hidden md:inline-flex` in the cascade and un-hides the desktop
+    trigger on mobile. Bare renders default to inline-flex. %>
+<% extra_classes = local_assigns.fetch(:class_name, "").presence || "inline-flex" %>
 <% sidebar_admin = respond_to?(:admin?) && admin? %>
 <button type="button"
         @click.stop="$store.sidebars.linkTreeOpen = !$store.sidebars.linkTreeOpen"
-        class="<%= "#{extra_classes} " if extra_classes.present? %>inline-flex h-9 w-9 items-center justify-center rounded-md text-secondary hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition"
+        class="<%= extra_classes %> h-9 w-9 items-center justify-center rounded-md text-secondary hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition"
         title="<%= sidebar_admin ? 'Admin Menu' : 'Links' %>"
         aria-label="<%= sidebar_admin ? 'Toggle admin menu' : 'Toggle links menu' %>"
         aria-controls="studio-link-sidebar studio-link-sidebar-mobile"
