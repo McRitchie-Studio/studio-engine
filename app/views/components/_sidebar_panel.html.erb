@@ -1,7 +1,12 @@
 <%# Shared fixed right-sidebar shell (lifted from the mcritchie-studio hub).
     Alpine-driven: `open` is an Alpine expression; the panel slides in from
     off-screen right under x-transition and positions beneath the sticky
-    header via the --nav-h custom property _head.html.erb publishes. %>
+    header via the --nav-bottom custom property _head.html.erb publishes.
+    --nav-bottom is the header's BOTTOM EDGE, not its height: the two differ
+    the moment an app renders chrome above the navbar (an environment banner
+    before the header), and positioning off the height put this panel over the
+    header by exactly that much. --nav-h is the fallback so a host pinning an
+    older _head still lands on today's behaviour rather than 6rem. %>
 <% id             = local_assigns.fetch(:id, nil) %>
 <% title          = local_assigns.fetch(:title, nil) %>
 <% open           = local_assigns.fetch(:open) %>
@@ -33,7 +38,7 @@
   x-transition:leave-start="translate-x-0"
   x-transition:leave-end="translate-x-full"
   class="<%= display_class %> fixed right-0 <%= width_class %> bg-surface border-l border-subtle shadow-2xl <%= z_class %> flex-col <%= panel_class %>"
-  style="top:var(--nav-h, 6rem);height:calc(100% - var(--nav-h, 6rem))"
+  style="top:var(--nav-bottom, var(--nav-h, 6rem));height:calc(100% - var(--nav-bottom, var(--nav-h, 6rem)))"
   role="<%= role %>"
   <% if labelledby %>aria-labelledby="<%= labelledby %>"<% elsif aria_label.present? %>aria-label="<%= aria_label %>"<% end %>>
   <div class="flex flex-col h-full">
