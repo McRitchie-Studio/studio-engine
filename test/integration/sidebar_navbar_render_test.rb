@@ -64,6 +64,25 @@ class SidebarNavbarRenderTest < ActiveSupport::TestCase
     assert_includes html, "Home"
   end
 
+  # The panel's geometry, asserted where it actually reaches a page: mounted BY the
+  # navbar, through the real dummy app, rather than rendered as a partial in isolation.
+  # A `fixed` overlay's `top` is a viewport coordinate, so it must be the header's bottom
+  # edge (--nav-bottom) and never its height (--nav-h) — the two differ by exactly the
+  # height of any chrome an app stacks above the navbar, and mcritchie-industries' 47px
+  # environment banner put this panel on top of the header, over the Log in button.
+  # Unit-level coverage of the same contract, including the publisher half, lives in
+  # test/views/nav_offset_contract_test.rb.
+  test "the mounted sidebar panel offsets from the header's bottom edge" do
+    Studio.sidebar_sections = SECTIONS
+
+    html = render_navbar
+
+    assert_includes html, "top:var(--nav-bottom, var(--nav-h, 6rem))",
+                    "the mounted panel must start at the header's bottom edge, not its height"
+    refute_includes html, "top:var(--nav-h,",
+                    "offsetting a fixed panel by the header HEIGHT is the banner-overlap bug"
+  end
+
   test "navbar is untouched with the default empty sections" do
     html = render_navbar
 

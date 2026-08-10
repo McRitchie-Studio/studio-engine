@@ -96,19 +96,54 @@
   body { overflow-anchor: none; }
 </style>
 <script>
-  // studio-engine: publish the sticky header's live height as the --nav-h
-  // CSS variable so fixed/sticky elements below the navbar can position off
-  // it (e.g. top: var(--nav-h)) without hardcoded px. Tracks every resize,
-  // including scroll-collapse animations, and re-attaches after Turbo nav.
+  // studio-engine: publish the sticky header's live geometry as CSS custom
+  // properties so fixed/sticky elements can position off it without hardcoded
+  // px. Tracks every resize, including scroll-collapse animations, and
+  // re-attaches after Turbo nav.
+  //
+  //   --nav-h      the header's HEIGHT
+  //   --nav-bottom the header's BOTTOM EDGE, in viewport coordinates
+  //
+  // They are equal only when the header sits at the top of the viewport, which
+  // is why one was long mistaken for the other. An app that stacks chrome ABOVE
+  // the header — an environment banner rendered before the navbar, as
+  // mcritchie-industries does — pushes the header down, and a `fixed` overlay
+  // positioned at --nav-h then rides UP over the header by exactly the height of
+  // that chrome. Use --nav-h to size something as tall as the header; use
+  // --nav-bottom to start something underneath it.
   (function () {
     if (!window.ResizeObserver) return;
     var ro = null;
+    var current = null;
+    var queued = false;
     function publish(header) {
-      document.documentElement.style.setProperty('--nav-h', header.offsetHeight + 'px');
+      var style = document.documentElement.style;
+      style.setProperty('--nav-h', header.offsetHeight + 'px');
+      // Scroll-dependent where --nav-h is not: chrome above the header scrolls
+      // away while an overlay is open (nothing here locks body scroll), so this
+      // is republished on scroll. Clamped at 0 — once the sticky header is
+      // pinned at top:0 the two values converge, which is why a consumer whose
+      // header already starts at the viewport top sees no change at all.
+      style.setProperty('--nav-bottom', Math.max(0, header.getBoundingClientRect().bottom) + 'px');
+    }
+    function schedule() {
+      if (queued || !current) return;
+      queued = true;
+      window.requestAnimationFrame(function () { queued = false; if (current) publish(current); });
     }
     function attach() {
       var header = document.querySelector('header');
-      if (!header) return;
+      if (!header) {
+        // A page with no <header> — a bare error page, a print view. RELEASE the
+        // old node instead of returning: the scroll listener outlives the visit,
+        // and publishing from a DETACHED element yields an all-zero rect, which
+        // would drive --nav-h to 0px. Before this listener existed nothing ran
+        // after detach, so --nav-h simply kept its last value; keep that promise.
+        if (ro) { ro.disconnect(); ro = null; }
+        current = null;
+        return;
+      }
+      current = header;
       if (ro) ro.disconnect();
       ro = new ResizeObserver(function () { publish(header); });
       ro.observe(header);
@@ -116,6 +151,10 @@
     }
     document.addEventListener('DOMContentLoaded', attach);
     document.addEventListener('turbo:load', attach);
+    // Registered ONCE at script eval, not inside attach(), so a Turbo nav
+    // re-points `current` instead of stacking another listener per visit.
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule, { passive: true });
   })();
 </script>
 
