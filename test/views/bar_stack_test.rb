@@ -52,12 +52,35 @@ class BarStackTest < ActiveSupport::TestCase
   test "the stack ships an observer that publishes its measured height" do
     html = render_stack
 
-    assert_includes html, "data-studio-bar-stack"
-    assert_includes html, "ResizeObserver"
-    assert_includes html, "--studio-bars-h"
+    # These four used to be bare token greps, which pin a VOCABULARY, not a
+    # WIRING — the same defect nav_offset_contract_test.rb was blocked for. Three
+    # mutations that break the feature outright left every token in place and the
+    # suite green: publishing onto the stack div instead of :root (custom
+    # properties inherit DOWN, never ACROSS to the sibling navbar), deleting the
+    # measured setProperty entirely (the server estimate still spells the
+    # property), and deleting the wrapper div (the querySelector string inside
+    # the script still spells the attribute). Each assertion below therefore
+    # spans the target AND the expression feeding it.
+
+    # The attribute must be on a real ELEMENT, not merely inside the script text.
+    stack = Nokogiri::HTML5.fragment(html).at_css("[data-studio-bar-stack]")
+    refute_nil stack, "the stack must render a real element carrying the hook attribute"
+    assert_includes stack["class"].to_s, "sticky", "the stack must pin, or bars scroll away"
+
+    # Published on :root — NOT on the stack element, which the navbar could never
+    # see, and NOT from a hardcoded value.
+    assert_match(/document\.documentElement\.style\.setProperty\(\s*"--studio-bars-h"/, html,
+                 "--studio-bars-h must be published on :root; a sibling cannot read it off the stack")
+    assert_match(/Math\.round\(\s*el\.getBoundingClientRect\(\)\.height/, html,
+                 "the published height must be MEASURED from the stack's rect")
+    refute_match(/\bel\.style\.setProperty\(\s*"--studio-bars-h"/, html,
+                 "publishing onto the stack element hides the property from the navbar")
+
     # Re-bound on Turbo nav: a stale observer on a detached node stops updating
     # silently, and the navbar would then sit at yesterday's offset.
-    assert_includes html, "turbo:load"
+    assert_match(/new ResizeObserver\(\s*publish\s*\)/, html, "the observer must republish the height")
+    assert_match(/addEventListener\(\s*"turbo:load"\s*,\s*apply\s*\)/, html,
+                 "the observer must be re-bound on Turbo navigation")
   end
 
 
@@ -117,7 +140,12 @@ class BarStackTest < ActiveSupport::TestCase
 
     # With no :root property published, var(...) resolves to the 0px fallback,
     # which is what `top-0` did before. Adoption is opt-in, not forced.
-    assert_includes nav, "0px"
+    #
+    # This asserted just "0px", which the navbar's own `@media (min-width: 400px)`
+    # satisfies — so the whole backward-compatibility claim survived deleting the
+    # fallback. Pin the FALLBACK, in place, not the digits.
+    assert_match(/top:\s*var\(\s*--studio-bars-h\s*,\s*0px\s*\)/, nav,
+                 "an unadopted app must degrade to top:0, which is what top-0 did before")
   end
 
   # ── D. exactly one pinned header ─────────────────────────────
