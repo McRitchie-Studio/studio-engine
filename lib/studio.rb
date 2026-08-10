@@ -136,6 +136,18 @@ module Studio
   mattr_accessor :impersonation_started_at_session_key, default: :impersonation_started_at
   mattr_accessor :impersonation_max_minutes, default: 30
 
+  # Cap for the host app's local (development + test) log file, in bytes.
+  # nil means "use the engine's defaults" — Studio::Engine::DEVELOPMENT_LOG_MAX_BYTES
+  # and ::TEST_LOG_MAX_BYTES. An Integer sets your own cap; `false` opts out and
+  # leaves Rails' own 100 MB default alone.
+  #
+  # UNLIKE every other setting here, this one is read during BOOT — before
+  # config/initializers/studio.rb is loaded — so it must be set earlier than the
+  # usual seam: in config/application.rb (after `require "studio"`) or in
+  # config/environments/development.rb. Setting it in an initializer is too late
+  # and does nothing.
+  mattr_accessor :local_log_max_bytes, default: nil
+
   # Default From: for engine-sent mail (magic links). Apps set this to their
   # verified sending address in config/initializers/studio.rb.
   mattr_accessor :mailer_from, default: nil
