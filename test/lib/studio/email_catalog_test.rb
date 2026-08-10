@@ -213,6 +213,47 @@ class EmailCatalogTest < Minitest::Test
       "an asset_host-resolved absolute URL must not be prefixed a second time"
   end
 
+  # --- the asset origin a banner URL hangs off ------------------------------
+  #
+  # REGRESSION GUARD. mailer_asset_host used to read default_url_options[:host]
+  # and prefix "https://", dropping the port and forcing TLS. On a worktree stack
+  # ({host: "localhost", port: 3001}) that produced https://localhost/... and the
+  # banner in every preview came back ERR_CONNECTION_REFUSED. The engine suite was
+  # green; opening the page is what showed it.
+
+  # The two pure helpers that carry all of the logic. mailer_asset_host itself
+  # needs a booted ActionMailer, so its end-to-end assembly is covered in
+  # test/integration/emails_page_test.rb rather than re-implemented here.
+
+  def test_a_local_stack_keeps_its_port
+    assert_equal ":3001", Studio::EmailImage.mailer_port_suffix(host: "localhost", port: 3001)
+  end
+
+  def test_loopback_defaults_to_http_not_https
+    assert_equal "http", Studio::EmailImage.mailer_protocol({ port: 3042 }, "127.0.0.1")
+    assert_equal "http", Studio::EmailImage.mailer_protocol({ port: 3001 }, "localhost")
+  end
+
+  def test_a_real_host_still_defaults_to_https
+    # Production apps set only {host: "mcritchie.studio"}; defaulting to http
+    # would downgrade every image in their email.
+    assert_equal "https", Studio::EmailImage.mailer_protocol({}, "mcritchie.studio")
+  end
+
+  def test_default_ports_are_left_off
+    assert_equal "", Studio::EmailImage.mailer_port_suffix(host: "mcritchie.studio", port: 443)
+    assert_equal "", Studio::EmailImage.mailer_port_suffix(host: "example.test", port: 80)
+    assert_equal "", Studio::EmailImage.mailer_port_suffix(host: "example.test")
+  end
+
+  def test_an_explicit_protocol_wins_over_the_loopback_default
+    assert_equal "https", Studio::EmailImage.mailer_protocol({ protocol: "https" }, "localhost")
+  end
+
+  def test_protocol_with_a_trailing_separator_is_normalized
+    assert_equal "https", Studio::EmailImage.mailer_protocol({ protocol: "https://" }, "example.test")
+  end
+
   # --- uploads gate: honest degradation, not a 500 --------------------------
 
   def test_uploads_are_unavailable_when_the_app_has_no_bucket

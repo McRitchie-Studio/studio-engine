@@ -202,6 +202,46 @@ class EmailsPageTest < ActiveSupport::TestCase
       "a sprockets host (mcritchie-studio, turf-monster) needs the explicit precompile entry"
   end
 
+  # --- the banner's absolute URL, assembled for real ------------------------
+  #
+  # REGRESSION GUARD, end to end with ActionMailer booted. mailer_asset_host used
+  # to take default_url_options[:host] and prefix "https://", dropping the port
+  # and forcing TLS — so a worktree stack on {host: "localhost", port: 3001} got
+  # https://localhost/... and the banner in every preview came back
+  # ERR_CONNECTION_REFUSED. The engine suite was green throughout; opening the
+  # page is what showed it.
+  def with_default_url_options(options)
+    previous = ActionMailer::Base.default_url_options
+    ActionMailer::Base.default_url_options = options
+    yield
+  ensure
+    ActionMailer::Base.default_url_options = previous
+  end
+
+  test "a local stack's port and scheme survive into the banner URL" do
+    with_default_url_options(host: "localhost", port: 3001) do
+      assert_equal "http://localhost:3001", Studio::EmailImage.mailer_asset_host
+    end
+  end
+
+  test "a production host with no port resolves to https with no port" do
+    with_default_url_options(host: "mcritchie.studio") do
+      assert_equal "https://mcritchie.studio", Studio::EmailImage.mailer_asset_host
+    end
+  end
+
+  test "the resolved banner URL is fetchable from the stack it was built on" do
+    stub_module(Studio::EmailImage, :record) { |_key| nil }
+
+    with_default_url_options(host: "localhost", port: 3001) do
+      url = Studio::EmailImage.resolved_url("magic_link")
+
+      assert url.start_with?("http://localhost:3001/"),
+        "a banner URL that drops the port points at :443 and never loads (got #{url.inspect})"
+      assert_includes url, "emails/magic-link"
+    end
+  end
+
   # --- 3. the gates ---------------------------------------------------------
 
   test "EmailsController gates every action with require_admin" do

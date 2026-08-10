@@ -365,17 +365,50 @@ module Studio
       false
     end
 
+    # The origin an email's banner URL hangs off. action_mailer.asset_host when
+    # the host sets one (turf-monster does, per env); otherwise built from the
+    # mailer's default_url_options.
+    #
+    # That fallback has to reconstruct a real origin, not just the hostname.
+    # default_url_options is routinely {host: "localhost", port: 3001} — taking
+    # :host alone and prefixing "https://" yields https://localhost, which is the
+    # wrong scheme AND the wrong port, and the banner comes back
+    # ERR_CONNECTION_REFUSED. Caught by opening the preview page on a worktree
+    # stack; every dev/QA preview took that path.
     def mailer_asset_host
-      host = Rails.application.config.action_mailer.asset_host.presence
-      return host if host
+      configured = Rails.application.config.action_mailer.asset_host.presence
+      return configured if configured
 
-      host = ActionMailer::Base.default_url_options[:host]
-      return nil if host.blank?
+      options = ActionMailer::Base.default_url_options || {}
+      host = options[:host].presence
+      return nil if host.nil?
+      return host if host.start_with?("http")
 
-      host.start_with?("http") ? host : "https://#{host}"
+      "#{mailer_protocol(options, host)}://#{host}#{mailer_port_suffix(options)}"
     rescue StandardError
       nil
     end
+
+    # Honor an explicit :protocol. Otherwise https — EXCEPT on loopback, which is
+    # a dev stack with no TLS. Defaulting the other way would downgrade every
+    # production app that sets only {host: "mcritchie.studio"}.
+    def mailer_protocol(options, host)
+      explicit = options[:protocol].presence
+      return explicit.to_s.sub(%r{://\z}, "") if explicit
+
+      LOOPBACK_HOSTS.include?(host.downcase) ? "http" : "https"
+    end
+
+    # Ports are part of the origin, and omitting one sends the reader to :443.
+    # The scheme defaults are left off so a normal URL stays normal.
+    def mailer_port_suffix(options)
+      port = options[:port]
+      return "" if port.blank? || [80, 443].include?(port.to_i)
+
+      ":#{port}"
+    end
+
+    LOOPBACK_HOSTS = %w[localhost 127.0.0.1 0.0.0.0 ::1].freeze
 
     def ext_for(content_type)
       case content_type.to_s
