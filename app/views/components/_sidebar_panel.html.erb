@@ -5,8 +5,14 @@
     --nav-bottom is the header's BOTTOM EDGE, not its height: the two differ
     the moment an app renders chrome above the navbar (an environment banner
     before the header), and positioning off the height put this panel over the
-    header by exactly that much. --nav-h is the fallback so a host pinning an
-    older _head still lands on today's behaviour rather than 6rem. %>
+    header by exactly that much.
+
+    The --nav-h fallback is NOT for a host pinning an older gem — an older gem
+    ships the old _head and the old panel together, so that path never runs.
+    It is reachable only when a host OVERRIDES layouts/studio/_head, in which
+    case --nav-bottom is never published and this degrades to the previous,
+    BUGGY geometry. That is a deliberate floor, not a safe default: it keeps an
+    overriding host at today's behaviour instead of collapsing to 6rem. %>
 <% id             = local_assigns.fetch(:id, nil) %>
 <% title          = local_assigns.fetch(:title, nil) %>
 <% open           = local_assigns.fetch(:open) %>

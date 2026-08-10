@@ -133,7 +133,16 @@
     }
     function attach() {
       var header = document.querySelector('header');
-      if (!header) return;
+      if (!header) {
+        // A page with no <header> — a bare error page, a print view. RELEASE the
+        // old node instead of returning: the scroll listener outlives the visit,
+        // and publishing from a DETACHED element yields an all-zero rect, which
+        // would drive --nav-h to 0px. Before this listener existed nothing ran
+        // after detach, so --nav-h simply kept its last value; keep that promise.
+        if (ro) { ro.disconnect(); ro = null; }
+        current = null;
+        return;
+      }
       current = header;
       if (ro) ro.disconnect();
       ro = new ResizeObserver(function () { publish(header); });

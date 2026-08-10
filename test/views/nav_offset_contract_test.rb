@@ -26,19 +26,40 @@ require "action_view"
 # browser lane, so this holds the CONTRACT, not the pixels. The pixel proof has to
 # come from a consumer that has one.
 class NavOffsetContractTest < Minitest::Test
+  # ASSERT THE ASSIGNMENT PAIR, NOT THE TOKENS.
+  #
+  # The first version of this file asked whether '--nav-h', '--nav-bottom',
+  # 'offsetHeight' and 'getBoundingClientRect().bottom' each appeared SOMEWHERE in
+  # the rendered head. That pins a vocabulary, not a wiring. Shannon defeated it
+  # with a mutation that deletes no token at all — just swap the two sources:
+  #
+  #   style.setProperty('--nav-h',      Math.max(0, header.getBoundingClientRect().bottom) + 'px');
+  #   style.setProperty('--nav-bottom', header.offsetHeight + 'px');
+  #
+  # Every grepped string survives, the banner-overlap bug is fully restored, every
+  # --nav-h consumer in the engine breaks — and the suite was green. Each regex
+  # below therefore spans the property name AND the expression feeding it, so the
+  # two cannot be exchanged without going red.
   def test_head_publishes_the_bottom_edge_from_the_headers_rect
     html = render_head
 
     # The height keeps its old meaning — consumers size off it and must not shift.
-    assert_includes html, "--nav-h"
-    assert_includes html, "header.offsetHeight"
+    assert_match(/setProperty\(\s*'--nav-h'\s*,\s*\w+\.offsetHeight/, html,
+                 "--nav-h must be fed by the header's HEIGHT, not by its rect")
 
-    # The offset is a different measurement, and must come from the rect. Reading it
-    # from offsetHeight again would reintroduce the bug under a new variable name.
-    assert_includes html, "--nav-bottom"
-    assert_includes html, "getBoundingClientRect().bottom"
-    assert_includes html, "Math.max(0,",
-                    "the bottom edge must clamp at 0 so a scrolled-past header never yields a negative offset"
+    # The offset is a DIFFERENT measurement and must come from the rect, clamped.
+    # Feeding it from offsetHeight would reintroduce the bug under a new name.
+    assert_match(
+      /setProperty\(\s*'--nav-bottom'\s*,\s*Math\.max\(\s*0\s*,\s*\w+\.getBoundingClientRect\(\)\.bottom/,
+      html,
+      "--nav-bottom must be fed by the header's clamped rect BOTTOM, not by its height"
+    )
+
+    # And neither may be fed by the other's source, in any spelling.
+    refute_match(/setProperty\(\s*'--nav-h'\s*,[^;]*getBoundingClientRect/, html,
+                 "feeding --nav-h from the rect breaks every consumer that sizes off it")
+    refute_match(/setProperty\(\s*'--nav-bottom'\s*,[^;]*offsetHeight/, html,
+                 "feeding --nav-bottom from the height IS the banner-overlap bug")
   end
 
   def test_head_republishes_the_bottom_edge_on_scroll
@@ -48,12 +69,44 @@ class NavOffsetContractTest < Minitest::Test
     # engine locks body scroll — so a bottom edge published only on resize goes
     # stale mid-scroll and the panel drifts. --nav-h has no such problem, which is
     # why the publisher cannot simply treat the two the same.
-    assert_match(/addEventListener\(\s*'scroll'/, html,
-                 "the bottom edge is scroll-dependent and must be republished on scroll")
-    assert_match(/passive:\s*true/, html,
-                 "a scroll listener on every page must be passive")
-    assert_includes html, "requestAnimationFrame",
-                    "and throttled, or it recomputes layout on every scroll event"
+    assert_match(/addEventListener\(\s*'scroll'\s*,\s*(\w+)\s*,\s*\{\s*passive:\s*true\s*\}/, html,
+                 "the bottom edge is scroll-dependent and must be republished on a passive scroll listener")
+
+    # The listener has to DO something. Greping for 'requestAnimationFrame' alone
+    # passed a mutation that kept the rAF and dropped the republish:
+    #   window.requestAnimationFrame(function () { queued = false; });
+    # which kills scroll tracking entirely — the exact drift this test names.
+    # So: the rAF callback must actually call the publisher.
+    assert_match(/requestAnimationFrame\(\s*function\s*\([^)]*\)\s*\{[^}]*publish\(/, html,
+                 "the rAF callback must republish — a throttle that never publishes is not a throttle")
+
+    # And the scroll handler must be the one that schedules that frame, rather than
+    # some unrelated function that merely shares the name.
+    scroll_handler = html[/addEventListener\(\s*'scroll'\s*,\s*(\w+)/, 1]
+    refute_nil scroll_handler, "could not identify the scroll handler"
+    assert_match(/function\s+#{Regexp.escape(scroll_handler)}\s*\([^)]*\)\s*\{[^}]*requestAnimationFrame/m, html,
+                 "the function bound to scroll must be the one that schedules the republish")
+  end
+
+  def test_head_releases_the_header_when_a_page_has_none
+    html = render_head
+
+    # The scroll listener outlives the visit, so a Turbo nav to a headerless page
+    # would otherwise keep publishing from the DETACHED old node — an all-zero rect,
+    # which drives --nav-h to 0px. Nothing ran after detach before this listener
+    # existed, so --nav-h kept its last value; the no-header branch has to release
+    # the node to keep that promise. Shape-level, like the rest of this file.
+    # Extract the guard BODY — everything between `if (!header) {` and its `return;`
+    # — and assert inside it. A whole-file grep would pass on a `current = null`
+    # anywhere else in the IIFE, which is the same token-vs-wiring mistake this
+    # file was blocked for. It also keeps a failure message readable.
+    guard = html[/if\s*\(\s*!header\s*\)\s*\{([\s\S]*?)\breturn;/, 1].to_s
+
+    refute_empty guard, "could not find the no-header guard block in the rendered head"
+    assert_includes guard, "current = null",
+                    "the no-header branch must drop the stale node, not just return"
+    assert_includes guard, "disconnect()",
+                    "and must disconnect the observer bound to the old header"
   end
 
   def test_sidebar_panel_offsets_from_the_bottom_edge_not_the_height
