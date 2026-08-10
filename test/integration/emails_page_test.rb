@@ -174,6 +174,38 @@ class EmailsPageTest < ActiveSupport::TestCase
     refute_includes html, "<body", "a bare content wrapper must not emit its own <body> shell"
   end
 
+  # REGRESSION GUARD. An ERB comment ends at its FIRST "%>", so a doc comment
+  # containing an ERB example silently closes early and dumps the remainder of
+  # itself onto the page as visible text. That shipped once, in the scoped
+  # host's usage example, and showed up as raw `<%= render ... %>` under the
+  # table. No amount of Nokogiri structure assertions caught it — only looking
+  # at the page did. This looks.
+  test "no raw ERB leaks into the rendered page" do
+    [render_index, render_index(uploads_available: false)].each do |html|
+      refute_match(/<%|%>/, html,
+        "an ERB delimiter reached the browser — a doc comment almost certainly " \
+        "closed early on a '%>' inside its own example")
+    end
+  end
+
+  test "no raw ERB leaks out of the scoped host partial" do
+    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    html = view.render(partial: "studio/modals/scoped_host", locals: { store: "emailModals" })
+
+    refute_match(/<%|%>/, html)
+  end
+
+  # REGRESSION GUARD. The outer `template x-if` unmounts one tick AFTER the
+  # stack empties, so a registration written `current().id` throws
+  # "Cannot read properties of null" on EVERY modal close.
+  test "modal registrations guard current() with optional chaining" do
+    html = render_index
+
+    assert_includes html, "$store.emailModals.current()?.id === 'crop-photo'"
+    refute_match(/current\(\)\.id/, html,
+      "a bare current().id throws on close — use current()?.id")
+  end
+
   test "the table shows the NAME and the LIVE IMAGE of every registered email" do
     stub_module(Studio::EmailImage, :record) { |_key| nil }
     stub_module(Studio::EmailImage, :default_asset_path) { |key| "/assets/#{key}.png" }
@@ -244,8 +276,8 @@ class EmailsPageTest < ActiveSupport::TestCase
     # the page has to bring its own rather than reach for $store.modals.
     assert_includes html, "emailModals",
       "the page must mount its own modal host so it works in an app with none"
-    assert_includes html, "$store.emailModals.current().id === 'crop-photo'"
-    assert_includes html, "$store.emailModals.current().id === 'saving'"
+    assert_includes html, "$store.emailModals.current()?.id === 'crop-photo'"
+    assert_includes html, "$store.emailModals.current()?.id === 'saving'"
   end
 
   test "an app with no object storage renders read-only and explains why" do
@@ -261,24 +293,65 @@ class EmailsPageTest < ActiveSupport::TestCase
       "an Edit button that cannot possibly work must not be offered"
   end
 
-  # --- the shared modal host stayed backwards compatible ---------------------
+  # --- the page-scoped host -------------------------------------------------
 
-  test "the modal host still defaults to the shared 'modals' store" do
+  # REGRESSION GUARD. The first cut of this page rendered "studio/modals/host"
+  # with a store: local. It worked in the dummy app and rendered NOTHING in
+  # mcritchie-studio, because this is a NON-ISOLATED engine and both
+  # mcritchie-studio and turf-monster ship their own
+  # app/views/studio/modals/_host.html.erb — older forks that know no store:
+  # local. The app fork shadows the engine's partial, so the page-scoped store
+  # was never registered and the Upload button opened nothing.
+  #
+  # studio/modals/scoped_host is unforked in every app. If some page ever points
+  # this page back at the forkable path, this test goes red.
+  test "the page mounts its host from the UNFORKED scoped_host path" do
+    source = File.read(File.expand_path("../../app/views/studio/emails/index.html.erb", __dir__))
+
+    assert_includes source, %(render "studio/modals/scoped_host")
+    refute_includes source, %(render "studio/modals/host"),
+      "mcritchie-studio and turf-monster fork studio/modals/_host — their copy would " \
+      "shadow the engine's and swallow the store: local, leaving the store unregistered"
+  end
+
+  test "the scoped host registers ONLY the store it was asked for" do
+    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    html = view.render(partial: "studio/modals/scoped_host", locals: { store: "emailModals" })
+
+    assert_includes html, "var STORE_NAME    = 'emailModals';"
+    assert_includes html, "$store.emailModals.current()"
+    refute_includes html, "Alpine.store('modals'",
+      "a page-scoped host must never touch the app's shared store"
+  end
+
+  test "the scoped host survives a Turbo visit" do
+    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    html = view.render(partial: "studio/modals/scoped_host", locals: { store: "emailModals" })
+
+    # alpine:init fires once per full document load. A host living in a PAGE BODY
+    # was absent for it, so a Turbo Drive visit needs the direct-call branch or
+    # the store is undefined and every x-data on the page throws.
+    assert_includes html, "if (window.Alpine) { registerScopedStore(); }"
+    assert_includes html, "else { document.addEventListener('alpine:init', registerScopedStore); }"
+  end
+
+  test "the scoped host ships the API the crop and saving modals call" do
+    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    html = view.render(partial: "studio/modals/scoped_host", locals: { store: "emailModals" })
+
+    # studio/modals/_crop_photo calls current()/close(); submitFormWithProgress
+    # calls open(id, props, { replace: true }) to turn crop-photo into saving;
+    # the backdrop binds cardClasses(). A missing one of these is a dead button.
+    %w[current: close: open: cardClasses: closeAllDismissible:].each do |method|
+      assert_includes html, method, "the scoped store must implement #{method.chomp(':')}()"
+    end
+  end
+
+  test "the shared modal host was left exactly as every app already renders it" do
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
     html = view.render(partial: "studio/modals/host")
 
     assert_includes html, "$store.modals.current()",
-      "every shipped host renders this partial with no store: local — it must not move"
-    assert_includes html, "var STORE_NAME = 'modals';"
-  end
-
-  test "the modal host mounts a page-scoped store when asked" do
-    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
-    html = view.render(partial: "studio/modals/host", locals: { store: "emailModals" })
-
-    assert_includes html, "var STORE_NAME = 'emailModals';"
-    assert_includes html, "$store.emailModals.current()"
-    refute_includes html, "$store.modals.current()?._closing",
-      "a page-scoped host must not bind the shared store's backdrop"
+      "the shared host is rendered by shipped app layouts — it must not move"
   end
 end

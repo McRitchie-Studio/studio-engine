@@ -66,8 +66,11 @@
     <p class="font-mono text-2xs text-muted mt-1"><%= entry.key %></p>
   </td>
 
+  <%# whitespace-nowrap keeps the pill a pill — "<App>'s own" is long enough to
+      wrap inside a bordered badge, which reads as a broken box next to the
+      short "Inherited default". %>
   <td class="px-4 py-4">
-    <span class="<%= badge_class %>"><%= badge_label %></span>
+    <span class="<%= badge_class %> whitespace-nowrap"><%= badge_label %></span>
     <p class="text-2xs text-muted mt-1.5 max-w-[12rem]"><%= badge_note %></p>
   </td>
 

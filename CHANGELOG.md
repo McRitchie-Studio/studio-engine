@@ -78,13 +78,25 @@ rescue `NotConfigured`.
 sending, naming the one setting that turns uploads on — instead of 500ing on the
 first upload.
 
-**`studio/modals/_host` takes a `store:` local** (default `"modals"`, so every
-shipped call site is unchanged). Pass a different name to mount a second,
-page-scoped host inside one page's body. `/admin/emails` uses it
-(`store: "emailModals"`) to bring its own crop + saving modals, so the page works
+**New partial: `studio/modals/scoped_host`** — a self-contained modal host on its
+own Alpine store, for a page that must bring its own modals. `/admin/emails` uses
+it (`store: "emailModals"`) to ship its crop + saving modals, so the page works
 identically in an app that renders a shared modal host and one that renders none
-at all. `imageUploadHost` and `submitFormWithProgress` accept the same `store`
-option; the crop-photo and saving partials already did.
+at all. `imageUploadHost` and `submitFormWithProgress` gained a matching `store`
+option (default `"modals"`, so existing call sites are unchanged); the crop-photo
+and saving partials already had one.
+
+It is a **separate partial rather than a local on `studio/modals/_host`** for a
+reason worth knowing: this is a non-isolated engine, so an app view at the same
+path shadows the engine's — and `mcritchie-studio` and `turf-monster` both ship
+their own `app/views/studio/modals/_host.html.erb`. A page rendering
+`studio/modals/host` in those apps silently gets the app's fork, which knows
+nothing of a `store:` local, so the page-scoped store is never registered and
+every modal trigger on the page does nothing. `scoped_host` is unforked in every
+app. The living style guide's hand-rolled `dsModals` host can rebase onto it.
+
+Register modals with `current()?.id`, not `current().id` — the outer template
+unmounts one tick after the stack empties, so a bare `.id` throws on close.
 
 **Consumer note.** Nothing here is required to upgrade. To adopt: link
 `admin_emails_path` from the app's admin sidebar, register any extra workflows,

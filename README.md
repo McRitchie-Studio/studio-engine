@@ -167,23 +167,38 @@ the block:
 <% end %>
 ```
 
-**Page-scoped hosts.** Pass `store:` to mount a second host inside one page's
-body without colliding with the app-level shared one — for a page that must
-bring its own modals because not every consuming app renders a shared host. The
-engine's `/admin/emails` does exactly this:
+**Page-scoped hosts — `studio/modals/scoped_host`.** When a page must bring its
+own modals (because not every consuming app renders a shared host, and the ones
+that do register their own modal set), render a second host on its own Alpine
+store:
 
 ```erb
-<%= render "studio/modals/host", store: "emailModals" do %>
-  <template x-if="$store.emailModals.current().id === 'crop-photo'">
+<%= render "studio/modals/scoped_host", store: "emailModals" do %>
+  <template x-if="$store.emailModals.current()?.id === 'crop-photo'">
     <%= render "studio/modals/crop_photo", store: "emailModals" %>
   </template>
 <% end %>
 ```
 
-`studio/modals/_crop_photo` and `_saving` already take the same `store:` local,
-and `imageUploadHost({ store: "emailModals", ... })` /
-`submitFormWithProgress(form, { store: "emailModals" })` route through it. Both
-default to `"modals"`, so every existing call site is unchanged.
+`studio/modals/_crop_photo` and `_saving` take the same `store:` local, and
+`imageUploadHost({ store: "emailModals", ... })` /
+`submitFormWithProgress(form, { store: "emailModals" })` route through it — all
+default to `"modals"`, so existing call sites are unchanged. The engine's
+`/admin/emails` is the live example.
+
+Two things that will bite you:
+
+- **Render `scoped_host`, not `host`.** This is a non-isolated engine, so an app
+  view at the same path shadows the engine's — and `mcritchie-studio` and
+  `turf-monster` both ship their own `app/views/studio/modals/_host.html.erb`.
+  A page rendering `studio/modals/host` in those apps silently gets the app's
+  fork. `scoped_host` is unforked everywhere.
+- **Guard registrations with `current()?.id`.** The outer template unmounts one
+  tick *after* the stack empties, so a bare `.id` throws on every close.
+
+The scoped host takes its animations from `engine-motion.css` rather than an
+inline copy, so a consumer bundling that layer gets the same spring as the shared
+host.
 
 Store API (`Alpine.store('modals')`):
 

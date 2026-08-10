@@ -15,18 +15,7 @@
   byte-identical; keep them in sync if you retune a curve or duration.
   Consumer integration example and API reference: the "Modal host"
   section of the gem README.
-
-  Local: store — the Alpine store name this host mounts. Defaults to
-  "modals" (the app-level shared host every consumer already renders once
-  from its layout). Pass a DIFFERENT name to mount a second, PAGE-SCOPED
-  host inside one page's body without colliding with the shared one — the
-  engine's own /admin/emails does this (store: "emailModals") so it brings
-  its own crop-photo + saving modals to EVERY host app, including the ones
-  that render no shared host at all. The matching store: local is already
-  accepted by studio/modals/_crop_photo and _saving, and by the
-  imageUploadHost / submitFormWithProgress factories.
 %>
-<% modal_store = local_assigns.fetch(:store, "modals") %>
 <style>
   /* Scroll lock applied by $store.modals._sync() when the stack is non-empty.
      Combined with the fixed backdrop on the host below, this keeps the
@@ -232,18 +221,9 @@
     var CLOSE_ANIM_MS = 220;
     var SWAP_IN_MS    = 220;
 
-    var STORE_NAME = '<%= modal_store %>';
-
-    // Named (not an inline alpine:init callback) so the dual-guard below can
-    // invoke it directly on a Turbo visit. Alpine's deferred script fires
-    // alpine:init exactly ONCE per full document load; a host rendered in a
-    // PAGE BODY rather than the layout was absent during that one init, and a
-    // Turbo Drive visit that swaps in the page would otherwise leave its store
-    // undefined and every x-data on the page throwing. Mirrors the guard in
-    // studio/modals/_image_upload.
-    function registerModalStore() {
-      if (Alpine.store(STORE_NAME)) return;
-      Alpine.store(STORE_NAME, {
+    document.addEventListener('alpine:init', function() {
+      if (Alpine.store('modals')) return;
+      Alpine.store('modals', {
         stack: [],
         // open(id, props, opts)
         //   opts.replace: true  → swap the top entry with this one. When a
@@ -466,10 +446,7 @@
           }
         }
       });
-    }
-
-    if (window.Alpine) { registerModalStore(); }
-    else { document.addEventListener('alpine:init', registerModalStore); }
+    });
 
     // === bfcache + Turbo snapshot cleanup ==============================
     //
@@ -481,7 +458,7 @@
     // a still-in-flight JS promise will resolve against.
     function clearStaleModals() {
       if (window.Alpine && Alpine.store) {
-        var m = Alpine.store(STORE_NAME);
+        var m = Alpine.store('modals');
         if (m && typeof m.closeAllDismissible === 'function') {
           m.closeAllDismissible();
         } else if (m && typeof m.closeAll === 'function') {
@@ -503,7 +480,7 @@
     See studio/modals/_load_convention for the full contract. %>
 <%= render "studio/modals/load_convention" %>
 
-<template x-if="$store.<%= modal_store %>.current()">
+<template x-if="$store.modals.current()">
   <%# Backdrop + card use CSS keyframe animations (NOT Alpine
       x-transition), all shipped in the inline style block above. On
       mount, the .modal-backdrop-mount + card mount classes fire fade-in
@@ -517,12 +494,12 @@
       where an accidental click would orphan a signed but un-confirmed
       transaction). Defaults to dismissible. %>
   <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop-mount"
-       :class="$store.<%= modal_store %>.current()?._closing && 'modal-backdrop-unmount'"
+       :class="$store.modals.current()?._closing && 'modal-backdrop-unmount'"
        style="background:rgba(0,0,0,0.6)"
        role="dialog"
        aria-modal="true"
-       @keydown.escape.window="$store.<%= modal_store %>.current() && $store.<%= modal_store %>.current().props.dismissible !== false && $store.<%= modal_store %>.close()"
-       @click.self="$store.<%= modal_store %>.current() && $store.<%= modal_store %>.current().props.dismissible !== false && $store.<%= modal_store %>.close()">
+       @keydown.escape.window="$store.modals.current() && $store.modals.current().props.dismissible !== false && $store.modals.close()"
+       @click.self="$store.modals.current() && $store.modals.current().props.dismissible !== false && $store.modals.close()">
     <%# Card animation is class-driven (cardClasses() in the store) so it
         can pick the right keyframe for the current store state. Plain
         mount/unmount for first open + close, resolved through the
@@ -539,7 +516,7 @@
         stays true for the rest of the entry's lifetime so a stale Alpine
         re-evaluation can't retrigger the bounce. %>
     <div class="bg-surface rounded-xl border border-subtle shadow-2xl p-6 max-w-sm w-full"
-         :class="$store.<%= modal_store %>.cardClasses()">
+         :class="$store.modals.cardClasses()">
       <%# Consumer-provided content registrations. Each block typically
           contains a <template x-if="$store.modals.current().id === 'X'">
           render "modals/X" </template>. %>
