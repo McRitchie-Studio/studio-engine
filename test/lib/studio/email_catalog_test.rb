@@ -226,32 +226,32 @@ class EmailCatalogTest < Minitest::Test
   # test/integration/emails_page_test.rb rather than re-implemented here.
 
   def test_a_local_stack_keeps_its_port
-    assert_equal ":3001", Studio::EmailImage.mailer_port_suffix(host: "localhost", port: 3001)
+    assert_equal ":3001", Studio::EmailCatalog.mailer_port_suffix(host: "localhost", port: 3001)
   end
 
   def test_loopback_defaults_to_http_not_https
-    assert_equal "http", Studio::EmailImage.mailer_protocol({ port: 3042 }, "127.0.0.1")
-    assert_equal "http", Studio::EmailImage.mailer_protocol({ port: 3001 }, "localhost")
+    assert_equal "http", Studio::EmailCatalog.mailer_protocol({ port: 3042 }, "127.0.0.1")
+    assert_equal "http", Studio::EmailCatalog.mailer_protocol({ port: 3001 }, "localhost")
   end
 
   def test_a_real_host_still_defaults_to_https
     # Production apps set only {host: "mcritchie.studio"}; defaulting to http
     # would downgrade every image in their email.
-    assert_equal "https", Studio::EmailImage.mailer_protocol({}, "mcritchie.studio")
+    assert_equal "https", Studio::EmailCatalog.mailer_protocol({}, "mcritchie.studio")
   end
 
   def test_default_ports_are_left_off
-    assert_equal "", Studio::EmailImage.mailer_port_suffix(host: "mcritchie.studio", port: 443)
-    assert_equal "", Studio::EmailImage.mailer_port_suffix(host: "example.test", port: 80)
-    assert_equal "", Studio::EmailImage.mailer_port_suffix(host: "example.test")
+    assert_equal "", Studio::EmailCatalog.mailer_port_suffix(host: "mcritchie.studio", port: 443)
+    assert_equal "", Studio::EmailCatalog.mailer_port_suffix(host: "example.test", port: 80)
+    assert_equal "", Studio::EmailCatalog.mailer_port_suffix(host: "example.test")
   end
 
   def test_an_explicit_protocol_wins_over_the_loopback_default
-    assert_equal "https", Studio::EmailImage.mailer_protocol({ protocol: "https" }, "localhost")
+    assert_equal "https", Studio::EmailCatalog.mailer_protocol({ protocol: "https" }, "localhost")
   end
 
   def test_protocol_with_a_trailing_separator_is_normalized
-    assert_equal "https", Studio::EmailImage.mailer_protocol({ protocol: "https://" }, "example.test")
+    assert_equal "https", Studio::EmailCatalog.mailer_protocol({ protocol: "https://" }, "example.test")
   end
 
   # --- uploads gate: honest degradation, not a 500 --------------------------

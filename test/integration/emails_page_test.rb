@@ -220,21 +220,21 @@ class EmailsPageTest < ActiveSupport::TestCase
 
   test "a local stack's port and scheme survive into the banner URL" do
     with_default_url_options(host: "localhost", port: 3001) do
-      assert_equal "http://localhost:3001", Studio::EmailImage.mailer_asset_host
+      assert_equal "http://localhost:3001", Studio::EmailCatalog.mailer_asset_host
     end
   end
 
   test "a production host with no port resolves to https with no port" do
     with_default_url_options(host: "mcritchie.studio") do
-      assert_equal "https://mcritchie.studio", Studio::EmailImage.mailer_asset_host
+      assert_equal "https://mcritchie.studio", Studio::EmailCatalog.mailer_asset_host
     end
   end
 
   test "the resolved banner URL is fetchable from the stack it was built on" do
-    stub_module(Studio::EmailImage, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
 
     with_default_url_options(host: "localhost", port: 3001) do
-      url = Studio::EmailImage.resolved_url("magic_link")
+      url = Studio::EmailCatalog.resolved_url("magic_link")
 
       assert url.start_with?("http://localhost:3001/"),
         "a banner URL that drops the port points at :443 and never loads (got #{url.inspect})"
