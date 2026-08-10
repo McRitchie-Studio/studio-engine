@@ -2,12 +2,70 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
-## 0.35.0 — 2026-08-10
+## 0.36.0 — 2026-08-10
 
-**The email registry becomes the email catalog.** 0.34 gave every app a shared
-page for its transactional email banners. This release folds in the other half —
-**what each email is, and what it actually looks like** — so an app has ONE email
-manager instead of two.
+**The local-review link now signs the reviewer in as someone who can SEE the
+page.** `/_studio/local_review` — the local half of the task board's WAITING
+APPROVAL button — provisions the account before it mints, at the new
+`Studio.local_review_role` (default `"admin"`).
+
+The board hands this endpoint the operator's **production** email address. A
+fresh worktree database has never seen it, so consuming the link took
+`Studio::LinkConsumption#sign_up_new` and created the account at the default
+role, `viewer`. `require_admin` on the page under review then redirected it to
+`/`. The sign-in **succeeded** every time, which is what kept this quiet: the
+button worked, the token was valid, and the operator simply arrived on the home
+page having never seen the thing he was asked to review. A seeded admin
+(`alex@mcritchie.studio`) worked fine, so only his real address ever hit it.
+
+The endpoint now find-or-creates the reviewer and ensures the role BEFORE
+minting, so the consume takes `sign_in_existing` onto an account that already
+has rights. An existing account is promoted, never duplicated; an already-correct
+one is not rewritten.
+
+New public config:
+
+```ruby
+Studio.configure do |config|
+  config.local_review_role = "admin" # default; nil provisions without a role
+end
+```
+
+Set it to `nil` for an app whose review pages are not admin-gated — the account
+is still provisioned (that is what avoids `sign_up_new`), but its role is left
+to the host's own `configure_new_user`.
+
+**The endpoint also answers "who is sitting at this desk?" when the caller names
+nobody.** `?email=` is now optional, and an explicit one still wins. With none,
+the reviewer resolves to `Studio.local_review_email`, and failing that to the
+**first user already holding `Studio.local_review_role`, by id** (that query
+falls back to `"admin"` when the setting is `nil`):
+
+```ruby
+config.local_review_email = "someone@example.com" # nil (default) = derive
+```
+
+This exists so the board's WAITING APPROVAL CTA can be a **public, sign-in-free
+redirect**. Requiring a board session to click it is what broke one-click review
+in the first place; sending an email in that public URL would publish the
+operator's address. The local stack is the machine the reviewer is sitting at,
+so it is the right place to decide. A desk with nobody at that role mints
+nothing and says so, rather than guessing: the derive only ever picks someone
+who ALREADY holds the role, so it never promotes a stranger into it. (The
+`?email=` path does promote the account it is handed — that is the point of it.)
+
+**The floor is unchanged, and now asserted rather than assumed.** The endpoint
+grants a role, so both gates in front of it are tested directly: the
+developer-desk routes are drawn only outside production (proved by drawing
+`Studio.routes` into a throwaway route set under a production env), and a
+non-loopback request 404s **before** provisioning or minting anything.
+Provisioning is best-effort: a host whose `User` rejects the write gets a logged
+warning and a working link, never a 500.
+
+**This release carries a second change: the email registry becomes the email
+catalog.** 0.34 gave every app a shared page for its transactional email
+banners. This half folds in the rest — **what each email is, and what it
+actually looks like** — so an app has ONE email manager instead of two.
 
 **`Studio::EmailImage` is now `Studio::EmailCatalog`.** The old name is a
 **delegating shim** with its full surface intact (`url`, `store`, `record`,
@@ -51,6 +109,20 @@ on that page — listing the emails never executes one.
 **Consumer note.** Nothing is required to upgrade; the shim keeps 0.34 call sites
 working. To adopt the preview: pass `preview:` when registering, and switch any
 `Studio::EmailImage` reference to `Studio::EmailCatalog`.
+
+### Added
+
+- **`Studio.local_review_role`** — the role `/_studio/local_review` stamps on the
+  account it provisions before minting. Defaults to `"admin"`; `nil` provisions
+  the account without touching its role.
+- **`Studio.local_review_email`** — who the local-review mint signs in when the
+  caller sends no `?email=`. `nil` (the default) derives the first admin in this
+  database, by id.
+- **`Studio::EmailCatalog`** — the email registry, renamed from
+  `Studio::EmailImage` and now carrying each entry's `type:` and `preview:`
+  callable. The old name stays as a delegating shim.
+- **`/admin/emails/:key`** — one email's own page: its banner, its type, its
+  subject, and a live preview of the real rendered email in an iframe.
 
 ## 0.34.0 — 2026-08-10
 

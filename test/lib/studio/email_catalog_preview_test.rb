@@ -22,6 +22,20 @@ class EmailCatalogPreviewTest < Minitest::Test
     def body = html_body.to_s
   end
 
+  # Stand-in for ActionMailer::MessageDelivery — the shape the DOCUMENTED idiom
+  # actually returns. FakeMail above is EAGER, and an eager stand-in cannot
+  # reproduce the bug this class is written to prevent: `UserMailer.magic_link(…)`
+  # hands back a lazy proxy whose mailer action has not run yet, so the builder's
+  # exception surfaces at the first `subject`/`html_part` — not at `call`.
+  # Responds to `message` and runs the body there, exactly as ActionMailer does.
+  # (Mail::Message does NOT respond to `message`; that is what tells them apart.)
+  LazyDelivery = Struct.new(:builder) do
+    def message = builder.call
+    def subject = message.subject
+    def html_part = message.html_part
+    def body = message.body
+  end
+
   def setup
     Studio::EmailCatalog.reset!
   end
@@ -91,6 +105,55 @@ class EmailCatalogPreviewTest < Minitest::Test
   # ActiveRecord constant — this suite is pure Ruby with no AR loaded, so
   # `raise ActiveRecord::RecordNotFound` would raise NameError instead and the
   # test would pass for a reason it doesn't claim.
+  # REGRESSION GUARD. The containment used to be a lie for the one shape the
+  # docs recommend. `preview_mail` returned whatever the builder returned; for a
+  # mailer call that is a LAZY delivery, so `callable.call` succeeded, NO error
+  # was recorded, and the mailer body finally ran — and raised — inside
+  # `preview_subject`, outside every rescue. `/admin/emails/:key` 500'd through
+  # the host's rescue_from, losing the whole page. One preview's cost was the
+  # manager, which is precisely what this class promises never happens.
+  def test_a_lazy_mailer_delivery_that_fails_is_contained_not_propagated
+    Studio::EmailCatalog.register("lazy_boom",
+      preview: -> { LazyDelivery.new(-> { raise ArgumentError, "sample data is gone" }) })
+
+    assert_nil Studio::EmailCatalog.preview_mail("lazy_boom"),
+      "a lazy delivery must be FORCED inside the rescue, not handed back unrun"
+    assert_includes Studio::EmailCatalog.preview_error("lazy_boom"), "ArgumentError"
+  end
+
+  # The 500 the bug actually produced, asserted at the call the page makes first.
+  def test_preview_subject_never_propagates_a_lazy_builders_failure
+    Studio::EmailCatalog.register("lazy_boom",
+      preview: -> { LazyDelivery.new(-> { raise ArgumentError, "sample data is gone" }) })
+
+    subject = nil
+    begin
+      subject = Studio::EmailCatalog.preview_subject("lazy_boom")
+    rescue StandardError, ScriptError => e
+      flunk "preview_subject propagated #{e.class}: #{e.message} — the page it feeds 500s"
+    end
+    assert_nil subject
+  end
+
+  def test_preview_html_never_propagates_a_lazy_builders_failure
+    Studio::EmailCatalog.register("lazy_boom",
+      preview: -> { LazyDelivery.new(-> { raise NotImplementedError, "mailer moved" }) })
+
+    assert_nil Studio::EmailCatalog.preview_html("lazy_boom")
+    assert_includes Studio::EmailCatalog.preview_error("lazy_boom"), "NotImplementedError"
+  end
+
+  # The happy path of the same shape — forcing must not break a WORKING mailer
+  # builder, and the forced value must be the real mail, not the proxy.
+  def test_a_lazy_mailer_delivery_that_works_previews_normally
+    Studio::EmailCatalog.register("lazy_ok",
+      preview: -> { LazyDelivery.new(-> { FakeMail.new("Your magic link", "<p>hi</p>") }) })
+
+    assert_equal "Your magic link", Studio::EmailCatalog.preview_subject("lazy_ok")
+    assert_includes Studio::EmailCatalog.preview_html("lazy_ok"), "<p>hi</p>"
+    assert_nil Studio::EmailCatalog.preview_error("lazy_ok")
+  end
+
   def test_a_raising_builder_returns_nil_instead_of_propagating
     Studio::EmailCatalog.register("broken", preview: -> { nil.email_address })
 

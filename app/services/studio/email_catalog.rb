@@ -219,7 +219,7 @@ module Studio
 
       @preview_errors ||= {}
       @preview_errors.delete(key.to_s)
-      callable.call
+      force_message(callable.call)
     rescue StandardError, ScriptError => e
       (@preview_errors ||= {})[key.to_s] = "#{e.class}: #{e.message}"
       nil
@@ -246,6 +246,28 @@ module Studio
     def preview_subject(key)
       preview_mail(key)&.subject
     end
+
+    # Force a builder's return value to a REAL mail, here, inside preview_mail's
+    # rescue.
+    #
+    # The documented idiom — `preview: -> { UserMailer.magic_link(user, token) }`
+    # — does not return a Mail. It returns an ActionMailer::MessageDelivery, a
+    # LAZY proxy: the mailer action has not run yet, and the first call to
+    # `subject` / `html_part` is what finally runs it. So without this, a builder
+    # that fails takes `callable.call` cleanly, records NO error, and then blows
+    # up later at `preview_subject` — outside every rescue, straight into the
+    # host's error handler, taking the whole page down. That is the exact failure
+    # this class exists to prevent, so the forcing belongs at the same layer as
+    # the rescue, not at each call site.
+    #
+    # Duck-typed rather than `is_a?(ActionMailer::MessageDelivery)`: it also
+    # covers Parameterized::MessageDelivery and any host's own lazy wrapper.
+    # Mail::Message does NOT respond to `message`, so a builder that already
+    # returns a real Mail passes straight through.
+    def force_message(result)
+      result.respond_to?(:message) ? result.message : result
+    end
+    private_class_method :force_message
 
     # THIS APP'S OWN image only — nil when nothing has been uploaded here.
     #

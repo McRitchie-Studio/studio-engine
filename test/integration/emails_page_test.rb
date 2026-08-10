@@ -480,4 +480,68 @@ class EmailsPageTest < ActiveSupport::TestCase
     assert_includes html, "$store.modals.current()",
       "the shared host is rendered by shipped app layouts — it must not move"
   end
+
+  # --- 6. the preview cannot take the page down (the REAL mailer shape) ------
+
+  # REGRESSION GUARD, and the reason it needs a booted Rails rather than a
+  # stand-in. The unit suite's fake mail is EAGER, so it cannot reproduce this:
+  # the idiom this feature documents — `preview: -> { SomeMailer.action(...) }` —
+  # returns an ActionMailer::MessageDelivery, a LAZY proxy whose mailer action
+  # has not run at `call` time. The catalog used to hand that proxy straight
+  # back, record no error, and let the mailer finally raise at #preview_subject,
+  # outside every rescue — a 500 on /admin/emails/:key through the host's
+  # rescue_from. One preview cost the whole manager.
+  #
+  # turf-monster's catalog on main — the prior art this work folds in — is eight
+  # builders, every one a mailer call. So this is the FIRST adopter's shape, not
+  # an exotic one.
+  class PreviewProbeMailer < ActionMailer::Base
+    def explodes
+      raise ArgumentError, "sample data is gone"
+    end
+
+    def works
+      mail(to: "someone@example.com", subject: "Your magic link", body: "<p>hi</p>",
+           content_type: "text/html")
+    end
+  end
+
+  test "a REAL lazy mailer delivery that fails is contained, not propagated" do
+    Studio::EmailCatalog.register("probe_boom", preview: -> { PreviewProbeMailer.explodes })
+
+    assert_instance_of ActionMailer::MessageDelivery, PreviewProbeMailer.explodes,
+      "guard the guard: if this stops being lazy, this test stops testing anything"
+
+    assert_nil Studio::EmailCatalog.preview_mail("probe_boom")
+    assert_nil Studio::EmailCatalog.preview_subject("probe_boom"),
+      "preview_subject is the FIRST thing #show calls — it must never propagate"
+    assert_nil Studio::EmailCatalog.preview_html("probe_boom")
+    assert_includes Studio::EmailCatalog.preview_error("probe_boom"), "ArgumentError"
+  end
+
+  test "a REAL lazy mailer delivery that works renders its subject and body" do
+    Studio::EmailCatalog.register("probe_ok", preview: -> { PreviewProbeMailer.works })
+
+    assert_equal "Your magic link", Studio::EmailCatalog.preview_subject("probe_ok")
+    assert_includes Studio::EmailCatalog.preview_html("probe_ok"), "<p>hi</p>"
+    assert_nil Studio::EmailCatalog.preview_error("probe_ok")
+  end
+
+  # The user-visible half: the page still RENDERS, and says why, instead of
+  # handing the host's error handler a 500.
+  test "the show page renders the failure reason instead of losing the page" do
+    Studio::EmailCatalog.register("probe_boom", preview: -> { PreviewProbeMailer.explodes })
+    Studio::EmailCatalog.preview_mail("probe_boom")
+
+    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    view.singleton_class.include(Rails.application.routes.url_helpers)
+    view.assign(entry: Studio::EmailCatalog.entry("probe_boom"),
+                subject: Studio::EmailCatalog.preview_subject("probe_boom"),
+                preview_error: Studio::EmailCatalog.preview_error("probe_boom"),
+                uploads_available: false)
+
+    html = view.render(template: "studio/emails/show")
+    assert_includes html, "ArgumentError", "the page must say WHY the preview is missing"
+    assert_includes html, "Probe boom", "the rest of the page must survive one dead preview"
+  end
 end

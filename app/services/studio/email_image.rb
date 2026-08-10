@@ -2,7 +2,7 @@ module Studio
   # DEPRECATED NAME — this is Studio::EmailCatalog now. Every method here just
   # forwards; there is no behavior in this file.
   #
-  # Kept, and kept COMPLETE, for two reasons:
+  # The METHOD surface is kept complete, for two reasons:
   #
   #   1. Engine 0.33 shipped this module as the registry's public name, so any
   #      app already on 0.33 is calling it.
@@ -11,6 +11,14 @@ module Studio
   #      on `main` calls .url, .store and .record directly. Dropping any of them
   #      reddens that lane from the moment the PR opens, and nothing inside the
   #      engine PR can reach the consumer's main to fix it.
+  #
+  # ONE thing did not survive: the `VARIANTS` CONSTANT. It was a frozen literal
+  # hash, and the registry it stood for is now built at runtime, so a constant
+  # cannot express it. The `variants` METHOD returns the same key => label shape
+  # and is the supported replacement. Checked before dropping it: no consumer's
+  # `main` names the constant — only .url, .store and .record — so consumer CI
+  # stays green. A host that did reference it gets a NameError, not a silent
+  # wrong answer.
   #
   # Delete it once no consumer's main names it — the same staged retirement
   # /admin/email_images is on.
