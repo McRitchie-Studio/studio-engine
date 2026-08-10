@@ -74,7 +74,11 @@ end
 #      page under review will bounce. Landing signed-in on "/" instead of on the
 #      page is the whole failure this endpoint exists to prevent, and the role
 #      is the half that was missing.
-#   5. It is a developer-desk tool: the route is not drawn in production, and a
+#   5. With NO `?email=` it answers "who is sitting at this desk?" itself —
+#      Studio.local_review_email, else the first admin by id. The board's CTA is
+#      a public, sign-in-free redirect, so it sends no email; publishing the
+#      operator's address on a public page is the thing being avoided.
+#   6. It is a developer-desk tool: the route is not drawn in production, and a
 #      non-loopback request 404s before it provisions or mints anything. It
 #      hands out sign-in material AND now grants a role, so those two gates are
 #      the only thing standing in front of it — they are asserted, not assumed.
@@ -85,7 +89,9 @@ class LocalReviewEndpointTest < ActionDispatch::IntegrationTest
     Studio::Link.delete_all
     User.delete_all
     @original_role = Studio.local_review_role
+    @original_email = Studio.local_review_email
     Studio.local_review_role = "admin"
+    Studio.local_review_email = nil
     # Force the route set to DRAW here, under the test env. Rails 8.1 draws
     # lazily, and the dev-only routes are drawn `unless Rails.env.production?` —
     # so a test that flips Rails.env before the first draw would strand the whole
@@ -96,6 +102,7 @@ class LocalReviewEndpointTest < ActionDispatch::IntegrationTest
 
   def teardown
     Studio.local_review_role = @original_role
+    Studio.local_review_email = @original_email
   end
 
   # --- 1 + 2. a real token, on the matching URL, carrying the review page ----
@@ -133,7 +140,12 @@ class LocalReviewEndpointTest < ActionDispatch::IntegrationTest
 
   # --- a missing/garbled email mints nothing ---------------------------------
 
-  test "a blank email mints nothing and sends the operator to login" do
+  # No email named AND nobody to derive one from (setup empties `users`), so
+  # there is no operator at this desk. The endpoint says so instead of guessing.
+  # When the desk DOES have an operator, section 5 covers who gets picked.
+  test "a blank email on an operator-less desk mints nothing and sends you to login" do
+    assert_equal 0, User.count, "precondition: nobody to derive a reviewer from"
+
     get "/_studio/local_review", params: { return_to: "/admin/style" }
 
     assert_equal "/login", URI.parse(response.location).path
@@ -258,7 +270,69 @@ class LocalReviewEndpointTest < ActionDispatch::IntegrationTest
     assert_equal 0, User.count
   end
 
-  # --- 5. the developer-desk floor -------------------------------------------
+  # --- 5. no email named: the LOCAL desk answers "who is sitting here?" ------
+
+  # The board's CTA is a public, sign-in-free redirect, so it sends no email —
+  # publishing the operator's address on a public page is the thing being
+  # avoided. The mint must still land someone signed in.
+  test "with no email at all, the first admin in this database is signed in" do
+    User.create!(email: "viewer@example.com", role: "viewer")
+    User.create!(email: "first-admin@example.com", role: "admin")
+    User.create!(email: "second-admin@example.com", role: "admin")
+
+    get "/_studio/local_review", params: { return_to: "/admin/style" }
+
+    assert_response :redirect
+    assert_equal "first-admin@example.com", minted_link.email,
+      "the desk's own operator signs in when the caller names nobody"
+  end
+
+  test "Studio.local_review_email outranks the derived admin" do
+    User.create!(email: "first-admin@example.com", role: "admin")
+    Studio.local_review_email = "named-operator@example.com"
+
+    get "/_studio/local_review", params: { return_to: "/admin/style" }
+
+    assert_equal "named-operator@example.com", minted_link.email
+    assert User.find_by(email: "named-operator@example.com").admin?,
+      "and the named operator is provisioned like any other reviewer"
+  end
+
+  test "an explicit ?email= still outranks everything" do
+    User.create!(email: "first-admin@example.com", role: "admin")
+    Studio.local_review_email = "named-operator@example.com"
+
+    get "/_studio/local_review", params: { email: OPERATOR, return_to: "/admin/style" }
+
+    assert_equal OPERATOR, minted_link.email
+  end
+
+  # The ordering is by id, not by whoever was touched last, so a re-seeded desk
+  # resolves to the same person on every click.
+  test "the derived admin is the FIRST by id, not the most recently updated" do
+    first = User.create!(email: "first-admin@example.com", role: "admin")
+    second = User.create!(email: "second-admin@example.com", role: "admin")
+    second.update!(name: "touched last")
+    first.update!(name: "touched first")
+
+    get "/_studio/local_review", params: { return_to: "/admin/style" }
+
+    assert_equal "first-admin@example.com", minted_link.email
+  end
+
+  # A desk with users but no ADMIN among them still has no operator — the
+  # non-admin must not be promoted into one by accident.
+  test "a desk whose only user is a viewer mints nothing rather than promoting them" do
+    User.create!(email: "viewer@example.com", role: "viewer")
+
+    get "/_studio/local_review", params: { return_to: "/admin/style" }
+
+    assert_equal "/login", URI.parse(response.location).path
+    assert_equal 0, Studio::Link.count, "a desk with no operator mints nothing rather than guessing"
+    assert_equal "viewer", User.find_by(email: "viewer@example.com").role
+  end
+
+  # --- 6. the developer-desk floor -------------------------------------------
 
   # [unit] The gate itself, against the SHIPPED lib/studio.rb. It lives here and
   # not in the pure-Ruby unit suite because that suite runs without Rails and so

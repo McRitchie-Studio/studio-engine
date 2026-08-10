@@ -458,6 +458,15 @@ pages are not admin-gated:
 config.local_review_role = nil # provision the account, leave its role alone
 ```
 
+`?email=` is optional. The board's CTA is a public, sign-in-free redirect and
+sends none, so the local stack decides who to sign in: `Studio.local_review_email`
+if set, else the **first admin in this database, by id**. A desk with no admin
+mints nothing rather than guessing.
+
+```ruby
+config.local_review_email = "someone@example.com" # nil (default) = derive
+```
+
 When you send a page for review, verify the WHOLE hop rather than the page:
 mint → confirm → POST consume → follow, and check the final URL is the review
 path **and** that it answered `200`. A bare `curl /admin/whatever` returning

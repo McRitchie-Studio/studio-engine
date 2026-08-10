@@ -36,7 +36,7 @@ module Studio
     before_action :require_local_development!
 
     def show
-      email = Studio::LinkToken.normalize_email(params[:email])
+      email = reviewer_email
       return redirect_to(login_path, alert: MISSING_EMAIL) unless email.match?(URI::MailTo::EMAIL_REGEXP)
 
       # Provision BEFORE minting, so the consume finds an existing account and
@@ -55,6 +55,36 @@ module Studio
     private
 
     MISSING_EMAIL = "Add ?email=<your address> to mint a local review link."
+
+    # WHO to sign in, in priority order:
+    #
+    #   1. `?email=` — an explicit caller still wins.
+    #   2. `Studio.local_review_email` — the app's declared desk operator.
+    #   3. the first admin in this database — the seeded operator, by id.
+    #
+    # The board deliberately stops at (1) being ABSENT. Its WAITING APPROVAL CTA
+    # is a public, sign-in-free redirect, so an email in that URL would be an
+    # address published on a public page for anyone to read. The local stack is
+    # the right place to answer "who is at this desk": it is the machine the
+    # reviewer is sitting at, and it already knows its own operator.
+    def reviewer_email
+      Studio::LinkToken.normalize_email(
+        params[:email].presence || Studio.local_review_email.presence || seeded_admin_email
+      )
+    end
+
+    # The database's own first admin. Ordered by id so a re-seeded desk resolves
+    # to the same person every time rather than to whoever was touched last.
+    # Rescued because this runs before the mint on every click: a host with no
+    # role column must fall through to MISSING_EMAIL, not a 500.
+    def seeded_admin_email
+      return nil unless User.respond_to?(:column_names) && User.column_names.include?("role")
+
+      User.where(role: Studio.local_review_role.presence || "admin").order(:id).first&.email
+    rescue StandardError => e
+      Rails.logger.warn("[Studio::LocalReviewsController] no default reviewer: #{e.class}: #{e.message}")
+      nil
+    end
 
     # Find-or-create the reviewer and ensure Studio.local_review_role, so the
     # page under review actually RENDERS for whoever follows the link.

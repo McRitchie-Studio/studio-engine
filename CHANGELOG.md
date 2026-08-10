@@ -35,6 +35,22 @@ Set it to `nil` for an app whose review pages are not admin-gated — the accoun
 is still provisioned (that is what avoids `sign_up_new`), but its role is left
 to the host's own `configure_new_user`.
 
+**The endpoint also answers "who is sitting at this desk?" when the caller names
+nobody.** `?email=` is now optional. With none, the reviewer resolves to
+`Studio.local_review_email`, and failing that to the **first admin in this
+database, by id**:
+
+```ruby
+config.local_review_email = "someone@example.com" # nil (default) = derive
+```
+
+This exists so the board's WAITING APPROVAL CTA can be a **public, sign-in-free
+redirect**. Requiring a board session to click it is what broke one-click review
+in the first place; sending an email in that public URL would publish the
+operator's address. The local stack is the machine the reviewer is sitting at,
+so it is the right place to decide. A desk with no admin to derive mints nothing
+and says so, rather than guessing — and never promotes a non-admin into the role.
+
 **The floor is unchanged, and now asserted rather than assumed.** The endpoint
 grants a role, so both gates in front of it are tested directly: the
 developer-desk routes are drawn only outside production (proved by drawing

@@ -161,6 +161,17 @@ module Studio
   # already take from the local email inbox beside it.
   mattr_accessor :local_review_role, default: "admin"
 
+  # WHO the local-review mint signs in when the caller names no `?email=`.
+  #
+  # The board's WAITING APPROVAL CTA is a public, sign-in-free redirect, so it
+  # sends no email — putting one in that URL would publish the operator's
+  # address on a public page. The local stack answers the question instead: it
+  # is the machine the reviewer is sitting at.
+  #
+  # nil (the default) means "derive": the first admin in this database, by id.
+  # Set it explicitly on a desk whose operator is not the first seeded admin.
+  mattr_accessor :local_review_email, default: nil
+
   # Theme role colors (7 roles)
   mattr_accessor :theme_primary,  default: "#8E82FE"
   mattr_accessor :theme_dark,     default: "#1A1535"
