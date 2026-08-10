@@ -28,10 +28,17 @@ a description — and its only real asset is its banner image.
 **Inheritance with per-app override.** Resolution is now two-layered:
 
 ```
-url(:magic_link)  ->  this app's ImageCache row (its own S3 bucket)   app-owned
-                  ->  the engine's default gem asset                  inherited
-                  ->  nil                                             bannerless
+resolved_url(:magic_link)  ->  this app's ImageCache row (its own S3 bucket)  app-owned
+                           ->  the engine's default gem asset                 inherited
+                           ->  nil                                            bannerless
 ```
+
+`resolved_url`, **not** `url`. `url` deliberately keeps its pre-registry meaning —
+this app's own image, or nil — so a caller written before the registry keeps the
+behavior it was built against. A mailer that falls back itself
+(`url(...) || own_banner`) must stay on `url`; switching it to `resolved_url`
+would make that fallback dead code and replace the app's own artwork with the
+engine default.
 
 Defaults **ride the gem** (`app/assets/images/emails/*`), so a brand-new app with
 an empty bucket sends good-looking email on day one with no cross-app S3
