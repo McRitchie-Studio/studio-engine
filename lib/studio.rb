@@ -145,6 +145,22 @@ module Studio
   # is truthy, otherwise disabled. Production always disables capture.
   mattr_accessor :local_email_capture, default: nil
 
+  # The role Studio::LocalReviewsController stamps on the account it provisions
+  # for a local review (the board's WAITING APPROVAL button).
+  #
+  # It defaults to "admin" because the pages sent for review are overwhelmingly
+  # admin-gated, and the operator's address is his PRODUCTION one — an address a
+  # fresh worktree database has never seen, so the sign-in would otherwise CREATE
+  # him at the default role and `require_admin` would bounce him to "/". The
+  # sign-in succeeds and he never sees the page: the bug this knob exists to end.
+  #
+  # Set it to nil (or "") to provision the account WITHOUT touching its role —
+  # for an app whose review pages are not admin-gated, or whose role column
+  # means something else. Only ever reached behind local_tool_enabled?
+  # (non-production AND loopback), so it grants nothing a local reader could not
+  # already take from the local email inbox beside it.
+  mattr_accessor :local_review_role, default: "admin"
+
   # Theme role colors (7 roles)
   mattr_accessor :theme_primary,  default: "#8E82FE"
   mattr_accessor :theme_dark,     default: "#1A1535"

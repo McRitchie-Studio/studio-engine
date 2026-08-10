@@ -2,6 +2,47 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.33.0 — 2026-08-10
+
+**The local-review link now signs the reviewer in as someone who can SEE the
+page.** `/_studio/local_review` — the local half of the task board's WAITING
+APPROVAL button — provisions the account before it mints, at the new
+`Studio.local_review_role` (default `"admin"`).
+
+The board hands this endpoint the operator's **production** email address. A
+fresh worktree database has never seen it, so consuming the link took
+`Studio::LinkConsumption#sign_up_new` and created the account at the default
+role, `viewer`. `require_admin` on the page under review then redirected it to
+`/`. The sign-in **succeeded** every time, which is what kept this quiet: the
+button worked, the token was valid, and the operator simply arrived on the home
+page having never seen the thing he was asked to review. A seeded admin
+(`alex@mcritchie.studio`) worked fine, so only his real address ever hit it.
+
+The endpoint now find-or-creates the reviewer and ensures the role BEFORE
+minting, so the consume takes `sign_in_existing` onto an account that already
+has rights. An existing account is promoted, never duplicated; an already-correct
+one is not rewritten.
+
+New public config:
+
+```ruby
+Studio.configure do |config|
+  config.local_review_role = "admin" # default; nil provisions without a role
+end
+```
+
+Set it to `nil` for an app whose review pages are not admin-gated — the account
+is still provisioned (that is what avoids `sign_up_new`), but its role is left
+to the host's own `configure_new_user`.
+
+**The floor is unchanged, and now asserted rather than assumed.** The endpoint
+grants a role, so both gates in front of it are tested directly: the
+developer-desk routes are drawn only outside production (proved by drawing
+`Studio.routes` into a throwaway route set under a production env), and a
+non-loopback request 404s **before** provisioning or minting anything.
+Provisioning is best-effort: a host whose `User` rejects the write gets a logged
+warning and a working link, never a 500.
+
 ## 0.32.3 — 2026-08-09
 
 **New public CSS custom property: `--nav-bottom`.** `_head.html.erb` now
