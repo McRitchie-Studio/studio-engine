@@ -81,6 +81,30 @@ class LinkSidebarTest < Minitest::Test
     assert_includes button["@click.stop"], "$store.sidebars.linkTreeOpen"
   end
 
+  # Regression pin (industries wave-1): the base class string used to hardcode
+  # inline-flex AFTER the caller's class_name, so `hidden md:inline-flex` lost
+  # the cascade and the desktop trigger rendered on mobile beside the real
+  # mobile trigger. The caller owns the display class; bare renders default it.
+  def test_trigger_class_name_owns_the_display_class
+    html = view(sections: [], admin: false)
+           .render(partial: "components/link_sidebar_trigger", locals: { class_name: "hidden md:inline-flex" })
+    classes = Nokogiri::HTML5.fragment(html).at_css("button")["class"].split
+
+    assert_includes classes, "hidden"
+    assert_includes classes, "md:inline-flex"
+    refute_includes classes, "inline-flex",
+                    "a bare inline-flex token beats the caller's hidden in the cascade"
+  end
+
+  def test_trigger_defaults_to_inline_flex_without_class_name
+    html = view(sections: [], admin: false)
+           .render(partial: "components/link_sidebar_trigger")
+    classes = Nokogiri::HTML5.fragment(html).at_css("button")["class"].split
+
+    assert_includes classes, "inline-flex"
+    refute_includes classes, "hidden"
+  end
+
   private
 
   def render_sidebar(sections:, admin:, logged_in: true)
