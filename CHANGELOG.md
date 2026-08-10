@@ -2,6 +2,53 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.33.0 — Unreleased
+
+**The environment banner is now the navbar's SIBLING, not its child, and the
+navbar sizes itself to whatever bars are actually there.** Nesting the banner
+inside the navbar coupled two unrelated components: every new bar meant editing
+the navbar, and there is already a second bar (impersonation), so this was never
+a 0-or-1 problem.
+
+Render the stack immediately before the navbar:
+
+```erb
+<%= render "studio/banners/stack" %>
+<%= render "layouts/navbar" %>
+```
+
+The bars do not know the navbar exists; the navbar does not know which bars
+rendered — only how tall they are, via `--studio-bars-h`.
+
+**The height is MEASURED, not assumed.** A `ResizeObserver` on the stack
+publishes its real height, so a bar that needs to be taller, a second bar, or one
+that wraps on a narrow screen all work with **no change to any consuming app**.
+A server-rendered estimate paints first so the common case never flashes, then the
+observer replaces it with the truth. Verified in a real browser: growing the bar
+32px moved the stack, the published property and the header's `top` together, on
+the same frame.
+
+**Backward-compatible.** An app that renders no stack gets
+`var(--studio-bars-h, 0px)` — identical to the old `top-0`. Adoption is opt-in.
+
+### Added
+
+- **`studio/banners/stack`** — renders whichever bars apply (environment via
+  `Studio.show_environment_banner?`, impersonation when the host passes
+  `impersonated_user` / `admin_user` / `stop_path`) and publishes their measured
+  height. Takes `preview:` and forwards `devnet:` / `extra:` to the environment bar.
+  A preview render emits nothing at all, so a navbar-preview copy cannot duplicate
+  live chrome or publish a height.
+
+### Changed
+
+- **The navbar's sticky `top` reads `--studio-bars-h`** instead of hardcoding
+  `top-0`. It never branches on which bars rendered.
+- **Banners are branded off the app's own theme tokens** — the environment bar
+  derives from `--color-warning` and impersonation from `--color-danger`, each
+  under a translucent gradient wash, replacing hardcoded hex stops. An app that
+  retunes its theme now gets a banner that follows it.
+
 ## 0.32.3 — 2026-08-09
 
 **New public CSS custom property: `--nav-bottom`.** `_head.html.erb` now
@@ -48,7 +95,7 @@ rendered the desktop trigger on mobile beside the real one. Callers now own
 the display class (bare renders default to `inline-flex`). Regression view
 tests pin both.
 
-## 0.32.1 — Unreleased
+## 0.32.1 — 2026-08-09
 
 **Setup-guide corrections.** Docs only — no code, no behavior change.
 
