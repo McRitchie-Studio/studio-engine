@@ -26,10 +26,22 @@ module Studio
       @variants = Studio::EmailImage.variants
     end
 
-    # The canonical page this one is being retired in favour of. Rendered as a
-    # banner at the top of the old view so an admin who lands here by a stale
-    # link or bookmark is walked forward rather than left on the worse page.
+    # The canonical page this one is being retired in favour of, or nil when this
+    # app has not drawn it. Rendered as a banner at the top of the old view so an
+    # admin who lands here by a stale link is walked forward.
+    #
+    # The nil case is REAL, not defensive padding: /admin/emails is opt-in
+    # (Studio.draw_admin_emails_routes, default off because turf-monster owns the
+    # name), so on any app that has not opted in the helper does not exist and a
+    # bare call raises NameError — which 500s this page. Consumer CI caught
+    # exactly that on mcritchie-studio.
+    #
+    # Asks the ROUTER rather than the config flag: the flag is read at route-draw
+    # time, so a host that flips it afterwards would still have no route, and the
+    # router is the thing that actually knows.
     def successor_path
+      return nil unless Rails.application.routes.named_routes.key?(:admin_emails)
+
       admin_emails_path
     end
     helper_method :successor_path

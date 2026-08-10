@@ -11,15 +11,19 @@
     </p>
   </header>
 
-  <div class="mb-6 rounded-xl border border-subtle bg-inset px-4 py-3">
-    <p class="text-sm font-semibold text-heading">There's a better page now</p>
-    <p class="text-sm text-body mt-1">
-      <%= link_to "Emails", successor_path, class: "underline underline-offset-2" %>
-      lists every email this app sends with its live banner, says whether that
-      banner is the shared default or this app's own, and crops on upload.
-      This page is going away.
-    </p>
-  </div>
+  <%# Only when this app actually DREW /admin/emails — it is opt-in, and pointing
+      at a route that does not exist raises NameError and 500s this page. %>
+  <% if successor_path %>
+    <div class="mb-6 rounded-xl border border-subtle bg-inset px-4 py-3">
+      <p class="text-sm font-semibold text-heading">There's a better page now</p>
+      <p class="text-sm text-body mt-1">
+        <%= link_to "Emails", successor_path, class: "underline underline-offset-2" %>
+        lists every email this app sends with its live banner, says whether that
+        banner is the shared default or this app's own, and crops on upload.
+        This page is going away.
+      </p>
+    </div>
+  <% end %>
 
   <% flash.each do |type, message| %>
     <div class="mb-4 rounded-lg px-4 py-3 text-sm <%= type.to_s == "alert" ? "bg-danger/10 text-danger" : "bg-success/10 text-success" %>">

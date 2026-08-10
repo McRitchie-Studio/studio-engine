@@ -125,6 +125,43 @@ class EmailsPageTest < ActiveSupport::TestCase
     assert_equal "update", patch_route.defaults[:action]
   end
 
+  # REGRESSION GUARD. The deprecated page links forward to /admin/emails — but
+  # that page is OPT-IN, so on an app that has not drawn it the helper does not
+  # exist and a bare call raises NameError, 500ing the very page the deprecation
+  # window exists to keep working. Consumer CI caught this on mcritchie-studio:
+  # "undefined local variable or method `admin_emails_path' for an instance of
+  # Studio::EmailImagesController".
+  test "the legacy page's forward link is guarded on the successor route existing" do
+    controller_source = File.read(
+      File.expand_path("../../app/controllers/studio/email_images_controller.rb", __dir__)
+    )
+    view_source = File.read(
+      File.expand_path("../../app/views/studio/email_images/index.html.erb", __dir__)
+    )
+
+    assert_includes controller_source, "named_routes.key?(:admin_emails)",
+      "successor_path must ask the router, not assume the opt-in route was drawn"
+    assert_includes view_source, "<% if successor_path %>",
+      "the forward-link banner must render only when there is a successor to link to"
+  end
+
+  test "successor_path returns nil when the opt-in page was never drawn" do
+    ensure_application_controller!
+    controller = Studio::EmailImagesController.new
+
+    # Stand in a router with no admin_emails route — an app that did not opt in.
+    # Hand-rolled singleton stub with ensure-restore; Minitest 6 dropped
+    # minitest/mock, so there is no .stub here.
+    app = Rails.application
+    original = app.method(:routes)
+    app.define_singleton_method(:routes) { ActionDispatch::Routing::RouteSet.new }
+
+    assert_nil controller.send(:successor_path),
+      "a page that 500s is worse than a page with no forward link"
+  ensure
+    app&.define_singleton_method(:routes, original) if original
+  end
+
   # Even on its way out, the old page must not keep telling the operator the
   # WRONG thing — reading only the S3 override is the bug this work exists to
   # fix, and it lives in both views until the old one is deleted.
