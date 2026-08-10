@@ -42,6 +42,7 @@ echo "Studio Engine: $(ruby -Ilib -e 'require "studio/version"; print Studio::VE
 for file in \
   lib/studio.rb \
   lib/studio/engine.rb \
+  lib/studio/log_rotation.rb \
   lib/studio/email.rb \
   lib/studio/email_smoke.rb \
   lib/studio/mail_transport.rb \
