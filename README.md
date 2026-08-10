@@ -55,6 +55,35 @@ Studio.configure do |config|
 end
 ```
 
+### Local log rotation (automatic — nothing to configure)
+
+The engine caps the host app's **development** log at 16 MB and its **test** log
+at 8 MB, keeping one rotated sibling each. There is nothing to install, run, or
+remember: it rides the gem, so every checkout and every worktree is born with it.
+
+It exists because Rails' own default is far too generous for a machine that
+carries many worktrees. `config.load_defaults "7.1"` sets `log_file_size` to
+**100 MB** for development *and* test, and each keeps a rotated sibling — up to
+~400 MB of log per checkout.
+
+**Production is untouched.** The cap applies only where `Rails.env.local?`, so
+apps that hand their stream to STDOUT for the platform keep doing exactly that.
+A host that names its own `config.logger` is never overridden.
+
+To choose your own cap, or to opt out:
+
+```ruby
+# config/application.rb (after `require "studio"`) or config/environments/development.rb
+Studio.local_log_max_bytes = 64.megabytes  # your own cap
+Studio.local_log_max_bytes = false         # opt out; Rails' 100 MB default returns
+```
+
+**This one setting cannot go in `config/initializers/studio.rb`.** It is read
+during boot — Rails builds the logger in a bootstrap initializer, long before
+`config/initializers` is loaded — so an initializer would be too late and would
+silently do nothing. Every *other* `Studio.*` setting belongs in the initializer
+as usual.
+
 Transactional mail transport is shared through `Studio::MailTransport`:
 
 ```ruby
