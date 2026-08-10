@@ -2,6 +2,95 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.33.0 — 2026-08-10
+
+**Transactional emails become an engine primitive.** Every consuming app now
+ships working, branded transactional email the moment it boots, and can grow its
+own workflows and artwork. Additive — no host change is required to take this
+release.
+
+**`Studio::EmailImage` is now a registry.** It was a one-entry `VARIANTS` hash;
+it is now a host-declared registry following the `Studio::ModelPage.register`
+precedent. A registered email is mostly symbolic of a workflow — a key, a label,
+a description — and its only real asset is its banner image.
+
+- The engine **pre-registers the two every Studio app sends**, `magic_link` and
+  `email_change_confirmation`, so a host inherits both without declaring
+  anything.
+- A host registers its own from an initializer:
+  `Studio::EmailImage.register("winnings", label: "Contest winnings")`.
+  Re-registering an inherited key **updates it in place**, keeping its page
+  position and its inherited artwork.
+- `variants`, `label`, `known?`, `record`, `url`, and `store` keep their old
+  shapes, so `Studio::EmailImage.url(:magic_link)` — the only external caller
+  today — is untouched.
+
+**Inheritance with per-app override.** Resolution is now two-layered:
+
+```
+url(:magic_link)  ->  this app's ImageCache row (its own S3 bucket)   app-owned
+                  ->  the engine's default gem asset                  inherited
+                  ->  nil                                             bannerless
+```
+
+Defaults **ride the gem** (`app/assets/images/emails/*`), so a brand-new app with
+an empty bucket sends good-looking email on day one with no cross-app S3
+permission. Uploading writes to that app's own bucket and its own `image_caches`
+row — which is exactly "the asset now belongs to this app". Placeholder artwork
+ships for both standard emails; real artwork lands in a later release.
+
+**New: `/admin/emails`**, modelled on the living style guide — one shared engine
+page, admin-gated, rendering inside each host's layout. Replaces
+`/admin/email_images`, whose `admin_email_images_path` helper **still resolves**
+(now a redirect), so a shipped host sidebar link keeps working through adoption.
+
+- The table is the primary view: **name + live image on every row**, so an email
+  is identifiable at a glance.
+- Each row says whether the live image is the **inherited default** or
+  **app-owned**, and an app-owned image can be reverted back to the default.
+- Uploading goes through the **standard crop modal**, not a bare file input.
+
+**Fix — the page misreported what was actually shipping.** It read only the S3
+override, so it announced *"No image yet — emails send without a banner until you
+upload one"* for an email that was visibly sending a banner from a committed repo
+asset. `current_url` now resolves what really ships, and the copy distinguishes
+"inherited default" from "no image at all".
+
+**New: `Studio.s3_key_prefix`** — an optional key namespace inside the bucket, so
+a satellite app can share an already-provisioned bucket instead of standing up
+its own pair:
+
+```ruby
+config.s3_bucket_prefix = "mcritchie-studio"
+config.s3_key_prefix    = "mcritchie-industries/"
+# -> s3://mcritchie-studio-dev/mcritchie-industries/email_banners/...
+```
+
+`Studio::S3` applies it to `upload`, `download`, `url`, `signed_url`, `exists?`,
+`delete`, and `list` — callers keep passing logical keys and never see it, and
+`list` strips it back off so a result feeds straight into `download`/`url`.
+**Unset by default, so every already-shipped app's keys are byte-identical.**
+Also new: `Studio::S3.configured?`, for callers that must degrade rather than
+rescue `NotConfigured`.
+
+**Honest degradation.** An app whose host never set `s3_bucket_prefix` renders
+`/admin/emails` **read-only** — showing the inherited defaults it is genuinely
+sending, naming the one setting that turns uploads on — instead of 500ing on the
+first upload.
+
+**`studio/modals/_host` takes a `store:` local** (default `"modals"`, so every
+shipped call site is unchanged). Pass a different name to mount a second,
+page-scoped host inside one page's body. `/admin/emails` uses it
+(`store: "emailModals"`) to bring its own crop + saving modals, so the page works
+identically in an app that renders a shared modal host and one that renders none
+at all. `imageUploadHost` and `submitFormWithProgress` accept the same `store`
+option; the crop-photo and saving partials already did.
+
+**Consumer note.** Nothing here is required to upgrade. To adopt: link
+`admin_emails_path` from the app's admin sidebar, register any extra workflows,
+and drop any local `branded_mailer.html.erb` fork — the engine's copy is
+app-name-aware through `Studio.app_name`.
+
 ## 0.32.3 — 2026-08-09
 
 **New public CSS custom property: `--nav-bottom`.** `_head.html.erb` now

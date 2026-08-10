@@ -8,6 +8,26 @@ module Studio
         studio/studio_confetti.js
         studio/sortable.js
       ]
+
+      # The INHERITED default email banners (Studio::EmailImage). They ride the
+      # gem so a brand-new app sends branded email on day one with an empty S3
+      # bucket. Enumerated from disk rather than listed by hand so adding a
+      # default is a one-file change. Sprockets hosts (mcritchie-studio,
+      # turf-monster) need the explicit precompile entry; propshaft hosts
+      # (mcritchie-industries, moms-app) serve everything on config.assets.paths
+      # and ignore this list.
+      # Named on the CLASS, not bare: an initializer block is instance_exec'd on
+      # an Engine INSTANCE, where a bare call resolves to nothing and boots red.
+      app.config.assets.precompile += Studio::Engine.default_email_banner_logical_paths
+    end
+
+    # Logical asset paths ("emails/magic-link.png") for every default banner the
+    # gem ships.
+    def self.default_email_banner_logical_paths
+      Dir[File.expand_path("../../app/assets/images/emails/*", __dir__)]
+        .select { |path| File.file?(path) }
+        .map { |path| "emails/#{File.basename(path)}" }
+        .sort
     end
 
     rake_tasks do

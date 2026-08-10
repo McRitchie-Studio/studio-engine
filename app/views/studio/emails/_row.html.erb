@@ -1,0 +1,99 @@
+<%# locals: (entry:, uploads_available:, aspect:, max_width:)
+    One registered email: its live banner, its name, and where that banner comes
+    from. The whole row is the imageUploadHost x-data so the thumbnail, the Edit
+    button, and the hidden multipart form the cropper submits all sit together —
+    the same unit turf-monster's og:image uploader uses, on the page-scoped
+    `emailModals` store. %>
+<%
+  source     = Studio::EmailImage.source(entry.key)
+  banner_url = Studio::EmailImage.preview_url(entry.key)
+  form_id    = "email-banner-form-#{entry.key.dasherize}"
+
+  # `badge` is a shape-only utility in engine.css — the state color comes from
+  # theme-token utilities so it follows each app's palette in light and dark.
+  badge_class, badge_label, badge_note =
+    case source
+    when :app
+      ["badge bg-success/10 text-success border-success/30", "#{Studio.app_name}'s own",
+       "Uploaded here — this app owns it."]
+    when :default
+      ["badge bg-inset text-muted border-subtle", "Inherited default",
+       "Shared Studio artwork, shipped with the engine."]
+    else
+      ["badge bg-warning/10 text-warning border-warning/30", "No image",
+       "This email sends without a banner."]
+    end
+%>
+<%# The uploader host is attached ONLY when this app can actually store an
+    override. On a read-only app the cropper assets are not loaded either, so an
+    unconditional x-data would reference an undefined factory and Alpine would
+    throw on every row. %>
+<tr class="border-b border-subtle last:border-0"
+    <% if uploads_available %>
+      x-data="imageUploadHost({
+        store: 'emailModals',
+        aspectRatio: <%= aspect %>,
+        maxWidth: <%= max_width %>,
+        transparent: false,
+        filename: '<%= entry.key %>.png',
+        saving: 'Saving banner…',
+        success: 'Banner updated',
+        successMessage: '<%= j entry.label %> now uses this app\'s own image.',
+        failure: 'Couldn\'t save the banner'
+      })"
+      @crop-photo-confirmed.window="applyCrop($event.detail.blob)"
+    <% end %>>
+
+  <td class="px-4 py-4">
+    <div class="rounded-lg overflow-hidden border border-subtle w-40"
+         style="aspect-ratio: <%= aspect %>; background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-900));">
+      <% if banner_url %>
+        <%= image_tag banner_url, class: "w-full h-full object-cover",
+              alt: "#{entry.label} email banner", loading: "lazy" %>
+      <% else %>
+        <div class="w-full h-full flex items-center justify-center text-2xs text-white/80 text-center px-3">
+          No banner
+        </div>
+      <% end %>
+    </div>
+  </td>
+
+  <td class="px-4 py-4">
+    <p class="font-semibold text-heading"><%= entry.label %></p>
+    <% if entry.description.present? %>
+      <p class="text-sm text-body mt-0.5 max-w-md"><%= entry.description %></p>
+    <% end %>
+    <p class="font-mono text-2xs text-muted mt-1"><%= entry.key %></p>
+  </td>
+
+  <td class="px-4 py-4">
+    <span class="<%= badge_class %>"><%= badge_label %></span>
+    <p class="text-2xs text-muted mt-1.5 max-w-[12rem]"><%= badge_note %></p>
+  </td>
+
+  <% if uploads_available %>
+    <td class="px-4 py-4 text-right whitespace-nowrap">
+      <button type="button" @click="open()" class="btn btn-outline btn-sm inline-flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+        </svg>
+        <%= source == :app ? "Replace" : "Upload" %>
+      </button>
+
+      <%# Only an APP-OWNED image can be reverted — there is nothing to drop when
+          the row is already showing the inherited default. %>
+      <% if source == :app %>
+        <%= button_to "Revert", admin_email_path(entry.key), method: :delete,
+              class: "btn btn-neutral btn-sm mt-1.5 w-full",
+              form: { data: { turbo_confirm: "Drop #{Studio.app_name}'s own #{entry.label} banner and go back to the shared default?" } } %>
+      <% end %>
+
+      <%# The cropper drops its Blob into this hidden input and submits. %>
+      <%= form_with url: admin_email_path(entry.key), method: :patch,
+            html: { multipart: true, id: form_id, "x-ref": "form" } do %>
+        <%= file_field_tag :image, class: "hidden", "x-ref": "fileInput" %>
+      <% end %>
+    </td>
+  <% end %>
+</tr>

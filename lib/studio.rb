@@ -163,6 +163,19 @@ module Studio
   mattr_accessor :s3_bucket_prefix, default: nil
   mattr_accessor :s3_region,        default: "us-east-2"
 
+  # Optional key namespace INSIDE the bucket, so a satellite app can share an
+  # existing bucket instead of provisioning its own pair. Set it and every key a
+  # caller passes to Studio::S3 is stored/read under that prefix — callers keep
+  # passing logical keys ("email_banners/magic_link-ab12.jpg") and never see it:
+  #
+  #   config.s3_bucket_prefix = "mcritchie-studio"
+  #   config.s3_key_prefix    = "mcritchie-industries/"
+  #   # -> s3://mcritchie-studio-dev/mcritchie-industries/email_banners/...
+  #
+  # Default nil = no namespace, so every already-shipped app's keys are unchanged.
+  # A trailing slash is added if you leave it off.
+  mattr_accessor :s3_key_prefix, default: nil
+
   class S3ConfigError < StandardError; end
 
   # Whether to validate the host app's User model at boot. See docs/USER_CONTRACT.md.
@@ -462,12 +475,21 @@ module Studio
       get   "admin/style",            to: "style#index",               as: :admin_style
       get   "admin/design_system",    to: redirect("/admin/style"),    as: :admin_design_system
 
-      # Admin-managed transactional-email banner images (Studio::EmailImage).
-      # index lists each managed email variant + its current banner; update
-      # uploads a replacement. Surfaced from each app's admin hub.
-      get   "admin/email_images",          to: "studio/email_images#index",  as: :admin_email_images
-      patch "admin/email_images/:variant", to: "studio/email_images#update",  as: :admin_email_image,
-            constraints: { variant: /[a-z_]+/ }
+      # The standard transactional-email page. Canonical at /admin/emails
+      # (Studio::EmailsController): index lists every registered email with its
+      # live banner and whether that banner is inherited or app-owned; update
+      # stores this app's own override; destroy drops it back to the inherited
+      # default. Surfaced from each app's admin sidebar.
+      #
+      # /admin/email_images redirects here but KEEPS its admin_email_images_path
+      # helper, so a shipped host sidebar link on the old helper still resolves
+      # (same treatment as /admin/design_system -> /admin/style).
+      get    "admin/emails",      to: "studio/emails#index",   as: :admin_emails
+      patch  "admin/emails/:key", to: "studio/emails#update",  as: :admin_email,
+             constraints: { key: /[a-z0-9_]+/ }
+      delete "admin/emails/:key", to: "studio/emails#destroy",
+             constraints: { key: /[a-z0-9_]+/ }
+      get   "admin/email_images", to: redirect("/admin/emails"), as: :admin_email_images
 
       # Model-page protocol (v1) — a reusable per-record inspector. Drawn into
       # every consuming app: /models/:model/:id renders one record as pretty JSON

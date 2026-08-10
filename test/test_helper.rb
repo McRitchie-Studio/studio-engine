@@ -61,6 +61,12 @@ module Studio
   mattr_accessor :impersonation_started_at_session_key, default: :impersonation_started_at
   mattr_accessor :impersonation_max_minutes, default: 30
 
+  # S3 / object storage. s3_key_prefix is the optional key namespace inside the
+  # bucket, so a satellite app can share an existing bucket (see lib/studio/s3.rb).
+  mattr_accessor :s3_bucket_prefix, default: nil
+  mattr_accessor :s3_region,        default: "us-east-2"
+  mattr_accessor :s3_key_prefix,    default: nil
+
   def self.configure
     yield self
   end

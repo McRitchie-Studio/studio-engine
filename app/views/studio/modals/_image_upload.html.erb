@@ -162,10 +162,11 @@
   // Swaps in the 'saving' card while the form uploads, then closes it (held
   // >= ~450ms so it doesn't flash) and toasts on completion. opts: { saving,
   // success, successMessage, failure, failureMessage, dismissible (default
-  // false), toast (default true) }.
+  // false), toast (default true), store (Alpine store name, default "modals" —
+  // pass a page-scoped host's name, e.g. "emailModals") }.
   window.submitFormWithProgress = function (form, opts) {
     opts = opts || {};
-    var store = window.Alpine && Alpine.store("modals");
+    var store = window.Alpine && Alpine.store(opts.store || "modals");
     var hold = (window.StudioModals && window.StudioModals.holdAtLeast)
       ? window.StudioModals.holdAtLeast(450)
       : { then: function (cb) { cb(); } };
@@ -199,9 +200,14 @@
   // it into the host's own hidden form input and submits immediately with a
   // loading card + toast (submitFormWithProgress). opts = crop config
   // (aspectRatio, maxWidth, maxHeight, transparent, autoCropArea) + save copy
-  // (saving, success, successMessage, failure, dismissible, toast, filename).
+  // (saving, success, successMessage, failure, dismissible, toast, filename) +
+  // store (Alpine store name, default "modals"). Pass `store` when the crop and
+  // saving modals are mounted on a PAGE-SCOPED host rather than the app's shared
+  // one — /admin/emails does, so the uploader works even in a host app that
+  // renders no shared modal host at all.
   window.imageUploadHost = function (opts) {
     opts = opts || {};
+    var storeName = opts.store || "modals";
     function cropProps(extra) {
       var p = {
         aspectRatio: opts.aspectRatio || 1,
@@ -217,8 +223,8 @@
     return {
       // Modal-as-picker: the crop modal itself is the file picker / drop target.
       open() {
-        if (!window.Alpine || !Alpine.store("modals")) return;
-        Alpine.store("modals").open("crop-photo", cropProps());
+        if (!window.Alpine || !Alpine.store(storeName)) return;
+        Alpine.store(storeName).open("crop-photo", cropProps());
       },
       // Native picker: read the chosen image, then hand it to the modal.
       onFileSelected(event) {
@@ -226,7 +232,7 @@
         if (!file) return;
         var reader = new FileReader();
         reader.onload = function (e) {
-          Alpine.store("modals").open("crop-photo", cropProps({ imageUrl: e.target.result }));
+          Alpine.store(storeName).open("crop-photo", cropProps({ imageUrl: e.target.result }));
         };
         reader.readAsDataURL(file);
         event.target.value = "";
