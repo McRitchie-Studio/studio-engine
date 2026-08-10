@@ -2,6 +2,40 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.32.3 — 2026-08-09
+
+**New public CSS custom property: `--nav-bottom`.** `_head.html.erb` now
+publishes the page header's **bottom edge** in viewport coordinates alongside
+the existing `--nav-h`, which stays the header's **height**. Use them for
+different jobs:
+
+- `var(--nav-h)` — to size something as tall as the header.
+- `var(--nav-bottom)` — to **start** something underneath it.
+
+They are equal only when the header sits at the top of the viewport, which is
+why one was long used for the other. An app that renders chrome **above** the
+navbar — an environment banner before the `<header>` — pushes the header down,
+and a `fixed` overlay offset by `--nav-h` then rides up over the header by
+exactly the height of that chrome.
+
+**Fix — `components/_sidebar_panel` offsets from `--nav-bottom`.** The open
+sidebar panel overlapped the header by 47px on `mcritchie-industries`, covering
+the Log in button. Falls back to `var(--nav-h)` (then `6rem`), so a host that
+overrides `layouts/studio/_head` keeps today's geometry rather than collapsing.
+**No change for a consumer whose header already starts at the viewport top** —
+the two values converge there.
+
+Unlike `--nav-h`, `--nav-bottom` is **scroll-dependent**: chrome above the
+header scrolls away while a panel is open, and nothing locks body scroll. It
+republishes on a passive `scroll` listener behind a `requestAnimationFrame`
+throttle, bound once at script eval rather than per Turbo visit. A page with no
+`<header>` now releases the observed node, so a Turbo visit to a headerless page
+can no longer publish an all-zero rect from a detached element.
+
+**Note for hosts that override `components/_sidebar_panel`** — an app copy of
+that partial shadows the engine's, so it keeps the old `top:var(--nav-h, 6rem)`
+until updated. `mcritchie-studio` and `turf-monster` both carry such an override.
+
 ## 0.32.2 — 2026-08-09
 
 **Two public-page navigation fixes** (found by the industries sidebar-adoption
