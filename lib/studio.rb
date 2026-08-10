@@ -170,6 +170,36 @@ module Studio
   # is truthy, otherwise disabled. Production always disables capture.
   mattr_accessor :local_email_capture, default: nil
 
+  # The role Studio::LocalReviewsController stamps on the account it provisions
+  # for a local review (the board's WAITING APPROVAL button).
+  #
+  # It defaults to "admin" because the pages sent for review are overwhelmingly
+  # admin-gated, and the operator's address is his PRODUCTION one — an address a
+  # fresh worktree database has never seen, so the sign-in would otherwise CREATE
+  # him at the default role and `require_admin` would bounce him to "/". The
+  # sign-in succeeds and he never sees the page: the bug this knob exists to end.
+  #
+  # Set it to nil (or "") to provision the account WITHOUT touching its role —
+  # for an app whose review pages are not admin-gated, or whose role column
+  # means something else. Only ever reached behind local_tool_enabled?
+  # (non-production AND loopback), so it grants nothing a local reader could not
+  # already take from the local email inbox beside it.
+  mattr_accessor :local_review_role, default: "admin"
+
+  # WHO the local-review mint signs in when the caller names no `?email=`.
+  #
+  # The board's WAITING APPROVAL CTA is a public, sign-in-free redirect, so it
+  # sends no email — putting one in that URL would publish the operator's
+  # address on a public page. The local stack answers the question instead: it
+  # is the machine the reviewer is sitting at.
+  #
+  # nil (the default) means "derive": the first user in this database already
+  # holding local_review_role, by id — falling back to "admin" when that setting
+  # is itself nil. So a desk that switches local_review_role OFF has no role to
+  # derive FROM and should name its operator here explicitly, as should a desk
+  # whose operator is not the first seeded account at that role.
+  mattr_accessor :local_review_email, default: nil
+
   # Theme role colors (7 roles)
   mattr_accessor :theme_primary,  default: "#8E82FE"
   mattr_accessor :theme_dark,     default: "#1A1535"

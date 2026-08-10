@@ -2,7 +2,7 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
-## 0.34.0 — 2026-08-10
+## 0.36.0 — 2026-08-10
 
 **Transactional emails become an engine primitive.** Every consuming app now
 ships working, branded transactional email the moment it boots, and can grow its
@@ -140,7 +140,78 @@ admin sidebar, register any extra workflows, switch mailers from `url` to
 `branded_mailer.html.erb` fork — the engine's copy is app-name-aware through
 `Studio.app_name`.
 
+**The local-review link now signs the reviewer in as someone who can SEE the
+page.** `/_studio/local_review` — the local half of the task board's WAITING
+APPROVAL button — provisions the account before it mints, at the new
+`Studio.local_review_role` (default `"admin"`).
+
+The board hands this endpoint the operator's **production** email address. A
+fresh worktree database has never seen it, so consuming the link took
+`Studio::LinkConsumption#sign_up_new` and created the account at the default
+role, `viewer`. `require_admin` on the page under review then redirected it to
+`/`. The sign-in **succeeded** every time, which is what kept this quiet: the
+button worked, the token was valid, and the operator simply arrived on the home
+page having never seen the thing he was asked to review. A seeded admin
+(`alex@mcritchie.studio`) worked fine, so only his real address ever hit it.
+
+The endpoint now find-or-creates the reviewer and ensures the role BEFORE
+minting, so the consume takes `sign_in_existing` onto an account that already
+has rights. An existing account is promoted, never duplicated; an already-correct
+one is not rewritten.
+
+New public config:
+
+```ruby
+Studio.configure do |config|
+  config.local_review_role = "admin" # default; nil provisions without a role
+end
+```
+
+Set it to `nil` for an app whose review pages are not admin-gated — the account
+is still provisioned (that is what avoids `sign_up_new`), but its role is left
+to the host's own `configure_new_user`.
+
+**The endpoint also answers "who is sitting at this desk?" when the caller names
+nobody.** `?email=` is now optional, and an explicit one still wins. With none,
+the reviewer resolves to `Studio.local_review_email`, and failing that to the
+**first user already holding `Studio.local_review_role`, by id** (that query
+falls back to `"admin"` when the setting is `nil`):
+
+```ruby
+config.local_review_email = "someone@example.com" # nil (default) = derive
+```
+
+This exists so the board's WAITING APPROVAL CTA can be a **public, sign-in-free
+redirect**. Requiring a board session to click it is what broke one-click review
+in the first place; sending an email in that public URL would publish the
+operator's address. The local stack is the machine the reviewer is sitting at,
+so it is the right place to decide. A desk with nobody at that role mints
+nothing and says so, rather than guessing: the derive only ever picks someone
+who ALREADY holds the role, so it never promotes a stranger into it. (The
+`?email=` path does promote the account it is handed — that is the point of it.)
+
+**The floor is unchanged, and now asserted rather than assumed.** The endpoint
+grants a role, so both gates in front of it are tested directly: the
+developer-desk routes are drawn only outside production (proved by drawing
+`Studio.routes` into a throwaway route set under a production env), and a
+non-loopback request 404s **before** provisioning or minting anything.
+Provisioning is best-effort: a host whose `User` rejects the write gets a logged
+warning and a working link, never a 500.
+
+### Added
+
+- **`Studio.local_review_role`** — the role `/_studio/local_review` stamps on the
+  account it provisions before minting. Defaults to `"admin"`; `nil` provisions
+  the account without touching its role.
+- **`Studio.local_review_email`** — who the local-review mint signs in when the
+  caller sends no `?email=`. `nil` (the default) derives the first admin in this
+  database, by id.
+
 ## 0.33.0 — 2026-08-10
+
+Two changes ship together in this release: local log files are now capped, and
+the pinned bars above the navbar become a composable **stack** that sits beside
+the navbar rather than inside it.
 
 **Local log files are now capped — 16 MB development, 8 MB test.** New
 `studio.logger` initializer. Nothing to install, run, or remember: it rides the
@@ -178,6 +249,59 @@ satisfied by Rails' 100 MB default. Dropping the `before:` ordering reds it.
 sets your own cap. Unlike every other `Studio.*` setting, it must be set in
 `config/application.rb` (after `require "studio"`) or `config/environments/*.rb`
 — `config/initializers/studio.rb` loads too late to be read.
+
+---
+
+**The environment banner is now the navbar's SIBLING, not its child, and the
+navbar sizes itself to whatever bars are actually there.** Nesting the banner
+inside the navbar coupled two unrelated components: every new bar meant editing
+the navbar, and there is already a second bar (impersonation), so this was never
+a 0-or-1 problem.
+
+Render the stack immediately before the navbar:
+
+```erb
+<%= render "studio/banners/stack" %>
+<%= render "layouts/navbar" %>
+```
+
+The bars do not know the navbar exists; the navbar does not know which bars
+rendered — only how tall they are, via `--studio-bars-h`.
+
+**The height is MEASURED, not assumed.** A `ResizeObserver` on the stack
+publishes its real height, so a bar that needs to be taller, a second bar, or one
+that wraps on a narrow screen all work with **no change to any consuming app**.
+A server-rendered estimate paints first so the common case never flashes, then the
+observer replaces it with the truth. Verified in a real browser: growing the bar
+32px moved the stack, the published property and the header's `top` together, on
+the same frame.
+
+**Backward-compatible.** An app that renders no stack gets
+`var(--studio-bars-h, 0px)` — identical to the old `top-0`. Adoption is opt-in.
+
+### Added
+
+- **`studio/banners/stack`** — renders whichever bars apply (environment via
+  `Studio.show_environment_banner?`, impersonation when the host passes
+  `impersonated_user` / `admin_user` / `stop_path`) and publishes their measured
+  height. Takes `preview:` and forwards `devnet:` / `extra:` to the environment bar.
+  A preview render emits nothing at all, so a navbar-preview copy cannot duplicate
+  live chrome or publish a height.
+- **`Studio.local_log_max_bytes`** — the opt-out (`false`) or override (an
+  Integer) for the new local log cap. Set it in `config/application.rb` or
+  `config/environments/*.rb`, never `config/initializers/studio.rb`.
+
+### Changed
+
+- **The navbar's sticky `top` reads `--studio-bars-h`** instead of hardcoding
+  `top-0`. It never branches on which bars rendered.
+- **Banners are branded off the app's own theme tokens** — the environment bar
+  derives from `--color-warning` and impersonation from `--color-danger`, each
+  under a translucent gradient wash, replacing hardcoded hex stops. An app that
+  retunes its theme now gets a banner that follows it.
+- **Local `development` and `test` logs rotate at 16 MB / 8 MB** via the new
+  `studio.logger` initializer, down from Rails' 100 MB default. Production is
+  untouched.
 
 ## 0.32.3 — 2026-08-09
 
@@ -225,7 +349,7 @@ rendered the desktop trigger on mobile beside the real one. Callers now own
 the display class (bare renders default to `inline-flex`). Regression view
 tests pin both.
 
-## 0.32.1 — Unreleased
+## 0.32.1 — 2026-08-09
 
 **Setup-guide corrections.** Docs only — no code, no behavior change.
 
