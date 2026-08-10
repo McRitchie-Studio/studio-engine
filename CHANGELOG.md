@@ -192,6 +192,10 @@ admin sidebar, register any extra workflows, switch mailers from `url` to
 
 ## 0.33.0 — 2026-08-10
 
+Two changes ship together in this release: local log files are now capped, and
+the pinned bars above the navbar become a composable **stack** that sits beside
+the navbar rather than inside it.
+
 **Local log files are now capped — 16 MB development, 8 MB test.** New
 `studio.logger` initializer. Nothing to install, run, or remember: it rides the
 gem, so every app, every future app, every worktree, and a freshly rebuilt Mac
@@ -228,6 +232,59 @@ satisfied by Rails' 100 MB default. Dropping the `before:` ordering reds it.
 sets your own cap. Unlike every other `Studio.*` setting, it must be set in
 `config/application.rb` (after `require "studio"`) or `config/environments/*.rb`
 — `config/initializers/studio.rb` loads too late to be read.
+
+---
+
+**The environment banner is now the navbar's SIBLING, not its child, and the
+navbar sizes itself to whatever bars are actually there.** Nesting the banner
+inside the navbar coupled two unrelated components: every new bar meant editing
+the navbar, and there is already a second bar (impersonation), so this was never
+a 0-or-1 problem.
+
+Render the stack immediately before the navbar:
+
+```erb
+<%= render "studio/banners/stack" %>
+<%= render "layouts/navbar" %>
+```
+
+The bars do not know the navbar exists; the navbar does not know which bars
+rendered — only how tall they are, via `--studio-bars-h`.
+
+**The height is MEASURED, not assumed.** A `ResizeObserver` on the stack
+publishes its real height, so a bar that needs to be taller, a second bar, or one
+that wraps on a narrow screen all work with **no change to any consuming app**.
+A server-rendered estimate paints first so the common case never flashes, then the
+observer replaces it with the truth. Verified in a real browser: growing the bar
+32px moved the stack, the published property and the header's `top` together, on
+the same frame.
+
+**Backward-compatible.** An app that renders no stack gets
+`var(--studio-bars-h, 0px)` — identical to the old `top-0`. Adoption is opt-in.
+
+### Added
+
+- **`studio/banners/stack`** — renders whichever bars apply (environment via
+  `Studio.show_environment_banner?`, impersonation when the host passes
+  `impersonated_user` / `admin_user` / `stop_path`) and publishes their measured
+  height. Takes `preview:` and forwards `devnet:` / `extra:` to the environment bar.
+  A preview render emits nothing at all, so a navbar-preview copy cannot duplicate
+  live chrome or publish a height.
+- **`Studio.local_log_max_bytes`** — the opt-out (`false`) or override (an
+  Integer) for the new local log cap. Set it in `config/application.rb` or
+  `config/environments/*.rb`, never `config/initializers/studio.rb`.
+
+### Changed
+
+- **The navbar's sticky `top` reads `--studio-bars-h`** instead of hardcoding
+  `top-0`. It never branches on which bars rendered.
+- **Banners are branded off the app's own theme tokens** — the environment bar
+  derives from `--color-warning` and impersonation from `--color-danger`, each
+  under a translucent gradient wash, replacing hardcoded hex stops. An app that
+  retunes its theme now gets a banner that follows it.
+- **Local `development` and `test` logs rotate at 16 MB / 8 MB** via the new
+  `studio.logger` initializer, down from Rails' 100 MB default. Production is
+  untouched.
 
 ## 0.32.3 — 2026-08-09
 
@@ -275,7 +332,7 @@ rendered the desktop trigger on mobile beside the real one. Callers now own
 the display class (bare renders default to `inline-flex`). Regression view
 tests pin both.
 
-## 0.32.1 — Unreleased
+## 0.32.1 — 2026-08-09
 
 **Setup-guide corrections.** Docs only — no code, no behavior change.
 
