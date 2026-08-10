@@ -2,9 +2,9 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
-## 0.34.0 — 2026-08-10
+## 0.35.0 — 2026-08-10
 
-**The email registry becomes the email catalog.** 0.33 gave every app a shared
+**The email registry becomes the email catalog.** 0.34 gave every app a shared
 page for its transactional email banners. This release folds in the other half —
 **what each email is, and what it actually looks like** — so an app has ONE email
 manager instead of two.
@@ -48,11 +48,11 @@ raising builder yields `nil`, records why, and renders the reason inside the
 iframe. One broken builder costs one preview, not the page. Builders run **only**
 on that page — listing the emails never executes one.
 
-**Consumer note.** Nothing is required to upgrade; the shim keeps 0.33 call sites
+**Consumer note.** Nothing is required to upgrade; the shim keeps 0.34 call sites
 working. To adopt the preview: pass `preview:` when registering, and switch any
 `Studio::EmailImage` reference to `Studio::EmailCatalog`.
 
-## 0.33.0 — 2026-08-10
+## 0.34.0 — 2026-08-10
 
 **Transactional emails become an engine primitive.** Every consuming app now
 ships working, branded transactional email the moment it boots, and can grow its
@@ -189,6 +189,45 @@ admin sidebar, register any extra workflows, switch mailers from `url` to
 `resolved_url` where you want the inherited default, and drop any local
 `branded_mailer.html.erb` fork — the engine's copy is app-name-aware through
 `Studio.app_name`.
+
+## 0.33.0 — 2026-08-10
+
+**Local log files are now capped — 16 MB development, 8 MB test.** New
+`studio.logger` initializer. Nothing to install, run, or remember: it rides the
+gem, so every app, every future app, every worktree, and a freshly rebuilt Mac
+all get it by construction.
+
+Rails' own default is the reason this was needed. `config.load_defaults "7.1"`
+sets `log_file_size` to **100 MB** for development *and* test, and each keeps one
+rotated sibling — up to ~400 MB of log per checkout, times every worktree on the
+machine. The logs were never unbounded; the ceiling was just far too high for a
+machine that carries many desks. New ceiling: ~48 MB per checkout.
+
+**Production is untouched.** The cap applies only where `Rails.env.local?`, so
+every `production.rb` that hands its stream to STDOUT keeps doing exactly that,
+and a host that names its own `config.logger` is never overridden.
+
+**Ordering is the load-bearing part of this change.** Rails' `:initialize_logger`
+is a *bootstrap* initializer — it runs before every railtie and engine
+initializer and does `Rails.logger ||= config.logger || <default>`. An engine
+that assigns `app.config.logger` from an ordinary initializer is therefore a
+silent no-op: Rails has already built the logger. So `studio.logger` declares
+`before: :initialize_logger` and sets `config.log_file_size`, the knob Rails
+itself reads one moment later, leaving Rails owning the path, formatter, level,
+and tagging. `after: :load_environment_hook` pins the other edge of the window,
+which also keeps Railtie's implicit initializer chaining from dragging
+`studio.assets` forward.
+
+`test/integration/log_rotation_test.rb` asserts the **behavior**, not the
+config: it boots real Rails apps and checks that the log file actually rotates
+on disk once it passes the cap. It carries a mutation control — the same 17 MB
+log with the cap switched off must *not* rotate — so the suite cannot be
+satisfied by Rails' 100 MB default. Dropping the `before:` ordering reds it.
+
+**New setting — `Studio.local_log_max_bytes`.** `false` opts out; an Integer
+sets your own cap. Unlike every other `Studio.*` setting, it must be set in
+`config/application.rb` (after `require "studio"`) or `config/environments/*.rb`
+— `config/initializers/studio.rb` loads too late to be read.
 
 ## 0.32.3 — 2026-08-09
 

@@ -52,7 +52,7 @@ module Studio
     def uploads_available? = EmailCatalog.uploads_available?
     def table_ready?       = EmailCatalog.table_ready?
 
-    # Origin resolution. Delegated because 0.33's suite asserted these directly.
+    # Origin resolution. Delegated because 0.34's suite asserted these directly.
     def mailer_asset_host = EmailCatalog.mailer_asset_host
     def mailer_protocol(options, host) = EmailCatalog.mailer_protocol(options, host)
     def mailer_port_suffix(options)    = EmailCatalog.mailer_port_suffix(options)
