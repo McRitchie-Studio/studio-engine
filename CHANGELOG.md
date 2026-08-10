@@ -40,9 +40,35 @@ row — which is exactly "the asset now belongs to this app". Placeholder artwor
 ships for both standard emails; real artwork lands in a later release.
 
 **New: `/admin/emails`**, modelled on the living style guide — one shared engine
-page, admin-gated, rendering inside each host's layout. Replaces
-`/admin/email_images`, whose `admin_email_images_path` helper **still resolves**
-(now a redirect), so a shipped host sidebar link keeps working through adoption.
+page, admin-gated, rendering inside each host's layout.
+
+**It is OPT-IN, and must be.** Add to `config/initializers/studio.rb`:
+
+```ruby
+config.draw_admin_emails_routes = true
+```
+
+`turf-monster` already owns `/admin/emails` (its `EmailCatalog` manager:
+`namespace :admin { get "emails", as: :emails }`) and therefore both helper
+names, `admin_emails_path` and `admin_email_path`. Drawing the engine's page
+unconditionally raises `ArgumentError: Invalid route name, already in use:
+'admin_emails'` *while turf-monster's own routes are loading*, which takes down
+its **entire** route set — every `admin_*_path` in the app goes undefined. A host
+cannot opt out of a failure that happens before its config is read, so the
+default is off until no consumer owns the name.
+
+The gate covers only the **page**. The registry and the inherited-default
+resolution are always on, and the engine's `UserMailer` already calls
+`resolved_url`, so an app sends branded email whether or not it draws the page.
+
+**`/admin/email_images` is deprecated, not deleted.** It still renders, and its
+`admin_email_images_path` / `admin_email_image_path` helpers still resolve —
+`mcritchie-studio` and `turf-monster` both have tests on `main` that drive it,
+and consumer CI runs each consumer's default branch. A later engine minor deletes
+the controller, view, and routes once no consumer references them. In the
+meantime the old page had its own reporting bug fixed too: it now reads
+`preview_url`, so it no longer claims "No image yet" about an email that is
+visibly sending one.
 
 - The table is the primary view: **name + live image on every row**, so an email
   is identifiable at a glance.
@@ -98,10 +124,21 @@ app. The living style guide's hand-rolled `dsModals` host can rebase onto it.
 Register modals with `current()?.id`, not `current().id` — the outer template
 unmounts one tick after the stack empties, so a bare `.id` throws on close.
 
-**Consumer note.** Nothing here is required to upgrade. To adopt: link
-`admin_emails_path` from the app's admin sidebar, register any extra workflows,
-and drop any local `branded_mailer.html.erb` fork — the engine's copy is
-app-name-aware through `Studio.app_name`.
+**Compatibility.** `Studio::EmailImage.url(key)` keeps its **pre-registry
+contract** — this app's own uploaded image, or `nil`. The two-layer resolution
+lives in the new `resolved_url(key)`. This matters: `turf-monster`'s mailer is
+`Studio::EmailImage.url(:magic_link) || email_banner_url("magic-link-banner.jpg")`,
+and making `url` resolve to the engine default would have turned that `||` into
+dead code and silently replaced turf-monster's committed branded banner with the
+engine's **placeholder** in live sign-in email. A method whose signature is
+unchanged but whose return value flips from `nil` to a value is not additive.
+
+**Consumer note.** Nothing here is required to upgrade. To adopt: set
+`config.draw_admin_emails_routes = true`, link `admin_emails_path` from the app's
+admin sidebar, register any extra workflows, switch mailers from `url` to
+`resolved_url` where you want the inherited default, and drop any local
+`branded_mailer.html.erb` fork — the engine's copy is app-name-aware through
+`Studio.app_name`.
 
 ## 0.32.3 — 2026-08-09
 

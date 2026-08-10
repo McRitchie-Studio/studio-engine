@@ -125,16 +125,18 @@ class EmailImageRegistryTest < Minitest::Test
     assert_equal :app, Studio::EmailImage.source("magic_link")
     assert Studio::EmailImage.app_owned?("magic_link")
     assert_equal "https://turf-monster-dev.s3.amazonaws.com/email_banners/magic_link-ab12.png",
-                 Studio::EmailImage.url("magic_link")
+                 Studio::EmailImage.resolved_url("magic_link")
   end
 
   def test_the_inherited_default_renders_when_the_app_uploaded_nothing
     stub_module(Studio::EmailImage, :record) { |_key| nil }
     stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailImage, :mailer_asset_host) { "https://mcritchie.studio" }
 
     assert_equal :default, Studio::EmailImage.source("magic_link")
     refute Studio::EmailImage.app_owned?("magic_link")
-    assert_nil Studio::EmailImage.override_url("magic_link")
+    assert_equal "https://mcritchie.studio/assets/emails/magic-link.png",
+                 Studio::EmailImage.resolved_url("magic_link")
   end
 
   def test_no_image_at_all_is_reported_as_none_not_as_a_default
@@ -142,8 +144,42 @@ class EmailImageRegistryTest < Minitest::Test
     stub_module(Studio::EmailImage, :default_asset_path) { |_key| nil }
 
     assert_equal :none, Studio::EmailImage.source("magic_link")
-    assert_nil Studio::EmailImage.url("magic_link"),
+    assert_nil Studio::EmailImage.resolved_url("magic_link"),
       "a bannerless email resolves to nil so the mailer renders the card without one"
+  end
+
+  # --- THE COMPATIBILITY CONTRACT -------------------------------------------
+  #
+  # REGRESSION GUARD, and the most important test in this file.
+  #
+  # `url` predates the registry and has always meant "this app's own image, or
+  # nil" — callers were written to fall back themselves. turf-monster's mailer
+  # today is literally:
+  #
+  #   Studio::EmailImage.url(:magic_link) || email_banner_url("magic-link-banner.jpg")
+  #
+  # The first cut of this work made `url` resolve to the engine default. Same
+  # signature, same arity, no deprecation — and that `||` became dead code, so
+  # turf-monster's committed 1200x600 branded banner would have been silently
+  # replaced by the engine's PLACEHOLDER GRADIENT in real sign-in email. The
+  # engine suite was green; only reading the consumer's call site caught it.
+  #
+  # If someone "simplifies" url into resolved_url again, this goes red.
+  def test_url_returns_nil_when_this_app_uploaded_nothing_even_with_a_default
+    stub_module(Studio::EmailImage, :record) { |_key| nil }
+    stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+
+    assert_nil Studio::EmailImage.url("magic_link"),
+      "url() must keep its pre-registry contract — a host's own `url(...) || its_own_asset` " \
+      "fallback is load-bearing, and resolving here would swap its artwork for the placeholder"
+  end
+
+  def test_url_returns_this_apps_own_image_when_there_is_one
+    row = app_row("https://turf-monster-dev.s3.amazonaws.com/email_banners/magic_link-ab12.png")
+    stub_module(Studio::EmailImage, :record) { |_key| row }
+
+    assert_equal "https://turf-monster-dev.s3.amazonaws.com/email_banners/magic_link-ab12.png",
+                 Studio::EmailImage.url("magic_link")
   end
 
   # --- 5. browser vs inbox addressing of the SAME default -------------------
@@ -158,22 +194,22 @@ class EmailImageRegistryTest < Minitest::Test
     assert_equal "/assets/emails/magic-link.png", Studio::EmailImage.preview_url("magic_link")
   end
 
-  def test_url_makes_a_default_absolute_for_the_inbox
+  def test_resolved_url_makes_a_default_absolute_for_the_inbox
     stub_module(Studio::EmailImage, :record) { |_key| nil }
     stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
     stub_module(Studio::EmailImage, :mailer_asset_host) { "https://mcritchie.studio" }
 
     assert_equal "https://mcritchie.studio/assets/emails/magic-link.png",
-                 Studio::EmailImage.url("magic_link")
+                 Studio::EmailImage.resolved_url("magic_link")
   end
 
-  def test_url_leaves_an_already_absolute_asset_path_alone
+  def test_resolved_url_leaves_an_already_absolute_asset_path_alone
     stub_module(Studio::EmailImage, :record) { |_key| nil }
     stub_module(Studio::EmailImage, :default_asset_path) { |_key| "https://cdn.example.com/assets/emails/magic-link.png" }
     stub_module(Studio::EmailImage, :mailer_asset_host) { "https://mcritchie.studio" }
 
     assert_equal "https://cdn.example.com/assets/emails/magic-link.png",
-                 Studio::EmailImage.url("magic_link"),
+                 Studio::EmailImage.resolved_url("magic_link"),
       "an asset_host-resolved absolute URL must not be prefixed a second time"
   end
 

@@ -54,6 +54,35 @@ class EmailsPageTest < ActiveSupport::TestCase
 
   # --- 1. routes drawn into every host --------------------------------------
 
+  # REGRESSION GUARD, and the reason the page is opt-in at all.
+  #
+  # turf-monster's routes.rb already contains, inside `namespace :admin`:
+  #   get "emails", to: "emails#index", as: :emails      -> admin_emails_path
+  #   get "emails/:key", to: "emails#show", as: :email   -> admin_email_path
+  #
+  # Drawing the engine's page unconditionally raised
+  # `ArgumentError: Invalid route name, already in use: 'admin_emails'` WHILE
+  # turf-monster's own routes were loading, which took down every route in the
+  # app — admin_dashboard_path, admin_scoring_path, all of it. Consumer CI runs
+  # each consumer's `main`, so a host cannot opt OUT of something that breaks it
+  # before its config is read. Default-off is the only shape that works until
+  # turf-monster's page is retired.
+  test "the /admin/emails page is OFF by default" do
+    # Read the SHIPPED default, not the live value — test/dummy/config/routes.rb
+    # opts in the way a consuming app does, so the runtime value is true here.
+    source = File.read(File.expand_path("../../lib/studio.rb", __dir__))
+    default = source[/mattr_accessor :draw_admin_emails_routes,\s*default: (\w+)/, 1]
+
+    refute_nil default, "expected a draw_admin_emails_routes accessor with an explicit default"
+    assert_equal "false", default,
+      "default-on collides with turf-monster's own admin_emails route and kills its entire route set"
+  end
+
+  test "a host opts in the way the dummy app does" do
+    assert Studio.draw_admin_emails_routes,
+      "test/dummy/config/routes.rb must opt in before Studio.routes, or this suite tests nothing"
+  end
+
   test "Studio.routes draws /admin/emails -> studio/emails#index" do
     assert_equal "/admin/emails", routes.admin_emails_path
 
@@ -73,19 +102,39 @@ class EmailsPageTest < ActiveSupport::TestCase
     assert_includes verbs, "DELETE", "an app must be able to revert to the inherited default"
   end
 
-  test "the legacy admin_email_images helper survives as a redirect to /admin/emails" do
-    # mcritchie-studio's link_tree_helper and turf-monster's admin hub link this
-    # helper on the shipped gem. It must resolve through the adoption gap.
+  # The legacy page is DEPRECATED but still SERVED for one release — deliberately
+  # not a redirect and not deleted. consumer-ci.yml runs each consumer's
+  # DEFAULT-BRANCH suite against this engine, and mcritchie-studio
+  # (test/integration/studio_email_image_test.rb) and turf-monster
+  # (test/integration/email_banner_test.rb) both GET this page and PATCH through
+  # admin_email_image_path on `main` today. Retiring it here would redden their
+  # lanes from the moment the PR opens, and no change inside the engine PR could
+  # fix it — the consumer PRs would have to reach accepted -> release -> main in
+  # BOTH apps first. So the retirement is staged across releases.
+  test "the legacy email-images page is still SERVED (staged retirement, not a redirect)" do
     assert_equal "/admin/email_images", routes.admin_email_images_path
+    assert_equal "/admin/email_images/magic_link", routes.admin_email_image_path("magic_link")
 
     route = Rails.application.routes.routes.find { |r| r.name == "admin_email_images" }
-    refute_nil route, "the admin_email_images helper must survive the move"
+    refute_nil route, "the admin_email_images helper must keep resolving"
+    assert_equal "studio/email_images", route.defaults[:controller],
+      "it must still DISPATCH — a consumer suite on main asserts this page renders"
 
-    endpoint = route.app
-    endpoint = endpoint.app while endpoint.respond_to?(:app) &&
-                                 !endpoint.is_a?(ActionDispatch::Routing::Redirect)
-    assert endpoint.is_a?(ActionDispatch::Routing::Redirect),
-      "admin_email_images must redirect to /admin/emails, not dispatch a controller"
+    patch_route = Rails.application.routes.routes.find { |r| r.name == "admin_email_image" }
+    refute_nil patch_route, "admin_email_image_path is called by consumer tests on main"
+    assert_equal "update", patch_route.defaults[:action]
+  end
+
+  # Even on its way out, the old page must not keep telling the operator the
+  # WRONG thing — reading only the S3 override is the bug this work exists to
+  # fix, and it lives in both views until the old one is deleted.
+  test "the legacy page reports the live image, not just the override" do
+    source = File.read(File.expand_path("../../app/views/studio/email_images/index.html.erb", __dir__))
+
+    assert_includes source, "Studio::EmailImage.preview_url(variant)"
+    refute_includes source, "Studio::EmailImage.url(variant)",
+      "the legacy page's original bug was reading ONLY the override, so it claimed " \
+      "'No image yet' about an email that was visibly sending a repo-asset banner"
   end
 
   # --- 2. the inherited defaults really ship in the gem ----------------------

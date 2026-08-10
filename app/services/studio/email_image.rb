@@ -10,9 +10,14 @@ module Studio
   #
   # ## Two layers: inherited default, app-owned override
   #
-  #   .url(key) => app's own ImageCache row (its S3 bucket)   # app-owned
-  #             -> the engine's default gem asset             # inherited
-  #             -> nil                                        # no image at all
+  #   .resolved_url(key) => app's own ImageCache row (its S3 bucket)  # app-owned
+  #                      -> the engine's default gem asset            # inherited
+  #                      -> nil                                       # no image
+  #
+  # `.url(key)` stays the PRE-REGISTRY contract — this app's own image or nil —
+  # so every caller written before the registry keeps its behavior until its app
+  # adopts. See the note on #url; getting this wrong swaps a host's committed
+  # artwork for the engine placeholder in live email.
   #
   # Defaults RIDE THE GEM (app/assets/images/emails/*), so a brand-new app with
   # an empty bucket sends good-looking email on day one and needs no cross-app S3
@@ -143,23 +148,41 @@ module Studio
 
     def app_owned?(key) = source(key) == :app
 
-    # The URL a MAILER should use — absolute, so it resolves from an inbox.
-    # App-owned override first, then the inherited default, then nil.
+    # THIS APP'S OWN image only — nil when nothing has been uploaded here.
+    #
+    # This is the PRE-REGISTRY contract, kept EXACTLY: `url` has always meant
+    # "the admin-managed override, or nil", and callers were written to fall back
+    # themselves. turf-monster's mailer is the live example:
+    #
+    #   @banner_url = Studio::EmailImage.url(:magic_link) || email_banner_url("magic-link-banner.jpg")
+    #
+    # Making `url` resolve to the engine default would make that `||` dead code
+    # and silently replace turf-monster's own branded 1200x600 banner with the
+    # engine's PLACEHOLDER in real sign-in email. A method whose signature is
+    # unchanged but whose return value flips from nil to a value is not additive.
+    # So the new two-layer resolution lives in resolved_url, and every existing
+    # caller keeps the behavior it was written against until its app adopts.
     def url(key)
-      override_url(key) || default_url(key)
-    end
-
-    # The URL the ADMIN PAGE should preview. Same resolution, but a default
-    # stays a root-relative asset path so it renders correctly whatever host and
-    # port this app is being viewed on (an absolute mailer asset_host is set for
-    # the inbox, not for the browser sitting on localhost:3042).
-    def preview_url(key)
-      override_url(key) || default_asset_path(key)
-    end
-
-    # The app-owned override only (nil when this app has not uploaded one).
-    def override_url(key)
       record(key)&.url
+    end
+
+    # What ACTUALLY SHIPS on this email — the two-layer resolution. Absolute, so
+    # it resolves from an inbox. App-owned override first, then the inherited
+    # engine default, then nil (the mailer renders bannerless).
+    #
+    # This is what a mailer should call once its app has adopted the registry.
+    # The engine's own UserMailer already does, which is what gives an app with
+    # an empty bucket branded email on day one.
+    def resolved_url(key)
+      url(key) || default_url(key)
+    end
+
+    # What the ADMIN PAGE previews. Same two layers as resolved_url, but a
+    # default stays a root-relative asset path so it renders correctly on
+    # whatever host and port this app is being viewed on (an absolute mailer
+    # asset_host is set for the inbox, not for a browser on localhost:3042).
+    def preview_url(key)
+      url(key) || default_asset_path(key)
     end
 
     # The ImageCache row holding this app's override, or nil (nothing uploaded /

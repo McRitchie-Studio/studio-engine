@@ -1,3 +1,9 @@
+# Opt in to the shared /admin/emails page, exactly as a consuming app does from
+# config/initializers/studio.rb. It is OFF by default because turf-monster
+# already owns that path and both of its helper names — see the note in
+# Studio.routes. Set here, before the draw, so the dummy exercises the page.
+Studio.draw_admin_emails_routes = true
+
 Rails.application.routes.draw do
   # Draw the engine's shared route table the same way every consuming app does
   # (Studio.routes(self), not `mount`). The boot test asserts the named path

@@ -275,11 +275,23 @@ matching slot is absent, so existing call sites render unchanged.
 
 ## Transactional emails
 
-Every consuming app gets the same admin page — **`/admin/emails`** — listing each
-transactional email it sends with the banner riding at the top of that email, and
-whether that banner is the **inherited default** or an **app-owned override**.
-Replaces the old `/admin/email_images` (its `admin_email_images_path` helper
-still resolves, now as a redirect).
+Every consuming app can render the same admin page — **`/admin/emails`** —
+listing each transactional email it sends with the banner riding at the top of
+that email, and whether that banner is the **inherited default** or an
+**app-owned override**. Supersedes the old `/admin/email_images`, which is
+deprecated but still renders for one release.
+
+**The page is opt-in:**
+
+```ruby
+# config/initializers/studio.rb
+config.draw_admin_emails_routes = true
+```
+
+Off by default because `turf-monster` already owns `/admin/emails` and both of
+its helper names; drawing them there raises at route-load and kills every route
+in the app. The gate covers only the page — the registry and the inherited
+defaults are always on.
 
 ### The registry
 
@@ -323,16 +335,25 @@ and **that** app's `image_caches` row — which is exactly "the asset now belong
 to this app". Every app has its own bucket and table, so an override never leaks
 between apps.
 
-A mailer asks for `url` (absolute, for an inbox); the admin page asks for
-`preview_url` (a default stays root-relative, so it renders on whatever
-host and port the app is being viewed on).
+Three accessors, and picking the wrong one changes what real people receive:
+
+| Call | Returns | Use for |
+|---|---|---|
+| `url(key)` | this app's **own** image, or `nil` | the pre-registry contract; a host doing its own `\|\| fallback` |
+| `resolved_url(key)` | own → inherited default → `nil`, **absolute** | mailers |
+| `preview_url(key)` | own → inherited default (root-relative) | the admin page |
+
+`url` deliberately does **not** resolve to the default. `turf-monster`'s mailer
+reads `Studio::EmailImage.url(:magic_link) || email_banner_url("magic-link-banner.jpg")`
+— making `url` resolve would turn that `||` into dead code and swap its committed
+branded banner for the engine placeholder in live email.
 
 ```ruby
 class UserMailer < ApplicationMailer
   layout "branded_mailer"
 
   def magic_link(email, token)
-    @banner_url = Studio::EmailImage.url(:magic_link) # nil renders bannerless
+    @banner_url = Studio::EmailImage.resolved_url(:magic_link) # nil renders bannerless
     # ...
   end
 end
