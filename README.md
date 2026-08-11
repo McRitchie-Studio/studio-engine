@@ -375,11 +375,18 @@ relabeling `magic_link` does not reorder the page or drop its default artwork.
 ### Resolution — inherit, then own
 
 ```
-Studio::EmailCatalog.url(:magic_link)
+Studio::EmailCatalog.resolved_url(:magic_link)
   1. this app's ImageCache row  (its own S3 bucket)   -> app-owned override
   2. the engine's default gem asset                   -> inherited default
   3. nil                                              -> sends bannerless
 ```
+
+Note the method: **`resolved_url` walks all three layers; `url` returns only
+layer 1** (this app's own image, or nil). That split is deliberate — it keeps
+every caller written before the registry behaving exactly as it did. A mailer
+that already falls back on its own, `url(:magic_link) || own_banner`, must stay
+on `url`; moving it to `resolved_url` makes that fallback unreachable and swaps
+the app's committed artwork for the engine's default.
 
 Defaults **ride the gem** (`app/assets/images/emails/*`), so a brand-new app with
 an empty bucket sends branded email on day one and needs no cross-app S3

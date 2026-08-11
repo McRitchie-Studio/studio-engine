@@ -393,6 +393,52 @@ class EmailsPageTest < ActiveSupport::TestCase
       "the old page's bare file_field_tag must be gone — uploads go through the crop modal"
   end
 
+
+  # THE FAN-OUT, pinned as a PROPERTY rather than a spelling.
+  #
+  # `crop-photo-confirmed` is a WINDOW event and this page mounts one
+  # imageUploadHost PER ROW, so every row hears every confirm. Before the owner
+  # guard, one confirmed crop PATCHed EVERY row's banner with the same image —
+  # destroying any app-owned banner already there — and since the engine
+  # pre-registers two emails, the FIRST upload any consumer admin performed hit it.
+  #
+  # The old assertion (`assert_includes html, "crop-photo-confirmed"`) passes with
+  # one listener or twenty, which is exactly why it never saw this. These assert the
+  # effect: every listener is ownership-guarded, and the unguarded form appears
+  # NOWHERE on a page that renders more than one row.
+  test "no row applies a crop unconditionally — every listener is ownership-guarded" do
+    stub_module(Studio::EmailImage, :record) { |_key| nil }
+    stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+
+    html = render_index
+
+    # Counted on the RAW markup, deliberately. Nokogiri's HTML parser DROPS Alpine
+    # attributes (`@crop-photo-confirmed.window` is not a legal attribute name), so a
+    # DOM assertion cannot see the handler at all — which is very likely why the
+    # original test settled for a page-wide substring that passes with one listener
+    # or twenty.
+    hosts = html.scan("imageUploadHost(").size
+    guarded = html.scan("onCropConfirmed($event.detail)").size
+
+    assert_operator hosts, :>, 1,
+      "precondition: the page must mount MORE THAN ONE uploader host, or this proves nothing"
+    assert_equal hosts, guarded,
+      "every uploader host must route the window confirm through the ownership guard — " \
+      "one unguarded host is the fan-out that PATCHes every row's banner with one image"
+    refute_includes html, "applyCrop($event.detail.blob)",
+      "the UNGUARDED form must not survive on a multi-row page — that IS the fan-out"
+  end
+
+  # WHAT THIS TIER CANNOT PROVE, said plainly so nobody mistakes green for safe.
+  # The test above asserts the WIRING (every host routes through the guard) and
+  # mutation-reddens when a row is re-wired to apply blindly. It CANNOT prove the
+  # guard's logic works: neutering the `detail.owner !== ownerId` comparison inside
+  # imageUploadHost leaves this suite green, because nothing here executes
+  # JavaScript. Proving the behaviour needs a browser tier that dispatches
+  # `crop-photo-confirmed` with a foreign owner on a two-row page and asserts
+  # exactly ONE form submits. Filed rather than faked — a markup assertion dressed
+  # up as a behavioural one is how a suite starts lying.
+
   test "the crop and saving modals mount on a PAGE-SCOPED store" do
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
     stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }

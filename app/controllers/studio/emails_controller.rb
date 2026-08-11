@@ -67,13 +67,20 @@ module Studio
     # DELETE /admin/emails/:key — drop this app's override and fall back to the
     # inherited default.
     def destroy
-      reverted = Studio::EmailCatalog.revert(@key)
-      notice = if reverted
-                 "#{Studio::EmailCatalog.label(@key)} reverted to the inherited default."
-               else
-                 "#{Studio::EmailCatalog.label(@key)} was already using the inherited default."
-               end
-      redirect_to admin_emails_path, notice: notice, status: :see_other
+      # rescue_and_log, like #update: destroy is a WRITE path (it drops an
+      # ImageCache row and deletes the S3 object behind it), and the bare rescue
+      # below turns any failure into a friendly alert. Without the log that
+      # failure is invisible — the admin sees "try again" and nothing reaches
+      # ErrorLog to say why.
+      rescue_and_log do
+        reverted = Studio::EmailCatalog.revert(@key)
+        notice = if reverted
+                   "#{Studio::EmailCatalog.label(@key)} reverted to the inherited default."
+                 else
+                   "#{Studio::EmailCatalog.label(@key)} was already using the inherited default."
+                 end
+        redirect_to admin_emails_path, notice: notice, status: :see_other
+      end
     rescue StandardError
       redirect_to admin_emails_path, alert: "Couldn't revert the image. Please try again.", status: :see_other
     end

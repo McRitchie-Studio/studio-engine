@@ -41,7 +41,7 @@
         successMessage: '<%= j entry.label %> now uses this app\'s own image.',
         failure: 'Couldn\'t save the banner'
       })"
-      @crop-photo-confirmed.window="applyCrop($event.detail.blob)"
+      @crop-photo-confirmed.window="onCropConfirmed($event.detail)"
     <% end %>>
 
   <td class="px-4 py-4">
