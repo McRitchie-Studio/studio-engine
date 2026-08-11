@@ -1,0 +1,91 @@
+<%#  admin/emails/:key — one email, previewed live.
+
+     A bare content wrapper like the index, so it renders inside each host's
+     layout. Lifted from turf-monster's admin/emails/show (the prior art this
+     work folds into the engine) and given the banner half: the same iframe over
+     the real rendered email, plus what artwork is riding on top of it and where
+     that artwork came from. %>
+<% content_for(:title) { @entry.label } %>
+<%
+  source     = Studio::EmailCatalog.source(@entry.key)
+  banner_url = Studio::EmailCatalog.preview_url(@entry.key)
+  aspect     = Studio::EmailCatalog::ASPECT_RATIO
+
+  badge_class, badge_label =
+    case source
+    when :app     then ["badge bg-success/10 text-success border-success/30", "#{Studio.app_name}'s own"]
+    when :default then ["badge bg-inset text-muted border-subtle", "Inherited default"]
+    else               ["badge bg-warning/10 text-warning border-warning/30", "No image"]
+    end
+%>
+<div class="max-w-5xl mx-auto px-4 pb-16">
+  <header class="pt-8 pb-5">
+    <%= link_to "← All emails", admin_emails_path,
+          class: "text-sm text-muted hover:text-heading underline underline-offset-2" %>
+    <h1 class="text-3xl font-bold text-heading mt-2"><%= @entry.label %></h1>
+
+    <div class="flex flex-wrap items-center gap-2 mt-3">
+      <span class="badge <%= @entry.marketing? ? "bg-primary/10 text-primary border-primary/30" : "bg-inset text-muted border-subtle" %> whitespace-nowrap">
+        <%= @entry.type.to_s.titleize %>
+      </span>
+      <span class="<%= badge_class %> whitespace-nowrap"><%= badge_label %></span>
+      <span class="font-mono text-2xs text-muted"><%= @entry.key %></span>
+    </div>
+
+    <% if @entry.description.present? %>
+      <p class="text-body max-w-2xl mt-3"><%= @entry.description %></p>
+    <% end %>
+
+    <% if @subject.present? %>
+      <p class="text-sm text-muted mt-2">
+        Subject: <strong class="text-heading"><%= @subject %></strong>
+      </p>
+    <% end %>
+  </header>
+
+  <%# The banner riding on top of this email, and where it came from. %>
+  <section class="card p-4 mb-6">
+    <p class="label-upper mb-3">Banner</p>
+    <div class="rounded-lg overflow-hidden border border-subtle max-w-md"
+         style="aspect-ratio: <%= aspect %>; background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-900));">
+      <% if banner_url %>
+        <%= image_tag banner_url, class: "w-full h-full object-cover",
+              alt: "#{@entry.label} email banner" %>
+      <% else %>
+        <div class="w-full h-full flex items-center justify-center text-xs text-white/80 text-center px-4">
+          This email sends without a banner.
+        </div>
+      <% end %>
+    </div>
+    <p class="text-sm text-muted mt-3">
+      <% if @uploads_available %>
+        Change it on the <%= link_to "emails list", admin_emails_path, class: "underline underline-offset-2" %>.
+      <% else %>
+        <%= Studio.app_name %> has no object storage configured, so this image can be
+        viewed but not replaced yet.
+      <% end %>
+    </p>
+  </section>
+
+  <%# The email itself. An iframe because the response IS an email document —
+      its own <html>, its own table layout, and no business inheriting the admin
+      page's stylesheet. %>
+  <section class="card p-3 bg-inset">
+    <p class="label-upper mb-3 px-1">Preview</p>
+    <% if @entry.previewable? %>
+      <iframe src="<%= admin_email_raw_path(@entry.key) %>"
+              style="width:100%;height:780px;border:0;border-radius:8px;background:#ffffff;"
+              title="<%= @entry.label %> preview"></iframe>
+    <% else %>
+      <div class="px-3 pb-4">
+        <p class="text-sm text-body">
+          No preview is registered for this email. Pass a <code class="font-mono text-2xs bg-surface px-1.5 py-0.5 rounded">preview:</code>
+          callable when registering it — anything that returns a Mail — and it renders here.
+        </p>
+      </div>
+    <% end %>
+    <% if @preview_error.present? %>
+      <p class="text-2xs text-danger mt-2 px-1 font-mono break-all"><%= @preview_error %></p>
+    <% end %>
+  </section>
+</div>

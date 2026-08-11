@@ -5,8 +5,8 @@
     the same unit turf-monster's og:image uploader uses, on the page-scoped
     `emailModals` store. %>
 <%
-  source     = Studio::EmailImage.source(entry.key)
-  banner_url = Studio::EmailImage.preview_url(entry.key)
+  source     = Studio::EmailCatalog.source(entry.key)
+  banner_url = Studio::EmailCatalog.preview_url(entry.key)
   form_id    = "email-banner-form-#{entry.key.dasherize}"
 
   # `badge` is a shape-only utility in engine.css — the state color comes from
@@ -59,7 +59,12 @@
   </td>
 
   <td class="px-4 py-4">
-    <p class="font-semibold text-heading"><%= entry.label %></p>
+    <%# The name is the link to the email's own page — banner + live preview. %>
+    <%= link_to entry.label, admin_email_path(entry.key),
+          class: "font-semibold text-heading hover:text-primary underline-offset-2 hover:underline" %>
+    <% if entry.marketing? %>
+      <span class="badge bg-primary/10 text-primary border-primary/30 ml-1.5 whitespace-nowrap">Marketing</span>
+    <% end %>
     <% if entry.description.present? %>
       <p class="text-sm text-body mt-0.5 max-w-md"><%= entry.description %></p>
     <% end %>

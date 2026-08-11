@@ -1,6 +1,6 @@
 <%#
   Shared branded transactional email shell. A full-bleed banner (set @banner_url,
-  e.g. from Studio::EmailImage.url(:magic_link)) sits flush at the top and sets
+  e.g. from Studio::EmailCatalog.resolved_url(:magic_link)) sits flush at the top and sets
   the 600px width; each email view supplies the body via yield. Bannerless is
   fine — the card still renders. Lifted from turf-monster so every Studio app
   shares one branded look. An app can override by defining its own

@@ -558,10 +558,17 @@ module Studio
       # Studio::EmailImage.resolved_url — so an app is branded on day one whether
       # or not it draws the page.
       if Studio.draw_admin_emails_routes
-        get    "admin/emails",      to: "studio/emails#index",   as: :admin_emails
-        patch  "admin/emails/:key", to: "studio/emails#update",  as: :admin_email,
+        get    "admin/emails",          to: "studio/emails#index", as: :admin_emails
+        # /raw is drawn BEFORE /:key so "raw" is never captured as a key.
+        get    "admin/emails/:key/raw", to: "studio/emails#raw",   as: :admin_email_raw,
                constraints: { key: /[a-z0-9_]+/ }
-        delete "admin/emails/:key", to: "studio/emails#destroy",
+        get    "admin/emails/:key",     to: "studio/emails#show",  as: :admin_email,
+               constraints: { key: /[a-z0-9_]+/ }
+        # Same path, same helper (admin_email_path) — a named route only needs
+        # to be declared once per name, and these share the show route's URL.
+        patch  "admin/emails/:key",     to: "studio/emails#update",
+               constraints: { key: /[a-z0-9_]+/ }
+        delete "admin/emails/:key",     to: "studio/emails#destroy",
                constraints: { key: /[a-z0-9_]+/ }
       end
 

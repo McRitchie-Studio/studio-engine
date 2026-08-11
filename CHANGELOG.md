@@ -2,11 +2,68 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## Unreleased
+
+**The email registry becomes the email catalog.** 0.37 gave every app a shared
+page for its transactional email banners. This folds in the rest — **what each
+email is, and what it actually looks like** — so an app has ONE email manager
+instead of two.
+
+**`Studio::EmailImage` is now `Studio::EmailCatalog`.** The old name is a
+**delegating shim** with its full surface intact (`url`, `store`, `record`,
+`register`, `label`, `known?`, `variants`, `resolved_url`, `preview_url`,
+`source`, and the constants), so nothing that names it breaks. It is deprecated
+and will be deleted once no consumer's `main` references it.
+
+Named for the prior art it absorbs: `turf-monster` built `::EmailCatalog` +
+`Admin::EmailsController` first, and left a note on both saying this manager
+*"moves into the shared studio-engine email framework (Phase 2)"*. This is
+Phase 2. turf-monster deletes its copy in its adoption task rather than running a
+second email page.
+
+**Registry entries carry a type and a preview builder:**
+
+```ruby
+Studio::EmailCatalog.register("winnings",
+  label: "Contest winnings",
+  description: "Sent when a player wins a contest.",
+  type: :marketing,                                   # or :transactional (default)
+  preview: -> { ContestMailer.winnings(sample_entry) })
+```
+
+Every keyword is optional, and omitting one on a re-register **keeps** the
+existing value — so a host can attach a preview to an inherited email, or
+relabel it, without restating its artwork. An unknown `type` falls back to
+`:transactional` rather than raising: a typo in an initializer must not take a
+host's boot down over a badge.
+
+**New: `/admin/emails/:key`** — one email's own page: its banner, its type, its
+subject, and a **live preview** of the real rendered email in an iframe
+(`/admin/emails/:key/raw`). The emails list links each row to it.
+
+**A preview can never take the manager down.** A `preview:` builder is host code
+run against whatever sample data an environment happens to hold — an empty table,
+a moved fixture, a mailer whose signature changed. Every call is contained: a
+raising builder yields `nil`, records why, and renders the reason inside the
+iframe. One broken builder costs one preview, not the page. Builders run **only**
+on that page — listing the emails never executes one.
+
+**Consumer note.** Nothing is required to upgrade; the shim keeps 0.37 call sites
+working. To adopt the preview: pass `preview:` when registering, and switch any
+`Studio::EmailImage` reference to `Studio::EmailCatalog`.
+
+### Added
+
+- **`Studio::EmailCatalog`** — the email registry, renamed from
+  `Studio::EmailImage` and now carrying each entry's `type:` and `preview:`
+  callable. The old name stays as a delegating shim.
+- **`/admin/emails/:key`** — one email's own page: its banner, its type, its
+  subject, and a live preview of the real rendered email in an iframe.
+
 ## 0.37.0 — 2026-08-10
 
 ### Added
-- Standard transactional email primitive with a registry-backed catalog, and the
-  email preview folded into that registry.
+- Standard transactional email primitive with a registry-backed catalog.
 
 ### Fixed
 - The crop confirm is guarded by owner, so one confirmed crop can no longer fan out
