@@ -24,6 +24,7 @@ Then `bundle install`. The current release is **v0.6.1**; see [`CHANGELOG.md`](.
 - **Operator tooling**: Shared `studio/banners/environment` banner with Dev Mode + email connector controls, `studio/banners/impersonation`, and an opt-in `Studio::Impersonation` concern for Act As session conventions.
 - **Sluggable concern**: `before_save :set_slug` with `to_param` for human-readable URLs
 - **ThemeSetting model**: Per-app DB overrides with fallback to config defaults
+- **Transactional emails**: `Studio::EmailImage` registry + the shared `/admin/emails` page. Every app inherits the standard emails and their artwork on day one, and can register its own workflows and upload its own banners. See [Transactional emails](#transactional-emails).
 
 ## Configuration
 
@@ -195,6 +196,39 @@ the block:
 <% end %>
 ```
 
+**Page-scoped hosts — `studio/modals/scoped_host`.** When a page must bring its
+own modals (because not every consuming app renders a shared host, and the ones
+that do register their own modal set), render a second host on its own Alpine
+store:
+
+```erb
+<%= render "studio/modals/scoped_host", store: "emailModals" do %>
+  <template x-if="$store.emailModals.current()?.id === 'crop-photo'">
+    <%= render "studio/modals/crop_photo", store: "emailModals" %>
+  </template>
+<% end %>
+```
+
+`studio/modals/_crop_photo` and `_saving` take the same `store:` local, and
+`imageUploadHost({ store: "emailModals", ... })` /
+`submitFormWithProgress(form, { store: "emailModals" })` route through it — all
+default to `"modals"`, so existing call sites are unchanged. The engine's
+`/admin/emails` is the live example.
+
+Two things that will bite you:
+
+- **Render `scoped_host`, not `host`.** This is a non-isolated engine, so an app
+  view at the same path shadows the engine's — and `mcritchie-studio` and
+  `turf-monster` both ship their own `app/views/studio/modals/_host.html.erb`.
+  A page rendering `studio/modals/host` in those apps silently gets the app's
+  fork. `scoped_host` is unforked everywhere.
+- **Guard registrations with `current()?.id`.** The outer template unmounts one
+  tick *after* the stack empties, so a bare `.id` throws on every close.
+
+The scoped host takes its animations from `engine-motion.css` rather than an
+inline copy, so a consumer bundling that layer gets the same spring as the shared
+host.
+
 Store API (`Alpine.store('modals')`):
 
 | Call | Behavior |
@@ -267,6 +301,129 @@ partial (String path, or `{ partial:, locals: }`):
 The legacy string locals (`balance_html`, `extra_icons_html`, `div2_html` —
 pre-rendered HTML injected via `raw`) are deprecated but still honored when the
 matching slot is absent, so existing call sites render unchanged.
+
+## Transactional emails
+
+Every consuming app can render the same admin page — **`/admin/emails`** —
+listing each transactional email it sends with the banner riding at the top of
+that email, and whether that banner is the **inherited default** or an
+**app-owned override**. Supersedes the old `/admin/email_images`, which is
+deprecated but still renders for one release.
+
+**The page is opt-in:**
+
+```ruby
+# config/initializers/studio.rb
+config.draw_admin_emails_routes = true
+```
+
+Off by default because `turf-monster` already owns `/admin/emails` and both of
+its helper names; drawing them there raises at route-load and kills every route
+in the app. The gate covers only the page — the registry and the inherited
+defaults are always on.
+
+### The registry
+
+A registered email is mostly symbolic of a workflow — a key, a label, a
+description. The only real asset is its image. The engine pre-registers the two
+every Studio app sends, so a new app inherits both without declaring anything:
+
+| Key | Label |
+|-----|-------|
+| `magic_link` | Magic-link sign-in |
+| `email_change_confirmation` | Email change confirmation |
+
+A host adds its own workflows from an initializer, mirroring
+`Studio::ModelPage.register`:
+
+```ruby
+# config/initializers/studio_emails.rb
+Rails.application.config.to_prepare do
+  Studio::EmailImage.register("winnings", label: "Contest winnings",
+                              description: "Sent when a player wins a contest.")
+  Studio::EmailImage.register("wallet_export", label: "Wallet export")
+end
+```
+
+Re-registering an inherited key updates it in place and keeps its position, so
+relabeling `magic_link` does not reorder the page or drop its default artwork.
+
+### Resolution — inherit, then own
+
+```
+Studio::EmailImage.resolved_url(:magic_link)
+  1. this app's ImageCache row  (its own S3 bucket)   -> app-owned override
+  2. the engine's default gem asset                   -> inherited default
+  3. nil                                              -> sends bannerless
+```
+
+Note the method: **`resolved_url` walks all three layers; `url` returns only
+layer 1** (this app's own image, or nil). That split is deliberate — it keeps
+every caller written before the registry behaving exactly as it did. A mailer
+that already falls back on its own, `url(:magic_link) || own_banner`, must stay
+on `url`; moving it to `resolved_url` makes that fallback unreachable and swaps
+the app's committed artwork for the engine's default.
+
+Defaults **ride the gem** (`app/assets/images/emails/*`), so a brand-new app with
+an empty bucket sends branded email on day one and needs no cross-app S3
+permission. Uploading on an app's `/admin/emails` writes to **that** app's bucket
+and **that** app's `image_caches` row — which is exactly "the asset now belongs
+to this app". Every app has its own bucket and table, so an override never leaks
+between apps.
+
+Three accessors, and picking the wrong one changes what real people receive:
+
+| Call | Returns | Use for |
+|---|---|---|
+| `url(key)` | this app's **own** image, or `nil` | the pre-registry contract; a host doing its own `\|\| fallback` |
+| `resolved_url(key)` | own → inherited default → `nil`, **absolute** | mailers |
+| `preview_url(key)` | own → inherited default (root-relative) | the admin page |
+
+`url` deliberately does **not** resolve to the default. `turf-monster`'s mailer
+reads `Studio::EmailImage.url(:magic_link) || email_banner_url("magic-link-banner.jpg")`
+— making `url` resolve would turn that `||` into dead code and swap its committed
+branded banner for the engine placeholder in live email.
+
+```ruby
+class UserMailer < ApplicationMailer
+  layout "branded_mailer"
+
+  def magic_link(email, token)
+    @banner_url = Studio::EmailImage.resolved_url(:magic_link) # nil renders bannerless
+    # ...
+  end
+end
+```
+
+Do **not** fork `layouts/branded_mailer.html.erb` — the engine's copy is
+app-name-aware through `Studio.app_name`.
+
+### Sharing a bucket — `s3_key_prefix`
+
+Uploads need `Studio.s3_bucket_prefix`. A satellite app that has no bucket of its
+own can share an existing one under its own key namespace:
+
+```ruby
+config.s3_bucket_prefix = "mcritchie-studio"
+config.s3_key_prefix    = "mcritchie-industries/"
+# -> s3://mcritchie-studio-dev/mcritchie-industries/email_banners/...
+```
+
+`Studio::S3` applies the prefix to every operation, so callers keep passing
+logical keys and never see it. Unset (the default) leaves keys byte-identical to
+what every already-shipped app wrote.
+
+An app with **no** bucket configured does not error — `/admin/emails` renders
+read-only, showing the inherited defaults it is genuinely sending and naming the
+one setting that turns uploads on.
+
+### Linking it
+
+Add it to the app's admin sidebar section:
+
+```ruby
+{ label: "Emails", href: admin_emails_path, emoji: "✉️", desc: "Transactional email banners" }
+```
 
 ## Overriding Views
 

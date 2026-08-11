@@ -4,6 +4,149 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## 0.36.0 — 2026-08-10
 
+**Transactional emails become an engine primitive.** Every consuming app now
+ships working, branded transactional email the moment it boots, and can grow its
+own workflows and artwork. Additive — no host change is required to take this
+release.
+
+**`Studio::EmailImage` is now a registry.** It was a one-entry `VARIANTS` hash;
+it is now a host-declared registry following the `Studio::ModelPage.register`
+precedent. A registered email is mostly symbolic of a workflow — a key, a label,
+a description — and its only real asset is its banner image.
+
+- The engine **pre-registers the two every Studio app sends**, `magic_link` and
+  `email_change_confirmation`, so a host inherits both without declaring
+  anything.
+- A host registers its own from an initializer:
+  `Studio::EmailImage.register("winnings", label: "Contest winnings")`.
+  Re-registering an inherited key **updates it in place**, keeping its page
+  position and its inherited artwork.
+- `variants`, `label`, `known?`, `record`, `url`, and `store` keep their old
+  shapes, so `Studio::EmailImage.url(:magic_link)` — the only external caller
+  today — is untouched.
+
+**Inheritance with per-app override.** Resolution is now two-layered:
+
+```
+resolved_url(:magic_link)  ->  this app's ImageCache row (its own S3 bucket)  app-owned
+                           ->  the engine's default gem asset                 inherited
+                           ->  nil                                            bannerless
+```
+
+`resolved_url`, **not** `url`. `url` deliberately keeps its pre-registry meaning —
+this app's own image, or nil — so a caller written before the registry keeps the
+behavior it was built against. A mailer that falls back itself
+(`url(...) || own_banner`) must stay on `url`; switching it to `resolved_url`
+would make that fallback dead code and replace the app's own artwork with the
+engine default.
+
+Defaults **ride the gem** (`app/assets/images/emails/*`), so a brand-new app with
+an empty bucket sends good-looking email on day one with no cross-app S3
+permission. Uploading writes to that app's own bucket and its own `image_caches`
+row — which is exactly "the asset now belongs to this app". Placeholder artwork
+ships for both standard emails; real artwork lands in a later release.
+
+**New: `/admin/emails`**, modelled on the living style guide — one shared engine
+page, admin-gated, rendering inside each host's layout.
+
+**It is OPT-IN, and must be.** Add to `config/initializers/studio.rb`:
+
+```ruby
+config.draw_admin_emails_routes = true
+```
+
+`turf-monster` already owns `/admin/emails` (its `EmailCatalog` manager:
+`namespace :admin { get "emails", as: :emails }`) and therefore both helper
+names, `admin_emails_path` and `admin_email_path`. Drawing the engine's page
+unconditionally raises `ArgumentError: Invalid route name, already in use:
+'admin_emails'` *while turf-monster's own routes are loading*, which takes down
+its **entire** route set — every `admin_*_path` in the app goes undefined. A host
+cannot opt out of a failure that happens before its config is read, so the
+default is off until no consumer owns the name.
+
+The gate covers only the **page**. The registry and the inherited-default
+resolution are always on, and the engine's `UserMailer` already calls
+`resolved_url`, so an app sends branded email whether or not it draws the page.
+
+**`/admin/email_images` is deprecated, not deleted.** It still renders, and its
+`admin_email_images_path` / `admin_email_image_path` helpers still resolve —
+`mcritchie-studio` and `turf-monster` both have tests on `main` that drive it,
+and consumer CI runs each consumer's default branch. A later engine minor deletes
+the controller, view, and routes once no consumer references them. In the
+meantime the old page had its own reporting bug fixed too: it now reads
+`preview_url`, so it no longer claims "No image yet" about an email that is
+visibly sending one.
+
+- The table is the primary view: **name + live image on every row**, so an email
+  is identifiable at a glance.
+- Each row says whether the live image is the **inherited default** or
+  **app-owned**, and an app-owned image can be reverted back to the default.
+- Uploading goes through the **standard crop modal**, not a bare file input.
+
+**Fix — the page misreported what was actually shipping.** It read only the S3
+override, so it announced *"No image yet — emails send without a banner until you
+upload one"* for an email that was visibly sending a banner from a committed repo
+asset. `current_url` now resolves what really ships, and the copy distinguishes
+"inherited default" from "no image at all".
+
+**New: `Studio.s3_key_prefix`** — an optional key namespace inside the bucket, so
+a satellite app can share an already-provisioned bucket instead of standing up
+its own pair:
+
+```ruby
+config.s3_bucket_prefix = "mcritchie-studio"
+config.s3_key_prefix    = "mcritchie-industries/"
+# -> s3://mcritchie-studio-dev/mcritchie-industries/email_banners/...
+```
+
+`Studio::S3` applies it to `upload`, `download`, `url`, `signed_url`, `exists?`,
+`delete`, and `list` — callers keep passing logical keys and never see it, and
+`list` strips it back off so a result feeds straight into `download`/`url`.
+**Unset by default, so every already-shipped app's keys are byte-identical.**
+Also new: `Studio::S3.configured?`, for callers that must degrade rather than
+rescue `NotConfigured`.
+
+**Honest degradation.** An app whose host never set `s3_bucket_prefix` renders
+`/admin/emails` **read-only** — showing the inherited defaults it is genuinely
+sending, naming the one setting that turns uploads on — instead of 500ing on the
+first upload.
+
+**New partial: `studio/modals/scoped_host`** — a self-contained modal host on its
+own Alpine store, for a page that must bring its own modals. `/admin/emails` uses
+it (`store: "emailModals"`) to ship its crop + saving modals, so the page works
+identically in an app that renders a shared modal host and one that renders none
+at all. `imageUploadHost` and `submitFormWithProgress` gained a matching `store`
+option (default `"modals"`, so existing call sites are unchanged); the crop-photo
+and saving partials already had one.
+
+It is a **separate partial rather than a local on `studio/modals/_host`** for a
+reason worth knowing: this is a non-isolated engine, so an app view at the same
+path shadows the engine's — and `mcritchie-studio` and `turf-monster` both ship
+their own `app/views/studio/modals/_host.html.erb`. A page rendering
+`studio/modals/host` in those apps silently gets the app's fork, which knows
+nothing of a `store:` local, so the page-scoped store is never registered and
+every modal trigger on the page does nothing. `scoped_host` is unforked in every
+app. The living style guide's hand-rolled `dsModals` host can rebase onto it.
+
+Register modals with `current()?.id`, not `current().id` — the outer template
+unmounts one tick after the stack empties, so a bare `.id` throws on close.
+
+**Compatibility.** `Studio::EmailImage.url(key)` keeps its **pre-registry
+contract** — this app's own uploaded image, or `nil`. The two-layer resolution
+lives in the new `resolved_url(key)`. This matters: `turf-monster`'s mailer is
+`Studio::EmailImage.url(:magic_link) || email_banner_url("magic-link-banner.jpg")`,
+and making `url` resolve to the engine default would have turned that `||` into
+dead code and silently replaced turf-monster's committed branded banner with the
+engine's **placeholder** in live sign-in email. A method whose signature is
+unchanged but whose return value flips from `nil` to a value is not additive.
+
+**Consumer note.** Nothing here is required to upgrade. To adopt: set
+`config.draw_admin_emails_routes = true`, link `admin_emails_path` from the app's
+admin sidebar, register any extra workflows, switch mailers from `url` to
+`resolved_url` where you want the inherited default, and drop any local
+`branded_mailer.html.erb` fork — the engine's copy is app-name-aware through
+`Studio.app_name`.
+
 **The local-review link now signs the reviewer in as someone who can SEE the
 page.** `/_studio/local_review` — the local half of the task board's WAITING
 APPROVAL button — provisions the account before it mints, at the new

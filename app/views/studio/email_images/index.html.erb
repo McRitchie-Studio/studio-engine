@@ -1,3 +1,6 @@
+<%# DEPRECATED page — superseded by /admin/emails (studio/emails/index).
+    Kept for one release so consumer suites on their default branch keep passing;
+    see Studio::EmailImagesController for the full staging note. %>
 <% content_for(:title) { "Email images" } %>
 <div class="max-w-2xl mx-auto px-4 py-8">
   <header class="mb-6">
@@ -8,6 +11,20 @@
     </p>
   </header>
 
+  <%# Only when this app actually DREW /admin/emails — it is opt-in, and pointing
+      at a route that does not exist raises NameError and 500s this page. %>
+  <% if successor_path %>
+    <div class="mb-6 rounded-xl border border-subtle bg-inset px-4 py-3">
+      <p class="text-sm font-semibold text-heading">There's a better page now</p>
+      <p class="text-sm text-body mt-1">
+        <%= link_to "Emails", successor_path, class: "underline underline-offset-2" %>
+        lists every email this app sends with its live banner, says whether that
+        banner is the shared default or this app's own, and crops on upload.
+        This page is going away.
+      </p>
+    </div>
+  <% end %>
+
   <% flash.each do |type, message| %>
     <div class="mb-4 rounded-lg px-4 py-3 text-sm <%= type.to_s == "alert" ? "bg-danger/10 text-danger" : "bg-success/10 text-success" %>">
       <%= message %>
@@ -16,7 +33,12 @@
 
   <div class="space-y-6">
     <% @variants.each do |variant, label| %>
-      <% current_url = Studio::EmailImage.url(variant) %>
+      <%# preview_url, not url: this page's ORIGINAL BUG was reading only the S3
+          override, so it announced "No image yet" for an email that was visibly
+          sending a banner from a committed repo asset. Even on its way out it
+          should tell the truth about what ships. %>
+      <% current_url = Studio::EmailImage.preview_url(variant) %>
+      <% inherited = current_url.present? && Studio::EmailImage.source(variant) == :default %>
       <section class="rounded-xl border border-subtle p-5">
         <h2 class="font-semibold mb-3"><%= label %></h2>
 
@@ -29,6 +51,13 @@
             </div>
           <% end %>
         </div>
+
+        <% if inherited %>
+          <p class="text-xs text-muted mb-3">
+            This is the shared default that ships with the engine. Uploading here
+            makes the image this app's own.
+          </p>
+        <% end %>
 
         <%= form_with url: admin_email_image_path(variant), method: :patch, html: { multipart: true }, class: "flex flex-wrap items-center gap-3" do %>
           <%= file_field_tag :image, accept: "image/png,image/jpeg,image/webp",

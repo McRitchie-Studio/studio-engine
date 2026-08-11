@@ -1,0 +1,195 @@
+<%#
+  PAGE-SCOPED modal host — a self-contained modal shell mounted on its OWN
+  Alpine store, for a page that must bring its own modals rather than rely on
+  the app's shared host.
+
+  Why this exists as a separate partial rather than a local on
+  studio/modals/_host: this is a NON-ISOLATED engine, so an app view at the same
+  path SHADOWS the engine's. `mcritchie-studio` and `turf-monster` both ship
+  their own app/views/studio/modals/_host.html.erb — older, simpler copies that
+  know nothing of a store: local. A page rendering "studio/modals/host" in those
+  apps silently gets the fork, and its page-scoped store is never registered.
+  This partial's path is unforked in every app, so it renders the engine's code
+  everywhere. (The living style guide hand-rolled the same thing inline for the
+  same reason; it can rebase onto this later.)
+
+  Two independent problems it solves at once:
+
+    1. Apps that DO have a shared host (mcritchie-studio, turf-monster) register
+       their own modal set. A page needing crop-photo would have to ask every
+       app to add it.
+    2. Apps that have NO host at all (mcritchie-industries, moms-app) would have
+       nowhere to open a modal from.
+
+  Both go away when the page owns its host.
+
+  Animations come from the shared motion layer
+  (app/assets/tailwind/studio_engine/engine-motion.css) — the .modal-card-* and
+  .modal-backdrop-* classes — rather than an inline copy, so this stays small.
+  A consumer that does not bundle engine-motion.css still gets a working modal,
+  just without the spring.
+
+  Locals:
+    store      — REQUIRED. Alpine store name, e.g. "emailModals". Must be unique
+                 on the page; never "modals" (that is the shared host's).
+    card_class — optional card sizing/skin override. Default is the shared
+                 host's max-w-sm card.
+
+  Usage: render this partial with a block, exactly like the shared host, and put
+  one `template x-if` per modal id inside it — see app/views/studio/emails/
+  index.html.erb for the live call site. Guard each registration with optional
+  chaining (`current()?.id`): the outer template unmounts one tick AFTER the
+  stack empties, so a bare `.id` throws on every close.
+
+  (No inline ERB example here on purpose. An ERB comment ends at its FIRST "%" +
+  ">", so an example containing one silently closes the comment and dumps the
+  rest of it onto the page as visible text. That shipped once.)
+%>
+<%
+  scoped_store = local_assigns.fetch(:store)
+  card_class   = local_assigns.fetch(:card_class,
+                   "bg-surface rounded-xl border border-subtle shadow-2xl p-6 max-w-sm w-full")
+%>
+<style>
+  /* Scroll lock, applied by the store's _sync() while the stack is non-empty.
+     Shipped here too because an app with no shared host never defines it. */
+  body.modal-open { overflow: hidden; }
+</style>
+
+<script>
+  (function() {
+    var STORE_NAME    = '<%= scoped_store %>';
+    // Keep in sync with .modal-card-unmount in engine-motion.css — the entry is
+    // spliced off the stack only after the exit animation has played.
+    var CLOSE_ANIM_MS = 220;
+
+    // window.StudioModals.holdAtLeast(ms) — the minimum-visible-duration
+    // convention shared with the app-level host, so a spinner can't flash past
+    // the user. Defined defensively: this page may be the only host on it.
+    window.StudioModals = window.StudioModals || {};
+    window.StudioModals.holdAtLeast = window.StudioModals.holdAtLeast || function(minMs) {
+      var startedAt = Date.now();
+      return {
+        then: function(callback) {
+          var remaining = Math.max(0, minMs - (Date.now() - startedAt));
+          if (remaining === 0) { callback(); return; }
+          setTimeout(callback, remaining);
+        }
+      };
+    };
+
+    // Named, so the dual-guard below can call it directly on a Turbo visit.
+    // Alpine's deferred script fires alpine:init exactly ONCE per full document
+    // load; this registration lives in a PAGE BODY, so it was absent during that
+    // one init. Without the guard, a Turbo Drive visit to this page leaves the
+    // store undefined and every x-data on it throws.
+    function registerScopedStore() {
+      if (Alpine.store(STORE_NAME)) return;
+
+      Alpine.store(STORE_NAME, {
+        stack: [],
+
+        // open(id, props, opts) — opts.replace swaps the top entry in place
+        // (what submitFormWithProgress does to turn crop-photo into saving).
+        open: function(id, props, opts) {
+          props = props || {};
+          opts  = opts  || {};
+          var entry = { id: id, props: props };
+
+          if (opts.replace && this.stack.length > 0) {
+            this.stack.splice(this.stack.length - 1, 1, entry);
+          } else {
+            this.stack.push(entry);
+          }
+          this._sync();
+        },
+
+        swap: function(id, props, opts) {
+          opts = opts || {};
+          opts.replace = true;
+          this.open(id, props, opts);
+        },
+
+        // Flip _closing so the exit animation plays, then splice.
+        close: function() {
+          var entry = this.current();
+          if (!entry) return;
+
+          var self = this;
+          entry._closing = true;
+          setTimeout(function() {
+            var index = self.stack.indexOf(entry);
+            if (index !== -1) self.stack.splice(index, 1);
+            self._sync();
+          }, CLOSE_ANIM_MS);
+        },
+
+        closeAll: function() {
+          this.stack = [];
+          this._sync();
+        },
+
+        // Keeps dismissible: false entries — a still-in-flight upload must not
+        // silently lose the card its promise will resolve against.
+        closeAllDismissible: function() {
+          this.stack = this.stack.filter(function(entry) {
+            return entry.props && entry.props.dismissible === false;
+          });
+          this._sync();
+        },
+
+        isOpen: function(id) {
+          return this.stack.some(function(entry) { return entry.id === id; });
+        },
+
+        current: function() {
+          return this.stack.length ? this.stack[this.stack.length - 1] : null;
+        },
+
+        // Mount on open, unmount while closing. _settled pins the entry after
+        // its first render so a stale Alpine re-evaluation cannot re-fire the
+        // bounce-in keyframe mid-life (which reads as a flash).
+        cardClasses: function() {
+          var entry = this.current();
+          if (!entry) return '';
+          if (entry._closing) return 'modal-card-unmount';
+          if (!entry._settled) { entry._settled = true; }
+          return 'modal-card-mount';
+        },
+
+        _sync: function() {
+          document.body.classList.toggle('modal-open', this.stack.length > 0);
+        }
+      });
+    }
+
+    if (window.Alpine) { registerScopedStore(); }
+    else { document.addEventListener('alpine:init', registerScopedStore); }
+
+    // bfcache + Turbo snapshot cleanup, so a modal left open does not reappear
+    // on a back navigation.
+    function clearStaleScopedModals() {
+      if (!window.Alpine || !Alpine.store) return;
+
+      var store = Alpine.store(STORE_NAME);
+      if (store && typeof store.closeAllDismissible === 'function') store.closeAllDismissible();
+    }
+    window.addEventListener('pageshow', function(e) { if (e.persisted) clearStaleScopedModals(); });
+    document.addEventListener('turbo:before-cache', clearStaleScopedModals);
+  })();
+</script>
+
+<template x-if="$store.<%= scoped_store %>.current()">
+  <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop-mount"
+       :class="$store.<%= scoped_store %>.current()?._closing && 'modal-backdrop-unmount'"
+       style="background:rgba(0,0,0,0.6)"
+       role="dialog"
+       aria-modal="true"
+       @keydown.escape.window="$store.<%= scoped_store %>.current() && $store.<%= scoped_store %>.current().props.dismissible !== false && $store.<%= scoped_store %>.close()"
+       @click.self="$store.<%= scoped_store %>.current() && $store.<%= scoped_store %>.current().props.dismissible !== false && $store.<%= scoped_store %>.close()">
+    <div class="<%= card_class %>" :class="$store.<%= scoped_store %>.cardClasses()">
+      <%# Consumer-provided registrations — one <template x-if> per modal id. %>
+      <%= yield if block_given? %>
+    </div>
+  </div>
+</template>

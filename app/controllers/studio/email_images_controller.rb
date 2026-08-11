@@ -1,7 +1,22 @@
 module Studio
-  # Admin page to manage the banner image on transactional emails (Studio::
-  # EmailImage). One managed variant today (magic_link); the registry is the
-  # extension point. Shared by every app — surfaced from each app's admin hub.
+  # DEPRECATED — superseded by Studio::EmailsController (/admin/emails), which
+  # shows every registered email with its live image, says whether that image is
+  # the inherited default or app-owned, and uploads through the crop modal.
+  #
+  # Kept alive for ONE release on purpose, not by neglect. consumer-ci.yml checks
+  # out each consumer repo with no `ref:` — i.e. its DEFAULT BRANCH — and runs
+  # that suite against the engine PR. mcritchie-studio and turf-monster both have
+  # tests on `main` that drive this page and its admin_email_image_path helper,
+  # so deleting it here would redden their lanes from the moment the PR opens,
+  # and nothing inside the engine PR could fix it: the consumer PRs would have to
+  # travel accepted -> release -> main in BOTH apps before this could go green.
+  #
+  # So the retirement is staged: this release adds /admin/emails and leaves this
+  # page working; each app's adoption task moves its link and its tests; a later
+  # engine minor deletes this file, its view, and its two routes once no
+  # consumer's main references them.
+  #
+  # It is not frozen in its broken state, though — see #index.
   class EmailImagesController < ApplicationController
     before_action :require_admin
 
@@ -10,6 +25,26 @@ module Studio
     def index
       @variants = Studio::EmailImage.variants
     end
+
+    # The canonical page this one is being retired in favour of, or nil when this
+    # app has not drawn it. Rendered as a banner at the top of the old view so an
+    # admin who lands here by a stale link is walked forward.
+    #
+    # The nil case is REAL, not defensive padding: /admin/emails is opt-in
+    # (Studio.draw_admin_emails_routes, default off because turf-monster owns the
+    # name), so on any app that has not opted in the helper does not exist and a
+    # bare call raises NameError — which 500s this page. Consumer CI caught
+    # exactly that on mcritchie-studio.
+    #
+    # Asks the ROUTER rather than the config flag: the flag is read at route-draw
+    # time, so a host that flips it afterwards would still have no route, and the
+    # router is the thing that actually knows.
+    def successor_path
+      return nil unless Rails.application.routes.named_routes.key?(:admin_emails)
+
+      admin_emails_path
+    end
+    helper_method :successor_path
 
     # PATCH /admin/email_images/:variant — upload/replace a banner.
     def update

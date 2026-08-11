@@ -129,6 +129,18 @@ module Studio
   # its own routes (it can still reuse Studio::Link + Studio::LinkConsumption).
   mattr_accessor :draw_link_routes, default: true
 
+  # Draw the shared transactional-email page at /admin/emails
+  # (Studio::EmailsController). OFF by default because the path AND its helper
+  # names (admin_emails_path / admin_email_path) are already taken in
+  # turf-monster, where drawing them raises at route-load and kills every route
+  # in the app. A host opts in from config/initializers/studio.rb:
+  #
+  #   config.draw_admin_emails_routes = true
+  #
+  # Gates only the PAGE. Studio::EmailImage's registry and its inherited-default
+  # resolution are always on, so an app sends branded email either way.
+  mattr_accessor :draw_admin_emails_routes, default: false
+
   # Optional admin Act As / impersonation session conventions. Consumers that
   # include Studio::Impersonation get current_user layered over true_user with
   # these session keys, but still own authorization, audit logging, and routes.
@@ -205,6 +217,19 @@ module Studio
   # Bucket name resolves to "#{s3_bucket_prefix}-#{Rails.env.production? ? 'production' : 'dev'}".
   mattr_accessor :s3_bucket_prefix, default: nil
   mattr_accessor :s3_region,        default: "us-east-2"
+
+  # Optional key namespace INSIDE the bucket, so a satellite app can share an
+  # existing bucket instead of provisioning its own pair. Set it and every key a
+  # caller passes to Studio::S3 is stored/read under that prefix — callers keep
+  # passing logical keys ("email_banners/magic_link-ab12.jpg") and never see it:
+  #
+  #   config.s3_bucket_prefix = "mcritchie-studio"
+  #   config.s3_key_prefix    = "mcritchie-industries/"
+  #   # -> s3://mcritchie-studio-dev/mcritchie-industries/email_banners/...
+  #
+  # Default nil = no namespace, so every already-shipped app's keys are unchanged.
+  # A trailing slash is added if you leave it off.
+  mattr_accessor :s3_key_prefix, default: nil
 
   class S3ConfigError < StandardError; end
 
@@ -505,11 +530,50 @@ module Studio
       get   "admin/style",            to: "style#index",               as: :admin_style
       get   "admin/design_system",    to: redirect("/admin/style"),    as: :admin_design_system
 
-      # Admin-managed transactional-email banner images (Studio::EmailImage).
-      # index lists each managed email variant + its current banner; update
-      # uploads a replacement. Surfaced from each app's admin hub.
+      # The standard transactional-email page. Canonical at /admin/emails
+      # (Studio::EmailsController): index lists every registered email with its
+      # live banner and whether that banner is inherited or app-owned; update
+      # stores this app's own override; destroy drops it back to the inherited
+      # default. Surfaced from each app's admin sidebar.
+      #
+      # /admin/email_images redirects here but KEEPS its admin_email_images_path
+      # helper, so a shipped host sidebar link on the old helper still resolves
+      # (same treatment as /admin/design_system -> /admin/style).
+      # OPT-IN, and it has to be. turf-monster ALREADY owns /admin/emails —
+      # `namespace :admin { get "emails", as: :emails }` (its EmailCatalog
+      # manager) — which claims the SAME path and the SAME helper names,
+      # admin_emails_path and admin_email_path. Drawing these unconditionally
+      # raises `ArgumentError: Invalid route name, already in use: 'admin_emails'`
+      # while turf-monster's own routes.rb is loading, which takes down its
+      # ENTIRE route set (every admin_*_path in the app goes undefined) — not a
+      # shadowed page, a dead app. Confirmed on consumer CI, PR #86.
+      #
+      # A host cannot opt out of something that breaks it before its config is
+      # read, and consumer CI runs each consumer's `main` — so default-on cannot
+      # be fixed from inside the engine. Default-off, and each app's adoption
+      # task turns it on. Flip the default once no consumer's main owns the name.
+      #
+      # This gates only the PAGE. The registry and the two-layer image resolution
+      # are always on, and the engine's own UserMailer already calls
+      # Studio::EmailImage.resolved_url — so an app is branded on day one whether
+      # or not it draws the page.
+      if Studio.draw_admin_emails_routes
+        get    "admin/emails",      to: "studio/emails#index",   as: :admin_emails
+        patch  "admin/emails/:key", to: "studio/emails#update",  as: :admin_email,
+               constraints: { key: /[a-z0-9_]+/ }
+        delete "admin/emails/:key", to: "studio/emails#destroy",
+               constraints: { key: /[a-z0-9_]+/ }
+      end
+
+      # DEPRECATED, kept for ONE release. Not a redirect: consumer-ci.yml runs
+      # each consumer's DEFAULT-BRANCH suite against this engine, and both
+      # mcritchie-studio and turf-monster have tests on `main` that GET this page
+      # and PATCH through admin_email_image_path. Redirecting (or deleting) here
+      # reddens their lanes the moment the PR opens, and no change inside the
+      # engine PR can fix it. Each app's adoption task moves its link + tests; a
+      # later engine minor deletes these two routes with the controller and view.
       get   "admin/email_images",          to: "studio/email_images#index",  as: :admin_email_images
-      patch "admin/email_images/:variant", to: "studio/email_images#update",  as: :admin_email_image,
+      patch "admin/email_images/:variant", to: "studio/email_images#update", as: :admin_email_image,
             constraints: { variant: /[a-z_]+/ }
 
       # Model-page protocol (v1) — a reusable per-record inspector. Drawn into

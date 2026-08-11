@@ -58,6 +58,9 @@
         if (props.maxHeight) this.maxHeight = props.maxHeight;
         if (typeof props.transparent === "boolean") this.transparent = props.transparent;
         if (props.dispatch) this.dispatch = true;
+        // Carried through untouched and echoed back on confirm, so the host that
+        // OPENED the cropper is the only one that acts on the result.
+        this.owner = props.owner || null;
         if (props.autoCropArea) this.autoCropArea = props.autoCropArea;
         if (props.imageUrl) {
           this.fromParent = true;
@@ -139,7 +142,15 @@
         var canvas = this.cropper.getCroppedCanvas(canvasOpts);
         canvas.toBlob(function (blob) {
           try {
-            window.dispatchEvent(new CustomEvent("crop-photo-confirmed", { detail: { blob: blob } }));
+            // OWNER RIDES WITH THE BLOB. `crop-photo-confirmed` is a WINDOW event, so
+            // every imageUploadHost on the page hears it — and /admin/emails mounts
+            // one host PER ROW. Without an owner, one confirmed crop PATCHed every
+            // row's banner with the same image, destroying any app-owned banner
+            // already there; the FIRST upload an admin ever performed hit it, because
+            // the engine pre-registers two emails. `owner` is the token the opening
+            // host stamped on the crop props, echoed back untouched.
+            window.dispatchEvent(new CustomEvent("crop-photo-confirmed",
+                                                 { detail: { blob: blob, owner: self.owner || null } }));
           } catch (_) {}
           if (self.cropper) { self.cropper.destroy(); self.cropper = null; }
           // dispatch mode: the opener's host owns the post-confirm flow
@@ -162,10 +173,11 @@
   // Swaps in the 'saving' card while the form uploads, then closes it (held
   // >= ~450ms so it doesn't flash) and toasts on completion. opts: { saving,
   // success, successMessage, failure, failureMessage, dismissible (default
-  // false), toast (default true) }.
+  // false), toast (default true), store (Alpine store name, default "modals" —
+  // pass a page-scoped host's name, e.g. "emailModals") }.
   window.submitFormWithProgress = function (form, opts) {
     opts = opts || {};
-    var store = window.Alpine && Alpine.store("modals");
+    var store = window.Alpine && Alpine.store(opts.store || "modals");
     var hold = (window.StudioModals && window.StudioModals.holdAtLeast)
       ? window.StudioModals.holdAtLeast(450)
       : { then: function (cb) { cb(); } };
@@ -199,9 +211,14 @@
   // it into the host's own hidden form input and submits immediately with a
   // loading card + toast (submitFormWithProgress). opts = crop config
   // (aspectRatio, maxWidth, maxHeight, transparent, autoCropArea) + save copy
-  // (saving, success, successMessage, failure, dismissible, toast, filename).
+  // (saving, success, successMessage, failure, dismissible, toast, filename) +
+  // store (Alpine store name, default "modals"). Pass `store` when the crop and
+  // saving modals are mounted on a PAGE-SCOPED host rather than the app's shared
+  // one — /admin/emails does, so the uploader works even in a host app that
+  // renders no shared modal host at all.
   window.imageUploadHost = function (opts) {
     opts = opts || {};
+    var storeName = opts.store || "modals";
     function cropProps(extra) {
       var p = {
         aspectRatio: opts.aspectRatio || 1,
@@ -214,11 +231,25 @@
       if (extra) { for (var k in extra) { p[k] = extra[k]; } }
       return p;
     }
+    // A token unique to THIS host instance. Many hosts can be mounted on one page
+    // (one per row on /admin/emails) and they all hear the same window event, so a
+    // confirm has to say WHICH host opened the cropper.
+    var ownerId = "iuh-" + (window.__studioImageUploadHostSeq = (window.__studioImageUploadHostSeq || 0) + 1);
+
     return {
+      ownerId: ownerId,
       // Modal-as-picker: the crop modal itself is the file picker / drop target.
       open() {
-        if (!window.Alpine || !Alpine.store("modals")) return;
-        Alpine.store("modals").open("crop-photo", cropProps());
+        if (!window.Alpine || !Alpine.store(storeName)) return;
+        Alpine.store(storeName).open("crop-photo", cropProps({ owner: ownerId }));
+      },
+      // The window-event guard: a confirm addressed to a DIFFERENT host is not ours
+      // to act on. An owner-LESS confirm still applies, so every existing
+      // single-host page keeps working unchanged.
+      onCropConfirmed(detail) {
+        if (!detail) return;
+        if (detail.owner && detail.owner !== ownerId) return;
+        this.applyCrop(detail.blob);
       },
       // Native picker: read the chosen image, then hand it to the modal.
       onFileSelected(event) {
@@ -226,7 +257,7 @@
         if (!file) return;
         var reader = new FileReader();
         reader.onload = function (e) {
-          Alpine.store("modals").open("crop-photo", cropProps({ imageUrl: e.target.result }));
+          Alpine.store(storeName).open("crop-photo", cropProps({ imageUrl: e.target.result, owner: ownerId }));
         };
         reader.readAsDataURL(file);
         event.target.value = "";
