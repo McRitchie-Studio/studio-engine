@@ -432,18 +432,24 @@ This is a non-isolated engine -- app views at the same path automatically overri
 ## Releasing
 
 Engine releases use semantic versions and are published to RubyGems. The full
-operator checklist lives in [`docs/RELEASE.md`](./docs/RELEASE.md).
+checklist — split by whether you are building or conducting the release — lives
+in [`docs/RELEASE.md`](./docs/RELEASE.md).
 
-Short form:
+**Building an engine change?** Do **not** edit `lib/studio/version.rb`. The
+release owns the version, and McRitchie Studio's `bin/dor-check` refuses any PR
+that touches that file. Update [`CHANGELOG.md`](./CHANGELOG.md) under
+`Unreleased` (that is *not* gated), run `bin/release-check --build`, and open
+your PR into `accepted`. That is the whole of your part.
 
-1. Update [`CHANGELOG.md`](./CHANGELOG.md) and `lib/studio/version.rb`.
-2. Run `bin/release-check --build`.
-3. Publish the gem only after explicit approval.
-4. Tag the release after RubyGems accepts the gem.
-5. In each consumer app, run `bundle update studio-engine`, verify the lockfile,
-   and run app smoke checks.
+**Conducting the release?** Commit the computed version — with `Gemfile.lock`,
+which pins the engine's own path-gem version — directly onto `accepted`, then
+run `bin/release prepare` from mcritchie-studio; it publishes, tags, and bumps
+each consumer's lock. Details and the exact commands are in
+[`docs/RELEASE.md`](./docs/RELEASE.md).
 
-**Semver guide**
+**Semver guide** — the release *derives* the bump from its members (a `breaking`
+risk tag → major, a `feature` → minor, otherwise patch), so this is what those
+levels mean, not a menu to pick from:
 - **PATCH**: bug fix; no API change. Consumers can update the gem with zero diff elsewhere.
 - **MINOR**: backward-compatible feature add. Consumers may opt in to new APIs.
 - **MAJOR**: breaking change. Consumers will need code changes alongside the tag bump.
