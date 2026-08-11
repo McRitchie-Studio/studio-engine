@@ -2,6 +2,16 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.37.0 — 2026-08-10
+
+### Added
+- Standard transactional email primitive with a registry-backed catalog, and the
+  email preview folded into that registry.
+
+### Fixed
+- The crop confirm is guarded by owner, so one confirmed crop can no longer fan out
+  and overwrite every row's banner on /admin/emails.
+
 ## 0.36.0 — 2026-08-10
 
 **Transactional emails become an engine primitive.** Every consuming app now
