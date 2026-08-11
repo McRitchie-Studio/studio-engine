@@ -78,7 +78,7 @@ mcritchie-studio encodes those rules, but **nothing calls it yet** —
 `bin/release prepare` does NOT allocate the version. Until it does, you set the
 number by hand:
 
-1. Compute `next` from the table above.
+1. Compute `next` from the rule above.
 2. Commit it **directly onto `accepted`** — no rung here is branch-protected,
    and the batch promote PR carries it to `release` without a `dor-check`:
 
