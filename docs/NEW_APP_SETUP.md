@@ -405,7 +405,7 @@ bespoke layout. Use Turf Monster's `/signin` flow as the full-featured reference
   </head>
 
   <body x-data class="bg-page text-body min-h-screen" :class="{ 'dev-mode': $store.devMode }">
-    <%= render "studio/banners/environment" %>
+    <%= render "studio/banners/stack" %>
     <%= render "layouts/navbar" %>
 
     <div class="max-w-7xl mx-auto px-4 py-6">
@@ -416,11 +416,28 @@ bespoke layout. Use Turf Monster's `/signin` flow as the full-featured reference
 </html>
 ```
 
-**Environment banner**: one render call, no conditional around it. Earlier
-versions of this guide pasted a hand-rolled yellow `<div>` here, and every app
-that copied it drifted — different show rules, different labels, and no link to
-the local email inbox. `studio/banners/environment` now owns all three
-decisions:
+**Bar stack**: render `studio/banners/stack` — not the individual banners — as
+the navbar's **sibling, immediately above it**. The stack decides which bars
+appear (environment always; impersonation when you pass
+`impersonated_user:`/`admin_user:`/`stop_path:`) and renders them in one block.
+
+Two rules, and they are the whole layout contract:
+
+| Rule | Why |
+|---|---|
+| The stack goes **before** the navbar, as a sibling — never nested inside it | Bars compose. There is already a second one, and nesting meant every new bar edited the navbar. |
+| The bars sit in **normal flow**; the navbar is the only pinned chrome (`sticky top-0`) | The bars reserve their space by taking it, so the navbar needs no offset to compute. Give either one a measured offset and the header moves after first paint — that was the `--studio-bars-h` jump fixed in `fix-navbar-offset-jump`. Two pinned siblings of unknown height cannot stack in CSS alone. |
+
+The bars therefore scroll away with the page and the navbar stays. An overlay
+that must clear the chrome positions off `--nav-bottom` (published by
+`layouts/studio/head`), which reports the header's live bottom edge.
+
+**Environment banner**: the stack renders it for you; render
+`studio/banners/environment` directly only in a layout that wants that one bar
+and nothing else. Earlier versions of this guide pasted a hand-rolled yellow
+`<div>` here, and every app that copied it drifted — different show rules,
+different labels, and no link to the local email inbox.
+`studio/banners/environment` owns all three decisions:
 
 | Decision | Rule |
 |---|---|
