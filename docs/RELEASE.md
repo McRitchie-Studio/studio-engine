@@ -31,7 +31,7 @@ should remain a patch release or move to the next minor.
 
 ## Preflight
 
-Run this before a release PR is considered ready:
+Run this before any engine PR is considered ready:
 
 ```bash
 cd /Users/alex/projects/studio-engine
@@ -46,23 +46,73 @@ bin/release-check --build
 
 The build artifact is written to `/tmp/studio-engine-release-check/`.
 
-## Release Checklist
+## Who sets the version
+
+**Not the builder.** A version is a property of the RELEASE, not of any one PR:
+N pull requests riding one release candidate publish exactly **one** version, so
+no individual PR can know the right answer when it is written. McRitchie Studio's
+`bin/dor-check` **refuses any PR whose diff touches `lib/studio/version.rb`** and
+will not let the task advance.
+
+So the two audiences below are separate. Read the one you are.
+
+### If you are building an engine change
 
 1. Confirm the diff is limited to the intended engine changes.
-2. Update `CHANGELOG.md` by moving the relevant `Unreleased` notes under the
-   new version heading.
-3. Bump `lib/studio/version.rb` to the same version.
-4. Run `bin/release-check --build`.
-5. Commit the version bump, changelog, and engine code together.
-6. Publish the gem only after explicit approval:
+2. **Do not touch `lib/studio/version.rb`.** Updating `CHANGELOG.md` under the
+   `Unreleased` heading is fine and encouraged — the changelog is *not* gated.
+3. Run `bin/release-check` (or `bin/release-check --build` for a package sanity
+   check).
+4. Open your PR into `accepted` like any other task. You are done; the release
+   assigns the number.
+
+If your change is **breaking**, say so on the task rather than versioning it:
+`bin/task update <task-slug> --gem-bump major`.
+
+### If you are the release conductor
+
+The bump is derived from the candidate's membership: any member risk-tagged
+`breaking` → **major**, else any member with `kind: feature` → **minor**, else
+**patch**; `next = last published v* tag + that bump`. `Release::GemVersion` in
+mcritchie-studio encodes those rules, but **nothing calls it yet** —
+`bin/release prepare` does NOT allocate the version. Until it does, you set the
+number by hand:
+
+1. Compute `next` from the rule above.
+2. Commit it **directly onto `accepted`** — no rung here is branch-protected,
+   and the batch promote PR carries it to `release` without a `dor-check`:
 
 ```bash
-gem push /tmp/studio-engine-release-check/studio-engine-<version>.gem
+cd /Users/alex/projects/studio-engine
+git checkout accepted && git pull
+# edit lib/studio/version.rb to <next>
+bundle install          # REQUIRED — see below
+git add lib/studio/version.rb Gemfile.lock
+git commit -m "Release <next>" && git push origin accepted
 ```
 
-7. Create/push the matching git tag after the gem is published:
+   **`Gemfile.lock` must ride in the same commit.** The engine bundles itself as
+   a path gem, so `Gemfile.lock` pins its own version (`PATH remote: .` →
+   `studio-engine (x.y.z)`). CI runs bundler frozen (`bundler-cache: true`), so a
+   version that moved without its lockfile dies with *"the gemspecs for path gems
+   changed, but the lockfile can't be updated because frozen mode is set"* —
+   before a single test runs. This is invisible locally, because any
+   `bundle install` or test run silently regenerates the lockfile in your working
+   tree while the commit stays broken.
+
+3. Run `bin/release prepare` from mcritchie-studio. It publishes the gem to
+   RubyGems and tags `v<version>` as its producer-first step, then bumps each
+   consumer's lock. Skip step 2 and prepare's **stranded-work guard** aborts the
+   sweep for *every* repo.
+
+### Publishing by hand (fallback)
+
+`bin/release prepare` automates this. Run it manually only when the conductor
+path is unavailable, and only after explicit approval:
 
 ```bash
+bin/release-check --build
+gem push /tmp/studio-engine-release-check/studio-engine-<version>.gem
 git tag v<version>
 git push origin main --tags
 ```

@@ -73,7 +73,15 @@ Troubleshooting guide for autonomous agents. Format: problem, diagnosis, fix.
 **Standard update flow**
 1. Make changes in `/Users/alex/projects/studio-engine/`
 2. Run `bin/release-check`
-3. Follow `docs/RELEASE.md` for version bump, changelog, build, and approved RubyGems publish
+3. Open the PR into `accepted`. **Do not bump `lib/studio/version.rb`** — the
+   release owns the version and `bin/dor-check` refuses a PR that edits it.
+   `CHANGELOG.md` is not gated. See `docs/RELEASE.md` for who sets the number.
+
+Steps 4-7 below are the **manual** consumer-adoption path. On the normal
+release, `bin/release prepare` does all of it — it publishes the gem, tags it,
+and commits each consumer's `Gemfile.lock` bump onto that consumer's `release`
+branch. Reach for these only outside the conductor path:
+
 4. In McRitchie Studio: `cd /Users/alex/projects/mcritchie-studio && bundle update studio-engine`
 5. In Turf Monster: `cd /Users/alex/projects/turf-monster && bundle update studio-engine`
 6. Test both apps and prove the local URLs still boot
