@@ -1,0 +1,116 @@
+<%#  admin/emails — the standard transactional-email page.
+
+     A bare content wrapper (no `layout` call), like the living style guide at
+     /admin/style: it renders inside each host's application.html.erb and
+     inherits that app's navbar and theme, so one shared engine page looks
+     native in every app.
+
+     The table is the primary view — one row per registered email, each carrying
+     the NAME and the LIVE IMAGE so an email is identifiable at a glance, plus
+     whether that image is the INHERITED engine default or an APP-OWNED
+     override. Editing goes through the shared crop modal (studio/cropper_assets
+     + the page-scoped host at the bottom), never a bare file input.
+
+     Page-scoped modal host: the crop + saving modals mount on `emailModals`
+     rather than the app's shared `modals` store, so this page works identically
+     in an app that renders a shared modal host (mcritchie-studio, turf-monster)
+     and one that renders none at all (mcritchie-industries, moms-app). It uses
+     studio/modals/scoped_host, NOT studio/modals/host — the latter is forked by
+     mcritchie-studio and turf-monster, and an app fork shadows the engine's
+     partial in this non-isolated engine. %>
+<% content_for(:title) { "Emails" } %>
+<%
+  aspect     = Studio::EmailImage::ASPECT_RATIO
+  max_width  = Studio::EmailImage::MAX_WIDTH
+  app_owned  = @entries.count { |entry| Studio::EmailImage.source(entry.key) == :app }
+%>
+<div class="max-w-5xl mx-auto px-4 pb-16">
+  <header class="space-y-2 pt-8 pb-6">
+    <p class="label-upper">studio-engine &middot; v<%= Studio::VERSION %></p>
+    <h1 class="text-3xl font-bold text-heading">Emails</h1>
+    <p class="text-body max-w-2xl">
+      Every transactional email <%= Studio.app_name %> sends, and the banner that
+      rides at the top of it. Each one starts on the shared Studio artwork; upload
+      your own and it belongs to this app from then on.
+    </p>
+    <p class="text-sm text-muted">
+      <%= pluralize(@entries.size, "email") %> registered &middot;
+      <%= app_owned.zero? ? "all inheriting the default artwork" : "#{app_owned} with #{Studio.app_name}'s own artwork" %>
+    </p>
+  </header>
+
+  <%# No flash block here on purpose — every host layout already renders the
+      shared layouts/studio/flash partial, so the controller's notice/alert
+      surfaces once rather than twice. %>
+
+  <%# Honest degradation: an app whose host never set Studio.s3_bucket_prefix can
+      SHOW what each email is sending but cannot store an override. Say so plainly
+      instead of offering an Edit button that 500s. %>
+  <% unless @uploads_available %>
+    <div class="mb-6 rounded-xl border border-subtle bg-inset px-4 py-3">
+      <p class="text-sm font-semibold text-heading">Read-only on this app</p>
+      <p class="text-sm text-body mt-1">
+        <%= Studio.app_name %> has no object storage configured, so the images below
+        can be viewed but not replaced yet. They are the shared defaults that ship
+        with the engine, and they are what this app is sending right now. Set
+        <code class="font-mono text-2xs bg-surface px-1.5 py-0.5 rounded">config.s3_bucket_prefix</code>
+        in <code class="font-mono text-2xs bg-surface px-1.5 py-0.5 rounded">config/initializers/studio.rb</code>
+        to turn on uploads.
+      </p>
+    </div>
+  <% end %>
+
+  <div class="card overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left align-middle">
+        <thead>
+          <tr class="border-b border-subtle">
+            <th class="label-upper px-4 py-3 w-48">Banner</th>
+            <th class="label-upper px-4 py-3">Email</th>
+            <th class="label-upper px-4 py-3 w-52">Image</th>
+            <% if @uploads_available %>
+              <th class="label-upper px-4 py-3 w-40 text-right">Actions</th>
+            <% end %>
+          </tr>
+        </thead>
+        <tbody>
+          <% @entries.each do |entry| %>
+            <%= render "studio/emails/row", entry: entry,
+                  uploads_available: @uploads_available,
+                  aspect: aspect, max_width: max_width %>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="text-xs text-muted mt-4">
+    Banners render full-bleed at 600px wide inside the email card. The crop is
+    fixed at <%= aspect.to_i %>:1 and saved at up to <%= max_width %>px, which is
+    retina-sharp in an inbox without tripping a clipping limit.
+    <% if @entries.any? { |entry| Studio::EmailImage.source(entry.key) == :none } %>
+      An email with no image sends bannerless — the card still renders.
+    <% end %>
+  </p>
+</div>
+
+<% if @uploads_available %>
+  <%# Cropper.js + the imageUploadHost / cropPhotoModal / submitFormWithProgress
+      factories, loaded only on this page. %>
+  <%= render "studio/cropper_assets" %>
+
+  <%# Page-scoped modal host — see the header note. Brings its own crop-photo +
+      saving modals so no host app has to register them. Deliberately NOT
+      studio/modals/host: mcritchie-studio and turf-monster ship app copies of
+      that path which shadow the engine's, so the page would get their fork. %>
+  <%# Optional chaining on current() is load-bearing: the outer template unmounts
+      one tick AFTER the stack empties, so a bare .id throws on every close. %>
+  <%= render "studio/modals/scoped_host", store: "emailModals" do %>
+    <template x-if="$store.emailModals.current()?.id === 'crop-photo'">
+      <div><%= render "studio/modals/crop_photo", store: "emailModals" %></div>
+    </template>
+    <template x-if="$store.emailModals.current()?.id === 'saving'">
+      <div><%= render "studio/modals/saving", store: "emailModals" %></div>
+    </template>
+  <% end %>
+<% end %>

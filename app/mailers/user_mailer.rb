@@ -21,7 +21,10 @@ class UserMailer < ApplicationMailer
     @app_name   = Studio.app_name
     @email      = email
     @magic_url  = magic_link_url_for(token)
-    @banner_url = Studio::EmailImage.url(:magic_link) # admin-managed; nil renders bannerless
+    # resolved_url, not url: this app's own upload if it has one, otherwise the
+    # engine's default banner — which is what makes a brand-new app's sign-in
+    # email branded on day one. nil renders bannerless.
+    @banner_url = Studio::EmailImage.resolved_url(:magic_link)
     @banner_alt = "Your #{@app_name} sign-in link"
     mail(to: email, subject: "Your #{@app_name} sign-in link")
   end
