@@ -20,9 +20,9 @@
      partial in this non-isolated engine. %>
 <% content_for(:title) { "Emails" } %>
 <%
-  aspect     = Studio::EmailImage::ASPECT_RATIO
-  max_width  = Studio::EmailImage::MAX_WIDTH
-  app_owned  = @entries.count { |entry| Studio::EmailImage.source(entry.key) == :app }
+  aspect     = Studio::EmailCatalog::ASPECT_RATIO
+  max_width  = Studio::EmailCatalog::MAX_WIDTH
+  app_owned  = @entries.count { |entry| Studio::EmailCatalog.source(entry.key) == :app }
 %>
 <div class="max-w-5xl mx-auto px-4 pb-16">
   <header class="space-y-2 pt-8 pb-6">
@@ -88,7 +88,7 @@
     Banners render full-bleed at 600px wide inside the email card. The crop is
     fixed at <%= aspect.to_i %>:1 and saved at up to <%= max_width %>px, which is
     retina-sharp in an inbox without tripping a clipping limit.
-    <% if @entries.any? { |entry| Studio::EmailImage.source(entry.key) == :none } %>
+    <% if @entries.any? { |entry| Studio::EmailCatalog.source(entry.key) == :none } %>
       An email with no image sends bannerless — the card still renders.
     <% end %>
   </p>

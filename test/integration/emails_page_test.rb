@@ -38,13 +38,13 @@ class EmailsPageTest < ActiveSupport::TestCase
   end
 
   def setup
-    Studio::EmailImage.reset!
+    Studio::EmailCatalog.reset!
     @stubs = []
   end
 
   def teardown
     @stubs.reverse_each { |mod, name, original| mod.define_singleton_method(name, original) }
-    Studio::EmailImage.reset!
+    Studio::EmailCatalog.reset!
   end
 
   def stub_module(mod, name, &replacement)
@@ -168,8 +168,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   test "the legacy page reports the live image, not just the override" do
     source = File.read(File.expand_path("../../app/views/studio/email_images/index.html.erb", __dir__))
 
-    assert_includes source, "Studio::EmailImage.preview_url(variant)"
-    refute_includes source, "Studio::EmailImage.url(variant)",
+    assert_includes source, "Studio::EmailCatalog.preview_url(variant)"
+    refute_includes source, "Studio::EmailCatalog.url(variant)",
       "the legacy page's original bug was reading ONLY the override, so it claimed " \
       "'No image yet' about an email that was visibly sending a repo-asset banner"
   end
@@ -177,7 +177,7 @@ class EmailsPageTest < ActiveSupport::TestCase
   # --- 2. the inherited defaults really ship in the gem ----------------------
 
   test "every standard email's default asset is a file that ships in the gem" do
-    Studio::EmailImage::STANDARD.each do |attrs|
+    Studio::EmailCatalog::STANDARD.each do |attrs|
       asset = attrs[:default_asset]
       path = File.expand_path("../../app/assets/images/#{asset}", __dir__)
       assert File.file?(path),
@@ -220,21 +220,21 @@ class EmailsPageTest < ActiveSupport::TestCase
 
   test "a local stack's port and scheme survive into the banner URL" do
     with_default_url_options(host: "localhost", port: 3001) do
-      assert_equal "http://localhost:3001", Studio::EmailImage.mailer_asset_host
+      assert_equal "http://localhost:3001", Studio::EmailCatalog.mailer_asset_host
     end
   end
 
   test "a production host with no port resolves to https with no port" do
     with_default_url_options(host: "mcritchie.studio") do
-      assert_equal "https://mcritchie.studio", Studio::EmailImage.mailer_asset_host
+      assert_equal "https://mcritchie.studio", Studio::EmailCatalog.mailer_asset_host
     end
   end
 
   test "the resolved banner URL is fetchable from the stack it was built on" do
-    stub_module(Studio::EmailImage, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
 
     with_default_url_options(host: "localhost", port: 3001) do
-      url = Studio::EmailImage.resolved_url("magic_link")
+      url = Studio::EmailCatalog.resolved_url("magic_link")
 
       assert url.start_with?("http://localhost:3001/"),
         "a banner URL that drops the port points at :443 and never loads (got #{url.inspect})"
@@ -290,7 +290,7 @@ class EmailsPageTest < ActiveSupport::TestCase
     # The rows link admin_email_path; a bare ActionView::Base carries no route
     # helpers, so mix the app's in rather than stubbing the URLs away.
     view.singleton_class.include(Rails.application.routes.url_helpers)
-    view.assign(entries: Studio::EmailImage.entries, uploads_available: uploads_available)
+    view.assign(entries: Studio::EmailCatalog.entries, uploads_available: uploads_available)
     view.render(template: "studio/emails/index")
   end
 
@@ -333,14 +333,14 @@ class EmailsPageTest < ActiveSupport::TestCase
   end
 
   test "the table shows the NAME and the LIVE IMAGE of every registered email" do
-    stub_module(Studio::EmailImage, :record) { |_key| nil }
-    stub_module(Studio::EmailImage, :default_asset_path) { |key| "/assets/#{key}.png" }
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |key| "/assets/#{key}.png" }
 
     doc = Nokogiri::HTML(render_index)
     rows = doc.css("tbody tr")
 
-    assert_equal Studio::EmailImage.entries.size, rows.size, "one row per registered email"
-    Studio::EmailImage.entries.each do |entry|
+    assert_equal Studio::EmailCatalog.entries.size, rows.size, "one row per registered email"
+    Studio::EmailCatalog.entries.each do |entry|
       row = rows.find { |r| r.text.include?(entry.label) }
       refute_nil row, "expected a row named #{entry.label}"
       refute_empty row.css("img"), "#{entry.key}'s row must show its live image, not just its name"
@@ -348,8 +348,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   end
 
   test "a row says its image is the INHERITED default when the app uploaded nothing" do
-    stub_module(Studio::EmailImage, :record) { |_key| nil }
-    stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
 
     html = render_index
     assert_includes html, "Inherited default"
@@ -360,8 +360,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   test "a row says the image is APP-OWNED once this app uploaded its own" do
     row = Object.new
     row.define_singleton_method(:url) { "https://turf-monster-dev.s3.amazonaws.com/email_banners/magic_link-ab12.png" }
-    stub_module(Studio::EmailImage, :record) { |key| key.to_s == "magic_link" ? row : nil }
-    stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/default.png" }
+    stub_module(Studio::EmailCatalog, :record) { |key| key.to_s == "magic_link" ? row : nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/default.png" }
 
     html = render_index
     assert_includes html, "#{Studio.app_name}&#39;s own"
@@ -371,8 +371,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   end
 
   test "an email with no image at all is labelled distinctly from an inherited one" do
-    stub_module(Studio::EmailImage, :record) { |_key| nil }
-    stub_module(Studio::EmailImage, :default_asset_path) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| nil }
 
     html = render_index
     assert_includes html, "No image"
@@ -380,8 +380,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   end
 
   test "upload runs through the shared crop modal, never a bare file input" do
-    stub_module(Studio::EmailImage, :record) { |_key| nil }
-    stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
 
     html = render_index
     assert_includes html, "imageUploadHost(", "each row hosts the shared cropper uploader"
@@ -440,8 +440,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   # up as a behavioural one is how a suite starts lying.
 
   test "the crop and saving modals mount on a PAGE-SCOPED store" do
-    stub_module(Studio::EmailImage, :record) { |_key| nil }
-    stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
 
     html = render_index
     # mcritchie-industries and moms-app render no shared modal host at all, so
@@ -453,8 +453,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   end
 
   test "an app with no object storage renders read-only and explains why" do
-    stub_module(Studio::EmailImage, :record) { |_key| nil }
-    stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
 
     html = render_index(uploads_available: false)
 
@@ -525,5 +525,69 @@ class EmailsPageTest < ActiveSupport::TestCase
 
     assert_includes html, "$store.modals.current()",
       "the shared host is rendered by shipped app layouts — it must not move"
+  end
+
+  # --- 6. the preview cannot take the page down (the REAL mailer shape) ------
+
+  # REGRESSION GUARD, and the reason it needs a booted Rails rather than a
+  # stand-in. The unit suite's fake mail is EAGER, so it cannot reproduce this:
+  # the idiom this feature documents — `preview: -> { SomeMailer.action(...) }` —
+  # returns an ActionMailer::MessageDelivery, a LAZY proxy whose mailer action
+  # has not run at `call` time. The catalog used to hand that proxy straight
+  # back, record no error, and let the mailer finally raise at #preview_subject,
+  # outside every rescue — a 500 on /admin/emails/:key through the host's
+  # rescue_from. One preview cost the whole manager.
+  #
+  # turf-monster's catalog on main — the prior art this work folds in — is eight
+  # builders, every one a mailer call. So this is the FIRST adopter's shape, not
+  # an exotic one.
+  class PreviewProbeMailer < ActionMailer::Base
+    def explodes
+      raise ArgumentError, "sample data is gone"
+    end
+
+    def works
+      mail(to: "someone@example.com", subject: "Your magic link", body: "<p>hi</p>",
+           content_type: "text/html")
+    end
+  end
+
+  test "a REAL lazy mailer delivery that fails is contained, not propagated" do
+    Studio::EmailCatalog.register("probe_boom", preview: -> { PreviewProbeMailer.explodes })
+
+    assert_instance_of ActionMailer::MessageDelivery, PreviewProbeMailer.explodes,
+      "guard the guard: if this stops being lazy, this test stops testing anything"
+
+    assert_nil Studio::EmailCatalog.preview_mail("probe_boom")
+    assert_nil Studio::EmailCatalog.preview_subject("probe_boom"),
+      "preview_subject is the FIRST thing #show calls — it must never propagate"
+    assert_nil Studio::EmailCatalog.preview_html("probe_boom")
+    assert_includes Studio::EmailCatalog.preview_error("probe_boom"), "ArgumentError"
+  end
+
+  test "a REAL lazy mailer delivery that works renders its subject and body" do
+    Studio::EmailCatalog.register("probe_ok", preview: -> { PreviewProbeMailer.works })
+
+    assert_equal "Your magic link", Studio::EmailCatalog.preview_subject("probe_ok")
+    assert_includes Studio::EmailCatalog.preview_html("probe_ok"), "<p>hi</p>"
+    assert_nil Studio::EmailCatalog.preview_error("probe_ok")
+  end
+
+  # The user-visible half: the page still RENDERS, and says why, instead of
+  # handing the host's error handler a 500.
+  test "the show page renders the failure reason instead of losing the page" do
+    Studio::EmailCatalog.register("probe_boom", preview: -> { PreviewProbeMailer.explodes })
+    Studio::EmailCatalog.preview_mail("probe_boom")
+
+    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    view.singleton_class.include(Rails.application.routes.url_helpers)
+    view.assign(entry: Studio::EmailCatalog.entry("probe_boom"),
+                subject: Studio::EmailCatalog.preview_subject("probe_boom"),
+                preview_error: Studio::EmailCatalog.preview_error("probe_boom"),
+                uploads_available: false)
+
+    html = view.render(template: "studio/emails/show")
+    assert_includes html, "ArgumentError", "the page must say WHY the preview is missing"
+    assert_includes html, "Probe boom", "the rest of the page must survive one dead preview"
   end
 end

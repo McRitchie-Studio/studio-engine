@@ -23,7 +23,7 @@ module Studio
     MAX_BYTES = 8.megabytes
 
     def index
-      @variants = Studio::EmailImage.variants
+      @variants = Studio::EmailCatalog.variants
     end
 
     # The canonical page this one is being retired in favour of, or nil when this
@@ -49,7 +49,7 @@ module Studio
     # PATCH /admin/email_images/:variant — upload/replace a banner.
     def update
       variant = params[:variant].to_s
-      return head :not_found unless Studio::EmailImage.known?(variant)
+      return head :not_found unless Studio::EmailCatalog.known?(variant)
 
       file = params[:image]
       unless valid_image?(file)
@@ -58,8 +58,8 @@ module Studio
       end
 
       rescue_and_log do
-        Studio::EmailImage.store(variant, io: file, content_type: file.content_type)
-        redirect_to admin_email_images_path, notice: "#{Studio::EmailImage.label(variant)} banner updated."
+        Studio::EmailCatalog.store(variant, io: file, content_type: file.content_type)
+        redirect_to admin_email_images_path, notice: "#{Studio::EmailCatalog.label(variant)} banner updated."
       end
     rescue StandardError
       redirect_to admin_email_images_path, alert: "Couldn't save the image. Please try again.", status: :see_other
