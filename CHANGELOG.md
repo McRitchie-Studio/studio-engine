@@ -2,7 +2,41 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
-## Unreleased
+## 0.39.0 — 2026-08-11
+
+### Removed
+
+- **`--studio-bars-h` is gone.** 0.33 advertised this CSS custom property as the
+  contract between the bar stack and a consumer's navbar, and the navbar's
+  sticky `top` read it. It no longer exists: the stack now sits in normal flow
+  directly above the navbar and simply occupies its own height, so a navbar
+  sticky at `top: 0` starts underneath the bars with nothing to compute.
+
+  **No consumer breaks.** A navbar still spelling `top: var(--studio-bars-h,
+  0px)` resolves to its `0px` fallback — exactly where the new layout wants it —
+  so an adopting app self-heals with no change. Verified against
+  `mcritchie-studio` (which carries that spelling) and `turf-monster` (which
+  never adopted the stack).
+
+### Fixed
+
+- **The navbar no longer jumps on load or navigation.** The removed property was
+  published twice and the two publishers could disagree: the server rendered an
+  ESTIMATE (bar count × a fixed unit) and a `ResizeObserver` then MEASURED the
+  real height and overwrote it. The header painted at the estimate and moved
+  when the measurement landed, moved again whenever a webfont changed a bar's
+  real height, and during a view transition the outgoing and incoming headers
+  composited at two different tops — so the navbar visibly drew twice. A
+  position only CSS can set cannot disagree with itself.
+
+  The estimate, the `ResizeObserver`, and the inline `<style>`/`<script>` the
+  stack used to emit are all gone. Reported from QA by the operator.
+
+  **Trade, recorded deliberately:** the bars now scroll away rather than
+  pinning. Two pinned siblings of unknown height cannot stack in CSS alone —
+  one must measure the other, and that measurement *is* the defect.
+
+## 0.38.0 — 2026-08-10
 
 **The email registry becomes the email catalog.** 0.37 gave every app a shared
 page for its transactional email banners. This folds in the rest — **what each

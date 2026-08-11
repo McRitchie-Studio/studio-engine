@@ -12,22 +12,31 @@
   0, 1 or 2, and growing. Nesting each new bar inside the navbar coupled two
   unrelated components and meant every new bar edited the navbar. Here the bars
   do not know the navbar exists, and the navbar does not know which bars
-  rendered — only how tall they are, via --studio-bars-h.
+  rendered — it simply starts below whatever space they take.
 
-  HOW THE HEIGHT IS KNOWN. The stack MEASURES itself and publishes the result, so
-  a bar that needs to be taller — or a second bar, or a third — just works, and no
-  consuming app is reworked to allow it. The apps respond to what the bars need.
+  HOW THE SPACE IS RESERVED. By the LAYOUT, and by nothing else. The stack sits
+  in normal flow directly above the navbar, so the bars occupy their own height
+  the way any block does, and the navbar — sticky at top:0 — starts underneath
+  them with no offset to compute. A taller bar, or a second, or a third, simply
+  takes more room and pushes the navbar down. Nothing measures, nothing
+  publishes, nothing repaints.
 
-  A server-rendered estimate (count × --studio-bar-unit) paints first so the
-  common case has no flash, then a ResizeObserver replaces it with the truth on
-  the same frame. An earlier cut declared a fixed bar height to avoid the
-  observer; that was rejected because it could only ever express the standard
-  case, which is the case that needed no help.
+  This replaced a measured custom property (--studio-bars-h: a server-rendered
+  estimate of count times a fixed unit, overwritten by a ResizeObserver reading
+  the real height). It worked, and it JUMPED: the header painted at the estimate
+  and moved when the measurement landed, then moved again whenever a webfont
+  changed the bar's real height — and during a view transition the outgoing and
+  incoming headers composited at two different tops, so the navbar visibly drew
+  twice. A position that only CSS can set cannot do any of that.
 
-  The property is published on :root from an inline <style>, deliberately. A
-  custom property set on this element would be invisible to the navbar, because
-  custom properties inherit DOWN, not ACROSS to siblings — and putting it on
-  <body> would need every host to change its layout.
+  THE TRADE, recorded so it is a decision and not a regression: the bars scroll
+  away with the page instead of pinning. Only the navbar stays. Two pinned
+  siblings of unknown height cannot stack in CSS alone — one has to measure the
+  other — so pinning the bars is what cost the offset variable. The navbar keeps
+  its pin; the bars are ambient labels, seen on every page load because a Turbo
+  visit lands at the top. An overlay that must clear the chrome should position
+  off --nav-bottom (published in layouts/studio/_head), which already reports the
+  header's live bottom edge and accounts for chrome above it.
 
   Locals (all optional):
     preview      — true inside a navbar-preview render; renders nothing, so a
@@ -61,42 +70,17 @@
     end
   end
 
-  # count { } and not count(true): show_impersonation is a truthy USER, not the
-  # literal true, and count(true) compares with ==. That published a one-bar
-  # height for a two-bar stack — the navbar would have sat under a bar.
-  bar_count = [show_environment, show_impersonation].count { |bar| bar }
+  # No count is kept. The old code counted bars to compute an offset, and had to
+  # use count { } rather than count(true) because show_impersonation is a truthy
+  # USER object, not the literal true — a mistake that once published a one-bar
+  # height for a two-bar stack. Normal flow needs no count at all: whatever
+  # rendered takes the room it needs.
+  any_bar = show_environment || show_impersonation
 %>
-<% if bar_count.positive? %>
-  <%# First-paint estimate only — the observer below replaces it with the measured
-      height. Expressed against a token so an app that retunes the unit still gets
-      a sensible pre-measurement value. %>
-  <%= tag.style safe_join([":root{--studio-bars-h:calc(#{bar_count} * var(--studio-bar-unit, 47px))}"]) %>
-  <div class="studio-bar-stack sticky top-0 z-[60] w-full" data-studio-bar-stack><%= bars %></div>
-  <script>
-    // Publishes the stack's REAL height, so the navbar offsets by what the bars
-    // actually need. Idempotent and re-bound on Turbo navigation — a stale
-    // observer pointed at a detached node silently stops updating, and the
-    // navbar would then sit at yesterday's offset.
-    (function () {
-      var apply = function () {
-        var el = document.querySelector("[data-studio-bar-stack]");
-        if (!el) {
-          document.documentElement.style.removeProperty("--studio-bars-h");
-          return;
-        }
-        if (window.__studioBarObserver) window.__studioBarObserver.disconnect();
-        var publish = function () {
-          var h = Math.round(el.getBoundingClientRect().height);
-          if (h > 0) document.documentElement.style.setProperty("--studio-bars-h", h + "px");
-        };
-        publish();
-        if (window.ResizeObserver) {
-          window.__studioBarObserver = new ResizeObserver(publish);
-          window.__studioBarObserver.observe(el);
-        }
-      };
-      apply();
-      document.addEventListener("turbo:load", apply);
-    })();
-  </script>
+<% if any_bar %>
+  <%# Normal flow, deliberately. No sticky, no z-index, no measured offset: the
+      navbar is the only pinned chrome, so the bars simply take their own height
+      above it. Not sticky also keeps the paint order right — the pinned navbar
+      is positioned, so it draws over these bars as they scroll up behind it. %>
+  <div class="studio-bar-stack w-full" data-studio-bar-stack><%= bars %></div>
 <% end %>

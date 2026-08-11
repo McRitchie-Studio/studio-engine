@@ -38,13 +38,15 @@
 %>
 
 <header x-data="{ scrolled: false }" <%= '@scroll.window="scrolled = scrolled ? (window.scrollY > 5) : (window.scrollY > 60)"'.html_safe unless is_preview %>
-        <%# top offsets by whatever studio/banners/_stack rendered above us. The
-            stack publishes --studio-bars-h on :root; with no stack the fallback
-            0px makes this identical to the old `top-0`, so an app that has not
-            adopted the stack is unaffected. The navbar never learns WHICH bars
-            rendered — only how tall they are. %>
-        style="<%= "top:var(--studio-bars-h, 0px);" unless is_preview %>"
-        class="<%= is_preview ? 'bg-page' : "#{'vt-pinned-header ' if pin_header}sticky z-50 bg-page transition-shadow duration-300" %>"
+        <%# top-0, a STATIC value, and never a custom property. Any bars render as
+            this header's sibling in normal flow (studio/banners/_stack), so they
+            already occupy their own height above it and there is nothing to
+            offset by. An offset read from a runtime-published property is what
+            made this header jump: it painted at a server estimate, moved when the
+            measurement landed, moved again on a webfont swap, and drew twice
+            during a view transition composited at two different tops. Only CSS
+            can set this top now, so none of that is reachable. %>
+        class="<%= is_preview ? 'bg-page' : "#{'vt-pinned-header ' if pin_header}sticky top-0 z-50 bg-page transition-shadow duration-300" %>"
         :class="scrolled && 'shadow-lg border-b border-subtle is-scrolled'">
   <style>
     .user-nav-col { width: 14rem; }

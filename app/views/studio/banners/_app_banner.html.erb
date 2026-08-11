@@ -24,9 +24,12 @@
     }
   }
 
-  # INTRINSIC height — content decides, and studio/banners/_stack MEASURES the
-  # result. An earlier cut declared a fixed height so the stack could compute its
-  # total server-side; that was rejected deliberately, because it cannot express
+  # INTRINSIC height — content decides, and the LAYOUT absorbs the result: the
+  # stack sits in normal flow, so a bar simply occupies the height it needs and
+  # nothing has to measure it. (It once did measure, publishing --studio-bars-h;
+  # that jumped, and 0.39.0 removed it.) An earlier cut declared a fixed height
+  # so the stack could compute its total server-side; that was rejected
+  # deliberately — and the reason still holds — because it cannot express
   # a bar that needs to be taller, or two bars stacked, without every consuming
   # app being reworked. The apps should respond to what the bar needs, not the
   # other way round.
