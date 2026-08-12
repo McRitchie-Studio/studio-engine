@@ -16,8 +16,14 @@ require_relative "../../app/helpers/studio/at_time_helper"
 #
 # The flag is deliberately absent from every assertion here, and that is the
 # design under test as much as anything else: the server cannot know the reader's
-# timezone, so it must never assert one. The flag half is proven in a browser, in
-# the consuming app's Playwright lane against /admin/style.
+# timezone, so it must never assert one.
+#
+# WHERE THE FLAG IS COVERED, STATED EXACTLY. This repo has no browser lane, so
+# nothing here can execute the client half. The flag's behavior is covered today
+# in mcritchie-studio's Playwright lane (e2e/at_time_flag.spec.js), against ITS
+# copy of this script — the two are kept byte-identical by hand until
+# /tasks/adopt-at-format-from-gem swaps the hub onto the gem and that spec covers
+# this file directly. Until then: no browser proof runs in THIS repo's CI.
 class AtTimeHelperTest < Minitest::Test
   # A fixed "now"; every case is positioned against it, so the today/not-today
   # boundary is tested rather than whatever day CI happens to run on.
@@ -106,6 +112,28 @@ class AtTimeHelperTest < Minitest::Test
     html = view.at_time_tag(Time.current - (7 * 60))
 
     assert_match(/title="7 minutes ago ·/, html)
+  end
+
+  def test_tag_folds_every_spelling_of_no_prefix_to_the_same_thing_on_both_halves
+    time = Time.utc(2026, 8, 11, 15, 53, 0)
+
+    [nil, "", false].each do |blank|
+      html = view.at_time_tag(time, prefix: blank, now: NOW)
+
+      assert_includes html, ">3:53p</span>", "prefix #{blank.inspect} renders bare"
+      # The client REBUILDS the label from this attribute, so a stringified value
+      # here hydrates to a visible "false 3:53p" the server never showed.
+      refute_includes html, "data-at-prefix",
+                      "prefix #{blank.inspect} must omit the attribute, not stringify it"
+    end
+  end
+
+  def test_tag_measures_the_hover_title_against_the_injected_now
+    time = Time.utc(2026, 8, 11, 15, 53, 0) # 4h 7m before NOW
+
+    assert_includes view.at_time_tag(time, now: NOW), 'title="about 4 hours ago ·',
+                    "an injected now must reach the title too, or it describes a different " \
+                    "moment than the label beside it"
   end
 
   def test_tag_is_nil_for_a_blank_time_so_callers_need_no_guard

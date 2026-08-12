@@ -2,6 +2,22 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## Unreleased
+
+### Added
+
+- **The "at" time stamp — `at_time_tag` + `studio/at_time_script`.** A shared
+  primitive for stamping WHEN something happened, on the READER's clock rather
+  than the app's: `at 3:53p`, gaining a date only when the stamp is not today and
+  the year only when it differs, with a country flag trailing the clock when the
+  reader's timezone is outside the US. The relative phrase moves to the hover
+  title. The server renders the app-timezone form as a no-JS fallback and never
+  renders a flag — it cannot know where the reader is sitting, so only the
+  reader's machine may assert one. Hosts render `studio/at_time_script` once,
+  near the end of the layout body; omitting it degrades to app-timezone stamps
+  rather than breaking. Specimen: `/admin/style` → Tricks → Time stamps; recipe
+  in the README's UI Primitives section.
+
 ## 0.39.0 — 2026-08-11
 
 ### Removed
