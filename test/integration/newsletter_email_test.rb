@@ -107,6 +107,18 @@ class NewsletterEmailTest < ActiveSupport::TestCase
     assert_equal "emails/newsletter-subscribed-background.gif", entry.background
   end
 
+  # An inherited email with no preview builder is a row on every host's manager
+  # that cannot be looked at — and turf-monster asserts every registered email
+  # carries one. The engine can supply this builder because the mailer takes a
+  # bare address: no host sample data is involved.
+  test "the newsletter ships its own preview builder" do
+    entry = Studio::EmailCatalog.entry("newsletter_subscribed")
+
+    assert entry.previewable?, "an inherited email with no preview cannot be viewed on any host"
+    assert_includes Studio::EmailCatalog.preview_subject("newsletter_subscribed").to_s,
+                    Studio.app_name, "the builder should render a real message"
+  end
+
   # --- the way out ----------------------------------------------------------
 
   # An unsubscribe link that goes nowhere is worse than none: it spends the

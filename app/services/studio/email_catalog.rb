@@ -139,7 +139,13 @@ module Studio
         header: "Welcome {name}!",
         header_fallback: "You're subscribed!",
         subtext: "you're on the list",
-        subject: "You're subscribed to {app}"
+        subject: "You're subscribed to {app}",
+        # The engine ships this email's preview because it can: the mailer takes
+        # a bare address, so no host sample data is involved. Every other entry's
+        # builder needs records only the host has — this one does not, and an
+        # inherited email with no preview is a row on every app's manager that
+        # cannot be looked at.
+        preview: -> { Studio::NewsletterMailer.subscribed("preview@example.com", name: "Alex") }
       }
     ].freeze
 
