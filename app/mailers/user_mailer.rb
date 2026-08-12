@@ -26,6 +26,29 @@ class UserMailer < ApplicationMailer
     # email branded on day one. nil renders bannerless.
     @banner_url = Studio::EmailCatalog.resolved_url(:magic_link)
     @banner_alt = "Your #{@app_name} sign-in link"
-    mail(to: email, subject: "Your #{@app_name} sign-in link")
+    # The operator's subject when they have set one, the hard-coded line
+    # otherwise — so an app that never visits /admin/emails is unchanged.
+    subject = Studio::EmailCatalog.subject_for(:magic_link, name: recipient_name(email)) ||
+              "Your #{@app_name} sign-in link"
+    mail(to: email, subject: subject)
+  end
+
+  private
+
+  # The recipient's name when this app holds an account for them. Defensive about
+  # the whole chain — a host may have no User model, no display_name, or no row —
+  # because a subject line must never be the reason a send raises.
+  def recipient_name(email)
+    model = "User".safe_constantize
+    return nil unless model.respond_to?(:find_by)
+
+    record = model.find_by(email: email.to_s.strip.downcase)
+    %i[display_name name full_name].each do |method|
+      value = record.try(method)
+      return value if value.present?
+    end
+    nil
+  rescue StandardError
+    nil
   end
 end

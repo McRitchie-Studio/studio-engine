@@ -19,6 +19,10 @@ module Studio
                                               less_than_or_equal_to: SCRIM_RANGE.max },
                               allow_nil: true
 
+    # The banner's words and logo. Each is nil until the operator sets it, and
+    # nil means INHERIT — never "empty".
+    COPY_FIELDS = %i[header header_fallback subtext logo_url subject].freeze
+
     class << self
       # The saved scrim for this email as a 0.0-1.0 fraction, or nil when the
       # operator has not set one (the registry default then applies).
@@ -27,6 +31,48 @@ module Studio
 
         percent = find_by(email_key: key.to_s)&.scrim_percent
         percent.nil? ? nil : percent / 100.0
+      end
+
+      # One saved copy field, or nil to inherit. Blank is stored as nil by
+      # #set_copy, so a blank return here always means "not set".
+      def copy_for(key, field)
+        return nil unless table_ready?
+        return nil unless COPY_FIELDS.include?(field.to_sym)
+
+        find_by(email_key: key.to_s)&.public_send(field).presence
+      end
+
+      # True when the operator has explicitly hidden the logo — which is a
+      # different answer from "no logo url saved" (that one inherits).
+      def hide_logo?(key)
+        return false unless table_ready?
+
+        find_by(email_key: key.to_s)&.hide_logo || false
+      rescue ActiveRecord::ActiveRecordError
+        false
+      end
+
+      # Save the words. A blank field is stored as NULL rather than "", so
+      # clearing a box means "go back to the registry default" — the same
+      # gesture that resets the tint.
+      def set_copy(key, attrs)
+        return nil unless table_ready?
+
+        record = find_or_initialize_by(email_key: key.to_s)
+        COPY_FIELDS.each do |field|
+          next unless attrs.key?(field) || attrs.key?(field.to_s)
+
+          record.public_send(:"#{field}=", (attrs[field] || attrs[field.to_s]).presence)
+        end
+        # ONLY when the form carried it. Two separate cards post to this method,
+        # and an absent checkbox means "this form does not manage the logo", not
+        # "show the logo" — writing false either way let saving the subject
+        # silently un-hide a logo the operator had hidden.
+        if attrs.key?(:hide_logo) || attrs.key?("hide_logo")
+          record.hide_logo = ActiveModel::Type::Boolean.new.cast(attrs[:hide_logo] || attrs["hide_logo"]) || false
+        end
+        record.save!
+        record
       end
 
       # Store a percent, or clear the override with nil/blank so the email falls

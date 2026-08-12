@@ -24,10 +24,22 @@
   # Counts the app's OWN artwork either way — uploaded here or committed in this
   # app's assets. Counting only uploads made turf-monster, whose eight banners
   # all ship from its own repo, report "all inheriting the default artwork".
+  # The picker renders entirely from this payload — a field omitted here is a
+  # grey circle with no letter in it, which is exactly what shipped once.
+  recipients_config = {
+    targets: (@targets || []).map do |t|
+      { id: t.id, label: t.label, name: t.name, email: t.email, admin: t.admin?,
+        avatar_url: t.avatar_url, avatar_color: t.avatar_color, initials: t.initials }
+    end,
+    targetId: @target&.id,
+    appName: Studio.app_name.to_s
+  }
+
   app_artwork = @entries.count { |entry| Studio::EmailCatalog.app_artwork?(entry.key) }
   bannerless  = @entries.count { |entry| Studio::EmailCatalog.source(entry.key) == :none }
 %>
-<div class="max-w-5xl mx-auto px-4 pb-16">
+<div class="max-w-5xl mx-auto px-4 pb-16"
+     x-data="emailRecipients(<%= recipients_config.to_json %>)">
   <header class="space-y-2 pt-8 pb-6">
     <p class="label-upper">studio-engine &middot; v<%= Studio::VERSION %></p>
     <h1 class="text-3xl font-bold text-heading">Emails</h1>
@@ -74,13 +86,24 @@
     </div>
   <% end %>
 
+  <%# WHO the list is rendered for. Every banner greets by name and a subject may
+      too, so a list rendered for one person is a list of half-truths about
+      everyone else — the control belongs above the table, not on each row. %>
+  <% if (@targets || []).any? %>
+    <div class="mb-4 max-w-sm">
+      <p class="label-upper mb-2">Example</p>
+      <%= render "studio/emails/recipient_picker" %>
+    </div>
+  <% end %>
+
   <div class="card overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full text-left align-middle">
         <thead>
           <tr class="border-b border-subtle">
-            <th class="label-upper px-4 py-3 w-48">Banner</th>
+            <th class="label-upper px-4 py-3 w-64">Banner</th>
             <th class="label-upper px-4 py-3">Email</th>
+            <th class="label-upper px-4 py-3 w-56">Subject</th>
             <th class="label-upper px-4 py-3 w-52">Image</th>
             <% if @uploads_available %>
               <th class="label-upper px-4 py-3 w-40 text-right">Actions</th>
@@ -91,12 +114,15 @@
           <% @entries.each do |entry| %>
             <%= render "studio/emails/row", entry: entry,
                   uploads_available: @uploads_available,
-                  max_width: max_width %>
+                  max_width: max_width, preview_name: @preview_name %>
           <% end %>
         </tbody>
       </table>
     </div>
   </div>
+
+  <%= render "studio/emails/banner_scale" %>
+  <%= render "studio/emails/recipient_repaint" %>
 
   <p class="text-xs text-muted mt-4">
     Banners render full-bleed at 600px wide inside the email card. The crop is

@@ -61,6 +61,12 @@ module Studio
   module EmailCatalog
     PURPOSE = "email_banner".freeze
 
+    # The LOGO is a separate purpose, not a variant of the banner. They are
+    # different pictures with different rules: a banner is 3:1 artwork that may be
+    # an animated GIF, a logo is a small transparent mark. Sharing one purpose
+    # would make "revert the banner" and "revert the logo" the same row.
+    LOGO_PURPOSE = "email_logo".freeze
+
     # What an email is FOR. Transactional = sent in response to something the
     # recipient did; marketing = sent because we decided to. Kept because
     # turf-monster's catalog carried it and the distinction drives real policy
@@ -75,6 +81,7 @@ module Studio
     #   preview       — callable returning a Mail, or nil.
     Entry = Struct.new(:key, :label, :description, :default_asset, :type, :preview,
                        :default_origin, :aspect_ratio, :background, :logo, :scrim,
+                       :header, :header_fallback, :subtext, :subject,
                        keyword_init: true) do
       def to_s = key
       def previewable? = preview.respond_to?(:call)
@@ -109,14 +116,30 @@ module Studio
         # top. default_asset above stays the flat <img> for a mailer that has not
         # adopted the layered banner.
         background: "emails/magic-link-background.gif",
-        logo: "emails/logo-horizontal.png"
+        logo: "emails/logo-horizontal.png",
+        # The DEFAULT wording, overridable per app on /admin/emails. {name} is
+        # filled from whoever the mailer says the recipient is.
+        header: "Welcome {name}!",
+        header_fallback: "Your Magic Link",
+        subtext: "your sign-in link is below",
+        subject: "Your {app} sign-in link"
       },
       {
-        key: "email_change_confirmation",
-        label: "Email change confirmation",
-        description: "Confirms a new address before the change takes effect.",
-        default_asset: "emails/email-change-confirmation.gif",
-        aspect_ratio: 3.0
+        key: "newsletter_subscribed",
+        label: "Newsletter subscribed",
+        description: "Welcomes someone who has just joined the mailing list.",
+        aspect_ratio: 3.0,
+        # LAYERED-NATIVE: no default_asset. A flat asset is the pre-layered
+        # fallback — artwork with the words baked in, for a mailer that only
+        # knows how to render an <img>. Studio::NewsletterMailer has known how to
+        # layer since the day it was written, so a baked-in copy of the same
+        # picture would be a second thing to keep in sync and never be shown.
+        background: "emails/newsletter-subscribed-background.gif",
+        logo: "emails/logo-horizontal.png",
+        header: "Welcome {name}!",
+        header_fallback: "You're subscribed!",
+        subtext: "you're on the list",
+        subject: "You're subscribed to {app}"
       }
     ].freeze
 
@@ -136,7 +159,8 @@ module Studio
     # existing value — that is what lets a host relabel an inherited email, or
     # attach a preview builder to it, without restating its artwork.
     def register(key, label: nil, description: nil, default_asset: nil, type: nil, preview: nil,
-                 aspect_ratio: nil, background: nil, logo: nil, scrim: nil)
+                 aspect_ratio: nil, background: nil, logo: nil, scrim: nil,
+                 header: nil, header_fallback: nil, subtext: nil, subject: nil)
       key = key.to_s
       existing = registry[key]
       registry[key] = Entry.new(
@@ -154,7 +178,11 @@ module Studio
         aspect_ratio: aspect_ratio || existing&.aspect_ratio,
         background: background.nil? ? existing&.background : background.presence,
         logo: logo.nil? ? existing&.logo : logo.presence,
-        scrim: scrim.nil? ? existing&.scrim : scrim
+        scrim: scrim.nil? ? existing&.scrim : scrim,
+        header: header.nil? ? existing&.header : header.presence,
+        header_fallback: header_fallback.nil? ? existing&.header_fallback : header_fallback.presence,
+        subtext: subtext.nil? ? existing&.subtext : subtext.presence,
+        subject: subject.nil? ? existing&.subject : subject.presence
       )
       key
     end
@@ -260,6 +288,60 @@ module Studio
       Studio::EmailSetting.scrim_for(key) || entry(key)&.scrim
     rescue StandardError
       entry(key)&.scrim
+    end
+
+    # --- the banner's words -------------------------------------------------
+    #
+    # Same order as the tint, for the same reason: the operator is the one
+    # looking at the artwork. Each falls back to the registry, then to a
+    # sensible default, so an email that nobody has configured still reads.
+
+    # The header TEMPLATE — it may contain {name}. Interpolation happens in
+    # Studio::Banner, which is the only place that knows the recipient.
+    def header_template(key)
+      saved(key, :header) || entry(key)&.header || entry(key)&.label
+    end
+
+    # What the header says when no name is known. A magic link is often the
+    # first contact we have with someone, so "Welcome {name}!" must have
+    # somewhere to land that is not "Welcome !".
+    def header_fallback(key)
+      saved(key, :header_fallback) || entry(key)&.header_fallback || entry(key)&.label
+    end
+
+    def subtext(key)
+      saved(key, :subtext) || entry(key)&.subtext
+    end
+
+    # The subject line, resolved the same way and supporting the same {name}
+    # placeholder. A mailer calls this instead of hard-coding a string, which is
+    # what makes the field on /admin/emails real rather than decorative.
+    def subject_for(key, name: nil)
+      template = saved(key, :subject) || entry(key)&.subject
+      return nil if template.blank?
+
+      Studio::Banner.interpolate(template, name).presence
+    end
+
+    # nil when the operator has hidden the logo — distinct from "none saved",
+    # which inherits the registry's.
+    # Hidden > uploaded here > a URL the operator typed > the registry's.
+    # "Hidden" comes first because it is the one answer the others cannot express.
+    def resolved_logo_url(key)
+      return nil if Studio::EmailSetting.hide_logo?(key)
+
+      uploaded_logo_url(key) || saved(key, :logo_url) || logo_url(key)
+    rescue StandardError
+      logo_url(key)
+    end
+
+    # An operator-saved field, or nil. Rescues because these are read on a
+    # delivery path: a settings table that is missing, locked, or mid-migration
+    # must degrade to the registry default rather than fail the send.
+    def saved(key, field)
+      Studio::EmailSetting.copy_for(key, field)
+    rescue StandardError
+      nil
     end
 
     def scrim_percent(key)
@@ -392,7 +474,26 @@ module Studio
     # whatever host and port this app is being viewed on (an absolute mailer
     # asset_host is set for the inbox, not for a browser on localhost:3042).
     def preview_url(key)
-      url(key) || default_asset_path(key)
+      url(key) || preview_asset_path(key)
+    end
+
+    # What the manager DRAWS, which is a different question from what the flat
+    # <img> fallback sends — so it resolves in the opposite order.
+    #
+    # LAYERED FIRST. magic_link ships both: `emails/magic-link.gif`, the old
+    # banner with "Your Magic Link" baked into the picture, and
+    # `emails/magic-link-background.gif`, the artwork the layered banner draws
+    # live text on top of. A mailer that has adopted layering sends the SECOND
+    # one — so previewing the first showed the operator a picture no inbox
+    # receives, and did it convincingly, because baked-in words look like a real
+    # banner. Same failure as the "No image" badge, one door further along: the
+    # page answering from the field it happened to read instead of from what
+    # ships.
+    #
+    # The flat asset stays the fallback, for a host still on the engine's own
+    # unlayered UserMailer — there, the baked-text banner IS what arrives.
+    def preview_asset_path(key)
+      asset_path(entry(key)&.background.presence || entry(key)&.default_asset)
     end
 
     # The ImageCache row holding this app's override, or nil (nothing uploaded /
@@ -403,14 +504,60 @@ module Studio
       ::ImageCache.find_by(owner: nil, purpose: PURPOSE, variant: key.to_s)
     end
 
-    # Root-relative path to the inherited default asset, or nil when the email
-    # has no default registered or the host's pipeline cannot resolve it.
+    def logo_record(key)
+      return nil unless table_ready?
+
+      ::ImageCache.find_by(owner: nil, purpose: LOGO_PURPOSE, variant: key.to_s)
+    end
+
+    # An uploaded logo for this email, or nil to inherit.
+    def uploaded_logo_url(key)
+      logo_record(key)&.url
+    rescue StandardError
+      nil
+    end
+
+    def store_logo(key, io:, content_type: nil)
+      s3_key = "email_logos/#{key}-#{SecureRandom.hex(4)}#{ext_for(content_type)}"
+      Studio::S3.upload(key: s3_key, body: io.read, content_type: content_type,
+                        cache_control: "public, max-age=300")
+      record = ::ImageCache.find_or_initialize_by(owner: nil, purpose: LOGO_PURPOSE, variant: key.to_s)
+      previous = record.s3_key
+      record.update!(s3_key: s3_key)
+      delete_object(previous) if previous.present? && previous != s3_key
+      record
+    rescue StandardError
+      delete_object(s3_key)
+      raise
+    end
+
+    def revert_logo(key)
+      row = logo_record(key)
+      return false if row.nil?
+
+      previous = row.s3_key
+      row.destroy!
+      delete_object(previous) if previous.present?
+      true
+    end
+
+    # Root-relative path to the FLAT artwork — what the <img> fallback sends.
+    # Flat first, then the layered background as a last resort so a
+    # layered-native email (newsletter_subscribed registers no flat asset,
+    # because it never renders one) still has something rather than nothing.
+    # See preview_asset_path above for why the manager resolves the other way.
     def default_asset_path(key)
-      asset = entry(key)&.default_asset
+      asset_path(entry(key)&.default_asset.presence || entry(key)&.background)
+    end
+
+    # Shared tail of both resolutions: a logical asset name to a root-relative
+    # path, or nil when there is no asset or the host's pipeline cannot resolve
+    # it. Rescues broadly because a missing asset must degrade to "no image",
+    # never take the manager down.
+    def asset_path(asset)
       return nil if asset.nil? || asset.empty?
 
-      path = ActionController::Base.helpers.asset_path(asset)
-      path.presence
+      ActionController::Base.helpers.asset_path(asset).presence
     rescue StandardError
       nil
     end
@@ -521,11 +668,18 @@ module Studio
 
     LOOPBACK_HOSTS = %w[localhost 127.0.0.1 0.0.0.0 ::1].freeze
 
+    # GIF is listed because animated banners are uploaded whole — they bypass the
+    # cropper, which would flatten them to a single PNG frame. Without this branch
+    # a GIF was stored under a ".png" key: the object's Content-Type was still
+    # image/gif so it played, but the URL said otherwise, and anything that trusts
+    # an extension (a CDN, a proxy, a person reading the bucket) was told the
+    # wrong thing.
     def ext_for(content_type)
       case content_type.to_s
       when %r{png}    then ".png"
       when %r{jpe?g}  then ".jpg"
       when %r{webp}   then ".webp"
+      when %r{gif}    then ".gif"
       else ".png"
       end
     end

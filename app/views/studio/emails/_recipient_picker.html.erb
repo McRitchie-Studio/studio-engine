@@ -1,0 +1,63 @@
+<%# locals: (targets:, target:) — the "preview as" control, shared by the emails
+    list and one email's own page.
+
+    Extracted rather than copied. The list repaints EVERY row's banner and
+    subject from this one selection; the detail page repaints one. Two copies of
+    an avatar listbox would be two places for the fallback circle to rot, and the
+    fallback is the branch that renders for a member with no avatar — the common
+    case.
+
+    A custom listbox rather than a select, because a native option cannot carry
+    an image, and the avatar is the whole point: it is how you tell at a glance
+    which account you are looking at. %>
+<div class="relative" @keydown.escape="pickerOpen = false" @click.outside="pickerOpen = false">
+  <button type="button" @click="pickerOpen = !pickerOpen" data-preview-target
+          class="input-field w-full py-2 flex items-center gap-3 text-left"
+          :aria-expanded="pickerOpen" aria-haspopup="listbox">
+    <template x-if="target().avatar_url">
+      <img :src="target().avatar_url" alt="" data-target-avatar
+           class="w-8 h-8 rounded-full object-cover shrink-0">
+    </template>
+    <template x-if="!target().avatar_url">
+      <span data-target-initials
+            class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+            :style="'background-color: ' + (target().avatar_color || '#6b7280')"
+            x-text="target().initials"></span>
+    </template>
+    <span class="min-w-0">
+      <span class="block text-heading truncate" x-text="target().name || target().label"></span>
+      <span class="block text-2xs text-muted truncate" x-text="target().email"></span>
+    </span>
+    <svg class="w-4 h-4 text-muted ml-auto shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+    </svg>
+  </button>
+
+  <ul x-show="pickerOpen" x-cloak role="listbox"
+      class="absolute z-20 mt-1 w-full rounded-lg border border-subtle bg-surface shadow-lg overflow-hidden">
+    <template x-for="option in targets" :key="option.id">
+      <li>
+        <button type="button" role="option" data-preview-option :data-option-id="option.id"
+                @click="targetId = option.id; pickerOpen = false"
+                :aria-selected="option.id === targetId"
+                class="w-full px-3 py-2 flex items-center gap-3 text-left hover:bg-inset"
+                :class="option.id === targetId ? 'bg-inset' : ''">
+          <template x-if="option.avatar_url">
+            <img :src="option.avatar_url" alt="" data-option-avatar
+                 class="w-8 h-8 rounded-full object-cover shrink-0">
+          </template>
+          <template x-if="!option.avatar_url">
+            <span data-option-initials
+                  class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                  :style="'background-color: ' + (option.avatar_color || '#6b7280')"
+                  x-text="option.initials"></span>
+          </template>
+          <span class="min-w-0">
+            <span class="block text-heading truncate" x-text="option.name || option.label"></span>
+            <span class="block text-2xs text-muted truncate" x-text="option.email"></span>
+          </span>
+        </button>
+      </li>
+    </template>
+  </ul>
+</div>

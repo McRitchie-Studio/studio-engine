@@ -361,7 +361,7 @@ declaring anything:
 | Key | Label |
 |-----|-------|
 | `magic_link` | Magic-link sign-in |
-| `email_change_confirmation` | Email change confirmation |
+| `newsletter_subscribed` | Newsletter subscribed |
 
 A host adds its own workflows from an initializer, mirroring
 `Studio::ModelPage.register`:

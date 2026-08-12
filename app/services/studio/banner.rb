@@ -75,16 +75,20 @@ module Studio
     # Reads the catalogue for the artwork so an app inherits the shared
     # background and logo without repeating them, and lets a caller override any
     # piece per send — which is the whole point of the header being dynamic.
-    def self.for(key, header: nil, subtext: nil, background_url: nil, logo_url: nil,
-                 scrim: nil, logo_alt: nil)
-      entry = Studio::EmailCatalog.entry(key)
-
+    # `name` is the DYNAMIC part and the only thing a mailer should normally
+    # pass. A mailer that hands over a finished header instead takes the wording
+    # away from the operator: the /admin/emails field would still accept an edit
+    # and the email would still ignore it — a control that lies about what it
+    # does. So the mailer supplies who the person is, and the operator supplies
+    # what the banner says about them.
+    def self.for(key, name: nil, header: nil, subtext: nil, background_url: nil,
+                 logo_url: nil, scrim: nil, logo_alt: nil)
       banner = new(
         background_url: background_url || Studio::EmailCatalog.background_url(key),
-        logo_url:       logo_url       || Studio::EmailCatalog.logo_url(key),
+        logo_url:       logo_url       || Studio::EmailCatalog.resolved_logo_url(key),
         logo_alt:       logo_alt       || Studio.app_name,
-        header:         header         || entry&.label,
-        subtext:        subtext,
+        header:         header         || header_for(key, name),
+        subtext:        subtext        || Studio::EmailCatalog.subtext(key),
         # Resolution order: an explicit argument (a caller who knows better),
         # then what the OPERATOR saved on /admin/emails, then the registry, then
         # the default. The operator sits above the registry on purpose — they
@@ -92,6 +96,54 @@ module Studio
         scrim:          scrim || Studio::EmailCatalog.scrim(key)
       )
       banner.renderable? ? banner : nil
+    end
+
+    # The placeholder an operator types into the header field. Braces rather
+    # than Ruby's %{name}: an operator-editable string is passed to no formatter
+    # here, and a stray "%" in "50% off" would raise inside format() where a
+    # stray brace is simply left alone.
+    NAME_PLACEHOLDER = "{name}".freeze
+
+    # The app's own name. Present because the DEFAULTS need it: "Your sign-in
+    # link" reads as though it could be from anyone, and a registry constant
+    # cannot interpolate Studio.app_name at load time. An operator gets it for
+    # free in any field.
+    APP_PLACEHOLDER = "{app}".freeze
+
+    # FIRST name only. The banner is one line of large type in a 600px box, and
+    # "Welcome Bartholomew Fitzgerald-Montgomery!" wraps out of it.
+    # Shared with the SUBJECT, which takes the same placeholder. One
+    # implementation, so "{name}" cannot mean two things on one email.
+    def self.interpolate(template, name)
+      text = template.to_s.gsub(APP_PLACEHOLDER, Studio.app_name.to_s)
+      first = name.to_s.strip.split.first
+      return text.gsub(NAME_PLACEHOLDER, first) if first.present?
+
+      # NO NAME, AND NO RAW PLACEHOLDER EITHER. The header carries a whole second
+      # field for this case; a subject line does not, and "Sign in to Studio,
+      # {name}" reaching an inbox is the most visible way this feature fails. The
+      # token goes, and the punctuation it hung off goes with it — the result is
+      # "Sign in to Studio", not "Sign in to Studio, ".
+      # Two passes, because the punctuation can sit on either side: "Sign in,
+      # {name}" and "{name}, your link is here" both have to come out clean, and
+      # "Hi {name} welcome" must not become "Hiwelcome".
+      text.gsub(/[,;:\u2014-]?\s*#{Regexp.escape(NAME_PLACEHOLDER)}/, "")
+          .sub(/\A\s*[,;:\u2014-]\s*/, "")
+          .squeeze(" ").strip
+    end
+
+    def self.header_for(key, name)
+      template = Studio::EmailCatalog.header_template(key).to_s
+      first = name.to_s.strip.split.first
+
+      return interpolate(template, name) if first.present?
+      # No name: a template that asks for one cannot be rendered honestly, so
+      # the fallback answers instead. A template with no name placeholder is
+      # already name-free and stands as written — still interpolated, because
+      # {app} does not depend on the recipient.
+      fallback = Studio::EmailCatalog.header_fallback(key) if template.include?(NAME_PLACEHOLDER)
+
+      interpolate(fallback || template, nil)
     end
   end
 

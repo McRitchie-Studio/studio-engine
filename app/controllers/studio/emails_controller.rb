@@ -15,14 +15,20 @@ module Studio
   # is currently sending.
   class EmailsController < ApplicationController
     before_action :require_admin
-    before_action :load_entry, only: %i[show raw update destroy settings]
-    before_action :require_uploads, only: %i[update destroy]
+    before_action :load_entry, only: %i[show raw update destroy settings copy logo]
+    before_action :require_uploads, only: %i[update destroy logo]
 
     MAX_BYTES = 8.megabytes
 
     def index
       @entries = Studio::EmailCatalog.entries
       @uploads_available = Studio::EmailCatalog.uploads_available?
+
+      # The list renders every banner and subject AS THEY WOULD ARRIVE, which has
+      # no answer until someone is receiving them.
+      @targets = Studio::EmailPreviewTarget.all
+      @target = Studio::EmailPreviewTarget.resolve(params[:target])
+      @preview_name = @target&.name
     end
 
     # GET /admin/emails/:key — one email: its banner, its type, and a live
@@ -32,6 +38,19 @@ module Studio
       @subject = Studio::EmailCatalog.preview_subject(@key)
       @preview_error = Studio::EmailCatalog.preview_error(@key)
       @uploads_available = Studio::EmailCatalog.uploads_available?
+
+      # WHO this is previewed as. The banner greets by name, so "what does this
+      # email look like" has no answer until someone is receiving it — and the
+      # two people who break email differently (an admin with a full name on
+      # file, a member with none) are both offered.
+      @targets = Studio::EmailPreviewTarget.all
+      @target = Studio::EmailPreviewTarget.resolve(params[:target])
+      @preview_name = @target&.name
+
+      # The banner AS IT ARRIVES, built the same way a mailer builds it so the
+      # page cannot show something the inbox never gets.
+      @banner = Studio::Banner.for(@key, name: @preview_name)
+      @subject = Studio::EmailCatalog.subject_for(@key, name: @preview_name) || @subject
     end
 
     # GET /admin/emails/:key/raw — the rendered email itself, as the iframe
@@ -52,7 +71,7 @@ module Studio
     def update
       file = params[:image]
       unless valid_image?(file)
-        message = file.blank? ? "Choose an image to upload." : "Use a PNG, JPG, or WebP under 8 MB."
+        message = file.blank? ? "Choose an image to upload." : "Use a PNG, JPG, WebP or GIF under 8 MB."
         return redirect_to admin_emails_path, alert: message, status: :see_other
       end
 
@@ -88,6 +107,57 @@ module Studio
                   alert: "Couldn't save the tint. Please try again."
     end
 
+    # PATCH /admin/emails/:key/copy — the banner's words and logo.
+    #
+    # Separate from #settings rather than one big form: the tint is a slider you
+    # nudge while looking at the picture, the copy is a sentence you write. They
+    # save independently so tuning one never risks clobbering an unsaved edit to
+    # the other.
+    # Saves EVERYTHING the page edits, in one write. The page has a single Save
+    # button, so it must: three buttons that each saved a third of the form meant
+    # an operator who changed the subject and the tint had to notice there were
+    # two places to press.
+    def copy
+      rescue_and_log do
+        Studio::EmailSetting.set_copy(@key, copy_params)
+        if params.key?(:scrim_percent)
+          percent = params[:scrim_percent]
+          percent = nil unless percent.present? && Studio::EmailSetting::SCRIM_RANGE.cover?(percent.to_i)
+          Studio::EmailSetting.set_scrim(@key, percent)
+        end
+        redirect_to admin_email_path(@key), status: :see_other, notice: "Saved."
+      end
+    rescue StandardError
+      redirect_to admin_email_path(@key), status: :see_other,
+                  alert: "Couldn't save the banner text. Please try again."
+    end
+
+    # PATCH /admin/emails/:key/logo — upload a logo for THIS email, or drop it.
+    #
+    # Its own action and its own ImageCache purpose: a logo is a small transparent
+    # mark, a banner is 3:1 artwork that may be animated, and reverting one must
+    # not touch the other.
+    def logo
+      if params[:remove].present?
+        rescue_and_log { Studio::EmailCatalog.revert_logo(@key) }
+        return redirect_to admin_email_path(@key), status: :see_other,
+                           notice: "Back to the standard logo."
+      end
+
+      file = params[:image]
+      unless valid_image?(file)
+        message = file.blank? ? "Choose an image to upload." : "Use a PNG, JPG, WebP or GIF under 8 MB."
+        return redirect_to admin_email_path(@key), alert: message, status: :see_other
+      end
+
+      rescue_and_log do
+        Studio::EmailCatalog.store_logo(@key, io: file, content_type: file.content_type)
+        redirect_to admin_email_path(@key), notice: "Logo updated.", status: :see_other
+      end
+    rescue StandardError
+      redirect_to admin_email_path(@key), alert: "Couldn't save the logo. Please try again.", status: :see_other
+    end
+
     # DELETE /admin/emails/:key — drop this app's override and fall back to the
     # inherited default.
     def destroy
@@ -110,6 +180,17 @@ module Studio
     end
 
     private
+
+    # Derived from the model's own field list rather than retyped here. The
+    # hand-written list silently dropped :subject when that field was added — the
+    # form posted it, strong params filtered it out, and the page reported
+    # "Saved." while the subject was discarded. A permit list that cannot go out
+    # of date with the columns it guards is worth more than one that reads
+    # explicitly, and COPY_FIELDS is itself the explicit list.
+    def copy_params
+      params.permit(*Studio::EmailSetting::COPY_FIELDS)
+            .to_h.symbolize_keys
+    end
 
     def load_entry
       @key = params[:key].to_s

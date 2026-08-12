@@ -1,0 +1,13 @@
+You're on the <%= @app_name %> list.
+
+Thanks for subscribing. We'll send the occasional note about what we're
+building — no more often than it's worth your time.
+
+We're sending to <%= @email %>.
+<% if @unsubscribe_url.present? %>
+Changed your mind? Unsubscribe here:
+<%= @unsubscribe_url %>
+<% end %>
+Didn't sign up? You can safely ignore this message and we won't send another.
+
+— <%= @app_name %>

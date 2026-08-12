@@ -87,6 +87,10 @@ class EmailImageShimTest < Minitest::Test
 
   def test_resolution_helpers_delegate
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    # Both seams: preview_url resolves layered-first through preview_asset_path,
+    # source() still asks default_asset_path. The shim only forwards, so stubbing
+    # one and asserting the other would test the stub rather than the delegation.
+    stub_module(Studio::EmailCatalog, :preview_asset_path) { |_key| "/assets/emails/magic-link.png" }
     stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
 
     assert_nil Studio::EmailImage.url("magic_link")

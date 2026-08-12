@@ -290,18 +290,26 @@ class LayeredBannerTest < ActiveSupport::TestCase
     end
   end
 
-  # The artwork ships RAW and is cropped by the client, not by us. Mr. McRitchie
-  # chose the full-width 2:1 framing, which background-size:cover produces from
-  # the 1200x720 original — so a destructive re-crop in the repo would throw away
-  # detail we can never get back AND lock in a framing the design may revisit.
-  test "the background ships at full size and is cropped at display time" do
+  # The artwork ships at EXACTLY the band the banner displays — 1200x400, which
+  # is 2x the 600x200 slot. That is not the same as pre-cropping for its own
+  # sake: the source was 1200x800, and the 400 rows the banner never shows cost
+  # 26MB of the 26.4MB file. Trimming them is 21x smaller with nothing visible
+  # lost, because those pixels could never reach an inbox.
+  #
+  # Anything TALLER than the band is still fine — background-size:cover crops it
+  # at render — so this asserts the aspect, not a byte count.
+  test "the background matches the banner's aspect so no pixels are shipped unseen" do
     path = File.expand_path("../../app/assets/images/emails/magic-link-background.gif", __dir__)
     header = File.binread(path, 10)
 
     assert_equal "GIF89a", header[0, 6], "the background must stay an animated GIF"
     width, height = header[6, 4].unpack("v2")
-    assert_equal 1200, width,  "the raw asset is 1200 wide — cropping belongs to the client"
-    assert_equal 720,  height, "the raw asset is 720 tall — cover crops it to 2:1 at render"
+
+    banner_aspect = Studio::Banner::DEFAULT_WIDTH.to_f / Studio::Banner::DEFAULT_HEIGHT
+    assert_in_delta banner_aspect, width.to_f / height, 0.05,
+      "a 1200x800 source ships 26MB to display a 1200x400 band — trim to the band"
+    assert_operator width, :>=, Studio::Banner::DEFAULT_WIDTH * 2,
+      "the banner is retina: the asset must be at least 2x the displayed width"
   end
 
   test "the banner box is the 600px email card, and cover does the cropping" do
@@ -311,7 +319,7 @@ class LayeredBannerTest < ActiveSupport::TestCase
 
     html = render_banner
     assert_includes html, "background-size:cover",
-      "cover is what turns a 1200x720 asset into the chosen full-width 2:1 framing"
+      "cover is what frames a wider-than-the-slot asset without squashing it"
     assert_includes html, "background-position:center",
       "without centring, cover crops from a corner"
   end
@@ -327,6 +335,47 @@ class LayeredBannerTest < ActiveSupport::TestCase
       "a relative banner path loads nothing in an inbox (got #{url.inspect})"
   ensure
     ActionMailer::Base.default_url_options = previous
+  end
+
+  # --- preview hooks must not reach an inbox --------------------------------
+
+  # The admin page repaints this banner as the operator types, which needs
+  # handles on its text nodes. They are opt-in, and this is the assertion that
+  # keeps them that way: shipping data- attributes into every email to serve an
+  # admin screen is invisible until a mail client chokes on it.
+  test "the email markup is byte-identical with preview hooks off" do
+    banner = Studio::Banner.for(:magic_link, name: "Alex")
+
+    default = view.render(partial: "studio/mailers/layered_banner", locals: { banner: banner })
+    explicit = view.render(partial: "studio/mailers/layered_banner",
+                           locals: { banner: banner, preview: false })
+
+    assert_equal default, explicit, "the default must BE the email path, not merely resemble it"
+    refute_includes default, "data-banner-", "a preview hook reached the email"
+  end
+
+  test "preview mode exposes a handle on every editable part" do
+    banner = Studio::Banner.for(:magic_link, name: "Alex")
+
+    html = view.render(partial: "studio/mailers/layered_banner",
+                       locals: { banner: banner, preview: true })
+
+    %w[data-banner-header data-banner-subtext data-banner-logo].each do |hook|
+      assert_includes html, hook, "the page cannot repaint what it cannot address"
+    end
+  end
+
+  # Hiding the logo, then unhiding it, must not need a round trip — so preview
+  # keeps a hidden placeholder where an email ships no img at all.
+  test "preview keeps a logo node even when the logo is hidden" do
+    banner = Studio::Banner.new(background_url: "/a.gif", header: "Hi", logo_url: nil)
+
+    preview = view.render(partial: "studio/mailers/layered_banner",
+                          locals: { banner: banner, preview: true })
+    email = view.render(partial: "studio/mailers/layered_banner", locals: { banner: banner })
+
+    assert_includes preview, "data-banner-logo"
+    refute_includes email, "<img", "an email with no logo must ship no img tag"
   end
 
   test "a host can override any piece per send" do

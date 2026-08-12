@@ -22,6 +22,17 @@
 <%
   banner = local_assigns.fetch(:banner)
 
+  # PREVIEW HOOKS, off by default.
+  #
+  # The admin page edits this banner's words and repaints it as you type, which
+  # needs handles on the three text nodes. They are opt-in because this partial
+  # renders REAL EMAIL: shipping data- attributes into every inbox to serve an
+  # admin screen is the kind of thing that is invisible until a mail client
+  # chokes on it. With preview off the markup is byte-for-byte what it was, and
+  # a test asserts exactly that.
+  preview = local_assigns.fetch(:preview, false)
+  hook = ->(name) { preview ? %( data-banner-#{name}).html_safe : "" }
+
   # TYPE AND RHYTHM SCALE WITH THE BANNER.
   #
   # Everything below is a proportion of the height, not a fixed pixel size.
@@ -79,21 +90,29 @@
                 content. Full height with horizontal-only padding gives both:
                 exactly 300px, and a wash over the whole picture. valign does
                 the vertical centring that the padding was doing. %>
-            <td align="center" valign="middle" height="<%= banner.height %>"
+            <td align="center" valign="middle" height="<%= banner.height %>"<%= hook.call("scrim") %>
                 style="height:<%= banner.height %>px;padding:0 <%= side_padding %>px;<%= "background-color:rgba(24,16,64,#{banner.scrim_opacity});" if banner.scrim_opacity.positive? %>">
-              <% if banner.header.present? %>
-                <p style="margin:0 0 <%= gap_after_header %>px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:<%= header_size %>px;line-height:<%= header_line %>px;font-weight:700;color:#ffffff;">
+              <% if preview || banner.header.present? %>
+                <p<%= hook.call("header") %> style="margin:0 0 <%= gap_after_header %>px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:<%= header_size %>px;line-height:<%= header_line %>px;font-weight:700;color:#ffffff;">
                   <%= banner.header %>
                 </p>
               <% end %>
-              <% if banner.subtext.present? %>
-                <p style="margin:0 0 <%= gap_before_logo %>px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:<%= subtext_size %>px;line-height:<%= subtext_line %>px;color:#efeaff;">
+              <% if preview || banner.subtext.present? %>
+                <p<%= hook.call("subtext") %> style="margin:0 0 <%= gap_before_logo %>px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:<%= subtext_size %>px;line-height:<%= subtext_line %>px;color:#efeaff;">
                   <%= banner.subtext %>
                 </p>
               <% end %>
               <% if banner.logo_url.present? %>
                 <%= image_tag banner.logo_url, width: logo_width, alt: banner.logo_alt.to_s,
+                      data: (preview ? { banner_logo: true } : {}),
                       style: "display:block;margin:0 auto;width:#{logo_width}px;height:auto;border:0;" %>
+              <% elsif preview %>
+                <%# A hidden placeholder so ticking "hide the logo" and unticking it
+                    again repaints without a round trip. Preview only — an email
+                    with no logo ships no img tag at all. %>
+                <img data-banner-logo width="<%= logo_width %>" alt=""
+                     src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="
+                     style="display:none;margin:0 auto;width:<%= logo_width %>px;height:auto;border:0;">
               <% end %>
             </td>
           </tr>

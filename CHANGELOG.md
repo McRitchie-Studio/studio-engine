@@ -4,6 +4,85 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **BREAKING for turf-monster — `email_change_confirmation` is no longer
+  pre-registered; `newsletter_subscribed` takes its place.** `STANDARD` means
+  "the emails EVERY Studio app sends", and only turf-monster sends an
+  email-change confirmation — McRitchie Studio, McRitchie Industries and moms-app
+  all showed a manager row for an email they have no mailer for. The artwork
+  (`emails/email-change-confirmation.gif`) still ships, so turf-monster restores
+  its banner with one line in `config/initializers/studio_emails.rb`:
+
+  ```ruby
+  Studio::EmailCatalog.register("email_change_confirmation",
+    label: "Email change confirmation",
+    description: "Confirms a new address before the change takes effect.",
+    default_asset: "emails/email-change-confirmation.gif",
+    aspect_ratio: 3.0)
+  ```
+
+  Without it `Studio::EmailCatalog.resolved_url(:email_change_confirmation)`
+  returns `nil` and that email sends bannerless — degraded, not broken, and no
+  exception. **Land turf-monster's registration before releasing this gem.**
+
+### Added
+
+- **`Studio::NewsletterMailer` — a sendable "you're on the list" email.**
+  Namespaced under `Studio::` on purpose: a host that defines its own top-level
+  `UserMailer` (McRitchie Studio does) SHADOWS the engine's outright, so an
+  action added there would reach only the apps that never customised their mail.
+  Layered-native — animated background with the greeting as live HTML on top,
+  and no flat `default_asset`, because a baked-in copy of the same picture is a
+  second thing to keep in sync and would never be shown. `unsubscribe_url:` is
+  optional and the line renders only when a host wires a real one.
+
+- **The banner's WORDS are operator-editable on /admin/emails.** Header,
+  a name-free fallback header, sub-text, subject, logo and tint, saved per app in
+  a new `studio_email_settings` row and resolved operator > registry > default.
+  `{name}` and `{app}` are filled per recipient — so the mailer now supplies WHO
+  the recipient is (`Studio::Banner.for(key, name:)`) and the operator supplies
+  what the banner says about them. A mailer that hands over a finished header
+  takes the wording away from the operator: the field still accepts the edit and
+  the email still ignores it, which is a control that lies.
+
+  An unresolved `{name}` never reaches an inbox. The header falls back to its
+  name-free variant; a subject, which has no second field, drops the token along
+  with the punctuation holding it — "Sign in to {app}, {name}" sends as
+  "Sign in to Studio" to someone with no name on file.
+
+- **The email manager previews what actually SHIPS.** Each email now renders the
+  real layered banner through the mailer's own partial (not a re-creation of it),
+  repaints as the operator types, and offers an example recipient — an admin, who
+  usually has a full name on file, and a member, who often has none. The nameless
+  case is the one the fallback header exists for and the one nobody thinks to
+  check. Preview hooks are opt-in (`preview: true`); with them off the email
+  markup is byte-identical, asserted by test.
+
+- **Animated GIF banners upload without losing their animation.** The cropper
+  paints onto a canvas and calls `toBlob(..., "image/png")`, which keeps frame one
+  and discards the rest — silently, leaving a good-looking still. `allowGifs: true`
+  routes a GIF around the cropper and stores the original bytes under a `.gif`
+  key.
+
+- **`Studio::EmailPreviewTarget`** — who an email is previewed as, read from the
+  host's own users with avatar and initials, degrading to a sample when an app has
+  none.
+
+### Fixed
+
+- **The manager reported artwork that was not being sent.** A layered-native email
+  (no flat `default_asset`) drew an empty box and a "sends without a banner" badge
+  while it was sending one, and an email with BOTH assets previewed the flat one —
+  a picture with the words baked in that a layered mailer never sends. The page
+  and the `<img>` fallback now resolve in opposite orders, each documented, because
+  they answer different questions.
+
+- **A doc comment leaked onto the page.** An ERB tag inside an ERB comment closes
+  it at its own delimiter; the rest of the sentence rendered above the banner. The
+  existing guard was real and only ran on the index, so it never saw the page that
+  shipped it.
+
 ### Added
 
 - **A browser lane — the engine now runs Playwright against its own partials.**

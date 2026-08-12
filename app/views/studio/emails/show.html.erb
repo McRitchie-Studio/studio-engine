@@ -2,14 +2,52 @@
 
      A bare content wrapper like the index, so it renders inside each host's
      layout. Lifted from turf-monster's admin/emails/show (the prior art this
-     work folds into the engine) and given the banner half: the same iframe over
-     the real rendered email, plus what artwork is riding on top of it and where
-     that artwork came from. %>
+     work folds into the engine) and given the banner half.
+
+     LAYOUT, AND WHY IT IS PAIRED
+     Two rows of two. Row one is WHO and WHAT SHOWS IN AN INBOX LIST: the subject
+     beside the person receiving it. Row two is WHAT THEY SEE: the two pictures
+     stacked on the left, the words that ride on them on the right. Every control
+     sits beside the thing it changes, and typing in one repaints the other with
+     no round trip.
+
+     NOTE: never write an ERB delimiter inside a comment like this one, in any
+     form. A comment ends at the first closing delimiter it contains, escaped or
+     not, and the remainder lands on the page as visible text. That shipped here
+     once. Name tags in prose instead of typing them. %>
 <% content_for(:title) { @entry.label } %>
 <%
   source     = Studio::EmailCatalog.source(@entry.key)
   banner_url = Studio::EmailCatalog.preview_url(@entry.key)
   aspect     = @entry.ratio
+  max_width  = Studio::EmailCatalog::MAX_WIDTH
+  card_width = Studio::Banner::DEFAULT_WIDTH
+
+  saved = {
+    header: Studio::EmailCatalog.header_template(@entry.key).to_s,
+    header_fallback: Studio::EmailCatalog.header_fallback(@entry.key).to_s,
+    subtext: Studio::EmailCatalog.subtext(@entry.key).to_s,
+    subject: (Studio::EmailSetting.copy_for(@entry.key, :subject) || @entry.subject).to_s,
+    logo_url: Studio::EmailSetting.copy_for(@entry.key, :logo_url).to_s,
+    hide_logo: Studio::EmailSetting.hide_logo?(@entry.key),
+    scrim_percent: Studio::EmailCatalog.scrim_percent(@entry.key).to_s
+  }
+
+  editor_config = {
+    values: saved,
+    targetId: @target&.id,
+    inheritedLogo: Studio::EmailCatalog.logo_url(@entry.key).to_s,
+    uploadedLogo: Studio::EmailCatalog.uploaded_logo_url(@entry.key).to_s,
+    defaultScrim: (Studio::Banner::DEFAULT_SCRIM * 100).round,
+    appName: Studio.app_name.to_s,
+    # The avatar fields are part of this payload, not an afterthought: the picker
+    # renders entirely from it, so a field omitted here is a grey circle with no
+    # letter in it — which is exactly what shipped.
+    targets: (@targets || []).map do |t|
+      { id: t.id, label: t.label, name: t.name, email: t.email, admin: t.admin?,
+        avatar_url: t.avatar_url, avatar_color: t.avatar_color, initials: t.initials }
+    end
+  }
 
   badge_class, badge_label =
     case source
@@ -19,11 +57,28 @@
     else               ["badge bg-warning/10 text-warning border-warning/30", "No image"]
     end
 %>
-<div class="max-w-5xl mx-auto px-4 pb-16">
+<div class="max-w-5xl mx-auto px-4 pb-16"
+     x-data="emailBannerEditor(<%= editor_config.to_json %>)">
   <header class="pt-8 pb-5">
     <%= link_to "← All emails", admin_emails_path,
           class: "text-sm text-muted hover:text-heading underline underline-offset-2" %>
-    <h1 class="text-3xl font-bold text-heading mt-2"><%= @entry.label %></h1>
+
+    <%# ONE save for the whole page, on the title's own row so it reads as
+        acting on this email rather than on the back-link above it. Shown only
+        once something has been typed, and disabled whenever the form matches
+        what is saved — so typing "A" and deleting it leaves a visible, disabled
+        button rather than an enabled one that would write nothing. %>
+    <div class="flex items-center justify-between gap-4 mt-2">
+      <h1 class="text-3xl font-bold text-heading"><%= @entry.label %></h1>
+      <div class="flex items-center gap-3 shrink-0">
+        <span class="text-2xs text-muted" x-show="touched && !dirty()" x-cloak>No changes</span>
+        <button type="button" @click="save()" x-show="touched" x-cloak
+                :disabled="!dirty()" data-save-all
+                :class="dirty() ? 'btn btn-primary btn-sm' : 'btn btn-primary btn-sm opacity-50 cursor-not-allowed'">
+          Save changes
+        </button>
+      </div>
+    </div>
 
     <div class="flex flex-wrap items-center gap-2 mt-3">
       <span class="badge <%= @entry.marketing? ? "bg-primary/10 text-primary border-primary/30" : "bg-inset text-muted border-subtle" %> whitespace-nowrap">
@@ -36,64 +91,256 @@
     <% if @entry.description.present? %>
       <p class="text-body max-w-2xl mt-3"><%= @entry.description %></p>
     <% end %>
-
-    <% if @subject.present? %>
-      <p class="text-sm text-muted mt-2">
-        Subject: <strong class="text-heading"><%= @subject %></strong>
-      </p>
-    <% end %>
   </header>
 
-  <%# The banner riding on top of this email, and where it came from. %>
-  <section class="card p-4 mb-6">
-    <p class="label-upper mb-3">Banner</p>
-    <div class="rounded-lg overflow-hidden border border-subtle max-w-md"
-         style="aspect-ratio: <%= aspect %>; background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-900));">
-      <% if banner_url %>
-        <%= image_tag banner_url, class: "w-full h-full object-cover",
-              alt: "#{@entry.label} email banner" %>
+  <%# ROW ONE — the subject line, and who is receiving it. %>
+  <div class="grid gap-6 md:grid-cols-2 mb-6">
+    <section class="card p-4">
+      <p class="label-upper mb-3">Example</p>
+      <%# The rendered subject sits with the person it is rendered FOR. It moved
+          out of the Subject card because what it shows depends on who is
+          selected below, not on the template above. %>
+      <p class="text-sm text-muted mb-3">
+        Sends as: <strong class="text-heading" x-text="subjectText()"></strong>
+      </p>
+      <% if editor_config[:targets].any? %>
+        <%# A custom listbox rather than a <select>: a native option cannot carry
+            an image, and the avatar is the whole reason this exists — it is how
+            you tell at a glance which account you are looking at. Keyboard and
+            click-away are handled; the value lives in Alpine state, and the
+            hidden form carries it. %>
+        <div class="relative" @keydown.escape="pickerOpen = false" @click.outside="pickerOpen = false">
+          <button type="button" @click="pickerOpen = !pickerOpen" data-preview-target
+                  class="input-field w-full py-2 flex items-center gap-3 text-left"
+                  :aria-expanded="pickerOpen" aria-haspopup="listbox">
+            <template x-if="target().avatar_url">
+              <img :src="target().avatar_url" alt="" class="w-8 h-8 rounded-full object-cover shrink-0">
+            </template>
+            <template x-if="!target().avatar_url">
+              <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                    :style="'background-color: ' + (target().avatar_color || '#6b7280')"
+                    x-text="target().initials"></span>
+            </template>
+            <span class="min-w-0">
+              <span class="block text-heading truncate" x-text="target().name || target().label"></span>
+              <span class="block text-2xs text-muted truncate" x-text="target().email"></span>
+            </span>
+            <svg class="w-4 h-4 text-muted ml-auto shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+
+          <ul x-show="pickerOpen" x-cloak role="listbox"
+              class="absolute z-20 mt-1 w-full rounded-lg border border-subtle bg-surface shadow-lg overflow-hidden">
+            <template x-for="option in targets" :key="option.id">
+              <li>
+                <button type="button" role="option" data-preview-option
+                        @click="targetId = option.id; pickerOpen = false"
+                        :aria-selected="option.id === targetId"
+                        class="w-full px-3 py-2 flex items-center gap-3 text-left hover:bg-inset"
+                        :class="option.id === targetId ? 'bg-inset' : ''">
+                  <template x-if="option.avatar_url">
+                    <img :src="option.avatar_url" alt="" class="w-8 h-8 rounded-full object-cover shrink-0">
+                  </template>
+                  <template x-if="!option.avatar_url">
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                          :style="'background-color: ' + (option.avatar_color || '#6b7280')"
+                          x-text="option.initials"></span>
+                  </template>
+                  <span class="min-w-0">
+                    <span class="block text-heading truncate" x-text="option.name || option.label"></span>
+                    <span class="block text-2xs text-muted truncate" x-text="option.email"></span>
+                  </span>
+                </button>
+              </li>
+            </template>
+          </ul>
+        </div>
       <% else %>
-        <div class="w-full h-full flex items-center justify-center text-xs text-white/80 text-center px-4">
-          This email sends without a banner.
+        <p class="text-sm text-muted">This app has no users to preview as yet.</p>
+      <% end %>
+    </section>
+
+    <section class="card p-4">
+      <p class="label-upper mb-2">Subject</p>
+      <p class="text-sm text-body mb-3">
+        Variables:
+        <code class="font-mono text-2xs px-1 py-0.5 rounded bg-inset">{name}</code>
+        <code class="font-mono text-2xs px-1 py-0.5 rounded bg-inset">{app}</code>
+      </p>
+      <%= text_field_tag :subject, saved[:subject], id: "subject", name: nil,
+            "x-model": "form.subject", class: "input-field w-full py-2" %>
+    </section>
+  </div>
+
+  <%# ROW TWO — the pictures, and the words that ride on them. %>
+  <div class="grid gap-6 md:grid-cols-2 mb-6">
+    <section class="card p-4"
+      <% if @uploads_available %>
+        x-data="imageUploadHost({
+          store: 'emailModals',
+          aspectRatio: <%= aspect %>,
+          maxWidth: <%= max_width %>,
+          transparent: false,
+          allowGifs: true,
+          filename: '<%= @entry.key %>.png',
+          saving: 'Saving banner…',
+          success: 'Banner updated',
+          successMessage: '<%= j @entry.label %> now uses this app\'s own image.',
+          failure: 'Couldn\'t save the banner'
+        })"
+        @crop-photo-confirmed.window="onCropConfirmed($event.detail)"
+      <% end %>>
+      <p class="label-upper mb-3">Banner</p>
+      <% if @banner %>
+        <div class="rounded-lg overflow-hidden border border-subtle"
+             style="aspect-ratio: <%= aspect %>; max-width: <%= card_width %>px;" data-email-banner-frame>
+          <div data-email-banner-preview data-banner-width="<%= card_width %>"
+               style="width:<%= card_width %>px;transform-origin:top left;">
+            <%= render "studio/mailers/layered_banner", banner: @banner, preview: true %>
+          </div>
+        </div>
+      <% else %>
+        <div class="rounded-lg overflow-hidden border border-subtle flex items-center justify-center text-xs text-muted text-center px-4"
+             style="aspect-ratio: <%= aspect %>; max-width: <%= card_width %>px;">
+          This email has no layered banner, so it sends the artwork as a plain image.
         </div>
       <% end %>
-    </div>
-    <p class="text-sm text-muted mt-3">
+
+      <p class="label-upper mb-3 mt-6">Artwork</p>
+      <%# The picture ALONE — the file an upload replaces. Hovering reveals the way
+          to change it, so the control sits on the thing it changes instead of in a
+          sentence pointing at another page. %>
+      <div class="relative group rounded-lg overflow-hidden border border-subtle" data-email-artwork-frame
+           style="aspect-ratio: <%= aspect %>; max-width: <%= card_width %>px; background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-900));">
+        <% if banner_url %>
+          <%= image_tag banner_url, class: "w-full h-full object-cover",
+                alt: "#{@entry.label} email artwork" %>
+        <% else %>
+          <div class="w-full h-full flex items-center justify-center text-xs text-white/80 text-center px-4">
+            This email sends without a banner.
+          </div>
+        <% end %>
+        <% if @uploads_available %>
+          <button type="button" @click="open()" data-modify-artwork
+                  class="absolute inset-0 w-full h-full flex items-center justify-center gap-2
+                         bg-black/55 text-white text-sm font-semibold opacity-0
+                         group-hover:opacity-100 focus:opacity-100 transition-opacity duration-150">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+            Modify image
+          </button>
+        <% end %>
+      </div>
       <% if @uploads_available %>
-        Change it on the <%= link_to "emails list", admin_emails_path, class: "underline underline-offset-2" %>.
-      <% else %>
-        <%= Studio.app_name %> has no object storage configured, so this image can be
-        viewed but not replaced yet.
+        <%# The upload host writes the chosen file into THIS input and submits it.
+            Without the pair, imageUploadHost has no $refs.fileInput and the whole
+            flow dies at "Cannot set properties of undefined" — after the modal has
+            already closed, so it reads as a silent no-op. %>
+        <%= form_with url: admin_email_path(@entry.key), method: :patch,
+              html: { multipart: true, id: "email-banner-form-#{@entry.key.tr("_", "-")}", "x-ref": "form" } do %>
+          <%= file_field_tag :image, class: "hidden", "x-ref": "fileInput" %>
+        <% end %>
       <% end %>
-    </p>
-  </section>
+      <p class="text-2xs text-muted mt-2">
+        <% if @uploads_available %>
+          GIFs keep their animation. Displayed at <%= card_width %>x<%= (card_width / aspect).round %>.
+        <% else %>
+          <%= Studio.app_name %> has no object storage configured, so this image can be
+          viewed but not replaced yet.
+        <% end %>
+      </p>
 
-  <%# The one knob an operator needs against real artwork. The scrim is the dial
-      between a readable header and a visible picture, and the right value
-      depends on a background that changes without a deploy — so it is set here,
-      next to the preview, rather than in code. %>
-  <section class="card p-4 mb-6">
-    <p class="label-upper mb-2">Banner tint</p>
-    <p class="text-sm text-body mb-3 max-w-xl">
-      How much the artwork is darkened behind the header. More tint means a more
-      legible greeting; less means a brighter picture. Leave it blank to use the
-      default (<%= (Studio::Banner::DEFAULT_SCRIM * 100).round %>%).
-    </p>
-    <%= form_with url: admin_email_settings_path(@entry.key), method: :patch,
-          class: "flex flex-wrap items-center gap-3" do %>
-      <label class="text-sm text-muted" for="scrim_percent">Tint</label>
-      <%= number_field_tag :scrim_percent, Studio::EmailCatalog.scrim_percent(@entry.key),
-            in: 0..100, step: 1, id: "scrim_percent",
-            class: "input-field w-24 py-2" %>
-      <span class="text-sm text-muted">%</span>
-      <%= submit_tag "Save tint", class: "btn btn-primary btn-sm" %>
-      <span class="text-2xs text-muted">Blank resets to the default.</span>
-    <% end %>
-  </section>
+      <%# The same artwork with the tint, the words and the logo on it — rendered
+          by the mailer's own partial, so it cannot drift from the email. The email
+          table is a fixed 600px because an inbox has no responsive layout; it is
+          scaled to this frame, and both frames are capped at 600 so they match at
+          every width. %>
+    </section>
+    <section class="card p-4">
+      <%# No name attributes and no form here. Every field is Alpine state, and
+          the hidden form at the bottom of the page mirrors all of it — one Save
+          writes the subject, the words, the logo and the tint together. %>
+      <div class="space-y-4">
+        <div>
+          <label class="text-sm text-muted block mb-1" for="header">Header</label>
+          <%= text_field_tag :header, saved[:header], id: "header", name: nil,
+                "x-model": "form.header", class: "input-field w-full py-2" %>
+        </div>
+        <div>
+          <label class="text-sm text-muted block mb-1" for="header_fallback">
+            Header for someone with no name on file
+          </label>
+          <%= text_field_tag :header_fallback, saved[:header_fallback], id: "header_fallback", name: nil,
+                "x-model": "form.header_fallback", class: "input-field w-full py-2" %>
+          <p class="text-2xs text-muted mt-1">
+            Used instead of the header above when we hold no name — a magic link is
+            often the first thing a stranger receives, and "Welcome !" is the
+            alternative.
+          </p>
+        </div>
+        <div>
+          <label class="text-sm text-muted block mb-1" for="subtext">Sub-text</label>
+          <%= text_field_tag :subtext, saved[:subtext], id: "subtext", name: nil,
+                "x-model": "form.subtext", class: "input-field w-full py-2" %>
+        </div>
 
-  <%# The email itself. An iframe because the response IS an email document —
-      its own <html>, its own table layout, and no business inheriting the admin
-      page's stylesheet. %>
+        <%# THE LOGO — three states, because a URL box can only express two.
+            Standard inherits the shared mark, Custom is what this app uploaded,
+            Hidden is the deliberate "no logo" that blank cannot say. %>
+        <div>
+          <span class="text-sm text-muted block mb-1">Logo</span>
+          <div class="flex flex-wrap items-center gap-2">
+            <button type="button" @click="setLogoMode('standard')" data-logo-standard
+                    :class="logoMode() === 'standard' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'">
+              Standard
+            </button>
+            <% if @uploads_available %>
+              <button type="button" @click="$dispatch('open-logo-upload')" data-logo-upload
+                      :class="logoMode() === 'custom' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'">
+                Upload new
+              </button>
+            <% end %>
+            <button type="button" @click="setLogoMode('hidden')" data-logo-hidden
+                    :class="logoMode() === 'hidden' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'">
+              None
+            </button>
+          </div>
+          <% if Studio::EmailCatalog.uploaded_logo_url(@entry.key).present? %>
+            <%= button_to "Back to the standard logo", admin_email_logo_path(@entry.key),
+                  method: :patch, params: { remove: "1" },
+                  class: "text-2xs text-muted underline underline-offset-2 mt-2" %>
+          <% end %>
+        </div>
+
+        <%# THE TINT lives here, beside the words it makes legible, and repaints
+            the banner as it changes. It was its own card with its own Save
+            button; that put the one control that trades legibility against
+            picture in a different place from the text it is protecting. %>
+        <div>
+          <label class="text-sm text-muted block mb-1" for="scrim_percent">
+            Tint — how far the artwork is darkened behind the text
+          </label>
+          <div class="flex items-center gap-3">
+            <input type="range" min="0" max="100" step="1" id="scrim_percent" data-scrim-range
+                   x-model="form.scrim_percent" class="studio-range flex-1"
+                   :style="'--range-fill: ' + scrimFill()">
+            <span class="font-mono text-2xs text-heading w-12 text-right"
+                  x-text="(form.scrim_percent === '' ? <%= (Studio::Banner::DEFAULT_SCRIM * 100).round %> : form.scrim_percent) + '%'"></span>
+          </div>
+          <p class="text-2xs text-muted mt-1">
+            More tint means a more legible greeting; less means a brighter picture.
+          </p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <%# The email itself. An iframe because the response IS an email document — its
+      own document shell, its own table layout, and no business inheriting the
+      admin page's stylesheet. %>
   <section class="card p-3 bg-inset">
     <p class="label-upper mb-3 px-1">Preview</p>
     <% if @entry.previewable? %>
@@ -112,4 +359,67 @@
       <p class="text-2xs text-danger mt-2 px-1 font-mono break-all"><%= @preview_error %></p>
     <% end %>
   </section>
+
+  <%# THE ONE WRITE. Every visible control above is Alpine state with no name
+      attribute; these hidden inputs mirror that state and this is the form the
+      header's Save submits. Done this way because a single <form> cannot wrap
+      the page — the artwork uploader is itself a form, and nesting forms is
+      invalid HTML that browsers silently repair by dropping one. %>
+  <%= form_with url: admin_email_copy_path(@entry.key), method: :patch,
+        html: { "x-ref": "saveForm", class: "hidden" } do %>
+    <input type="hidden" name="subject" :value="form.subject">
+    <input type="hidden" name="header" :value="form.header">
+    <input type="hidden" name="header_fallback" :value="form.header_fallback">
+    <input type="hidden" name="subtext" :value="form.subtext">
+    <input type="hidden" name="logo_url" :value="form.logo_url">
+    <input type="hidden" name="hide_logo" :value="form.hide_logo ? '1' : ''">
+    <input type="hidden" name="scrim_percent" :value="form.scrim_percent">
+  <% end %>
+
+  <%= render "studio/emails/banner_scale" %>
+  <%= render "studio/emails/banner_editor" %>
+
+  <% if @uploads_available %>
+    <%# Cropper + the page-scoped modal host, exactly as the index mounts them:
+        scoped_host rather than modals/host, because mcritchie-studio and
+        turf-monster both ship app copies of modals/host that shadow the engine's
+        in this non-isolated engine.
+
+        Optional chaining on current() is load-bearing: the outer template
+        unmounts one tick AFTER the stack empties, so a bare .id throws on every
+        modal close. %>
+    <%# The LOGO uploader — a second host, listening for its own event. Separate
+        from the artwork host because the two want different crops: artwork is
+        3:1 and may be an animated GIF, a logo is a small transparent mark that
+        should keep its alpha and be cropped freely. %>
+    <div x-data="imageUploadHost({
+           store: 'emailModals',
+           aspectRatio: 0,
+           maxWidth: 600,
+           transparent: true,
+           allowGifs: false,
+           filename: '<%= @entry.key %>-logo.png',
+           saving: 'Saving logo…',
+           success: 'Logo updated',
+           successMessage: 'This email now uses its own logo.',
+           failure: 'Couldn\'t save the logo'
+         })"
+         @open-logo-upload.window="open()"
+         @crop-photo-confirmed.window="onCropConfirmed($event.detail)">
+      <%= form_with url: admin_email_logo_path(@entry.key), method: :patch,
+            html: { multipart: true, "x-ref": "form", class: "hidden" } do %>
+        <%= file_field_tag :image, class: "hidden", "x-ref": "fileInput" %>
+      <% end %>
+    </div>
+
+    <%= render "studio/cropper_assets" %>
+    <%= render "studio/modals/scoped_host", store: "emailModals" do %>
+      <template x-if="$store.emailModals.current()?.id === 'crop-photo'">
+        <div><%= render "studio/modals/crop_photo", store: "emailModals" %></div>
+      </template>
+      <template x-if="$store.emailModals.current()?.id === 'saving'">
+        <div><%= render "studio/modals/saving", store: "emailModals" %></div>
+      </template>
+    <% end %>
+  <% end %>
 </div>

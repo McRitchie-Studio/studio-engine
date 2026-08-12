@@ -1,4 +1,4 @@
-<%# locals: (entry:, uploads_available:, max_width:)
+<%# locals: (entry:, uploads_available:, max_width:, preview_name: nil)
     One registered email: its live banner, its name, and where that banner comes
     from. The whole row is the imageUploadHost x-data so the thumbnail, the Edit
     button, and the hidden multipart form the cropper submits all sit together —
@@ -8,6 +8,23 @@
   source     = Studio::EmailCatalog.source(entry.key)
   banner_url = Studio::EmailCatalog.preview_url(entry.key)
   form_id    = "email-banner-form-#{entry.key.dasherize}"
+  card_width = Studio::Banner::DEFAULT_WIDTH
+
+  # The banner AS IT ARRIVES, not the bare artwork. Same partial the mailer
+  # renders, in preview mode so the text nodes carry handles — the row repaints
+  # when the example recipient changes.
+  # Defaulted rather than required: the row is rendered by tests and by any host
+  # that has not passed a recipient, and "nobody selected" is a real state — it
+  # renders the name-free header, which is what a stranger receives.
+  name    = local_assigns.fetch(:preview_name, nil)
+  banner  = Studio::Banner.for(entry.key, name: name)
+  subject = Studio::EmailCatalog.subject_for(entry.key, name: name)
+
+  # The TEMPLATES ride on the row so the repaint script can re-resolve them for
+  # whoever is selected, without a second payload to keep in step.
+  header_template = Studio::EmailCatalog.header_template(entry.key)
+  header_fallback = Studio::EmailCatalog.header_fallback(entry.key)
+  subject_template = Studio::EmailSetting.copy_for(entry.key, :subject) || entry.subject
 
   # `badge` is a shape-only utility in engine.css — the state color comes from
   # theme-token utilities so it follows each app's palette in light and dark.
@@ -35,7 +52,10 @@
     override. On a read-only app the cropper assets are not loaded either, so an
     unconditional x-data would reference an undefined factory and Alpine would
     throw on every row. %>
-<tr class="border-b border-subtle last:border-0"
+<tr class="border-b border-subtle last:border-0" data-email-row
+    data-header="<%= header_template %>"
+    data-header-fallback="<%= header_fallback %>"
+    data-subject="<%= subject_template %>"
     <% if uploads_available %>
       x-data="imageUploadHost({
         store: 'emailModals',
@@ -52,17 +72,31 @@
     <% end %>>
 
   <td class="px-4 py-4">
-    <div class="rounded-lg overflow-hidden border border-subtle w-40"
-         style="aspect-ratio: <%= entry.ratio %>; background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-900));">
-      <% if banner_url %>
-        <%= image_tag banner_url, class: "w-full h-full object-cover",
-              alt: "#{entry.label} email banner", loading: "lazy" %>
-      <% else %>
-        <div class="w-full h-full flex items-center justify-center text-2xs text-white/80 text-center px-3">
-          No banner
+    <%# The rendered banner rather than the artwork alone: the artwork is the
+        file, the banner is what lands in an inbox, and only one of those answers
+        "what does this email look like". The fixed 600px email table is scaled
+        into this cell by studio/emails/banner_scale. %>
+    <% if banner %>
+      <div class="rounded-lg overflow-hidden border border-subtle w-56" data-email-banner-frame
+           style="aspect-ratio: <%= entry.ratio %>;">
+        <div data-email-banner-preview data-banner-width="<%= card_width %>"
+             style="width:<%= card_width %>px;transform-origin:top left;">
+          <%= render "studio/mailers/layered_banner", banner: banner, preview: true %>
         </div>
-      <% end %>
-    </div>
+      </div>
+    <% else %>
+      <div class="rounded-lg overflow-hidden border border-subtle w-56"
+           style="aspect-ratio: <%= entry.ratio %>; background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-900));">
+        <% if banner_url %>
+          <%= image_tag banner_url, class: "w-full h-full object-cover",
+                alt: "#{entry.label} email banner", loading: "lazy" %>
+        <% else %>
+          <div class="w-full h-full flex items-center justify-center text-2xs text-white/80 text-center px-3">
+            No banner
+          </div>
+        <% end %>
+      </div>
+    <% end %>
   </td>
 
   <td class="px-4 py-4">
@@ -76,6 +110,10 @@
       <p class="text-sm text-body mt-0.5 max-w-md"><%= entry.description %></p>
     <% end %>
     <p class="font-mono text-2xs text-muted mt-1"><%= entry.key %></p>
+  </td>
+
+  <td class="px-4 py-4">
+    <p class="text-sm text-heading" data-row-subject><%= subject %></p>
   </td>
 
   <%# whitespace-nowrap keeps the pill a pill — "<App>'s own" is long enough to
