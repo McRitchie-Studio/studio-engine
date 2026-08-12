@@ -4,7 +4,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
-**Fix — the emails page named the wrong owner for an app's own artwork.**
+### Added
+
+- **The "at" time stamp — `at_time_tag` + `studio/at_time_script`.** A shared
+  primitive for stamping WHEN something happened, on the READER's clock rather
+  than the app's: `at 3:53p`, gaining a date only when the stamp is not today and
+  the year only when it differs, with a country flag trailing the clock when the
+  reader's timezone is outside the US. The relative phrase moves to the hover
+  title. The server renders the app-timezone form as a no-JS fallback and never
+  renders a flag — it cannot know where the reader is sitting, so only the
+  reader's machine may assert one. Hosts render `studio/at_time_script` once,
+  near the end of the layout body; omitting it degrades to app-timezone stamps
+  rather than breaking. Specimen: `/admin/style` → Tricks → Time stamps; recipe
+  in the README's UI Primitives section.
+
+### Fixed
+
+**The emails page named the wrong owner for an app's own artwork.**
 `/admin/emails` described ANY registered banner as *"Shared Studio artwork,
 shipped with the engine"*. turf-monster registers its own eight committed
 banners, so its page announced its own artwork as the engine's — the same

@@ -155,6 +155,35 @@ privileges while impersonating.
 
 ## UI Primitives
 
+### The "at" time stamp — `at_time_tag`
+
+Stamps WHEN something happened, on the reader's own clock: `at 3:53p`, gaining a
+date only when the stamp is not today and the year only when it differs. A
+country flag trails the clock when the reader's timezone is outside the US, and
+inside the US there is no flag at all — it carries signal only because it is
+unusual. The relative phrase ("7 minutes ago") moves to the hover title.
+
+Render the re-stamper **once per page, near the end of the layout body**, then
+use the helper anywhere:
+
+```erb
+<%# near the end of <body>, once %>
+<%= render "studio/at_time_script" %>
+
+<%# anywhere %>
+<%= at_time_tag(release.shipped_at) %>
+<%= at_time_tag(task.created_at, prefix: nil) %>
+```
+
+**Near the END of the body matters.** The script's first pass runs synchronously
+as it parses, so rendering it in `head` finds zero stamps on that pass and leaves
+them until the next one.
+
+The server renders the app-timezone form as a no-JS fallback and never renders a
+flag — it cannot know where the reader is sitting, so only the reader's machine
+may assert one. A host that omits the script still gets working stamps, just
+frozen in the app's timezone. Specimen: `/admin/style` → Tricks → Time stamps.
+
 ### Smooth-load header pin — `.vt-pinned-header`
 
 When `Studio.smooth_load` is on, put `vt-pinned-header` on the app's sticky

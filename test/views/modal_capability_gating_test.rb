@@ -26,7 +26,12 @@ require "action_view"
 #      capability is off (disabled-but-present preview), never hidden.
 class ModalCapabilityGatingTest < ActiveSupport::TestCase
   def render_index
+    # A host renders these views through ApplicationController, which has EVERY
+    # engine helper mixed in (no isolate_namespace). A bare test view has none, so
+    # give it the whole set rather than the one module today's specimens happen to
+    # call — otherwise the next helper-backed specimen breaks all five harnesses.
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    view.extend(Studio::Engine.helpers)
     view.render(template: "style/index")
   end
 
