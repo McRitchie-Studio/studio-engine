@@ -201,22 +201,57 @@ class EmailsPageTest < ActiveSupport::TestCase
     refute_empty shipped, "the engine must ship at least one default email banner"
   end
 
+  # Every frame each banner is supposed to carry, pinned by number.
+  #
+  # Pinned rather than "more than one" because "keeping every frame" IS the
+  # decision — frame-dropping was measured (half the frames: 3.1 MB against
+  # 3.5 MB) and rejected, so a file that quietly comes back at 60 frames has
+  # lost the thing that was chosen, not merely thinned. Re-encoding on purpose
+  # means editing this number, and then the diff says what it cost.
+  BANNER_FRAMES = {
+    "emails/magic-link.gif" => 120,
+    "emails/email-change-confirmation.gif" => 60
+  }.freeze
+
+  # A GIF frame is introduced by a Graphic Control Extension: the block
+  # terminator closing the previous block, then 0x21 (extension introducer),
+  # 0xF9 (graphic-control label), 0x04 (block size).
+  GRAPHIC_CONTROL_EXTENSION = "\x00\x21\xF9\x04".b.freeze
+
   # The artwork itself, asserted as a FILE. A default_asset naming a file that
   # moved, got flattened, or lost its frames renders wrong in real email while
   # every other assertion on this page still passes.
+  #
+  # The FRAMES are asserted, not inferred from the header. "GIF89a" is a FORMAT
+  # VERSION, not proof of animation: flatten these to a single frame and the
+  # magic bytes and the logical-screen size are both untouched, so every other
+  # assertion here still passes while every inbox loses the motion Mr. McRitchie
+  # chose over a 24 KB static frame. At 5.5 MB these files INVITE exactly that
+  # optimisation, which is why the property is checked instead of a proxy for it.
   test "the standard banners are the real artwork, animated and full size" do
     Studio::EmailCatalog::STANDARD.each do |attrs|
-      path = File.expand_path("../../app/assets/images/#{attrs[:default_asset]}", __dir__)
-      assert File.file?(path), "missing #{attrs[:default_asset]}"
+      asset = attrs[:default_asset]
+      path = File.expand_path("../../app/assets/images/#{asset}", __dir__)
+      assert File.file?(path), "missing #{asset}"
 
-      header = File.binread(path, 6)
-      assert_equal "GIF89a", header,
-        "#{attrs[:default_asset]} must stay an animated GIF — Mr. McRitchie chose animation over a 24KB static frame"
+      data = File.binread(path)
+
+      assert_equal "GIF89a", data[0, 6],
+        "#{asset} must stay an animated GIF — Mr. McRitchie chose animation over a 24KB static frame"
 
       # GIF logical-screen size, little-endian, bytes 6..9.
-      width, height = File.binread(path, 4, 6).unpack("v2")
-      assert_equal 1800, width,  "#{attrs[:default_asset]} lost its width"
-      assert_equal 600,  height, "#{attrs[:default_asset]} lost its height"
+      width, height = data[6, 4].unpack("v2")
+      assert_equal 1800, width,  "#{asset} lost its width"
+      assert_equal 600,  height, "#{asset} lost its height"
+
+      assert_equal BANNER_FRAMES.fetch(asset), data.scan(GRAPHIC_CONTROL_EXTENSION).size,
+        "#{asset} lost frames — a flattened or thinned banner still passes every " \
+        "other assertion here, and still reads as GIF89a at 1800x600"
+
+      # The looping application extension. Without it a mail client that DOES
+      # animate plays the waves once and stops on the last frame.
+      assert_includes data, "NETSCAPE2.0",
+        "#{asset} lost its loop extension — the animation would play once and stop"
     end
   end
 
