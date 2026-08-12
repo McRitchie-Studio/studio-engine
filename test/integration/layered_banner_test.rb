@@ -30,7 +30,10 @@ class LayeredBannerTest < ActiveSupport::TestCase
     return if ActiveRecord::Base.connection.table_exists?(:studio_email_settings)
 
     require_relative "../../db/migrate/20260812000000_create_studio_email_settings"
-    CreateStudioEmailSettings.new.migrate(:up)
+    # suppress_messages, because bin/suite-guard reads STDOUT to work out which
+    # test files ran — a migration announcing itself there is parsed as a file
+    # and reported as missing from the tree.
+    ActiveRecord::Migration.suppress_messages { CreateStudioEmailSettings.new.migrate(:up) }
   end
 
   def setup
