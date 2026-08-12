@@ -54,7 +54,7 @@ class EmailCatalogTest < Minitest::Test
     entry = Studio::EmailCatalog.entry("magic_link")
 
     assert_equal "Magic-link sign-in", entry.label
-    assert_equal "emails/magic-link.png", entry.default_asset
+    assert_equal "emails/magic-link.gif", entry.default_asset
     refute_empty entry.description.to_s, "a registered email describes its workflow"
   end
 
@@ -85,7 +85,7 @@ class EmailCatalogTest < Minitest::Test
     assert_equal %w[magic_link email_change_confirmation], Studio::EmailCatalog.keys,
       "a relabel must not append a duplicate or reorder the page"
     assert_equal "Sign in to Turf Monster", Studio::EmailCatalog.label("magic_link")
-    assert_equal "emails/magic-link.png", Studio::EmailCatalog.entry("magic_link").default_asset,
+    assert_equal "emails/magic-link.gif", Studio::EmailCatalog.entry("magic_link").default_asset,
       "a relabel must keep the inherited default artwork"
   end
 
@@ -120,7 +120,7 @@ class EmailCatalogTest < Minitest::Test
   def test_an_app_owned_override_wins_over_the_inherited_default
     row = app_row("https://turf-monster-dev.s3.amazonaws.com/email_banners/magic_link-ab12.png")
     stub_module(Studio::EmailCatalog, :record) { |_key| row }
-    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
     assert_equal :app, Studio::EmailCatalog.source("magic_link")
     assert Studio::EmailCatalog.app_owned?("magic_link")
@@ -130,12 +130,13 @@ class EmailCatalogTest < Minitest::Test
 
   def test_the_inherited_default_renders_when_the_app_uploaded_nothing
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
-    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
     stub_module(Studio::EmailCatalog, :mailer_asset_host) { "https://mcritchie.studio" }
 
-    assert_equal :default, Studio::EmailCatalog.source("magic_link")
+    # magic_link is one of the engine's STANDARD two, so its artwork is the gem's.
+    assert_equal :engine_default, Studio::EmailCatalog.source("magic_link")
     refute Studio::EmailCatalog.app_owned?("magic_link")
-    assert_equal "https://mcritchie.studio/assets/emails/magic-link.png",
+    assert_equal "https://mcritchie.studio/assets/emails/magic-link.gif",
                  Studio::EmailCatalog.resolved_url("magic_link")
   end
 
@@ -167,7 +168,7 @@ class EmailCatalogTest < Minitest::Test
   # If someone "simplifies" url into resolved_url again, this goes red.
   def test_url_returns_nil_when_this_app_uploaded_nothing_even_with_a_default
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
-    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
     assert_nil Studio::EmailCatalog.url("magic_link"),
       "url() must keep its pre-registry contract — a host's own `url(...) || its_own_asset` " \
@@ -182,33 +183,94 @@ class EmailCatalogTest < Minitest::Test
                  Studio::EmailCatalog.url("magic_link")
   end
 
+  # --- WHOSE artwork: the bug this file's source() section missed ------------
+  #
+  # REGRESSION GUARD. source() used to collapse every registered default_asset
+  # into :default, and the page printed "Shared Studio artwork, shipped with the
+  # engine" for all of them. turf-monster registers its OWN eight committed
+  # banners, so its page announced its alligator artwork as the engine's — the
+  # same wrong-provenance failure this page was built to end.
+  #
+  # Origin is recorded at REGISTRATION, not guessed from the path: by the time
+  # the page asks, a resolved asset path looks identical either way.
+
+  def test_a_host_registered_asset_is_reported_as_that_apps_own
+    Studio::EmailCatalog.register("winnings", label: "Contest winnings",
+                                  default_asset: "emails/winnings-banner.jpg")
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/winnings-banner.jpg" }
+
+    assert_equal :app_asset, Studio::EmailCatalog.source("winnings"),
+      "a banner the HOST registered is the host's artwork, not the engine's"
+    assert Studio::EmailCatalog.app_artwork?("winnings")
+  end
+
+  def test_the_engines_own_standard_artwork_is_reported_as_the_engines
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
+
+    assert_equal :engine_default, Studio::EmailCatalog.source("magic_link")
+    refute Studio::EmailCatalog.app_artwork?("magic_link")
+  end
+
+  # A host taking over an inherited email's artwork flips the origin with it.
+  def test_overriding_an_inherited_asset_makes_it_the_apps_own
+    Studio::EmailCatalog.register("magic_link", default_asset: "emails/my-own-magic-link.jpg")
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/my-own-magic-link.jpg" }
+
+    assert_equal :app_asset, Studio::EmailCatalog.source("magic_link")
+  end
+
+  # …but merely relabelling one must NOT claim the engine's picture.
+  def test_relabelling_an_inherited_email_does_not_claim_its_artwork
+    Studio::EmailCatalog.register("magic_link", label: "Sign in to Turf Monster")
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
+
+    assert_equal :engine_default, Studio::EmailCatalog.source("magic_link")
+  end
+
+  # An UPLOAD outranks either, and keeps the value turf-monster's suite asserts
+  # on its main branch. Consumer CI runs consumers' default branch, so renaming
+  # :app would redden a lane no change inside the engine could fix.
+  def test_an_upload_still_reports_app_exactly_as_before
+    row = app_row("https://turf-monster-dev.s3.amazonaws.com/email_banners/x.png")
+    Studio::EmailCatalog.register("winnings", default_asset: "emails/winnings-banner.jpg")
+    stub_module(Studio::EmailCatalog, :record) { |_key| row }
+
+    assert_equal :app, Studio::EmailCatalog.source("winnings"),
+      "turf-monster asserts :app on main — this value is a consumer contract"
+    assert Studio::EmailCatalog.app_artwork?("winnings")
+  end
+
   # --- 5. browser vs inbox addressing of the SAME default -------------------
 
   def test_preview_url_keeps_a_default_root_relative_for_the_browser
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
-    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
     # The admin page is viewed on whatever host+port this app is running on
     # (localhost:3042 in a worktree), so an absolute mailer asset_host would
     # point the preview at the wrong origin.
-    assert_equal "/assets/emails/magic-link.png", Studio::EmailCatalog.preview_url("magic_link")
+    assert_equal "/assets/emails/magic-link.gif", Studio::EmailCatalog.preview_url("magic_link")
   end
 
   def test_resolved_url_makes_a_default_absolute_for_the_inbox
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
-    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
     stub_module(Studio::EmailCatalog, :mailer_asset_host) { "https://mcritchie.studio" }
 
-    assert_equal "https://mcritchie.studio/assets/emails/magic-link.png",
+    assert_equal "https://mcritchie.studio/assets/emails/magic-link.gif",
                  Studio::EmailCatalog.resolved_url("magic_link")
   end
 
   def test_resolved_url_leaves_an_already_absolute_asset_path_alone
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
-    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "https://cdn.example.com/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "https://cdn.example.com/assets/emails/magic-link.gif" }
     stub_module(Studio::EmailCatalog, :mailer_asset_host) { "https://mcritchie.studio" }
 
-    assert_equal "https://cdn.example.com/assets/emails/magic-link.png",
+    assert_equal "https://cdn.example.com/assets/emails/magic-link.gif",
                  Studio::EmailCatalog.resolved_url("magic_link"),
       "an asset_host-resolved absolute URL must not be prefixed a second time"
   end

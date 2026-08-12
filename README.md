@@ -155,6 +155,35 @@ privileges while impersonating.
 
 ## UI Primitives
 
+### The "at" time stamp — `at_time_tag`
+
+Stamps WHEN something happened, on the reader's own clock: `at 3:53p`, gaining a
+date only when the stamp is not today and the year only when it differs. A
+country flag trails the clock when the reader's timezone is outside the US, and
+inside the US there is no flag at all — it carries signal only because it is
+unusual. The relative phrase ("7 minutes ago") moves to the hover title.
+
+Render the re-stamper **once per page, near the end of the layout body**, then
+use the helper anywhere:
+
+```erb
+<%# near the end of <body>, once %>
+<%= render "studio/at_time_script" %>
+
+<%# anywhere %>
+<%= at_time_tag(release.shipped_at) %>
+<%= at_time_tag(task.created_at, prefix: nil) %>
+```
+
+**Near the END of the body matters.** The script's first pass runs synchronously
+as it parses, so rendering it in `head` finds zero stamps on that pass and leaves
+them until the next one.
+
+The server renders the app-timezone form as a no-JS fallback and never renders a
+flag — it cannot know where the reader is sitting, so only the reader's machine
+may assert one. A host that omits the script still gets working stamps, just
+frozen in the app's timezone. Specimen: `/admin/style` → Tricks → Time stamps.
+
 ### Smooth-load header pin — `.vt-pinned-header`
 
 When `Studio.smooth_load` is on, put `vt-pinned-header` on the app's sticky
@@ -376,10 +405,17 @@ relabeling `magic_link` does not reorder the page or drop its default artwork.
 
 ```
 Studio::EmailCatalog.resolved_url(:magic_link)
-  1. this app's ImageCache row  (its own S3 bucket)   -> app-owned override
-  2. the engine's default gem asset                   -> inherited default
+  1. this app's ImageCache row  (its own S3 bucket)   -> uploaded here
+  2. the registered default_asset                     -> a committed file
   3. nil                                              -> sends bannerless
 ```
+
+`source(key)` says WHOSE the live banner is — `:app` (uploaded here, revertible),
+`:app_asset` (registered by this app, committed in its repo), `:engine_default`
+(the shared artwork in the gem), or `:none`. The origin is recorded when the
+email is registered, because a resolved asset path looks identical either way by
+the time the page asks. Passing `default_asset:` makes that artwork the host's;
+relabelling an inherited email leaves it the engine's.
 
 Note the method: **`resolved_url` walks all three layers; `url` returns only
 layer 1** (this app's own image, or nil). That split is deliberate — it keeps

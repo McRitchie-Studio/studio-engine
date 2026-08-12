@@ -113,6 +113,72 @@
     </div>
   </section>
 
+  <!-- Time stamps: the "at" format -->
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <h3 class="text-xl font-bold text-heading">Time stamps — the &ldquo;at&rdquo; format</h3>
+      <p class="text-muted text-sm">
+        <code class="font-mono text-2xs">at_time_tag</code> stamps WHEN something happened, on
+        the reader&rsquo;s own clock. The stamps below are live: the server rendered them in this
+        app&rsquo;s timezone and <code class="font-mono text-2xs">studio/at_time_script</code>
+        re-stamped them in yours. Hover one for the relative time and your zone.
+      </p>
+    </div>
+    <%# An ERB snippet cannot be written literally inside an ERB template: the
+        scanner closes the tag at the first `%` + `>` it sees, whatever Ruby string
+        it sits in. So assemble the markers — the raw template never contains one. %>
+    <% erb = ->(code) { "<" + "%= " + code + " %" + ">" } %>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%= render layout: "style/specimen",
+            locals: { klass: "at_time_tag(time)",
+                      usage: erb.call("at_time_tag(release.shipped_at)") } do %>
+        <span class="text-sm text-body"><%= at_time_tag(Time.current) %></span>
+      <% end %>
+
+      <%# The date joins only when the stamp is not today — the rule is easiest to
+          read as two specimens side by side. %>
+      <%= render layout: "style/specimen",
+            locals: { klass: "at_time_tag — not today",
+                      usage: erb.call("at_time_tag(task.created_at)") + "\n# the date joins only when it is not today" } do %>
+        <span class="text-sm text-body"><%= at_time_tag(3.days.ago) %></span>
+      <% end %>
+
+      <%= render layout: "style/specimen",
+            locals: { klass: "at_time_tag — another year",
+                      usage: erb.call("at_time_tag(old_record.created_at)") + "\n# the year joins only when it differs" } do %>
+        <span class="text-sm text-body"><%= at_time_tag(1.year.ago) %></span>
+      <% end %>
+
+      <%= render layout: "style/specimen",
+            locals: { klass: "at_time_tag(time, prefix: nil)",
+                      usage: erb.call("at_time_tag(time, prefix: nil)") + %(\n# bare clock, for a cell that already says "at") } do %>
+        <span class="text-sm text-body"><%= at_time_tag(Time.current, prefix: nil) %></span>
+      <% end %>
+
+      <%# STATIC ILLUSTRATION, not the primitive: a reader inside the US never sees
+          the flag, so a live specimen cannot show them what it looks like. Hand-built
+          to match the hydrated markup exactly (clock, then ml-2, then the flag). %>
+      <%= render layout: "style/specimen",
+            locals: { klass: "outside the US — the flag trails",
+                      usage: %(# The flag is added CLIENT-side from the browser's IANA zone.\n# Inside the US there is no flag at all, and its margin collapses with it.) } do %>
+        <div class="flex flex-col items-start gap-1.5 text-sm text-body">
+          <span class="whitespace-nowrap"><span>at 6:50a</span><span class="ml-2">🇯🇵</span></span>
+          <span class="whitespace-nowrap"><span>at 10:50p</span><span class="ml-2">🇬🇧</span></span>
+          <span class="whitespace-nowrap"><span>at 9:50p</span><span class="ml-2">🌐</span></span>
+          <span class="whitespace-nowrap text-muted"><span>at 4:50p</span></span>
+        </div>
+      <% end %>
+
+      <%# The first caller's shape, so a host sees the primitive in a real pill
+          rather than only as bare text. %>
+      <%= render layout: "style/specimen",
+            locals: { klass: "in a status badge",
+                      usage: %(<span class="badge">Shipped ) + erb.call("at_time_tag(release.shipped_at)") + "</span>" } do %>
+        <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">Shipped <%= at_time_tag(42.minutes.ago) %></span>
+      <% end %>
+    </div>
+  </section>
+
   <!-- Motion primitives -->
   <section class="space-y-5">
     <div class="space-y-1">

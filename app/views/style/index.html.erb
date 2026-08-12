@@ -58,3 +58,8 @@
     <%= render "style/tasks" %>
   </div>
 </div>
+
+<%# The "at" format's re-stamper, so the Tricks time-stamp specimens hydrate to the
+    reader's clock even on a host that has not yet wired it into its own layout.
+    Self-guarded — a host that HAS wired it renders this as a no-op. %>
+<%= render "studio/at_time_script" %>

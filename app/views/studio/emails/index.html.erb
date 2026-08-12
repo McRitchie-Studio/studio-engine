@@ -20,9 +20,12 @@
      partial in this non-isolated engine. %>
 <% content_for(:title) { "Emails" } %>
 <%
-  aspect     = Studio::EmailCatalog::ASPECT_RATIO
   max_width  = Studio::EmailCatalog::MAX_WIDTH
-  app_owned  = @entries.count { |entry| Studio::EmailCatalog.source(entry.key) == :app }
+  # Counts the app's OWN artwork either way — uploaded here or committed in this
+  # app's assets. Counting only uploads made turf-monster, whose eight banners
+  # all ship from its own repo, report "all inheriting the default artwork".
+  app_artwork = @entries.count { |entry| Studio::EmailCatalog.app_artwork?(entry.key) }
+  bannerless  = @entries.count { |entry| Studio::EmailCatalog.source(entry.key) == :none }
 %>
 <div class="max-w-5xl mx-auto px-4 pb-16">
   <header class="space-y-2 pt-8 pb-6">
@@ -30,12 +33,23 @@
     <h1 class="text-3xl font-bold text-heading">Emails</h1>
     <p class="text-body max-w-2xl">
       Every transactional email <%= Studio.app_name %> sends, and the banner that
-      rides at the top of it. Each one starts on the shared Studio artwork; upload
-      your own and it belongs to this app from then on.
+      rides at the top of it. An email starts on the shared Studio artwork, or on
+      artwork this app registered itself; upload here and the image belongs to
+      <%= Studio.app_name %> from then on.
     </p>
     <p class="text-sm text-muted">
       <%= pluralize(@entries.size, "email") %> registered &middot;
-      <%= app_owned.zero? ? "all inheriting the default artwork" : "#{app_owned} with #{Studio.app_name}'s own artwork" %>
+      <%
+        summary =
+          if app_artwork == @entries.size && @entries.any?
+            "all on #{Studio.app_name}'s own artwork"
+          elsif app_artwork.zero?
+            bannerless == @entries.size && @entries.any? ? "none have a banner yet" : "all on the shared Studio artwork"
+          else
+            "#{app_artwork} on #{Studio.app_name}'s own artwork"
+          end
+      %>
+      <%= summary %>
     </p>
   </header>
 
@@ -77,7 +91,7 @@
           <% @entries.each do |entry| %>
             <%= render "studio/emails/row", entry: entry,
                   uploads_available: @uploads_available,
-                  aspect: aspect, max_width: max_width %>
+                  max_width: max_width %>
           <% end %>
         </tbody>
       </table>
@@ -86,8 +100,9 @@
 
   <p class="text-xs text-muted mt-4">
     Banners render full-bleed at 600px wide inside the email card. The crop is
-    fixed at <%= aspect.to_i %>:1 and saved at up to <%= max_width %>px, which is
-    retina-sharp in an inbox without tripping a clipping limit.
+    saved at up to <%= max_width %>px, which is retina-sharp in an inbox. Each
+    email crops to the shape of its own banner, so a replacement lands in the
+    same frame as the artwork it is replacing.
     <% if @entries.any? { |entry| Studio::EmailCatalog.source(entry.key) == :none } %>
       An email with no image sends bannerless — the card still renders.
     <% end %>
