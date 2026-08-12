@@ -79,15 +79,22 @@ jobs:
   # A SEPARATE JOB, NOT A STEP IN bin/release-check. That is a cost decision, made
   # against measurements rather than taste:
   #
-  #   engine-suite (today)          ~1m20s wall
-  #   playwright (this job)         ~1m10s wall — ~45s setup (npm ci + chromium
+  #   engine-suite                  1m31s wall
+  #   playwright (this job)         1m5s wall — ~45s setup (npm ci + chromium
   #                                 download) + ~10s Rails boot and Tailwind
-  #                                 compile + ~4s of specs
+  #                                 compile + ~4s OF SPECS
+  #   e2e_executed_set              10s wall
+  #
+  # (measured on this lane's first CI run, 31586075901 — not estimated.)
   #
   # Run as a step inside bin/release-check those numbers ADD, and every engine PR
-  # waits ~2m30s. Run as a parallel job they do not: the PR waits max(1m20s, 1m10s)
-  # ≈ 1m20s, which is what it waits today. The lane costs ~1m10s of BILLABLE runner
-  # time and ~0s of anyone's attention.
+  # waits ~2m45s. Run as parallel jobs they do not: the PR waits max(1m31s, 1m5s)
+  # = 1m31s, inside the 1m11s–1m30s band this repo already ran in. The lane costs
+  # ~1m15s of BILLABLE runner time and ~0s of anyone's attention.
+  #
+  # Note where the minute goes: the SPECS are 4 seconds. The rest is npm ci and the
+  # chromium download. If this ever needs to be cheaper, cache the browser — do not
+  # delete specs.
   #
   # WHY NO PATH FILTER, WHEN THE GATE THIS SERVES IS ITSELF A PATH CLASSIFIER.
   # It is a fair question — `paths: ['app/views/**', 'app/assets/**']` would skip
@@ -99,7 +106,7 @@ jobs:
   # phantom-element defect was introduced by editing a COMMENT. A filter listing
   # app/views would have caught that one, but the general claim — "we can predict
   # from paths whether the browser is affected" — is the claim ClientSurfaceDiff
-  # refuses to make about hunks, for the same reason. At ~1m10s in parallel, the
+  # refuses to make about hunks, for the same reason. At 1m5s in parallel, the
   # saving is not worth buying that risk.
   #
   # If the lane ever grows past the engine suite's wall time it becomes the critical

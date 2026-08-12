@@ -136,18 +136,24 @@ Also not covered:
 
 ## Cost
 
-Measured on `ubuntu-latest`:
+Measured on `ubuntu-latest`, from this lane's own first CI run
+([run 31586075901](https://github.com/McRitchie-Studio/studio-engine/actions/runs/31586075901)):
 
 | Job | Wall time |
 |---|---|
-| `engine-suite` (existing, `bin/release-check`) | ~1m20s |
-| `playwright` (this lane) | ~1m10s — ~45s setup (`npm ci` + chromium), ~10s Rails boot + Tailwind compile, **~4s of specs** |
-| `e2e_executed_set` | ~15s |
+| `engine-suite` (existing, `bin/release-check`) | **1m31s** |
+| `playwright` (this lane) | **1m5s** — ~45s setup (`npm ci` + chromium), ~10s Rails boot + Tailwind compile, **~4s of specs** |
+| `e2e_executed_set` | **10s** |
 
 The lane is a **parallel job, not a step in `bin/release-check`**. As a step those
-numbers add and every engine PR waits ~2m30s. As a parallel job the PR waits
-`max(1m20s, 1m10s)` ≈ what it waits today. The lane costs **~1m10s of billable
-runner time and ~0s of anyone's attention.**
+numbers add and every engine PR would wait ~2m45s. As a parallel job the PR waits
+`max(1m31s, 1m5s)` = **1m31s, which is inside the 1m11s–1m30s band the engine lane
+already ran in.** The lane costs **~1m15s of billable runner time and ~0s of
+anyone's attention.**
+
+Note where the minute actually goes: **the specs are 4 seconds.** Everything else is
+`npm ci` and the chromium download. If this ever needs to be cheaper, cache the
+browser — do not delete specs.
 
 It is also kept out of `bin/release-check` so a local cert stays in its ~1 minute
 budget and does not require a browser install.
@@ -166,7 +172,7 @@ save the minute. Refused, for two reasons:
    browser is affected" — is the claim `ClientSurfaceDiff` refuses to make about
    hunks, for exactly the same reason.
 
-At ~1m10s in parallel, the saving does not buy that risk. If the lane ever grows
+At 1m5s in parallel, the saving does not buy that risk. If the lane ever grows
 past the engine suite's wall time it becomes the critical path, and **that** is the
 moment to shard (`config/e2e_lane.yml` → `shards:`), not to start filtering.
 

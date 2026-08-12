@@ -48,9 +48,11 @@
 //
 // ================= COST =================
 //
-// engine-ci.yml runs ~1m20s today. This lane adds a SECOND, PARALLEL job, so the
-// wall-clock a PR waits is max(existing, lane) rather than the sum. Measurements
-// and the path-filter question are in docs/E2E_LANE.md.
+// MEASURED on this lane's first CI run: the engine suite is 1m31s, this lane is
+// 1m5s, and they run as SEPARATE PARALLEL JOBS — so the wall-clock a PR waits is
+// max(1m31s, 1m5s) = 1m31s, unchanged. Of that 1m5s, the SPECS ARE 4 SECONDS; the
+// rest is npm ci and the chromium download. The path-filter question, and why it
+// was refused, are in docs/E2E_LANE.md.
 
 const { defineConfig } = require("@playwright/test");
 
