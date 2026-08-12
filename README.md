@@ -405,10 +405,17 @@ relabeling `magic_link` does not reorder the page or drop its default artwork.
 
 ```
 Studio::EmailCatalog.resolved_url(:magic_link)
-  1. this app's ImageCache row  (its own S3 bucket)   -> app-owned override
-  2. the engine's default gem asset                   -> inherited default
+  1. this app's ImageCache row  (its own S3 bucket)   -> uploaded here
+  2. the registered default_asset                     -> a committed file
   3. nil                                              -> sends bannerless
 ```
+
+`source(key)` says WHOSE the live banner is — `:app` (uploaded here, revertible),
+`:app_asset` (registered by this app, committed in its repo), `:engine_default`
+(the shared artwork in the gem), or `:none`. The origin is recorded when the
+email is registered, because a resolved asset path looks identical either way by
+the time the page asks. Passing `default_asset:` makes that artwork the host's;
+relabelling an inherited email leaves it the engine's.
 
 Note the method: **`resolved_url` walks all three layers; `url` returns only
 layer 1** (this app's own image, or nil). That split is deliberate — it keeps

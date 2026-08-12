@@ -74,11 +74,19 @@ module Studio
     #   type          — :transactional or :marketing.
     #   preview       — callable returning a Mail, or nil.
     Entry = Struct.new(:key, :label, :description, :default_asset, :type, :preview,
-                       keyword_init: true) do
+                       :default_origin, keyword_init: true) do
       def to_s = key
       def previewable? = preview.respond_to?(:call)
       # nil-safe: an Entry built directly (the STANDARD seed) may carry no type.
       def marketing? = type.to_s == "marketing"
+
+      # WHOSE artwork default_asset names. Recorded at registration rather than
+      # inferred later: by the time the page asks, a resolved asset path looks
+      # identical whether the file came from the gem or from the host, and
+      # guessing from the path is exactly the wrong-answer machine this exists
+      # to remove. The engine seeds its own two as :engine; anything a host
+      # passes default_asset for is that host's own.
+      def engine_artwork? = default_origin.to_s != "app"
     end
 
     # The emails EVERY Studio app sends. Pre-registered, so a host inherits both
@@ -122,7 +130,12 @@ module Studio
         description: description || existing&.description,
         default_asset: default_asset.nil? ? existing&.default_asset : default_asset.presence,
         type: normalize_type(type || existing&.type),
-        preview: preview || existing&.preview
+        preview: preview || existing&.preview,
+        # Passing artwork here makes it THIS APP's artwork — that is the only
+        # moment anyone can know. Omitting it keeps whatever the entry already
+        # had, so a host relabelling an inherited email does not accidentally
+        # claim the engine's picture as its own.
+        default_origin: default_asset.nil? ? (existing&.default_origin || :engine) : :app
       )
       key
     end
@@ -177,22 +190,40 @@ module Studio
     # symbol, not nil) and every reader can trust the shape.
     def registry
       @registry ||= STANDARD.each_with_object({}) do |attrs, out|
-        out[attrs[:key]] = Entry.new(**attrs, type: normalize_type(attrs[:type]), preview: attrs[:preview])
+        out[attrs[:key]] = Entry.new(**attrs, type: normalize_type(attrs[:type]),
+                                     preview: attrs[:preview], default_origin: :engine)
       end
     end
 
     # --- Resolution --------------------------------------------------------
 
-    # Where the live banner for this email comes from:
-    #   :app     — this app uploaded its own (ImageCache row in its bucket)
-    #   :default — the inherited engine default (gem asset)
-    #   :none    — no image at all; the email sends bannerless
+    # Where the live banner for this email actually comes from:
+    #
+    #   :app            — uploaded on this app's /admin/emails (ImageCache row
+    #                     in this app's bucket). Revertible.
+    #   :app_asset      — registered by this app, committed in its own repo.
+    #   :engine_default — the shared artwork that ships in the gem.
+    #   :none           — no image at all; the email sends bannerless.
+    #
+    # `:default` USED to cover the middle two together, and the page said
+    # "Shared Studio artwork, shipped with the engine" for both — so
+    # turf-monster's own eight banners were announced as the engine's. Telling
+    # the operator the wrong provenance is the same failure this page was built
+    # to end (the page it replaced claimed "No image yet" about an email that
+    # was visibly sending one).
+    #
+    # `:app` is deliberately unchanged: turf-monster's suite on `main` asserts
+    # it, and consumer CI runs consumers' default branch.
     def source(key)
       return :app if record(key)
-      return :default if default_asset_path(key)
+      return :none unless default_asset_path(key)
 
-      :none
+      entry(key)&.engine_artwork? ? :engine_default : :app_asset
     end
+
+    # True when the live banner belongs to this app either way — uploaded here
+    # or committed here. What the page's summary line counts.
+    def app_artwork?(key) = %i[app app_asset].include?(source(key))
 
     def app_owned?(key) = source(key) == :app
 
