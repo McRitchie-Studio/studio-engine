@@ -4,16 +4,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
-**The two standard emails now ship Mr. McRitchie's real artwork** — "Your Magic
-Link" and "Confirm Email" — replacing the placeholder gradients. Animated, 1800x600,
-with the McRitchie Studio logo. Every app that has not uploaded its own banner
-inherits them.
+### Added
 
-Shipped **animated at full size on purpose**, with the trade measured rather than
-assumed: a static first frame would have been 24 KB against 3.5 MB, and
-re-encoding smaller made the files LARGER (GIF re-dithers the smooth gradient on
-every frame, so colour reduction and frame-dropping both backfired). Outlook
-desktop renders frame one only — frame one is a complete, legible banner.
+- **The "at" time stamp — `at_time_tag` + `studio/at_time_script`.** A shared
+  primitive for stamping WHEN something happened, on the READER's clock rather
+  than the app's: `at 3:53p`, gaining a date only when the stamp is not today and
+  the year only when it differs, with a country flag trailing the clock when the
+  reader's timezone is outside the US. The relative phrase moves to the hover
+  title. The server renders the app-timezone form as a no-JS fallback and never
+  renders a flag — it cannot know where the reader is sitting, so only the
+  reader's machine may assert one. Hosts render `studio/at_time_script` once,
+  near the end of the layout body; omitting it degrades to app-timezone stamps
+  rather than breaking. Specimen: `/admin/style` → Tricks → Time stamps; recipe
+  in the README's UI Primitives section.
 
 **Banner aspect ratio is now per-entry.** The new artwork is 3:1 while the shared
 default is 2:1, and turf-monster's eight banners are 2:1. A single global constant
@@ -29,7 +32,22 @@ The page draws each row's thumbnail in that shape, and the upload cropper
 enforces it, so a replacement lands in the same frame as the artwork it replaces.
 `Studio::EmailCatalog.ratio(key)` reads it; `ASPECT_RATIO` remains the fallback.
 
-**Fix — the emails page named the wrong owner for an app's own artwork.**
+### Changed
+
+**The two standard emails now ship Mr. McRitchie's real artwork** — "Your Magic
+Link" and "Confirm Email" — replacing the placeholder gradients. Animated, 1800x600,
+with the McRitchie Studio logo. Every app that has not uploaded its own banner
+inherits them.
+
+Shipped **animated at full size on purpose**, with the trade measured rather than
+assumed: a static first frame would have been 24 KB against 3.5 MB, and
+re-encoding smaller made the files LARGER (GIF re-dithers the smooth gradient on
+every frame, so colour reduction and frame-dropping both backfired). Outlook
+desktop renders frame one only — frame one is a complete, legible banner.
+
+### Fixed
+
+**The emails page named the wrong owner for an app's own artwork.**
 `/admin/emails` described ANY registered banner as *"Shared Studio artwork,
 shipped with the engine"*. turf-monster registers its own eight committed
 banners, so its page announced its own artwork as the engine's — the same
@@ -59,20 +77,6 @@ Also new: `Studio::EmailCatalog.app_artwork?(key)` — true when the live banner
 belongs to this app either way. The page's summary line counts it, so an app
 whose banners all ship from its own repo no longer reports "all inheriting the
 default artwork".
-
-### Added
-
-- **The "at" time stamp — `at_time_tag` + `studio/at_time_script`.** A shared
-  primitive for stamping WHEN something happened, on the READER's clock rather
-  than the app's: `at 3:53p`, gaining a date only when the stamp is not today and
-  the year only when it differs, with a country flag trailing the clock when the
-  reader's timezone is outside the US. The relative phrase moves to the hover
-  title. The server renders the app-timezone form as a no-JS fallback and never
-  renders a flag — it cannot know where the reader is sitting, so only the
-  reader's machine may assert one. Hosts render `studio/at_time_script` once,
-  near the end of the layout body; omitting it degrades to app-timezone stamps
-  rather than breaking. Specimen: `/admin/style` → Tricks → Time stamps; recipe
-  in the README's UI Primitives section.
 
 ## 0.39.0 — 2026-08-11
 
