@@ -1,4 +1,4 @@
-<%# locals: (entry:, uploads_available:, aspect:, max_width:)
+<%# locals: (entry:, uploads_available:, max_width:)
     One registered email: its live banner, its name, and where that banner comes
     from. The whole row is the imageUploadHost x-data so the thumbnail, the Edit
     button, and the hidden multipart form the cropper submits all sit together —
@@ -39,7 +39,7 @@
     <% if uploads_available %>
       x-data="imageUploadHost({
         store: 'emailModals',
-        aspectRatio: <%= aspect %>,
+        aspectRatio: <%= entry.ratio %>,
         maxWidth: <%= max_width %>,
         transparent: false,
         filename: '<%= entry.key %>.png',
@@ -53,7 +53,7 @@
 
   <td class="px-4 py-4">
     <div class="rounded-lg overflow-hidden border border-subtle w-40"
-         style="aspect-ratio: <%= aspect %>; background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-900));">
+         style="aspect-ratio: <%= entry.ratio %>; background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-900));">
       <% if banner_url %>
         <%= image_tag banner_url, class: "w-full h-full object-cover",
               alt: "#{entry.label} email banner", loading: "lazy" %>

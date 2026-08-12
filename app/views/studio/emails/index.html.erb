@@ -20,7 +20,6 @@
      partial in this non-isolated engine. %>
 <% content_for(:title) { "Emails" } %>
 <%
-  aspect     = Studio::EmailCatalog::ASPECT_RATIO
   max_width  = Studio::EmailCatalog::MAX_WIDTH
   # Counts the app's OWN artwork either way — uploaded here or committed in this
   # app's assets. Counting only uploads made turf-monster, whose eight banners
@@ -92,7 +91,7 @@
           <% @entries.each do |entry| %>
             <%= render "studio/emails/row", entry: entry,
                   uploads_available: @uploads_available,
-                  aspect: aspect, max_width: max_width %>
+                  max_width: max_width %>
           <% end %>
         </tbody>
       </table>
@@ -101,8 +100,9 @@
 
   <p class="text-xs text-muted mt-4">
     Banners render full-bleed at 600px wide inside the email card. The crop is
-    fixed at <%= aspect.to_i %>:1 and saved at up to <%= max_width %>px, which is
-    retina-sharp in an inbox without tripping a clipping limit.
+    saved at up to <%= max_width %>px, which is retina-sharp in an inbox. Each
+    email crops to the shape of its own banner, so a replacement lands in the
+    same frame as the artwork it is replacing.
     <% if @entries.any? { |entry| Studio::EmailCatalog.source(entry.key) == :none } %>
       An email with no image sends bannerless — the card still renders.
     <% end %>

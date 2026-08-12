@@ -193,12 +193,61 @@ class EmailsPageTest < ActiveSupport::TestCase
     refute_empty shipped, "the engine must ship at least one default email banner"
   end
 
+  # The artwork itself, asserted as a FILE. A default_asset naming a file that
+  # moved, got flattened, or lost its frames renders wrong in real email while
+  # every other assertion on this page still passes.
+  test "the standard banners are the real artwork, animated and full size" do
+    Studio::EmailCatalog::STANDARD.each do |attrs|
+      path = File.expand_path("../../app/assets/images/#{attrs[:default_asset]}", __dir__)
+      assert File.file?(path), "missing #{attrs[:default_asset]}"
+
+      header = File.binread(path, 6)
+      assert_equal "GIF89a", header,
+        "#{attrs[:default_asset]} must stay an animated GIF — Mr. McRitchie chose animation over a 24KB static frame"
+
+      # GIF logical-screen size, little-endian, bytes 6..9.
+      width, height = File.binread(path, 4, 6).unpack("v2")
+      assert_equal 1800, width,  "#{attrs[:default_asset]} lost its width"
+      assert_equal 600,  height, "#{attrs[:default_asset]} lost its height"
+    end
+  end
+
+  # REGRESSION GUARD. The artwork is 3:1 but the shared default is 2:1, and
+  # turf-monster's eight banners ARE 2:1. A single global constant would either
+  # letterbox this artwork or crop turf-monster's on every upload, so the ratio
+  # is per-entry.
+  test "each email carries its own banner shape" do
+    assert_equal 3.0, Studio::EmailCatalog.ratio("magic_link")
+    assert_equal 3.0, Studio::EmailCatalog.ratio("email_change_confirmation")
+
+    Studio::EmailCatalog.register("winnings", default_asset: "emails/winnings.jpg")
+    assert_equal Studio::EmailCatalog::ASPECT_RATIO, Studio::EmailCatalog.ratio("winnings"),
+      "an app that states no ratio keeps the shared default — turf-monster depends on this"
+
+    Studio::EmailCatalog.register("wide", default_asset: "emails/wide.jpg", aspect_ratio: 4.0)
+    assert_equal 4.0, Studio::EmailCatalog.ratio("wide")
+  end
+
+  test "the crop modal enforces each email's own ratio, not one page-wide value" do
+    Studio::EmailCatalog.register("winnings", label: "Contest winnings",
+                                  default_asset: "emails/winnings.jpg")
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |key| "/assets/emails/#{key}.gif" }
+
+    html = render_index
+
+    assert_includes html, "aspectRatio: 3.0",
+      "the standard emails must crop to the shape of their own 3:1 artwork"
+    assert_includes html, "aspectRatio: #{Studio::EmailCatalog::ASPECT_RATIO}",
+      "an email on the shared default ratio must still crop at that ratio"
+  end
+
   test "the asset initializer enumerates the default banners for a sprockets host" do
     paths = Studio::Engine.default_email_banner_logical_paths
 
-    assert_includes paths, "emails/magic-link.png"
-    assert_includes paths, "emails/email-change-confirmation.png"
-    assert_includes Rails.application.config.assets.precompile, "emails/magic-link.png",
+    assert_includes paths, "emails/magic-link.gif"
+    assert_includes paths, "emails/email-change-confirmation.gif"
+    assert_includes Rails.application.config.assets.precompile, "emails/magic-link.gif",
       "a sprockets host (mcritchie-studio, turf-monster) needs the explicit precompile entry"
   end
 
@@ -349,7 +398,7 @@ class EmailsPageTest < ActiveSupport::TestCase
 
   test "a row says its image is the SHARED default when the app uploaded nothing" do
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
-    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
     html = render_index
     # magic_link + email_change_confirmation are the engine's OWN standard two,
@@ -395,7 +444,7 @@ class EmailsPageTest < ActiveSupport::TestCase
 
   test "the engine's own standard artwork is still called the Studio default" do
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
-    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
     html = render_index
 
@@ -428,7 +477,7 @@ class EmailsPageTest < ActiveSupport::TestCase
 
   test "upload runs through the shared crop modal, never a bare file input" do
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
-    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
     html = render_index
     assert_includes html, "imageUploadHost(", "each row hosts the shared cropper uploader"
@@ -455,7 +504,7 @@ class EmailsPageTest < ActiveSupport::TestCase
   # NOWHERE on a page that renders more than one row.
   test "no row applies a crop unconditionally — every listener is ownership-guarded" do
     stub_module(Studio::EmailImage, :record) { |_key| nil }
-    stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
     html = render_index
 
@@ -488,7 +537,7 @@ class EmailsPageTest < ActiveSupport::TestCase
 
   test "the crop and saving modals mount on a PAGE-SCOPED store" do
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
-    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
     html = render_index
     # mcritchie-industries and moms-app render no shared modal host at all, so
@@ -501,7 +550,7 @@ class EmailsPageTest < ActiveSupport::TestCase
 
   test "an app with no object storage renders read-only and explains why" do
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
-    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
     html = render_index(uploads_available: false)
 

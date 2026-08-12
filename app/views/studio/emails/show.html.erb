@@ -9,7 +9,7 @@
 <%
   source     = Studio::EmailCatalog.source(@entry.key)
   banner_url = Studio::EmailCatalog.preview_url(@entry.key)
-  aspect     = Studio::EmailCatalog::ASPECT_RATIO
+  aspect     = @entry.ratio
 
   badge_class, badge_label =
     case source

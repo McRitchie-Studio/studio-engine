@@ -74,7 +74,7 @@ module Studio
     #   type          — :transactional or :marketing.
     #   preview       — callable returning a Mail, or nil.
     Entry = Struct.new(:key, :label, :description, :default_asset, :type, :preview,
-                       :default_origin, keyword_init: true) do
+                       :default_origin, :aspect_ratio, keyword_init: true) do
       def to_s = key
       def previewable? = preview.respond_to?(:call)
       # nil-safe: an Entry built directly (the STANDARD seed) may carry no type.
@@ -87,6 +87,12 @@ module Studio
       # to remove. The engine seeds its own two as :engine; anything a host
       # passes default_asset for is that host's own.
       def engine_artwork? = default_origin.to_s != "app"
+
+      # The shape of THIS email's banner — the box the page draws and the ratio
+      # the upload cropper enforces. Per-entry because the engine's own artwork
+      # is 3:1 while turf-monster's eight banners are 2:1; one global constant
+      # would letterbox one app's art and crop the other's on every upload.
+      def ratio = (aspect_ratio || ASPECT_RATIO).to_f
     end
 
     # The emails EVERY Studio app sends. Pre-registered, so a host inherits both
@@ -96,13 +102,15 @@ module Studio
         key: "magic_link",
         label: "Magic-link sign-in",
         description: "Passwordless sign-in link. Sent whenever someone asks to sign in by email.",
-        default_asset: "emails/magic-link.png"
+        default_asset: "emails/magic-link.gif",
+        aspect_ratio: 3.0
       },
       {
         key: "email_change_confirmation",
         label: "Email change confirmation",
         description: "Confirms a new address before the change takes effect.",
-        default_asset: "emails/email-change-confirmation.png"
+        default_asset: "emails/email-change-confirmation.gif",
+        aspect_ratio: 3.0
       }
     ].freeze
 
@@ -121,7 +129,8 @@ module Studio
     # Every keyword is OPTIONAL and omitting one on a re-register KEEPS the
     # existing value — that is what lets a host relabel an inherited email, or
     # attach a preview builder to it, without restating its artwork.
-    def register(key, label: nil, description: nil, default_asset: nil, type: nil, preview: nil)
+    def register(key, label: nil, description: nil, default_asset: nil, type: nil, preview: nil,
+                 aspect_ratio: nil)
       key = key.to_s
       existing = registry[key]
       registry[key] = Entry.new(
@@ -135,7 +144,8 @@ module Studio
         # moment anyone can know. Omitting it keeps whatever the entry already
         # had, so a host relabelling an inherited email does not accidentally
         # claim the engine's picture as its own.
-        default_origin: default_asset.nil? ? (existing&.default_origin || :engine) : :app
+        default_origin: default_asset.nil? ? (existing&.default_origin || :engine) : :app,
+        aspect_ratio: aspect_ratio || existing&.aspect_ratio
       )
       key
     end
@@ -191,7 +201,8 @@ module Studio
     def registry
       @registry ||= STANDARD.each_with_object({}) do |attrs, out|
         out[attrs[:key]] = Entry.new(**attrs, type: normalize_type(attrs[:type]),
-                                     preview: attrs[:preview], default_origin: :engine)
+                                     preview: attrs[:preview], default_origin: :engine,
+                                     aspect_ratio: attrs[:aspect_ratio])
       end
     end
 
@@ -224,6 +235,9 @@ module Studio
     # True when the live banner belongs to this app either way — uploaded here
     # or committed here. What the page's summary line counts.
     def app_artwork?(key) = %i[app app_asset].include?(source(key))
+
+    # This email's banner shape, falling back to the shared default.
+    def ratio(key) = entry(key)&.ratio || ASPECT_RATIO
 
     def app_owned?(key) = source(key) == :app
 
