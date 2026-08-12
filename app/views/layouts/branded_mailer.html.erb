@@ -1,17 +1,33 @@
 <%#
-  Shared branded transactional email shell. A full-bleed banner (set @banner_url,
-  e.g. from Studio::EmailCatalog.resolved_url(:magic_link)) sits flush at the top and sets
-  the 600px width; each email view supplies the body via yield. Bannerless is
-  fine — the card still renders. Lifted from turf-monster so every Studio app
-  shares one branded look. An app can override by defining its own
+  Shared branded transactional email shell. A full-bleed banner sits flush at the
+  top and sets the 600px width; each email view supplies the body via yield.
+  Bannerless is fine — the card still renders. Lifted from turf-monster so every
+  Studio app shares one branded look. An app can override by defining its own
   layouts/branded_mailer.html.erb.
+
+  TWO banner shapes, in priority order:
+
+    @banner — a Studio::Banner (see Studio::EmailBannerRenderer). LAYERED: a
+      background image with the header, sub-text and logo as live HTML on top.
+      This is the shape that supports an ANIMATED background together with
+      per-recipient text, because the text is never drawn into the picture.
+
+    @banner_url — a plain image URL, rendered as an <img>. The original shape,
+      UNCHANGED: every mailer already shipping sets this and renders exactly as
+      before. A layered banner is opt-in, never a migration.
 %>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0;padding:24px 0;background:#f4f5f7;">
   <tr>
     <td align="center" style="padding:0 12px;">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 1px 4px rgba(15,23,42,0.08);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
 
-        <% if @banner_url.present? %>
+        <% if @banner.respond_to?(:renderable?) && @banner.renderable? %>
+          <tr>
+            <td style="padding:0;line-height:0;">
+              <%= render "studio/mailers/layered_banner", banner: @banner %>
+            </td>
+          </tr>
+        <% elsif @banner_url.present? %>
           <tr>
             <td style="padding:0;line-height:0;">
               <img src="<%= @banner_url %>" width="600" alt="<%= @banner_alt || Studio.app_name %>"

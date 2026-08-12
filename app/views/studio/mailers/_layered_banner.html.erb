@@ -1,0 +1,70 @@
+<%#
+  The layered email banner: background image, live text on top.
+
+  locals: (banner:)  — a Studio::Banner
+
+  The markup is deliberately old-fashioned. Outlook on Windows renders through
+  Word and ignores `background-image` on nearly everything, so the picture is
+  carried three ways at once:
+
+    * the `background` ATTRIBUTE on the td, which the widest set of clients honour
+    * the CSS `background-image`, for the ones that prefer it
+    * a VML `v:rect` / `v:fill` inside a `gte mso 9` conditional, which is the
+      only thing that reaches Outlook. Every other client never sees it.
+
+  `bgcolor` is the floor: if the image is blocked or still loading, the cell is a
+  brand colour with legible text on it rather than white-on-white.
+
+  The scrim is a coloured overlay cell between artwork and type. Background art
+  is chosen to look good, not to guarantee contrast, and white text on a pale
+  sky cannot be read. Set scrim: 0 on artwork dark enough to carry the type.
+%>
+<% banner = local_assigns.fetch(:banner) %>
+<table role="presentation" width="<%= banner.width %>" cellpadding="0" cellspacing="0" border="0"
+       style="width:<%= banner.width %>px;border-collapse:collapse;">
+  <tr>
+    <td <%= %(background="#{banner.background_url}").html_safe if banner.background_url.present? %>
+        bgcolor="<%= Studio.theme_primary %>"
+        width="<%= banner.width %>" height="<%= banner.height %>" valign="middle"
+        style="width:<%= banner.width %>px;height:<%= banner.height %>px;<%= "background-image:url(#{banner.background_url});background-size:cover;background-position:center;background-repeat:no-repeat;" if banner.background_url.present? %>">
+      <% if banner.background_url.present? %>
+        <!--[if gte mso 9]>
+        <v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false"
+                style="width:<%= banner.width %>px;height:<%= banner.height %>px;">
+          <v:fill type="frame" src="<%= banner.background_url %>" color="<%= Studio.theme_primary %>" />
+          <v:textbox inset="0,0,0,0">
+        <![endif]-->
+      <% end %>
+      <div>
+        <table role="presentation" width="<%= banner.width %>" cellpadding="0" cellspacing="0" border="0"
+               style="width:<%= banner.width %>px;">
+          <tr>
+            <td align="center" valign="middle" height="<%= banner.height %>"
+                style="height:<%= banner.height %>px;padding:26px 30px;<%= "background-color:rgba(24,16,64,#{banner.scrim_opacity});" if banner.scrim_opacity.positive? %>">
+              <% if banner.header.present? %>
+                <p style="margin:0 0 6px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:42px;line-height:48px;font-weight:700;color:#ffffff;">
+                  <%= banner.header %>
+                </p>
+              <% end %>
+              <% if banner.subtext.present? %>
+                <p style="margin:0 0 18px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:20px;line-height:28px;color:#efeaff;">
+                  <%= banner.subtext %>
+                </p>
+              <% end %>
+              <% if banner.logo_url.present? %>
+                <%= image_tag banner.logo_url, width: 150, alt: banner.logo_alt.to_s,
+                      style: "display:block;margin:0 auto;width:150px;height:auto;border:0;" %>
+              <% end %>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <% if banner.background_url.present? %>
+        <!--[if gte mso 9]>
+          </v:textbox>
+        </v:rect>
+        <![endif]-->
+      <% end %>
+    </td>
+  </tr>
+</table>

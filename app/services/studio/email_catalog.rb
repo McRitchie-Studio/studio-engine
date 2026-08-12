@@ -74,7 +74,8 @@ module Studio
     #   type          — :transactional or :marketing.
     #   preview       — callable returning a Mail, or nil.
     Entry = Struct.new(:key, :label, :description, :default_asset, :type, :preview,
-                       :default_origin, :aspect_ratio, keyword_init: true) do
+                       :default_origin, :aspect_ratio, :background, :logo, :scrim,
+                       keyword_init: true) do
       def to_s = key
       def previewable? = preview.respond_to?(:call)
       # nil-safe: an Entry built directly (the STANDARD seed) may carry no type.
@@ -103,7 +104,12 @@ module Studio
         label: "Magic-link sign-in",
         description: "Passwordless sign-in link. Sent whenever someone asks to sign in by email.",
         default_asset: "emails/magic-link.gif",
-        aspect_ratio: 3.0
+        aspect_ratio: 3.0,
+        # Layered artwork: the background animates, the greeting is live HTML on
+        # top. default_asset above stays the flat <img> for a mailer that has not
+        # adopted the layered banner.
+        background: "emails/magic-link-background.gif",
+        logo: "emails/logo-horizontal.png"
       },
       {
         key: "email_change_confirmation",
@@ -130,7 +136,7 @@ module Studio
     # existing value — that is what lets a host relabel an inherited email, or
     # attach a preview builder to it, without restating its artwork.
     def register(key, label: nil, description: nil, default_asset: nil, type: nil, preview: nil,
-                 aspect_ratio: nil)
+                 aspect_ratio: nil, background: nil, logo: nil, scrim: nil)
       key = key.to_s
       existing = registry[key]
       registry[key] = Entry.new(
@@ -145,7 +151,10 @@ module Studio
         # had, so a host relabelling an inherited email does not accidentally
         # claim the engine's picture as its own.
         default_origin: default_asset.nil? ? (existing&.default_origin || :engine) : :app,
-        aspect_ratio: aspect_ratio || existing&.aspect_ratio
+        aspect_ratio: aspect_ratio || existing&.aspect_ratio,
+        background: background.nil? ? existing&.background : background.presence,
+        logo: logo.nil? ? existing&.logo : logo.presence,
+        scrim: scrim.nil? ? existing&.scrim : scrim
       )
       key
     end
@@ -202,7 +211,9 @@ module Studio
       @registry ||= STANDARD.each_with_object({}) do |attrs, out|
         out[attrs[:key]] = Entry.new(**attrs, type: normalize_type(attrs[:type]),
                                      preview: attrs[:preview], default_origin: :engine,
-                                     aspect_ratio: attrs[:aspect_ratio])
+                                     aspect_ratio: attrs[:aspect_ratio],
+                                     background: attrs[:background], logo: attrs[:logo],
+                                     scrim: attrs[:scrim])
       end
     end
 
@@ -238,6 +249,27 @@ module Studio
 
     # This email's banner shape, falling back to the shared default.
     def ratio(key) = entry(key)&.ratio || ASPECT_RATIO
+
+    # --- layered banner artwork ---------------------------------------------
+    #
+    # Absolute URLs, because a mail client fetches these from an inbox and a
+    # root-relative path resolves against nothing there.
+
+    def background_url(key) = absolute_asset_url(entry(key)&.background)
+    def logo_url(key)       = absolute_asset_url(entry(key)&.logo)
+
+    def absolute_asset_url(asset)
+      return nil if asset.blank?
+
+      path = ActionController::Base.helpers.asset_path(asset)
+      return nil if path.blank?
+      return path if path.start_with?("http")
+
+      host = mailer_asset_host
+      host ? "#{host}#{path}" : path
+    rescue StandardError
+      nil
+    end
 
     def app_owned?(key) = source(key) == :app
 

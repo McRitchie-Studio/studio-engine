@@ -1,0 +1,170 @@
+# frozen_string_literal: true
+
+require "bundler/setup"
+
+ENV["RAILS_ENV"] ||= "test"
+require_relative "../dummy/config/environment"
+
+require "minitest/autorun"
+require "active_support/test_case"
+require "action_view"
+require "nokogiri"
+
+# [integration] The LAYERED email banner — background image with the header,
+# sub-text and logo as live HTML on top.
+#
+# Two properties carry this feature, and neither is "it renders":
+#
+#   1. It reaches OUTLOOK. Outlook on Windows renders through Word, which
+#      ignores background-image on nearly everything. Without the VML block the
+#      banner is a blank cell there — and Outlook is exactly the client that
+#      cannot be checked by looking at Gmail.
+#   2. It does not disturb what already ships. Every mailer in every app sets
+#      @banner_url and renders an <img>. Layered is opt-in; a mailer that knows
+#      nothing about it must render byte-for-byte as before.
+class LayeredBannerTest < ActiveSupport::TestCase
+  def view
+    v = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    v.singleton_class.include(Rails.application.routes.url_helpers)
+    v
+  end
+
+  def banner(**overrides)
+    Studio::Banner.new(**{
+      background_url: "https://cdn.example.com/bg.gif",
+      header: "Welcome Mason!",
+      subtext: "your sign-in link is below",
+      logo_url: "https://cdn.example.com/logo.png",
+      logo_alt: "Studio"
+    }.merge(overrides))
+  end
+
+  def render_banner(**overrides)
+    view.render(partial: "studio/mailers/layered_banner", locals: { banner: banner(**overrides) })
+  end
+
+  # --- 1. it has to reach Outlook -------------------------------------------
+
+  test "the background is carried three ways, one of them VML for Outlook" do
+    html = render_banner
+
+    assert_includes html, %(background="https://cdn.example.com/bg.gif"),
+      "the td background ATTRIBUTE is what the widest set of clients honour"
+    # Unquoted url() on purpose: ERB entity-escapes an apostrophe inside an
+    # attribute, and while a parser decodes it, email sanitisers are crude.
+    assert_includes html, "background-image:url(https://cdn.example.com/bg.gif)",
+      "CSS for the clients that prefer it"
+    refute_includes html, "&#39;", "no entity-escaped quotes in the style attribute"
+
+    assert_includes html, "<!--[if gte mso 9]>",
+      "without a conditional the VML would reach clients that cannot parse it"
+    assert_includes html, "v:rect", "Outlook renders through Word and ignores background-image"
+    assert_includes html, "v:fill", "the fill is what actually paints the picture in Outlook"
+    assert_includes html, "</v:rect>", "an unclosed VML rect swallows the rest of the email"
+  end
+
+  test "a blocked or slow image still leaves legible text" do
+    html = render_banner
+
+    assert_match(/bgcolor="#[0-9A-Fa-f]{6}"/, html,
+      "the cell needs a brand floor, or white text lands on white while the image loads")
+  end
+
+  # --- 2. it must not disturb what already ships -----------------------------
+
+  test "a mailer that only sets @banner_url still renders the plain img" do
+    layout = File.read(File.expand_path("../../app/views/layouts/branded_mailer.html.erb", __dir__))
+
+    assert_includes layout, "elsif @banner_url.present?",
+      "the img path must remain, and remain the fallback"
+    assert_includes layout, %(<img src="<%= @banner_url %>"),
+      "every shipped mailer sets @banner_url — that path cannot change shape"
+    assert_includes layout, "@banner.respond_to?(:renderable?)",
+      "layered is opt-in: an app that sets no @banner must be unaffected"
+  end
+
+  test "an empty banner never displaces the img path" do
+    refute Studio::Banner.new.renderable?,
+      "a banner with no artwork and no header would render an empty cell over the real one"
+    refute Studio::Banner.new(header: "").renderable?
+    assert Studio::Banner.new(header: "Welcome Mason!").renderable?
+    assert Studio::Banner.new(background_url: "https://x/y.gif").renderable?
+  end
+
+  # --- the scrim -------------------------------------------------------------
+
+  test "the scrim is applied by default because artwork does not guarantee contrast" do
+    html = render_banner
+
+    assert_match(/background-color:rgba\(24,16,64,0\.\d+\)/, html,
+      "white text over a pale sky is unreadable without a wash")
+  end
+
+  test "the scrim can be turned off for artwork dark enough to carry type" do
+    html = render_banner(scrim: 0)
+
+    refute_includes html, "background-color:rgba(24,16,64,",
+      "scrim: 0 must mean no overlay cell at all, not a zero-alpha one"
+  end
+
+  test "a nonsense scrim is clamped rather than emitted" do
+    assert_equal 1.0, Studio::Banner.new(scrim: 4).scrim_opacity
+    assert_equal 0.0, Studio::Banner.new(scrim: -2).scrim_opacity
+    assert_equal Studio::Banner::DEFAULT_SCRIM, Studio::Banner.new.scrim_opacity
+  end
+
+  # --- the pieces the banner is built from -----------------------------------
+
+  test "header, sub-text and logo all render on top of the picture" do
+    doc = Nokogiri::HTML(render_banner)
+
+    assert_includes doc.text, "Welcome Mason!"
+    assert_includes doc.text, "your sign-in link is below"
+    refute_empty doc.css('img[src="https://cdn.example.com/logo.png"]'),
+      "the logo is a real img in flow — it is never composited into the artwork"
+  end
+
+  test "each piece is optional" do
+    assert_includes render_banner(subtext: nil, logo_url: nil), "Welcome Mason!"
+    refute_includes render_banner(logo_url: nil), "<img"
+  end
+
+  # --- artwork resolution ----------------------------------------------------
+
+  test "the standard magic link inherits the engine's layered artwork" do
+    entry = Studio::EmailCatalog.entry("magic_link")
+
+    assert_equal "emails/magic-link-background.gif", entry.background
+    assert_equal "emails/logo-horizontal.png", entry.logo
+
+    %w[emails/magic-link-background.gif emails/logo-horizontal.png].each do |asset|
+      path = File.expand_path("../../app/assets/images/#{asset}", __dir__)
+      assert File.file?(path), "#{asset} must ship in the gem"
+    end
+  end
+
+  # A mail client fetches from an inbox, where a root-relative path resolves
+  # against nothing.
+  test "artwork resolves to an absolute url for the inbox" do
+    previous = ActionMailer::Base.default_url_options
+    ActionMailer::Base.default_url_options = { host: "mcritchie.studio" }
+
+    url = Studio::EmailCatalog.background_url("magic_link")
+    assert url.to_s.start_with?("https://mcritchie.studio/"),
+      "a relative banner path loads nothing in an inbox (got #{url.inspect})"
+  ensure
+    ActionMailer::Base.default_url_options = previous
+  end
+
+  test "a host can override any piece per send" do
+    Studio::EmailCatalog.register("magic_link", background: "emails/custom.gif", scrim: 0.1)
+
+    entry = Studio::EmailCatalog.entry("magic_link")
+    assert_equal "emails/custom.gif", entry.background
+    assert_in_delta 0.1, entry.scrim, 0.001
+    assert_equal "emails/logo-horizontal.png", entry.logo,
+      "overriding the background must not drop the inherited logo"
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+end

@@ -387,6 +387,53 @@ than raising.
 > `Studio::EmailImage` is the old name for this module and still works as a
 > delegating shim. It is deprecated; prefer `Studio::EmailCatalog`.
 
+### Layered banners — a background image with live text on it
+
+An email's banner can be a picture with the header, sub-text and logo rendered
+as HTML **on top**, rather than drawn into the image:
+
+```ruby
+def magic_link(email, token)
+  @banner = Studio::Banner.for(:magic_link,
+                               header: "Welcome #{user.first_name}!",
+                               subtext: "your sign-in link is below")
+  # ...
+end
+```
+
+`layouts/branded_mailer` renders it. A mailer that sets `@banner_url` instead
+still renders a plain `<img>` exactly as before — layered is opt-in, never a
+migration.
+
+Register the artwork once and every app inherits it:
+
+```ruby
+Studio::EmailCatalog.register("magic_link",
+  background: "emails/magic-link-background.gif",
+  logo: "emails/logo-horizontal.png",
+  scrim: 0.34)
+```
+
+**Why layered rather than composited.** Drawing the text into the image gives
+pixel-exact brand typography everywhere, but it cannot have an ANIMATED
+background AND per-recipient text — composing a greeting into sixty frames means
+a multi-megabyte GIF per recipient, per send. Layering separates them.
+
+**What it costs.** Gmail and Outlook strip webfonts, so the heading falls back to
+a system face rather than the brand font. In exchange the text survives blocked
+images (Outlook desktop blocks by default), stays selectable, and nothing is
+generated at send time.
+
+**The scrim** is a wash between artwork and type, on by default at 0.34.
+Background art is chosen to look good, not to guarantee contrast, and white text
+over a pale sky cannot be read. Pass `scrim: 0` for artwork dark enough to carry
+the type itself.
+
+**The markup is deliberately old-fashioned.** Outlook on Windows renders through
+Word and ignores `background-image`, so the picture is carried by the `<td
+background>` attribute, by CSS, and by a VML block inside an `mso` conditional.
+Remove any one of the three and a client loses the banner.
+
 ### Live preview
 
 `preview:` is any callable returning a `Mail`. It powers `/admin/emails/:key`,
