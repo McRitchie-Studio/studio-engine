@@ -13,8 +13,9 @@
 
   badge_class, badge_label =
     case source
-    when :app     then ["badge bg-success/10 text-success border-success/30", "#{Studio.app_name}'s own"]
-    when :default then ["badge bg-inset text-muted border-subtle", "Inherited default"]
+    when :app       then ["badge bg-success/10 text-success border-success/30", "Uploaded here"]
+    when :app_asset then ["badge bg-success/10 text-success border-success/30", "#{Studio.app_name}'s artwork"]
+    when :engine_default then ["badge bg-inset text-muted border-subtle", "Studio default"]
     else               ["badge bg-warning/10 text-warning border-warning/30", "No image"]
     end
 %>

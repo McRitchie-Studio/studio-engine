@@ -2,6 +2,39 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
+## 0.40.0 — 2026-08-11
+
+**Fix — the emails page named the wrong owner for an app's own artwork.**
+`/admin/emails` described ANY registered banner as *"Shared Studio artwork,
+shipped with the engine"*. turf-monster registers its own eight committed
+banners, so its page announced its own artwork as the engine's — the same
+wrong-provenance failure this page exists to end (the page it replaced claimed
+"No image yet" about an email that was visibly sending one).
+
+`Studio::EmailCatalog.source` now answers with four states instead of three:
+
+| State | Means |
+|---|---|
+| `:app` | uploaded on this app's /admin/emails — revertible |
+| `:app_asset` | registered by this app, committed in its own repo |
+| `:engine_default` | the shared artwork that ships in the gem |
+| `:none` | no banner; the email sends without one |
+
+`:default` is gone; it was the value covering the middle two together.
+**`:app` is deliberately unchanged** — turf-monster's suite asserts it on `main`
+and consumer CI runs consumers' default branch.
+
+Origin is recorded at **registration**, not inferred later: by the time the page
+asks, a resolved asset path looks identical whether the file came from the gem
+or from the host. The engine seeds its own two as engine-owned; passing
+`default_asset:` makes that artwork the host's. Relabelling an inherited email
+does NOT claim its picture, and overriding its asset DOES.
+
+Also new: `Studio::EmailCatalog.app_artwork?(key)` — true when the live banner
+belongs to this app either way. The page's summary line counts it, so an app
+whose banners all ship from its own repo no longer reports "all inheriting the
+default artwork".
+
 ## 0.39.0 — 2026-08-11
 
 ### Removed

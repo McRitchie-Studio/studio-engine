@@ -347,12 +347,15 @@ class EmailsPageTest < ActiveSupport::TestCase
     end
   end
 
-  test "a row says its image is the INHERITED default when the app uploaded nothing" do
+  test "a row says its image is the SHARED default when the app uploaded nothing" do
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
     stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
 
     html = render_index
-    assert_includes html, "Inherited default"
+    # magic_link + email_change_confirmation are the engine's OWN standard two,
+    # so on an app that registered no artwork of its own this really is the
+    # Studio default.
+    assert_includes html, "Studio default"
     refute_includes html, "No image yet",
       "the pre-registry copy claimed an email had no image while it was sending one"
   end
@@ -364,10 +367,54 @@ class EmailsPageTest < ActiveSupport::TestCase
     stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/default.png" }
 
     html = render_index
-    assert_includes html, "#{Studio.app_name}&#39;s own"
-    assert_includes html, "Inherited default",
-      "the OTHER email is still inheriting — both states must be distinguishable on one page"
-    assert_includes html, "Revert", "an app-owned image can be dropped back to the default"
+    assert_includes html, "Uploaded here"
+    assert_includes html, "Studio default",
+      "the OTHER email is still on the shared artwork — both states must be distinguishable on one page"
+    assert_includes html, "Revert", "an uploaded image can be dropped back to the default"
+  end
+
+  # REGRESSION GUARD, at the level the operator actually reads.
+  #
+  # The row's copy is the whole product of this column. It used to print
+  # "Shared Studio artwork, shipped with the engine" for ANY registered asset,
+  # so turf-monster's own eight committed banners were announced as the
+  # engine's. Asserting source() alone would not have caught it — the wrong
+  # answer was in the view.
+  test "a host's own registered artwork is never called the engine's" do
+    Studio::EmailCatalog.register("winnings", label: "Contest winnings",
+                                  default_asset: "emails/winnings-banner.jpg")
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |key| "/assets/emails/#{key}.jpg" }
+
+    html = render_index
+
+    assert_includes html, ERB::Util.html_escape("#{Studio.app_name}'s artwork")
+    refute_match(/Contest winnings.*ships with the engine/m, html,
+      "an app's committed artwork must not be described as the engine's")
+  end
+
+  test "the engine's own standard artwork is still called the Studio default" do
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+
+    html = render_index
+
+    assert_includes html, "Studio default"
+    assert_includes html, "ships with the engine"
+  end
+
+  test "the summary line counts the app's own artwork, however it got there" do
+    Studio::EmailCatalog.entries.each do |entry|
+      Studio::EmailCatalog.register(entry.key, default_asset: "emails/#{entry.key}.jpg")
+    end
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |key| "/assets/emails/#{key}.jpg" }
+
+    html = render_index
+
+    assert_includes html, ERB::Util.html_escape("all on #{Studio.app_name}'s own artwork")
+    refute_includes html, "all inheriting the default artwork",
+      "an app whose banners all ship from its own repo is not inheriting anything"
   end
 
   test "an email with no image at all is labelled distinctly from an inherited one" do
@@ -459,7 +506,7 @@ class EmailsPageTest < ActiveSupport::TestCase
     html = render_index(uploads_available: false)
 
     # It still SHOWS what is shipping — that is the honest part.
-    assert_includes html, "Inherited default"
+    assert_includes html, "Studio default"
     assert_includes html, "s3_bucket_prefix", "say what is missing, in the operator's terms"
     refute_includes html, "imageUploadHost(",
       "an Edit button that cannot possibly work must not be offered"

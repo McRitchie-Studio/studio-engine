@@ -11,14 +11,21 @@
 
   # `badge` is a shape-only utility in engine.css — the state color comes from
   # theme-token utilities so it follows each app's palette in light and dark.
+  #
+  # Four states, because three of them used to read as one. An app that ships
+  # its own committed artwork was told that artwork "ships with the engine",
+  # which is the wrong answer to the only question this column exists to answer.
   badge_class, badge_label, badge_note =
     case source
     when :app
-      ["badge bg-success/10 text-success border-success/30", "#{Studio.app_name}'s own",
-       "Uploaded here — this app owns it."]
-    when :default
-      ["badge bg-inset text-muted border-subtle", "Inherited default",
-       "Shared Studio artwork, shipped with the engine."]
+      ["badge bg-success/10 text-success border-success/30", "Uploaded here",
+       "Stored for #{Studio.app_name} — replaces the artwork in its assets."]
+    when :app_asset
+      ["badge bg-success/10 text-success border-success/30", "#{Studio.app_name}'s artwork",
+       "Committed in this app's own assets. Upload to replace it."]
+    when :engine_default
+      ["badge bg-inset text-muted border-subtle", "Studio default",
+       "Shared artwork that ships with the engine. Upload to make it #{Studio.app_name}'s."]
     else
       ["badge bg-warning/10 text-warning border-warning/30", "No image",
        "This email sends without a banner."]

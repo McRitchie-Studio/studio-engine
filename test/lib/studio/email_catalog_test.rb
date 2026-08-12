@@ -133,7 +133,8 @@ class EmailCatalogTest < Minitest::Test
     stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
     stub_module(Studio::EmailCatalog, :mailer_asset_host) { "https://mcritchie.studio" }
 
-    assert_equal :default, Studio::EmailCatalog.source("magic_link")
+    # magic_link is one of the engine's STANDARD two, so its artwork is the gem's.
+    assert_equal :engine_default, Studio::EmailCatalog.source("magic_link")
     refute Studio::EmailCatalog.app_owned?("magic_link")
     assert_equal "https://mcritchie.studio/assets/emails/magic-link.png",
                  Studio::EmailCatalog.resolved_url("magic_link")
@@ -180,6 +181,67 @@ class EmailCatalogTest < Minitest::Test
 
     assert_equal "https://turf-monster-dev.s3.amazonaws.com/email_banners/magic_link-ab12.png",
                  Studio::EmailCatalog.url("magic_link")
+  end
+
+  # --- WHOSE artwork: the bug this file's source() section missed ------------
+  #
+  # REGRESSION GUARD. source() used to collapse every registered default_asset
+  # into :default, and the page printed "Shared Studio artwork, shipped with the
+  # engine" for all of them. turf-monster registers its OWN eight committed
+  # banners, so its page announced its alligator artwork as the engine's — the
+  # same wrong-provenance failure this page was built to end.
+  #
+  # Origin is recorded at REGISTRATION, not guessed from the path: by the time
+  # the page asks, a resolved asset path looks identical either way.
+
+  def test_a_host_registered_asset_is_reported_as_that_apps_own
+    Studio::EmailCatalog.register("winnings", label: "Contest winnings",
+                                  default_asset: "emails/winnings-banner.jpg")
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/winnings-banner.jpg" }
+
+    assert_equal :app_asset, Studio::EmailCatalog.source("winnings"),
+      "a banner the HOST registered is the host's artwork, not the engine's"
+    assert Studio::EmailCatalog.app_artwork?("winnings")
+  end
+
+  def test_the_engines_own_standard_artwork_is_reported_as_the_engines
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+
+    assert_equal :engine_default, Studio::EmailCatalog.source("magic_link")
+    refute Studio::EmailCatalog.app_artwork?("magic_link")
+  end
+
+  # A host taking over an inherited email's artwork flips the origin with it.
+  def test_overriding_an_inherited_asset_makes_it_the_apps_own
+    Studio::EmailCatalog.register("magic_link", default_asset: "emails/my-own-magic-link.jpg")
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/my-own-magic-link.jpg" }
+
+    assert_equal :app_asset, Studio::EmailCatalog.source("magic_link")
+  end
+
+  # …but merely relabelling one must NOT claim the engine's picture.
+  def test_relabelling_an_inherited_email_does_not_claim_its_artwork
+    Studio::EmailCatalog.register("magic_link", label: "Sign in to Turf Monster")
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.png" }
+
+    assert_equal :engine_default, Studio::EmailCatalog.source("magic_link")
+  end
+
+  # An UPLOAD outranks either, and keeps the value turf-monster's suite asserts
+  # on its main branch. Consumer CI runs consumers' default branch, so renaming
+  # :app would redden a lane no change inside the engine could fix.
+  def test_an_upload_still_reports_app_exactly_as_before
+    row = app_row("https://turf-monster-dev.s3.amazonaws.com/email_banners/x.png")
+    Studio::EmailCatalog.register("winnings", default_asset: "emails/winnings-banner.jpg")
+    stub_module(Studio::EmailCatalog, :record) { |_key| row }
+
+    assert_equal :app, Studio::EmailCatalog.source("winnings"),
+      "turf-monster asserts :app on main — this value is a consumer contract"
+    assert Studio::EmailCatalog.app_artwork?("winnings")
   end
 
   # --- 5. browser vs inbox addressing of the SAME default -------------------

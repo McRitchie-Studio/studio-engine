@@ -91,7 +91,10 @@ class EmailImageShimTest < Minitest::Test
 
     assert_nil Studio::EmailImage.url("magic_link")
     assert_equal "/assets/emails/magic-link.png", Studio::EmailImage.preview_url("magic_link")
-    assert_equal :default, Studio::EmailImage.source("magic_link")
+    # The shim forwards, so it reports whatever the catalog reports — and
+    # :default split into :app_asset / :engine_default. magic_link is one of the
+    # engine's own STANDARD two, so its artwork really is the engine's.
+    assert_equal :engine_default, Studio::EmailImage.source("magic_link")
   end
 
   def test_constants_still_resolve_through_the_old_name

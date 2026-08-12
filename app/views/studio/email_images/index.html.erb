@@ -38,7 +38,11 @@
           sending a banner from a committed repo asset. Even on its way out it
           should tell the truth about what ships. %>
       <% current_url = Studio::EmailCatalog.preview_url(variant) %>
-      <% inherited = current_url.present? && Studio::EmailCatalog.source(variant) == :default %>
+      <%# NOT `== :default` — that value split into :app_asset / :engine_default.
+          Comparing against a value nothing returns would silently never show
+          this note again. Anything that is not an upload is still inherited
+          from a file, which is all this retiring page needs to say. %>
+      <% inherited = current_url.present? && Studio::EmailCatalog.source(variant) != :app %>
       <section class="rounded-xl border border-subtle p-5">
         <h2 class="font-semibold mb-3"><%= label %></h2>
 
