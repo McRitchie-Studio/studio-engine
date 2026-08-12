@@ -18,6 +18,33 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   rather than breaking. Specimen: `/admin/style` → Tricks → Time stamps; recipe
   in the README's UI Primitives section.
 
+**Banner aspect ratio is now per-entry.** The new artwork is 3:1 while the shared
+default is 2:1, and turf-monster's eight banners are 2:1. A single global constant
+would letterbox one app's artwork or crop the other's on every upload, so:
+
+```ruby
+Studio::EmailCatalog.register("winnings",
+  default_asset: "emails/winnings.jpg",
+  aspect_ratio: 2.0)   # omit it and you keep the shared default
+```
+
+The page draws each row's thumbnail in that shape, and the upload cropper
+enforces it, so a replacement lands in the same frame as the artwork it replaces.
+`Studio::EmailCatalog.ratio(key)` reads it; `ASPECT_RATIO` remains the fallback.
+
+### Changed
+
+**The two standard emails now ship Mr. McRitchie's real artwork** — "Your Magic
+Link" and "Confirm Email" — replacing the placeholder gradients. Animated, 1800x600,
+with the McRitchie Studio logo. Every app that has not uploaded its own banner
+inherits them.
+
+Shipped **animated at full size on purpose**, with the trade measured rather than
+assumed: a static first frame would have been 24 KB against 3.5 MB, and
+re-encoding smaller made the files LARGER (GIF re-dithers the smooth gradient on
+every frame, so colour reduction and frame-dropping both backfired). Outlook
+desktop renders frame one only — frame one is a complete, legible banner.
+
 ### Fixed
 
 **The emails page named the wrong owner for an app's own artwork.**
