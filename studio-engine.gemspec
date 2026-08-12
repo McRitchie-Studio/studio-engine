@@ -18,7 +18,11 @@ Gem::Specification.new do |spec|
     "changelog_uri"   => "https://github.com/McRitchie-Studio/studio-engine/blob/main/CHANGELOG.md"
   }
 
-  spec.files = Dir["lib/**/*", "app/**/*", "config/**/*", "db/**/*", "tailwind/**/*", "Gemfile", "studio-engine.gemspec", "README.md", "CHANGELOG.md", "LICENSE"]
+  # config/e2e_lane.yml is the BROWSER LANE's contract — a fact about this repo's CI,
+  # read by bin/e2e-executed-set-check and test/lib/e2e_lane_contract_test.rb. It is
+  # the only thing under config/, and it has no meaning in a consuming app, so it is
+  # excluded rather than shipped. (e2e/, bin/ and test/ were never in this list.)
+  spec.files = Dir["lib/**/*", "app/**/*", "config/**/*", "db/**/*", "tailwind/**/*", "Gemfile", "studio-engine.gemspec", "README.md", "CHANGELOG.md", "LICENSE"] - ["config/e2e_lane.yml"]
   spec.require_paths = ["lib"]
 
   spec.add_dependency "rails", ">= 7.2", "< 8.2"
