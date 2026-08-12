@@ -6,6 +6,25 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **A browser lane — the engine now runs Playwright against its own partials.**
+  Measured across 40 merged engine feature units, 12 (30%) add an imperative
+  browser program and zero had ever carried browser evidence; the engine was the
+  one repo in the ecosystem with no way to observe client-side behavior. A
+  Playwright suite (`e2e/`) drives a real Chromium against engine partials
+  rendered through the `test/dummy` host, served by `e2e/boot.rb` with real
+  compiled Tailwind. Both engine-side defects that motivated the ecosystem's
+  browser-evidence gate were reproduced against the new lane and confirmed to turn
+  it red: the navbar's paint-time offset jump (sampled per animation frame — the
+  header moved 80px one frame after paint, which a single-sample spec reads as
+  correct) and the re-stamper swallowed by a phantom element. The lane carries a
+  runtime executed-set gate (`bin/e2e-executed-set-check` reads Playwright's own
+  report against `config/e2e_lane.yml`) and a static guard
+  (`test/lib/e2e_lane_contract_test.rb`) that refuses any edit able to narrow the
+  set. It runs as a parallel CI job, so the wall time an engine PR waits is
+  unchanged. Chromium-only, with the Intl/timezone blind spot that implies named
+  and covered instead by `test/views/at_time_zone_table_test.rb`. Full rationale,
+  limits and cost: `docs/E2E_LANE.md`.
+
 - **The "at" time stamp — `at_time_tag` + `studio/at_time_script`.** A shared
   primitive for stamping WHEN something happened, on the READER's clock rather
   than the app's: `at 3:53p`, gaining a date only when the stamp is not today and

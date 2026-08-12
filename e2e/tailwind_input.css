@@ -1,0 +1,25 @@
+/*
+  The lab's Tailwind entry point.
+
+  It is assembled the same way a CONSUMING APP assembles its own — core Tailwind,
+  then the shared preset via @config, then the engine's component layer — because
+  a lane compiled from a different source than the apps would be grading CSS that
+  ships nowhere. Compare mcritchie-studio/app/assets/tailwind/application.css:
+  same three ingredients, same order.
+
+  @source is what makes this honest for the ENGINE specifically. Tailwind v4 emits
+  only the utilities it can SEE used, and it scans the CSS file's own directory by
+  default — which here is e2e/, where no view lives. Without these two lines the
+  build would emit no `sticky`, no `top-0`, no `z-50`, every lab page would lay out
+  as static flow, and the paint specs would pass over a page with no pinned header
+  at all. That is a green lane observing nothing, so the specs assert the computed
+  `position` before they assert anything about movement.
+*/
+@import "tailwindcss";
+
+@config "../tailwind/studio.tailwind.config.js";
+
+@source "../app/views";
+@source "../test/dummy/app/views";
+
+@import "../app/assets/tailwind/studio_engine/engine.css";
