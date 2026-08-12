@@ -91,7 +91,13 @@ window.__atTimeFmt  →  expected true, got false
 [data-at-text]  →  still reads the SERVER's clock
 ```
 
-The page renders identically in both cases. Only a browser can tell them apart.
+The two pages are not byte-identical — the broken one carries the leaked prose. What
+matters is that no markup assertion in place could tell them apart: the guard written
+for exactly this defect, `assert_includes html, "__atTimeFmt"`, is GREEN on the broken
+page, because the token survives inside the text the phantom element ate. And the
+stamp the server renders is identical whether or not the script later runs, since the
+server cannot know where the reader sits. So the localisation itself is observable
+only in a browser.
 
 ## One browser, and what that cannot see
 
