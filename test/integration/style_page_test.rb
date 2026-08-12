@@ -161,6 +161,12 @@ class StylePageTest < ActiveSupport::TestCase
 
   def render_index
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    # A host renders this page through ApplicationController, which has EVERY
+    # engine helper mixed in (the engine sets no isolate_namespace, so its
+    # app/helpers join the host's helper path). This bare view has none, so give
+    # it the whole set — naming one module would model a weaker host than any real
+    # one, and would need editing again for the next helper-backed specimen.
+    view.extend(Studio::Engine.helpers)
     view.render(template: "style/index")
   end
 
@@ -169,6 +175,76 @@ class StylePageTest < ActiveSupport::TestCase
     assert_includes html, "Style", "expected the page heading"
     refute_includes html, "<html", "a bare content wrapper must not emit its own <html> shell"
     refute_includes html, "<body", "a bare content wrapper must not emit its own <body> shell"
+  end
+
+  # The "at" format is the first specimen family that is a HELPER rather than a
+  # CSS class, so REQUIRED_CLASSES cannot cover it. What makes the specimens real
+  # is the pair: live stamps from the helper AND the script that localizes them.
+  test "the Tricks section stages the 'at' time-stamp primitive" do
+    html = render_index
+    stamps = Nokogiri::HTML.fragment(html).css("time[data-at-stamp]")
+
+    assert_operator stamps.size, :>=, 4,
+      "expected the at-format specimens to render LIVE stamps, not hand-written markup"
+
+    stamps.each do |stamp|
+      refute_empty stamp["data-at-epoch"].to_s,
+        "every stamp carries the epoch the client re-stamps from"
+      assert stamp.at_css("[data-at-text]"), "every stamp needs the text slot the client rewrites"
+
+      flag = stamp.at_css("[data-at-flag]")
+      assert flag, "every stamp needs the flag slot the client fills"
+      assert_equal "", flag.text,
+        "the server must never assert a country — it cannot know the reader's timezone"
+    end
+  end
+
+  # THE CLAIM THE WHOLE ADOPTION STORY RESTS ON: a host writes `at_time_tag` in a
+  # view and it just works, because the engine sets no isolate_namespace and its
+  # app/helpers join the host's helper path. Every other test here extends a bare
+  # view by hand, which would keep passing if that inheritance broke — so pin it
+  # against a REAL host controller, where nothing was extended by us.
+  test "a host controller gets the engine's helpers with no wiring" do
+    assert_includes PagesController._helpers.instance_methods, :at_time_tag,
+      "a host must reach at_time_tag through plain helper inheritance — if this fails, " \
+      "every README recipe and every specimen is wrong about adoption"
+  end
+
+  # THE RE-STAMPER MUST BE ABLE TO RUN, WHICH IS NOT THE SAME AS BEING PRESENT.
+  #
+  # The first version of this guard was `assert_includes html, "__atTimeFmt"`. It
+  # was written to catch exactly the failure it then MISSED: a close-tag inside the
+  # partial's leading ERB comment ended that comment early, so the remaining prose
+  # rendered as page text — and because the prose named a script tag inside angle
+  # brackets, the browser opened a phantom element that swallowed the real script
+  # and the genuine close tag closed the phantom. The bytes "__atTimeFmt" were
+  # still on the page. Nothing executed. Every reader of the design system, and of
+  # every page of any host following the documented recipe, silently got
+  # app-timezone stamps with no flag.
+  #
+  # So this asserts the STRUCTURE the browser will build, not the presence of a
+  # string. Review re-proved it by mutation on 2026-08-11: reintroduce the leaked
+  # prose and the retired one-liner still PASSES while this one fails, naming the
+  # text that swallowed the script.
+  # (The behavior itself — that it runs and localizes — is proven in a real engine
+  # by the consuming app's Playwright lane: mcritchie-studio's
+  # e2e/at_time_flag.spec.js.)
+  test "the at-format re-stamper is a well-formed script element, not text that merely contains it" do
+    doc = Nokogiri::HTML.fragment(render_index)
+    carriers = doc.css("script").select { |s| s.text.include?("__atTimeFmt") }
+
+    assert_equal 1, carriers.size, "expected exactly one script to carry the re-stamper"
+
+    # THE assertion. Parse the page the way a browser does and demand that the
+    # element carrying the re-stamper BEGINS with it. Leaked prose ahead of the
+    # real open tag lands inside this element's content — so anything before the
+    # IIFE means a phantom element swallowed the script and nothing will execute.
+    # (A raw count of open vs close tags cannot serve here: an unrelated engine
+    # script legitimately names a script tag inside a JS comment.)
+    assert carriers.first.text.lstrip.start_with?("(function"),
+      "the re-stamper's script element must BEGIN with its IIFE — anything before it is " \
+      "leaked page text that has swallowed the script, and nothing will execute. Saw: " \
+      "#{carriers.first.text.lstrip[0, 80].inspect}"
   end
 
   test "the view references every primitive family's class" do
