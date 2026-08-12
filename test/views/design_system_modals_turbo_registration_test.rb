@@ -73,7 +73,10 @@ class DesignSystemModalsTurboRegistrationTest < ActiveSupport::TestCase
   # and extract the ONE <script> block that registers the page-scoped dsModals
   # store — identified by the registration function, not a bare id match.
   def ds_modals_script
+    # The style page's at-format specimens call Studio::AtTimeHelper. A host gets
+    # every engine helper for free (no isolate_namespace); a bare test view does not.
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    view.extend(Studio::AtTimeHelper)
     html = view.render(template: "style/index")
     html.scan(%r{<script[^>]*>(.*?)</script>}m)
         .map(&:first)

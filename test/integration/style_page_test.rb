@@ -161,6 +161,13 @@ class StylePageTest < ActiveSupport::TestCase
 
   def render_index
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    # A host renders this page through ApplicationController, which has every
+    # engine helper mixed in (the engine sets no isolate_namespace, so its
+    # app/helpers join the host's helper path). This bare view has none, so give
+    # it the ones the page's specimens actually call — otherwise the harness is a
+    # weaker host than any real one, and a specimen that uses a helper cannot be
+    # covered here at all.
+    view.extend(Studio::AtTimeHelper)
     view.render(template: "style/index")
   end
 
@@ -169,6 +176,33 @@ class StylePageTest < ActiveSupport::TestCase
     assert_includes html, "Style", "expected the page heading"
     refute_includes html, "<html", "a bare content wrapper must not emit its own <html> shell"
     refute_includes html, "<body", "a bare content wrapper must not emit its own <body> shell"
+  end
+
+  # The "at" format is the first specimen family that is a HELPER rather than a
+  # CSS class, so REQUIRED_CLASSES cannot cover it. What makes the specimens real
+  # is the pair: live stamps from the helper AND the script that localizes them.
+  # A page with the stamps and no script silently shows every reader the app's
+  # timezone — green on any assertion that only counted the markup.
+  test "the Tricks section stages the 'at' time-stamp primitive with its re-stamper" do
+    html = render_index
+    stamps = Nokogiri::HTML.fragment(html).css("time[data-at-stamp]")
+
+    assert_operator stamps.size, :>=, 4,
+      "expected the at-format specimens to render LIVE stamps, not hand-written markup"
+
+    stamps.each do |stamp|
+      refute_empty stamp["data-at-epoch"].to_s,
+        "every stamp carries the epoch the client re-stamps from"
+      assert stamp.at_css("[data-at-text]"), "every stamp needs the text slot the client rewrites"
+
+      flag = stamp.at_css("[data-at-flag]")
+      assert flag, "every stamp needs the flag slot the client fills"
+      assert_equal "", flag.text,
+        "the server must never assert a country — it cannot know the reader's timezone"
+    end
+
+    assert_includes html, "__atTimeFmt",
+      "the page must ship studio/_at_time_script, or every stamp above is frozen in the app's zone"
   end
 
   test "the view references every primitive family's class" do

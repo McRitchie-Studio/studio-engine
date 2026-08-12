@@ -22,7 +22,10 @@ require "json"
 #   zone:  id="dropzone-<key>", class .kanban-dropzone, data-<zone_attr>, .kanban-empty
 class BoardPrimitiveTest < ActiveSupport::TestCase
   def view
+    # The style page's at-format specimens call Studio::AtTimeHelper. A host gets
+    # every engine helper for free (no isolate_namespace); a bare test view does not.
     ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+                    .tap { |v| v.extend(Studio::AtTimeHelper) }
   end
 
   def render_board(locals)

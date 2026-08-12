@@ -57,7 +57,10 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
   ].freeze
 
   def view
+    # The style page's at-format specimens call Studio::AtTimeHelper. A host gets
+    # every engine helper for free (no isolate_namespace); a bare test view does not.
     ActionView::Base.with_empty_template_cache.with_view_paths([File.join(ENGINE_ROOT, "app/views")])
+                    .tap { |v| v.extend(Studio::AtTimeHelper) }
   end
 
   def render_change_username(**locals)

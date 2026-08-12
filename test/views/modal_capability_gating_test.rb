@@ -26,7 +26,10 @@ require "action_view"
 #      capability is off (disabled-but-present preview), never hidden.
 class ModalCapabilityGatingTest < ActiveSupport::TestCase
   def render_index
+    # The style page's at-format specimens call Studio::AtTimeHelper. A host gets
+    # every engine helper for free (no isolate_namespace); a bare test view does not.
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    view.extend(Studio::AtTimeHelper)
     view.render(template: "style/index")
   end
 
