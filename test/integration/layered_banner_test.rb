@@ -143,6 +143,32 @@ class LayeredBannerTest < ActiveSupport::TestCase
     end
   end
 
+  # The artwork ships RAW and is cropped by the client, not by us. Mr. McRitchie
+  # chose the full-width 2:1 framing, which background-size:cover produces from
+  # the 1200x720 original — so a destructive re-crop in the repo would throw away
+  # detail we can never get back AND lock in a framing the design may revisit.
+  test "the background ships at full size and is cropped at display time" do
+    path = File.expand_path("../../app/assets/images/emails/magic-link-background.gif", __dir__)
+    header = File.binread(path, 10)
+
+    assert_equal "GIF89a", header[0, 6], "the background must stay an animated GIF"
+    width, height = header[6, 4].unpack("v2")
+    assert_equal 1200, width,  "the raw asset is 1200 wide — cropping belongs to the client"
+    assert_equal 720,  height, "the raw asset is 720 tall — cover crops it to 2:1 at render"
+  end
+
+  test "the banner box is the 600px email card, and cover does the cropping" do
+    assert_equal 600, Studio::Banner::DEFAULT_WIDTH,
+      "600px is the width every email client and template assumes"
+    assert_equal 300, Studio::Banner::DEFAULT_HEIGHT
+
+    html = render_banner
+    assert_includes html, "background-size:cover",
+      "cover is what turns a 1200x720 asset into the chosen full-width 2:1 framing"
+    assert_includes html, "background-position:center",
+      "without centring, cover crops from a corner"
+  end
+
   # A mail client fetches from an inbox, where a root-relative path resolves
   # against nothing.
   test "artwork resolves to an absolute url for the inbox" do
