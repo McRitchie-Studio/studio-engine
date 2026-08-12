@@ -91,6 +91,29 @@ class LayeredBannerTest < ActiveSupport::TestCase
     assert Studio::Banner.new(background_url: "https://x/y.gif").renderable?
   end
 
+  # REGRESSION GUARD, and the reason for two.
+  #
+  # A table cell's padding ADDS to its declared height. Carrying height:300 AND
+  # 26px of vertical padding on the tinted cell rendered a 350px banner — which
+  # is what Mr. McRitchie saw in his inbox. Dropping the height instead made it
+  # 300 but shrank the scrim to a band across the middle, because a tinted cell
+  # with no height only covers its own content. Full height plus
+  # horizontal-ONLY padding is the shape that satisfies both.
+  test "the tinted cell carries the full height and no vertical padding" do
+    html = render_banner
+
+    assert_includes html, "padding:0 30px",
+      "vertical padding on a sized cell adds to its height — 300 becomes 352"
+    refute_match(/padding:[1-9]\d*px 30px/, html,
+      "any non-zero vertical padding reintroduces the 350px banner")
+    # The cell that PAINTS the wash must itself be full height, or the tint
+    # covers only its content and leaves unwashed bands top and bottom.
+    tinted = Nokogiri::HTML(html).css("td").find { |td| td["style"].to_s.include?("background-color:rgba") }
+    refute_nil tinted, "no tinted cell found"
+    assert_includes tinted["style"], "height:300px",
+      "the tinted cell must be full height or the scrim becomes a band across the middle"
+  end
+
   # --- the scrim -------------------------------------------------------------
 
   test "the scrim is applied by default because artwork does not guarantee contrast" do

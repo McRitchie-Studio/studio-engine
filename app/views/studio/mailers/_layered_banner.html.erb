@@ -39,8 +39,16 @@
         <table role="presentation" width="<%= banner.width %>" cellpadding="0" cellspacing="0" border="0"
                style="width:<%= banner.width %>px;">
           <tr>
+            <%# VERTICAL PADDING IS ZERO ON PURPOSE.
+                A table cell's padding ADDS to its declared height, so
+                height:300 plus 26px top and bottom rendered a 352px banner.
+                Dropping the height instead shrank the scrim to a band across
+                the middle, because the tinted cell then only covered its own
+                content. Full height with horizontal-only padding gives both:
+                exactly 300px, and a wash over the whole picture. valign does
+                the vertical centring that the padding was doing. %>
             <td align="center" valign="middle" height="<%= banner.height %>"
-                style="height:<%= banner.height %>px;padding:26px 30px;<%= "background-color:rgba(24,16,64,#{banner.scrim_opacity});" if banner.scrim_opacity.positive? %>">
+                style="height:<%= banner.height %>px;padding:0 30px;<%= "background-color:rgba(24,16,64,#{banner.scrim_opacity});" if banner.scrim_opacity.positive? %>">
               <% if banner.header.present? %>
                 <p style="margin:0 0 6px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:42px;line-height:48px;font-weight:700;color:#ffffff;">
                   <%= banner.header %>
