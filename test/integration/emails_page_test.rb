@@ -639,33 +639,22 @@ class EmailsPageTest < ActiveSupport::TestCase
   # row nests rows inside rows — every consumer asserting "one row per email"
   # counted three times as many, and each of those consumers was ALSO being shown
   # a layered banner its mailers never send.
-  test "an email with no layered artwork keeps the flat image in the list" do
-    Studio::EmailCatalog.register("flat_only", label: "Flat only",
-                                  default_asset: "emails/magic-link.gif")
-    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
-
-    html = render_row("flat_only")
-
-    refute_includes html, "data-banner-header",
-      "a flat email must not show a layered banner its mailers never send"
-    assert_includes html, "<img", "and it must still show its artwork"
-  ensure
-    Studio::EmailCatalog.reset!
-  end
-
-  test "an email WITH layered artwork renders the real banner in the list" do
+  # THE CONSUMER CONTRACT. A list row must not nest an email <table>: the layered
+  # banner is one, and rendering it here made every host's "one row per email"
+  # assertion count three rows per layered email. Two consumer suites went red on
+  # exactly that. The rendered banner lives on the email's own page instead.
+  test "a list row shows the artwork and nests no email markup" do
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
 
     html = render_row("magic_link")
 
-    assert_includes html, "data-banner-header",
-      "a layered email should show the banner as it arrives, not the bare artwork"
+    refute_includes html, "data-banner-header",
+      "a list row must not nest the email's own table — it triples every host's row count"
+    assert_includes html, "<img", "the row still identifies the email by its artwork"
   end
 
-  # ONE row, rendered alone. Asserted against the partial's own output rather
-  # than the parsed page: a layered row nests an email <table>, and the HTML
-  # parser reparents the rows around it, so a selector scoped to one row can
-  # return its neighbour's markup.
+  # ONE row, rendered alone, so an assertion about a row cannot pick up its
+  # neighbour's markup.
   def render_row(key)
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
     view.singleton_class.include(Rails.application.routes.url_helpers)

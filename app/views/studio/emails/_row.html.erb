@@ -17,17 +17,22 @@
   # that has not passed a recipient, and "nobody selected" is a real state — it
   # renders the name-free header, which is what a stranger receives.
   name    = local_assigns.fetch(:preview_name, nil)
-  # The banner AS IT ARRIVES — for a LAYERED email that is artwork with live text
-  # on it; for every other email it is still the flat image.
+  # THE LIST SHOWS THE ARTWORK; the email's own page shows the rendered banner.
   #
-  # Gated on layered artwork existing, and the gate is the point. An email with no
-  # registered `background` is sent by a mailer that renders an <img>: it has no
-  # layered banner, and drawing one here puts a picture on the page that no inbox
-  # receives. turf-monster's nine emails are all of that kind, and rendering them
-  # layered was both wrong and a contract break — the layered markup is a <table>,
-  # so nesting it in a list row tripled every consumer's "one row per email" count.
-  layered = Studio::EmailCatalog.background_url(entry.key).present?
-  banner  = layered ? Studio::Banner.for(entry.key, name: name) : nil
+  # Rendering the layered banner here was tried and reverted, for two reasons that
+  # both point the same way. The layered banner is an email <table>, so nesting one
+  # inside a list row makes every "one row per email" assertion count three rows
+  # per layered email — two consumer suites went red on exactly that, which is the
+  # engine changing a markup contract its hosts test against.
+  #
+  # And it was showing the wrong picture. Whether an email layers is a property of
+  # its MAILER, not of the catalogue: turf-monster re-registers magic_link with its
+  # own flat artwork and keeps the engine's background by inheritance, so the row
+  # drew a layered banner turf-monster never sends. The catalogue cannot tell the
+  # difference, and guessing produced exactly the failure this feature exists to
+  # prevent.
+  #
+  # The rendered banner lives on /admin/emails/:key, where the page can be sure.
   subject = Studio::EmailCatalog.subject_for(entry.key, name: name)
 
   # The TEMPLATES ride on the row so the repaint script can re-resolve them for
@@ -82,31 +87,17 @@
     <% end %>>
 
   <td class="px-4 py-4">
-    <%# The rendered banner rather than the artwork alone: the artwork is the
-        file, the banner is what lands in an inbox, and only one of those answers
-        "what does this email look like". The fixed 600px email table is scaled
-        into this cell by studio/emails/banner_scale. %>
-    <% if banner %>
-      <div class="rounded-lg overflow-hidden border border-subtle w-56" data-email-banner-frame
-           style="aspect-ratio: <%= entry.ratio %>;">
-        <div data-email-banner-preview data-banner-width="<%= card_width %>"
-             style="width:<%= card_width %>px;transform-origin:top left;">
-          <%= render "studio/mailers/layered_banner", banner: banner, preview: true %>
+    <div class="rounded-lg overflow-hidden border border-subtle w-56"
+         style="aspect-ratio: <%= entry.ratio %>; background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-900));">
+      <% if banner_url %>
+        <%= image_tag banner_url, class: "w-full h-full object-cover",
+              alt: "#{entry.label} email banner", loading: "lazy" %>
+      <% else %>
+        <div class="w-full h-full flex items-center justify-center text-2xs text-white/80 text-center px-3">
+          No banner
         </div>
-      </div>
-    <% else %>
-      <div class="rounded-lg overflow-hidden border border-subtle w-56"
-           style="aspect-ratio: <%= entry.ratio %>; background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-900));">
-        <% if banner_url %>
-          <%= image_tag banner_url, class: "w-full h-full object-cover",
-                alt: "#{entry.label} email banner", loading: "lazy" %>
-        <% else %>
-          <div class="w-full h-full flex items-center justify-center text-2xs text-white/80 text-center px-3">
-            No banner
-          </div>
-        <% end %>
-      </div>
-    <% end %>
+      <% end %>
+    </div>
   </td>
 
   <td class="px-4 py-4">
