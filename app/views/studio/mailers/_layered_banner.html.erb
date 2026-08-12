@@ -19,7 +19,27 @@
   is chosen to look good, not to guarantee contrast, and white text on a pale
   sky cannot be read. Set scrim: 0 on artwork dark enough to carry the type.
 %>
-<% banner = local_assigns.fetch(:banner) %>
+<%
+  banner = local_assigns.fetch(:banner)
+
+  # VERTICAL RHYTHM. The block is vertically centred, so the way to push the
+  # header toward the top edge and the logo toward the bottom is to make the
+  # block TALLER — the gap between the sub-text and the logo is the dial.
+  #
+  # It has to ADAPT, because the header is a greeting and greetings vary. A gap
+  # tuned to fill the banner for "Welcome Alex!" leaves "Welcome
+  # Bartholomew Fitzgerald-Montgomery!" clipped at the top and its logo jammed
+  # against the bottom edge — the block grows by a whole line while the box
+  # stays 300px. So a wrapping header gets the smaller gap.
+  #
+  # The line estimate is a heuristic, and deliberately a crude one: it only has
+  # to answer "one line or more", the fonts differ per client anyway, and being
+  # wrong costs some breathing room rather than a broken banner.
+  gap_after_header = 4
+  chars_per_line   = 21
+  header_lines     = [(banner.header.to_s.length / chars_per_line.to_f).ceil, 1].max
+  gap_before_logo  = header_lines > 1 ? 46 : 122
+%>
 <table role="presentation" width="<%= banner.width %>" cellpadding="0" cellspacing="0" border="0"
        style="width:<%= banner.width %>px;border-collapse:collapse;">
   <tr>
@@ -50,12 +70,12 @@
             <td align="center" valign="middle" height="<%= banner.height %>"
                 style="height:<%= banner.height %>px;padding:0 30px;<%= "background-color:rgba(24,16,64,#{banner.scrim_opacity});" if banner.scrim_opacity.positive? %>">
               <% if banner.header.present? %>
-                <p style="margin:0 0 6px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:42px;line-height:48px;font-weight:700;color:#ffffff;">
+                <p style="margin:0 0 <%= gap_after_header %>px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:42px;line-height:48px;font-weight:700;color:#ffffff;">
                   <%= banner.header %>
                 </p>
               <% end %>
               <% if banner.subtext.present? %>
-                <p style="margin:0 0 18px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:20px;line-height:28px;color:#efeaff;">
+                <p style="margin:0 0 <%= gap_before_logo %>px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:20px;line-height:28px;color:#efeaff;">
                   <%= banner.subtext %>
                 </p>
               <% end %>

@@ -114,6 +114,25 @@ class LayeredBannerTest < ActiveSupport::TestCase
       "the tinted cell must be full height or the scrim becomes a band across the middle"
   end
 
+  # The banner fills its box rather than floating in the middle of it, and it
+  # keeps doing so when the greeting wraps.
+  #
+  # A gap tuned to fill 300px for "Welcome Alex!" leaves a two-line header
+  # clipped at the top with its logo jammed on the bottom edge, because the
+  # block grows by a whole line while the box does not. Measured in a browser:
+  # 31px at both edges on one line, 45px on two, no clipping either way.
+  test "the gap tightens when the greeting wraps to a second line" do
+    one_line = render_banner(header: "Welcome Alex!")
+    two_line = render_banner(header: "Welcome Bartholomew Fitzgerald-Montgomery!")
+
+    one_gap = one_line[/margin:0 0 (\d+)px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:20px/, 1].to_i
+    two_gap = two_line[/margin:0 0 (\d+)px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:20px/, 1].to_i
+
+    assert two_gap.positive?, "expected a gap before the logo"
+    assert two_gap < one_gap,
+      "a wrapping header must get LESS space before the logo, or it clips at both edges"
+  end
+
   # --- the scrim -------------------------------------------------------------
 
   test "the scrim is applied by default because artwork does not guarantee contrast" do
