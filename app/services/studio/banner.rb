@@ -44,7 +44,7 @@ module Studio
 
     # The email card is 600px wide; the banner fills it.
     DEFAULT_WIDTH  = 600
-    DEFAULT_HEIGHT = 300
+    DEFAULT_HEIGHT = 200
 
     # A wash between the artwork and the text. Not decoration: background art is
     # chosen for looks, not contrast, and white text over a pale sky is

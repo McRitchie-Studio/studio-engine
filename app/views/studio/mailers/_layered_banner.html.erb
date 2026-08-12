@@ -22,23 +22,35 @@
 <%
   banner = local_assigns.fetch(:banner)
 
-  # VERTICAL RHYTHM. The block is vertically centred, so the way to push the
-  # header toward the top edge and the logo toward the bottom is to make the
-  # block TALLER — the gap between the sub-text and the logo is the dial.
+  # TYPE AND RHYTHM SCALE WITH THE BANNER.
   #
-  # It has to ADAPT, because the header is a greeting and greetings vary. A gap
-  # tuned to fill the banner for "Welcome Alex!" leaves "Welcome
-  # Bartholomew Fitzgerald-Montgomery!" clipped at the top and its logo jammed
-  # against the bottom edge — the block grows by a whole line while the box
-  # stays 300px. So a wrapping header gets the smaller gap.
+  # Everything below is a proportion of the height, not a fixed pixel size.
+  # Hardcoding 42px type looked right at 300px tall and OVERFLOWED at 200 —
+  # the box shrank, the words did not, and the banner rendered 238px with the
+  # header clipped at both edges. Proportions mean the next height change is a
+  # one-line edit rather than a re-tune.
+  h = banner.height
+
+  header_size   = (h * 0.15).round      # 30px at 200, 45 at 300
+  header_line   = (h * 0.17).round
+  subtext_size  = (h * 0.075).round     # 15px at 200
+  subtext_line  = (h * 0.10).round
+  logo_width    = (h * 0.60).round      # 120px at 200
+  side_padding  = (banner.width * 0.05).round
+
+  # The block is vertically centred, so the gap between sub-text and logo is
+  # what pushes the header toward the top edge and the logo toward the bottom.
   #
-  # The line estimate is a heuristic, and deliberately a crude one: it only has
-  # to answer "one line or more", the fonts differ per client anyway, and being
-  # wrong costs some breathing room rather than a broken banner.
-  gap_after_header = 4
+  # It has to ADAPT to the greeting. A gap that fills the banner for "Welcome
+  # Alex!" leaves "Welcome Bartholomew Fitzgerald-Montgomery!" clipped, because
+  # a wrapped header is a whole line taller while the box is not. The line
+  # estimate is deliberately crude — it only has to answer "one line or more",
+  # client fonts differ anyway, and being wrong costs breathing room rather
+  # than a broken banner.
+  gap_after_header = (h * 0.02).round
   chars_per_line   = 21
   header_lines     = [(banner.header.to_s.length / chars_per_line.to_f).ceil, 1].max
-  gap_before_logo  = header_lines > 1 ? 46 : 122
+  gap_before_logo  = header_lines > 1 ? (h * 0.18).round : (h * 0.35).round
 %>
 <table role="presentation" width="<%= banner.width %>" cellpadding="0" cellspacing="0" border="0"
        style="width:<%= banner.width %>px;border-collapse:collapse;">
@@ -68,20 +80,20 @@
                 exactly 300px, and a wash over the whole picture. valign does
                 the vertical centring that the padding was doing. %>
             <td align="center" valign="middle" height="<%= banner.height %>"
-                style="height:<%= banner.height %>px;padding:0 30px;<%= "background-color:rgba(24,16,64,#{banner.scrim_opacity});" if banner.scrim_opacity.positive? %>">
+                style="height:<%= banner.height %>px;padding:0 <%= side_padding %>px;<%= "background-color:rgba(24,16,64,#{banner.scrim_opacity});" if banner.scrim_opacity.positive? %>">
               <% if banner.header.present? %>
-                <p style="margin:0 0 <%= gap_after_header %>px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:42px;line-height:48px;font-weight:700;color:#ffffff;">
+                <p style="margin:0 0 <%= gap_after_header %>px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:<%= header_size %>px;line-height:<%= header_line %>px;font-weight:700;color:#ffffff;">
                   <%= banner.header %>
                 </p>
               <% end %>
               <% if banner.subtext.present? %>
-                <p style="margin:0 0 <%= gap_before_logo %>px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:20px;line-height:28px;color:#efeaff;">
+                <p style="margin:0 0 <%= gap_before_logo %>px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:<%= subtext_size %>px;line-height:<%= subtext_line %>px;color:#efeaff;">
                   <%= banner.subtext %>
                 </p>
               <% end %>
               <% if banner.logo_url.present? %>
-                <%= image_tag banner.logo_url, width: 150, alt: banner.logo_alt.to_s,
-                      style: "display:block;margin:0 auto;width:150px;height:auto;border:0;" %>
+                <%= image_tag banner.logo_url, width: logo_width, alt: banner.logo_alt.to_s,
+                      style: "display:block;margin:0 auto;width:#{logo_width}px;height:auto;border:0;" %>
               <% end %>
             </td>
           </tr>

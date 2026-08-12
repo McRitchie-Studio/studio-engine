@@ -102,15 +102,16 @@ class LayeredBannerTest < ActiveSupport::TestCase
   test "the tinted cell carries the full height and no vertical padding" do
     html = render_banner
 
-    assert_includes html, "padding:0 30px",
-      "vertical padding on a sized cell adds to its height — 300 becomes 352"
-    refute_match(/padding:[1-9]\d*px 30px/, html,
-      "any non-zero vertical padding reintroduces the 350px banner")
+    assert_match(/padding:0 \d+px/, html,
+      "vertical padding on a sized cell ADDS to its height — 300 rendered as 352"
+    )
+    refute_match(/padding:[1-9]\d*px \d+px/, html,
+      "any non-zero vertical padding reintroduces the over-tall banner")
     # The cell that PAINTS the wash must itself be full height, or the tint
     # covers only its content and leaves unwashed bands top and bottom.
     tinted = Nokogiri::HTML(html).css("td").find { |td| td["style"].to_s.include?("background-color:rgba") }
     refute_nil tinted, "no tinted cell found"
-    assert_includes tinted["style"], "height:300px",
+    assert_includes tinted["style"], "height:#{Studio::Banner::DEFAULT_HEIGHT}px",
       "the tinted cell must be full height or the scrim becomes a band across the middle"
   end
 
@@ -125,12 +126,31 @@ class LayeredBannerTest < ActiveSupport::TestCase
     one_line = render_banner(header: "Welcome Alex!")
     two_line = render_banner(header: "Welcome Bartholomew Fitzgerald-Montgomery!")
 
-    one_gap = one_line[/margin:0 0 (\d+)px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:20px/, 1].to_i
-    two_gap = two_line[/margin:0 0 (\d+)px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:20px/, 1].to_i
+    # Keyed on the sub-text's colour, not its font size: the sizes are
+    # proportional now, so pinning a literal px value would break on any
+    # height change and tell us nothing about the gap.
+    one_gap = one_line[/margin:0 0 (\d+)px;[^"]*color:#efeaff/, 1].to_i
+    two_gap = two_line[/margin:0 0 (\d+)px;[^"]*color:#efeaff/, 1].to_i
 
     assert two_gap.positive?, "expected a gap before the logo"
     assert two_gap < one_gap,
       "a wrapping header must get LESS space before the logo, or it clips at both edges"
+  end
+
+  # REGRESSION GUARD. Type was hardcoded at 42px, which looked right in a 300px
+  # banner and OVERFLOWED a 200px one: the box shrank, the words did not, and it
+  # rendered 238px tall with the header clipped at both edges. Everything is now
+  # a proportion of the height, so a height change is a one-line edit.
+  test "type scales with the banner rather than being hardcoded" do
+    tall  = render_banner(height: 300)
+    short = render_banner(height: 200)
+
+    tall_size  = tall[/font-size:(\d+)px;line-height:\d+px;font-weight:700/, 1].to_i
+    short_size = short[/font-size:(\d+)px;line-height:\d+px;font-weight:700/, 1].to_i
+
+    assert short_size < tall_size,
+      "a shorter banner needs smaller type, or the content overflows the box"
+    assert_operator short_size, :>, 0
   end
 
   # --- the scrim -------------------------------------------------------------
@@ -202,7 +222,7 @@ class LayeredBannerTest < ActiveSupport::TestCase
   test "the banner box is the 600px email card, and cover does the cropping" do
     assert_equal 600, Studio::Banner::DEFAULT_WIDTH,
       "600px is the width every email client and template assumes"
-    assert_equal 300, Studio::Banner::DEFAULT_HEIGHT
+    assert_equal 200, Studio::Banner::DEFAULT_HEIGHT
 
     html = render_banner
     assert_includes html, "background-size:cover",
