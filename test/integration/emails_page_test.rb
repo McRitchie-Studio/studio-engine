@@ -79,6 +79,14 @@ class EmailsPageTest < ActiveSupport::TestCase
   end
 
   test "a host opts in the way the dummy app does" do
+    # Routes draw LAZILY. The flag this reads is set by test/dummy/config/routes.rb
+    # AS IT DRAWS, so on a seed that happened to run this test before any
+    # route-touching one, it read the pre-draw default and failed. Measured on an
+    # untouched `accepted` checkout: red at --seed 3, green at 1, 2, 4, 5 and 6 — a
+    # roughly 1-in-6 flake that has nothing to do with whatever branch trips it.
+    # Force the draw, then assert what the message actually claims.
+    Rails.application.reload_routes!
+
     assert Studio.draw_admin_emails_routes,
       "test/dummy/config/routes.rb must opt in before Studio.routes, or this suite tests nothing"
   end
