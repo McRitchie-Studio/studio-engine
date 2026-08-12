@@ -17,6 +17,22 @@
 # skips when node is absent. `bin/release-check`'s suite guard additionally
 # rejects any file that runs zero tests or skips one, so a lane that silently
 # stops covering something goes red instead of green.
+#
+# THREE JOBS, and the second two are the BROWSER LANE (added 2026-08-12):
+#
+#   engine-suite       the Ruby suite, via bin/release-check
+#   playwright         a real Chromium against real engine partials (e2e/)
+#   e2e_executed_set   asserts the lane RAN what it claims, from Playwright's receipt
+#
+# The browser lane is a PARALLEL job rather than a step inside bin/release-check,
+# so it adds ~0 to the wall time a PR waits. That decision, its measurements, the
+# refused path filter, and what a Chromium-only lane cannot see are all recorded in
+# docs/E2E_LANE.md — read that before changing anything below.
+#
+# The store behavior suite (node with browser stubs) is deliberately KEPT. It is
+# fast, it runs in the Ruby lane, and it covers store timing and state that the
+# browser lane does not currently drive. The browser lane covers what stubs
+# structurally cannot: layout, paint, and whether a script runs at all.
 
 name: Engine CI
 
@@ -57,3 +73,129 @@ jobs:
 
       - name: Run the engine suite
         run: bin/release-check
+
+  # ================= THE BROWSER LANE =================
+  #
+  # A SEPARATE JOB, NOT A STEP IN bin/release-check. That is a cost decision, made
+  # against measurements rather than taste:
+  #
+  #   engine-suite (today)          ~1m20s wall
+  #   playwright (this job)         ~1m10s wall — ~45s setup (npm ci + chromium
+  #                                 download) + ~10s Rails boot and Tailwind
+  #                                 compile + ~4s of specs
+  #
+  # Run as a step inside bin/release-check those numbers ADD, and every engine PR
+  # waits ~2m30s. Run as a parallel job they do not: the PR waits max(1m20s, 1m10s)
+  # ≈ 1m20s, which is what it waits today. The lane costs ~1m10s of BILLABLE runner
+  # time and ~0s of anyone's attention.
+  #
+  # WHY NO PATH FILTER, WHEN THE GATE THIS SERVES IS ITSELF A PATH CLASSIFIER.
+  # It is a fair question — `paths: ['app/views/**', 'app/assets/**']` would skip
+  # this job on a docs-only PR and save the minute. It is refused for two reasons.
+  # First, a path-filtered required check reports SKIPPED, not passed, and a skipped
+  # required check is the exact shape that let a red gate go quiet in this ecosystem
+  # before. Second, the filter would have to be right about which paths can change
+  # browser behaviour, and this lane's own history says that inference is hard: the
+  # phantom-element defect was introduced by editing a COMMENT. A filter listing
+  # app/views would have caught that one, but the general claim — "we can predict
+  # from paths whether the browser is affected" — is the claim ClientSurfaceDiff
+  # refuses to make about hunks, for the same reason. At ~1m10s in parallel, the
+  # saving is not worth buying that risk.
+  #
+  # If the lane ever grows past the engine suite's wall time it becomes the critical
+  # path, and THAT is the moment to shard (config/e2e_lane.yml `shards:`) rather than
+  # to start filtering.
+  playwright:
+    name: browser lane (playwright)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout engine
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3.11
+          bundler-cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      # `--with-deps` installs the shared libraries headless chromium needs on a
+      # bare ubuntu runner. Without it the browser downloads fine and then fails to
+      # launch, which reads as a mysterious lane failure rather than a missing apt
+      # package.
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      # No database service. test/dummy runs sqlite :memory: inside the server
+      # process and the lab pages hold no rows — see e2e/boot.rb.
+      - name: Run the browser lane
+        env:
+          RAILS_ENV: test
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/e2e-report.json
+        run: npx playwright test --reporter=list,json
+
+      # `if: always()`, NOT `if: failure()`. A failing spec still RAN, and the
+      # executed-set gate must count it — otherwise a red lane would also look like
+      # a lane that executed nothing.
+      - name: Upload the executed-set receipt
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-report
+          path: ${{ github.workspace }}/e2e-report.json
+          if-no-files-found: error
+
+      - name: Keep the Playwright report from a failed run
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: ${{ github.workspace }}/playwright-report
+          if-no-files-found: ignore
+
+  # THE VERDICT GATE. The lane above can say its specs PASSED; it cannot say it RAN
+  # THEM ALL. This job reads the receipt and asserts the executed set against
+  # config/e2e_lane.yml.
+  #
+  # `if: always()` is LOAD-BEARING and is the only condition this job may carry:
+  # on `needs: playwright` alone, a red lane SKIPS this job, and a skipped required
+  # check does not report failure — so the gate would go quiet exactly when it
+  # matters. test/lib/e2e_lane_contract_test.rb pins that.
+  #
+  # `bundler-cache: false` because the gate is stdlib-only (json + yaml). It audits
+  # the suite, so it must not be breakable by a dependency problem in the thing it
+  # audits.
+  e2e_executed_set:
+    name: browser lane executed-set
+    runs-on: ubuntu-latest
+    needs: playwright
+    if: always()
+
+    steps:
+      - name: Checkout engine
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3.11
+          bundler-cache: false
+
+      - name: Download the receipt
+        uses: actions/download-artifact@v4
+        with:
+          pattern: e2e-report
+          path: e2e-reports
+          merge-multiple: true
+
+      - name: Assert the lane executed exactly the specs it claims to
+        run: bin/e2e-executed-set-check e2e-reports

@@ -23,4 +23,10 @@ group :development, :test do
   # engine's ActiveRecord/Railtie surfaces. Not a runtime dependency — the
   # consuming apps bring their own database adapter. Rails 8.1 needs sqlite3 ~> 2.1.
   gem "sqlite3", ">= 2.1"
+
+  # Puma serves the dummy host for the BROWSER LANE (e2e/boot.rb). The gem ships no
+  # config.ru and test/dummy has no bin/rails, so the lane boots Puma::Server around
+  # Rails.application directly rather than growing Rails-app scaffolding inside a
+  # test fixture. Not a runtime dependency — consuming apps bring their own server.
+  gem "puma", ">= 6.0"
 end

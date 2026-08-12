@@ -1,0 +1,21 @@
+<%# DEFECT 1's lab page — the bar stack and the navbar, as siblings.
+
+    This is the composition studio/banners/_stack documents: the stack partial
+    first, the navbar partial second, siblings rather than nested. Both are ENGINE
+    partials rendered by name. Nothing here reimplements either one — if this page
+    hand-rolled a sticky header, the spec would be grading the lab instead of the
+    engine, and the lane would report green over untested code.
+
+    The tall filler exists so the page SCROLLS. That is not decoration: the whole
+    class of defect this page is here to catch only becomes observable once the
+    header is PINNED. Unscrolled, a header sitting below the bars in normal flow
+    and a header offset by a measured custom property look identical. Scrolled,
+    the first is nailed to the viewport top and the second tracks a number that a
+    ResizeObserver republishes a frame late. %>
+<%= render "studio/banners/stack" %>
+<%= render "layouts/navbar" %>
+
+<main class="p-8">
+  <p data-test="lab-body">bar stack lab</p>
+  <div style="height: 4000px"></div>
+</main>

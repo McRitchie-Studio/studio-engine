@@ -1,0 +1,66 @@
+# THE BROWSER LANE'S CONTRACT — what the green `playwright` check actually covers.
+#
+# ONE file, read by BOTH halves of the guard, so there is exactly ONE number to move:
+#
+#   · bin/e2e-executed-set-check        THE RUNTIME GATE. Reads Playwright's OWN report
+#                                       after the lane runs and asserts the set it
+#                                       EXECUTED matches this contract.
+#   · test/lib/e2e_lane_contract_test.rb THE STATIC GUARD. Reads the committed specs and
+#                                       config and asserts they DECLARE this contract,
+#                                       and that nothing in the lane can narrow the set.
+#
+# THE PROPERTY, AND WHY IT IS ASSERTED AT RUNTIME.
+# Static counting answers "how many specs are DECLARED". It cannot answer "how many
+# specs RAN" — different questions, and the gap between them is where every escape
+# hatch lives. A runtime skip is invisible to a source reader BY CONSTRUCTION:
+#
+#     test("the header does not move", async ({ page }, testInfo) => {
+#       testInfo.skip();          // exit 0, "1 skipped", every static guard green
+#
+# and so is a `--grep` added to the CI command, and so is `--only-changed`, and so is
+# a spec whose file never got collected. Each is a different SPELLING of the same
+# event: a spec left the executed set. Enumerating spellings is how the hub's version
+# of this guard was defeated three times. So the gate reads the RECEIPT, where all of
+# them show up as the same arithmetic failure:
+#
+#     executed == total_specs
+#
+# TO CHANGE THESE NUMBERS you must edit this file, which is a visible, reviewable diff
+# line with a comment attached. That is the point: the hole cannot grow silently.
+#
+# THIS LANE HAS NO QUARANTINE, AND THAT IS A DECISION.
+# The hub's contract carries `quarantined`, a `quarantine_tag`, a `--grep-invert`, and
+# an origin/release-baselined ratchet to stop a branch raising its own ceiling. Every
+# bit of that is machinery for 18 specs that had already rotted when its lane was
+# switched on. This lane starts with none: each spec below was written against code
+# that is green today, and each was verified to go RED against its own defect
+# reintroduced (see docs/E2E_LANE.md for the traces).
+#
+# Shipping the quarantine anyway would hand a lane with nothing to exclude a
+# documented, tested, reviewed way to exclude things — and the first inconvenient
+# spec would find it. There is deliberately no third option here: a spec that cannot
+# be fixed gets DELETED, with both numbers below lowered in the same commit, which is
+# a diff a reviewer reads as exactly what it is.
+---
+# Every `test(...)` committed under e2e/. Verified against Playwright's own model,
+# not prose:
+#   npx playwright test --list   ->  5 tests in 2 files
+total_specs: 5
+
+# What the lane MUST execute — asserted against the runner's own report, so no
+# source-level spelling on any axis can move it without moving this line. With no
+# quarantine this equals total_specs, and test/lib/e2e_lane_contract_test.rb asserts
+# that equality rather than letting the two drift into a silent exclusion.
+#
+# NOTE FOR ANYONE ADDING A BROWSER. Playwright counts one test per spec PER PROJECT.
+# Adding a `firefox` project to playwright.config.js does not add specs, but it
+# DOUBLES this number. That is the correct behaviour — the lane really would be
+# running twice the tests — and the reason it is called out is that the failure reads
+# as "5 more than the contract" rather than "you added a browser".
+executed: 5
+
+# The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
+# unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
+# arrived", a real property that catches a webServer that died after the health probe
+# or an upload step that wrote nothing.
+shards: 1

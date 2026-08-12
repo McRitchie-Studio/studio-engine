@@ -1,0 +1,26 @@
+<%# The lab layout.
+
+    It renders the ENGINE's real head partial, not a hand-rolled one. That matters
+    more than it looks: layouts/studio/_head installs the Alpine `theme` store the
+    navbar's toggle reads, publishes --nav-h/--nav-bottom, and sets
+    `body { overflow-anchor: none }` — which the paint spec depends on, because
+    scroll anchoring would otherwise drag scrollY when a bar's height changes and
+    contaminate the very measurement that spec exists to take. A hand-rolled head
+    would have quietly dropped all three, and the lane would have been grading a
+    page no consumer ever renders.
+
+    The asset tags at the end of that partial are the HOST's job. The dummy does
+    them in E2eLabController::AssetDelivery, pointing at the engine's real
+    app/assets files that e2e/boot.rb copies into public/e2e. %>
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>studio-engine e2e lab</title>
+    <%= render "layouts/studio/head" %>
+  </head>
+  <body class="bg-page text-body">
+    <%= yield %>
+  </body>
+</html>

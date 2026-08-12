@@ -1,1 +1,13 @@
 /.worktrees/
+
+# The browser lane (e2e/). All build output or run output — nothing here is source.
+/node_modules/
+/test-results/
+/playwright-report/
+/e2e-report.json
+# e2e/boot.rb compiles Tailwind, copies Alpine, and copies the engine's own served
+# assets into here before serving the dummy lab. Regenerated on every boot.
+/test/dummy/public/
+
+# Rails writes here when e2e/boot.rb boots the dummy (the theme CSS cache).
+/tmp/

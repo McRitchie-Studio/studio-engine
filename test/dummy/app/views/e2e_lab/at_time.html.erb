@@ -1,0 +1,23 @@
+<%# DEFECT 3's lab page — an @-time stamp and the script that localises it.
+
+    The server renders the stamp in the APP timezone with the flag hidden, because
+    it cannot know where the reader sits. studio/_at_time_script is the client half
+    that re-stamps it to the VIEWER's clock and reveals a country flag when the
+    viewer's IANA zone is outside the US.
+
+    That split is why this page is the sharpest test in the lane. The server's
+    output is the SAME bytes whether the script runs or not, so every assertion a
+    Rails view test can make passes on a page whose client half is dead — which is
+    exactly how the phantom-element defect shipped, with a guard test
+    (`assert_includes html, "__atTimeFmt"`) that passed on the broken page because
+    the token survived inside the text the phantom element had swallowed.
+
+    A fixed epoch, not Time.current: the spec asserts an exact wall-clock string,
+    so the input may not drift between runs. 2026-03-14 12:34:00 UTC. %>
+<% stamp_time = Time.at(1_773_491_640).utc %>
+
+<p>
+  Deployed <%= at_time_tag(stamp_time, now: stamp_time) %>
+</p>
+
+<%= render "studio/at_time_script" %>

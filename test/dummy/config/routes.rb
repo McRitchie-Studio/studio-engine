@@ -18,4 +18,18 @@ Rails.application.routes.draw do
   # PagesController for why they are controllers and not Rack lambdas.
   root to: "pages#show", defaults: { page: "root" }
   get "dashboard", to: "pages#show", defaults: { page: "dashboard" }
+
+  # THE BROWSER LAB (e2e/). Drawn unconditionally rather than behind an env check:
+  # a route that exists only when a flag is set is a route that can silently stop
+  # existing, and the lane would then 404 its way to a green run. These pages are
+  # part of the dummy TEST app, which ships in no gem — spec.files in
+  # studio-engine.gemspec has never included test/ — so there is nothing to gate.
+  #
+  # Path prefixes are deliberately disjoint: /e2e/* is served as STATIC files from
+  # test/dummy/public (the compiled Tailwind and Alpine), /lab/* is routed. Sharing
+  # one prefix means the static file server shadows a route the day someone adds a
+  # file whose name collides.
+  get "up", to: "e2e_lab#up"
+  get "lab/bar_stack", to: "e2e_lab#bar_stack"
+  get "lab/at_time", to: "e2e_lab#at_time"
 end
