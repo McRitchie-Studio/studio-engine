@@ -17,7 +17,17 @@
   # that has not passed a recipient, and "nobody selected" is a real state — it
   # renders the name-free header, which is what a stranger receives.
   name    = local_assigns.fetch(:preview_name, nil)
-  banner  = Studio::Banner.for(entry.key, name: name)
+  # The banner AS IT ARRIVES — for a LAYERED email that is artwork with live text
+  # on it; for every other email it is still the flat image.
+  #
+  # Gated on layered artwork existing, and the gate is the point. An email with no
+  # registered `background` is sent by a mailer that renders an <img>: it has no
+  # layered banner, and drawing one here puts a picture on the page that no inbox
+  # receives. turf-monster's nine emails are all of that kind, and rendering them
+  # layered was both wrong and a contract break — the layered markup is a <table>,
+  # so nesting it in a list row tripled every consumer's "one row per email" count.
+  layered = Studio::EmailCatalog.background_url(entry.key).present?
+  banner  = layered ? Studio::Banner.for(entry.key, name: name) : nil
   subject = Studio::EmailCatalog.subject_for(entry.key, name: name)
 
   # The TEMPLATES ride on the row so the repaint script can re-resolve them for

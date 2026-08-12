@@ -634,6 +634,46 @@ class EmailsPageTest < ActiveSupport::TestCase
     end
   end
 
+  # A consumer whose emails are all flat (turf-monster's nine) must keep the
+  # markup it had. The layered banner is a <table>, so rendering one in a list
+  # row nests rows inside rows — every consumer asserting "one row per email"
+  # counted three times as many, and each of those consumers was ALSO being shown
+  # a layered banner its mailers never send.
+  test "an email with no layered artwork keeps the flat image in the list" do
+    Studio::EmailCatalog.register("flat_only", label: "Flat only",
+                                  default_asset: "emails/magic-link.gif")
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+
+    html = render_row("flat_only")
+
+    refute_includes html, "data-banner-header",
+      "a flat email must not show a layered banner its mailers never send"
+    assert_includes html, "<img", "and it must still show its artwork"
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  test "an email WITH layered artwork renders the real banner in the list" do
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+
+    html = render_row("magic_link")
+
+    assert_includes html, "data-banner-header",
+      "a layered email should show the banner as it arrives, not the bare artwork"
+  end
+
+  # ONE row, rendered alone. Asserted against the partial's own output rather
+  # than the parsed page: a layered row nests an email <table>, and the HTML
+  # parser reparents the rows around it, so a selector scoped to one row can
+  # return its neighbour's markup.
+  def render_row(key)
+    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    view.singleton_class.include(Rails.application.routes.url_helpers)
+    view.render(partial: "studio/emails/row",
+                locals: { entry: Studio::EmailCatalog.entry(key), uploads_available: true,
+                          max_width: Studio::EmailCatalog::MAX_WIDTH, preview_name: "Alex" })
+  end
+
   test "a row says its image is the SHARED default when the app uploaded nothing" do
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
     stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
