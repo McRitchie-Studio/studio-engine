@@ -23,6 +23,35 @@ require "nokogiri"
 #      @banner_url and renders an <img>. Layered is opt-in; a mailer that knows
 #      nothing about it must render byte-for-byte as before.
 class LayeredBannerTest < ActiveSupport::TestCase
+  # The dummy app has no schema; the engine's other DB-touching guard builds its
+  # table the same way. Runs the REAL migration so a mistake in it fails here
+  # rather than in a host's db:migrate.
+  def self.ensure_settings_table!
+    return if ActiveRecord::Base.connection.table_exists?(:studio_email_settings)
+
+    require_relative "../../db/migrate/20260812000000_create_studio_email_settings"
+    CreateStudioEmailSettings.new.migrate(:up)
+  end
+
+  def setup
+    self.class.ensure_settings_table!
+    Studio::EmailSetting.delete_all
+  end
+
+  def teardown
+    Studio::EmailSetting.delete_all
+    Studio::EmailCatalog.reset!
+  end
+
+  # Hand-rolled: Minitest 6 dropped minitest/mock, so there is no .stub.
+  def stub_singleton(mod, name, value)
+    original = mod.method(name)
+    mod.define_singleton_method(name) { |*| value }
+    yield
+  ensure
+    mod.define_singleton_method(name, original)
+  end
+
   def view
     v = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
     v.singleton_class.include(Rails.application.routes.url_helpers)
@@ -189,6 +218,59 @@ class LayeredBannerTest < ActiveSupport::TestCase
   test "each piece is optional" do
     assert_includes render_banner(subtext: nil, logo_url: nil), "Welcome Mason!"
     refute_includes render_banner(logo_url: nil), "<img"
+  end
+
+  # --- the operator's tint ---------------------------------------------------
+  #
+  # The scrim is a judgement about a picture, and the picture changes without a
+  # deploy — so an operator can set it on /admin/emails and that value outranks
+  # the registry. These pin the ORDER, which is the part that silently goes
+  # wrong: a saved 40% that loses to a registered default is invisible until
+  # someone looks at an inbox.
+
+  test "the default tint is 40%" do
+    assert_in_delta 0.40, Studio::Banner::DEFAULT_SCRIM, 0.001
+  end
+
+  test "a saved tint outranks the registry" do
+    Studio::EmailCatalog.register("magic_link", scrim: 0.9)
+    Studio::EmailSetting.set_scrim("magic_link", 25)
+
+    assert_in_delta 0.25, Studio::EmailCatalog.scrim("magic_link"), 0.001,
+      "the operator is the one looking at the artwork"
+  ensure
+    Studio::EmailSetting.where(email_key: "magic_link").delete_all
+    Studio::EmailCatalog.reset!
+  end
+
+  test "clearing the tint falls back to the registry, not to whatever was saved" do
+    Studio::EmailCatalog.register("magic_link", scrim: 0.6)
+    Studio::EmailSetting.set_scrim("magic_link", 25)
+    Studio::EmailSetting.set_scrim("magic_link", nil)
+
+    assert_in_delta 0.6, Studio::EmailCatalog.scrim("magic_link"), 0.001,
+      "blank means 'use the default', not 'pin today's default'"
+  ensure
+    Studio::EmailSetting.where(email_key: "magic_link").delete_all
+    Studio::EmailCatalog.reset!
+  end
+
+  test "the tint is stored as the percent the operator typed" do
+    record = Studio::EmailSetting.set_scrim("magic_link", 40)
+
+    assert_equal 40, record.scrim_percent,
+      "storing the operator's own units keeps the round-trip lossless"
+    assert_equal 40, Studio::EmailCatalog.scrim_percent("magic_link")
+  ensure
+    Studio::EmailSetting.where(email_key: "magic_link").delete_all
+  end
+
+  test "a missing settings table never stops an email" do
+    stub_singleton(Studio::EmailSetting, :table_ready?, false) do
+      assert_nil Studio::EmailSetting.scrim_for("magic_link")
+      refute_nil Studio::EmailCatalog.scrim_percent("magic_link"),
+        "an app that has not run the migration must still send email"
+    end
   end
 
   # --- artwork resolution ----------------------------------------------------

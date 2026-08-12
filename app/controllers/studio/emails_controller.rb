@@ -15,7 +15,7 @@ module Studio
   # is currently sending.
   class EmailsController < ApplicationController
     before_action :require_admin
-    before_action :load_entry, only: %i[show raw update destroy]
+    before_action :load_entry, only: %i[show raw update destroy settings]
     before_action :require_uploads, only: %i[update destroy]
 
     MAX_BYTES = 8.megabytes
@@ -62,6 +62,30 @@ module Studio
       end
     rescue StandardError
       redirect_to admin_emails_path, alert: "Couldn't save the image. Please try again.", status: :see_other
+    end
+
+    # PATCH /admin/emails/:key/settings — operator-tunable knobs.
+    #
+    # The scrim is the dial between a readable header and a visible picture, and
+    # the right value depends on artwork that changes without a deploy. Blank
+    # clears the override so the email falls back to the registry default rather
+    # than being pinned to whatever that default was on the day.
+    def settings
+      percent = params[:scrim_percent]
+
+      if percent.present? && !Studio::EmailSetting::SCRIM_RANGE.cover?(percent.to_i)
+        return redirect_to admin_email_path(@key), status: :see_other,
+                           alert: "Tint must be between 0 and 100."
+      end
+
+      rescue_and_log do
+        Studio::EmailSetting.set_scrim(@key, percent)
+        redirect_to admin_email_path(@key), status: :see_other,
+                    notice: percent.present? ? "Tint set to #{percent.to_i}%." : "Tint reset to the default."
+      end
+    rescue StandardError
+      redirect_to admin_email_path(@key), status: :see_other,
+                  alert: "Couldn't save the tint. Please try again."
     end
 
     # DELETE /admin/emails/:key — drop this app's override and fall back to the

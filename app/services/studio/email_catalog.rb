@@ -255,6 +255,18 @@ module Studio
     # Absolute URLs, because a mail client fetches these from an inbox and a
     # root-relative path resolves against nothing there.
 
+    # Saved by the operator > registered by the app > engine default.
+    def scrim(key)
+      Studio::EmailSetting.scrim_for(key) || entry(key)&.scrim
+    rescue StandardError
+      entry(key)&.scrim
+    end
+
+    def scrim_percent(key)
+      value = scrim(key) || Studio::Banner::DEFAULT_SCRIM
+      (value.to_f * 100).round
+    end
+
     def background_url(key) = absolute_asset_url(entry(key)&.background)
     def logo_url(key)       = absolute_asset_url(entry(key)&.logo)
 

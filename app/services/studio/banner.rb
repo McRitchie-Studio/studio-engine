@@ -49,7 +49,12 @@ module Studio
     # A wash between the artwork and the text. Not decoration: background art is
     # chosen for looks, not contrast, and white text over a pale sky is
     # unreadable. 0 disables it for artwork already dark enough to carry type.
-    DEFAULT_SCRIM = 0.34
+    #
+    # Raised from 0.34 after seeing it in a real inbox — bright artwork left the
+    # sub-text working harder than it should. Rendered at 0.34 / 0.45 / 0.55 and
+    # chosen by eye, because "legible" is a judgement about a picture, not a
+    # number a test can settle.
+    DEFAULT_SCRIM = 0.40
 
     def width  = (@width  || DEFAULT_WIDTH).to_i
     def height = (@height || DEFAULT_HEIGHT).to_i
@@ -80,7 +85,11 @@ module Studio
         logo_alt:       logo_alt       || Studio.app_name,
         header:         header         || entry&.label,
         subtext:        subtext,
-        scrim:          scrim.nil? ? entry&.scrim : scrim
+        # Resolution order: an explicit argument (a caller who knows better),
+        # then what the OPERATOR saved on /admin/emails, then the registry, then
+        # the default. The operator sits above the registry on purpose — they
+        # are the one looking at the artwork.
+        scrim:          scrim || Studio::EmailCatalog.scrim(key)
       )
       banner.renderable? ? banner : nil
     end

@@ -68,6 +68,29 @@
     </p>
   </section>
 
+  <%# The one knob an operator needs against real artwork. The scrim is the dial
+      between a readable header and a visible picture, and the right value
+      depends on a background that changes without a deploy — so it is set here,
+      next to the preview, rather than in code. %>
+  <section class="card p-4 mb-6">
+    <p class="label-upper mb-2">Banner tint</p>
+    <p class="text-sm text-body mb-3 max-w-xl">
+      How much the artwork is darkened behind the header. More tint means a more
+      legible greeting; less means a brighter picture. Leave it blank to use the
+      default (<%= (Studio::Banner::DEFAULT_SCRIM * 100).round %>%).
+    </p>
+    <%= form_with url: admin_email_settings_path(@entry.key), method: :patch,
+          class: "flex flex-wrap items-center gap-3" do %>
+      <label class="text-sm text-muted" for="scrim_percent">Tint</label>
+      <%= number_field_tag :scrim_percent, Studio::EmailCatalog.scrim_percent(@entry.key),
+            in: 0..100, step: 1, id: "scrim_percent",
+            class: "input-field w-24 py-2" %>
+      <span class="text-sm text-muted">%</span>
+      <%= submit_tag "Save tint", class: "btn btn-primary btn-sm" %>
+      <span class="text-2xs text-muted">Blank resets to the default.</span>
+    <% end %>
+  </section>
+
   <%# The email itself. An iframe because the response IS an email document —
       its own <html>, its own table layout, and no business inheriting the admin
       page's stylesheet. %>

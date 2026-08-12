@@ -570,6 +570,10 @@ module Studio
                constraints: { key: /[a-z0-9_]+/ }
         delete "admin/emails/:key",     to: "studio/emails#destroy",
                constraints: { key: /[a-z0-9_]+/ }
+        # Operator-tunable per-email settings (the banner scrim today). Separate
+        # from #update, which takes an image upload.
+        patch  "admin/emails/:key/settings", to: "studio/emails#settings",
+               as: :admin_email_settings, constraints: { key: /[a-z0-9_]+/ }
       end
 
       # DEPRECATED, kept for ONE release. Not a redirect: consumer-ci.yml runs
