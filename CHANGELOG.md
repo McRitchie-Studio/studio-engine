@@ -60,6 +60,20 @@ belongs to this app either way. The page's summary line counts it, so an app
 whose banners all ship from its own repo no longer reports "all inheriting the
 default artwork".
 
+### Added
+
+- **The "at" time stamp — `at_time_tag` + `studio/at_time_script`.** A shared
+  primitive for stamping WHEN something happened, on the READER's clock rather
+  than the app's: `at 3:53p`, gaining a date only when the stamp is not today and
+  the year only when it differs, with a country flag trailing the clock when the
+  reader's timezone is outside the US. The relative phrase moves to the hover
+  title. The server renders the app-timezone form as a no-JS fallback and never
+  renders a flag — it cannot know where the reader is sitting, so only the
+  reader's machine may assert one. Hosts render `studio/at_time_script` once,
+  near the end of the layout body; omitting it degrades to app-timezone stamps
+  rather than breaking. Specimen: `/admin/style` → Tricks → Time stamps; recipe
+  in the README's UI Primitives section.
+
 ## 0.39.0 — 2026-08-11
 
 ### Removed
