@@ -199,6 +199,17 @@ class StylePageTest < ActiveSupport::TestCase
     end
   end
 
+  # THE CLAIM THE WHOLE ADOPTION STORY RESTS ON: a host writes `at_time_tag` in a
+  # view and it just works, because the engine sets no isolate_namespace and its
+  # app/helpers join the host's helper path. Every other test here extends a bare
+  # view by hand, which would keep passing if that inheritance broke — so pin it
+  # against a REAL host controller, where nothing was extended by us.
+  test "a host controller gets the engine's helpers with no wiring" do
+    assert_includes PagesController._helpers.instance_methods, :at_time_tag,
+      "a host must reach at_time_tag through plain helper inheritance — if this fails, " \
+      "every README recipe and every specimen is wrong about adoption"
+  end
+
   # THE RE-STAMPER MUST BE ABLE TO RUN, WHICH IS NOT THE SAME AS BEING PRESENT.
   #
   # The first version of this guard was `assert_includes html, "__atTimeFmt"`. It
@@ -212,22 +223,12 @@ class StylePageTest < ActiveSupport::TestCase
   # app-timezone stamps with no flag.
   #
   # So this asserts the STRUCTURE the browser will build, not the presence of a
-  # string. A leaked-prose open tag breaks the open/close balance and shifts the
-  # script element's content — both of which are visible here, without a browser.
+  # string. Review re-proved it by mutation on 2026-08-11: reintroduce the leaked
+  # prose and the retired one-liner still PASSES while this one fails, naming the
+  # text that swallowed the script.
   # (The behavior itself — that it runs and localizes — is proven in a real engine
   # by the consuming app's Playwright lane: mcritchie-studio's
   # e2e/at_time_flag.spec.js.)
-  # THE CLAIM THE WHOLE ADOPTION STORY RESTS ON: a host writes `at_time_tag` in a
-  # view and it just works, because the engine sets no isolate_namespace and its
-  # app/helpers join the host's helper path. Every other test here extends a bare
-  # view by hand, which would keep passing if that inheritance broke — so pin it
-  # against a REAL host controller, where nothing was extended by us.
-  test "a host controller gets the engine's helpers with no wiring" do
-    assert_includes PagesController._helpers.instance_methods, :at_time_tag,
-      "a host must reach at_time_tag through plain helper inheritance — if this fails, " \
-      "every README recipe and every specimen is wrong about adoption"
-  end
-
   test "the at-format re-stamper is a well-formed script element, not text that merely contains it" do
     doc = Nokogiri::HTML.fragment(render_index)
     carriers = doc.css("script").select { |s| s.text.include?("__atTimeFmt") }
