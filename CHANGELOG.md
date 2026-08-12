@@ -2,7 +2,7 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
 
-## 0.40.0 — 2026-08-11
+## Unreleased
 
 **Fix — the emails page named the wrong owner for an app's own artwork.**
 `/admin/emails` described ANY registered banner as *"Shared Studio artwork,
