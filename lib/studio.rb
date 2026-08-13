@@ -1,5 +1,6 @@
 require "studio/version"
 require "studio/log_rotation"
+require "studio/ip_locations"
 require "studio/engine"
 require "studio/color_scale"
 require "studio/environment_banner"
@@ -191,6 +192,38 @@ module Studio
     return false if session.present? && session[FIRST_NAME_SKIP_SESSION_KEY]
 
     user.first_name.blank?
+  end
+
+  # Record a place this account has been seen from, if it is a place we have not
+  # seen it from before. Returns true when something was actually written.
+  #
+  # NEW LOCATIONS ONLY, and that is the design rather than a shortcut: this is
+  # called from the request path, so refreshing a counter on every hit would mean
+  # a database write per request for no analytic gain. The first sign-in from a
+  # place writes; the next thousand do not. A host wanting last-seen/count
+  # refresh can call Studio::IpLocations.push directly on its own cadence.
+  #
+  # The host resolves the location — turf-monster already has Geocoder wired in
+  # ApplicationController#detect_geo_state — and passes whatever it got. Pass
+  # only an IP and the IP is what gets deduped on.
+  #
+  # Tolerates an app that has not run the migration (no ip_locations column):
+  # it records nothing rather than raising on a request path.
+  def self.record_ip_location!(user, ip:, country: nil, region: nil, city: nil, at: nil)
+    return false if user.blank?
+    return false unless user.respond_to?(:ip_locations)
+
+    current = user.ip_locations
+    return false if IpLocations.seen?(current, ip: ip, country: country, region: region, city: city)
+
+    updated = IpLocations.push(current, ip: ip, country: country, region: region,
+                                        city: city, at: at)
+    return false if updated == IpLocations.normalize(current)
+
+    # update_columns, not update!: analytics must never block a request, and a
+    # validation failure elsewhere on the record is not this write's business.
+    user.update_columns(ip_locations: updated)
+    true
   end
 
   # Optional admin Act As / impersonation session conventions. Consumers that
