@@ -29,7 +29,7 @@ module Studio
       def scrim_for(key)
         return nil unless table_ready?
 
-        percent = find_by(email_key: key.to_s)&.scrim_percent
+        percent = for_key(key)&.scrim_percent
         percent.nil? ? nil : percent / 100.0
       end
 
@@ -39,7 +39,34 @@ module Studio
         return nil unless table_ready?
         return nil unless COPY_FIELDS.include?(field.to_sym)
 
-        find_by(email_key: key.to_s)&.public_send(field).presence
+        for_key(key)&.public_send(field).presence
+      end
+
+      # The row for this email, memoised PER REQUEST.
+      #
+      # Building one banner asks for the header, the fallback, the sub-text, the
+      # logo, the subject, the scrim and hide_logo — seven find_by calls for one
+      # row, on the mail DELIVERY path, and multiplied by every row on
+      # /admin/emails. The cache is request-scoped rather than a class variable
+      # so a write in one request cannot be served to the next.
+      # IsolatedExecutionState, not Thread.current: Puma reuses threads, so a
+      # thread-local outlives the request that filled it and the next request
+      # served by that thread would get the previous one's row. Rails resets
+      # IsolatedExecutionState around every request and job.
+      def for_key(key)
+        cache = ActiveSupport::IsolatedExecutionState[:studio_email_settings] ||= {}
+        return cache[key.to_s] if cache.key?(key.to_s)
+
+        cache[key.to_s] = find_by(email_key: key.to_s)
+      end
+
+      # Called after any write, because a memoised row that outlives its update
+      # serves the operator their old copy back and looks like the save failed.
+      def forget!(key = nil)
+        cache = ActiveSupport::IsolatedExecutionState[:studio_email_settings]
+        return if cache.nil?
+
+        key.nil? ? cache.clear : cache.delete(key.to_s)
       end
 
       # True when the operator has explicitly hidden the logo — which is a
@@ -47,7 +74,7 @@ module Studio
       def hide_logo?(key)
         return false unless table_ready?
 
-        find_by(email_key: key.to_s)&.hide_logo || false
+        for_key(key)&.hide_logo || false
       rescue ActiveRecord::ActiveRecordError
         false
       end
@@ -72,6 +99,9 @@ module Studio
           record.hide_logo = ActiveModel::Type::Boolean.new.cast(attrs[:hide_logo] || attrs["hide_logo"]) || false
         end
         record.save!
+        # Drop the memo, or the operator is shown the value they just replaced —
+        # the same "saved successfully, changed nothing" shape the permit bug had.
+        forget!(key)
         record
       end
 
@@ -84,6 +114,7 @@ module Studio
         record = find_or_initialize_by(email_key: key.to_s)
         record.scrim_percent = percent.presence&.to_i
         record.save!
+        forget!(key)
         record
       end
 

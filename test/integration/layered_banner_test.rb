@@ -337,6 +337,35 @@ class LayeredBannerTest < ActiveSupport::TestCase
     ActionMailer::Base.default_url_options = previous
   end
 
+  # OUTLOOK GETS A WASH TOO. Word ignores rgba(), so the scrim simply did not
+  # exist there: white text over bare artwork, which is the contrast case the
+  # scrim was added to solve and the one client that cannot be eyeballed.
+  test "the scrim reaches outlook as a solid colour" do
+    banner = Studio::Banner.for(:magic_link, name: "Alex")
+    html = view.render(partial: "studio/mailers/layered_banner", locals: { banner: banner })
+
+    assert_match(/bgcolor="#[0-9A-F]{6}"[^>]*background-color:rgba/m, html,
+      "the flat attribute must sit alongside the rgba declaration, not replace it")
+    assert_includes html, "background-color:rgba(24,16,64,",
+      "every other client should still get the translucent wash"
+  end
+
+  test "a scrim of zero paints nothing in either client" do
+    banner = Studio::Banner.new(background_url: "/a.gif", header: "Hi", scrim: 0)
+    html = view.render(partial: "studio/mailers/layered_banner", locals: { banner: banner })
+
+    refute_includes html, "background-color:rgba(24,16,64,",
+      "artwork dark enough to carry type should get no wash at all"
+  end
+
+  test "the solid approximation tracks the opacity" do
+    light = Studio::Banner.new(scrim: 0.1).scrim_solid_hex
+    heavy = Studio::Banner.new(scrim: 0.9).scrim_solid_hex
+
+    refute_equal light, heavy, "a fixed colour would ignore the operator's tint entirely"
+    assert_match(/\A#[0-9A-F]{6}\z/, heavy)
+  end
+
   # --- preview hooks must not reach an inbox --------------------------------
 
   # The admin page repaints this banner as the operator types, which needs

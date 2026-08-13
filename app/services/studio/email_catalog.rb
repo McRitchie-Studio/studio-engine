@@ -149,9 +149,12 @@ module Studio
       }
     ].freeze
 
-    # Banners render full-bleed at 600px in a 600px card. 1200x600 is the
-    # right cut: 2:1, retina-sharp at render width, and small enough to stay
-    # out of an inbox clipping limit.
+    # The FALLBACK shape, for an email that states none. 2:1 because that is what
+    # turf-monster's eight banners are, and changing it would recrop all of them.
+    #
+    # It is NOT what the engine's own emails use: both STANDARD entries declare
+    # aspect_ratio: 3.0 and both shipped backgrounds are 1200x400. The ratio is
+    # per-entry precisely so those two answers can differ.
     ASPECT_RATIO = 2.0
     MAX_WIDTH = 1200
 

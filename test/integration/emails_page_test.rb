@@ -269,6 +269,40 @@ class EmailsPageTest < ActiveSupport::TestCase
     end
   end
 
+  # --- an upload whose email left the registry ------------------------------
+
+  # The standard set can change. An email that leaves it takes its page with it,
+  # and a host that had uploaded artwork was left holding a live ImageCache row
+  # and a paid-for S3 object with no revert button — the only control that could
+  # remove either lived on the page that now 404s.
+  test "a key with an upload stays reachable after it leaves the registry" do
+    row = Struct.new(:url, :s3_key).new("https://cdn.test/orphan.gif", "email_banners/orphan.gif")
+    stub_module(Studio::EmailCatalog, :record) { |key| key.to_s == "gone_away" ? row : nil }
+
+    refute Studio::EmailCatalog.known?("gone_away"), "this guard is meaningless if the key is registered"
+    refute_nil Studio::EmailCatalog.record("gone_away"),
+      "an orphan is exactly: unregistered, but this app still stores an image for it"
+  end
+
+  test "an unregistered key with NO upload is still a 404" do
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+
+    assert_nil Studio::EmailCatalog.record("never_existed")
+    refute Studio::EmailCatalog.known?("never_existed"),
+      "keeping every unknown key reachable would turn a typo into a page"
+  end
+
+  # --- an operator-typed logo url -------------------------------------------
+
+  test "a logo url is only accepted when it can be fetched as an image" do
+    assert_equal "https://cdn.test/logo.png", Studio::Banner.safe_image_url("https://cdn.test/logo.png")
+    assert_equal "/assets/emails/logo.png", Studio::Banner.safe_image_url("/assets/emails/logo.png")
+
+    ["javascript:alert(1)", "data:text/html;base64,AAAA", "ftp://x/y.png", "  "].each do |value|
+      assert_nil Studio::Banner.safe_image_url(value), "#{value.inspect} reached an img src"
+    end
+  end
+
   # --- 2. the inherited defaults really ship in the gem ----------------------
 
   # Whichever artwork an entry declares — the flat fallback, the layered

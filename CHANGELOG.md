@@ -6,25 +6,26 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Changed
 
-- **BREAKING for turf-monster — `email_change_confirmation` is no longer
-  pre-registered; `newsletter_subscribed` takes its place.** `STANDARD` means
-  "the emails EVERY Studio app sends", and only turf-monster sends an
-  email-change confirmation — McRitchie Studio, McRitchie Industries and moms-app
-  all showed a manager row for an email they have no mailer for. The artwork
-  (`emails/email-change-confirmation.gif`) still ships, so turf-monster restores
-  its banner with one line in `config/initializers/studio_emails.rb`:
+- **`email_change_confirmation` leaves the pre-registered set; `newsletter_subscribed`
+  joins it.** `STANDARD` means "the emails EVERY Studio app sends", and only
+  turf-monster sends an email-change confirmation — which it **already registers
+  itself**, with its own artwork, in `config/initializers/studio_emails.rb`. No
+  host loses a banner, and no host action is required for the removal.
 
-  ```ruby
-  Studio::EmailCatalog.register("email_change_confirmation",
-    label: "Email change confirmation",
-    description: "Confirms a new address before the change takes effect.",
-    default_asset: "emails/email-change-confirmation.gif",
-    aspect_ratio: 3.0)
-  ```
+  What DOES break consumers is the ADDITION. Two suites assert against the whole
+  shared catalogue, so a new standard email fails them:
 
-  Without it `Studio::EmailCatalog.resolved_url(:email_change_confirmation)`
-  returns `nil` and that email sends bannerless — degraded, not broken, and no
-  exception. **Land turf-monster's registration before releasing this gem.**
+  | Consumer | Assertion | Fix |
+  |---|---|---|
+  | turf-monster | `EmailRegistrationTest` compares the full key list | mcritchie/turf-monster#292 |
+  | mcritchie-studio | `StudioEmailsPageTest` pins the registry list, an `email_change_confirmation` link, and the upload-rejection wording | mcritchie/mcritchie-studio#813 |
+
+  Consumer CI builds each app against its **default branch**, so both must reach
+  `main` before this engine's consumer lanes go green. Nothing on this branch can
+  turn them green.
+
+  The artwork `emails/email-change-confirmation.gif` still ships, so a host that
+  wants the entry can register it.
 
 ### Added
 

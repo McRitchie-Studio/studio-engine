@@ -59,6 +59,26 @@ module Studio
     def width  = (@width  || DEFAULT_WIDTH).to_i
     def height = (@height || DEFAULT_HEIGHT).to_i
 
+    # The scrim as a SOLID hex, for Outlook.
+    #
+    # Word's rendering engine ignores rgba(), so the wash simply does not exist
+    # there — white text over bare artwork, which is the exact contrast case the
+    # scrim was added to solve, in the one client nobody can spot-check. VML
+    # cannot layer a translucent fill over an image fill either, so the honest
+    # approximation is a solid colour: the scrim tint blended toward the artwork's
+    # own darkness by the same fraction. It is not the same picture as everywhere
+    # else, and it is legible, which is the point.
+    SCRIM_RGB = [24, 16, 64].freeze
+
+    def scrim_solid_hex
+      fraction = scrim_opacity
+      # Blend the tint toward mid-grey rather than to black: at low opacities a
+      # blend toward black reads far darker in Outlook than the rgba() wash does
+      # elsewhere, which trades one wrong picture for another.
+      blended = SCRIM_RGB.map { |channel| ((channel * fraction) + (128 * (1 - fraction))).round.clamp(0, 255) }
+      format("#%02X%02X%02X", *blended)
+    end
+
     def scrim_opacity
       value = @scrim
       return DEFAULT_SCRIM if value.nil?
@@ -85,7 +105,7 @@ module Studio
                  logo_url: nil, scrim: nil, logo_alt: nil)
       banner = new(
         background_url: background_url || Studio::EmailCatalog.background_url(key),
-        logo_url:       logo_url       || Studio::EmailCatalog.resolved_logo_url(key),
+        logo_url:       logo_url       || safe_image_url(Studio::EmailCatalog.resolved_logo_url(key)),
         logo_alt:       logo_alt       || Studio.app_name,
         header:         header         || header_for(key, name),
         subtext:        subtext        || Studio::EmailCatalog.subtext(key),
@@ -102,6 +122,18 @@ module Studio
     # than Ruby's %{name}: an operator-editable string is passed to no formatter
     # here, and a stray "%" in "50% off" would raise inside format() where a
     # stray brace is simply left alone.
+    # An operator types the logo URL into an admin form, and it is rendered into
+    # an <img src>. Admin-only and low risk, but "javascript:" and "data:" in a
+    # src are cheap to refuse and there is no reason to carry them: a logo is
+    # fetched over http(s) or served from this app's own asset path.
+    def self.safe_image_url(url)
+      value = url.to_s.strip
+      return nil if value.empty?
+      return value if value.start_with?("/")
+
+      value.match?(%r{\Ahttps?://}i) ? value : nil
+    end
+
     NAME_PLACEHOLDER = "{name}".freeze
 
     # The app's own name. Present because the DEFAULTS need it: "Your sign-in

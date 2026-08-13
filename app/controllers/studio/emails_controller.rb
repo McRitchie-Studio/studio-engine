@@ -34,7 +34,13 @@ module Studio
     # GET /admin/emails/:key — one email: its banner, its type, and a live
     # preview built from the host's sample data.
     def show
+      # nil for an ORPHAN — an email that left the registry while this app still
+      # holds an upload for it. The view renders a minimal page whose only real
+      # affordance is Revert, which is the whole reason the route stays open.
       @entry = Studio::EmailCatalog.entry(@key)
+      @orphan = @entry.nil?
+      return render(:orphan) if @orphan
+
       @subject = Studio::EmailCatalog.preview_subject(@key)
       @preview_error = Studio::EmailCatalog.preview_error(@key)
       @uploads_available = Studio::EmailCatalog.uploads_available?
@@ -168,10 +174,13 @@ module Studio
       # ErrorLog to say why.
       rescue_and_log do
         reverted = Studio::EmailCatalog.revert(@key)
+        # label() falls back to the humanised key, so an ORPHAN (no registry
+        # entry at all) still gets a readable message rather than a blank one.
+        label = Studio::EmailCatalog.label(@key).presence || @key.humanize
         notice = if reverted
-                   "#{Studio::EmailCatalog.label(@key)} reverted to the inherited default."
+                   "#{label} reverted to the inherited default."
                  else
-                   "#{Studio::EmailCatalog.label(@key)} was already using the inherited default."
+                   "#{label} was already using the inherited default."
                  end
         redirect_to admin_emails_path, notice: notice, status: :see_other
       end
@@ -181,20 +190,36 @@ module Studio
 
     private
 
-    # Derived from the model's own field list rather than retyped here. The
-    # hand-written list silently dropped :subject when that field was added — the
-    # form posted it, strong params filtered it out, and the page reported
-    # "Saved." while the subject was discarded. A permit list that cannot go out
-    # of date with the columns it guards is worth more than one that reads
-    # explicitly, and COPY_FIELDS is itself the explicit list.
+    # COPY_FIELDS plus :hide_logo, and the awkward shape is the honest one.
+    #
+    # This list was DERIVED from COPY_FIELDS precisely because a hand-typed one
+    # dropped :subject — the form posted it, strong params filtered it out, and
+    # the page still said "Saved." Deriving it then reintroduced exactly that bug
+    # for the one editable column that is NOT a copy field: hide_logo is a
+    # boolean rather than text, so it lives outside COPY_FIELDS and vanished from
+    # the permit list. Hiding the logo saved nothing and reported success.
+    #
+    # Every model-level logo test passed throughout, because set_copy was never
+    # the broken part. The filter lives here, so the assertion does too.
     def copy_params
-      params.permit(*Studio::EmailSetting::COPY_FIELDS)
+      params.permit(*Studio::EmailSetting::COPY_FIELDS, :hide_logo)
             .to_h.symbolize_keys
     end
 
+    # A key is reachable when it is REGISTERED, or when this app still holds an
+    # upload for it.
+    #
+    # The second half matters because the standard set can change. An email that
+    # leaves it takes its page with it — and a host that had uploaded its own
+    # artwork was left with a live ImageCache row, a paid-for S3 object, and a
+    # 404 on the only page that could delete either. Keeping the page reachable
+    # for an orphan is what gives that operator a revert button.
     def load_entry
       @key = params[:key].to_s
-      head :not_found unless Studio::EmailCatalog.known?(@key)
+      return if Studio::EmailCatalog.known?(@key)
+      return if Studio::EmailCatalog.record(@key).present?
+
+      head :not_found
     end
 
     def require_uploads

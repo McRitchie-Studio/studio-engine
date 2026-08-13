@@ -91,6 +91,13 @@
                 exactly 300px, and a wash over the whole picture. valign does
                 the vertical centring that the padding was doing. %>
             <td align="center" valign="middle" height="<%= banner.height %>"<%= hook.call("scrim") %>
+                <%# bgcolor is the OUTLOOK path and the CSS below is everywhere
+                    else. Word ignores rgba(), so without the attribute the wash
+                    vanishes there and white text sits on bare artwork — the exact
+                    contrast case the scrim exists for, in the one client that
+                    cannot be spot-checked. Every other client honours the rgba
+                    declaration and overrides the flat attribute. %>
+                <%= %(bgcolor="#{banner.scrim_solid_hex}").html_safe if banner.scrim_opacity.positive? %>
                 style="height:<%= banner.height %>px;padding:0 <%= side_padding %>px;<%= "background-color:rgba(24,16,64,#{banner.scrim_opacity});" if banner.scrim_opacity.positive? %>">
               <% if preview || banner.header.present? %>
                 <p<%= hook.call("header") %> style="margin:0 0 <%= gap_after_header %>px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:<%= header_size %>px;line-height:<%= header_line %>px;font-weight:700;color:#ffffff;">

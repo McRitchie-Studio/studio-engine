@@ -1,0 +1,45 @@
+<%#  admin/emails/:key for an ORPHAN — an email this app uploaded artwork for,
+     which has since left the registry.
+
+     It exists so the operator has a way out. Without the page, that upload is a
+     live ImageCache row and a paid-for S3 object with no revert button anywhere,
+     because the only control that could remove it lived on a page that 404s the
+     moment the key is unregistered.
+
+     Deliberately minimal: there is no banner to preview, no copy to edit and no
+     recipient to render as. The one honest affordance is "drop it". %>
+<% content_for(:title) { "Unregistered email" } %>
+<div class="max-w-5xl mx-auto px-4 pb-16">
+  <header class="pt-8 pb-5">
+    <%= link_to "← All emails", admin_emails_path,
+          class: "text-sm text-muted hover:text-heading underline underline-offset-2" %>
+    <h1 class="text-3xl font-bold text-heading mt-2">Unregistered email</h1>
+    <div class="flex flex-wrap items-center gap-2 mt-3">
+      <span class="badge bg-warning/10 text-warning border-warning/30 whitespace-nowrap">Not registered</span>
+      <span class="font-mono text-2xs text-muted"><%= @key %></span>
+    </div>
+  </header>
+
+  <section class="card p-4 mb-6">
+    <p class="text-body max-w-2xl">
+      <%= Studio.app_name %> uploaded artwork for <code class="font-mono text-2xs bg-inset px-1.5 py-0.5 rounded"><%= @key %></code>,
+      but no email is registered under that key any more — so nothing sends it. The
+      image is still stored, and this page is here so you can drop it.
+    </p>
+
+    <% if (record = Studio::EmailCatalog.record(@key)) %>
+      <div class="rounded-lg overflow-hidden border border-subtle w-56 mt-4">
+        <%= image_tag record.url, class: "w-full h-auto", alt: "Stored artwork for #{@key}" %>
+      </div>
+      <p class="font-mono text-2xs text-muted mt-2 break-all"><%= record.s3_key %></p>
+    <% end %>
+
+    <% if @uploads_available %>
+      <div class="mt-4">
+        <%= button_to "Drop this image", admin_email_path(@key), method: :delete,
+              class: "btn btn-outline btn-sm",
+              form: { data: { turbo_confirm: "Delete the stored image for #{@key}? Nothing sends it." } } %>
+      </div>
+    <% end %>
+  </section>
+</div>

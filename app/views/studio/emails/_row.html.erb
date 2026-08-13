@@ -85,6 +85,9 @@
         aspectRatio: <%= entry.ratio %>,
         maxWidth: <%= max_width %>,
         transparent: false,
+        <%# Same answer as the email's own page. Without this the SAME button
+            refused an animated GIF here and accepted it there. %>
+        allowGifs: true,
         filename: '<%= entry.key %>.png',
         saving: 'Saving banner…',
         success: 'Banner updated',

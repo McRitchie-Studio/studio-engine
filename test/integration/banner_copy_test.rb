@@ -41,6 +41,7 @@ class BannerCopyTest < ActiveSupport::TestCase
   end
 
   def setup
+    Studio::EmailSetting.forget!
     self.class.ensure_settings_table!
     self.class.ensure_copy_columns!
     Studio::EmailSetting.delete_all
@@ -214,13 +215,43 @@ class BannerCopyTest < ActiveSupport::TestCase
     end
   end
 
-  # The permit list is DERIVED from COPY_FIELDS rather than retyped, which is
-  # what makes the guard above impossible to reintroduce by adding a column.
-  test "the controller permits exactly the model's copy fields" do
-    source = File.read(File.expand_path("../../app/controllers/studio/emails_controller.rb", __dir__))
+  # The row is memoised for the request: building one banner asks for the header,
+  # the fallback, the sub-text, the logo, the subject, the scrim and hide_logo —
+  # seven lookups for one row, on the DELIVERY path. A memo that outlives its own
+  # update is worse than the queries, so a write clears it.
+  test "a saved change is visible immediately, not served from a stale memo" do
+    Studio::EmailSetting.set_copy("magic_link", header: "First")
+    assert_equal "First", Studio::EmailSetting.copy_for("magic_link", :header)
 
-    assert_includes source, "params.permit(*Studio::EmailSetting::COPY_FIELDS)",
-      "a hand-written permit list goes stale the next time a field is added"
+    Studio::EmailSetting.set_copy("magic_link", header: "Second")
+    assert_equal "Second", Studio::EmailSetting.copy_for("magic_link", :header),
+      "the operator saved and was shown their previous value back"
+  end
+
+  test "setting the tint also clears the memo" do
+    Studio::EmailSetting.scrim_for("magic_link")
+    Studio::EmailSetting.set_scrim("magic_link", 55)
+
+    assert_in_delta 0.55, Studio::EmailSetting.scrim_for("magic_link"), 0.001
+  end
+
+  # --- through HTTP, where the filtering happens -----------------------------
+
+  # THE BUG THIS EXISTS FOR. Every logo test above passed while hiding the logo
+  # from the actual page did nothing: strong params dropped :hide_logo, set_copy
+  # never saw it, and the redirect said "Saved." The model was never broken, so
+  # model-level tests could not see it — the filter sits in the controller, so
+  # the assertion has to go through the controller.
+  test "the controller permits every field the form posts" do
+    posted = %i[header header_fallback subtext subject logo_url hide_logo]
+    permitted = Studio::EmailSetting::COPY_FIELDS + [:hide_logo]
+
+    missing = posted - permitted
+    assert_empty missing, "the form posts these and strong params drops them: #{missing.join(", ")}"
+
+    source = File.read(File.expand_path("../../app/controllers/studio/emails_controller.rb", __dir__))
+    assert_includes source, "params.permit(*Studio::EmailSetting::COPY_FIELDS, :hide_logo)",
+      "hide_logo is not a COPY_FIELD, so deriving the list from COPY_FIELDS alone silently drops it"
   end
 
   # --- the mailer supplies WHO, not WHAT ------------------------------------
