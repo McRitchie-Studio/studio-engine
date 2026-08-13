@@ -670,6 +670,22 @@ class EmailsPageTest < ActiveSupport::TestCase
     refute_stray_synthetic targets # the SAME expression the guard uses, not a copy
   end
 
+  # THE NO-USER-MODEL WORLD, unstubbed — the shape the deleted builder served,
+  # and the one mutant every other test here is blind to. The two tests above
+  # stub a POPULATED model, so `find_member` never reaches its `record.nil?`
+  # branch; the two below never call `all` at all. Restore the deleted builder as
+  # that nil fallback and, without this test, the whole suite stays green — while
+  # the suite this one replaced caught it. That is a kill worth keeping.
+  test "an app with no User model is offered the admin backstop alone" do
+    assert_nil Studio::EmailPreviewTarget.send(:user_model),
+      "precondition: the engine's dummy app defines no User model"
+
+    targets = Studio::EmailPreviewTarget.all
+
+    assert_equal %w[sample-admin], targets.map(&:id), "the backstop, and nothing beside it"
+    refute_stray_synthetic targets
+  end
+
   # THE INVARIANT ITSELF, exercised directly — because both tests above run
   # against a picker that currently offers no synthetic member, so neither can
   # tell `sample? && !admin?` apart from a check on one hard-coded id. That
