@@ -21,14 +21,38 @@ class UserMailer < ApplicationMailer
     @app_name   = Studio.app_name
     @email      = email
     @magic_url  = magic_link_url_for(token)
+    # ONE lookup, two consumers. recipient_name queries the host's users table,
+    # and the banner and the subject want the same answer — asking twice on a
+    # delivery path buys nothing and risks the two disagreeing.
+    name        = recipient_name(email)
+    # THE LAYERED BANNER, when this app has layered artwork for the email.
+    #
+    # The mailer supplies only WHO the recipient is. What the banner SAYS about
+    # them — the greeting, the sub-text, whether the name is used at all — is
+    # the operator's, editable on /admin/emails. Handing over a finished header
+    # here would leave those fields accepting edits no inbox ever sees.
+    #
+    # Why this assignment exists at all: /admin/emails draws its preview from
+    # this same Studio::Banner.for call, so a mailer that set only @banner_url
+    # made the manager show a layered banner with live text for an email that
+    # shipped flat baked-in artwork. Preview and send now resolve through one
+    # expression and cannot disagree.
+    #
+    # nil when the app registers no background (or owns the artwork itself), and
+    # the layout falls through to the flat <img> below.
+    @banner     = Studio::Banner.for(:magic_link, name: name)
     # resolved_url, not url: this app's own upload if it has one, otherwise the
     # engine's default banner — which is what makes a brand-new app's sign-in
     # email branded on day one. nil renders bannerless.
+    #
+    # KEPT AS THE FLOOR. @banner above wins when it is present; this is what an
+    # app with no layered artwork registered still sends, exactly as before.
+    # Layered is opt-in, never a migration.
     @banner_url = Studio::EmailCatalog.resolved_url(:magic_link)
     @banner_alt = "Your #{@app_name} sign-in link"
     # The operator's subject when they have set one, the hard-coded line
     # otherwise — so an app that never visits /admin/emails is unchanged.
-    subject = Studio::EmailCatalog.subject_for(:magic_link, name: recipient_name(email)) ||
+    subject = Studio::EmailCatalog.subject_for(:magic_link, name: name) ||
               "Your #{@app_name} sign-in link"
     mail(to: email, subject: subject)
   end

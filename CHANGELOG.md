@@ -58,13 +58,24 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   with the punctuation holding it — "Sign in to {app}, {name}" sends as
   "Sign in to Studio" to someone with no name on file.
 
-- **The email manager previews what actually SHIPS.** Each email now renders the
+- **The email manager previews what actually SHIPS.** Each email renders the
   real layered banner through the mailer's own partial (not a re-creation of it),
   repaints as the operator types, and offers an example recipient — an admin, who
   usually has a full name on file, and a member, who often has none. The nameless
   case is the one the fallback header exists for and the one nobody thinks to
   check. Preview hooks are opt-in (`preview: true`); with them off the email
   markup is byte-identical, asserted by test.
+
+  What makes that true rather than aspirational: the engine's own
+  `UserMailer#magic_link` ADOPTS the layered banner (`Studio::Banner.for`), and
+  /admin/emails builds its preview from the same call — one expression, so the
+  two cannot disagree. Before this, the manager drew a layered banner with live
+  "Welcome Alex!" text for a sign-in email that shipped flat artwork with the
+  words baked in: a preview showing something no recipient receives. A test
+  renders the mailer and the manager for the same key and compares the artwork
+  and the layered-ness, so the two are held together rather than trusted to
+  match. An app that registers no layered artwork still sends the plain `<img>`
+  — layered is opt-in, never a migration.
 
 - **Animated GIF banners upload without losing their animation.** The cropper
   paints onto a canvas and calls `toBlob(..., "image/png")`, which keeps frame one

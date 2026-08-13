@@ -394,16 +394,23 @@ as HTML **on top**, rather than drawn into the image:
 
 ```ruby
 def magic_link(email, token)
-  @banner = Studio::Banner.for(:magic_link,
-                               header: "Welcome #{user.first_name}!",
-                               subtext: "your sign-in link is below")
+  # The mailer supplies WHO the recipient is. What the banner SAYS about them —
+  # the greeting, the sub-text, whether the name is used at all — belongs to the
+  # operator, editable on /admin/emails. Pass a finished `header:` here and those
+  # fields still accept edits no inbox ever sees.
+  @banner = Studio::Banner.for(:magic_link, name: recipient_name(email))
   # ...
 end
 ```
 
-`layouts/branded_mailer` renders it. A mailer that sets `@banner_url` instead
-still renders a plain `<img>` exactly as before — layered is opt-in, never a
-migration.
+`layouts/branded_mailer` renders it. The engine's own `UserMailer#magic_link`
+does exactly the above, and /admin/emails builds its preview from the same
+`Studio::Banner.for` call — so preview and send cannot disagree.
+
+A mailer that sets `@banner_url` instead still renders a plain `<img>` exactly
+as before, and `Studio::Banner.for` returns `nil` when the app has registered no
+layered artwork, so the flat path is what an unadopted app keeps getting —
+layered is opt-in, never a migration.
 
 Register the artwork once and every app inherits it:
 
@@ -411,7 +418,7 @@ Register the artwork once and every app inherits it:
 Studio::EmailCatalog.register("magic_link",
   background: "emails/magic-link-background.gif",
   logo: "emails/logo-horizontal.png",
-  scrim: 0.34)
+  scrim: 0.40)
 ```
 
 **Why layered rather than composited.** Drawing the text into the image gives
@@ -424,7 +431,7 @@ a system face rather than the brand font. In exchange the text survives blocked
 images (Outlook desktop blocks by default), stays selectable, and nothing is
 generated at send time.
 
-**The scrim** is a wash between artwork and type, on by default at 0.34.
+**The scrim** is a wash between artwork and type, on by default at 0.40.
 Background art is chosen to look good, not to guarantee contrast, and white text
 over a pale sky cannot be read. Pass `scrim: 0` for artwork dark enough to carry
 the type itself.

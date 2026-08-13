@@ -7,7 +7,8 @@
 
   TWO banner shapes, in priority order:
 
-    @banner — a Studio::Banner (see Studio::EmailBannerRenderer). LAYERED: a
+    @banner — a Studio::Banner, built by Studio::Banner.for and drawn by the
+      studio/mailers/layered_banner partial. LAYERED: a
       background image with the header, sub-text and logo as live HTML on top.
       This is the shape that supports an ANIMATED background together with
       per-recipient text, because the text is never drawn into the picture.

@@ -441,6 +441,119 @@ class LayeredBannerTest < ActiveSupport::TestCase
     Studio::EmailCatalog.reset!
   end
 
+  # --- ACCEPTANCE 3: the manager previews what actually SHIPS --------------
+  #
+  # Asserted as a COMPARISON between two rendered things, not as two
+  # independent expectations. The defect this exists to catch was never "the
+  # preview is wrong" or "the email is wrong" — each looked right on its own.
+  # They DISAGREED: /admin/emails drew a layered banner with live "Welcome
+  # Alex!" text for an email that shipped flat artwork with the words baked in,
+  # and did it convincingly enough to survive two reviews.
+  #
+  # Compared: LAYERED-NESS and the ARTWORK URL. Deliberately not the header
+  # text — the preview greets whichever example recipient the operator picked
+  # and the send greets the real one, so the words differing is the feature
+  # working rather than a mismatch.
+  MAGIC_TOKEN = "tokenfortest1234"
+
+  # magic_link_url_for needs a host to build a URL at all.
+  def with_mailer_host
+    previous = ActionMailer::Base.default_url_options
+    ActionMailer::Base.default_url_options = { host: "example.test" }
+    yield
+  ensure
+    ActionMailer::Base.default_url_options = previous
+  end
+
+  def sent_doc
+    mail = UserMailer.magic_link("reader@example.test", MAGIC_TOKEN)
+    Nokogiri::HTML((mail.html_part&.body || mail.body).to_s)
+  end
+
+  # The banner as the EMAIL BODY carries it, read from real rendered mail
+  # through the real layout — NOT from the mailer's instance variables. An
+  # assign the layout never consumes is exactly the bug, so a test reading
+  # assigns would have passed throughout.
+  def banner_as_sent(doc = sent_doc)
+    cell = doc.css("td[background]").first
+
+    { layered: !cell.nil?, artwork: cell && cell["background"] }
+  end
+
+  # The banner as the MANAGER draws it. Studio::Banner.for IS the manager's
+  # decision: the detail page assigns it (Studio::EmailsController), the list
+  # row builds it (_row.html.erb), and both render the same partial from it —
+  # or fall back to the flat image when it is nil.
+  def banner_as_previewed(name: "Alex")
+    banner = Studio::Banner.for("magic_link", name: name)
+
+    { layered: !banner.nil?, artwork: banner&.background_url }
+  end
+
+  test "the manager previews the banner the mailer actually sends" do
+    with_mailer_host do
+      sent = banner_as_sent
+
+      # The comparison below is only worth something if this quadrant is the
+      # LAYERED one. Without this anchor, an environment where the artwork
+      # failed to resolve would leave both sides flat-and-nil and the test
+      # would pass while asserting nothing at all.
+      assert sent[:layered],
+        "the engine's own magic_link should send a LAYERED banner; both sides " \
+        "being flat would make the comparison below vacuous"
+
+      assert_equal banner_as_previewed, sent,
+        "/admin/emails and the inbox disagree about the magic-link banner"
+    end
+  end
+
+  # THE FLAT FLOOR. An app with no layered artwork registered still sends the
+  # plain <img>, unchanged — the promise branded_mailer.html.erb makes in its
+  # own comment ("layered is opt-in, never a migration"). The engine's mailer
+  # adopting Studio::Banner.for is precisely the change that could break it.
+  test "an email with no layered artwork still sends the flat image" do
+    # "" CLEARS the inherited background: register keeps the existing value for
+    # nil and drops an empty through .presence. This app registers artwork with
+    # no layered half.
+    Studio::EmailCatalog.register("magic_link", background: "")
+    assert_nil Studio::EmailCatalog.background_url("magic_link"),
+      "setup failed — this key still has layered artwork, so the flat floor is untested"
+
+    with_mailer_host do
+      doc = sent_doc
+
+      refute banner_as_sent(doc)[:layered],
+        "an app with no layered artwork must not render the layered banner"
+      assert_equal [Studio::EmailCatalog.resolved_url("magic_link")],
+                   doc.css("img").map { |img| img["src"] },
+        "the flat <img> is what an app with no layered artwork sends, unchanged"
+    end
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  # THE CONSUMER QUADRANT, at the inbox rather than the catalogue. turf-monster
+  # re-registers magic_link with its own flat artwork and INHERITS the engine's
+  # background. The guard at 5cdeaa5 stopped the manager drawing the inherited
+  # picture; this stops the engine's newly-layering mailer from sending it.
+  test "a host that owns its artwork still sends it flat" do
+    stub_singleton(Studio::EmailCatalog, :record, nil) do
+      Studio::EmailCatalog.register("magic_link", default_asset: "emails/magic-link.gif")
+
+      with_mailer_host do
+        doc = sent_doc
+
+        refute banner_as_sent(doc)[:layered],
+          "the engine layered live text over artwork this host sends flat"
+        assert_equal [Studio::EmailCatalog.resolved_url("magic_link")],
+                     doc.css("img").map { |img| img["src"] },
+          "a host that owns its artwork sends that picture, not the engine's background"
+      end
+    end
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
   test "a host can override any piece per send" do
     Studio::EmailCatalog.register("magic_link", background: "emails/custom.gif", scrim: 0.1)
 
