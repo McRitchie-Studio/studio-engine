@@ -115,7 +115,11 @@ module Studio
         # are the one looking at the artwork.
         scrim:          scrim || Studio::EmailCatalog.scrim(key)
       )
-      banner.renderable? ? banner : nil
+      # A LAYERED banner needs its picture, and renderable? deliberately accepts
+      # a header alone — right for a caller building a Banner directly, wrong
+      # here. A nil background means the catalogue said this app sends the email
+      # flat, and a text-only card is not what that inbox gets.
+      banner.background_url.present? ? banner : nil
     end
 
     # The placeholder an operator types into the header field. Braces rather

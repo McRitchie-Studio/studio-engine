@@ -424,6 +424,23 @@ class LayeredBannerTest < ActiveSupport::TestCase
     end
   end
 
+  # A HOST THAT REGISTERS ITS OWN FLAT ARTWORK SENDS THAT PICTURE. turf-monster
+  # re-registers magic_link and inherits the engine's background; the manager
+  # drew the inherited one, for an email whose words are already baked in.
+  test "a host's own flat artwork is what the manager previews" do
+    stub_singleton(Studio::EmailCatalog, :record, nil) do
+      Studio::EmailCatalog.register("magic_link", default_asset: "emails/magic-link.gif")
+
+      assert_equal Studio::EmailCatalog.resolved_url("magic_link"),
+                   Studio::EmailCatalog.preview_url("magic_link"),
+        "the manager drew a picture the mailer does not send"
+      assert_nil Studio::Banner.for("magic_link", name: "Alex"),
+        "the detail page layered live text over artwork this app sends flat"
+    end
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
   test "a host can override any piece per send" do
     Studio::EmailCatalog.register("magic_link", background: "emails/custom.gif", scrim: 0.1)
 

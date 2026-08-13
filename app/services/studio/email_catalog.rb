@@ -366,7 +366,16 @@ module Studio
     # LAYERED email — the upload landed, the page showed it, the provenance badge
     # flipped to "Uploaded here", and the email kept sending the gem's artwork
     # because the layered banner never looked at the row.
-    def background_url(key) = url(key) || absolute_asset_url(entry(key)&.background)
+    #
+    # NIL WHEN THIS APP OWNS THE ARTWORK. A host registering its own flat
+    # default_asset sends that picture; the background it also inherited is the
+    # engine's and nothing sends it. The list row carried this guard alone, so
+    # the detail page still layered live text over artwork no inbox receives.
+    def background_url(key)
+      return nil unless entry(key)&.engine_artwork?
+
+      url(key) || absolute_asset_url(entry(key)&.background)
+    end
     def logo_url(key)       = absolute_asset_url(entry(key)&.logo)
 
     def absolute_asset_url(asset)
@@ -509,7 +518,12 @@ module Studio
     #
     # The flat asset stays the fallback, for a host still on the engine's own
     # unlayered UserMailer — there, the baked-text banner IS what arrives.
+    #
+    # Unless THIS APP owns the artwork, in which case it previews exactly what
+    # the flat resolution sends — same method, so the two cannot disagree.
     def preview_asset_path(key)
+      return default_asset_path(key) unless entry(key)&.engine_artwork?
+
       asset_path(entry(key)&.background.presence || entry(key)&.default_asset)
     end
 
