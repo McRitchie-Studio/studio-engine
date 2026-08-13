@@ -417,9 +417,33 @@ Register the artwork once and every app inherits it:
 ```ruby
 Studio::EmailCatalog.register("magic_link",
   background: "emails/magic-link-background.gif",
-  logo: "emails/logo-horizontal.png",
+  logo: "emails/our-own-mark.png",   # a path THIS app ships — see below
   scrim: 0.40)
 ```
+
+**A background is shareable; a logo is not.** Artwork rides the gem on purpose,
+so a brand-new app sends good-looking mail on day one. A wordmark is somebody's
+identity, so `logo:` must name a file **your app** ships. Two traps make getting
+this wrong silent:
+
+- **A logical path that your app does not ship resolves to the ENGINE's copy.**
+  turf-monster registered `"emails/logo-horizontal.png"`, shipped no such file,
+  and Sprockets served studio-engine's — its sign-in email went out carrying the
+  McRITCHIE STUDIO wordmark. Nothing raised.
+- **The alt text agrees with you, not with the pixels.** `Studio::Banner` sets it
+  from `Studio.app_name`, so it reads as your app's name over whatever picture
+  actually loaded.
+
+`logo:` merges three ways: omitted or `nil` **inherits** whatever the entry
+already had, `""` **clears** it, and a path **sets** it. So deleting a `logo: ""`
+line does not remove the logo — it restores the inherited one.
+
+What each `STANDARD` entry lends today:
+
+| Entry | Seeds a logo? |
+|---|---|
+| `newsletter_subscribed` | **No.** A host that names none sends none. |
+| `magic_link` | **Yes** — `emails/logo-horizontal.png`, the Studio wordmark. A host that has not registered its own mark inherits it. |
 
 **Why layered rather than composited.** Drawing the text into the image gives
 pixel-exact brand typography everywhere, but it cannot have an ANIMATED

@@ -166,7 +166,12 @@ module Studio
         # layer since the day it was written, so a baked-in copy of the same
         # picture would be a second thing to keep in sync and never be shown.
         background: "emails/newsletter-subscribed-background.gif",
-        logo: "emails/logo-horizontal.png",
+        # NO logo: KEY, and adding one back is the bug. It seeded
+        # "emails/logo-horizontal.png" — the McRITCHIE STUDIO wordmark — into
+        # every host that registers this email without naming a logo of its own,
+        # because register() merges on `logo.presence` and an omitted key
+        # inherits. Full reasoning under NO DEFAULT LOGO below; the guards are in
+        # test/integration/newsletter_email_test.rb.
         header: "Welcome {name}!",
         header_fallback: "You're subscribed!",
         subtext: "you're on the list",
@@ -194,19 +199,46 @@ module Studio
     ASPECT_RATIO = 2.0
     MAX_WIDTH = 1200
 
-    # NO DEFAULT LOGO, deliberately.
+    # NO DEFAULT LOGO, deliberately — on any route.
     #
-    # It was emails/logo-horizontal.png — the white "McRITCHIE STUDIO" wordmark —
-    # and every consumer inherits this layout without defining its own. That put
-    # Studio branding into turf-monster's entire player-facing mail set, which
-    # today carries none, plus moms-app, mcritchie-industries, acquisition-studio
-    # and rolio, with no opt-in and no host-side change.
+    # There is no DEFAULT_LOGO constant here, and newsletter_subscribed above
+    # seeds no logo either. Same rule, learned twice, on two different routes.
     #
-    # It also contradicted the rule at the top of this file: the url / resolved_url
+    # The constant went first. It was emails/logo-horizontal.png — the white
+    # "McRITCHIE STUDIO" wordmark — and every consumer inherits this layout
+    # without defining its own. That put Studio branding into turf-monster's
+    # entire player-facing mail set, which today carries none, plus moms-app,
+    # mcritchie-industries, acquisition-studio and rolio, with no opt-in and no
+    # host-side change.
+    #
+    # The SEED went second, and it is the subtler half: newsletter_subscribed
+    # carried the same file as its banner logo, and register() merges on
+    # `logo.presence` — omitting the key INHERITS. A host registering that email
+    # to relabel it or attach a preview would have inherited the wordmark without
+    # naming it. turf-monster had already been bitten by this on magic_link, where
+    # the sign-in banner sent the Studio wordmark under an alt of "Turf Monster".
+    #
+    # Both contradict the rule at the top of this file: the url / resolved_url
     # split exists so the engine cannot swap a host's artwork for the engine's in
-    # live email. A footer logo is the same swap by another route.
+    # live email. A logo is the same swap by another route — and the ALT TEXT
+    # cannot warn anyone, because Studio::Banner sets it from Studio.app_name, so
+    # it always agrees with the host and never with the pixels.
     #
-    # Each app opts in on /admin/emails by pasting its own mark.
+    # ARTWORK still rides the gem, and should: a background is a picture any app
+    # can send, and inheriting one is what gives a new app good-looking mail on
+    # day one. A wordmark is somebody's identity. The line is there, not at
+    # "engine assets are bad".
+    #
+    # Each app opts in with its own mark — in an initializer
+    # (`Studio::EmailCatalog.register("newsletter_subscribed", logo: "emails/our-mark.png")`,
+    # a path THAT APP ships) or on /admin/emails.
+    #
+    # STILL OUTSTANDING, stated so nobody reads this as swept: magic_link above
+    # DOES still seed the wordmark, so a host that has registered no mark of its
+    # own inherits it on the sign-in email. turf-monster and McRitchie Studio are
+    # covered — turf registers emails/turf-logo.png, and the Studio hub IS the
+    # wordmark's owner — but an app that registers nothing is not. That is a
+    # consumer-visible change of its own and belongs to its own task.
 
     # The footer band. Dark on purpose: it closes the white card, and a light
     # sign-off floating under body copy reads as part of the message rather than

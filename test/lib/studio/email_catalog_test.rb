@@ -108,6 +108,55 @@ class EmailCatalogTest < Minitest::Test
                  Studio::EmailCatalog.variants)
   end
 
+  # --- 2b. the seed lends artwork, never a wordmark -------------------------
+  #
+  # THE MECHANISM THIS PINS, because it is the one that leaked. `logo:` merges
+  # three ways and only one of them is obvious:
+  #
+  #   omitted / nil -> INHERITS whatever the entry already had
+  #   ""            -> clears it
+  #   "path"        -> sets it
+  #
+  # newsletter_subscribed seeded "emails/logo-horizontal.png" (the McRITCHIE
+  # STUDIO wordmark), so the first branch handed the engine's identity to any
+  # host that registered the key for an unrelated reason — a relabel, a preview
+  # builder — and never mentioned a logo. The rendered-email half of this guard
+  # is in test/integration/newsletter_email_test.rb; this half is the merge
+  # itself, which is where the surprise lives.
+  def test_the_newsletter_seed_lends_no_logo
+    entry = Studio::EmailCatalog.entry("newsletter_subscribed")
+
+    assert_nil entry.logo,
+      "the engine's wordmark must not ride the seed into a host's branded email"
+    assert_equal "emails/newsletter-subscribed-background.gif", entry.background,
+      "ARTWORK still rides the gem — the line is at branding, not at engine assets"
+  end
+
+  def test_registering_the_newsletter_without_a_logo_inherits_none
+    Studio::EmailCatalog.register("newsletter_subscribed", label: "Welcome to the list")
+
+    assert_nil Studio::EmailCatalog.entry("newsletter_subscribed").logo,
+      "an omitted logo: INHERITS, so a host relabelling this email must inherit nothing"
+  end
+
+  # The merge still works — otherwise the guard above would also pass on a
+  # catalog that had lost the ability to carry a logo at all.
+  def test_a_host_names_its_own_logo_and_keeps_it_across_a_relabel
+    Studio::EmailCatalog.register("newsletter_subscribed", logo: "emails/our-own-mark.png")
+    Studio::EmailCatalog.register("newsletter_subscribed", label: "Welcome to the list")
+
+    assert_equal "emails/our-own-mark.png", Studio::EmailCatalog.entry("newsletter_subscribed").logo,
+      "a relabel must not drop the mark the host registered"
+  end
+
+  def test_an_empty_logo_clears_one_the_host_registered
+    Studio::EmailCatalog.register("newsletter_subscribed", logo: "emails/our-own-mark.png")
+    Studio::EmailCatalog.register("newsletter_subscribed", logo: "")
+
+    assert_nil Studio::EmailCatalog.entry("newsletter_subscribed").logo,
+      %q(the documented way to say "no logo" is "", and it has to keep working)
+  end
+
   # --- 3 + 4. resolution order and the source it reports --------------------
 
   # A stand-in for the app's own ImageCache row. Built OUTSIDE the stub block —
