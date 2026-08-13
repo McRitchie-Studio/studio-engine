@@ -400,4 +400,68 @@ class EmailCatalogTest < Minitest::Test
   ensure
     Studio.s3_bucket_prefix = previous
   end
+
+  # --- the header a recipient with NO NAME ON FILE gets ----------------------
+  #
+  # THE GAP THIS CLOSES. /admin/emails offers a "Header for someone with no name
+  # on file" field, and until now every guard on it asserted "Your Magic Link" —
+  # which is the REGISTRY DEFAULT. Saved-or-default resolve to the same string,
+  # so an operator's own edit to that field was shipped to every stranger who
+  # asks for a magic link and asserted by nothing: change header_fallback to
+  # ignore the saved value entirely and the whole suite stayed green.
+  #
+  # It is the LEAST checkable field on the page, which is why it needs the most
+  # checking. Everything else there can be looked at in the preview; the two
+  # example recipients both have names on file (deliberately — the synthetic
+  # "No name on file" entry was removed on Mr. McRitchie's call), so this field's
+  # effect cannot be previewed at all. Unpreviewable AND untested is the
+  # combination worth closing.
+  #
+  # The row itself lives one layer down, so these stub the row and assert the
+  # RESOLUTION; test/integration/banner_copy_test.rb saves a real row and follows
+  # the value into a rendered email.
+
+  # Records every (key, field) the catalogue asks the settings row for, and
+  # answers with `values`. A stub of `saved` itself would not notice the
+  # resolver reading the WRONG FIELD — the mutant that ships the ordinary
+  # header to a nameless recipient — so the field asked for is asserted.
+  def stub_saved_copy(values)
+    asked = []
+    stub_module(Studio::EmailCatalog, :saved) do |key, field|
+      asked << [key.to_s, field.to_sym]
+      values[field.to_sym]
+    end
+    asked
+  end
+
+  def test_the_operators_saved_fallback_header_beats_the_registry_default
+    saved_header = "Someone asked for a link"
+    refute_equal saved_header, Studio::EmailCatalog.entry("magic_link").header_fallback,
+      "the saved value has to differ from the registry default, or this test cannot fail"
+
+    asked = stub_saved_copy(header_fallback: saved_header)
+
+    assert_equal saved_header, Studio::EmailCatalog.header_fallback("magic_link"),
+      "the operator's own words, not the engine's"
+    assert_includes asked, ["magic_link", :header_fallback],
+      "the fallback must be read from the fallback field — reading :header here would " \
+      "send the nameless recipient the greeting they have no name for"
+  end
+
+  def test_the_registry_default_answers_when_the_operator_has_saved_nothing
+    stub_saved_copy({})
+
+    assert_equal "Your Magic Link", Studio::EmailCatalog.header_fallback("magic_link"),
+      "an app that never opens /admin/emails must send exactly what it sent before"
+  end
+
+  # The third rung, and the reason an unconfigured host still sends a headed
+  # email: an entry registered with no fallback of its own falls back to its
+  # label rather than to nothing.
+  def test_an_entry_with_no_fallback_of_its_own_falls_back_to_its_label
+    Studio::EmailCatalog.register("winnings", label: "Contest winnings")
+    stub_saved_copy({})
+
+    assert_equal "Contest winnings", Studio::EmailCatalog.header_fallback("winnings")
+  end
 end
