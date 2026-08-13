@@ -35,6 +35,60 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **`$store.modals.isLive(id)` — "is this card up?", the question `isOpen` cannot
+  answer.** `close()` flips `_closing` immediately and splices the entry only
+  after the exit animation, so for that whole ~220ms window `isOpen(id)` reports
+  a card that is already leaving the screen as open. Every consumer guard that
+  means *don't open this twice* wants the opposite answer, and turf-monster had
+  hand-rolled the same `_closing`-aware `.some()` over `.stack` to get it.
+
+  `isLive(id)` returns true when a card with that id is on the stack **and not on
+  its way out**. It also accepts an array — `isLive(['onboarding', 'age-verify',
+  'wallet-setup'])` — so a caller can ask "is any card of this flow still up?"
+  without reaching into `.stack` and re-deriving the lifecycle rule. Shipped on
+  both the shared host and the page-scoped host.
+
+  **`isOpen(id)` is unchanged.** It still answers "on the stack, in any state",
+  which is what a caller asking "is the DOM node still mounted" depends on. This
+  is additive; no existing call site changes behavior. The proposal on the task
+  was `isOpen(id, { ignoreClosing: true })`, rejected because it reads as a double
+  negative at the call site (*is it open, ignoring that it is closing*) and
+  because two genuinely different questions are clearer as two names than as one
+  name with a mode flag.
+
+  The asymmetry to know, and the reason this is not simply "not animating":
+
+  | Transition | Flags on the entry | `isOpen` | `isLive` |
+  |---|---|---|---|
+  | `open()` | — | true | **true** |
+  | `close()` | `_closing` | true | **false** |
+  | `swap()`, leaving entry | `_swappingOut` + `_closing` | true | **false** |
+  | `advance()` | `_swappingOut` only | true | **true** |
+  | spliced / never opened | — | false | **false** |
+
+  `advance()` slides the SAME card between steps of its own flow, so it sets
+  `_swappingOut` and nothing else. `isLive` therefore tests `_closing` alone and
+  never consults `_swappingOut`: conflating the two reports a card as gone in the
+  middle of a step transition, which is how an in-flow hand-off starts looking to
+  a caller like a dismissal. Both halves are pinned by tests that execute the
+  store under node (`test/views/modal_host_store_behavior_test.rb`) — dropping the
+  `_closing` check and conflating it with `_swappingOut` redden *different*
+  assertions.
+
+  **Consumers that fork the host do not get this from a version bump.**
+  `mcritchie-studio` and `turf-monster` both ship their own
+  `app/views/studio/modals/_host.html.erb`, and a non-isolated engine lets the app
+  copy shadow the gem's. Those apps pick `isLive` up only by porting it into their
+  fork or by retiring the fork; `studio/modals/scoped_host` is unforked everywhere
+  and carries it today. turf-monster's two hand-rolled scans — the onboarding
+  chain driver's `open()` guard (`layouts/application.html.erb`) and
+  `selectionBoard#showWalletSetupModal` (`contests/_turf_totals_board.html.erb`)
+  — can then collapse onto this primitive, as can its two remaining bare
+  `isOpen()` idempotence guards (`app/javascript/solana_stores.js` for
+  `wallet-changed`, `cdp/returns/show.html.erb` for `cdp-ramp`), which are the
+  exact defect `isLive` exists to prevent. A turf-side follow-up, not part of
+  this change.
+
 - **The standard user profile columns — and the engine's first migration against
   a host-owned table.** Every other engine migration creates a `studio_*` table
   the engine owns outright; `users` belongs to the host. That boundary is crossed

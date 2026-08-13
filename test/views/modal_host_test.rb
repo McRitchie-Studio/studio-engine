@@ -37,7 +37,12 @@ class ModalHostTest < Minitest::Test
   def test_store_exposes_the_full_stack_api
     html = render_host
 
-    %w[open: swap: advance: close: closeAll: closeAllDismissible: isOpen: current: cardClasses: _sync:].each do |method|
+    # Surface only. What isOpen/isLive actually RETURN across the lifecycle
+    # is asserted by executing the store in
+    # test/views/modal_host_store_behavior_test.rb — a substring match
+    # cannot tell the two apart.
+    %w[open: swap: advance: close: closeAll: closeAllDismissible: isOpen: isLive: current: cardClasses:
+       _sync:].each do |method|
       assert_includes html, method, "expected Alpine store to define #{method}"
     end
   end
