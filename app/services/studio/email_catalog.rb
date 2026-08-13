@@ -493,10 +493,14 @@ module Studio
     # flipped to "Uploaded here", and the email kept sending the gem's artwork
     # because the layered banner never looked at the row.
     #
-    # NIL WHEN THIS APP OWNS THE ARTWORK. A host registering its own flat
-    # default_asset sends that picture; the background it also inherited is the
-    # engine's and nothing sends it. The list row carried this guard alone, so
-    # the detail page still layered live text over artwork no inbox receives.
+    # NIL UNLESS THIS EMAIL LAYERS. A host registering its own flat
+    # default_asset sends that picture, and the background it merely INHERITED is
+    # the engine's — nothing sends it. But a host that registers a background of
+    # its OWN is asking to layer, and layered? is what tells the two apart.
+    #
+    # This is the ONE place that decision is made. Every reader asks this method
+    # rather than re-deriving it: the list row used to carry its own copy of the
+    # guard, and the copy went stale the moment the guard moved here.
     def background_url(key)
       return nil unless entry(key)&.layered?
 
@@ -645,10 +649,19 @@ module Studio
     # The flat asset stays the fallback, for a host still on the engine's own
     # unlayered UserMailer — there, the baked-text banner IS what arrives.
     #
-    # Unless THIS APP owns the artwork, in which case it previews exactly what
+    # Unless this email does not LAYER, in which case it previews exactly what
     # the flat resolution sends — same method, so the two cannot disagree.
+    #
+    # THE SAME QUESTION background_url ASKS, so it must ask it the same way.
+    # This guard read engine_artwork? while background_url read layered?, and the
+    # two answer differently for a host that registers its own background: the
+    # mailer sent the layered banner while /admin/email_images and the detail
+    # page's "Artwork" frame both drew the flat asset. That frame is where
+    # "Modify image" lives, and an upload writes the row background_url reads
+    # FIRST — so the operator was shown one picture and told it was the one the
+    # button would replace.
     def preview_asset_path(key)
-      return default_asset_path(key) unless entry(key)&.engine_artwork?
+      return default_asset_path(key) unless entry(key)&.layered?
 
       asset_path(entry(key)&.background.presence || entry(key)&.default_asset)
     end

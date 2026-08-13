@@ -622,6 +622,39 @@ class LayeredBannerTest < ActiveSupport::TestCase
     Studio::EmailCatalog.reset!
   end
 
+  # THE THIRD READER. background_url is not the only method that answers "does
+  # this email layer" — preview_asset_path answers it too, for every surface that
+  # draws the artwork as a plain <img>: /admin/email_images, and the "Artwork"
+  # frame on /admin/emails/:key. Both guards must ask the SAME question, because
+  # the guard that drifts is the one nobody is looking at.
+  #
+  # This one drifted. background_url moved to layered? and preview_asset_path
+  # stayed on engine_artwork?, so a host registering its own background got a
+  # LAYERED email whose Artwork frame drew the FLAT asset — and "Modify image"
+  # sits on that frame, over a picture the upload does not replace.
+  test "every artwork surface agrees on whether this email layers" do
+    Studio::EmailCatalog.register("magic_link", default_asset: "emails/host-flat.jpg",
+                                                background: "emails/magic-link-background.gif")
+
+    assert_includes Studio::EmailCatalog.background_url("magic_link"), "magic-link-background.gif",
+      "the mailer sends the layered backdrop"
+    assert_includes Studio::EmailCatalog.preview_url("magic_link"), "magic-link-background.gif",
+      "the plain-<img> surfaces drew the flat asset for an email that sends LAYERED"
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  # The other half of the same rule: an email that does NOT layer must preview
+  # its flat asset, or this guard would just be wrong in the other direction.
+  test "a non-layering email previews the flat asset it actually sends" do
+    Studio::EmailCatalog.register("magic_link", default_asset: "emails/host-flat.jpg")
+
+    assert_nil Studio::EmailCatalog.background_url("magic_link")
+    assert_includes Studio::EmailCatalog.preview_url("magic_link"), "host-flat.jpg"
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
   test "a host can override any piece per send" do
     Studio::EmailCatalog.register("magic_link", background: "emails/custom.gif", scrim: 0.1)
 
