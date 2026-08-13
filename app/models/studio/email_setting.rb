@@ -21,7 +21,13 @@ module Studio
 
     # The banner's words and logo. Each is nil until the operator sets it, and
     # nil means INHERIT — never "empty".
-    COPY_FIELDS = %i[header header_fallback subtext logo_url subject].freeze
+    COPY_FIELDS = %i[header header_fallback subtext logo_url subject body cta_text cta_color].freeze
+
+    # The footer is shared by every email this app sends, so it is stored once
+    # under a reserved key rather than copied onto each row. Underscored so it
+    # cannot collide with a registry key, which is always a plain identifier.
+    FOOTER_KEY = "_footer".freeze
+    FOOTER_FIELDS = %i[discord_url logo_url].freeze
 
     class << self
       # The saved scrim for this email as a 0.0-1.0 fraction, or nil when the
@@ -67,6 +73,49 @@ module Studio
         return if cache.nil?
 
         key.nil? ? cache.clear : cache.delete(key.to_s)
+      end
+
+      # The shared footer, as a plain hash. Reads through the same per-request
+      # memo as everything else, so rendering it on every email in a list costs
+      # one query rather than one per email.
+      def footer
+        return {} unless table_ready?
+
+        row = for_key(FOOTER_KEY)
+        return {} if row.nil?
+
+        FOOTER_FIELDS.index_with { |field| row.public_send(field).presence }.compact
+      end
+
+      def set_footer(attrs)
+        return nil unless table_ready?
+
+        record = find_or_initialize_by(email_key: FOOTER_KEY)
+        FOOTER_FIELDS.each do |field|
+          next unless attrs.key?(field) || attrs.key?(field.to_s)
+
+          record.public_send(:"#{field}=", (attrs[field] || attrs[field.to_s]).presence)
+        end
+        record.save!
+        forget!(FOOTER_KEY)
+        record
+      end
+
+      # nil when the operator has not decided — the registry then answers.
+      def cta_enabled_for(key)
+        return nil unless table_ready?
+
+        for_key(key)&.cta_enabled
+      end
+
+      def set_cta_enabled(key, value)
+        return nil unless table_ready?
+
+        record = find_or_initialize_by(email_key: key.to_s)
+        record.cta_enabled = value.nil? ? nil : ActiveModel::Type::Boolean.new.cast(value)
+        record.save!
+        forget!(key)
+        record
       end
 
       # True when the operator has explicitly hidden the logo — which is a

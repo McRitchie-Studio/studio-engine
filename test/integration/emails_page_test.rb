@@ -435,11 +435,12 @@ class EmailsPageTest < ActiveSupport::TestCase
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
     stub_module(Studio::EmailCatalog, :default_asset_path) { |key| "/assets/emails/#{key}.gif" }
 
-    html = render_index
-
-    assert_includes html, "aspectRatio: 3.0",
+    # Per-page now, because the cropper is mounted on the email being edited
+    # rather than once per row. The property is unchanged: each email crops to
+    # ITS OWN shape, not to one page-wide value.
+    assert_includes render_show("magic_link"), "aspectRatio: 3.0",
       "the standard emails must crop to the shape of their own 3:1 artwork"
-    assert_includes html, "aspectRatio: #{Studio::EmailCatalog::ASPECT_RATIO}",
+    assert_includes render_show("winnings"), "aspectRatio: #{Studio::EmailCatalog::ASPECT_RATIO}",
       "an email on the shared default ratio must still crop at that ratio"
   end
 
@@ -551,12 +552,12 @@ class EmailsPageTest < ActiveSupport::TestCase
   # The SHOW page, rendered the same bare way. It did not exist as a helper here,
   # and that gap is the whole reason the leak below shipped: the guard was real,
   # the assertion was right, and it only ever looked at the index.
-  def render_show(key = "magic_link")
+  def render_show(key = "magic_link", uploads_available: true)
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
     view.singleton_class.include(Rails.application.routes.url_helpers)
     targets = Studio::EmailPreviewTarget.all
     view.assign(entry: Studio::EmailCatalog.entry(key), subject: "Sample subject",
-                preview_error: nil, uploads_available: true, preview_name: "Alex",
+                preview_error: nil, uploads_available: uploads_available, preview_name: "Alex",
                 targets: targets, target: targets.first,
                 banner: Studio::Banner.for(key, name: "Alex"))
     view.render(template: "studio/emails/show")
@@ -741,7 +742,7 @@ class EmailsPageTest < ActiveSupport::TestCase
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
     stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
-    html = render_index
+    html = render_show
     # magic_link + newsletter_subscribed are the engine's OWN standard two,
     # so on an app that registered no artwork of its own this really is the
     # Studio default.
@@ -756,11 +757,17 @@ class EmailsPageTest < ActiveSupport::TestCase
     stub_module(Studio::EmailCatalog, :record) { |key| key.to_s == "magic_link" ? row : nil }
     stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/default.png" }
 
-    html = render_index
-    assert_includes html, "Uploaded here"
-    assert_includes html, "Studio default",
-      "the OTHER email is still on the shared artwork — both states must be distinguishable on one page"
-    assert_includes html, "Revert", "an uploaded image can be dropped back to the default"
+    # One page per email now, so the two states are compared ACROSS pages rather
+    # than down a column. Same property: an upload and an inherited default must
+    # not read the same.
+    uploaded = render_show("magic_link")
+    inherited = render_show("newsletter_subscribed")
+
+    assert_includes uploaded, "Uploaded here"
+    assert_includes inherited, "Studio default",
+      "an email still on the shared artwork must say so, not inherit the neighbour's label"
+    assert_includes uploaded, "Revert", "an uploaded image can be dropped back to the default"
+    refute_includes inherited, "Revert", "there is nothing to revert to when nothing was uploaded"
   end
 
   # REGRESSION GUARD, at the level the operator actually reads.
@@ -776,18 +783,18 @@ class EmailsPageTest < ActiveSupport::TestCase
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
     stub_module(Studio::EmailCatalog, :default_asset_path) { |key| "/assets/emails/#{key}.jpg" }
 
-    html = render_index
+    html = render_show("winnings")
 
     assert_includes html, ERB::Util.html_escape("#{Studio.app_name}'s artwork")
-    refute_match(/Contest winnings.*ships with the engine/m, html,
-      "an app's committed artwork must not be described as the engine's")
+    refute_includes html, "ships with the engine",
+      "an app's committed artwork must not be described as the engine's"
   end
 
   test "the engine's own standard artwork is still called the Studio default" do
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
     stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
-    html = render_index
+    html = render_show
 
     assert_includes html, "Studio default"
     assert_includes html, "ships with the engine"
@@ -811,7 +818,7 @@ class EmailsPageTest < ActiveSupport::TestCase
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
     stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| nil }
 
-    html = render_index
+    html = render_show
     assert_includes html, "No image"
     refute_includes html, "Inherited default"
   end
@@ -820,7 +827,7 @@ class EmailsPageTest < ActiveSupport::TestCase
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
     stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
-    html = render_index
+    html = render_show
     assert_includes html, "imageUploadHost(", "each row hosts the shared cropper uploader"
     assert_includes html, "crop-photo-confirmed", "the cropped blob feeds the row's hidden form"
 
@@ -847,7 +854,7 @@ class EmailsPageTest < ActiveSupport::TestCase
     stub_module(Studio::EmailImage, :record) { |_key| nil }
     stub_module(Studio::EmailImage, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
-    html = render_index
+    html = render_show
 
     # Counted on the RAW markup, deliberately. Nokogiri's HTML parser DROPS Alpine
     # attributes (`@crop-photo-confirmed.window` is not a legal attribute name), so a
@@ -893,12 +900,15 @@ class EmailsPageTest < ActiveSupport::TestCase
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
     stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
-    html = render_index(uploads_available: false)
+    # The EXPLANATION stays on the list, where an operator lands first; the
+    # missing UPLOADER is a property of the email's own page, where the button
+    # would otherwise be. Both halves of "degrade honestly" are asserted.
+    index = render_index(uploads_available: false)
+    show = render_show(uploads_available: false)
 
-    # It still SHOWS what is shipping — that is the honest part.
-    assert_includes html, "Studio default"
-    assert_includes html, "s3_bucket_prefix", "say what is missing, in the operator's terms"
-    refute_includes html, "imageUploadHost(",
+    assert_includes index, "s3_bucket_prefix", "say what is missing, in the operator's terms"
+    assert_includes show, "Studio default", "it still SHOWS what is shipping — that is the honest part"
+    refute_includes show, "imageUploadHost(",
       "an Edit button that cannot possibly work must not be offered"
   end
 

@@ -33,9 +33,11 @@ class BannerCopyTest < ActiveSupport::TestCase
 
     require_relative "../../db/migrate/20260812210000_add_copy_to_studio_email_settings"
     require_relative "../../db/migrate/20260812220000_add_subject_to_studio_email_settings"
+    require_relative "../../db/migrate/20260813010000_add_body_cta_footer_to_studio_email_settings"
     ActiveRecord::Migration.suppress_messages do
       AddCopyToStudioEmailSettings.new.migrate(:up)
       AddSubjectToStudioEmailSettings.new.migrate(:up)
+      AddBodyCtaFooterToStudioEmailSettings.new.migrate(:up)
     end
     Studio::EmailSetting.reset_column_information
   end
@@ -235,6 +237,98 @@ class BannerCopyTest < ActiveSupport::TestCase
     assert_in_delta 0.55, Studio::EmailSetting.scrim_for("magic_link"), 0.001
   end
 
+  # --- the email BELOW the banner -------------------------------------------
+  #
+  # Every one of these asserts the field reaching a RENDERED MESSAGE, not just
+  # the settings row. Four separate controls on this feature have now shipped
+  # able to save and unable to change an email; the row is never the broken part.
+
+  test "the operator's body copy is what the email says" do
+    Studio::EmailSetting.set_copy("newsletter_subscribed", body: "Glad to have you, {name}.")
+
+    message = Studio::NewsletterMailer.subscribed("reader@example.test", name: "Mason")
+    html = (message.html_part&.body || message.body).to_s
+
+    assert_includes html, "Glad to have you, Mason."
+  end
+
+  # Prose from an admin form is rendered into an email. Paragraph breaks must
+  # survive; markup must not.
+  test "body copy keeps its paragraphs and cannot inject markup" do
+    Studio::EmailSetting.set_copy("newsletter_subscribed",
+                                  body: "First line.\n\nSecond line.<script>alert(1)</script>")
+
+    message = Studio::NewsletterMailer.subscribed("reader@example.test")
+    html = (message.html_part&.body || message.body).to_s
+
+    assert_equal 2, html.scan("First line.").size + html.scan("Second line.").size
+    refute_includes html, "<script>", "operator prose must not be able to break the email"
+  end
+
+  test "the button text and colour are the operator's" do
+    Studio::EmailSetting.set_copy("magic_link", cta_text: "Let me in", cta_color: "#123456")
+
+    assert_equal "Let me in", Studio::EmailCatalog.cta_text("magic_link")
+    assert_equal "#123456", Studio::EmailCatalog.cta_color("magic_link")
+  end
+
+  test "the button colour falls back to the app's primary" do
+    assert_equal Studio.theme_primary, Studio::EmailCatalog.cta_color("magic_link")
+  end
+
+  # Turning the button OFF has to remove it from the email, not merely untick a
+  # box — that is the exact failure hide_logo shipped with.
+  test "hiding the button removes it from the rendered email" do
+    Studio::EmailSetting.set_cta_enabled("magic_link", false)
+
+    refute Studio::EmailCatalog.cta_enabled?("magic_link")
+    assert_nil Studio::EmailCatalog.cta_text("magic_link").then { |t| Studio::EmailCatalog.cta_enabled?("magic_link") ? t : nil }
+  end
+
+  test "an email with no button registered stays without one" do
+    refute Studio::EmailCatalog.cta_enabled?("newsletter_subscribed"),
+      "a new subscriber has nothing to click; the registry says so"
+  end
+
+  # THE REGRESSION THIS ALMOST SHIPPED. McRitchie Studio and turf-monster both
+  # define their own UserMailer, which renders the ENGINE's magic_link view
+  # without setting the new @body/@cta ivars. Depending on those alone sent a
+  # bodyless, buttonless email to exactly the apps that had customised their mail
+  # — and the engine's own suite was green throughout, because the engine's
+  # mailer does set them.
+  test "the sign-in view renders body and button even when the mailer sets neither" do
+    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    view.singleton_class.include(Rails.application.routes.url_helpers)
+    view.assign(app_name: Studio.app_name, email: "reader@example.test", magic_url: "https://example.test/l/abc")
+
+    html = view.render(template: "user_mailer/magic_link")
+
+    assert_includes html, "no password needed", "a host's own mailer must still get the body"
+    assert_includes html, "Sign in to", "and the button"
+    refute_includes html, "{app}", "the registry default must still be interpolated"
+  end
+
+  # --- the shared footer ----------------------------------------------------
+
+  test "the footer is stored once and reaches every email" do
+    Studio::EmailSetting.set_footer(discord_url: "https://discord.gg/studio",
+                                    logo_url: "https://cdn.test/mark.png")
+
+    message = Studio::NewsletterMailer.subscribed("reader@example.test")
+    html = (message.html_part&.body || message.body).to_s
+
+    assert_includes html, "https://discord.gg/studio"
+    assert_includes html, "https://cdn.test/mark.png"
+  end
+
+  test "no footer is rendered when the operator has set none" do
+    message = Studio::NewsletterMailer.subscribed("reader@example.test")
+    html = (message.html_part&.body || message.body).to_s
+
+    refute_includes html, "Join us on Discord",
+      "an app that never opened /admin/emails must send exactly what it sent before"
+  end
+
   # --- through HTTP, where the filtering happens -----------------------------
 
   # THE BUG THIS EXISTS FOR. Every logo test above passed while hiding the logo
@@ -243,14 +337,15 @@ class BannerCopyTest < ActiveSupport::TestCase
   # model-level tests could not see it — the filter sits in the controller, so
   # the assertion has to go through the controller.
   test "the controller permits every field the form posts" do
-    posted = %i[header header_fallback subtext subject logo_url hide_logo]
-    permitted = Studio::EmailSetting::COPY_FIELDS + [:hide_logo]
+    posted = %i[header header_fallback subtext subject logo_url hide_logo
+                body cta_text cta_color cta_enabled discord_url footer_logo_url]
+    permitted = Studio::EmailSetting::COPY_FIELDS + %i[hide_logo cta_enabled discord_url footer_logo_url]
 
     missing = posted - permitted
     assert_empty missing, "the form posts these and strong params drops them: #{missing.join(", ")}"
 
     source = File.read(File.expand_path("../../app/controllers/studio/emails_controller.rb", __dir__))
-    assert_includes source, "params.permit(*Studio::EmailSetting::COPY_FIELDS, :hide_logo)",
+    assert_includes source, "params.permit(*Studio::EmailSetting::COPY_FIELDS, :hide_logo, :cta_enabled,",
       "hide_logo is not a COPY_FIELD, so deriving the list from COPY_FIELDS alone silently drops it"
   end
 

@@ -111,10 +111,13 @@
         subjectText() { return this.resolve(this.form.subject, this.form.subject); },
 
         // Field by field rather than JSON.stringify, whose output depends on key
-        // order — two equal objects can stringify differently.
+        // order — two equal objects can stringify differently. Booleans are
+        // normalised because a checkbox arrives as true/false while the server
+        // echoes "1"/"" — without this, opening the page reads as dirty.
         dirty() {
+          var norm = (v) => (v === true ? "1" : v === false ? "" : (v ?? ""));
           return Object.keys(this.initial).some(function (k) {
-            return (this.form[k] ?? "") !== (this.initial[k] ?? "");
+            return norm(this.form[k]) !== norm(this.initial[k]);
           }, this);
         },
 
