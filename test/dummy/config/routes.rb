@@ -4,6 +4,11 @@
 # Studio.routes. Set here, before the draw, so the dummy exercises the page.
 Studio.draw_admin_emails_routes = true
 
+# Opt in to the shared first-name onboarding endpoints, likewise. OFF by default
+# because turf-monster owns onboarding_first_name_path and
+# onboarding_skip_first_name_path until its adoption task deletes the local pair.
+Studio.draw_onboarding_routes = true
+
 Rails.application.routes.draw do
   # Draw the engine's shared route table the same way every consuming app does
   # (Studio.routes(self), not `mount`). The boot test asserts the named path
