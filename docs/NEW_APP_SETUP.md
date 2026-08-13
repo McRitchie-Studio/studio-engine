@@ -546,8 +546,10 @@ bin/rails db:seed
 ```
 
 **Names must be distinct.** If the app uses `Sluggable`, slug is derived from
-`name.parameterize` under a unique index, so two identical names collide on
-insert — hence "Alex McRitchie (Your App)" rather than a second "Alex McRitchie".
+`name.parameterize` under a unique index, so any two names that parameterize to
+the same slug collide on insert — hence "Alex McRitchie (Your App)" rather than
+a second "Alex McRitchie". The rule is the slug, not the spelling: "Alex
+McRitchie" and "Alex Mcritchie" look distinct and are not.
 
 Distinct from the rows **already there**, too — the case that actually bites,
 because `users` is rarely empty by the time you seed. Any existing row whose
