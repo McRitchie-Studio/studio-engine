@@ -549,6 +549,17 @@ bin/rails db:seed
 `name.parameterize` under a unique index, so two identical names collide on
 insert — hence "Alex McRitchie (Your App)" rather than a second "Alex McRitchie".
 
+Distinct from the rows **already there**, too — the case that actually bites,
+because `users` is rarely empty by the time you seed. Any existing row whose
+name parameterizes to the same slug collides, and `find_or_create_by!` reports
+it unrecognizably: on Rails 8.1 it creates first, then rescues `RecordNotUnique`
+by retrying `find_by!(email:)`. That retry misses, so a SLUG conflict surfaces
+as `ActiveRecord::RecordNotFound: Couldn't find User with [WHERE
+"users"."email" = $1 AND "users"."email" = $2]` — naming only `email`, twice —
+and the seed stops there with the rest of the list uncreated. Rename or remove
+the existing row, then re-seed. Reproduced on mcritchie-industries, whose sole
+account was already "Alex McRitchie" under a different address.
+
 **`role:` values are yours.** There is no shared role vocabulary: the non-admin
 role is `viewer` in mcritchie-studio and mcritchie-industries but `user` in
 turf-monster. Use whatever your `admin?` tests against.
