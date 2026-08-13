@@ -563,6 +563,45 @@ class LayeredBannerTest < ActiveSupport::TestCase
     Studio::EmailCatalog.reset!
   end
 
+  # --- who gets to layer ----------------------------------------------------
+
+  # THE BUG. The guard read "does the ENGINE own the flat artwork", which is a
+  # proxy for "did this app ask to layer" — and it is wrong in the case a host
+  # actually cares about. turf-monster registers its own flat .jpg for
+  # magic_link, so the proxy said no and NO configuration could make it layer:
+  # it registered a background, and background_url still returned nil.
+  test "a host that registers its own background can layer" do
+    Studio::EmailCatalog.register("magic_link",
+                                  default_asset: "emails/host-flat.jpg",
+                                  background: "emails/magic-link-background.gif")
+
+    refute Studio::EmailCatalog.entry("magic_link").engine_artwork?,
+      "this guard is meaningless unless the host owns the flat asset"
+    assert Studio::EmailCatalog.entry("magic_link").layered?
+    refute_nil Studio::EmailCatalog.background_url("magic_link"),
+      "a host that registers a background is asking to layer"
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  # And the case the guard was added for still holds: a host that registered
+  # only its own flat artwork INHERITED the engine's background and never asked
+  # for it, so drawing live text over a picture it does not send stays refused.
+  test "a host that only inherits a background still does not layer" do
+    Studio::EmailCatalog.register("magic_link", default_asset: "emails/host-flat.jpg")
+
+    refute Studio::EmailCatalog.entry("magic_link").layered?
+    assert_nil Studio::EmailCatalog.background_url("magic_link"),
+      "an inherited background is not a request to layer"
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  test "an app that registers nothing keeps the engine's layered banner" do
+    assert Studio::EmailCatalog.entry("magic_link").layered?
+    refute_nil Studio::EmailCatalog.background_url("magic_link")
+  end
+
   test "a host can override any piece per send" do
     Studio::EmailCatalog.register("magic_link", background: "emails/custom.gif", scrim: 0.1)
 

@@ -80,7 +80,7 @@ module Studio
     #   type          — :transactional or :marketing.
     #   preview       — callable returning a Mail, or nil.
     Entry = Struct.new(:key, :label, :description, :default_asset, :type, :preview,
-                       :default_origin, :aspect_ratio, :background, :logo, :scrim,
+                       :default_origin, :background_origin, :aspect_ratio, :background, :logo, :scrim,
                        :header, :header_fallback, :subtext, :subject, :body, :cta_text, :cta_color, :cta_enabled, :supports_cta,
                        keyword_init: true) do
       def to_s = key
@@ -103,6 +103,24 @@ module Studio
       # to remove. The engine seeds its own two as :engine; anything a host
       # passes default_asset for is that host's own.
       def engine_artwork? = default_origin.to_s != "app"
+
+      # Does THIS APP's artwork layer?
+      #
+      # True when the app registered a background itself — that is the host
+      # saying "layer this email", whatever else it registered. Also true when
+      # the app has registered no artwork at all, so an app that touches nothing
+      # keeps the engine's layered banner.
+      #
+      # False only in the case this exists for: the app registered its OWN flat
+      # asset and merely INHERITED a background it never asked for. turf-monster
+      # is exactly that — its magic_link carries a baked-in .jpg and inherits the
+      # engine's island art — and drawing live text over a picture it never sends
+      # is the failure this whole feature exists to prevent.
+      def layered?
+        return true if background_origin.to_s == "app"
+
+        engine_artwork?
+      end
 
       # The shape of THIS email's banner — the box the page draws and the ratio
       # the upload cropper enforces. Per-entry because the engine's own artwork
@@ -224,6 +242,11 @@ module Studio
         # had, so a host relabelling an inherited email does not accidentally
         # claim the engine's picture as its own.
         default_origin: default_asset.nil? ? (existing&.default_origin || :engine) : :app,
+        # WHOSE background this is, recorded the same way and for the same
+        # reason: by the time anyone asks, an inherited background and a
+        # host-registered one are indistinguishable, and guessing is what this
+        # records to avoid. A host passing background: is ASKING to layer.
+        background_origin: background.nil? ? (existing&.background_origin || :engine) : :app,
         aspect_ratio: aspect_ratio || existing&.aspect_ratio,
         background: background.nil? ? existing&.background : background.presence,
         logo: logo.nil? ? existing&.logo : logo.presence,
@@ -480,7 +503,7 @@ module Studio
     # engine's and nothing sends it. The list row carried this guard alone, so
     # the detail page still layered live text over artwork no inbox receives.
     def background_url(key)
-      return nil unless entry(key)&.engine_artwork?
+      return nil unless entry(key)&.layered?
 
       url(key) || absolute_asset_url(entry(key)&.background)
     end
