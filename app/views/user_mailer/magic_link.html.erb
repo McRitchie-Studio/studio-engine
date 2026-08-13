@@ -1,6 +1,11 @@
 <%# Body only — branded_mailer supplies the banner + card.
 
-    The button is theme PRIMARY, not success. Success is the "it worked" green;
+    The button and its copy-and-paste fallback share ONE colour — cta_color,
+    which the operator can change. They were pinned to different sources, so a
+    yellow button left a purple fallback underneath it and the pair the comment
+    below promises to keep together came apart.
+
+    The button is theme PRIMARY by default, not success. Success is the "it worked" green;
     signing in has not happened yet, and the brand colour is what ties the button
     to the banner above it. The copy-and-paste link is the SAME colour on purpose
     — it is the button's fallback, and a green link under a purple button reads
@@ -10,10 +15,16 @@
 <%# BODY AND BUTTON COME FROM THE CATALOGUE, not from this file. An operator
     edits them on /admin/emails; the strings that used to live here are the
     registry defaults, so an app that never opens that page sends what it always
-    sent. simple_format keeps paragraph breaks without letting HTML in.
+    sent.
+
+    simple_format(sanitize: true) turns blank lines into paragraphs and strips
+    scripts and event handlers — it does NOT strip all HTML: a, strong and img
+    survive. That is acceptable because the author is an admin, but the guard is
+    narrower than "no HTML" and the comment should not claim otherwise.
 
     THE VIEW RESOLVES THEM ITSELF when the mailer did not. A host that defines
-    its own UserMailer — McRitchie Studio and turf-monster both do — renders THIS
+    its own UserMailer — turf-monster does on main; McRitchie Studio does on its
+    adoption branch — renders THIS
     view without setting the new ivars, so depending on them alone shipped an
     email with no body and no button to exactly the apps that had customised
     their mail. The mailer's values still win when present, which is what carries
@@ -45,7 +56,7 @@
       button fails, so it has to be readable enough to select by hand. It stays
       a step under the 12px label above it — the label explains, the URL is the
       thing you drag across. %>
-  <a href="<%= @magic_url %>" style="font-size:11px;line-height:1.5;color:<%= Studio.theme_primary %>;word-break:break-all;"><%= @magic_url %></a>
+  <a href="<%= @magic_url %>" style="font-size:11px;line-height:1.5;color:<%= cta_color %>;word-break:break-all;"><%= @magic_url %></a>
 </p>
 
 <p style="margin:28px 0 0;font-size:12px;line-height:1.5;color:#8a948a;text-align:center;">

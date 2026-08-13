@@ -11,9 +11,10 @@
 class AddBodyCtaFooterToStudioEmailSettings < ActiveRecord::Migration[7.2]
   def change
     change_table :studio_email_settings, bulk: true do |t|
-      # The paragraph(s) under the header. Plain text: an operator writing copy
-      # should not be able to break an email's markup, and HTML in a mail body
-      # is the single easiest way to do it.
+      # The paragraph(s) under the header. Rendered through
+      # simple_format(sanitize: true), which makes blank lines into paragraphs and
+      # strips scripts and event handlers — inline tags like a and strong survive.
+      # The author is an admin, so that line is deliberate rather than an oversight.
       t.text    :body
 
       t.string  :cta_text

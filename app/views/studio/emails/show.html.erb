@@ -378,6 +378,10 @@
             "x-model": "form.body", class: "input-field w-full py-2" %>
     </section>
 
+    <%# Offered ONLY when this email's template can render a button. A card for
+        an email that cannot is a dead control: the operator ticks the box, saves,
+        and no button ever appears. %>
+    <% if @entry.supports_cta? %>
     <section class="card p-4">
       <p class="label-upper mb-2">Call to action</p>
       <div class="space-y-4">
@@ -400,6 +404,7 @@
         </div>
       </div>
     </section>
+    <% end %>
   </div>
 
   <%# THE FOOTER IS SHARED. Stored once for the whole app rather than per email,
@@ -423,8 +428,8 @@
       </div>
     </div>
     <p class="text-2xs text-muted mt-2">
-      Until you save this card, the footer shows <%= Studio.app_name %>'s own logo.
-      Save it blank and no footer renders at all.
+      Leave both blank and no footer renders at all. Clearing them later removes it
+      from every email.
     </p>
   </section>
 

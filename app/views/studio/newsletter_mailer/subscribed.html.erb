@@ -3,8 +3,11 @@
     emails read as coming from the same place. %>
 <h1 style="margin:0 0 18px;font-size:22px;line-height:1.3;color:#1f2a1c;">You're on the list</h1>
 
-<%# From the catalogue, so /admin/emails owns this copy. sanitize: true because
-    an operator writing prose must not be able to break the email's markup. %>
+<%# From the catalogue, so /admin/emails owns this copy.
+
+    sanitize: true strips scripts and event handlers; it leaves a, strong and img
+    standing. The author is an admin, so that is a reasonable line — but it is not
+    "no HTML", and describing it that way would misstate the guard. %>
 <%# Resolved here as well as in the mailer, for the same reason the sign-in view
     does it: a host may render this view from its own mailer. %>
 <% body = @body.presence || Studio::EmailCatalog.body(:newsletter_subscribed) %>

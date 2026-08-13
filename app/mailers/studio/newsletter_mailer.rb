@@ -35,9 +35,9 @@ module Studio
       # registered the layout renders the flat <img> instead of nothing.
       @banner_url = Studio::EmailCatalog.resolved_url(:newsletter_subscribed)
 
-      @body      = Studio::EmailCatalog.body(:newsletter_subscribed, name: @name)
-      @cta_text  = Studio::EmailCatalog.cta_text(:newsletter_subscribed, name: @name) if Studio::EmailCatalog.cta_enabled?(:newsletter_subscribed)
-      @cta_color = Studio::EmailCatalog.cta_color(:newsletter_subscribed)
+      # No @cta_* here: this email's template renders no button, and setting
+      # ivars a view never reads is how a dead control looks like a live one.
+      @body = Studio::EmailCatalog.body(:newsletter_subscribed, name: @name)
 
       subject = Studio::EmailCatalog.subject_for(:newsletter_subscribed, name: @name) ||
                 "You're subscribed to #{@app_name}"

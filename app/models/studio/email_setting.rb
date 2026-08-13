@@ -93,6 +93,26 @@ module Studio
         FOOTER_FIELDS.index_with { |field| row.public_send(field).presence }
       end
 
+      # Write the footer ONLY when it actually changes.
+      #
+      # There is one Save for the whole page, so every save posts the footer
+      # inputs — blank ones included, from a page where the operator only touched
+      # the subject. Writing those blanks created a row of nils, which reads the
+      # same as "cleared", so the shared footer vanished from every email the app
+      # sends and could not be recovered without retyping it.
+      #
+      # Comparing against what is stored keeps both meanings: blanks matching an
+      # untouched footer write nothing, blanks replacing a stored value clear it.
+      def update_footer(discord_url: nil, logo_url: nil)
+        posted = { discord_url: discord_url.presence, logo_url: logo_url.presence }
+        stored = footer
+
+        return nil if stored.nil? && posted.values.all?(&:nil?)
+        return nil if stored.present? && stored.slice(:discord_url, :logo_url) == posted
+
+        set_footer(posted)
+      end
+
       def set_footer(attrs)
         return nil unless table_ready?
 

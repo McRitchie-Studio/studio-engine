@@ -130,12 +130,7 @@ module Studio
         # The button's on/off is a boolean, so it is not a COPY_FIELD and needs
         # its own write — the same shape that once made hide_logo a dead control.
         Studio::EmailSetting.set_cta_enabled(@key, attrs[:cta_enabled]) if attrs.key?(:cta_enabled)
-        # The footer belongs to the APP, not this email, so it is written to its
-        # own reserved row. Editing it from any email's page changes all of them,
-        # which is what the card says it does.
-        if attrs.key?(:discord_url) || attrs.key?(:footer_logo_url)
-          Studio::EmailSetting.set_footer(discord_url: attrs[:discord_url], logo_url: attrs[:footer_logo_url])
-        end
+        write_footer(attrs)
         if params.key?(:scrim_percent)
           percent = params[:scrim_percent]
           percent = nil unless percent.present? && Studio::EmailSetting::SCRIM_RANGE.cover?(percent.to_i)
