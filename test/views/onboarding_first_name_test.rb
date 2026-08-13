@@ -52,8 +52,17 @@ class OnboardingFirstNameTest < ActiveSupport::TestCase
     # string assertion below would still pass while the modal is dead in a
     # browser. This exact bug has bitten twice in turf (PR #30, then the wallet
     # modal), which is why the port carries the guard with it.
-    x_data = doc.at_css("[x-data]")["x-data"]
-    assert x_data.present?, "no x-data found"
+    #
+    # Read the RAW markup, NEVER Nokogiri's parsed attribute. An HTML parser
+    # TERMINATES a double-quoted value at the first unescaped `"`, so the parsed
+    # string can never contain one — `at_css("[x-data]")["x-data"]` passes on the
+    # exact input this test exists to catch (mutation-checked in review, 2026-08-13:
+    # a literal quote inside x-data left all 11 tests green). The closing `"` is
+    # pinned to the newline + `class=` that really ends the attribute, which is
+    # what makes a stray quote land INSIDE the captured span. Same shape as turf's
+    # test/controllers/onboarding_gallery_test.rb, the guard this port came from.
+    x_data = render_first_name[/<div x-data="(.*?)"\s*\n\s*class=/m, 1]
+    assert x_data.present?, "could not locate the x-data attribute — did the root element change?"
     assert_not_includes x_data, '"',
                         "a double quote inside x-data kills the component in the browser"
   end
