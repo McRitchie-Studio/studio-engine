@@ -378,6 +378,23 @@ class LayeredBannerTest < ActiveSupport::TestCase
     refute_includes email, "<img", "an email with no logo must ship no img tag"
   end
 
+  # THE UPLOAD BUTTON MUST CHANGE THE EMAIL. Reading only the registry meant an
+  # operator could upload artwork, watch the page show it and the badge flip to
+  # "Uploaded here", and have every send keep the gem's picture.
+  test "an uploaded banner becomes the layered background" do
+    uploaded = Struct.new(:url).new("https://cdn.test/ours.gif")
+    stub_singleton(Studio::EmailCatalog, :record, uploaded) do
+      assert_equal "https://cdn.test/ours.gif", Studio::EmailCatalog.background_url("magic_link")
+      assert_equal "https://cdn.test/ours.gif", Studio::Banner.for(:magic_link, name: "Alex").background_url
+    end
+  end
+
+  test "the registered artwork still applies when nothing was uploaded" do
+    stub_singleton(Studio::EmailCatalog, :record, nil) do
+      assert_includes Studio::EmailCatalog.background_url("magic_link").to_s, "magic-link-background"
+    end
+  end
+
   test "a host can override any piece per send" do
     Studio::EmailCatalog.register("magic_link", background: "emails/custom.gif", scrim: 0.1)
 

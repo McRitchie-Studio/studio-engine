@@ -17,22 +17,24 @@
   # that has not passed a recipient, and "nobody selected" is a real state — it
   # renders the name-free header, which is what a stranger receives.
   name    = local_assigns.fetch(:preview_name, nil)
-  # THE LIST SHOWS THE ARTWORK; the email's own page shows the rendered banner.
+  # THE BANNER AS IT ARRIVES — for a layered email, artwork with live text on it.
   #
-  # Rendering the layered banner here was tried and reverted, for two reasons that
-  # both point the same way. The layered banner is an email <table>, so nesting one
-  # inside a list row makes every "one row per email" assertion count three rows
-  # per layered email — two consumer suites went red on exactly that, which is the
-  # engine changing a markup contract its hosts test against.
+  # Two conditions, and both were learned the hard way.
   #
-  # And it was showing the wrong picture. Whether an email layers is a property of
-  # its MAILER, not of the catalogue: turf-monster re-registers magic_link with its
-  # own flat artwork and keeps the engine's background by inheritance, so the row
-  # drew a layered banner turf-monster never sends. The catalogue cannot tell the
-  # difference, and guessing produced exactly the failure this feature exists to
-  # prevent.
+  # It renders in an IFRAME. The banner is the email's own <table>, and putting
+  # one directly in a list row nests rows inside rows: every host asserting "one
+  # row per email" counted three per layered email, and two consumer suites went
+  # red. An iframe is a separate document, so the list's markup contract is
+  # untouched — the same reason the email preview lower down the detail page is
+  # one.
   #
-  # The rendered banner lives on /admin/emails/:key, where the page can be sure.
+  # And it only layers when THIS APP's artwork is layered. Whether an email
+  # layers belongs to its mailer, which the catalogue cannot see; the closest
+  # honest proxy is whose artwork is registered. turf-monster re-registers
+  # magic_link with its own flat banner and inherits the engine's background, so
+  # a naive check drew a layered picture turf-monster never sends.
+  layered = Studio::EmailCatalog.background_url(entry.key).present? && entry.engine_artwork?
+  banner  = layered ? Studio::Banner.for(entry.key, name: name) : nil
   subject = Studio::EmailCatalog.subject_for(entry.key, name: name)
 
   # The TEMPLATES ride on the row so the repaint script can re-resolve them for
@@ -67,7 +69,13 @@
     override. On a read-only app the cropper assets are not loaded either, so an
     unconditional x-data would reference an undefined factory and Alpine would
     throw on every row. %>
-<tr class="border-b border-subtle last:border-0" data-email-row
+<%# THE WHOLE ROW OPENS THE EMAIL. Kept as a click handler on the row with the
+    name still a real <a>: wrapping a table row in a link is invalid HTML, and
+    making every cell a link would break the Upload button inside one of them.
+    The handler ignores clicks that landed on a control, so Upload, Revert and
+    the name link keep their own behaviour. %>
+<tr class="border-b border-subtle last:border-0 cursor-pointer hover:bg-inset/60" data-email-row
+    data-email-path="<%= admin_email_path(entry.key) %>"
     data-header="<%= header_template %>"
     data-header-fallback="<%= header_fallback %>"
     data-subject="<%= subject_template %>"
@@ -87,9 +95,23 @@
     <% end %>>
 
   <td class="px-4 py-4">
-    <div class="rounded-lg overflow-hidden border border-subtle w-56"
+    <div class="rounded-lg overflow-hidden border border-subtle w-56" data-email-banner-frame
          style="aspect-ratio: <%= entry.ratio %>; background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-900));">
-      <% if banner_url %>
+      <% if banner %>
+        <%# srcdoc, so the email's table lives in its own document. Root-relative
+            asset paths inside it resolve against this page's origin, which is
+            what the admin preview wants. %>
+        <iframe class="pointer-events-none" scrolling="no" tabindex="-1" loading="lazy"
+                data-email-banner-preview data-banner-width="<%= card_width %>"
+                title="<%= entry.label %> banner"
+                style="width:<%= card_width %>px;height:<%= (card_width / entry.ratio).round %>px;border:0;transform-origin:top left;display:block;"
+                <%# ESCAPED EXPLICITLY. render returns an html_safe buffer, so a bare
+                    output tag injects it RAW into the attribute and closes the iframe
+                    at the banner's first quote — the row's markup collapses and the
+                    email's name disappears from the page. to_str drops the safe flag
+                    so the escaping actually happens. %>
+                srcdoc="<%= ERB::Util.html_escape(render("studio/mailers/layered_banner", banner: banner, preview: true).to_str) %>"></iframe>
+      <% elsif banner_url %>
         <%= image_tag banner_url, class: "w-full h-full object-cover",
               alt: "#{entry.label} email banner", loading: "lazy" %>
       <% else %>

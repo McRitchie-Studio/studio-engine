@@ -355,7 +355,15 @@ module Studio
       (value.to_f * 100).round
     end
 
-    def background_url(key) = absolute_asset_url(entry(key)&.background)
+    # THE APP'S OWN UPLOAD WINS, then the registered artwork. Same two layers as
+    # resolved_url, and for the same reason: uploading on /admin/emails is how an
+    # operator says "this picture is ours now".
+    #
+    # Reading only the registry made the Upload button a control that lies on a
+    # LAYERED email — the upload landed, the page showed it, the provenance badge
+    # flipped to "Uploaded here", and the email kept sending the gem's artwork
+    # because the layered banner never looked at the row.
+    def background_url(key) = url(key) || absolute_asset_url(entry(key)&.background)
     def logo_url(key)       = absolute_asset_url(entry(key)&.logo)
 
     def absolute_asset_url(asset)

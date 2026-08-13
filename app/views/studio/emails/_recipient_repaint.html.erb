@@ -61,16 +61,51 @@
                      .trim();
         },
 
+        // A row's banner lives in an IFRAME — the email's table is its own
+        // document so it cannot nest rows inside the list. Same-origin srcdoc,
+        // so its nodes are reachable; contentDocument is null until the frame
+        // has parsed, which is why the load listener is wired as well as the
+        // immediate attempt.
+        bannerNode(row, selector) {
+          var frame = row.querySelector("iframe[data-email-banner-preview]");
+          if (frame) {
+            try { return frame.contentDocument && frame.contentDocument.querySelector(selector); }
+            catch (_) { return null; }
+          }
+          return row.querySelector(selector);
+        },
+
+        paintRow(row) {
+          var header = this.bannerNode(row, "[data-banner-header]");
+          var subject = row.querySelector("[data-row-subject]");
+          if (header) {
+            header.textContent = this.resolve(row.dataset.header, row.dataset.headerFallback);
+          }
+          if (subject) subject.textContent = this.resolveSubject(row.dataset.subject);
+        },
+
         paint() {
-          var rows = this.$root.querySelectorAll("[data-email-row]");
-          rows.forEach(function (row) {
-            var header = row.querySelector("[data-banner-header]");
-            var subject = row.querySelector("[data-row-subject]");
-            if (header) {
-              header.textContent = this.resolve(row.dataset.header, row.dataset.headerFallback);
+          var self = this;
+          this.$root.querySelectorAll("[data-email-row]").forEach(function (row) {
+            self.paintRow(row);
+            var frame = row.querySelector("iframe[data-email-banner-preview]");
+            if (frame && !frame.dataset.repaintBound) {
+              frame.dataset.repaintBound = "1";
+              frame.addEventListener("load", function () { self.paintRow(row); });
             }
-            if (subject) subject.textContent = this.resolveSubject(row.dataset.subject);
-          }, this);
+          });
+        },
+
+        // Anything interactive keeps its own behaviour; everything else opens
+        // the email. Without the closest() guard, clicking Upload would both
+        // open the cropper and navigate away from it.
+        openRow(event, row) {
+          // The listener sits on the tbody, so a click can land between rows and
+          // arrive with no row at all.
+          if (!row) return;
+          if (event.target.closest("a, button, input, label, form")) return;
+          var path = row.dataset.emailPath;
+          if (path) window.location = path;
         }
       };
     }

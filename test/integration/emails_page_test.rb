@@ -630,7 +630,10 @@ class EmailsPageTest < ActiveSupport::TestCase
     Studio::EmailCatalog.entries.each do |entry|
       row = rows.find { |r| r.text.include?(entry.label) }
       refute_nil row, "expected a row named #{entry.label}"
-      refute_empty row.css("img"), "#{entry.key}'s row must show its live image, not just its name"
+      # An img for flat artwork, an iframe for a layered banner — the property is
+      # that the row SHOWS the email, not which element carries it.
+      refute_empty row.css("img, iframe"),
+        "#{entry.key}'s row must show its live banner, not just its name"
     end
   end
 
@@ -643,14 +646,31 @@ class EmailsPageTest < ActiveSupport::TestCase
   # banner is one, and rendering it here made every host's "one row per email"
   # assertion count three rows per layered email. Two consumer suites went red on
   # exactly that. The rendered banner lives on the email's own page instead.
-  test "a list row shows the artwork and nests no email markup" do
+  # THE CONSUMER CONTRACT. The banner is the email's own <table>; nesting one in a
+  # list row puts rows inside rows, and every host asserting "one row per email"
+  # counted three per layered email. Rendering it through an iframe's srcdoc keeps
+  # the markup in a separate document, so the row itself stays one row.
+  test "a layered row renders its banner without nesting email markup" do
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
 
-    html = render_row("magic_link")
+    row = Nokogiri::HTML.fragment(render_row("magic_link"))
 
-    refute_includes html, "data-banner-header",
-      "a list row must not nest the email's own table — it triples every host's row count"
-    assert_includes html, "<img", "the row still identifies the email by its artwork"
+    assert_equal 1, row.css("tr").length, "the row must contain no nested rows"
+    assert_empty row.css("table"), "the email's table belongs in the iframe document, not the row"
+    refute_empty row.css("iframe[data-email-banner-preview]"), "the banner should still render"
+  end
+
+  test "a flat row shows its artwork as a plain image" do
+    Studio::EmailCatalog.register("flat_only", label: "Flat only",
+                                  default_asset: "emails/magic-link.gif")
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+
+    row = Nokogiri::HTML.fragment(render_row("flat_only"))
+
+    assert_empty row.css("iframe"), "an email whose artwork is flat has no layered banner to show"
+    refute_empty row.css("img")
+  ensure
+    Studio::EmailCatalog.reset!
   end
 
   # ONE row, rendered alone, so an assertion about a row cannot pick up its

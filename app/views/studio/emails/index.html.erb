@@ -110,7 +110,7 @@
             <% end %>
           </tr>
         </thead>
-        <tbody>
+        <tbody @click="openRow($event, $event.target.closest('[data-email-row]'))">
           <% @entries.each do |entry| %>
             <%= render "studio/emails/row", entry: entry,
                   uploads_available: @uploads_available,
