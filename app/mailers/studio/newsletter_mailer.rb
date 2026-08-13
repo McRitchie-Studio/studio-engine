@@ -19,7 +19,20 @@ module Studio
     # unsubscribe_url is OPTIONAL and the line renders only when it is given.
     # A newsletter needs a way out, but a hard-coded dead link is worse than an
     # honest omission — a host wires its real one and the line appears.
-    def subscribed(email, name: nil, unsubscribe_url: nil)
+    #
+    # `from` is OPTIONAL on the same terms, and it exists for a reason worth
+    # stating: THIS EMAIL IS MARKETING, and the rest of what this engine sends
+    # is transactional. A host that keeps a separate marketing address does so
+    # to protect the reputation of the address its SIGN-IN LINKS go out on —
+    # complaints and unsubscribes against a newsletter must not follow the
+    # address someone needs to get back into their account. Without this
+    # parameter a host with that separation could not migrate onto this mailer
+    # without giving it up, which is a deliverability regression disguised as an
+    # adoption.
+    #
+    # Omitted, nothing changes: ActionMailer falls back to the default_from the
+    # host already configured.
+    def subscribed(email, name: nil, unsubscribe_url: nil, from: nil)
       @app_name        = Studio.app_name
       @email           = email
       @name            = name.presence
@@ -41,7 +54,12 @@ module Studio
 
       subject = Studio::EmailCatalog.subject_for(:newsletter_subscribed, name: @name) ||
                 "You're subscribed to #{@app_name}"
-      mail(to: email, subject: subject)
+      # Built conditionally rather than passing `from: nil`: ActionMailer treats
+      # an explicit nil as a SET header and drops the host's default_from,
+      # sending with no From at all.
+      headers = { to: email, subject: subject }
+      headers[:from] = from if from.present?
+      mail(**headers)
     end
   end
 end
