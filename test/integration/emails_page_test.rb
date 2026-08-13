@@ -575,12 +575,150 @@ class EmailsPageTest < ActiveSupport::TestCase
   # name-free fallback header could be previewed. Mr. McRitchie asked for just
   # the two, knowing the cost — so this asserts the DECISION, and the test below
   # keeps the guarantee that actually matters.
+  # RUN AGAINST A POPULATED MODEL, which this test did not do and which is why it
+  # could not fail. The engine's dummy app has no User model, so `all` returned
+  # ["sample-admin"] alone — one entry, no member — and a test whose NAME
+  # promises "the admin and the member" was asserting over a list that had
+  # neither. Reverting its assertion to the old defective proxy left the suite
+  # green, because there was no member present for the proxy to misjudge.
+  #
+  # ASSERTS SYNTHETIC, not "has no name". Those are not the same thing: the first
+  # version used a missing name as a PROXY for synthetic, so a real member who
+  # genuinely has no name on file would have failed it — punishing the exact
+  # person the name-free fallback header exists to serve.
   test "the example list offers the admin and the member, and nothing synthetic" do
+    targets = with_seeded_users { Studio::EmailPreviewTarget.all }
+
+    assert_equal 2, targets.length, "the admin and the member, and nothing else"
+    assert_equal %w[alex@example.test mack@example.test], targets.map(&:email).sort
+    refute_stray_synthetic targets
+  end
+
+  # The two people every McRitchie app seeds, as the host model would hand them
+  # over. Shared so both tests below exercise the SAME populated world.
+  def with_seeded_users(rows = nil)
+    row = Struct.new(:id, :email, :name, :admin) do
+      def try(method, *) = respond_to?(method) ? public_send(method) : nil
+      def admin? = admin
+    end
+    rows ||= [ row.new(1, "alex@example.test", "Alex McRitchie", true),
+               row.new(2, "mack@example.test", "Mack McRitchie", false) ]
+    fake = Class.new do
+      class << self
+        attr_accessor :rows
+        def column_names = %w[id email name]
+        def limit(_n) = rows
+        def all = rows
+        def respond_to?(m, priv = false) = %i[all column_names limit].include?(m.to_sym) || super
+      end
+    end
+    fake.rows = rows
+
+    target = Studio::EmailPreviewTarget
+    original = target.method(:user_model)
+    target.define_singleton_method(:user_model) { fake }
+    yield
+  ensure
+    target&.define_singleton_method(:user_model, original) if original
+  end
+
+  def nameless_member_row
+    Struct.new(:id, :email, :name, :admin) do
+      def try(method, *) = respond_to?(method) ? public_send(method) : nil
+      def admin? = admin
+    end
+  end
+
+  # THE INVARIANT, in one place because BOTH tests must share it. Carl proved the
+  # cost of not sharing: the regression test below repeated the expression, so
+  # reverting the guard here alone left the whole suite green — the regression
+  # pinned a COPY of the guard rather than the guard.
+  #
+  # And `id == "sample-member"` was the wrong property anyway. Against four
+  # mutants — re-add same id / re-add renamed / re-add with a name / pristine —
+  # only this one kills all of them:
+  #
+  #   id == "sample-member"   MISSES a rename
+  #   sample? && name.nil?    MISSES one re-added with a name
+  #   sample? && !admin?      catches all three
+  #
+  # It is also the honest statement of the rule: the ONLY synthetic the picker
+  # may offer is the admin backstop, which an app with no User model still needs.
+  def refute_stray_synthetic(targets)
+    stray = targets.select { |t| t.sample? && !t.admin? }
+
+    assert_empty stray.map(&:id),
+      "the synthetic nameless entry was removed deliberately; the only stand-in the " \
+      "picker may offer is the admin backstop. Do not re-add a synthetic member here."
+  end
+
+  # THE REGRESSION CARL FOUND, pinned. The guard above once used "has no name" as
+  # a stand-in for "is synthetic". A REAL member with no name on file is the
+  # person the fallback header exists to serve, and the old assertion failed on
+  # them — so the natural fix would have been to give them a name. This proves
+  # the guard now tolerates exactly that person.
+  test "a real member with no name on file does not trip the synthetic guard" do
+    row = nameless_member_row
+    rows = [ row.new(1, "alex@example.test", "Alex McRitchie", true),
+             row.new(2, "mack@example.test", nil, false) ] # no name on file
+
+    targets = with_seeded_users(rows) { Studio::EmailPreviewTarget.all }
+    nameless = targets.find { |t| t.name.nil? }
+
+    refute_nil nameless, "the member has no name on file — that is the case under test"
+    refute nameless.sample?, "they are a real record, not a stand-in"
+    refute_stray_synthetic targets # the SAME expression the guard uses, not a copy
+  end
+
+  # THE NO-USER-MODEL WORLD, unstubbed — the shape the deleted builder served,
+  # and the one mutant every other test here is blind to. The two tests above
+  # stub a POPULATED model, so `find_member` never reaches its `record.nil?`
+  # branch; the two below never call `all` at all. Restore the deleted builder as
+  # that nil fallback and, without this test, the whole suite stays green — while
+  # the suite this one replaced caught it. That is a kill worth keeping.
+  test "an app with no User model is offered the admin backstop alone" do
+    assert_nil Studio::EmailPreviewTarget.send(:user_model),
+      "precondition: the engine's dummy app defines no User model"
+
     targets = Studio::EmailPreviewTarget.all
 
-    assert_operator targets.length, :<=, 2
-    refute targets.any? { |t| t.name.nil? },
-      "the synthetic nameless entry was removed deliberately; do not re-add it here"
+    assert_equal %w[sample-admin], targets.map(&:id), "the backstop, and nothing beside it"
+    refute_stray_synthetic targets
+  end
+
+  # THE INVARIANT ITSELF, exercised directly — because both tests above run
+  # against a picker that currently offers no synthetic member, so neither can
+  # tell `sample? && !admin?` apart from a check on one hard-coded id. That
+  # difference is the whole point: an id check misses the same entry re-added
+  # under any other name, which is exactly how this defect would return.
+  test "a synthetic member is rejected whatever id it is given" do
+    admin_backstop = Studio::EmailPreviewTarget.new(
+      id: "sample-admin", label: "Admin (sample)", admin: true,
+      name: "Alex McRitchie", email: "alex@example.test"
+    )
+    stray = Studio::EmailPreviewTarget.new(
+      id: "sample-anything-at-all", label: "No name on file", admin: false,
+      name: nil, email: "someone@example.test"
+    )
+
+    # The backstop alone is legitimate — an app with no User model needs it, and
+    # forbidding every sample would leave that app an empty picker.
+    assert_nothing_raised { refute_stray_synthetic [ admin_backstop ] }
+
+    assert_raises(Minitest::Assertion, "a synthetic member must be rejected on its own terms") do
+      refute_stray_synthetic [ admin_backstop, stray ]
+    end
+  end
+
+  # A synthetic member that HAS a name is still synthetic. Pins the third mutant:
+  # `sample? && name.nil?` would wave this one through.
+  test "a synthetic member with a name is still rejected" do
+    named_stray = Studio::EmailPreviewTarget.new(
+      id: "sample-someone", label: "Someone", admin: false,
+      name: "Someone", email: "someone@example.test"
+    )
+
+    assert_raises(Minitest::Assertion) { refute_stray_synthetic [ named_stray ] }
   end
 
   # THE FALLBACK HEADER STILL SHIPS, and that is the part worth protecting. It

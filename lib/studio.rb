@@ -1,5 +1,6 @@
 require "studio/version"
 require "studio/log_rotation"
+require "studio/ip_locations"
 require "studio/engine"
 require "studio/color_scale"
 require "studio/environment_banner"
@@ -140,6 +141,90 @@ module Studio
   # Gates only the PAGE. Studio::EmailImage's registry and its inherited-default
   # resolution are always on, so an app sends branded email either way.
   mattr_accessor :draw_admin_emails_routes, default: false
+
+  # Draw the shared first-name onboarding endpoints
+  # (Studio::OnboardingController#first_name / #skip_first_name). OFF by default,
+  # and for the same hard reason as draw_admin_emails_routes above:
+  # turf-monster ALREADY owns `post "/onboarding/first_name"` with the helper
+  # names onboarding_first_name_path and onboarding_skip_first_name_path, so
+  # drawing these unconditionally raises `Invalid route name, already in use`
+  # while that app's routes.rb loads — which takes down its ENTIRE route set, not
+  # just this page. Consumer CI runs each consumer's main, so a default-on flag
+  # cannot be fixed from inside the engine. Each app's adoption task turns it on
+  # as it deletes its local copy:
+  #
+  #   config.draw_onboarding_routes = true
+  #
+  # Gates only the ENDPOINTS. The modal partial
+  # (studio/modals/onboarding/_first_name) and its /admin/style specimen are
+  # always available, so a host can preview the step before it wires the writes.
+  mattr_accessor :draw_onboarding_routes, default: false
+
+  # What the onboarding endpoints report back as still-remaining after a write,
+  # so the client can keep walking its chain without a second round trip.
+  #
+  # The engine owns ONE STEP (the first-name ask); the HOST owns the SEQUENCE
+  # around it. turf-monster walks welcome → first name → age → wallet, which
+  # means nothing in a hub app, so this resolver is how a host says what comes
+  # next. It takes (user, session) and returns an array of step names; the
+  # default — no further steps — is correct for an app whose only ask is the name.
+  #
+  #   config.onboarding_steps_resolver = ->(user, session) {
+  #     OnboardingFlow.new(user, session).remaining.map(&:to_s)
+  #   }
+  mattr_accessor :onboarding_steps_resolver, default: ->(_user, _session) { [] }
+
+  # Session key recording "asked, and they said not now". Session-scoped
+  # DELIBERATELY: skipping means not now, not never — the field stays blank, so a
+  # later session may ask again. That is the whole reason this is not a column.
+  FIRST_NAME_SKIP_SESSION_KEY = :onboarding_skipped_first_name
+
+  # The shared rule for "does this account still owe us a first name?" — the one
+  # piece of onboarding logic every app agrees on. Hosts compose it into their own
+  # flow rather than re-deriving it (turf's OnboardingFlow calls straight through).
+  #
+  # Tolerates a host whose users table has no first_name column: an app that has
+  # not run the migration yet is simply never asked, instead of raising on every
+  # signed-in request.
+  def self.first_name_outstanding?(user, session = {})
+    return false if user.blank?
+    return false unless user.respond_to?(:first_name)
+    return false if session.present? && session[FIRST_NAME_SKIP_SESSION_KEY]
+
+    user.first_name.blank?
+  end
+
+  # Record a place this account has been seen from, if it is a place we have not
+  # seen it from before. Returns true when something was actually written.
+  #
+  # NEW LOCATIONS ONLY, and that is the design rather than a shortcut: this is
+  # called from the request path, so refreshing a counter on every hit would mean
+  # a database write per request for no analytic gain. The first sign-in from a
+  # place writes; the next thousand do not. A host wanting last-seen/count
+  # refresh can call Studio::IpLocations.push directly on its own cadence.
+  #
+  # The host resolves the location — turf-monster already has Geocoder wired in
+  # ApplicationController#detect_geo_state — and passes whatever it got. Pass
+  # only an IP and the IP is what gets deduped on.
+  #
+  # Tolerates an app that has not run the migration (no ip_locations column):
+  # it records nothing rather than raising on a request path.
+  def self.record_ip_location!(user, ip:, country: nil, region: nil, city: nil, at: nil)
+    return false if user.blank?
+    return false unless user.respond_to?(:ip_locations)
+
+    current = user.ip_locations
+    return false if IpLocations.seen?(current, ip: ip, country: country, region: region, city: city)
+
+    updated = IpLocations.push(current, ip: ip, country: country, region: region,
+                                        city: city, at: at)
+    return false if updated == IpLocations.normalize(current)
+
+    # update_columns, not update!: analytics must never block a request, and a
+    # validation failure elsewhere on the record is not this write's business.
+    user.update_columns(ip_locations: updated)
+    true
+  end
 
   # Optional admin Act As / impersonation session conventions. Consumers that
   # include Studio::Impersonation get current_user layered over true_user with
@@ -582,6 +667,20 @@ module Studio
         # picture, different ImageCache purpose, independently revertible.
         patch  "admin/emails/:key/logo", to: "studio/emails#logo",
                as: :admin_email_logo, constraints: { key: /[a-z0-9_]+/ }
+      end
+
+      # The shared first-name onboarding step's two writes. OPT-IN — see
+      # Studio.draw_onboarding_routes above: turf-monster owns these exact helper
+      # names today, and drawing them there before its adoption task deletes the
+      # local pair kills every route in that app.
+      #
+      # The paths match the partial's defaults, so a host that opts in and has no
+      # other onboarding of its own needs no further wiring.
+      if Studio.draw_onboarding_routes
+        post "onboarding/first_name",      to: "studio/onboarding#first_name",
+             as: :onboarding_first_name
+        post "onboarding/skip_first_name", to: "studio/onboarding#skip_first_name",
+             as: :onboarding_skip_first_name
       end
 
       # DEPRECATED, kept for ONE release. Not a redirect: consumer-ci.yml runs

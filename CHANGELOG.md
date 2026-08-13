@@ -35,6 +35,83 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **The standard user profile columns — and the engine's first migration against
+  a host-owned table.** Every other engine migration creates a `studio_*` table
+  the engine owns outright; `users` belongs to the host. That boundary is crossed
+  deliberately, on the operator's call, because the alternative was three
+  hand-written migrations kept identical by discipline alone — and column drift
+  across apps is the exact thing a standard prevents.
+
+  | Column | Type | Why |
+  |---|---|---|
+  | `first_name` | string | The shared onboarding ask. MS and TM already had it; MI did not. |
+  | `birth_day` / `birth_month` / `birth_year` | integer | Age needs the year plus month/day for the boundary case; "whose birthday is today" needs month + day and no year at all. |
+  | `ip_locations` | jsonb, default `[]` | The distinct places an account has been seen from. |
+
+  Three integers rather than one date is the point: **no single date-of-birth
+  column is stored.** turf-monster's `AgePolicy` composes a `Date` from the trio.
+  turf already had `birth_year` as an integer, so it matches exactly.
+
+  **Every add is `if_not_exists: true`, and the migration no-ops when the app has
+  no `users` table.** Both matter: the apps disagree today (MS and TM already have
+  `first_name`, turf already has `birth_year`), and an unguarded add would mean
+  the engine breaking consumers that did nothing wrong. Migrations are
+  install-copied (`bin/rails studio_engine:install:migrations`), so each app still
+  adopts deliberately.
+
+  `Studio::IpLocations` owns the analytics shape so it cannot drift: string keys
+  and ISO-8601 times (it round-trips through jsonb), dedupe on the **place**
+  rather than the address — two sign-ins from Austin are one entry however many
+  IPs they arrive from — a 50-entry cap, and loopback/private ranges skipped so
+  dev sessions don't crowd out real ones. `Studio.record_ip_location!(user, ip:,
+  country:, region:, city:)` writes only when the place is **new**: this sits on
+  the request path, and refreshing a counter per hit would be a database write
+  per page view. The host resolves the location — turf already has Geocoder wired
+  in `ApplicationController#detect_geo_state` — and an app that has not run the
+  migration records nothing rather than raising.
+
+  `ip_locations` holds IP-derived location data, which is personal data in most
+  jurisdictions. The cap bounds it, and no app writes to it until it opts in.
+
+- **First-name capture as a shared onboarding step.** Every Studio app addresses
+  people by name in email, and all three were going to write the same modal and
+  the same controller. Ported out of turf-monster, where it shipped first:
+
+  | Piece | What it is |
+  |---|---|
+  | `studio/modals/onboarding/_first_name` | The step's UI. Every endpoint and label is a local with a default, so a host mounting it elsewhere does not fork the partial. Previewable at `/admin/style#modals`. |
+  | `Studio::OnboardingController` | The two writes — `#first_name` and `#skip_first_name`, JSON only. |
+  | `Studio.first_name_outstanding?(user, session)` | The one rule every app agrees on: blank field, not skipped this session. |
+  | `Studio.onboarding_steps_resolver` | How a host declares what comes NEXT. |
+
+  **The engine owns ONE STEP; the host owns the SEQUENCE.** turf walks
+  welcome → first name → age → wallet, which means nothing in a hub app. The
+  partial never opens another modal — it reports the remaining steps upward and
+  closes — and the controller's `next` array is whatever the host's resolver
+  returns. The default is empty, which is the right answer for an app whose only
+  ask is the name: opt in, and it works with no further configuration.
+
+  Skipping is **session-scoped on purpose**. It means "not now", not "never" —
+  the column stays blank, so a later session may ask again. That is the whole
+  reason it is not a users column.
+
+  **The endpoints are OPT-IN (`config.draw_onboarding_routes = true`), and they
+  have to be** — the same hard constraint as `/admin/emails`. turf-monster owns
+  `onboarding_first_name_path` and `onboarding_skip_first_name_path` TODAY, and
+  drawing them there raises `Invalid route name, already in use` while that app's
+  routes load, taking down its entire route set. Consumer CI runs each consumer's
+  default branch, so this cannot be fixed from inside the engine. Each app's
+  adoption task flips the flag as it deletes its local copy.
+
+  Two consumer notes:
+
+  - **turf-monster** deletes `OnboardingController`, its two routes, and points
+    its `OnboardingFlow` at `Studio.first_name_outstanding?`. Net deletion.
+  - **mcritchie-industries** has **no `users.first_name` column**. The rule
+    tolerates that — an app that has not run the migration is simply never asked,
+    rather than raising on every signed-in request — so the gem can land there
+    before the migration does.
+
 - **`Studio::NewsletterMailer` — a sendable "you're on the list" email.**
   Namespaced under `Studio::` on purpose: a host that defines its own top-level
   `UserMailer` (McRitchie Studio does) SHADOWS the engine's outright, so an
