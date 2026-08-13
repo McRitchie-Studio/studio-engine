@@ -138,8 +138,24 @@
           this._sync();
         },
 
+        // isOpen(id) — on the stack in ANY lifecycle state, including a card
+        // mid-close (close() flips _closing at once and splices only after
+        // CLOSE_ANIM_MS). isLive() below is the "still up" question.
         isOpen: function(id) {
           return this.stack.some(function(entry) { return entry.id === id; });
+        },
+
+        // isLive(id) / isLive([id, ...]) — on the stack and NOT on its way
+        // out. Mirrors the shared host's primitive so a page-scoped store
+        // answers the same question the same way; see studio/modals/_host
+        // for the full lifecycle rationale. Tests _closing ALONE: a leaving
+        // swap() entry carries _swappingOut AND _closing, so _swappingOut on
+        // its own must never count as leaving.
+        isLive: function(id) {
+          var ids = Array.isArray(id) ? id : [id];
+          return this.stack.some(function(entry) {
+            return entry && !entry._closing && ids.indexOf(entry.id) !== -1;
+          });
         },
 
         current: function() {

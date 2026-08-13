@@ -268,7 +268,17 @@ Store API (`Alpine.store('modals')`):
 | `close()` | Animated close of the current modal (no-op if already closing). |
 | `closeAll()` | Instant, unanimated clear (used by navigation cleanup). |
 | `closeAllDismissible()` | Clears all modals except those opened with `dismissible: false`. |
-| `isOpen(id)` / `current()` | Introspection. |
+| `isOpen(id)` / `current()` | Introspection. `isOpen` is true while a card is ON THE STACK — including the whole exit animation, because `close()` flips `_closing` at once and splices only after it. |
+| `isLive(id)` / `isLive([id, …])` | True when a card with that id is up and **not on its way out**. Pass an array to ask about a set of ids ("is any card of this flow still up?"). |
+
+**`isOpen` or `isLive`?** A guard that means "don't open this twice" almost
+always wants `isLive`. `isOpen` stays true for the ~220ms exit window, so an
+idempotence check built on it refuses to reopen a card the user just dismissed.
+The one asymmetry worth knowing: `advance()` slides the *same* card between
+steps of its own flow and sets only `_swappingOut`, so a mid-advance card is
+still **live** — only `close()` and the outgoing half of a `swap()` set
+`_closing`. `isLive` tests `_closing` alone, deliberately; conflating it with
+`_swappingOut` makes an in-flow hand-off look like a dismissal.
 
 Recognized props: `dismissible: false` disables escape/click-outside dismissal
 (e.g. an in-flight transaction); `enterAnim` / `exitAnim` pick a named
