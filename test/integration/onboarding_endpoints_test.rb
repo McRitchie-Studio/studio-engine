@@ -80,6 +80,14 @@ class OnboardingEndpointsTest < ActiveSupport::TestCase
   end
 
   test "the drawn paths dispatch to the engine controller" do
+    # recognize_path resolves the controller LAZILY, which loads
+    # Studio::OnboardingController — and that inherits ::ApplicationController,
+    # which the dummy does not define (hosts own theirs). Without this the test
+    # passes or fails BY SEED: green whenever a test that defines the constant
+    # happened to run first, NameError when this one leads. Measured on this
+    # file: green at --seed 39435, red at --seed 23876.
+    ensure_application_controller!
+
     Rails.application.reload_routes!
     recognized = Rails.application.routes.recognize_path("/onboarding/first_name", method: :post)
 
