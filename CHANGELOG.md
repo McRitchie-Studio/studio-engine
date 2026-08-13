@@ -40,8 +40,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   after the exit animation, so for that whole ~220ms window `isOpen(id)` reports
   a card that is already leaving the screen as open. Every consumer guard that
   means *don't open this twice* wants the opposite answer, and turf-monster had
-  hand-rolled the same `_closing`-aware `.some()` over `.stack` in three places
-  to get it.
+  hand-rolled the same `_closing`-aware `.some()` over `.stack` to get it.
 
   `isLive(id)` returns true when a card with that id is on the stack **and not on
   its way out**. It also accepts an array — `isLive(['onboarding', 'age-verify',
@@ -81,10 +80,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `app/views/studio/modals/_host.html.erb`, and a non-isolated engine lets the app
   copy shadow the gem's. Those apps pick `isLive` up only by porting it into their
   fork or by retiring the fork; `studio/modals/scoped_host` is unforked everywhere
-  and carries it today. turf-monster's three hand-rolled scans (the onboarding
-  chain driver's `open()` guard, `selectionBoard#showWalletSetupModal`, and the
-  chain-exit watcher when it returns) can then collapse onto this primitive —
-  a turf-side follow-up, not part of this change.
+  and carries it today. turf-monster's two hand-rolled scans — the onboarding
+  chain driver's `open()` guard (`layouts/application.html.erb`) and
+  `selectionBoard#showWalletSetupModal` (`contests/_turf_totals_board.html.erb`)
+  — can then collapse onto this primitive, as can its two remaining bare
+  `isOpen()` idempotence guards (`app/javascript/solana_stores.js` for
+  `wallet-changed`, `cdp/returns/show.html.erb` for `cdp-ramp`), which are the
+  exact defect `isLive` exists to prevent. A turf-side follow-up, not part of
+  this change.
 
 - **The standard user profile columns — and the engine's first migration against
   a host-owned table.** Every other engine migration creates a `studio_*` table
