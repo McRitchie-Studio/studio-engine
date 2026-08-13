@@ -453,10 +453,12 @@ rides the gem, which is what gives a new app good-looking mail on day one.
 Studio::EmailCatalog.register("magic_link", logo: "emails/our-mark.png")
 ```
 
-If you are **bumping this gem** from a version at or below 0.45.0, note what
-CHANGED rather than what to fear: `magic_link` used to seed the Studio wordmark,
-so an app that registered no logo inherited it. If your app WANTED that mark, it
-now has to name it — see the CHANGELOG entry, which lists who that affects.
+If you are **bumping this gem** ACROSS this change — that is, from any release
+that still seeded the mark, which is **every version up to and including
+0.47.0** — note what CHANGED rather than what to fear: `magic_link` used to seed
+the Studio wordmark, so an app that registered no logo inherited it. If your app
+WANTED that mark, it now has to name it — see the CHANGELOG entry, which lists
+who that affects.
 
 **Why layered rather than composited.** Drawing the text into the image gives
 pixel-exact brand typography everywhere, but it cannot have an ANIMATED
