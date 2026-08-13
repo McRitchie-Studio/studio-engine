@@ -111,7 +111,7 @@ module Studio
         label: "Magic-link sign-in",
         description: "Passwordless sign-in link. Sent whenever someone asks to sign in by email.",
         default_asset: "emails/magic-link.gif",
-        aspect_ratio: 3.0,
+        aspect_ratio: 2.0,
         # Layered artwork: the background animates, the greeting is live HTML on
         # top. default_asset above stays the flat <img> for a mailer that has not
         # adopted the layered banner.
@@ -131,7 +131,7 @@ module Studio
         key: "newsletter_subscribed",
         label: "Newsletter subscribed",
         description: "Welcomes someone who has just joined the mailing list.",
-        aspect_ratio: 3.0,
+        aspect_ratio: 2.0,
         # LAYERED-NATIVE: no default_asset. A flat asset is the pre-layered
         # fallback — artwork with the words baked in, for a mailer that only
         # knows how to render an <img>. Studio::NewsletterMailer has known how to

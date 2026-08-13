@@ -315,7 +315,7 @@ class LayeredBannerTest < ActiveSupport::TestCase
 
     banner_aspect = Studio::Banner::DEFAULT_WIDTH.to_f / Studio::Banner::DEFAULT_HEIGHT
     assert_in_delta banner_aspect, width.to_f / height, 0.05,
-      "a 1200x800 source ships 26MB to display a 1200x400 band — trim to the band"
+      "a 1200x800 source ships 26MB to display a narrower band — trim to the band"
     assert_operator width, :>=, Studio::Banner::DEFAULT_WIDTH * 2,
       "the banner is retina: the asset must be at least 2x the displayed width"
   end
@@ -323,7 +323,10 @@ class LayeredBannerTest < ActiveSupport::TestCase
   test "the banner box is the 600px email card, and cover does the cropping" do
     assert_equal 600, Studio::Banner::DEFAULT_WIDTH,
       "600px is the width every email client and template assumes"
-    assert_equal 200, Studio::Banner::DEFAULT_HEIGHT
+    # 300. It was 200 for a while, to take out vertical dead space that the
+    # proportional type had already closed — so the shorter box bought nothing
+    # and cost the artwork half its sky.
+    assert_equal 300, Studio::Banner::DEFAULT_HEIGHT
 
     html = render_banner
     assert_includes html, "background-size:cover",

@@ -348,8 +348,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   # ROLE calls for rather than one global number.
   BANNER_SIZES = {
     "emails/magic-link.gif" => [1800, 600],
-    "emails/magic-link-background.gif" => [1200, 400],
-    "emails/newsletter-subscribed-background.gif" => [1200, 400]
+    "emails/magic-link-background.gif" => [1200, 600],
+    "emails/newsletter-subscribed-background.gif" => [1200, 600]
   }.freeze
 
   # A GIF frame is introduced by a Graphic Control Extension: the block
@@ -418,8 +418,8 @@ class EmailsPageTest < ActiveSupport::TestCase
   # letterbox this artwork or crop turf-monster's on every upload, so the ratio
   # is per-entry.
   test "each email carries its own banner shape" do
-    assert_equal 3.0, Studio::EmailCatalog.ratio("magic_link")
-    assert_equal 3.0, Studio::EmailCatalog.ratio("newsletter_subscribed")
+    assert_equal 2.0, Studio::EmailCatalog.ratio("magic_link")
+    assert_equal 2.0, Studio::EmailCatalog.ratio("newsletter_subscribed")
 
     Studio::EmailCatalog.register("winnings", default_asset: "emails/winnings.jpg")
     assert_equal Studio::EmailCatalog::ASPECT_RATIO, Studio::EmailCatalog.ratio("winnings"),
@@ -438,7 +438,7 @@ class EmailsPageTest < ActiveSupport::TestCase
     # Per-page now, because the cropper is mounted on the email being edited
     # rather than once per row. The property is unchanged: each email crops to
     # ITS OWN shape, not to one page-wide value.
-    assert_includes render_show("magic_link"), "aspectRatio: 3.0",
+    assert_includes render_show("magic_link"), "aspectRatio: 2.0",
       "the standard emails must crop to the shape of their own 3:1 artwork"
     assert_includes render_show("winnings"), "aspectRatio: #{Studio::EmailCatalog::ASPECT_RATIO}",
       "an email on the shared default ratio must still crop at that ratio"
