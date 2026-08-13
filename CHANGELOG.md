@@ -12,17 +12,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   itself**, with its own artwork, in `config/initializers/studio_emails.rb`. No
   host loses a banner, and no host action is required for the removal.
 
-  What DOES break consumers is the ADDITION. Two suites assert against the whole
-  shared catalogue, so a new standard email fails them:
+  What DOES break consumers is the ADDITION. Three suites assert against the
+  whole shared catalogue, so a new standard email fails them:
 
-  | Consumer | Assertion | Fix |
-  |---|---|---|
-  | turf-monster | `EmailRegistrationTest` compares the full key list | mcritchie/turf-monster#292 |
-  | mcritchie-studio | `StudioEmailsPageTest` pins the registry list, an `email_change_confirmation` link, and the upload-rejection wording | mcritchie/mcritchie-studio#813 |
+  | Consumer | Assertion | Fix | State |
+  |---|---|---|---|
+  | turf-monster | `EmailRegistrationTest` compares the full key list | McRitchie-Studio/turf-monster#292 | merged |
+  | turf-monster | `AdminEmailsRenderTest` counts `tbody img` exactly | McRitchie-Studio/turf-monster#294 | merged |
+  | mcritchie-studio | `StudioEmailsPageTest` pins the registry list, an `email_change_confirmation` link, and the upload-rejection wording | McRitchie-Studio/mcritchie-studio#813 | merged |
 
-  Consumer CI builds each app against its **default branch**, so both must reach
-  `main` before this engine's consumer lanes go green. Nothing on this branch can
-  turn them green.
+  The second turf fix is the easy one to miss: a layered standard email renders
+  its banner through an `<iframe>` rather than an `<img>`, so an exact image
+  count comes up one short. #292 alone does NOT turn that lane green.
+
+  Consumer CI builds each app against its **default branch**, so all three had to
+  reach `main` before this engine's consumer lanes could go green. All three now
+  have, and the lanes pass. Nothing on this branch ever could have turned them
+  green — a red consumer lane here is a consumer-side fix, not an engine defect.
 
   The artwork `emails/email-change-confirmation.gif` still ships, so a host that
   wants the entry can register it.
