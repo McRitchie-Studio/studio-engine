@@ -234,11 +234,25 @@ module Studio
     # a path THAT APP ships) or on /admin/emails.
     #
     # STILL OUTSTANDING, stated so nobody reads this as swept: magic_link above
-    # DOES still seed the wordmark, so a host that has registered no mark of its
-    # own inherits it on the sign-in email. turf-monster and McRitchie Studio are
-    # covered — turf registers emails/turf-logo.png, and the Studio hub IS the
-    # wordmark's owner — but an app that registers nothing is not. That is a
-    # consumer-visible change of its own and belongs to its own task.
+    # DOES still seed the wordmark, so a host that registers no mark of its own
+    # inherits it on the sign-in email. turf-monster registers emails/turf-logo.png
+    # and the Studio hub owns the mark, so both are covered.
+    #
+    # It is an UPGRADE TRAP rather than a live leak, which is the sharper shape.
+    # The apps carrying no email initializer are pinned far enough back that this
+    # file does not exist in the gem they run, so they inherit nothing today — but
+    # the routine dependency bump that brings one forward would put another
+    # brand's mark in its most-sent email, with no code change of its own and
+    # nobody looking for it.
+    #
+    # CHECK REACHABILITY AT THE PIN, never from main: `git ls-tree` at the tag the
+    # app resolves, or read the installed gem. "HEAD seeds it" plus "the app
+    # registers nothing" are both true and together say nothing about what that
+    # app RUNS — a wrong conclusion this very comment was first drafted with.
+    #
+    # Tracked, with the design question it raises — should STANDARD seed a logo at
+    # all, or should hosts opt in? — at /tasks/guard-wordmark-on-engine-bump.
+    # Fixing magic_link alone leaves the next entry free to repeat this.
 
     # The footer band. Dark on purpose: it closes the white card, and a light
     # sign-off floating under body copy reads as part of the message rather than

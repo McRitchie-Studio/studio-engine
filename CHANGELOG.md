@@ -113,9 +113,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   file on the engine's own asset load path, comparing the wordmark by its BYTES,
   so renaming the file and re-seeding it is caught too.
 
-  **`magic_link` is unchanged and still seeds the wordmark.** A host that has
-  registered no mark of its own still inherits it on the sign-in email; that is a
-  consumer-visible change of its own and is tracked separately.
+  **`magic_link` is unchanged and still seeds the wordmark.** A host that
+  registers no mark of its own inherits it on the sign-in email. That is an
+  **upgrade trap** rather than a live leak — the apps with no email initializer
+  are pinned before this registry existed, so they inherit nothing today, but the
+  bump that brings one forward would hand it another brand's mark with no code
+  change of its own. Tracked separately, with the design question of whether
+  `STANDARD` should seed a logo at all.
 
 - **The manager reported artwork that was not being sent.** A layered-native email
   (no flat `default_asset`) drew an empty box and a "sends without a banner" badge

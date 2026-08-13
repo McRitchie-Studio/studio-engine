@@ -445,6 +445,11 @@ What each `STANDARD` entry lends today:
 | `newsletter_subscribed` | **No.** A host that names none sends none. |
 | `magic_link` | **Yes** — `emails/logo-horizontal.png`, the Studio wordmark. A host that has not registered its own mark inherits it. |
 
+If you are **bumping this gem** into an app that registers no email entries, that
+second row is an upgrade trap: the app gains a Studio wordmark on its sign-in
+email without changing a line of its own. Register a `magic_link` logo your app
+ships — or `logo: ""` — in the same bump.
+
 **Why layered rather than composited.** Drawing the text into the image gives
 pixel-exact brand typography everywhere, but it cannot have an ANIMATED
 background AND per-recipient text — composing a greeting into sixty frames means
