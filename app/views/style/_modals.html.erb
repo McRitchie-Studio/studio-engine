@@ -309,6 +309,14 @@
           <div><%= render "style/modals/auth" %></div>
         </template>
 
+        <%# --- Onboarding --- %>
+        <%# The REAL engine partial, mounted on the page-scoped host: what the
+            style page shows is exactly what a consumer renders, not a copy. %>
+        <template x-if="$store.dsModals.current().id === 'onboarding-first-name'">
+          <div><%= render "studio/modals/onboarding/first_name",
+                     modal_store: "dsModals", done_event: "ds-onboarding-step-done" %></div>
+        </template>
+
         <%# --- Eligibility + entry --- %>
         <template x-if="$store.dsModals.current().id === 'age-verify'">
           <div><%= render "style/modals/age_verify" %></div>
@@ -463,6 +471,43 @@
   </template>
 
   <%# ===================================================================== %>
+  <%# 0. ONBOARDING — the post-auth chain's shared step %>
+  <%# ===================================================================== %>
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <h3 class="text-xl font-bold text-heading">Onboarding</h3>
+      <p class="text-muted text-sm">
+        The step every Studio app asks a brand-new account, ported from Turf
+        Monster
+        (<code class="font-mono text-2xs">studio/modals/onboarding/_first_name</code>).
+        It is <strong>one step, not a flow</strong>: the host owns the SEQUENCE
+        around it — Turf walks <strong>welcome &rarr; first name &rarr; age gate
+        &rarr; wallet setup</strong>, while a hub app may ask nothing else — so
+        this partial never opens another modal. It reports what remains on its
+        <code class="font-mono text-2xs">done_event</code> and closes, and the host
+        decides what comes next. Every endpoint and label is a local with a
+        default, so mounting it under different routes needs no fork.
+        <strong>Both</strong> the &times; and the "Skip for now" link SKIP (a close
+        that silently abandons the chain is how a host ends up with a step nobody
+        can answer again), and the field focuses itself on open.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "First name",
+            reference: %(the shared onboarding first-name step (studio-engine studio/modals/onboarding/_first_name) — open with $store.dsModals.open('onboarding-first-name'). Posts to submit_path/skip_path (defaults /onboarding/first_name and /onboarding/skip_first_name) and dispatches its done_event with the steps the SERVER says remain),
+            open_expr: "$store.dsModals.open('onboarding-first-name')",
+            glow_when: ds_glow.call("onboarding-first-name")
+          } do %>
+        <p class="text-muted text-2xs">
+          Saving or skipping dispatches
+          <code class="font-mono">ds-onboarding-step-done</code> here rather than
+          the app-level event, so the specimen cannot drive a real chain.
+        </p>
+      <% end %>
+    </div>
+  </section>
+
   <%# 1. AUTH suite %>
   <%# ===================================================================== %>
   <section class="space-y-5">

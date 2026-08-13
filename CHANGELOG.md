@@ -35,6 +35,45 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **First-name capture as a shared onboarding step.** Every Studio app addresses
+  people by name in email, and all three were going to write the same modal and
+  the same controller. Ported out of turf-monster, where it shipped first:
+
+  | Piece | What it is |
+  |---|---|
+  | `studio/modals/onboarding/_first_name` | The step's UI. Every endpoint and label is a local with a default, so a host mounting it elsewhere does not fork the partial. Previewable at `/admin/style#modals`. |
+  | `Studio::OnboardingController` | The two writes — `#first_name` and `#skip_first_name`, JSON only. |
+  | `Studio.first_name_outstanding?(user, session)` | The one rule every app agrees on: blank field, not skipped this session. |
+  | `Studio.onboarding_steps_resolver` | How a host declares what comes NEXT. |
+
+  **The engine owns ONE STEP; the host owns the SEQUENCE.** turf walks
+  welcome → first name → age → wallet, which means nothing in a hub app. The
+  partial never opens another modal — it reports the remaining steps upward and
+  closes — and the controller's `next` array is whatever the host's resolver
+  returns. The default is empty, which is the right answer for an app whose only
+  ask is the name: opt in, and it works with no further configuration.
+
+  Skipping is **session-scoped on purpose**. It means "not now", not "never" —
+  the column stays blank, so a later session may ask again. That is the whole
+  reason it is not a users column.
+
+  **The endpoints are OPT-IN (`config.draw_onboarding_routes = true`), and they
+  have to be** — the same hard constraint as `/admin/emails`. turf-monster owns
+  `onboarding_first_name_path` and `onboarding_skip_first_name_path` TODAY, and
+  drawing them there raises `Invalid route name, already in use` while that app's
+  routes load, taking down its entire route set. Consumer CI runs each consumer's
+  default branch, so this cannot be fixed from inside the engine. Each app's
+  adoption task flips the flag as it deletes its local copy.
+
+  Two consumer notes:
+
+  - **turf-monster** deletes `OnboardingController`, its two routes, and points
+    its `OnboardingFlow` at `Studio.first_name_outstanding?`. Net deletion.
+  - **mcritchie-industries** has **no `users.first_name` column**. The rule
+    tolerates that — an app that has not run the migration is simply never asked,
+    rather than raising on every signed-in request — so the gem can land there
+    before the migration does.
+
 - **`Studio::NewsletterMailer` — a sendable "you're on the list" email.**
   Namespaced under `Studio::` on purpose: a host that defines its own top-level
   `UserMailer` (McRitchie Studio does) SHADOWS the engine's outright, so an
