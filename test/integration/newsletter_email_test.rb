@@ -147,6 +147,47 @@ class NewsletterEmailTest < ActiveSupport::TestCase
     assert_includes text, "https://example.test/unsubscribe/abc"
   end
 
+  # --- it can be sent from a marketing address ------------------------------
+
+  # WHY THIS IS NOT COSMETIC. This is the only MARKETING email the engine sends;
+  # everything else is transactional, sign-in links included. A host that keeps
+  # a separate marketing from-address does it so that complaints and
+  # unsubscribes against a newsletter never accrue to the address someone needs
+  # to get back into their account. turf-monster keeps exactly that separation
+  # (marketing_from), so without this parameter adopting this mailer would have
+  # cost it — a deliverability regression arriving disguised as an adoption.
+  test "a host can send it from its own marketing address" do
+    message = mail(from: "news@marketing.example.test")
+
+    assert_equal [ "news@marketing.example.test" ], message.from
+  end
+
+  # The default must be untouched: every app already sending this email keeps
+  # sending it from wherever it was.
+  # Asserts the PROPERTY, not a re-derivation of where the default lives: the
+  # engine resolves it through a per-message lambda on ApplicationMailer, so
+  # there is no static value to compare against — and a test that recomputed the
+  # lambda would pass even if the mailer stopped consulting it.
+  test "omitting the address leaves the host's default from in place" do
+    default = mail.from.to_a
+
+    refute_empty default,
+      "a host that never asks for a marketing address must be unaffected"
+    refute_includes default, "news@marketing.example.test",
+      "the override must not leak into a send that did not ask for it"
+  end
+
+  # THE TRAP THIS GUARDS. `mail(from: nil)` does NOT fall back to the default —
+  # ActionMailer treats the explicit nil as a set header and sends with NO From
+  # at all, which most receivers reject outright. Verified against ActionMailer
+  # 8.1 before this was written, which is why the header hash is built
+  # conditionally rather than always passing the parameter through.
+  test "an explicitly blank address falls back rather than sending with no From" do
+    refute_empty mail(from: nil).from.to_a,
+      "an email with no From is rejected, not merely unbranded"
+    refute_empty mail(from: "").from.to_a
+  end
+
   # --- it stays the recipient's email, not a template -----------------------
 
   test "it tells the reader which address it was sent to" do
