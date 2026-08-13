@@ -78,13 +78,19 @@ module Studio
       # The shared footer, as a plain hash. Reads through the same per-request
       # memo as everything else, so rendering it on every email in a list costs
       # one query rather than one per email.
+      # The saved footer, or NIL when the operator has never touched it.
+      #
+      # nil and {} are different answers and the distinction is load-bearing: no
+      # row means "apply the defaults", while a row whose fields are blank means
+      # "I cleared these on purpose". Returning {} for both made clearing the
+      # logo hand the default straight back, so the field could not be emptied.
       def footer
-        return {} unless table_ready?
+        return nil unless table_ready?
 
         row = for_key(FOOTER_KEY)
-        return {} if row.nil?
+        return nil if row.nil?
 
-        FOOTER_FIELDS.index_with { |field| row.public_send(field).presence }.compact
+        FOOTER_FIELDS.index_with { |field| row.public_send(field).presence }
       end
 
       def set_footer(attrs)

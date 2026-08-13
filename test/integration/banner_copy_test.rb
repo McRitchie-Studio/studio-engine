@@ -321,12 +321,37 @@ class BannerCopyTest < ActiveSupport::TestCase
     assert_includes html, "https://cdn.test/mark.png"
   end
 
-  test "no footer is rendered when the operator has set none" do
+  # The logo DEFAULTS, so every app gets a branded sign-off without an operator
+  # pasting a URL. This is a deliberate behaviour change — before it, an app that
+  # never opened /admin/emails rendered no footer at all.
+  test "the footer logo defaults to the engine's own mark" do
     message = Studio::NewsletterMailer.subscribed("reader@example.test")
     html = (message.html_part&.body || message.body).to_s
 
-    refute_includes html, "Join us on Discord",
-      "an app that never opened /admin/emails must send exactly what it sent before"
+    assert_includes html, "logo-horizontal", "an app that set nothing still gets a sign-off"
+    refute_includes html, "Join us on Discord", "but not a Discord line it never configured"
+  end
+
+  # The band closes the white card, so it has to actually be dark — and it has to
+  # be dark in OUTLOOK, which renders through Word and drops background-color on a
+  # td often enough that the attribute is the only reliable half.
+  test "the footer band is dark in every client" do
+    message = Studio::NewsletterMailer.subscribed("reader@example.test")
+    html = (message.html_part&.body || message.body).to_s
+
+    assert_match(/bgcolor="#1A1535"[^>]*background-color:#1A1535/i, html,
+      "the attribute and the declaration must both carry the colour")
+  end
+
+  # An operator who wants no footer clears both fields.
+  test "clearing the logo and the discord link removes the footer entirely" do
+    Studio::EmailSetting.set_footer(logo_url: "", discord_url: "")
+
+    message = Studio::NewsletterMailer.subscribed("reader@example.test")
+    html = (message.html_part&.body || message.body).to_s
+
+    refute_includes html, Studio::EmailCatalog::FOOTER_BACKGROUND,
+      "cleared means gone, not the default coming back"
   end
 
   # --- through HTTP, where the filtering happens -----------------------------

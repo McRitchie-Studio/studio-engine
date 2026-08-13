@@ -46,6 +46,14 @@ class LayeredBannerTest < ActiveSupport::TestCase
     Studio::EmailCatalog.reset!
   end
 
+  # Every image EXCEPT the shared footer's sign-off. These assertions are about
+  # what the banner sends; the footer logo is a second, intended <img> that would
+  # otherwise turn "exactly the flat banner" into a two-element mismatch.
+  def banner_images(doc)
+    footer_logo = Studio::EmailCatalog.footer[:logo_url]
+    doc.css("img").map { |img| img["src"] } - [footer_logo]
+  end
+
   # Hand-rolled: Minitest 6 dropped minitest/mock, so there is no .stub.
   def stub_singleton(mod, name, value)
     original = mod.method(name)
@@ -524,8 +532,7 @@ class LayeredBannerTest < ActiveSupport::TestCase
 
       refute banner_as_sent(doc)[:layered],
         "an app with no layered artwork must not render the layered banner"
-      assert_equal [Studio::EmailCatalog.resolved_url("magic_link")],
-                   doc.css("img").map { |img| img["src"] },
+      assert_equal [Studio::EmailCatalog.resolved_url("magic_link")], banner_images(doc),
         "the flat <img> is what an app with no layered artwork sends, unchanged"
     end
   ensure
@@ -545,8 +552,7 @@ class LayeredBannerTest < ActiveSupport::TestCase
 
         refute banner_as_sent(doc)[:layered],
           "the engine layered live text over artwork this host sends flat"
-        assert_equal [Studio::EmailCatalog.resolved_url("magic_link")],
-                     doc.css("img").map { |img| img["src"] },
+        assert_equal [Studio::EmailCatalog.resolved_url("magic_link")], banner_images(doc),
           "a host that owns its artwork sends that picture, not the engine's background"
       end
     end

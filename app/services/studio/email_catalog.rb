@@ -165,6 +165,16 @@ module Studio
     ASPECT_RATIO = 2.0
     MAX_WIDTH = 1200
 
+    # The sign-off every email carries unless an operator replaces it.
+    DEFAULT_FOOTER_LOGO = "emails/logo-horizontal.png".freeze
+
+    # The footer band. Dark on purpose: it closes the white card, and a light
+    # sign-off floating under body copy reads as part of the message rather than
+    # the end of it. Hard-coded rather than derived from the theme because a
+    # host's primary can be light, and white-on-light is unreadable — the one
+    # thing this band must never be.
+    FOOTER_BACKGROUND = "#1A1535".freeze
+
     module_function
 
     # --- Registry ----------------------------------------------------------
@@ -378,10 +388,27 @@ module Studio
     end
 
     # The shared footer — the same on every email this app sends.
+    #
+    # The LOGO DEFAULTS to the artwork the engine already ships, so every app
+    # gets a branded sign-off without an operator pasting a URL. That is a
+    # deliberate behaviour change: before this, an app that never opened
+    # /admin/emails rendered no footer at all. An operator who wants none clears
+    # the logo field and leaves Discord empty.
     def footer
-      Studio::EmailSetting.footer
+      saved = Studio::EmailSetting.footer
+      # NEVER TOUCHED: give the app a branded sign-off it did not have to ask for.
+      # TOUCHED: the operator's answer stands, including the blanks — that is how
+      # the footer gets turned off.
+      return { logo_url: default_footer_logo_url }.compact if saved.nil?
+
+      saved.compact
     rescue StandardError
       {}
+    end
+
+    # The engine's own horizontal mark, absolute so it loads from an inbox.
+    def default_footer_logo_url
+      absolute_asset_url(DEFAULT_FOOTER_LOGO)
     end
 
     # The subject line, resolved the same way and supporting the same {name}

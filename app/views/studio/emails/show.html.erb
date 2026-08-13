@@ -33,8 +33,11 @@
     cta_text: (Studio::EmailSetting.copy_for(@entry.key, :cta_text) || @entry.cta_text).to_s,
     cta_color: Studio::EmailCatalog.cta_color(@entry.key).to_s,
     cta_enabled: Studio::EmailCatalog.cta_enabled?(@entry.key),
-    discord_url: Studio::EmailSetting.footer[:discord_url].to_s,
-    footer_logo_url: Studio::EmailSetting.footer[:logo_url].to_s,
+    # The SAVED footer, not the resolved one: the form shows what the operator
+    # actually stored, so a blank field reads as blank rather than echoing the
+    # default back and making "clear this" impossible to express.
+    discord_url: (Studio::EmailSetting.footer || {})[:discord_url].to_s,
+    footer_logo_url: (Studio::EmailSetting.footer || {})[:logo_url].to_s,
     hide_logo: Studio::EmailSetting.hide_logo?(@entry.key),
     scrim_percent: Studio::EmailCatalog.scrim_percent(@entry.key).to_s
   }
@@ -419,7 +422,10 @@
               class: "input-field w-full py-2 font-mono text-2xs" %>
       </div>
     </div>
-    <p class="text-2xs text-muted mt-2">Leave both blank and no footer renders at all.</p>
+    <p class="text-2xs text-muted mt-2">
+      Until you save this card, the footer shows <%= Studio.app_name %>'s own logo.
+      Save it blank and no footer renders at all.
+    </p>
   </section>
 
   <%# The email itself. An iframe because the response IS an email document — its
