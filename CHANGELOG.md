@@ -89,6 +89,38 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **The newsletter's seed lent every host the McRitchie Studio wordmark.**
+  `STANDARD`'s `newsletter_subscribed` entry seeded
+  `logo: "emails/logo-horizontal.png"`, and `EmailCatalog.register` merges on
+  `logo.presence` — so an omitted `logo:` INHERITS. A host registering that email
+  for any ordinary reason (a relabel, its own preview builder) would have sent its
+  branded newsletter under Studio's mark, and the alt text could not warn anyone:
+  `Studio::Banner` sets it from `Studio.app_name`, so it always agrees with the
+  host and never with the pixels. turf-monster hit the same mechanism on
+  `magic_link`.
+
+  **No consumer was exposed.** No app registers `newsletter_subscribed` or sends
+  it — turf's own `NewsletterMailer` sends its flat `newsletter_welcome` — so this
+  was visible only on the `/admin/emails` preview. It was seeded identically in
+  0.42 and 0.43; nothing changed it recently.
+
+  The seed now carries no logo. **Artwork still rides the gem** — a background is
+  a picture any app can send, and inheriting one is what gives a new app
+  good-looking mail on day one. A wordmark is somebody's identity, and the line is
+  drawn there. An app that wants a mark registers a path IT ships
+  (`register("newsletter_subscribed", logo: "emails/our-mark.png")`) or sets one
+  on /admin/emails. Guards render the mail and resolve every `<img>` back to a
+  file on the engine's own asset load path, comparing the wordmark by its BYTES,
+  so renaming the file and re-seeding it is caught too.
+
+  **`magic_link` is unchanged and still seeds the wordmark.** A host that
+  registers no mark of its own inherits it on the sign-in email. That is an
+  **upgrade trap** rather than a live leak — the apps with no email initializer
+  are pinned before this registry existed, so they inherit nothing today, but the
+  bump that brings one forward would hand it another brand's mark with no code
+  change of its own. Tracked separately, with the design question of whether
+  `STANDARD` should seed a logo at all.
+
 - **The manager reported artwork that was not being sent.** A layered-native email
   (no flat `default_asset`) drew an empty box and a "sends without a banner" badge
   while it was sending one, and an email with BOTH assets previewed the flat one —
