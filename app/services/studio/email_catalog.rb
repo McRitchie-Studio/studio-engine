@@ -440,11 +440,6 @@ module Studio
 
     # The shared footer — the same on every email this app sends.
     #
-    # The LOGO DEFAULTS to the artwork the engine already ships, so every app
-    # gets a branded sign-off without an operator pasting a URL. That is a
-    # deliberate behaviour change: before this, an app that never opened
-    # /admin/emails rendered no footer at all. An operator who wants none clears
-    # the logo field and leaves Discord empty.
     # The operator's footer, or nothing. An app that has not set one renders no
     # band at all — the engine ships no branding of its own into a host's email.
     def footer

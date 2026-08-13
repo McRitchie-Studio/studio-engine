@@ -39,6 +39,7 @@ class LayeredBannerTest < ActiveSupport::TestCase
   def setup
     self.class.ensure_settings_table!
     Studio::EmailSetting.delete_all
+    Studio::EmailSetting.forget!
   end
 
   def teardown
@@ -600,6 +601,25 @@ class LayeredBannerTest < ActiveSupport::TestCase
   test "an app that registers nothing keeps the engine's layered banner" do
     assert Studio::EmailCatalog.entry("magic_link").layered?
     refute_nil Studio::EmailCatalog.background_url("magic_link")
+  end
+
+  # THE LIST ROW, RENDERED. banner_as_previewed above asks Studio::Banner.for,
+  # but the row does not ask it alone — it carried a SECOND copy of the layering
+  # guard, and moving the guard into background_url left that copy behind. So a
+  # host registering its own background sent layered while the row still drew
+  # the flat <img>: preview != send, one surface below the one that was fixed.
+  test "the list row layers exactly when the mailer sends layered" do
+    Studio::EmailCatalog.register("magic_link", default_asset: "emails/magic-link.gif",
+                                                background: "emails/magic-link-background.gif")
+
+    html = view.render(partial: "studio/emails/row",
+                       locals: { entry: Studio::EmailCatalog.entry("magic_link"),
+                                 uploads_available: false, max_width: Studio::Banner::DEFAULT_WIDTH })
+
+    assert_includes html, "data-email-banner-preview",
+      "the row drew a flat image for a host whose mailer sends a LAYERED banner"
+  ensure
+    Studio::EmailCatalog.reset!
   end
 
   test "a host can override any piece per send" do
