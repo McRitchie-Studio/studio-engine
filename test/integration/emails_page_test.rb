@@ -726,6 +726,13 @@ class EmailsPageTest < ActiveSupport::TestCase
   # checks, because whoever is previewing has a name on file. Removing the
   # dropdown entry removed the way to LOOK at it, not the behaviour, so this
   # exercises the banner directly instead of through a preview target.
+  #
+  # WHAT IT DOES NOT PROVE, spelled out because two reviews read it as if it did:
+  # "Your Magic Link" is the REGISTRY DEFAULT, so this passes whether or not the
+  # resolver ever consults the value the operator saved in the field. Make
+  # EmailCatalog.header_fallback ignore the saved value and this test stays green.
+  # Whose fallback wins is asserted in test/integration/banner_copy_test.rb and
+  # test/lib/studio/email_catalog_test.rb, against a string the engine never says.
   test "a recipient with no name still gets the fallback header" do
     header = Studio::Banner.for(:magic_link, name: nil).header
 

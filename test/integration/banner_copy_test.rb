@@ -75,6 +75,11 @@ class BannerCopyTest < ActiveSupport::TestCase
 
   # "Welcome !" is the bug the fallback exists to prevent — and a magic link is
   # often the first contact we have with someone, so it is not a rare path.
+  #
+  # THAT A FALLBACK IS CONSULTED AT ALL is the whole of what this proves. The
+  # string it saves is the registry default character for character, so it
+  # cannot tell the operator's saved fallback apart from the engine's — the
+  # section below does that, and none of it is covered by this.
   test "a template that wants a name falls back when there is none" do
     Studio::EmailSetting.set_copy("magic_link", header: "Welcome {name}!",
                                                 header_fallback: "Your Magic Link")
@@ -83,6 +88,98 @@ class BannerCopyTest < ActiveSupport::TestCase
 
     assert_equal "Your Magic Link", banner.header
     refute_includes banner.header, "{name}"
+  end
+
+  # --- WHOSE fallback header, and does it leave the building ----------------
+  #
+  # "Header for someone with no name on file" is the least checkable field on
+  # /admin/emails: both example recipients in the preview picker have names on
+  # file (deliberately — the synthetic "No name on file" entry was removed on Mr.
+  # McRitchie's call), so an operator cannot LOOK at their own saved value there.
+  # Every guard on it asserted "Your Magic Link", which is what the registry
+  # ships, so saved-or-default were the same string and nothing noticed the
+  # difference. These save something the engine would never say, and follow it
+  # to the inbox; the two after them prove a cleared field still inherits.
+
+  # Deliberately unlike anything in the registry. The refute below is the guard
+  # on the guard: if this ever equals the default, the test passes on the
+  # engine's string and proves nothing, which is exactly how the gap survived.
+  OPERATOR_FALLBACK = "Someone asked for a link"
+
+  # The header template is saved too, so this test states its own precondition
+  # rather than borrowing it: the fallback is consulted ONLY for a template that
+  # asks for a name, and a registry default that stopped asking would leave this
+  # passing on a path it never took.
+  test "the operator's own fallback header is what a nameless recipient gets" do
+    refute_equal OPERATOR_FALLBACK, Studio::EmailCatalog.entry("magic_link").header_fallback,
+      "the saved value must differ from the registry default, or this cannot fail"
+    Studio::EmailSetting.set_copy("magic_link", header: "Welcome {name}!",
+                                                header_fallback: OPERATOR_FALLBACK)
+
+    header = Studio::Banner.for(:magic_link, name: nil).header
+
+    assert_equal OPERATOR_FALLBACK, header,
+      "the field accepted the edit and the stranger got the engine's words"
+    refute_includes header, "{name}"
+  end
+
+  # AND IT REACHES AN INBOX. The row and the resolver both being right has not
+  # been enough on this feature: four controls here have shipped able to save and
+  # unable to change an email. This one follows the saved string into the
+  # rendered message, for a recipient this app holds no account for — which is
+  # who the field exists for.
+  test "the saved fallback header is what the magic-link email actually sends" do
+    Studio::EmailSetting.set_copy("magic_link", header: "Welcome {name}!",
+                                                header_fallback: OPERATOR_FALLBACK)
+
+    message = UserMailer.magic_link("stranger@example.test", "tokenfortest1234")
+    html = (message.html_part&.body || message.body).to_s
+
+    assert_includes html, OPERATOR_FALLBACK,
+      "the operator's fallback header never left the settings row"
+    refute_includes html, "Your Magic Link", "the engine's default shipped instead of theirs"
+  end
+
+  # CLEARING IT RESTORES THE DEFAULT, rather than sending a headless banner.
+  #
+  # Blank is presenced TWICE, and the two are different guards: set_copy stores a
+  # cleared field as nil (so the row says INHERIT), and copy_for presences again
+  # on the way out (so a row that already carries "" inherits too). The resolver
+  # itself has no opinion — "" is truthy in Ruby, so an empty string reaching
+  # `saved(key, :header_fallback) || …` would win and ship a headless banner.
+  # Both guards are asserted: this test the write side, the next the read side.
+  test "clearing the fallback header restores the registry default" do
+    Studio::EmailSetting.set_copy("magic_link", header: "Welcome {name}!",
+                                                header_fallback: OPERATOR_FALLBACK)
+    Studio::EmailSetting.set_copy("magic_link", header_fallback: "")
+
+    row = Studio::EmailSetting.find_by(email_key: "magic_link")
+    refute_nil row, "the row survives — this is a cleared field, not a deleted setting"
+    assert_nil row.header_fallback, "a cleared field is stored as nil, which means INHERIT"
+    assert_nil Studio::EmailSetting.copy_for("magic_link", :header_fallback)
+
+    header = Studio::Banner.for(:magic_link, name: nil).header
+
+    assert_equal "Your Magic Link", header, "the registry default answers again"
+    refute_empty header.to_s, "clearing the field must not send a banner with no words on it"
+  end
+
+  # THE READ SIDE, exercised on a row that ALREADY carries a blank — the state
+  # set_copy no longer produces, which is precisely why nothing else here covers
+  # it. update_column writes past the model, and the per-request memo is dropped
+  # afterwards: without that, the banner would be resolved from the row object
+  # cached before the write and this would pass without ever seeing the blank.
+  test "a row that already carries a blank fallback still inherits the default" do
+    Studio::EmailSetting.set_copy("magic_link", header: "Welcome {name}!",
+                                                header_fallback: OPERATOR_FALLBACK)
+    Studio::EmailSetting.find_by(email_key: "magic_link").update_column(:header_fallback, "")
+    Studio::EmailSetting.forget!("magic_link")
+
+    assert_equal "", Studio::EmailSetting.find_by(email_key: "magic_link").header_fallback,
+      "precondition: the stored column is blank, not nil — that is the case under test"
+    assert_nil Studio::EmailSetting.copy_for("magic_link", :header_fallback),
+      "a blank column means INHERIT on the way out as well as on the way in"
+    assert_equal "Your Magic Link", Studio::Banner.for(:magic_link, name: nil).header
   end
 
   test "a header with no placeholder stands as written even without a name" do
