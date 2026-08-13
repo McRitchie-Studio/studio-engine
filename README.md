@@ -258,10 +258,13 @@ The scoped host takes its animations from `engine-motion.css` rather than an
 inline copy, so a consumer bundling that layer gets the same spring as the shared
 host.
 
-It carries the store API below with two deliberate differences: there is no
-`advance()`, and `swap()` replaces the top entry immediately rather than running
-the shared host's directional slide — so no entry is ever left mid-transition.
-`isOpen` and `isLive` behave identically on both.
+It carries the store API below with three deliberate differences: there is no
+`advance()`; `swap()` replaces the top entry immediately rather than running the
+shared host's directional slide — so no entry is ever left mid-transition; and it
+does not read the `window.ModalAnimations` registry, so the `enterAnim` /
+`exitAnim` props documented under the table are ignored and the exit always plays
+the 220ms unmount from `engine-motion.css`. `isOpen` and `isLive` behave
+identically on both.
 
 Store API (`Alpine.store('modals')`):
 
