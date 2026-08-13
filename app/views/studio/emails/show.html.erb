@@ -312,8 +312,15 @@
         </div>
 
         <%# THE LOGO — three states, because a URL box can only express two.
-            Standard inherits the shared mark, Custom is what this app uploaded,
-            Hidden is the deliberate "no logo" that blank cannot say. %>
+            Standard is the mark THIS APP registered, Custom is what it uploaded,
+            Hidden is the deliberate "no logo" that blank cannot say.
+
+            "Standard" is no longer a shared mark. No STANDARD entry seeds a logo
+            (the engine's wordmark riding the seed into a host's sign-in email
+            was the bug), so on an app that registered none, Standard and None
+            are the same picture — nothing. The note below says so, because a
+            control offering a choice that changes nothing is the failure this
+            page keeps producing. %>
         <div>
           <span class="text-sm text-muted block mb-1">Logo</span>
           <div class="flex flex-wrap items-center gap-2">
@@ -336,6 +343,13 @@
             <%= button_to "Back to the standard logo", admin_email_logo_path(@entry.key),
                   method: :patch, params: { remove: "1" },
                   class: "text-2xs text-muted underline underline-offset-2 mt-2" %>
+          <% elsif Studio::EmailCatalog.logo_url(@entry.key).blank? %>
+            <p class="text-2xs text-muted mt-2" data-logo-none-registered>
+              This app registers no mark for this email, so Standard shows none.
+              Upload one here, or name a file your app ships with
+              <code class="font-mono">logo:</code> in
+              <code class="font-mono">config/initializers/studio_emails.rb</code>.
+            </p>
           <% end %>
         </div>
 

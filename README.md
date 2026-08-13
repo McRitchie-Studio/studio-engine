@@ -438,17 +438,25 @@ this wrong silent:
 already had, `""` **clears** it, and a path **sets** it. So deleting a `logo: ""`
 line does not remove the logo — it restores the inherited one.
 
-What each `STANDARD` entry lends today:
+**No `STANDARD` entry seeds a logo** — not `magic_link`, not
+`newsletter_subscribed`, and not the next one added. A host that names no mark
+sends no mark, and there is nothing to opt out of.
 
-| Entry | Seeds a logo? |
-|---|---|
-| `newsletter_subscribed` | **No.** A host that names none sends none. |
-| `magic_link` | **Yes** — `emails/logo-horizontal.png`, the Studio wordmark. A host that has not registered its own mark inherits it. |
+That is an invariant, not a coincidence: `test/lib/studio/email_catalog_test.rb`
+reads `STANDARD` and fails on any entry carrying a logo, because this mechanism
+was fixed three times as an instance before it was fixed as a rule. Artwork still
+rides the gem, which is what gives a new app good-looking mail on day one.
 
-If you are **bumping this gem** into an app that registers no email entries, that
-second row is an upgrade trap: the app gains a Studio wordmark on its sign-in
-email without changing a line of its own. Register a `magic_link` logo your app
-ships — or `logo: ""` — in the same bump.
+**Adopting a mark** is one line, in an initializer or on `/admin/emails`:
+
+```ruby
+Studio::EmailCatalog.register("magic_link", logo: "emails/our-mark.png")
+```
+
+If you are **bumping this gem** from a version at or below 0.45.0, note what
+CHANGED rather than what to fear: `magic_link` used to seed the Studio wordmark,
+so an app that registered no logo inherited it. If your app WANTED that mark, it
+now has to name it — see the CHANGELOG entry, which lists who that affects.
 
 **Why layered rather than composited.** Drawing the text into the image gives
 pixel-exact brand typography everywhere, but it cannot have an ANIMATED

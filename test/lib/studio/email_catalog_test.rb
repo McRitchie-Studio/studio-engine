@@ -157,6 +157,44 @@ class EmailCatalogTest < Minitest::Test
       %q(the documented way to say "no logo" is "", and it has to keep working)
   end
 
+  # THE INVARIANT, over the WHOLE seed rather than the two keys in it today.
+  #
+  # This mechanism has now been fixed three times — turf's magic_link, then
+  # newsletter_subscribed, then magic_link here — because each fix pinned the
+  # INSTANCE and left the rule unwritten. The entry that repeats it next will be
+  # written by someone who never read this file, so the guard has to catch a key
+  # that does not exist yet. It reads the seeded registry rather than a list of
+  # names for exactly that reason.
+  #
+  # Whoever this fails on: you are not blocked from shipping a logo. You are
+  # blocked from shipping one that every consumer inherits WITHOUT ASKING,
+  # because `logo:` merges on presence and an omitted key inherits. Let the host
+  # name its own in an initializer or on /admin/emails.
+  def test_no_standard_entry_seeds_a_logo
+    Studio::EmailCatalog.reset!
+
+    seeded = Studio::EmailCatalog.entries.select { |entry| entry.logo.present? }
+
+    assert_empty seeded.map(&:key),
+      "a pre-registered email is seeding a logo, which every consumer inherits by " \
+      "omission — the engine's identity in somebody else's inbox"
+  end
+
+  # THE OTHER HALF. Without it the guard above would also pass on a seed that had
+  # stopped carrying artwork at all — and artwork riding the gem is the point of
+  # the seed, the thing that gives a brand-new app good-looking mail on day one.
+  # The line is at BRANDING, not at "engine assets are bad".
+  def test_the_seed_still_lends_its_artwork
+    Studio::EmailCatalog.reset!
+
+    backgrounds = Studio::EmailCatalog.entries.to_h { |entry| [ entry.key, entry.background ] }
+
+    assert_equal({ "magic_link" => "emails/magic-link-background.gif",
+                   "newsletter_subscribed" => "emails/newsletter-subscribed-background.gif" },
+                 backgrounds,
+                 "the seed must still lend artwork, or the logo guard proves nothing")
+  end
+
   # --- 3 + 4. resolution order and the source it reports --------------------
 
   # A stand-in for the app's own ImageCache row. Built OUTSIDE the stub block —

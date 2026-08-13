@@ -6,6 +6,55 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Changed
 
+- **No pre-registered email seeds a logo — `magic_link` was the last one, and it
+  seeded the Studio wordmark onto the SIGN-IN email.** `STANDARD`'s `magic_link`
+  entry carried `logo: "emails/logo-horizontal.png"`, and
+  `Studio::EmailCatalog.register` merges on `logo.presence` — an omitted key
+  **inherits**. So any host that registered this email for an unrelated reason (a
+  relabel, attaching a preview builder) inherited the McRitchie Studio wordmark
+  into its own branded sign-in email without ever naming it.
+
+  **ACTION REQUIRED — one consumer, and only one:**
+
+  | Consumer | Was it affected? | What to do |
+  |---|---|---|
+  | **mcritchie-studio** | **Yes.** Registers `magic_link` to attach a preview builder and names no logo, so it INHERITED the mark it owns. | Add `logo: "emails/logo-horizontal.png"` to the `register("magic_link", …)` call already in `config/initializers/studio_emails.rb`. Without it the sign-in banner loses the wordmark. |
+  | turf-monster | No. Registers `emails/turf-logo.png` of its own. | Nothing. |
+  | moms-app, mcritchie-industries, acquisition-studio | No — and they are who this is for. | Nothing. |
+
+  The asset still ships in this gem, so the hub's one-line opt-in resolves today.
+  The tidier end-state is the hub shipping its own copy of the file, since the
+  mark is its identity and not the engine's.
+
+  **This was an UPGRADE TRAP, not a live leak — worth stating precisely, because
+  it was first raised as an incident and is not one.** The three apps carrying no
+  email initializer pin 0.32.1 / 0.32.2 / 0.13.1, and
+  `app/services/studio/email_catalog.rb` does not exist in the gem they run —
+  verified by `git ls-tree` at each tag and against the installed gem. They
+  inherited nothing. The defect was that a routine dependency bump would have put
+  another brand's wordmark on three apps' most-sent email, silently, with no code
+  change of their own. Check reachability at the PIN, never from `main`: "HEAD
+  seeds it" and "the app registers nothing" are both true and together say nothing
+  about what that app RUNS.
+
+  **Why the whole seed and not just the one entry.** This mechanism has now been
+  fixed three times — turf-monster's `magic_link`, then `newsletter_subscribed`,
+  then this — because each fix pinned the instance and left the rule unwritten.
+  `test/lib/studio/email_catalog_test.rb` now reads `STANDARD` and fails on ANY
+  entry carrying a logo, so the next entry cannot repeat it. Artwork still rides
+  the gem, which is what gives a new app good-looking mail on day one; the line is
+  at branding, not at engine assets.
+
+  The asymmetry is what decides it: a host that wanted the mark and lost it sees a
+  missing logo — visible, one line to restore. A host that never asked inherits
+  another brand's identity into its inbox — invisible, and the ALT TEXT AGREES
+  WITH IT, because `Studio::Banner` sets `logo_alt` from `Studio.app_name`. turf's
+  read `alt="Turf Monster"` over the Studio wordmark for weeks.
+
+  On `/admin/emails`, "Standard" and "None" are now the same picture for an app
+  that registers no mark, so the page says so rather than offering a choice that
+  changes nothing.
+
 - **`email_change_confirmation` leaves the pre-registered set; `newsletter_subscribed`
   joins it.** `STANDARD` means "the emails EVERY Studio app sends", and only
   turf-monster sends an email-change confirmation — which it **already registers

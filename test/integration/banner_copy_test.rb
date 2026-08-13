@@ -136,21 +136,39 @@ class BannerCopyTest < ActiveSupport::TestCase
 
   # --- the logo -------------------------------------------------------------
 
-  test "a saved logo url replaces the inherited one" do
+  # THE REGISTERED LOGO these two need. It is stated here rather than inherited
+  # from the catalogue seed on purpose: STANDARD seeds NO logo on any entry
+  # (the engine's wordmark riding the seed into a host's sign-in email was the
+  # bug — see the NO DEFAULT LOGO note in email_catalog.rb), so leaning on an
+  # inherited mark would test a default that must never come back. This is the
+  # real-world shape anyway: the host names its own mark, then the operator
+  # overrides or hides it on /admin/emails.
+  def register_host_logo
+    Studio::EmailCatalog.register("magic_link", logo: "emails/our-own-mark.png")
+  end
+
+  test "a saved logo url replaces the registered one" do
+    register_host_logo
     Studio::EmailSetting.set_copy("magic_link", logo_url: "https://cdn.test/mine.png")
 
     assert_equal "https://cdn.test/mine.png", Studio::Banner.for(:magic_link, name: nil).logo_url
+  ensure
+    Studio::EmailCatalog.reset!
   end
 
   # "Hidden" and "not set" have to be different answers — blank inherits, so
   # without an explicit flag there is no way to say "no logo at all".
   test "hiding the logo is distinct from leaving it blank" do
+    register_host_logo
+
     Studio::EmailSetting.set_copy("magic_link", hide_logo: true)
     assert_nil Studio::Banner.for(:magic_link, name: nil).logo_url
 
     Studio::EmailSetting.set_copy("magic_link", hide_logo: false)
     refute_nil Studio::Banner.for(:magic_link, name: nil).logo_url,
-      "unchecking must restore the inherited logo, not leave it hidden"
+      "unchecking must restore the host's registered logo, not leave it hidden"
+  ensure
+    Studio::EmailCatalog.reset!
   end
 
   # --- it must not break a send ---------------------------------------------

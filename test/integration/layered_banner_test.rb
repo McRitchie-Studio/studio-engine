@@ -287,12 +287,20 @@ class LayeredBannerTest < ActiveSupport::TestCase
 
   # --- artwork resolution ----------------------------------------------------
 
-  test "the standard magic link inherits the engine's layered artwork" do
+  # ARTWORK is inherited; a WORDMARK is not. The seed used to lend both, and the
+  # logo half was the bug — the engine's mark rode into any host that registered
+  # this email without naming one of its own, on the SIGN-IN email. Rendered-mail
+  # guards live in test/integration/magic_link_logo_test.rb; the seed-wide
+  # invariant is in test/lib/studio/email_catalog_test.rb.
+  test "the standard magic link inherits the engine's artwork but no wordmark" do
     entry = Studio::EmailCatalog.entry("magic_link")
 
     assert_equal "emails/magic-link-background.gif", entry.background
-    assert_equal "emails/logo-horizontal.png", entry.logo
+    assert_nil entry.logo,
+      "the engine's wordmark must not ride the seed into a host's sign-in email"
 
+    # The wordmark still SHIPS — the hub opts back in by naming it, and the
+    # guards that compare against it would prove nothing if the file vanished.
     %w[emails/magic-link-background.gif emails/logo-horizontal.png].each do |asset|
       path = File.expand_path("../../app/assets/images/#{asset}", __dir__)
       assert File.file?(path), "#{asset} must ship in the gem"
@@ -655,14 +663,19 @@ class LayeredBannerTest < ActiveSupport::TestCase
     Studio::EmailCatalog.reset!
   end
 
+  # The property is that register() MERGES: restating one field must not clear
+  # the others. The logo is registered by the host first rather than inherited
+  # from the seed, because STANDARD deliberately seeds none — and this is the
+  # real-world shape anyway, a host that owns its mark then retunes its artwork.
   test "a host can override any piece per send" do
+    Studio::EmailCatalog.register("magic_link", logo: "emails/our-own-mark.png")
     Studio::EmailCatalog.register("magic_link", background: "emails/custom.gif", scrim: 0.1)
 
     entry = Studio::EmailCatalog.entry("magic_link")
     assert_equal "emails/custom.gif", entry.background
     assert_in_delta 0.1, entry.scrim, 0.001
-    assert_equal "emails/logo-horizontal.png", entry.logo,
-      "overriding the background must not drop the inherited logo"
+    assert_equal "emails/our-own-mark.png", entry.logo,
+      "overriding the background must not drop the logo the host registered"
   ensure
     Studio::EmailCatalog.reset!
   end

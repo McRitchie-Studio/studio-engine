@@ -303,6 +303,34 @@ class EmailsPageTest < ActiveSupport::TestCase
     end
   end
 
+  # --- the logo modes tell the truth about what they will do ----------------
+  #
+  # "Standard" USED to mean the shared mark every app inherited. No STANDARD
+  # entry seeds a logo any more — the engine's wordmark riding the seed into a
+  # host's sign-in email was the bug — so on an app that registers none,
+  # Standard and None paint the same picture: nothing.
+  #
+  # That is a control offering a choice that changes nothing, which is precisely
+  # the failure this page keeps producing. It is allowed to stay only because it
+  # SAYS so, and the note is what this asserts.
+  test "the page says so when this app registers no mark to fall back to" do
+    html = render_show("magic_link")
+
+    assert_includes html, "data-logo-none-registered",
+      "Standard and None are the same picture here, and the page must not pretend otherwise"
+    assert_includes html, "studio_emails.rb",
+      "the note has to say where a mark is named, or it only reports a dead end"
+  end
+
+  test "the note goes away once this app names a mark of its own" do
+    Studio::EmailCatalog.register("magic_link", logo: "emails/our-own-mark.png")
+
+    refute_includes render_show("magic_link"), "data-logo-none-registered",
+      "Standard now returns a real mark, so the note is wrong"
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
   # --- 2. the inherited defaults really ship in the gem ----------------------
 
   # Whichever artwork an entry declares — the flat fallback, the layered
