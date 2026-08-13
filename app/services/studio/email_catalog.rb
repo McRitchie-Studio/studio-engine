@@ -81,12 +81,20 @@ module Studio
     #   preview       — callable returning a Mail, or nil.
     Entry = Struct.new(:key, :label, :description, :default_asset, :type, :preview,
                        :default_origin, :aspect_ratio, :background, :logo, :scrim,
-                       :header, :header_fallback, :subtext, :subject,
+                       :header, :header_fallback, :subtext, :subject, :body, :cta_text, :cta_color, :cta_enabled, :supports_cta,
                        keyword_init: true) do
       def to_s = key
       def previewable? = preview.respond_to?(:call)
       # nil-safe: an Entry built directly (the STANDARD seed) may carry no type.
       def marketing? = type.to_s == "marketing"
+
+      # Can this email render a button AT ALL? An email's view has to have
+      # somewhere to send the reader — the sign-in link has a token URL, a
+      # "you're subscribed" note has nothing. OPT-IN, because an entry that has
+      # not said yes cannot be assumed to have a destination, and a Call-to-action
+      # card offered for an email whose template ignores it is a dead control:
+      # the operator ticks the box, saves, and no button ever appears.
+      def supports_cta? = supports_cta == true
 
       # WHOSE artwork default_asset names. Recorded at registration rather than
       # inferred later: by the time the page asks, a resolved asset path looks
@@ -111,7 +119,7 @@ module Studio
         label: "Magic-link sign-in",
         description: "Passwordless sign-in link. Sent whenever someone asks to sign in by email.",
         default_asset: "emails/magic-link.gif",
-        aspect_ratio: 3.0,
+        aspect_ratio: 2.0,
         # Layered artwork: the background animates, the greeting is live HTML on
         # top. default_asset above stays the flat <img> for a mailer that has not
         # adopted the layered banner.
@@ -122,13 +130,18 @@ module Studio
         header: "Welcome {name}!",
         header_fallback: "Your Magic Link",
         subtext: "your sign-in link is below",
-        subject: "Your {app} sign-in link"
+        subject: "Your {app} sign-in link",
+        body: "Tap the button below to sign in to {app} — no password needed. " \
+              "If you don't have an account yet, we'll create one for you.",
+        # The token URL is the destination, so this email really does have a button.
+        supports_cta: true,
+        cta_text: "Sign in to {app}"
       },
       {
         key: "newsletter_subscribed",
         label: "Newsletter subscribed",
         description: "Welcomes someone who has just joined the mailing list.",
-        aspect_ratio: 3.0,
+        aspect_ratio: 2.0,
         # LAYERED-NATIVE: no default_asset. A flat asset is the pre-layered
         # fallback — artwork with the words baked in, for a mailer that only
         # knows how to render an <img>. Studio::NewsletterMailer has known how to
@@ -140,6 +153,11 @@ module Studio
         header_fallback: "You're subscribed!",
         subtext: "you're on the list",
         subject: "You're subscribed to {app}",
+        body: "Thanks for subscribing to {app}. We'll send the occasional note " \
+              "about what we're building — no more often than it's worth your time.",
+        # NO BUTTON, and no card offering one: a new subscriber has nowhere to be
+        # sent, so subscribed.html.erb renders none and never will.
+        supports_cta: false,
         # The engine ships this email's preview because it can: the mailer takes
         # a bare address, so no host sample data is involved. Every other entry's
         # builder needs records only the host has — this one does not, and an
@@ -152,11 +170,32 @@ module Studio
     # The FALLBACK shape, for an email that states none. 2:1 because that is what
     # turf-monster's eight banners are, and changing it would recrop all of them.
     #
-    # It is NOT what the engine's own emails use: both STANDARD entries declare
-    # aspect_ratio: 3.0 and both shipped backgrounds are 1200x400. The ratio is
-    # per-entry precisely so those two answers can differ.
+    # The engine's own two entries now declare 2.0 as well, and their backgrounds
+    # are 1200x600 — but the ratio stays per-entry, because that is what lets a
+    # host register artwork of a different shape without recropping everyone's.
     ASPECT_RATIO = 2.0
     MAX_WIDTH = 1200
+
+    # NO DEFAULT LOGO, deliberately.
+    #
+    # It was emails/logo-horizontal.png — the white "McRITCHIE STUDIO" wordmark —
+    # and every consumer inherits this layout without defining its own. That put
+    # Studio branding into turf-monster's entire player-facing mail set, which
+    # today carries none, plus moms-app, mcritchie-industries, acquisition-studio
+    # and rolio, with no opt-in and no host-side change.
+    #
+    # It also contradicted the rule at the top of this file: the url / resolved_url
+    # split exists so the engine cannot swap a host's artwork for the engine's in
+    # live email. A footer logo is the same swap by another route.
+    #
+    # Each app opts in on /admin/emails by pasting its own mark.
+
+    # The footer band. Dark on purpose: it closes the white card, and a light
+    # sign-off floating under body copy reads as part of the message rather than
+    # the end of it. Hard-coded rather than derived from the theme because a
+    # host's primary can be light, and white-on-light is unreadable — the one
+    # thing this band must never be.
+    FOOTER_BACKGROUND = "#1A1535".freeze
 
     module_function
 
@@ -169,7 +208,8 @@ module Studio
     # attach a preview builder to it, without restating its artwork.
     def register(key, label: nil, description: nil, default_asset: nil, type: nil, preview: nil,
                  aspect_ratio: nil, background: nil, logo: nil, scrim: nil,
-                 header: nil, header_fallback: nil, subtext: nil, subject: nil)
+                 header: nil, header_fallback: nil, subtext: nil, subject: nil,
+                 body: nil, cta_text: nil, cta_color: nil, cta_enabled: nil, supports_cta: nil)
       key = key.to_s
       existing = registry[key]
       registry[key] = Entry.new(
@@ -191,7 +231,12 @@ module Studio
         header: header.nil? ? existing&.header : header.presence,
         header_fallback: header_fallback.nil? ? existing&.header_fallback : header_fallback.presence,
         subtext: subtext.nil? ? existing&.subtext : subtext.presence,
-        subject: subject.nil? ? existing&.subject : subject.presence
+        subject: subject.nil? ? existing&.subject : subject.presence,
+        body: body.nil? ? existing&.body : body.presence,
+        cta_text: cta_text.nil? ? existing&.cta_text : cta_text.presence,
+        cta_color: cta_color.nil? ? existing&.cta_color : cta_color.presence,
+        cta_enabled: cta_enabled.nil? ? existing&.cta_enabled : cta_enabled,
+        supports_cta: supports_cta.nil? ? existing&.supports_cta : supports_cta
       )
       key
     end
@@ -320,6 +365,69 @@ module Studio
 
     def subtext(key)
       saved(key, :subtext) || entry(key)&.subtext
+    end
+
+    # --- the email below the banner ------------------------------------------
+    #
+    # Same resolution as the banner's words: operator > registry > default. A
+    # mailer reads these instead of hard-coding copy, which is what makes the
+    # cards on /admin/emails real rather than decorative.
+
+    def body(key, name: nil)
+      template = saved(key, :body) || entry(key)&.body
+      return nil if template.blank?
+
+      Studio::Banner.interpolate(template, name).presence
+    end
+
+    def cta_text(key, name: nil)
+      template = saved(key, :cta_text) || entry(key)&.cta_text
+      return nil if template.blank?
+
+      Studio::Banner.interpolate(template, name).presence
+    end
+
+    # The app's primary unless this email says otherwise — a button that matches
+    # the banner above it by default, and can be made to stand out per email.
+    def cta_color(key)
+      saved(key, :cta_color) || entry(key)&.cta_color || Studio.theme_primary
+    end
+
+    # Shown unless someone said no. Defaults to TRUE for an email that has CTA
+    # text, because the button is the point of a transactional email; an email
+    # with no text has nothing to render either way.
+    def cta_enabled?(key)
+      # An email whose template cannot render a button is never "enabled", no
+      # matter what is stored — otherwise a value saved before the capability was
+      # declared keeps claiming a button that cannot appear.
+      return false unless entry(key)&.supports_cta?
+
+      operator = begin
+        Studio::EmailSetting.cta_enabled_for(key)
+      rescue StandardError
+        nil
+      end
+      return operator unless operator.nil?
+
+      registered = entry(key)&.cta_enabled
+      return registered unless registered.nil?
+
+      true
+    end
+
+    # The shared footer — the same on every email this app sends.
+    #
+    # The LOGO DEFAULTS to the artwork the engine already ships, so every app
+    # gets a branded sign-off without an operator pasting a URL. That is a
+    # deliberate behaviour change: before this, an app that never opened
+    # /admin/emails rendered no footer at all. An operator who wants none clears
+    # the logo field and leaves Discord empty.
+    # The operator's footer, or nothing. An app that has not set one renders no
+    # band at all — the engine ships no branding of its own into a host's email.
+    def footer
+      (Studio::EmailSetting.footer || {}).compact
+    rescue StandardError
+      {}
     end
 
     # The subject line, resolved the same way and supporting the same {name}

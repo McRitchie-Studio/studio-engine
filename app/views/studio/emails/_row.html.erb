@@ -43,86 +43,41 @@
   header_fallback = Studio::EmailCatalog.header_fallback(entry.key)
   subject_template = Studio::EmailSetting.copy_for(entry.key, :subject) || entry.subject
 
-  # `badge` is a shape-only utility in engine.css — the state color comes from
-  # theme-token utilities so it follows each app's palette in light and dark.
-  #
-  # Four states, because three of them used to read as one. An app that ships
-  # its own committed artwork was told that artwork "ships with the engine",
-  # which is the wrong answer to the only question this column exists to answer.
-  badge_class, badge_label, badge_note =
-    case source
-    when :app
-      ["badge bg-success/10 text-success border-success/30", "Uploaded here",
-       "Stored for #{Studio.app_name} — this upload is what ships."]
-    when :app_asset
-      ["badge bg-success/10 text-success border-success/30", "#{Studio.app_name}'s artwork",
-       "Committed in this app's own assets. Upload to replace it."]
-    when :engine_default
-      ["badge bg-inset text-muted border-subtle", "Studio default",
-       "Shared artwork that ships with the engine. Upload to make it #{Studio.app_name}'s."]
-    else
-      ["badge bg-warning/10 text-warning border-warning/30", "No image",
-       "This email sends without a banner."]
-    end
 %>
-<%# The uploader host is attached ONLY when this app can actually store an
-    override. On a read-only app the cropper assets are not loaded either, so an
-    unconditional x-data would reference an undefined factory and Alpine would
-    throw on every row. %>
-<%# THE WHOLE ROW OPENS THE EMAIL. Kept as a click handler on the row with the
-    name still a real <a>: wrapping a table row in a link is invalid HTML, and
-    making every cell a link would break the Upload button inside one of them.
-    The handler ignores clicks that landed on a control, so Upload, Revert and
-    the name link keep their own behaviour. %>
+<%# THE WHOLE ROW OPENS THE EMAIL, and now that is the only thing it does. The
+    provenance badge and the upload button lived here and both moved to the
+    email's own page — one place where changes are made, rather than a row that
+    is half a control panel.
+
+    A click handler rather than a wrapping link: an anchor around a <tr> is
+    invalid HTML. The name stays a real <a> so it keeps middle-click and
+    open-in-new-tab. %>
 <tr class="border-b border-subtle last:border-0 cursor-pointer hover:bg-inset/60" data-email-row
     data-email-path="<%= admin_email_path(entry.key) %>"
     data-header="<%= header_template %>"
     data-header-fallback="<%= header_fallback %>"
     data-subject="<%= subject_template %>"
-    <% if uploads_available %>
-      x-data="imageUploadHost({
-        store: 'emailModals',
-        aspectRatio: <%= entry.ratio %>,
-        maxWidth: <%= max_width %>,
-        transparent: false,
-        <%# Same answer as the email's own page. Without this the SAME button
-            refused an animated GIF here and accepted it there. %>
-        allowGifs: true,
-        filename: '<%= entry.key %>.png',
-        saving: 'Saving banner…',
-        success: 'Banner updated',
-        successMessage: '<%= j entry.label %> now uses this app\'s own image.',
-        failure: 'Couldn\'t save the banner'
-      })"
-      @crop-photo-confirmed.window="onCropConfirmed($event.detail)"
-    <% end %>>
+    >
 
   <td class="px-4 py-4">
-    <div class="rounded-lg overflow-hidden border border-subtle w-56" data-email-banner-frame
-         style="aspect-ratio: <%= entry.ratio %>; background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-900));">
-      <% if banner %>
-        <%# srcdoc, so the email's table lives in its own document. Root-relative
-            asset paths inside it resolve against this page's origin, which is
-            what the admin preview wants. %>
-        <iframe class="pointer-events-none" scrolling="no" tabindex="-1" loading="lazy"
-                data-email-banner-preview data-banner-width="<%= card_width %>"
-                title="<%= entry.label %> banner"
-                style="width:<%= card_width %>px;height:<%= (card_width / entry.ratio).round %>px;border:0;transform-origin:top left;display:block;"
-                <%# ESCAPED EXPLICITLY. render returns an html_safe buffer, so a bare
-                    output tag injects it RAW into the attribute and closes the iframe
-                    at the banner's first quote — the row's markup collapses and the
-                    email's name disappears from the page. to_str drops the safe flag
-                    so the escaping actually happens. %>
-                srcdoc="<%= ERB::Util.html_escape(render("studio/mailers/layered_banner", banner: banner, preview: true).to_str) %>"></iframe>
-      <% elsif banner_url %>
+    <% if banner %>
+      <%= render "studio/emails/banner_preview", banner: banner, ratio: entry.ratio, max_width: 224 %>
+    <% elsif banner_url %>
+      <div class="rounded-lg overflow-hidden border border-subtle"
+           style="aspect-ratio: <%= entry.ratio %>; max-width: 224px;">
         <%= image_tag banner_url, class: "w-full h-full object-cover",
               alt: "#{entry.label} email banner", loading: "lazy" %>
-      <% else %>
-        <div class="w-full h-full flex items-center justify-center text-2xs text-white/80 text-center px-3">
-          No banner
-        </div>
-      <% end %>
-    </div>
+      </div>
+    <% else %>
+      <div class="rounded-lg overflow-hidden border border-subtle flex items-center justify-center text-2xs text-white/80 text-center px-3"
+           style="aspect-ratio: <%= entry.ratio %>; max-width: 224px; background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-900));">
+        No banner
+      </div>
+    <% end %>
+  </td>
+
+  <td class="px-4 py-4">
+    <p class="text-sm text-heading" data-row-subject><%= subject %></p>
   </td>
 
   <td class="px-4 py-4">
@@ -138,41 +93,4 @@
     <p class="font-mono text-2xs text-muted mt-1"><%= entry.key %></p>
   </td>
 
-  <td class="px-4 py-4">
-    <p class="text-sm text-heading" data-row-subject><%= subject %></p>
-  </td>
-
-  <%# whitespace-nowrap keeps the pill a pill — "<App>'s own" is long enough to
-      wrap inside a bordered badge, which reads as a broken box next to the
-      short "Inherited default". %>
-  <td class="px-4 py-4">
-    <span class="<%= badge_class %> whitespace-nowrap"><%= badge_label %></span>
-    <p class="text-2xs text-muted mt-1.5 max-w-[12rem]"><%= badge_note %></p>
-  </td>
-
-  <% if uploads_available %>
-    <td class="px-4 py-4 text-right whitespace-nowrap">
-      <button type="button" @click="open()" class="btn btn-outline btn-sm inline-flex items-center gap-1.5">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-        </svg>
-        <%= source == :app ? "Replace" : "Upload" %>
-      </button>
-
-      <%# Only an APP-OWNED image can be reverted — there is nothing to drop when
-          the row is already showing the inherited default. %>
-      <% if source == :app %>
-        <%= button_to "Revert", admin_email_path(entry.key), method: :delete,
-              class: "btn btn-neutral btn-sm mt-1.5 w-full",
-              form: { data: { turbo_confirm: "Drop #{Studio.app_name}'s own #{entry.label} banner and go back to the shared default?" } } %>
-      <% end %>
-
-      <%# The cropper drops its Blob into this hidden input and submits. %>
-      <%= form_with url: admin_email_path(entry.key), method: :patch,
-            html: { multipart: true, id: form_id, "x-ref": "form" } do %>
-        <%= file_field_tag :image, class: "hidden", "x-ref": "fileInput" %>
-      <% end %>
-    </td>
-  <% end %>
 </tr>

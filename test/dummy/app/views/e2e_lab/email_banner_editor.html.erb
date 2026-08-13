@@ -6,7 +6,9 @@
 <% config = {
      values: { header: "Welcome {name}!", header_fallback: "Your Magic Link",
                subtext: "your sign-in link is below", subject: "Your {app} sign-in link",
-               logo_url: "", hide_logo: false, scrim_percent: "40" },
+               logo_url: "", hide_logo: false, scrim_percent: "40",
+               body: "Tap the button below to sign in to {app}.", cta_text: "Sign in to {app}",
+               cta_color: "#8E82FE", cta_enabled: true, discord_url: "", footer_logo_url: "" },
      targetId: "admin-1",
      inheritedLogo: "/e2e/img/logo.png",
      uploadedLogo: "",
@@ -72,6 +74,14 @@
       </ul>
     </div>
     <input type="range" min="0" max="100" step="1" id="scrim_percent" data-scrim-range x-model="form.scrim_percent">
+    <textarea id="body" x-model="form.body" rows="3"></textarea>
+    <label><input type="checkbox" id="cta_enabled" x-model="form.cta_enabled"> Show the button</label>
+    <div data-cta-fields :class="form.cta_enabled ? '' : 'dimmed'"
+         :style="form.cta_enabled ? 'opacity:1' : 'opacity:0.5;pointer-events:none'">
+      <input type="text" id="cta_text" x-model="form.cta_text">
+      <input type="text" id="cta_color" x-model="form.cta_color">
+    </div>
+    <input type="text" id="discord_url" x-model="form.discord_url">
     <button type="button" data-logo-standard @click="setLogoMode('standard')">Standard</button>
     <button type="button" data-logo-hidden @click="setLogoMode('hidden')">None</button>
     <p>Sends as: <strong data-subject-preview x-text="subjectText()"></strong></p>

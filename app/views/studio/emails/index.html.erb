@@ -101,13 +101,13 @@
       <table class="w-full text-left align-middle">
         <thead>
           <tr class="border-b border-subtle">
+            <%# Banner, then what an inbox shows: the subject line, then the
+                email itself. Provenance and the upload button used to sit here;
+                both belong on the email's own page, which is one click away and
+                is where every other change is made. %>
             <th class="label-upper px-4 py-3 w-64">Banner</th>
+            <th class="label-upper px-4 py-3 w-64">Subject</th>
             <th class="label-upper px-4 py-3">Email</th>
-            <th class="label-upper px-4 py-3 w-56">Subject</th>
-            <th class="label-upper px-4 py-3 w-52">Image</th>
-            <% if @uploads_available %>
-              <th class="label-upper px-4 py-3 w-40 text-right">Actions</th>
-            <% end %>
           </tr>
         </thead>
         <tbody @click="openRow($event, $event.target.closest('[data-email-row]'))">

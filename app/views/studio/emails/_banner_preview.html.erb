@@ -1,0 +1,62 @@
+<%# THE banner preview — one component, every size.
+
+    locals:
+      banner:   a Studio::Banner (required)
+      ratio:    the frame's aspect ratio (default: the banner's own)
+      max_width: cap the frame in px, or nil to fill its column
+      isolate:  render inside an iframe (default true)
+
+    WHY IT IS A COMPONENT
+    There were two copies of this — the list row and the email's own page — and
+    they had already drifted: one carried the "does this app actually send a
+    layered banner" guard and the other did not, so the detail page previewed
+    live text over artwork no inbox receives. One component means a fix lands
+    everywhere, which is the same argument as rendering through the mailer's own
+    partial rather than a lookalike.
+
+    WHY THE IFRAME
+    The banner is the EMAIL's markup — a <table>. Dropping one into a list row
+    nests rows inside rows, and every host asserting "one row per email" counted
+    three per layered email. A separate document keeps the host page's markup
+    contract intact. Pass isolate: false where nesting is not a concern and a
+    plain preview is cheaper.
+
+    WHY THE RESET
+    A srcdoc document is a fresh page with the browser's default stylesheet, so
+    it inherits `body { margin: 8px }` — which showed as a band of padding around
+    every thumbnail. The email itself never sees this: the reset lives here, not
+    in the partial the mailer renders.
+%>
+<%
+  banner    = local_assigns.fetch(:banner)
+  ratio     = local_assigns.fetch(:ratio, banner.width.to_f / banner.height)
+  max_width = local_assigns.fetch(:max_width, Studio::Banner::DEFAULT_WIDTH)
+  isolate   = local_assigns.fetch(:isolate, true)
+
+  markup = render("studio/mailers/layered_banner", banner: banner, preview: true)
+  document = <<~HTML
+    <!doctype html><html><head><meta charset="utf-8">
+    <style>html,body{margin:0;padding:0;background:transparent;}</style>
+    </head><body>#{markup}</body></html>
+  HTML
+  frame_style = ["aspect-ratio: #{ratio}"]
+  frame_style << "max-width: #{max_width}px" if max_width
+%>
+<div class="rounded-lg overflow-hidden border border-subtle" data-email-banner-frame
+     style="<%= frame_style.join("; ") %>;">
+  <% if isolate %>
+    <iframe class="pointer-events-none block" scrolling="no" tabindex="-1" loading="lazy"
+            data-email-banner-preview data-banner-width="<%= banner.width %>"
+            title="<%= banner.header.presence || "Email banner" %>"
+            style="width:<%= banner.width %>px;height:<%= banner.height %>px;border:0;display:block;transform-origin:top left;"
+            <%# ESCAPED EXPLICITLY: render returns an html_safe buffer, so a bare
+                output tag injects it RAW and closes the iframe at the banner's
+                first quote. to_str drops the safe flag so escaping happens. %>
+            srcdoc="<%= ERB::Util.html_escape(document.to_str) %>"></iframe>
+  <% else %>
+    <div data-email-banner-preview data-banner-width="<%= banner.width %>"
+         style="width:<%= banner.width %>px;transform-origin:top left;">
+      <%= markup %>
+    </div>
+  <% end %>
+</div>

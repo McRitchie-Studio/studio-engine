@@ -33,9 +33,11 @@ class BannerCopyTest < ActiveSupport::TestCase
 
     require_relative "../../db/migrate/20260812210000_add_copy_to_studio_email_settings"
     require_relative "../../db/migrate/20260812220000_add_subject_to_studio_email_settings"
+    require_relative "../../db/migrate/20260813010000_add_body_cta_footer_to_studio_email_settings"
     ActiveRecord::Migration.suppress_messages do
       AddCopyToStudioEmailSettings.new.migrate(:up)
       AddSubjectToStudioEmailSettings.new.migrate(:up)
+      AddBodyCtaFooterToStudioEmailSettings.new.migrate(:up)
     end
     Studio::EmailSetting.reset_column_information
   end
@@ -235,6 +237,207 @@ class BannerCopyTest < ActiveSupport::TestCase
     assert_in_delta 0.55, Studio::EmailSetting.scrim_for("magic_link"), 0.001
   end
 
+  # --- the email BELOW the banner -------------------------------------------
+  #
+  # Every one of these asserts the field reaching a RENDERED MESSAGE, not just
+  # the settings row. Four separate controls on this feature have now shipped
+  # able to save and unable to change an email; the row is never the broken part.
+
+  test "the operator's body copy is what the email says" do
+    Studio::EmailSetting.set_copy("newsletter_subscribed", body: "Glad to have you, {name}.")
+
+    message = Studio::NewsletterMailer.subscribed("reader@example.test", name: "Mason")
+    html = (message.html_part&.body || message.body).to_s
+
+    assert_includes html, "Glad to have you, Mason."
+  end
+
+  # Prose from an admin form is rendered into an email. Paragraph breaks must
+  # survive; markup must not.
+  test "body copy keeps its paragraphs and cannot inject markup" do
+    Studio::EmailSetting.set_copy("newsletter_subscribed",
+                                  body: "First line.\n\nSecond line.<script>alert(1)</script>")
+
+    message = Studio::NewsletterMailer.subscribed("reader@example.test")
+    html = (message.html_part&.body || message.body).to_s
+
+    assert_equal 2, html.scan("First line.").size + html.scan("Second line.").size
+    refute_includes html, "<script>", "operator prose must not be able to break the email"
+  end
+
+  test "the button text and colour are the operator's" do
+    Studio::EmailSetting.set_copy("magic_link", cta_text: "Let me in", cta_color: "#123456")
+
+    assert_equal "Let me in", Studio::EmailCatalog.cta_text("magic_link")
+    assert_equal "#123456", Studio::EmailCatalog.cta_color("magic_link")
+  end
+
+  test "the button colour falls back to the app's primary" do
+    assert_equal Studio.theme_primary, Studio::EmailCatalog.cta_color("magic_link")
+  end
+
+  # THE REGRESSION THIS ALMOST SHIPPED. McRitchie Studio and turf-monster both
+  # define their own UserMailer, which renders the ENGINE's magic_link view
+  # without setting the new @body/@cta ivars. Depending on those alone sent a
+  # bodyless, buttonless email to exactly the apps that had customised their mail
+  # — and the engine's own suite was green throughout, because the engine's
+  # mailer does set them.
+  test "the sign-in view renders body and button even when the mailer sets neither" do
+    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    view.singleton_class.include(Rails.application.routes.url_helpers)
+    view.assign(app_name: Studio.app_name, email: "reader@example.test", magic_url: "https://example.test/l/abc")
+
+    html = view.render(template: "user_mailer/magic_link")
+
+    assert_includes html, "no password needed", "a host's own mailer must still get the body"
+    assert_includes html, "Sign in to", "and the button"
+    refute_includes html, "{app}", "the registry default must still be interpolated"
+  end
+
+  # --- the shared footer ----------------------------------------------------
+
+  test "the footer is stored once and reaches every email" do
+    Studio::EmailSetting.set_footer(discord_url: "https://discord.gg/studio",
+                                    logo_url: "https://cdn.test/mark.png")
+
+    message = Studio::NewsletterMailer.subscribed("reader@example.test")
+    html = (message.html_part&.body || message.body).to_s
+
+    assert_includes html, "https://discord.gg/studio"
+    assert_includes html, "https://cdn.test/mark.png"
+  end
+
+  # THE ENGINE SHIPS NO BRANDING OF ITS OWN. A default footer logo was the
+  # McRitchie Studio wordmark, and every consumer inherits this layout without
+  # defining one — so turf-monster's entire player-facing mail set, which carries
+  # no Studio branding today, would have grown a Studio footer on a gem upgrade
+  # with no opt-in. It is the same swap the url / resolved_url split exists to
+  # prevent, by another route.
+  test "an app that set no footer sends no footer" do
+    message = Studio::NewsletterMailer.subscribed("reader@example.test")
+    html = (message.html_part&.body || message.body).to_s
+
+    refute_includes html, Studio::EmailCatalog::FOOTER_BACKGROUND,
+      "the engine must not put its own mark in a host's email"
+  end
+
+  # The band closes the white card, so it has to be dark in OUTLOOK too — Word
+  # drops background-color on a td often enough that the attribute is the only
+  # reliable half. The alt text needs its own colour for the same reason: with
+  # images blocked, a client's near-black default on a near-black band is
+  # invisible.
+  test "the footer band is dark and legible in every client" do
+    Studio::EmailSetting.set_footer(logo_url: "https://cdn.test/mark.png")
+
+    message = Studio::NewsletterMailer.subscribed("reader@example.test")
+    html = (message.html_part&.body || message.body).to_s
+
+    assert_match(/bgcolor="#1A1535"[^>]*background-color:#1A1535/i, html,
+      "the attribute and the declaration must both carry the colour")
+    assert_match(/bgcolor="#1A1535"[^>]*color:#F5F3FF/i, html,
+      "blocked images leave only alt text, which needs a colour that is not the band's")
+    assert_match(/<img[^>]+height="\d+"/, html,
+      "without a height Outlook collapses the alt placeholder to nothing")
+  end
+
+  test "clearing the logo and the discord link removes the footer entirely" do
+    Studio::EmailSetting.set_footer(logo_url: "https://cdn.test/mark.png")
+    Studio::EmailSetting.set_footer(logo_url: "", discord_url: "")
+
+    message = Studio::NewsletterMailer.subscribed("reader@example.test")
+    html = (message.html_part&.body || message.body).to_s
+
+    refute_includes html, Studio::EmailCatalog::FOOTER_BACKGROUND, "cleared means gone"
+  end
+
+  # --- the button is a CAPABILITY, not a checkbox ---------------------------
+
+  # THE DEAD CONTROL. The Call-to-action card rendered for every email, and
+  # cta_enabled? returned the operator's value the moment one was stored — but
+  # subscribed.html.erb has no button in it and never will. Ticking the box saved
+  # a setting that no email could ever honour.
+  test "an email whose template renders no button never reports one enabled" do
+    Studio::EmailSetting.set_cta_enabled("newsletter_subscribed", true)
+    Studio::EmailSetting.set_copy("newsletter_subscribed", cta_text: "Click me")
+
+    refute Studio::EmailCatalog.cta_enabled?("newsletter_subscribed"),
+      "a stored yes cannot conjure a button the template cannot render"
+
+    message = Studio::NewsletterMailer.subscribed("reader@example.test")
+    html = (message.html_part&.body || message.body).to_s
+    refute_includes html, "Click me", "and no button appears in the email either"
+  end
+
+  test "the sign-in email declares the capability and honours the switch" do
+    assert Studio::EmailCatalog.entry("magic_link").supports_cta?
+    assert Studio::EmailCatalog.cta_enabled?("magic_link")
+
+    Studio::EmailSetting.set_cta_enabled("magic_link", false)
+    refute Studio::EmailCatalog.cta_enabled?("magic_link")
+  end
+
+  # An entry that says nothing cannot be assumed to have a destination.
+  test "an email that never declares the capability does not offer a button" do
+    Studio::EmailCatalog.register("mystery", label: "Mystery")
+
+    refute Studio::EmailCatalog.entry("mystery").supports_cta?
+    refute Studio::EmailCatalog.cta_enabled?("mystery")
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  # --- saving one field must not destroy another ----------------------------
+
+  # THE BUG: there is ONE Save for the page, so every save posts the footer
+  # inputs — blank ones included, on a page where the operator only changed the
+  # subject. Writing those blanks created a `_footer` row of nils, which reads
+  # the same as "cleared", so the shared footer vanished from every email the app
+  # sends and could not be recovered without retyping it.
+  #
+  # These call the MODEL directly. They are the decision table for "when does a
+  # posted footer count as a change", and they are complete for that question.
+  #
+  # They are NOT proof that the page reaches this method, and must not be read as
+  # such: this guard passed for the whole life of a controller that called
+  # write_footer — a method defined nowhere — so the wipe fix shipped correct and
+  # unreachable, and the footer could not be turned on at all. The controller
+  # round trip lives in test/integration/emails_page_save_test.rb; a change to
+  # who calls what belongs there, not here.
+  #
+  # What the page posts on any save: both footer inputs, always.
+  def write_page(discord_url: "", footer_logo_url: "")
+    Studio::EmailSetting.update_footer(discord_url: discord_url, logo_url: footer_logo_url)
+  end
+
+  test "saving an unrelated field leaves an untouched footer alone" do
+    write_page
+
+    assert_nil Studio::EmailSetting.footer,
+      "blank posts from a page nobody edited must not create a cleared footer"
+  end
+
+  test "saving an unrelated field leaves a CONFIGURED footer alone" do
+    Studio::EmailSetting.set_footer(logo_url: "https://cdn.test/mark.png")
+
+    write_page(footer_logo_url: "https://cdn.test/mark.png")
+
+    assert_equal "https://cdn.test/mark.png", Studio::EmailCatalog.footer[:logo_url]
+  end
+
+  test "clearing the field on purpose still clears it" do
+    Studio::EmailSetting.set_footer(logo_url: "https://cdn.test/mark.png")
+
+    write_page
+
+    assert_empty Studio::EmailCatalog.footer, "an explicit clear must still work"
+  end
+
+  test "a new footer value is written" do
+    write_page(discord_url: "https://discord.gg/x")
+
+    assert_equal "https://discord.gg/x", Studio::EmailCatalog.footer[:discord_url]
+  end
+
   # --- through HTTP, where the filtering happens -----------------------------
 
   # THE BUG THIS EXISTS FOR. Every logo test above passed while hiding the logo
@@ -243,15 +446,27 @@ class BannerCopyTest < ActiveSupport::TestCase
   # model-level tests could not see it — the filter sits in the controller, so
   # the assertion has to go through the controller.
   test "the controller permits every field the form posts" do
-    posted = %i[header header_fallback subtext subject logo_url hide_logo]
-    permitted = Studio::EmailSetting::COPY_FIELDS + [:hide_logo]
+    posted = %i[header header_fallback subtext subject logo_url hide_logo
+                body cta_text cta_color cta_enabled discord_url footer_logo_url]
+    permitted = Studio::EmailSetting::COPY_FIELDS + %i[hide_logo cta_enabled discord_url footer_logo_url]
 
     missing = posted - permitted
     assert_empty missing, "the form posts these and strong params drops them: #{missing.join(", ")}"
 
-    source = File.read(File.expand_path("../../app/controllers/studio/emails_controller.rb", __dir__))
-    assert_includes source, "params.permit(*Studio::EmailSetting::COPY_FIELDS, :hide_logo)",
-      "hide_logo is not a COPY_FIELD, so deriving the list from COPY_FIELDS alone silently drops it"
+    # Asserted as an EFFECT, not as source text. The previous version matched the
+    # literal permit line, so reformatting it broke the test without any change
+    # in behaviour — and it never proved the params reached the model.
+    params = ActionController::Parameters.new(
+      header: "H", header_fallback: "F", subtext: "S", subject: "Su", logo_url: "L",
+      body: "B", cta_text: "C", cta_color: "#111111", hide_logo: "1", cta_enabled: "1",
+      discord_url: "https://discord.gg/x", footer_logo_url: "https://cdn.test/l.png",
+      injected: "should not survive"
+    )
+    permitted = params.permit(*Studio::EmailSetting::COPY_FIELDS, :hide_logo, :cta_enabled,
+                              :discord_url, :footer_logo_url).to_h.symbolize_keys
+
+    assert_empty posted - permitted.keys, "the form posts these and strong params drops them"
+    refute_includes permitted.keys, :injected, "and it must still drop what the form does not post"
   end
 
   # --- the mailer supplies WHO, not WHAT ------------------------------------

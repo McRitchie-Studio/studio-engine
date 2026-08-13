@@ -43,8 +43,13 @@ module Studio
     end
 
     # The email card is 600px wide; the banner fills it.
+    #
+    # 300, not 200. It was cut to 200 to take out vertical dead space, which the
+    # proportional type below then closed on its own — so the shorter box was
+    # buying nothing and costing the artwork half its sky. Everything in the
+    # partial scales from this number, which is what makes the change one line.
     DEFAULT_WIDTH  = 600
-    DEFAULT_HEIGHT = 200
+    DEFAULT_HEIGHT = 300
 
     # A wash between the artwork and the text. Not decoration: background art is
     # chosen for looks, not contrast, and white text over a pale sky is

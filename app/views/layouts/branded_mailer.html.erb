@@ -42,6 +42,38 @@
             <%= yield %>
           </td>
         </tr>
+
+        <%# THE SHARED FOOTER — the same on every email this app sends, which is
+            why it lives in the layout and is stored once rather than per email.
+
+            FULL-BLEED AND DARK. The band closes the white card: a light sign-off
+            floating under the body reads as part of the message rather than the
+            end of it. bgcolor as well as the CSS, because Outlook renders through
+            Word and drops background-color on a td often enough that the
+            attribute is the only reliable half.
+
+            Renders nothing when the operator has cleared both fields. %>
+        <% footer = Studio::EmailCatalog.footer %>
+        <% if footer[:logo_url].present? || footer[:discord_url].present? %>
+          <tr>
+            <td align="center" bgcolor="<%= Studio::EmailCatalog::FOOTER_BACKGROUND %>"
+                <%# color as well as the background: with images blocked, the alt
+                    text is all that is left, and a client's near-black default on
+                    a near-black band is invisible. %>
+                style="background-color:<%= Studio::EmailCatalog::FOOTER_BACKGROUND %>;padding:28px 36px;color:#F5F3FF;">
+              <% if footer[:logo_url].present? %>
+                <%# height as well as width: Outlook collapses an alt placeholder
+                    that has no height, so a blocked image leaves nothing at all. %>
+                <img src="<%= footer[:logo_url] %>" width="132" height="32" alt="<%= Studio.app_name %>"
+                     style="display:block;margin:0 auto 14px;width:132px;height:auto;border:0;color:#F5F3FF;" />
+              <% end %>
+              <% if footer[:discord_url].present? %>
+                <a href="<%= footer[:discord_url] %>"
+                   style="font-size:13px;color:#C9C2FF;text-decoration:none;">Join us on Discord</a>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
       </table>
     </td>
   </tr>

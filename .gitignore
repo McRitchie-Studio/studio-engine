@@ -1,7 +1,10 @@
 /.worktrees/
 
 # The browser lane (e2e/). All build output or run output — nothing here is source.
-/node_modules/
+# No trailing slash and no leading slash: '/node_modules/' is a DIRECTORY
+# pattern and does not match a symlink, so a machine-local link into another
+# worktree was committed and reached accepted.
+node_modules
 /test-results/
 /playwright-report/
 /e2e-report.json
