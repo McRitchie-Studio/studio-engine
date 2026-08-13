@@ -44,7 +44,7 @@
 ---
 # Every `test(...)` committed under e2e/. Verified against Playwright's own model,
 # not prose:
-#   npx playwright test --list   ->  19 tests in 4 files
+#   npx playwright test --list   ->  22 tests in 4 files
 #
 # 5 -> 7: e2e/email_banner_frames.spec.js. The email manager shows a fluid artwork
 # frame beside the email's own FIXED 600px banner table; measured side by side they
@@ -69,7 +69,18 @@
 # button is visible-but-disabled after an edit is undone, whether dragging the
 # tint repaints the wash, and whether an avatar renders for an account that has
 # none.
-total_specs: 19
+#
+# 19 -> 22: the manager grew Body, Call-to-action and Footer cards. The dimming of
+# the button's fields when the button is switched off is a COMPUTED STYLE — the
+# one shape of this a String assertion cannot fake — and removing that binding
+# fails 1. The other two cover an untouched page not offering to save, and an
+# edited body offering to; both are cheap and both exercise the component.
+#
+# Worth recording: a fourth was written for a boolean-normalisation guard in the
+# dirty check, and the mutation run showed removing the normalisation changed
+# nothing. The normalisation was deleted rather than kept with a test that could
+# not fail.
+total_specs: 22
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -81,7 +92,7 @@ total_specs: 19
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 19
+executed: 22
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

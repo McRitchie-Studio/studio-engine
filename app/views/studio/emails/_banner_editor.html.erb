@@ -111,13 +111,17 @@
         subjectText() { return this.resolve(this.form.subject, this.form.subject); },
 
         // Field by field rather than JSON.stringify, whose output depends on key
-        // order — two equal objects can stringify differently. Booleans are
-        // normalised because a checkbox arrives as true/false while the server
-        // echoes "1"/"" — without this, opening the page reads as dirty.
+        // order — two equal objects can stringify differently.
+        //
+        // No type coercion here, deliberately. An earlier version normalised
+        // booleans on the theory that a checkbox holds true while the server
+        // echoes "1"; a mutation run showed removing it changed nothing, because
+        // the payload sends real booleans for the two checkboxes and strings for
+        // everything else. Unproven defensive code in a comparison that decides
+        // whether a Save button appears is worse than none.
         dirty() {
-          var norm = (v) => (v === true ? "1" : v === false ? "" : (v ?? ""));
           return Object.keys(this.initial).some(function (k) {
-            return norm(this.form[k]) !== norm(this.initial[k]);
+            return (this.form[k] ?? "") !== (this.initial[k] ?? "");
           }, this);
         },
 

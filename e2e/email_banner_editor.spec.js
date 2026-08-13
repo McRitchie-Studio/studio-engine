@@ -166,6 +166,46 @@ test.describe("email banner editor", () => {
     expect(color.replace(/\s/g, "")).toContain("0)");
   });
 
+  // --- the copy below the banner --------------------------------------------
+
+  // THE ONE THAT BREAKS SILENTLY. The dirty check compares the form against what
+  // the server echoed, and a checkbox holds `true` while the server sends "1" —
+  // so without normalisation the page is dirty the moment it loads, and the Save
+  // button appears before anyone has typed. Nothing in the markup shows that;
+  // only a browser that has run the component can.
+  test("a page nobody has touched does not offer to save" , async ({ page }) => {
+    await expect(page.locator("[data-save-all]")).toBeHidden();
+
+    await page.click("#cta_enabled");
+    await page.click("#cta_enabled");
+    await page.waitForTimeout(150);
+
+    await expect(page.locator("[data-save-all]"), "ticking and unticking is not a change")
+      .toBeDisabled();
+  });
+
+  // Turning the button off dims its fields — a computed style, which is the only
+  // form of this a String assertion cannot fake.
+  test("the button's fields dim when the button is turned off", async ({ page }) => {
+    const opacity = () => page.evaluate(() =>
+      getComputedStyle(document.querySelector("[data-cta-fields]")).opacity);
+
+    expect(parseFloat(await opacity())).toBeCloseTo(1, 1);
+
+    await page.uncheck("#cta_enabled");
+    await page.waitForTimeout(150);
+
+    expect(parseFloat(await opacity())).toBeLessThan(1);
+  });
+
+  test("editing the body marks the page dirty", async ({ page }) => {
+    await page.fill("#body", "Different copy entirely.");
+    await page.waitForTimeout(150);
+
+    await expect(page.locator("[data-save-all]")).toBeVisible();
+    await expect(page.locator("[data-save-all]")).toBeEnabled();
+  });
+
   // --- the logo -------------------------------------------------------------
 
   test("choosing None hides the logo and Standard brings it back", async ({ page }) => {
