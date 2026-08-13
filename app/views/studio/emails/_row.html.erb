@@ -28,12 +28,12 @@
   # untouched — the same reason the email preview lower down the detail page is
   # one.
   #
-  # And it only layers when THIS APP's artwork is layered. Whether an email
-  # layers belongs to its mailer, which the catalogue cannot see; the closest
-  # honest proxy is whose artwork is registered. turf-monster re-registers
-  # magic_link with its own flat banner and inherits the engine's background, so
-  # a naive check drew a layered picture turf-monster never sends.
-  layered = Studio::EmailCatalog.background_url(entry.key).present? && entry.engine_artwork?
+  # And it only layers when THIS APP's artwork is layered — a question
+  # background_url now answers by itself (it returns nil unless entry.layered?).
+  # The row used to carry a SECOND copy of that guard; when the guard moved down
+  # and grew the host-registered-background case, the stale copy started
+  # disagreeing with the mailer. One guard, one place, so they cannot drift.
+  layered = Studio::EmailCatalog.background_url(entry.key).present?
   banner  = layered ? Studio::Banner.for(entry.key, name: name) : nil
   subject = Studio::EmailCatalog.subject_for(entry.key, name: name)
 

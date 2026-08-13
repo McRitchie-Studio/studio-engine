@@ -39,6 +39,7 @@ class LayeredBannerTest < ActiveSupport::TestCase
   def setup
     self.class.ensure_settings_table!
     Studio::EmailSetting.delete_all
+    Studio::EmailSetting.forget!
   end
 
   def teardown
@@ -559,6 +560,97 @@ class LayeredBannerTest < ActiveSupport::TestCase
           "a host that owns its artwork sends that picture, not the engine's background"
       end
     end
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  # --- who gets to layer ----------------------------------------------------
+
+  # THE BUG. The guard read "does the ENGINE own the flat artwork", which is a
+  # proxy for "did this app ask to layer" — and it is wrong in the case a host
+  # actually cares about. turf-monster registers its own flat .jpg for
+  # magic_link, so the proxy said no and NO configuration could make it layer:
+  # it registered a background, and background_url still returned nil.
+  test "a host that registers its own background can layer" do
+    Studio::EmailCatalog.register("magic_link",
+                                  default_asset: "emails/host-flat.jpg",
+                                  background: "emails/magic-link-background.gif")
+
+    refute Studio::EmailCatalog.entry("magic_link").engine_artwork?,
+      "this guard is meaningless unless the host owns the flat asset"
+    assert Studio::EmailCatalog.entry("magic_link").layered?
+    refute_nil Studio::EmailCatalog.background_url("magic_link"),
+      "a host that registers a background is asking to layer"
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  # And the case the guard was added for still holds: a host that registered
+  # only its own flat artwork INHERITED the engine's background and never asked
+  # for it, so drawing live text over a picture it does not send stays refused.
+  test "a host that only inherits a background still does not layer" do
+    Studio::EmailCatalog.register("magic_link", default_asset: "emails/host-flat.jpg")
+
+    refute Studio::EmailCatalog.entry("magic_link").layered?
+    assert_nil Studio::EmailCatalog.background_url("magic_link"),
+      "an inherited background is not a request to layer"
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  test "an app that registers nothing keeps the engine's layered banner" do
+    assert Studio::EmailCatalog.entry("magic_link").layered?
+    refute_nil Studio::EmailCatalog.background_url("magic_link")
+  end
+
+  # THE LIST ROW, RENDERED. banner_as_previewed above asks Studio::Banner.for,
+  # but the row does not ask it alone — it carried a SECOND copy of the layering
+  # guard, and moving the guard into background_url left that copy behind. So a
+  # host registering its own background sent layered while the row still drew
+  # the flat <img>: preview != send, one surface below the one that was fixed.
+  test "the list row layers exactly when the mailer sends layered" do
+    Studio::EmailCatalog.register("magic_link", default_asset: "emails/magic-link.gif",
+                                                background: "emails/magic-link-background.gif")
+
+    html = view.render(partial: "studio/emails/row",
+                       locals: { entry: Studio::EmailCatalog.entry("magic_link"),
+                                 uploads_available: false, max_width: Studio::Banner::DEFAULT_WIDTH })
+
+    assert_includes html, "data-email-banner-preview",
+      "the row drew a flat image for a host whose mailer sends a LAYERED banner"
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  # THE THIRD READER. background_url is not the only method that answers "does
+  # this email layer" — preview_asset_path answers it too, for every surface that
+  # draws the artwork as a plain <img>: /admin/email_images, and the "Artwork"
+  # frame on /admin/emails/:key. Both guards must ask the SAME question, because
+  # the guard that drifts is the one nobody is looking at.
+  #
+  # This one drifted. background_url moved to layered? and preview_asset_path
+  # stayed on engine_artwork?, so a host registering its own background got a
+  # LAYERED email whose Artwork frame drew the FLAT asset — and "Modify image"
+  # sits on that frame, over a picture the upload does not replace.
+  test "every artwork surface agrees on whether this email layers" do
+    Studio::EmailCatalog.register("magic_link", default_asset: "emails/host-flat.jpg",
+                                                background: "emails/magic-link-background.gif")
+
+    assert_includes Studio::EmailCatalog.background_url("magic_link"), "magic-link-background.gif",
+      "the mailer sends the layered backdrop"
+    assert_includes Studio::EmailCatalog.preview_url("magic_link"), "magic-link-background.gif",
+      "the plain-<img> surfaces drew the flat asset for an email that sends LAYERED"
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  # The other half of the same rule: an email that does NOT layer must preview
+  # its flat asset, or this guard would just be wrong in the other direction.
+  test "a non-layering email previews the flat asset it actually sends" do
+    Studio::EmailCatalog.register("magic_link", default_asset: "emails/host-flat.jpg")
+
+    assert_nil Studio::EmailCatalog.background_url("magic_link")
+    assert_includes Studio::EmailCatalog.preview_url("magic_link"), "host-flat.jpg"
   ensure
     Studio::EmailCatalog.reset!
   end
