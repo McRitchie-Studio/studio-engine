@@ -506,18 +506,70 @@ Place in `public/`:
 
 ## 11. Seeds
 
+Seed **three** identities, not one. This is the standard every McRitchie app
+forks with:
+
+| Identity | Role | Why |
+|----------|------|-----|
+| `alex@mcritchie.studio` | admin | The shared operator. Same person, same address, in every app — so an example means the same thing wherever you are. |
+| `mack@mcritchie.studio` | **not** an admin | The ordinary member. |
+| `alex@<your-domain>` | admin | An admin on THIS app's own domain. |
+
 ```ruby
 # db/seeds.rb
-admin = User.find_or_create_by!(email: "alex@mcritchie.studio") do |u|
-  u.name = "Alex McRitchie"
-  u.role = "admin"
+[
+  { email: "alex@mcritchie.studio",   name: "Alex McRitchie",           role: "admin" },
+  # THE MEMBER IS NOT OPTIONAL. Without one, every seeded account is an admin
+  # and nothing in the app can be looked at as an ordinary user: admin-only
+  # pages, member-facing copy, and anything branching on role each have exactly
+  # one answer available locally. McRitchie Industries shipped without one and
+  # its /admin/emails page had no member to offer as an example recipient.
+  #
+  # Mack rather than an invented account: he is already the non-admin in
+  # turf-monster and mcritchie-studio, so one person means the same thing
+  # everywhere instead of each app growing its own stand-in.
+  { email: "mack@mcritchie.studio",   name: "Mack McRitchie",           role: "viewer" },
+  # AN ADMIN ON YOUR OWN DOMAIN, so a session can be "the operator of THIS app"
+  # without borrowing Studio's identity. Substitute your app's domain.
+  { email: "alex@your-app.com",       name: "Alex McRitchie (Your App)", role: "admin" }
+].each do |attrs|
+  user = User.find_or_create_by!(email: attrs[:email]) do |u|
+    u.name = attrs[:name]
+    u.role = attrs[:role]
+  end
+  puts "Seeded #{user.role}: #{user.email}"
 end
-puts "Seeded admin: #{admin.email}"
 ```
 
 ```bash
 bin/rails db:seed
 ```
+
+**Names must be distinct.** If the app uses `Sluggable`, slug is derived from
+`name.parameterize` under a unique index, so two identical names collide on
+insert — hence "Alex McRitchie (Your App)" rather than a second "Alex McRitchie".
+
+**`role:` values are yours.** There is no shared role vocabulary: the non-admin
+role is `viewer` in mcritchie-studio and mcritchie-industries but `user` in
+turf-monster. Use whatever your `admin?` tests against.
+
+### The list is yours from here
+
+This is a STARTING POINT, not a shared constant. Each app owns its own identity
+list and diverges freely — turf-monster's carries usernames and Solana wallets
+that no other app has; mcritchie-industries splits admins from members because
+its admin seed is also a release command.
+
+Do not factor these three into a `Studio::` constant that every app references.
+It was proposed and declined: it would couple every app forever for the sake of
+two email addresses, and the apps already differ in ways such a constant could
+not hold. The commonality belongs HERE, at the fork.
+
+**If an identity has no wallet**, check that nothing keys on one unconditionally.
+`find_by(some_wallet_column: nil)` does not mean "no match" — it matches the
+first row that happens to have no wallet, so a seed adopting rows by wallet will
+adopt a stranger's account and overwrite it. turf-monster hit exactly this when
+it added an email-only admin.
 
 ## 12. Google Cloud Console
 
