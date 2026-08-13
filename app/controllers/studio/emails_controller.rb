@@ -125,7 +125,22 @@ module Studio
     # two places to press.
     def copy
       rescue_and_log do
-        Studio::EmailSetting.set_copy(@key, copy_params)
+        attrs = copy_params
+        Studio::EmailSetting.set_copy(@key, attrs)
+        # The button's on/off is a boolean, so it is not a COPY_FIELD and needs
+        # its own write — the same shape that once made hide_logo a dead control.
+        Studio::EmailSetting.set_cta_enabled(@key, attrs[:cta_enabled]) if attrs.key?(:cta_enabled)
+        # The footer is SHARED across every email, so it is stored under its own
+        # key rather than this one, and the page posts its two inputs on every
+        # save. update_footer (not set_footer) is what makes that safe: it writes
+        # only on a real change, so blank posts from a page nobody edited cannot
+        # wipe the footer every email sends.
+        #
+        # The form spells the footer's logo `footer_logo_url` because `logo_url`
+        # is already this email's OWN banner logo; the model takes it as
+        # `logo_url`, so the rename is undone here.
+        Studio::EmailSetting.update_footer(discord_url: attrs[:discord_url],
+                                           logo_url: attrs[:footer_logo_url])
         if params.key?(:scrim_percent)
           percent = params[:scrim_percent]
           percent = nil unless percent.present? && Studio::EmailSetting::SCRIM_RANGE.cover?(percent.to_i)
@@ -202,7 +217,8 @@ module Studio
     # Every model-level logo test passed throughout, because set_copy was never
     # the broken part. The filter lives here, so the assertion does too.
     def copy_params
-      params.permit(*Studio::EmailSetting::COPY_FIELDS, :hide_logo)
+      params.permit(*Studio::EmailSetting::COPY_FIELDS, :hide_logo, :cta_enabled,
+                    :discord_url, :footer_logo_url)
             .to_h.symbolize_keys
     end
 

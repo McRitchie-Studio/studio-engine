@@ -50,6 +50,13 @@ class UserMailer < ApplicationMailer
     # Layered is opt-in, never a migration.
     @banner_url = Studio::EmailCatalog.resolved_url(:magic_link)
     @banner_alt = "Your #{@app_name} sign-in link"
+    # THE COPY BELOW THE BANNER is the operator's too, on the same terms as the
+    # banner's words: the registry carries what this file used to hard-code, so
+    # an app that never opens /admin/emails sends exactly what it sent before.
+    @body      = Studio::EmailCatalog.body(:magic_link, name: name)
+    @cta_text  = Studio::EmailCatalog.cta_text(:magic_link, name: name) if Studio::EmailCatalog.cta_enabled?(:magic_link)
+    @cta_color = Studio::EmailCatalog.cta_color(:magic_link)
+
     # The operator's subject when they have set one, the hard-coded line
     # otherwise — so an app that never visits /admin/emails is unchanged.
     subject = Studio::EmailCatalog.subject_for(:magic_link, name: name) ||

@@ -29,6 +29,15 @@
     subtext: Studio::EmailCatalog.subtext(@entry.key).to_s,
     subject: (Studio::EmailSetting.copy_for(@entry.key, :subject) || @entry.subject).to_s,
     logo_url: Studio::EmailSetting.copy_for(@entry.key, :logo_url).to_s,
+    body: (Studio::EmailSetting.copy_for(@entry.key, :body) || @entry.body).to_s,
+    cta_text: (Studio::EmailSetting.copy_for(@entry.key, :cta_text) || @entry.cta_text).to_s,
+    cta_color: Studio::EmailCatalog.cta_color(@entry.key).to_s,
+    cta_enabled: Studio::EmailCatalog.cta_enabled?(@entry.key),
+    # The SAVED footer, not the resolved one: the form shows what the operator
+    # actually stored, so a blank field reads as blank rather than echoing the
+    # default back and making "clear this" impossible to express.
+    discord_url: (Studio::EmailSetting.footer || {})[:discord_url].to_s,
+    footer_logo_url: (Studio::EmailSetting.footer || {})[:logo_url].to_s,
     hide_logo: Studio::EmailSetting.hide_logo?(@entry.key),
     scrim_percent: Studio::EmailCatalog.scrim_percent(@entry.key).to_s
   }
@@ -49,12 +58,25 @@
     end
   }
 
-  badge_class, badge_label =
+  # Provenance moved here from the list, along with the upload and the revert —
+  # the list is now a list, and every change to an email is made on its own page.
+  # Four states, because three of them once read as one: an app that ships its
+  # OWN committed artwork was told that artwork "ships with the engine", which is
+  # the wrong answer to the only question this label exists to answer.
+  badge_class, badge_label, badge_note =
     case source
-    when :app       then ["badge bg-success/10 text-success border-success/30", "Uploaded here"]
-    when :app_asset then ["badge bg-success/10 text-success border-success/30", "#{Studio.app_name}'s artwork"]
-    when :engine_default then ["badge bg-inset text-muted border-subtle", "Studio default"]
-    else               ["badge bg-warning/10 text-warning border-warning/30", "No image"]
+    when :app
+      ["badge bg-success/10 text-success border-success/30", "Uploaded here",
+       "Stored for #{Studio.app_name} — this upload is what ships."]
+    when :app_asset
+      ["badge bg-success/10 text-success border-success/30", "#{Studio.app_name}'s artwork",
+       "Committed in this app's own assets. Upload to replace it."]
+    when :engine_default
+      ["badge bg-inset text-muted border-subtle", "Studio default",
+       "Shared artwork that ships with the engine. Upload to make it #{Studio.app_name}'s."]
+    else
+      ["badge bg-warning/10 text-warning border-warning/30", "No image",
+       "This email sends without a banner."]
     end
 %>
 <div class="max-w-5xl mx-auto px-4 pb-16"
@@ -193,13 +215,7 @@
       <% end %>>
       <p class="label-upper mb-3">Banner</p>
       <% if @banner %>
-        <div class="rounded-lg overflow-hidden border border-subtle"
-             style="aspect-ratio: <%= aspect %>; max-width: <%= card_width %>px;" data-email-banner-frame>
-          <div data-email-banner-preview data-banner-width="<%= card_width %>"
-               style="width:<%= card_width %>px;transform-origin:top left;">
-            <%= render "studio/mailers/layered_banner", banner: @banner, preview: true %>
-          </div>
-        </div>
+        <%= render "studio/emails/banner_preview", banner: @banner, ratio: aspect, max_width: card_width %>
       <% else %>
         <div class="rounded-lg overflow-hidden border border-subtle flex items-center justify-center text-xs text-muted text-center px-4"
              style="aspect-ratio: <%= aspect %>; max-width: <%= card_width %>px;">
@@ -243,6 +259,14 @@
               html: { multipart: true, id: "email-banner-form-#{@entry.key.tr("_", "-")}", "x-ref": "form" } do %>
           <%= file_field_tag :image, class: "hidden", "x-ref": "fileInput" %>
         <% end %>
+      <% end %>
+      <p class="text-sm text-body mt-3"><%= badge_note %></p>
+      <% if @uploads_available && source == :app %>
+        <%# Only an APP-OWNED image can be reverted — there is nothing to drop
+            when this email is already showing the inherited default. %>
+        <%= button_to "Revert to the shared default", admin_email_path(@entry.key), method: :delete,
+              class: "btn btn-outline btn-sm mt-2",
+              form: { data: { turbo_confirm: "Drop #{Studio.app_name}'s own #{@entry.label} banner and go back to the shared default?" } } %>
       <% end %>
       <p class="text-2xs text-muted mt-2">
         <% if @uploads_available %>
@@ -338,6 +362,77 @@
     </section>
   </div>
 
+  <%# BELOW THE BANNER — the words, the button, and the footer every email
+      shares. Each field reaches a real send: the mailers read these from the
+      catalogue instead of hard-coding copy, so a card here is not a control that
+      changes nothing. %>
+  <div class="grid gap-6 md:grid-cols-2 mb-6">
+    <section class="card p-4">
+      <p class="label-upper mb-2">Body</p>
+      <p class="text-sm text-body mb-3">
+        The paragraph under the header. Blank lines make new paragraphs, and
+        <code class="font-mono text-2xs px-1 py-0.5 rounded bg-inset">{name}</code>
+        <code class="font-mono text-2xs px-1 py-0.5 rounded bg-inset">{app}</code> apply here too.
+      </p>
+      <%= text_area_tag :body, saved[:body], id: "body", name: nil, rows: 7,
+            "x-model": "form.body", class: "input-field w-full py-2" %>
+    </section>
+
+    <%# Offered ONLY when this email's template can render a button. A card for
+        an email that cannot is a dead control: the operator ticks the box, saves,
+        and no button ever appears. %>
+    <% if @entry.supports_cta? %>
+    <section class="card p-4">
+      <p class="label-upper mb-2">Call to action</p>
+      <div class="space-y-4">
+        <label class="flex items-center gap-2 text-sm text-body">
+          <%= check_box_tag :cta_enabled, "1", saved[:cta_enabled],
+                "x-model": "form.cta_enabled", class: "rounded border-subtle" %>
+          Show the button
+        </label>
+        <div :class="form.cta_enabled ? '' : 'opacity-50 pointer-events-none'">
+          <label class="text-sm text-muted block mb-1" for="cta_text">Button text</label>
+          <%= text_field_tag :cta_text, saved[:cta_text], id: "cta_text", name: nil,
+                "x-model": "form.cta_text", class: "input-field w-full py-2" %>
+          <label class="text-sm text-muted block mb-1 mt-3" for="cta_color">Button colour</label>
+          <div class="flex items-center gap-3">
+            <%= color_field_tag :cta_color, saved[:cta_color], id: "cta_color", name: nil,
+                  "x-model": "form.cta_color", class: "h-9 w-14 rounded border border-subtle bg-transparent" %>
+            <span class="font-mono text-2xs text-muted" x-text="form.cta_color"></span>
+          </div>
+          <p class="text-2xs text-muted mt-2">Defaults to this app's primary colour.</p>
+        </div>
+      </div>
+    </section>
+    <% end %>
+  </div>
+
+  <%# THE FOOTER IS SHARED. Stored once for the whole app rather than per email,
+      because it is the same block on every one — so the label says out loud that
+      editing it here changes every email this app sends. %>
+  <section class="card p-4 mb-6">
+    <p class="label-upper mb-2">Footer</p>
+    <p class="text-sm text-body mb-3">Shared by every email <%= Studio.app_name %> sends.</p>
+    <div class="grid gap-4 md:grid-cols-2">
+      <div>
+        <label class="text-sm text-muted block mb-1" for="discord_url">Discord invite</label>
+        <%= text_field_tag :discord_url, saved[:discord_url], id: "discord_url", name: nil,
+              "x-model": "form.discord_url", placeholder: "https://discord.gg/…",
+              class: "input-field w-full py-2 font-mono text-2xs" %>
+      </div>
+      <div>
+        <label class="text-sm text-muted block mb-1" for="footer_logo_url">Application logo</label>
+        <%= text_field_tag :footer_logo_url, saved[:footer_logo_url], id: "footer_logo_url", name: nil,
+              "x-model": "form.footer_logo_url",
+              class: "input-field w-full py-2 font-mono text-2xs" %>
+      </div>
+    </div>
+    <p class="text-2xs text-muted mt-2">
+      Leave both blank and no footer renders at all. Clearing them later removes it
+      from every email.
+    </p>
+  </section>
+
   <%# The email itself. An iframe because the response IS an email document — its
       own document shell, its own table layout, and no business inheriting the
       admin page's stylesheet. %>
@@ -374,6 +469,12 @@
     <input type="hidden" name="logo_url" :value="form.logo_url">
     <input type="hidden" name="hide_logo" :value="form.hide_logo ? '1' : ''">
     <input type="hidden" name="scrim_percent" :value="form.scrim_percent">
+    <input type="hidden" name="body" :value="form.body">
+    <input type="hidden" name="cta_text" :value="form.cta_text">
+    <input type="hidden" name="cta_color" :value="form.cta_color">
+    <input type="hidden" name="cta_enabled" :value="form.cta_enabled ? '1' : '0'">
+    <input type="hidden" name="discord_url" :value="form.discord_url">
+    <input type="hidden" name="footer_logo_url" :value="form.footer_logo_url">
   <% end %>
 
   <%= render "studio/emails/banner_scale" %>

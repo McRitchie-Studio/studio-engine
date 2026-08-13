@@ -80,13 +80,21 @@ module Studio
     #   type          — :transactional or :marketing.
     #   preview       — callable returning a Mail, or nil.
     Entry = Struct.new(:key, :label, :description, :default_asset, :type, :preview,
-                       :default_origin, :aspect_ratio, :background, :logo, :scrim,
-                       :header, :header_fallback, :subtext, :subject,
+                       :default_origin, :background_origin, :aspect_ratio, :background, :logo, :scrim,
+                       :header, :header_fallback, :subtext, :subject, :body, :cta_text, :cta_color, :cta_enabled, :supports_cta,
                        keyword_init: true) do
       def to_s = key
       def previewable? = preview.respond_to?(:call)
       # nil-safe: an Entry built directly (the STANDARD seed) may carry no type.
       def marketing? = type.to_s == "marketing"
+
+      # Can this email render a button AT ALL? An email's view has to have
+      # somewhere to send the reader — the sign-in link has a token URL, a
+      # "you're subscribed" note has nothing. OPT-IN, because an entry that has
+      # not said yes cannot be assumed to have a destination, and a Call-to-action
+      # card offered for an email whose template ignores it is a dead control:
+      # the operator ticks the box, saves, and no button ever appears.
+      def supports_cta? = supports_cta == true
 
       # WHOSE artwork default_asset names. Recorded at registration rather than
       # inferred later: by the time the page asks, a resolved asset path looks
@@ -95,6 +103,24 @@ module Studio
       # to remove. The engine seeds its own two as :engine; anything a host
       # passes default_asset for is that host's own.
       def engine_artwork? = default_origin.to_s != "app"
+
+      # Does THIS APP's artwork layer?
+      #
+      # True when the app registered a background itself — that is the host
+      # saying "layer this email", whatever else it registered. Also true when
+      # the app has registered no artwork at all, so an app that touches nothing
+      # keeps the engine's layered banner.
+      #
+      # False only in the case this exists for: the app registered its OWN flat
+      # asset and merely INHERITED a background it never asked for. turf-monster
+      # is exactly that — its magic_link carries a baked-in .jpg and inherits the
+      # engine's island art — and drawing live text over a picture it never sends
+      # is the failure this whole feature exists to prevent.
+      def layered?
+        return true if background_origin.to_s == "app"
+
+        engine_artwork?
+      end
 
       # The shape of THIS email's banner — the box the page draws and the ratio
       # the upload cropper enforces. Per-entry because the engine's own artwork
@@ -111,7 +137,7 @@ module Studio
         label: "Magic-link sign-in",
         description: "Passwordless sign-in link. Sent whenever someone asks to sign in by email.",
         default_asset: "emails/magic-link.gif",
-        aspect_ratio: 3.0,
+        aspect_ratio: 2.0,
         # Layered artwork: the background animates, the greeting is live HTML on
         # top. default_asset above stays the flat <img> for a mailer that has not
         # adopted the layered banner.
@@ -122,13 +148,18 @@ module Studio
         header: "Welcome {name}!",
         header_fallback: "Your Magic Link",
         subtext: "your sign-in link is below",
-        subject: "Your {app} sign-in link"
+        subject: "Your {app} sign-in link",
+        body: "Tap the button below to sign in to {app} — no password needed. " \
+              "If you don't have an account yet, we'll create one for you.",
+        # The token URL is the destination, so this email really does have a button.
+        supports_cta: true,
+        cta_text: "Sign in to {app}"
       },
       {
         key: "newsletter_subscribed",
         label: "Newsletter subscribed",
         description: "Welcomes someone who has just joined the mailing list.",
-        aspect_ratio: 3.0,
+        aspect_ratio: 2.0,
         # LAYERED-NATIVE: no default_asset. A flat asset is the pre-layered
         # fallback — artwork with the words baked in, for a mailer that only
         # knows how to render an <img>. Studio::NewsletterMailer has known how to
@@ -140,6 +171,11 @@ module Studio
         header_fallback: "You're subscribed!",
         subtext: "you're on the list",
         subject: "You're subscribed to {app}",
+        body: "Thanks for subscribing to {app}. We'll send the occasional note " \
+              "about what we're building — no more often than it's worth your time.",
+        # NO BUTTON, and no card offering one: a new subscriber has nowhere to be
+        # sent, so subscribed.html.erb renders none and never will.
+        supports_cta: false,
         # The engine ships this email's preview because it can: the mailer takes
         # a bare address, so no host sample data is involved. Every other entry's
         # builder needs records only the host has — this one does not, and an
@@ -152,11 +188,32 @@ module Studio
     # The FALLBACK shape, for an email that states none. 2:1 because that is what
     # turf-monster's eight banners are, and changing it would recrop all of them.
     #
-    # It is NOT what the engine's own emails use: both STANDARD entries declare
-    # aspect_ratio: 3.0 and both shipped backgrounds are 1200x400. The ratio is
-    # per-entry precisely so those two answers can differ.
+    # The engine's own two entries now declare 2.0 as well, and their backgrounds
+    # are 1200x600 — but the ratio stays per-entry, because that is what lets a
+    # host register artwork of a different shape without recropping everyone's.
     ASPECT_RATIO = 2.0
     MAX_WIDTH = 1200
+
+    # NO DEFAULT LOGO, deliberately.
+    #
+    # It was emails/logo-horizontal.png — the white "McRITCHIE STUDIO" wordmark —
+    # and every consumer inherits this layout without defining its own. That put
+    # Studio branding into turf-monster's entire player-facing mail set, which
+    # today carries none, plus moms-app, mcritchie-industries, acquisition-studio
+    # and rolio, with no opt-in and no host-side change.
+    #
+    # It also contradicted the rule at the top of this file: the url / resolved_url
+    # split exists so the engine cannot swap a host's artwork for the engine's in
+    # live email. A footer logo is the same swap by another route.
+    #
+    # Each app opts in on /admin/emails by pasting its own mark.
+
+    # The footer band. Dark on purpose: it closes the white card, and a light
+    # sign-off floating under body copy reads as part of the message rather than
+    # the end of it. Hard-coded rather than derived from the theme because a
+    # host's primary can be light, and white-on-light is unreadable — the one
+    # thing this band must never be.
+    FOOTER_BACKGROUND = "#1A1535".freeze
 
     module_function
 
@@ -169,7 +226,8 @@ module Studio
     # attach a preview builder to it, without restating its artwork.
     def register(key, label: nil, description: nil, default_asset: nil, type: nil, preview: nil,
                  aspect_ratio: nil, background: nil, logo: nil, scrim: nil,
-                 header: nil, header_fallback: nil, subtext: nil, subject: nil)
+                 header: nil, header_fallback: nil, subtext: nil, subject: nil,
+                 body: nil, cta_text: nil, cta_color: nil, cta_enabled: nil, supports_cta: nil)
       key = key.to_s
       existing = registry[key]
       registry[key] = Entry.new(
@@ -184,6 +242,11 @@ module Studio
         # had, so a host relabelling an inherited email does not accidentally
         # claim the engine's picture as its own.
         default_origin: default_asset.nil? ? (existing&.default_origin || :engine) : :app,
+        # WHOSE background this is, recorded the same way and for the same
+        # reason: by the time anyone asks, an inherited background and a
+        # host-registered one are indistinguishable, and guessing is what this
+        # records to avoid. A host passing background: is ASKING to layer.
+        background_origin: background.nil? ? (existing&.background_origin || :engine) : :app,
         aspect_ratio: aspect_ratio || existing&.aspect_ratio,
         background: background.nil? ? existing&.background : background.presence,
         logo: logo.nil? ? existing&.logo : logo.presence,
@@ -191,7 +254,12 @@ module Studio
         header: header.nil? ? existing&.header : header.presence,
         header_fallback: header_fallback.nil? ? existing&.header_fallback : header_fallback.presence,
         subtext: subtext.nil? ? existing&.subtext : subtext.presence,
-        subject: subject.nil? ? existing&.subject : subject.presence
+        subject: subject.nil? ? existing&.subject : subject.presence,
+        body: body.nil? ? existing&.body : body.presence,
+        cta_text: cta_text.nil? ? existing&.cta_text : cta_text.presence,
+        cta_color: cta_color.nil? ? existing&.cta_color : cta_color.presence,
+        cta_enabled: cta_enabled.nil? ? existing&.cta_enabled : cta_enabled,
+        supports_cta: supports_cta.nil? ? existing&.supports_cta : supports_cta
       )
       key
     end
@@ -322,6 +390,64 @@ module Studio
       saved(key, :subtext) || entry(key)&.subtext
     end
 
+    # --- the email below the banner ------------------------------------------
+    #
+    # Same resolution as the banner's words: operator > registry > default. A
+    # mailer reads these instead of hard-coding copy, which is what makes the
+    # cards on /admin/emails real rather than decorative.
+
+    def body(key, name: nil)
+      template = saved(key, :body) || entry(key)&.body
+      return nil if template.blank?
+
+      Studio::Banner.interpolate(template, name).presence
+    end
+
+    def cta_text(key, name: nil)
+      template = saved(key, :cta_text) || entry(key)&.cta_text
+      return nil if template.blank?
+
+      Studio::Banner.interpolate(template, name).presence
+    end
+
+    # The app's primary unless this email says otherwise — a button that matches
+    # the banner above it by default, and can be made to stand out per email.
+    def cta_color(key)
+      saved(key, :cta_color) || entry(key)&.cta_color || Studio.theme_primary
+    end
+
+    # Shown unless someone said no. Defaults to TRUE for an email that has CTA
+    # text, because the button is the point of a transactional email; an email
+    # with no text has nothing to render either way.
+    def cta_enabled?(key)
+      # An email whose template cannot render a button is never "enabled", no
+      # matter what is stored — otherwise a value saved before the capability was
+      # declared keeps claiming a button that cannot appear.
+      return false unless entry(key)&.supports_cta?
+
+      operator = begin
+        Studio::EmailSetting.cta_enabled_for(key)
+      rescue StandardError
+        nil
+      end
+      return operator unless operator.nil?
+
+      registered = entry(key)&.cta_enabled
+      return registered unless registered.nil?
+
+      true
+    end
+
+    # The shared footer — the same on every email this app sends.
+    #
+    # The operator's footer, or nothing. An app that has not set one renders no
+    # band at all — the engine ships no branding of its own into a host's email.
+    def footer
+      (Studio::EmailSetting.footer || {}).compact
+    rescue StandardError
+      {}
+    end
+
     # The subject line, resolved the same way and supporting the same {name}
     # placeholder. A mailer calls this instead of hard-coding a string, which is
     # what makes the field on /admin/emails real rather than decorative.
@@ -367,12 +493,16 @@ module Studio
     # flipped to "Uploaded here", and the email kept sending the gem's artwork
     # because the layered banner never looked at the row.
     #
-    # NIL WHEN THIS APP OWNS THE ARTWORK. A host registering its own flat
-    # default_asset sends that picture; the background it also inherited is the
-    # engine's and nothing sends it. The list row carried this guard alone, so
-    # the detail page still layered live text over artwork no inbox receives.
+    # NIL UNLESS THIS EMAIL LAYERS. A host registering its own flat
+    # default_asset sends that picture, and the background it merely INHERITED is
+    # the engine's — nothing sends it. But a host that registers a background of
+    # its OWN is asking to layer, and layered? is what tells the two apart.
+    #
+    # This is the ONE place that decision is made. Every reader asks this method
+    # rather than re-deriving it: the list row used to carry its own copy of the
+    # guard, and the copy went stale the moment the guard moved here.
     def background_url(key)
-      return nil unless entry(key)&.engine_artwork?
+      return nil unless entry(key)&.layered?
 
       url(key) || absolute_asset_url(entry(key)&.background)
     end
@@ -519,10 +649,19 @@ module Studio
     # The flat asset stays the fallback, for a host still on the engine's own
     # unlayered UserMailer — there, the baked-text banner IS what arrives.
     #
-    # Unless THIS APP owns the artwork, in which case it previews exactly what
+    # Unless this email does not LAYER, in which case it previews exactly what
     # the flat resolution sends — same method, so the two cannot disagree.
+    #
+    # THE SAME QUESTION background_url ASKS, so it must ask it the same way.
+    # This guard read engine_artwork? while background_url read layered?, and the
+    # two answer differently for a host that registers its own background: the
+    # mailer sent the layered banner while /admin/email_images and the detail
+    # page's "Artwork" frame both drew the flat asset. That frame is where
+    # "Modify image" lives, and an upload writes the row background_url reads
+    # FIRST — so the operator was shown one picture and told it was the one the
+    # button would replace.
     def preview_asset_path(key)
-      return default_asset_path(key) unless entry(key)&.engine_artwork?
+      return default_asset_path(key) unless entry(key)&.layered?
 
       asset_path(entry(key)&.background.presence || entry(key)&.default_asset)
     end
