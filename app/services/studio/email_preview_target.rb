@@ -66,8 +66,15 @@ module Studio
 
     class << self
       # Every target the page can offer, admin first.
+      #
+      # The NAMELESS sample is always offered, even when a real member exists.
+      # It is the only way to see what the name-free fallback header sends, and
+      # the accounts an app actually parks tend to be real people with real names
+      # — McRitchie Studio's member is Mack McRitchie. The alternative was
+      # stripping a real person's name to make a preview reachable, which trades
+      # a worse app for a better test.
       def all
-        [find_admin, find_member].compact
+        [find_admin, find_member, sample_member].compact.uniq(&:id)
       end
 
       # The one to preview as. Falls back to the first available rather than
@@ -88,7 +95,7 @@ module Studio
 
       def find_member
         record = first_user { |scope| members(scope) }
-        return sample_member if record.nil?
+        return nil if record.nil?
 
         from_record(record, id_prefix: "member", label: "Member", admin: false)
       end
@@ -175,12 +182,13 @@ module Studio
             name: "Alex McRitchie", email: "alex@#{sample_domain}")
       end
 
-      # Deliberately NAMELESS. The member stand-in exists to show the operator
-      # what someone with no name on file receives, which is the case the header
-      # fallback is for and the one nobody thinks to check.
+      # Deliberately NAMELESS, and always present. This is the only recipient that
+      # exercises the name-free fallback header — the case a magic link hits every
+      # time it reaches someone with no account yet, and the one nobody thinks to
+      # check because whoever is previewing has a name on file.
       def sample_member
-        new(id: "sample-member", label: "Member (sample)", admin: false,
-            name: nil, email: "member@#{sample_domain}")
+        new(id: "sample-member", label: "No name on file", admin: false,
+            name: nil, email: "someone@#{sample_domain}")
       end
     end
   end

@@ -568,6 +568,26 @@ class EmailsPageTest < ActiveSupport::TestCase
   # in it, beside a navbar showing the same person's initials in their own
   # colour — and every avatar assertion in the browser lane passed, because the
   # lab page supplies its own payload.
+  # THE NAME-FREE CASE MUST ALWAYS BE PREVIEWABLE. It is what a magic link sends
+  # to anyone without an account, and it is the one nobody checks because whoever
+  # is previewing has a name on file. Offering it only when an app happens to have
+  # a nameless member made it disappear the moment McRitchie Studio parked Mack —
+  # a real person with a real name — as its member.
+  test "a nameless recipient is always on offer" do
+    nameless = Studio::EmailPreviewTarget.all.select { |target| target.name.nil? }
+
+    refute_empty nameless, "the fallback header has no way to be seen"
+    assert nameless.any?(&:sample?), "it is a stand-in, and should be labelled as one"
+  end
+
+  test "the nameless sample renders the fallback header, not an empty greeting" do
+    target = Studio::EmailPreviewTarget.all.find { |t| t.name.nil? }
+    header = Studio::Banner.for(:magic_link, name: target.name).header
+
+    assert_equal "Your Magic Link", header
+    refute_includes header, "Welcome !", "this is the exact failure the fallback exists to prevent"
+  end
+
   # A "member" whose name is synthesised from their email address is not a
   # nameless member, and the nameless case is the entire reason that option is
   # offered. MS's display_name turns member@… into "Member", so asking for a
