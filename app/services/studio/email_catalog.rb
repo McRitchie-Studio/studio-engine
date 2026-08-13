@@ -204,12 +204,14 @@ module Studio
     # There is no DEFAULT_LOGO constant here, and newsletter_subscribed above
     # seeds no logo either. Same rule, learned twice, on two different routes.
     #
-    # The constant went first. It was emails/logo-horizontal.png — the white
-    # "McRITCHIE STUDIO" wordmark — and every consumer inherits this layout
-    # without defining its own. That put Studio branding into turf-monster's
-    # entire player-facing mail set, which today carries none, plus moms-app,
-    # mcritchie-industries, acquisition-studio and rolio, with no opt-in and no
-    # host-side change.
+    # The constant went first (DEFAULT_FOOTER_LOGO). It was
+    # emails/logo-horizontal.png — the white "McRITCHIE STUDIO" wordmark —
+    # inherited by every consumer that defines none of its own, with no opt-in and
+    # no host-side change. It reached the apps actually RUNNING that engine:
+    # turf-monster's entire player-facing mail set, which today carries none.
+    # It did NOT reach moms-app, mcritchie-industries or acquisition-studio — they
+    # pin 0.32.1 / 0.32.2 / 0.13.1 and the wordmark first shipped at v0.42.0 — and
+    # rolio is not a consumer at all. Reachability at the PIN, as below.
     #
     # The SEED went second, and it is the subtler half: newsletter_subscribed
     # carried the same file as its banner logo, and register() merges on
