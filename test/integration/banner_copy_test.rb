@@ -394,8 +394,16 @@ class BannerCopyTest < ActiveSupport::TestCase
   # the same as "cleared", so the shared footer vanished from every email the app
   # sends and could not be recovered without retyping it.
   #
-  # Exercised through the controller's own write path, because the model was
-  # never the broken part.
+  # These call the MODEL directly. They are the decision table for "when does a
+  # posted footer count as a change", and they are complete for that question.
+  #
+  # They are NOT proof that the page reaches this method, and must not be read as
+  # such: this guard passed for the whole life of a controller that called
+  # write_footer — a method defined nowhere — so the wipe fix shipped correct and
+  # unreachable, and the footer could not be turned on at all. The controller
+  # round trip lives in test/integration/emails_page_save_test.rb; a change to
+  # who calls what belongs there, not here.
+  #
   # What the page posts on any save: both footer inputs, always.
   def write_page(discord_url: "", footer_logo_url: "")
     Studio::EmailSetting.update_footer(discord_url: discord_url, logo_url: footer_logo_url)

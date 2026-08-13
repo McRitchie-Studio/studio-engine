@@ -130,7 +130,17 @@ module Studio
         # The button's on/off is a boolean, so it is not a COPY_FIELD and needs
         # its own write — the same shape that once made hide_logo a dead control.
         Studio::EmailSetting.set_cta_enabled(@key, attrs[:cta_enabled]) if attrs.key?(:cta_enabled)
-        write_footer(attrs)
+        # The footer is SHARED across every email, so it is stored under its own
+        # key rather than this one, and the page posts its two inputs on every
+        # save. update_footer (not set_footer) is what makes that safe: it writes
+        # only on a real change, so blank posts from a page nobody edited cannot
+        # wipe the footer every email sends.
+        #
+        # The form spells the footer's logo `footer_logo_url` because `logo_url`
+        # is already this email's OWN banner logo; the model takes it as
+        # `logo_url`, so the rename is undone here.
+        Studio::EmailSetting.update_footer(discord_url: attrs[:discord_url],
+                                           logo_url: attrs[:footer_logo_url])
         if params.key?(:scrim_percent)
           percent = params[:scrim_percent]
           percent = nil unless percent.present? && Studio::EmailSetting::SCRIM_RANGE.cover?(percent.to_i)
