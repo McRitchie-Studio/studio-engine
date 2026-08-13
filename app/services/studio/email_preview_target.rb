@@ -67,14 +67,18 @@ module Studio
     class << self
       # Every target the page can offer, admin first.
       #
-      # The NAMELESS sample is always offered, even when a real member exists.
-      # It is the only way to see what the name-free fallback header sends, and
-      # the accounts an app actually parks tend to be real people with real names
-      # — McRitchie Studio's member is Mack McRitchie. The alternative was
-      # stripping a real person's name to make a preview reachable, which trades
-      # a worse app for a better test.
+      # TWO REAL PEOPLE: the operator admin and an ordinary member.
+      #
+      # A third, SYNTHETIC "No name on file" entry used to be appended here so
+      # the name-free fallback header could be previewed. Mr. McRitchie asked for
+      # the list to be just the two, knowing what it costs: the "header for
+      # someone with no name on file" field stays in the editor and still ships
+      # to strangers, it simply cannot be previewed from this page any more.
+      # Do not quietly re-add the sample to make that field previewable — if
+      # that needs solving, solve it somewhere this decision is not reversed by
+      # accident.
       def all
-        [find_admin, find_member, sample_member].compact.uniq(&:id)
+        [find_admin, find_member].compact.uniq(&:id)
       end
 
       # The one to preview as. Falls back to the first available rather than
@@ -123,16 +127,41 @@ module Studio
       # `admin` may be a column, a method, or absent entirely. Only the column
       # can be queried; anything else is filtered in Ruby over a bounded slice,
       # because a preview must not table-scan a production users table.
-      def admins(model)
-        return model.where(admin: true).first if model.column_names.include?("admin")
+      # THE HOUSE STANDARD, preferred over whoever happens to sort first. Every
+      # McRitchie app seeds an "alex" admin and a "mack" member, and without a
+      # preference this offered whatever the id order gave: McRitchie Studio
+      # showed team@ instead of alex@, and turf-monster showed a test-fixture
+      # row (jordan@) instead of Mack.
+      #
+      # Matched on the email LOCAL PART, so an app's own-domain admin counts too
+      # — alex@turfmonster.media and alex@mcritchie.industries are the same
+      # person as alex@mcritchie.studio for this purpose.
+      #
+      # Preference only. An app that seeds neither still gets its first admin
+      # and first member, which is what this did before.
+      PREFERRED_ADMIN_LOCAL = "alex"
+      PREFERRED_MEMBER_LOCAL = "mack"
 
-        model.limit(50).detect { |user| user.try(:admin?) }
+      def local_part(record) = record.try(:email).to_s.split("@").first.to_s.downcase
+
+      def prefer(candidates, local)
+        candidates.detect { |user| local_part(user) == local } || candidates.first
+      end
+
+      def admins(model)
+        if model.column_names.include?("admin")
+          return prefer(model.where(admin: true).limit(50).to_a, PREFERRED_ADMIN_LOCAL)
+        end
+
+        prefer(model.limit(50).select { |user| user.try(:admin?) }, PREFERRED_ADMIN_LOCAL)
       end
 
       def members(model)
-        return model.where(admin: [false, nil]).first if model.column_names.include?("admin")
+        if model.column_names.include?("admin")
+          return prefer(model.where(admin: [ false, nil ]).limit(50).to_a, PREFERRED_MEMBER_LOCAL)
+        end
 
-        model.limit(50).detect { |user| !user.try(:admin?) }
+        prefer(model.limit(50).reject { |user| user.try(:admin?) }, PREFERRED_MEMBER_LOCAL)
       end
 
       def from_record(record, id_prefix:, label:, admin:)
