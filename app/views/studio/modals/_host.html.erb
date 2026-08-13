@@ -390,9 +390,48 @@
           });
           this._sync();
         },
+        // isOpen(id) — is a card with this id ON THE STACK, in any
+        // lifecycle state? A card mid-close still counts: close() flips
+        // _closing at once and splices only after the exit animation, so
+        // this answers TRUE for that whole exit window. Unchanged — callers
+        // asking "is the DOM node still mounted" depend on exactly this.
+        // If you mean "is it still up", you want isLive() below.
         isOpen: function(id) {
           for (var i = 0; i < this.stack.length; i++) {
             if (this.stack[i].id === id) return true;
+          }
+          return false;
+        },
+        // isLive(id) / isLive([id, ...]) — is a card with this id on the
+        // stack and NOT on its way out? This is what a "don't open it
+        // twice" guard actually means, and it is the question isOpen
+        // cannot answer.
+        //
+        // The difference is a TIMING one, and the asymmetry is load-bearing:
+        //
+        //   close()               entry gets _closing, and is spliced
+        //                         CLOSE_ANIM_MS later. isOpen stays TRUE for
+        //                         that window; isLive is FALSE immediately.
+        //   swap() / open(...,    the LEAVING entry gets _swappingOut AND
+        //   { replace: true })    _closing — a different card is taking the
+        //                         screen, so it is not live either.
+        //   advance()             the entry gets _swappingOut and NOTHING
+        //                         else. Same card, same id, sliding between
+        //                         steps of its own flow. It stays LIVE.
+        //
+        // So this tests _closing ALONE and deliberately never consults
+        // _swappingOut. Conflating the two reports a card as gone in the
+        // middle of a step transition, which is how an in-flow hand-off
+        // starts looking to a caller like a dismissal.
+        //
+        // Accepts an array so a caller can ask about a SET of ids ("is any
+        // card belonging to this flow still up?") without reaching into
+        // .stack and re-deriving the lifecycle rule for itself.
+        isLive: function(id) {
+          var ids = Array.isArray(id) ? id : [id];
+          for (var i = 0; i < this.stack.length; i++) {
+            var entry = this.stack[i];
+            if (entry && !entry._closing && ids.indexOf(entry.id) !== -1) return true;
           }
           return false;
         },
