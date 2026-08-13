@@ -166,7 +166,12 @@ module Studio
         # layer since the day it was written, so a baked-in copy of the same
         # picture would be a second thing to keep in sync and never be shown.
         background: "emails/newsletter-subscribed-background.gif",
-        logo: "emails/logo-horizontal.png",
+        # NO logo: KEY, and adding one back is the bug. It seeded
+        # "emails/logo-horizontal.png" — the McRITCHIE STUDIO wordmark — into
+        # every host that registers this email without naming a logo of its own,
+        # because register() merges on `logo.presence` and an omitted key
+        # inherits. Full reasoning under NO DEFAULT LOGO below; the guards are in
+        # test/integration/newsletter_email_test.rb.
         header: "Welcome {name}!",
         header_fallback: "You're subscribed!",
         subtext: "you're on the list",
@@ -194,19 +199,62 @@ module Studio
     ASPECT_RATIO = 2.0
     MAX_WIDTH = 1200
 
-    # NO DEFAULT LOGO, deliberately.
+    # NO DEFAULT LOGO, deliberately — on any route.
     #
-    # It was emails/logo-horizontal.png — the white "McRITCHIE STUDIO" wordmark —
-    # and every consumer inherits this layout without defining its own. That put
-    # Studio branding into turf-monster's entire player-facing mail set, which
-    # today carries none, plus moms-app, mcritchie-industries, acquisition-studio
-    # and rolio, with no opt-in and no host-side change.
+    # There is no DEFAULT_LOGO constant here, and newsletter_subscribed above
+    # seeds no logo either. Same rule, learned twice, on two different routes.
     #
-    # It also contradicted the rule at the top of this file: the url / resolved_url
+    # The constant went first (DEFAULT_FOOTER_LOGO). It was
+    # emails/logo-horizontal.png — the white "McRITCHIE STUDIO" wordmark —
+    # inherited by every consumer that defines none of its own, with no opt-in and
+    # no host-side change. It reached the apps actually RUNNING that engine:
+    # turf-monster's entire player-facing mail set, which today carries none.
+    # It did NOT reach moms-app, mcritchie-industries or acquisition-studio — they
+    # pin 0.32.1 / 0.32.2 / 0.13.1 and the wordmark first shipped at v0.42.0 — and
+    # rolio is not a consumer at all. Reachability at the PIN, as below.
+    #
+    # The SEED went second, and it is the subtler half: newsletter_subscribed
+    # carried the same file as its banner logo, and register() merges on
+    # `logo.presence` — omitting the key INHERITS. A host registering that email
+    # to relabel it or attach a preview would have inherited the wordmark without
+    # naming it. turf-monster had already been bitten by this on magic_link, where
+    # the sign-in banner sent the Studio wordmark under an alt of "Turf Monster".
+    #
+    # Both contradict the rule at the top of this file: the url / resolved_url
     # split exists so the engine cannot swap a host's artwork for the engine's in
-    # live email. A footer logo is the same swap by another route.
+    # live email. A logo is the same swap by another route — and the ALT TEXT
+    # cannot warn anyone, because Studio::Banner sets it from Studio.app_name, so
+    # it always agrees with the host and never with the pixels.
     #
-    # Each app opts in on /admin/emails by pasting its own mark.
+    # ARTWORK still rides the gem, and should: a background is a picture any app
+    # can send, and inheriting one is what gives a new app good-looking mail on
+    # day one. A wordmark is somebody's identity. The line is there, not at
+    # "engine assets are bad".
+    #
+    # Each app opts in with its own mark — in an initializer
+    # (`Studio::EmailCatalog.register("newsletter_subscribed", logo: "emails/our-mark.png")`,
+    # a path THAT APP ships) or on /admin/emails.
+    #
+    # STILL OUTSTANDING, stated so nobody reads this as swept: magic_link above
+    # DOES still seed the wordmark, so a host that registers no mark of its own
+    # inherits it on the sign-in email. turf-monster registers emails/turf-logo.png
+    # and the Studio hub owns the mark, so both are covered.
+    #
+    # It is an UPGRADE TRAP rather than a live leak, which is the sharper shape.
+    # The apps carrying no email initializer are pinned far enough back that this
+    # file does not exist in the gem they run, so they inherit nothing today — but
+    # the routine dependency bump that brings one forward would put another
+    # brand's mark in its most-sent email, with no code change of its own and
+    # nobody looking for it.
+    #
+    # CHECK REACHABILITY AT THE PIN, never from main: `git ls-tree` at the tag the
+    # app resolves, or read the installed gem. "HEAD seeds it" plus "the app
+    # registers nothing" are both true and together say nothing about what that
+    # app RUNS — a wrong conclusion this very comment was first drafted with.
+    #
+    # Tracked, with the design question it raises — should STANDARD seed a logo at
+    # all, or should hosts opt in? — at /tasks/guard-wordmark-on-engine-bump.
+    # Fixing magic_link alone leaves the next entry free to repeat this.
 
     # The footer band. Dark on purpose: it closes the white card, and a light
     # sign-off floating under body copy reads as part of the message rather than
