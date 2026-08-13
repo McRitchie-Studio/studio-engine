@@ -211,14 +211,6 @@ module Studio
             name: "Alex McRitchie", email: "alex@#{sample_domain}")
       end
 
-      # Deliberately NAMELESS, and always present. This is the only recipient that
-      # exercises the name-free fallback header — the case a magic link hits every
-      # time it reaches someone with no account yet, and the one nobody thinks to
-      # check because whoever is previewing has a name on file.
-      def sample_member
-        new(id: "sample-member", label: "No name on file", admin: false,
-            name: nil, email: "someone@#{sample_domain}")
-      end
     end
   end
 end
