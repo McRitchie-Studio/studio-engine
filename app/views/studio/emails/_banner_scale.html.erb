@@ -1,0 +1,56 @@
+<%# Scales the 600px email banner down to whatever width its frame has.
+
+    Why this needs script at all: the banner is the EMAIL's own markup, a fixed
+    600px table, and it must stay that way — an inbox has no responsive layout,
+    so making it fluid here would mean previewing markup no one receives. The
+    frame beside it is fluid. Nothing in CSS converts a fixed-width box into a
+    fluid one without knowing the container's width, so the width is read and a
+    transform applied.
+
+    What it does NOT do: move anything. It sets a scale on a box whose height is
+    already reserved by `aspect-ratio`, so no reflow follows and there is no
+    paint-time jump — the failure mode of measuring layout in script.
+
+    Degrades to an unscaled, clipped preview if script never runs. That is the
+    behaviour this replaced, so a failure here costs the improvement, not the page.
+%>
+<script>
+  (function () {
+    function fit(preview) {
+      var frame = preview.parentElement;
+      if (!frame) return;
+      var natural = parseFloat(preview.dataset.bannerWidth) || 600;
+      var available = frame.clientWidth;
+      if (!available) return;
+      // Never scale UP past the real size: at 1:1 this preview is exactly the
+      // 600px the recipient sees, and blowing it past that would show the
+      // operator a banner larger than any inbox renders.
+      var scale = Math.min(available / natural, 1);
+      preview.style.transform = "scale(" + scale + ")";
+    }
+
+    function fitAll() {
+      document.querySelectorAll("[data-email-banner-preview]").forEach(fit);
+    }
+
+    // ResizeObserver rather than a resize listener: the frame changes width when
+    // a sidebar opens or the grid reflows, neither of which resizes the window.
+    var observer = typeof ResizeObserver === "function" ? new ResizeObserver(fitAll) : null;
+
+    function start() {
+      fitAll();
+      if (!observer) return;
+      observer.disconnect();
+      document.querySelectorAll("[data-email-banner-frame]").forEach(function (frame) {
+        observer.observe(frame);
+      });
+    }
+
+    // turbo:load as well as DOMContentLoaded — a Turbo visit swaps the body
+    // without firing DOMContentLoaded, which would leave the preview at its
+    // unscaled 600px until a full reload.
+    document.addEventListener("DOMContentLoaded", start);
+    document.addEventListener("turbo:load", start);
+    if (document.readyState !== "loading") start();
+  })();
+</script>

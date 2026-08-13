@@ -1,0 +1,36 @@
+<%# The two preview frames from /admin/emails/:key, in the same grid, at the same
+    widths. Deliberately a COPY of the two frames rather than a render of the
+    admin view: that view needs @entry, an admin session and a settings row, none
+    of which this measures. What must match the real page is the SIZING contract
+    — an aspect-ratio'd frame each, a fixed 600px banner inside the second, and
+    the scaler — so those are what this page reproduces. %>
+<% aspect = 3.0 %>
+<style>
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .card { padding: 16px; }
+  .grid2 { display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .frame { border: 1px solid #d4d4d8; border-radius: 8px; overflow: hidden; background: #4c3fb5; max-width: 600px; }
+</style>
+
+<div class="card">
+  <div class="grid2">
+    <div>
+      <p>Artwork</p>
+      <div class="frame" data-email-artwork-frame style="aspect-ratio: <%= aspect %>;">
+        <img src="/e2e/img/banner.gif" alt="artwork" style="width:100%;height:100%;object-fit:cover;">
+      </div>
+    </div>
+
+    <div>
+      <p>In the email</p>
+      <div class="frame" data-email-banner-frame style="aspect-ratio: <%= aspect %>;">
+        <div data-email-banner-preview data-banner-width="<%= Studio::Banner::DEFAULT_WIDTH %>"
+             style="width:<%= Studio::Banner::DEFAULT_WIDTH %>px;transform-origin:top left;">
+          <%= render "studio/mailers/layered_banner", banner: @banner %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%= render "studio/emails/banner_scale" %>

@@ -101,6 +101,41 @@ class E2eLabController < ActionController::Base
   # subject; the stamps are what prove it ran.
   def at_time = render(:at_time)
 
+  # The email manager's two preview frames — the ARTWORK box and the IN THE EMAIL
+  # box — rendered side by side exactly as /admin/emails/:key renders them.
+  #
+  # A lab page rather than the real admin page because that one needs an admin
+  # session and a settings table, and neither is what is under test here. What IS
+  # under test is a size relationship between two boxes, which no markup
+  # assertion can see: measured side by side they were 467x156 and 467x202, and
+  # every string assertion about them passed.
+  def email_banner_frames
+    @banner = Studio::Banner.new(
+      background_url: "/e2e/img/banner.gif",
+      header: "Welcome Alex!",
+      subtext: "your sign-in link is below",
+      logo_url: "/e2e/img/logo.png",
+      logo_alt: "Studio",
+      scrim: 0.4
+    )
+    render(:email_banner_frames)
+  end
+
+  # The banner editor: the copy form beside the rendered banner it repaints.
+  #
+  # A lab page because the real /admin/emails/:key needs an admin session and a
+  # settings table, and neither is what is under test. What IS under test is that
+  # typing changes the picture and that Save reports whether there is anything to
+  # save — both of which exist only after a browser has run the component.
+  def email_banner_editor
+    @banner = Studio::Banner.new(
+      background_url: "/e2e/img/banner.gif", header: "Welcome Alex!",
+      subtext: "your sign-in link is below", logo_url: "/e2e/img/logo.png",
+      logo_alt: "Studio", scrim: 0.4
+    )
+    render(:email_banner_editor)
+  end
+
   # Liveness. Playwright's webServer polls this before the first spec, so it must
   # not depend on anything a lab page needs.
   def up = render(plain: "ok")

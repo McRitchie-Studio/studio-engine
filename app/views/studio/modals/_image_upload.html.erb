@@ -44,6 +44,16 @@
       maxWidth: 256,
       maxHeight: 256,
       transparent: true,
+      // GIFS BYPASS THE CROPPER ENTIRELY when allowed. They cannot go through
+      // it: confirm() paints the crop onto a canvas and calls toBlob(...,
+      // "image/png"), which keeps frame one and throws the animation away —
+      // silently, with a perfectly good-looking still as the result. So an
+      // allowed GIF is passed through as its ORIGINAL BYTES, uncropped, and the
+      // aspect it was authored at is the aspect that ships.
+      //
+      // Off by default because most upload sites (avatars, square thumbnails)
+      // genuinely want the crop, and an un-cropped image there is a bug.
+      allowGifs: false,
       autoCropArea: 0.9,
       // dispatch: keep the modal open after confirm so the opener's host can run
       // its own processing -> success flow (it replaces the modal). When false
@@ -57,6 +67,7 @@
         if (props.maxWidth) this.maxWidth = props.maxWidth;
         if (props.maxHeight) this.maxHeight = props.maxHeight;
         if (typeof props.transparent === "boolean") this.transparent = props.transparent;
+        if (typeof props.allowGifs === "boolean") this.allowGifs = props.allowGifs;
         if (props.dispatch) this.dispatch = true;
         // Carried through untouched and echoed back on confirm, so the host that
         // OPENED the cropper is the only one that acts on the result.
@@ -103,6 +114,17 @@
           return;
         }
         var self = this;
+
+        if (this.isAnimatedCandidate(file)) {
+          if (!this.allowGifs) {
+            this.error = "GIFs aren't accepted here. Use a PNG, JPG or WebP.";
+            return;
+          }
+          this.error = null;
+          this.passThrough(file);
+          return;
+        }
+
         var reader = new FileReader();
         reader.onload = function (e) {
           self.error = null;
@@ -110,6 +132,25 @@
           self.mountCropper();
         };
         reader.readAsDataURL(file);
+      },
+
+      // Type, not extension: a file renamed to .gif is still a PNG and belongs in
+      // the cropper, and a .GIF from a Windows machine is still a GIF.
+      isAnimatedCandidate(file) {
+        return (file.type || "").toLowerCase() === "image/gif";
+      },
+
+      // Hand the ORIGINAL file straight to the opener, no canvas in the path.
+      // Same event and the same owner token as a cropped confirm, so every host
+      // downstream is unchanged — the only difference is what is in the blob.
+      passThrough(file) {
+        try {
+          window.dispatchEvent(new CustomEvent("crop-photo-confirmed",
+                                               { detail: { blob: file, owner: this.owner || null,
+                                                           filename: file.name, uncropped: true } }));
+        } catch (_) {}
+        if (this.cropper) { this.cropper.destroy(); this.cropper = null; }
+        if (!this.dispatch) this.$store[this._storeName].close();
       },
 
       onFilePicked(event) {
@@ -228,6 +269,7 @@
       if (opts.maxWidth) p.maxWidth = opts.maxWidth;
       if (opts.maxHeight) p.maxHeight = opts.maxHeight;
       if (opts.autoCropArea) p.autoCropArea = opts.autoCropArea;
+      if (typeof opts.allowGifs === "boolean") p.allowGifs = opts.allowGifs;
       if (extra) { for (var k in extra) { p[k] = extra[k]; } }
       return p;
     }
@@ -249,7 +291,12 @@
       onCropConfirmed(detail) {
         if (!detail) return;
         if (detail.owner && detail.owner !== ownerId) return;
-        this.applyCrop(detail.blob);
+        // An uncropped pass-through (a GIF) carries its own name and type. The
+        // cropped path does not — it produced a PNG — so it keeps the caller's
+        // filename. Sending "banner.png" for GIF bytes would have the server
+        // store an animated file under a name and content type that say
+        // otherwise, and the inbox would be told it is a PNG.
+        this.applyCrop(detail.blob, detail.filename);
       },
       // Native picker: read the chosen image, then hand it to the modal.
       onFileSelected(event) {
@@ -262,10 +309,15 @@
         reader.readAsDataURL(file);
         event.target.value = "";
       },
-      applyCrop(blob) {
+      applyCrop(blob, filename) {
         if (!blob) return;
+        // The blob's OWN type when it has one — a pass-through GIF arrives as the
+        // original File and already knows it is image/gif. Only the cropped path
+        // needs the png default, because that is what toBlob produced.
+        var type = blob.type || "image/png";
+        var name = filename || opts.filename || "image.png";
         var dt = new DataTransfer();
-        dt.items.add(new File([blob], opts.filename || "image.png", { type: "image/png" }));
+        dt.items.add(new File([blob], name, { type: type }));
         this.$refs.fileInput.files = dt.files;
         window.submitFormWithProgress(this.$refs.form, opts);
       }

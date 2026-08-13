@@ -1,0 +1,568 @@
+# frozen_string_literal: true
+
+require "bundler/setup"
+
+ENV["RAILS_ENV"] ||= "test"
+require_relative "../dummy/config/environment"
+
+require "minitest/autorun"
+require "active_support/test_case"
+require "action_view"
+require "nokogiri"
+
+# [integration] The LAYERED email banner — background image with the header,
+# sub-text and logo as live HTML on top.
+#
+# Two properties carry this feature, and neither is "it renders":
+#
+#   1. It reaches OUTLOOK. Outlook on Windows renders through Word, which
+#      ignores background-image on nearly everything. Without the VML block the
+#      banner is a blank cell there — and Outlook is exactly the client that
+#      cannot be checked by looking at Gmail.
+#   2. It does not disturb what already ships. Every mailer in every app sets
+#      @banner_url and renders an <img>. Layered is opt-in; a mailer that knows
+#      nothing about it must render byte-for-byte as before.
+class LayeredBannerTest < ActiveSupport::TestCase
+  # The dummy app has no schema; the engine's other DB-touching guard builds its
+  # table the same way. Runs the REAL migration so a mistake in it fails here
+  # rather than in a host's db:migrate.
+  def self.ensure_settings_table!
+    return if ActiveRecord::Base.connection.table_exists?(:studio_email_settings)
+
+    require_relative "../../db/migrate/20260812000000_create_studio_email_settings"
+    # suppress_messages, because bin/suite-guard reads STDOUT to work out which
+    # test files ran — a migration announcing itself there is parsed as a file
+    # and reported as missing from the tree.
+    ActiveRecord::Migration.suppress_messages { CreateStudioEmailSettings.new.migrate(:up) }
+  end
+
+  def setup
+    self.class.ensure_settings_table!
+    Studio::EmailSetting.delete_all
+  end
+
+  def teardown
+    Studio::EmailSetting.delete_all
+    Studio::EmailCatalog.reset!
+  end
+
+  # Hand-rolled: Minitest 6 dropped minitest/mock, so there is no .stub.
+  def stub_singleton(mod, name, value)
+    original = mod.method(name)
+    mod.define_singleton_method(name) { |*| value }
+    yield
+  ensure
+    mod.define_singleton_method(name, original)
+  end
+
+  def view
+    v = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    v.singleton_class.include(Rails.application.routes.url_helpers)
+    v
+  end
+
+  def banner(**overrides)
+    Studio::Banner.new(**{
+      background_url: "https://cdn.example.com/bg.gif",
+      header: "Welcome Mason!",
+      subtext: "your sign-in link is below",
+      logo_url: "https://cdn.example.com/logo.png",
+      logo_alt: "Studio"
+    }.merge(overrides))
+  end
+
+  def render_banner(**overrides)
+    view.render(partial: "studio/mailers/layered_banner", locals: { banner: banner(**overrides) })
+  end
+
+  # --- 1. it has to reach Outlook -------------------------------------------
+
+  test "the background is carried three ways, one of them VML for Outlook" do
+    html = render_banner
+
+    assert_includes html, %(background="https://cdn.example.com/bg.gif"),
+      "the td background ATTRIBUTE is what the widest set of clients honour"
+    # Unquoted url() on purpose: ERB entity-escapes an apostrophe inside an
+    # attribute, and while a parser decodes it, email sanitisers are crude.
+    assert_includes html, "background-image:url(https://cdn.example.com/bg.gif)",
+      "CSS for the clients that prefer it"
+    refute_includes html, "&#39;", "no entity-escaped quotes in the style attribute"
+
+    assert_includes html, "<!--[if gte mso 9]>",
+      "without a conditional the VML would reach clients that cannot parse it"
+    assert_includes html, "v:rect", "Outlook renders through Word and ignores background-image"
+    assert_includes html, "v:fill", "the fill is what actually paints the picture in Outlook"
+    assert_includes html, "</v:rect>", "an unclosed VML rect swallows the rest of the email"
+  end
+
+  test "a blocked or slow image still leaves legible text" do
+    html = render_banner
+
+    assert_match(/bgcolor="#[0-9A-Fa-f]{6}"/, html,
+      "the cell needs a brand floor, or white text lands on white while the image loads")
+  end
+
+  # --- 2. it must not disturb what already ships -----------------------------
+
+  test "a mailer that only sets @banner_url still renders the plain img" do
+    layout = File.read(File.expand_path("../../app/views/layouts/branded_mailer.html.erb", __dir__))
+
+    assert_includes layout, "elsif @banner_url.present?",
+      "the img path must remain, and remain the fallback"
+    assert_includes layout, %(<img src="<%= @banner_url %>"),
+      "every shipped mailer sets @banner_url — that path cannot change shape"
+    assert_includes layout, "@banner.respond_to?(:renderable?)",
+      "layered is opt-in: an app that sets no @banner must be unaffected"
+  end
+
+  test "an empty banner never displaces the img path" do
+    refute Studio::Banner.new.renderable?,
+      "a banner with no artwork and no header would render an empty cell over the real one"
+    refute Studio::Banner.new(header: "").renderable?
+    assert Studio::Banner.new(header: "Welcome Mason!").renderable?
+    assert Studio::Banner.new(background_url: "https://x/y.gif").renderable?
+  end
+
+  # REGRESSION GUARD, and the reason for two.
+  #
+  # A table cell's padding ADDS to its declared height. Carrying height:300 AND
+  # 26px of vertical padding on the tinted cell rendered a 350px banner — which
+  # is what Mr. McRitchie saw in his inbox. Dropping the height instead made it
+  # 300 but shrank the scrim to a band across the middle, because a tinted cell
+  # with no height only covers its own content. Full height plus
+  # horizontal-ONLY padding is the shape that satisfies both.
+  test "the tinted cell carries the full height and no vertical padding" do
+    html = render_banner
+
+    assert_match(/padding:0 \d+px/, html,
+      "vertical padding on a sized cell ADDS to its height — 300 rendered as 352"
+    )
+    refute_match(/padding:[1-9]\d*px \d+px/, html,
+      "any non-zero vertical padding reintroduces the over-tall banner")
+    # The cell that PAINTS the wash must itself be full height, or the tint
+    # covers only its content and leaves unwashed bands top and bottom.
+    tinted = Nokogiri::HTML(html).css("td").find { |td| td["style"].to_s.include?("background-color:rgba") }
+    refute_nil tinted, "no tinted cell found"
+    assert_includes tinted["style"], "height:#{Studio::Banner::DEFAULT_HEIGHT}px",
+      "the tinted cell must be full height or the scrim becomes a band across the middle"
+  end
+
+  # The banner fills its box rather than floating in the middle of it, and it
+  # keeps doing so when the greeting wraps.
+  #
+  # A gap tuned to fill 300px for "Welcome Alex!" leaves a two-line header
+  # clipped at the top with its logo jammed on the bottom edge, because the
+  # block grows by a whole line while the box does not. Measured in a browser:
+  # 31px at both edges on one line, 45px on two, no clipping either way.
+  test "the gap tightens when the greeting wraps to a second line" do
+    one_line = render_banner(header: "Welcome Alex!")
+    two_line = render_banner(header: "Welcome Bartholomew Fitzgerald-Montgomery!")
+
+    # Keyed on the sub-text's colour, not its font size: the sizes are
+    # proportional now, so pinning a literal px value would break on any
+    # height change and tell us nothing about the gap.
+    one_gap = one_line[/margin:0 0 (\d+)px;[^"]*color:#efeaff/, 1].to_i
+    two_gap = two_line[/margin:0 0 (\d+)px;[^"]*color:#efeaff/, 1].to_i
+
+    assert two_gap.positive?, "expected a gap before the logo"
+    assert two_gap < one_gap,
+      "a wrapping header must get LESS space before the logo, or it clips at both edges"
+  end
+
+  # REGRESSION GUARD. Type was hardcoded at 42px, which looked right in a 300px
+  # banner and OVERFLOWED a 200px one: the box shrank, the words did not, and it
+  # rendered 238px tall with the header clipped at both edges. Everything is now
+  # a proportion of the height, so a height change is a one-line edit.
+  test "type scales with the banner rather than being hardcoded" do
+    tall  = render_banner(height: 300)
+    short = render_banner(height: 200)
+
+    tall_size  = tall[/font-size:(\d+)px;line-height:\d+px;font-weight:700/, 1].to_i
+    short_size = short[/font-size:(\d+)px;line-height:\d+px;font-weight:700/, 1].to_i
+
+    assert short_size < tall_size,
+      "a shorter banner needs smaller type, or the content overflows the box"
+    assert_operator short_size, :>, 0
+  end
+
+  # --- the scrim -------------------------------------------------------------
+
+  test "the scrim is applied by default because artwork does not guarantee contrast" do
+    html = render_banner
+
+    assert_match(/background-color:rgba\(24,16,64,0\.\d+\)/, html,
+      "white text over a pale sky is unreadable without a wash")
+  end
+
+  test "the scrim can be turned off for artwork dark enough to carry type" do
+    html = render_banner(scrim: 0)
+
+    refute_includes html, "background-color:rgba(24,16,64,",
+      "scrim: 0 must mean no overlay cell at all, not a zero-alpha one"
+  end
+
+  test "a nonsense scrim is clamped rather than emitted" do
+    assert_equal 1.0, Studio::Banner.new(scrim: 4).scrim_opacity
+    assert_equal 0.0, Studio::Banner.new(scrim: -2).scrim_opacity
+    assert_equal Studio::Banner::DEFAULT_SCRIM, Studio::Banner.new.scrim_opacity
+  end
+
+  # --- the pieces the banner is built from -----------------------------------
+
+  test "header, sub-text and logo all render on top of the picture" do
+    doc = Nokogiri::HTML(render_banner)
+
+    assert_includes doc.text, "Welcome Mason!"
+    assert_includes doc.text, "your sign-in link is below"
+    refute_empty doc.css('img[src="https://cdn.example.com/logo.png"]'),
+      "the logo is a real img in flow — it is never composited into the artwork"
+  end
+
+  test "each piece is optional" do
+    assert_includes render_banner(subtext: nil, logo_url: nil), "Welcome Mason!"
+    refute_includes render_banner(logo_url: nil), "<img"
+  end
+
+  # --- the operator's tint ---------------------------------------------------
+  #
+  # The scrim is a judgement about a picture, and the picture changes without a
+  # deploy — so an operator can set it on /admin/emails and that value outranks
+  # the registry. These pin the ORDER, which is the part that silently goes
+  # wrong: a saved 40% that loses to a registered default is invisible until
+  # someone looks at an inbox.
+
+  test "the default tint is 40%" do
+    assert_in_delta 0.40, Studio::Banner::DEFAULT_SCRIM, 0.001
+  end
+
+  test "a saved tint outranks the registry" do
+    Studio::EmailCatalog.register("magic_link", scrim: 0.9)
+    Studio::EmailSetting.set_scrim("magic_link", 25)
+
+    assert_in_delta 0.25, Studio::EmailCatalog.scrim("magic_link"), 0.001,
+      "the operator is the one looking at the artwork"
+  ensure
+    Studio::EmailSetting.where(email_key: "magic_link").delete_all
+    Studio::EmailCatalog.reset!
+  end
+
+  test "clearing the tint falls back to the registry, not to whatever was saved" do
+    Studio::EmailCatalog.register("magic_link", scrim: 0.6)
+    Studio::EmailSetting.set_scrim("magic_link", 25)
+    Studio::EmailSetting.set_scrim("magic_link", nil)
+
+    assert_in_delta 0.6, Studio::EmailCatalog.scrim("magic_link"), 0.001,
+      "blank means 'use the default', not 'pin today's default'"
+  ensure
+    Studio::EmailSetting.where(email_key: "magic_link").delete_all
+    Studio::EmailCatalog.reset!
+  end
+
+  test "the tint is stored as the percent the operator typed" do
+    record = Studio::EmailSetting.set_scrim("magic_link", 40)
+
+    assert_equal 40, record.scrim_percent,
+      "storing the operator's own units keeps the round-trip lossless"
+    assert_equal 40, Studio::EmailCatalog.scrim_percent("magic_link")
+  ensure
+    Studio::EmailSetting.where(email_key: "magic_link").delete_all
+  end
+
+  test "a missing settings table never stops an email" do
+    stub_singleton(Studio::EmailSetting, :table_ready?, false) do
+      assert_nil Studio::EmailSetting.scrim_for("magic_link")
+      refute_nil Studio::EmailCatalog.scrim_percent("magic_link"),
+        "an app that has not run the migration must still send email"
+    end
+  end
+
+  # --- artwork resolution ----------------------------------------------------
+
+  test "the standard magic link inherits the engine's layered artwork" do
+    entry = Studio::EmailCatalog.entry("magic_link")
+
+    assert_equal "emails/magic-link-background.gif", entry.background
+    assert_equal "emails/logo-horizontal.png", entry.logo
+
+    %w[emails/magic-link-background.gif emails/logo-horizontal.png].each do |asset|
+      path = File.expand_path("../../app/assets/images/#{asset}", __dir__)
+      assert File.file?(path), "#{asset} must ship in the gem"
+    end
+  end
+
+  # The artwork ships at EXACTLY the band the banner displays — 1200x400, which
+  # is 2x the 600x200 slot. That is not the same as pre-cropping for its own
+  # sake: the source was 1200x800, and the 400 rows the banner never shows cost
+  # 26MB of the 26.4MB file. Trimming them is 21x smaller with nothing visible
+  # lost, because those pixels could never reach an inbox.
+  #
+  # Anything TALLER than the band is still fine — background-size:cover crops it
+  # at render — so this asserts the aspect, not a byte count.
+  test "the background matches the banner's aspect so no pixels are shipped unseen" do
+    path = File.expand_path("../../app/assets/images/emails/magic-link-background.gif", __dir__)
+    header = File.binread(path, 10)
+
+    assert_equal "GIF89a", header[0, 6], "the background must stay an animated GIF"
+    width, height = header[6, 4].unpack("v2")
+
+    banner_aspect = Studio::Banner::DEFAULT_WIDTH.to_f / Studio::Banner::DEFAULT_HEIGHT
+    assert_in_delta banner_aspect, width.to_f / height, 0.05,
+      "a 1200x800 source ships 26MB to display a 1200x400 band — trim to the band"
+    assert_operator width, :>=, Studio::Banner::DEFAULT_WIDTH * 2,
+      "the banner is retina: the asset must be at least 2x the displayed width"
+  end
+
+  test "the banner box is the 600px email card, and cover does the cropping" do
+    assert_equal 600, Studio::Banner::DEFAULT_WIDTH,
+      "600px is the width every email client and template assumes"
+    assert_equal 200, Studio::Banner::DEFAULT_HEIGHT
+
+    html = render_banner
+    assert_includes html, "background-size:cover",
+      "cover is what frames a wider-than-the-slot asset without squashing it"
+    assert_includes html, "background-position:center",
+      "without centring, cover crops from a corner"
+  end
+
+  # A mail client fetches from an inbox, where a root-relative path resolves
+  # against nothing.
+  test "artwork resolves to an absolute url for the inbox" do
+    previous = ActionMailer::Base.default_url_options
+    ActionMailer::Base.default_url_options = { host: "mcritchie.studio" }
+
+    url = Studio::EmailCatalog.background_url("magic_link")
+    assert url.to_s.start_with?("https://mcritchie.studio/"),
+      "a relative banner path loads nothing in an inbox (got #{url.inspect})"
+  ensure
+    ActionMailer::Base.default_url_options = previous
+  end
+
+  # OUTLOOK GETS A WASH TOO. Word ignores rgba(), so the scrim simply did not
+  # exist there: white text over bare artwork, which is the contrast case the
+  # scrim was added to solve and the one client that cannot be eyeballed.
+  test "the scrim reaches outlook as a solid colour" do
+    banner = Studio::Banner.for(:magic_link, name: "Alex")
+    html = view.render(partial: "studio/mailers/layered_banner", locals: { banner: banner })
+
+    assert_match(/bgcolor="#[0-9A-F]{6}"[^>]*background-color:rgba/m, html,
+      "the flat attribute must sit alongside the rgba declaration, not replace it")
+    assert_includes html, "background-color:rgba(24,16,64,",
+      "every other client should still get the translucent wash"
+  end
+
+  test "a scrim of zero paints nothing in either client" do
+    banner = Studio::Banner.new(background_url: "/a.gif", header: "Hi", scrim: 0)
+    html = view.render(partial: "studio/mailers/layered_banner", locals: { banner: banner })
+
+    refute_includes html, "background-color:rgba(24,16,64,",
+      "artwork dark enough to carry type should get no wash at all"
+  end
+
+  test "the solid approximation tracks the opacity" do
+    light = Studio::Banner.new(scrim: 0.1).scrim_solid_hex
+    heavy = Studio::Banner.new(scrim: 0.9).scrim_solid_hex
+
+    refute_equal light, heavy, "a fixed colour would ignore the operator's tint entirely"
+    assert_match(/\A#[0-9A-F]{6}\z/, heavy)
+  end
+
+  # --- preview hooks must not reach an inbox --------------------------------
+
+  # The admin page repaints this banner as the operator types, which needs
+  # handles on its text nodes. They are opt-in, and this is the assertion that
+  # keeps them that way: shipping data- attributes into every email to serve an
+  # admin screen is invisible until a mail client chokes on it.
+  test "the email markup is byte-identical with preview hooks off" do
+    banner = Studio::Banner.for(:magic_link, name: "Alex")
+
+    default = view.render(partial: "studio/mailers/layered_banner", locals: { banner: banner })
+    explicit = view.render(partial: "studio/mailers/layered_banner",
+                           locals: { banner: banner, preview: false })
+
+    assert_equal default, explicit, "the default must BE the email path, not merely resemble it"
+    refute_includes default, "data-banner-", "a preview hook reached the email"
+  end
+
+  test "preview mode exposes a handle on every editable part" do
+    banner = Studio::Banner.for(:magic_link, name: "Alex")
+
+    html = view.render(partial: "studio/mailers/layered_banner",
+                       locals: { banner: banner, preview: true })
+
+    %w[data-banner-header data-banner-subtext data-banner-logo].each do |hook|
+      assert_includes html, hook, "the page cannot repaint what it cannot address"
+    end
+  end
+
+  # Hiding the logo, then unhiding it, must not need a round trip — so preview
+  # keeps a hidden placeholder where an email ships no img at all.
+  test "preview keeps a logo node even when the logo is hidden" do
+    banner = Studio::Banner.new(background_url: "/a.gif", header: "Hi", logo_url: nil)
+
+    preview = view.render(partial: "studio/mailers/layered_banner",
+                          locals: { banner: banner, preview: true })
+    email = view.render(partial: "studio/mailers/layered_banner", locals: { banner: banner })
+
+    assert_includes preview, "data-banner-logo"
+    refute_includes email, "<img", "an email with no logo must ship no img tag"
+  end
+
+  # THE UPLOAD BUTTON MUST CHANGE THE EMAIL. Reading only the registry meant an
+  # operator could upload artwork, watch the page show it and the badge flip to
+  # "Uploaded here", and have every send keep the gem's picture.
+  test "an uploaded banner becomes the layered background" do
+    uploaded = Struct.new(:url).new("https://cdn.test/ours.gif")
+    stub_singleton(Studio::EmailCatalog, :record, uploaded) do
+      assert_equal "https://cdn.test/ours.gif", Studio::EmailCatalog.background_url("magic_link")
+      assert_equal "https://cdn.test/ours.gif", Studio::Banner.for(:magic_link, name: "Alex").background_url
+    end
+  end
+
+  test "the registered artwork still applies when nothing was uploaded" do
+    stub_singleton(Studio::EmailCatalog, :record, nil) do
+      assert_includes Studio::EmailCatalog.background_url("magic_link").to_s, "magic-link-background"
+    end
+  end
+
+  # A HOST THAT REGISTERS ITS OWN FLAT ARTWORK SENDS THAT PICTURE. turf-monster
+  # re-registers magic_link and inherits the engine's background; the manager
+  # drew the inherited one, for an email whose words are already baked in.
+  test "a host's own flat artwork is what the manager previews" do
+    stub_singleton(Studio::EmailCatalog, :record, nil) do
+      Studio::EmailCatalog.register("magic_link", default_asset: "emails/magic-link.gif")
+
+      assert_equal Studio::EmailCatalog.resolved_url("magic_link"),
+                   Studio::EmailCatalog.preview_url("magic_link"),
+        "the manager drew a picture the mailer does not send"
+      assert_nil Studio::Banner.for("magic_link", name: "Alex"),
+        "the detail page layered live text over artwork this app sends flat"
+    end
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  # --- ACCEPTANCE 3: the manager previews what actually SHIPS --------------
+  #
+  # Asserted as a COMPARISON between two rendered things, not as two
+  # independent expectations. The defect this exists to catch was never "the
+  # preview is wrong" or "the email is wrong" — each looked right on its own.
+  # They DISAGREED: /admin/emails drew a layered banner with live "Welcome
+  # Alex!" text for an email that shipped flat artwork with the words baked in,
+  # and did it convincingly enough to survive two reviews.
+  #
+  # Compared: LAYERED-NESS and the ARTWORK URL. Deliberately not the header
+  # text — the preview greets whichever example recipient the operator picked
+  # and the send greets the real one, so the words differing is the feature
+  # working rather than a mismatch.
+  MAGIC_TOKEN = "tokenfortest1234"
+
+  # magic_link_url_for needs a host to build a URL at all.
+  def with_mailer_host
+    previous = ActionMailer::Base.default_url_options
+    ActionMailer::Base.default_url_options = { host: "example.test" }
+    yield
+  ensure
+    ActionMailer::Base.default_url_options = previous
+  end
+
+  def sent_doc
+    mail = UserMailer.magic_link("reader@example.test", MAGIC_TOKEN)
+    Nokogiri::HTML((mail.html_part&.body || mail.body).to_s)
+  end
+
+  # The banner as the EMAIL BODY carries it, read from real rendered mail
+  # through the real layout — NOT from the mailer's instance variables. An
+  # assign the layout never consumes is exactly the bug, so a test reading
+  # assigns would have passed throughout.
+  def banner_as_sent(doc = sent_doc)
+    cell = doc.css("td[background]").first
+
+    { layered: !cell.nil?, artwork: cell && cell["background"] }
+  end
+
+  # The banner as the MANAGER draws it. Studio::Banner.for IS the manager's
+  # decision: the detail page assigns it (Studio::EmailsController), the list
+  # row builds it (_row.html.erb), and both render the same partial from it —
+  # or fall back to the flat image when it is nil.
+  def banner_as_previewed(name: "Alex")
+    banner = Studio::Banner.for("magic_link", name: name)
+
+    { layered: !banner.nil?, artwork: banner&.background_url }
+  end
+
+  test "the manager previews the banner the mailer actually sends" do
+    with_mailer_host do
+      sent = banner_as_sent
+
+      # The comparison below is only worth something if this quadrant is the
+      # LAYERED one. Without this anchor, an environment where the artwork
+      # failed to resolve would leave both sides flat-and-nil and the test
+      # would pass while asserting nothing at all.
+      assert sent[:layered],
+        "the engine's own magic_link should send a LAYERED banner; both sides " \
+        "being flat would make the comparison below vacuous"
+
+      assert_equal banner_as_previewed, sent,
+        "/admin/emails and the inbox disagree about the magic-link banner"
+    end
+  end
+
+  # THE FLAT FLOOR. An app with no layered artwork registered still sends the
+  # plain <img>, unchanged — the promise branded_mailer.html.erb makes in its
+  # own comment ("layered is opt-in, never a migration"). The engine's mailer
+  # adopting Studio::Banner.for is precisely the change that could break it.
+  test "an email with no layered artwork still sends the flat image" do
+    # "" CLEARS the inherited background: register keeps the existing value for
+    # nil and drops an empty through .presence. This app registers artwork with
+    # no layered half.
+    Studio::EmailCatalog.register("magic_link", background: "")
+    assert_nil Studio::EmailCatalog.background_url("magic_link"),
+      "setup failed — this key still has layered artwork, so the flat floor is untested"
+
+    with_mailer_host do
+      doc = sent_doc
+
+      refute banner_as_sent(doc)[:layered],
+        "an app with no layered artwork must not render the layered banner"
+      assert_equal [Studio::EmailCatalog.resolved_url("magic_link")],
+                   doc.css("img").map { |img| img["src"] },
+        "the flat <img> is what an app with no layered artwork sends, unchanged"
+    end
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  # THE CONSUMER QUADRANT, at the inbox rather than the catalogue. turf-monster
+  # re-registers magic_link with its own flat artwork and INHERITS the engine's
+  # background. The guard at 5cdeaa5 stopped the manager drawing the inherited
+  # picture; this stops the engine's newly-layering mailer from sending it.
+  test "a host that owns its artwork still sends it flat" do
+    stub_singleton(Studio::EmailCatalog, :record, nil) do
+      Studio::EmailCatalog.register("magic_link", default_asset: "emails/magic-link.gif")
+
+      with_mailer_host do
+        doc = sent_doc
+
+        refute banner_as_sent(doc)[:layered],
+          "the engine layered live text over artwork this host sends flat"
+        assert_equal [Studio::EmailCatalog.resolved_url("magic_link")],
+                     doc.css("img").map { |img| img["src"] },
+          "a host that owns its artwork sends that picture, not the engine's background"
+      end
+    end
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  test "a host can override any piece per send" do
+    Studio::EmailCatalog.register("magic_link", background: "emails/custom.gif", scrim: 0.1)
+
+    entry = Studio::EmailCatalog.entry("magic_link")
+    assert_equal "emails/custom.gif", entry.background
+    assert_in_delta 0.1, entry.scrim, 0.001
+    assert_equal "emails/logo-horizontal.png", entry.logo,
+      "overriding the background must not drop the inherited logo"
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+end

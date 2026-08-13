@@ -1,0 +1,33 @@
+<%# Body only — branded_mailer supplies the banner + card. Colours mirror
+    user_mailer/magic_link: brand primary for anything actionable, so the two
+    emails read as coming from the same place. %>
+<h1 style="margin:0 0 18px;font-size:22px;line-height:1.3;color:#1f2a1c;">You're on the list</h1>
+
+<p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#3f4a3c;">
+  Thanks for subscribing to <strong style="color:#1f2a1c;"><%= @app_name %></strong>. We'll send
+  the occasional note about what we're building — no more often than it's worth your time.
+</p>
+
+<p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:#3f4a3c;">
+  Nothing else to do. The next one lands in this inbox.
+</p>
+
+<p style="margin:28px 0 0;font-size:13px;line-height:1.5;color:#6b756a;text-align:center;">
+  We're sending to <strong style="color:#2f3a2c;"><%= @email %></strong>.
+</p>
+
+<% if @unsubscribe_url.present? %>
+  <%# Renders ONLY when the host wired a real URL. A newsletter needs a way out,
+      but an unsubscribe link that goes nowhere is worse than none — it spends
+      the reader's trust and then fails them. %>
+  <p style="margin:24px 0 0;font-size:12px;line-height:1.4;color:#8a948a;text-align:center;">
+    Changed your mind?
+    <a href="<%= @unsubscribe_url %>" style="color:<%= Studio.theme_primary %>;">Unsubscribe</a>.
+  </p>
+<% end %>
+
+<p style="margin:28px 0 0;font-size:12px;line-height:1.5;color:#8a948a;text-align:center;">
+  Didn't sign up? You can safely ignore this email and we won't send another.
+</p>
+
+<p style="margin:20px 0 0;font-size:13px;color:#6b756a;text-align:center;">— <%= @app_name %></p>

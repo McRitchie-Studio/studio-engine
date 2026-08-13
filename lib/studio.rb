@@ -570,6 +570,18 @@ module Studio
                constraints: { key: /[a-z0-9_]+/ }
         delete "admin/emails/:key",     to: "studio/emails#destroy",
                constraints: { key: /[a-z0-9_]+/ }
+        # Operator-tunable per-email settings (the banner scrim today). Separate
+        # from #update, which takes an image upload.
+        patch  "admin/emails/:key/settings", to: "studio/emails#settings",
+               as: :admin_email_settings, constraints: { key: /[a-z0-9_]+/ }
+        # The banner's words and logo. Its own route so writing a sentence and
+        # nudging the tint save independently.
+        patch  "admin/emails/:key/copy", to: "studio/emails#copy",
+               as: :admin_email_copy, constraints: { key: /[a-z0-9_]+/ }
+        # The per-email logo. Separate from the banner upload above — different
+        # picture, different ImageCache purpose, independently revertible.
+        patch  "admin/emails/:key/logo", to: "studio/emails#logo",
+               as: :admin_email_logo, constraints: { key: /[a-z0-9_]+/ }
       end
 
       # DEPRECATED, kept for ONE release. Not a redirect: consumer-ci.yml runs

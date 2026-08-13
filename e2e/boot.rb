@@ -74,6 +74,23 @@ FileUtils.cp(alpine_src, File.join(PUBLIC_DIR, "alpine.js"))
   FileUtils.cp_r(Dir.glob(File.join(source, "*")), target)
 end
 
+# ---- Email banner artwork ----------------------------------------------------
+#
+# The email-frames lab page renders the REAL layered banner partial, which wants a
+# background and a logo. Copied rather than stubbed with a placeholder: a missing
+# image 404s, and the lane's own error watch counts a failed resource load as a
+# failure — so a stub would make the page noisy about something the spec does not
+# care about while measuring boxes.
+IMG_DIR = File.join(PUBLIC_DIR, "img")
+FileUtils.mkdir_p(IMG_DIR)
+{
+  "magic-link-background.gif" => "banner.gif",
+  "logo-horizontal.png" => "logo.png"
+}.each do |source_name, target_name|
+  source = File.join(ROOT, "app", "assets", "images", "emails", source_name)
+  FileUtils.cp(source, File.join(IMG_DIR, target_name)) if File.exist?(source)
+end
+
 # ---- Serve -------------------------------------------------------------------
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../test/dummy/config/environment"
