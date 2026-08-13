@@ -569,24 +569,73 @@ class EmailsPageTest < ActiveSupport::TestCase
   # in it, beside a navbar showing the same person's initials in their own
   # colour — and every avatar assertion in the browser lane passed, because the
   # lab page supplies its own payload.
-  # THE NAME-FREE CASE MUST ALWAYS BE PREVIEWABLE. It is what a magic link sends
-  # to anyone without an account, and it is the one nobody checks because whoever
-  # is previewing has a name on file. Offering it only when an app happens to have
-  # a nameless member made it disappear the moment McRitchie Studio parked Mack —
-  # a real person with a real name — as its member.
-  test "a nameless recipient is always on offer" do
-    nameless = Studio::EmailPreviewTarget.all.select { |target| target.name.nil? }
+  # THE LIST IS TWO REAL PEOPLE: the operator admin and an ordinary member.
+  #
+  # A third, SYNTHETIC "No name on file" entry used to be appended so the
+  # name-free fallback header could be previewed. Mr. McRitchie asked for just
+  # the two, knowing the cost — so this asserts the DECISION, and the test below
+  # keeps the guarantee that actually matters.
+  test "the example list offers the admin and the member, and nothing synthetic" do
+    targets = Studio::EmailPreviewTarget.all
 
-    refute_empty nameless, "the fallback header has no way to be seen"
-    assert nameless.any?(&:sample?), "it is a stand-in, and should be labelled as one"
+    assert_operator targets.length, :<=, 2
+    refute targets.any? { |t| t.name.nil? },
+      "the synthetic nameless entry was removed deliberately; do not re-add it here"
   end
 
-  test "the nameless sample renders the fallback header, not an empty greeting" do
-    target = Studio::EmailPreviewTarget.all.find { |t| t.name.nil? }
-    header = Studio::Banner.for(:magic_link, name: target.name).header
+  # THE FALLBACK HEADER STILL SHIPS, and that is the part worth protecting. It
+  # is what a magic link sends to anyone without an account — the case nobody
+  # checks, because whoever is previewing has a name on file. Removing the
+  # dropdown entry removed the way to LOOK at it, not the behaviour, so this
+  # exercises the banner directly instead of through a preview target.
+  test "a recipient with no name still gets the fallback header" do
+    header = Studio::Banner.for(:magic_link, name: nil).header
 
     assert_equal "Your Magic Link", header
     refute_includes header, "Welcome !", "this is the exact failure the fallback exists to prevent"
+  end
+
+  # --- who the two are ------------------------------------------------------
+
+  # WHOEVER SORTS FIRST IS NOT THE ANSWER. Without a preference this offered
+  # McRitchie Studio's team@ account instead of alex@, and turf-monster's
+  # jordan@ test-fixture row instead of Mack.
+  test "the admin and member prefer the house standard over first-found" do
+    row = Struct.new(:id, :email, :name, :admin) do
+      def try(method, *) = respond_to?(method) ? public_send(method) : nil
+      def admin? = admin
+    end
+    rows = [
+      row.new(1, "team@example.test",   "Team",           true),
+      row.new(2, "jordan@example.test", "Jordan",         false),
+      row.new(3, "alex@example.test",   "Alex McRitchie", true),
+      row.new(4, "mack@example.test",   "Mack McRitchie", false)
+    ]
+    fake = Class.new do
+      class << self
+        attr_accessor :rows
+        def column_names = %w[id email name]
+        def limit(_n) = rows
+        def all = rows
+        def respond_to?(m, priv = false) = %i[all column_names limit].include?(m.to_sym) || super
+      end
+    end
+    fake.rows = rows
+
+    # Hand-rolled singleton stub with ensure-restore; Minitest 6 dropped
+    # minitest/mock, so there is no .stub here.
+    target = Studio::EmailPreviewTarget
+    original = target.method(:user_model)
+    target.define_singleton_method(:user_model) { fake }
+
+    emails = target.all.map(&:email)
+
+    assert_includes emails, "alex@example.test", "the admin should be Alex, not whoever sorts first"
+    assert_includes emails, "mack@example.test", "the member should be Mack, not a fixture row"
+    refute_includes emails, "team@example.test"
+    refute_includes emails, "jordan@example.test"
+  ensure
+    target&.define_singleton_method(:user_model, original) if original
   end
 
   # A "member" whose name is synthesised from their email address is not a
