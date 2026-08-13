@@ -1,0 +1,192 @@
+<%# The live banner editor: typing repaints the banner, and ONE Save button in
+    the header reports whether there is anything to save.
+
+    WHY THE PREVIEW IS PAINTED IN THE BROWSER AND NOT RE-RENDERED
+    The banner is already server-rendered by the mailer's own partial, which is
+    what makes it trustworthy. This does not replace it — it edits the text
+    nodes, the logo and the tint of that same rendered banner in place. The
+    shape, the typography and the scaling stay the server's. Re-rendering a
+    second banner in JavaScript would be a second implementation of the email,
+    and it would drift.
+
+    WHY THE PLACEHOLDER RULE IS REPEATED HERE
+    Studio::Banner fills {name} and {app} server-side. Repeating that in script
+    is a real duplication and worth naming: the alternative is a round trip per
+    keystroke. The rule is small and pinned on both sides — banner_copy_test.rb
+    for Ruby, e2e/email_banner_editor.spec.js for the browser. If they ever
+    disagree, the server is right.
+
+    TOUCHED VS DIRTY — they are different questions and the button answers both.
+    `touched` is "has anyone typed here", and it decides whether the button is
+    SHOWN. `dirty` is "is anything actually different from what is saved", and it
+    decides whether the button is ENABLED. Typing "A" into the subject and
+    deleting it again leaves touched true and dirty false: the button stays
+    visible and goes back to disabled, which is what tells the operator their
+    edit was undone rather than silently swallowed.
+%>
+<style>
+  /* The tint slider, in the app's own palette.
+
+     appearance:none and explicit track/thumb rules rather than `accent-color`:
+     accent-color tints a native slider but leaves its proportions to the
+     browser, so the control looked like a system widget dropped into the page —
+     a blue rail in a purple app. These rules give it the same rail, radius and
+     primary colour as everything else on the card.
+
+     The FILLED portion is a gradient driven by --range-fill, which the component
+     sets from the current value. Firefox has ::-moz-range-progress and WebKit
+     has nothing equivalent, so one gradient serves both rather than two
+     divergent implementations. */
+  .studio-range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background: linear-gradient(to right,
+                var(--color-primary, #8E82FE) var(--range-fill, 40%),
+                var(--color-inset, rgba(148, 163, 184, 0.35)) var(--range-fill, 40%));
+    outline: none;
+    cursor: pointer;
+  }
+  .studio-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--color-primary, #8E82FE);
+    border: 2px solid var(--color-surface, #ffffff);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+  }
+  .studio-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--color-primary, #8E82FE);
+    border: 2px solid var(--color-surface, #ffffff);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.35);
+  }
+  .studio-range::-moz-range-track { height: 6px; border-radius: 999px; background: transparent; }
+  .studio-range:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary, #8E82FE) 35%, transparent); }
+</style>
+<script>
+  (function () {
+    function editor(config) {
+      return {
+        form: Object.assign({}, config.values),
+        initial: Object.assign({}, config.values),
+        targets: config.targets || [],
+        targetId: config.targetId,
+        touched: false,
+        pickerOpen: false,
+
+        init() {
+          this.paint();
+          this.$watch("form", () => { this.touched = true; this.paint(); });
+          this.$watch("targetId", () => this.paint());
+        },
+
+        target() {
+          return this.targets.find((t) => t.id === this.targetId) || this.targets[0] || {};
+        },
+
+        firstName() {
+          return (this.target().name || "").trim().split(/\s+/)[0] || "";
+        },
+
+        // {app} is substituted on both paths because it does not depend on the
+        // recipient — a header reading "Welcome to {app}" must not show a raw
+        // brace here while the inbox shows the app's name.
+        resolve(template, fallback) {
+          var first = this.firstName();
+          var app = config.appName || "";
+          var text = (template || "").replace(/\{app\}/g, app);
+          if (first) return text.replace(/\{name\}/g, first);
+          if (text.indexOf("{name}") !== -1) return (fallback || "").replace(/\{app\}/g, app);
+          return text;
+        },
+
+        headerText() { return this.resolve(this.form.header, this.form.header_fallback); },
+        subjectText() { return this.resolve(this.form.subject, this.form.subject); },
+
+        // Field by field rather than JSON.stringify, whose output depends on key
+        // order — two equal objects can stringify differently.
+        dirty() {
+          return Object.keys(this.initial).some(function (k) {
+            return (this.form[k] ?? "") !== (this.initial[k] ?? "");
+          }, this);
+        },
+
+        // The logo has THREE states, and a URL field alone can only express two.
+        // "standard" inherits, "custom" uses what this app uploaded, "hidden" is
+        // the deliberate no-logo answer that blank cannot say.
+        logoMode() {
+          if (this.form.hide_logo === true || this.form.hide_logo === "1") return "hidden";
+          if (config.uploadedLogo) return "custom";
+          return "standard";
+        },
+
+        setLogoMode(mode) {
+          this.form.hide_logo = mode === "hidden";
+        },
+
+        currentLogo() {
+          if (this.logoMode() === "hidden") return "";
+          return config.uploadedLogo || config.inheritedLogo || "";
+        },
+
+        // The slider's own fill, as a percentage string for --range-fill.
+        scrimFill() {
+          var percent = parseInt(this.form.scrim_percent, 10);
+          if (isNaN(percent)) percent = config.defaultScrim;
+          return Math.min(Math.max(percent, 0), 100) + "%";
+        },
+
+        scrimCss() {
+          var percent = parseInt(this.form.scrim_percent, 10);
+          if (isNaN(percent)) percent = config.defaultScrim;
+          percent = Math.min(Math.max(percent, 0), 100);
+          return "rgba(24,16,64," + (percent / 100) + ")";
+        },
+
+        paint() {
+          var root = this.$root;
+          var header = root.querySelector("[data-banner-header]");
+          var subtext = root.querySelector("[data-banner-subtext]");
+          var logo = root.querySelector("[data-banner-logo]");
+          var scrim = root.querySelector("[data-banner-scrim]");
+
+          if (header) header.textContent = this.headerText();
+          if (subtext) subtext.textContent = this.form.subtext || "";
+          if (scrim) scrim.style.backgroundColor = this.scrimCss();
+          if (logo) {
+            var url = this.currentLogo();
+            if (url) {
+              if (logo.getAttribute("src") !== url) logo.setAttribute("src", url);
+              logo.style.display = "block";
+            } else {
+              logo.style.display = "none";
+            }
+          }
+        },
+
+        // Every visible field is x-model bound and carries no name; the hidden
+        // form below mirrors them. One submit writes the whole page.
+        save() {
+          if (!this.dirty()) return;
+          this.$refs.saveForm.requestSubmit();
+        }
+      };
+    }
+
+    window.emailBannerEditor = editor;
+    if (typeof Alpine !== "undefined") {
+      Alpine.data("emailBannerEditor", editor);
+    } else {
+      document.addEventListener("alpine:init", function () {
+        Alpine.data("emailBannerEditor", editor);
+      });
+    }
+  })();
+</script>

@@ -4,6 +4,103 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **`email_change_confirmation` leaves the pre-registered set; `newsletter_subscribed`
+  joins it.** `STANDARD` means "the emails EVERY Studio app sends", and only
+  turf-monster sends an email-change confirmation — which it **already registers
+  itself**, with its own artwork, in `config/initializers/studio_emails.rb`. No
+  host loses a banner, and no host action is required for the removal.
+
+  What DOES break consumers is the ADDITION. Three suites assert against the
+  whole shared catalogue, so a new standard email fails them:
+
+  | Consumer | Assertion | Fix | State |
+  |---|---|---|---|
+  | turf-monster | `EmailRegistrationTest` compares the full key list | McRitchie-Studio/turf-monster#292 | merged |
+  | turf-monster | `AdminEmailsRenderTest` counts `tbody img` exactly | McRitchie-Studio/turf-monster#294 | merged |
+  | mcritchie-studio | `StudioEmailsPageTest` pins the registry list, an `email_change_confirmation` link, and the upload-rejection wording | McRitchie-Studio/mcritchie-studio#813 | merged |
+
+  The second turf fix is the easy one to miss: a layered standard email renders
+  its banner through an `<iframe>` rather than an `<img>`, so an exact image
+  count comes up one short. #292 alone does NOT turn that lane green.
+
+  Consumer CI builds each app against its **default branch**, so all three had to
+  reach `main` before this engine's consumer lanes could go green. All three now
+  have, and the lanes pass. Nothing on this branch ever could have turned them
+  green — a red consumer lane here is a consumer-side fix, not an engine defect.
+
+  The artwork `emails/email-change-confirmation.gif` still ships, so a host that
+  wants the entry can register it.
+
+### Added
+
+- **`Studio::NewsletterMailer` — a sendable "you're on the list" email.**
+  Namespaced under `Studio::` on purpose: a host that defines its own top-level
+  `UserMailer` (McRitchie Studio does) SHADOWS the engine's outright, so an
+  action added there would reach only the apps that never customised their mail.
+  Layered-native — animated background with the greeting as live HTML on top,
+  and no flat `default_asset`, because a baked-in copy of the same picture is a
+  second thing to keep in sync and would never be shown. `unsubscribe_url:` is
+  optional and the line renders only when a host wires a real one.
+
+- **The banner's WORDS are operator-editable on /admin/emails.** Header,
+  a name-free fallback header, sub-text, subject, logo and tint, saved per app in
+  a new `studio_email_settings` row and resolved operator > registry > default.
+  `{name}` and `{app}` are filled per recipient — so the mailer now supplies WHO
+  the recipient is (`Studio::Banner.for(key, name:)`) and the operator supplies
+  what the banner says about them. A mailer that hands over a finished header
+  takes the wording away from the operator: the field still accepts the edit and
+  the email still ignores it, which is a control that lies.
+
+  An unresolved `{name}` never reaches an inbox. The header falls back to its
+  name-free variant; a subject, which has no second field, drops the token along
+  with the punctuation holding it — "Sign in to {app}, {name}" sends as
+  "Sign in to Studio" to someone with no name on file.
+
+- **The email manager previews what actually SHIPS.** Each email renders the
+  real layered banner through the mailer's own partial (not a re-creation of it),
+  repaints as the operator types, and offers an example recipient — an admin, who
+  usually has a full name on file, and a member, who often has none. The nameless
+  case is the one the fallback header exists for and the one nobody thinks to
+  check. Preview hooks are opt-in (`preview: true`); with them off the email
+  markup is byte-identical, asserted by test.
+
+  What makes that true rather than aspirational: the engine's own
+  `UserMailer#magic_link` ADOPTS the layered banner (`Studio::Banner.for`), and
+  /admin/emails builds its preview from the same call — one expression, so the
+  two cannot disagree. Before this, the manager drew a layered banner with live
+  "Welcome Alex!" text for a sign-in email that shipped flat artwork with the
+  words baked in: a preview showing something no recipient receives. A test
+  renders the mailer and the manager for the same key and compares the artwork
+  and the layered-ness, so the two are held together rather than trusted to
+  match. An app that registers no layered artwork still sends the plain `<img>`
+  — layered is opt-in, never a migration.
+
+- **Animated GIF banners upload without losing their animation.** The cropper
+  paints onto a canvas and calls `toBlob(..., "image/png")`, which keeps frame one
+  and discards the rest — silently, leaving a good-looking still. `allowGifs: true`
+  routes a GIF around the cropper and stores the original bytes under a `.gif`
+  key.
+
+- **`Studio::EmailPreviewTarget`** — who an email is previewed as, read from the
+  host's own users with avatar and initials, degrading to a sample when an app has
+  none.
+
+### Fixed
+
+- **The manager reported artwork that was not being sent.** A layered-native email
+  (no flat `default_asset`) drew an empty box and a "sends without a banner" badge
+  while it was sending one, and an email with BOTH assets previewed the flat one —
+  a picture with the words baked in that a layered mailer never sends. The page
+  and the `<img>` fallback now resolve in opposite orders, each documented, because
+  they answer different questions.
+
+- **A doc comment leaked onto the page.** An ERB tag inside an ERB comment closes
+  it at its own delimiter; the rest of the sentence rendered above the banner. The
+  existing guard was real and only ran on the index, so it never saw the page that
+  shipped it.
+
 ### Added
 
 - **A browser lane — the engine now runs Playwright against its own partials.**

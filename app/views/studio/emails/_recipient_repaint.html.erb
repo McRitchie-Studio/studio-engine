@@ -1,0 +1,122 @@
+<%# Repaints EVERY row on the emails list when the example recipient changes.
+
+    The list shows each email's banner and subject as they would arrive. Both are
+    per-recipient — the banner greets by first name and the subject may too — so
+    a list rendered for one person is a list of half-truths about everyone else.
+    Changing the selection has to repaint all of them.
+
+    WHY THE TEMPLATES RIDE ON THE ROW
+    Each row carries its own header / fallback / subject templates as data
+    attributes, and this reads them from the DOM. The alternative was a second
+    JSON payload listing every email, which would have to be kept in step with
+    the rows themselves — and a row whose payload entry went missing would
+    silently stop repainting while still looking correct for whoever was selected
+    at page load.
+
+    The placeholder rule is the same one Studio::Banner applies server-side, and
+    the same one the detail page's editor applies. It is small, and it is pinned
+    on both sides. If they disagree, the server is right. %>
+<script>
+  (function () {
+    function recipients(config) {
+      return {
+        targets: config.targets || [],
+        targetId: config.targetId,
+        pickerOpen: false,
+
+        init() {
+          this.paint();
+          this.$watch("targetId", () => this.paint());
+        },
+
+        target() {
+          return this.targets.find((t) => t.id === this.targetId) || this.targets[0] || {};
+        },
+
+        firstName() {
+          return (this.target().name || "").trim().split(/\s+/)[0] || "";
+        },
+
+        resolve(template, fallback) {
+          var first = this.firstName();
+          var app = config.appName || "";
+          var text = (template || "").replace(/\{app\}/g, app);
+          if (first) return text.replace(/\{name\}/g, first);
+          if (text.indexOf("{name}") !== -1) return (fallback || "").replace(/\{app\}/g, app);
+          return text;
+        },
+
+        // A subject has no second field for the nameless case, so an unresolved
+        // placeholder is removed along with the punctuation holding it — the
+        // same two passes Studio::Banner.interpolate makes, so "Sign in, {name}"
+        // reads "Sign in" here exactly as it would in an inbox.
+        resolveSubject(template) {
+          var app = config.appName || "";
+          var text = (template || "").replace(/\{app\}/g, app);
+          var first = this.firstName();
+          if (first) return text.replace(/\{name\}/g, first);
+          return text.replace(/[,;:—-]?\s*\{name\}/g, "")
+                     .replace(/^\s*[,;:—-]\s*/, "")
+                     .replace(/\s+/g, " ")
+                     .trim();
+        },
+
+        // A row's banner lives in an IFRAME — the email's table is its own
+        // document so it cannot nest rows inside the list. Same-origin srcdoc,
+        // so its nodes are reachable; contentDocument is null until the frame
+        // has parsed, which is why the load listener is wired as well as the
+        // immediate attempt.
+        bannerNode(row, selector) {
+          var frame = row.querySelector("iframe[data-email-banner-preview]");
+          if (frame) {
+            try { return frame.contentDocument && frame.contentDocument.querySelector(selector); }
+            catch (_) { return null; }
+          }
+          return row.querySelector(selector);
+        },
+
+        paintRow(row) {
+          var header = this.bannerNode(row, "[data-banner-header]");
+          var subject = row.querySelector("[data-row-subject]");
+          if (header) {
+            header.textContent = this.resolve(row.dataset.header, row.dataset.headerFallback);
+          }
+          if (subject) subject.textContent = this.resolveSubject(row.dataset.subject);
+        },
+
+        paint() {
+          var self = this;
+          this.$root.querySelectorAll("[data-email-row]").forEach(function (row) {
+            self.paintRow(row);
+            var frame = row.querySelector("iframe[data-email-banner-preview]");
+            if (frame && !frame.dataset.repaintBound) {
+              frame.dataset.repaintBound = "1";
+              frame.addEventListener("load", function () { self.paintRow(row); });
+            }
+          });
+        },
+
+        // Anything interactive keeps its own behaviour; everything else opens
+        // the email. Without the closest() guard, clicking Upload would both
+        // open the cropper and navigate away from it.
+        openRow(event, row) {
+          // The listener sits on the tbody, so a click can land between rows and
+          // arrive with no row at all.
+          if (!row) return;
+          if (event.target.closest("a, button, input, label, form")) return;
+          var path = row.dataset.emailPath;
+          if (path) window.location = path;
+        }
+      };
+    }
+
+    window.emailRecipients = recipients;
+    if (typeof Alpine !== "undefined") {
+      Alpine.data("emailRecipients", recipients);
+    } else {
+      document.addEventListener("alpine:init", function () {
+        Alpine.data("emailRecipients", recipients);
+      });
+    }
+  })();
+</script>

@@ -44,8 +44,32 @@
 ---
 # Every `test(...)` committed under e2e/. Verified against Playwright's own model,
 # not prose:
-#   npx playwright test --list   ->  5 tests in 2 files
-total_specs: 5
+#   npx playwright test --list   ->  19 tests in 4 files
+#
+# 5 -> 7: e2e/email_banner_frames.spec.js. The email manager shows a fluid artwork
+# frame beside the email's own FIXED 600px banner table; measured side by side they
+# were 467x156 and 467x202, with the banner clipped to the column on top of that.
+# The relationship between two laid-out boxes is not observable from markup — every
+# string assertion on that page passed the whole time it was wrong — so it is
+# asserted in a browser, across three widths, and both specs were verified to go RED
+# against the defect reintroduced.
+#
+# 7 -> 16: e2e/email_banner_editor.spec.js. The manager repaints the banner as the
+# operator types and disables Save until something changes; both exist only after a
+# browser has run the component, and a markup test asserting the x-model/:disabled
+# attributes stays green while the component throws on init or paints the wrong
+# node. Verified RED against three reintroduced defects: an inert paint() fails 6,
+# an always-dirty button fails 2, and dropping the name-free fallback (which ships
+# "Welcome !" to anyone with no name on file) fails 2.
+#
+# 16 -> 19: the same file grew three. The page collapsed three per-card Save
+# buttons into one in the header, moved the tint in beside the text it makes
+# legible, and replaced the recipient <select> with a listbox that shows avatars
+# (a native option cannot carry an image). All three are browser-only: whether a
+# button is visible-but-disabled after an edit is undone, whether dragging the
+# tint repaints the wash, and whether an avatar renders for an account that has
+# none.
+total_specs: 19
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -57,7 +81,7 @@ total_specs: 5
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 5
+executed: 19
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

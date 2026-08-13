@@ -46,7 +46,7 @@ class EmailCatalogTest < Minitest::Test
   # --- 1. the engine ships the standard two ---------------------------------
 
   def test_standard_emails_are_pre_registered_in_display_order
-    assert_equal %w[magic_link email_change_confirmation], Studio::EmailCatalog.keys,
+    assert_equal %w[magic_link newsletter_subscribed], Studio::EmailCatalog.keys,
       "every app must inherit the standard two, magic_link first"
   end
 
@@ -62,7 +62,7 @@ class EmailCatalogTest < Minitest::Test
     assert Studio::EmailCatalog.known?("magic_link")
     assert Studio::EmailCatalog.known?(:magic_link), "a symbol key must resolve too"
     refute Studio::EmailCatalog.known?("nope")
-    assert_equal "Email change confirmation", Studio::EmailCatalog.label("email_change_confirmation")
+    assert_equal "Newsletter subscribed", Studio::EmailCatalog.label("newsletter_subscribed")
   end
 
   def test_label_falls_back_to_a_humanized_key_for_an_unregistered_email
@@ -75,14 +75,14 @@ class EmailCatalogTest < Minitest::Test
     Studio::EmailCatalog.register("winnings", label: "Contest winnings",
                                 description: "Sent when a player wins.")
 
-    assert_equal %w[magic_link email_change_confirmation winnings], Studio::EmailCatalog.keys
+    assert_equal %w[magic_link newsletter_subscribed winnings], Studio::EmailCatalog.keys
     assert_equal "Contest winnings", Studio::EmailCatalog.label("winnings")
   end
 
   def test_re_registering_an_inherited_key_updates_in_place
     Studio::EmailCatalog.register("magic_link", label: "Sign in to Turf Monster")
 
-    assert_equal %w[magic_link email_change_confirmation], Studio::EmailCatalog.keys,
+    assert_equal %w[magic_link newsletter_subscribed], Studio::EmailCatalog.keys,
       "a relabel must not append a duplicate or reorder the page"
     assert_equal "Sign in to Turf Monster", Studio::EmailCatalog.label("magic_link")
     assert_equal "emails/magic-link.gif", Studio::EmailCatalog.entry("magic_link").default_asset,
@@ -99,12 +99,12 @@ class EmailCatalogTest < Minitest::Test
     Studio::EmailCatalog.register("winnings", label: "Contest winnings")
     Studio::EmailCatalog.reset!
 
-    assert_equal %w[magic_link email_change_confirmation], Studio::EmailCatalog.keys
+    assert_equal %w[magic_link newsletter_subscribed], Studio::EmailCatalog.keys
   end
 
   def test_variants_keeps_the_legacy_key_to_label_shape
     assert_equal({ "magic_link" => "Magic-link sign-in",
-                   "email_change_confirmation" => "Email change confirmation" },
+                   "newsletter_subscribed" => "Newsletter subscribed" },
                  Studio::EmailCatalog.variants)
   end
 
@@ -248,7 +248,10 @@ class EmailCatalogTest < Minitest::Test
 
   def test_preview_url_keeps_a_default_root_relative_for_the_browser
     stub_module(Studio::EmailCatalog, :record) { |_key| nil }
-    stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
+    # preview_asset_path, not default_asset_path: the page resolves layered
+    # artwork FIRST (it is what a layered mailer sends) while the <img> fallback
+    # resolves flat-first, so the two no longer share one lookup.
+    stub_module(Studio::EmailCatalog, :preview_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
     # The admin page is viewed on whatever host+port this app is running on
     # (localhost:3042 in a worktree), so an absolute mailer asset_host would

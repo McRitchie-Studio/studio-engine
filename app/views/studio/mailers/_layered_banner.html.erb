@@ -1,0 +1,136 @@
+<%#
+  The layered email banner: background image, live text on top.
+
+  locals: (banner:)  — a Studio::Banner
+
+  The markup is deliberately old-fashioned. Outlook on Windows renders through
+  Word and ignores `background-image` on nearly everything, so the picture is
+  carried three ways at once:
+
+    * the `background` ATTRIBUTE on the td, which the widest set of clients honour
+    * the CSS `background-image`, for the ones that prefer it
+    * a VML `v:rect` / `v:fill` inside a `gte mso 9` conditional, which is the
+      only thing that reaches Outlook. Every other client never sees it.
+
+  `bgcolor` is the floor: if the image is blocked or still loading, the cell is a
+  brand colour with legible text on it rather than white-on-white.
+
+  The scrim is a coloured overlay cell between artwork and type. Background art
+  is chosen to look good, not to guarantee contrast, and white text on a pale
+  sky cannot be read. Set scrim: 0 on artwork dark enough to carry the type.
+%>
+<%
+  banner = local_assigns.fetch(:banner)
+
+  # PREVIEW HOOKS, off by default.
+  #
+  # The admin page edits this banner's words and repaints it as you type, which
+  # needs handles on the three text nodes. They are opt-in because this partial
+  # renders REAL EMAIL: shipping data- attributes into every inbox to serve an
+  # admin screen is the kind of thing that is invisible until a mail client
+  # chokes on it. With preview off the markup is byte-for-byte what it was, and
+  # a test asserts exactly that.
+  preview = local_assigns.fetch(:preview, false)
+  hook = ->(name) { preview ? %( data-banner-#{name}).html_safe : "" }
+
+  # TYPE AND RHYTHM SCALE WITH THE BANNER.
+  #
+  # Everything below is a proportion of the height, not a fixed pixel size.
+  # Hardcoding 42px type looked right at 300px tall and OVERFLOWED at 200 —
+  # the box shrank, the words did not, and the banner rendered 238px with the
+  # header clipped at both edges. Proportions mean the next height change is a
+  # one-line edit rather than a re-tune.
+  h = banner.height
+
+  header_size   = (h * 0.15).round      # 30px at 200, 45 at 300
+  header_line   = (h * 0.17).round
+  subtext_size  = (h * 0.075).round     # 15px at 200
+  subtext_line  = (h * 0.10).round
+  logo_width    = (h * 0.60).round      # 120px at 200
+  side_padding  = (banner.width * 0.05).round
+
+  # The block is vertically centred, so the gap between sub-text and logo is
+  # what pushes the header toward the top edge and the logo toward the bottom.
+  #
+  # It has to ADAPT to the greeting. A gap that fills the banner for "Welcome
+  # Alex!" leaves "Welcome Bartholomew Fitzgerald-Montgomery!" clipped, because
+  # a wrapped header is a whole line taller while the box is not. The line
+  # estimate is deliberately crude — it only has to answer "one line or more",
+  # client fonts differ anyway, and being wrong costs breathing room rather
+  # than a broken banner.
+  gap_after_header = (h * 0.02).round
+  chars_per_line   = 21
+  header_lines     = [(banner.header.to_s.length / chars_per_line.to_f).ceil, 1].max
+  gap_before_logo  = header_lines > 1 ? (h * 0.18).round : (h * 0.35).round
+%>
+<table role="presentation" width="<%= banner.width %>" cellpadding="0" cellspacing="0" border="0"
+       style="width:<%= banner.width %>px;border-collapse:collapse;">
+  <tr>
+    <td <%= %(background="#{banner.background_url}").html_safe if banner.background_url.present? %>
+        bgcolor="<%= Studio.theme_primary %>"
+        width="<%= banner.width %>" height="<%= banner.height %>" valign="middle"
+        style="width:<%= banner.width %>px;height:<%= banner.height %>px;<%= "background-image:url(#{banner.background_url});background-size:cover;background-position:center;background-repeat:no-repeat;" if banner.background_url.present? %>">
+      <% if banner.background_url.present? %>
+        <!--[if gte mso 9]>
+        <v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false"
+                style="width:<%= banner.width %>px;height:<%= banner.height %>px;">
+          <v:fill type="frame" src="<%= banner.background_url %>" color="<%= Studio.theme_primary %>" />
+          <v:textbox inset="0,0,0,0">
+        <![endif]-->
+      <% end %>
+      <div>
+        <table role="presentation" width="<%= banner.width %>" cellpadding="0" cellspacing="0" border="0"
+               style="width:<%= banner.width %>px;">
+          <tr>
+            <%# VERTICAL PADDING IS ZERO ON PURPOSE.
+                A table cell's padding ADDS to its declared height, so
+                height:300 plus 26px top and bottom rendered a 352px banner.
+                Dropping the height instead shrank the scrim to a band across
+                the middle, because the tinted cell then only covered its own
+                content. Full height with horizontal-only padding gives both:
+                exactly 300px, and a wash over the whole picture. valign does
+                the vertical centring that the padding was doing. %>
+            <td align="center" valign="middle" height="<%= banner.height %>"<%= hook.call("scrim") %>
+                <%# bgcolor is the OUTLOOK path and the CSS below is everywhere
+                    else. Word ignores rgba(), so without the attribute the wash
+                    vanishes there and white text sits on bare artwork — the exact
+                    contrast case the scrim exists for, in the one client that
+                    cannot be spot-checked. Every other client honours the rgba
+                    declaration and overrides the flat attribute. %>
+                <%= %(bgcolor="#{banner.scrim_solid_hex}").html_safe if banner.scrim_opacity.positive? %>
+                style="height:<%= banner.height %>px;padding:0 <%= side_padding %>px;<%= "background-color:rgba(24,16,64,#{banner.scrim_opacity});" if banner.scrim_opacity.positive? %>">
+              <% if preview || banner.header.present? %>
+                <p<%= hook.call("header") %> style="margin:0 0 <%= gap_after_header %>px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:<%= header_size %>px;line-height:<%= header_line %>px;font-weight:700;color:#ffffff;">
+                  <%= banner.header %>
+                </p>
+              <% end %>
+              <% if preview || banner.subtext.present? %>
+                <p<%= hook.call("subtext") %> style="margin:0 0 <%= gap_before_logo %>px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:<%= subtext_size %>px;line-height:<%= subtext_line %>px;color:#efeaff;">
+                  <%= banner.subtext %>
+                </p>
+              <% end %>
+              <% if banner.logo_url.present? %>
+                <%= image_tag banner.logo_url, width: logo_width, alt: banner.logo_alt.to_s,
+                      data: (preview ? { banner_logo: true } : {}),
+                      style: "display:block;margin:0 auto;width:#{logo_width}px;height:auto;border:0;" %>
+              <% elsif preview %>
+                <%# A hidden placeholder so ticking "hide the logo" and unticking it
+                    again repaints without a round trip. Preview only — an email
+                    with no logo ships no img tag at all. %>
+                <img data-banner-logo width="<%= logo_width %>" alt=""
+                     src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="
+                     style="display:none;margin:0 auto;width:<%= logo_width %>px;height:auto;border:0;">
+              <% end %>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <% if banner.background_url.present? %>
+        <!--[if gte mso 9]>
+          </v:textbox>
+        </v:rect>
+        <![endif]-->
+      <% end %>
+    </td>
+  </tr>
+</table>

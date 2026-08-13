@@ -1,4 +1,4 @@
-<%# locals: (entry:, uploads_available:, max_width:)
+<%# locals: (entry:, uploads_available:, max_width:, preview_name: nil)
     One registered email: its live banner, its name, and where that banner comes
     from. The whole row is the imageUploadHost x-data so the thumbnail, the Edit
     button, and the hidden multipart form the cropper submits all sit together —
@@ -8,6 +8,40 @@
   source     = Studio::EmailCatalog.source(entry.key)
   banner_url = Studio::EmailCatalog.preview_url(entry.key)
   form_id    = "email-banner-form-#{entry.key.dasherize}"
+  card_width = Studio::Banner::DEFAULT_WIDTH
+
+  # The banner AS IT ARRIVES, not the bare artwork. Same partial the mailer
+  # renders, in preview mode so the text nodes carry handles — the row repaints
+  # when the example recipient changes.
+  # Defaulted rather than required: the row is rendered by tests and by any host
+  # that has not passed a recipient, and "nobody selected" is a real state — it
+  # renders the name-free header, which is what a stranger receives.
+  name    = local_assigns.fetch(:preview_name, nil)
+  # THE BANNER AS IT ARRIVES — for a layered email, artwork with live text on it.
+  #
+  # Two conditions, and both were learned the hard way.
+  #
+  # It renders in an IFRAME. The banner is the email's own <table>, and putting
+  # one directly in a list row nests rows inside rows: every host asserting "one
+  # row per email" counted three per layered email, and two consumer suites went
+  # red. An iframe is a separate document, so the list's markup contract is
+  # untouched — the same reason the email preview lower down the detail page is
+  # one.
+  #
+  # And it only layers when THIS APP's artwork is layered. Whether an email
+  # layers belongs to its mailer, which the catalogue cannot see; the closest
+  # honest proxy is whose artwork is registered. turf-monster re-registers
+  # magic_link with its own flat banner and inherits the engine's background, so
+  # a naive check drew a layered picture turf-monster never sends.
+  layered = Studio::EmailCatalog.background_url(entry.key).present? && entry.engine_artwork?
+  banner  = layered ? Studio::Banner.for(entry.key, name: name) : nil
+  subject = Studio::EmailCatalog.subject_for(entry.key, name: name)
+
+  # The TEMPLATES ride on the row so the repaint script can re-resolve them for
+  # whoever is selected, without a second payload to keep in step.
+  header_template = Studio::EmailCatalog.header_template(entry.key)
+  header_fallback = Studio::EmailCatalog.header_fallback(entry.key)
+  subject_template = Studio::EmailSetting.copy_for(entry.key, :subject) || entry.subject
 
   # `badge` is a shape-only utility in engine.css — the state color comes from
   # theme-token utilities so it follows each app's palette in light and dark.
@@ -35,13 +69,25 @@
     override. On a read-only app the cropper assets are not loaded either, so an
     unconditional x-data would reference an undefined factory and Alpine would
     throw on every row. %>
-<tr class="border-b border-subtle last:border-0"
+<%# THE WHOLE ROW OPENS THE EMAIL. Kept as a click handler on the row with the
+    name still a real <a>: wrapping a table row in a link is invalid HTML, and
+    making every cell a link would break the Upload button inside one of them.
+    The handler ignores clicks that landed on a control, so Upload, Revert and
+    the name link keep their own behaviour. %>
+<tr class="border-b border-subtle last:border-0 cursor-pointer hover:bg-inset/60" data-email-row
+    data-email-path="<%= admin_email_path(entry.key) %>"
+    data-header="<%= header_template %>"
+    data-header-fallback="<%= header_fallback %>"
+    data-subject="<%= subject_template %>"
     <% if uploads_available %>
       x-data="imageUploadHost({
         store: 'emailModals',
         aspectRatio: <%= entry.ratio %>,
         maxWidth: <%= max_width %>,
         transparent: false,
+        <%# Same answer as the email's own page. Without this the SAME button
+            refused an animated GIF here and accepted it there. %>
+        allowGifs: true,
         filename: '<%= entry.key %>.png',
         saving: 'Saving banner…',
         success: 'Banner updated',
@@ -52,9 +98,23 @@
     <% end %>>
 
   <td class="px-4 py-4">
-    <div class="rounded-lg overflow-hidden border border-subtle w-40"
+    <div class="rounded-lg overflow-hidden border border-subtle w-56" data-email-banner-frame
          style="aspect-ratio: <%= entry.ratio %>; background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-900));">
-      <% if banner_url %>
+      <% if banner %>
+        <%# srcdoc, so the email's table lives in its own document. Root-relative
+            asset paths inside it resolve against this page's origin, which is
+            what the admin preview wants. %>
+        <iframe class="pointer-events-none" scrolling="no" tabindex="-1" loading="lazy"
+                data-email-banner-preview data-banner-width="<%= card_width %>"
+                title="<%= entry.label %> banner"
+                style="width:<%= card_width %>px;height:<%= (card_width / entry.ratio).round %>px;border:0;transform-origin:top left;display:block;"
+                <%# ESCAPED EXPLICITLY. render returns an html_safe buffer, so a bare
+                    output tag injects it RAW into the attribute and closes the iframe
+                    at the banner's first quote — the row's markup collapses and the
+                    email's name disappears from the page. to_str drops the safe flag
+                    so the escaping actually happens. %>
+                srcdoc="<%= ERB::Util.html_escape(render("studio/mailers/layered_banner", banner: banner, preview: true).to_str) %>"></iframe>
+      <% elsif banner_url %>
         <%= image_tag banner_url, class: "w-full h-full object-cover",
               alt: "#{entry.label} email banner", loading: "lazy" %>
       <% else %>
@@ -76,6 +136,10 @@
       <p class="text-sm text-body mt-0.5 max-w-md"><%= entry.description %></p>
     <% end %>
     <p class="font-mono text-2xs text-muted mt-1"><%= entry.key %></p>
+  </td>
+
+  <td class="px-4 py-4">
+    <p class="text-sm text-heading" data-row-subject><%= subject %></p>
   </td>
 
   <%# whitespace-nowrap keeps the pill a pill — "<App>'s own" is long enough to

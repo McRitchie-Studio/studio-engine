@@ -182,14 +182,143 @@ class EmailsPageTest < ActiveSupport::TestCase
       "'No image yet' about an email that was visibly sending a repo-asset banner"
   end
 
+  # --- 1b. a layered email is not "no image" --------------------------------
+
+  # THE ORIGINAL BUG, SECOND DOOR. The page it replaced said "No image yet"
+  # about an email that was visibly sending a banner. This is the same failure
+  # reached differently: a layered-native email registers no flat `default_asset`
+  # (it never renders one), so a preview that reads only that field drew an empty
+  # box and a "This email sends without a banner" badge for an email that was at
+  # that moment sending a banner. Reported by the page, disproved by the inbox.
+  test "a layered email previews its background rather than reporting no image" do
+    entry = Studio::EmailCatalog.entry("newsletter_subscribed")
+    assert_nil entry.default_asset, "this guard is meaningless if the entry gains a flat asset"
+
+    path = Studio::EmailCatalog.preview_url("newsletter_subscribed")
+
+    refute_nil path, "the manager would draw an empty box for an email that sends artwork"
+    assert_includes path, "newsletter-subscribed-background"
+  end
+
+  test "a layered email's provenance is the engine's artwork, not none" do
+    assert_equal :engine_default, Studio::EmailCatalog.source("newsletter_subscribed"),
+      "':none' renders the 'sends without a banner' badge, which is false here"
+  end
+
+  # An email with genuinely no artwork must still say so — the fix above must not
+  # turn the honest answer into a lie in the other direction.
+  test "an email with no artwork at all still reports none" do
+    Studio::EmailCatalog.register("bare_email", label: "Bare")
+
+    assert_nil Studio::EmailCatalog.preview_url("bare_email")
+    assert_equal :none, Studio::EmailCatalog.source("bare_email")
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  # THE THIRD DOOR onto the same bug, and the one that shipped: magic_link
+  # registers BOTH — the old banner with "Your Magic Link" baked into the picture,
+  # and the artwork the layered banner draws live text over. Previewing the flat
+  # one put a picture on the manager that no inbox receives, and it looked right
+  # precisely because baked-in words look like a real banner.
+  test "an email with both kinds of artwork previews the layered one" do
+    path = Studio::EmailCatalog.preview_url("magic_link")
+
+    assert_includes path, "background",
+      "a layered mailer sends the background with live text on it; preview what ships"
+  end
+
+  # The flat asset is still the right preview for a host on the engine's own
+  # unlayered UserMailer — there the baked-text banner IS what arrives.
+  test "an email with only flat artwork previews that" do
+    Studio::EmailCatalog.register("legacy_email", label: "Legacy",
+                                  default_asset: "emails/magic-link.gif")
+
+    path = Studio::EmailCatalog.preview_url("legacy_email")
+
+    assert_includes path, "magic-link"
+    refute_includes path, "background"
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  # The <img> fallback resolves the OTHER way — it is the flat path, so the flat
+  # asset wins there even though the preview prefers the background.
+  test "the flat fallback still prefers the flat asset" do
+    assert_includes Studio::EmailCatalog.resolved_url("magic_link").to_s, "magic-link"
+    refute_includes Studio::EmailCatalog.resolved_url("magic_link").to_s, "background"
+  end
+
+  # --- 1c. an uploaded GIF stays a GIF --------------------------------------
+
+  # Animated banners bypass the cropper — it paints onto a canvas and calls
+  # toBlob(..., "image/png"), which keeps frame one and discards the animation
+  # silently, leaving a perfectly good-looking still behind. So the bytes are
+  # stored whole, and the key has to say what they are: a GIF written to a
+  # ".png" key still PLAYS (S3 serves the Content-Type it was given) but tells
+  # every CDN, proxy and human reading the bucket the wrong thing.
+  test "an uploaded gif is stored under a gif key" do
+    key = Studio::EmailCatalog.send(:ext_for, "image/gif")
+
+    assert_equal ".gif", key, "a gif stored as .png misreports itself to anything reading the URL"
+  end
+
+  test "the other upload types keep their own extensions" do
+    { "image/png" => ".png", "image/jpeg" => ".jpg", "image/webp" => ".webp" }.each do |type, ext|
+      assert_equal ext, Studio::EmailCatalog.send(:ext_for, type), "#{type} lost its extension"
+    end
+  end
+
+  # --- an upload whose email left the registry ------------------------------
+
+  # The standard set can change. An email that leaves it takes its page with it,
+  # and a host that had uploaded artwork was left holding a live ImageCache row
+  # and a paid-for S3 object with no revert button — the only control that could
+  # remove either lived on the page that now 404s.
+  test "a key with an upload stays reachable after it leaves the registry" do
+    row = Struct.new(:url, :s3_key).new("https://cdn.test/orphan.gif", "email_banners/orphan.gif")
+    stub_module(Studio::EmailCatalog, :record) { |key| key.to_s == "gone_away" ? row : nil }
+
+    refute Studio::EmailCatalog.known?("gone_away"), "this guard is meaningless if the key is registered"
+    refute_nil Studio::EmailCatalog.record("gone_away"),
+      "an orphan is exactly: unregistered, but this app still stores an image for it"
+  end
+
+  test "an unregistered key with NO upload is still a 404" do
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+
+    assert_nil Studio::EmailCatalog.record("never_existed")
+    refute Studio::EmailCatalog.known?("never_existed"),
+      "keeping every unknown key reachable would turn a typo into a page"
+  end
+
+  # --- an operator-typed logo url -------------------------------------------
+
+  test "a logo url is only accepted when it can be fetched as an image" do
+    assert_equal "https://cdn.test/logo.png", Studio::Banner.safe_image_url("https://cdn.test/logo.png")
+    assert_equal "/assets/emails/logo.png", Studio::Banner.safe_image_url("/assets/emails/logo.png")
+
+    ["javascript:alert(1)", "data:text/html;base64,AAAA", "ftp://x/y.png", "  "].each do |value|
+      assert_nil Studio::Banner.safe_image_url(value), "#{value.inspect} reached an img src"
+    end
+  end
+
   # --- 2. the inherited defaults really ship in the gem ----------------------
 
-  test "every standard email's default asset is a file that ships in the gem" do
+  # Whichever artwork an entry declares — the flat fallback, the layered
+  # background, or both — must be a file in the gem. A layered-native entry
+  # declares no default_asset at all, and that is not a missing file.
+  test "every standard email's declared artwork is a file that ships in the gem" do
     Studio::EmailCatalog::STANDARD.each do |attrs|
-      asset = attrs[:default_asset]
-      path = File.expand_path("../../app/assets/images/#{asset}", __dir__)
-      assert File.file?(path),
-        "#{attrs[:key]} declares #{asset}, but no such file ships in app/assets/images"
+      declared = { default_asset: attrs[:default_asset], background: attrs[:background] }.compact
+
+      refute_empty declared, "#{attrs[:key]} declares no artwork at all"
+
+      declared.each do |role, asset|
+        path = File.expand_path("../../app/assets/images/#{asset}", __dir__)
+        assert File.file?(path),
+          "#{attrs[:key]} declares #{role} #{asset}, but no such file ships in app/assets/images"
+      end
     end
   end
 
@@ -210,7 +339,17 @@ class EmailsPageTest < ActiveSupport::TestCase
   # means editing this number, and then the diff says what it cost.
   BANNER_FRAMES = {
     "emails/magic-link.gif" => 120,
-    "emails/email-change-confirmation.gif" => 60
+    "emails/magic-link-background.gif" => 72,
+    "emails/newsletter-subscribed-background.gif" => 72
+  }.freeze
+
+  # Flat assets are 3:1 at 1800 wide; layered BACKGROUNDS are 3:1 at 1200. Both
+  # shapes are legitimate, so the guard asserts each artwork against the size its
+  # ROLE calls for rather than one global number.
+  BANNER_SIZES = {
+    "emails/magic-link.gif" => [1800, 600],
+    "emails/magic-link-background.gif" => [1200, 400],
+    "emails/newsletter-subscribed-background.gif" => [1200, 400]
   }.freeze
 
   # A GIF frame is introduced by a Graphic Control Extension: the block
@@ -229,8 +368,15 @@ class EmailsPageTest < ActiveSupport::TestCase
   # chose over a 24 KB static frame. At 5.5 MB these files INVITE exactly that
   # optimisation, which is why the property is checked instead of a proxy for it.
   test "the standard banners are the real artwork, animated and full size" do
-    Studio::EmailCatalog::STANDARD.each do |attrs|
-      asset = attrs[:default_asset]
+    # BOTH roles, because a standard entry may ship either or both: `default_asset`
+    # is the flat <img> fallback, `background` is the layered artwork. Iterating
+    # only default_asset (as this did) left every layered background — the thing
+    # actually rendered in the inbox now — with no guard on it at all.
+    assets = Studio::EmailCatalog::STANDARD.flat_map { |attrs| [attrs[:default_asset], attrs[:background]] }.compact.uniq
+
+    refute_empty assets, "the standard entries must ship artwork"
+
+    assets.each do |asset|
       path = File.expand_path("../../app/assets/images/#{asset}", __dir__)
       assert File.file?(path), "missing #{asset}"
 
@@ -241,17 +387,29 @@ class EmailsPageTest < ActiveSupport::TestCase
 
       # GIF logical-screen size, little-endian, bytes 6..9.
       width, height = data[6, 4].unpack("v2")
-      assert_equal 1800, width,  "#{asset} lost its width"
-      assert_equal 600,  height, "#{asset} lost its height"
+      expected_width, expected_height = BANNER_SIZES.fetch(asset)
+      assert_equal expected_width,  width,  "#{asset} lost its width"
+      assert_equal expected_height, height, "#{asset} lost its height"
 
       assert_equal BANNER_FRAMES.fetch(asset), data.scan(GRAPHIC_CONTROL_EXTENSION).size,
         "#{asset} lost frames — a flattened or thinned banner still passes every " \
-        "other assertion here, and still reads as GIF89a at 1800x600"
+        "other assertion here, and still reads as GIF89a at the right size"
 
       # The looping application extension. Without it a mail client that DOES
       # animate plays the waves once and stops on the last frame.
       assert_includes data, "NETSCAPE2.0",
         "#{asset} lost its loop extension — the animation would play once and stop"
+    end
+  end
+
+  # The two maps above are hand-maintained, and a new banner that nobody adds to
+  # them would sail past the loop with `fetch` never called on it.
+  test "every standard banner is pinned in both maps" do
+    assets = Studio::EmailCatalog::STANDARD.flat_map { |a| [a[:default_asset], a[:background]] }.compact.uniq
+
+    assets.each do |asset|
+      assert BANNER_FRAMES.key?(asset), "#{asset} ships unpinned — add its frame count to BANNER_FRAMES"
+      assert BANNER_SIZES.key?(asset),  "#{asset} ships unpinned — add its size to BANNER_SIZES"
     end
   end
 
@@ -261,7 +419,7 @@ class EmailsPageTest < ActiveSupport::TestCase
   # is per-entry.
   test "each email carries its own banner shape" do
     assert_equal 3.0, Studio::EmailCatalog.ratio("magic_link")
-    assert_equal 3.0, Studio::EmailCatalog.ratio("email_change_confirmation")
+    assert_equal 3.0, Studio::EmailCatalog.ratio("newsletter_subscribed")
 
     Studio::EmailCatalog.register("winnings", default_asset: "emails/winnings.jpg")
     assert_equal Studio::EmailCatalog::ASPECT_RATIO, Studio::EmailCatalog.ratio("winnings"),
@@ -289,7 +447,7 @@ class EmailsPageTest < ActiveSupport::TestCase
     paths = Studio::Engine.default_email_banner_logical_paths
 
     assert_includes paths, "emails/magic-link.gif"
-    assert_includes paths, "emails/email-change-confirmation.gif"
+    assert_includes paths, "emails/newsletter-subscribed-background.gif"
     assert_includes Rails.application.config.assets.precompile, "emails/magic-link.gif",
       "a sprockets host (mcritchie-studio, turf-monster) needs the explicit precompile entry"
   end
@@ -359,7 +517,11 @@ class EmailsPageTest < ActiveSupport::TestCase
     refute_nil filter, "require_uploads must be scoped with only:"
 
     actions = filter.instance_variable_get(:@actions).to_a
-    assert_equal %w[update destroy].sort, actions.sort
+    # Every action that WRITES AN IMAGE, and only those. `logo` is here for the
+    # same reason as `update`: it uploads to the app's bucket, so an app without
+    # one must be told rather than 500. The read paths and the copy/settings
+    # writes stay reachable — none of them touch storage.
+    assert_equal %w[update destroy logo].sort, actions.sort
     refute_includes actions, "index",
       "index must stay reachable on an app with no bucket — degrading honestly is the point"
   end
@@ -386,6 +548,87 @@ class EmailsPageTest < ActiveSupport::TestCase
     view.render(template: "studio/emails/index")
   end
 
+  # The SHOW page, rendered the same bare way. It did not exist as a helper here,
+  # and that gap is the whole reason the leak below shipped: the guard was real,
+  # the assertion was right, and it only ever looked at the index.
+  def render_show(key = "magic_link")
+    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    view.singleton_class.include(Rails.application.routes.url_helpers)
+    targets = Studio::EmailPreviewTarget.all
+    view.assign(entry: Studio::EmailCatalog.entry(key), subject: "Sample subject",
+                preview_error: nil, uploads_available: true, preview_name: "Alex",
+                targets: targets, target: targets.first,
+                banner: Studio::Banner.for(key, name: "Alex"))
+    view.render(template: "studio/emails/show")
+  end
+
+  # THE BUG: the recipient picker renders ENTIRELY from a JSON payload the view
+  # builds, and that payload was hand-listed. Studio::EmailPreviewTarget grew
+  # avatar fields; the list did not. The result was a grey circle with no letter
+  # in it, beside a navbar showing the same person's initials in their own
+  # colour — and every avatar assertion in the browser lane passed, because the
+  # lab page supplies its own payload.
+  # THE NAME-FREE CASE MUST ALWAYS BE PREVIEWABLE. It is what a magic link sends
+  # to anyone without an account, and it is the one nobody checks because whoever
+  # is previewing has a name on file. Offering it only when an app happens to have
+  # a nameless member made it disappear the moment McRitchie Studio parked Mack —
+  # a real person with a real name — as its member.
+  test "a nameless recipient is always on offer" do
+    nameless = Studio::EmailPreviewTarget.all.select { |target| target.name.nil? }
+
+    refute_empty nameless, "the fallback header has no way to be seen"
+    assert nameless.any?(&:sample?), "it is a stand-in, and should be labelled as one"
+  end
+
+  test "the nameless sample renders the fallback header, not an empty greeting" do
+    target = Studio::EmailPreviewTarget.all.find { |t| t.name.nil? }
+    header = Studio::Banner.for(:magic_link, name: target.name).header
+
+    assert_equal "Your Magic Link", header
+    refute_includes header, "Welcome !", "this is the exact failure the fallback exists to prevent"
+  end
+
+  # A "member" whose name is synthesised from their email address is not a
+  # nameless member, and the nameless case is the entire reason that option is
+  # offered. MS's display_name turns member@… into "Member", so asking for a
+  # display name previewed somebody with a name and the fallback header never
+  # rendered.
+  test "a record with no name reports no name, not a synthesised one" do
+    record = Struct.new(:id, :email, :name, :admin) do
+      def display_name = "Member"   # the host's presentation fallback
+      def try(method, *) = respond_to?(method) ? public_send(method) : nil
+    end.new(7, "member@example.test", nil, false)
+
+    target = Studio::EmailPreviewTarget.send(:from_record, record,
+                                             id_prefix: "member", label: "Member", admin: false)
+
+    assert_nil target.name, "a blank name is the honest answer to 'do we hold a name'"
+  end
+
+  test "the recipient payload carries everything the picker draws" do
+    # PARSED, not string-matched: the payload is JSON inside an HTML attribute,
+    # so every quote arrives as &quot; and a naive assert_includes on '"initials"'
+    # fails against a page that is perfectly correct.
+    config = editor_config_from(render_show)
+
+    refute_empty config["targets"], "the picker has nobody to draw"
+    config["targets"].each do |target|
+      %w[avatar_url avatar_color initials].each do |field|
+        assert target.key?(field),
+          "the picker draws #{field}; omitting it renders a grey circle with no letter in it"
+      end
+      refute_nil target["initials"], "an avatar with no initials identifies nobody"
+      refute_nil target["avatar_color"]
+    end
+  end
+
+  # The x-data attribute is `emailBannerEditor({...})`; Nokogiri unescapes the
+  # entities, leaving the JSON the browser actually receives.
+  def editor_config_from(html)
+    attribute = Nokogiri::HTML(html).at_css("[x-data^='emailBannerEditor']")["x-data"]
+    JSON.parse(attribute[/emailBannerEditor\((.*)\)\z/m, 1])
+  end
+
   test "the view is a bare content wrapper (no host layout of its own)" do
     html = render_index
     refute_includes html, "<html", "a bare content wrapper must not emit its own <html> shell"
@@ -399,7 +642,9 @@ class EmailsPageTest < ActiveSupport::TestCase
   # table. No amount of Nokogiri structure assertions caught it — only looking
   # at the page did. This looks.
   test "no raw ERB leaks into the rendered page" do
-    [render_index, render_index(uploads_available: false)].each do |html|
+    # render_show included, because the index-only version of this guard passed
+    # while the show page was displaying half a code comment above the banner.
+    [render_index, render_index(uploads_available: false), render_show].each do |html|
       refute_match(/<%|%>/, html,
         "an ERB delimiter reached the browser — a doc comment almost certainly " \
         "closed early on a '%>' inside its own example")
@@ -429,14 +674,67 @@ class EmailsPageTest < ActiveSupport::TestCase
     stub_module(Studio::EmailCatalog, :default_asset_path) { |key| "/assets/#{key}.png" }
 
     doc = Nokogiri::HTML(render_index)
-    rows = doc.css("tbody tr")
+    # By MARKER, not by "tbody tr". Each row now renders the real layered banner,
+    # which is an email <table> with rows of its own nested inside the cell — so
+    # a descendant selector counts the email's markup as list rows and reports
+    # three times as many emails as exist.
+    rows = doc.css("tr[data-email-row]")
 
     assert_equal Studio::EmailCatalog.entries.size, rows.size, "one row per registered email"
     Studio::EmailCatalog.entries.each do |entry|
       row = rows.find { |r| r.text.include?(entry.label) }
       refute_nil row, "expected a row named #{entry.label}"
-      refute_empty row.css("img"), "#{entry.key}'s row must show its live image, not just its name"
+      # An img for flat artwork, an iframe for a layered banner — the property is
+      # that the row SHOWS the email, not which element carries it.
+      refute_empty row.css("img, iframe"),
+        "#{entry.key}'s row must show its live banner, not just its name"
     end
+  end
+
+  # A consumer whose emails are all flat (turf-monster's nine) must keep the
+  # markup it had. The layered banner is a <table>, so rendering one in a list
+  # row nests rows inside rows — every consumer asserting "one row per email"
+  # counted three times as many, and each of those consumers was ALSO being shown
+  # a layered banner its mailers never send.
+  # THE CONSUMER CONTRACT. A list row must not nest an email <table>: the layered
+  # banner is one, and rendering it here made every host's "one row per email"
+  # assertion count three rows per layered email. Two consumer suites went red on
+  # exactly that. The rendered banner lives on the email's own page instead.
+  # THE CONSUMER CONTRACT. The banner is the email's own <table>; nesting one in a
+  # list row puts rows inside rows, and every host asserting "one row per email"
+  # counted three per layered email. Rendering it through an iframe's srcdoc keeps
+  # the markup in a separate document, so the row itself stays one row.
+  test "a layered row renders its banner without nesting email markup" do
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+
+    row = Nokogiri::HTML.fragment(render_row("magic_link"))
+
+    assert_equal 1, row.css("tr").length, "the row must contain no nested rows"
+    assert_empty row.css("table"), "the email's table belongs in the iframe document, not the row"
+    refute_empty row.css("iframe[data-email-banner-preview]"), "the banner should still render"
+  end
+
+  test "a flat row shows its artwork as a plain image" do
+    Studio::EmailCatalog.register("flat_only", label: "Flat only",
+                                  default_asset: "emails/magic-link.gif")
+    stub_module(Studio::EmailCatalog, :record) { |_key| nil }
+
+    row = Nokogiri::HTML.fragment(render_row("flat_only"))
+
+    assert_empty row.css("iframe"), "an email whose artwork is flat has no layered banner to show"
+    refute_empty row.css("img")
+  ensure
+    Studio::EmailCatalog.reset!
+  end
+
+  # ONE row, rendered alone, so an assertion about a row cannot pick up its
+  # neighbour's markup.
+  def render_row(key)
+    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    view.singleton_class.include(Rails.application.routes.url_helpers)
+    view.render(partial: "studio/emails/row",
+                locals: { entry: Studio::EmailCatalog.entry(key), uploads_available: true,
+                          max_width: Studio::EmailCatalog::MAX_WIDTH, preview_name: "Alex" })
   end
 
   test "a row says its image is the SHARED default when the app uploaded nothing" do
@@ -444,7 +742,7 @@ class EmailsPageTest < ActiveSupport::TestCase
     stub_module(Studio::EmailCatalog, :default_asset_path) { |_key| "/assets/emails/magic-link.gif" }
 
     html = render_index
-    # magic_link + email_change_confirmation are the engine's OWN standard two,
+    # magic_link + newsletter_subscribed are the engine's OWN standard two,
     # so on an app that registered no artwork of its own this really is the
     # Studio default.
     assert_includes html, "Studio default"

@@ -1,0 +1,84 @@
+<%# The banner editor from /admin/emails/:key: the rendered banner (preview mode,
+    so it carries the data-banner-* handles) beside the form that repaints it.
+
+    The Alpine component and the banner partial are the REAL ones. Only the page
+    chrome is reproduced, because the chrome is not what is being asserted. %>
+<% config = {
+     values: { header: "Welcome {name}!", header_fallback: "Your Magic Link",
+               subtext: "your sign-in link is below", subject: "Your {app} sign-in link",
+               logo_url: "", hide_logo: false, scrim_percent: "40" },
+     targetId: "admin-1",
+     inheritedLogo: "/e2e/img/logo.png",
+     uploadedLogo: "",
+     defaultScrim: 40,
+     appName: "Studio",
+     targets: [
+       { id: "admin-1", label: "Admin", name: "Alex McRitchie", email: "alex@example.test",
+         admin: true, avatar_url: "/e2e/img/logo.png", avatar_color: "#8E82FE", initials: "AM" },
+       { id: "member-2", label: "Member", name: nil, email: "member@example.test",
+         admin: false, avatar_url: nil, avatar_color: "#6b7280", initials: "ME" }
+     ]
+   } %>
+<style>
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { padding: 16px; display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .frame { border: 1px solid #d4d4d8; border-radius: 8px; overflow: hidden; max-width: 600px; aspect-ratio: 3; }
+  input[type=text] { display: block; width: 100%; margin-bottom: 8px; }
+  [x-cloak] { display: none !important; }
+</style>
+
+<div x-data="emailBannerEditor(<%= config.to_json %>)" class="wrap">
+  <div>
+    <div class="frame" data-email-banner-frame>
+      <div data-email-banner-preview data-banner-width="<%= Studio::Banner::DEFAULT_WIDTH %>"
+           style="width:<%= Studio::Banner::DEFAULT_WIDTH %>px;transform-origin:top left;">
+        <%= render "studio/mailers/layered_banner", banner: @banner, preview: true %>
+      </div>
+    </div>
+  </div>
+
+  <form>
+    <input type="text" id="header" x-model="form.header">
+    <input type="text" id="header_fallback" x-model="form.header_fallback">
+    <input type="text" id="subtext" x-model="form.subtext">
+    <input type="text" id="subject" x-model="form.subject">
+    <input type="text" id="logo_url" x-model="form.logo_url">
+    <label><input type="checkbox" id="hide_logo" x-model="form.hide_logo"> Hide logo</label>
+    <div class="relative">
+      <button type="button" data-preview-target @click="pickerOpen = !pickerOpen">
+        <template x-if="target().avatar_url">
+          <img :src="target().avatar_url" alt="" data-target-avatar width="24" height="24">
+        </template>
+        <template x-if="!target().avatar_url">
+          <span data-target-initials x-text="target().initials"></span>
+        </template>
+        <span x-text="target().name || target().label"></span>
+      </button>
+      <ul x-show="pickerOpen" x-cloak>
+        <template x-for="option in targets" :key="option.id">
+          <li>
+            <button type="button" data-preview-option :data-option-id="option.id"
+                    @click="targetId = option.id; pickerOpen = false">
+              <template x-if="option.avatar_url">
+                <img :src="option.avatar_url" alt="" data-option-avatar width="24" height="24">
+              </template>
+              <template x-if="!option.avatar_url">
+                <span data-option-initials x-text="option.initials"></span>
+              </template>
+              <span x-text="option.name || option.label"></span>
+            </button>
+          </li>
+        </template>
+      </ul>
+    </div>
+    <input type="range" min="0" max="100" step="1" id="scrim_percent" data-scrim-range x-model="form.scrim_percent">
+    <button type="button" data-logo-standard @click="setLogoMode('standard')">Standard</button>
+    <button type="button" data-logo-hidden @click="setLogoMode('hidden')">None</button>
+    <p>Sends as: <strong data-subject-preview x-text="subjectText()"></strong></p>
+    <button type="button" data-save-all x-show="touched" x-cloak :disabled="!dirty()">Save changes</button>
+    <span data-unsaved x-show="touched && !dirty()" x-cloak>No changes</span>
+  </form>
+</div>
+
+<%= render "studio/emails/banner_scale" %>
+<%= render "studio/emails/banner_editor" %>
