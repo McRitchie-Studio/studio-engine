@@ -579,8 +579,57 @@ class EmailsPageTest < ActiveSupport::TestCase
     targets = Studio::EmailPreviewTarget.all
 
     assert_operator targets.length, :<=, 2
-    refute targets.any? { |t| t.name.nil? },
+
+    # ASSERTS SYNTHETIC, not "has no name". Those are not the same thing, and the
+    # first version of this guard used the missing name as a PROXY for the
+    # synthetic entry — so a real member who genuinely has no name on file would
+    # have failed it, punishing the exact person the name-free fallback header
+    # exists to serve. The natural way to make that pass would be to give them a
+    # name, which is precisely backwards. `sample?` is the real property.
+    # Named exactly, because `sample?` alone is too strong: sample_admin is a
+    # LEGITIMATE backstop for an app with no User model, and forbidding it would
+    # leave such an app with an empty picker. The entry that was removed is the
+    # nameless member.
+    refute targets.any? { |t| t.id == "sample-member" },
       "the synthetic nameless entry was removed deliberately; do not re-add it here"
+  end
+
+  # THE REGRESSION CARL FOUND, pinned. The guard above once used "has no name" as
+  # a stand-in for "is synthetic". A REAL member with no name on file is the
+  # person the fallback header exists to serve, and the old assertion failed on
+  # them — so the natural fix would have been to give them a name. This proves
+  # the guard now tolerates exactly that person.
+  test "a real member with no name on file does not trip the synthetic guard" do
+    row = Struct.new(:id, :email, :name, :admin) do
+      def try(method, *) = respond_to?(method) ? public_send(method) : nil
+      def admin? = admin
+    end
+    rows = [ row.new(1, "alex@example.test", "Alex McRitchie", true),
+             row.new(2, "mack@example.test", nil, false) ] # no name on file
+    fake = Class.new do
+      class << self
+        attr_accessor :rows
+        def column_names = %w[id email name]
+        def limit(_n) = rows
+        def all = rows
+        def respond_to?(m, priv = false) = %i[all column_names limit].include?(m.to_sym) || super
+      end
+    end
+    fake.rows = rows
+
+    target = Studio::EmailPreviewTarget
+    original = target.method(:user_model)
+    target.define_singleton_method(:user_model) { fake }
+
+    targets = target.all
+    nameless = targets.find { |t| t.name.nil? }
+
+    refute_nil nameless, "the member has no name on file — that is the case under test"
+    refute nameless.sample?, "they are a real record, not a stand-in"
+    refute targets.any? { |t| t.id == "sample-member" },
+      "and no synthetic entry crept back in alongside them"
+  ensure
+    target&.define_singleton_method(:user_model, original) if original
   end
 
   # THE FALLBACK HEADER STILL SHIPS, and that is the part worth protecting. It
