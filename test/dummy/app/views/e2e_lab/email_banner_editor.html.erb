@@ -10,6 +10,12 @@
                body: "Tap the button below to sign in to {app}.", cta_text: "Sign in to {app}",
                cta_color: "#8E82FE", cta_enabled: true, discord_url: "", footer_logo_url: "" },
      targetId: "admin-1",
+     # A HOST THAT REGISTERED ITS OWN MARK — turf-monster's shape, not the
+     # default one. No STANDARD entry seeds a logo (see the NO DEFAULT LOGO note
+     # in email_catalog.rb), so an app that registers none sends none and this
+     # value is "" on its real page. It is set here because the spec below
+     # exercises the Standard/None toggle, which needs something to toggle; the
+     # empty case is covered server-side in emails_page_test.rb.
      inheritedLogo: "/e2e/img/logo.png",
      uploadedLogo: "",
      defaultScrim: 40,
