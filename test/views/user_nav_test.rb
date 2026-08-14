@@ -92,9 +92,9 @@ class UserNavTest < Minitest::Test
   # looks identical to a working one until it is clicked, which is why it
   # survived in two production apps for as long as they have had a navbar.
   #
-  # The rule now: link to /profile when it exists, fall back to a host's own
-  # account_path (turf-monster, mid-migration), and render PLAIN TEXT when
-  # neither does. Never a dead href.
+  # The rule now: a host's own account_path wins where it exists (turf-monster),
+  # /profile is the destination for the four apps that never wrote one, and
+  # PLAIN TEXT renders when neither does. Never a dead href.
 
   def test_username_and_avatar_link_to_profile_when_the_route_exists
     doc = Nokogiri::HTML5.fragment(render_nav)
@@ -128,24 +128,28 @@ class UserNavTest < Minitest::Test
     assert_includes doc.to_html, "PS", "the initials circle survives the degrade"
   end
 
-  # turf-monster keeps its own /account working while its rows move to /profile
-  # one at a time. Until it adopts, its navbar must still point at the page it
-  # actually has — the fallback is what lets the two pages coexist.
-  def test_falls_back_to_a_hosts_own_account_path
+  def test_a_hosts_own_account_path_is_used_when_profile_is_not_drawn
     doc = Nokogiri::HTML5.fragment(render_nav(profile_path: nil, account_path: "/account"))
     hrefs = doc.css("a").map { |a| a["href"] }
 
     assert_equal 2, hrefs.count("/account")
   end
 
-  def test_profile_wins_over_a_hosts_account_path
-    # Once an app draws both, /profile is the destination — that is how the
-    # migration actually flips over for turf-monster.
+  # THE MIGRATION RULE, and the one most likely to be "simplified" into a
+  # regression. turf-monster's /account carries wallet balances, identities,
+  # referrals and quests; /profile ships with two rows. Preferring /profile here
+  # would silently demote turf's navbar to a thinner page on a routine
+  # dependency bump — an upgrade that takes something away.
+  #
+  # So the host's page wins while it exists, and turf flips over by DELETING its
+  # account route once /profile can actually replace it.
+  def test_a_hosts_own_account_path_wins_when_both_exist
     doc = Nokogiri::HTML5.fragment(render_nav(profile_path: "/profile", account_path: "/account"))
     hrefs = doc.css("a").map { |a| a["href"] }
 
-    assert_equal 2, hrefs.count("/profile")
-    refute_includes hrefs, "/account"
+    assert_equal 2, hrefs.count("/account"),
+      "the engine must not repoint an app that already has its own account page"
+    refute_includes hrefs, "/profile"
   end
 
   # --- logged-out path --------------------------------------------------

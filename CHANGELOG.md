@@ -100,13 +100,21 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 ### Changed
 
 - **`components/_user_nav` no longer renders a dead link.** The username and
-  avatar point at `profile_path` when it exists, fall back to a host's own
-  `account_path` when it does not (turf-monster, mid-migration), and render as
-  **plain text** when neither exists. The name and the picture still render in
-  that last case — only the link is dropped. Previously both were `href="#"`.
+  avatar point at **a host's own `account_path` where it exists**, at
+  `profile_path` otherwise, and render as **plain text** when neither exists.
+  The name and the picture still render in that last case — only the link is
+  dropped. Previously both were `href="#"`.
 
-  Apps that draw both routes now point at `/profile`; an app that wants the old
-  destination back sets `Studio.draw_profile_routes = false`.
+  **The host's page wins deliberately.** turf-monster's `/account` carries wallet
+  balances, identities, referrals and quests; `/profile` ships with two rows.
+  Preferring `/profile` would silently demote turf's navbar to a thinner page on
+  a routine dependency bump — an upgrade that takes something away. turf instead
+  keeps its page, moves its rows to `/profile` one at a time, and flips over by
+  **deleting its account route** once `/profile` can replace it.
+
+  So: **no consumer's navbar destination changes on this upgrade.** The four apps
+  with no account page gain a working link where they had `href="#"`;
+  turf-monster is untouched.
 
 - **No pre-registered email seeds a logo — `magic_link` was the last one, and it
   seeded the Studio wordmark onto the SIGN-IN email.** `STANDARD`'s `magic_link`

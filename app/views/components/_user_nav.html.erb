@@ -42,11 +42,17 @@
 
 <%# Where the username and the avatar point — resolved ONCE, used by both.
 
-    Prefers the shared /profile page (Studio::ProfilesController, drawn by
-    default). Falls back to a host's own account_path so an app that has one and
-    has not adopted /profile yet keeps its existing destination — that is
-    turf-monster for the length of its migration, and the fallback is what lets
-    the two pages coexist while its rows move across one at a time.
+    A HOST'S OWN account_path WINS. /profile is the destination for an app that
+    never wrote an account page — which is four of the five consumers — and the
+    engine does not repoint an app that already has one.
+
+    That order is deliberate and it is the migration. turf-monster's /account
+    carries wallet balances, identities, referrals and quests; /profile ships
+    with two rows. Preferring /profile would silently demote turf's navbar to a
+    thinner page on a routine dependency bump, which is a regression dressed as
+    an upgrade. Instead turf keeps its page, moves its rows across one at a time,
+    and flips over by DELETING its account route when /profile can finally
+    replace it. The last step of a migration should be the deliberate one.
 
     nil when NEITHER exists, and then the name and avatar render as plain text.
     They used to render `href="#"`, which was not a graceful degradation but a
@@ -57,10 +63,10 @@
     until it is clicked, which is why nobody reported it.
 %>
 <% studio_nav_destination =
-     if defined?(profile_path)
-       profile_path
-     elsif defined?(account_path)
+     if defined?(account_path)
        account_path
+     elsif defined?(profile_path)
+       profile_path
      end %>
 
 <div class="flex gap-2">
