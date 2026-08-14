@@ -136,6 +136,18 @@ class ProfilePageRenderTest < Minitest::Test
     refute_includes avatar_row, "Alpine.store('modals')"
   end
 
+  # The saving card must NOT be dismissible. submitFormWithProgress opens it with
+  # `dismissible: opts.dismissible === true`, and the scoped host's bfcache /
+  # turbo:before-cache cleanup keeps ONLY `dismissible === false` entries — its
+  # own comment says "a still-in-flight upload must not silently lose the card
+  # its promise will resolve against". Passing the flag through drops the card
+  # mid-upload and lets Escape close it. Copied from turf's call site; both
+  # engine sibling call sites (studio/emails/show.html.erb) omit it.
+  def test_the_saving_card_is_not_dismissible_mid_upload
+    refute_includes avatar_row, "dismissible",
+      "an upload in flight must keep its saving card"
+  end
+
   def test_the_first_name_row_renders_prefilled_and_capped
     html = view.render(partial: "studio/profiles/first_name_section", locals: { user: StubUser.new })
     doc = Nokogiri::HTML5.fragment(html)
