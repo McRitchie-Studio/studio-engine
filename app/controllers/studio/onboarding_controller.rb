@@ -23,7 +23,11 @@ module Studio
     # Both actions are for the freshly signed-in user, so authentication is the
     # host's default require_authentication — no skip_before_action here.
 
-    MAX_FIRST_NAME = 40
+    # The shared cap (Studio::FIRST_NAME_MAX_LENGTH). Kept under the old name
+    # here because it is referenced from outside this class; what changed is that
+    # it is no longer a SECOND definition of the same number. /profile writes the
+    # same column and now reads the same constant.
+    MAX_FIRST_NAME = Studio::FIRST_NAME_MAX_LENGTH
 
     # POST /onboarding/first_name
     #

@@ -1,0 +1,37 @@
+<%# The shared /profile page.
+
+    A bare content wrapper, not a layout: it renders inside the host's
+    application layout and inherits that app's navbar, theme and flash. Same
+    shape as /admin/style and /admin/emails.
+
+    The page is nothing but its sections. @profile_sections is already resolved
+    and filtered by the controller (Studio.profile_sections_for) — rows the host
+    cannot serve, and admin rows for non-admins, are gone before we get here — so
+    this template makes no decisions of its own beyond an empty state.
+%>
+<% content_for(:title, "Profile") %>
+
+<div class="max-w-2xl mx-auto py-8">
+  <h1 class="text-2xl font-extrabold text-heading mb-8">Profile</h1>
+
+  <% if @profile_sections.blank? %>
+    <%# Reachable, and worth rendering honestly rather than as a blank page: an
+        app whose user model serves none of the declared rows (no avatar
+        attachment, no first_name column) lands here until it installs the
+        standard profile columns. %>
+    <%= render "components/empty_state",
+               message: "Nothing to edit yet",
+               detail: "This app has not enabled any profile fields." %>
+  <% else %>
+    <div class="space-y-6">
+      <% @profile_sections.each do |section| %>
+        <section class="card p-6" data-profile-section="<%= section[:key] %>">
+          <% if section[:title].present? %>
+            <h2 class="text-lg font-bold text-heading mb-4"><%= section[:title] %></h2>
+          <% end %>
+          <%= render section[:partial], **section.fetch(:locals, {}).merge(user: current_user) %>
+        </section>
+      <% end %>
+    </div>
+  <% end %>
+</div>

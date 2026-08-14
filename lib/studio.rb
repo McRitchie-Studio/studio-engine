@@ -7,6 +7,8 @@ require "studio/environment_banner"
 require "studio/theme_resolver"
 require "studio/ui_primitives"
 require "studio/sidebar_sections"
+require "studio/profile_sections"
+require "studio/profile_image"
 require "studio/username_generator"
 require "studio/s3"
 require "studio/image_cache"
@@ -82,6 +84,49 @@ module Studio
   #     }
   #   end
   mattr_accessor :sidebar_sections, default: []
+
+  # ---- The shared profile page (/profile) ----
+  # The rows that make up /profile. `nil` — the default — means "the engine's
+  # standard page", NOT "no rows": a brand-new app with an empty initializer gets
+  # a working profile page, which is the entire point of standardizing it.
+  #
+  # Declare an Array (or a callable receiving the view) to customize. Compose
+  # against Studio.default_profile_sections rather than a literal, so a later
+  # engine release that adds a standard row delivers it to you:
+  #
+  #   Studio.configure do |config|
+  #     config.profile_sections = ->(view) {
+  #       Studio.default_profile_sections +
+  #         [ { key: :wallet, title: "Identities", partial: "profiles/wallet" } ]
+  #     }
+  #   end
+  #
+  # Drop a standard row by key instead of restating the list:
+  #
+  #   config.profile_sections = Studio.default_profile_sections.reject { |s| s[:key] == :avatar }
+  #
+  # Shape and resolution rules: lib/studio/profile_sections.rb. A row may declare
+  # `requires:` — an attribute the current user must respond to — and is dropped
+  # when this host's model does not have it, so the page tolerates the fact that
+  # the consuming apps' users tables genuinely disagree.
+  mattr_accessor :profile_sections, default: nil
+
+  # Whether Studio.routes draws /profile (Studio::ProfilesController).
+  #
+  # ON BY DEFAULT, and it is worth saying why this one can be when
+  # draw_admin_emails_routes and draw_onboarding_routes could not: those two
+  # claimed helper names a consumer ALREADY OWNED, so drawing them raised
+  # `Invalid route name, already in use` while that app's routes.rb loaded and
+  # took down its entire route set. `profile` is claimed by none of the five
+  # consumers — mcritchie-studio, mcritchie-industries, turf-monster, moms-app
+  # and acquisition-studio were each checked (2026-08-14) — and turf-monster's
+  # nearest names are complete_profile_account_path / save_profile_account_path,
+  # which do not collide.
+  #
+  # That is exactly why the shared page is /profile and not /account: turf owns
+  # account_path, and a shared /account could never be default-on. An app that
+  # wants the page gone still sets this false.
+  mattr_accessor :draw_profile_routes, default: true
 
   # How long a freshly minted magic link stays live.
   mattr_accessor :magic_link_ttl, default: 15.minutes
@@ -178,6 +223,17 @@ module Studio
   # DELIBERATELY: skipping means not now, not never — the field stays blank, so a
   # later session may ask again. That is the whole reason this is not a column.
   FIRST_NAME_SKIP_SESSION_KEY = :onboarding_skipped_first_name
+
+  # How long a first name may be. ONE constant because users.first_name is
+  # written from TWO surfaces — the onboarding step (seconds after signup) and
+  # /profile (any time after) — and rendered by a third, the profile form's
+  # maxlength. Two independently-correct caps that disagreed would let onboarding
+  # accept a name /profile then refused to save, a bug with no obvious owner.
+  #
+  # Keeping it here rather than on either controller also keeps the VIEW off a
+  # controller constant: the form needs the number, and a view reaching into
+  # Studio::ProfilesController to get it would couple the two for no reason.
+  FIRST_NAME_MAX_LENGTH = 40
 
   # The shared rule for "does this account still owe us a first name?" — the one
   # piece of onboarding logic every app agrees on. Hosts compose it into their own
@@ -545,6 +601,21 @@ module Studio
     SidebarSections.resolve(sidebar_sections, view)
   end
 
+  # The engine's standard /profile rows. Hosts compose against this rather than
+  # restating a literal list, so a later release that adds a standard row
+  # delivers it to every app that used the seam as intended.
+  def self.default_profile_sections
+    ProfileSections.defaults
+  end
+
+  # Profile rows resolved for a view context: a callable config is called with
+  # the view, keys symbolize, admin-only rows drop for non-admin viewers, and
+  # rows this host's user model cannot serve drop entirely. `nil` config resolves
+  # to the standard page.
+  def self.profile_sections_for(view)
+    ProfileSections.resolve(profile_sections, view)
+  end
+
   def self.env_truthy?(value)
     %w[1 true yes on].include?(value.to_s.strip.downcase)
   end
@@ -600,6 +671,19 @@ module Studio
       if Studio.draw_auth_routes && Studio.auth_method?(:wallet)
         get  "auth/solana/nonce",  to: "solana_sessions#nonce",  as: :solana_nonce
         post "auth/solana/verify", to: "solana_sessions#verify", as: :solana_verify
+      end
+
+      # The shared profile page. ON by default — unlike /admin/emails and the
+      # onboarding pair, `profile` is claimed by no consumer, so drawing it
+      # cannot take an app's route set down. See Studio.draw_profile_routes.
+      #
+      # Avatar is its own PATCH rather than a field on #update: an attachment
+      # param submitted empty PURGES the attachment, so a single form carrying
+      # both would delete someone's photo every time they edited their name.
+      if Studio.draw_profile_routes
+        get   "profile",        to: "studio/profiles#show",   as: :profile
+        patch "profile",        to: "studio/profiles#update"
+        patch "profile/avatar", to: "studio/profiles#avatar", as: :profile_avatar
       end
 
       resources :error_logs, only: [:index, :show]

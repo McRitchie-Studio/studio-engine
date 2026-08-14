@@ -4,7 +4,109 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **The shared profile page — `/profile`.** The engine now ships the account page
+  itself, not just the parts. `Studio::ProfilesController` renders a page of
+  declared rows; iteration one ships two, **change your photo** and **change your
+  first name**. Every consumer gets it on upgrade with no configuration.
+
+  **Why this page exists at all.** `components/_user_nav` — the navbar block every
+  app renders — has always linked the username and the avatar to
+  `defined?(account_path) ? account_path : "#"`. Only turf-monster draws an
+  account route, so **mcritchie-studio and mcritchie-industries have shipped a
+  navbar whose avatar and username are `href="#"`** for as long as they have had
+  a navbar. A dead link looks exactly like a working one until it is clicked,
+  which is why it survived in two production apps. The engine assumed a page every
+  consumer was expected to write for itself; now it ships the page.
+
+  **Why `/profile` and not `/account`.** turf-monster owns `AccountsController`
+  and the `account_path` helper. A shared `/account` route would raise
+  `Invalid route name, already in use` while turf's own `routes.rb` loads, which
+  takes down **every** route in that app — the same collision that forced
+  `draw_admin_emails_routes` and `draw_onboarding_routes` to be opt-in. `profile`
+  is claimed by none of the five consumers (mcritchie-studio,
+  mcritchie-industries, turf-monster, moms-app, acquisition-studio — each checked
+  2026-08-14), so **`Studio.draw_profile_routes` defaults to `true`** and a
+  brand-new app is correct on day one. It also buys turf a migration path: its
+  `/account` keeps working untouched while its rows move to `/profile` one at a
+  time, and `/account` is deleted only once it is empty.
+
+  | Route | Helper | What it does |
+  |---|---|---|
+  | `GET /profile` | `profile_path` | The page |
+  | `PATCH /profile` | `profile_path` | Scalar fields (today: `first_name`) |
+  | `PATCH /profile/avatar` | `profile_avatar_path` | The picture |
+
+  The avatar has a route of its own **deliberately**: an attachment param
+  submitted empty PURGES the attachment, so one form carrying both the name and
+  the file would delete someone's photo every time they edited their name.
+
+- **`Studio.profile_sections` — declare the rows, per app.** Same shape as
+  `Studio.sidebar_sections`: a static Array or a callable receiving the view, keys
+  symbolized, `admin: true` rows gated. Compose against
+  `Studio.default_profile_sections` so a later release that adds a standard row
+  delivers it to you:
+
+  ```ruby
+  Studio.configure do |config|
+    config.profile_sections = ->(view) {
+      Studio.default_profile_sections +
+        [ { key: :wallet, title: "Identities", partial: "profiles/wallet" } ]
+    }
+  end
+  ```
+
+  Drop a standard row by key instead of restating the list:
+  `config.profile_sections = Studio.default_profile_sections.reject { |s| s[:key] == :avatar }`.
+
+  **`nil` — the default — means the standard page, NOT a blank one.** That
+  distinction is what makes an empty initializer produce a working page.
+
+  A row may declare `requires:` — an attribute the current user must respond to —
+  and is **dropped when this host's model does not have it**. The consuming apps
+  genuinely disagree about `users` (mcritchie-industries has eight columns and no
+  `first_name`; turf-monster has forty), so a shared page that assumed a column
+  would raise `NoMethodError` on every signed-in request there. MI gets a page
+  with the photo row and no name row until it installs the standard profile
+  columns, at which point the row appears with no code change.
+
+- **`Studio::UserProfile` — the display helpers, written once.** A model concern
+  supplying `display_name`, `avatar_initials`, `avatar_color` and
+  `AVATAR_COLORS`. `components/_avatar` has always called all three and the engine
+  has never provided any of them, so all three apps wrote their own — and they had
+  drifted (`"anon"` vs `"User"` for the same empty state; two different email-prefix
+  casings). `include Studio::UserProfile` and delete your copy. Every method is
+  overridable by defining it in the class body.
+
+  **Adopting changes behavior in mcritchie-industries**, deliberately: a user with
+  no name now falls back to `"anon"` rather than `"User"`, and an email-derived
+  name is capitalized. The merged chain is
+  `username → name → first_name → email prefix → truncated wallet → "anon"`,
+  respond_to?-guarded at every link.
+
+- **`Studio::ProfileImage` — one allowlist for profile uploads.** `ALLOWED_CONTENT_TYPES`
+  (PNG, JPEG, WebP), `MAX_BYTES` (8 MB) and `acceptable?(file)`, lifted from
+  turf-monster's `ApplicationController#valid_image?`. It is an allowlist rather
+  than a `start_with?("image/")` check because an avatar is attacker-supplied
+  bytes served back to other people, and an SVG is a script host wearing an
+  image's content type.
+
+- **`Studio::FIRST_NAME_MAX_LENGTH`** (40) — one constant for a column now written
+  from two surfaces (the onboarding step and `/profile`) and rendered by a third
+  (the form's `maxlength`). `Studio::OnboardingController::MAX_FIRST_NAME` now
+  reads it instead of defining a second copy.
+
 ### Changed
+
+- **`components/_user_nav` no longer renders a dead link.** The username and
+  avatar point at `profile_path` when it exists, fall back to a host's own
+  `account_path` when it does not (turf-monster, mid-migration), and render as
+  **plain text** when neither exists. The name and the picture still render in
+  that last case — only the link is dropped. Previously both were `href="#"`.
+
+  Apps that draw both routes now point at `/profile`; an app that wants the old
+  destination back sets `Studio.draw_profile_routes = false`.
 
 - **No pre-registered email seeds a logo — `magic_link` was the last one, and it
   seeded the Studio wordmark onto the SIGN-IN email.** `STANDARD`'s `magic_link`

@@ -1,0 +1,29 @@
+<%# Profile photo row.
+
+    Locals: user (required).
+
+    Posts to its OWN route (profile_avatar_path), not the shared PATCH /profile.
+    An attachment param submitted empty PURGES the attachment, so a combined form
+    would delete the picture every time someone edited their name. Keeping the
+    file field in a form of its own makes that trap unreachable rather than
+    merely avoided.
+
+    A plain file field for now. The engine already ships a crop modal
+    (studio/modals/_crop_photo plus the cropPhotoModal factory), but wiring it
+    needs a modal host and the cropper assets on the page; this row is designed to
+    be swapped to it without changing the endpoint.
+%>
+<div class="flex items-center gap-5">
+  <%= render "components/avatar", user: user, size: "lg" %>
+
+  <div class="flex-1 min-w-0">
+    <%= form_with url: profile_avatar_path, method: :patch, scope: :profile, multipart: true,
+                  data: { turbo: false }, class: "flex flex-wrap items-center gap-3" do |form| %>
+      <%= form.file_field :avatar,
+                          accept: Studio::ProfileImage::ALLOWED_CONTENT_TYPES.join(","),
+                          class: "text-sm text-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-surface-alt file:text-heading" %>
+      <%= form.submit "Save photo", class: "btn btn-primary btn-sm" %>
+    <% end %>
+    <p class="text-muted text-xs mt-2"><%= Studio::ProfileImage::MESSAGE %></p>
+  </div>
+</div>
