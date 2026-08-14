@@ -11,6 +11,29 @@
 %>
 <% content_for(:title, "Profile") %>
 
+<%# Does any resolved row need the crop/saving modals? A row declares
+    `modals: true` and the page mounts them once, here.
+
+    The page owns its modal host DELIBERATELY. The obvious alternative — render
+    "studio/modals/host" and let the app supply it — fails in both directions:
+    mcritchie-industries and moms-app render no shared host at all, so there
+    would be nowhere to open a modal from; and mcritchie-studio and turf-monster
+    each ship their OWN app/views/studio/modals/_host.html.erb, which shadows the
+    engine's in this non-isolated engine, so the page would silently get their
+    fork and its registrations. studio/modals/_scoped_host is unforked in every
+    app. /admin/emails reached the same conclusion first.
+
+    Mounted once per page rather than once per row: two hosts sharing a store
+    name would register the same modal ids twice and render duplicate cards. %>
+<% profile_needs_modals = Array(@profile_sections).any? { |section| section[:modals] } %>
+
+<% if profile_needs_modals %>
+  <%# cropper.js + the imageUploadHost / cropPhotoModal / submitFormWithProgress
+      factories. Loaded only when a row can actually open the cropper, which is
+      the whole reason this is a partial and not a global include. %>
+  <%= render "studio/cropper_assets" %>
+<% end %>
+
 <div class="max-w-2xl mx-auto py-8">
   <h1 class="text-2xl font-extrabold text-heading mb-8">Profile</h1>
 
@@ -35,3 +58,16 @@
     </div>
   <% end %>
 </div>
+
+<% if profile_needs_modals %>
+  <%# Optional chaining on current() is load-bearing: the outer template unmounts
+      one tick AFTER the stack empties, so a bare .id throws on every close. %>
+  <%= render "studio/modals/scoped_host", store: "profileModals" do %>
+    <template x-if="$store.profileModals.current()?.id === 'crop-photo'">
+      <div><%= render "studio/modals/crop_photo", store: "profileModals" %></div>
+    </template>
+    <template x-if="$store.profileModals.current()?.id === 'saving'">
+      <div><%= render "studio/modals/saving", store: "profileModals" %></div>
+    </template>
+  <% end %>
+<% end %>

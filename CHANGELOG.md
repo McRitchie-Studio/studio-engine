@@ -42,6 +42,31 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   submitted empty PURGES the attachment, so one form carrying both the name and
   the file would delete someone's photo every time they edited their name.
 
+  **The photo row is turf-monster's avatar interaction, standardized.** Click the
+  picture, a hover cap reads "Update", pick a file, crop it square, and it saves
+  immediately — no Save button and no visible file field. It runs on the engine's
+  existing `imageUploadHost` factory and shared crop-photo modal, the same
+  primitives `/admin/emails` uses.
+
+  Two changes from turf's copy, both deliberate:
+
+  - **The click target is a `<button>`, not a `<div>`.** turf's is a `div @click`,
+    which no keyboard or screen-reader user can reach — for them the only way to
+    change a photo would be a mouse. Same visual; the hover cap also reveals on
+    focus.
+  - **The crop confirm goes through `onCropConfirmed()`, not `applyCrop()`.** Every
+    `imageUploadHost` on a page hears the same window event, so binding
+    `applyCrop` directly means a page that later grows a second uploader has both
+    hosts save the same crop. `onCropConfirmed` checks the owner token first.
+
+  **The page brings its own modals.** A row declares `modals: true` and the page
+  mounts `studio/modals/_scoped_host` on a `profileModals` store, so the row works
+  in an app that renders no shared modal host at all (mcritchie-industries,
+  moms-app) and is not shadowed in the two apps that ship their own fork of
+  `studio/modals/_host` (mcritchie-studio, turf-monster). **No host app has to
+  touch its layout to get a working avatar cropper.** cropper.js loads only when
+  a resolved row actually needs it.
+
 - **`Studio.profile_sections` — declare the rows, per app.** Same shape as
   `Studio.sidebar_sections`: a static Array or a callable receiving the view, keys
   symbolized, `admin: true` rows gated. Compose against

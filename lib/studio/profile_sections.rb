@@ -23,6 +23,12 @@
 #   requires — optional attribute (or Array of them) the CURRENT USER must
 #              respond to for the row to render. See below.
 #   admin    — admin-only row, same rule as the sidebar's.
+#   modals   — the row opens the shared crop/saving modals. The PAGE mounts them
+#              once (studio/modals/_scoped_host on a "profileModals" store) when
+#              any resolved row asks for them, so a row never has to know whether
+#              the host app renders a modal host of its own. Two of the five
+#              consumers render none at all, and the two that do ship a FORK of
+#              the engine's shared host that would shadow it.
 #
 # ON `requires` — this is the whole reason the registry exists rather than a
 # hardcoded page. The consuming apps do NOT agree on their users table:
@@ -44,7 +50,7 @@ module Studio
     # it composes against `Studio.default_profile_sections` rather than a literal.
     DEFAULTS = [
       { key: :avatar, title: "Profile photo",
-        partial: "studio/profiles/avatar_section", requires: :avatar },
+        partial: "studio/profiles/avatar_section", requires: :avatar, modals: true },
       { key: :first_name, title: "Your name",
         partial: "studio/profiles/first_name_section", requires: :first_name }
     ].freeze
