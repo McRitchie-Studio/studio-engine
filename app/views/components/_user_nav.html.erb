@@ -40,6 +40,35 @@
      end
    end %>
 
+<%# Where the username and the avatar point — resolved ONCE, used by both.
+
+    A HOST'S OWN account_path WINS. /profile is the destination for an app that
+    never wrote an account page — which is four of the five consumers — and the
+    engine does not repoint an app that already has one.
+
+    That order is deliberate and it is the migration. turf-monster's /account
+    carries wallet balances, identities, referrals and quests; /profile ships
+    with two rows. Preferring /profile would silently demote turf's navbar to a
+    thinner page on a routine dependency bump, which is a regression dressed as
+    an upgrade. Instead turf keeps its page, moves its rows across one at a time,
+    and flips over by DELETING its account route when /profile can finally
+    replace it. The last step of a migration should be the deliberate one.
+
+    nil when NEITHER exists, and then the name and avatar render as plain text.
+    They used to render `href="#"`, which was not a graceful degradation but a
+    dead link: mcritchie-studio and mcritchie-industries have shipped a navbar
+    whose avatar and username go nowhere for as long as they have had a navbar,
+    because the engine assumed an account route every consumer was expected to
+    write for itself. A link that goes nowhere looks identical to one that works
+    until it is clicked, which is why nobody reported it.
+%>
+<% studio_nav_destination =
+     if defined?(account_path)
+       account_path
+     elsif defined?(profile_path)
+       profile_path
+     end %>
+
 <div class="flex gap-2">
   <% if logged_in? %>
     <%# Left column: Div 1 + Div 2 stacked %>
@@ -61,9 +90,11 @@
           <%= render "components/admin_dropdown" unless respond_to?(:studio_sidebar_replaces_admin_menu?) && studio_sidebar_replaces_admin_menu? %>
           <%= render "components/theme_toggle_morph" %>
         </div>
-        <% account_link = defined?(account_path) ? account_path : "#" %>
-        <%= link_to account_link, class: "text-heading font-semibold hover:text-primary transition text-base leading-none truncate text-right" do %>
-          <%= current_user.display_name %>
+        <% nav_name_classes = "text-heading font-semibold hover:text-primary transition text-base leading-none truncate text-right" %>
+        <% if studio_nav_destination %>
+          <%= link_to current_user.display_name, studio_nav_destination, class: nav_name_classes %>
+        <% else %>
+          <span class="<%= nav_name_classes %>"><%= current_user.display_name %></span>
         <% end %>
       </div>
       <% div2_content = studio_nav_slot.call(div2_slot, div2_html) %>
@@ -168,9 +199,14 @@
       <% end %>
     </div>
     <%# Div 3 (Avatar): spans both rows %>
-    <% account_link = defined?(account_path) ? account_path : "#" %>
-    <%= link_to account_link, class: "hover:opacity-80 transition flex-shrink-0 flex items-center", "x-bind:style": "$store.devMode && 'background: lightgreen'" do %>
-      <%= render "components/avatar", user: current_user, size: "nav" %>
+    <% if studio_nav_destination %>
+      <%= link_to studio_nav_destination, class: "hover:opacity-80 transition flex-shrink-0 flex items-center", "x-bind:style": "$store.devMode && 'background: lightgreen'" do %>
+        <%= render "components/avatar", user: current_user, size: "nav" %>
+      <% end %>
+    <% else %>
+      <span class="flex-shrink-0 flex items-center" x-bind:style="$store.devMode && 'background: lightgreen'">
+        <%= render "components/avatar", user: current_user, size: "nav" %>
+      </span>
     <% end %>
   <% else %>
     <%= render "components/admin_dropdown" unless respond_to?(:studio_sidebar_replaces_admin_menu?) && studio_sidebar_replaces_admin_menu? %>

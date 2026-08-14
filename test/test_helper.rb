@@ -18,6 +18,8 @@ require_relative "../lib/studio/color_scale"
 require_relative "../lib/studio/log_rotation"
 require_relative "../lib/studio/environment_banner"
 require_relative "../lib/studio/sidebar_sections"
+require_relative "../lib/studio/profile_sections"
+require_relative "../lib/studio/profile_image"
 require_relative "../lib/studio/theme_resolver"
 require_relative "../lib/studio/ui_primitives"
 require_relative "../lib/studio/email"
@@ -46,6 +48,25 @@ module Studio
   mattr_accessor :smooth_load,          default: false
   mattr_accessor :nav_spinner_min_ms,   default: 2500
   mattr_accessor :sidebar_sections,     default: []
+  # nil, NOT [] — nil means "the engine's standard profile page". The unit suite
+  # asserts that distinction (test/lib/studio/profile_sections_test.rb), so this
+  # mirror has to carry the real default rather than a convenient one.
+  mattr_accessor :profile_sections,     default: nil
+  mattr_accessor :draw_profile_routes,  default: true
+
+  # READ from lib/studio.rb rather than restated. This mirror block is
+  # hand-maintained, and a restated number here would be a second definition of
+  # the very constant that exists to stop first-name caps from drifting — the
+  # view suite asserts the form's maxlength against this value, so a stale mirror
+  # would go green while the real page rendered a different limit.
+  FIRST_NAME_MAX_LENGTH =
+    begin
+      source = File.read(File.expand_path("../lib/studio.rb", __dir__))
+      captured = source[/^\s*FIRST_NAME_MAX_LENGTH\s*=\s*(\d+)/, 1]
+      raise "FIRST_NAME_MAX_LENGTH not found in lib/studio.rb — the mirror is stale" if captured.nil?
+
+      captured.to_i
+    end
 
   mattr_accessor :theme_primary,  default: "#8E82FE"
   mattr_accessor :theme_dark,     default: "#1A1535"
@@ -74,6 +95,14 @@ module Studio
 
   def self.sidebar_sections_for(view)
     SidebarSections.resolve(sidebar_sections, view)
+  end
+
+  def self.default_profile_sections
+    ProfileSections.defaults
+  end
+
+  def self.profile_sections_for(view)
+    ProfileSections.resolve(profile_sections, view)
   end
 
   def self.mailer_from_for_transport(env: ENV, ses_from:, resend_from: nil)
