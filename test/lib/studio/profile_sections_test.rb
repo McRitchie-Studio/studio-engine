@@ -166,6 +166,48 @@ class ProfileSectionsTest < Minitest::Test
     assert_equal %i[avatar first_name google], Studio.default_profile_sections.map { |s| s[:key] }
   end
 
+  # --- the app-capability gate (`if:`) ----------------------------------------
+  #
+  # DISTINCT FROM `requires:`, and the distinction is the bug this closes.
+  # `requires:` asks whether the MODEL can serve the row; `if:` asks whether the
+  # APP offers the feature. Every consumer's users table carries provider and
+  # uid, so the model gate alone selected the whole fleet for the Google row —
+  # including mcritchie-industries, which has `auth_methods = %i[magic_link]` and
+  # no omniauth gem, and would have rendered a Connect button leading nowhere.
+
+  def test_a_row_whose_if_returns_false_is_dropped
+    sections = [{ key: :on, partial: "x", if: -> { true } },
+                { key: :off, partial: "x", if: -> { false } }]
+
+    assert_equal %i[on], Studio::ProfileSections.resolve(sections, full_view).map { |s| s[:key] }
+  end
+
+  def test_an_if_taking_the_view_receives_it
+    sections = [{ key: :named, partial: "x", if: ->(view) { view.current_user.first_name == "Alex" } }]
+
+    assert_equal %i[named], Studio::ProfileSections.resolve(sections, full_view).map { |s| s[:key] }
+  end
+
+  def test_a_row_with_no_if_always_renders
+    assert_equal %i[bare], Studio::ProfileSections.resolve([{ key: :bare, partial: "x" }], full_view).map { |s| s[:key] }
+  end
+
+  # REGRESSION GUARD for the blocker itself. mcritchie-industries' shape: the
+  # columns are present, the auth method is not.
+  def test_the_google_row_drops_in_an_app_that_does_not_offer_google
+    oauth_user = Struct.new(:first_name, :provider, :uid) { def avatar = nil }.new("Alex", "google_oauth2", "1")
+    view = UserView.new(oauth_user)
+
+    Studio.auth_methods = %i[magic_link]
+    refute_includes Studio::ProfileSections.resolve(nil, view).map { |s| s[:key] }, :google,
+      "having provider/uid columns is not the same as offering Google sign-in"
+
+    Studio.auth_methods = %i[magic_link google]
+    assert_includes Studio::ProfileSections.resolve(nil, view).map { |s| s[:key] }, :google
+  ensure
+    Studio.auth_methods = %i[magic_link google wallet]
+  end
+
   # The requires-gate, exercised on the row most likely to be absent: the Google
   # row needs BOTH provider and uid, and a host with neither must get a page
   # without it rather than a NoMethodError from the partial's linked? check.

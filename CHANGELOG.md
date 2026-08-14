@@ -33,8 +33,32 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   refuses the request independently, because a disabled button is a courtesy and
   anyone can send the `DELETE`.
 
-  The row declares `requires: %i[provider uid]`, so a host whose users table has
-  neither gets a page without it rather than a `NoMethodError`.
+  **What counts as a way back in is deliberately narrow**, because a false
+  positive here permits an unlink that orphans an account. A password counts only
+  via `Studio.password_login_available?` (`auth_method?(:password)` **and** the
+  User answering `authenticate`) — turf-monster removed `has_secure_password` and
+  kept the column, so its rows carry fossil digests no code can authenticate
+  against. A wallet counts only when the host has **explicitly** named its
+  signing-wallet column via `Studio.wallet_address_method`; the engine does not
+  guess a conventional reader, because turf's `User#solana_address` returns
+  `web3 || web2` and only the web3 address can sign in — the web2 one is
+  custodial, with no signer. An unconfigured app is treated as having no wallet
+  sign-in, which errs toward refusing: the cost is a refusal the operator fixes
+  with one config line, against someone locked out of their account.
+
+  The row declares `requires: %i[provider uid]` **and**
+  `if: -> { Studio.auth_method?(:google) }` — the model gate and the app gate are
+  different questions, and only the pair is correct. **Every** consumer's users
+  table carries `provider` and `uid`, so the model gate alone selected the whole
+  fleet; mcritchie-industries has both columns, `auth_methods = %i[magic_link]`,
+  and no omniauth gem at all, and would have been handed a "Link Google Account"
+  button leading nowhere. The engine's login page already asks the app question
+  before drawing this identical button (`app/views/sessions/new.html.erb`).
+
+- **`Studio.profile_sections` rows accept `if:`** — an optional callable gating a
+  row on an app capability, evaluated at resolve time, called with the view when
+  it takes an argument and without when it does not. Distinct from `requires:`,
+  which asks whether the user MODEL can serve the row.
 
 - **The shared profile page — `/profile`.** The engine now ships the account page
   itself, not just the parts. `Studio::ProfilesController` renders a page of

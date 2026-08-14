@@ -102,6 +102,26 @@ module Studio
     SidebarSections.resolve(sidebar_sections, view)
   end
 
+  # Mirrors lib/studio.rb — Studio::ProfileSections and Studio::OauthIdentity both
+  # gate on these, so the pure-Ruby suite needs them defined.
+  PASSWORD_USER_INSTANCE_METHODS = %i[authenticate].freeze
+
+  def self.auth_method?(method)
+    auth_methods.include?(method.to_sym)
+  end
+
+  def self.password_login_available?
+    auth_method?(:password) && user_supports_password?
+  end
+
+  def self.user_supports_password?
+    return false unless defined?(::User) && ::User.respond_to?(:instance_methods)
+
+    PASSWORD_USER_INSTANCE_METHODS.all? { |m| ::User.instance_methods.include?(m) }
+  rescue StandardError
+    false
+  end
+
   def self.default_profile_sections
     ProfileSections.defaults
   end

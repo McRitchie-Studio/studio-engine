@@ -46,9 +46,16 @@ module Studio
 
       remaining << :magic_link if methods.include?(:magic_link) && present?(user, :email)
       remaining << :wallet     if methods.include?(:wallet) && wallet_present?(user)
-      # Not in auth_methods — a password is a property of the record, and an app
-      # with password_digest set can always sign in with it.
-      remaining << :password   if present?(user, :password_digest)
+      # `Studio.password_login_available?` — NOT a bare password_digest check.
+      # A digest can be a FOSSIL: turf-monster removed `has_secure_password` and
+      # kept the column, so rows still carry digests no code can authenticate
+      # against. Counting one as a way back in is a false positive in the
+      # dangerous direction — it would permit an unlink that orphans the account.
+      # The engine already ships the correct composite predicate
+      # (auth_method?(:password) && the User answering `authenticate`).
+      remaining << :password if methods.include?(:password) &&
+                                Studio.password_login_available? &&
+                                present?(user, :password_digest)
 
       remaining
     end
@@ -62,15 +69,27 @@ module Studio
       user.respond_to?(attribute) && user.public_send(attribute).present?
     end
 
-    # The host names its own wallet column (Studio.wallet_address_method) —
-    # turf-monster has two (web2/web3) and resolves between them, mcritchie-studio
-    # has one. Fall back to the conventional name so an app that never configured
-    # it is still read correctly.
+    # ONLY the explicitly configured wallet column — no fallback to a
+    # conventional name, deliberately.
+    #
+    # A convention-guessed reader is a false positive waiting to happen, and
+    # turf-monster is the live example: its `User#solana_address` returns
+    # `web3_solana_address || web2_solana_address`, and only the WEB3 address can
+    # actually sign in (SolanaSessionsController verifies a wallet signature; the
+    # web2 address is a custodial account with no signer). Guessing that reader
+    # would count a custodial address as a way back in and permit an unlink that
+    # orphans the account.
+    #
+    # So an app that has not named its signing-wallet column is treated as having
+    # no wallet sign-in. That errs toward REFUSING an unlink, which is the safe
+    # direction: the cost is an occasional refusal the operator can resolve by
+    # configuring `Studio.wallet_address_method`; the cost of the other direction
+    # is someone locked out of their account.
     def wallet_present?(user)
       configured = Studio.wallet_address_method
-      return present?(user, configured) if configured.present?
+      return false if configured.blank?
 
-      present?(user, :solana_address)
+      present?(user, configured)
     end
   end
 end

@@ -198,23 +198,28 @@ class ProfilePageTest < ActiveSupport::TestCase
   # regex-matched `unsupported(:x) unless serves?(:x)` and broke the moment a
   # guard legitimately checked two columns while naming one row, which is a test
   # failing on a reformat rather than on a defect.
-  WRITE_ACTIONS = %w[update avatar unlink_google].freeze
+  # The three write actions as of this change. Named ONLY as a canary: the test
+  # DISCOVERS writers below rather than trusting this list, and asserts the two
+  # agree. A hardcoded list alone would stay green when a fourth, unguarded write
+  # action was added — which is the whole failure this guards.
+  KNOWN_WRITE_ACTIONS = %w[update avatar unlink_google].freeze
+  WRITE_PATTERN = /current_user\.(update|avatar\.attach)/
 
   test "every write action refuses before it writes" do
-    bodies = controller_source.split(/^    def /).to_h do |chunk|
-      [chunk[/\A(\w+)/, 1], chunk]
-    end
+    bodies = controller_source.split(/^    def /).to_h { |chunk| [chunk[/\A(\w+)/, 1], chunk] }
+    writers = bodies.select { |_name, body| body&.match?(WRITE_PATTERN) }
 
-    WRITE_ACTIONS.each do |action|
-      body = bodies[action]
-      refute_nil body, "expected a #{action} action"
+    assert_equal KNOWN_WRITE_ACTIONS.sort, writers.keys.sort,
+      "a write action appeared or vanished — update KNOWN_WRITE_ACTIONS deliberately, " \
+      "and make sure the new one guards"
 
-      guard_at = body.index("serves?(")
-      write_at = body.index(/current_user\.(update|avatar\.attach)/)
+    writers.each do |action, body|
+      guard = body[/^\s*return \S+ unless [^\n]*serves\?\([^\n]*\n/]
+      refute_nil guard,
+        "#{action} must RETURN early when the host cannot serve the field — " \
+        "merely mentioning serves? is not refusing"
 
-      refute_nil guard_at, "#{action} must ask whether this host can serve the field"
-      refute_nil write_at, "expected #{action} to write something"
-      assert guard_at < write_at,
+      assert body.index(guard) < body.index(WRITE_PATTERN),
         "#{action} writes before it guards — the endpoint 500s where its row is merely hidden"
     end
   end
