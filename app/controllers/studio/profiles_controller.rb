@@ -38,6 +38,8 @@ module Studio
 
     # PATCH /profile — the scalar fields. Today that is the first name.
     def update
+      return unsupported(:first_name) unless serves?(:first_name)
+
       value = normalized_first_name
 
       if value.blank?
@@ -83,6 +85,8 @@ module Studio
     # this and branched inside its own #update; a separate route is the same
     # lesson expressed so the trap cannot be reintroduced.
     def avatar
+      return unsupported(:avatar) unless serves?(:avatar)
+
       file = params.dig(:profile, :avatar)
 
       if file.blank?
@@ -100,6 +104,31 @@ module Studio
     end
 
     private
+
+    # Can this host's user model serve this field?
+    #
+    # A HIDDEN ROW IS NOT A GUARD. Studio::ProfileSections drops a row the host
+    # cannot serve, so nobody SEES a first-name form in an app without the
+    # column — but the endpoint stays open to anyone who posts to it, and
+    # rescue_and_log RE-RAISES, so an unguarded write is a 500 plus an ErrorLog
+    # row. That is not hypothetical: three of the five consumers
+    # (mcritchie-industries, moms-app, acquisition-studio) have an avatar
+    # attachment and no first_name column right now.
+    #
+    # The endpoint asks the SAME question the row does, through the SAME method,
+    # so the two cannot drift into disagreeing about what this app supports.
+    def serves?(attribute)
+      Studio::ProfileSections.served_by?(current_user, attribute)
+    end
+
+    # Land the person back on a page that works rather than on a bare 404. This
+    # is unreachable through the UI — the row that posts here is not rendered —
+    # so the wording is for whoever is poking at the endpoint directly.
+    def unsupported(attribute)
+      redirect_to profile_path,
+                  alert: "This app has no #{attribute.to_s.tr("_", " ")} to change.",
+                  status: :see_other
+    end
 
     # Collapse runs of whitespace and cap the length. Done here rather than in a
     # model validation because the engine does not own the host's User class.

@@ -145,6 +145,42 @@ class ProfilePageTest < ActiveSupport::TestCase
       "hardcoding the rows removes the seam every consuming app extends through"
   end
 
+  # A HIDDEN ROW IS NOT A GUARD, and this is the test that says so.
+  #
+  # ProfileSections drops a row the host cannot serve, so nobody SEES a
+  # first-name form in an app without the column. The endpoint is still open to
+  # anyone who posts to it, and Studio::ErrorHandling#rescue_and_log RE-RAISES —
+  # so an unguarded write is a 500 plus an ErrorLog row. Three of the five
+  # consumers have an avatar and no first_name column TODAY (mcritchie-industries,
+  # moms-app, acquisition-studio), so this is the live shape of the ecosystem
+  # rather than a defensive hypothetical.
+  #
+  # Both write actions must ask the SAME question the row asks, through the same
+  # predicate, so the endpoint and the page cannot drift apart.
+  test "both write actions guard on what the host can actually serve" do
+    guards = controller_source.scan(/return unsupported\(:(\w+)\) unless serves\?\(:(\w+)\)/)
+
+    assert_equal 2, guards.length,
+      "each write action guards, or the endpoint 500s where its row is merely hidden"
+    guards.each do |named, checked|
+      assert_equal named, checked, "the guard and its message must name the same field"
+    end
+    assert_equal %w[avatar first_name], guards.map(&:first).sort
+  end
+
+  # The guard delegates to the registry's predicate rather than re-deriving
+  # respond_to? — one rule, unit-tested in test/lib/studio/profile_sections_test.rb.
+  test "the guard reuses the registry's own predicate" do
+    assert_includes controller_source, "Studio::ProfileSections.served_by?"
+
+    ensure_application_controller!
+    thin = Struct.new(:x).new(nil)
+    full = Struct.new(:first_name).new("Pat")
+
+    refute Studio::ProfileSections.served_by?(thin, :first_name)
+    assert Studio::ProfileSections.served_by?(full, :first_name)
+  end
+
   # --- the default page's partials actually exist -----------------------------
 
   # Studio::ProfileSections names two partials by path. A rename that missed one
