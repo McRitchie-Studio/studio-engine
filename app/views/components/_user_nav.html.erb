@@ -42,25 +42,23 @@
 
 <%# Where the username and the avatar point — resolved ONCE, used by both.
 
-    A HOST'S OWN account_path WINS. /profile is the destination for an app that
-    never wrote an account page — which is four of the five consumers — and the
-    engine does not repoint an app that already has one.
+    A HOST'S OWN account_path WINS: an app that already has an account page keeps
+    it rather than being repointed at a thinner /profile by a routine dependency
+    bump. An app adopting /profile flips over by DELETING its account route, so
+    the last step of the migration is the deliberate one.
 
-    That order is deliberate and it is the migration. turf-monster's /account
-    carries wallet balances, identities, referrals and quests; /profile ships
-    with two rows. Preferring /profile would silently demote turf's navbar to a
-    thinner page on a routine dependency bump, which is a regression dressed as
-    an upgrade. Instead turf keeps its page, moves its rows across one at a time,
-    and flips over by DELETING its account route when /profile can finally
-    replace it. The last step of a migration should be the deliberate one.
+    NO CONSUMER EXERCISES THAT BRANCH TODAY, and the comment here said otherwise
+    until 2026-08-14. turf-monster is the only app with an account_path, and it
+    ships its own app/views/components/_user_nav.html.erb — a host view SHADOWS
+    the engine's in this non-isolated engine, so turf never renders THIS file.
+    The rule is for apps that adopt /profile later.
 
     nil when NEITHER exists, and then the name and avatar render as plain text.
     They used to render `href="#"`, which was not a graceful degradation but a
-    dead link: mcritchie-studio and mcritchie-industries have shipped a navbar
-    whose avatar and username go nowhere for as long as they have had a navbar,
-    because the engine assumed an account route every consumer was expected to
-    write for itself. A link that goes nowhere looks identical to one that works
-    until it is clicked, which is why nobody reported it.
+    dead link. Who that actually reached: mcritchie-industries and
+    acquisition-studio — the consumers rendering this partial rather than a fork
+    of it. A link that goes nowhere looks identical to one that works until it is
+    clicked, which is why nobody reported it.
 %>
 <% studio_nav_destination =
      if defined?(account_path)

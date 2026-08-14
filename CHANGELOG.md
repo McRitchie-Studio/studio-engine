@@ -11,14 +11,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   declared rows; iteration one ships two, **change your photo** and **change your
   first name**. Every consumer gets it on upgrade with no configuration.
 
-  **Why this page exists at all.** `components/_user_nav` — the navbar block every
-  app renders — has always linked the username and the avatar to
-  `defined?(account_path) ? account_path : "#"`. Only turf-monster draws an
-  account route, so **mcritchie-studio and mcritchie-industries have shipped a
-  navbar whose avatar and username are `href="#"`** for as long as they have had
-  a navbar. A dead link looks exactly like a working one until it is clicked,
-  which is why it survived in two production apps. The engine assumed a page every
-  consumer was expected to write for itself; now it ships the page.
+  **Why this page exists at all.** `components/_user_nav` has always linked the
+  username and the avatar to `defined?(account_path) ? account_path : "#"`, and
+  only turf-monster draws an account route — so every app that renders the
+  ENGINE's copy of that partial shipped a navbar whose avatar and username are
+  `href="#"`. A dead link looks exactly like a working one until it is clicked,
+  which is why it survived in production. The engine assumed a page every consumer
+  was expected to write for itself; now it ships the page.
+
+  **Which apps that actually is** (host views shadow engine views, so a fork does
+  not receive this): **mcritchie-industries and acquisition-studio** render the
+  engine partial and had the dead link. **mcritchie-studio** and **turf-monster**
+  each ship their own `app/views/components/_user_nav.html.erb` and are unaffected
+  either way; **moms-app** forks `layouts/_navbar` and renders no user nav at all.
 
   **Why `/profile` and not `/account`.** turf-monster owns `AccountsController`
   and the `account_path` helper. A shared `/account` route would raise
@@ -62,7 +67,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   **The page brings its own modals.** A row declares `modals: true` and the page
   mounts `studio/modals/_scoped_host` on a `profileModals` store, so the row works
   in an app that renders no shared modal host at all (mcritchie-industries,
-  moms-app) and is not shadowed in the two apps that ship their own fork of
+  moms-app, acquisition-studio) and is not shadowed in the apps that ship a fork of
   `studio/modals/_host` (mcritchie-studio, turf-monster). **No host app has to
   touch its layout to get a working avatar cropper.** cropper.js loads only when
   a resolved row actually needs it.
@@ -130,16 +135,15 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   The name and the picture still render in that last case — only the link is
   dropped. Previously both were `href="#"`.
 
-  **The host's page wins deliberately.** turf-monster's `/account` carries wallet
-  balances, identities, referrals and quests; `/profile` ships with two rows.
-  Preferring `/profile` would silently demote turf's navbar to a thinner page on
-  a routine dependency bump — an upgrade that takes something away. turf instead
-  keeps its page, moves its rows to `/profile` one at a time, and flips over by
-  **deleting its account route** once `/profile` can replace it.
+  **The host's page wins deliberately** — the engine does not repoint an app that
+  already has an account page of its own. No consumer exercises that branch today
+  (turf-monster is the only app with an `account_path`, and it forks this partial
+  anyway), so it is a rule for the apps that adopt `/profile` later rather than a
+  behavior change now.
 
-  So: **no consumer's navbar destination changes on this upgrade.** The four apps
-  with no account page gain a working link where they had `href="#"`;
-  turf-monster is untouched.
+  So: **no consumer's navbar destination changes on this upgrade.**
+  mcritchie-industries and acquisition-studio gain a working link where they had
+  `href="#"`; every other consumer forks the partial and is untouched.
 
 - **No pre-registered email seeds a logo — `magic_link` was the last one, and it
   seeded the Studio wordmark onto the SIGN-IN email.** `STANDARD`'s `magic_link`
