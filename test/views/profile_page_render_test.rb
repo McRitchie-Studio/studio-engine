@@ -165,9 +165,10 @@ class ProfilePageRenderTest < Minitest::Test
     html = render_page(Studio::ProfileSections.defaults)
     doc = Nokogiri::HTML5.fragment(html)
 
-    assert_equal %w[avatar first_name], doc.css("[data-profile-section]").map { |s| s["data-profile-section"] }
+    assert_equal %w[avatar first_name google], doc.css("[data-profile-section]").map { |s| s["data-profile-section"] }
     assert_includes doc.text, "Profile photo"
     assert_includes doc.text, "Your name"
+    assert_includes doc.text, "Google account"
   end
 
   def test_the_page_renders_only_the_rows_it_was_given
@@ -179,6 +180,64 @@ class ProfilePageRenderTest < Minitest::Test
 
     assert_equal %w[avatar], doc.css("[data-profile-section]").map { |s| s["data-profile-section"] }
     refute_includes doc.text, "Your name"
+  end
+
+  # --- the Google identity row -------------------------------------------------
+
+  class GoogleUser
+    def initialize(provider: "google_oauth2", uid: "123", email: "pat@example.com")
+      @provider, @uid, @email = provider, uid, email
+    end
+    attr_reader :provider, :uid, :email
+    def display_name = "Pat Studio"
+  end
+
+  def google_row(user)
+    v = view
+    v.define_singleton_method(:profile_unlink_google_path) { "/profile/google" }
+    v.render(partial: "studio/profiles/google_section", locals: { user: user })
+  end
+
+  def test_the_linked_state_offers_unlink
+    doc = Nokogiri::HTML5.fragment(google_row(GoogleUser.new))
+
+    assert_includes doc.text, "Connected via Google"
+    form = doc.at_css("form")
+    refute_nil form, "expected the unlink button"
+    assert_equal "/profile/google", form["action"]
+    assert_equal "delete", doc.at_css('input[name="_method"]')["value"],
+      "unlinking removes an identity — it is a DELETE"
+  end
+
+  def test_the_unlinked_state_offers_the_omniauth_connect_button
+    doc = Nokogiri::HTML5.fragment(google_row(GoogleUser.new(provider: nil, uid: nil)))
+
+    assert_includes doc.text, "Link Google Account"
+    # OmniAuth's own path; the engine does not draw it, the middleware owns it.
+    assert_equal "/auth/google_oauth2", doc.at_css("form")["action"]
+    refute_includes doc.text, "Connected via Google"
+  end
+
+  # THE ORPHAN GUARD, at the UI. An account whose only sign-in is Google must not
+  # be offered a live Unlink button. The control is DISABLED with the reason
+  # beside it rather than hidden — a control that vanishes teaches nothing, and
+  # the person cannot tell whether the feature is missing or their account is
+  # special. The server refuses this case regardless; this is the explanation.
+  def test_a_google_only_account_cannot_click_unlink
+    row = google_row(GoogleUser.new(email: nil))
+    doc = Nokogiri::HTML5.fragment(row)
+
+    assert_includes doc.text, "Connected via Google"
+    refute_nil doc.at_css("button[disabled]"), "unlink must not be clickable"
+    assert_nil doc.at_css("form"), "no submittable unlink form for a Google-only account"
+    assert_includes doc.text, "Add an email address first"
+  end
+
+  def test_an_account_with_another_sign_in_keeps_a_live_unlink
+    doc = Nokogiri::HTML5.fragment(google_row(GoogleUser.new(email: "pat@example.com")))
+
+    assert_nil doc.at_css("button[disabled]")
+    refute_nil doc.at_css("form")
   end
 
   # --- the page mounts the modals its rows need -------------------------------

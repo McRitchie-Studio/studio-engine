@@ -52,7 +52,9 @@ module Studio
       { key: :avatar, title: "Profile photo",
         partial: "studio/profiles/avatar_section", requires: :avatar, modals: true },
       { key: :first_name, title: "Your name",
-        partial: "studio/profiles/first_name_section", requires: :first_name }
+        partial: "studio/profiles/first_name_section", requires: :first_name },
+      { key: :google, title: "Google account",
+        partial: "studio/profiles/google_section", requires: %i[provider uid] }
     ].freeze
 
     module_function

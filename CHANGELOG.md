@@ -6,6 +6,36 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **`/profile` gains the Google account row.** Shows the linked identity with an
+  Unlink control, or a branded Connect button that POSTs to OmniAuth's own
+  `/auth/google_oauth2` (the engine does not draw a link route — the middleware
+  owns that path). Lifted from turf-monster's `/account` Identities card.
+
+  New route: `DELETE /profile/google` → `profile_unlink_google_path`.
+
+  **`Studio::OauthIdentity`** carries the rules, pure and duck-typed like
+  `Studio::ProfileImage`: `google_linked?`, `remaining_sign_ins`,
+  `unlink_orphans_account?`. It matches **both** provider spellings in the wild —
+  `google_oauth2` (the OmniAuth strategy name that lands in `users.provider`) and
+  `google` (what `Studio.auth_methods` calls it).
+
+  **THE ORPHAN GUARD — the reason this is not a straight copy.** turf-monster's
+  unlink is an unconditional `update!(provider: nil, uid: nil)`. For an account
+  whose only sign-in is Google — blank email so no magic link, no wallet, no
+  password — that silently locks someone out of their own account behind a button
+  labelled "Unlink". It is safe in turf today only because turf's users happen to
+  carry an email, which is a property of that app's **data**, not of its code.
+
+  The engine refuses instead, and gates on **`Studio.auth_methods`, not merely on
+  the column**: an app that has an `email` column but does not offer magic-link
+  sign-in cannot use it to get back in, so counting it would be exactly the wrong
+  answer. The row disables the button with the reason beside it; the endpoint
+  refuses the request independently, because a disabled button is a courtesy and
+  anyone can send the `DELETE`.
+
+  The row declares `requires: %i[provider uid]`, so a host whose users table has
+  neither gets a page without it rather than a `NoMethodError`.
+
 - **The shared profile page — `/profile`.** The engine now ships the account page
   itself, not just the parts. `Studio::ProfilesController` renders a page of
   declared rows; iteration one ships two, **change your photo** and **change your

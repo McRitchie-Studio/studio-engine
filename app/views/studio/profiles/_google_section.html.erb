@@ -1,0 +1,56 @@
+<%# Google account row — lifted from turf-monster's /account Identities card.
+
+    Locals: user (required).
+
+    Two states. LINKED: a tick, "Connected via Google", and an Unlink button
+    behind a confirm. NOT LINKED: the branded Connect button, which POSTs to
+    OmniAuth's own /auth/google_oauth2 — the engine does not draw that path, the
+    middleware owns it, which is why this is a literal string and not a helper.
+
+    The row only renders when the host's user model answers provider AND uid
+    (Studio::ProfileSections drops it otherwise), so nothing here re-checks.
+
+    ON THE PREDICATE: turf's view asks `@user.google_connected?`, a method only
+    turf defines. The engine cannot call that — it reads provider/uid itself
+    through Studio::OauthIdentity, which also matches BOTH spellings that appear
+    in the wild (`google_oauth2` from the OmniAuth strategy, `google` from
+    Studio.auth_methods).
+%>
+<% linked = Studio::OauthIdentity.google_linked?(user) %>
+
+<% if linked %>
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+      </svg>
+      <span class="text-body">Connected via Google</span>
+    </div>
+
+    <%# The button is rendered either way; when unlinking would orphan the
+        account it is DISABLED with the reason beside it, rather than hidden.
+        A control that vanishes teaches nothing — the person cannot tell whether
+        the feature is missing or their account is special. The server refuses
+        this case regardless (ProfilesController#unlink_google); this is the
+        explanation, not the enforcement. %>
+    <% orphans = Studio::OauthIdentity.unlink_orphans_account?(user) %>
+    <% if orphans %>
+      <div class="text-right">
+        <button type="button" disabled
+                class="btn btn-danger btn-sm opacity-50 cursor-not-allowed"
+                title="Google is currently the only way to sign in">Unlink</button>
+        <p class="text-muted text-xs mt-1">Add an email address first — Google is your only sign-in.</p>
+      </div>
+    <% else %>
+      <%= button_to "Unlink", profile_unlink_google_path, method: :delete,
+                    class: "btn btn-danger btn-sm",
+                    data: { turbo_confirm: "Unlink your Google account?" } %>
+    <% end %>
+  </div>
+<% else %>
+  <%= button_to "/auth/google_oauth2", method: :post, data: { turbo: false },
+                class: "btn btn-google gap-3 w-full" do %>
+    <%= render "components/google_logo" %>
+    Link Google Account
+  <% end %>
+<% end %>

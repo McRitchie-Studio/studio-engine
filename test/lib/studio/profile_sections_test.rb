@@ -163,7 +163,18 @@ class ProfileSectionsTest < Minitest::Test
   end
 
   def test_studio_default_profile_sections_is_the_public_composition_handle
-    assert_equal %i[avatar first_name], Studio.default_profile_sections.map { |s| s[:key] }
+    assert_equal %i[avatar first_name google], Studio.default_profile_sections.map { |s| s[:key] }
+  end
+
+  # The requires-gate, exercised on the row most likely to be absent: the Google
+  # row needs BOTH provider and uid, and a host with neither must get a page
+  # without it rather than a NoMethodError from the partial's linked? check.
+  def test_the_google_row_drops_for_a_model_with_no_oauth_columns
+    refute_includes Studio::ProfileSections.resolve(nil, full_view).map { |s| s[:key] }, :google,
+      "FullUser answers neither provider nor uid"
+
+    oauth_user = Struct.new(:first_name, :provider, :uid) { def avatar = nil }.new("Alex", "google_oauth2", "1")
+    assert_includes Studio::ProfileSections.resolve(nil, UserView.new(oauth_user)).map { |s| s[:key] }, :google
   end
 
   def test_default_config_is_nil_so_a_bare_app_gets_the_standard_page

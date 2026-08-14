@@ -20,6 +20,7 @@ require_relative "../lib/studio/environment_banner"
 require_relative "../lib/studio/sidebar_sections"
 require_relative "../lib/studio/profile_sections"
 require_relative "../lib/studio/profile_image"
+require_relative "../lib/studio/oauth_identity"
 require_relative "../lib/studio/theme_resolver"
 require_relative "../lib/studio/ui_primitives"
 require_relative "../lib/studio/email"
@@ -53,6 +54,10 @@ module Studio
   # mirror has to carry the real default rather than a convenient one.
   mattr_accessor :profile_sections,     default: nil
   mattr_accessor :draw_profile_routes,  default: true
+  # Mirrors lib/studio.rb. Studio::OauthIdentity gates the orphan guard on this,
+  # so the unit suite needs it defined; the tests that depend on a specific value
+  # set it explicitly and restore it in teardown.
+  mattr_accessor :auth_methods,         default: %i[magic_link google wallet]
 
   # READ from lib/studio.rb rather than restated. This mirror block is
   # hand-maintained, and a restated number here would be a second definition of
