@@ -90,8 +90,18 @@ end
 # is what supplies current_user / logged_in? / require_authentication / rescue_and_log —
 # every consumer includes it, so a dummy that did not would be testing a host
 # nobody ships.
+# A real consuming app looks exactly like this: ApplicationController includes
+# Studio::ErrorHandling and wires the OPSEC-045 session-token check AHEAD of
+# authentication (the shape magic_link_flow_test.rb has carried all along).
+#
+# WITHOUT verify_session_token THE SESSION TESTS BELOW CANNOT FAIL, which is how
+# a broken re-establish shipped past them: rotating the token and then NOT
+# putting the new one in the cookie left the suite green, because nothing in this
+# dummy ever compared the two. Caught in review by mutation, not by the suite.
 class ApplicationController < ActionController::Base
   include Studio::ErrorHandling
+
+  before_action :verify_session_token
 end
 
 class User < ApplicationRecord
@@ -120,7 +130,10 @@ class TestSessionsController < ApplicationController
   skip_before_action :require_authentication
 
   def create
-    session[Studio.session_key] = params[:id]
+    user = User.find(params[:id])
+    user.regenerate_session_token! if user.session_token.blank?
+    session[Studio.session_key] = user.id
+    session[:session_token] = user.session_token
     head :ok
   end
 end
@@ -135,6 +148,8 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
     User.delete_all
   end
 
+  # Mirrors what a host's real sign-in does — the session key AND the rotating
+  # token that verify_session_token checks on every later request.
   def sign_in(user)
     post "/test_sign_in/#{user.id}"
     assert_response :ok

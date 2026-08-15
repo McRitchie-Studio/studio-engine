@@ -15,16 +15,13 @@ module Studio
   #
   # Under `Studio::` nothing shadows it, following Studio::NewsletterMailer.
   #
-  # WHY TWO EMAILS, going to two different addresses:
+  # ONE EMAIL, and it goes to the address being LEFT:
   #
-  #   email_change_confirmation → the CURRENT address. It carries the link that
-  #     authorizes the swap, so the person who holds the existing inbox is the one
-  #     who approves it. Sending it to the NEW address instead would let anyone
-  #     who reached a logged-in session move the account to their own inbox.
-  #
-  #   email_change_notification → the OLD address, AFTER the swap. Out-of-band
-  #     notice that the change happened, so an unauthorized change is visible to
-  #     the person losing the account rather than silent.
+  #   email_change_notification → the OLD address, after the change lands. With
+  #     the change applying directly from any signed-in session, this mail is the
+  #     only thing that makes a change nobody made VISIBLE to the person losing
+  #     the account. That is why it survives and why it is sent even though
+  #     nothing about it is required for the change to work.
   class ProfileMailer < ApplicationMailer
     layout "branded_mailer"
 

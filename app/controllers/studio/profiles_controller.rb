@@ -152,18 +152,24 @@ module Studio
         # flow picks it up from here.
         current_user.update_columns(email_verified_at: nil) if current_user.respond_to?(:email_verified_at)
 
+        # ROTATE FIRST, MAIL SECOND — the order matters and it was the other way
+        # round. Studio::Email.deliver can raise (a host's delivery record is a
+        # create! plus perform_later with no rescue at that level), and a mail
+        # failure between the write and the rotation would leave the address
+        # changed with every other session still live. That is the exact window
+        # OPSEC-045 exists to close, so it closes before anything that can throw.
+        # turf-monster's own apply_email_change rotates first for the same reason.
+        if current_user.respond_to?(:regenerate_session_token!)
+          current_user.regenerate_session_token!
+          # Re-establish THIS session. Rotating without it signs out the very
+          # person who just made the change — correct when the actor arrived from
+          # a confirmation link, wrong now that the actor IS the session.
+          session[:session_token] = current_user.session_token if current_user.respond_to?(:session_token)
+        end
+
         if current.present?
           Studio::Email.deliver(Studio::ProfileMailer, :email_change_notification,
                                 current_user, current, value, to: current, user: current_user)
-        end
-
-        # Kill every OTHER session, then re-establish THIS one. Rotation without
-        # the re-establish would sign out the very person who just made the
-        # change — correct when the actor arrived from a confirmation link, wrong
-        # now that the actor is the session.
-        if current_user.respond_to?(:regenerate_session_token!)
-          current_user.regenerate_session_token!
-          session[:session_token] = current_user.session_token if current_user.respond_to?(:session_token)
         end
 
         redirect_to profile_path, notice: "Email changed to #{value}."
