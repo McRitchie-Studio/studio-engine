@@ -148,9 +148,12 @@ module Studio
                               current_user, current, value, token,
                               to: current, user: current_user)
 
-        redirect_to profile_path,
-                    notice: "Check #{current} — we sent a link there to confirm the change. " \
-                            "Your address stays the same until you do."
+        # A modal, not a flash toast: this is a handoff with two addresses in it —
+        # which inbox to open and what will happen — and a one-line toast cannot
+        # carry that without being ignored. show.html.erb reads this flash into a
+        # JSON tag and opens studio/modals/blocks/email_change_pending.
+        flash[:email_change_pending] = { current_email: current, new_email: value }
+        redirect_to profile_path
       end
     end
 

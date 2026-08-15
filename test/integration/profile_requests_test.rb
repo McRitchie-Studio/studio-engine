@@ -346,6 +346,36 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
     assert_empty mails, "no mail for a no-op"
   end
 
+  # THE HANDOFF MODAL. A one-line toast cannot carry two addresses — which inbox
+  # to open, and what will happen when you do — so the ask hands off to a modal
+  # instead. Asserted through a real redirect-and-follow, because the flash is
+  # single-render and the page reads it into a JSON tag on arrival.
+  test "the ask hands off to a modal naming both addresses" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+    follow_redirect!
+
+    assert_response :success
+    assert_includes response.body, "email-change-pending", "the modal must be registered and opened"
+    assert_includes response.body, "old@example.com", "it has to say WHICH inbox to open"
+    assert_includes response.body, "new@example.com", "and what will happen when you do"
+  end
+
+  # Flash is single-render: the modal must not reappear on the next visit, or a
+  # back navigation replays a handoff for a change already dealt with.
+  test "the handoff does not replay on the next visit" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+    follow_redirect!
+
+    get "/profile"
+
+    refute_includes response.body, "profile-email-change-pending"
+  end
+
   # --- the confirm link -------------------------------------------------------
 
   def confirm_token_for(user, to:)

@@ -37,6 +37,11 @@ class ProfilePageRenderTest < Minitest::Test
     v.define_singleton_method(:profile_path) { "/profile" }
     v.define_singleton_method(:profile_avatar_path) { "/profile/avatar" }
     v.define_singleton_method(:profile_email_path) { "/profile/email" }
+    # show.html.erb reads flash[:email_change_pending] to decide whether to open
+    # the handoff modal. A bare ActionView has no controller to delegate flash
+    # to, so supply the empty case — the populated one is exercised by a real
+    # request in test/integration/profile_requests_test.rb.
+    v.define_singleton_method(:flash) { {} }
     v.define_singleton_method(:protect_against_forgery?) { false }
     v
   end
@@ -182,6 +187,93 @@ class ProfilePageRenderTest < Minitest::Test
 
     assert_equal %w[avatar], doc.css("[data-profile-section]").map { |s| s["data-profile-section"] }
     refute_includes doc.text, "Your name"
+  end
+
+  # --- one card, rows inside it ------------------------------------------------
+
+  # The operator's revision (2026-08-14): four separate cards read as four
+  # unrelated settings pages stacked up. One card, hairline dividers.
+  def test_the_page_renders_one_card_with_the_rows_inside_it
+    doc = Nokogiri::HTML5.fragment(render_page(Studio::ProfileSections.defaults))
+    cards = doc.css(".card")
+
+    assert_equal 1, cards.length, "the rows share one card, not one card each"
+    assert_equal Studio::ProfileSections.defaults.length,
+                 cards.first.css("[data-profile-section]").length,
+                 "every row lives inside that card"
+  end
+
+  # A TOP border on every row but the first, so a row can be added or dropped
+  # anywhere without leaving a trailing rule under the last one.
+  def test_rows_are_divided_by_a_top_border_except_the_first
+    doc = Nokogiri::HTML5.fragment(render_page(Studio::ProfileSections.defaults))
+    rows = doc.css("[data-profile-section]")
+
+    refute_includes rows.first["class"], "border-t", "no rule above the first row"
+    rows.drop(1).each do |row|
+      assert_includes row["class"], "border-t", "#{row["data-profile-section"]} needs its divider"
+    end
+  end
+
+  # --- the delta-gated buttons -------------------------------------------------
+
+  def test_the_first_name_field_is_prefilled_and_its_button_says_update
+    doc = Nokogiri::HTML5.fragment(
+      view.render(partial: "studio/profiles/first_name_section", locals: { user: StubUser.new })
+    )
+
+    assert_equal "Pat", doc.at_css('input[name="profile[first_name]"]')["value"],
+      "a blank field made you retype a name you had already set"
+    assert_equal "Update", doc.at_css('input[type="submit"]')["value"]
+  end
+
+  # The gate compares TRIMMED values on both sides, so whitespace is not a
+  # change — and the controller trims on the way in too, which is what makes the
+  # button agree with what the server would actually do.
+  def test_the_update_button_is_disabled_until_the_name_actually_changes
+    html = view.render(partial: "studio/profiles/first_name_section", locals: { user: StubUser.new })
+    submit = Nokogiri::HTML5.fragment(html).at_css('input[type="submit"]')
+
+    assert_equal "value.trim() === initial.trim()", submit[":disabled"]
+    # Read the parsed attribute, not the raw markup — the JSON quotes render as
+    # &quot; entities.
+    x_data = Nokogiri::HTML5.fragment(html).at_css("form")["x-data"]
+    assert_equal %({ initial: "Pat", value: "Pat" }), x_data,
+      "the delta is measured against what the server rendered"
+  end
+
+  # NO-JS FALLBACK. Alpine adds the disabled state on init; a static `disabled`
+  # in the markup would leave a page whose JS never ran with a control it can
+  # never turn on. The server re-checks regardless.
+  def test_the_buttons_are_not_statically_disabled
+    %w[first_name_section email_section].each do |partial|
+      submit = Nokogiri::HTML5.fragment(
+        view.render(partial: "studio/profiles/#{partial}", locals: { user: StubUser.new })
+      ).at_css('input[type="submit"]')
+
+      assert_nil submit["disabled"], "#{partial} must not ship a hard-disabled button"
+    end
+  end
+
+  def test_the_email_button_says_change_and_gates_on_a_real_delta
+    html = view.render(partial: "studio/profiles/email_section", locals: { user: StubUser.new })
+    submit = Nokogiri::HTML5.fragment(html).at_css('input[type="submit"]')
+
+    assert_equal "Change", submit["value"]
+    # Empty, or the address you already have, would spend a real email on nothing.
+    assert_equal "value.trim() === '' || value.trim().toLowerCase() === current", submit[":disabled"]
+    x_data = Nokogiri::HTML5.fragment(html).at_css("form")["x-data"]
+    assert_includes x_data, %(current: "pat@example.com"),
+      "the gate compares against the address the server rendered, lowercased"
+  end
+
+  def test_an_account_with_no_address_yet_gets_save_not_change
+    no_email = Class.new(StubUser) { def email = nil }.new
+    submit = Nokogiri::HTML5.fragment(
+      view.render(partial: "studio/profiles/email_section", locals: { user: no_email })
+    ).at_css('input[type="submit"]')
+
+    assert_equal "Save", submit["value"], "there is no prior owner to ask, so it applies directly"
   end
 
   # --- the Google identity row -------------------------------------------------

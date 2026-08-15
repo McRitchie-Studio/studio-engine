@@ -4,10 +4,15 @@
     application layout and inherits that app's navbar, theme and flash. Same
     shape as /admin/style and /admin/emails.
 
-    The page is nothing but its sections. @profile_sections is already resolved
-    and filtered by the controller (Studio.profile_sections_for) — rows the host
-    cannot serve, and admin rows for non-admins, are gone before we get here — so
-    this template makes no decisions of its own beyond an empty state.
+    ONE CARD, rows inside it (operator's call, 2026-08-14). Each row used to be
+    its own card, which read as four unrelated settings pages stacked up rather
+    than one profile. Rows are separated by a hairline instead, so the page has a
+    single edge and the eye runs down one column.
+
+    The page is still nothing but its sections. @profile_sections is already
+    resolved and filtered by the controller (Studio.profile_sections_for) — rows
+    the host cannot serve, and admin rows for non-admins, are gone before we get
+    here — so this template makes no decisions of its own beyond the empty state.
 %>
 <% content_for(:title, "Profile") %>
 
@@ -21,11 +26,12 @@
     each ship their OWN app/views/studio/modals/_host.html.erb, which shadows the
     engine's in this non-isolated engine, so the page would silently get their
     fork and its registrations. studio/modals/_scoped_host is unforked in every
-    app. /admin/emails reached the same conclusion first.
-
-    Mounted once per page rather than once per row: two hosts sharing a store
-    name would register the same modal ids twice and render duplicate cards. %>
+    app. /admin/emails reached the same conclusion first. %>
 <% profile_needs_modals = Array(@profile_sections).any? { |section| section[:modals] } %>
+<%# The email-change handoff needs the host too, even on a page whose rows want
+    no cropper. %>
+<% profile_pending_email = flash[:email_change_pending].presence %>
+<% profile_mount_host = profile_needs_modals || profile_pending_email.present? %>
 
 <% if profile_needs_modals %>
   <%# cropper.js + the imageUploadHost / cropPhotoModal / submitFormWithProgress
@@ -46,11 +52,14 @@
                message: "Nothing to edit yet",
                detail: "This app has not enabled any profile fields." %>
   <% else %>
-    <div class="space-y-6">
-      <% @profile_sections.each do |section| %>
-        <section class="card p-6" data-profile-section="<%= section[:key] %>">
+    <div class="card p-0 overflow-hidden">
+      <% @profile_sections.each_with_index do |section, index| %>
+        <%# The divider is a TOP border on every row but the first, so a row can
+            be added or dropped anywhere without leaving a trailing rule. %>
+        <section class="p-6 <%= "border-t border-subtle" unless index.zero? %>"
+                 data-profile-section="<%= section[:key] %>">
           <% if section[:title].present? %>
-            <h2 class="text-lg font-bold text-heading mb-4"><%= section[:title] %></h2>
+            <h2 class="text-sm font-bold text-heading mb-4"><%= section[:title] %></h2>
           <% end %>
           <%= render section[:partial], **section.fetch(:locals, {}).merge(user: current_user) %>
         </section>
@@ -59,15 +68,55 @@
   <% end %>
 </div>
 
-<% if profile_needs_modals %>
+<% if profile_mount_host %>
   <%# Optional chaining on current() is load-bearing: the outer template unmounts
       one tick AFTER the stack empties, so a bare .id throws on every close. %>
   <%= render "studio/modals/scoped_host", store: "profileModals" do %>
-    <template x-if="$store.profileModals.current()?.id === 'crop-photo'">
-      <div><%= render "studio/modals/crop_photo", store: "profileModals" %></div>
+    <% if profile_needs_modals %>
+      <template x-if="$store.profileModals.current()?.id === 'crop-photo'">
+        <div><%= render "studio/modals/crop_photo", store: "profileModals" %></div>
+      </template>
+      <template x-if="$store.profileModals.current()?.id === 'saving'">
+        <div><%= render "studio/modals/saving", store: "profileModals" %></div>
+      </template>
+    <% end %>
+    <template x-if="$store.profileModals.current()?.id === 'email-change-pending'">
+      <div><%= render "studio/modals/blocks/email_change_pending", store: "profileModals" %></div>
     </template>
-    <template x-if="$store.profileModals.current()?.id === 'saving'">
-      <div><%= render "studio/modals/saving", store: "profileModals" %></div>
-    </template>
+  <% end %>
+
+  <% if profile_pending_email.present? %>
+    <%# The handoff after PATCH /profile/email. Flash round-trips through the
+        session cookie as JSON, so it comes back with STRING keys however the
+        controller set it.
+
+        Opened on turbo:load rather than DOMContentLoaded: the row's form is a
+        normal submit today, but a host that turns Turbo on would land this
+        redirect via a body swap, and turbo:load fires on both that and a cold
+        load. The one-shot guard stops a back/forward turbo:load replaying a
+        stale flash, and the poll covers turbo:load winning the race against
+        Alpine's boot on a first paint. %>
+    <% pending = profile_pending_email.with_indifferent_access %>
+    <script type="application/json" id="profile-email-change-pending"><%==
+      { currentEmail: pending[:current_email], newEmail: pending[:new_email] }.to_json
+    %></script>
+    <script>
+      (function() {
+        var opened = false;
+        function openPending() {
+          if (opened) return;
+          var tag = document.getElementById("profile-email-change-pending");
+          if (!tag) return;
+          if (!window.Alpine || !Alpine.store || !Alpine.store("profileModals")) {
+            return setTimeout(openPending, 50);
+          }
+          opened = true;
+          Alpine.store("profileModals").open("email-change-pending", JSON.parse(tag.textContent));
+        }
+        document.addEventListener("turbo:load", openPending);
+        if (document.readyState !== "loading") openPending();
+        else document.addEventListener("DOMContentLoaded", openPending);
+      })();
+    </script>
   <% end %>
 <% end %>
