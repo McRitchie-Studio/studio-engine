@@ -1,0 +1,64 @@
+<%# THE EDIT PAGE'S two browser-only controls.
+
+    Both were added on the operator's call (2026-08-15) and both are invisible to
+    every server-side tier for the usual reason: the markup is identical whether
+    the browser program works or is dead.
+
+      1. THE AVATAR OVERLAY. The 28px pencil badge is gone; the picture is the
+         button, and hovering the card fades a "Change photo" label over it.
+         A String assertion sees the label on every render — it is always in the
+         document — and can say nothing about whether it is ever VISIBLE, because
+         that is a computed opacity set by a CSS hover rule. It also cannot say
+         whether clicking actually reaches the file picker.
+
+      2. THE BIRTHDAY CALENDAR. Its popover is `position: fixed`, and the two
+         positioning modes are INDISTINGUISHABLE until the page scrolls — at
+         scroll 0 they land in the same place. The defect is a geometry fact:
+         the element renders, has correct markup, and is simply in the wrong
+         place. Only a browser can tell them apart, and only after scrolling.
+         This page reproduces the edit page's overflow-hidden container so the
+         specs run against the real shape.
+
+    LOCALS ONLY, per test/lib/e2e_lane_contract_test.rb: this page may set a
+    partial's locals and nothing else. Every control below comes from an ENGINE
+    partial rendered BY NAME.
+%>
+<div x-data="studioProfileForm(<%= { first_name: @user.first_name, last_name: @user.last_name, email: @user.email, birthday: "" }.to_json %>)">
+  <div class="max-w-2xl mx-auto py-8">
+    <%# imageUploadHost is defined inside this partial, and editable_identity's
+        x-data calls it. The cropper library it also pulls in comes from a CDN,
+        which the lane answers with an empty 200 (see blockOffsiteRequests) — so
+        the CROPPING is not under test here, only that clicking the avatar
+        reaches the picker.
+
+        (The guard in e2e_lane_contract_test.rb refuses the literal opening tag
+        of a browser program anywhere in a lab page, comments included, and that
+        bluntness is deliberate: an ERB comment ends at its FIRST `%>`, so a
+        leaked one turns its own prose into a phantom element. That is exactly
+        how the at-time defect shipped.) %>
+    <%= render "studio/cropper_assets" %>
+
+    <%= render "studio/profiles/editable_identity", user: @user %>
+
+    <form x-ref="form" data-studio-lab-form>
+      <%# THE CLIPPING CONTAINER, reproduced deliberately. `card p-0
+          overflow-hidden` is what edit.html.erb wraps its rows in. A lab page
+          rendering the field bare would be a different shape from the real page,
+          and the popover's placement would be tested against conditions no
+          consumer ever renders. %>
+      <div class="card p-0 overflow-hidden">
+        <section class="p-6" data-profile-section="birthday">
+          <h2 class="text-sm font-bold text-heading mb-4">Birthday</h2>
+          <%= render "studio/profiles/birthday_fields", user: @user %>
+        </section>
+      </div>
+    </form>
+
+    <%# Runway, so there is somewhere to scroll when the popover has to flip. %>
+    <div data-studio-lab-spacer style="height: 120vh;"></div>
+  </div>
+
+  <%= render "studio/profiles/save_bar" %>
+</div>
+
+<%= render "studio/profiles/form_script" %>

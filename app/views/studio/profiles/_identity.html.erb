@@ -28,7 +28,12 @@
 <%= render "studio/profiles/identity_mini", user: user %>
 
 <% if editable %>
-  <div data-studio-identity-full class="card p-6 mb-6 text-center">
+  <%# `studio-identity-card-editable` is the hover hook: the operator asked for the
+      overlay to reveal on hovering the CARD, not only the picture, so the card
+      needs a class the stylesheet can hang that off. Deliberately NOT the read
+      page's `studio-identity-card`, which also paints a primary border to say
+      "this whole thing is a link" — a claim that is false here. %>
+  <div data-studio-identity-full class="studio-identity-card-editable card p-6 mb-6 text-center">
     <%= render "studio/profiles/identity_body", user: user, editable: true, attachable: attachable %>
   </div>
 <% else %>

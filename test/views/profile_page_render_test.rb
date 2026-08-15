@@ -102,10 +102,54 @@ class ProfilePageRenderTest < Minitest::Test
     assert_match(/\.studio-avatar-badge-icon\s*\{[^}]*opacity:\s*0/, styles,
       "the glyph rests hidden")
     assert_includes styles, ".studio-avatar:hover .studio-avatar-badge-icon"
-    assert_includes styles, ".studio-avatar-badge:focus .studio-avatar-badge-icon",
-      "a keyboard never hovers, and this badge is the only way to the edit page"
+    assert_includes styles, ".studio-identity-card:focus-visible .studio-avatar-badge-icon",
+      "a keyboard never hovers, and this card is the only way to the edit page"
     assert_match(/@media \(hover: none\)/, styles,
       "touch has no hover — the glyph must not simply never appear there")
+  end
+
+  # --- the EDIT page's avatar control ----------------------------------------
+  #
+  # The 28px badge is gone here (operator's call, 2026-08-15): the picture is the
+  # button, and hovering the card fades a label over it.
+
+  def test_the_edit_page_has_no_badge_at_all
+    doc = Nokogiri::HTML5.fragment(identity(editable: true))
+
+    assert_nil doc.at_css(".studio-avatar-badge"),
+      "the corner badge was replaced by the avatar overlay; two affordances for one action is one too many"
+  end
+
+  def test_the_avatar_itself_opens_the_picker
+    doc = Nokogiri::HTML5.fragment(identity(editable: true))
+    trigger = doc.at_css("button.studio-avatar-trigger")
+
+    refute_nil trigger, "the picture is the control now"
+    assert_equal "$refs.filePicker.click()", trigger["@click"]
+    assert_includes trigger.text.strip, "Change photo"
+  end
+
+  # The label is the button's ACCESSIBLE NAME, so it may be hidden by opacity but
+  # never by display/visibility — either of those drops it out of the
+  # accessibility tree and leaves the button silently unnamed at rest.
+  def test_the_overlay_label_is_hidden_by_opacity_not_removed
+    html = identity(editable: true)
+    styles = html[/<style>(.*?)<\/style>/m, 1].to_s
+    overlay = styles[/\.studio-avatar-overlay\s*\{[^}]*\}/m].to_s
+
+    assert_match(/opacity:\s*0/, overlay, "the label rests hidden")
+    refute_match(/display:\s*none/, overlay,
+      "display:none removes the label from the accessibility tree — the button would have no name")
+    refute_match(/visibility:\s*hidden/, overlay, "same problem as display:none")
+  end
+
+  def test_the_overlay_reveals_on_card_hover_and_on_focus
+    styles = identity(editable: true)[/<style>(.*?)<\/style>/m, 1].to_s
+
+    assert_includes styles, ".studio-identity-card-editable:hover .studio-avatar-overlay",
+      "the operator asked for the reveal on hovering the CARD, not only the picture"
+    assert_includes styles, ".studio-avatar-trigger:focus-visible .studio-avatar-overlay",
+      "a keyboard never hovers, and this is the only route to changing the photo"
   end
 
   def test_the_badge_circle_itself_is_always_visible
@@ -140,13 +184,14 @@ class ProfilePageRenderTest < Minitest::Test
     assert_equal "true", badge["aria-hidden"]
   end
 
-  # The edit page's badge is still a real button — it opens the cropper there,
-  # and that card is not a link.
-  def test_the_edit_badge_stays_a_button
+  # The edit card is not a link — its avatar is a button instead. Kept as its own
+  # test because "the card is a link" is true on the read page and false here, and
+  # that asymmetry is what the nested-link rule above depends on.
+  def test_the_edit_card_is_not_a_link
     doc = Nokogiri::HTML5.fragment(identity(editable: true))
 
     assert_nil doc.at_css("a.studio-identity-card"), "the edit card is not a link"
-    assert_equal "button", doc.at_css('[aria-label="Change your profile photo"]').name
+    assert_equal "button", doc.at_css("button.studio-avatar-trigger").name
   end
 
   # --- the compact header that takes over on scroll --------------------------
@@ -219,14 +264,6 @@ class ProfilePageRenderTest < Minitest::Test
     assert_equal 1, edit_links.length, "exactly one route through: the avatar badge"
   end
 
-  def test_the_edit_headers_badge_opens_the_picker
-    doc = Nokogiri::HTML5.fragment(identity(editable: true))
-    badge = doc.at_css('[aria-label="Change your profile photo"]')
-
-    refute_nil badge
-    assert_equal "button", badge.name, "a div here is unreachable by keyboard"
-    assert_equal "$refs.filePicker.click()", badge["@click"]
-  end
 
   # REGRESSION GUARD. The avatar used to be a ROW declaring `requires: :avatar`,
   # so it was dropped whole on a host whose model has no attachment. Moving it

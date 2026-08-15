@@ -40,4 +40,5 @@ Rails.application.routes.draw do
   get "lab/email_banner_frames", to: "e2e_lab#email_banner_frames"
   get "lab/email_banner_editor", to: "e2e_lab#email_banner_editor"
   get "lab/profile", to: "e2e_lab#profile"
+  get "lab/profile_edit", to: "e2e_lab#profile_edit"
 end
