@@ -217,6 +217,35 @@ class E2eLaneContractTest < Minitest::Test
     end
   end
 
+  # THE RELEASE BRANCH MUST BE BUILDABLE, in every workflow that gates a release.
+  #
+  # The G3 pre-QA gate reads GitHub CI's conclusion for the RELEASE SHA and fails
+  # closed on anything but green. A gem release pushes a version + Gemfile.lock
+  # commit DIRECTLY onto `release` — not a pull_request — so with `push` limited
+  # to `main` that SHA gets no run at all, and the gate polls for a verdict that
+  # can never exist.
+  #
+  # Measured 2026-08-15: `gh run list --branch release` returned ZERO runs in this
+  # repo's entire history, `f339f45` (the 0.50.0 version commit) had 0 check-runs,
+  # and the release aborted after ~1200s of polling WITH THE GEM ALREADY PUBLISHED
+  # to RubyGems. The promote PR that produced that tree was green on all six
+  # checks, so nothing was wrong with the code — only with what CI was watching.
+  #
+  # Asserted for BOTH workflows because the gate reads the SHA's whole check set,
+  # not one lane, so either one reverting reopens the hole.
+  def test_integration_every_gating_workflow_builds_the_release_branch
+    { "engine-ci.yml" => "the engine suite", "consumer-ci.yml" => "the consumer suites" }.each do |file, what|
+      path = File.join(ROOT, ".github", "workflows", file)
+      triggers = File.read(path)[/^on:\n(?:.*\n)*?(?=^jobs:)/]
+
+      refute_nil triggers, "#{file} has no `on:` block above `jobs:`"
+      assert_match(/^\s*branches:.*\brelease\b/, triggers,
+                   "#{file} does not build `release`, so #{what} produces NO check-run for a " \
+                   "release SHA — and the G3 gate, which fails closed on a missing verdict, " \
+                   "can never pass. A gem's version commit reaches `release` outside a PR.")
+    end
+  end
+
   # No quarantine, and no quiet arrival of one. The concept is refused in the
   # contract, the config and the CI command at once, because it only takes one of the
   # three to reintroduce an exclusion.
