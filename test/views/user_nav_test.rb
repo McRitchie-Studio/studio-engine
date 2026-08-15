@@ -83,6 +83,75 @@ class UserNavTest < Minitest::Test
     refute_includes html, "LEGACY-BAL"
   end
 
+  # --- where the username and avatar point ------------------------------
+  #
+  # THE REGRESSION THESE GUARD (found 2026-08-14). The partial used to resolve
+  # `defined?(account_path) ? account_path : "#"` in two places. Neither
+  # mcritchie-studio nor mcritchie-industries draws an account route, so both
+  # shipped a navbar whose username AND avatar were `href="#"` — a link that
+  # looks identical to a working one until it is clicked, which is why it
+  # survived in two production apps for as long as they have had a navbar.
+  #
+  # The rule now: a host's own account_path wins where it exists (turf-monster),
+  # /profile is the destination for the four apps that never wrote one, and
+  # PLAIN TEXT renders when neither does. Never a dead href.
+
+  def test_username_and_avatar_link_to_profile_when_the_route_exists
+    doc = Nokogiri::HTML5.fragment(render_nav)
+    hrefs = doc.css("a").map { |a| a["href"] }
+
+    assert_equal 2, hrefs.count("/profile"),
+      "both the username and the avatar link to /profile"
+  end
+
+  def test_no_dead_href_anywhere_when_no_account_route_exists
+    html = render_nav(profile_path: nil, account_path: nil)
+
+    refute_includes html, 'href="#"',
+      "a link to nowhere is the bug; render plain text instead"
+  end
+
+  def test_the_username_still_renders_when_there_is_nowhere_to_link
+    # Degrading must not cost the user their name or their picture — only the
+    # link. Asserting the text survives is what separates this fix from
+    # "hide the whole block".
+    doc = Nokogiri::HTML5.fragment(render_nav(profile_path: nil))
+
+    assert_includes doc.text, "Pat Studio"
+    assert_nil doc.at_css("a.truncate"), "no link when there is no destination"
+    refute_nil doc.at_css("span.truncate"), "the name renders as plain text instead"
+  end
+
+  def test_the_avatar_still_renders_when_there_is_nowhere_to_link
+    doc = Nokogiri::HTML5.fragment(render_nav(profile_path: nil))
+
+    assert_includes doc.to_html, "PS", "the initials circle survives the degrade"
+  end
+
+  def test_a_hosts_own_account_path_is_used_when_profile_is_not_drawn
+    doc = Nokogiri::HTML5.fragment(render_nav(profile_path: nil, account_path: "/account"))
+    hrefs = doc.css("a").map { |a| a["href"] }
+
+    assert_equal 2, hrefs.count("/account")
+  end
+
+  # THE MIGRATION RULE, and the one most likely to be "simplified" into a
+  # regression. turf-monster's /account carries wallet balances, identities,
+  # referrals and quests; /profile ships with two rows. Preferring /profile here
+  # would silently demote turf's navbar to a thinner page on a routine
+  # dependency bump — an upgrade that takes something away.
+  #
+  # So the host's page wins while it exists, and turf flips over by DELETING its
+  # account route once /profile can actually replace it.
+  def test_a_hosts_own_account_path_wins_when_both_exist
+    doc = Nokogiri::HTML5.fragment(render_nav(profile_path: "/profile", account_path: "/account"))
+    hrefs = doc.css("a").map { |a| a["href"] }
+
+    assert_equal 2, hrefs.count("/account"),
+      "the engine must not repoint an app that already has its own account page"
+    refute_includes hrefs, "/profile"
+  end
+
   # --- logged-out path --------------------------------------------------
 
   def test_logged_out_renders_login_and_signup
@@ -183,7 +252,10 @@ class UserNavTest < Minitest::Test
     def avatar_initials = "PS"
   end
 
-  def render_nav(logged_in: true, **locals)
+  # `profile_path` / `account_path` are passed as nil to model a host that does
+  # NOT draw that route — `defined?` is false there, exactly as in a real app
+  # whose router never named the helper.
+  def render_nav(logged_in: true, profile_path: "/profile", account_path: nil, **locals)
     view = ActionView::Base.with_empty_template_cache.with_view_paths(
       ["app/views", "test/views/fixtures"]
     )
@@ -193,6 +265,8 @@ class UserNavTest < Minitest::Test
     view.define_singleton_method(:logout_path) { "/logout" }
     view.define_singleton_method(:login_path) { "/login" }
     view.define_singleton_method(:signup_path) { "/signup" }
+    view.define_singleton_method(:profile_path) { profile_path } if profile_path
+    view.define_singleton_method(:account_path) { account_path } if account_path
 
     view.render(partial: "components/user_nav", locals: locals)
   end

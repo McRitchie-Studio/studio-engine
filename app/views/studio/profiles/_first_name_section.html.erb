@@ -1,0 +1,26 @@
+<%# First-name row.
+
+    Locals: user (required).
+
+    This row only renders when the host's user model actually answers
+    `first_name` — Studio::ProfileSections drops it otherwise, so an app that has
+    not installed the standard profile columns gets a page without this row
+    rather than a NoMethodError on every visit. Nothing here needs to re-check.
+
+    The same column is written by the onboarding step
+    (Studio::OnboardingController#first_name); this is the surface for changing it
+    later.
+%>
+<%= form_with url: profile_path, method: :patch, scope: :profile,
+              data: { turbo: false }, class: "flex flex-wrap items-end gap-3" do |form| %>
+  <div class="flex-1 min-w-0" style="min-width: 12rem;">
+    <label class="block text-sm text-secondary mb-2 font-medium" for="profile_first_name">First name</label>
+    <%= form.text_field :first_name,
+                        value: user.first_name,
+                        maxlength: Studio::FIRST_NAME_MAX_LENGTH,
+                        autocomplete: "given-name",
+                        placeholder: "What should we call you?",
+                        class: "input-field" %>
+  </div>
+  <%= form.submit "Save", class: "btn btn-primary" %>
+<% end %>

@@ -4,7 +4,211 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **`Studio.profile_sections`' `if:` gate no longer fails open on a Symbol.**
+  `if: :some_predicate` — Rails' own `before_action ..., if: :method_name`
+  spelling, and so the most natural thing a host will write — was coerced
+  straight to `true`, because a Symbol does not answer `call`. The gate silently
+  did nothing, with no signal to the host, in the same permissive direction as
+  the bug `if:` was added to fix. Symbols and Strings now name a method on the
+  view; a name the view does not answer drops the row rather than rendering it.
+  Lambdas and plain booleans are unchanged.
+
+### Added
+
+- **`/profile` gains the Google account row.** Shows the linked identity with an
+  Unlink control, or a branded Connect button that POSTs to OmniAuth's own
+  `/auth/google_oauth2` (the engine does not draw a link route — the middleware
+  owns that path). Lifted from turf-monster's `/account` Identities card.
+
+  New route: `DELETE /profile/google` → `profile_unlink_google_path`.
+
+  **`Studio::OauthIdentity`** carries the rules, pure and duck-typed like
+  `Studio::ProfileImage`: `google_linked?`, `remaining_sign_ins`,
+  `unlink_orphans_account?`. It matches **both** provider spellings in the wild —
+  `google_oauth2` (the OmniAuth strategy name that lands in `users.provider`) and
+  `google` (what `Studio.auth_methods` calls it).
+
+  **THE ORPHAN GUARD — the reason this is not a straight copy.** turf-monster's
+  unlink is an unconditional `update!(provider: nil, uid: nil)`. For an account
+  whose only sign-in is Google — blank email so no magic link, no wallet, no
+  password — that silently locks someone out of their own account behind a button
+  labelled "Unlink". It is safe in turf today only because turf's users happen to
+  carry an email, which is a property of that app's **data**, not of its code.
+
+  The engine refuses instead, and gates on **`Studio.auth_methods`, not merely on
+  the column**: an app that has an `email` column but does not offer magic-link
+  sign-in cannot use it to get back in, so counting it would be exactly the wrong
+  answer. The row disables the button with the reason beside it; the endpoint
+  refuses the request independently, because a disabled button is a courtesy and
+  anyone can send the `DELETE`.
+
+  **What counts as a way back in is deliberately narrow**, because a false
+  positive here permits an unlink that orphans an account. A password counts only
+  via `Studio.password_login_available?` (`auth_method?(:password)` **and** the
+  User answering `authenticate`) — turf-monster removed `has_secure_password` and
+  kept the column, so its rows carry fossil digests no code can authenticate
+  against. A wallet counts only when the host has **explicitly** named its
+  signing-wallet column via `Studio.wallet_address_method`; the engine does not
+  guess a conventional reader, because turf's `User#solana_address` returns
+  `web3 || web2` and only the web3 address can sign in — the web2 one is
+  custodial, with no signer. An unconfigured app is treated as having no wallet
+  sign-in, which errs toward refusing: the cost is a refusal the operator fixes
+  with one config line, against someone locked out of their account.
+
+  The row declares `requires: %i[provider uid]` **and**
+  `if: -> { Studio.auth_method?(:google) }` — the model gate and the app gate are
+  different questions, and only the pair is correct. **Every** consumer's users
+  table carries `provider` and `uid`, so the model gate alone selected the whole
+  fleet; mcritchie-industries has both columns, `auth_methods = %i[magic_link]`,
+  and no omniauth gem at all, and would have been handed a "Link Google Account"
+  button leading nowhere. The engine's login page already asks the app question
+  before drawing this identical button (`app/views/sessions/new.html.erb`).
+
+- **`Studio.profile_sections` rows accept `if:`** — an optional callable gating a
+  row on an app capability, evaluated at resolve time, called with the view when
+  it takes an argument and without when it does not. Distinct from `requires:`,
+  which asks whether the user MODEL can serve the row.
+
+- **The shared profile page — `/profile`.** The engine now ships the account page
+  itself, not just the parts. `Studio::ProfilesController` renders a page of
+  declared rows; iteration one ships two, **change your photo** and **change your
+  first name**. Every consumer gets it on upgrade with no configuration.
+
+  **Why this page exists at all.** `components/_user_nav` has always linked the
+  username and the avatar to `defined?(account_path) ? account_path : "#"`, and
+  only turf-monster draws an account route — so every app that renders the
+  ENGINE's copy of that partial shipped a navbar whose avatar and username are
+  `href="#"`. A dead link looks exactly like a working one until it is clicked,
+  which is why it survived in production. The engine assumed a page every consumer
+  was expected to write for itself; now it ships the page.
+
+  **Which apps that actually is** (host views shadow engine views, so a fork does
+  not receive this): **mcritchie-industries and acquisition-studio** render the
+  engine partial and had the dead link. **mcritchie-studio** and **turf-monster**
+  each ship their own `app/views/components/_user_nav.html.erb` and are unaffected
+  either way; **moms-app** forks `layouts/_navbar` and renders no user nav at all.
+
+  **Why `/profile` and not `/account`.** turf-monster owns `AccountsController`
+  and the `account_path` helper. A shared `/account` route would raise
+  `Invalid route name, already in use` while turf's own `routes.rb` loads, which
+  takes down **every** route in that app — the same collision that forced
+  `draw_admin_emails_routes` and `draw_onboarding_routes` to be opt-in. `profile`
+  is claimed by none of the five consumers (mcritchie-studio,
+  mcritchie-industries, turf-monster, moms-app, acquisition-studio — each checked
+  2026-08-14), so **`Studio.draw_profile_routes` defaults to `true`** and a
+  brand-new app is correct on day one. It also buys turf a migration path: its
+  `/account` keeps working untouched while its rows move to `/profile` one at a
+  time, and `/account` is deleted only once it is empty.
+
+  | Route | Helper | What it does |
+  |---|---|---|
+  | `GET /profile` | `profile_path` | The page |
+  | `PATCH /profile` | `profile_path` | Scalar fields (today: `first_name`) |
+  | `PATCH /profile/avatar` | `profile_avatar_path` | The picture |
+
+  The avatar has a route of its own **deliberately**: an attachment param
+  submitted empty PURGES the attachment, so one form carrying both the name and
+  the file would delete someone's photo every time they edited their name.
+
+  **The photo row is turf-monster's avatar interaction, standardized.** Click the
+  picture, a hover cap reads "Update", pick a file, crop it square, and it saves
+  immediately — no Save button and no visible file field. It runs on the engine's
+  existing `imageUploadHost` factory and shared crop-photo modal, the same
+  primitives `/admin/emails` uses.
+
+  Two changes from turf's copy, both deliberate:
+
+  - **The click target is a `<button>`, not a `<div>`.** turf's is a `div @click`,
+    which no keyboard or screen-reader user can reach — for them the only way to
+    change a photo would be a mouse. Same visual; the hover cap also reveals on
+    focus.
+  - **The crop confirm goes through `onCropConfirmed()`, not `applyCrop()`.** Every
+    `imageUploadHost` on a page hears the same window event, so binding
+    `applyCrop` directly means a page that later grows a second uploader has both
+    hosts save the same crop. `onCropConfirmed` checks the owner token first.
+
+  **The page brings its own modals.** A row declares `modals: true` and the page
+  mounts `studio/modals/_scoped_host` on a `profileModals` store, so the row works
+  in an app that renders no shared modal host at all (mcritchie-industries,
+  moms-app, acquisition-studio) and is not shadowed in the apps that ship a fork of
+  `studio/modals/_host` (mcritchie-studio, turf-monster). **No host app has to
+  touch its layout to get a working avatar cropper.** cropper.js loads only when
+  a resolved row actually needs it.
+
+- **`Studio.profile_sections` — declare the rows, per app.** Same shape as
+  `Studio.sidebar_sections`: a static Array or a callable receiving the view, keys
+  symbolized, `admin: true` rows gated. Compose against
+  `Studio.default_profile_sections` so a later release that adds a standard row
+  delivers it to you:
+
+  ```ruby
+  Studio.configure do |config|
+    config.profile_sections = ->(view) {
+      Studio.default_profile_sections +
+        [ { key: :wallet, title: "Identities", partial: "profiles/wallet" } ]
+    }
+  end
+  ```
+
+  Drop a standard row by key instead of restating the list:
+  `config.profile_sections = Studio.default_profile_sections.reject { |s| s[:key] == :avatar }`.
+
+  **`nil` — the default — means the standard page, NOT a blank one.** That
+  distinction is what makes an empty initializer produce a working page.
+
+  A row may declare `requires:` — an attribute the current user must respond to —
+  and is **dropped when this host's model does not have it**. The consuming apps
+  genuinely disagree about `users` (mcritchie-industries has eight columns and no
+  `first_name`; turf-monster has forty), so a shared page that assumed a column
+  would raise `NoMethodError` on every signed-in request there. MI gets a page
+  with the photo row and no name row until it installs the standard profile
+  columns, at which point the row appears with no code change.
+
+- **`Studio::UserProfile` — the display helpers, written once.** A model concern
+  supplying `display_name`, `avatar_initials`, `avatar_color` and
+  `AVATAR_COLORS`. `components/_avatar` has always called all three and the engine
+  has never provided any of them, so all three apps wrote their own — and they had
+  drifted (`"anon"` vs `"User"` for the same empty state; two different email-prefix
+  casings). `include Studio::UserProfile` and delete your copy. Every method is
+  overridable by defining it in the class body.
+
+  **Adopting changes behavior in mcritchie-industries**, deliberately: a user with
+  no name now falls back to `"anon"` rather than `"User"`, and an email-derived
+  name is capitalized. The merged chain is
+  `username → name → first_name → email prefix → truncated wallet → "anon"`,
+  respond_to?-guarded at every link.
+
+- **`Studio::ProfileImage` — one allowlist for profile uploads.** `ALLOWED_CONTENT_TYPES`
+  (PNG, JPEG, WebP), `MAX_BYTES` (8 MB) and `acceptable?(file)`, lifted from
+  turf-monster's `ApplicationController#valid_image?`. It is an allowlist rather
+  than a `start_with?("image/")` check because an avatar is attacker-supplied
+  bytes served back to other people, and an SVG is a script host wearing an
+  image's content type.
+
+- **`Studio::FIRST_NAME_MAX_LENGTH`** (40) — one constant for a column now written
+  from two surfaces (the onboarding step and `/profile`) and rendered by a third
+  (the form's `maxlength`). `Studio::OnboardingController::MAX_FIRST_NAME` now
+  reads it instead of defining a second copy.
+
 ### Changed
+
+- **`components/_user_nav` no longer renders a dead link.** The username and
+  avatar point at **a host's own `account_path` where it exists**, at
+  `profile_path` otherwise, and render as **plain text** when neither exists.
+  The name and the picture still render in that last case — only the link is
+  dropped. Previously both were `href="#"`.
+
+  **The host's page wins deliberately** — the engine does not repoint an app that
+  already has an account page of its own. No consumer exercises that branch today
+  (turf-monster is the only app with an `account_path`, and it forks this partial
+  anyway), so it is a rule for the apps that adopt `/profile` later rather than a
+  behavior change now.
+
+  So: **no consumer's navbar destination changes on this upgrade.**
+  mcritchie-industries and acquisition-studio gain a working link where they had
+  `href="#"`; every other consumer forks the partial and is untouched.
 
 - **No pre-registered email seeds a logo — `magic_link` was the last one, and it
   seeded the Studio wordmark onto the SIGN-IN email.** `STANDARD`'s `magic_link`
