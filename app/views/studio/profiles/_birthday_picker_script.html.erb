@@ -23,6 +23,9 @@
   window.studioBirthdayPicker = function (initial) {
     return {
       open: false,
+      // Which side this open chose. Set by chooseSide() when the popover opens and
+      // then left alone — see place() for why re-deciding it is the bug.
+      flipped: false,
       value: initial || "",
       viewYear: 0,
       viewMonth: 0,
@@ -123,9 +126,13 @@
 
         // Placed twice, deliberately. The first call stops the popover appearing
         // at 0,0 for a frame; the second is the one that can MEASURE, because
-        // offsetHeight is 0 while x-show still has the element hidden.
+        // offsetHeight is 0 while x-show still has the element hidden — and it is
+        // also the only place the SIDE is chosen, for the life of this open.
         this.place();
-        this.$nextTick(function () { this.place(); }.bind(this));
+        this.$nextTick(function () {
+          this.chooseSide();
+          this.place();
+        }.bind(this));
       },
 
       // Placed from the trigger's rect because the popover is fixed. Flips above
@@ -151,16 +158,37 @@
         var popover = this.$refs.popover;
         var height = (popover && popover.offsetHeight) || 340;
         var GAP = 4;
-        var below = window.innerHeight - r.bottom;
 
         this.left = r.left;
         this.width = r.width;
 
-        // Flip only when there is room ABOVE to flip into. Falling back to
-        // below-placement when neither fits keeps the popover attached to its
-        // field rather than pinned to the top of the viewport.
-        var flip = below < height + GAP && r.top > height + GAP;
-        this.top = flip ? r.top - height - GAP : r.bottom + GAP;
+        // THE SIDE IS NOT RE-DECIDED HERE. place() runs on every scroll and
+        // resize event, and choosing the side each time makes the popover SNAP
+        // between above and below the moment the available space crosses the
+        // threshold. Measured on turf-monster at 60px scroll steps: ABOVE, ABOVE,
+        // ABOVE, ABOVE, then below — a 254px jump between two steps, mid-scroll,
+        // while the reader was looking at it. That is what "the date picker
+        // freaks out on scroll" was.
+        //
+        // chooseSide() runs ONCE per open; this only moves the popover.
+        this.top = this.flipped ? r.top - height - GAP : r.bottom + GAP;
+      },
+
+      // Which side to open on, decided once and then left alone. Flips above only
+      // when there is not room below AND there is room above — with neither, it
+      // stays below, attached to its field rather than pinned to the top of the
+      // viewport.
+      chooseSide() {
+        var el = this.$refs.trigger;
+        if (!el) return;
+
+        var r = el.getBoundingClientRect();
+        var popover = this.$refs.popover;
+        var height = (popover && popover.offsetHeight) || 340;
+        var GAP = 4;
+        var below = window.innerHeight - r.bottom;
+
+        this.flipped = below < height + GAP && r.top > height + GAP;
       }
     };
   };
