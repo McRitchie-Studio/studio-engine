@@ -44,7 +44,7 @@
 ---
 # Every `test(...)` committed under e2e/. Verified against Playwright's own model,
 # not prose:
-#   npx playwright test --list   ->  47 tests in 7 files
+#   npx playwright test --list   ->  49 tests in 8 files
 #
 # 5 -> 7: e2e/email_banner_frames.spec.js. The email manager shows a fluid artwork
 # frame beside the email's own FIXED 600px banner table; measured side by side they
@@ -162,7 +162,31 @@
 # The third: clicking the CARD (not only the picture) opens the picker, exactly
 # once. Removing the card's handler reddens it; dropping `.stop` from the avatar
 # button reddens it too, because the click then bubbles and opens two dialogs.
-total_specs: 47
+#
+# 47 -> 49: e2e/vendored_alpine.spec.js. Alpine moved from a floating CDN range to a
+# file the engine ships, and the unit guard (test/lib/vendored_alpine_test.rb) can only
+# read SOURCE: it proves the head names no CDN and that studio/alpine.js is
+# precompiled. Neither fact means the bytes the browser receives are a working Alpine.
+# A truncated download, the wrong build, and a missing precompile entry all render
+# identical HTML and a dead page — which is why dor-check refused the handoff with
+# "this diff ADDS browser code and no browser ever saw it run".
+#
+# The origin is PROVEN rather than asserted: blockOffsiteRequests fulfils every
+# non-localhost request with an EMPTY 200, so passing with the network blocked is only
+# possible if Alpine arrived from the pipeline. Restoring the CDN tag fails both specs
+# (window.Alpine undefined at the 10s wait). The second spec drives a real x-data /
+# x-show transition, because a present Alpine that binds nothing is still broken.
+#
+# WRITING THESE FOUND A DEFECT IN THE LANE ITSELF, which is why the count moves by two
+# rather than one. The first mutation run failed only 1 of 2: E2eLabController's
+# `javascript_importmap_tags` stand-in served a SECOND Alpine from node_modules
+# (`alpinejs: ^3.14.9` — itself a floating range), so the page had a working Alpine
+# whether or not the engine delivered one, and BOTH copies were 3.16.1, so even the
+# version assertion could not tell them apart. That stand-in existed to compensate for
+# the very CDN this change removes. The stand-in, the copy in e2e/boot.rb, and the
+# dependency are all deleted, so the lane now OBSERVES the real delivery path instead
+# of papering over it. Every pre-existing spec stays green on the engine's own Alpine.
+total_specs: 49
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -174,7 +198,7 @@ total_specs: 47
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 47
+executed: 49
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

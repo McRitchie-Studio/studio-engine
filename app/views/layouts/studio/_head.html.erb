@@ -21,7 +21,26 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<%# Alpine is VENDORED into the engine (studio/alpine.js) and shipped through the
+    asset pipeline — no CDN, CSP-safe (same-origin :self), mirroring canvas_confetti
+    and sortable below. PINNED AT 3.16.1.
+
+    WHAT THIS REPLACED, and why it is worth the 47KB in the repo: the tag here was
+
+      <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js">
+
+    — a FLOATING major range, fetched from a third party at page load, for the
+    library every chip, drawer, modal and board filter in the fleet depends on.
+    Three consequences, none of them visible in a diff: two CI runs on ONE SHA could
+    execute different Alpine builds; production interactivity depended on jsDelivr
+    being reachable and honest; and an upgrade arrived with no review, because
+    nothing changed in the repo when it did. Bumping is now a deliberate act —
+    replace the file, change the version in this comment, and the diff shows it.
+
+    Investigated as a suspect in the board-filter flake (three PRs reddened in one
+    day, 2026-08-15). This removes a real source of run-to-run variance; it does NOT
+    claim to be that flake's cause, and the remaining suspect there is untouched. %>
+<%= javascript_include_tag "studio/alpine", defer: true, "data-turbo-track": "reload" %>
 <%# canvas-confetti is VENDORED into the engine (studio/canvas_confetti.js) and
     shipped through the asset pipeline — no CDN, CSP-safe (same-origin :self),
     zero-per-app dependency. Defines the global `confetti`; studio_confetti.js
