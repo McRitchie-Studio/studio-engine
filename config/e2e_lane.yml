@@ -44,7 +44,7 @@
 ---
 # Every `test(...)` committed under e2e/. Verified against Playwright's own model,
 # not prose:
-#   npx playwright test --list   ->  49 tests in 8 files
+#   npx playwright test --list   ->  50 tests in 7 files
 #
 # 5 -> 7: e2e/email_banner_frames.spec.js. The email manager shows a fluid artwork
 # frame beside the email's own FIXED 600px banner table; measured side by side they
@@ -186,7 +186,26 @@
 # the very CDN this change removes. The stand-in, the copy in e2e/boot.rb, and the
 # dependency are all deleted, so the lane now OBSERVES the real delivery path instead
 # of papering over it. Every pre-existing spec stays green on the engine's own Alpine.
-total_specs: 49
+# 49 -> 50: the calendar's FLIP branch, which no earlier spec had ever run.
+#
+# The lab's birthday field sits near the top with room below, so every placement
+# assertion exercised the BELOW branch only. The flip path — used whenever the
+# field is near the viewport bottom — shipped untested and was wrong: it placed
+# the popover from a hardcoded `estimatedHeight = 340` while the real popover is
+# about 245px, so a flipped calendar floated ~95px above its field and jumped on
+# every scroll. The operator found it in turf-monster, on the version that had
+# just shipped.
+#
+# "It fits on screen" could not catch it — a popover 95px too high still fits.
+# The property that separates right from wrong is that its BOTTOM edge sits
+# against the trigger's TOP edge, and the spec asserts the flip actually happened
+# first, so it cannot quietly re-test the branch that already worked.
+#
+# Two mutations, both red on it: restoring the hardcoded estimate, and measuring
+# but dropping the $nextTick (offsetHeight is 0 while x-show still hides it).
+#
+#
+total_specs: 50
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -198,7 +217,7 @@ total_specs: 49
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 49
+executed: 50
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

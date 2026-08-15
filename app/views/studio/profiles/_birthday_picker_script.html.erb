@@ -117,27 +117,50 @@
 
       toggle() {
         this.open = !this.open;
-        if (this.open) {
-          this.syncViewFromValue();
-          this.place();
-        }
+        if (!this.open) return;
+
+        this.syncViewFromValue();
+
+        // Placed twice, deliberately. The first call stops the popover appearing
+        // at 0,0 for a frame; the second is the one that can MEASURE, because
+        // offsetHeight is 0 while x-show still has the element hidden.
+        this.place();
+        this.$nextTick(function () { this.place(); }.bind(this));
       },
 
       // Placed from the trigger's rect because the popover is fixed. Flips above
       // the trigger when there is not room below, so it never opens off-screen on
       // a short viewport.
+      //
+      // THE HEIGHT IS MEASURED, NOT GUESSED, and that distinction is the bug the
+      // operator reported. This used a hardcoded `estimatedHeight = 340` for both
+      // the decision AND the flipped coordinate. The real popover is about 245px,
+      // so a flip landed ~95px too high and the calendar floated visibly detached
+      // from its field — and since scroll re-runs this, it kept jumping. The
+      // arithmetic was legible in the screenshot: trigger at 640, popover at 300,
+      // and 640 - 340 - 4 = 316.
+      //
+      // The element is rendered under x-show (display is toggled, it stays in the
+      // DOM), so offsetHeight is readable as soon as it is shown. The constant
+      // survives only as the fallback for the first call, before the ref exists.
       place() {
         var el = this.$refs.trigger;
         if (!el) return;
+
         var r = el.getBoundingClientRect();
-        var estimatedHeight = 340;
+        var popover = this.$refs.popover;
+        var height = (popover && popover.offsetHeight) || 340;
+        var GAP = 4;
         var below = window.innerHeight - r.bottom;
 
         this.left = r.left;
         this.width = r.width;
-        this.top = below < estimatedHeight && r.top > estimatedHeight
-          ? r.top - estimatedHeight - 4
-          : r.bottom + 4;
+
+        // Flip only when there is room ABOVE to flip into. Falling back to
+        // below-placement when neither fits keeps the popover attached to its
+        // field rather than pinned to the top of the viewport.
+        var flip = below < height + GAP && r.top > height + GAP;
+        this.top = flip ? r.top - height - GAP : r.bottom + GAP;
       }
     };
   };

@@ -4,6 +4,29 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **The birthday calendar measures itself instead of guessing, so a flipped
+  popover stays attached to its field.** `place()` used a hardcoded
+  `estimatedHeight = 340` for both the flip DECISION and the flipped COORDINATE.
+  The real popover is about 245px, so whenever the field sat near the bottom of
+  the viewport the calendar opened roughly 95px above where it belonged — visibly
+  detached, and jumping on every scroll, because scroll re-runs the same
+  arithmetic.
+
+  It now reads the popover's own `offsetHeight` through an `x-ref`, with the
+  constant surviving only as the fallback for the first call before the element
+  is shown. `toggle()` places twice: once so it never appears at 0,0 for a frame,
+  then again in `$nextTick` — the call that can actually measure, since
+  `offsetHeight` is 0 while `x-show` still has it hidden.
+
+  **No earlier spec had ever run the flip branch.** The lab's field sits near the
+  top with room below, so every placement assertion exercised the below-branch
+  only, and "it fits on screen" cannot catch this — a popover 95px too high still
+  fits. The new spec forces the flip, asserts the flip actually happened, and then
+  asserts the popover's bottom edge sits against the trigger's top edge.
+
+
 ### Changed
 
 - **The edit page's avatar is now the control; its corner badge is gone.**
