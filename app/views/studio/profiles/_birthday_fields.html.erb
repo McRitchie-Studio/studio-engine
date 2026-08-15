@@ -66,6 +66,7 @@
       </button>
 
       <div x-show="open" x-cloak
+           x-ref="popover"
            @click.outside="open = false"
            @keydown.escape.window="open = false"
            @scroll.window="place()" @resize.window="place()"

@@ -320,3 +320,49 @@ test("the calendar fits on screen", async ({ page }) => {
     "the popover is taller than the viewport — its rows are stacking instead of gridding"
   ).toBeLessThan(viewport.height);
 });
+
+// THE FLIP BRANCH, which no earlier spec ever ran.
+//
+// The lab page's birthday field sits near the top with plenty of room below, so
+// every placement assertion above exercised the BELOW branch only. The flip path
+// — used whenever the field is near the bottom of the viewport — shipped
+// untested, and it was wrong: it placed the popover using a hardcoded
+// `estimatedHeight = 340` while the real popover is about 245px, so a flipped
+// calendar floated ~95px above its field and jumped on every scroll. The operator
+// found it in turf-monster.
+//
+// "It fits on screen" could not catch that. A popover 95px too high still fits.
+// The property that separates right from wrong is that its BOTTOM edge sits
+// against the trigger's TOP edge.
+test("the calendar flips above its field and stays attached to it", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit");
+
+  // Put the field near the bottom of the viewport so there is no room below and
+  // the flip branch is the one that runs.
+  await page.locator(DATE_TRIGGER).evaluate((el) => el.scrollIntoView({ block: "end" }));
+  await page.evaluate(() => window.scrollBy(0, -40));
+
+  await page.locator(DATE_TRIGGER).click();
+  await expect(page.locator(POPOVER)).toBeVisible();
+
+  const trigger = await page.locator(DATE_TRIGGER).boundingBox();
+  const popover = await page.locator(POPOVER).boundingBox();
+  const viewport = page.viewportSize();
+
+  // It really did flip — otherwise this spec is silently re-testing the below
+  // branch and proves nothing about the one that was broken.
+  expect(
+    popover.y,
+    "the popover opened BELOW the field — this spec did not exercise the flip branch it exists for"
+  ).toBeLessThan(trigger.y);
+
+  // THE ASSERTION THE ESTIMATE FAILED. Bottom edge against the field's top edge.
+  expect(
+    Math.abs(trigger.y - (popover.y + popover.height)),
+    "the flipped calendar is detached from its field — its height was guessed, not measured"
+  ).toBeLessThan(12);
+
+  expect(popover.y, "the flip pushed it off the top of the viewport").toBeGreaterThanOrEqual(0);
+  expect(popover.y + popover.height).toBeLessThanOrEqual(viewport.height + 1);
+});
