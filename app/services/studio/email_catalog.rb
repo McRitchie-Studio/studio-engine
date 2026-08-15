@@ -193,6 +193,42 @@ module Studio
         # inherited email with no preview is a row on every app's manager that
         # cannot be looked at.
         preview: -> { Studio::NewsletterMailer.subscribed("preview@example.com", name: "Alex") }
+      },
+      {
+        key: "email_change_confirmation",
+        label: "Email change — confirm",
+        description: "Sent to the CURRENT address when someone asks to change it. Carries the link that authorizes the swap.",
+        default_asset: "emails/email-change-confirmation.gif",
+        # NO logo, following magic_link: an omitted key
+        # INHERITS through register()'s logo.presence merge, which is how the
+        # Studio wordmark once leaked onto other brands' sign-in email.
+        header: "Confirm your new email",
+        header_fallback: "Confirm your new email",
+        subtext: "approve this change from your current inbox",
+        subject: "Confirm your {app} email change",
+        body: "Someone asked to change the email on your {app} account. " \
+              "If that was you, tap the button below to approve it. " \
+              "If it was not, ignore this message and nothing will change.",
+        supports_cta: true,
+        cta_text: "Confirm the change"
+      },
+      {
+        key: "email_change_notification",
+        label: "Email change — heads up",
+        description: "Sent to the OLD address after a change lands, so an unauthorized change is visible rather than silent.",
+        # Shares the confirmation's artwork: same subject, and this pair reads as
+        # one conversation — the ask and the receipt. A host that wants them
+        # distinct uploads its own on /admin/emails.
+        default_asset: "emails/email-change-confirmation.gif",
+        header: "Your email was changed",
+        header_fallback: "Your email was changed",
+        subtext: "a heads-up from {app}",
+        subject: "Your {app} email was changed",
+        body: "The email address on your {app} account was just changed. " \
+              "If you did not do this, contact us straight away — this message " \
+              "was sent to your previous address on purpose.",
+        # No button: there is nothing to click. The point is the notice itself.
+        supports_cta: false
       }
     ].freeze
 

@@ -202,18 +202,29 @@ class ProfilePageTest < ActiveSupport::TestCase
   # DISCOVERS writers below rather than trusting this list, and asserts the two
   # agree. A hardcoded list alone would stay green when a fourth, unguarded write
   # action was added — which is the whole failure this guards.
-  KNOWN_WRITE_ACTIONS = %w[update avatar unlink_google].freeze
-  WRITE_PATTERN = /current_user\.(update|avatar\.attach)/
+  # Write actions guarded by `serves?` — they touch a column this host may not
+  # have, so they must refuse before writing.
+  KNOWN_WRITE_ACTIONS = %w[update avatar email unlink_google].freeze
+
+  # Write actions guarded by the SIGNED TOKEN instead. apply_email_change is
+  # reached only with a valid, fresh token that already named the account and its
+  # current address, so a column gate would be asking a question the token has
+  # answered. Listed explicitly rather than left to fall through a pattern that
+  # happens not to match `user.update!` — an omission the reader cannot see is
+  # indistinguishable from an unguarded action.
+  TOKEN_GUARDED_WRITE_ACTIONS = %w[apply_email_change].freeze
+
+  WRITE_PATTERN = /(?:current_user|user)\.(update|update!|avatar\.attach)/
 
   test "every write action refuses before it writes" do
     bodies = controller_source.split(/^    def /).to_h { |chunk| [chunk[/\A(\w+)/, 1], chunk] }
     writers = bodies.select { |_name, body| body&.match?(WRITE_PATTERN) }
 
-    assert_equal KNOWN_WRITE_ACTIONS.sort, writers.keys.sort,
-      "a write action appeared or vanished — update KNOWN_WRITE_ACTIONS deliberately, " \
-      "and make sure the new one guards"
+    assert_equal (KNOWN_WRITE_ACTIONS + TOKEN_GUARDED_WRITE_ACTIONS).sort, writers.keys.sort,
+      "a write action appeared or vanished — update the lists deliberately, and make " \
+      "sure the new one is guarded by serves? or by the signed token"
 
-    writers.each do |action, body|
+    writers.slice(*KNOWN_WRITE_ACTIONS).each do |action, body|
       guard = body[/^\s*return \S+ unless [^\n]*serves\?\([^\n]*\n/]
       refute_nil guard,
         "#{action} must RETURN early when the host cannot serve the field — " \

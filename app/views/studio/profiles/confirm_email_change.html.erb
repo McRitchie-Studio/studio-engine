@@ -1,0 +1,34 @@
+<%# The out-of-band confirmation interstitial.
+
+    Rendered by a GET that CHANGES NOTHING. The button below is the only thing
+    that applies the swap, and it is a POST — because mail scanners and link
+    prefetchers issue GETs with no human involved, and a GET that mutated here
+    would let a prefetch complete an account takeover silently.
+
+    Reachable while SIGNED OUT: the link goes to the person's old inbox and may
+    be opened on another device. The signed token is the auth boundary, so this
+    view must not assume current_user.
+%>
+<% content_for(:title, "Confirm your email change") %>
+
+<div class="max-w-md mx-auto py-12">
+  <div class="card p-6 text-center">
+    <h1 class="text-2xl font-extrabold text-heading mb-2">Confirm your email change</h1>
+    <p class="text-secondary mb-6">Approving this moves your account to the new address.</p>
+
+    <div class="rounded-lg p-4 mb-6 text-left" style="background: var(--color-surface-alt);">
+      <p class="text-sm text-muted mb-1">From</p>
+      <p class="text-heading font-semibold mb-3 break-all"><%= @email_change[:current_email] %></p>
+      <p class="text-sm text-muted mb-1">To</p>
+      <p class="text-heading font-semibold break-all"><%= @email_change[:new_email] %></p>
+    </div>
+
+    <%= button_to "Confirm the change", apply_profile_email_path(token: @email_change_token),
+                  method: :post, class: "btn btn-primary w-full" %>
+
+    <p class="text-muted text-xs mt-4">
+      Didn't ask for this? Close this page and nothing changes — your address stays
+      <span class="font-semibold"><%= @email_change[:current_email] %></span>.
+    </p>
+  </div>
+</div>

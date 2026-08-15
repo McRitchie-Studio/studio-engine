@@ -163,7 +163,7 @@ class ProfileSectionsTest < Minitest::Test
   end
 
   def test_studio_default_profile_sections_is_the_public_composition_handle
-    assert_equal %i[avatar first_name google], Studio.default_profile_sections.map { |s| s[:key] }
+    assert_equal %i[avatar first_name email google], Studio.default_profile_sections.map { |s| s[:key] }
   end
 
   # --- the app-capability gate (`if:`) ----------------------------------------

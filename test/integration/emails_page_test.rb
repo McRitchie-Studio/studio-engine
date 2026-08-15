@@ -368,7 +368,10 @@ class EmailsPageTest < ActiveSupport::TestCase
   BANNER_FRAMES = {
     "emails/magic-link.gif" => 120,
     "emails/magic-link-background.gif" => 72,
-    "emails/newsletter-subscribed-background.gif" => 72
+    "emails/newsletter-subscribed-background.gif" => 72,
+    # Flat 1800x600 (3:1) artwork, shared by both email-change emails — the ask
+    # and the receipt read as one conversation.
+    "emails/email-change-confirmation.gif" => 60
   }.freeze
 
   # Flat assets are 3:1 at 1800 wide; layered BACKGROUNDS are 3:1 at 1200. Both
@@ -377,7 +380,9 @@ class EmailsPageTest < ActiveSupport::TestCase
   BANNER_SIZES = {
     "emails/magic-link.gif" => [1800, 600],
     "emails/magic-link-background.gif" => [1200, 600],
-    "emails/newsletter-subscribed-background.gif" => [1200, 600]
+    "emails/newsletter-subscribed-background.gif" => [1200, 600],
+    # Flat role (default_asset), so 1800 wide like magic-link.gif.
+    "emails/email-change-confirmation.gif" => [1800, 600]
   }.freeze
 
   # A GIF frame is introduced by a Graphic Control Extension: the block

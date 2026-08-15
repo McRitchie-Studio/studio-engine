@@ -42,6 +42,19 @@ ActionDispatch::IntegrationTest.app = Rails.application
 # test and is not one. Every real consumer is a Rails app with turbo.
 Mime::Type.register "text/vnd.turbo-stream.html", :turbo_stream unless Mime[:turbo_stream]
 
+# Mail is asserted by what actually landed in ActionMailer::Base.deliveries, so
+# the async hop has to resolve inside the request: Studio::Email.deliver calls
+# deliver_later.
+require "active_job"
+ActiveJob::Base.queue_adapter = :inline
+ActionMailer::Base.delivery_method = :test
+ActionMailer::Base.perform_deliveries = true
+# The confirm mail builds an ABSOLUTE url (it is opened from an inbox, often on
+# another device), so the mailer needs a host — the same requirement the engine's
+# existing magic-link mail already carries, and one every real Rails app sets.
+ActionMailer::Base.default_url_options = { host: "example.com" }
+Rails.application.routes.default_url_options[:host] = "example.com"
+
 ActiveRecord::Schema.verbose = false
 ActiveRecord::Schema.define do
   # The host owns this table in production. The columns here are exactly the ones
@@ -53,6 +66,7 @@ ActiveRecord::Schema.define do
     t.string :role
     t.string :provider
     t.string :uid
+    t.string :session_token
     t.timestamps
   end
 
@@ -82,6 +96,13 @@ end
 
 class User < ApplicationRecord
   def admin? = role == "admin"
+
+  # The OPSEC-045 seam. The engine calls this if the host answers it, so a host
+  # that has it must have its rotation actually exercised — the whole point of
+  # the call is that a hijacker's live session dies when the owner confirms.
+  def regenerate_session_token!
+    update_column(:session_token, SecureRandom.hex(8))
+  end
 end
 
 # A sign-in door for the suite. Deliberately a REAL controller writing the REAL
@@ -256,6 +277,188 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
 
     assert_response :redirect
     assert_equal "google_oauth2", user.reload.provider
+  end
+
+  # --- PATCH /profile/email — the ASK, which must not be the CHANGE -----------
+  #
+  # OUT-OF-BAND (turf's Lazarus audit #4). A logged-in session is not enough to
+  # move an account to someone else's mailbox: the request only mails a link to
+  # the CURRENT address, and the holder of THAT inbox decides. These assert it by
+  # reading the database and the outbox after a real request.
+
+  def mails
+    ActionMailer::Base.deliveries
+  end
+
+  # Multipart mail: the URL lives in the decoded parts, and quoted-printable can
+  # wrap a long line with a trailing "=" — so decode each part and unwrap before
+  # matching, rather than regexing the raw container.
+  def mail_body(mail)
+    parts = mail.multipart? ? mail.all_parts : [mail]
+    parts.map { |part| part.body.decoded.gsub(/=\r?\n/, "") }.join("\n")
+  end
+
+  def mail_confirm_token(mail)
+    mail_body(mail)[%r{/profile/email/confirm/([A-Za-z0-9_\-]+)}, 1]
+  end
+
+  test "asking to change the email does NOT change it" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+
+    assert_response :redirect
+    assert_equal "old@example.com", user.reload.email,
+      "a session alone must never move the account to another inbox"
+  end
+
+  test "the confirmation goes to the CURRENT address, never the new one" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+    mails.clear
+
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+
+    assert_equal 1, mails.size
+    assert_equal ["old@example.com"], mails.last.to,
+      "mailing the NEW address would let a hijacker approve their own takeover"
+    assert_includes mail_body(mails.last), "new@example.com", "it still has to say what is being approved"
+  end
+
+  test "a first email applies directly because there is no prior owner to ask" do
+    user = create_user(email: nil)
+    sign_in user
+
+    patch "/profile/email", params: { profile: { email: "first@example.com" } }
+
+    assert_equal "first@example.com", user.reload.email
+  end
+
+  test "asking for the address you already have is refused" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+    mails.clear
+
+    patch "/profile/email", params: { profile: { email: "OLD@example.com" } }
+
+    assert_response :see_other
+    assert_empty mails, "no mail for a no-op"
+  end
+
+  # --- the confirm link -------------------------------------------------------
+
+  def confirm_token_for(user, to:)
+    sign_in user
+    mails.clear
+    patch "/profile/email", params: { profile: { email: to } }
+    mail_confirm_token(mails.last)
+  end
+
+  test "the emailed link carries a usable token" do
+    user = create_user(email: "old@example.com")
+
+    refute_nil confirm_token_for(user, to: "new@example.com"), "the mail must contain the confirm link"
+  end
+
+  # THE PREFETCH DEFENCE. Mail scanners and link prefetchers issue GETs with no
+  # human involved. A GET that applied the change would let a prefetch complete
+  # an account takeover silently, so this one must RENDER and write nothing.
+  test "GET on the confirm link renders and changes nothing" do
+    user = create_user(email: "old@example.com")
+    token = confirm_token_for(user, to: "new@example.com")
+
+    get "/profile/email/confirm/#{token}"
+
+    assert_response :success
+    assert_equal "old@example.com", user.reload.email,
+      "a GET must never apply the change — prefetchers issue GETs"
+  end
+
+  test "POST on the confirm link applies the change" do
+    user = create_user(email: "old@example.com")
+    token = confirm_token_for(user, to: "new@example.com")
+
+    post "/profile/email/confirm/#{token}"
+
+    assert_response :redirect
+    assert_equal "new@example.com", user.reload.email
+  end
+
+  # OPSEC-045. A hijacker's live session is how an unwanted change gets started;
+  # rotating on apply is what ends it the moment the real owner confirms.
+  test "applying the change rotates the session token" do
+    user = create_user(email: "old@example.com")
+    user.regenerate_session_token!
+    before = user.reload.session_token
+    token = confirm_token_for(user, to: "new@example.com")
+
+    post "/profile/email/confirm/#{token}"
+
+    refute_equal before, user.reload.session_token, "other live sessions must lose access"
+  end
+
+  # OPSEC-046. The person LOSING the account is the one who needs to know.
+  test "applying the change notifies the OLD address" do
+    user = create_user(email: "old@example.com")
+    token = confirm_token_for(user, to: "new@example.com")
+    mails.clear
+
+    post "/profile/email/confirm/#{token}"
+
+    assert_equal 1, mails.size
+    assert_equal ["old@example.com"], mails.last.to,
+      "the heads-up goes where the person who is losing the account can see it"
+  end
+
+  # --- dead links -------------------------------------------------------------
+
+  test "a confirm link cannot be used twice" do
+    user = create_user(email: "old@example.com")
+    token = confirm_token_for(user, to: "new@example.com")
+    post "/profile/email/confirm/#{token}"
+
+    post "/profile/email/confirm/#{token}"
+
+    assert_response :gone
+    assert_equal "new@example.com", user.reload.email, "the second use must not re-apply or revert"
+  end
+
+  test "a link superseded by a newer change is dead" do
+    user = create_user(email: "old@example.com")
+    stale = confirm_token_for(user, to: "first@example.com")
+    fresh = confirm_token_for(user, to: "second@example.com")
+    post "/profile/email/confirm/#{fresh}"
+
+    post "/profile/email/confirm/#{stale}"
+
+    assert_response :gone
+    assert_equal "second@example.com", user.reload.email
+  end
+
+  test "a tampered token is refused on both halves" do
+    user = create_user(email: "old@example.com")
+    token = confirm_token_for(user, to: "new@example.com")
+    tampered = token.sub(/.\z/) { |c| c == "A" ? "B" : "A" }
+
+    get "/profile/email/confirm/#{tampered}"
+    assert_response :gone
+
+    post "/profile/email/confirm/#{tampered}"
+    assert_response :gone
+    assert_equal "old@example.com", user.reload.email
+  end
+
+  # The link is authed by the TOKEN, not the session — it is opened from an inbox,
+  # often on another device. Requiring a session would break the flow it exists for.
+  test "the confirm link works while signed out" do
+    user = create_user(email: "old@example.com")
+    token = confirm_token_for(user, to: "new@example.com")
+    reset!
+
+    post "/profile/email/confirm/#{token}"
+
+    assert_equal "new@example.com", user.reload.email
   end
 
   # --- the guard is the SERVER's, not the button's ----------------------------

@@ -27,6 +27,13 @@ module Studio
     # (HTML redirects to login; JSON gets a clean 401 rather than a 406).
     before_action :require_authentication
 
+    # The confirm link is sent to the person's OLD inbox and may be opened on a
+    # device that is not signed in — so the SIGNED TOKEN is the auth boundary for
+    # these two, not the session. Skipping is what makes the flow work on a
+    # second device; the token check in each action is what keeps it safe.
+    skip_before_action :require_authentication,
+                       only: %i[confirm_email_change apply_email_change], raise: false
+
     # THE shared cap, not a copy of it — see Studio::FIRST_NAME_MAX_LENGTH. The
     # onboarding step writes this same column and reads this same constant, so
     # the two surfaces cannot drift apart.
@@ -103,6 +110,101 @@ module Studio
       end
     end
 
+    # PATCH /profile/email — ASK to change the address. Never applies it.
+    #
+    # OUT-OF-BAND BY DESIGN (turf-monster's Lazarus audit #4, lifted whole). The
+    # request only mints a token and mails it to the CURRENT address; the change
+    # lands when the holder of THAT inbox confirms. A logged-in session is not
+    # enough to move an account to someone else's mailbox, which is exactly what
+    # a direct write here would allow after a session hijack.
+    #
+    # The one exception is an account with NO email yet: there is no prior owner
+    # to ask, so the first address applies directly and is simply unverified.
+    def email
+      return unsupported(:email) unless serves?(:email)
+
+      value = params.dig(:profile, :email).to_s.strip
+      current = current_user.email.to_s
+
+      return redirect_to profile_path, alert: "Enter an email address.", status: :see_other if value.blank?
+
+      if value.casecmp?(current)
+        return redirect_to profile_path, alert: "That is already your email address.", status: :see_other
+      end
+
+      rescue_and_log(target: current_user) do
+        if current.blank?
+          # First address on the account. Nothing to protect, so apply it —
+          # unverified, which the host's own verification flow then handles.
+          current_user.update(email: value)
+          current_user.update_columns(email_verified_at: nil) if current_user.respond_to?(:email_verified_at)
+          next redirect_to profile_path, notice: "Email set to #{value}. Check your inbox to verify it."
+        end
+
+        token = Studio::EmailChangeToken.generate(
+          user_id: current_user.id, current_email: current, new_email: value
+        )
+        Studio::Email.deliver(Studio::ProfileMailer, :email_change_confirmation,
+                              current_user, current, value, token,
+                              to: current, user: current_user)
+
+        redirect_to profile_path,
+                    notice: "Check #{current} — we sent a link there to confirm the change. " \
+                            "Your address stays the same until you do."
+      end
+    end
+
+    # GET /profile/email/confirm/:token — RENDER the confirmation. Never mutates.
+    #
+    # THIS IS THE HALF THAT MUST NOT WRITE. Mail scanners and link prefetchers
+    # issue GETs without a human involved, so a GET that applied the change would
+    # let a prefetch silently complete an account takeover. The swap is the
+    # CSRF-protected POST below.
+    #
+    # Authentication is the TOKEN, not the session: the link is sent to the old
+    # inbox and may be opened on a device that is not signed in.
+    def confirm_email_change
+      @email_change = Studio::EmailChangeToken.verify(params[:token])
+      @email_change_token = params[:token]
+      @email_change_user = User.find_by(id: @email_change[:user_id])
+
+      unless Studio::EmailChangeToken.fresh_for?(@email_change, @email_change_user)
+        return render_email_change_dead
+      end
+      # renders studio/profiles/confirm_email_change
+    rescue ActiveSupport::MessageVerifier::InvalidSignature
+      render_email_change_dead
+    end
+
+    # POST /profile/email/confirm/:token — apply it.
+    def apply_email_change
+      payload = Studio::EmailChangeToken.verify(params[:token])
+      user = User.find_by(id: payload[:user_id])
+
+      return render_email_change_dead unless Studio::EmailChangeToken.fresh_for?(payload, user)
+
+      rescue_and_log(target: user) do
+        old_email = user.email
+        user.update!(email: payload[:new_email])
+        user.update_columns(email_verified_at: nil) if user.respond_to?(:email_verified_at)
+
+        # OPSEC-045: rotate the session token so any OTHER live session — a
+        # hijacker's, say, which is how an unwanted change gets started — loses
+        # access the moment the legitimate owner confirms.
+        user.regenerate_session_token! if user.respond_to?(:regenerate_session_token!)
+
+        # OPSEC-046: tell the OLD address it happened. An unauthorised change is
+        # then visible to the person losing the account instead of silent.
+        Studio::Email.deliver(Studio::ProfileMailer, :email_change_notification,
+                              user, old_email, user.email, to: old_email, user: user)
+
+        redirect_to(logged_in? ? profile_path : login_path,
+                    notice: "Email changed to #{user.email}.")
+      end
+    rescue ActiveSupport::MessageVerifier::InvalidSignature
+      render_email_change_dead
+    end
+
     # DELETE /profile/google — drop the linked Google identity.
     #
     # REFUSES WHEN IT WOULD ORPHAN THE ACCOUNT. turf-monster's version is an
@@ -135,6 +237,19 @@ module Studio
     end
 
     private
+
+    # ONE response for every dead-link case — bad signature, malformed token,
+    # expired, already used, or superseded by a newer change.
+    #
+    # Deliberately undifferentiated: the person's next step is identical in all
+    # of them (ask for a fresh link), and telling an attacker WHICH way a token
+    # failed hands them a probe. 410 Gone rather than 404 — the link was real,
+    # it simply is not any more.
+    def render_email_change_dead
+      render plain: "This email-change link is invalid, expired, or has already been used. " \
+                    "Request a fresh one from your profile page.",
+             status: :gone
+    end
 
     # Can this host's user model serve this field?
     #

@@ -66,6 +66,8 @@ module Studio
       # Gated on the app OFFERING Google, not merely on having the columns —
       # the same question app/views/sessions/new.html.erb:79 already asks before
       # drawing this identical button on the login page.
+      { key: :email, title: "Email",
+        partial: "studio/profiles/email_section", requires: :email },
       { key: :google, title: "Google account",
         partial: "studio/profiles/google_section", requires: %i[provider uid],
         if: -> { Studio.auth_method?(:google) } }

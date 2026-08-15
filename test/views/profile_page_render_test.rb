@@ -25,6 +25,7 @@ class ProfilePageRenderTest < Minitest::Test
   class StubUser
     def display_name = "Pat Studio"
     def first_name = "Pat"
+    def email = "pat@example.com"
     def avatar = @avatar ||= Class.new { def attached? = false }.new
     def avatar_color = "#6366f1"
     def avatar_initials = "PS"
@@ -35,6 +36,7 @@ class ProfilePageRenderTest < Minitest::Test
     v.define_singleton_method(:current_user) { user }
     v.define_singleton_method(:profile_path) { "/profile" }
     v.define_singleton_method(:profile_avatar_path) { "/profile/avatar" }
+    v.define_singleton_method(:profile_email_path) { "/profile/email" }
     v.define_singleton_method(:protect_against_forgery?) { false }
     v
   end
@@ -165,7 +167,7 @@ class ProfilePageRenderTest < Minitest::Test
     html = render_page(Studio::ProfileSections.defaults)
     doc = Nokogiri::HTML5.fragment(html)
 
-    assert_equal %w[avatar first_name google], doc.css("[data-profile-section]").map { |s| s["data-profile-section"] }
+    assert_equal %w[avatar first_name email google], doc.css("[data-profile-section]").map { |s| s["data-profile-section"] }
     assert_includes doc.text, "Profile photo"
     assert_includes doc.text, "Your name"
     assert_includes doc.text, "Google account"
