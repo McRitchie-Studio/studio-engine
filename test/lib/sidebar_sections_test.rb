@@ -7,18 +7,6 @@ require "test_helper"
 # and admin-flagged sections resolve only for admin? viewers — including views
 # that expose no admin? at all (bare contexts count as non-admin).
 class SidebarSectionsTest < Minitest::Test
-  # Views that can serve the standard Profile link: signed in, with the helper.
-  ProfileView = Struct.new(:name) do
-    def admin? = false
-    def logged_in? = true
-    def profile_path = "/profile"
-  end
-  SignedOutView = Struct.new(:name) do
-    def admin? = false
-    def logged_in? = false
-    def profile_path = "/profile"
-  end
-
   AdminView    = Struct.new(:name) { def admin? = true }
   ViewerView   = Struct.new(:name) { def admin? = false }
   BareView     = Struct.new(:name)
