@@ -20,11 +20,32 @@
 
 require "bundler/setup"
 require "fileutils"
+require "base64"
 
 ROOT = File.expand_path("..", __dir__)
 PUBLIC_DIR = File.join(ROOT, "test", "dummy", "public", "e2e")
 
 FileUtils.mkdir_p(PUBLIC_DIR)
+
+# ---- The host's favicon ------------------------------------------------------
+#
+# _head links `<link rel="icon" href="/favicon.png">` and every real host serves one.
+# The dummy did not, so every lab page 404'd on it. Not cosmetic here: `watchPageErrors`
+# counts console.error and a failed load IS one, so a spec asserting a clean console
+# passes or fails on whether the browser's LAZY favicon fetch beat the assertion. It hid
+# from 2026-03-24 until a head change shifted script timing and reddened `release` at
+# b654525, 48 passed / 1 failed. Written, not committed — test/dummy/public is gitignored
+# whole. A 1x1 transparent PNG: the REQUEST must succeed; nobody looks at it.
+favicon = File.join(ROOT, "test", "dummy", "public", "favicon.png")
+File.binwrite(favicon, Base64.decode64(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk" \
+  "YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+))
+
+# FAIL LOUD, like the CSS build below: a lane serving a page that 404s on its own
+# icon reports console noise as spec failures, which reads as a defect in whatever
+# spec happened to observe it.
+abort "e2e/boot: favicon not written at #{favicon}" if File.size?(favicon).to_i.zero?
 
 # ---- CSS ---------------------------------------------------------------------
 #
