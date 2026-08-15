@@ -78,11 +78,19 @@ module Studio
     end
 
     def local_action_url(record, args)
-      token = args[1].to_s
+      # args[1] is the token for the mailers this started with. The engine's own
+      # ProfileMailer takes (user, current_email, new_email, token), so its token
+      # is the LAST argument — reading args[1] there yields the CURRENT EMAIL
+      # ADDRESS, which is what this page was rendering into the link.
+      token = (engine_email_change?(record) ? args.last : args[1]).to_s
       return if token.empty?
 
       path =
         case record.email_key
+        when /\AStudio::ProfileMailer#email_change_confirmation\z/
+          # The ENGINE's row lives at /profile. The /account case below is
+          # turf-monster's own mailer and stays as it is.
+          "/profile/email/confirm/#{ERB::Util.url_encode(token)}"
         when /#magic_link\z/
           # /l/<token> only when the app actually emails /l (Studio::Link store +
           # /l routes drawn); otherwise the legacy /magic_link/<token> — covers the
@@ -98,6 +106,10 @@ module Studio
         end
 
       "#{request.base_url}#{path}" if path
+    end
+
+    def engine_email_change?(record)
+      record.email_key.to_s.start_with?("Studio::ProfileMailer#")
     end
 
     def preview_value(value)
