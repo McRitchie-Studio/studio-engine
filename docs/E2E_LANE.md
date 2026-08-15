@@ -143,9 +143,21 @@ with an empty 200. It **answers** rather than aborts on purpose: `route.abort()`
 produces `net::ERR_FAILED`, which is the same console error fired deterministically
 (3 of 9 specs red on every run). Filtering the message afterwards was rejected — it
 would have to recognise a string Chromium chose, and it would forgive a genuine 404
-on an engine asset, which this lane must fail on. The older spec files still make
-the request and carry the same latent flake; adopting the helper there is a
-follow-up, not a silent edit.
+on an engine asset, which this lane must fail on.
+
+**The follow-up that sentence promised is done, and enforced.** For a while only the
+specs written after the helper used it, and the four older files kept counting console
+errors over an open network — the gap was recorded here honestly and then simply not
+closed, which is how a known follow-up becomes a permanent hole. All four now block,
+and `test/lib/e2e_lane_contract_test.rb` asserts the pairing: **a test that calls
+`watchPageErrors` must also call `blockOffsiteRequests`**, in the test body or in a
+`beforeEach` for a file that navigates there. Delete the call from any spec and that
+guard reddens by name.
+
+Asserting it structurally is not a preference, it is the only honest option: the
+failure is an intermittent third-party fetch, so it cannot be reproduced on demand to
+prove a spec catches it. The structural property can be proven, and was — dropping the
+call from a test body and from a `beforeEach` each redden the guard.
 
 ## What the lane's OWN Tailwind build cannot see
 

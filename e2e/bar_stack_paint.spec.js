@@ -1,5 +1,7 @@
 const { test, expect } = require("@playwright/test");
-const { watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames } = require("./helpers");
+const {
+  watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames, blockOffsiteRequests
+} = require("./helpers");
 
 // [e2e] DEFECT 1 — the navbar's paint-time offset jump (fix-navbar-offset-jump).
 //
@@ -38,6 +40,7 @@ const VIEWPORT = { width: 390, height: 780 };
 test("the pinned header does not move when a bar grows under it", async ({ page }) => {
   const pageErrors = watchPageErrors(page);
 
+  await blockOffsiteRequests(page);
   await page.setViewportSize(VIEWPORT);
   await page.goto("/lab/bar_stack");
 

@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { watchPageErrors } = require("./helpers");
+const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 
 // [e2e] The banner editor on /admin/emails/:key — typing repaints the banner,
 // and Save reports whether there is anything to save.
@@ -18,6 +18,9 @@ const { watchPageErrors } = require("./helpers");
 // here and the Ruby side in test/integration/banner_copy_test.rb.
 test.describe("email banner editor", () => {
   test.beforeEach(async ({ page }) => {
+    // BEFORE the goto, not in the test bodies: this page is navigated here, so a block
+    // installed later would arrive after the fonts had already been requested.
+    await blockOffsiteRequests(page);
     await page.goto("/lab/email_banner_editor");
     await page.waitForTimeout(150);
   });

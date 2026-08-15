@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { watchPageErrors } = require("./helpers");
+const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 
 // [e2e] The email manager's two preview frames must be the SAME SIZE.
 //
@@ -26,6 +26,7 @@ test.describe("email manager preview frames", () => {
   test("both frames render at identical size across widths", async ({ page }) => {
     const errors = watchPageErrors(page);
 
+    await blockOffsiteRequests(page);
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: 1000 });
       await page.goto("/lab/email_banner_frames");
