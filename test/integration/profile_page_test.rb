@@ -213,6 +213,9 @@ class ProfilePageTest < ActiveSupport::TestCase
   TOKEN_GUARDED_WRITE_ACTIONS = [].freeze
 
   WRITE_PATTERN = /(?:current_user|user)\.(update|update!|avatar\.attach)/
+  # `.+` not `\S+`: the refusal takes a human label, so the guard line legitimately
+  # contains spaces — `return unsupported("profile photo") unless row_rendered?(...)`.
+  GUARD_PATTERN = /^\s*return .+ unless row_rendered\?\([^\n]*\n/
 
   test "every write action refuses before it writes" do
     bodies = controller_source.split(/^    def /).to_h { |chunk| [chunk[/\A(\w+)/, 1], chunk] }
@@ -223,56 +226,36 @@ class ProfilePageTest < ActiveSupport::TestCase
       "sure the new one is guarded by serves? or by the signed token"
 
     writers.slice(*KNOWN_WRITE_ACTIONS).each do |action, body|
-      guard = body[/^\s*return \S+ unless [^\n]*serves\?\([^\n]*\n/]
+      guard = body[GUARD_PATTERN]
       refute_nil guard,
-        "#{action} must RETURN early when the host cannot serve the field — " \
-        "merely mentioning serves? is not refusing"
+        "#{action} must RETURN early when the page would not render its row — " \
+        "merely mentioning the check is not refusing"
 
       assert body.index(guard) < body.index(WRITE_PATTERN),
         "#{action} writes before it guards — the endpoint 500s where its row is merely hidden"
     end
   end
 
-  # The guard delegates to the registry's predicate rather than re-deriving
-  # respond_to? — one rule, unit-tested in test/lib/studio/profile_sections_test.rb.
-  test "the guard reuses the registry's own predicate" do
-    assert_includes controller_source, "Studio::ProfileSections.served_by?"
-
-    ensure_application_controller!
-    thin = Struct.new(:x).new(nil)
-    full = Struct.new(:first_name).new("Pat")
-
-    refute Studio::ProfileSections.served_by?(thin, :first_name)
-    assert Studio::ProfileSections.served_by?(full, :first_name)
-  end
-
-  # THE `if:` GATE AGAINST A REAL VIEW CONTEXT, not a Struct double.
+  # THE GUARD ASKS THE RESOLVER, not one of its rules — and this replaces a test
+  # that asserted the weaker property.
   #
-  # The unit suite resolves against a Struct, which answers respond_to? for its
-  # members and nothing else. A live ActionView context is a different animal —
-  # it inherits a large method surface and resolves helpers dynamically — so
-  # "the Symbol gate calls the view" is worth asserting where the view is real.
-  # This is also the tier that would catch the gate blowing up on a view that
-  # answers respond_to? but raises on send.
-  test "a symbol if: gate is honoured against a live view context" do
-    ensure_application_controller!
-
-    view = ApplicationController.new.tap { |c| c.request = ActionDispatch::TestRequest.create }.view_context
-    # `admin?` too: the resolver asks the view for it, and the concern's own
-    # implementation walks current_user -> the host's User constant, which this
-    # file does not define. Stubbing the predicate keeps the test on the gate.
-    view.define_singleton_method(:current_user) { nil }
-    view.define_singleton_method(:admin?) { false }
-    view.define_singleton_method(:feature_off?) { false }
-    view.define_singleton_method(:feature_on?)  { true }
-
-    on  = Studio::ProfileSections.resolve([{ key: :row, partial: "x", if: :feature_on? }], view)
-    off = Studio::ProfileSections.resolve([{ key: :row, partial: "x", if: :feature_off? }], view)
-    missing = Studio::ProfileSections.resolve([{ key: :row, partial: "x", if: :typo_not_a_method? }], view)
-
-    assert_equal %i[row], on.map { |s| s[:key] }
-    assert_equal [], off.map { |s| s[:key] }, "a false predicate must drop the row, not coerce to true"
-    assert_equal [], missing.map { |s| s[:key] }, "an unanswerable gate name drops the row"
+  # It used to call ProfileSections.served_by?, which answers only the MODEL gate
+  # (`requires:`). Once rows also carried an APP gate (`if:`), the two questions
+  # came apart: mcritchie-industries drops the Google row because it offers no
+  # Google sign-in, while an endpoint asking only about columns it does have
+  # stayed open. Carl caught it in review, on a controller comment of mine that
+  # claimed the two "cannot drift" while they already were.
+  #
+  # Asking the resolver makes that claim true by construction: the page and the
+  # endpoint run the same code, whatever gates a row grows next.
+  test "the write guards ask the resolver, so the row and the endpoint cannot drift" do
+    assert_includes controller_source, "Studio.profile_sections_for(view_context)",
+      "the guard must resolve the same rows the page renders"
+    # The CALL, not the word — the comment above row_rendered? explains the old
+    # behaviour by name, and a bare substring check would trip on the history it
+    # is there to preserve.
+    refute_includes controller_source, "ProfileSections.served_by?(",
+      "served_by? answers only the model gate — an app gate would be invisible to it"
   end
 
   # --- the default page's partials actually exist -----------------------------

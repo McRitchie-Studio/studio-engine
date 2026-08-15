@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "stringio"
 
 # [unit] Resolution rules for Studio.profile_sections (lib/studio/profile_sections.rb).
 #
@@ -211,6 +212,36 @@ class ProfileSectionsTest < Minitest::Test
     view = Struct.new(:current_user) { def admin? = false }.new(nil)
 
     assert_equal [], Studio::ProfileSections.resolve([{ key: :s, partial: "x", if: :typo? }], view).map { |s| s[:key] }
+  end
+
+  # Carl's F1 on #130: the Symbol branch was arity-0 only, so a predicate written
+  # as `def visible?(view)` raised ArgumentError — a 500 on /profile rather than a
+  # dropped row — while the lambda branch three lines below accepted both shapes.
+  def test_a_symbol_if_accepts_a_predicate_that_takes_the_view
+    view = Struct.new(:current_user) do
+      def admin? = false
+      def wants?(v) = !v.nil?
+    end.new(:someone)
+
+    assert_equal %i[s], Studio::ProfileSections.resolve([{ key: :s, partial: "x", if: :wants? }], view).map { |s| s[:key] }
+  end
+
+  # Carl's F2 on #130: dropping silently repeats the shape of the bug this key
+  # was added to fix. The host gets told.
+  def test_a_gate_naming_a_missing_method_warns
+    # No stub: this suite boots no Rails, so warn_gate takes its Kernel.warn
+    # fallback and the real path can be captured. (Minitest 6 dropped
+    # minitest/mock, so a stub would have had to be hand-rolled anyway.)
+    view = Struct.new(:current_user) { def admin? = false }.new(nil)
+    captured = StringIO.new
+    original, $stderr = $stderr, captured
+    begin
+      Studio::ProfileSections.resolve([{ key: :s, partial: "x", if: :typo? }], view)
+    ensure
+      $stderr = original
+    end
+
+    assert_includes captured.string, "typo?", "a typo'd gate must say so"
   end
 
   def test_a_row_with_no_if_always_renders

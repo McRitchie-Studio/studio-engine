@@ -38,7 +38,7 @@ module Studio
 
     # PATCH /profile — the scalar fields. Today that is the first name.
     def update
-      return unsupported(:first_name) unless serves?(:first_name)
+      return unsupported("name") unless row_rendered?(:first_name)
 
       value = normalized_first_name
 
@@ -85,7 +85,7 @@ module Studio
     # this and branched inside its own #update; a separate route is the same
     # lesson expressed so the trap cannot be reintroduced.
     def avatar
-      return unsupported(:avatar) unless serves?(:avatar)
+      return unsupported("profile photo") unless row_rendered?(:avatar)
 
       file = params.dig(:profile, :avatar)
 
@@ -124,7 +124,7 @@ module Studio
     # and letting the two drift means the next OAuth sign-in either re-links to a
     # stranger's row or fails to find its own. Unlink Google first, then change it.
     def email
-      return unsupported(:email) unless serves?(:email)
+      return unsupported("email") unless row_rendered?(:email)
 
       if Studio::OauthIdentity.google_linked?(current_user)
         return redirect_to profile_path, status: :see_other,
@@ -183,7 +183,7 @@ module Studio
     # column: an app with an email column that does not offer magic-link sign-in
     # cannot use it to get back in.
     def unlink_google
-      return unsupported(:google_account) unless serves?(:provider) && serves?(:uid)
+      return unsupported("Google account") unless row_rendered?(:google)
 
       unless Studio::OauthIdentity.google_linked?(current_user)
         return redirect_to profile_path, alert: "No Google account is linked.", status: :see_other
@@ -203,28 +203,42 @@ module Studio
 
     private
 
-    # Can this host's user model serve this field?
+    # Would the page render this row for this viewer?
     #
-    # A HIDDEN ROW IS NOT A GUARD. Studio::ProfileSections drops a row the host
+    # A HIDDEN ROW IS NOT A GUARD. Studio::ProfileSections drops a row this host
     # cannot serve, so nobody SEES a first-name form in an app without the
     # column — but the endpoint stays open to anyone who posts to it, and
     # rescue_and_log RE-RAISES, so an unguarded write is a 500 plus an ErrorLog
-    # row. That is not hypothetical: three of the five consumers
-    # (mcritchie-industries, moms-app, acquisition-studio) have an avatar
-    # attachment and no first_name column right now.
+    # row. Three of the five consumers have an avatar attachment and no
+    # first_name column right now.
     #
-    # The endpoint asks the SAME question the row does, through the SAME method,
-    # so the two cannot drift into disagreeing about what this app supports.
-    def serves?(attribute)
-      Studio::ProfileSections.served_by?(current_user, attribute)
+    # ASKED OF THE RESOLVER, not of one of its rules — and that distinction was a
+    # real bug, caught in review. This used to call served_by?, which answers only
+    # the MODEL gate (`requires:`). Once rows also carried an APP gate (`if:`),
+    # the two questions came apart: mcritchie-industries drops the Google row
+    # because it offers no Google sign-in, while the endpoint — asking only about
+    # columns it does have — stayed open. The comment here claimed they "cannot
+    # drift" while they were already drifting.
+    #
+    # Asking the resolver makes that true rather than asserted: the page and the
+    # endpoint run the same code and get the same answer, whatever gates a row
+    # grows next.
+    def row_rendered?(key)
+      profile_rows.any? { |section| section[:key] == key.to_sym }
+    end
+
+    # Memoized per request: a host's `if:` may be a lambda doing real work, and a
+    # write should not pay for it more than once.
+    def profile_rows
+      @profile_rows ||= Studio.profile_sections_for(view_context)
     end
 
     # Land the person back on a page that works rather than on a bare 404. This
     # is unreachable through the UI — the row that posts here is not rendered —
     # so the wording is for whoever is poking at the endpoint directly.
-    def unsupported(attribute)
+    def unsupported(label)
       redirect_to profile_path,
-                  alert: "This app has no #{attribute.to_s.tr("_", " ")} to change.",
+                  alert: "This app has no #{label} to change.",
                   status: :see_other
     end
 
