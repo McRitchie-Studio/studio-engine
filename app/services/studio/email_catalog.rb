@@ -210,7 +210,17 @@ module Studio
               "If that was you, tap the button below to approve it. " \
               "If it was not, ignore this message and nothing will change.",
         supports_cta: true,
-        cta_text: "Confirm the change"
+        cta_text: "Confirm the change",
+        # Every registered email owes a preview builder, or its row on
+        # /admin/emails is a card the operator cannot look at. Sample data only —
+        # this runs on that admin page and never in a delivery path.
+        preview: lambda {
+          Studio::ProfileMailer.email_change_confirmation(
+            nil, "current@example.com", "new@example.com",
+            Studio::EmailChangeToken.generate(user_id: 0, current_email: "current@example.com",
+                                              new_email: "new@example.com")
+          )
+        }
       },
       {
         key: "email_change_notification",
@@ -228,7 +238,10 @@ module Studio
               "If you did not do this, contact us straight away — this message " \
               "was sent to your previous address on purpose.",
         # No button: there is nothing to click. The point is the notice itself.
-        supports_cta: false
+        supports_cta: false,
+        preview: lambda {
+          Studio::ProfileMailer.email_change_notification(nil, "old@example.com", "new@example.com")
+        }
       }
     ].freeze
 
