@@ -10,11 +10,6 @@
 <% content_for(:title, "Profile") %>
 
 <div class="max-w-2xl mx-auto py-8">
-  <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-extrabold text-heading">Profile</h1>
-    <%= link_to "Edit", edit_profile_path, class: "btn btn-outline btn-sm" %>
-  </div>
-
   <%= render "studio/profiles/identity", user: current_user, editable: false %>
 
   <% if @profile_sections.present? %>

@@ -74,13 +74,25 @@ class ProfilePageRenderTest < Minitest::Test
     assert_includes doc.text, "pat@example.com"
   end
 
-  def test_the_read_headers_badge_links_to_the_edit_page
+  # THE ONLY WAY THROUGH. The operator removed the page heading and the top-right
+  # Edit button, so this badge is the read page's entire route to editing — not a
+  # convenience beside another link. Losing it strands the edit page.
+  def test_the_read_headers_badge_is_the_only_route_to_editing
     doc = Nokogiri::HTML5.fragment(identity)
     badge = doc.at_css('[aria-label="Edit your profile"]')
 
     refute_nil badge, "the read page needs a way through to editing"
     assert_equal "a", badge.name
     assert_equal "/profile/edit", badge["href"]
+  end
+
+  def test_the_read_page_carries_no_heading_or_second_edit_control
+    html = render_page(Studio::ProfileSections.defaults.select { |x| x[:page] == :show })
+    doc = Nokogiri::HTML5.fragment(html)
+
+    assert_nil doc.at_css("h1"), "the card is the page — no heading above it"
+    edit_links = doc.css("a").select { |a| a["href"] == "/profile/edit" }
+    assert_equal 1, edit_links.length, "exactly one route through: the avatar badge"
   end
 
   def test_the_edit_headers_badge_opens_the_picker

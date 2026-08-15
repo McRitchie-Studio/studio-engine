@@ -1,6 +1,13 @@
 <%# The "you at a glance" header — avatar, name, address — at the top of BOTH
     /profile and /profile/edit.
 
+    THE AVATAR BADGE IS THE ONLY WAY THROUGH TO EDITING from the read page — the
+    operator removed the "Profile" heading and the top-right Edit button so the
+    card is the page. That makes the badge load-bearing rather than decorative,
+    which is why it is a real <a>/<button> with an aria-label rather than a
+    styled div: losing it to a keyboard or a screen reader now means losing the
+    edit page entirely.
+
     Locals:
       user      (required)
       editable  (Boolean) — true on the edit page, where the avatar button opens
@@ -25,13 +32,13 @@
   <%# The avatar and its edit affordance. The badge sits on the circle's
       lower-right — the position the operator's illustration used for a marker,
       now carrying an action instead. %>
-  <div class="relative mb-3" style="width: 96px; height: 96px;">
+  <div class="relative mb-3" style="width: 128px; height: 128px;">
     <% if attachable && user.avatar.attached? %>
       <%= image_tag user.avatar, class: "rounded-full object-cover",
-                    style: "width: 96px; height: 96px;", alt: user.display_name %>
+                    style: "width: 128px; height: 128px;", alt: user.display_name %>
     <% else %>
-      <div class="rounded-full flex items-center justify-center font-bold text-white text-3xl"
-           style="width: 96px; height: 96px; background-color: <%= user.avatar_color %>">
+      <div class="rounded-full flex items-center justify-center font-bold text-white text-4xl"
+           style="width: 128px; height: 128px; background-color: <%= user.avatar_color %>">
         <%= user.avatar_initials %>
       </div>
     <% end %>
@@ -40,7 +47,7 @@
         spot, and each does what that page can do. Both are real controls rather
         than a div, so a keyboard reaches them. %>
     <% badge_class = "absolute bottom-0 right-0 flex items-center justify-center rounded-full border-2 border-page bg-primary text-white hover:opacity-90 transition" %>
-    <% badge_style = "width: 30px; height: 30px;" %>
+    <% badge_style = "width: 36px; height: 36px;" %>
     <% if editable && attachable %>
       <button type="button" @click="$refs.filePicker.click()"
               aria-label="Change your profile photo"
@@ -55,7 +62,7 @@
     <% end %>
   </div>
 
-  <p class="text-xl font-bold text-heading"><%= user.display_name %></p>
+  <p class="text-3xl font-extrabold text-heading"><%= user.display_name %></p>
   <% if user.respond_to?(:email) && user.email.present? %>
     <p class="text-secondary text-sm break-all"><%= user.email %></p>
   <% end %>
