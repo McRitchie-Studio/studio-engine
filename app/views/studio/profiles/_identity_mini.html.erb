@@ -25,7 +25,7 @@
 <div data-studio-identity-mini
      class="studio-identity-mini"
      aria-hidden="true">
-  <div class="max-w-2xl mx-auto px-4">
+  <div class="px-4">
     <div class="flex items-center gap-3 py-2">
       <% if user.respond_to?(:avatar) && user.avatar.respond_to?(:attached?) && user.avatar.attached? %>
         <%= image_tag user.avatar, class: "rounded-full object-cover flex-shrink-0",
@@ -62,12 +62,31 @@
 
       if (mini._studioObserver) mini._studioObserver.disconnect();
 
+      // HAND OVER PART-WAY, not once the card has gone. Waiting for the last
+      // pixel left a gap where neither header was on screen, which is the moment
+      // the bar exists to cover. It appears once most of the card has scrolled
+      // past, so the two overlap briefly instead.
+      //
+      // Ratio, not a pixel offset: the card's height changes with the name's
+      // wrap and with whether there is an email under it, so a fixed offset
+      // would mean something different on every account.
+      var SHOW_BELOW_RATIO = 0.6;
+
       var observer = new IntersectionObserver(function (entries) {
-        // The card is "gone" once its last pixel passes under the navbar, which
-        // is what the negative top margin accounts for — without it the bar
-        // appears while the card is still visible behind the nav.
-        mini.classList.toggle(CLASS, !entries[0].isIntersecting);
-      }, { rootMargin: "-72px 0px 0px 0px", threshold: 0 });
+        var entry = entries[0];
+        // A card taller than the viewport can never reach ratio 1, so "not
+        // intersecting at all" has to count as gone in its own right.
+        var gone = !entry.isIntersecting || entry.intersectionRatio < SHOW_BELOW_RATIO;
+        mini.classList.toggle(CLASS, gone);
+      }, {
+        // The navbar covers the top of the viewport, so pixels behind it are not
+        // visible pixels — without this the card reads as on-screen while it is
+        // hidden under the nav.
+        rootMargin: "-72px 0px 0px 0px",
+        // A spread of thresholds, or the callback only fires at fully-in and
+        // fully-out and the ratio test above never gets a chance to run.
+        threshold: [0, 0.2, 0.4, 0.5, 0.6, 0.8, 1]
+      });
 
       observer.observe(full);
       mini._studioObserver = observer;

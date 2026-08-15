@@ -155,13 +155,35 @@ class ProfilePageRenderTest < Minitest::Test
     assert_match(/\.studio-identity-mini\s*\{[^}]*opacity:\s*0/, styles, "it rests hidden")
   end
 
+  # CARD WIDTH, not full bleed — it should read as the identity card shrunk, not
+  # as a second navbar. The calc keeps it inside the gutters on a narrow screen,
+  # where a bare 42rem would run off the edge.
+  def test_the_compact_header_matches_the_card_width
+    styles = identity[/<style>(.*?)<\/style>/m, 1].to_s
+
+    assert_match(/width:\s*min\(42rem,\s*calc\(100% - 2rem\)\)/, styles)
+  end
+
+  # The centring translate and the entry animation share ONE transform property —
+  # declaring a second would silently replace the first and the bar would fly in
+  # from the left edge.
+  def test_the_compact_headers_centring_survives_its_animation
+    styles = identity[/<style>(.*?)<\/style>/m, 1].to_s
+    visible = styles[/\.studio-identity-mini\.is-visible\s*\{([^}]*)\}/m, 1].to_s
+
+    assert_match(/transform:\s*translateX\(-50%\)/, visible,
+      "the visible state must keep the centring, not just drop the offset")
+  end
+
   # Pinned to the height the host navbar publishes — the same variable
   # /admin/style uses to stick its section nav — with a 0px fallback so an app
   # that publishes nothing gets a bar at the top rather than a broken one.
   def test_the_compact_header_pins_under_the_host_navbar
     styles = identity[/<style>(.*?)<\/style>/m, 1].to_s
 
-    assert_match(/top:\s*var\(--nav-h,\s*0px\)/, styles)
+    # The variable and its fallback, wherever they sit — the offset around them
+    # is a design nudge, the anchor is the contract.
+    assert_match(/top:[^;]*var\(--nav-h,\s*0px\)/, styles)
   end
 
   # It duplicates content already on the page and already reachable. A second
