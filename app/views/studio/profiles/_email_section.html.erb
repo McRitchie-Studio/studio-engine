@@ -1,0 +1,55 @@
+<%# Email row.
+
+    Locals: user (required).
+
+    DIRECT CHANGE from any signed-in session (operator's call, 2026-08-14). The
+    earlier build mailed a confirmation link to the current address and applied
+    the change only when someone clicked it; the session is the authority now.
+    The row therefore saves what you type, and the copy says so plainly rather
+    than implying a pending step that no longer exists.
+
+    THE GOOGLE EXCEPTION. An account with a linked Google identity cannot change
+    its email here — Google is the authoritative source for that address, and
+    letting the two drift means the next OAuth sign-in either re-links to a
+    stranger's row or cannot find its own. The locked branch renders NO form at
+    all — there is nothing to type into and nothing to submit — and
+    ProfilesController#email refuses the request independently anyway, because a
+    missing form is a courtesy and anyone can POST.
+
+    Gated on a real delta for the same reason the name row is — an empty field,
+    or the address you already have, is not a change.
+%>
+<% locked = Studio::OauthIdentity.google_linked?(user) %>
+<% current = user.email.to_s.strip %>
+
+<% if locked %>
+  <p class="text-sm text-secondary mb-1">Current address</p>
+  <p class="text-heading font-semibold mb-3 break-all"><%= user.email %></p>
+  <div class="rounded-lg p-3 flex items-start gap-2" style="background: var(--color-surface-alt);">
+    <span aria-hidden="true">🔒</span>
+    <p class="text-muted text-xs">
+      This comes from your linked Google account. Unlink Google below if you want to change it.
+    </p>
+  </div>
+<% else %>
+  <%= form_with url: profile_email_path, method: :patch, scope: :profile,
+                data: { turbo: false },
+                html: { "x-data": "{ current: #{current.downcase.to_json}, value: #{current.to_json} }" },
+                class: "flex flex-wrap items-end gap-3" do |form| %>
+    <div class="flex-1 min-w-0" style="min-width: 14rem;">
+      <label class="block text-sm text-secondary mb-2 font-medium" for="profile_email">Email</label>
+      <%= form.email_field :email, value: user.email, autocomplete: "email",
+                           placeholder: "you@example.com", class: "input-field",
+                           "x-model": "value" %>
+    </div>
+    <%= form.submit "Update",
+                    class: "btn btn-primary",
+                    ":disabled": "value.trim() === '' || value.trim().toLowerCase() === current",
+                    ":class": "(value.trim() === '' || value.trim().toLowerCase() === current) && 'opacity-50 cursor-not-allowed'" %>
+  <% end %>
+  <% if current.present? %>
+    <p class="text-muted text-xs mt-2">
+      We'll let <span class="font-semibold"><%= user.email %></span> know it changed, and sign out your other devices.
+    </p>
+  <% end %>
+<% end %>

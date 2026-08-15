@@ -2,17 +2,29 @@
 
     Locals: user (required).
 
-    This row only renders when the host's user model actually answers
-    `first_name` — Studio::ProfileSections drops it otherwise, so an app that has
-    not installed the standard profile columns gets a page without this row
-    rather than a NoMethodError on every visit. Nothing here needs to re-check.
+    PREFILLED, with the Update button to the right of the input and DISABLED
+    until the value actually differs (operator's call, 2026-08-14). A blank field
+    made you retype a name you had already set just to see what it was, and an
+    always-live Save invited a no-op write that flashed "Name updated." over a
+    change nobody made.
 
-    The same column is written by the onboarding step
-    (Studio::OnboardingController#first_name); this is the surface for changing it
-    later.
+    The delta is computed against the value the server rendered, and both sides
+    are trimmed — leading or trailing whitespace is not a change, and the
+    controller trims on the way in too, so the button agrees with what the server
+    would actually do.
+
+    NO-JS FALLBACK: the button carries no `disabled` attribute in the markup;
+    Alpine adds it on init. A page whose JS never ran therefore gets a working,
+    always-enabled Save rather than a control it can never turn on — the server
+    re-checks anyway.
+
+    This row only renders when the host's user model answers `first_name`
+    (Studio::ProfileSections drops it otherwise), so nothing here re-checks.
 %>
 <%= form_with url: profile_path, method: :patch, scope: :profile,
-              data: { turbo: false }, class: "flex flex-wrap items-end gap-3" do |form| %>
+              data: { turbo: false },
+              html: { "x-data": "{ initial: #{user.first_name.to_s.strip.to_json}, value: #{user.first_name.to_s.strip.to_json} }" },
+              class: "flex flex-wrap items-end gap-3" do |form| %>
   <div class="flex-1 min-w-0" style="min-width: 12rem;">
     <label class="block text-sm text-secondary mb-2 font-medium" for="profile_first_name">First name</label>
     <%= form.text_field :first_name,
@@ -20,7 +32,11 @@
                         maxlength: Studio::FIRST_NAME_MAX_LENGTH,
                         autocomplete: "given-name",
                         placeholder: "What should we call you?",
-                        class: "input-field" %>
+                        class: "input-field",
+                        "x-model": "value" %>
   </div>
-  <%= form.submit "Save", class: "btn btn-primary" %>
+  <%= form.submit "Update",
+                  class: "btn btn-primary",
+                  ":disabled": "value.trim() === initial.trim()",
+                  ":class": "value.trim() === initial.trim() && 'opacity-50 cursor-not-allowed'" %>
 <% end %>

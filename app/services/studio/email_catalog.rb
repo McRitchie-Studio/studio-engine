@@ -193,6 +193,27 @@ module Studio
         # inherited email with no preview is a row on every app's manager that
         # cannot be looked at.
         preview: -> { Studio::NewsletterMailer.subscribed("preview@example.com", name: "Alex") }
+      },
+      {
+        key: "email_change_notification",
+        label: "Email change — heads up",
+        description: "Sent to the OLD address after a change lands, so an unauthorized change is visible rather than silent.",
+        # Reuses the shipped email-change artwork. The asset is named for a
+        # confirmation email that no longer exists; the picture is right for the
+        # subject either way, and renaming a shipped asset is its own migration.
+        default_asset: "emails/email-change-confirmation.gif",
+        header: "Your email was changed",
+        header_fallback: "Your email was changed",
+        subtext: "a heads-up from {app}",
+        subject: "Your {app} email was changed",
+        body: "The email address on your {app} account was just changed. " \
+              "If you did not do this, contact us straight away — this message " \
+              "was sent to your previous address on purpose.",
+        # No button: there is nothing to click. The point is the notice itself.
+        supports_cta: false,
+        preview: lambda {
+          Studio::ProfileMailer.email_change_notification(nil, "old@example.com", "new@example.com")
+        }
       }
     ].freeze
 

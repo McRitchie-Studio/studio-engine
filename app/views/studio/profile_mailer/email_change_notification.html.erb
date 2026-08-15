@@ -1,0 +1,30 @@
+<%# Body only — branded_mailer supplies the banner + card.
+
+    NO BUTTON, deliberately: there is nothing to click. This email exists so an
+    unauthorised change is VISIBLE to the person losing the account, and the
+    catalogue entry sets supports_cta: false to match. Adding a CTA here would
+    invite someone to click their way somewhere from a message that may itself
+    be the first sign of a compromise.
+%>
+<%
+  body = @body.presence || Studio::EmailCatalog.body(:email_change_notification)
+%>
+<h1 style="margin:0 0 18px;font-size:22px;line-height:1.3;color:#1f2a1c;">Your email was changed</h1>
+
+<% if body.present? %>
+  <%= simple_format body, { style: "margin:0 0 24px;font-size:16px;line-height:1.6;color:#3f4a3c;" }, sanitize: true %>
+<% end %>
+
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 24px;">
+  <tr>
+    <td style="padding:14px 16px;background:#f4f6f3;border-radius:10px;font-size:15px;line-height:1.6;color:#3f4a3c;">
+      <strong style="color:#2f3a2c;">Was:</strong> <%= @old_email %><br>
+      <strong style="color:#2f3a2c;">Now:</strong> <%= @new_email %>
+    </td>
+  </tr>
+</table>
+
+<p style="margin:28px 0 0;font-size:13px;line-height:1.5;color:#6b756a;text-align:center;">
+  This message was sent to <strong style="color:#2f3a2c;"><%= @old_email %></strong> — your previous
+  address — on purpose, so a change you did not make cannot happen quietly.
+</p>
