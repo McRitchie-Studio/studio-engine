@@ -40,11 +40,24 @@
 </div>
 
 <% if modal_rows.any? %>
-  <%# Mounted ONCE per page, on the page's own store. Two hosts sharing a store
+  <%# THE `x-data` IS LOAD-BEARING, and its absence is silent. Alpine 3 only
+      initialises trees rooted at an x-data, and _scoped_host declares none of its
+      own — its outer `<template x-if>` is inert without an Alpine scope above it.
+      The store still registers, `open()` still pushes onto the stack, and NOTHING
+      RENDERS. Measured on this very page: current() returned the right modal id
+      while the document contained no dialog at all.
+
+      The engine's own live call site (studio/emails/index.html.erb) happens to
+      render the host inside `x-data="emailRecipients(...)"`, which is the only
+      reason this has ever worked anywhere.
+
+      Mounted ONCE per page, on the page's own store — two hosts sharing a store
       name would register the same ids twice and render duplicate cards. %>
+  <div x-data>
   <%= render "studio/modals/scoped_host", store: "profileModals" do %>
     <% modal_rows.each do |section| %>
       <%= render section[:modals], user: current_user %>
     <% end %>
   <% end %>
+  </div>
 <% end %>

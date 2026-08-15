@@ -37,6 +37,26 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   silence rather than a 500. The columns ship consumer-first under
   *Roll Out Standard Profile Columns*.
 
+### Fixed
+
+- **A page-scoped modal host rendered outside an Alpine scope was inert, and
+  `/profile/edit` was in exactly that state.** `studio/modals/_scoped_host`
+  declares no `x-data` of its own, and Alpine 3 only initialises trees rooted at
+  one — so its outer `<template x-if>` never runs. The store registers, `open()`
+  pushes onto the stack, `current()` returns the right modal id, and **no dialog
+  reaches the document**. Every symptom points at the modal id or the store;
+  none of them is the cause.
+
+  `/profile/edit` mounts its crop-photo host after the `studioProfileForm` div
+  closes, with no scope above it, so the avatar cropper could not open. The
+  engine's other live call site (`studio/emails/index.html.erb`) happens to
+  render inside `x-data="emailRecipients(...)"`, which is the only reason this
+  pattern has worked anywhere.
+
+  Both pages now wrap the host in `<div x-data>`. Found by the newsletter row's
+  first browser spec — the view suite was green on the `@click` attribute
+  throughout.
+
 ### Changed
 
 - **The read page mounts a modal host only when a row asks for one.** This is the

@@ -44,7 +44,7 @@
 ---
 # Every `test(...)` committed under e2e/. Verified against Playwright's own model,
 # not prose:
-#   npx playwright test --list   ->  30 tests in 5 files
+#   npx playwright test --list   ->  35 tests in 6 files
 #
 # 5 -> 7: e2e/email_banner_frames.spec.js. The email manager shows a fluid artwork
 # frame beside the email's own FIXED 600px banner table; measured side by side they
@@ -104,7 +104,25 @@
 # callback. The two that survive now dirty the form (or scroll the page) FIRST, so
 # they assert a TRANSITION, which no poll can win a race against. The third made the
 # same claim as an existing transition spec and was deleted rather than kept.
-total_specs: 30
+# 30 -> 35: e2e/profile_newsletter.spec.js. The newsletter row's Unsubscribe
+# opens a confirmation, and the read page grew a modal host to open it from —
+# wiring that is new, so "the @click attribute is present" is exactly the
+# evidence that would not have caught getting it wrong.
+#
+# IT CAUGHT A REAL BUG IMMEDIATELY, and one already shipped in 0.51.0.
+# studio/modals/_scoped_host declares no x-data of its own, and Alpine 3 only
+# initialises trees rooted at one — so a host rendered outside any Alpine scope
+# is INERT. The store registers, open() pushes onto the stack, current() returns
+# the right modal id, and no dialog reaches the document. Every symptom points at
+# the modal id or the store; none of them is the cause.
+#
+# /profile/edit had the identical shape: its crop-photo host sits after the
+# studioProfileForm div closes, with no scope above it. The engine's other live
+# call site (studio/emails/index.html.erb) happens to render inside
+# x-data="emailRecipients(...)", which is the only reason the pattern has ever
+# worked anywhere. Both pages now wrap the host in `<div x-data>`, and the lab
+# page reproduces that wrapper rather than getting it right by accident.
+total_specs: 35
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -116,7 +134,7 @@ total_specs: 30
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 30
+executed: 35
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
