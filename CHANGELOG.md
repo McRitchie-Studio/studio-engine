@@ -4,6 +4,45 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The edit page's avatar is now the control; its corner badge is gone.**
+  Hovering the identity card fades a **Change photo** label over the picture, and
+  clicking anywhere on the picture opens the file picker and then the cropper. A
+  128px target replaces a 28px one, and a label replaces a glyph that had to be
+  interpreted. The reveal also fires on **focus**, because a keyboard never
+  hovers and this is the only route to changing a photo; on touch the label stays
+  visible over a thinner scrim, so the affordance exists without hiding the photo
+  it describes.
+
+  The label is the button's **accessible name**, so it is hidden by `opacity`
+  and never by `display`/`visibility` — either of those would drop it out of the
+  accessibility tree and leave the button silently unnamed at rest.
+
+  **The read page is unchanged**: its whole card is a link to `/profile/edit` and
+  its badge stays a decorative `<span>` (an `<a>` inside an `<a>` is invalid, and
+  browsers repair it by closing the outer link early).
+
+- **Birthday is entered through a calendar rather than an open field.** The
+  popover carries month and year **selects** rather than only step arrows —
+  stepping from today to 1985 is about four hundred clicks, which is why
+  turf-monster's contest picker could not simply be reused. Future dates are
+  disabled per-day (the boundary month is half valid), today is still selectable,
+  and a set birthday can be cleared.
+
+  It is `position: fixed`, placed from the trigger's rect, for two reasons: an
+  absolutely-positioned popover is clipped the day a consumer's card carries
+  `position: relative` alongside `overflow-hidden`, and viewport coordinates only
+  stay meaningful under `fixed` once the page scrolls.
+
+  **Without JavaScript the native `<input type="date">` renders instead**, and
+  the two branches are `<template x-if>` rather than `x-show` — only one is ever
+  in the DOM, so the form can never submit two `profile[birthday]` fields.
+
+  The three integer columns are unchanged; the UI joins them for entry and
+  `ProfilesController#update` splits them again.
+
+
 ### Added
 
 - **`/profile` gains the Newsletter row.** Lifted from turf-monster's `/account`

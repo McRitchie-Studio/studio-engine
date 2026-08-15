@@ -166,15 +166,31 @@ class E2eLabController < ActionController::Base
     # The newsletter pair. Present as METHODS so the row's `requires:` gate is
     # satisfied, nil as VALUES, which is the "never asked" state the card opens
     # from. A LabUser without them would drop the row entirely, and every
-    # newsletter spec below would pass by never running.
+    # newsletter spec would pass by never running.
     def joined_email_list_at = nil
     def left_email_list_at = nil
+
+    # The birth trio: present as methods, empty as values — an account that has
+    # the columns and has not filled them in, which is the state the calendar
+    # opens from.
+    def birth_day = nil
+    def birth_month = nil
+    def birth_year = nil
   end
 
-  # Already on the list — the other half of the card, and the only state whose
-  # control opens the confirmation.
+  # Already on the list — the other half of the newsletter card, and the only
+  # state whose control opens the confirmation.
   class LabSubscriber < LabUser
     def joined_email_list_at = Time.at(1_700_000_000)
+  end
+
+  # THE EDIT PAGE'S user needs one thing more: an `avatar` that answers
+  # `attached?`. The identity header's `attachable` guard drops the upload
+  # affordance entirely for a model without it, so the read page's LabUser (which
+  # deliberately has none) would render no avatar trigger and the overlay specs
+  # would pass over a page that has nothing to hover.
+  class LabUserWithAvatar < LabUser
+    def avatar = @avatar ||= Class.new { def attached? = false }.new
   end
 
   def profile
@@ -186,6 +202,16 @@ class E2eLabController < ActionController::Base
     # spec green on a registry that had stopped asking for it.
     @profile_sections = Studio.profile_sections_for(view_context, page: :show)
     render(:profile)
+  end
+
+  # The EDIT page's two browser-only controls: the avatar's hover-to-change
+  # overlay, and the birthday calendar. Separate from #profile because the read
+  # and edit headers are deliberately different components — the read card is a
+  # link with a decorative badge, the edit card is not a link and its avatar is a
+  # button — and one page cannot exhibit both.
+  def profile_edit
+    @user = LabUserWithAvatar.new
+    render(:profile_edit)
   end
 
   # Liveness. Playwright's webServer polls this before the first spec, so it must

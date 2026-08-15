@@ -1,7 +1,14 @@
-<%# The avatar badge's reveal.
+<%# The identity header's styles — the read page's badge, the edit page's avatar
+    control, and the compact header that takes over on scroll.
 
-    The badge sits empty until you hover the picture, then the pencil fades in —
-    the operator's call, and it keeps the resting state quiet.
+    TWO DIFFERENT AFFORDANCES, because the two pages ask different questions.
+
+      READ  — the whole card is a link to /profile/edit. A 28px badge sits in the
+              avatar's corner, empty until you hover the card, and then the pencil
+              fades in. Decorative: the card carries the destination.
+      EDIT  — there is no badge. The PICTURE is the button (operator's call,
+              2026-08-15), and hovering the card fades a "Change photo" label over
+              it. A 128px target beats a 28px one, and a label beats a glyph.
 
     WRITTEN AS CSS RATHER THAN TAILWIND UTILITIES on purpose. The engine ships a
     prebuilt bundle to consumers, so a utility only exists if something already
@@ -21,7 +28,8 @@
                       visible there rather than never appearing
 
     The badge circle itself is always visible in every case; it is only the
-    glyph inside it that waits.
+    glyph inside it that waits. The edit page's overlay follows the same three
+    paths for the same reasons.
 %>
 <style>
   .studio-avatar-badge-icon {
@@ -29,17 +37,49 @@
     transition: opacity 200ms ease;
   }
 
-  /* The read page: the whole card is the link, so hovering ANYWHERE on it
-     reveals the glyph. The avatar and badge selectors stay for the edit page,
-     where the badge is its own button. */
+  /* The READ page only. The badge is decorative there and the whole card is the
+     link, so hovering anywhere on it reveals the glyph.
+
+     The edit page's badge-button selectors used to live here and are GONE with
+     the button — the picture itself is the control there now, and its reveal is
+     the overlay block below. A selector for an element that no longer renders is
+     not harmless: it reads as coverage. */
   .studio-identity-card:hover .studio-avatar-badge-icon,
   .studio-identity-card:focus .studio-avatar-badge-icon,
   .studio-identity-card:focus-visible .studio-avatar-badge-icon,
-  .studio-avatar:hover .studio-avatar-badge-icon,
-  .studio-avatar-badge:hover .studio-avatar-badge-icon,
-  .studio-avatar-badge:focus .studio-avatar-badge-icon,
-  .studio-avatar-badge:focus-visible .studio-avatar-badge-icon {
+  .studio-avatar:hover .studio-avatar-badge-icon {
     opacity: 1;
+  }
+
+  /* ---- THE EDIT PAGE'S AVATAR CONTROL -------------------------------------
+     The picture is the button. A scrim + label fades in over it on hover, so the
+     resting state is just the photo. */
+  .studio-avatar-overlay {
+    opacity: 0;
+    background: rgba(0, 0, 0, 0.55);
+    transition: opacity 200ms ease;
+    /* The label must never be the reason the button changes size. */
+    pointer-events: none;
+  }
+
+  /* Hovering the CARD reveals it (operator's call — not only the picture), and
+     so does focusing the button, because a keyboard never hovers and this is the
+     only route to changing the photo. */
+  .studio-identity-card-editable:hover .studio-avatar-overlay,
+  .studio-avatar-trigger:hover .studio-avatar-overlay,
+  .studio-avatar-trigger:focus .studio-avatar-overlay,
+  .studio-avatar-trigger:focus-visible .studio-avatar-overlay {
+    opacity: 1;
+  }
+
+  /* The whole card is the trigger, so it has to say so. */
+  .studio-identity-card-clickable { cursor: pointer; }
+
+  /* The button is a bare circle; give focus something to land on that is visible
+     against both a photo and a flat initials colour. */
+  .studio-avatar-trigger:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
   }
 
   /* The card reads as clickable before you click it. Kept subtle — this is a
@@ -53,18 +93,38 @@
     border-color: var(--color-primary);
   }
 
-  /* No hover to give: show it and be done. */
+  /* No hover to give: show it and be done.
+
+     The overlay is a JUDGEMENT CALL rather than the same rule. Showing the full
+     scrim permanently on touch would hide the photo it is describing, so the
+     label stays but the scrim thins to where the picture still reads through.
+     The affordance exists; the picture is not lost to it. */
   @media (hover: none) {
     .studio-avatar-badge-icon { opacity: 1; }
+
+    .studio-avatar-overlay {
+      opacity: 1;
+      background: rgba(0, 0, 0, 0.35);
+    }
   }
 
   /* The compact header that takes over on scroll. FIXED so it costs no layout
      height while hidden; pinned to the navbar height the host publishes. */
   .studio-identity-mini {
     position: fixed;
-    /* Sits just under the host navbar, with a little air so it reads as a card
-       floating over the page rather than a second navbar welded to the first. */
-    top: calc(var(--nav-h, 0px) + 0.5rem);
+    /* --nav-bottom, NOT --nav-h, and the engine already learned this once: the
+       two differ by exactly the height of any chrome an app stacks ABOVE the
+       navbar, and mcritchie-industries' 47px environment banner is exactly such
+       chrome. test/integration/sidebar_navbar_render_test.rb refuses `--nav-h`
+       for the sidebar panel for this reason; this bar had the same bug.
+       A `fixed` element's `top` is a viewport coordinate, so it must be the
+       header's BOTTOM EDGE.
+
+       FLUSH, with no added gap. It first carried `+ 0.5rem` "so it reads as a
+       card floating over the page"; the operator saw that as a strip of dead
+       space between the navbar and the bar (2026-08-15). The bar is a
+       continuation of the chrome, not a card hovering under it. */
+    top: var(--nav-bottom, var(--nav-h, 0px));
     /* CARD WIDTH, not full bleed. 42rem is max-w-2xl — the page container's
        width — and the calc keeps it inside the viewport's gutters on a narrow
        screen, where a fixed 42rem would run off the edge. Centred with the same
@@ -90,6 +150,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .studio-avatar-badge-icon,
+    .studio-avatar-overlay,
     .studio-identity-card,
     .studio-identity-mini { transition: none; }
   }
