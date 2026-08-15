@@ -4,6 +4,41 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **The link sidebar leads with a Profile link, shipped by the engine.** The
+  engine ships `/profile`, so it now ships the way in rather than asking five
+  apps to declare the same entry and watching them drift in wording and emoji.
+  `Studio::SidebarSections.resolve` prepends a `You` section; a host's own
+  sections follow in their declared order.
+
+  Two gates, both load-bearing:
+
+  - **`Studio.draw_profile_routes`** — an app that turned the page off must not
+    be handed a menu item pointing at a route that does not exist.
+  - **signed in** — `/profile` requires authentication, so offering it to a
+    signed-out visitor bounces them to login from something that looked like
+    navigation. Same shape as the existing `admin:` rule.
+
+  **WHO ACTUALLY RECEIVES THIS — check before assuming your app does.** The
+  trigger renders from `layouts/_navbar`, and two consumers fork that partial:
+
+  | Consumer | Effect |
+  |---|---|
+  | mcritchie-studio | Profile link added to the top of its existing sidebar |
+  | mcritchie-industries | same |
+  | acquisition-studio | **gains a sidebar it did not have** — it declared no sections, and now has one |
+  | turf-monster, moms-app | **no change** — both fork `layouts/_navbar` and render no sidebar trigger, so a bump does not deliver this |
+
+  That last row is the standing rule in this engine: a host view shadows the
+  engine's, so a partial change reaches only the apps that still render the
+  engine's copy.
+
+  **`studio_sidebar?` is now true in any signed-in app** that renders the engine
+  navbar, where it previously depended on the host declaring something. That is
+  the intended consequence — the sidebar always has at least the viewer's own
+  profile in it — but it is a visible change to a navbar every consumer inherits.
+
 ### Fixed
 
 - **`Studio.profile_sections`' `if:` gate no longer fails open on a Symbol.**
