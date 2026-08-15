@@ -10,6 +10,7 @@ require "studio/sidebar_sections"
 require "studio/profile_sections"
 require "studio/profile_image"
 require "studio/oauth_identity"
+require "studio/newsletter"
 require "studio/username_generator"
 require "studio/s3"
 require "studio/image_cache"
@@ -690,6 +691,14 @@ module Studio
         # here: it is OmniAuth's own /auth/:provider, which the middleware owns.
         delete "profile/google", to: "studio/profiles#unlink_google",
                as: :profile_unlink_google
+
+        # POST joins, DELETE leaves — the verbs the two actions actually are, on
+        # one path. Not a PATCH on the profile: subscribing is its own decision
+        # with its own confirmation, and folding it into the bulk field save would
+        # mean every name change re-asserted a mailing-list preference.
+        post   "profile/newsletter", to: "studio/profiles#subscribe_newsletter",
+               as: :profile_newsletter
+        delete "profile/newsletter", to: "studio/profiles#unsubscribe_newsletter"
       end
 
       resources :error_logs, only: [:index, :show]

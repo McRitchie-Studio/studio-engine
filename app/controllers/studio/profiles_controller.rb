@@ -142,6 +142,59 @@ module Studio
       end
     end
 
+    # POST /profile/newsletter — join the mailing list.
+    #
+    # DIRECT, no confirmation. Joining is reversible in one click from the same
+    # card, so a confirm step would be friction protecting nothing. LEAVING is the
+    # one that asks, because a mis-click there is silent until the next send that
+    # never arrives.
+    #
+    # An account with no address on file supplies one here — a wallet-only sign-in
+    # has no email, and a newsletter needs somewhere to send. It is written as the
+    # account email but NOT marked verified: this proves the person can type an
+    # address, not that they hold it, and treating it as verified would turn a
+    # mailing-list form into an account-recovery path.
+    def subscribe_newsletter
+      return unsupported("newsletter") unless row_rendered?(:newsletter)
+
+      if Studio::Newsletter.needs_email?(current_user)
+        value = params.dig(:profile, :email).to_s.strip
+        unless value.match?(URI::MailTo::EMAIL_REGEXP)
+          return redirect_to profile_path, status: :see_other,
+                             alert: "Enter an email address to subscribe."
+        end
+        current_user.email = value
+      end
+
+      rescue_and_log(target: current_user) do
+        # left_email_list_at is CLEARED rather than left in place. `subscribed?`
+        # compares the two dates, so a stale leave date in the future of the join
+        # would read as unsubscribed the moment the clock disagreed.
+        current_user.update!(joined_email_list_at: Time.current, left_email_list_at: nil)
+        redirect_to profile_path, notice: "You're on the list."
+      end
+    end
+
+    # DELETE /profile/newsletter — leave it.
+    #
+    # STAMPS A DATE, never clears the join. "Have they ever joined" is a different
+    # question from "are they on the list", and a consumer that pays a once-ever
+    # welcome bonus (turf-monster does, on-chain) needs the first one to survive
+    # every leave and rejoin. Clearing joined_email_list_at here would let someone
+    # re-earn it by cycling.
+    def unsubscribe_newsletter
+      return unsupported("newsletter") unless row_rendered?(:newsletter)
+
+      unless Studio::Newsletter.subscribed?(current_user)
+        return redirect_to profile_path, alert: "You're not subscribed.", status: :see_other
+      end
+
+      rescue_and_log(target: current_user) do
+        current_user.update!(left_email_list_at: Time.current)
+        redirect_to profile_path, notice: "You've been unsubscribed."
+      end
+    end
+
     private
 
     # Would the page render this row for this viewer?

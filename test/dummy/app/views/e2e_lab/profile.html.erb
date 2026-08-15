@@ -33,6 +33,18 @@
   <div class="max-w-2xl mx-auto py-8">
     <%= render "studio/profiles/identity", user: @user, editable: false %>
 
+    <%# The newsletter row and the host its confirmation opens from. Rendered
+        through the RESOLVED sections rather than by name, because the thing under
+        test is partly the resolution: the host must mount because a row DECLARED
+        modals, not because this page hard-coded one. %>
+    <div class="card p-0 overflow-hidden mb-6">
+      <% @profile_sections.each do |section| %>
+        <section class="p-6" data-profile-section="<%= section[:key] %>">
+          <%= render section[:partial], **section.fetch(:locals, {}).merge(user: @user) %>
+        </section>
+      <% end %>
+    </div>
+
     <form x-ref="form" data-studio-lab-form>
       <div class="card p-6">
         <%= render "studio/profiles/name_fields", user: @user %>
@@ -46,5 +58,19 @@
 
   <%= render "studio/profiles/save_bar" %>
 </div>
+
+<% modal_rows = @profile_sections.select { |section| section[:modals] } %>
+<% if modal_rows.any? %>
+  <%# The x-data wrapper is the page's job, not the host's — see show.html.erb.
+      The lab reproduces it because a lab page that got this right by accident
+      would test a shape no consumer renders. %>
+  <div x-data>
+    <%= render "studio/modals/scoped_host", store: "profileModals" do %>
+      <% modal_rows.each do |section| %>
+        <%= render section[:modals], user: @user %>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>
 
 <%= render "studio/profiles/form_script" %>

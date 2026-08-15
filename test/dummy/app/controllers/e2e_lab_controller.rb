@@ -75,11 +75,18 @@ class E2eLabController < ActionController::Base
 
   layout "e2e_lab"
 
-  helper_method :logged_in?, :root_path
+  helper_method :logged_in?, :root_path, :current_user
 
   def logged_in? = false
 
   def root_path = "/"
+
+  # THE PROFILE REGISTRY ASKS THE VIEW FOR THIS. Studio::ProfileSections#resolve
+  # reads `view.current_user` to run each row's `requires:` gate, and a nil user
+  # is served NOTHING — so without this the newsletter row is silently dropped and
+  # its specs pass over a page that never rendered it. Nil on every other lab
+  # page, which render with logged_in? false and never reach it.
+  def current_user = @user
 
   # DEFECT 1's page — the bar stack above the navbar.
   #
@@ -155,10 +162,29 @@ class E2eLabController < ActionController::Base
     def email = "pat@example.com"
     def avatar_initials = "PS"
     def avatar_color = "#6366f1"
+
+    # The newsletter pair. Present as METHODS so the row's `requires:` gate is
+    # satisfied, nil as VALUES, which is the "never asked" state the card opens
+    # from. A LabUser without them would drop the row entirely, and every
+    # newsletter spec below would pass by never running.
+    def joined_email_list_at = nil
+    def left_email_list_at = nil
+  end
+
+  # Already on the list — the other half of the card, and the only state whose
+  # control opens the confirmation.
+  class LabSubscriber < LabUser
+    def joined_email_list_at = Time.at(1_700_000_000)
   end
 
   def profile
-    @user = LabUser.new
+    @user = params[:subscribed].present? ? LabSubscriber.new : LabUser.new
+
+    # RESOLVED, not hard-coded, because the resolution is part of what is under
+    # test: the modal host must mount because a ROW DECLARED modals, not because
+    # this page decided to render one. Hard-coding the host here would make the
+    # spec green on a registry that had stopped asking for it.
+    @profile_sections = Studio.profile_sections_for(view_context, page: :show)
     render(:profile)
   end
 
