@@ -366,3 +366,44 @@ test("the calendar flips above its field and stays attached to it", async ({ pag
   expect(popover.y, "the flip pushed it off the top of the viewport").toBeGreaterThanOrEqual(0);
   expect(popover.y + popover.height).toBeLessThanOrEqual(viewport.height + 1);
 });
+
+// THE SIDE MUST NOT CHANGE AFTER IT OPENS.
+//
+// place() runs on every scroll and resize. When it also CHOSE the side, the
+// popover snapped between above and below the instant the available space
+// crossed the threshold — measured on turf-monster at 60px scroll steps: ABOVE,
+// ABOVE, ABOVE, ABOVE, then below, a 254px jump between two steps while the
+// reader was looking at it. That is what "the date picker freaks out on scroll"
+// was, and no existing spec could see it: the flip spec opens and asserts ONCE,
+// so a side that changes later is invisible to it.
+test("the calendar keeps the side it opened on while you scroll", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit");
+
+  // Open with the field near the bottom, so it opens FLIPPED — the interesting
+  // direction, because scrolling from here is what used to open room below.
+  await page.locator(DATE_TRIGGER).evaluate((el) => el.scrollIntoView({ block: "end" }));
+  await page.evaluate(() => window.scrollBy(0, -40));
+  await page.locator(DATE_TRIGGER).click();
+  await expect(page.locator(POPOVER)).toBeVisible();
+
+  const sideNow = async () => {
+    const t = await page.locator(DATE_TRIGGER).boundingBox();
+    const p = await page.locator(POPOVER).boundingBox();
+    return p.y < t.y ? "above" : "below";
+  };
+
+  const opened = await sideNow();
+  expect(opened, "this spec needs to open FLIPPED or it proves nothing").toBe("above");
+
+  // Scroll in steps, the way a reader does — the old bug appeared between two of
+  // them, not at the extremes.
+  for (let i = 0; i < 5; i++) {
+    await page.evaluate(() => window.scrollBy(0, 60));
+    await page.waitForTimeout(80);
+    expect(
+      await sideNow(),
+      `the calendar switched sides mid-scroll (step ${i + 1}) — place() is re-deciding instead of moving`
+    ).toBe(opened);
+  }
+});

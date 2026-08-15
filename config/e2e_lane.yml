@@ -44,7 +44,7 @@
 ---
 # Every `test(...)` committed under e2e/. Verified against Playwright's own model,
 # not prose:
-#   npx playwright test --list   ->  50 tests in 7 files
+#   npx playwright test --list   ->  51 tests in 7 files
 #
 # 5 -> 7: e2e/email_banner_frames.spec.js. The email manager shows a fluid artwork
 # frame beside the email's own FIXED 600px banner table; measured side by side they
@@ -205,7 +205,25 @@
 # but dropping the $nextTick (offsetHeight is 0 while x-show still hides it).
 #
 #
-total_specs: 50
+# 50 -> 51: the calendar's side must not change after it opens.
+#
+# place() runs on every scroll and resize, and it also CHOSE the side — so the
+# popover snapped between above and below the instant the available space
+# crossed the threshold. Measured on turf-monster at 60px scroll steps: ABOVE,
+# ABOVE, ABOVE, ABOVE, then below — a 254px jump between two steps, mid-scroll,
+# while the reader was looking at it.
+#
+# NO EXISTING SPEC COULD SEE IT, including the flip spec added one release
+# earlier: that one opens and asserts ONCE, so a side that changes LATER is
+# invisible to it. The fix that shipped before this corrected WHERE a flip lands;
+# it never asked whether the side should be re-decided at all. The new spec opens
+# flipped, asserts it opened flipped (or it proves nothing), then scrolls in
+# steps and asserts the side is unchanged at each one — because the jump happened
+# between steps, not at the extremes.
+#
+# Mutation: moving the side decision back inside place() reddens it.
+
+total_specs: 51
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -217,7 +235,7 @@ total_specs: 50
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 50
+executed: 51
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

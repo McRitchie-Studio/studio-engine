@@ -6,6 +6,24 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **The birthday calendar keeps the side it opened on.** `place()` runs on every
+  scroll and resize, and it also **chose** the side — so the popover snapped
+  between above and below the moment the available space crossed the threshold.
+  Measured on turf-monster at 60px scroll steps: ABOVE, ABOVE, ABOVE, ABOVE, then
+  below — a **254px jump between two steps**, mid-scroll, while the reader was
+  looking at it.
+
+  The side is now decided once, by `chooseSide()`, when the popover opens.
+  `place()` only moves it.
+
+  This is a different bug from the height fix that shipped alongside it: that one
+  corrected **where** a flipped popover lands, and never asked whether the side
+  should be re-decided at all. The flip spec added with it opens and asserts
+  once, so a side that changes **later** was invisible to it.
+
+
+### Fixed
+
 - **The birthday calendar measures itself instead of guessing, so a flipped
   popover stays attached to its field.** `place()` used a hardcoded
   `estimatedHeight = 340` for both the flip DECISION and the flipped COORDINATE.
