@@ -4,6 +4,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **`Studio.profile_sections`' `if:` gate no longer fails open on a Symbol.**
+  `if: :some_predicate` — Rails' own `before_action ..., if: :method_name`
+  spelling, and so the most natural thing a host will write — was coerced
+  straight to `true`, because a Symbol does not answer `call`. The gate silently
+  did nothing, with no signal to the host, in the same permissive direction as
+  the bug `if:` was added to fix. Symbols and Strings now name a method on the
+  view; a name the view does not answer drops the row rather than rendering it.
+  Lambdas and plain booleans are unchanged.
+
 ### Added
 
 - **`/profile` gains the Google account row.** Shows the linked identity with an
