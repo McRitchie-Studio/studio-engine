@@ -43,6 +43,7 @@ module Studio
       app.config.assets.precompile += %w[
         studio/sticky_table_header.css
         studio/sticky_table_header.js
+        studio/alpine.js
         studio/canvas_confetti.js
         studio/studio_confetti.js
         studio/sortable.js
