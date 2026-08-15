@@ -27,7 +27,7 @@ class StandardProfileColumnsTest < ActiveSupport::TestCase
     "../../db/migrate/20260813220000_add_standard_user_profile_columns.rb", __dir__
   )
 
-  STANDARD_COLUMNS = %w[first_name last_name birth_day birth_month birth_year ip_locations].freeze
+  STANDARD_COLUMNS = %w[first_name birth_day birth_month birth_year ip_locations].freeze
 
   def source
     @source ||= File.read(MIGRATION)
