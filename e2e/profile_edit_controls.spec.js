@@ -97,6 +97,38 @@ test("a keyboard reaches the same affordance", async ({ page }) => {
     .toBe("1");
 });
 
+// THE WHOLE CARD IS THE TRIGGER, and it must fire EXACTLY ONCE. The card and the
+// avatar button both carry the handler — the button so a keyboard can reach it,
+// the card so the click matches the hover. Without `.stop` on the button, a click
+// on the picture bubbles to the card and opens two file dialogs.
+test("clicking anywhere on the card opens the picker, exactly once", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit");
+  await expect(page.locator(TRIGGER)).toBeVisible();
+
+  await page.evaluate(() => {
+    window.__pickerClicks = 0;
+    document.querySelector('input[type="file"]:not([name])')
+      .addEventListener("click", (e) => { e.preventDefault(); window.__pickerClicks++; });
+  });
+
+  // A corner of the card — deliberately NOT the picture, which is what the
+  // operator reported doing when nothing happened.
+  await page.locator(CARD).click({ position: { x: 20, y: 20 } });
+  expect(
+    await page.evaluate(() => window.__pickerClicks),
+    "clicking the card away from the avatar did nothing — the hover lights it up, so the click must act"
+  ).toBe(1);
+
+  // And the picture itself still fires once, not twice.
+  await page.evaluate(() => { window.__pickerClicks = 0; });
+  await page.locator(TRIGGER).click();
+  expect(
+    await page.evaluate(() => window.__pickerClicks),
+    "the avatar's click bubbled to the card as well — two file dialogs"
+  ).toBe(1);
+});
+
 test("clicking the avatar reaches the file picker", async ({ page }) => {
   await blockOffsiteRequests(page);
   await page.goto("/lab/profile_edit");
@@ -235,4 +267,56 @@ test("a birthday cannot be set in the future", async ({ page }) => {
   await expect(
     page.locator(POPOVER).getByRole("button", { name: String(now.d), exact: true })
   ).toBeEnabled();
+});
+
+// --- the calendar's own layout ------------------------------------------------
+
+// THE BUG THE OPERATOR SAW, and the one this lane was structurally blind to.
+//
+// The popover first shipped using `grid grid-cols-7`. The engine ships a PREBUILT
+// bundle, so a Tailwind utility exists in a consuming app only if that app's own
+// views already emitted it — and `grid-cols-7` is rare enough that none had.
+// Measured in mcritchie-studio's compiled bundle: zero occurrences. With no grid
+// the seven weekday letters stacked into one vertical column and the popover grew
+// to the height of the page.
+//
+// THIS SPEC ALONE WOULD NOT HAVE CAUGHT IT, and that is worth saying plainly:
+// e2e/tailwind_input.css carries `@source "../app/views"`, so the lane compiles
+// the ENGINE's views and emits grid-cols-7 that no consumer has. What makes the
+// assertion meaningful now is that the rule is OWNED CSS shipped in the partial,
+// which is true in every app regardless of what its bundle emitted.
+test("the calendar lays out as seven columns", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit");
+  await page.locator(DATE_TRIGGER).click();
+  await expect(page.locator(POPOVER)).toBeVisible();
+
+  const grid = await page.evaluate(() => {
+    const el = document.querySelector(".studio-birthday-grid");
+    if (!el) return null;
+    const s = window.getComputedStyle(el);
+    return { display: s.display, tracks: s.gridTemplateColumns.split(" ").length };
+  });
+
+  expect(grid, "no .studio-birthday-grid — the calendar is not using its own layout").not.toBeNull();
+  expect(grid.display, "the day grid is not a grid at all — this is the stacked-column bug").toBe("grid");
+  expect(grid.tracks, "a week has seven days; anything else means the columns did not resolve").toBe(7);
+});
+
+// The popover must not be taller than the viewport it has to be placed inside.
+// When the grid collapsed, it became as tall as the page — which is what made the
+// placement look, in the operator's words, like it "freaks out" on scroll.
+test("the calendar fits on screen", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit");
+  await page.locator(DATE_TRIGGER).click();
+  await expect(page.locator(POPOVER)).toBeVisible();
+
+  const box = await page.locator(POPOVER).boundingBox();
+  const viewport = page.viewportSize();
+
+  expect(
+    box.height,
+    "the popover is taller than the viewport — its rows are stacking instead of gridding"
+  ).toBeLessThan(viewport.height);
 });

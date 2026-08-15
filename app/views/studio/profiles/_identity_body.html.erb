@@ -38,7 +38,9 @@
       `visibility:hidden` — those two remove an element from the accessibility
       tree, which would leave this button silently unnamed for a screen reader
       at rest. %>
-  <button type="button" @click="$refs.filePicker.click()"
+  <%# `.stop` because the CARD now carries the same handler. Without it the click
+      bubbles and the picker opens twice. %>
+  <button type="button" @click.stop="$refs.filePicker.click()"
           class="studio-avatar studio-avatar-trigger relative mb-3 mx-auto block rounded-full overflow-hidden"
           style="<%= avatar_style %>">
     <%= avatar_inner %>

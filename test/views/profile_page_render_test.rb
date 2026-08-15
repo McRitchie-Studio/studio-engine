@@ -125,8 +125,23 @@ class ProfilePageRenderTest < Minitest::Test
     trigger = doc.at_css("button.studio-avatar-trigger")
 
     refute_nil trigger, "the picture is the control now"
-    assert_equal "$refs.filePicker.click()", trigger["@click"]
+    # `.stop` is load-bearing: the CARD carries the same handler, so without it
+    # the click bubbles and the picker opens twice.
+    assert_equal "$refs.filePicker.click()", trigger["@click.stop"]
+    assert_nil trigger["@click"], "an un-stopped handler here double-fires with the card's"
     assert_includes trigger.text.strip, "Change photo"
+  end
+
+  # THE WHOLE CARD IS THE TRIGGER (operator's call). The hover already lit up the
+  # whole card, so a click that only worked on the picture read as broken.
+  def test_the_whole_edit_card_opens_the_picker
+    doc = Nokogiri::HTML5.fragment(identity(editable: true))
+    card = doc.at_css("[data-studio-identity-full]")
+
+    assert_equal "$refs.filePicker.click()", card["@click"],
+      "clicking the card anywhere — including the name and address — must open the picker"
+    assert_includes card["class"], "studio-identity-card-clickable",
+      "a surface that acts on click has to say so with a cursor"
   end
 
   # The label is the button's ACCESSIBLE NAME, so it may be hidden by opacity but
@@ -192,6 +207,27 @@ class ProfilePageRenderTest < Minitest::Test
 
     assert_nil doc.at_css("a.studio-identity-card"), "the edit card is not a link"
     assert_equal "button", doc.at_css("button.studio-avatar-trigger").name
+  end
+
+  # THE COMPACT HEADER'S OFFSET, and the engine has been bitten by this exact
+  # distinction before. A `fixed` element's `top` is a VIEWPORT coordinate, so it
+  # must be the header's BOTTOM EDGE (--nav-bottom), never its HEIGHT (--nav-h) —
+  # the two differ by exactly the height of any chrome an app stacks above the
+  # navbar, and mcritchie-industries ships a 47px environment banner that is
+  # precisely that. test/integration/sidebar_navbar_render_test.rb refuses
+  # `--nav-h` for the sidebar panel for the same reason; this bar had the bug.
+  #
+  # And NO ADDED GAP: it first carried `+ 0.5rem`, which the operator read as a
+  # strip of dead space between the navbar and the bar. It is a continuation of
+  # the chrome, not a card floating under it.
+  def test_the_compact_header_hangs_off_the_headers_bottom_edge
+    styles = identity[/<style>(.*?)<\/style>/m, 1].to_s
+    rule = styles[/\.studio-identity-mini\s*\{[^}]*\}/m].to_s
+
+    assert_match(/top:\s*var\(--nav-bottom/, rule,
+      "a fixed bar offset by the header HEIGHT lands wrong under any app that stacks chrome above the navbar")
+    refute_match(/top:\s*calc\(/, rule,
+      "the +0.5rem gap was the dead space the operator reported")
   end
 
   # --- the compact header that takes over on scroll --------------------------

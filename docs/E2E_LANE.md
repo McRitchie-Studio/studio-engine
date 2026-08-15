@@ -147,6 +147,36 @@ on an engine asset, which this lane must fail on. The older spec files still mak
 the request and carry the same latent flake; adopting the helper there is a
 follow-up, not a silent edit.
 
+## What the lane's OWN Tailwind build cannot see
+
+`e2e/tailwind_input.css` carries `@source "../app/views"`, so the lane compiles
+the **engine's own views**. That is what makes the lab pages render at all — and
+it is also a blind spot with a measured cost.
+
+**A consuming app does not scan the gem's views.** The engine ships a prebuilt
+bundle, and a Tailwind utility exists in a consumer only if that consumer's own
+source already emitted it. So the lane can emit a utility that no app on earth
+has, and every spec passes over a page no consumer can render.
+
+Measured on 2026-08-15: the birthday popover shipped using `grid grid-cols-7`.
+`grid-cols-7` appears **zero** times in mcritchie-studio's compiled bundle, so
+the day grid was never a grid — the seven weekday letters stacked into a single
+vertical column and the popover grew to the height of the page. The operator
+found it by looking at the page. Nine browser specs were green throughout.
+`hover:bg-surface-alt` was missing for the same reason.
+
+**The fix is not a cleverer spec.** Pointing `@source` somewhere else would break
+every lab page, and enumerating "utilities consumers happen to have" is a list
+that rots. The rule the engine already had, written on
+`studio/profiles/_identity_styles`, is the answer: **layout- and state-critical
+CSS in an engine partial is OWNED CSS, not borrowed utilities.** The calendar's
+grid, day cells, hover and disabled states are now rules the partial ships, which
+are true in every app regardless of what its bundle emitted.
+
+What the specs can then honestly claim is narrower and still worth having: that
+the owned rule resolves to seven columns and that the popover fits on screen.
+Both go red when the rule is removed.
+
 ## One browser, and what that cannot see
 
 The lane runs **Chromium only**. Named limits, rather than implied ones:

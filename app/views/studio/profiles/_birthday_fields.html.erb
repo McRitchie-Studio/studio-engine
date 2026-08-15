@@ -76,14 +76,14 @@
         <%# Month and year JUMP rather than step. Stepping from today to 1985 is
             about four hundred clicks, which is the whole reason this is not the
             contest picker. %>
-        <div class="flex items-center gap-2 mb-3">
-          <select x-model.number="viewMonth" class="input-field text-sm py-1 flex-1"
+        <div class="studio-birthday-nav">
+          <select x-model.number="viewMonth" class="input-field studio-birthday-month"
                   aria-label="Month">
             <template x-for="(name, i) in months" :key="name">
               <option :value="i" x-text="name"></option>
             </template>
           </select>
-          <select x-model.number="viewYear" class="input-field text-sm py-1"
+          <select x-model.number="viewYear" class="input-field studio-birthday-year"
                   aria-label="Year">
             <template x-for="y in years" :key="y">
               <option :value="y" x-text="y"></option>
@@ -91,23 +91,19 @@
           </select>
         </div>
 
-        <div class="grid grid-cols-7 mb-1">
+        <div class="studio-birthday-grid studio-birthday-weekdays">
           <template x-for="(wd, i) in weekdays" :key="i">
-            <div class="text-center text-xs text-muted font-medium py-1" x-text="wd"></div>
+            <div x-text="wd"></div>
           </template>
         </div>
 
-        <div class="grid grid-cols-7">
+        <div class="studio-birthday-grid">
           <template x-for="(cell, i) in calDays()" :key="i">
-            <div class="text-center">
+            <div>
               <template x-if="cell">
                 <button type="button" @click="pick(cell)" :disabled="isFuture(cell)"
-                        :class="isSelected(cell)
-                                  ? 'bg-primary text-white font-bold'
-                                  : isFuture(cell)
-                                    ? 'text-muted opacity-40 cursor-not-allowed'
-                                    : 'text-body hover:bg-surface-alt'"
-                        class="w-8 h-8 rounded-full text-sm transition"
+                        :class="isSelected(cell) && 'is-selected'"
+                        class="studio-birthday-day"
                         x-text="cell"></button>
               </template>
             </div>
@@ -131,6 +127,81 @@
 <p class="text-muted text-xs mt-2">Stored as day, month and year — we use it for birthdays and age checks.</p>
 
 <style>
+  /* EVERY RULE BELOW IS OWNED CSS, NOT TAILWIND UTILITIES, and that is not a
+     style preference — it is the bug the operator reported.
+     
+     The engine ships a PREBUILT bundle to consumers. A Tailwind utility exists in
+     a consuming app only if that app's OWN views already emitted it, because its
+     build scans its own source, not the gem's. This calendar first shipped using
+     `grid grid-cols-7`, and `grid-cols-7` is rare enough that NO consumer had
+     ever emitted it: measured in mcritchie-studio's compiled bundle, zero
+     occurrences. With no grid, the seven weekday letters stacked into a single
+     vertical column and the popover grew to the height of the page.
+     `hover:bg-surface-alt` was missing for the same reason.
+     
+     The same note is on studio/profiles/_identity_styles for the same reason.
+     
+     AND THE BROWSER LANE COULD NOT SEE IT. e2e/tailwind_input.css carries
+     `@source "../app/views"`, so the lane compiles the engine's OWN views and
+     emits grid-cols-7 — every spec passed against a page no consumer renders.
+     That blindness is recorded in docs/E2E_LANE.md; the fix here is to stop
+     depending on the utility at all. */
+  .studio-birthday-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .studio-birthday-month { flex: 1 1 auto; }
+
+  .studio-birthday-month,
+  .studio-birthday-year {
+    font-size: 0.875rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+
+  /* THE ONE THAT BROKE. Seven columns, owned outright. */
+  .studio-birthday-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    text-align: center;
+  }
+
+  .studio-birthday-weekdays {
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-muted, #9ca3af);
+  }
+
+  .studio-birthday-weekdays > div { padding: 0.25rem 0; }
+
+  .studio-birthday-day {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    color: var(--color-text-body, inherit);
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  .studio-birthday-day:hover:not(:disabled) {
+    background: var(--color-surface-alt, rgba(127, 127, 127, 0.15));
+  }
+
+  .studio-birthday-day:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .studio-birthday-day.is-selected {
+    background: var(--color-primary);
+    color: #fff;
+    font-weight: 700;
+  }
+
   /* FIXED, not absolute, for TWO reasons — and the second is the one a spec can
      actually catch.
 

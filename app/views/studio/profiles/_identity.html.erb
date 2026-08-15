@@ -33,7 +33,23 @@
       needs a class the stylesheet can hang that off. Deliberately NOT the read
       page's `studio-identity-card`, which also paints a primary border to say
       "this whole thing is a link" — a claim that is false here. %>
-  <div data-studio-identity-full class="studio-identity-card-editable card p-6 mb-6 text-center">
+  <%# THE WHOLE CARD IS THE TRIGGER (operator's call, 2026-08-15). The hover
+      already revealed the label across the whole card, so the click had to match
+      it — a surface that lights up on hover and does nothing when clicked reads
+      as broken.
+
+      `@click.self` is NOT used: the click must count anywhere on the card,
+      including on the name and the address. The inner avatar button keeps its own
+      handler with `.stop`, so clicking the picture fires the picker ONCE rather
+      than twice — the button and the card would otherwise both handle it and open
+      two file dialogs.
+
+      The button stays for keyboard and assistive tech: a div with a click handler
+      is unreachable by either, and this is still the only route to changing the
+      photo. %>
+  <div data-studio-identity-full
+       @click="$refs.filePicker.click()"
+       class="studio-identity-card-editable studio-identity-card-clickable card p-6 mb-6 text-center">
     <%= render "studio/profiles/identity_body", user: user, editable: true, attachable: attachable %>
   </div>
 <% else %>

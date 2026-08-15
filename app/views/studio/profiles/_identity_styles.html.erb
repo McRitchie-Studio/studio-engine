@@ -72,6 +72,9 @@
     opacity: 1;
   }
 
+  /* The whole card is the trigger, so it has to say so. */
+  .studio-identity-card-clickable { cursor: pointer; }
+
   /* The button is a bare circle; give focus something to land on that is visible
      against both a photo and a flat initials colour. */
   .studio-avatar-trigger:focus-visible {
@@ -109,9 +112,19 @@
      height while hidden; pinned to the navbar height the host publishes. */
   .studio-identity-mini {
     position: fixed;
-    /* Sits just under the host navbar, with a little air so it reads as a card
-       floating over the page rather than a second navbar welded to the first. */
-    top: calc(var(--nav-h, 0px) + 0.5rem);
+    /* --nav-bottom, NOT --nav-h, and the engine already learned this once: the
+       two differ by exactly the height of any chrome an app stacks ABOVE the
+       navbar, and mcritchie-industries' 47px environment banner is exactly such
+       chrome. test/integration/sidebar_navbar_render_test.rb refuses `--nav-h`
+       for the sidebar panel for this reason; this bar had the same bug.
+       A `fixed` element's `top` is a viewport coordinate, so it must be the
+       header's BOTTOM EDGE.
+
+       FLUSH, with no added gap. It first carried `+ 0.5rem` "so it reads as a
+       card floating over the page"; the operator saw that as a strip of dead
+       space between the navbar and the bar (2026-08-15). The bar is a
+       continuation of the chrome, not a card hovering under it. */
+    top: var(--nav-bottom, var(--nav-h, 0px));
     /* CARD WIDTH, not full bleed. 42rem is max-w-2xl — the page container's
        width — and the calc keeps it inside the viewport's gutters on a narrow
        screen, where a fixed 42rem would run off the edge. Centred with the same

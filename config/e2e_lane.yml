@@ -46,6 +46,7 @@
 # not prose:
 #   npx playwright test --list   ->  35 tests in 6 files
 #   npx playwright test --list   ->  39 tests in 6 files
+#   npx playwright test --list   ->  42 tests in 6 files
 #
 # 5 -> 7: e2e/email_banner_frames.spec.js. The email manager shows a fluid artwork
 # frame beside the email's own FIXED 600px banner table; measured side by side they
@@ -127,7 +128,29 @@
 #   · `fixed` and `absolute` are INDISTINGUISHABLE at scroll 0. The clipping spec
 #     was green against the swap; a second spec scrolls first, which is where
 #     viewport coordinates and document coordinates actually diverge.
-total_specs: 39
+# 39 -> 42: the operator's bug report on the edit controls. Three specs, and the
+# first two exist because THIS LANE WAS STRUCTURALLY BLIND to the defect.
+#
+# The birthday popover shipped using `grid grid-cols-7`. The engine ships a
+# PREBUILT bundle, so a Tailwind utility exists in a consuming app only if that
+# app's own views already emitted it — and grid-cols-7 is rare enough that none
+# had. Measured in mcritchie-studio's compiled bundle: ZERO occurrences. With no
+# grid the seven weekday letters stacked into one vertical column and the popover
+# grew to the height of the page.
+#
+# Every spec here passed the whole time, because e2e/tailwind_input.css carries
+# `@source "../app/views"` — the lane compiles the ENGINE's views and emits
+# utilities no consumer has. The fix is not a better spec, it is to stop
+# depending on the utility: the calendar's layout is now owned CSS shipped in the
+# partial, which is true in every app. The two specs added on top of that
+# (seven columns resolve, the popover fits on screen) go red against the rule
+# being removed, which is the most they can honestly claim. docs/E2E_LANE.md
+# records the blindness.
+#
+# The third: clicking the CARD (not only the picture) opens the picker, exactly
+# once. Removing the card's handler reddens it; dropping `.stop` from the avatar
+# button reddens it too, because the click then bubbles and opens two dialogs.
+total_specs: 42
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -139,7 +162,7 @@ total_specs: 39
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 39
+executed: 42
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
