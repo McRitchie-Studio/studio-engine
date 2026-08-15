@@ -4,6 +4,56 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`Studio.after_newsletter_change`** — a seam so a host can react to a
+  subscribe or unsubscribe without the engine knowing what it does.
+
+  ```ruby
+  Studio.after_newsletter_change = lambda do |user, subscribed:, first_join:|
+    GrantWelcomeSeeds.call(user) if subscribed && first_join
+  end
+  ```
+
+  **Why it exists, concretely:** turf-monster pays a 25-seed welcome bonus
+  on-chain, gated on `first_newsletter_join?` — literally
+  `joined_email_list_at.nil?`. The engine's subscribe action set that column and
+  told nobody, so a subscribe from `/profile` granted no seeds **and** made the
+  once-ever bonus unclaimable forever. Turf had to hold the newsletter row off
+  its profile page entirely; this is what lets it come back.
+
+  **`first_join:` is computed BEFORE the write**, because the write is what sets
+  the column — asked afterwards it is always false, and no host could ever pay a
+  welcome bonus.
+
+  **A raising callback cannot undo the subscription.** The subscription is the
+  durable fact and the reaction is not: turf's grant goes over RPC to a chain
+  that is sometimes unreachable, and a failed bonus must not cost someone their
+  place on the mailing list, or roll the write back inside `rescue_and_log`. It
+  is rescued and logged.
+
+  Fires on both verbs, so a host that only cares about joins ignores the flag.
+  The default is inert.
+
+
+### Fixed
+
+- **The birthday calendar keeps the side it opened on.** `place()` runs on every
+  scroll and resize, and it also **chose** the side — so the popover snapped
+  between above and below the moment the available space crossed the threshold.
+  Measured on turf-monster at 60px scroll steps: ABOVE, ABOVE, ABOVE, ABOVE, then
+  below — a **254px jump between two steps**, mid-scroll, while the reader was
+  looking at it.
+
+  The side is now decided once, by `chooseSide()`, when the popover opens.
+  `place()` only moves it.
+
+  This is a different bug from the height fix that shipped alongside it: that one
+  corrected **where** a flipped popover lands, and never asked whether the side
+  should be re-decided at all. The flip spec added with it opens and asserts
+  once, so a side that changes **later** was invisible to it.
+
+
 ### Fixed
 
 - **The birthday calendar measures itself instead of guessing, so a flipped

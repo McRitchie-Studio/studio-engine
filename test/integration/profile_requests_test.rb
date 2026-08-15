@@ -606,3 +606,94 @@ class ProfileNewsletterRequestsTest < ProfileRequestsTest
     refute Studio::Newsletter.subscribed?(user), "no address, no subscription"
   end
 end
+
+# --- the host callback -------------------------------------------------------
+#
+# The seam that lets a consumer react to a newsletter change without the engine
+# knowing what it does. It exists because turf-monster pays a once-ever welcome
+# bonus gated on `joined_email_list_at.nil?`, and before this the engine set that
+# column and told nobody — so a subscribe from /profile granted nothing AND made
+# the bonus unclaimable forever.
+class ProfileNewsletterCallbackTest < ProfileRequestsTest
+  def with_callback
+    calls = []
+    Studio.after_newsletter_change = lambda do |user, subscribed:, first_join:|
+      calls << { id: user.id, subscribed: subscribed, first_join: first_join }
+    end
+    yield calls
+  ensure
+    Studio.after_newsletter_change = ->(_user, subscribed:, first_join:) {}
+  end
+
+  test "a first-ever join reports first_join" do
+    user = create_user
+    sign_in user
+
+    with_callback do |calls|
+      post "/profile/newsletter"
+
+      assert_equal 1, calls.length
+      assert_equal user.id, calls.first[:id]
+      assert calls.first[:subscribed]
+      assert calls.first[:first_join], "the first join is what a once-ever bonus pays on"
+    end
+  end
+
+  # THE ORDERING THAT MAKES first_join MEAN ANYTHING. It is computed BEFORE the
+  # write, because the write is what sets the column — asked afterwards it would
+  # always be false and no host could ever pay a welcome bonus.
+  test "a REJOIN does not report first_join" do
+    user = create_user(joined_email_list_at: 3.days.ago, left_email_list_at: 2.days.ago)
+    sign_in user
+
+    with_callback do |calls|
+      post "/profile/newsletter"
+
+      assert calls.first[:subscribed]
+      refute calls.first[:first_join],
+             "this account has joined before — paying again is the bug the on-chain guard exists to stop"
+    end
+  end
+
+  test "leaving reports subscribed false" do
+    user = create_user(joined_email_list_at: 2.days.ago)
+    sign_in user
+
+    with_callback do |calls|
+      delete "/profile/newsletter"
+
+      assert_equal 1, calls.length
+      refute calls.first[:subscribed]
+    end
+  end
+
+  # THE SUBSCRIPTION IS THE DURABLE FACT, the reaction is not. turf's callback
+  # grants seeds on-chain over RPC to a node that is sometimes unreachable; a
+  # failed bonus must not cost someone their place on the mailing list, and must
+  # not roll the write back inside rescue_and_log.
+  test "a raising callback cannot undo the subscription" do
+    user = create_user
+    sign_in user
+
+    Studio.after_newsletter_change = ->(_user, subscribed:, first_join:) { raise "chain unreachable" }
+
+    post "/profile/newsletter"
+
+    assert_response :redirect
+    assert Studio::Newsletter.subscribed?(user.reload),
+           "the callback blew up and took the subscription with it"
+  ensure
+    Studio.after_newsletter_change = ->(_user, subscribed:, first_join:) {}
+  end
+
+  # A host that never configures one must not pay for the seam existing.
+  test "the default callback is inert" do
+    user = create_user
+    sign_in user
+
+    post "/profile/newsletter"
+
+    assert_response :redirect
+    assert Studio::Newsletter.subscribed?(user.reload)
+  end
+end

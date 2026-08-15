@@ -166,11 +166,17 @@ module Studio
         current_user.email = value
       end
 
+      # BEFORE THE WRITE, because the write is what sets the column — asking
+      # afterwards always answers false, and "is this their first ever join" is
+      # exactly the question a once-ever welcome bonus asks.
+      first_join = !Studio::Newsletter.ever_joined?(current_user)
+
       rescue_and_log(target: current_user) do
         # left_email_list_at is CLEARED rather than left in place. `subscribed?`
         # compares the two dates, so a stale leave date in the future of the join
         # would read as unsubscribed the moment the clock disagreed.
         current_user.update!(joined_email_list_at: Time.current, left_email_list_at: nil)
+        notify_newsletter_change(subscribed: true, first_join: first_join)
         redirect_to profile_path, notice: "You're on the list."
       end
     end
@@ -191,11 +197,33 @@ module Studio
 
       rescue_and_log(target: current_user) do
         current_user.update!(left_email_list_at: Time.current)
+        notify_newsletter_change(subscribed: false, first_join: false)
         redirect_to profile_path, notice: "You've been unsubscribed."
       end
     end
 
     private
+
+    # Tell the host, and NEVER let it break the subscription.
+    #
+    # The subscription is the durable fact; the reaction is not. turf-monster's
+    # callback grants seeds ON-CHAIN over RPC to a node that is sometimes
+    # unreachable, and a failed bonus must not cost someone their place on the
+    # mailing list — or, worse, roll the write back inside rescue_and_log and
+    # leave them looking unsubscribed.
+    #
+    # Rescued and logged rather than re-raised for that reason. The host's own
+    # controller already treats its grant as deferred and backfillable; this
+    # keeps that true when the same grant is reached from here.
+    def notify_newsletter_change(subscribed:, first_join:)
+      callback = Studio.after_newsletter_change
+      return unless callback.respond_to?(:call)
+
+      callback.call(current_user, subscribed: subscribed, first_join: first_join)
+    rescue StandardError => e
+      Rails.logger.warn("[studio][newsletter] after_newsletter_change raised for " \
+                        "user=#{current_user&.id}: #{e.class}: #{e.message.to_s[0, 200]}")
+    end
 
     # Would the page render this row for this viewer?
     #
