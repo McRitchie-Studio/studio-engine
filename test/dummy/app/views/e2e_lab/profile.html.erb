@@ -1,0 +1,50 @@
+<%# THE PROFILE LAB PAGE — the two browser programs /profile and /profile/edit add.
+
+    Both are invisible to every tier this repo already runs, and invisible in the
+    same way: the server emits identical bytes whether the program works or not.
+
+      1. studio/profiles/_identity_mini carries an IntersectionObserver that
+         reveals a compact header once the full card has mostly scrolled past. A
+         String assertion sees the bar's markup on every page — it is always in
+         the document — and can say nothing about whether it EVER appears, or
+         whether it appears at the right moment. `is-visible` is toggled by an
+         observer callback, and its effect is a computed opacity.
+
+      2. studio/profiles/_form_script's dirty check raises the save bar. The bar
+         is likewise always in the markup, behind x-show, and a markup test
+         asserting `x-show="dirty"` stays green while the component throws on
+         init, computes `changed()` wrongly, or never boots at all.
+
+    This page renders BOTH on one document deliberately: on the real edit page
+    they coexist, the mini bar is fixed at the top while the save bar is fixed at
+    the bottom, and a spec that scrolls to dirty a field is exercising the two
+    together — which is the composition a consumer actually ships.
+
+    LOCALS ONLY. Per test/lib/e2e_lane_contract_test.rb this page may set a
+    partial's locals and nothing else. The save bar is rendered by name for that
+    reason: it lived inline in edit.html.erb and was extracted into
+    studio/profiles/_save_bar so there was a name to render, rather than copied
+    here — a copy would make the spec a test of the lab.
+
+    THE SPACER is layout, not behaviour: the observer needs somewhere to scroll
+    to, and a viewport-height column of nothing is the cheapest honest way to
+    give it one. It asserts nothing and no partial reimplements it. %>
+<div x-data="studioProfileForm(<%= { first_name: @user.first_name, last_name: @user.last_name, email: @user.email }.to_json %>)">
+  <div class="max-w-2xl mx-auto py-8">
+    <%= render "studio/profiles/identity", user: @user, editable: false %>
+
+    <form x-ref="form" data-studio-lab-form>
+      <div class="card p-6">
+        <%= render "studio/profiles/name_fields", user: @user %>
+      </div>
+    </form>
+
+    <%# Scroll runway. The observer hands over at 60% of the card, so the page
+        has to be tall enough for the card to actually get there. %>
+    <div data-studio-lab-spacer style="height: 300vh;"></div>
+  </div>
+
+  <%= render "studio/profiles/save_bar" %>
+</div>
+
+<%= render "studio/profiles/form_script" %>

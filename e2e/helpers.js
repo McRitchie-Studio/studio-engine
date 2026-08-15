@@ -82,4 +82,37 @@ async function sampleAcrossFrames(page, { perturb, read, frames = 30 }) {
   );
 }
 
-module.exports = { watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames };
+// Refuse every request that leaves this origin, so the lane cannot depend on the
+// public internet.
+//
+// WHY THIS IS NEEDED AND NOT PARANOIA. layouts/studio/_head — the engine's real head
+// partial, which the lab renders on purpose — links Montserrat from
+// fonts.gstatic.com. A slow or refused fetch there surfaces to the page as
+// `console.error: Failed to load resource`, which watchPageErrors counts, which
+// fails a spec that has nothing to do with fonts. Measured: 2 runs in 10 on a normal
+// connection, and the failure names the assertion rather than the cause.
+//
+// ANSWERED, NOT ABORTED, and that distinction is the whole implementation. Calling
+// route.abort() here fails the request, which Chromium reports to the page as
+// `console.error: Failed to load resource: net::ERR_FAILED` — the same console error
+// the flake produced, now fired deterministically. Measured: 3 of 9 specs red on
+// every run. Answering the request with an empty 200 means nothing failed, so
+// nothing is logged, and the page falls back to the next font in its stack.
+//
+// Filtering the message afterwards was the other candidate and is worse: it has to
+// recognise a string Chromium chose, and it would also forgive a genuine 404 on an
+// ENGINE asset — which is a defect this lane must fail on.
+//
+// The cost is named: specs downstream of this see the fallback font, so nothing here
+// may assert a measurement that depends on Montserrat's metrics. Container widths and
+// fixed-position offsets do not.
+async function blockOffsiteRequests(page) {
+  await page.route("**/*", (route) => {
+    const url = new URL(route.request().url());
+    if (url.hostname === "127.0.0.1" || url.hostname === "localhost") return route.continue();
+
+    return route.fulfill({ status: 200, body: "" });
+  });
+}
+
+module.exports = { watchPageErrors, expectStickyChromeIsLive, sampleAcrossFrames, blockOffsiteRequests };

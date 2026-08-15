@@ -1,0 +1,111 @@
+<%# /profile/edit — ONE form, one Save, and a save bar that does not depend on
+    where you are in the page.
+
+    THE SAVE BAR is fixed to the viewport bottom and exists only while the form
+    is dirty. Rejected alternatives, so nobody re-litigates them: a sticky TOP bar
+    stacks under the navbar and eats mobile viewport; a floating button has no
+    room for a Discard or a change count; an always-present footer costs vertical
+    space permanently on a page that is usually short.
+
+    Four details that make or break it, all present below:
+
+      * the form carries bottom padding while the bar is up, so the bar never
+        covers the last field;
+      * env(safe-area-inset-bottom), or it sits under the iPhone home indicator;
+      * role="status" + aria-live="polite" announces "unsaved changes" without
+        stealing focus;
+      * beforeunload AND turbo:before-visit guard the exit, so navigating away
+        does not silently drop edits.
+
+    THE DIRTY CHECK compares against what the server rendered, trimmed on both
+    sides — whitespace is not a change, and the controller trims on the way in
+    too, so the bar agrees with what saving would actually do.
+
+    NO-JS FALLBACK: the form has a plain submit at the end. A page whose JS never
+    ran still saves; it simply never gets the bar.
+%>
+<% content_for(:title, "Edit profile") %>
+
+<% initial = {
+     first_name: current_user.try(:first_name).to_s,
+     last_name:  current_user.try(:last_name).to_s,
+     email:      current_user.try(:email).to_s,
+     birthday:   (if current_user.respond_to?(:birth_year) && current_user.birth_year.present? &&
+                     current_user.birth_month.present? && current_user.birth_day.present?
+                    format("%04d-%02d-%02d", current_user.birth_year, current_user.birth_month, current_user.birth_day)
+                  else
+                    ""
+                  end)
+   } %>
+
+<%# THE CROPPER COMES FROM THE IDENTITY HEADER, not from a row. It used to be a
+    row carrying `modals: true`, and this page kept gating on that flag after the
+    avatar moved — so nothing declared it, the host never mounted, and clicking
+    the badge opened nothing at all. Gate on the same thing the badge does. %>
+<% avatar_editable = current_user.respond_to?(:avatar) && current_user.avatar.respond_to?(:attached?) %>
+
+<% if avatar_editable %>
+  <%= render "studio/cropper_assets" %>
+<% end %>
+
+<div x-data="studioProfileForm(<%= initial.to_json %>)"
+     x-bind:style="dirty ? 'padding-bottom: 96px' : ''">
+  <div class="max-w-2xl mx-auto py-8">
+    <%# The way back. The page heading and the Done button came off on the
+        operator's call, which left browser-back as the only exit for someone who
+        opened this and changed nothing — so a small explicit one goes here.
+        Deliberately quiet: it is an escape hatch, not an action, and the save bar
+        owns the bottom of the screen when there is anything to save. %>
+    <%= link_to profile_path,
+                class: "inline-flex items-center gap-1 text-sm text-secondary hover:text-heading transition mb-4",
+                aria: { label: "Back to your profile" } do %>
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"
+           viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+      </svg>
+      Back
+    <% end %>
+
+    <%# Header + uploader in ONE Alpine scope — the badge calls $refs.filePicker,
+        and refs do not cross components. %>
+    <%= render "studio/profiles/editable_identity", user: current_user %>
+
+    <%= form_with url: profile_path, method: :patch, scope: :profile,
+                  data: { turbo: false }, html: { "x-ref": "form" } do %>
+      <div class="card p-0 overflow-hidden">
+        <% @profile_sections.each_with_index do |section, index| %>
+          <section class="p-6 <%= "border-t border-subtle" unless index.zero? %>"
+                   data-profile-section="<%= section[:key] %>">
+            <% if section[:title].present? %>
+              <h2 class="text-sm font-bold text-heading mb-4"><%= section[:title] %></h2>
+            <% end %>
+            <%= render section[:partial], **section.fetch(:locals, {}).merge(user: current_user) %>
+          </section>
+        <% end %>
+      </div>
+
+      <%# The JS-less path. Hidden once Alpine boots, because with the bar up
+          there would be two Saves. %>
+      <div class="mt-6" x-show="!alpine" x-cloak>
+        <button type="submit" class="btn btn-primary">Save changes</button>
+      </div>
+
+      <%= render "studio/profiles/save_bar" %>
+    <% end %>
+  </div>
+</div>
+
+<%= render "studio/profiles/form_script" %>
+
+<% if avatar_editable %>
+  <%# Mounted ONCE per page. Two hosts sharing a store name would register the
+      same modal ids twice and render duplicate cards. %>
+  <%= render "studio/modals/scoped_host", store: "profileModals" do %>
+    <template x-if="$store.profileModals.current()?.id === 'crop-photo'">
+      <div><%= render "studio/modals/crop_photo", store: "profileModals" %></div>
+    </template>
+    <template x-if="$store.profileModals.current()?.id === 'saving'">
+      <div><%= render "studio/modals/saving", store: "profileModals" %></div>
+    </template>
+  <% end %>
+<% end %>

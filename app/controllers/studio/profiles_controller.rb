@@ -33,146 +33,81 @@ module Studio
     MAX_FIRST_NAME = Studio::FIRST_NAME_MAX_LENGTH
 
     def show
-      @profile_sections = Studio.profile_sections_for(view_context)
+      @profile_sections = Studio.profile_sections_for(view_context, page: :show)
     end
 
-    # PATCH /profile — the scalar fields. Today that is the first name.
+    # GET /profile/edit — the form. Read and edit are separate pages (operator's
+    # call, 2026-08-14): /profile is "you at a glance", this is where you change
+    # things.
+    def edit
+      @profile_sections = Studio.profile_sections_for(view_context, page: :edit)
+    end
+
+    # PATCH /profile — every editable field, in one request.
+    #
+    # ONE FORM, ONE SAVE (operator's call). Email used to be its own action, and
+    # needed to be only while it was out-of-band; now that it applies directly
+    # there is no reason for a second mechanism on the same page. Its side
+    # effects stay here rather than moving into the form.
+    #
+    # Each field is applied only if its ROW would render — the same resolver the
+    # page uses — so a host that cannot serve a field cannot have one posted into
+    # it either.
     def update
-      return unsupported("name") unless row_rendered?(:first_name)
+      attrs = {}
+      attrs.merge!(name_attributes)     if row_rendered?(:name)
+      attrs.merge!(birthday_attributes) if row_rendered?(:birthday)
 
-      value = normalized_first_name
+      # May redirect (the Google lock); if it did, we are done.
+      prepare_email_change(attrs) if row_rendered?(:email)
+      return if performed?
 
-      if value.blank?
-        return redirect_to profile_path, alert: "Enter your first name.", status: :see_other
+      if attrs.empty?
+        return redirect_to edit_profile_path, alert: "Nothing to save.", status: :see_other
       end
 
+      previous_email = current_user.email.to_s if current_user.respond_to?(:email)
+
       rescue_and_log(target: current_user) do
-        attrs = { first_name: value }
-        # Backfill `name` when it is blank so the display-name chain has
-        # something better than an email prefix to show. Same rule as the
-        # onboarding step, which writes this column from the other direction.
-        attrs[:name] = value if current_user.respond_to?(:name) && current_user.name.blank?
-
-        if current_user.update(attrs)
-          # Read back rather than trusting the write. A host whose before_save
-          # DERIVES first_name from name (turf-monster's set_name_parts does
-          # exactly that) would silently discard the value, and a flash saying
-          # "Saved" over a discarded write is worse than a plain failure.
-          # Reporting what actually persisted keeps the page honest on a host the
-          # engine has not met yet.
-          persisted = current_user.reload.first_name.to_s
-
-          if persisted == value
-            redirect_to profile_path, notice: "Name updated."
-          else
-            redirect_to profile_path,
-                        alert: "This app derives your name from another field — it saved as #{persisted.presence || "blank"}.",
-                        status: :see_other
-          end
-        else
-          redirect_to profile_path,
-                      alert: current_user.errors.full_messages.to_sentence.presence || "Could not save that name.",
-                      status: :see_other
+        unless current_user.update(attrs)
+          next redirect_to edit_profile_path, status: :see_other,
+                           alert: current_user.errors.full_messages.to_sentence.presence ||
+                                  "Could not save those changes."
         end
+
+        after_email_change(previous_email) if attrs.key?(:email)
+
+        redirect_to profile_path, notice: "Profile updated."
       end
     end
 
     # PATCH /profile/avatar — the picture, on its own route.
     #
     # SEPARATE FROM #update deliberately: an attachment param submitted empty
-    # PURGES the attachment, so a combined form that carried both would delete
-    # someone's avatar every time they edited their name. turf-monster learned
-    # this and branched inside its own #update; a separate route is the same
-    # lesson expressed so the trap cannot be reintroduced.
+    # PURGES the attachment, so a combined form carrying both would delete
+    # someone's photo every time they saved a name. A separate route makes that
+    # unreachable rather than merely avoided.
+    #
+    # GUARDED DIFFERENTLY FROM THE FIELD ROWS, and the difference is real: the
+    # avatar stopped being a row when it moved into the identity header, so
+    # "would its row render?" has no answer for it. The MODEL gate is the right
+    # question here — can this host's user hold an attachment at all.
     def avatar
-      return unsupported("profile photo") unless row_rendered?(:avatar)
+      return unsupported("profile photo") unless avatar_supported?
 
       file = params.dig(:profile, :avatar)
 
       if file.blank?
-        return redirect_to profile_path, alert: "Choose an image first.", status: :see_other
+        return redirect_to edit_profile_path, alert: "Choose an image first.", status: :see_other
       end
 
       unless Studio::ProfileImage.acceptable?(file)
-        return redirect_to profile_path, alert: Studio::ProfileImage::MESSAGE, status: :see_other
+        return redirect_to edit_profile_path, alert: Studio::ProfileImage::MESSAGE, status: :see_other
       end
 
       rescue_and_log(target: current_user) do
         current_user.avatar.attach(file)
-        redirect_to profile_path, notice: "Photo updated."
-      end
-    end
-
-    # PATCH /profile/email — change the address, from any signed-in session.
-    #
-    # DIRECT, not out-of-band (operator's call, 2026-08-14). An earlier build
-    # mailed a confirmation link to the current address and applied the change
-    # only when the holder of that inbox clicked it. That is the stronger flow and
-    # it is gone on purpose: the session is now the authority.
-    #
-    # What that trades away, stated so nobody has to rediscover it: a hijacked
-    # session can move the account to another inbox, and the old address no
-    # longer gets a veto. Two things are kept BECAUSE the veto is gone —
-    #
-    #   * the OLD address is mailed after every change (OPSEC-046), so a change
-    #     nobody made is visible to the person losing the account, and
-    #   * every OTHER session is invalidated (OPSEC-045), so a hijacker holding a
-    #     second cookie loses it the moment the address moves.
-    #
-    # THE GOOGLE EXCEPTION. An account with a linked Google identity cannot
-    # change its email here: Google is the authoritative source for that address,
-    # and letting the two drift means the next OAuth sign-in either re-links to a
-    # stranger's row or fails to find its own. Unlink Google first, then change it.
-    def email
-      return unsupported("email") unless row_rendered?(:email)
-
-      if Studio::OauthIdentity.google_linked?(current_user)
-        return redirect_to profile_path, status: :see_other,
-                           alert: "Your email comes from your linked Google account. " \
-                                  "Unlink Google first if you want to change it."
-      end
-
-      value = params.dig(:profile, :email).to_s.strip
-      current = current_user.email.to_s
-
-      return redirect_to profile_path, alert: "Enter an email address.", status: :see_other if value.blank?
-
-      if value.casecmp?(current)
-        return redirect_to profile_path, alert: "That is already your email address.", status: :see_other
-      end
-
-      rescue_and_log(target: current_user) do
-        unless current_user.update(email: value)
-          next redirect_to profile_path, status: :see_other,
-                           alert: current_user.errors.full_messages.to_sentence.presence ||
-                                  "Could not save that address."
-        end
-
-        # The new address has not been proved yet; the host's own verification
-        # flow picks it up from here.
-        current_user.update_columns(email_verified_at: nil) if current_user.respond_to?(:email_verified_at)
-
-        # ROTATE FIRST, MAIL SECOND — the order matters and it was the other way
-        # round. Studio::Email.deliver can raise (a host's delivery record is a
-        # create! plus perform_later with no rescue at that level), and a mail
-        # failure between the write and the rotation would leave the address
-        # changed with every other session still live. That is the exact window
-        # OPSEC-045 exists to close, so it closes before anything that can throw.
-        # turf-monster's own apply_email_change rotates first for the same reason.
-        if current_user.respond_to?(:regenerate_session_token!)
-          current_user.regenerate_session_token!
-          # Re-establish THIS session. Rotating without it signs out the very
-          # person who just made the change — correct when the actor arrived from
-          # a confirmation link, wrong now that the actor IS the session.
-          session[:session_token] = current_user.session_token if current_user.respond_to?(:session_token)
-        end
-
-        if current.present?
-          Studio::Email.deliver(Studio::ProfileMailer, :email_change_notification,
-                                current_user, current, value, to: current, user: current_user)
-        end
-
-        redirect_to profile_path, notice: "Email changed to #{value}."
+        redirect_to edit_profile_path, notice: "Photo updated."
       end
     end
 
@@ -233,6 +168,11 @@ module Studio
       profile_rows.any? { |section| section[:key] == key.to_sym }
     end
 
+    # The avatar is not a row, so it asks the MODEL gate directly — see #avatar.
+    def avatar_supported?
+      Studio::ProfileSections.served_by?(current_user, :avatar)
+    end
+
     # Memoized per request: a host's `if:` may be a lambda doing real work, and a
     # write should not pay for it more than once.
     def profile_rows
@@ -248,10 +188,103 @@ module Studio
                   status: :see_other
     end
 
+    # --- field assembly ---------------------------------------------------------
+
+    def name_attributes
+      attrs = {}
+      first = normalized_name(params.dig(:profile, :first_name))
+      attrs[:first_name] = first if first.present?
+
+      if current_user.respond_to?(:last_name)
+        last = normalized_name(params.dig(:profile, :last_name))
+        attrs[:last_name] = last if last.present?
+      end
+
+      # Backfill `name` when it is blank so the display-name chain has something
+      # better than an email prefix to show. Same rule as the onboarding step.
+      if attrs[:first_name].present? && current_user.respond_to?(:name) && current_user.name.blank?
+        attrs[:name] = [attrs[:first_name], attrs[:last_name]].compact_blank.join(" ")
+      end
+
+      attrs
+    end
+
+    # ONE date input, THREE integer columns. The split is deliberate upstream —
+    # it keeps "how old are they" and "whose birthday is today" both cheap — so
+    # the form joins them and this takes them apart again.
+    #
+    # A blank date CLEARS all three rather than being ignored: someone deleting
+    # their birthday means it, and leaving a stale year behind would be the
+    # wrong answer to both questions above.
+    def birthday_attributes
+      raw = params.dig(:profile, :birthday)
+      return {} if raw.nil?
+
+      if raw.to_s.strip.blank?
+        return { birth_year: nil, birth_month: nil, birth_day: nil }
+      end
+
+      date = begin
+        Date.iso8601(raw.to_s)
+      rescue ArgumentError, TypeError
+        nil
+      end
+      return {} if date.nil? || date > Date.current
+
+      { birth_year: date.year, birth_month: date.month, birth_day: date.day }
+    end
+
+    # Adds :email to attrs, or REDIRECTS when the change must be refused — the
+    # caller checks performed? rather than a return value.
+    def prepare_email_change(attrs)
+      value = params.dig(:profile, :email).to_s.strip
+      return nil if value.blank?
+      return nil if value.casecmp?(current_user.email.to_s)
+
+      # THE GOOGLE EXCEPTION. Google is the authoritative source for a linked
+      # account's address; letting the two drift means the next OAuth sign-in
+      # either re-links to a stranger's row or cannot find its own. The field is
+      # locked in the row and refused here — a disabled input is a courtesy, and
+      # anyone can POST.
+      if Studio::OauthIdentity.google_linked?(current_user)
+        redirect_to edit_profile_path, status: :see_other,
+                    alert: "Your email comes from your linked Google account. " \
+                           "Unlink Google on your profile first if you want to change it."
+        return
+      end
+
+      attrs[:email] = value
+      nil
+    end
+
+    # The two protections kept BECAUSE a direct change leaves the old address no
+    # veto: tell it, and invalidate every other session.
+    def after_email_change(previous_email)
+      current_user.update_columns(email_verified_at: nil) if current_user.respond_to?(:email_verified_at)
+
+      # ROTATE FIRST, MAIL SECOND. Studio::Email.deliver can raise, and a mail
+      # failure between the write and the rotation would leave the address
+      # changed with every other session still live — the exact window OPSEC-045
+      # exists to close, so it closes before anything that can throw.
+      # turf-monster's own apply_email_change rotates first for the same reason.
+      if current_user.respond_to?(:regenerate_session_token!)
+        current_user.regenerate_session_token!
+        # Re-establish THIS session. Rotating without it signs out the very
+        # person who just made the change.
+        session[:session_token] = current_user.session_token if current_user.respond_to?(:session_token)
+      end
+
+      return if previous_email.blank?
+
+      Studio::Email.deliver(Studio::ProfileMailer, :email_change_notification,
+                            current_user, previous_email, current_user.email,
+                            to: previous_email, user: current_user)
+    end
+
     # Collapse runs of whitespace and cap the length. Done here rather than in a
     # model validation because the engine does not own the host's User class.
-    def normalized_first_name
-      params.dig(:profile, :first_name).to_s.strip.gsub(/\s+/, " ")[0, MAX_FIRST_NAME].to_s
+    def normalized_name(raw)
+      raw.to_s.strip.gsub(/\s+/, " ")[0, MAX_FIRST_NAME].to_s
     end
   end
 end

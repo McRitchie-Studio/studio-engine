@@ -191,7 +191,17 @@ class E2eLaneContractTest < Minitest::Test
 
     {
       "bar_stack.html.erb" => ["studio/banners/stack", "layouts/navbar"],
-      "at_time.html.erb" => ["studio/at_time_script"]
+      "at_time.html.erb" => ["studio/at_time_script"],
+      # The save bar is named here for a reason worth keeping: it lived INLINE in
+      # studio/profiles/edit.html.erb, and a template needs a controller, a session
+      # and a user that this lab has none of. It was extracted to
+      # studio/profiles/_save_bar so the lab could render it BY NAME instead of
+      # copying its markup — a copy would have turned every save-bar spec into a
+      # test of the lab page.
+      "profile.html.erb" => [
+        "studio/profiles/identity", "studio/profiles/name_fields",
+        "studio/profiles/save_bar", "studio/profiles/form_script"
+      ]
     }.each do |page, partials|
       source = File.read(File.join(lab, page))
 

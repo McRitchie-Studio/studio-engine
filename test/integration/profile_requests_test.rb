@@ -107,6 +107,14 @@ end
 class User < ApplicationRecord
   def admin? = role == "admin"
 
+  # The engine's avatar contract, which components/_avatar has required since
+  # long before /profile existed — every real consumer defines these (that is
+  # what Studio::UserProfile exists to supply). A double without them is thinner
+  # than any app the engine actually ships to.
+  def display_name = name.presence || email.to_s.split("@").first.presence || "anon"
+  def avatar_initials = display_name.to_s[0].to_s.upcase
+  def avatar_color = "#6366f1"
+
   # The OPSEC-045 seam. The engine calls this if the host answers it, so a host
   # that has it must have its rotation actually exercised — the whole point of
   # the call is that a hijacker's live session dies when the owner confirms.
@@ -168,13 +176,27 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
     assert_equal "/login", URI(response.location).path
   end
 
-  test "a signed-in visitor gets the page" do
-    sign_in create_user
+  # /profile is now the READ page: identity at a glance, plus the read-level rows.
+  # The fields moved to /profile/edit.
+  test "a signed-in visitor gets the read page" do
+    user = create_user(name: "Pat Studio")
+    sign_in user
     get "/profile"
 
     assert_response :success
-    assert_includes response.body, "Your name"
+    assert_includes response.body, "Pat Studio", "the identity header is the point of this page"
     assert_includes response.body, "Google account"
+    refute_includes response.body, 'name="profile[first_name]"', "fields live on /profile/edit"
+  end
+
+  test "the edit page carries the fields" do
+    sign_in create_user
+    get "/profile/edit"
+
+    assert_response :success
+    assert_includes response.body, 'name="profile[first_name]"'
+    assert_includes response.body, 'name="profile[email]"'
+    refute_includes response.body, "Google account", "Google is read-level, on /profile"
   end
 
   # THE MODEL GATE, proven by a real render rather than by unit-testing the
@@ -294,7 +316,7 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
     assert_equal "google_oauth2", user.reload.provider
   end
 
-  # --- PATCH /profile/email — a DIRECT change from any session ----------------
+  # --- the email field — a DIRECT change from any session ----------------------
   #
   # The out-of-band confirmation was removed on 2026-08-14: the session is the
   # authority now. What is asserted here is the behaviour that REPLACED it, plus
@@ -308,7 +330,7 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
     user = create_user(email: "old@example.com")
     sign_in user
 
-    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+    patch "/profile", params: { profile: { email: "new@example.com" } }
 
     assert_response :redirect
     assert_equal "new@example.com", user.reload.email
@@ -322,7 +344,7 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
     sign_in user
     mails.clear
 
-    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+    patch "/profile", params: { profile: { email: "new@example.com" } }
 
     assert_equal 1, mails.size
     assert_equal ["old@example.com"], mails.last.to,
@@ -346,30 +368,59 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
     hijacker.get "/profile"
     assert_equal 200, hijacker.response.status, "the second session starts out working"
 
-    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+    patch "/profile", params: { profile: { email: "new@example.com" } }
 
     hijacker.get "/profile"
     assert_equal 302, hijacker.response.status,
       "a session holding the pre-change cookie must lose ACCESS, not merely hold a stale string"
   end
 
-  test "the actor keeps access across the change" do
-    user = create_user(email: "old@example.com")
-    sign_in user
-
-    patch "/profile/email", params: { profile: { email: "new@example.com" } }
-    get "/profile"
-
-    assert_response :success, "rotating without re-establishing signs out the person who did it"
-  end
-
   # ...but NOT the session that made the change. Rotating without re-establishing
   # would sign out the very person who just did it — correct when the actor
   # arrived from a confirmation link, wrong now that the actor is the session.
+  # THE ORDER of the two side effects, which is invisible on the happy path: mail
+  # first or rotate first, a successful change looks identical either way. It
+  # stops looking identical the moment the mailer throws — SMTP down, a bad
+  # template, an outbox adapter refusing the write. Mailing first means that
+  # throw lands BETWEEN the address changing and the sessions closing, leaving
+  # the account moved with the hijacker's cookie still live: precisely the window
+  # OPSEC-045 exists to shut. So the rotation goes first, and this is the test
+  # that notices if someone reorders them back.
+  test "a mail failure still leaves the other sessions locked out" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+
+    hijacker = ActionDispatch::Integration::Session.new(Rails.application)
+    hijacker.post "/test_sign_in/#{user.id}"
+    hijacker.get "/profile"
+    assert_equal 200, hijacker.response.status, "the second session starts out working"
+
+    # Hand-rolled rather than Minitest's `stub`: minitest/mock is not in this
+    # gem's bundle, and one singleton swap is cheaper than a new dependency.
+    Studio::Email.singleton_class.send(:alias_method, :deliver_without_failure, :deliver)
+    Studio::Email.define_singleton_method(:deliver) { |*, **| raise "SMTP is down" }
+    begin
+      # rescue_and_log re-raises outside production, so the failure surfaces here
+      # rather than being swallowed — which is the honest shape of the incident.
+      assert_raises(RuntimeError) do
+        patch "/profile", params: { profile: { email: "new@example.com" } }
+      end
+    ensure
+      Studio::Email.singleton_class.send(:alias_method, :deliver, :deliver_without_failure)
+      Studio::Email.singleton_class.send(:remove_method, :deliver_without_failure)
+    end
+
+    assert_equal "new@example.com", user.reload.email, "the change itself still landed"
+    hijacker.get "/profile"
+    assert_equal 302, hijacker.response.status,
+      "the rotation must land BEFORE anything that can throw — a mailer failure " \
+      "must not leave the address moved with other sessions still holding access"
+  end
+
   test "the session that made the change survives it" do
     user = create_user(email: "old@example.com")
     sign_in user
-    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+    patch "/profile", params: { profile: { email: "new@example.com" } }
 
     get "/profile"
 
@@ -386,7 +437,7 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
     user = create_user(email: "old@example.com", provider: "google_oauth2", uid: "123")
     sign_in user
 
-    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+    patch "/profile", params: { profile: { email: "new@example.com" } }
 
     assert_response :see_other
     assert_equal "old@example.com", user.reload.email
@@ -398,7 +449,7 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
     user = create_user(email: "old@example.com", provider: "google_oauth2", uid: "123")
     sign_in user
 
-    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+    patch "/profile", params: { profile: { email: "new@example.com" } }
 
     assert_equal "old@example.com", user.reload.email
   end
@@ -408,7 +459,7 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
     sign_in user
 
     delete "/profile/google"
-    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+    patch "/profile", params: { profile: { email: "new@example.com" } }
 
     assert_equal "new@example.com", user.reload.email
   end
@@ -420,31 +471,33 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
     sign_in user
     mails.clear
 
-    patch "/profile/email", params: { profile: { email: "first@example.com" } }
+    patch "/profile", params: { profile: { email: "first@example.com" } }
 
     assert_equal "first@example.com", user.reload.email
     assert_empty mails, "there is no old address to warn"
   end
 
-  test "asking for the address you already have is refused" do
+  test "resubmitting the address you already have is a no-op" do
     user = create_user(email: "old@example.com")
     sign_in user
     mails.clear
 
-    patch "/profile/email", params: { profile: { email: "OLD@example.com" } }
+    patch "/profile", params: { profile: { email: "OLD@example.com", first_name: "Ada" } }
 
-    assert_response :see_other
-    assert_empty mails, "no mail for a no-op"
+    assert_equal "old@example.com", user.reload.email
+    assert_empty mails, "no mail for a no-op — and no session churn either"
   end
 
-  test "a blank address is refused and writes nothing" do
+  # In a BULK form a blank field means "I did not change this", not "clear it" —
+  # so a blank email contributes nothing rather than refusing the whole save.
+  test "a blank address contributes nothing and leaves the old one" do
     user = create_user(email: "old@example.com")
     sign_in user
 
-    patch "/profile/email", params: { profile: { email: "  " } }
+    patch "/profile", params: { profile: { email: "  ", first_name: "Ada" } }
 
-    assert_response :see_other
     assert_equal "old@example.com", user.reload.email
+    assert_equal "Ada", user.first_name, "the rest of the form still saves"
   end
 
   # --- the guard is the SERVER's, not the button's ----------------------------

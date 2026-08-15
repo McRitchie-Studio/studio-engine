@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Studio
-  # The two emails an email change sends.
+  # The one email an email change sends.
   #
   # NAMESPACED, and that is load-bearing rather than tidiness. `app/mailers` is an
   # autoload path and this engine is not isolated, so a host that defines a

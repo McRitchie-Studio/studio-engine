@@ -1,0 +1,41 @@
+<%# The "you at a glance" header — avatar, name, address — at the top of BOTH
+    /profile and /profile/edit.
+
+    Locals:
+      user      (required)
+      editable  (Boolean) — true on the edit page, where the avatar badge opens
+                the crop modal.
+
+    ON THE READ PAGE THE WHOLE CARD IS THE LINK to /profile/edit (operator's
+    call). It began as a badge-only link, then the page heading and the Edit
+    button were removed, and a 28px target became the single route to editing —
+    so the target grew to the thing people actually aim at.
+
+    That is also why the badge is a <span> there: an <a> inside an <a> is invalid,
+    and browsers repair it by closing the outer link early, which would quietly
+    shrink the card's clickable area to whatever preceded the badge.
+
+    THE AVATAR IS OPTIONAL — the guard the registry used to carry. As a ROW the
+    avatar declared `requires: :avatar` and was dropped whole on a host whose
+    model has no attachment; moving it into this header lost that, and the first
+    render against such a model raised `undefined method 'avatar'`.
+%>
+<% editable = local_assigns.fetch(:editable, false) %>
+<% attachable = user.respond_to?(:avatar) && user.avatar.respond_to?(:attached?) %>
+
+<%= render "studio/profiles/identity_styles" %>
+
+<%= render "studio/profiles/identity_mini", user: user %>
+
+<% if editable %>
+  <div data-studio-identity-full class="card p-6 mb-6 text-center">
+    <%= render "studio/profiles/identity_body", user: user, editable: true, attachable: attachable %>
+  </div>
+<% else %>
+  <%= link_to edit_profile_path,
+              class: "studio-identity-card card p-6 mb-6 text-center block no-underline",
+              data: { studio_identity_full: true },
+              aria: { label: "Edit your profile" } do %>
+    <%= render "studio/profiles/identity_body", user: user, editable: false, attachable: attachable %>
+  <% end %>
+<% end %>
