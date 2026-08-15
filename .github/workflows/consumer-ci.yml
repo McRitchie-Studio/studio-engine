@@ -34,7 +34,22 @@ name: Consumer CI
 on:
   pull_request:
   push:
-    branches: [main]
+    # `release` is here because the G3 pre-QA gate READS this lane's verdict for
+    # the release SHA and fails closed on anything but green — and a gem release
+    # pushes a version + Gemfile.lock commit DIRECTLY onto `release`, which is not
+    # a pull_request and was not a build. So the gate polled for a verdict that
+    # could never exist: measured on 2026-08-15, `gh run list --branch release`
+    # returned ZERO runs in this repo's entire history, and the 0.50.0 release
+    # aborted after 1200s of polling with the gem already published.
+    #
+    # NOT a special case for gems. mcritchie-studio's ci.yml has built
+    # [main, release, accepted] all along; this repo simply never followed.
+    #
+    # `accepted` is deliberately NOT here. Every commit reaches it through a PR,
+    # which the pull_request trigger above already builds, so adding it would run
+    # the whole matrix a second time on the identical tree. `release` needs it
+    # precisely BECAUSE the version commit arrives outside a PR.
+    branches: [main, release]
 
 jobs:
   consumer-tests:
