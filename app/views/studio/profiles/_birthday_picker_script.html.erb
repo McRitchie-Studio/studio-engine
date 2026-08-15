@@ -1,0 +1,144 @@
+<%# The birthday calendar's Alpine component.
+
+    Its own partial so the field markup stays readable and this can be reasoned
+    about as behaviour.
+
+    WHY NOT REUSE turf-monster's contest_lock_picker. That component is the
+    nearest thing in the ecosystem and its GRID is where this one's shape came
+    from, but its navigation is built for the opposite problem: picking a lock
+    time a few weeks OUT, by stepping months from today. Stepping to 1985 that
+    way is roughly four hundred clicks. A birthday needs to JUMP — hence the year
+    and month selects in the header — and it needs the future closed off, which a
+    contest picker specifically must not do.
+
+    WHY `position: fixed` AND NOT `absolute`. The edit page renders its rows
+    inside `card p-0 overflow-hidden`, which CLIPS an absolutely-positioned child
+    — the popover would open and be invisible below the row. Fixed takes it out
+    of the clipping context entirely, at the cost of having to place it by hand
+    from the trigger's rect and re-place it while it is open. The compact identity
+    header is fixed for a related reason, so this is the file's second instance of
+    the same trade rather than a one-off.
+%>
+<script>
+  window.studioBirthdayPicker = function (initial) {
+    return {
+      open: false,
+      value: initial || "",
+      viewYear: 0,
+      viewMonth: 0,
+      top: 0,
+      left: 0,
+      width: 0,
+
+      // Oldest year offered. 120 covers every living person with room to spare;
+      // the point is a bounded list, because a select has to end somewhere.
+      get years() {
+        var now = new Date().getFullYear();
+        var out = [];
+        for (var y = now; y >= now - 120; y--) out.push(y);
+        return out;
+      },
+
+      months: ["January", "February", "March", "April", "May", "June",
+               "July", "August", "September", "October", "November", "December"],
+
+      weekdays: ["S", "M", "T", "W", "T", "F", "S"],
+
+      init() {
+        this.syncViewFromValue();
+      },
+
+      // The month the grid opens on: the chosen birthday when there is one, else
+      // a sensible landing spot. NOT today — opening a birthday picker on the
+      // current year means everyone starts 30+ years from where they are going.
+      syncViewFromValue() {
+        var parts = this.parse(this.value);
+        var now = new Date();
+        this.viewYear = parts ? parts.y : now.getFullYear() - 30;
+        this.viewMonth = parts ? parts.m - 1 : 0;
+      },
+
+      parse(iso) {
+        var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+        if (!m) return null;
+        return { y: +m[1], m: +m[2], d: +m[3] };
+      },
+
+      get displayValue() {
+        var p = this.parse(this.value);
+        if (!p) return "";
+        return this.months[p.m - 1] + " " + p.d + ", " + p.y;
+      },
+
+      // Leading blanks so the 1st lands under its real weekday, then the days.
+      calDays() {
+        var first = new Date(this.viewYear, this.viewMonth, 1).getDay();
+        var count = new Date(this.viewYear, this.viewMonth + 1, 0).getDate();
+        var cells = [];
+        for (var i = 0; i < first; i++) cells.push(null);
+        for (var d = 1; d <= count; d++) cells.push(d);
+        return cells;
+      },
+
+      // A birthday cannot be in the future. Checked per-DAY rather than by
+      // clamping the year, because the boundary month is half valid.
+      isFuture(day) {
+        var candidate = new Date(this.viewYear, this.viewMonth, day);
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return candidate > today;
+      },
+
+      isSelected(day) {
+        var p = this.parse(this.value);
+        return !!p && p.y === this.viewYear && p.m === this.viewMonth + 1 && p.d === day;
+      },
+
+      pick(day) {
+        if (this.isFuture(day)) return;
+        var mm = String(this.viewMonth + 1).padStart(2, "0");
+        var dd = String(day).padStart(2, "0");
+        this.value = this.viewYear + "-" + mm + "-" + dd;
+
+        // `fields` belongs to the enclosing studioProfileForm component. Alpine's
+        // scope chain makes it reachable from here, and it is the SAME object, so
+        // assigning through it is what raises the save bar. Without this line the
+        // picker would set a value the dirty check never notices.
+        if (this.fields) this.fields.birthday = this.value;
+
+        this.open = false;
+      },
+
+      clear() {
+        this.value = "";
+        if (this.fields) this.fields.birthday = "";
+        this.syncViewFromValue();
+      },
+
+      toggle() {
+        this.open = !this.open;
+        if (this.open) {
+          this.syncViewFromValue();
+          this.place();
+        }
+      },
+
+      // Placed from the trigger's rect because the popover is fixed. Flips above
+      // the trigger when there is not room below, so it never opens off-screen on
+      // a short viewport.
+      place() {
+        var el = this.$refs.trigger;
+        if (!el) return;
+        var r = el.getBoundingClientRect();
+        var estimatedHeight = 340;
+        var below = window.innerHeight - r.bottom;
+
+        this.left = r.left;
+        this.width = r.width;
+        this.top = below < estimatedHeight && r.top > estimatedHeight
+          ? r.top - estimatedHeight - 4
+          : r.bottom + 4;
+      }
+    };
+  };
+</script>

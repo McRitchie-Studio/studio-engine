@@ -44,7 +44,7 @@
 ---
 # Every `test(...)` committed under e2e/. Verified against Playwright's own model,
 # not prose:
-#   npx playwright test --list   ->  37 tests in 7 files
+#   npx playwright test --list   ->  49 tests in 8 files
 #
 # 5 -> 7: e2e/email_banner_frames.spec.js. The email manager shows a fluid artwork
 # frame beside the email's own FIXED 600px banner table; measured side by side they
@@ -104,26 +104,66 @@
 # callback. The two that survive now dirty the form (or scroll the page) FIRST, so
 # they assert a TRANSITION, which no poll can win a race against. The third made the
 # same claim as an existing transition spec and was deleted rather than kept.
-# 30 -> 35: e2e/profile_newsletter.spec.js. The newsletter row's Unsubscribe
-# opens a confirmation, and the read page grew a modal host to open it from —
-# wiring that is new, so "the @click attribute is present" is exactly the
-# evidence that would not have caught getting it wrong.
 #
-# IT CAUGHT A REAL BUG IMMEDIATELY, and one already shipped in 0.51.0.
-# studio/modals/_scoped_host declares no x-data of its own, and Alpine 3 only
-# initialises trees rooted at one — so a host rendered outside any Alpine scope
-# is INERT. The store registers, open() pushes onto the stack, current() returns
-# the right modal id, and no dialog reaches the document. Every symptom points at
-# the modal id or the store; none of them is the cause.
+# 30 -> 35: e2e/profile_newsletter.spec.js. The newsletter row's Unsubscribe opens
+# a confirmation, and the read page grew a modal host to open it from — wiring that
+# was new, so "the @click attribute is present" is exactly the evidence that would
+# not have caught getting it wrong.
 #
-# /profile/edit had the identical shape: its crop-photo host sits after the
-# studioProfileForm div closes, with no scope above it. The engine's other live
-# call site (studio/emails/index.html.erb) happens to render inside
-# x-data="emailRecipients(...)", which is the only reason the pattern has ever
-# worked anywhere. Both pages now wrap the host in `<div x-data>`, and the lab
-# page reproduces that wrapper rather than getting it right by accident.
+# IT CAUGHT A BUG ALREADY SHIPPED IN 0.51.0. studio/modals/_scoped_host declares no
+# x-data of its own, and Alpine 3 only initialises trees rooted at one — so a host
+# rendered outside any Alpine scope is INERT. The store registers, open() pushes
+# onto the stack, current() returns the right modal id, and no dialog reaches the
+# document. /profile/edit had the identical shape, so its avatar cropper could not
+# open. Both pages now wrap the host in `<div x-data>`; removing that wrapper
+# reddens 3 of these 5.
 #
-# 35 -> 37: e2e/vendored_alpine.spec.js. Alpine moved from a floating CDN range to a
+# 35 -> 44: e2e/profile_edit_controls.spec.js. The edit page's avatar became the
+# photo control (the 28px badge is gone) and its birthday became a calendar. Both
+# are hidden-by-computed-value, so the markup is identical whether they work.
+# Eight mutations, each verified red with the lab server restarted between runs:
+#
+#   card-hover rule dropped        -> 1 red   focus reveal dropped          -> 1 red
+#   overlay hidden by display:none -> 1 red   click no longer reaches picker-> 1 red
+#   popover absolute not fixed     -> 1 red   picker skips the dirty check  -> 1 red
+#   future dates selectable        -> 1 red   the badge comes back          -> 4 red
+#
+# THREE OF THESE FIRST PASSED AGAINST THEIR OWN MUTATION, and each failure is
+# worth keeping written down:
+#
+#   · Hovering the card landed ON the avatar — it is centred, so `.hover()` fired
+#     the avatar rule and the CARD rule was never exercised. The spec now hovers
+#     a corner, which is the only reason it can fail.
+#   · `display: none` computes an opacity of 1 under a hover rule, so an
+#     opacity-only assertion passed over a label that rendered nothing. The spec
+#     now also demands a box.
+#   · `fixed` and `absolute` are INDISTINGUISHABLE at scroll 0. The clipping spec
+#     was green against the swap; a second spec scrolls first, which is where
+#     viewport coordinates and document coordinates actually diverge.
+# 44 -> 47: the operator's bug report on the edit controls. Three specs, and the
+# first two exist because THIS LANE WAS STRUCTURALLY BLIND to the defect.
+#
+# The birthday popover shipped using `grid grid-cols-7`. The engine ships a
+# PREBUILT bundle, so a Tailwind utility exists in a consuming app only if that
+# app's own views already emitted it — and grid-cols-7 is rare enough that none
+# had. Measured in mcritchie-studio's compiled bundle: ZERO occurrences. With no
+# grid the seven weekday letters stacked into one vertical column and the popover
+# grew to the height of the page.
+#
+# Every spec here passed the whole time, because e2e/tailwind_input.css carries
+# `@source "../app/views"` — the lane compiles the ENGINE's views and emits
+# utilities no consumer has. The fix is not a better spec, it is to stop
+# depending on the utility: the calendar's layout is now owned CSS shipped in the
+# partial, which is true in every app. The two specs added on top of that
+# (seven columns resolve, the popover fits on screen) go red against the rule
+# being removed, which is the most they can honestly claim. docs/E2E_LANE.md
+# records the blindness.
+#
+# The third: clicking the CARD (not only the picture) opens the picker, exactly
+# once. Removing the card's handler reddens it; dropping `.stop` from the avatar
+# button reddens it too, because the click then bubbles and opens two dialogs.
+#
+# 47 -> 49: e2e/vendored_alpine.spec.js. Alpine moved from a floating CDN range to a
 # file the engine ships, and the unit guard (test/lib/vendored_alpine_test.rb) can only
 # read SOURCE: it proves the head names no CDN and that studio/alpine.js is
 # precompiled. Neither fact means the bytes the browser receives are a working Alpine.
@@ -145,8 +185,8 @@
 # version assertion could not tell them apart. That stand-in existed to compensate for
 # the very CDN this change removes. The stand-in, the copy in e2e/boot.rb, and the
 # dependency are all deleted, so the lane now OBSERVES the real delivery path instead
-# of papering over it. All 35 pre-existing specs stay green on the engine's own Alpine.
-total_specs: 37
+# of papering over it. Every pre-existing spec stays green on the engine's own Alpine.
+total_specs: 49
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -158,7 +198,7 @@ total_specs: 37
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 37
+executed: 49
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

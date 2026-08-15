@@ -206,6 +206,11 @@ class E2eLaneContractTest < Minitest::Test
         # renders it outside an Alpine scope gets a store that opens and a dialog
         # that never appears.
         "studio/modals/scoped_host"
+      ],
+      "profile_edit.html.erb" => [
+        "studio/cropper_assets", "studio/profiles/editable_identity",
+        "studio/profiles/birthday_fields", "studio/profiles/save_bar",
+        "studio/profiles/form_script"
       ]
     }.each do |page, partials|
       source = File.read(File.join(lab, page))
