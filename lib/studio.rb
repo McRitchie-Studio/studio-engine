@@ -29,6 +29,29 @@ module Studio
   mattr_accessor :registration_params, default: [:name, :email, :password, :password_confirmation]
   mattr_accessor :configure_new_user,  default: ->(user) {}
   mattr_accessor :configure_sso_user,  default: ->(user) {}
+
+  # Called after a newsletter subscribe or unsubscribe on /profile, so a host can
+  # react without the engine knowing anything about what it does.
+  #
+  # THE REASON THIS EXISTS, stated concretely: turf-monster pays a 25-seed welcome
+  # bonus on-chain, gated on `first_newsletter_join?` — literally
+  # `joined_email_list_at.nil?`. The engine's subscribe action sets that column
+  # and told nobody, so a subscribe from /profile granted no seeds AND made the
+  # once-ever bonus unclaimable forever. Turf had to hold the row off its profile
+  # page entirely. This is what lets it come back.
+  #
+  #   Studio.after_newsletter_change = lambda do |user, subscribed:, first_join:|
+  #     GrantWelcomeSeeds.call(user) if subscribed && first_join
+  #   end
+  #
+  # `first_join:` is computed BEFORE the write, because the write is what sets the
+  # column — asking afterwards always answers false.
+  #
+  # A raising callback CANNOT undo the subscription: the subscription is the
+  # durable fact and the reaction is not. Turf's grant goes over RPC to a chain
+  # that is sometimes unreachable, and a failed bonus must not cost someone their
+  # place on the mailing list.
+  mattr_accessor :after_newsletter_change, default: ->(_user, subscribed:, first_join:) {}
   mattr_accessor :sso_logo,            default: nil
   mattr_accessor :wallet_address_method, default: nil
   mattr_accessor :theme_logos,         default: []
