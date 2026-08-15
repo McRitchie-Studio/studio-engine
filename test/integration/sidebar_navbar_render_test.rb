@@ -43,6 +43,23 @@ class SidebarAdminHostController < SidebarNavbarRenderHostController
   def current_user = @current_user ||= StubUser.new
 end
 
+# A host that draws /profile and has someone signed in — the shape every consumer
+# is in once the engine's standard link ships.
+class SidebarProfileLinkHostController < SidebarNavbarRenderHostController
+  class StubUser
+    def display_name = "Pat Studio"
+    def avatar = @avatar ||= Class.new { def attached? = false }.new
+    def avatar_color = "#6366f1"
+    def avatar_initials = "PS"
+  end
+
+  def logged_in? = true
+  def admin? = false
+  def current_user = @current_user ||= StubUser.new
+  def profile_path = "/profile"
+  helper_method :logged_in?, :admin?, :current_user, :profile_path
+end
+
 class SidebarNavbarRenderTest < ActiveSupport::TestCase
   SECTIONS = [
     { title: "Site", links: [{ label: "Home", href: "/", emoji: "🏠" }] }
@@ -81,6 +98,19 @@ class SidebarNavbarRenderTest < ActiveSupport::TestCase
                     "the mounted panel must start at the header's bottom edge, not its height"
     refute_includes html, "top:var(--nav-h,",
                     "offsetting a fixed panel by the header HEIGHT is the banner-overlap bug"
+  end
+
+  # THE STANDARD LINK, asserted where it actually reaches a page: mounted BY the
+  # navbar through the real dummy app, not resolved as a Hash in isolation. The
+  # unit suite proves the resolution rules; this proves a consumer that declares
+  # NOTHING still gets a working sidebar with the viewer's own profile in it.
+  test "a signed-in host with no declared sections still gets the Profile link" do
+    html = render_navbar(controller: SidebarProfileLinkHostController)
+
+    assert_includes html, "data-link-sidebar-trigger",
+      "the sidebar now has content in every signed-in app, so the trigger mounts"
+    assert_includes html, "Profile"
+    assert_includes html, "/profile"
   end
 
   test "navbar is untouched with the default empty sections" do
@@ -126,7 +156,7 @@ class SidebarNavbarRenderTest < ActiveSupport::TestCase
 
   private
 
-  def render_navbar
-    SidebarNavbarRenderHostController.render(inline: %(<%= render "layouts/navbar" %>))
+  def render_navbar(controller: SidebarNavbarRenderHostController)
+    controller.render(inline: %(<%= render "layouts/navbar" %>))
   end
 end
