@@ -198,9 +198,9 @@ module Studio
         key: "email_change_notification",
         label: "Email change — heads up",
         description: "Sent to the OLD address after a change lands, so an unauthorized change is visible rather than silent.",
-        # Shares the confirmation's artwork: same subject, and this pair reads as
-        # one conversation — the ask and the receipt. A host that wants them
-        # distinct uploads its own on /admin/emails.
+        # Reuses the shipped email-change artwork. The asset is named for a
+        # confirmation email that no longer exists; the picture is right for the
+        # subject either way, and renaming a shipped asset is its own migration.
         default_asset: "emails/email-change-confirmation.gif",
         header: "Your email was changed",
         header_fallback: "Your email was changed",

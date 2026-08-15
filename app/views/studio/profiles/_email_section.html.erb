@@ -11,9 +11,10 @@
     THE GOOGLE EXCEPTION. An account with a linked Google identity cannot change
     its email here — Google is the authoritative source for that address, and
     letting the two drift means the next OAuth sign-in either re-links to a
-    stranger's row or cannot find its own. The field is disabled with the reason
-    beside it, and ProfilesController#email refuses the request independently: a
-    disabled input is a courtesy, and anyone can POST.
+    stranger's row or cannot find its own. The locked branch renders NO form at
+    all — there is nothing to type into and nothing to submit — and
+    ProfilesController#email refuses the request independently anyway, because a
+    missing form is a courtesy and anyone can POST.
 
     Gated on a real delta for the same reason the name row is — an empty field,
     or the address you already have, is not a change.

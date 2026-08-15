@@ -63,11 +63,11 @@ module Studio
         partial: "studio/profiles/avatar_section", requires: :avatar, modals: true },
       { key: :first_name, title: "Your name",
         partial: "studio/profiles/first_name_section", requires: :first_name },
-      # Gated on the app OFFERING Google, not merely on having the columns —
-      # the same question app/views/sessions/new.html.erb:79 already asks before
-      # drawing this identical button on the login page.
       { key: :email, title: "Email",
         partial: "studio/profiles/email_section", requires: :email },
+      # Gated on the app OFFERING Google, not merely on having the columns —
+      # the same question app/views/sessions/new.html.erb already asks before
+      # drawing this identical button on the login page.
       { key: :google, title: "Google account",
         partial: "studio/profiles/google_section", requires: %i[provider uid],
         if: -> { Studio.auth_method?(:google) } }

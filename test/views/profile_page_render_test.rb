@@ -37,10 +37,8 @@ class ProfilePageRenderTest < Minitest::Test
     v.define_singleton_method(:profile_path) { "/profile" }
     v.define_singleton_method(:profile_avatar_path) { "/profile/avatar" }
     v.define_singleton_method(:profile_email_path) { "/profile/email" }
-    # show.html.erb reads flash[:email_change_pending] to decide whether to open
-    # the handoff modal. A bare ActionView has no controller to delegate flash
-    # to, so supply the empty case — the populated one is exercised by a real
-    # request in test/integration/profile_requests_test.rb.
+    # A bare ActionView has no controller to delegate `flash` to, and the page
+    # touches it. Supply the empty case.
     v.define_singleton_method(:flash) { {} }
     v.define_singleton_method(:protect_against_forgery?) { false }
     v

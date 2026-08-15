@@ -49,9 +49,9 @@ require "active_job"
 ActiveJob::Base.queue_adapter = :inline
 ActionMailer::Base.delivery_method = :test
 ActionMailer::Base.perform_deliveries = true
-# The confirm mail builds an ABSOLUTE url (it is opened from an inbox, often on
-# another device), so the mailer needs a host — the same requirement the engine's
-# existing magic-link mail already carries, and one every real Rails app sets.
+# The notification mail's banner and layout build absolute URLs, so the mailer
+# needs a host — the same requirement the engine's existing magic-link mail
+# carries, and one every real Rails app sets.
 ActionMailer::Base.default_url_options = { host: "example.com" }
 Rails.application.routes.default_url_options[:host] = "example.com"
 
@@ -331,15 +331,36 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
 
   # OPSEC-045. A hijacker holding a second cookie loses it the moment the address
   # moves — which is the other half of what replaced the confirmation step.
-  test "changing the email invalidates other sessions" do
+  # OPSEC-045, asserted as ACCESS rather than as a column value. Checking only
+  # that session_token changed proves the write happened, not that anybody was
+  # actually locked out — and with verify_session_token now wired into this
+  # dummy, the second half is finally testable.
+  test "changing the email locks out a session holding the old cookie" do
     user = create_user(email: "old@example.com")
-    user.regenerate_session_token!
-    before = user.reload.session_token
     sign_in user
+
+    # A SECOND session for the same account — the hijacker's, in the shape this
+    # protects against. It captures the token that is live right now.
+    hijacker = ActionDispatch::Integration::Session.new(Rails.application)
+    hijacker.post "/test_sign_in/#{user.id}"
+    hijacker.get "/profile"
+    assert_equal 200, hijacker.response.status, "the second session starts out working"
 
     patch "/profile/email", params: { profile: { email: "new@example.com" } }
 
-    refute_equal before, user.reload.session_token
+    hijacker.get "/profile"
+    assert_equal 302, hijacker.response.status,
+      "a session holding the pre-change cookie must lose ACCESS, not merely hold a stale string"
+  end
+
+  test "the actor keeps access across the change" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+    get "/profile"
+
+    assert_response :success, "rotating without re-establishing signs out the person who did it"
   end
 
   # ...but NOT the session that made the change. Rotating without re-establishing

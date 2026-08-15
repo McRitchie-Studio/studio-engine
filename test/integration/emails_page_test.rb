@@ -369,8 +369,7 @@ class EmailsPageTest < ActiveSupport::TestCase
     "emails/magic-link.gif" => 120,
     "emails/magic-link-background.gif" => 72,
     "emails/newsletter-subscribed-background.gif" => 72,
-    # Flat 1800x600 (3:1) artwork, shared by both email-change emails — the ask
-    # and the receipt read as one conversation.
+    # Flat 1800x600 (3:1) artwork for the email-change notification.
     "emails/email-change-confirmation.gif" => 60
   }.freeze
 

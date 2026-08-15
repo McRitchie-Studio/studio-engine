@@ -27,8 +27,10 @@
     engine's in this non-isolated engine, so the page would silently get their
     fork and its registrations. studio/modals/_scoped_host is unforked in every
     app. /admin/emails reached the same conclusion first. %>
+<%# Mounted ONCE per page, not once per row. Two hosts sharing a store name
+    would register the same modal ids twice and render duplicate cards, so the
+    page owns the host and the rows only ask for it. %>
 <% profile_needs_modals = Array(@profile_sections).any? { |section| section[:modals] } %>
-<% profile_mount_host = profile_needs_modals %>
 
 <% if profile_needs_modals %>
   <%# cropper.js + the imageUploadHost / cropPhotoModal / submitFormWithProgress
@@ -65,17 +67,15 @@
   <% end %>
 </div>
 
-<% if profile_mount_host %>
+<% if profile_needs_modals %>
   <%# Optional chaining on current() is load-bearing: the outer template unmounts
       one tick AFTER the stack empties, so a bare .id throws on every close. %>
   <%= render "studio/modals/scoped_host", store: "profileModals" do %>
-    <% if profile_needs_modals %>
-      <template x-if="$store.profileModals.current()?.id === 'crop-photo'">
-        <div><%= render "studio/modals/crop_photo", store: "profileModals" %></div>
-      </template>
-      <template x-if="$store.profileModals.current()?.id === 'saving'">
-        <div><%= render "studio/modals/saving", store: "profileModals" %></div>
-      </template>
-    <% end %>
+    <template x-if="$store.profileModals.current()?.id === 'crop-photo'">
+      <div><%= render "studio/modals/crop_photo", store: "profileModals" %></div>
+    </template>
+    <template x-if="$store.profileModals.current()?.id === 'saving'">
+      <div><%= render "studio/modals/saving", store: "profileModals" %></div>
+    </template>
   <% end %>
 <% end %>
