@@ -43,9 +43,10 @@ class E2eLabController < ActionController::Base
   # app/helpers) so it cannot shadow the real ActionView helpers for the view tests
   # that render engine partials through ActionView::Base.
   #
-  # NAMED LIMIT: `javascript_importmap_tags` delivers Alpine and nothing else. There
-  # is no Turbo in the lab, so `turbo:load`/`turbo:render` listeners never fire and
-  # the lane cannot observe Turbo-navigation behavior. docs/E2E_LANE.md records it.
+  # NAMED LIMIT: `javascript_importmap_tags` delivers NOTHING (Alpine now ships in the
+  # engine and arrives through javascript_include_tag, like every other engine asset).
+  # There is no Turbo in the lab, so `turbo:load`/`turbo:render` listeners never fire
+  # and the lane cannot observe Turbo-navigation behavior. docs/E2E_LANE.md records it.
   module AssetDelivery
     ENGINE_STYLESHEETS = { "studio/sticky_table_header" => "/e2e/css/studio/sticky_table_header.css" }.freeze
 
@@ -66,9 +67,12 @@ class E2eLabController < ActionController::Base
       safe_join(scripts)
     end
 
-    def javascript_importmap_tags(*)
-      tag.script("".html_safe, src: "/e2e/alpine.js", defer: true)
-    end
+    # The host's importmap delivers NOTHING the lane needs, and that is the honest
+    # stand-in. It used to serve Alpine from node_modules — necessary while the
+    # engine's head fetched Alpine from a CDN this lane will not call. Now the engine
+    # vendors Alpine and the head's own javascript_include_tag above delivers it, so
+    # serving a second copy here would only mask whether that delivery works.
+    def javascript_importmap_tags(*) = "".html_safe
   end
 
   helper AssetDelivery

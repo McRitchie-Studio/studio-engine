@@ -48,15 +48,24 @@ ok = system(Tailwindcss::Ruby.executable.to_s, "-i", css_in, "-o", css_out, "--m
 abort "e2e/boot: tailwind build FAILED" unless ok
 abort "e2e/boot: tailwind build produced nothing at #{css_out}" if File.size?(css_out).to_i.zero?
 
-# ---- Alpine ------------------------------------------------------------------
+# ---- Alpine: DELETED FROM HERE ON PURPOSE ------------------------------------
 #
-# From node_modules, never a CDN. The engine's navbar and modal host are Alpine
-# components; a lane that fetched Alpine over the public internet would be one DNS
-# failure away from reporting green over dead components, and would not run at all
-# on an isolated runner.
-alpine_src = File.join(ROOT, "node_modules", "alpinejs", "dist", "cdn.min.js")
-abort "e2e/boot: alpine missing at #{alpine_src} — run `npm ci`" unless File.exist?(alpine_src)
-FileUtils.cp(alpine_src, File.join(PUBLIC_DIR, "alpine.js"))
+# This used to copy node_modules/alpinejs/dist/cdn.min.js to public/e2e/alpine.js,
+# and E2eLabController's `javascript_importmap_tags` stand-in served it. That existed
+# because the engine's head loaded Alpine from a CDN, and this lane refuses to fetch
+# a dependency over the public internet — one DNS failure away from reporting green
+# over dead components. The lane compensated for the defect instead of observing it.
+#
+# The engine now VENDORS Alpine (app/assets/javascripts/studio/alpine.js), so the
+# block below already copies it, and the head's own javascript_include_tag delivers
+# it — the real path a consumer uses. Keeping the node_modules copy would load Alpine
+# TWICE and, worse, make the delivery UNOBSERVABLE: with a second Alpine always in
+# the page, e2e/vendored_alpine.spec.js stayed green with the CDN tag restored, which
+# is how this was found.
+#
+# It also removes the last floating dependency in the lane. `alpinejs: ^3.14.9`
+# resolved to 3.16.1 today and to whatever npm serves tomorrow — the same defect the
+# vendoring exists to fix, one directory over.
 
 # ---- The engine's OWN served assets ------------------------------------------
 #
