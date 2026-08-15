@@ -690,7 +690,6 @@ module Studio
         # here: it is OmniAuth's own /auth/:provider, which the middleware owns.
         delete "profile/google", to: "studio/profiles#unlink_google",
                as: :profile_unlink_google
-
       end
 
       resources :error_logs, only: [:index, :show]

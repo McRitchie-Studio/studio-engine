@@ -378,6 +378,45 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
   # ...but NOT the session that made the change. Rotating without re-establishing
   # would sign out the very person who just did it — correct when the actor
   # arrived from a confirmation link, wrong now that the actor is the session.
+  # THE ORDER of the two side effects, which is invisible on the happy path: mail
+  # first or rotate first, a successful change looks identical either way. It
+  # stops looking identical the moment the mailer throws — SMTP down, a bad
+  # template, an outbox adapter refusing the write. Mailing first means that
+  # throw lands BETWEEN the address changing and the sessions closing, leaving
+  # the account moved with the hijacker's cookie still live: precisely the window
+  # OPSEC-045 exists to shut. So the rotation goes first, and this is the test
+  # that notices if someone reorders them back.
+  test "a mail failure still leaves the other sessions locked out" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+
+    hijacker = ActionDispatch::Integration::Session.new(Rails.application)
+    hijacker.post "/test_sign_in/#{user.id}"
+    hijacker.get "/profile"
+    assert_equal 200, hijacker.response.status, "the second session starts out working"
+
+    # Hand-rolled rather than Minitest's `stub`: minitest/mock is not in this
+    # gem's bundle, and one singleton swap is cheaper than a new dependency.
+    Studio::Email.singleton_class.send(:alias_method, :deliver_without_failure, :deliver)
+    Studio::Email.define_singleton_method(:deliver) { |*, **| raise "SMTP is down" }
+    begin
+      # rescue_and_log re-raises outside production, so the failure surfaces here
+      # rather than being swallowed — which is the honest shape of the incident.
+      assert_raises(RuntimeError) do
+        patch "/profile", params: { profile: { email: "new@example.com" } }
+      end
+    ensure
+      Studio::Email.singleton_class.send(:alias_method, :deliver, :deliver_without_failure)
+      Studio::Email.singleton_class.send(:remove_method, :deliver_without_failure)
+    end
+
+    assert_equal "new@example.com", user.reload.email, "the change itself still landed"
+    hijacker.get "/profile"
+    assert_equal 302, hijacker.response.status,
+      "the rotation must land BEFORE anything that can throw — a mailer failure " \
+      "must not leave the address moved with other sessions still holding access"
+  end
+
   test "the session that made the change survives it" do
     user = create_user(email: "old@example.com")
     sign_in user
