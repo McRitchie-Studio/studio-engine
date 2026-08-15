@@ -237,6 +237,35 @@ class ProfilePageTest < ActiveSupport::TestCase
     assert Studio::ProfileSections.served_by?(full, :first_name)
   end
 
+  # THE `if:` GATE AGAINST A REAL VIEW CONTEXT, not a Struct double.
+  #
+  # The unit suite resolves against a Struct, which answers respond_to? for its
+  # members and nothing else. A live ActionView context is a different animal —
+  # it inherits a large method surface and resolves helpers dynamically — so
+  # "the Symbol gate calls the view" is worth asserting where the view is real.
+  # This is also the tier that would catch the gate blowing up on a view that
+  # answers respond_to? but raises on send.
+  test "a symbol if: gate is honoured against a live view context" do
+    ensure_application_controller!
+
+    view = ApplicationController.new.tap { |c| c.request = ActionDispatch::TestRequest.create }.view_context
+    # `admin?` too: the resolver asks the view for it, and the concern's own
+    # implementation walks current_user -> the host's User constant, which this
+    # file does not define. Stubbing the predicate keeps the test on the gate.
+    view.define_singleton_method(:current_user) { nil }
+    view.define_singleton_method(:admin?) { false }
+    view.define_singleton_method(:feature_off?) { false }
+    view.define_singleton_method(:feature_on?)  { true }
+
+    on  = Studio::ProfileSections.resolve([{ key: :row, partial: "x", if: :feature_on? }], view)
+    off = Studio::ProfileSections.resolve([{ key: :row, partial: "x", if: :feature_off? }], view)
+    missing = Studio::ProfileSections.resolve([{ key: :row, partial: "x", if: :typo_not_a_method? }], view)
+
+    assert_equal %i[row], on.map { |s| s[:key] }
+    assert_equal [], off.map { |s| s[:key] }, "a false predicate must drop the row, not coerce to true"
+    assert_equal [], missing.map { |s| s[:key] }, "an unanswerable gate name drops the row"
+  end
+
   # --- the default page's partials actually exist -----------------------------
 
   # Studio::ProfileSections names two partials by path. A rename that missed one
