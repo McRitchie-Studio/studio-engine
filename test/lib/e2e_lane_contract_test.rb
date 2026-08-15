@@ -101,6 +101,53 @@ class E2eLaneContractTest < Minitest::Test
     end
   end
 
+  # A TEST THAT COUNTS CONSOLE ERRORS MUST ALSO CLOSE THE NETWORK.
+  #
+  # `watchPageErrors` fails a spec on any console.error, and a FAILED RESOURCE LOAD is
+  # one. Every lab page links Montserrat from fonts.googleapis.com through
+  # layouts/studio/_head, so a spec that counts console errors with the network open
+  # fails on a slow or unreachable font — naming an assertion that had nothing to do
+  # with fonts. Measured at 2 failures in 10 runs before the helper existed.
+  #
+  # WHY THIS IS A GUARD AND NOT FOUR EDITS. The helper was written for exactly this and
+  # then applied only to the specs added AFTER it; the four older files kept counting
+  # errors over an open network for months. Fixing them by hand fixes today and regresses
+  # at spec #9. The property is structural, so it is asserted structurally.
+  #
+  # It is also the only honest way to test this. The failure is an INTERMITTENT network
+  # event — it cannot be mutation-tested by reproducing it on demand. This CAN be:
+  # delete the call from any spec and this reddens, deterministically.
+  #
+  # A block in the preamble (a `beforeEach`) covers every test in the file, and is the
+  # RIGHT place when the file navigates there — a block installed inside a test body
+  # would arrive after that navigation had already fetched the fonts.
+  def test_unit_a_spec_that_counts_console_errors_closes_the_network
+    spec_paths.each do |path|
+      source = strip_comments(File.read(path))
+      name = File.basename(path)
+
+      # Chunk per `test(...)`. `test.describe(` / `test.beforeEach(` do not match — the
+      # paren must follow the word — so both land in the preamble, which is what covers
+      # a file-level block.
+      chunks = source.split(/^\s*test\(/)
+      preamble = chunks.first.to_s
+      covered_file_wide = preamble.include?("blockOffsiteRequests(")
+
+      chunks.drop(1).each_with_index do |body, index|
+        next unless body.include?("watchPageErrors(")
+        next if covered_file_wide || body.include?("blockOffsiteRequests(")
+
+        title = body.lines.first.to_s.strip[0, 70] || "##{index + 1}"
+
+        flunk "#{name}: the test \"#{title}\" counts console errors (watchPageErrors) but never " \
+              "calls blockOffsiteRequests. Every lab page links Montserrat from a third party, so " \
+              "this spec fails whenever that fetch is slow or unreachable — reporting it as a " \
+              "failure of whatever it actually asserts. Add `await blockOffsiteRequests(page);` " \
+              "before the navigation (or in a beforeEach if the file navigates there)."
+      end
+    end
+  end
+
   def test_unit_playwright_config_does_not_narrow_the_test_set
     assert_match(/testDir:\s*["']\.\/e2e["']/, config_source,
                  "the lane must collect from ./e2e")
