@@ -217,6 +217,31 @@ class E2eLaneContractTest < Minitest::Test
     end
   end
 
+  # NO PATH FILTER ON THE GATING TRIGGERS — the subtler spelling of the same hole.
+  #
+  # Adding `paths:` is the obvious way to make CI cheaper, and docs/E2E_LANE.md
+  # already refused it for the browser lane on two grounds: a path-filtered
+  # required check reports SKIPPED rather than passed, and predicting from paths
+  # which changes affect behaviour is the inference this codebase declines to make.
+  #
+  # It is worse HERE than in the general case, and worth its own guard rather than
+  # prose. The commit the G3 gate most needs a verdict for is a gem release's
+  # version bump, and that commit touches exactly `lib/studio/version.rb` and
+  # `Gemfile.lock` — nothing else. Any filter written around app or view paths
+  # skips precisely that commit, the gate finds no check-run, and the release
+  # aborts exactly as it did on 2026-08-15. The trigger would still say `release`;
+  # the hole would just be harder to see.
+  def test_unit_the_gating_triggers_carry_no_path_filter
+    %w[engine-ci.yml consumer-ci.yml].each do |file|
+      triggers = File.read(File.join(ROOT, ".github", "workflows", file))[/^on:\n(?:.*\n)*?(?=^jobs:)/]
+
+      refute_match(/^\s*paths(-ignore)?:/, triggers.to_s,
+                   "#{file} filters its triggers by path. A gem release's version commit touches " \
+                   "only lib/studio/version.rb and Gemfile.lock, so a path filter skips the very " \
+                   "SHA the G3 gate polls for — and a skipped required check reports no failure.")
+    end
+  end
+
   # THE RELEASE BRANCH MUST BE BUILDABLE, in every workflow that gates a release.
   #
   # The G3 pre-QA gate reads GitHub CI's conclusion for the RELEASE SHA and fails
