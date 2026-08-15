@@ -60,3 +60,75 @@ class SidebarSectionsTest < Minitest::Test
     assert_equal [], resolved.first[:links]
   end
 end
+
+# --- the engine's own standard section ----------------------------------------
+#
+# The engine ships /profile, so it ships the way in — otherwise five consumers
+# each declare the same entry and they drift in wording and emoji.
+class SidebarStandardSectionTest < Minitest::Test
+  ProfileView = Struct.new(:name) do
+    def admin? = false
+    def logged_in? = true
+    def profile_path = "/profile"
+  end
+
+  SignedOutView = Struct.new(:name) do
+    def admin? = false
+    def logged_in? = false
+    def profile_path = "/profile"
+  end
+
+  BareView = Struct.new(:name)
+
+  def teardown
+    Studio.draw_profile_routes = true
+  end
+
+  def resolve(view, declared = [])
+    Studio::SidebarSections.resolve(declared, view)
+  end
+
+  def test_the_profile_link_leads_the_sidebar
+    sections = resolve(ProfileView.new("pat"))
+
+    assert_equal "You", sections.first[:title]
+    link = sections.first[:links].first
+    assert_equal "Profile", link[:label]
+    assert_equal "/profile", link[:href]
+  end
+
+  # PREPENDED: it is the viewer's own account, and the operator asked for it at
+  # the top. A host's sections keep their order below it.
+  def test_a_hosts_sections_follow_it_in_their_own_order
+    declared = [{ title: "Site", links: [] }, { title: "Ops", links: [] }]
+
+    assert_equal %w[You Site Ops], resolve(ProfileView.new("pat"), declared).map { |s| s[:title] }
+  end
+
+  # An app that turned the page off must not be handed a menu item pointing at a
+  # route that does not exist — a 404 from its own navigation.
+  def test_it_is_absent_when_the_page_is_not_drawn
+    Studio.draw_profile_routes = false
+
+    assert_equal [], resolve(ProfileView.new("pat")).map { |s| s[:title] }
+  end
+
+  # /profile requires authentication, so offering it to a signed-out visitor
+  # bounces them to login from something that looked like navigation.
+  def test_it_is_absent_for_a_signed_out_viewer
+    assert_equal [], resolve(SignedOutView.new("pat")).map { |s| s[:title] }
+  end
+
+  # A view answering neither predicate gets nothing. Safe direction: a missing
+  # link is visible and fixable, a link to nowhere is the bug.
+  def test_a_view_without_the_helpers_gets_nothing_rather_than_a_broken_link
+    assert_equal [], resolve(BareView.new("x")).map { |s| s[:title] }
+  end
+
+  # The sidebar now has content in every signed-in app, so studio_sidebar? is
+  # true where it used to depend on the host declaring something. Asserted so
+  # the consequence is deliberate rather than discovered.
+  def test_a_host_declaring_nothing_still_gets_a_sidebar
+    refute_empty resolve(ProfileView.new("pat"), [])
+  end
+end

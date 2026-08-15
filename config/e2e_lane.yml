@@ -44,7 +44,7 @@
 ---
 # Every `test(...)` committed under e2e/. Verified against Playwright's own model,
 # not prose:
-#   npx playwright test --list   ->  22 tests in 4 files
+#   npx playwright test --list   ->  30 tests in 5 files
 #
 # 5 -> 7: e2e/email_banner_frames.spec.js. The email manager shows a fluid artwork
 # frame beside the email's own FIXED 600px banner table; measured side by side they
@@ -80,7 +80,31 @@
 # dirty check, and the mutation run showed removing the normalisation changed
 # nothing. The normalisation was deleted rather than kept with a test that could
 # not fail.
-total_specs: 22
+#
+# 22 -> 30: e2e/profile_chrome.spec.js. /profile split into a read page and an edit
+# page, and the split added the two most browser-only things in the engine so far —
+# an IntersectionObserver that swaps the identity card for a compact header on
+# scroll, and an Alpine dirty check that raises a fixed save bar. Both are in the
+# document on EVERY render, hidden by a computed value, so the server's bytes are
+# identical whether either program works. Each spec was verified RED against its own
+# defect reintroduced, with the lab server restarted between runs (a reused
+# RAILS_ENV=test server caches templates and silently reports the PREVIOUS
+# mutation's result — that contaminated the first matrix run):
+#
+#   observer never decides "gone"  -> 3 red   observer pinned "gone"        -> 1 red
+#   bar spans the viewport         -> 1 red   dirty check stops trimming    -> 1 red
+#   Discard keeps the edit         -> 1 red   save bar absolute not fixed   -> 1 red
+#   dirty is always true           -> 3 red
+#
+# TWO SPECS WERE REWRITTEN AND ONE DELETED because the mutation run caught them
+# passing for free, and both failures are the same shape — a negative asserted about
+# a state the page was ALREADY in. `toBeHidden()` right after typing is satisfied by
+# the first poll, before Alpine has reacted; polling for the compact header's
+# opacity at load is satisfied by the initial CSS, before the observer's first
+# callback. The two that survive now dirty the form (or scroll the page) FIRST, so
+# they assert a TRANSITION, which no poll can win a race against. The third made the
+# same claim as an existing transition spec and was deleted rather than kept.
+total_specs: 30
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -92,7 +116,7 @@ total_specs: 22
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 22
+executed: 30
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

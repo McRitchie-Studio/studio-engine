@@ -1,0 +1,65 @@
+<%# The edit form's Alpine component.
+
+    Its own partial so the page above stays readable and this can be reasoned
+    about as behaviour rather than markup.
+%>
+<script>
+  window.studioProfileForm = function (initial) {
+    return {
+      alpine: true,
+      fields: Object.assign({}, initial),
+      initial: Object.assign({}, initial),
+
+      // Trimmed on both sides: whitespace is not a change, and the controller
+      // trims on the way in too — so the bar agrees with what saving would do.
+      changed(key) {
+        return String(this.fields[key] || "").trim() !== String(this.initial[key] || "").trim();
+      },
+
+      get changeCount() {
+        var self = this;
+        return Object.keys(this.fields).filter(function (k) { return self.changed(k); }).length;
+      },
+
+      get dirty() { return this.changeCount > 0; },
+
+      discard() {
+        this.fields = Object.assign({}, this.initial);
+      },
+
+      init() {
+        var self = this;
+
+        // Guard the exit BOTH ways. beforeunload covers a hard navigation or a
+        // closed tab; turbo:before-visit covers a Turbo Drive visit, which never
+        // fires beforeunload — an app with Turbo on would otherwise drop edits
+        // silently on any in-app link.
+        this._beforeUnload = function (e) {
+          if (!self.dirty) return;
+          e.preventDefault();
+          e.returnValue = "";
+        };
+        window.addEventListener("beforeunload", this._beforeUnload);
+
+        this._beforeVisit = function (e) {
+          if (!self.dirty) return;
+          if (!window.confirm("You have unsaved changes. Leave without saving?")) {
+            e.preventDefault();
+          }
+        };
+        document.addEventListener("turbo:before-visit", this._beforeVisit);
+
+        // Submitting is not leaving. Drop both guards before the form goes, or
+        // saving prompts you about the very changes you just chose to save.
+        this.$refs.form.addEventListener("submit", function () { self.teardown(); });
+      },
+
+      teardown() {
+        window.removeEventListener("beforeunload", this._beforeUnload);
+        document.removeEventListener("turbo:before-visit", this._beforeVisit);
+      },
+
+      destroy() { this.teardown(); }
+    };
+  };
+</script>

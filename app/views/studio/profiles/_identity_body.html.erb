@@ -1,0 +1,44 @@
+<%# The identity block's contents — avatar, name, address.
+
+    Its own partial because the READ page wraps it in a link and the EDIT page
+    does not, and duplicating the markup to achieve that is how the two drift.
+
+    Locals: user, editable, attachable.
+%>
+<div class="relative mb-3 studio-avatar mx-auto" style="width: 128px; height: 128px;">
+  <% if attachable && user.avatar.attached? %>
+    <%= image_tag user.avatar, class: "rounded-full object-cover",
+                  style: "width: 128px; height: 128px;", alt: user.display_name %>
+  <% else %>
+    <div class="rounded-full flex items-center justify-center font-bold text-white text-4xl"
+         style="width: 128px; height: 128px; background-color: <%= user.avatar_color %>">
+      <%= user.avatar_initials %>
+    </div>
+  <% end %>
+
+  <% badge_class = "studio-avatar-badge absolute bottom-0 right-0 flex items-center justify-center rounded-full border-2 border-page bg-primary text-white transition" %>
+  <% badge_style = "width: 28px; height: 28px;" %>
+
+  <% if editable && attachable %>
+    <%# A real button: on the edit page this opens the cropper. %>
+    <button type="button" @click="$refs.filePicker.click()"
+            aria-label="Change your profile photo"
+            class="<%= badge_class %>" style="<%= badge_style %>">
+      <%= render "studio/profiles/pencil_icon" %>
+    </button>
+  <% elsif !editable %>
+    <%# DECORATIVE on the read page, and it has to be: the whole card is a link
+        now, and an <a> inside an <a> is invalid HTML that browsers repair by
+        closing the outer one early — which would silently cut the card's
+        clickable area down to whatever came before the badge. The card carries
+        the destination and the accessible name; this is just the glyph. %>
+    <span class="<%= badge_class %>" style="<%= badge_style %>" aria-hidden="true">
+      <%= render "studio/profiles/pencil_icon" %>
+    </span>
+  <% end %>
+</div>
+
+<p class="text-3xl font-extrabold text-heading"><%= user.display_name %></p>
+<% if user.respond_to?(:email) && user.email.present? %>
+  <p class="text-secondary text-sm break-all"><%= user.email %></p>
+<% end %>

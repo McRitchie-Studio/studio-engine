@@ -99,6 +99,54 @@ stamp the server renders is identical whether or not the script later runs, sinc
 server cannot know where the reader sits. So the localisation itself is observable
 only in a browser.
 
+**The profile chrome — two programs the server cannot betray.** `/profile` splits
+into a read page and an edit page, and the split added an `IntersectionObserver`
+that swaps the identity card for a compact header on scroll, plus an Alpine dirty
+check that raises a fixed save bar. Both sit in the document on **every** render
+and are hidden by a computed value, so the response bytes are identical whether
+either program works. Seven mutations, each verified red:
+
+| Mutation | Specs red |
+|---|---|
+| the observer never decides "gone" (the script is inert) | 3 |
+| the observer is pinned to "gone" (the bar never comes down) | 1 |
+| the compact bar spans the viewport instead of matching the card | 1 |
+| the dirty check stops trimming | 1 |
+| Discard lowers the bar without restoring the fields | 1 |
+| the save bar is `absolute`, not `fixed` | 1 |
+| `dirty` is always true | 3 |
+
+**Two things this run taught, both worth more than the specs.**
+
+*A reused lab server serves cached templates.* `reuseExistingServer` is on
+locally and `RAILS_ENV=test` caches template loading, so a mutation applied
+between two runs reports the **previous** mutation's result. The first matrix was
+built on that and was wrong in a way that read as a finding: the trim mutation
+looked caught when it was not. Kill the server on port 3620 between mutations, or
+you are grading a page that no longer exists.
+
+*A negative asserted about a state the page is already in cannot fail.*
+`toBeHidden()` immediately after typing is satisfied by the first poll, before
+Alpine has reacted; polling for the compact header's opacity at load is satisfied
+by the initial CSS, before the observer's first callback. Both passed under the
+mutation that should have killed them. The fix is to assert a **transition** —
+dirty the form (or scroll the page) first, so the spec watches something *become*
+hidden. A third spec made the same claim as an existing transition spec and was
+deleted rather than kept, following the precedent in `config/e2e_lane.yml`.
+
+**The lane no longer touches the network.** `layouts/studio/_head` links Montserrat
+from `fonts.gstatic.com`, and a slow fetch there surfaces as
+`console.error: Failed to load resource`, which `watchPageErrors` counts — measured
+at 2 failures in 10 runs, each naming an assertion that had nothing to do with
+fonts. `blockOffsiteRequests` in `e2e/helpers.js` answers every off-origin request
+with an empty 200. It **answers** rather than aborts on purpose: `route.abort()`
+produces `net::ERR_FAILED`, which is the same console error fired deterministically
+(3 of 9 specs red on every run). Filtering the message afterwards was rejected — it
+would have to recognise a string Chromium chose, and it would forgive a genuine 404
+on an engine asset, which this lane must fail on. The older spec files still make
+the request and carry the same latent flake; adopting the helper there is a
+follow-up, not a silent edit.
+
 ## One browser, and what that cannot see
 
 The lane runs **Chromium only**. Named limits, rather than implied ones:

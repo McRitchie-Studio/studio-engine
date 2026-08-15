@@ -4,6 +4,41 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **The link sidebar leads with a Profile link, shipped by the engine.** The
+  engine ships `/profile`, so it now ships the way in rather than asking five
+  apps to declare the same entry and watching them drift in wording and emoji.
+  `Studio::SidebarSections.resolve` prepends a `You` section; a host's own
+  sections follow in their declared order.
+
+  Two gates, both load-bearing:
+
+  - **`Studio.draw_profile_routes`** — an app that turned the page off must not
+    be handed a menu item pointing at a route that does not exist.
+  - **signed in** — `/profile` requires authentication, so offering it to a
+    signed-out visitor bounces them to login from something that looked like
+    navigation. Same shape as the existing `admin:` rule.
+
+  **WHO ACTUALLY RECEIVES THIS — check before assuming your app does.** The
+  trigger renders from `layouts/_navbar`, and two consumers fork that partial:
+
+  | Consumer | Effect |
+  |---|---|
+  | mcritchie-studio | Profile link added to the top of its existing sidebar |
+  | mcritchie-industries | same |
+  | acquisition-studio | **gains a sidebar it did not have** — it declared no sections, and now has one |
+  | turf-monster, moms-app | **no change** — both fork `layouts/_navbar` and render no sidebar trigger, so a bump does not deliver this |
+
+  That last row is the standing rule in this engine: a host view shadows the
+  engine's, so a partial change reaches only the apps that still render the
+  engine's copy.
+
+  **`studio_sidebar?` is now true in any signed-in app** that renders the engine
+  navbar, where it previously depended on the host declaring something. That is
+  the intended consequence — the sidebar always has at least the viewer's own
+  profile in it — but it is a visible change to a navbar every consumer inherits.
+
 ### Fixed
 
 - **`Studio.profile_sections`' `if:` gate no longer fails open on a Symbol.**
@@ -17,15 +52,44 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
-- **`/profile` gains the Email row — changeable from any signed-in session.**
-  `PATCH /profile/email` (`profile_email_path`) applies the change directly.
+- **`/profile` splits into a read page and an edit page.** `/profile` is now "you
+  at a glance" — the identity header, and the rows you look at rather than type
+  into. `/profile/edit` (`edit_profile_path`) holds the fields, in ONE form with
+  ONE save.
+
+  A section declares which page it belongs to with **`page:`** — `:show` or
+  `:edit`. A row that says nothing defaults to `:edit`, because someone adding a
+  row is usually adding a field, and the read page is a curated surface. Existing
+  hosts need no change: `Studio.profile_sections_for(view)` without a `page:`
+  still returns every row.
+
+  **The identity header** (avatar, display name, address) renders on both pages
+  and is where the avatar now lives — it stopped being a row when it stopped
+  looking like one. On the read page the whole card is the link through to
+  editing, and its badge glyph fades in on hover; on the edit page the badge is a
+  button that opens the cropper.
+
+  **The save bar is sticky**, so it never depends on where the reader is in the
+  scroll, and it stays out of the way until a field is actually dirty. Without
+  JavaScript it renders as a plain always-visible submit — the form still saves.
+
+  **The header morphs on scroll.** Once the card leaves the viewport a compact
+  bar takes its place beneath the navbar, matched to the card's own width, so who
+  you are stays on screen down a long page. It is `aria-hidden` and
+  non-interactive: it duplicates what is already in the document rather than
+  adding a second copy for a screen reader to read out. Honors
+  `prefers-reduced-motion`.
+
+- **`/profile` gains the Email field — changeable from any signed-in session.**
+  It saves with the rest of the edit form through `PATCH /profile`.
 
   **THE GOOGLE EXCEPTION.** An account with a linked Google identity **cannot**
   change its email: Google is the authoritative source for that address, and
   letting the two drift means the next OAuth sign-in either re-links to a
-  stranger's row or cannot find its own. The row shows the address with the
-  reason instead of a field, and the endpoint refuses independently — a disabled
-  input is a courtesy, and anyone can POST.
+  stranger's row or cannot find its own. The locked branch renders **no input at
+  all** — it shows the address, the reason, and a link to the read page where the
+  unlink control lives. The server refuses the change independently of what the
+  page drew, because anyone can POST.
 
   **What a direct change trades away, stated so nobody rediscovers it:** a
   hijacked session can move the account to another inbox, and the old address has

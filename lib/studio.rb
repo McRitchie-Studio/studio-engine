@@ -613,8 +613,8 @@ module Studio
   # the view, keys symbolize, admin-only rows drop for non-admin viewers, and
   # rows this host's user model cannot serve drop entirely. `nil` config resolves
   # to the standard page.
-  def self.profile_sections_for(view)
-    ProfileSections.resolve(profile_sections, view)
+  def self.profile_sections_for(view, page: nil)
+    ProfileSections.resolve(profile_sections, view, page: page)
   end
 
   def self.env_truthy?(value)
@@ -683,14 +683,13 @@ module Studio
       # both would delete someone's photo every time they edited their name.
       if Studio.draw_profile_routes
         get    "profile",        to: "studio/profiles#show",   as: :profile
+        get    "profile/edit",   to: "studio/profiles#edit",   as: :edit_profile
         patch  "profile",        to: "studio/profiles#update"
         patch  "profile/avatar", to: "studio/profiles#avatar", as: :profile_avatar
         # DELETE, because unlinking removes an identity. Linking is not drawn
         # here: it is OmniAuth's own /auth/:provider, which the middleware owns.
-        patch  "profile/email",  to: "studio/profiles#email", as: :profile_email
         delete "profile/google", to: "studio/profiles#unlink_google",
                as: :profile_unlink_google
-
       end
 
       resources :error_logs, only: [:index, :show]

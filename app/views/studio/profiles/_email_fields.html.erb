@@ -1,0 +1,37 @@
+<%# Email field.
+
+    Locals: user (required).
+
+    LOCKED WHEN GOOGLE IS LINKED, and the message points at /profile — because
+    that is where the unlink lives. The two surfaces work in conjunction: Google
+    is read-level and visible on the read page, and unlinking it there is what
+    frees this field. A lock that does not say where the key is is just a wall.
+
+    Changing this address has consequences the form does not show: the old
+    address is told, and every other session is signed out. The line underneath
+    says so, because a field that quietly logs out your other devices is a
+    surprise worth spending two lines on.
+%>
+<% locked = Studio::OauthIdentity.google_linked?(user) %>
+
+<% if locked %>
+  <p class="text-heading font-semibold mb-2 break-all"><%= user.email %></p>
+  <div class="rounded-lg p-3 flex items-start gap-2" style="background: var(--color-surface-alt);">
+    <span aria-hidden="true">🔒</span>
+    <p class="text-muted text-xs">
+      This comes from your linked Google account.
+      <%= link_to "Unlink Google on your profile", profile_path, class: "text-primary hover:underline" %>
+      to change it.
+    </p>
+  </div>
+<% else %>
+  <input type="email" name="profile[email]" id="profile_email"
+         value="<%= user.email %>" class="input-field"
+         autocomplete="email" placeholder="you@example.com"
+         x-model="fields.email">
+  <% if user.email.present? %>
+    <p class="text-muted text-xs mt-2">
+      Changing this tells <span class="font-semibold"><%= user.email %></span> and signs out your other devices.
+    </p>
+  <% end %>
+<% end %>
