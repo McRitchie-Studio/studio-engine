@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { watchPageErrors } = require("./helpers");
+const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 
 // [e2e] DEFECT 3 — the re-stamper swallowed by a phantom element
 // (propagate-at-format-gem).
@@ -38,6 +38,7 @@ test("a viewer abroad sees their own clock and their country's flag", async ({ b
   const page = await context.newPage();
   const pageErrors = watchPageErrors(page);
 
+  await blockOffsiteRequests(page);
   await page.goto("/lab/at_time");
 
   // data-at-zone is written ONLY by stamp(). Its presence is the completion receipt
@@ -78,6 +79,7 @@ test("a viewer inside the US sees their own clock and no flag", async ({ browser
   const page = await context.newPage();
   const pageErrors = watchPageErrors(page);
 
+  await blockOffsiteRequests(page);
   await page.goto("/lab/at_time");
 
   await expect(page.locator(STAMP)).toHaveAttribute("data-at-zone", "America/Chicago");
