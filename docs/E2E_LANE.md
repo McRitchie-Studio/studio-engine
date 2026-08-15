@@ -29,7 +29,7 @@ The second one is the whole argument for this lane. The guard written to catch
 | Specs | `e2e/*.spec.js` | Drive a real Chromium against the lab pages |
 | Lab pages | `test/dummy/app/views/e2e_lab/` | Render **engine partials by name** in a real layout |
 | Lab controller | `test/dummy/app/controllers/e2e_lab_controller.rb` | Sets up partial locals; supplies the host's asset delivery |
-| Server | `e2e/boot.rb` | Compiles Tailwind, copies Alpine + the engine's served assets, boots Puma |
+| Server | `e2e/boot.rb` | Compiles Tailwind, copies the engine's served assets (Alpine among them), boots Puma |
 | Config | `playwright.config.js` | One chromium project, `workers: 1`, webServer |
 | Contract | `config/e2e_lane.yml` | How many specs the lane must execute |
 | Runtime gate | `bin/e2e-executed-set-check` | Reads Playwright's own receipt and asserts the executed set |
@@ -186,7 +186,16 @@ Also not covered:
 - **The engine's asset-pipeline integration.** The lab delivers assets by its own
   route (`E2eLabController::AssetDelivery`) rather than through sprockets/propshaft.
   The CSS and JS bytes are the engine's real ones; the delivery mechanism is not a
-  consumer's.
+  consumer's. What the lane DOES see is whether the head asks for an asset at all and
+  whether those bytes work in a browser — `vendored_alpine.spec.js` covers exactly
+  that for Alpine, and the precompile entry a sprockets consumer needs is asserted
+  statically in `test/lib/vendored_alpine_test.rb`.
+
+  A stand-in that delivers something the engine also delivers makes the engine's own
+  delivery UNOBSERVABLE, and this lane shipped that bug for a while: the importmap
+  stand-in served its own Alpine from `node_modules`, so specs stayed green with the
+  engine's Alpine removed entirely. It now delivers nothing. When adding to
+  `AssetDelivery`, serve only what a HOST would serve and the engine does not.
 
 ## Cost
 

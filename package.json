@@ -9,7 +9,6 @@
     "test:e2e:headed": "npx playwright test --headed"
   },
   "devDependencies": {
-    "@playwright/test": "^1.52.0",
-    "alpinejs": "^3.14.9"
+    "@playwright/test": "^1.52.0"
   }
 }
