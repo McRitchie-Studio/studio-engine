@@ -42,6 +42,7 @@ class ProfilePageRenderTest < Minitest::Test
     v.define_singleton_method(:profile_path) { "/profile" }
     v.define_singleton_method(:profile_avatar_path) { "/profile/avatar" }
     v.define_singleton_method(:edit_profile_path) { "/profile/edit" }
+    v.define_singleton_method(:profile_newsletter_path) { "/profile/newsletter" }
     # show.html.erb reads flash[:email_change_pending] to decide whether to open
     # the handoff modal. A bare ActionView has no controller to delegate flash
     # to, so supply the empty case — the populated one is exercised by a real
@@ -376,6 +377,72 @@ class ProfilePageRenderTest < Minitest::Test
     refute_nil doc.at_css("form")
   end
 
+  # --- the newsletter row ------------------------------------------------------
+  #
+  # Two states, and the asymmetry between them is the design: joining is one
+  # click, leaving asks. Joining is reversible from the same card, so a confirm
+  # would be friction protecting nothing; a mis-click on leave is silent until the
+  # next send never arrives.
+
+  def newsletter(user)
+    v = view
+    v.define_singleton_method(:profile_newsletter_path) { "/profile/newsletter" }
+    v.render(partial: "studio/profiles/newsletter_section", locals: { user: user })
+  end
+
+  def subscriber(**attrs)
+    Class.new(StubUser) do
+      define_method(:joined_email_list_at) { attrs.fetch(:joined, nil) }
+      define_method(:left_email_list_at) { attrs.fetch(:left, nil) }
+      define_method(:email) { attrs.fetch(:email, "pat@example.com") }
+    end.new
+  end
+
+  def test_an_unsubscribed_account_is_offered_a_one_click_join
+    doc = Nokogiri::HTML5.fragment(newsletter(subscriber))
+    form = doc.at_css("form")
+
+    refute_nil form, "joining is a plain form — it must work with no JavaScript"
+    assert_equal "/profile/newsletter", form["action"]
+    assert_nil doc.at_css('input[name="_method"]'), "joining is a POST, not an override"
+  end
+
+  def test_a_subscribed_account_is_offered_the_way_out
+    doc = Nokogiri::HTML5.fragment(newsletter(subscriber(joined: Time.at(1_700_000_000))))
+
+    assert_includes doc.text, "Subscribed"
+    button = doc.at_css("button")
+    assert_equal "$store.profileModals.open('newsletter-unsubscribe')", button["@click"],
+      "leaving opens the confirmation rather than submitting straight away"
+  end
+
+  # NO INLINE DELETE FORM on the card. The confirmation carries the form it
+  # submits, so there is exactly one place the DELETE is issued from — a confirm
+  # whose button posts a form elsewhere on the page drifts the moment that form
+  # moves.
+  def test_the_subscribed_card_carries_no_form_of_its_own
+    doc = Nokogiri::HTML5.fragment(newsletter(subscriber(joined: Time.at(1_700_000_000))))
+
+    assert_nil doc.at_css("form"), "the DELETE lives in the modal, not on the card"
+  end
+
+  # A wallet-only account has no address, and a newsletter needs somewhere to
+  # send. It is ASKED rather than allowed to submit and fail.
+  def test_an_account_with_no_email_is_asked_for_one
+    doc = Nokogiri::HTML5.fragment(newsletter(subscriber(email: nil)))
+
+    assert_nil doc.at_css("form"), "there is nothing to submit yet"
+    assert_equal "$store.profileModals.open('newsletter-email')", doc.at_css("button")["@click"]
+  end
+
+  def test_a_returning_account_is_told_it_can_rejoin
+    doc = Nokogiri::HTML5.fragment(
+      newsletter(subscriber(joined: Time.at(1_700_000_000), left: Time.at(1_700_000_100)))
+    )
+
+    assert_includes doc.text, "Join again"
+  end
+
   # --- the pages ------------------------------------------------------------------
 
   def test_the_read_page_renders_its_rows_in_one_card
@@ -383,7 +450,7 @@ class ProfilePageRenderTest < Minitest::Test
       render_page(Studio::ProfileSections.defaults.select { |x| x[:page] == :show })
     )
 
-    assert_equal %w[google], doc.css("[data-profile-section]").map { |x| x["data-profile-section"] }
+    assert_equal %w[google newsletter], doc.css("[data-profile-section]").map { |x| x["data-profile-section"] }
   end
 
   def test_a_read_page_with_no_rows_still_renders_the_identity
@@ -395,11 +462,27 @@ class ProfilePageRenderTest < Minitest::Test
 
   # Nothing on the READ page opens a modal, so it must not pay ~40 KB of
   # cropper.js or mount a host for nobody.
-  def test_the_read_page_mounts_no_modal_host
+  # THE HOST IS CONDITIONAL, which is what the registry's `modals:` key was
+  # documented for and, until the newsletter row, never exercised. This test used
+  # to assert the page mounted NO host — true and correct while nothing on it
+  # opened one. Now a row asks, so the claim becomes "mounts when asked, and only
+  # then", which is the property that was always meant.
+  def test_the_read_page_mounts_a_host_only_when_a_row_asks_for_one
+    without = render_page([{ key: :plain, title: "Plain", partial: "studio/profiles/google_section" }])
+    refute_includes without, "profileModals",
+      "no row asked for modals — a host here would be furniture for nobody"
+
+    with = render_page(Studio::ProfileSections.defaults.select { |x| x[:page] == :show })
+    assert_includes with, "profileModals", "the newsletter row asks for a host"
+  end
+
+  # A HOST IS NOT A CROPPER. The avatar is read-only on this page — the picker
+  # lives on /profile/edit — so mounting a host must not drag ~40 KB of cropper.js
+  # along with it.
+  def test_the_read_page_never_loads_the_cropper
     html = render_page(Studio::ProfileSections.defaults.select { |x| x[:page] == :show })
 
     refute_includes html, "cropper.min.js"
-    refute_includes html, "profileModals"
   end
 
   def test_a_host_section_renders_with_its_own_locals

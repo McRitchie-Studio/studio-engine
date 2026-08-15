@@ -67,6 +67,11 @@ ActiveRecord::Schema.define do
     t.string :provider
     t.string :uid
     t.string :session_token
+    # The newsletter pair. Declared here rather than left out because the row is
+    # gated on `requires:` — a users table without them drops the row entirely,
+    # and every newsletter assertion below would pass by never running.
+    t.datetime :joined_email_list_at
+    t.datetime :left_email_list_at
     t.timestamps
   end
 
@@ -515,5 +520,89 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
 
     assert_response :see_other
     assert_equal "google_oauth2", user.reload.provider
+  end
+end
+
+# --- the newsletter row's writes, DISPATCHED ----------------------------------
+#
+# The card's states are asserted in the view suite; these are the two WRITES, put
+# through the real router and the real database. The interesting properties are
+# both about what the columns end up holding, which no markup test can see.
+class ProfileNewsletterRequestsTest < ProfileRequestsTest
+  test "subscribing puts the account on the list" do
+    user = create_user
+    sign_in user
+
+    post "/profile/newsletter"
+
+    assert_response :redirect
+    assert Studio::Newsletter.subscribed?(user.reload)
+  end
+
+  # The leave date is CLEARED on a rejoin. `subscribed?` compares the two dates,
+  # so a stale leave date sitting after the new join would read as unsubscribed
+  # the moment the clock disagreed.
+  test "rejoining clears the old leave date" do
+    user = create_user(joined_email_list_at: 3.days.ago, left_email_list_at: 2.days.ago)
+    sign_in user
+    refute Studio::Newsletter.subscribed?(user)
+
+    post "/profile/newsletter"
+
+    user.reload
+    assert_nil user.left_email_list_at, "a stale leave date would fight the new join"
+    assert Studio::Newsletter.subscribed?(user)
+  end
+
+  # THE ONE THAT MATTERS FOR A CONSUMER PAYING A ONCE-EVER BONUS. Leaving stamps
+  # a date; it must never clear the join, or cycling would let someone re-earn a
+  # welcome bonus turf-monster guards on-chain precisely to pay once.
+  test "unsubscribing keeps the fact that they ever joined" do
+    joined = 3.days.ago.change(usec: 0)
+    user = create_user(joined_email_list_at: joined)
+    sign_in user
+
+    delete "/profile/newsletter"
+
+    user.reload
+    refute Studio::Newsletter.subscribed?(user)
+    assert Studio::Newsletter.ever_joined?(user)
+    assert_equal joined, user.joined_email_list_at, "the join date must survive the leave"
+  end
+
+  test "unsubscribing when not subscribed is refused rather than stamped" do
+    user = create_user
+    sign_in user
+
+    delete "/profile/newsletter"
+
+    assert_response :redirect
+    assert_nil user.reload.left_email_list_at,
+               "stamping a leave date for someone who never joined invents history"
+  end
+
+  # An account with no address supplies one in the same request. It is written as
+  # the account email but must NOT be treated as verified — this proves someone
+  # can type an address, not that they hold it.
+  test "an account with no email supplies one while subscribing" do
+    user = create_user(email: nil)
+    sign_in user
+
+    post "/profile/newsletter", params: { profile: { email: "new@example.com" } }
+
+    user.reload
+    assert_equal "new@example.com", user.email
+    assert Studio::Newsletter.subscribed?(user)
+  end
+
+  test "a junk address is refused rather than saved" do
+    user = create_user(email: nil)
+    sign_in user
+
+    post "/profile/newsletter", params: { profile: { email: "not-an-email" } }
+
+    user.reload
+    assert_nil user.email
+    refute Studio::Newsletter.subscribed?(user), "no address, no subscription"
   end
 end

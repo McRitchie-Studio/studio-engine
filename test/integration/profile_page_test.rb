@@ -204,7 +204,7 @@ class ProfilePageTest < ActiveSupport::TestCase
   # action was added — which is the whole failure this guards.
   # Write actions guarded by `serves?` — they touch a column this host may not
   # have, so they must refuse before writing.
-  KNOWN_WRITE_ACTIONS = %w[update avatar unlink_google].freeze
+  KNOWN_WRITE_ACTIONS = %w[update avatar unlink_google subscribe_newsletter unsubscribe_newsletter].freeze
 
   # PRIVATE helpers that write, reached only from inside an action that already
   # guarded. Declared rather than pattern-excluded: an omission the reader cannot

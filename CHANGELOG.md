@@ -6,6 +6,55 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **`/profile` gains the Newsletter row.** Lifted from turf-monster's `/account`
+  card, which has run this flow in production, and stripped of everything
+  turf-specific on the way: its 25-seed on-chain welcome bonus, its quest state,
+  its seeds level-up payload. What the engine takes is the part every app needs.
+
+  New routes: `POST /profile/newsletter` (`profile_newsletter_path`) joins,
+  `DELETE` on the same path leaves.
+
+  **TWO TIMESTAMPS, NOT A BOOLEAN.** `joined_email_list_at` and
+  `left_email_list_at`, matching turf, because the pair carries three states a
+  flag cannot: never asked (both nil), subscribed (joined after left, *including
+  a rejoin where both are set*), and unsubscribed. `Studio::Newsletter` holds the
+  rules — `subscribed?`, `ever_joined?`, `needs_email?` — pure and duck-typed
+  like `Studio::OauthIdentity`.
+
+  `ever_joined?` is deliberately a different question from `subscribed?`: leaving
+  stamps a date and never clears the join, so a consumer paying a once-ever
+  welcome bonus cannot have it re-earned by cycling.
+
+  **ASYMMETRIC ON PURPOSE.** Joining is one click; leaving asks for confirmation
+  in a modal. Joining is reversible from the same card, so a confirm step would
+  be friction protecting nothing — a mis-click on leave is silent until the next
+  send that never arrives. An account with **no address on file** (a wallet-only
+  sign-in) is asked for one in a modal rather than allowed to submit and fail;
+  the address is written but **not** marked verified, because typing an address
+  is not the same as holding it.
+
+  Gated on `requires:` like every other row, so a host without the columns gets
+  silence rather than a 500. The columns ship consumer-first under
+  *Roll Out Standard Profile Columns*.
+
+### Changed
+
+- **The read page mounts a modal host only when a row asks for one.** This is the
+  registry's `modals:` key finally doing the job it was documented for — until
+  the newsletter row, nothing on `/profile` opened a modal and mounting a host
+  would have been furniture for nobody.
+
+  `modals:` is now **a partial path rather than a boolean**. A host row that
+  declares modals keeps its partial in the host's own app, so any convention like
+  `"studio/profiles/#{key}_modals"` would resolve to a path that does not exist
+  there. It costs one string and works for everyone.
+
+  The host is **not** the cropper: `/profile` mounts `studio/modals/_scoped_host`
+  and never `studio/cropper_assets`, because the avatar is read-only on that page.
+
+
+### Added
+
 - **The link sidebar leads with a Profile link, shipped by the engine.** The
   engine ships `/profile`, so it now ships the way in rather than asking five
   apps to declare the same entry and watching them drift in wording and emoji.
