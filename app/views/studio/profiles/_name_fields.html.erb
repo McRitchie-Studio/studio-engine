@@ -1,0 +1,34 @@
+<%# Name fields — first and last, side by side on a wide row.
+
+    Locals: user (required).
+
+    NO BUTTON. These are fields in the edit page's single form; the sticky bar
+    saves them. `x-model` feeds the dirty check that makes the bar appear.
+
+    LAST NAME IS OPTIONAL AT THE COLUMN LEVEL. mcritchie-studio and turf-monster
+    have it; mcritchie-industries, moms-app and acquisition-studio do not, and
+    they get a first-name-only row rather than a broken one. The engine's
+    standard-columns migration does not yet carry last_name — making it universal
+    is a coordinated fleet change (roll-out-last-name-column), and gating here is
+    what lets this page ship without waiting on it.
+%>
+<div class="grid gap-4 sm:grid-cols-2">
+  <div>
+    <label class="block text-sm text-secondary mb-2 font-medium" for="profile_first_name">First name</label>
+    <input type="text" name="profile[first_name]" id="profile_first_name"
+           value="<%= user.first_name %>" class="input-field"
+           maxlength="<%= Studio::FIRST_NAME_MAX_LENGTH %>"
+           autocomplete="given-name" placeholder="What should we call you?"
+           x-model="fields.first_name">
+  </div>
+
+  <% if user.respond_to?(:last_name) %>
+    <div>
+      <label class="block text-sm text-secondary mb-2 font-medium" for="profile_last_name">Last name</label>
+      <input type="text" name="profile[last_name]" id="profile_last_name"
+             value="<%= user.last_name %>" class="input-field"
+             maxlength="<%= Studio::FIRST_NAME_MAX_LENGTH %>"
+             autocomplete="family-name" x-model="fields.last_name">
+    </div>
+  <% end %>
+</div>

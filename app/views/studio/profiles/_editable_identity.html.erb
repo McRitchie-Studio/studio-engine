@@ -1,0 +1,35 @@
+<%# The identity header on the EDIT page, wrapped in the uploader's Alpine scope.
+
+    Locals: user (required).
+
+    ONE COMPONENT, and it has to be: the header's badge button calls
+    `$refs.filePicker`, and Alpine resolves $refs only within the same x-data.
+    Rendering the header and the picker as siblings — which is how this was first
+    written — leaves the badge pointing at a ref that does not exist in its
+    scope, so clicking it does nothing at all. Silently.
+
+    The avatar SAVES ON ITS OWN, outside the field form. An attachment param
+    submitted empty PURGES the attachment, so an avatar input inside the bulk
+    form would delete someone's photo every time they saved a name. Nesting
+    forms is invalid HTML anyway; this sits alongside.
+%>
+<div x-data="imageUploadHost({
+       store: 'profileModals',
+       aspectRatio: 1,
+       filename: 'avatar.png',
+       saving: 'Saving photo…',
+       toast: false
+     })"
+     @crop-photo-confirmed.window="onCropConfirmed($event.detail)">
+
+  <%= render "studio/profiles/identity", user: user, editable: true %>
+
+  <%# Auto-submitted once a crop is confirmed; the person never touches it. %>
+  <%= form_with url: profile_avatar_path, method: :patch, scope: :profile, multipart: true,
+                html: { "x-ref": "form", class: "hidden" } do %>
+    <input type="file" name="profile[avatar]" x-ref="fileInput">
+  <% end %>
+
+  <input type="file" x-ref="filePicker" @change="onFileSelected($event)"
+         accept="<%= Studio::ProfileImage::ALLOWED_CONTENT_TYPES.join(",") %>" class="hidden">
+</div>

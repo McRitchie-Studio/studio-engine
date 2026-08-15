@@ -20,7 +20,18 @@ require "stringio"
 class ProfileSectionsTest < Minitest::Test
   # View doubles. `current_user` is what the requires-gate reads; a bare view
   # (no current_user, no admin?) stands in for a render with nobody signed in.
-  FullUser  = Struct.new(:first_name) { def avatar = nil }
+  # Shaped like a consumer that has every standard column, so the defaults all
+  # resolve and the PAGE split is what the assertions are actually measuring.
+  FullUser = Struct.new(:first_name) do
+    def avatar = nil
+    def last_name = nil
+    def email = "pat@example.com"
+    def provider = "google_oauth2"
+    def uid = "1"
+    def birth_day = nil
+    def birth_month = nil
+    def birth_year = nil
+  end
   ThinUser  = Struct.new(:nothing)
 
   AdminView = Struct.new(:current_user) { def admin? = true }
@@ -44,7 +55,32 @@ class ProfileSectionsTest < Minitest::Test
   def test_nil_config_resolves_to_the_default_sections
     resolved = Studio::ProfileSections.resolve(nil, full_view)
 
-    assert_equal %i[avatar first_name], resolved.map { |s| s[:key] }
+    assert_equal %i[google name email birthday], resolved.map { |s| s[:key] }
+  end
+
+  # --- the page split ----------------------------------------------------------
+  #
+  # /profile is "you at a glance" and /profile/edit is the form. A row says which
+  # it belongs to; `page:` on resolve selects one, and nil means all of them —
+  # which is what the write guards ask, since a field is writable if its row
+  # exists on either page.
+
+  def test_resolving_a_page_returns_only_that_pages_rows
+    assert_equal %i[google], Studio::ProfileSections.resolve(nil, full_view, page: :show).map { |s| s[:key] }
+    assert_equal %i[name email birthday], Studio::ProfileSections.resolve(nil, full_view, page: :edit).map { |s| s[:key] }
+  end
+
+  def test_no_page_returns_every_row
+    assert_equal 4, Studio::ProfileSections.resolve(nil, full_view).length
+  end
+
+  # A row that never says defaults to :edit — someone adding a row is usually
+  # adding a field, and the read page is a deliberate, curated surface.
+  def test_a_row_that_names_no_page_is_an_edit_row
+    section = { key: :custom, partial: "x" }
+
+    assert_equal %i[custom], Studio::ProfileSections.resolve([section], full_view, page: :edit).map { |s| s[:key] }
+    assert_equal [], Studio::ProfileSections.resolve([section], full_view, page: :show).map { |s| s[:key] }
   end
 
   def test_an_explicitly_empty_array_still_means_no_rows
@@ -73,11 +109,12 @@ class ProfileSectionsTest < Minitest::Test
   end
 
   def test_rows_the_host_can_serve_survive_alongside_ones_it_cannot
-    partial_user = Struct.new(:x) { def avatar = nil }.new(nil)
+    # mcritchie-industries' shape: an email column and none of the rest.
+    partial_user = Struct.new(:x) { def email = "pat@example.com" }.new(nil)
     resolved = Studio::ProfileSections.resolve(nil, UserView.new(partial_user))
 
-    assert_equal %i[avatar], resolved.map { |s| s[:key] },
-      "avatar is served, first_name is not — the page keeps the half it can render"
+    assert_equal %i[email], resolved.map { |s| s[:key] },
+      "email is served, the name and birthday rows are not — the page keeps the half it can render"
   end
 
   def test_a_row_requiring_nothing_always_renders
@@ -143,14 +180,14 @@ class ProfileSectionsTest < Minitest::Test
     config = ->(_view) { Studio::ProfileSections.defaults + [{ key: :wallet, partial: "x" }] }
     resolved = Studio::ProfileSections.resolve(config, full_view)
 
-    assert_equal %i[avatar first_name wallet], resolved.map { |s| s[:key] }
+    assert_equal %i[google name email birthday wallet], resolved.map { |s| s[:key] }
   end
 
   def test_hosts_drop_a_standard_row_by_key
-    config = Studio::ProfileSections.defaults.reject { |s| s[:key] == :avatar }
+    config = Studio::ProfileSections.defaults.reject { |s| s[:key] == :birthday }
     resolved = Studio::ProfileSections.resolve(config, full_view)
 
-    assert_equal %i[first_name], resolved.map { |s| s[:key] }
+    assert_equal %i[google name email], resolved.map { |s| s[:key] }
   end
 
   # --- the Studio.* facade -----------------------------------------------------
@@ -164,7 +201,7 @@ class ProfileSectionsTest < Minitest::Test
   end
 
   def test_studio_default_profile_sections_is_the_public_composition_handle
-    assert_equal %i[avatar first_name email google], Studio.default_profile_sections.map { |s| s[:key] }
+    assert_equal %i[google name email birthday], Studio.default_profile_sections.map { |s| s[:key] }
   end
 
   # --- the app-capability gate (`if:`) ----------------------------------------
@@ -268,11 +305,11 @@ class ProfileSectionsTest < Minitest::Test
   # row needs BOTH provider and uid, and a host with neither must get a page
   # without it rather than a NoMethodError from the partial's linked? check.
   def test_the_google_row_drops_for_a_model_with_no_oauth_columns
-    refute_includes Studio::ProfileSections.resolve(nil, full_view).map { |s| s[:key] }, :google,
-      "FullUser answers neither provider nor uid"
+    bare = Struct.new(:first_name).new("Alex")
 
-    oauth_user = Struct.new(:first_name, :provider, :uid) { def avatar = nil }.new("Alex", "google_oauth2", "1")
-    assert_includes Studio::ProfileSections.resolve(nil, UserView.new(oauth_user)).map { |s| s[:key] }, :google
+    refute_includes Studio::ProfileSections.resolve(nil, UserView.new(bare)).map { |s| s[:key] }, :google,
+      "a model answering neither provider nor uid cannot serve the Google row"
+    assert_includes Studio::ProfileSections.resolve(nil, full_view).map { |s| s[:key] }, :google
   end
 
   def test_default_config_is_nil_so_a_bare_app_gets_the_standard_page

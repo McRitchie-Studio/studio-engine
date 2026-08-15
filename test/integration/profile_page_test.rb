@@ -159,7 +159,7 @@ class ProfilePageTest < ActiveSupport::TestCase
     assert_equal Studio::FIRST_NAME_MAX_LENGTH, Studio::OnboardingController::MAX_FIRST_NAME
 
     form = File.read(File.expand_path(
-      "../../app/views/studio/profiles/_first_name_section.html.erb", __dir__
+      "../../app/views/studio/profiles/_name_fields.html.erb", __dir__
     ))
     assert_includes form, "Studio::FIRST_NAME_MAX_LENGTH",
       "the form's maxlength must come from the shared constant, not a literal"
@@ -204,35 +204,56 @@ class ProfilePageTest < ActiveSupport::TestCase
   # action was added — which is the whole failure this guards.
   # Write actions guarded by `serves?` — they touch a column this host may not
   # have, so they must refuse before writing.
-  KNOWN_WRITE_ACTIONS = %w[update avatar email unlink_google].freeze
+  KNOWN_WRITE_ACTIONS = %w[update avatar unlink_google].freeze
 
-  # Nothing is token-guarded any more: the out-of-band email confirmation was
-  # removed on 2026-08-14 when email became changeable from any session. Kept as
-  # an empty list rather than deleted, so re-introducing a token-authed write has
-  # an obvious place to be declared instead of silently failing the count above.
-  TOKEN_GUARDED_WRITE_ACTIONS = [].freeze
+  # PRIVATE helpers that write, reached only from inside an action that already
+  # guarded. Declared rather than pattern-excluded: an omission the reader cannot
+  # see is indistinguishable from an unguarded action, which is the whole point
+  # of the count below. If one of these ever becomes reachable on its own, it
+  # moves to the list above and grows a guard.
+  CALLER_GUARDED_WRITERS = %w[after_email_change].freeze
 
   WRITE_PATTERN = /(?:current_user|user)\.(update|update!|avatar\.attach)/
   # `.+` not `\S+`: the refusal takes a human label, so the guard line legitimately
   # contains spaces — `return unsupported("profile photo") unless row_rendered?(...)`.
-  GUARD_PATTERN = /^\s*return .+ unless row_rendered\?\([^\n]*\n/
+  # `avatar` guards on avatar_supported? rather than row_rendered? — it stopped
+  # being a row when it moved into the identity header, so "would its row render?"
+  # has no answer for it. The MODEL gate is the right question there.
+  GUARD_PATTERN = /^\s*return .+ unless (?:row_rendered\?|avatar_supported\?)[^\n]*\n/
 
   test "every write action refuses before it writes" do
     bodies = controller_source.split(/^    def /).to_h { |chunk| [chunk[/\A(\w+)/, 1], chunk] }
     writers = bodies.select { |_name, body| body&.match?(WRITE_PATTERN) }
 
-    assert_equal (KNOWN_WRITE_ACTIONS + TOKEN_GUARDED_WRITE_ACTIONS).sort, writers.keys.sort,
+    assert_equal (KNOWN_WRITE_ACTIONS + CALLER_GUARDED_WRITERS).sort, writers.keys.sort,
       "a write action appeared or vanished — update the lists deliberately, and make " \
-      "sure the new one is guarded by serves? or by the signed token"
+      "sure the new one guards, or is a private helper its caller already guarded"
 
-    writers.slice(*KNOWN_WRITE_ACTIONS).each do |action, body|
+    # SINGLE-FIELD actions refuse the whole request.
+    (KNOWN_WRITE_ACTIONS - ["update"]).each do |action|
+      body = writers.fetch(action)
       guard = body[GUARD_PATTERN]
-      refute_nil guard,
-        "#{action} must RETURN early when the page would not render its row — " \
-        "merely mentioning the check is not refusing"
 
+      refute_nil guard, "#{action} must RETURN early when it cannot serve the field"
       assert body.index(guard) < body.index(WRITE_PATTERN),
-        "#{action} writes before it guards — the endpoint 500s where its row is merely hidden"
+        "#{action} writes before it guards"
+    end
+  end
+
+  # `update` is a BULK form, so it does not refuse the whole request — it applies
+  # only the fields whose rows would render. The property is therefore per-field
+  # rather than early-return, and asserting the old shape here would force the
+  # worse design: one unservable field rejecting a save of three good ones.
+  test "update contributes no field without checking that field's row" do
+    body = controller_source.split(/^    def /).find { |c| c.start_with?("update") }
+    refute_nil body
+
+    contributions = body.lines.select { |line| line.match?(/attrs\.merge!|prepare_email_change/) }
+
+    refute_empty contributions, "expected update to assemble fields"
+    contributions.each do |line|
+      assert_match(/if row_rendered\?\(/, line,
+        "every field this action contributes must be gated on its own row: #{line.strip}")
     end
   end
 
@@ -254,8 +275,10 @@ class ProfilePageTest < ActiveSupport::TestCase
     # The CALL, not the word — the comment above row_rendered? explains the old
     # behaviour by name, and a bare substring check would trip on the history it
     # is there to preserve.
-    refute_includes controller_source, "ProfileSections.served_by?(",
-      "served_by? answers only the model gate — an app gate would be invisible to it"
+    # Exactly one served_by? call is legitimate — the avatar's, which is not a row.
+    # Any second one means a ROW guard regressed to the model gate.
+    assert_equal 1, controller_source.scan("ProfileSections.served_by?(").length,
+      "only the avatar (not a row) may ask the model gate; a row guard must ask the resolver"
   end
 
   # --- the default page's partials actually exist -----------------------------

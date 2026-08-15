@@ -1,60 +1,25 @@
-<%# The shared /profile page.
+<%# /profile — the READ page.
 
-    A bare content wrapper, not a layout: it renders inside the host's
-    application layout and inherits that app's navbar, theme and flash. Same
-    shape as /admin/style and /admin/emails.
+    "You at a glance" (the operator's framing, and the shape iOS Settings uses):
+    an identity block you look at, then the things that are read-level but need a
+    way to act — Google being the one that exists today.
 
-    ONE CARD, rows inside it (operator's call, 2026-08-14). Each row used to be
-    its own card, which read as four unrelated settings pages stacked up rather
-    than one profile. Rows are separated by a hairline instead, so the page has a
-    single edge and the eye runs down one column.
-
-    The page is still nothing but its sections. @profile_sections is already
-    resolved and filtered by the controller (Studio.profile_sections_for) — rows
-    the host cannot serve, and admin rows for non-admins, are gone before we get
-    here — so this template makes no decisions of its own beyond the empty state.
+    Editing lives at /profile/edit. The avatar's badge links there, so the same
+    control in the same place means "change this" on both pages.
 %>
 <% content_for(:title, "Profile") %>
 
-<%# Does any resolved row need the crop/saving modals? A row declares
-    `modals: true` and the page mounts them once, here.
-
-    The page owns its modal host DELIBERATELY. The obvious alternative — render
-    "studio/modals/host" and let the app supply it — fails in both directions:
-    mcritchie-industries and moms-app render no shared host at all, so there
-    would be nowhere to open a modal from; and mcritchie-studio and turf-monster
-    each ship their OWN app/views/studio/modals/_host.html.erb, which shadows the
-    engine's in this non-isolated engine, so the page would silently get their
-    fork and its registrations. studio/modals/_scoped_host is unforked in every
-    app. /admin/emails reached the same conclusion first. %>
-<%# Mounted ONCE per page, not once per row. Two hosts sharing a store name
-    would register the same modal ids twice and render duplicate cards, so the
-    page owns the host and the rows only ask for it. %>
-<% profile_needs_modals = Array(@profile_sections).any? { |section| section[:modals] } %>
-
-<% if profile_needs_modals %>
-  <%# cropper.js + the imageUploadHost / cropPhotoModal / submitFormWithProgress
-      factories. Loaded only when a row can actually open the cropper, which is
-      the whole reason this is a partial and not a global include. %>
-  <%= render "studio/cropper_assets" %>
-<% end %>
-
 <div class="max-w-2xl mx-auto py-8">
-  <h1 class="text-2xl font-extrabold text-heading mb-8">Profile</h1>
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-extrabold text-heading">Profile</h1>
+    <%= link_to "Edit", edit_profile_path, class: "btn btn-outline btn-sm" %>
+  </div>
 
-  <% if @profile_sections.blank? %>
-    <%# Reachable, and worth rendering honestly rather than as a blank page: an
-        app whose user model serves none of the declared rows (no avatar
-        attachment, no first_name column) lands here until it installs the
-        standard profile columns. %>
-    <%= render "components/empty_state",
-               message: "Nothing to edit yet",
-               detail: "This app has not enabled any profile fields." %>
-  <% else %>
+  <%= render "studio/profiles/identity", user: current_user, editable: false %>
+
+  <% if @profile_sections.present? %>
     <div class="card p-0 overflow-hidden">
       <% @profile_sections.each_with_index do |section, index| %>
-        <%# The divider is a TOP border on every row but the first, so a row can
-            be added or dropped anywhere without leaving a trailing rule. %>
         <section class="p-6 <%= "border-t border-subtle" unless index.zero? %>"
                  data-profile-section="<%= section[:key] %>">
           <% if section[:title].present? %>
@@ -66,16 +31,3 @@
     </div>
   <% end %>
 </div>
-
-<% if profile_needs_modals %>
-  <%# Optional chaining on current() is load-bearing: the outer template unmounts
-      one tick AFTER the stack empties, so a bare .id throws on every close. %>
-  <%= render "studio/modals/scoped_host", store: "profileModals" do %>
-    <template x-if="$store.profileModals.current()?.id === 'crop-photo'">
-      <div><%= render "studio/modals/crop_photo", store: "profileModals" %></div>
-    </template>
-    <template x-if="$store.profileModals.current()?.id === 'saving'">
-      <div><%= render "studio/modals/saving", store: "profileModals" %></div>
-    </template>
-  <% end %>
-<% end %>

@@ -26,6 +26,11 @@ class ProfilePageRenderTest < Minitest::Test
     def display_name = "Pat Studio"
     def first_name = "Pat"
     def email = "pat@example.com"
+    # The birth trio: present as methods, empty as values — the shape of an
+    # account that has the columns and has not filled them in.
+    def birth_year = nil
+    def birth_month = nil
+    def birth_day = nil
     def avatar = @avatar ||= Class.new { def attached? = false }.new
     def avatar_color = "#6366f1"
     def avatar_initials = "PS"
@@ -36,9 +41,11 @@ class ProfilePageRenderTest < Minitest::Test
     v.define_singleton_method(:current_user) { user }
     v.define_singleton_method(:profile_path) { "/profile" }
     v.define_singleton_method(:profile_avatar_path) { "/profile/avatar" }
-    v.define_singleton_method(:profile_email_path) { "/profile/email" }
-    # A bare ActionView has no controller to delegate `flash` to, and the page
-    # touches it. Supply the empty case.
+    v.define_singleton_method(:edit_profile_path) { "/profile/edit" }
+    # show.html.erb reads flash[:email_change_pending] to decide whether to open
+    # the handoff modal. A bare ActionView has no controller to delegate flash
+    # to, so supply the empty case — the populated one is exercised by a real
+    # request in test/integration/profile_requests_test.rb.
     v.define_singleton_method(:flash) { {} }
     v.define_singleton_method(:protect_against_forgery?) { false }
     v
@@ -50,246 +57,130 @@ class ProfilePageRenderTest < Minitest::Test
     v.render(template: "studio/profiles/show")
   end
 
-  # --- the rows ---------------------------------------------------------------
-
-  def avatar_row
-    @avatar_row ||= view.render(partial: "studio/profiles/avatar_section", locals: { user: StubUser.new })
-  end
-
-  def test_the_avatar_row_renders_with_a_file_field_pointed_at_its_own_route
-    doc = Nokogiri::HTML5.fragment(avatar_row)
-    form = doc.at_css("form")
-
-    refute_nil form, "expected an upload form"
-    assert_equal "/profile/avatar", form["action"],
-      "the avatar posts to its OWN route — sharing PATCH /profile purges the attachment"
-    refute_nil doc.at_css('input[type="file"][name="profile[avatar]"]')
-  end
-
-  def test_the_avatar_row_advertises_only_the_allowed_types
-    accept = Nokogiri::HTML5.fragment(avatar_row).at_css('input[x-ref="filePicker"]')["accept"]
-
-    assert_equal Studio::ProfileImage::ALLOWED_CONTENT_TYPES.join(","), accept
-    refute_includes accept, "svg", "the picker must not offer a format the server rejects"
-  end
-
-  def test_the_avatar_row_shows_the_current_picture
-    assert_includes avatar_row, "PS", "an unattached avatar falls back to the initials circle"
-  end
-
-  # --- the turf-monster interaction, which is the point of this row -----------
+  # --- the identity header ------------------------------------------------------
   #
-  # The operator named turf's /account avatar as the north star: click the
-  # picture, a hover cap says "Update", pick a file, crop it square, and it saves
-  # with no Save button. These tests pin the wiring that produces that, because
-  # every piece of it is invisible in a screenshot and trivial to break.
+  # "You at a glance" (the operator's framing, and the shape iOS Settings uses).
+  # It renders on BOTH pages, and its badge is the one control on it: a LINK to
+  # the edit page when reading, a BUTTON that opens the cropper when editing.
 
-  def test_the_avatar_is_the_click_target_and_opens_the_picker
-    doc = Nokogiri::HTML5.fragment(avatar_row)
-    trigger = doc.at_css('[aria-label="Change your profile photo"]')
-
-    refute_nil trigger, "the avatar itself is the affordance — there is no Save button"
-    assert_equal "$refs.filePicker.click()", trigger["@click"]
+  def identity(user: StubUser.new, editable: false)
+    view.render(partial: "studio/profiles/identity", locals: { user: user, editable: editable })
   end
 
-  # turf's is a <div @click>, which no keyboard or screen-reader user can reach —
-  # for them the only way to change a photo would be a mouse. Same visual, but a
-  # real button.
-  def test_the_click_target_is_keyboard_reachable
-    trigger = Nokogiri::HTML5.fragment(avatar_row).at_css('[aria-label="Change your profile photo"]')
+  def test_the_header_shows_who_you_are
+    doc = Nokogiri::HTML5.fragment(identity)
 
-    assert_equal "button", trigger.name, "a div is unreachable by keyboard"
-    assert_equal "button", trigger["type"], "an untyped button inside a form submits it"
+    assert_includes doc.text, "Pat Studio"
+    assert_includes doc.text, "pat@example.com"
   end
 
-  def test_the_hover_cap_says_update_and_reveals_on_focus_too
-    doc = Nokogiri::HTML5.fragment(avatar_row)
-    # Find the element that actually REVEALS, then read what it says — rather
-    # than finding the words and guessing which ancestor carries the class.
-    overlay = doc.css("span").find { |s| s["class"].to_s.include?("group-hover:opacity-100") }
+  def test_the_read_headers_badge_links_to_the_edit_page
+    doc = Nokogiri::HTML5.fragment(identity)
+    badge = doc.at_css('[aria-label="Edit your profile"]')
 
-    refute_nil overlay, "the hover cap is what tells someone the picture is clickable"
-    assert_equal "Update", overlay.text.strip
-    assert_includes overlay["class"], "opacity-0", "the cap is hidden until hover"
-    assert_includes overlay["class"], "group-focus:opacity-100",
-      "a keyboard user must see the same affordance a mouse user does"
+    refute_nil badge, "the read page needs a way through to editing"
+    assert_equal "a", badge.name
+    assert_equal "/profile/edit", badge["href"]
   end
 
-  def test_the_row_saves_immediately_through_the_upload_host
-    assert_includes avatar_row, "imageUploadHost(",
-      "the crop-then-immediate-save factory is what removes the Save button"
-    assert_includes avatar_row, "crop-photo-confirmed.window"
-    assert_includes avatar_row, 'x-ref="form"'
-    assert_includes avatar_row, 'x-ref="fileInput"'
+  def test_the_edit_headers_badge_opens_the_picker
+    doc = Nokogiri::HTML5.fragment(identity(editable: true))
+    badge = doc.at_css('[aria-label="Change your profile photo"]')
+
+    refute_nil badge
+    assert_equal "button", badge.name, "a div here is unreachable by keyboard"
+    assert_equal "$refs.filePicker.click()", badge["@click"]
   end
 
-  # REGRESSION GUARD. turf's call site binds applyCrop($event.detail.blob)
-  # directly, which predates the owner token. Every imageUploadHost on a page
-  # hears the same window event, so a page that later grows a second uploader
-  # would have BOTH hosts save the same crop. onCropConfirmed checks the owner
-  # first and costs nothing extra.
-  def test_the_crop_confirm_goes_through_the_owner_guard
-    assert_includes avatar_row, "onCropConfirmed($event.detail)"
-    refute_includes avatar_row, "applyCrop($event.detail",
-      "binding applyCrop directly skips the owner guard turf's copy predates"
+  # REGRESSION GUARD. The avatar used to be a ROW declaring `requires: :avatar`,
+  # so it was dropped whole on a host whose model has no attachment. Moving it
+  # into this header lost that protection, and the first render against such a
+  # model raised `undefined method 'avatar'`. A header is not exempt from the
+  # rule that consumers disagree about their users table.
+  def test_the_header_tolerates_a_model_with_no_attachment
+    no_avatar = Class.new do
+      def display_name = "Pat Studio"
+      def email = "pat@example.com"
+      def avatar_initials = "P"
+      def avatar_color = "#6366f1"
+    end.new
+
+    doc = Nokogiri::HTML5.fragment(identity(user: no_avatar, editable: true))
+
+    assert_includes doc.text, "Pat Studio"
+    assert_nil doc.at_css('[aria-label="Change your profile photo"]'),
+      "no attachment means no upload affordance — not a raise"
   end
 
-  # The modal store must be the PAGE's, not the app's shared one — two consumers
-  # render no shared host at all, and the two that do ship a fork of it.
-  def test_the_row_opens_on_the_page_scoped_store
-    assert_includes avatar_row, "store: 'profileModals'"
-    refute_includes avatar_row, "Alpine.store('modals')"
-  end
+  # --- the edit fields ------------------------------------------------------------
+  #
+  # These are fields in ONE form with ONE save, so none of them carries a button.
+  # x-model feeds the dirty check that raises the save bar.
 
-  # The saving card must NOT be dismissible. submitFormWithProgress opens it with
-  # `dismissible: opts.dismissible === true`, and the scoped host's bfcache /
-  # turbo:before-cache cleanup keeps ONLY `dismissible === false` entries — its
-  # own comment says "a still-in-flight upload must not silently lose the card
-  # its promise will resolve against". Passing the flag through drops the card
-  # mid-upload and lets Escape close it. Copied from turf's call site; both
-  # engine sibling call sites (studio/emails/show.html.erb) omit it.
-  def test_the_saving_card_is_not_dismissible_mid_upload
-    refute_includes avatar_row, "dismissible",
-      "an upload in flight must keep its saving card"
-  end
-
-  def test_the_first_name_row_renders_prefilled_and_capped
-    html = view.render(partial: "studio/profiles/first_name_section", locals: { user: StubUser.new })
-    doc = Nokogiri::HTML5.fragment(html)
-    field = doc.at_css('input[name="profile[first_name]"]')
-
-    refute_nil field, "expected the first-name field"
-    assert_equal "Pat", field["value"], "the row shows what is saved, not a blank box"
-    assert_equal Studio::FIRST_NAME_MAX_LENGTH.to_s, field["maxlength"]
-    assert_equal "/profile", doc.at_css("form")["action"]
-  end
-
-  # --- the page ---------------------------------------------------------------
-
-  def test_the_page_renders_each_resolved_section
-    html = render_page(Studio::ProfileSections.defaults)
-    doc = Nokogiri::HTML5.fragment(html)
-
-    assert_equal %w[avatar first_name email google], doc.css("[data-profile-section]").map { |s| s["data-profile-section"] }
-    assert_includes doc.text, "Profile photo"
-    assert_includes doc.text, "Your name"
-    assert_includes doc.text, "Google account"
-  end
-
-  def test_the_page_renders_only_the_rows_it_was_given
-    # The controller resolves and filters; the template decides nothing. A page
-    # given one row must render one row — this is what makes an app whose model
-    # cannot serve a row get a shorter page instead of an error.
-    html = render_page(Studio::ProfileSections.defaults.select { |s| s[:key] == :avatar })
-    doc = Nokogiri::HTML5.fragment(html)
-
-    assert_equal %w[avatar], doc.css("[data-profile-section]").map { |s| s["data-profile-section"] }
-    refute_includes doc.text, "Your name"
-  end
-
-  # --- one card, rows inside it ------------------------------------------------
-
-  # The operator's revision (2026-08-14): four separate cards read as four
-  # unrelated settings pages stacked up. One card, hairline dividers.
-  def test_the_page_renders_one_card_with_the_rows_inside_it
-    doc = Nokogiri::HTML5.fragment(render_page(Studio::ProfileSections.defaults))
-    cards = doc.css(".card")
-
-    assert_equal 1, cards.length, "the rows share one card, not one card each"
-    assert_equal Studio::ProfileSections.defaults.length,
-                 cards.first.css("[data-profile-section]").length,
-                 "every row lives inside that card"
-  end
-
-  # A TOP border on every row but the first, so a row can be added or dropped
-  # anywhere without leaving a trailing rule under the last one.
-  def test_rows_are_divided_by_a_top_border_except_the_first
-    doc = Nokogiri::HTML5.fragment(render_page(Studio::ProfileSections.defaults))
-    rows = doc.css("[data-profile-section]")
-
-    refute_includes rows.first["class"], "border-t", "no rule above the first row"
-    rows.drop(1).each do |row|
-      assert_includes row["class"], "border-t", "#{row["data-profile-section"]} needs its divider"
-    end
-  end
-
-  # --- the delta-gated buttons -------------------------------------------------
-
-  def test_the_first_name_field_is_prefilled_and_its_button_says_update
+  def test_the_name_fields_prefill_and_feed_the_dirty_check
     doc = Nokogiri::HTML5.fragment(
-      view.render(partial: "studio/profiles/first_name_section", locals: { user: StubUser.new })
+      view.render(partial: "studio/profiles/name_fields", locals: { user: StubUser.new })
     )
 
-    assert_equal "Pat", doc.at_css('input[name="profile[first_name]"]')["value"],
-      "a blank field made you retype a name you had already set"
-    assert_equal "Update", doc.at_css('input[type="submit"]')["value"]
+    first = doc.at_css('input[name="profile[first_name]"]')
+    assert_equal "Pat", first["value"]
+    assert_equal "fields.first_name", first["x-model"]
+    assert_nil doc.at_css('input[type="submit"]'), "the sticky bar saves this, not a per-row button"
   end
 
-  # The gate compares TRIMMED values on both sides, so whitespace is not a
-  # change — and the controller trims on the way in too, which is what makes the
-  # button agree with what the server would actually do.
-  def test_the_update_button_is_disabled_until_the_name_actually_changes
-    html = view.render(partial: "studio/profiles/first_name_section", locals: { user: StubUser.new })
-    submit = Nokogiri::HTML5.fragment(html).at_css('input[type="submit"]')
+  # last_name is not a standard column yet — mcritchie-studio and turf-monster
+  # have it, the other three do not. The field is gated rather than blocking the
+  # page on a coordinated fleet migration.
+  def test_the_last_name_field_appears_only_where_the_column_does
+    with_last = Class.new(StubUser) { def last_name = "McRitchie" }.new
 
-    assert_equal "value.trim() === initial.trim()", submit[":disabled"]
-    # Read the parsed attribute, not the raw markup — the JSON quotes render as
-    # &quot; entities.
-    x_data = Nokogiri::HTML5.fragment(html).at_css("form")["x-data"]
-    assert_equal %({ initial: "Pat", value: "Pat" }), x_data,
-      "the delta is measured against what the server rendered"
+    assert_nil Nokogiri::HTML5.fragment(
+      view.render(partial: "studio/profiles/name_fields", locals: { user: StubUser.new })
+    ).at_css('input[name="profile[last_name]"]')
+
+    refute_nil Nokogiri::HTML5.fragment(
+      view.render(partial: "studio/profiles/name_fields", locals: { user: with_last })
+    ).at_css('input[name="profile[last_name]"]')
   end
 
-  # NO-JS FALLBACK. Alpine adds the disabled state on init; a static `disabled`
-  # in the markup would leave a page whose JS never ran with a control it can
-  # never turn on. The server re-checks regardless.
-  def test_the_buttons_are_not_statically_disabled
-    %w[first_name_section email_section].each do |partial|
-      submit = Nokogiri::HTML5.fragment(
-        view.render(partial: "studio/profiles/#{partial}", locals: { user: StubUser.new })
-      ).at_css('input[type="submit"]')
+  # ONE date input over THREE integer columns — the split is deliberate upstream
+  # and the UI joins them for entry.
+  def test_the_birthday_field_joins_three_columns_into_one_date
+    dated = Class.new(StubUser) do
+      def birth_year = 1991
+      def birth_month = 9
+      def birth_day = 15
+    end.new
+    field = Nokogiri::HTML5.fragment(
+      view.render(partial: "studio/profiles/birthday_fields", locals: { user: dated })
+    ).at_css('input[name="profile[birthday]"]')
 
-      assert_nil submit["disabled"], "#{partial} must not ship a hard-disabled button"
-    end
+    assert_equal "date", field["type"]
+    assert_equal "1991-09-15", field["value"]
   end
 
-  def test_the_email_field_is_prefilled_and_gates_on_a_real_delta
-    html = view.render(partial: "studio/profiles/email_section", locals: { user: StubUser.new })
-    doc = Nokogiri::HTML5.fragment(html)
-    submit = doc.at_css('input[type="submit"]')
+  def test_a_missing_birthday_leaves_the_field_empty_rather_than_guessing
+    field = Nokogiri::HTML5.fragment(
+      view.render(partial: "studio/profiles/birthday_fields", locals: { user: StubUser.new })
+    ).at_css('input[name="profile[birthday]"]')
 
-    assert_equal "pat@example.com", doc.at_css('input[name="profile[email]"]')["value"],
-      "the field shows the address you have — the change is direct now, not a request"
-    assert_equal "Update", submit["value"]
-    assert_equal "value.trim() === '' || value.trim().toLowerCase() === current", submit[":disabled"]
-    assert_includes doc.at_css("form")["x-data"], %(current: "pat@example.com")
+    assert_equal "", field["value"].to_s, "an unknown birthday must not be guessed at"
   end
 
-  # THE GOOGLE EXCEPTION, at the UI. Google is the authoritative source for a
-  # linked account's address, so the row offers no field at all and says why.
-  # ProfilesController#email refuses independently — a disabled input is a
-  # courtesy, and anyone can POST.
-  def test_a_google_linked_account_gets_no_email_field_and_a_reason
+  def test_the_email_field_locks_when_google_is_linked
     linked = Class.new(StubUser) do
       def provider = "google_oauth2"
-      def uid = "123"
+      def uid = "1"
     end.new
     doc = Nokogiri::HTML5.fragment(
-      view.render(partial: "studio/profiles/email_section", locals: { user: linked })
+      view.render(partial: "studio/profiles/email_fields", locals: { user: linked })
     )
 
-    assert_nil doc.at_css("form"), "a locked address must not offer a form to submit"
+    assert_nil doc.at_css('input[name="profile[email]"]'), "a locked address offers nothing to type into"
     assert_includes doc.text, "linked Google account"
-    assert_includes doc.text, "pat@example.com", "it still shows the address you have"
-  end
-
-  def test_an_unlinked_account_keeps_its_email_field
-    doc = Nokogiri::HTML5.fragment(
-      view.render(partial: "studio/profiles/email_section", locals: { user: StubUser.new })
-    )
-
-    refute_nil doc.at_css("form")
-    refute_includes doc.text, "linked Google account"
+    # The unlink lives on the READ page — a lock that does not say where the key
+    # is is just a wall.
+    assert_equal "/profile", doc.at_css("a")["href"]
   end
 
   # --- the Google identity row -------------------------------------------------
@@ -350,45 +241,30 @@ class ProfilePageRenderTest < Minitest::Test
     refute_nil doc.at_css("form")
   end
 
-  # --- the page mounts the modals its rows need -------------------------------
+  # --- the pages ------------------------------------------------------------------
 
-  def test_the_page_mounts_a_scoped_modal_host_when_a_row_needs_one
-    html = render_page(Studio::ProfileSections.defaults)
+  def test_the_read_page_renders_its_rows_in_one_card
+    doc = Nokogiri::HTML5.fragment(
+      render_page(Studio::ProfileSections.defaults.select { |x| x[:page] == :show })
+    )
 
-    assert_includes html, "profileModals", "the page brings its own modal store"
-    assert_includes html, "'crop-photo'"
-    assert_includes html, "'saving'"
-    assert_includes html, "cropper.min.js", "the crop modal needs cropper.js on the page"
+    assert_equal %w[google], doc.css("[data-profile-section]").map { |x| x["data-profile-section"] }
   end
 
-  # REGRESSION GUARD, and the reason this is scoped_host rather than host:
-  # mcritchie-studio and turf-monster each ship their own
-  # app/views/studio/modals/_host.html.erb, which SHADOWS the engine's in this
-  # non-isolated engine — the page would silently get their fork and its
-  # registrations, and profileModals would never be registered.
-  def test_the_page_uses_the_unforked_scoped_host
-    html = render_page(Studio::ProfileSections.defaults)
+  def test_a_read_page_with_no_rows_still_renders_the_identity
+    html = render_page([])
 
-    refute_includes html, "studio/modals/host",
-      "the shared host partial is forked by two consumers and would shadow the engine's"
+    refute_includes html, "data-profile-section"
+    assert_includes html, "Pat Studio", "the header IS the read page when there are no rows"
   end
 
-  # Loaded only where a row can actually open the cropper — a page of plain rows
-  # must not pull ~40 KB of cropper.js for nothing.
-  def test_a_page_with_no_modal_rows_loads_no_cropper
-    html = render_page(Studio::ProfileSections.defaults.reject { |s| s[:modals] })
+  # Nothing on the READ page opens a modal, so it must not pay ~40 KB of
+  # cropper.js or mount a host for nobody.
+  def test_the_read_page_mounts_no_modal_host
+    html = render_page(Studio::ProfileSections.defaults.select { |x| x[:page] == :show })
 
     refute_includes html, "cropper.min.js"
     refute_includes html, "profileModals"
-  end
-
-  def test_a_page_with_no_servable_rows_renders_an_honest_empty_state
-    # Reachable: an app with no avatar attachment and no first_name column
-    # resolves to zero rows. A blank page would read as broken.
-    html = render_page([])
-
-    assert_includes html, "Nothing to edit yet"
-    refute_includes html, "data-profile-section"
   end
 
   def test_a_host_section_renders_with_its_own_locals
@@ -396,7 +272,7 @@ class ProfilePageRenderTest < Minitest::Test
     # naming its own partial and passing locals must render like any other.
     v = view
     v.instance_variable_set(:@profile_sections, [
-      { key: :note, title: "Host row", partial: "studio/profiles/first_name_section", locals: {} }
+      { key: :note, title: "Host row", partial: "studio/profiles/name_fields", locals: {} }
     ])
     html = v.render(template: "studio/profiles/show")
 

@@ -126,8 +126,8 @@ module Studio
     ProfileSections.defaults
   end
 
-  def self.profile_sections_for(view)
-    ProfileSections.resolve(profile_sections, view)
+  def self.profile_sections_for(view, page: nil)
+    ProfileSections.resolve(profile_sections, view, page: page)
   end
 
   def self.mailer_from_for_transport(env: ENV, ses_from:, resend_from: nil)

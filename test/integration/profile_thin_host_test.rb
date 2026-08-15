@@ -63,6 +63,14 @@ end
 
 class User < ApplicationRecord
   def admin? = role == "admin"
+
+  # The engine's avatar contract, which components/_avatar has required since
+  # long before /profile existed — every real consumer defines these (that is
+  # what Studio::UserProfile exists to supply). A double without them is thinner
+  # than any app the engine actually ships to.
+  def display_name = name.presence || email.to_s.split("@").first.presence || "anon"
+  def avatar_initials = display_name.to_s[0].to_s.upcase
+  def avatar_color = "#6366f1"
 end
 
 class TestSessionsController < ApplicationController
@@ -89,23 +97,27 @@ class ProfileThinHostTest < ActionDispatch::IntegrationTest
 
   # --- the page degrades rather than breaking ---------------------------------
 
-  test "the page renders only the rows this host can serve" do
+  # The READ page: identity at a glance. This host has no Google columns, so the
+  # only read row drops and the page is the header alone — which must still
+  # render rather than blow up or come back blank.
+  test "the read page renders the identity even with no rows to show" do
     get "/profile"
 
     assert_response :success
-
-    # It HAS an email column, so that row is legitimately served.
-    assert_includes response.body, "Email"
-    # It has none of these.
-    refute_includes response.body, "Your name"
-    refute_includes response.body, "Profile photo"
+    assert_includes response.body, "Pat Studio"
     refute_includes response.body, "Google account"
   end
 
-  # The zero-row empty state is covered where it can actually be produced —
-  # test/views/profile_page_render_test.rb renders the template with an empty
-  # section list. It cannot be reached from here: this host serves `email`, and
-  # one file cannot carry two shapes of the users table.
+  # The EDIT page. This host has `email` and none of the name or birthday
+  # columns, so it gets exactly one field.
+  test "the edit page offers only the fields this host can serve" do
+    get "/profile/edit"
+
+    assert_response :success
+    assert_includes response.body, 'name="profile[email]"'
+    refute_includes response.body, 'name="profile[first_name]"'
+    refute_includes response.body, 'name="profile[birthday]"'
+  end
 
   # --- the writes REFUSE rather than 500 --------------------------------------
   #

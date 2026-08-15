@@ -12,8 +12,8 @@
 #
 # What a section looks like:
 #
-#   { key: :avatar, title: "Profile photo", partial: "studio/profiles/avatar_section",
-#     locals: { ... }, requires: :avatar, admin: false }
+#   { key: :name, title: "Name", page: :edit, partial: "studio/profiles/name_fields",
+#     locals: { ... }, requires: :first_name, admin: false }
 #
 #   key      — stable identifier. A host removes or replaces a default by key,
 #              so reordering the defaults never breaks a host's override.
@@ -48,29 +48,44 @@
 # Studio.first_name_outstanding? already guards against with respond_to?.
 #
 # So a row DECLARES what it needs and is dropped when the host cannot serve it.
-# mcritchie-industries gets a working profile page with an avatar row and no name
-# row until it installs the standard-profile-columns migration, at which point
-# the row appears with no code change. Silence, not a 500.
+# mcritchie-industries gets a working edit page with an email field and no name
+# or birthday fields until it installs the standard-profile-columns migration, at
+# which point they appear with no code change. Silence, not a 500.
 module Studio
   module ProfileSections
-    # The page every consumer gets for free. Iteration one is deliberately two
-    # rows: the picture and the name. Everything else the account-standardization
-    # program lifts (email change, identities, preferences) arrives as further
-    # defaults, and a host that has declared its own list keeps working because
-    # it composes against `Studio.default_profile_sections` rather than a literal.
+    # Which page a row belongs to. `:show` is the read page (/profile) — things
+    # you look at and occasionally act on; `:edit` is the form (/profile/edit).
+    PAGES = %i[show edit].freeze
+
+    # The rows every consumer gets for free.
+    #
+    # THE AVATAR IS NOT HERE, and that is a change rather than an omission: it
+    # moved into the identity header both pages render, where it sits with the
+    # display name and the address. It stopped being a row when it stopped
+    # looking like one.
     DEFAULTS = [
-      { key: :avatar, title: "Profile photo",
-        partial: "studio/profiles/avatar_section", requires: :avatar, modals: true },
-      { key: :first_name, title: "Your name",
-        partial: "studio/profiles/first_name_section", requires: :first_name },
-      { key: :email, title: "Email",
-        partial: "studio/profiles/email_section", requires: :email },
-      # Gated on the app OFFERING Google, not merely on having the columns —
-      # the same question app/views/sessions/new.html.erb already asks before
-      # drawing this identical button on the login page.
-      { key: :google, title: "Google account",
+      # --- the read page ------------------------------------------------------
+      # Google is an identity you CONNECT, not a field you type, which is why it
+      # reads rather than edits. Gated on the app OFFERING Google, not merely on
+      # having the columns — the same question app/views/sessions/new.html.erb
+      # already asks before drawing this identical button on the login page.
+      { key: :google, title: "Google account", page: :show,
         partial: "studio/profiles/google_section", requires: %i[provider uid],
-        if: -> { Studio.auth_method?(:google) } }
+        if: -> { Studio.auth_method?(:google) } },
+
+      # --- the edit page ------------------------------------------------------
+      # These are FIELDS in one form with one Save, so they carry no buttons of
+      # their own. Email included: it needed a separate action only while it was
+      # out-of-band, and now that it applies directly there is no reason for a
+      # second mechanism on the same page. Its side effects — the Google lock,
+      # notifying the old address, invalidating other sessions — are the server's
+      # business, not the form's.
+      { key: :name, title: "Name", page: :edit,
+        partial: "studio/profiles/name_fields", requires: :first_name },
+      { key: :email, title: "Email", page: :edit,
+        partial: "studio/profiles/email_fields", requires: :email },
+      { key: :birthday, title: "Birthday", page: :edit,
+        partial: "studio/profiles/birthday_fields", requires: %i[birth_day birth_month birth_year] }
     ].freeze
 
     module_function
@@ -88,7 +103,9 @@ module Studio
     # `nil` meaning "the defaults" rather than "no sections" is the load-bearing
     # choice here: it is what makes a brand-new app's profile page work with an
     # empty initializer, which is the entire point of standardizing this.
-    def resolve(declared, view)
+    # `page:` selects a subset. nil means every page, which is what the pre-split
+    # callers passed and what a host asking "all of them" wants.
+    def resolve(declared, view, page: nil)
       sections = declared.respond_to?(:call) ? declared.call(view) : declared
       sections = defaults if sections.nil?
 
@@ -97,6 +114,7 @@ module Studio
 
       Array(sections)
         .map { |section| symbolize(section) }
+        .reject { |section| page && page_of(section) != page.to_sym }
         .reject { |section| section[:admin] && !admin }
         .select { |section| enabled?(section[:if], view) }
         .select { |section| served_by?(user, section[:requires]) }
@@ -143,6 +161,12 @@ module Studio
     # Can this host's user model serve the row? No requirement means yes — a row
     # that reads nothing off the user (a static explainer, a link out) is always
     # served. A nil user means we are rendering for nobody, and nothing is served.
+    # A row that never says defaults to :edit — someone adding a row is usually
+    # adding a field, and the read page is a deliberate, curated surface.
+    def page_of(section)
+      (section[:page] || :edit).to_sym
+    end
+
     def served_by?(user, requires)
       needed = Array(requires).compact
       return true if needed.empty?

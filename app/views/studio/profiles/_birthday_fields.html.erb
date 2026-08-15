@@ -1,0 +1,31 @@
+<%# Birthday — ONE date input over THREE integer columns.
+
+    Locals: user (required).
+
+    The split is deliberate in the standard-columns migration and worth not
+    undoing: birth_day / birth_month / birth_year keep the two questions apps
+    actually ask cheap and separable — how old is this person (needs the year,
+    and the month and day for the boundary case) and whose birthday is today
+    (needs month and day, and no year at all). A single date column answers the
+    second one badly.
+
+    So the UI joins them and ProfilesController#update splits them again. A
+    native date input is used rather than three selects because a date is one
+    idea to the person entering it, and the browser already knows how to enter
+    one on every platform.
+
+    The row renders only when the host has all three columns, so nothing here
+    re-checks.
+%>
+<%
+  y = user.birth_year
+  m = user.birth_month
+  d = user.birth_day
+  value = (y.present? && m.present? && d.present?) ? format("%04d-%02d-%02d", y, m, d) : nil
+%>
+<label class="block text-sm text-secondary mb-2 font-medium" for="profile_birthday">Date of birth</label>
+<input type="date" name="profile[birthday]" id="profile_birthday"
+       value="<%= value %>" class="input-field"
+       autocomplete="bday" max="<%= Date.current.iso8601 %>"
+       x-model="fields.birthday">
+<p class="text-muted text-xs mt-2">Stored as day, month and year — we use it for birthdays and age checks.</p>
