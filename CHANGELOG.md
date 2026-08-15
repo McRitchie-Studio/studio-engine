@@ -17,21 +17,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
-- **`last_name` joins the standard user profile columns**, as its own migration
-  (`AddLastNameToUsers`). Run `bin/rails studio_engine:install:migrations` to pick
-  it up. Guarded with `if_not_exists` and a `table_exists?` no-op like the rest;
-  mcritchie-studio and turf-monster already own the column and are untouched, and
-  the `down` refuses rather than dropping data those apps owned first.
-
-  **It is a NEW file rather than an edit to `AddStandardUserProfileColumns`, and
-  that distinction is load-bearing for anyone adding the seventh column.** Engine
-  migrations are install-COPIED into each app's `db/migrate` with the app's own
-  timestamp, and `install:migrations` SKIPS a name already installed — so editing
-  a shipped migration updates nothing, silently diverges every installed copy,
-  and leaves an app that already ran it stamped on a body that exists nowhere.
-  A shipped migration is immutable; the standard SET spans however many files it
-  takes.
-
 - **`/profile` gains the Email row — changeable from any signed-in session.**
   `PATCH /profile/email` (`profile_email_path`) applies the change directly.
 
