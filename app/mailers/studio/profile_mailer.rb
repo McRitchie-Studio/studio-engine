@@ -28,21 +28,6 @@ module Studio
   class ProfileMailer < ApplicationMailer
     layout "branded_mailer"
 
-    # To the CURRENT address, with the confirm link.
-    def email_change_confirmation(user, current_email, new_email, token)
-      @user          = user
-      @app_name      = Studio.app_name
-      @current_email = current_email
-      @new_email     = new_email
-      @confirm_url   = confirm_profile_email_url(token: token)
-
-      @banner     = Studio::Banner.for(:email_change_confirmation, name: display_name_for(user))
-      @banner_url = Studio::EmailCatalog.resolved_url(:email_change_confirmation)
-      @banner_alt = [@banner&.header, "confirm your #{@app_name} email change"].compact.join(" — ")
-
-      mail(to: current_email, subject: Studio::EmailCatalog.subject_for(:email_change_confirmation, name: display_name_for(user)))
-    end
-
     # To the OLD address, after the swap landed.
     def email_change_notification(user, old_email, new_email)
       @user      = user

@@ -13,10 +13,10 @@
 # Two properties make that safe:
 #
 #   1. EVERY add is `if_not_exists: true`. The apps disagree TODAY — McRitchie
-#      Studio and turf-monster already have `first_name`, and turf already has
-#      `birth_year` (as an integer, matching below). An unguarded add would raise
-#      on those apps, which is the failure mode that makes engine migrations
-#      against host tables frightening in the first place.
+#      Studio and turf-monster already have `first_name` and `last_name`, and
+#      turf already has `birth_year` (as an integer, matching below). An
+#      unguarded add would raise on those apps, which is the failure mode that
+#      makes engine migrations against host tables frightening in the first place.
 #   2. It no-ops on an app with no `users` table at all, rather than raising.
 #      The engine's own dummy is such an app.
 #
@@ -43,8 +43,8 @@
 #
 # So a `down` cannot tell "I added this" from "the host has had it since 2024":
 #
-#   - mcritchie-studio owned `users.first_name` BEFORE this ran.
-#   - turf-monster owned `users.first_name` AND `users.birth_year`.
+#   - mcritchie-studio owned `users.first_name` and `users.last_name` BEFORE this ran.
+#   - turf-monster owned both of those AND `users.birth_year`.
 #   - mcritchie-industries owned none of the five.
 #
 # The two apps the `up` was careful not to touch are the two a `DROP COLUMN`
@@ -62,7 +62,7 @@
 # genuinely wants these columns gone can drop the ones they know they own, by
 # hand, with the schema in front of them.
 class AddStandardUserProfileColumns < ActiveRecord::Migration[7.2]
-  COLUMNS = %i[first_name birth_day birth_month birth_year ip_locations].freeze
+  COLUMNS = %i[first_name last_name birth_day birth_month birth_year ip_locations].freeze
 
   def up
     # An app that has no users table (the engine's dummy, and any future
@@ -70,6 +70,7 @@ class AddStandardUserProfileColumns < ActiveRecord::Migration[7.2]
     return unless table_exists?(:users)
 
     add_column :users, :first_name, :string, if_not_exists: true
+    add_column :users, :last_name,  :string, if_not_exists: true
 
     add_column :users, :birth_day,   :integer, if_not_exists: true
     add_column :users, :birth_month, :integer, if_not_exists: true
@@ -89,7 +90,7 @@ class AddStandardUserProfileColumns < ActiveRecord::Migration[7.2]
       Its `up` adds #{COLUMNS.join(", ")} with `if_not_exists`, so it does not
       know which of them it created on this host and which the host already
       owned. Dropping them all would destroy host-owned data (mcritchie-studio
-      owned first_name; turf-monster owned first_name and birth_year).
+      owned first_name and last_name; turf-monster owned those and birth_year).
 
       If you truly want a column gone, drop the ones you know this app did not
       own before the migration, by hand, in their own migration.

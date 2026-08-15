@@ -28,10 +28,7 @@
     fork and its registrations. studio/modals/_scoped_host is unforked in every
     app. /admin/emails reached the same conclusion first. %>
 <% profile_needs_modals = Array(@profile_sections).any? { |section| section[:modals] } %>
-<%# The email-change handoff needs the host too, even on a page whose rows want
-    no cropper. %>
-<% profile_pending_email = flash[:email_change_pending].presence %>
-<% profile_mount_host = profile_needs_modals || profile_pending_email.present? %>
+<% profile_mount_host = profile_needs_modals %>
 
 <% if profile_needs_modals %>
   <%# cropper.js + the imageUploadHost / cropPhotoModal / submitFormWithProgress
@@ -80,43 +77,5 @@
         <div><%= render "studio/modals/saving", store: "profileModals" %></div>
       </template>
     <% end %>
-    <template x-if="$store.profileModals.current()?.id === 'email-change-pending'">
-      <div><%= render "studio/modals/blocks/email_change_pending", store: "profileModals" %></div>
-    </template>
-  <% end %>
-
-  <% if profile_pending_email.present? %>
-    <%# The handoff after PATCH /profile/email. Flash round-trips through the
-        session cookie as JSON, so it comes back with STRING keys however the
-        controller set it.
-
-        Opened on turbo:load rather than DOMContentLoaded: the row's form is a
-        normal submit today, but a host that turns Turbo on would land this
-        redirect via a body swap, and turbo:load fires on both that and a cold
-        load. The one-shot guard stops a back/forward turbo:load replaying a
-        stale flash, and the poll covers turbo:load winning the race against
-        Alpine's boot on a first paint. %>
-    <% pending = profile_pending_email.with_indifferent_access %>
-    <script type="application/json" id="profile-email-change-pending"><%==
-      { currentEmail: pending[:current_email], newEmail: pending[:new_email] }.to_json
-    %></script>
-    <script>
-      (function() {
-        var opened = false;
-        function openPending() {
-          if (opened) return;
-          var tag = document.getElementById("profile-email-change-pending");
-          if (!tag) return;
-          if (!window.Alpine || !Alpine.store || !Alpine.store("profileModals")) {
-            return setTimeout(openPending, 50);
-          }
-          opened = true;
-          Alpine.store("profileModals").open("email-change-pending", JSON.parse(tag.textContent));
-        }
-        document.addEventListener("turbo:load", openPending);
-        if (document.readyState !== "loading") openPending();
-        else document.addEventListener("DOMContentLoaded", openPending);
-      })();
-    </script>
   <% end %>
 <% end %>

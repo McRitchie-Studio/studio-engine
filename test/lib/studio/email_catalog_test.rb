@@ -46,7 +46,7 @@ class EmailCatalogTest < Minitest::Test
   # --- 1. the engine ships the standard set ---------------------------------
 
   def test_standard_emails_are_pre_registered_in_display_order
-    assert_equal %w[magic_link newsletter_subscribed email_change_confirmation email_change_notification], Studio::EmailCatalog.keys,
+    assert_equal %w[magic_link newsletter_subscribed email_change_notification], Studio::EmailCatalog.keys,
       "every app must inherit the standard set, magic_link first — the email-change " \
       "pair is appended rather than prepended precisely to keep that order"
   end
@@ -76,14 +76,14 @@ class EmailCatalogTest < Minitest::Test
     Studio::EmailCatalog.register("winnings", label: "Contest winnings",
                                 description: "Sent when a player wins.")
 
-    assert_equal %w[magic_link newsletter_subscribed email_change_confirmation email_change_notification winnings], Studio::EmailCatalog.keys
+    assert_equal %w[magic_link newsletter_subscribed email_change_notification winnings], Studio::EmailCatalog.keys
     assert_equal "Contest winnings", Studio::EmailCatalog.label("winnings")
   end
 
   def test_re_registering_an_inherited_key_updates_in_place
     Studio::EmailCatalog.register("magic_link", label: "Sign in to Turf Monster")
 
-    assert_equal %w[magic_link newsletter_subscribed email_change_confirmation email_change_notification], Studio::EmailCatalog.keys,
+    assert_equal %w[magic_link newsletter_subscribed email_change_notification], Studio::EmailCatalog.keys,
       "a relabel must not append a duplicate or reorder the page"
     assert_equal "Sign in to Turf Monster", Studio::EmailCatalog.label("magic_link")
     assert_equal "emails/magic-link.gif", Studio::EmailCatalog.entry("magic_link").default_asset,
@@ -100,13 +100,12 @@ class EmailCatalogTest < Minitest::Test
     Studio::EmailCatalog.register("winnings", label: "Contest winnings")
     Studio::EmailCatalog.reset!
 
-    assert_equal %w[magic_link newsletter_subscribed email_change_confirmation email_change_notification], Studio::EmailCatalog.keys
+    assert_equal %w[magic_link newsletter_subscribed email_change_notification], Studio::EmailCatalog.keys
   end
 
   def test_variants_keeps_the_legacy_key_to_label_shape
     assert_equal({ "magic_link" => "Magic-link sign-in",
                    "newsletter_subscribed" => "Newsletter subscribed",
-                   "email_change_confirmation" => "Email change — confirm",
                    "email_change_notification" => "Email change — heads up" },
                  Studio::EmailCatalog.variants)
   end
@@ -199,7 +198,6 @@ class EmailCatalogTest < Minitest::Test
                    # not a seed that stopped carrying artwork. The flat asset is
                    # asserted as a real, animated, full-size file in
                    # test/integration/emails_page_test.rb.
-                   "email_change_confirmation" => nil,
                    "email_change_notification" => nil },
                  backgrounds,
                  "the seed must still lend artwork, or the logo guard proves nothing")

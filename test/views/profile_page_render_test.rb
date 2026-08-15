@@ -255,25 +255,43 @@ class ProfilePageRenderTest < Minitest::Test
     end
   end
 
-  def test_the_email_button_says_change_and_gates_on_a_real_delta
+  def test_the_email_field_is_prefilled_and_gates_on_a_real_delta
     html = view.render(partial: "studio/profiles/email_section", locals: { user: StubUser.new })
-    submit = Nokogiri::HTML5.fragment(html).at_css('input[type="submit"]')
+    doc = Nokogiri::HTML5.fragment(html)
+    submit = doc.at_css('input[type="submit"]')
 
-    assert_equal "Change", submit["value"]
-    # Empty, or the address you already have, would spend a real email on nothing.
+    assert_equal "pat@example.com", doc.at_css('input[name="profile[email]"]')["value"],
+      "the field shows the address you have — the change is direct now, not a request"
+    assert_equal "Update", submit["value"]
     assert_equal "value.trim() === '' || value.trim().toLowerCase() === current", submit[":disabled"]
-    x_data = Nokogiri::HTML5.fragment(html).at_css("form")["x-data"]
-    assert_includes x_data, %(current: "pat@example.com"),
-      "the gate compares against the address the server rendered, lowercased"
+    assert_includes doc.at_css("form")["x-data"], %(current: "pat@example.com")
   end
 
-  def test_an_account_with_no_address_yet_gets_save_not_change
-    no_email = Class.new(StubUser) { def email = nil }.new
-    submit = Nokogiri::HTML5.fragment(
-      view.render(partial: "studio/profiles/email_section", locals: { user: no_email })
-    ).at_css('input[type="submit"]')
+  # THE GOOGLE EXCEPTION, at the UI. Google is the authoritative source for a
+  # linked account's address, so the row offers no field at all and says why.
+  # ProfilesController#email refuses independently — a disabled input is a
+  # courtesy, and anyone can POST.
+  def test_a_google_linked_account_gets_no_email_field_and_a_reason
+    linked = Class.new(StubUser) do
+      def provider = "google_oauth2"
+      def uid = "123"
+    end.new
+    doc = Nokogiri::HTML5.fragment(
+      view.render(partial: "studio/profiles/email_section", locals: { user: linked })
+    )
 
-    assert_equal "Save", submit["value"], "there is no prior owner to ask, so it applies directly"
+    assert_nil doc.at_css("form"), "a locked address must not offer a form to submit"
+    assert_includes doc.text, "linked Google account"
+    assert_includes doc.text, "pat@example.com", "it still shows the address you have"
+  end
+
+  def test_an_unlinked_account_keeps_its_email_field
+    doc = Nokogiri::HTML5.fragment(
+      view.render(partial: "studio/profiles/email_section", locals: { user: StubUser.new })
+    )
+
+    refute_nil doc.at_css("form")
+    refute_includes doc.text, "linked Google account"
   end
 
   # --- the Google identity row -------------------------------------------------

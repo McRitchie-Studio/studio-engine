@@ -206,13 +206,11 @@ class ProfilePageTest < ActiveSupport::TestCase
   # have, so they must refuse before writing.
   KNOWN_WRITE_ACTIONS = %w[update avatar email unlink_google].freeze
 
-  # Write actions guarded by the SIGNED TOKEN instead. apply_email_change is
-  # reached only with a valid, fresh token that already named the account and its
-  # current address, so a column gate would be asking a question the token has
-  # answered. Listed explicitly rather than left to fall through a pattern that
-  # happens not to match `user.update!` — an omission the reader cannot see is
-  # indistinguishable from an unguarded action.
-  TOKEN_GUARDED_WRITE_ACTIONS = %w[apply_email_change].freeze
+  # Nothing is token-guarded any more: the out-of-band email confirmation was
+  # removed on 2026-08-14 when email became changeable from any session. Kept as
+  # an empty list rather than deleted, so re-introducing a token-authed write has
+  # an obvious place to be declared instead of silently failing the count above.
+  TOKEN_GUARDED_WRITE_ACTIONS = [].freeze
 
   WRITE_PATTERN = /(?:current_user|user)\.(update|update!|avatar\.attach)/
 

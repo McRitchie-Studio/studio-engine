@@ -279,41 +279,30 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
     assert_equal "google_oauth2", user.reload.provider
   end
 
-  # --- PATCH /profile/email — the ASK, which must not be the CHANGE -----------
+  # --- PATCH /profile/email — a DIRECT change from any session ----------------
   #
-  # OUT-OF-BAND (turf's Lazarus audit #4). A logged-in session is not enough to
-  # move an account to someone else's mailbox: the request only mails a link to
-  # the CURRENT address, and the holder of THAT inbox decides. These assert it by
-  # reading the database and the outbox after a real request.
+  # The out-of-band confirmation was removed on 2026-08-14: the session is the
+  # authority now. What is asserted here is the behaviour that REPLACED it, plus
+  # the two protections kept precisely because the old address lost its veto.
 
   def mails
     ActionMailer::Base.deliveries
   end
 
-  # Multipart mail: the URL lives in the decoded parts, and quoted-printable can
-  # wrap a long line with a trailing "=" — so decode each part and unwrap before
-  # matching, rather than regexing the raw container.
-  def mail_body(mail)
-    parts = mail.multipart? ? mail.all_parts : [mail]
-    parts.map { |part| part.body.decoded.gsub(/=\r?\n/, "") }.join("\n")
-  end
-
-  def mail_confirm_token(mail)
-    mail_body(mail)[%r{/profile/email/confirm/([A-Za-z0-9_\-]+)}, 1]
-  end
-
-  test "asking to change the email does NOT change it" do
+  test "changing the email applies immediately" do
     user = create_user(email: "old@example.com")
     sign_in user
 
     patch "/profile/email", params: { profile: { email: "new@example.com" } }
 
     assert_response :redirect
-    assert_equal "old@example.com", user.reload.email,
-      "a session alone must never move the account to another inbox"
+    assert_equal "new@example.com", user.reload.email
   end
 
-  test "the confirmation goes to the CURRENT address, never the new one" do
+  # OPSEC-046, and it carries more weight now than it did behind a confirm step:
+  # with no veto, this mail is the only way a change nobody made becomes visible
+  # to the person losing the account.
+  test "the OLD address is told the change happened" do
     user = create_user(email: "old@example.com")
     sign_in user
     mails.clear
@@ -322,17 +311,83 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
 
     assert_equal 1, mails.size
     assert_equal ["old@example.com"], mails.last.to,
-      "mailing the NEW address would let a hijacker approve their own takeover"
-    assert_includes mail_body(mails.last), "new@example.com", "it still has to say what is being approved"
+      "the heads-up goes where the person losing the account can see it"
   end
 
-  test "a first email applies directly because there is no prior owner to ask" do
+  # OPSEC-045. A hijacker holding a second cookie loses it the moment the address
+  # moves — which is the other half of what replaced the confirmation step.
+  test "changing the email invalidates other sessions" do
+    user = create_user(email: "old@example.com")
+    user.regenerate_session_token!
+    before = user.reload.session_token
+    sign_in user
+
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+
+    refute_equal before, user.reload.session_token
+  end
+
+  # ...but NOT the session that made the change. Rotating without re-establishing
+  # would sign out the very person who just did it — correct when the actor
+  # arrived from a confirmation link, wrong now that the actor is the session.
+  test "the session that made the change survives it" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+
+    get "/profile"
+
+    assert_response :success, "the person who changed their email must not be logged out"
+  end
+
+  # --- the Google exception ---------------------------------------------------
+  #
+  # Google is the authoritative source for a linked account's address. Letting
+  # the two drift means the next OAuth sign-in either re-links to a stranger's
+  # row or cannot find its own.
+
+  test "an account linked to Google cannot change its email" do
+    user = create_user(email: "old@example.com", provider: "google_oauth2", uid: "123")
+    sign_in user
+
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+
+    assert_response :see_other
+    assert_equal "old@example.com", user.reload.email
+  end
+
+  # The row disables the field and explains why. A disabled input is a courtesy —
+  # anyone can POST — so the endpoint refuses on its own.
+  test "the google refusal does not depend on the page having been rendered" do
+    user = create_user(email: "old@example.com", provider: "google_oauth2", uid: "123")
+    sign_in user
+
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+
+    assert_equal "old@example.com", user.reload.email
+  end
+
+  test "unlinking google frees the email to be changed" do
+    user = create_user(email: "old@example.com", provider: "google_oauth2", uid: "123")
+    sign_in user
+
+    delete "/profile/google"
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+
+    assert_equal "new@example.com", user.reload.email
+  end
+
+  # --- the ordinary refusals --------------------------------------------------
+
+  test "a first email applies with no prior address to notify" do
     user = create_user(email: nil)
     sign_in user
+    mails.clear
 
     patch "/profile/email", params: { profile: { email: "first@example.com" } }
 
     assert_equal "first@example.com", user.reload.email
+    assert_empty mails, "there is no old address to warn"
   end
 
   test "asking for the address you already have is refused" do
@@ -346,149 +401,14 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
     assert_empty mails, "no mail for a no-op"
   end
 
-  # THE HANDOFF MODAL. A one-line toast cannot carry two addresses — which inbox
-  # to open, and what will happen when you do — so the ask hands off to a modal
-  # instead. Asserted through a real redirect-and-follow, because the flash is
-  # single-render and the page reads it into a JSON tag on arrival.
-  test "the ask hands off to a modal naming both addresses" do
+  test "a blank address is refused and writes nothing" do
     user = create_user(email: "old@example.com")
     sign_in user
 
-    patch "/profile/email", params: { profile: { email: "new@example.com" } }
-    follow_redirect!
+    patch "/profile/email", params: { profile: { email: "  " } }
 
-    assert_response :success
-    assert_includes response.body, "email-change-pending", "the modal must be registered and opened"
-    assert_includes response.body, "old@example.com", "it has to say WHICH inbox to open"
-    assert_includes response.body, "new@example.com", "and what will happen when you do"
-  end
-
-  # Flash is single-render: the modal must not reappear on the next visit, or a
-  # back navigation replays a handoff for a change already dealt with.
-  test "the handoff does not replay on the next visit" do
-    user = create_user(email: "old@example.com")
-    sign_in user
-    patch "/profile/email", params: { profile: { email: "new@example.com" } }
-    follow_redirect!
-
-    get "/profile"
-
-    refute_includes response.body, "profile-email-change-pending"
-  end
-
-  # --- the confirm link -------------------------------------------------------
-
-  def confirm_token_for(user, to:)
-    sign_in user
-    mails.clear
-    patch "/profile/email", params: { profile: { email: to } }
-    mail_confirm_token(mails.last)
-  end
-
-  test "the emailed link carries a usable token" do
-    user = create_user(email: "old@example.com")
-
-    refute_nil confirm_token_for(user, to: "new@example.com"), "the mail must contain the confirm link"
-  end
-
-  # THE PREFETCH DEFENCE. Mail scanners and link prefetchers issue GETs with no
-  # human involved. A GET that applied the change would let a prefetch complete
-  # an account takeover silently, so this one must RENDER and write nothing.
-  test "GET on the confirm link renders and changes nothing" do
-    user = create_user(email: "old@example.com")
-    token = confirm_token_for(user, to: "new@example.com")
-
-    get "/profile/email/confirm/#{token}"
-
-    assert_response :success
-    assert_equal "old@example.com", user.reload.email,
-      "a GET must never apply the change — prefetchers issue GETs"
-  end
-
-  test "POST on the confirm link applies the change" do
-    user = create_user(email: "old@example.com")
-    token = confirm_token_for(user, to: "new@example.com")
-
-    post "/profile/email/confirm/#{token}"
-
-    assert_response :redirect
-    assert_equal "new@example.com", user.reload.email
-  end
-
-  # OPSEC-045. A hijacker's live session is how an unwanted change gets started;
-  # rotating on apply is what ends it the moment the real owner confirms.
-  test "applying the change rotates the session token" do
-    user = create_user(email: "old@example.com")
-    user.regenerate_session_token!
-    before = user.reload.session_token
-    token = confirm_token_for(user, to: "new@example.com")
-
-    post "/profile/email/confirm/#{token}"
-
-    refute_equal before, user.reload.session_token, "other live sessions must lose access"
-  end
-
-  # OPSEC-046. The person LOSING the account is the one who needs to know.
-  test "applying the change notifies the OLD address" do
-    user = create_user(email: "old@example.com")
-    token = confirm_token_for(user, to: "new@example.com")
-    mails.clear
-
-    post "/profile/email/confirm/#{token}"
-
-    assert_equal 1, mails.size
-    assert_equal ["old@example.com"], mails.last.to,
-      "the heads-up goes where the person who is losing the account can see it"
-  end
-
-  # --- dead links -------------------------------------------------------------
-
-  test "a confirm link cannot be used twice" do
-    user = create_user(email: "old@example.com")
-    token = confirm_token_for(user, to: "new@example.com")
-    post "/profile/email/confirm/#{token}"
-
-    post "/profile/email/confirm/#{token}"
-
-    assert_response :gone
-    assert_equal "new@example.com", user.reload.email, "the second use must not re-apply or revert"
-  end
-
-  test "a link superseded by a newer change is dead" do
-    user = create_user(email: "old@example.com")
-    stale = confirm_token_for(user, to: "first@example.com")
-    fresh = confirm_token_for(user, to: "second@example.com")
-    post "/profile/email/confirm/#{fresh}"
-
-    post "/profile/email/confirm/#{stale}"
-
-    assert_response :gone
-    assert_equal "second@example.com", user.reload.email
-  end
-
-  test "a tampered token is refused on both halves" do
-    user = create_user(email: "old@example.com")
-    token = confirm_token_for(user, to: "new@example.com")
-    tampered = token.sub(/.\z/) { |c| c == "A" ? "B" : "A" }
-
-    get "/profile/email/confirm/#{tampered}"
-    assert_response :gone
-
-    post "/profile/email/confirm/#{tampered}"
-    assert_response :gone
+    assert_response :see_other
     assert_equal "old@example.com", user.reload.email
-  end
-
-  # The link is authed by the TOKEN, not the session — it is opened from an inbox,
-  # often on another device. Requiring a session would break the flow it exists for.
-  test "the confirm link works while signed out" do
-    user = create_user(email: "old@example.com")
-    token = confirm_token_for(user, to: "new@example.com")
-    reset!
-
-    post "/profile/email/confirm/#{token}"
-
-    assert_equal "new@example.com", user.reload.email
   end
 
   # --- the guard is the SERVER's, not the button's ----------------------------

@@ -195,34 +195,6 @@ module Studio
         preview: -> { Studio::NewsletterMailer.subscribed("preview@example.com", name: "Alex") }
       },
       {
-        key: "email_change_confirmation",
-        label: "Email change — confirm",
-        description: "Sent to the CURRENT address when someone asks to change it. Carries the link that authorizes the swap.",
-        default_asset: "emails/email-change-confirmation.gif",
-        # NO logo, following magic_link: an omitted key
-        # INHERITS through register()'s logo.presence merge, which is how the
-        # Studio wordmark once leaked onto other brands' sign-in email.
-        header: "Confirm your new email",
-        header_fallback: "Confirm your new email",
-        subtext: "approve this change from your current inbox",
-        subject: "Confirm your {app} email change",
-        body: "Someone asked to change the email on your {app} account. " \
-              "If that was you, tap the button below to approve it. " \
-              "If it was not, ignore this message and nothing will change.",
-        supports_cta: true,
-        cta_text: "Confirm the change",
-        # Every registered email owes a preview builder, or its row on
-        # /admin/emails is a card the operator cannot look at. Sample data only —
-        # this runs on that admin page and never in a delivery path.
-        preview: lambda {
-          Studio::ProfileMailer.email_change_confirmation(
-            nil, "current@example.com", "new@example.com",
-            Studio::EmailChangeToken.generate(user_id: 0, current_email: "current@example.com",
-                                              new_email: "new@example.com")
-          )
-        }
-      },
-      {
         key: "email_change_notification",
         label: "Email change — heads up",
         description: "Sent to the OLD address after a change lands, so an unauthorized change is visible rather than silent.",

@@ -17,55 +17,41 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
-- **`/profile` gains the Email row — change your address, out of band.** The
-  fourth standard row, and the only security-shaped one: it changes the address
-  that magic-link sign-in uses, so getting it wrong locks someone out or lets
-  someone else in.
+- **`last_name` joins the standard user profile columns.** The
+  `AddStandardUserProfileColumns` migration now adds it alongside `first_name`
+  and the birth trio, so an app gets a full name without inventing its own
+  spelling. Guarded with `if_not_exists` like every other add — mcritchie-studio
+  and turf-monster already own the column and are untouched.
 
-  | Route | Helper | What it does |
-  |---|---|---|
-  | `PATCH /profile/email` | `profile_email_path` | ASKS for the change; mails a link |
-  | `GET /profile/email/confirm/:token` | `confirm_profile_email_path` | Renders an interstitial. Writes nothing |
-  | `POST /profile/email/confirm/:token` | `apply_profile_email_path` | Applies it |
+- **`/profile` gains the Email row — changeable from any signed-in session.**
+  `PATCH /profile/email` (`profile_email_path`) applies the change directly.
 
-  Lifted from turf-monster's `/account` with its three audited properties intact,
-  each now proven by a dispatched request rather than by reading the code:
+  **THE GOOGLE EXCEPTION.** An account with a linked Google identity **cannot**
+  change its email: Google is the authoritative source for that address, and
+  letting the two drift means the next OAuth sign-in either re-links to a
+  stranger's row or cannot find its own. The row shows the address with the
+  reason instead of a field, and the endpoint refuses independently — a disabled
+  input is a courtesy, and anyone can POST.
 
-  - **The confirm link goes to the CURRENT address** (Lazarus audit #4), so the
-    holder of the existing inbox approves the move. A logged-in session is not
-    enough to send an account to someone else's mailbox — which is exactly what a
-    direct write would allow after a session hijack.
-  - **The GET renders and the POST mutates.** Mail scanners and link prefetchers
-    issue GETs with no human involved; a GET that applied the change would let a
-    prefetch complete a takeover silently.
-  - **Applying rotates the session token** (OPSEC-045), so a hijacker's live
-    session dies the moment the real owner confirms, and **mails the OLD address**
-    (OPSEC-046) so an unauthorised change is visible rather than silent.
+  **What a direct change trades away, stated so nobody rediscovers it:** a
+  hijacked session can move the account to another inbox, and the old address has
+  no veto. Two protections are kept precisely BECAUSE the veto is gone —
 
-  A dead link — tampered, expired, already used, or superseded by a newer change
-  — returns one undifferentiated **410 Gone**. The person's next step is the same
-  in every case, and distinguishing them hands an attacker a probe.
+  - the **old address is mailed** after every change (OPSEC-046), so a change
+    nobody made is visible to the person losing the account, and
+  - **every other session is invalidated** (OPSEC-045), so a hijacker holding a
+    second cookie loses it the moment the address moves. The session that made
+    the change is re-established, so the person doing it is not signed out.
 
-  An account with **no** address yet is the exception: there is no prior owner to
-  ask, so the first address applies directly and is simply unverified.
-
-- **`Studio::ProfileMailer`** with `email_change_confirmation` and
-  `email_change_notification`, plus two new standard `Studio::EmailCatalog`
-  entries so the copy, subject and banner are operator-editable on
-  `/admin/emails` like every other Studio email. **Namespaced deliberately:**
+- **`Studio::ProfileMailer`** with `email_change_notification`, plus a new
+  standard `Studio::EmailCatalog` entry so its copy, subject and banner are
+  operator-editable on `/admin/emails` like every other Studio email. **Namespaced deliberately:**
   `app/mailers` is an autoload path and this engine is not isolated, so a host's
-  top-level `UserMailer` shadows the engine's — turf-monster already defines
-  `email_change_confirmation` with its own signature and its own `/account` URL,
-  so a bare `UserMailer` call would have mailed turf-routed links with no error
-  at all.
-
-- **`Studio::EmailChangeToken`** — the signed, expiring (30 min) token that is
-  the auth boundary for the confirm link, since the link is opened from an inbox
-  and often on a different device than the session. It binds the **current**
-  address, which is what makes a link single-purpose: once the address has moved,
-  the link is stale.
-
-### Added
+  top-level `UserMailer` shadows the engine's — mcritchie-studio's fork defines no
+  `email_change_notification` at all (a bare call raises `NoMethodError`), and
+  turf-monster's defines one with the SAME signature — so there the call would
+  not raise, it would quietly send TURF's copy, banner and `account_url` instead
+  of the engine's. The silent case is the dangerous one.
 
 - **`/profile` gains the Google account row.** Shows the linked identity with an
   Unlink control, or a branded Connect button that POSTs to OmniAuth's own

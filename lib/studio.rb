@@ -10,7 +10,6 @@ require "studio/sidebar_sections"
 require "studio/profile_sections"
 require "studio/profile_image"
 require "studio/oauth_identity"
-require "studio/email_change_token"
 require "studio/username_generator"
 require "studio/s3"
 require "studio/image_cache"
@@ -692,22 +691,6 @@ module Studio
         delete "profile/google", to: "studio/profiles#unlink_google",
                as: :profile_unlink_google
 
-        # Out-of-band email-change confirmation.
-        #
-        # The GET only RENDERS an interstitial; the POST is what mutates. That
-        # split is the whole defence: mail scanners and link prefetchers issue
-        # GETs, so a GET that applied the change would let a prefetch complete an
-        # account takeover with nobody clicking anything. The POST is CSRF-
-        # protected and needs a human.
-        #
-        # Authed by the SIGNED TOKEN, not the session — the link goes to the
-        # person's old inbox and may be opened on a different device than the one
-        # holding the login. `format: false` plus the [^/]+ constraint stop Rails
-        # reading a dot in the token as a format extension.
-        get  "profile/email/confirm/:token", to: "studio/profiles#confirm_email_change",
-             as: :confirm_profile_email, constraints: { token: %r{[^/]+} }, format: false
-        post "profile/email/confirm/:token", to: "studio/profiles#apply_email_change",
-             as: :apply_profile_email, constraints: { token: %r{[^/]+} }, format: false
       end
 
       resources :error_logs, only: [:index, :show]
