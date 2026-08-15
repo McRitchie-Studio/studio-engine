@@ -188,6 +188,31 @@ class ProfileSectionsTest < Minitest::Test
     assert_equal %i[named], Studio::ProfileSections.resolve(sections, full_view).map { |s| s[:key] }
   end
 
+  # REGRESSION GUARD. `if: :method_name` is Rails' own before_action spelling and
+  # the most natural thing a host will write. A Symbol does not answer `call`, so
+  # it used to be coerced straight to true — a gate that silently did nothing,
+  # failing in the same permissive direction as the bug `if:` exists to fix.
+  def test_a_symbol_if_calls_the_view_rather_than_coercing_to_true
+    view = Struct.new(:current_user) do
+      def admin? = false
+      def never? = false
+      def always? = true
+    end.new(nil)
+
+    assert_equal [], Studio::ProfileSections.resolve([{ key: :s, partial: "x", if: :never? }], view).map { |s| s[:key] }
+    assert_equal %i[s], Studio::ProfileSections.resolve([{ key: :s, partial: "x", if: :always? }], view).map { |s| s[:key] }
+    assert_equal [], Studio::ProfileSections.resolve([{ key: :s, partial: "x", if: "never?" }], view).map { |s| s[:key] }
+  end
+
+  # An `if:` naming a method the view does not have is a typo. Dropping the row
+  # keeps the failure in the safe direction — a missing row is visible and
+  # fixable; a row that renders because its gate was misspelled is the bug.
+  def test_a_symbol_if_naming_a_missing_method_drops_the_row
+    view = Struct.new(:current_user) { def admin? = false }.new(nil)
+
+    assert_equal [], Studio::ProfileSections.resolve([{ key: :s, partial: "x", if: :typo? }], view).map { |s| s[:key] }
+  end
+
   def test_a_row_with_no_if_always_renders
     assert_equal %i[bare], Studio::ProfileSections.resolve([{ key: :bare, partial: "x" }], full_view).map { |s| s[:key] }
   end

@@ -105,6 +105,22 @@ module Studio
     # write either `-> { Studio.feature?(:x) }` or `->(view) { view.admin? }`.
     def enabled?(condition, view)
       return true if condition.nil?
+
+      # A Symbol/String names a method on the VIEW — Rails' own
+      # `before_action ..., if: :method_name` convention, and therefore the most
+      # natural thing a host will write here.
+      #
+      # It is handled explicitly because the alternative FAILS OPEN: a Symbol
+      # does not answer `call`, so the earlier `return !!condition` coerced
+      # `:some_predicate` to true and rendered the row unconditionally — a gate
+      # that silently does nothing, in the same permissive direction as the bug
+      # this whole `if:` key was added to fix. A host would have had no signal.
+      if condition.is_a?(Symbol) || condition.is_a?(String)
+        return false unless view.respond_to?(condition)
+
+        return !!view.public_send(condition)
+      end
+
       return !!condition unless condition.respond_to?(:call)
 
       !!(condition.arity.zero? ? condition.call : condition.call(view))
