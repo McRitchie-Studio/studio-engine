@@ -86,6 +86,31 @@ class ProfilePageRenderTest < Minitest::Test
     assert_equal "/profile/edit", badge["href"]
   end
 
+  # The glyph starts hidden and fades in. The three reveal paths are asserted
+  # together because the last two are what stop a hover-only affordance from
+  # stranding people: this badge is the read page's ONLY route to editing, and a
+  # keyboard never hovers while touch has no hover at all.
+  def test_the_badge_glyph_is_hidden_until_hover_focus_or_touch
+    html = identity
+    styles = html[/<style>(.*?)<\/style>/m, 1].to_s
+
+    assert_includes html, "studio-avatar-badge-icon"
+    assert_match(/\.studio-avatar-badge-icon\s*\{[^}]*opacity:\s*0/, styles,
+      "the glyph rests hidden")
+    assert_includes styles, ".studio-avatar:hover .studio-avatar-badge-icon"
+    assert_includes styles, ".studio-avatar-badge:focus .studio-avatar-badge-icon",
+      "a keyboard never hovers, and this badge is the only way to the edit page"
+    assert_match(/@media \(hover: none\)/, styles,
+      "touch has no hover — the glyph must not simply never appear there")
+  end
+
+  def test_the_badge_circle_itself_is_always_visible
+    styles = identity[/<style>(.*?)<\/style>/m, 1].to_s
+
+    refute_match(/\.studio-avatar-badge\s*\{[^}]*opacity:\s*0/, styles,
+      "only the glyph waits; the circle is the resting affordance")
+  end
+
   def test_the_read_page_carries_no_heading_or_second_edit_control
     html = render_page(Studio::ProfileSections.defaults.select { |x| x[:page] == :show })
     doc = Nokogiri::HTML5.fragment(html)

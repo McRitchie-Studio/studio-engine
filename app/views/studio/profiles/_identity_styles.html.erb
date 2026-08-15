@@ -1,0 +1,47 @@
+<%# The avatar badge's reveal.
+
+    The badge sits empty until you hover the picture, then the pencil fades in —
+    the operator's call, and it keeps the resting state quiet.
+
+    WRITTEN AS CSS RATHER THAN TAILWIND UTILITIES on purpose. The engine ships a
+    prebuilt bundle to consumers, so a utility only exists if something already
+    emitted it; `group-focus-within:opacity-100` is exactly the kind of class
+    that is absent in one app and present in another, and the failure mode is
+    silent — a keyboard user simply never sees the icon. Owning the selector
+    removes that uncertainty.
+
+    THREE REVEAL PATHS, and the last two are not decoration. Since the operator
+    removed the page heading and the Edit button, this badge is the ONLY route
+    from /profile to /profile/edit, so an affordance that exists only on hover
+    would strand two whole groups of people:
+
+      hover        — the intended interaction on a pointer
+      focus        — the same affordance for a keyboard, which never hovers
+      (hover: none) — touch has no hover at all, so the icon simply stays
+                      visible there rather than never appearing
+
+    The badge circle itself is always visible in every case; it is only the
+    glyph inside it that waits.
+%>
+<style>
+  .studio-avatar-badge-icon {
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+
+  .studio-avatar:hover .studio-avatar-badge-icon,
+  .studio-avatar-badge:hover .studio-avatar-badge-icon,
+  .studio-avatar-badge:focus .studio-avatar-badge-icon,
+  .studio-avatar-badge:focus-visible .studio-avatar-badge-icon {
+    opacity: 1;
+  }
+
+  /* No hover to give: show it and be done. */
+  @media (hover: none) {
+    .studio-avatar-badge-icon { opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .studio-avatar-badge-icon { transition: none; }
+  }
+</style>

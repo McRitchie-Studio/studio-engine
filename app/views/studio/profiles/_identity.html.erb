@@ -28,11 +28,13 @@
     exempt from the rule that consumers disagree about their users table. %>
 <% attachable = user.respond_to?(:avatar) && user.avatar.respond_to?(:attached?) %>
 
+<%= render "studio/profiles/identity_styles" %>
+
 <div class="card p-6 mb-6 flex flex-col items-center text-center">
   <%# The avatar and its edit affordance. The badge sits on the circle's
       lower-right — the position the operator's illustration used for a marker,
       now carrying an action instead. %>
-  <div class="relative mb-3" style="width: 128px; height: 128px;">
+  <div class="relative mb-3 studio-avatar" style="width: 128px; height: 128px;">
     <% if attachable && user.avatar.attached? %>
       <%= image_tag user.avatar, class: "rounded-full object-cover",
                     style: "width: 128px; height: 128px;", alt: user.display_name %>
@@ -46,7 +48,7 @@
     <%# A BUTTON on the edit page, a LINK on the read page — same glyph, same
         spot, and each does what that page can do. Both are real controls rather
         than a div, so a keyboard reaches them. %>
-    <% badge_class = "absolute bottom-0 right-0 flex items-center justify-center rounded-full border-2 border-page bg-primary text-white hover:opacity-90 transition" %>
+    <% badge_class = "studio-avatar-badge absolute bottom-0 right-0 flex items-center justify-center rounded-full border-2 border-page bg-primary text-white transition" %>
     <% badge_style = "width: 28px; height: 28px;" %>
     <% if editable && attachable %>
       <button type="button" @click="$refs.filePicker.click()"
