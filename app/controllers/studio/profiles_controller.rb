@@ -103,6 +103,37 @@ module Studio
       end
     end
 
+    # DELETE /profile/google — drop the linked Google identity.
+    #
+    # REFUSES WHEN IT WOULD ORPHAN THE ACCOUNT. turf-monster's version is an
+    # unconditional `update!(provider: nil, uid: nil)`; for an account whose only
+    # sign-in is Google (no email, so no magic link; no wallet; no password) that
+    # locks someone out of their own account behind a button labelled "Unlink".
+    # It is safe in turf only because turf's users happen to carry an email —
+    # a property of that app's data, not of the code.
+    #
+    # Studio::OauthIdentity gates on Studio.auth_methods, not merely on the
+    # column: an app with an email column that does not offer magic-link sign-in
+    # cannot use it to get back in.
+    def unlink_google
+      return unsupported(:google_account) unless serves?(:provider) && serves?(:uid)
+
+      unless Studio::OauthIdentity.google_linked?(current_user)
+        return redirect_to profile_path, alert: "No Google account is linked.", status: :see_other
+      end
+
+      if Studio::OauthIdentity.unlink_orphans_account?(current_user)
+        return redirect_to profile_path, status: :see_other,
+                           alert: "Google is the only way to sign in to this account. " \
+                                  "Add an email address first, then unlink."
+      end
+
+      rescue_and_log(target: current_user) do
+        current_user.update!(provider: nil, uid: nil)
+        redirect_to profile_path, notice: "Google account unlinked."
+      end
+    end
+
     private
 
     # Can this host's user model serve this field?

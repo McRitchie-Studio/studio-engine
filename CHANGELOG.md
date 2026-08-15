@@ -6,6 +6,60 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **`/profile` gains the Google account row.** Shows the linked identity with an
+  Unlink control, or a branded Connect button that POSTs to OmniAuth's own
+  `/auth/google_oauth2` (the engine does not draw a link route — the middleware
+  owns that path). Lifted from turf-monster's `/account` Identities card.
+
+  New route: `DELETE /profile/google` → `profile_unlink_google_path`.
+
+  **`Studio::OauthIdentity`** carries the rules, pure and duck-typed like
+  `Studio::ProfileImage`: `google_linked?`, `remaining_sign_ins`,
+  `unlink_orphans_account?`. It matches **both** provider spellings in the wild —
+  `google_oauth2` (the OmniAuth strategy name that lands in `users.provider`) and
+  `google` (what `Studio.auth_methods` calls it).
+
+  **THE ORPHAN GUARD — the reason this is not a straight copy.** turf-monster's
+  unlink is an unconditional `update!(provider: nil, uid: nil)`. For an account
+  whose only sign-in is Google — blank email so no magic link, no wallet, no
+  password — that silently locks someone out of their own account behind a button
+  labelled "Unlink". It is safe in turf today only because turf's users happen to
+  carry an email, which is a property of that app's **data**, not of its code.
+
+  The engine refuses instead, and gates on **`Studio.auth_methods`, not merely on
+  the column**: an app that has an `email` column but does not offer magic-link
+  sign-in cannot use it to get back in, so counting it would be exactly the wrong
+  answer. The row disables the button with the reason beside it; the endpoint
+  refuses the request independently, because a disabled button is a courtesy and
+  anyone can send the `DELETE`.
+
+  **What counts as a way back in is deliberately narrow**, because a false
+  positive here permits an unlink that orphans an account. A password counts only
+  via `Studio.password_login_available?` (`auth_method?(:password)` **and** the
+  User answering `authenticate`) — turf-monster removed `has_secure_password` and
+  kept the column, so its rows carry fossil digests no code can authenticate
+  against. A wallet counts only when the host has **explicitly** named its
+  signing-wallet column via `Studio.wallet_address_method`; the engine does not
+  guess a conventional reader, because turf's `User#solana_address` returns
+  `web3 || web2` and only the web3 address can sign in — the web2 one is
+  custodial, with no signer. An unconfigured app is treated as having no wallet
+  sign-in, which errs toward refusing: the cost is a refusal the operator fixes
+  with one config line, against someone locked out of their account.
+
+  The row declares `requires: %i[provider uid]` **and**
+  `if: -> { Studio.auth_method?(:google) }` — the model gate and the app gate are
+  different questions, and only the pair is correct. **Every** consumer's users
+  table carries `provider` and `uid`, so the model gate alone selected the whole
+  fleet; mcritchie-industries has both columns, `auth_methods = %i[magic_link]`,
+  and no omniauth gem at all, and would have been handed a "Link Google Account"
+  button leading nowhere. The engine's login page already asks the app question
+  before drawing this identical button (`app/views/sessions/new.html.erb`).
+
+- **`Studio.profile_sections` rows accept `if:`** — an optional callable gating a
+  row on an app capability, evaluated at resolve time, called with the view when
+  it takes an argument and without when it does not. Distinct from `requires:`,
+  which asks whether the user MODEL can serve the row.
+
 - **The shared profile page — `/profile`.** The engine now ships the account page
   itself, not just the parts. `Studio::ProfilesController` renders a page of
   declared rows; iteration one ships two, **change your photo** and **change your

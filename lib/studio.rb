@@ -9,6 +9,7 @@ require "studio/ui_primitives"
 require "studio/sidebar_sections"
 require "studio/profile_sections"
 require "studio/profile_image"
+require "studio/oauth_identity"
 require "studio/username_generator"
 require "studio/s3"
 require "studio/image_cache"
@@ -681,9 +682,13 @@ module Studio
       # param submitted empty PURGES the attachment, so a single form carrying
       # both would delete someone's photo every time they edited their name.
       if Studio.draw_profile_routes
-        get   "profile",        to: "studio/profiles#show",   as: :profile
-        patch "profile",        to: "studio/profiles#update"
-        patch "profile/avatar", to: "studio/profiles#avatar", as: :profile_avatar
+        get    "profile",        to: "studio/profiles#show",   as: :profile
+        patch  "profile",        to: "studio/profiles#update"
+        patch  "profile/avatar", to: "studio/profiles#avatar", as: :profile_avatar
+        # DELETE, because unlinking removes an identity. Linking is not drawn
+        # here: it is OmniAuth's own /auth/:provider, which the middleware owns.
+        delete "profile/google", to: "studio/profiles#unlink_google",
+               as: :profile_unlink_google
       end
 
       resources :error_logs, only: [:index, :show]

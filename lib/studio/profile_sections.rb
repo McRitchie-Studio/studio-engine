@@ -23,6 +23,16 @@
 #   requires — optional attribute (or Array of them) the CURRENT USER must
 #              respond to for the row to render. See below.
 #   admin    — admin-only row, same rule as the sidebar's.
+#   if       — optional callable. The row renders only when it returns truthy.
+#              Called with the view when it takes an argument, without when it
+#              does not. This is the APP-CAPABILITY gate, distinct from
+#              `requires:` which is the MODEL gate — and the two really are
+#              different questions. Every consumer's users table carries
+#              `provider` and `uid`, so `requires:` alone selected the whole
+#              fleet for the Google row; mcritchie-industries has those columns
+#              AND `auth_methods = %i[magic_link]` with no omniauth gem at all,
+#              so it would have rendered a "Link Google Account" button leading
+#              nowhere. Having a column is not the same as offering the feature.
 #   modals   — the row opens the shared crop/saving modals. The PAGE mounts them
 #              once (studio/modals/_scoped_host on a "profileModals" store) when
 #              any resolved row asks for them, so a row never has to know whether
@@ -52,7 +62,13 @@ module Studio
       { key: :avatar, title: "Profile photo",
         partial: "studio/profiles/avatar_section", requires: :avatar, modals: true },
       { key: :first_name, title: "Your name",
-        partial: "studio/profiles/first_name_section", requires: :first_name }
+        partial: "studio/profiles/first_name_section", requires: :first_name },
+      # Gated on the app OFFERING Google, not merely on having the columns —
+      # the same question app/views/sessions/new.html.erb:79 already asks before
+      # drawing this identical button on the login page.
+      { key: :google, title: "Google account",
+        partial: "studio/profiles/google_section", requires: %i[provider uid],
+        if: -> { Studio.auth_method?(:google) } }
     ].freeze
 
     module_function
@@ -80,7 +96,18 @@ module Studio
       Array(sections)
         .map { |section| symbolize(section) }
         .reject { |section| section[:admin] && !admin }
+        .select { |section| enabled?(section[:if], view) }
         .select { |section| served_by?(user, section[:requires]) }
+    end
+
+    # The app-capability gate. No `if:` means always enabled. The callable takes
+    # the view when it wants one and nothing when it does not, so a host can
+    # write either `-> { Studio.feature?(:x) }` or `->(view) { view.admin? }`.
+    def enabled?(condition, view)
+      return true if condition.nil?
+      return !!condition unless condition.respond_to?(:call)
+
+      !!(condition.arity.zero? ? condition.call : condition.call(view))
     end
 
     # Can this host's user model serve the row? No requirement means yes — a row

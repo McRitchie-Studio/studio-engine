@@ -72,6 +72,42 @@ class ProfilePageTest < ActiveSupport::TestCase
     assert_equal "/profile/avatar", routes.profile_avatar_path
   end
 
+  test "the unlink route draws as a DELETE and dispatches" do
+    ensure_application_controller!
+    Rails.application.reload_routes!
+
+    assert_equal "/profile/google", routes.profile_unlink_google_path
+
+    recognized = Rails.application.routes.recognize_path("/profile/google", method: :delete)
+    assert_equal "studio/profiles", recognized[:controller]
+    assert_equal "unlink_google", recognized[:action]
+  end
+
+  # Linking is OmniAuth's `/auth/:provider`, owned by the middleware — the engine
+  # must NOT draw a link route of its own, or it shadows the strategy's.
+  test "the engine draws no google LINK route of its own" do
+    Rails.application.reload_routes!
+
+    refute Rails.application.routes.url_helpers.respond_to?(:profile_link_google_path),
+      "linking belongs to OmniAuth's /auth/:provider, not to this engine"
+  end
+
+  # THE ORPHAN GUARD AT THE ENDPOINT, not only in the view. The row disables the
+  # button for a Google-only account, but a disabled button is a UI courtesy —
+  # anyone can send the DELETE. The controller must refuse it on its own, through
+  # the same predicate the view asks.
+  test "the unlink action refuses an unlink that would orphan the account" do
+    assert_includes controller_source, "Studio::OauthIdentity.unlink_orphans_account?",
+      "a disabled button is not a guard — the endpoint must refuse it too"
+
+    guard_index  = controller_source.index("unlink_orphans_account?")
+    update_index = controller_source.index("current_user.update!(provider: nil, uid: nil)")
+
+    refute_nil update_index, "expected the unlink write"
+    assert guard_index < update_index,
+      "the orphan check must run BEFORE the identity is cleared"
+  end
+
   test "the drawn paths dispatch to the engine controller" do
     # recognize_path resolves the controller LAZILY, which loads
     # Studio::ProfilesController — and that inherits ::ApplicationController,
@@ -157,15 +193,35 @@ class ProfilePageTest < ActiveSupport::TestCase
   #
   # Both write actions must ask the SAME question the row asks, through the same
   # predicate, so the endpoint and the page cannot drift apart.
-  test "both write actions guard on what the host can actually serve" do
-    guards = controller_source.scan(/return unsupported\(:(\w+)\) unless serves\?\(:(\w+)\)/)
+  # Asserts the PROPERTY — every write action refuses before it writes — rather
+  # than a particular spelling of the guard. The earlier version of this test
+  # regex-matched `unsupported(:x) unless serves?(:x)` and broke the moment a
+  # guard legitimately checked two columns while naming one row, which is a test
+  # failing on a reformat rather than on a defect.
+  # The three write actions as of this change. Named ONLY as a canary: the test
+  # DISCOVERS writers below rather than trusting this list, and asserts the two
+  # agree. A hardcoded list alone would stay green when a fourth, unguarded write
+  # action was added — which is the whole failure this guards.
+  KNOWN_WRITE_ACTIONS = %w[update avatar unlink_google].freeze
+  WRITE_PATTERN = /current_user\.(update|avatar\.attach)/
 
-    assert_equal 2, guards.length,
-      "each write action guards, or the endpoint 500s where its row is merely hidden"
-    guards.each do |named, checked|
-      assert_equal named, checked, "the guard and its message must name the same field"
+  test "every write action refuses before it writes" do
+    bodies = controller_source.split(/^    def /).to_h { |chunk| [chunk[/\A(\w+)/, 1], chunk] }
+    writers = bodies.select { |_name, body| body&.match?(WRITE_PATTERN) }
+
+    assert_equal KNOWN_WRITE_ACTIONS.sort, writers.keys.sort,
+      "a write action appeared or vanished — update KNOWN_WRITE_ACTIONS deliberately, " \
+      "and make sure the new one guards"
+
+    writers.each do |action, body|
+      guard = body[/^\s*return \S+ unless [^\n]*serves\?\([^\n]*\n/]
+      refute_nil guard,
+        "#{action} must RETURN early when the host cannot serve the field — " \
+        "merely mentioning serves? is not refusing"
+
+      assert body.index(guard) < body.index(WRITE_PATTERN),
+        "#{action} writes before it guards — the endpoint 500s where its row is merely hidden"
     end
-    assert_equal %w[avatar first_name], guards.map(&:first).sort
   end
 
   # The guard delegates to the registry's predicate rather than re-deriving
