@@ -63,8 +63,10 @@ module Studio
         partial: "studio/profiles/avatar_section", requires: :avatar, modals: true },
       { key: :first_name, title: "Your name",
         partial: "studio/profiles/first_name_section", requires: :first_name },
+      { key: :email, title: "Email",
+        partial: "studio/profiles/email_section", requires: :email },
       # Gated on the app OFFERING Google, not merely on having the columns —
-      # the same question app/views/sessions/new.html.erb:79 already asks before
+      # the same question app/views/sessions/new.html.erb already asks before
       # drawing this identical button on the login page.
       { key: :google, title: "Google account",
         partial: "studio/profiles/google_section", requires: %i[provider uid],
@@ -116,9 +118,21 @@ module Studio
       # that silently does nothing, in the same permissive direction as the bug
       # this whole `if:` key was added to fix. A host would have had no signal.
       if condition.is_a?(Symbol) || condition.is_a?(String)
-        return false unless view.respond_to?(condition)
+        unless view.respond_to?(condition)
+          # SILENT would repeat the bug this key was added to fix. The old
+          # coercion gave the host no signal; dropping the row without one only
+          # moves the silence somewhere safer. A typo'd gate now says so.
+          warn_gate("profile_sections: `if: #{condition.inspect}` names a method the view " \
+                    "does not answer — the row was dropped. Check the spelling.")
+          return false
+        end
 
-        return !!view.public_send(condition)
+        # Arity-aware, matching the lambda branch below: a predicate written as
+        # `def visible?(view)` is as natural as one written without an argument,
+        # and calling it wrong raises ArgumentError — which surfaces as a 500 on
+        # /profile rather than as a dropped row.
+        method = view.method(condition)
+        return !!(method.arity.zero? ? view.public_send(condition) : view.public_send(condition, view))
       end
 
       return !!condition unless condition.respond_to?(:call)
@@ -135,6 +149,15 @@ module Studio
       return false if user.nil?
 
       needed.all? { |attribute| user.respond_to?(attribute) }
+    end
+
+    # Pure Ruby: this file loads without Rails, so it cannot assume a logger.
+    def warn_gate(message)
+      if defined?(Rails) && Rails.respond_to?(:logger) && Rails.logger
+        Rails.logger.warn(message)
+      else
+        Kernel.warn(message)
+      end
     end
 
     def symbolize(hash)

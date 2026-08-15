@@ -687,8 +687,10 @@ module Studio
         patch  "profile/avatar", to: "studio/profiles#avatar", as: :profile_avatar
         # DELETE, because unlinking removes an identity. Linking is not drawn
         # here: it is OmniAuth's own /auth/:provider, which the middleware owns.
+        patch  "profile/email",  to: "studio/profiles#email", as: :profile_email
         delete "profile/google", to: "studio/profiles#unlink_google",
                as: :profile_unlink_google
+
       end
 
       resources :error_logs, only: [:index, :show]

@@ -42,6 +42,19 @@ ActionDispatch::IntegrationTest.app = Rails.application
 # test and is not one. Every real consumer is a Rails app with turbo.
 Mime::Type.register "text/vnd.turbo-stream.html", :turbo_stream unless Mime[:turbo_stream]
 
+# Mail is asserted by what actually landed in ActionMailer::Base.deliveries, so
+# the async hop has to resolve inside the request: Studio::Email.deliver calls
+# deliver_later.
+require "active_job"
+ActiveJob::Base.queue_adapter = :inline
+ActionMailer::Base.delivery_method = :test
+ActionMailer::Base.perform_deliveries = true
+# The notification mail's banner and layout build absolute URLs, so the mailer
+# needs a host — the same requirement the engine's existing magic-link mail
+# carries, and one every real Rails app sets.
+ActionMailer::Base.default_url_options = { host: "example.com" }
+Rails.application.routes.default_url_options[:host] = "example.com"
+
 ActiveRecord::Schema.verbose = false
 ActiveRecord::Schema.define do
   # The host owns this table in production. The columns here are exactly the ones
@@ -53,6 +66,7 @@ ActiveRecord::Schema.define do
     t.string :role
     t.string :provider
     t.string :uid
+    t.string :session_token
     t.timestamps
   end
 
@@ -76,12 +90,29 @@ end
 # is what supplies current_user / logged_in? / require_authentication / rescue_and_log —
 # every consumer includes it, so a dummy that did not would be testing a host
 # nobody ships.
+# A real consuming app looks exactly like this: ApplicationController includes
+# Studio::ErrorHandling and wires the OPSEC-045 session-token check AHEAD of
+# authentication (the shape magic_link_flow_test.rb has carried all along).
+#
+# WITHOUT verify_session_token THE SESSION TESTS BELOW CANNOT FAIL, which is how
+# a broken re-establish shipped past them: rotating the token and then NOT
+# putting the new one in the cookie left the suite green, because nothing in this
+# dummy ever compared the two. Caught in review by mutation, not by the suite.
 class ApplicationController < ActionController::Base
   include Studio::ErrorHandling
+
+  before_action :verify_session_token
 end
 
 class User < ApplicationRecord
   def admin? = role == "admin"
+
+  # The OPSEC-045 seam. The engine calls this if the host answers it, so a host
+  # that has it must have its rotation actually exercised — the whole point of
+  # the call is that a hijacker's live session dies when the owner confirms.
+  def regenerate_session_token!
+    update_column(:session_token, SecureRandom.hex(8))
+  end
 end
 
 # A sign-in door for the suite. Deliberately a REAL controller writing the REAL
@@ -99,7 +130,10 @@ class TestSessionsController < ApplicationController
   skip_before_action :require_authentication
 
   def create
-    session[Studio.session_key] = params[:id]
+    user = User.find(params[:id])
+    user.regenerate_session_token! if user.session_token.blank?
+    session[Studio.session_key] = user.id
+    session[:session_token] = user.session_token
     head :ok
   end
 end
@@ -114,6 +148,8 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
     User.delete_all
   end
 
+  # Mirrors what a host's real sign-in does — the session key AND the rotating
+  # token that verify_session_token checks on every later request.
   def sign_in(user)
     post "/test_sign_in/#{user.id}"
     assert_response :ok
@@ -256,6 +292,159 @@ class ProfileRequestsTest < ActionDispatch::IntegrationTest
 
     assert_response :redirect
     assert_equal "google_oauth2", user.reload.provider
+  end
+
+  # --- PATCH /profile/email — a DIRECT change from any session ----------------
+  #
+  # The out-of-band confirmation was removed on 2026-08-14: the session is the
+  # authority now. What is asserted here is the behaviour that REPLACED it, plus
+  # the two protections kept precisely because the old address lost its veto.
+
+  def mails
+    ActionMailer::Base.deliveries
+  end
+
+  test "changing the email applies immediately" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+
+    assert_response :redirect
+    assert_equal "new@example.com", user.reload.email
+  end
+
+  # OPSEC-046, and it carries more weight now than it did behind a confirm step:
+  # with no veto, this mail is the only way a change nobody made becomes visible
+  # to the person losing the account.
+  test "the OLD address is told the change happened" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+    mails.clear
+
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+
+    assert_equal 1, mails.size
+    assert_equal ["old@example.com"], mails.last.to,
+      "the heads-up goes where the person losing the account can see it"
+  end
+
+  # OPSEC-045. A hijacker holding a second cookie loses it the moment the address
+  # moves — which is the other half of what replaced the confirmation step.
+  # OPSEC-045, asserted as ACCESS rather than as a column value. Checking only
+  # that session_token changed proves the write happened, not that anybody was
+  # actually locked out — and with verify_session_token now wired into this
+  # dummy, the second half is finally testable.
+  test "changing the email locks out a session holding the old cookie" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+
+    # A SECOND session for the same account — the hijacker's, in the shape this
+    # protects against. It captures the token that is live right now.
+    hijacker = ActionDispatch::Integration::Session.new(Rails.application)
+    hijacker.post "/test_sign_in/#{user.id}"
+    hijacker.get "/profile"
+    assert_equal 200, hijacker.response.status, "the second session starts out working"
+
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+
+    hijacker.get "/profile"
+    assert_equal 302, hijacker.response.status,
+      "a session holding the pre-change cookie must lose ACCESS, not merely hold a stale string"
+  end
+
+  test "the actor keeps access across the change" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+    get "/profile"
+
+    assert_response :success, "rotating without re-establishing signs out the person who did it"
+  end
+
+  # ...but NOT the session that made the change. Rotating without re-establishing
+  # would sign out the very person who just did it — correct when the actor
+  # arrived from a confirmation link, wrong now that the actor is the session.
+  test "the session that made the change survives it" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+
+    get "/profile"
+
+    assert_response :success, "the person who changed their email must not be logged out"
+  end
+
+  # --- the Google exception ---------------------------------------------------
+  #
+  # Google is the authoritative source for a linked account's address. Letting
+  # the two drift means the next OAuth sign-in either re-links to a stranger's
+  # row or cannot find its own.
+
+  test "an account linked to Google cannot change its email" do
+    user = create_user(email: "old@example.com", provider: "google_oauth2", uid: "123")
+    sign_in user
+
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+
+    assert_response :see_other
+    assert_equal "old@example.com", user.reload.email
+  end
+
+  # The row disables the field and explains why. A disabled input is a courtesy —
+  # anyone can POST — so the endpoint refuses on its own.
+  test "the google refusal does not depend on the page having been rendered" do
+    user = create_user(email: "old@example.com", provider: "google_oauth2", uid: "123")
+    sign_in user
+
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+
+    assert_equal "old@example.com", user.reload.email
+  end
+
+  test "unlinking google frees the email to be changed" do
+    user = create_user(email: "old@example.com", provider: "google_oauth2", uid: "123")
+    sign_in user
+
+    delete "/profile/google"
+    patch "/profile/email", params: { profile: { email: "new@example.com" } }
+
+    assert_equal "new@example.com", user.reload.email
+  end
+
+  # --- the ordinary refusals --------------------------------------------------
+
+  test "a first email applies with no prior address to notify" do
+    user = create_user(email: nil)
+    sign_in user
+    mails.clear
+
+    patch "/profile/email", params: { profile: { email: "first@example.com" } }
+
+    assert_equal "first@example.com", user.reload.email
+    assert_empty mails, "there is no old address to warn"
+  end
+
+  test "asking for the address you already have is refused" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+    mails.clear
+
+    patch "/profile/email", params: { profile: { email: "OLD@example.com" } }
+
+    assert_response :see_other
+    assert_empty mails, "no mail for a no-op"
+  end
+
+  test "a blank address is refused and writes nothing" do
+    user = create_user(email: "old@example.com")
+    sign_in user
+
+    patch "/profile/email", params: { profile: { email: "  " } }
+
+    assert_response :see_other
+    assert_equal "old@example.com", user.reload.email
   end
 
   # --- the guard is the SERVER's, not the button's ----------------------------

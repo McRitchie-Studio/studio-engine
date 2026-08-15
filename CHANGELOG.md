@@ -17,6 +17,36 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **`/profile` gains the Email row — changeable from any signed-in session.**
+  `PATCH /profile/email` (`profile_email_path`) applies the change directly.
+
+  **THE GOOGLE EXCEPTION.** An account with a linked Google identity **cannot**
+  change its email: Google is the authoritative source for that address, and
+  letting the two drift means the next OAuth sign-in either re-links to a
+  stranger's row or cannot find its own. The row shows the address with the
+  reason instead of a field, and the endpoint refuses independently — a disabled
+  input is a courtesy, and anyone can POST.
+
+  **What a direct change trades away, stated so nobody rediscovers it:** a
+  hijacked session can move the account to another inbox, and the old address has
+  no veto. Two protections are kept precisely BECAUSE the veto is gone —
+
+  - the **old address is mailed** after every change (OPSEC-046), so a change
+    nobody made is visible to the person losing the account, and
+  - **every other session is invalidated** (OPSEC-045), so a hijacker holding a
+    second cookie loses it the moment the address moves. The session that made
+    the change is re-established, so the person doing it is not signed out.
+
+- **`Studio::ProfileMailer`** with `email_change_notification`, plus a new
+  standard `Studio::EmailCatalog` entry so its copy, subject and banner are
+  operator-editable on `/admin/emails` like every other Studio email. **Namespaced deliberately:**
+  `app/mailers` is an autoload path and this engine is not isolated, so a host's
+  top-level `UserMailer` shadows the engine's — mcritchie-studio's fork defines no
+  `email_change_notification` at all (a bare call raises `NoMethodError`), and
+  turf-monster's defines one with the SAME signature — so there the call would
+  not raise, it would quietly send TURF's copy, banner and `account_url` instead
+  of the engine's. The silent case is the dangerous one.
+
 - **`/profile` gains the Google account row.** Shows the linked identity with an
   Unlink control, or a branded Connect button that POSTs to OmniAuth's own
   `/auth/google_oauth2` (the engine does not draw a link route — the middleware

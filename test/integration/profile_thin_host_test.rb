@@ -89,20 +89,23 @@ class ProfileThinHostTest < ActionDispatch::IntegrationTest
 
   # --- the page degrades rather than breaking ---------------------------------
 
-  test "the page renders with none of the rows this host cannot serve" do
+  test "the page renders only the rows this host can serve" do
     get "/profile"
 
     assert_response :success
+
+    # It HAS an email column, so that row is legitimately served.
+    assert_includes response.body, "Email"
+    # It has none of these.
     refute_includes response.body, "Your name"
     refute_includes response.body, "Profile photo"
     refute_includes response.body, "Google account"
   end
 
-  test "a host that can serve nothing gets an honest empty state, not a blank page" do
-    get "/profile"
-
-    assert_includes response.body, "Nothing to edit yet"
-  end
+  # The zero-row empty state is covered where it can actually be produced —
+  # test/views/profile_page_render_test.rb renders the template with an empty
+  # section list. It cannot be reached from here: this host serves `email`, and
+  # one file cannot carry two shapes of the users table.
 
   # --- the writes REFUSE rather than 500 --------------------------------------
   #

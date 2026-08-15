@@ -25,6 +25,7 @@ class ProfilePageRenderTest < Minitest::Test
   class StubUser
     def display_name = "Pat Studio"
     def first_name = "Pat"
+    def email = "pat@example.com"
     def avatar = @avatar ||= Class.new { def attached? = false }.new
     def avatar_color = "#6366f1"
     def avatar_initials = "PS"
@@ -35,6 +36,10 @@ class ProfilePageRenderTest < Minitest::Test
     v.define_singleton_method(:current_user) { user }
     v.define_singleton_method(:profile_path) { "/profile" }
     v.define_singleton_method(:profile_avatar_path) { "/profile/avatar" }
+    v.define_singleton_method(:profile_email_path) { "/profile/email" }
+    # A bare ActionView has no controller to delegate `flash` to, and the page
+    # touches it. Supply the empty case.
+    v.define_singleton_method(:flash) { {} }
     v.define_singleton_method(:protect_against_forgery?) { false }
     v
   end
@@ -165,7 +170,7 @@ class ProfilePageRenderTest < Minitest::Test
     html = render_page(Studio::ProfileSections.defaults)
     doc = Nokogiri::HTML5.fragment(html)
 
-    assert_equal %w[avatar first_name google], doc.css("[data-profile-section]").map { |s| s["data-profile-section"] }
+    assert_equal %w[avatar first_name email google], doc.css("[data-profile-section]").map { |s| s["data-profile-section"] }
     assert_includes doc.text, "Profile photo"
     assert_includes doc.text, "Your name"
     assert_includes doc.text, "Google account"
@@ -180,6 +185,111 @@ class ProfilePageRenderTest < Minitest::Test
 
     assert_equal %w[avatar], doc.css("[data-profile-section]").map { |s| s["data-profile-section"] }
     refute_includes doc.text, "Your name"
+  end
+
+  # --- one card, rows inside it ------------------------------------------------
+
+  # The operator's revision (2026-08-14): four separate cards read as four
+  # unrelated settings pages stacked up. One card, hairline dividers.
+  def test_the_page_renders_one_card_with_the_rows_inside_it
+    doc = Nokogiri::HTML5.fragment(render_page(Studio::ProfileSections.defaults))
+    cards = doc.css(".card")
+
+    assert_equal 1, cards.length, "the rows share one card, not one card each"
+    assert_equal Studio::ProfileSections.defaults.length,
+                 cards.first.css("[data-profile-section]").length,
+                 "every row lives inside that card"
+  end
+
+  # A TOP border on every row but the first, so a row can be added or dropped
+  # anywhere without leaving a trailing rule under the last one.
+  def test_rows_are_divided_by_a_top_border_except_the_first
+    doc = Nokogiri::HTML5.fragment(render_page(Studio::ProfileSections.defaults))
+    rows = doc.css("[data-profile-section]")
+
+    refute_includes rows.first["class"], "border-t", "no rule above the first row"
+    rows.drop(1).each do |row|
+      assert_includes row["class"], "border-t", "#{row["data-profile-section"]} needs its divider"
+    end
+  end
+
+  # --- the delta-gated buttons -------------------------------------------------
+
+  def test_the_first_name_field_is_prefilled_and_its_button_says_update
+    doc = Nokogiri::HTML5.fragment(
+      view.render(partial: "studio/profiles/first_name_section", locals: { user: StubUser.new })
+    )
+
+    assert_equal "Pat", doc.at_css('input[name="profile[first_name]"]')["value"],
+      "a blank field made you retype a name you had already set"
+    assert_equal "Update", doc.at_css('input[type="submit"]')["value"]
+  end
+
+  # The gate compares TRIMMED values on both sides, so whitespace is not a
+  # change — and the controller trims on the way in too, which is what makes the
+  # button agree with what the server would actually do.
+  def test_the_update_button_is_disabled_until_the_name_actually_changes
+    html = view.render(partial: "studio/profiles/first_name_section", locals: { user: StubUser.new })
+    submit = Nokogiri::HTML5.fragment(html).at_css('input[type="submit"]')
+
+    assert_equal "value.trim() === initial.trim()", submit[":disabled"]
+    # Read the parsed attribute, not the raw markup — the JSON quotes render as
+    # &quot; entities.
+    x_data = Nokogiri::HTML5.fragment(html).at_css("form")["x-data"]
+    assert_equal %({ initial: "Pat", value: "Pat" }), x_data,
+      "the delta is measured against what the server rendered"
+  end
+
+  # NO-JS FALLBACK. Alpine adds the disabled state on init; a static `disabled`
+  # in the markup would leave a page whose JS never ran with a control it can
+  # never turn on. The server re-checks regardless.
+  def test_the_buttons_are_not_statically_disabled
+    %w[first_name_section email_section].each do |partial|
+      submit = Nokogiri::HTML5.fragment(
+        view.render(partial: "studio/profiles/#{partial}", locals: { user: StubUser.new })
+      ).at_css('input[type="submit"]')
+
+      assert_nil submit["disabled"], "#{partial} must not ship a hard-disabled button"
+    end
+  end
+
+  def test_the_email_field_is_prefilled_and_gates_on_a_real_delta
+    html = view.render(partial: "studio/profiles/email_section", locals: { user: StubUser.new })
+    doc = Nokogiri::HTML5.fragment(html)
+    submit = doc.at_css('input[type="submit"]')
+
+    assert_equal "pat@example.com", doc.at_css('input[name="profile[email]"]')["value"],
+      "the field shows the address you have — the change is direct now, not a request"
+    assert_equal "Update", submit["value"]
+    assert_equal "value.trim() === '' || value.trim().toLowerCase() === current", submit[":disabled"]
+    assert_includes doc.at_css("form")["x-data"], %(current: "pat@example.com")
+  end
+
+  # THE GOOGLE EXCEPTION, at the UI. Google is the authoritative source for a
+  # linked account's address, so the row offers no field at all and says why.
+  # ProfilesController#email refuses independently — a disabled input is a
+  # courtesy, and anyone can POST.
+  def test_a_google_linked_account_gets_no_email_field_and_a_reason
+    linked = Class.new(StubUser) do
+      def provider = "google_oauth2"
+      def uid = "123"
+    end.new
+    doc = Nokogiri::HTML5.fragment(
+      view.render(partial: "studio/profiles/email_section", locals: { user: linked })
+    )
+
+    assert_nil doc.at_css("form"), "a locked address must not offer a form to submit"
+    assert_includes doc.text, "linked Google account"
+    assert_includes doc.text, "pat@example.com", "it still shows the address you have"
+  end
+
+  def test_an_unlinked_account_keeps_its_email_field
+    doc = Nokogiri::HTML5.fragment(
+      view.render(partial: "studio/profiles/email_section", locals: { user: StubUser.new })
+    )
+
+    refute_nil doc.at_css("form")
+    refute_includes doc.text, "linked Google account"
   end
 
   # --- the Google identity row -------------------------------------------------

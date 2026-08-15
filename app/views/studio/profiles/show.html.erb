@@ -4,10 +4,15 @@
     application layout and inherits that app's navbar, theme and flash. Same
     shape as /admin/style and /admin/emails.
 
-    The page is nothing but its sections. @profile_sections is already resolved
-    and filtered by the controller (Studio.profile_sections_for) — rows the host
-    cannot serve, and admin rows for non-admins, are gone before we get here — so
-    this template makes no decisions of its own beyond an empty state.
+    ONE CARD, rows inside it (operator's call, 2026-08-14). Each row used to be
+    its own card, which read as four unrelated settings pages stacked up rather
+    than one profile. Rows are separated by a hairline instead, so the page has a
+    single edge and the eye runs down one column.
+
+    The page is still nothing but its sections. @profile_sections is already
+    resolved and filtered by the controller (Studio.profile_sections_for) — rows
+    the host cannot serve, and admin rows for non-admins, are gone before we get
+    here — so this template makes no decisions of its own beyond the empty state.
 %>
 <% content_for(:title, "Profile") %>
 
@@ -21,10 +26,10 @@
     each ship their OWN app/views/studio/modals/_host.html.erb, which shadows the
     engine's in this non-isolated engine, so the page would silently get their
     fork and its registrations. studio/modals/_scoped_host is unforked in every
-    app. /admin/emails reached the same conclusion first.
-
-    Mounted once per page rather than once per row: two hosts sharing a store
-    name would register the same modal ids twice and render duplicate cards. %>
+    app. /admin/emails reached the same conclusion first. %>
+<%# Mounted ONCE per page, not once per row. Two hosts sharing a store name
+    would register the same modal ids twice and render duplicate cards, so the
+    page owns the host and the rows only ask for it. %>
 <% profile_needs_modals = Array(@profile_sections).any? { |section| section[:modals] } %>
 
 <% if profile_needs_modals %>
@@ -46,11 +51,14 @@
                message: "Nothing to edit yet",
                detail: "This app has not enabled any profile fields." %>
   <% else %>
-    <div class="space-y-6">
-      <% @profile_sections.each do |section| %>
-        <section class="card p-6" data-profile-section="<%= section[:key] %>">
+    <div class="card p-0 overflow-hidden">
+      <% @profile_sections.each_with_index do |section, index| %>
+        <%# The divider is a TOP border on every row but the first, so a row can
+            be added or dropped anywhere without leaving a trailing rule. %>
+        <section class="p-6 <%= "border-t border-subtle" unless index.zero? %>"
+                 data-profile-section="<%= section[:key] %>">
           <% if section[:title].present? %>
-            <h2 class="text-lg font-bold text-heading mb-4"><%= section[:title] %></h2>
+            <h2 class="text-sm font-bold text-heading mb-4"><%= section[:title] %></h2>
           <% end %>
           <%= render section[:partial], **section.fetch(:locals, {}).merge(user: current_user) %>
         </section>
