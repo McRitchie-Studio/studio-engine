@@ -200,7 +200,17 @@ class E2eLaneContractTest < Minitest::Test
       # test of the lab page.
       "profile.html.erb" => [
         "studio/profiles/identity", "studio/profiles/name_fields",
-        "studio/profiles/save_bar", "studio/profiles/form_script"
+        "studio/profiles/save_bar", "studio/profiles/form_script",
+        # The modal host is named here because the lane's sharpest finding lives
+        # in how it is MOUNTED: it declares no x-data of its own, so a page that
+        # renders it outside an Alpine scope gets a store that opens and a dialog
+        # that never appears.
+        "studio/modals/scoped_host"
+      ],
+      "profile_edit.html.erb" => [
+        "studio/cropper_assets", "studio/profiles/editable_identity",
+        "studio/profiles/birthday_fields", "studio/profiles/save_bar",
+        "studio/profiles/form_script"
       ]
     }.each do |page, partials|
       source = File.read(File.join(lab, page))

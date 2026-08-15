@@ -1,0 +1,61 @@
+<%# The newsletter row's two modals, registered into the page's scoped host.
+
+    Locals: user (required).
+
+    BOTH CARRY THE FORM THEY SUBMIT, so there is exactly one place each verb is
+    issued from. A confirmation whose button posts a form elsewhere on the page
+    drifts the moment that form moves.
+
+      newsletter-unsubscribe — the confirmation. DELETE.
+      newsletter-email       — the address capture, for an account with none on
+                               file. POST, with the address in the same request.
+
+    The email modal exists because a wallet-only account (turf-monster has many)
+    has no address, and a newsletter needs somewhere to send. It is written as the
+    account email but NOT marked verified — see the controller for why that
+    distinction is load-bearing.
+%>
+
+<%# --- leaving asks --------------------------------------------------------- %>
+<template x-if="$store.profileModals.current()?.id === 'newsletter-unsubscribe'">
+  <div>
+    <%= render "studio/modals/blocks/card_header",
+          size: :lg,
+          icon: :error,
+          title: "Unsubscribe?",
+          subtitle: "You'll stop receiving updates. You can join again from this page any time." %>
+
+    <%= form_with url: profile_newsletter_path, method: :delete, data: { turbo: false } do %>
+      <button type="submit" class="btn btn-danger btn-lg w-full">Unsubscribe</button>
+    <% end %>
+
+    <button type="button" @click="$store.profileModals.close()"
+            class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+      Cancel
+    </button>
+  </div>
+</template>
+
+<%# --- joining without an address on file ----------------------------------- %>
+<template x-if="$store.profileModals.current()?.id === 'newsletter-email'">
+  <div>
+    <%= render "studio/modals/blocks/card_header",
+          size: :lg,
+          icon_color: :primary,
+          title: "Where should we send it?",
+          subtitle: "There's no email on this account yet. We'll use this for the newsletter." %>
+
+    <%= form_with url: profile_newsletter_path, method: :post, scope: :profile,
+                  data: { turbo: false } do |f| %>
+      <%= f.email_field :email, required: true, autocomplete: "email",
+                        placeholder: "you@example.com",
+                        class: "input-field w-full mb-3" %>
+      <button type="submit" class="btn btn-primary btn-lg w-full">Subscribe</button>
+    <% end %>
+
+    <button type="button" @click="$store.profileModals.close()"
+            class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+      Cancel
+    </button>
+  </div>
+</template>

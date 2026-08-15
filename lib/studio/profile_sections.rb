@@ -1,5 +1,12 @@
 # frozen_string_literal: true
 
+# REQUIRED HERE, not left to lib/studio.rb's ordering. DEFAULTS names
+# Studio::Newsletter::COLUMNS at LOAD time, and profile_sections is required
+# BEFORE newsletter in that file — so without this line the constant is undefined
+# and the engine fails to boot. Declaring the dependency where it is used makes
+# the pair immune to a future reorder of that require list.
+require_relative "newsletter"
+
 # Resolves Studio.profile_sections — the rows that make up the shared /profile
 # page — for a given view context. Pure Ruby (no Rails dependency) so the unit
 # suite exercises the resolution rules without booting the dummy app.
@@ -33,12 +40,19 @@
 #              AND `auth_methods = %i[magic_link]` with no omniauth gem at all,
 #              so it would have rendered a "Link Google Account" button leading
 #              nowhere. Having a column is not the same as offering the feature.
-#   modals   — the row opens the shared crop/saving modals. The PAGE mounts them
-#              once (studio/modals/_scoped_host on a "profileModals" store) when
-#              any resolved row asks for them, so a row never has to know whether
-#              the host app renders a modal host of its own. Two of the five
-#              consumers render none at all, and the two that do ship a FORK of
-#              the engine's shared host that would shadow it.
+#   modals   — a partial of modal registrations this row needs, or nil. The PAGE
+#              mounts studio/modals/_scoped_host on a "profileModals" store when
+#              ANY resolved row declares one, and renders each declared partial
+#              inside it — so a row never has to know whether the host app renders
+#              a modal host of its own. Two of the five consumers render none at
+#              all, and the two that do ship a FORK of the engine's shared host
+#              that would shadow it.
+#
+#              A PATH, not a boolean, and not derived from `key`. A host row
+#              declaring modals keeps its partial in the host's own app, so any
+#              convention like "studio/profiles/#{key}_modals" would resolve to a
+#              path that does not exist there. Saying it outright costs one string
+#              and works for everyone.
 #
 # ON `requires` — this is the whole reason the registry exists rather than a
 # hardcoded page. The consuming apps do NOT agree on their users table:
@@ -72,6 +86,19 @@ module Studio
       { key: :google, title: "Google account", page: :show,
         partial: "studio/profiles/google_section", requires: %i[provider uid],
         if: -> { Studio.auth_method?(:google) } },
+
+      # The mailing list. READ-level for the same reason Google is: it is a state
+      # you look at and occasionally flip, not a field you type into.
+      #
+      # `modals: true` is what makes the page mount a host — leaving asks for
+      # confirmation, and an account with no address on file is asked for one.
+      # This is the FIRST row to declare the flag, which the registry has
+      # documented since it shipped; before this the read page mounted no host at
+      # all, correctly, because nothing asked.
+      { key: :newsletter, title: "Newsletter", page: :show,
+        partial: "studio/profiles/newsletter_section",
+        requires: Studio::Newsletter::COLUMNS,
+        modals: "studio/profiles/newsletter_modals" },
 
       # --- the edit page ------------------------------------------------------
       # These are FIELDS in one form with one Save, so they carry no buttons of

@@ -98,14 +98,31 @@
 <%= render "studio/profiles/form_script" %>
 
 <% if avatar_editable %>
-  <%# Mounted ONCE per page. Two hosts sharing a store name would register the
+  <%# THE `x-data` IS LOAD-BEARING, and this page was missing it. Alpine 3 only
+      initialises trees rooted at an x-data, and studio/modals/_scoped_host
+      declares none of its own — so its outer `<template x-if>` sits inert, the
+      store registers fine, `open()` pushes onto the stack, and NOTHING RENDERS.
+      Every symptom points at the modal id or the store; none of them is the
+      cause.
+
+      This host sits AFTER the studioProfileForm div closes, so it had no Alpine
+      scope above it at all. Found while wiring the newsletter row's confirmation
+      on /profile, where the identical shape produced an identical silent
+      failure — current() returning the right id with no dialog in the document.
+      The engine's other live call site (studio/emails/index.html.erb) renders
+      inside `x-data="emailRecipients(...)"`, which is the only reason this
+      pattern has ever worked anywhere.
+
+      Mounted ONCE per page. Two hosts sharing a store name would register the
       same modal ids twice and render duplicate cards. %>
-  <%= render "studio/modals/scoped_host", store: "profileModals" do %>
-    <template x-if="$store.profileModals.current()?.id === 'crop-photo'">
-      <div><%= render "studio/modals/crop_photo", store: "profileModals" %></div>
-    </template>
-    <template x-if="$store.profileModals.current()?.id === 'saving'">
-      <div><%= render "studio/modals/saving", store: "profileModals" %></div>
-    </template>
-  <% end %>
+  <div x-data>
+    <%= render "studio/modals/scoped_host", store: "profileModals" do %>
+      <template x-if="$store.profileModals.current()?.id === 'crop-photo'">
+        <div><%= render "studio/modals/crop_photo", store: "profileModals" %></div>
+      </template>
+      <template x-if="$store.profileModals.current()?.id === 'saving'">
+        <div><%= render "studio/modals/saving", store: "profileModals" %></div>
+      </template>
+    <% end %>
+  </div>
 <% end %>

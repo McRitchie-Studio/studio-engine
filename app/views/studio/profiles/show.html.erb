@@ -6,8 +6,20 @@
 
     Editing lives at /profile/edit. The avatar's badge links there, so the same
     control in the same place means "change this" on both pages.
+
+    THE MODAL HOST IS CONDITIONAL, and that is the registry's `modals:` key doing
+    the job it was documented for. Until the newsletter row shipped, NOTHING on
+    this page opened a modal, so mounting a host would have been furniture for
+    nobody. Now one row asks and the host appears; a host that declares the row
+    away gets no host again, automatically.
+
+    NOT studio/cropper_assets. That is ~40 KB of cropper.js for an upload
+    affordance this page does not have — the avatar is read-only here and the
+    picker lives on /profile/edit. A host is not a cropper.
 %>
 <% content_for(:title, "Profile") %>
+
+<% modal_rows = @profile_sections.to_a.select { |section| section[:modals] } %>
 
 <div class="max-w-2xl mx-auto py-8">
   <%= render "studio/profiles/identity", user: current_user, editable: false %>
@@ -26,3 +38,26 @@
     </div>
   <% end %>
 </div>
+
+<% if modal_rows.any? %>
+  <%# THE `x-data` IS LOAD-BEARING, and its absence is silent. Alpine 3 only
+      initialises trees rooted at an x-data, and _scoped_host declares none of its
+      own — its outer `<template x-if>` is inert without an Alpine scope above it.
+      The store still registers, `open()` still pushes onto the stack, and NOTHING
+      RENDERS. Measured on this very page: current() returned the right modal id
+      while the document contained no dialog at all.
+
+      The engine's own live call site (studio/emails/index.html.erb) happens to
+      render the host inside `x-data="emailRecipients(...)"`, which is the only
+      reason this has ever worked anywhere.
+
+      Mounted ONCE per page, on the page's own store — two hosts sharing a store
+      name would register the same ids twice and render duplicate cards. %>
+  <div x-data>
+  <%= render "studio/modals/scoped_host", store: "profileModals" do %>
+    <% modal_rows.each do |section| %>
+      <%= render section[:modals], user: current_user %>
+    <% end %>
+  <% end %>
+  </div>
+<% end %>

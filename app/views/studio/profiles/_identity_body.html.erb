@@ -5,38 +5,67 @@
 
     Locals: user, editable, attachable.
 %>
-<div class="relative mb-3 studio-avatar mx-auto" style="width: 128px; height: 128px;">
+<%# THE PICTURE ITSELF IS THE CONTROL ON THE EDIT PAGE (operator's call). The
+    28px pencil badge that used to sit in the corner is gone there: hovering the
+    card fades a label over the avatar, and clicking anywhere on it opens the
+    picker and then the cropper. A 128px target beats a 28px one, and the label
+    says what will happen instead of leaving a glyph to be interpreted.
+
+    The badge REMAINS on the read page, where it is decorative and the whole card
+    is the link. %>
+<% avatar_style = "width: 128px; height: 128px;" %>
+
+<% avatar_inner = capture do %>
   <% if attachable && user.avatar.attached? %>
     <%= image_tag user.avatar, class: "rounded-full object-cover",
-                  style: "width: 128px; height: 128px;", alt: user.display_name %>
+                  style: avatar_style, alt: user.display_name %>
   <% else %>
     <div class="rounded-full flex items-center justify-center font-bold text-white text-4xl"
-         style="width: 128px; height: 128px; background-color: <%= user.avatar_color %>">
+         style="<%= avatar_style %> background-color: <%= user.avatar_color %>">
       <%= user.avatar_initials %>
     </div>
   <% end %>
+<% end %>
 
-  <% badge_class = "studio-avatar-badge absolute bottom-0 right-0 flex items-center justify-center rounded-full border-2 border-page bg-primary text-white transition" %>
-  <% badge_style = "width: 28px; height: 28px;" %>
+<% if editable && attachable %>
+  <%# A BUTTON, not a div with a click handler: this is the only route to
+      changing the photo, and a div is unreachable by keyboard and invisible to
+      assistive tech.
 
-  <% if editable && attachable %>
-    <%# A real button: on the edit page this opens the cropper. %>
-    <button type="button" @click="$refs.filePicker.click()"
-            aria-label="Change your profile photo"
-            class="<%= badge_class %>" style="<%= badge_style %>">
-      <%= render "studio/profiles/pencil_icon" %>
-    </button>
-  <% elsif !editable %>
-    <%# DECORATIVE on the read page, and it has to be: the whole card is a link
-        now, and an <a> inside an <a> is invalid HTML that browsers repair by
-        closing the outer one early — which would silently cut the card's
-        clickable area down to whatever came before the badge. The card carries
-        the destination and the accessible name; this is just the glyph. %>
-    <span class="<%= badge_class %>" style="<%= badge_style %>" aria-hidden="true">
-      <%= render "studio/profiles/pencil_icon" %>
+      The visible label doubles as the ACCESSIBLE NAME, which is why it lives
+      inside the button rather than beside it and why there is no aria-label to
+      drift from it. It is hidden by opacity, never by `display:none` or
+      `visibility:hidden` — those two remove an element from the accessibility
+      tree, which would leave this button silently unnamed for a screen reader
+      at rest. %>
+  <%# `.stop` because the CARD now carries the same handler. Without it the click
+      bubbles and the picker opens twice. %>
+  <button type="button" @click.stop="$refs.filePicker.click()"
+          class="studio-avatar studio-avatar-trigger relative mb-3 mx-auto block rounded-full overflow-hidden"
+          style="<%= avatar_style %>">
+    <%= avatar_inner %>
+
+    <span class="studio-avatar-overlay absolute inset-0 flex items-center justify-center rounded-full text-white font-semibold text-sm px-2 text-center">
+      Change photo
     </span>
-  <% end %>
-</div>
+  </button>
+<% else %>
+  <div class="relative mb-3 studio-avatar mx-auto" style="<%= avatar_style %>">
+    <%= avatar_inner %>
+
+    <% if !editable %>
+      <%# DECORATIVE on the read page, and it has to be: the whole card is a link
+          now, and an <a> inside an <a> is invalid HTML that browsers repair by
+          closing the outer one early — which would silently cut the card's
+          clickable area down to whatever came before the badge. The card carries
+          the destination and the accessible name; this is just the glyph. %>
+      <span class="studio-avatar-badge absolute bottom-0 right-0 flex items-center justify-center rounded-full border-2 border-page bg-primary text-white transition"
+            style="width: 28px; height: 28px;" aria-hidden="true">
+        <%= render "studio/profiles/pencil_icon" %>
+      </span>
+    <% end %>
+  </div>
+<% end %>
 
 <p class="text-3xl font-extrabold text-heading"><%= user.display_name %></p>
 <% if user.respond_to?(:email) && user.email.present? %>

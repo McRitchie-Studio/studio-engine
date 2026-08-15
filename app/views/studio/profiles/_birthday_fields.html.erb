@@ -1,4 +1,4 @@
-<%# Birthday — ONE date input over THREE integer columns.
+<%# Birthday — ONE date over THREE integer columns, entered through a calendar.
 
     Locals: user (required).
 
@@ -9,23 +9,221 @@
     (needs month and day, and no year at all). A single date column answers the
     second one badly.
 
-    So the UI joins them and ProfilesController#update splits them again. A
-    native date input is used rather than three selects because a date is one
-    idea to the person entering it, and the browser already knows how to enter
-    one on every platform.
+    So the UI joins them and ProfilesController#update splits them again. The row
+    renders only when the host has all three columns, so nothing here re-checks.
 
-    The row renders only when the host has all three columns, so nothing here
-    re-checks.
+    TWO INPUTS, ONE NAME, AND ONLY EVER ONE IN THE DOM. `<template x-if>` is what
+    makes that true rather than a claim: the branch Alpine does not take is never
+    instantiated, so the form can never carry two `profile[birthday]` fields and
+    the server can never receive the wrong one. Toggling with x-show would leave
+    BOTH present and submit the hidden one's value too — the last duplicate wins
+    in Rack's params, which is precisely the bug this shape avoids.
+
+      no JS  — the native `<input type="date">`. It is not a downgrade; it is the
+               control every platform already knows how to render, and the reason
+               a JS-less page can still set a birthday at all.
+      JS     — the calendar below. `alpine` comes from the enclosing
+               studioProfileForm and is true only once that component has booted.
+
+    The operator asked for a calendar rather than an open field (2026-08-15).
 %>
+<label class="block text-sm text-secondary mb-2 font-medium" for="profile_birthday">Date of birth</label>
+
 <%
   y = user.birth_year
   m = user.birth_month
   d = user.birth_day
   value = (y.present? && m.present? && d.present?) ? format("%04d-%02d-%02d", y, m, d) : nil
 %>
-<label class="block text-sm text-secondary mb-2 font-medium" for="profile_birthday">Date of birth</label>
-<input type="date" name="profile[birthday]" id="profile_birthday"
-       value="<%= value %>" class="input-field"
-       autocomplete="bday" max="<%= Date.current.iso8601 %>"
-       x-model="fields.birthday">
+
+<div x-data="studioBirthdayPicker('<%= value %>')">
+  <%# --- the JS-less path ------------------------------------------------- %>
+  <template x-if="!alpine">
+    <input type="date" name="profile[birthday]" id="profile_birthday"
+           value="<%= value %>" class="input-field"
+           autocomplete="bday" max="<%= Date.current.iso8601 %>">
+  </template>
+
+  <%# --- the calendar ------------------------------------------------------ %>
+  <template x-if="alpine">
+    <div>
+      <%# The value the form actually submits. The calendar writes here; nothing
+          types into it. %>
+      <input type="hidden" name="profile[birthday]" :value="value">
+
+      <button type="button" x-ref="trigger" @click="toggle()"
+              @keydown.escape="open = false"
+              :aria-expanded="open ? 'true' : 'false'"
+              aria-haspopup="dialog"
+              class="input-field w-full text-left flex items-center justify-between gap-2">
+        <span :class="displayValue ? 'text-heading' : 'text-muted'"
+              x-text="displayValue || 'Select your date of birth'"></span>
+        <svg class="w-4 h-4 text-muted flex-shrink-0" fill="none" stroke="currentColor"
+             stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round"
+                d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
+        </svg>
+      </button>
+
+      <div x-show="open" x-cloak
+           @click.outside="open = false"
+           @keydown.escape.window="open = false"
+           @scroll.window="place()" @resize.window="place()"
+           role="dialog" aria-label="Choose your date of birth"
+           class="studio-birthday-popover"
+           :style="'top:' + top + 'px; left:' + left + 'px; min-width:' + width + 'px;'">
+
+        <%# Month and year JUMP rather than step. Stepping from today to 1985 is
+            about four hundred clicks, which is the whole reason this is not the
+            contest picker. %>
+        <div class="studio-birthday-nav">
+          <select x-model.number="viewMonth" class="input-field studio-birthday-month"
+                  aria-label="Month">
+            <template x-for="(name, i) in months" :key="name">
+              <option :value="i" x-text="name"></option>
+            </template>
+          </select>
+          <select x-model.number="viewYear" class="input-field studio-birthday-year"
+                  aria-label="Year">
+            <template x-for="y in years" :key="y">
+              <option :value="y" x-text="y"></option>
+            </template>
+          </select>
+        </div>
+
+        <div class="studio-birthday-grid studio-birthday-weekdays">
+          <template x-for="(wd, i) in weekdays" :key="i">
+            <div x-text="wd"></div>
+          </template>
+        </div>
+
+        <div class="studio-birthday-grid">
+          <template x-for="(cell, i) in calDays()" :key="i">
+            <div>
+              <template x-if="cell">
+                <button type="button" @click="pick(cell)" :disabled="isFuture(cell)"
+                        :class="isSelected(cell) && 'is-selected'"
+                        class="studio-birthday-day"
+                        x-text="cell"></button>
+              </template>
+            </div>
+          </template>
+        </div>
+
+        <%# A birthday already set is the only case where clearing is meaningful,
+            and without this the calendar is a one-way door — every day cell sets
+            a value and none of them unset one. %>
+        <div class="mt-3 flex justify-end" x-show="value">
+          <button type="button" @click="clear()"
+                  class="text-xs text-secondary hover:text-heading transition">
+            Clear
+          </button>
+        </div>
+      </div>
+    </div>
+  </template>
+</div>
+
 <p class="text-muted text-xs mt-2">Stored as day, month and year — we use it for birthdays and age checks.</p>
+
+<style>
+  /* EVERY RULE BELOW IS OWNED CSS, NOT TAILWIND UTILITIES, and that is not a
+     style preference — it is the bug the operator reported.
+     
+     The engine ships a PREBUILT bundle to consumers. A Tailwind utility exists in
+     a consuming app only if that app's OWN views already emitted it, because its
+     build scans its own source, not the gem's. This calendar first shipped using
+     `grid grid-cols-7`, and `grid-cols-7` is rare enough that NO consumer had
+     ever emitted it: measured in mcritchie-studio's compiled bundle, zero
+     occurrences. With no grid, the seven weekday letters stacked into a single
+     vertical column and the popover grew to the height of the page.
+     `hover:bg-surface-alt` was missing for the same reason.
+     
+     The same note is on studio/profiles/_identity_styles for the same reason.
+     
+     AND THE BROWSER LANE COULD NOT SEE IT. e2e/tailwind_input.css carries
+     `@source "../app/views"`, so the lane compiles the engine's OWN views and
+     emits grid-cols-7 — every spec passed against a page no consumer renders.
+     That blindness is recorded in docs/E2E_LANE.md; the fix here is to stop
+     depending on the utility at all. */
+  .studio-birthday-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .studio-birthday-month { flex: 1 1 auto; }
+
+  .studio-birthday-month,
+  .studio-birthday-year {
+    font-size: 0.875rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+
+  /* THE ONE THAT BROKE. Seven columns, owned outright. */
+  .studio-birthday-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    text-align: center;
+  }
+
+  .studio-birthday-weekdays {
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-muted, #9ca3af);
+  }
+
+  .studio-birthday-weekdays > div { padding: 0.25rem 0; }
+
+  .studio-birthday-day {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    color: var(--color-text-body, inherit);
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  .studio-birthday-day:hover:not(:disabled) {
+    background: var(--color-surface-alt, rgba(127, 127, 127, 0.15));
+  }
+
+  .studio-birthday-day:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .studio-birthday-day.is-selected {
+    background: var(--color-primary);
+    color: #fff;
+    font-weight: 700;
+  }
+
+  /* FIXED, not absolute, for TWO reasons — and the second is the one a spec can
+     actually catch.
+
+     1. Clipping. The edit page's rows sit inside `card p-0 overflow-hidden`. An
+        absolutely-positioned popover only escapes that clip while NO ancestor is
+        positioned; the day a consumer's card grows a `position: relative` it is
+        clipped out of sight, with perfectly correct markup.
+     2. Anchoring. place() writes VIEWPORT coordinates from the trigger's rect.
+        Fixed keeps them meaningful as the page scrolls; absolute reinterprets
+        them as document coordinates and the popover drifts by the scroll offset.
+
+     At scroll 0 the two are indistinguishable, which is why the spec that proves
+     this scrolls first. */
+  .studio-birthday-popover {
+    position: fixed;
+    z-index: 40;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.25);
+    padding: 0.75rem;
+  }
+</style>
+
+<%= render "studio/profiles/birthday_picker_script" %>

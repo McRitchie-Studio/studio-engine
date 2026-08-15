@@ -42,6 +42,7 @@ class ProfilePageRenderTest < Minitest::Test
     v.define_singleton_method(:profile_path) { "/profile" }
     v.define_singleton_method(:profile_avatar_path) { "/profile/avatar" }
     v.define_singleton_method(:edit_profile_path) { "/profile/edit" }
+    v.define_singleton_method(:profile_newsletter_path) { "/profile/newsletter" }
     # show.html.erb reads flash[:email_change_pending] to decide whether to open
     # the handoff modal. A bare ActionView has no controller to delegate flash
     # to, so supply the empty case — the populated one is exercised by a real
@@ -101,10 +102,69 @@ class ProfilePageRenderTest < Minitest::Test
     assert_match(/\.studio-avatar-badge-icon\s*\{[^}]*opacity:\s*0/, styles,
       "the glyph rests hidden")
     assert_includes styles, ".studio-avatar:hover .studio-avatar-badge-icon"
-    assert_includes styles, ".studio-avatar-badge:focus .studio-avatar-badge-icon",
-      "a keyboard never hovers, and this badge is the only way to the edit page"
+    assert_includes styles, ".studio-identity-card:focus-visible .studio-avatar-badge-icon",
+      "a keyboard never hovers, and this card is the only way to the edit page"
     assert_match(/@media \(hover: none\)/, styles,
       "touch has no hover — the glyph must not simply never appear there")
+  end
+
+  # --- the EDIT page's avatar control ----------------------------------------
+  #
+  # The 28px badge is gone here (operator's call, 2026-08-15): the picture is the
+  # button, and hovering the card fades a label over it.
+
+  def test_the_edit_page_has_no_badge_at_all
+    doc = Nokogiri::HTML5.fragment(identity(editable: true))
+
+    assert_nil doc.at_css(".studio-avatar-badge"),
+      "the corner badge was replaced by the avatar overlay; two affordances for one action is one too many"
+  end
+
+  def test_the_avatar_itself_opens_the_picker
+    doc = Nokogiri::HTML5.fragment(identity(editable: true))
+    trigger = doc.at_css("button.studio-avatar-trigger")
+
+    refute_nil trigger, "the picture is the control now"
+    # `.stop` is load-bearing: the CARD carries the same handler, so without it
+    # the click bubbles and the picker opens twice.
+    assert_equal "$refs.filePicker.click()", trigger["@click.stop"]
+    assert_nil trigger["@click"], "an un-stopped handler here double-fires with the card's"
+    assert_includes trigger.text.strip, "Change photo"
+  end
+
+  # THE WHOLE CARD IS THE TRIGGER (operator's call). The hover already lit up the
+  # whole card, so a click that only worked on the picture read as broken.
+  def test_the_whole_edit_card_opens_the_picker
+    doc = Nokogiri::HTML5.fragment(identity(editable: true))
+    card = doc.at_css("[data-studio-identity-full]")
+
+    assert_equal "$refs.filePicker.click()", card["@click"],
+      "clicking the card anywhere — including the name and address — must open the picker"
+    assert_includes card["class"], "studio-identity-card-clickable",
+      "a surface that acts on click has to say so with a cursor"
+  end
+
+  # The label is the button's ACCESSIBLE NAME, so it may be hidden by opacity but
+  # never by display/visibility — either of those drops it out of the
+  # accessibility tree and leaves the button silently unnamed at rest.
+  def test_the_overlay_label_is_hidden_by_opacity_not_removed
+    html = identity(editable: true)
+    styles = html[/<style>(.*?)<\/style>/m, 1].to_s
+    overlay = styles[/\.studio-avatar-overlay\s*\{[^}]*\}/m].to_s
+
+    assert_match(/opacity:\s*0/, overlay, "the label rests hidden")
+    refute_match(/display:\s*none/, overlay,
+      "display:none removes the label from the accessibility tree — the button would have no name")
+    refute_match(/visibility:\s*hidden/, overlay, "same problem as display:none")
+  end
+
+  def test_the_overlay_reveals_on_card_hover_and_on_focus
+    styles = identity(editable: true)[/<style>(.*?)<\/style>/m, 1].to_s
+
+    assert_includes styles, ".studio-identity-card-editable:hover .studio-avatar-overlay",
+      "the operator asked for the reveal on hovering the CARD, not only the picture"
+    assert_includes styles, ".studio-avatar-trigger:focus-visible .studio-avatar-overlay",
+      "a keyboard never hovers, and this is the only route to changing the photo"
   end
 
   def test_the_badge_circle_itself_is_always_visible
@@ -139,13 +199,35 @@ class ProfilePageRenderTest < Minitest::Test
     assert_equal "true", badge["aria-hidden"]
   end
 
-  # The edit page's badge is still a real button — it opens the cropper there,
-  # and that card is not a link.
-  def test_the_edit_badge_stays_a_button
+  # The edit card is not a link — its avatar is a button instead. Kept as its own
+  # test because "the card is a link" is true on the read page and false here, and
+  # that asymmetry is what the nested-link rule above depends on.
+  def test_the_edit_card_is_not_a_link
     doc = Nokogiri::HTML5.fragment(identity(editable: true))
 
     assert_nil doc.at_css("a.studio-identity-card"), "the edit card is not a link"
-    assert_equal "button", doc.at_css('[aria-label="Change your profile photo"]').name
+    assert_equal "button", doc.at_css("button.studio-avatar-trigger").name
+  end
+
+  # THE COMPACT HEADER'S OFFSET, and the engine has been bitten by this exact
+  # distinction before. A `fixed` element's `top` is a VIEWPORT coordinate, so it
+  # must be the header's BOTTOM EDGE (--nav-bottom), never its HEIGHT (--nav-h) —
+  # the two differ by exactly the height of any chrome an app stacks above the
+  # navbar, and mcritchie-industries ships a 47px environment banner that is
+  # precisely that. test/integration/sidebar_navbar_render_test.rb refuses
+  # `--nav-h` for the sidebar panel for the same reason; this bar had the bug.
+  #
+  # And NO ADDED GAP: it first carried `+ 0.5rem`, which the operator read as a
+  # strip of dead space between the navbar and the bar. It is a continuation of
+  # the chrome, not a card floating under it.
+  def test_the_compact_header_hangs_off_the_headers_bottom_edge
+    styles = identity[/<style>(.*?)<\/style>/m, 1].to_s
+    rule = styles[/\.studio-identity-mini\s*\{[^}]*\}/m].to_s
+
+    assert_match(/top:\s*var\(--nav-bottom/, rule,
+      "a fixed bar offset by the header HEIGHT lands wrong under any app that stacks chrome above the navbar")
+    refute_match(/top:\s*calc\(/, rule,
+      "the +0.5rem gap was the dead space the operator reported")
   end
 
   # --- the compact header that takes over on scroll --------------------------
@@ -218,14 +300,6 @@ class ProfilePageRenderTest < Minitest::Test
     assert_equal 1, edit_links.length, "exactly one route through: the avatar badge"
   end
 
-  def test_the_edit_headers_badge_opens_the_picker
-    doc = Nokogiri::HTML5.fragment(identity(editable: true))
-    badge = doc.at_css('[aria-label="Change your profile photo"]')
-
-    refute_nil badge
-    assert_equal "button", badge.name, "a div here is unreachable by keyboard"
-    assert_equal "$refs.filePicker.click()", badge["@click"]
-  end
 
   # REGRESSION GUARD. The avatar used to be a ROW declaring `requires: :avatar`,
   # so it was dropped whole on a host whose model has no attachment. Moving it
@@ -376,6 +450,72 @@ class ProfilePageRenderTest < Minitest::Test
     refute_nil doc.at_css("form")
   end
 
+  # --- the newsletter row ------------------------------------------------------
+  #
+  # Two states, and the asymmetry between them is the design: joining is one
+  # click, leaving asks. Joining is reversible from the same card, so a confirm
+  # would be friction protecting nothing; a mis-click on leave is silent until the
+  # next send never arrives.
+
+  def newsletter(user)
+    v = view
+    v.define_singleton_method(:profile_newsletter_path) { "/profile/newsletter" }
+    v.render(partial: "studio/profiles/newsletter_section", locals: { user: user })
+  end
+
+  def subscriber(**attrs)
+    Class.new(StubUser) do
+      define_method(:joined_email_list_at) { attrs.fetch(:joined, nil) }
+      define_method(:left_email_list_at) { attrs.fetch(:left, nil) }
+      define_method(:email) { attrs.fetch(:email, "pat@example.com") }
+    end.new
+  end
+
+  def test_an_unsubscribed_account_is_offered_a_one_click_join
+    doc = Nokogiri::HTML5.fragment(newsletter(subscriber))
+    form = doc.at_css("form")
+
+    refute_nil form, "joining is a plain form — it must work with no JavaScript"
+    assert_equal "/profile/newsletter", form["action"]
+    assert_nil doc.at_css('input[name="_method"]'), "joining is a POST, not an override"
+  end
+
+  def test_a_subscribed_account_is_offered_the_way_out
+    doc = Nokogiri::HTML5.fragment(newsletter(subscriber(joined: Time.at(1_700_000_000))))
+
+    assert_includes doc.text, "Subscribed"
+    button = doc.at_css("button")
+    assert_equal "$store.profileModals.open('newsletter-unsubscribe')", button["@click"],
+      "leaving opens the confirmation rather than submitting straight away"
+  end
+
+  # NO INLINE DELETE FORM on the card. The confirmation carries the form it
+  # submits, so there is exactly one place the DELETE is issued from — a confirm
+  # whose button posts a form elsewhere on the page drifts the moment that form
+  # moves.
+  def test_the_subscribed_card_carries_no_form_of_its_own
+    doc = Nokogiri::HTML5.fragment(newsletter(subscriber(joined: Time.at(1_700_000_000))))
+
+    assert_nil doc.at_css("form"), "the DELETE lives in the modal, not on the card"
+  end
+
+  # A wallet-only account has no address, and a newsletter needs somewhere to
+  # send. It is ASKED rather than allowed to submit and fail.
+  def test_an_account_with_no_email_is_asked_for_one
+    doc = Nokogiri::HTML5.fragment(newsletter(subscriber(email: nil)))
+
+    assert_nil doc.at_css("form"), "there is nothing to submit yet"
+    assert_equal "$store.profileModals.open('newsletter-email')", doc.at_css("button")["@click"]
+  end
+
+  def test_a_returning_account_is_told_it_can_rejoin
+    doc = Nokogiri::HTML5.fragment(
+      newsletter(subscriber(joined: Time.at(1_700_000_000), left: Time.at(1_700_000_100)))
+    )
+
+    assert_includes doc.text, "Join again"
+  end
+
   # --- the pages ------------------------------------------------------------------
 
   def test_the_read_page_renders_its_rows_in_one_card
@@ -383,7 +523,7 @@ class ProfilePageRenderTest < Minitest::Test
       render_page(Studio::ProfileSections.defaults.select { |x| x[:page] == :show })
     )
 
-    assert_equal %w[google], doc.css("[data-profile-section]").map { |x| x["data-profile-section"] }
+    assert_equal %w[google newsletter], doc.css("[data-profile-section]").map { |x| x["data-profile-section"] }
   end
 
   def test_a_read_page_with_no_rows_still_renders_the_identity
@@ -395,11 +535,27 @@ class ProfilePageRenderTest < Minitest::Test
 
   # Nothing on the READ page opens a modal, so it must not pay ~40 KB of
   # cropper.js or mount a host for nobody.
-  def test_the_read_page_mounts_no_modal_host
+  # THE HOST IS CONDITIONAL, which is what the registry's `modals:` key was
+  # documented for and, until the newsletter row, never exercised. This test used
+  # to assert the page mounted NO host — true and correct while nothing on it
+  # opened one. Now a row asks, so the claim becomes "mounts when asked, and only
+  # then", which is the property that was always meant.
+  def test_the_read_page_mounts_a_host_only_when_a_row_asks_for_one
+    without = render_page([{ key: :plain, title: "Plain", partial: "studio/profiles/google_section" }])
+    refute_includes without, "profileModals",
+      "no row asked for modals — a host here would be furniture for nobody"
+
+    with = render_page(Studio::ProfileSections.defaults.select { |x| x[:page] == :show })
+    assert_includes with, "profileModals", "the newsletter row asks for a host"
+  end
+
+  # A HOST IS NOT A CROPPER. The avatar is read-only on this page — the picker
+  # lives on /profile/edit — so mounting a host must not drag ~40 KB of cropper.js
+  # along with it.
+  def test_the_read_page_never_loads_the_cropper
     html = render_page(Studio::ProfileSections.defaults.select { |x| x[:page] == :show })
 
     refute_includes html, "cropper.min.js"
-    refute_includes html, "profileModals"
   end
 
   def test_a_host_section_renders_with_its_own_locals

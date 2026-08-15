@@ -1,0 +1,65 @@
+<%# The newsletter row — subscribe, and unsubscribe behind a confirmation.
+
+    Locals: user (required).
+
+    LIFTED FROM turf-monster's /account card, which has run this flow in
+    production, and deliberately stripped of everything turf-specific on the way:
+    its 25-seed on-chain welcome bonus, its quest state, its seeds level-up
+    payload. What survives is the part every app needs — two states, a join, a
+    leave, and a confirmation before leaving.
+
+    SERVER-RENDERED, not JSON. turf's version POSTs and patches the card in place
+    because it sits beside a live seeds counter that must tick in the same
+    breath. Nothing on /profile is live, so a form and a redirect is the simpler
+    mechanism and the one that still works with no JavaScript at all. The only
+    JavaScript here is the confirmation.
+
+    ASYMMETRIC ON PURPOSE: joining is one click, leaving asks. Joining is
+    reversible from this same card in one more click, so a confirm step would be
+    friction protecting nothing; a mis-click on LEAVE is silent until the next
+    send that never arrives.
+%>
+<% subscribed = Studio::Newsletter.subscribed?(user) %>
+
+<% if subscribed %>
+  <div class="flex items-center justify-between gap-3 flex-wrap">
+    <div class="flex items-center gap-2 min-w-0">
+      <svg class="w-5 h-5 text-primary flex-shrink-0" fill="none" stroke="currentColor"
+           stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+      </svg>
+      <span class="text-body">Subscribed</span>
+    </div>
+
+    <%# Opens the confirmation rather than submitting. The FORM it submits lives
+        in the modal, so there is exactly one place the DELETE is issued from. %>
+    <button type="button" @click="$store.profileModals.open('newsletter-unsubscribe')"
+            class="text-sm text-secondary hover:text-heading transition underline-offset-2 hover:underline">
+      Unsubscribe
+    </button>
+  </div>
+<% else %>
+  <div class="flex items-center justify-between gap-3 flex-wrap">
+    <p class="text-secondary text-sm min-w-0">
+      <% if Studio::Newsletter.ever_joined?(user) %>
+        You're not on the list. Join again any time.
+      <% else %>
+        Occasional updates. No spam, and one click to leave.
+      <% end %>
+    </p>
+
+    <%# NO EMAIL ON FILE — a wallet-only account. Asking in a modal rather than
+        growing a second inline form keeps the resting card one line, and it is
+        the same shape the operator asked for: the flow uses the modals. %>
+    <% if Studio::Newsletter.needs_email?(user) %>
+      <button type="button" @click="$store.profileModals.open('newsletter-email')"
+              class="btn btn-primary btn-sm flex-shrink-0">
+        Subscribe
+      </button>
+    <% else %>
+      <%= button_to "Subscribe", profile_newsletter_path, method: :post,
+                    class: "btn btn-primary btn-sm flex-shrink-0",
+                    form: { class: "flex-shrink-0" } %>
+    <% end %>
+  </div>
+<% end %>
