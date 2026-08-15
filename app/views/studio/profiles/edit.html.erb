@@ -72,17 +72,19 @@
 
     <%= form_with url: profile_path, method: :patch, scope: :profile,
                   data: { turbo: false }, html: { "x-ref": "form" } do %>
-      <div class="card p-0 overflow-hidden">
-        <% @profile_sections.each_with_index do |section, index| %>
-          <section class="p-6 <%= "border-t border-subtle" unless index.zero? %>"
-                   data-profile-section="<%= section[:key] %>">
-            <% if section[:title].present? %>
-              <h2 class="text-sm font-bold text-heading mb-4"><%= section[:title] %></h2>
-            <% end %>
-            <%= render section[:partial], **section.fetch(:locals, {}).merge(user: current_user) %>
-          </section>
-        <% end %>
-      </div>
+      <%# ONE CARD PER ROW — see show.html.erb. The merged wrapper also carried
+          `overflow-hidden`, which is worth naming as it goes: the birthday
+          popover is `position: fixed` and placed from the trigger's rect, so it
+          was never relying on that wrapper as a containing block and is
+          unaffected by its removal. %>
+      <% @profile_sections.each do |section| %>
+        <section class="card p-6 mb-6" data-profile-section="<%= section[:key] %>">
+          <% if section[:title].present? %>
+            <h2 class="text-sm font-bold text-heading mb-4"><%= section[:title] %></h2>
+          <% end %>
+          <%= render section[:partial], **section.fetch(:locals, {}).merge(user: current_user) %>
+        </section>
+      <% end %>
 
       <%# The JS-less path. Hidden once Alpine boots, because with the bar up
           there would be two Saves. %>
