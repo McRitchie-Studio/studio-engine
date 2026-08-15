@@ -29,11 +29,28 @@
     transition: opacity 200ms ease;
   }
 
+  /* The read page: the whole card is the link, so hovering ANYWHERE on it
+     reveals the glyph. The avatar and badge selectors stay for the edit page,
+     where the badge is its own button. */
+  .studio-identity-card:hover .studio-avatar-badge-icon,
+  .studio-identity-card:focus .studio-avatar-badge-icon,
+  .studio-identity-card:focus-visible .studio-avatar-badge-icon,
   .studio-avatar:hover .studio-avatar-badge-icon,
   .studio-avatar-badge:hover .studio-avatar-badge-icon,
   .studio-avatar-badge:focus .studio-avatar-badge-icon,
   .studio-avatar-badge:focus-visible .studio-avatar-badge-icon {
     opacity: 1;
+  }
+
+  /* The card reads as clickable before you click it. Kept subtle — this is a
+     whole card lighting up, not a button. */
+  .studio-identity-card {
+    transition: border-color 200ms ease, background-color 200ms ease;
+  }
+
+  .studio-identity-card:hover,
+  .studio-identity-card:focus-visible {
+    border-color: var(--color-primary);
   }
 
   /* No hover to give: show it and be done. */
@@ -42,6 +59,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .studio-avatar-badge-icon { transition: none; }
+    .studio-avatar-badge-icon,
+    .studio-identity-card { transition: none; }
   }
 </style>

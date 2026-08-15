@@ -1,71 +1,38 @@
 <%# The "you at a glance" header — avatar, name, address — at the top of BOTH
     /profile and /profile/edit.
 
-    THE AVATAR BADGE IS THE ONLY WAY THROUGH TO EDITING from the read page — the
-    operator removed the "Profile" heading and the top-right Edit button so the
-    card is the page. That makes the badge load-bearing rather than decorative,
-    which is why it is a real <a>/<button> with an aria-label rather than a
-    styled div: losing it to a keyboard or a screen reader now means losing the
-    edit page entirely.
-
     Locals:
       user      (required)
-      editable  (Boolean) — true on the edit page, where the avatar button opens
-                the crop modal. On the read page it LINKS to /profile/edit
-                instead, so the same affordance in the same place does the
-                obvious thing on each page.
+      editable  (Boolean) — true on the edit page, where the avatar badge opens
+                the crop modal.
 
-    IT IS A HEADER, NOT A ROW. It was a section in the registry until the operator
-    drew it as the identity block iOS Settings puts at the top of the page: a
-    thing you look at, with one control on it. Rows are things you change.
+    ON THE READ PAGE THE WHOLE CARD IS THE LINK to /profile/edit (operator's
+    call). It began as a badge-only link, then the page heading and the Edit
+    button were removed, and a 28px target became the single route to editing —
+    so the target grew to the thing people actually aim at.
+
+    That is also why the badge is a <span> there: an <a> inside an <a> is invalid,
+    and browsers repair it by closing the outer link early, which would quietly
+    shrink the card's clickable area to whatever preceded the badge.
+
+    THE AVATAR IS OPTIONAL — the guard the registry used to carry. As a ROW the
+    avatar declared `requires: :avatar` and was dropped whole on a host whose
+    model has no attachment; moving it into this header lost that, and the first
+    render against such a model raised `undefined method 'avatar'`.
 %>
 <% editable = local_assigns.fetch(:editable, false) %>
-<%# THE AVATAR IS OPTIONAL, and this guard is the one the registry used to carry.
-    As a ROW the avatar declared `requires: :avatar` and was dropped whole on a
-    host whose model has no attachment. Moving it into this header lost that
-    protection — the first render against such a model raised
-    `undefined method 'avatar'`, caught by the thin-host suite. A header is not
-    exempt from the rule that consumers disagree about their users table. %>
 <% attachable = user.respond_to?(:avatar) && user.avatar.respond_to?(:attached?) %>
 
 <%= render "studio/profiles/identity_styles" %>
 
-<div class="card p-6 mb-6 flex flex-col items-center text-center">
-  <%# The avatar and its edit affordance. The badge sits on the circle's
-      lower-right — the position the operator's illustration used for a marker,
-      now carrying an action instead. %>
-  <div class="relative mb-3 studio-avatar" style="width: 128px; height: 128px;">
-    <% if attachable && user.avatar.attached? %>
-      <%= image_tag user.avatar, class: "rounded-full object-cover",
-                    style: "width: 128px; height: 128px;", alt: user.display_name %>
-    <% else %>
-      <div class="rounded-full flex items-center justify-center font-bold text-white text-4xl"
-           style="width: 128px; height: 128px; background-color: <%= user.avatar_color %>">
-        <%= user.avatar_initials %>
-      </div>
-    <% end %>
-
-    <%# A BUTTON on the edit page, a LINK on the read page — same glyph, same
-        spot, and each does what that page can do. Both are real controls rather
-        than a div, so a keyboard reaches them. %>
-    <% badge_class = "studio-avatar-badge absolute bottom-0 right-0 flex items-center justify-center rounded-full border-2 border-page bg-primary text-white transition" %>
-    <% badge_style = "width: 28px; height: 28px;" %>
-    <% if editable && attachable %>
-      <button type="button" @click="$refs.filePicker.click()"
-              aria-label="Change your profile photo"
-              class="<%= badge_class %>" style="<%= badge_style %>">
-        <%= render "studio/profiles/pencil_icon" %>
-      </button>
-    <% elsif !editable %>
-      <%= link_to edit_profile_path, aria: { label: "Edit your profile" },
-                  class: badge_class, style: badge_style do %>
-        <%= render "studio/profiles/pencil_icon" %>
-      <% end %>
-    <% end %>
+<% if editable %>
+  <div class="card p-6 mb-6 text-center">
+    <%= render "studio/profiles/identity_body", user: user, editable: true, attachable: attachable %>
   </div>
-
-  <p class="text-3xl font-extrabold text-heading"><%= user.display_name %></p>
-  <% if user.respond_to?(:email) && user.email.present? %>
-    <p class="text-secondary text-sm break-all"><%= user.email %></p>
+<% else %>
+  <%= link_to edit_profile_path,
+              class: "studio-identity-card card p-6 mb-6 text-center block no-underline",
+              aria: { label: "Edit your profile" } do %>
+    <%= render "studio/profiles/identity_body", user: user, editable: false, attachable: attachable %>
   <% end %>
-</div>
+<% end %>

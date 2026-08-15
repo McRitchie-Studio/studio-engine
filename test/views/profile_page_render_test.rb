@@ -77,15 +77,6 @@ class ProfilePageRenderTest < Minitest::Test
   # THE ONLY WAY THROUGH. The operator removed the page heading and the top-right
   # Edit button, so this badge is the read page's entire route to editing — not a
   # convenience beside another link. Losing it strands the edit page.
-  def test_the_read_headers_badge_is_the_only_route_to_editing
-    doc = Nokogiri::HTML5.fragment(identity)
-    badge = doc.at_css('[aria-label="Edit your profile"]')
-
-    refute_nil badge, "the read page needs a way through to editing"
-    assert_equal "a", badge.name
-    assert_equal "/profile/edit", badge["href"]
-  end
-
   # The glyph starts hidden and fades in. The three reveal paths are asserted
   # together because the last two are what stop a hover-only affordance from
   # stranding people: this badge is the read page's ONLY route to editing, and a
@@ -109,6 +100,40 @@ class ProfilePageRenderTest < Minitest::Test
 
     refute_match(/\.studio-avatar-badge\s*\{[^}]*opacity:\s*0/, styles,
       "only the glyph waits; the circle is the resting affordance")
+  end
+
+  # THE WHOLE CARD IS THE LINK on the read page — a 28px badge became the single
+  # route to editing once the heading and Edit button came off, so the target
+  # grew to the thing people actually aim at.
+  def test_the_read_identity_card_is_itself_the_link_to_edit
+    doc = Nokogiri::HTML5.fragment(identity)
+    card = doc.at_css("a.studio-identity-card")
+
+    refute_nil card, "the card carries the destination"
+    assert_equal "/profile/edit", card["href"]
+    assert_equal "Edit your profile", card["aria-label"]
+    assert_includes card.text, "Pat Studio", "the whole block is inside the link"
+  end
+
+  # An <a> inside an <a> is invalid, and browsers repair it by closing the outer
+  # link early — which would silently shrink the card's clickable area to
+  # whatever preceded the badge.
+  def test_the_read_badge_is_decorative_not_a_nested_link
+    doc = Nokogiri::HTML5.fragment(identity)
+
+    assert_equal 1, doc.css("a").length, "exactly one link: the card itself"
+    badge = doc.at_css("span.studio-avatar-badge")
+    refute_nil badge, "the badge stays as a decorative glyph"
+    assert_equal "true", badge["aria-hidden"]
+  end
+
+  # The edit page's badge is still a real button — it opens the cropper there,
+  # and that card is not a link.
+  def test_the_edit_badge_stays_a_button
+    doc = Nokogiri::HTML5.fragment(identity(editable: true))
+
+    assert_nil doc.at_css("a.studio-identity-card"), "the edit card is not a link"
+    assert_equal "button", doc.at_css('[aria-label="Change your profile photo"]').name
   end
 
   def test_the_read_page_carries_no_heading_or_second_edit_control

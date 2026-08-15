@@ -51,10 +51,20 @@
 <div x-data="studioProfileForm(<%= initial.to_json %>)"
      x-bind:style="dirty ? 'padding-bottom: 96px' : ''">
   <div class="max-w-2xl mx-auto py-8">
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-extrabold text-heading">Edit profile</h1>
-      <%= link_to "Done", profile_path, class: "btn btn-outline btn-sm" %>
-    </div>
+    <%# The way back. The page heading and the Done button came off on the
+        operator's call, which left browser-back as the only exit for someone who
+        opened this and changed nothing — so a small explicit one goes here.
+        Deliberately quiet: it is an escape hatch, not an action, and the save bar
+        owns the bottom of the screen when there is anything to save. %>
+    <%= link_to profile_path,
+                class: "inline-flex items-center gap-1 text-sm text-secondary hover:text-heading transition mb-4",
+                aria: { label: "Back to your profile" } do %>
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"
+           viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+      </svg>
+      Back
+    <% end %>
 
     <%# Header + uploader in ONE Alpine scope — the badge calls $refs.filePicker,
         and refs do not cross components. %>
