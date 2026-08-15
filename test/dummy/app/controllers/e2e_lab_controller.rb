@@ -136,6 +136,32 @@ class E2eLabController < ActionController::Base
     render(:email_banner_editor)
   end
 
+  # THE PROFILE PAGE — the scroll-morph header and the dirty-check save bar.
+  #
+  # A PORO rather than a record, on purpose. The dummy runs sqlite :memory: (see
+  # e2e/boot.rb) and the partials under test read the user through duck-typed
+  # accessors — display_name, email, avatar_initials, avatar_color, first_name —
+  # which is precisely the interface Studio::UserProfile gives a host model. There
+  # is no row for a spec to seed and nothing here that a database would make more
+  # true.
+  #
+  # `avatar` is deliberately ABSENT: the header's attachable guard drops the
+  # upload affordance for a model with no attachment, which is both the cheaper
+  # page and the shape three of the five consumers are in.
+  class LabUser
+    def display_name = "Pat Studio"
+    def first_name = "Pat"
+    def last_name = "Studio"
+    def email = "pat@example.com"
+    def avatar_initials = "PS"
+    def avatar_color = "#6366f1"
+  end
+
+  def profile
+    @user = LabUser.new
+    render(:profile)
+  end
+
   # Liveness. Playwright's webServer polls this before the first spec, so it must
   # not depend on anything a lab page needs.
   def up = render(plain: "ok")

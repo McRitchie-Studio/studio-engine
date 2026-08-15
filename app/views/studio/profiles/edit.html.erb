@@ -90,22 +90,7 @@
         <button type="submit" class="btn btn-primary">Save changes</button>
       </div>
 
-      <%# --- the save bar ---------------------------------------------------- %>
-      <div x-show="dirty" x-cloak x-transition.opacity
-           role="status" aria-live="polite"
-           class="fixed inset-x-0 bottom-0 z-40 border-t border-subtle"
-           style="background: var(--color-surface); padding-bottom: env(safe-area-inset-bottom);">
-        <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <p class="text-sm text-secondary">
-            <span class="font-semibold text-heading" x-text="changeCount"></span>
-            <span x-text="changeCount === 1 ? 'unsaved change' : 'unsaved changes'"></span>
-          </p>
-          <div class="flex items-center gap-2">
-            <button type="button" @click="discard()" class="btn btn-outline btn-sm">Discard</button>
-            <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
-          </div>
-        </div>
-      </div>
+      <%= render "studio/profiles/save_bar" %>
     <% end %>
   </div>
 </div>

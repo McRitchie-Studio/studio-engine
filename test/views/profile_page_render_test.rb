@@ -51,6 +51,18 @@ class ProfilePageRenderTest < Minitest::Test
     v
   end
 
+  # THE EDIT PAGE, rendered whole. The read page above has had this since it shipped;
+  # the edit page did not, and the gap had teeth: its save bar was extracted into
+  # studio/profiles/_save_bar so the browser lane could mount it, and a mistyped
+  # partial name in that extraction raises at request time and nowhere else. The
+  # browser lane renders the partial DIRECTLY on its lab page, so it would stay green
+  # while /profile/edit 500s.
+  def render_edit(sections = Studio::ProfileSections.defaults.select { |x| x[:page] == :edit })
+    v = view
+    v.instance_variable_set(:@profile_sections, sections)
+    v.render(template: "studio/profiles/edit")
+  end
+
   def render_page(sections)
     v = view
     v.instance_variable_set(:@profile_sections, sections)
@@ -401,5 +413,45 @@ class ProfilePageRenderTest < Minitest::Test
 
     assert_includes html, "Host row"
     assert_includes html, 'data-profile-section="note"'
+  end
+end
+
+class ProfileEditPageRenderTest < ProfilePageRenderTest
+  def test_the_edit_page_renders_whole
+    doc = Nokogiri::HTML5.fragment(render_edit)
+
+    # The form, its fields, and the one Save that owns them. Selected by action, not
+    # by position: the avatar uploader is a SECOND form on this page and it comes
+    # first in document order.
+    assert_equal 1, doc.css('form[action="/profile"]').length
+    refute_nil doc.at_css('input[name="profile[first_name]"]')
+    refute_nil doc.at_css("[data-studio-save-bar]"),
+      "the save bar partial did not reach the page — an extraction that renders nowhere"
+  end
+
+  def test_the_edit_page_offers_a_way_back
+    doc = Nokogiri::HTML5.fragment(render_edit)
+    back = doc.at_css('a[aria-label="Back to your profile"]')
+
+    refute_nil back, "the heading and Done came off, so this is the only exit for someone who changed nothing"
+    assert_equal "/profile", back["href"]
+  end
+
+  # The no-JS path. A page whose script never ran still has to save, and the sticky
+  # bar cannot be that path — it exists only once Alpine has computed `dirty`.
+  def test_the_edit_page_saves_without_javascript
+    doc = Nokogiri::HTML5.fragment(render_edit)
+    plain = doc.css('button[type="submit"]').reject { |b| b.ancestors("[data-studio-save-bar]").any? }
+
+    refute_empty plain, "with the save bar behind x-show, a JS-less page would have no Save at all"
+  end
+
+  # The dirty check compares against what the SERVER rendered. If the seed and the
+  # field disagree the bar is up on arrival, before anyone has typed.
+  def test_the_dirty_check_is_seeded_from_the_rendered_values
+    doc = Nokogiri::HTML5.fragment(render_edit)
+    seed = JSON.parse(doc.at_css("[x-data]")["x-data"][/studioProfileForm\((.*)\)\z/m, 1])
+
+    assert_equal doc.at_css('input[name="profile[first_name]"]')["value"], seed["first_name"]
   end
 end
