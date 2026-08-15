@@ -25,13 +25,16 @@
 
 <%= render "studio/profiles/identity_styles" %>
 
+<%= render "studio/profiles/identity_mini", user: user %>
+
 <% if editable %>
-  <div class="card p-6 mb-6 text-center">
+  <div data-studio-identity-full class="card p-6 mb-6 text-center">
     <%= render "studio/profiles/identity_body", user: user, editable: true, attachable: attachable %>
   </div>
 <% else %>
   <%= link_to edit_profile_path,
               class: "studio-identity-card card p-6 mb-6 text-center block no-underline",
+              data: { studio_identity_full: true },
               aria: { label: "Edit your profile" } do %>
     <%= render "studio/profiles/identity_body", user: user, editable: false, attachable: attachable %>
   <% end %>

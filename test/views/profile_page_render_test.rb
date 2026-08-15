@@ -136,6 +136,45 @@ class ProfilePageRenderTest < Minitest::Test
     assert_equal "button", doc.at_css('[aria-label="Change your profile photo"]').name
   end
 
+  # --- the compact header that takes over on scroll --------------------------
+
+  def test_the_identity_ships_a_compact_header_and_something_to_watch
+    html = identity
+
+    assert_includes html, "data-studio-identity-mini"
+    assert_includes html, "data-studio-identity-full", "the observer needs a target"
+    assert_includes html, "IntersectionObserver"
+  end
+
+  # FIXED, not sticky. A sticky bar stays in flow and would reserve its height
+  # under the card forever, pushing every row down whether or not it is showing.
+  def test_the_compact_header_costs_no_layout_height
+    styles = identity[/<style>(.*?)<\/style>/m, 1].to_s
+
+    assert_match(/\.studio-identity-mini\s*\{[^}]*position:\s*fixed/, styles)
+    assert_match(/\.studio-identity-mini\s*\{[^}]*opacity:\s*0/, styles, "it rests hidden")
+  end
+
+  # Pinned to the height the host navbar publishes — the same variable
+  # /admin/style uses to stick its section nav — with a 0px fallback so an app
+  # that publishes nothing gets a bar at the top rather than a broken one.
+  def test_the_compact_header_pins_under_the_host_navbar
+    styles = identity[/<style>(.*?)<\/style>/m, 1].to_s
+
+    assert_match(/top:\s*var\(--nav-h,\s*0px\)/, styles)
+  end
+
+  # It duplicates content already on the page and already reachable. A second
+  # link would be a duplicate tab stop and a second announcement of the same
+  # name for no gain.
+  def test_the_compact_header_is_not_a_second_interactive_copy
+    doc = Nokogiri::HTML5.fragment(identity)
+    mini = doc.at_css("[data-studio-identity-mini]")
+
+    assert_equal "true", mini["aria-hidden"]
+    assert_empty mini.css("a, button"), "the full card above is the route to editing"
+  end
+
   def test_the_read_page_carries_no_heading_or_second_edit_control
     html = render_page(Studio::ProfileSections.defaults.select { |x| x[:page] == :show })
     doc = Nokogiri::HTML5.fragment(html)

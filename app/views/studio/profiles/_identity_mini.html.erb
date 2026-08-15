@@ -1,0 +1,87 @@
+<%# The compact identity that takes over when the full card scrolls away.
+
+    Locals: user (required).
+
+    WHY IT EXISTS: on a long profile the header is the thing that tells you whose
+    page you are on, and it is the first thing to disappear. This keeps that
+    answer on screen — the same move the navbar makes when it shrinks on scroll.
+
+    FIXED, NOT STICKY, and that is the whole layout decision. A sticky element
+    stays in flow, so it would reserve its own height under the card forever and
+    push every row down by 56px whether or not it is showing. Fixed takes it out
+    of flow: nothing moves, and the bar simply is not there until it is.
+
+    Pinned to `var(--nav-h, 0px)` — the height the host navbar publishes, which
+    /admin/style already uses to stick its section nav. The 0px fallback means an
+    app that publishes nothing gets a bar at the top of the viewport rather than
+    a broken one.
+
+    NOT INTERACTIVE, and aria-hidden. It duplicates content that is already on
+    the page and already reachable: the full card above is the link to editing.
+    A second link here would be a duplicate tab stop and a second announcement of
+    the same name for no gain — this is an orientation aid for people who can see
+    the screen, so it says so.
+%>
+<div data-studio-identity-mini
+     class="studio-identity-mini"
+     aria-hidden="true">
+  <div class="max-w-2xl mx-auto px-4">
+    <div class="flex items-center gap-3 py-2">
+      <% if user.respond_to?(:avatar) && user.avatar.respond_to?(:attached?) && user.avatar.attached? %>
+        <%= image_tag user.avatar, class: "rounded-full object-cover flex-shrink-0",
+                      style: "width: 32px; height: 32px;", alt: "" %>
+      <% else %>
+        <div class="rounded-full flex items-center justify-center font-bold text-white text-xs flex-shrink-0"
+             style="width: 32px; height: 32px; background-color: <%= user.avatar_color %>">
+          <%= user.avatar_initials %>
+        </div>
+      <% end %>
+
+      <div class="min-w-0">
+        <p class="text-sm font-bold text-heading truncate"><%= user.display_name %></p>
+        <% if user.respond_to?(:email) && user.email.present? %>
+          <p class="text-xs text-muted truncate"><%= user.email %></p>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var CLASS = "is-visible";
+
+    function wire() {
+      var full = document.querySelector("[data-studio-identity-full]");
+      var mini = document.querySelector("[data-studio-identity-mini]");
+      if (!full || !mini) return;
+
+      // No IntersectionObserver: leave the bar hidden rather than showing a
+      // duplicate header permanently. The page is fully usable without it.
+      if (!("IntersectionObserver" in window)) return;
+
+      if (mini._studioObserver) mini._studioObserver.disconnect();
+
+      var observer = new IntersectionObserver(function (entries) {
+        // The card is "gone" once its last pixel passes under the navbar, which
+        // is what the negative top margin accounts for — without it the bar
+        // appears while the card is still visible behind the nav.
+        mini.classList.toggle(CLASS, !entries[0].isIntersecting);
+      }, { rootMargin: "-72px 0px 0px 0px", threshold: 0 });
+
+      observer.observe(full);
+      mini._studioObserver = observer;
+    }
+
+    document.addEventListener("turbo:load", wire);
+    document.addEventListener("turbo:before-cache", function () {
+      var mini = document.querySelector("[data-studio-identity-mini]");
+      if (mini) {
+        mini.classList.remove(CLASS);
+        if (mini._studioObserver) mini._studioObserver.disconnect();
+      }
+    });
+    if (document.readyState !== "loading") wire();
+    else document.addEventListener("DOMContentLoaded", wire);
+  })();
+</script>
