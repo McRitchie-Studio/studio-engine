@@ -44,9 +44,12 @@ class EngineMotionCssTest < Minitest::Test
   # The declaration block of ONE rule. No rule in this file nests braces, so a
   # non-greedy scan to the first `}` is exact — and anchoring the selector to the
   # start of a line followed by `{` keeps `.conic-surface` from matching
-  # `.conic-surface::before`.
+  # `.conic-surface::before`. The lookbehind is what makes a selector that also
+  # appears as the TAIL of a list resolve to its own rule: `.studio-team-glow::after`
+  # closes the shared `::before, ::after` list too, and without this it would hand
+  # back the shared block instead of the bloom's own.
   def rule_body(selector)
-    match = css.match(/^#{Regexp.escape(selector)}\s*\{([^}]*)\}/)
+    match = css.match(/(?<!,\n)^#{Regexp.escape(selector)}\s*\{([^}]*)\}/)
     refute_nil match, "expected engine-motion.css to define #{selector}"
     match[1]
   end
@@ -176,21 +179,54 @@ class EngineMotionCssTest < Minitest::Test
     )
   end
 
-  # The ring's contract, stated where a reader of the CSS will hit it: the host is
-  # a bare wrapper. Its own background can never cover the wedges (an element's
-  # background paints BEFORE its negative-z descendants), so the recipe in the file
-  # must not teach `bg-` on the glow element — that is the exact form that shipped
-  # a washed card to admin/style. The rendered proof is in StylePageTest.
-  def test_selection_glow_documents_the_opaque_child_contract
-    section = css[/9b\. studio-team-glow.*?={10,}\s*\*\//m]
-    refute_nil section, "expected the §9b selection-glow doc block"
+  # THE RING MUST WORK ON A HOST THAT PAINTS ITS OWN BACKGROUND.
+  #
+  # Both wedge layers are pseudo-elements at z-index -1 / -2, and CSS paints an
+  # element's background BEFORE its negative-z descendants (CSS 2.1 Appendix E,
+  # steps 1 and 2). So the host's own background cannot cover the wedges — a card
+  # that wears this class directly would be WASHED by them. Two things can cover
+  # the middle: an opaque child, or cutting the host's box out of the layers.
+  #
+  # A live board card can only have the second. Turbo targets the card element for
+  # both replace and remove, so a wrapper host is orphaned every time a card leaves
+  # the board — the child shape is not available to it at all. This asserts the
+  # hole is there, on BOTH layers, because losing it on either one silently returns
+  # the wash (the ::after alone would haze the whole face through its blur).
+  def test_selection_glow_cuts_the_host_box_out_of_both_wedge_layers
+    wedges = rule_body(".studio-team-glow::before,\n.studio-team-glow::after")
 
-    assert_match(/opaque CHILD/i, section,
-      "§9b must state that an opaque CHILD covers the middle, not the host's background")
-    usage = section[/Usage:.*?Tune:/m].to_s
-    refute_match(/studio-team-glow[^\n]*\bbg-/, usage,
-      "the §9b usage recipe must not put a background on the glow host — that host is " \
-      "a bare wrapper, and a background on it is painted over by the wedges")
+    assert_match(/padding:\s*var\(--studio-team-glow-thickness\)/, wedges,
+      "each wedge layer needs padding equal to the ring thickness — that is what makes " \
+      "its content box the host's own box, the thing being punched out")
+    assert_match(/mask-composite:\s*exclude/, wedges,
+      "the wedge layers must exclude the host's box from the mask (the hole)")
+    assert_match(/-webkit-mask-composite:\s*xor/, wedges,
+      "ship the -webkit- mask-composite fallback alongside the standard one")
+    assert_match(/mask:\s*\n?\s*linear-gradient\(#000 0 0\) content-box/, wedges,
+      "the punched-out region is the CONTENT box — the host's own box")
+
+    # The bloom twin blurs BEFORE the mask applies, so its box has to out-measure
+    # the blur or the halo ends on a hard line at its own edge.
+    bloom = rule_body(".studio-team-glow::after")
+    assert_match(/border:\s*calc\(var\(--studio-team-glow-bloom\) \* 2\) solid transparent/, bloom,
+      "the bloom layer needs transparent border room for the blur to fade into")
+    assert_match(/background-clip:\s*padding-box/, bloom,
+      "the bloom's wedges must stop at the padding box, leaving that border room empty")
+  end
+
+  # Two opposed wedges travel the ring, so a caller with two colors to show gets
+  # one per wedge. The default aliases the first color, which is what keeps every
+  # existing one-color consumer rendering exactly as before.
+  def test_selection_glow_second_wedge_takes_its_own_color
+    assert_match(/--studio-team-glow-color-b:\s*var\(--studio-team-glow-color\)/, css,
+      "--studio-team-glow-color-b must default to the first color (no change for one-color callers)")
+
+    wedges = rule_body(".studio-team-glow::before,\n.studio-team-glow::after")
+    assert_match(/var\(--studio-team-glow-color\)\s+12%/, wedges,
+      "the first wedge reads --studio-team-glow-color")
+    assert_match(/var\(--studio-team-glow-color-b\)\s+62%/, wedges,
+      "the SECOND wedge must read --studio-team-glow-color-b, or a two-color caller " \
+      "gets one color twice")
   end
 
   def test_gem_packages_the_stylesheet

@@ -272,7 +272,7 @@
       <h3 class="text-xl font-bold text-heading">Effects</h3>
       <p class="text-muted text-sm">
         The <code class="font-mono text-2xs">engine-motion.css</code> visual-effect primitives beyond motion -
-        gradient text, a soft glow halo, a single-color rotating <strong>selection glow</strong>
+        gradient text, a soft glow halo, a one- or two-color rotating <strong>selection glow</strong>
         (ported from Turf Monster's selected-team-card ring), frosted glass, and a conic wash. Each is
         themed through the role tokens and tunable via CSS-var knobs.
       </p>
@@ -297,22 +297,18 @@
         </div>
       <% end %>
 
-      <%# The glow host is a BARE wrapper and the opaque face is a CHILD. The ring
-          pseudos sit at z-index -1/-2, and a negative-z descendant paints ABOVE its
-          host's own background — so a background on the HOST washes the whole card
-          face and there is no ring left. The child in front is what covers the
-          middle, exactly as TM's holo-wrap / holo-card split does. See
-          engine-motion.css §9b. %>
+      <%# The CARD shape: the host carries its own background and the ring still
+          rings, because the primitive punches the host's box out of both wedge
+          layers. The WRAPPER shape (bare host + opaque child) is staged by the
+          Modals section's glow cards — both are documented in engine-motion.css
+          §9b. Two wedges travel the edge, so a pair of colors reads as a pair. %>
       <%= render layout: "style/specimen",
-            locals: { klass: ".studio-team-glow  (knob: --studio-team-glow-color)",
-                      usage: %(<div class="studio-team-glow rounded-xl">\n  <div class="rounded-xl bg-surface p-5">Selected</div>\n</div>) } do %>
+            locals: { klass: ".studio-team-glow  (knobs: --studio-team-glow-color / -color-b)",
+                      usage: %(<div class="studio-team-glow rounded-xl bg-surface p-5">Selected</div>\n<div class="studio-team-glow rounded-xl bg-surface p-5"\n     style="--studio-team-glow-color: #F08030; --studio-team-glow-color-b: #6890F0">Fire / Flying</div>) } do %>
         <div class="flex flex-wrap items-center justify-center gap-6">
-          <div class="studio-team-glow rounded-xl">
-            <div class="rounded-xl bg-surface border border-subtle px-5 py-4 text-sm font-semibold text-heading text-center">Selected</div>
-          </div>
-          <div class="studio-team-glow rounded-xl" style="--studio-team-glow-color: #E11D48">
-            <div class="rounded-xl bg-surface border border-subtle px-5 py-4 text-sm font-semibold text-heading text-center">Ravens</div>
-          </div>
+          <div class="studio-team-glow rounded-xl bg-surface border border-subtle px-5 py-4 text-sm font-semibold text-heading text-center">Selected</div>
+          <div class="studio-team-glow rounded-xl bg-surface border border-subtle px-5 py-4 text-sm font-semibold text-heading text-center"
+               style="--studio-team-glow-color: #F08030; --studio-team-glow-color-b: #6890F0">Fire / Flying</div>
         </div>
       <% end %>
 

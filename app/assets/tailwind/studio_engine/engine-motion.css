@@ -507,38 +507,56 @@
 }
 
 /* =============================================================================
-   9b. studio-team-glow — single-color rotating "selected card" ring glow
+   9b. studio-team-glow — rotating "selected card" ring glow, one or two colors
    Ported from turf-monster's per-team selected-card glow (.holo-border-glow):
-   a single-color conic-gradient ring rotates around the element's edge, with a
-   blurred bloom twin behind it. DISTINCT from .studio-border-glow (an animated
-   RAINBOW border) and .studio-glow (a static soft box-shadow halo) — this is the
-   "this card is selected / live" ring, tinted one color.
+   a conic-gradient ring rotates around the element's edge, with a blurred bloom
+   twin behind it. DISTINCT from .studio-border-glow (an animated RAINBOW border)
+   and .studio-glow (a static soft box-shadow halo) — this is the "this card is
+   selected / live" ring.
 
    The color is a CSS var (default the CTA role, so purple on McRitchie Studio),
-   just like TM's per-team --glow-c. The wedge is swept by animating a registered
+   just like TM's per-team --glow-c. TWO opposed wedges travel the edge, and they
+   can carry two colors: --studio-team-glow-color-b defaults to the first, so a
+   one-color caller sees no change, and a caller with a pair to show (a Pokémon's
+   two types) gets one per wedge. The wedges are swept by animating a registered
    @property angle (rotating the GRADIENT, not the element — so no oversized-child
    clipping trick is needed). Opacity is a var (--studio-team-glow-opacity) with a
    transition, so a consumer can fade the glow in/out (the living style guide
    slides it between step cards as a modal's step machine advances).
 
-   THE HOST IS A BARE WRAPPER, NOT THE CARD. Both wedge layers are pseudo-elements
-   at z-index -1 / -2, and CSS paints an element's own background FIRST, then its
-   negative-z descendants on top of it (CSS 2.1 Appendix E, steps 1 and 2). So a
-   background on the HOST cannot cover the wedges — they wash its whole face, and
-   the ring is gone. What covers the middle is an opaque CHILD in front: in-flow
-   descendants paint later (step 3), leaving only the thickness-wide band around
-   the edge. That is TM's holo-wrap / holo-card split, and it is what both
-   consumers ship — the engine's style/_modal_specimen (bare glow wrapper + the
-   opaque .card article) and the hub's release-phase-meter (bare host + the bar's
-   own fill). Demoing it the other way is what shipped a washed card to
-   admin/style; the host also must NOT be clipped by an overflow-hidden ancestor
-   near its border.
+   THE HOST MAY CARRY ITS OWN BACKGROUND — the ring cuts the host's box out of
+   both wedge layers, so only the band around the edge paints. That hole is what
+   makes the primitive work in the two shapes its consumers need:
 
-   Usage:  <div class="studio-team-glow rounded-xl">
-             <div class="rounded-xl bg-surface p-5">Selected</div>
-           </div>
-           red glow:  style="--studio-team-glow-color: #E11D48"
-   Tune:   --studio-team-glow-color / -opacity / -speed / -thickness / -bloom
+     · the WRAPPER shape (TM's holo-wrap / holo-card split) — a bare host with an
+       opaque child in front. The engine's style/_modal_specimen and the hub's
+       release-phase-meter both ship this. Unchanged by the hole: the child was
+       already covering that interior.
+     · the CARD shape — the host IS the opaque surface. This is what a live board
+       card needs, because it cannot take a wrapper at all: Turbo targets the card
+       element for both replace and remove, so a wrapper is orphaned every time a
+       card leaves the board.
+
+   Without the hole the card shape is impossible, and not for a tunable reason:
+   both layers are pseudo-elements at z-index -1 / -2, and CSS paints an element's
+   own background FIRST, then its negative-z descendants ON TOP of it (CSS 2.1
+   Appendix E, steps 1 and 2) — so a background on the host is covered BY the
+   wedges, and the ring becomes a wash across the whole face. Only a child, or
+   this hole, can cover the middle.
+
+   The host must still NOT be clipped by an overflow-hidden ancestor near its
+   border, or the ring is cut off with it.
+
+   Usage:  <div class="studio-team-glow rounded-xl bg-surface p-5">Selected</div>
+           wrapper shape, when the face is its own element:
+             <div class="studio-team-glow rounded-xl">
+               <div class="rounded-xl bg-surface p-5">Selected</div>
+             </div>
+           red glow:   style="--studio-team-glow-color: #E11D48"
+           two types:  style="--studio-team-glow-color: #F08030;
+                              --studio-team-glow-color-b: #6890F0"
+   Tune:   --studio-team-glow-color / -color-b / -opacity / -speed / -thickness /
+           -bloom
    ========================================================================== */
 @property --studio-team-glow-angle {
   syntax: "<angle>";
@@ -547,6 +565,11 @@
 }
 .studio-team-glow {
   --studio-team-glow-color: var(--color-cta);
+  /* The SECOND wedge's color. Defaults to the first, so a one-color caller sees
+     no change; a caller with two colors to show (a Pokémon's two types, a pair of
+     brand colors) gets one per wedge. Resolved on this element, so an inline
+     --studio-team-glow-color override feeds this default too. */
+  --studio-team-glow-color-b: var(--studio-team-glow-color);
   --studio-team-glow-opacity: 1;
   --studio-team-glow-speed: 4s;
   --studio-team-glow-thickness: 4px;
@@ -571,14 +594,42 @@
     var(--studio-team-glow-color) 12%,
     transparent 33%,
     transparent 50%,
-    var(--studio-team-glow-color) 62%,
+    var(--studio-team-glow-color-b) 62%,
     transparent 83%
   );
   animation: studio-team-glow-spin var(--studio-team-glow-speed) linear infinite;
+  /* THE HOST'S OWN BOX IS PUNCHED OUT of both wedge layers, so what paints is the
+     band around the edge and nothing else. `padding` makes each layer's CONTENT
+     box exactly the host's box; mask-composite then removes that box from the
+     layer — the same mask trick §1's .studio-border-glow uses.
+     Why it is here: an opaque child in front covers the middle only when the host
+     CAN take a child. A live board card cannot — Turbo targets the card element
+     itself for replace and remove, so a wrapper is orphaned on every remove. With
+     the hole cut here the ring rides the card directly. For a wrapper host this
+     changes nothing visible: the child was already covering that interior. */
+  padding: var(--studio-team-glow-thickness);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
 }
 .studio-team-glow::after {
-  /* Blurred bloom twin, a touch larger. */
-  inset: calc(-1 * (var(--studio-team-glow-thickness) + 4px));
+  /* Blurred bloom twin. Its box carries a transparent BORDER of bloom-reach on
+     top of the ring, and the mask still holes out the host's box — so the blur
+     spreads outward into that reach and is cut where it has already faded, while
+     the inward half is cut at the host's edge (invisible: that edge is either the
+     card's own or the wrapper child's). Mask applies AFTER filter, which is why
+     the reach has to out-measure the blur — without it the halo ends on a hard
+     line at the layer's own box. */
+  inset: calc(-1 * (var(--studio-team-glow-thickness) + var(--studio-team-glow-bloom) * 2));
+  border: calc(var(--studio-team-glow-bloom) * 2) solid transparent;
+  /* The wedges stop at the padding box (the host + its ring); the border is empty
+     room the blur is allowed to spread into. */
+  background-clip: padding-box;
   z-index: -2;
   filter: blur(var(--studio-team-glow-bloom)) saturate(1.35);
 }
