@@ -25,7 +25,7 @@
 
 <%= render "studio/profiles/identity_styles" %>
 
-<%= render "studio/profiles/identity_mini", user: user %>
+<%= render "studio/profiles/identity_mini", user: user, editable: editable %>
 
 <% if editable %>
   <%# `studio-identity-card-editable` is the hover hook: the operator asked for the
@@ -47,10 +47,31 @@
       The button stays for keyboard and assistive tech: a div with a click handler
       is unreachable by either, and this is still the only route to changing the
       photo. %>
+  <%# `relative` positions the save controls, which float in this card's
+      SOUTH-EAST corner while it is on screen (operator's call, 2026-08-15).
+      They are absolutely positioned so they do not push the centred avatar and
+      name off-centre, and so the card does not change height when they appear —
+      a card that grew on the first keystroke would shove the whole form down.
+
+      BELOW 640px THEY GO BACK IN FLOW and the card does grow, because absolute
+      positioning inside a text-center card lands them on the name and the email
+      at every phone width (measured: 106px of the name at 390px). The no-resize
+      guarantee above therefore holds at 640px and up; see the media query in
+      _identity_styles for why that is the right trade at phone widths. %>
   <div data-studio-identity-full
        @click="$refs.filePicker.click()"
-       class="studio-identity-card-editable studio-identity-card-clickable card p-6 mb-6 text-center">
+       class="studio-identity-card-editable studio-identity-card-clickable card p-6 mb-6 text-center relative">
     <%= render "studio/profiles/identity_body", user: user, editable: true, attachable: attachable %>
+
+    <%# `.stop` ON THE WRAPPER, not only on the buttons. Both buttons stop their
+        own clicks, but the 8px GAP between them is still card surface — a click
+        landing there bubbled to the card's handler and opened the file picker.
+        Measured in review: a gap-midpoint click opened it once, a button click
+        zero times. Stopping at the wrapper covers the buttons, the gap, and
+        anything added here later. %>
+    <div class="studio-identity-actions" @click.stop>
+      <%= render "studio/profiles/save_controls" %>
+    </div>
   </div>
 <% else %>
   <%= link_to edit_profile_path,

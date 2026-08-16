@@ -54,7 +54,7 @@ class ProfilePageRenderTest < Minitest::Test
 
   # THE EDIT PAGE, rendered whole. The read page above has had this since it shipped;
   # the edit page did not, and the gap had teeth: its save bar was extracted into
-  # studio/profiles/_save_bar so the browser lane could mount it, and a mistyped
+  # a partial so the browser lane could mount it, and a mistyped
   # partial name in that extraction raises at request time and nowhere else. The
   # browser lane renders the partial DIRECTLY on its lab page, so it would stay green
   # while /profile/edit 500s.
@@ -280,15 +280,52 @@ class ProfilePageRenderTest < Minitest::Test
     assert_match(/top:[^;]*var\(--nav-h,\s*0px\)/, styles)
   end
 
-  # It duplicates content already on the page and already reachable. A second
-  # link would be a duplicate tab stop and a second announcement of the same
-  # name for no gain.
-  def test_the_compact_header_is_not_a_second_interactive_copy
+  # THE DUPLICATE IS HIDDEN; THE BAR IS NOT. The name and picture in here repeat
+  # content already on the page and already reachable, so they are aria-hidden — a
+  # second link would be a duplicate tab stop and a second announcement of the
+  # same name for no gain.
+  #
+  # THE ATTRIBUTE MOVED DOWN A LEVEL when the save controls moved in
+  # (2026-08-15). It used to sit on the whole bar, which was right while the bar
+  # held nothing but the duplicate. On the edit page it now also holds Save and
+  # Discard, and a focusable control inside an aria-hidden subtree is a WCAG
+  # failure and a practical one: a button you can tab to and cannot hear. So the
+  # claim is no longer "the bar is hidden" but "the DUPLICATE is hidden, and
+  # nothing interactive is inside it".
+  def test_the_compact_header_hides_the_duplicate_it_repeats
     doc = Nokogiri::HTML5.fragment(identity)
     mini = doc.at_css("[data-studio-identity-mini]")
+    duplicate = mini.at_css('[aria-hidden="true"]')
 
-    assert_equal "true", mini["aria-hidden"]
+    refute_nil duplicate, "the duplicated name and picture are announced a second time"
+    assert_includes duplicate.text, "Pat Studio", "the wrong element got the aria-hidden"
+    assert_empty duplicate.css("a, button"),
+                 "an interactive element inside the aria-hidden duplicate is reachable but unannounced"
+  end
+
+  # The READ page's bar has nothing to save, so it stays exactly as it was: no
+  # interactive content anywhere in it. The full card above is the route to
+  # editing.
+  def test_the_read_pages_compact_header_carries_no_controls
+    doc = Nokogiri::HTML5.fragment(identity(editable: false))
+    mini = doc.at_css("[data-studio-identity-mini]")
+
     assert_empty mini.css("a, button"), "the full card above is the route to editing"
+    assert_nil mini.at_css("[data-studio-save-controls]"),
+               "the read page has nothing to save — these belong to the edit form"
+  end
+
+  # The EDIT page's bar carries them, and they must be OUTSIDE the aria-hidden
+  # duplicate rather than merely present.
+  def test_the_edit_pages_compact_header_carries_usable_controls
+    doc = Nokogiri::HTML5.fragment(identity(editable: true))
+    mini = doc.at_css("[data-studio-identity-mini]")
+    controls = mini.at_css('[data-studio-save-controls="compact"]')
+
+    refute_nil controls, "the controls are unreachable once the full card scrolls away"
+    refute_empty controls.css("button")
+    assert_nil controls.ancestors.find { |node| node["aria-hidden"] == "true" },
+               "the controls sit inside the aria-hidden duplicate — focusable but unannounced"
   end
 
   def test_the_read_page_carries_no_heading_or_second_edit_control
@@ -606,8 +643,60 @@ class ProfileEditPageRenderTest < ProfilePageRenderTest
     # first in document order.
     assert_equal 1, doc.css('form[action="/profile"]').length
     refute_nil doc.at_css('input[name="profile[first_name]"]')
-    refute_nil doc.at_css("[data-studio-save-bar]"),
-      "the save bar partial did not reach the page — an extraction that renders nowhere"
+    refute_nil doc.at_css('[data-studio-save-controls="card"]'),
+      "the save controls did not reach the identity card — an extraction that renders nowhere"
+    refute_nil doc.at_css('[data-studio-save-controls="compact"]'),
+      "the compact identity bar did not get them — they are unreachable once the card scrolls away"
+
+    # THE BUTTON REACHES THE RIGHT FORM, which is the sharpest thing to get wrong
+    # here. Both identity surfaces render OUTSIDE the profile form and BEFORE it,
+    # so Save relies entirely on `form=` naming the id. Get it wrong and the
+    # button falls back to its nearest ancestor form — the AVATAR form — where an
+    # empty attachment param PURGES the attachment: saving a name would delete
+    # the photo, silently, with no error anywhere.
+    form_id = doc.at_css('form[action="/profile"]')["id"]
+    refute_nil form_id, "the profile form has no id for the save controls to target"
+
+    doc.css('[data-studio-save-controls] button[type="submit"]').each do |button|
+      assert_equal form_id, button["form"],
+        "a Save button targets #{button['form'].inspect} instead of the profile form " \
+        "(#{form_id.inspect}) — it would submit the avatar form and purge the photo"
+    end
+  end
+
+  # BOTH BUTTONS MUST STOP THE CLICK. The whole editable card is a click target
+  # for the photo picker, so a control inside it that lets its click bubble opens
+  # a file dialog on its way to doing its own job.
+  def test_the_save_controls_do_not_bubble_into_the_card
+    doc = Nokogiri::HTML5.fragment(render_edit)
+    buttons = doc.css('[data-studio-save-controls="card"] button')
+
+    refute_empty buttons
+    buttons.each do |button|
+      handler = button.attributes.keys.find { |k| k.start_with?("@click") || k.start_with?("x-on:click") }
+      refute_nil handler, "a save control has no click binding at all"
+      assert_includes handler, "stop",
+        "#{button.text.strip.inspect} lets its click bubble to the card, which opens the photo picker"
+    end
+  end
+
+  # THE COMPACT BAR HIDES THE DUPLICATE, NOT THE CONTROLS. It carries
+  # aria-hidden because it repeats the name and picture already on the page — but
+  # a focusable control inside an aria-hidden subtree is a WCAG failure and a
+  # practical one: a button you can tab to and cannot hear.
+  def test_the_compact_bar_does_not_hide_its_controls_from_assistive_tech
+    doc = Nokogiri::HTML5.fragment(render_edit)
+    controls = doc.at_css('[data-studio-save-controls="compact"]')
+
+    refute_nil controls
+    hidden_ancestor = controls.ancestors.find { |node| node["aria-hidden"] == "true" }
+    assert_nil hidden_ancestor,
+      "the save controls sit inside aria-hidden=\"true\" — they are focusable but " \
+      "unannounced. The attribute belongs on the duplicated identity, not the whole bar."
+
+    mini = doc.at_css("[data-studio-identity-mini]")
+    refute_nil mini.at_css('[aria-hidden="true"]'),
+      "the duplicated name and picture lost their aria-hidden — they are announced twice now"
   end
 
   def test_the_edit_page_offers_a_way_back
@@ -618,13 +707,14 @@ class ProfileEditPageRenderTest < ProfilePageRenderTest
     assert_equal "/profile", back["href"]
   end
 
-  # The no-JS path. A page whose script never ran still has to save, and the sticky
-  # bar cannot be that path — it exists only once Alpine has computed `dirty`.
+  # The no-JS path. A page whose script never ran still has to save, and the
+  # identity card's controls cannot be that path — they exist only once Alpine has
+  # computed `dirty`.
   def test_the_edit_page_saves_without_javascript
     doc = Nokogiri::HTML5.fragment(render_edit)
-    plain = doc.css('button[type="submit"]').reject { |b| b.ancestors("[data-studio-save-bar]").any? }
+    plain = doc.css('button[type="submit"]').reject { |b| b.ancestors("[data-studio-save-controls]").any? }
 
-    refute_empty plain, "with the save bar behind x-show, a JS-less page would have no Save at all"
+    refute_empty plain, "with every Save behind x-show, a JS-less page would have no Save at all"
   end
 
   # The dirty check compares against what the SERVER rendered. If the seed and the

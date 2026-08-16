@@ -1,7 +1,5 @@
 <%# The compact identity that takes over when the full card scrolls away.
 
-    Locals: user (required).
-
     WHY IT EXISTS: on a long profile the header is the thing that tells you whose
     page you are on, and it is the first thing to disappear. This keeps that
     answer on screen — the same move the navbar makes when it shrinks on scroll.
@@ -16,33 +14,82 @@
     app that publishes nothing gets a bar at the top of the viewport rather than
     a broken one.
 
-    NOT INTERACTIVE, and aria-hidden. It duplicates content that is already on
-    the page and already reachable: the full card above is the link to editing.
-    A second link here would be a duplicate tab stop and a second announcement of
-    the same name for no gain — this is an orientation aid for people who can see
-    the screen, so it says so.
+    THE IDENTITY HALF IS aria-hidden, and only that half. It duplicates content
+    that is already on the page and already reachable: the full card above is the
+    link to editing. A second link here would be a duplicate tab stop and a
+    second announcement of the same name for no gain — this is an orientation aid
+    for people who can see the screen, so it says so.
+
+    THE aria-hidden USED TO SIT ON THE WHOLE BAR, and it had to come down one
+    level when the save controls moved in (operator's call, 2026-08-15). A
+    focusable control inside an aria-hidden subtree is a WCAG failure and a
+    practical one: screen-reader users get a button they can tab to and cannot
+    hear. The duplicated name and picture are still hidden; the controls are not.
+
+    Locals:
+      user      (required)
+      editable  (Boolean) — true on the edit page, where this bar carries the
+                save controls once the full card has scrolled away. On the read
+                page there is nothing to save and the bar stays as it was.
 %>
+<% editable = local_assigns.fetch(:editable, false) %>
+
+<%# `inert` SHIPS ON, and comes off only when the bar is actually showing.
+
+    THE BUG IT CLOSES. This bar hides itself with opacity: 0 and
+    pointer-events: none, and NEITHER of those takes an element out of the tab
+    order or the accessibility tree. That was harmless for as long as the bar
+    held a picture and a name — this change is the first to put BUTTONS in it.
+    The result: on /profile/edit with unsaved changes and the page NOT scrolled,
+    the first two tab stops were an invisible Discard and Save, because this
+    partial renders before the card. Tab, Enter, and the edits were gone with
+    nothing on screen to explain it.
+
+    IT IS THE SAME OBSERVATION THIS CHANGE ALREADY MADE FOR THE MOUSE. The bar
+    was dead to clicks while hidden, which `pointer-events: auto` on .is-visible
+    fixed; the keyboard half of the identical problem was left open. A spec now
+    covers it, because the browser lane had no focus assertions at all.
+
+    ON BY DEFAULT rather than set only in the observer's callback, so the
+    early return for a browser without IntersectionObserver — which leaves the
+    bar hidden forever — leaves it inert forever too. %>
 <div data-studio-identity-mini
      class="studio-identity-mini"
-     aria-hidden="true">
+     inert>
   <div class="px-4">
-    <div class="flex items-center gap-3 py-2">
-      <% if user.respond_to?(:avatar) && user.avatar.respond_to?(:attached?) && user.avatar.attached? %>
-        <%= image_tag user.avatar, class: "rounded-full object-cover flex-shrink-0",
-                      style: "width: 32px; height: 32px;", alt: "" %>
-      <% else %>
-        <div class="rounded-full flex items-center justify-center font-bold text-white text-xs flex-shrink-0"
-             style="width: 32px; height: 32px; background-color: <%= user.avatar_color %>">
-          <%= user.avatar_initials %>
-        </div>
-      <% end %>
-
-      <div class="min-w-0">
-        <p class="text-sm font-bold text-heading truncate"><%= user.display_name %></p>
-        <% if user.respond_to?(:email) && user.email.present? %>
-          <p class="text-xs text-muted truncate"><%= user.email %></p>
+    <div class="studio-identity-mini-row flex items-center gap-3 py-2">
+      <div class="flex items-center gap-3 min-w-0 flex-1" aria-hidden="true">
+        <% if user.respond_to?(:avatar) && user.avatar.respond_to?(:attached?) && user.avatar.attached? %>
+          <%= image_tag user.avatar, class: "rounded-full object-cover flex-shrink-0",
+                        style: "width: 32px; height: 32px;", alt: "" %>
+        <% else %>
+          <div class="rounded-full flex items-center justify-center font-bold text-white text-xs flex-shrink-0"
+               style="width: 32px; height: 32px; background-color: <%= user.avatar_color %>">
+            <%= user.avatar_initials %>
+          </div>
         <% end %>
+
+        <div class="min-w-0">
+          <p class="text-sm font-bold text-heading truncate"><%= user.display_name %></p>
+          <% if user.respond_to?(:email) && user.email.present? %>
+            <%# THE ADDRESS YIELDS FIRST on a narrow screen. This bar is a strip,
+                and once it carries Save and Discard there is not room for an
+                avatar, two lines of text and two buttons: at 320px the name
+                measured 13px of clientWidth against 71px of content and rendered
+                as "P.", the address as "p..". Neither told anyone whose page
+                they were on, which is the only reason this bar exists.
+
+                Dropping the address gives the NAME that space back. It is the
+                line that identifies the account, and it is already on the page
+                above in full. %>
+            <p class="text-xs text-muted truncate"><%= user.email %></p>
+          <% end %>
+        </div>
       </div>
+
+      <% if editable %>
+        <%= render "studio/profiles/save_controls", compact: true %>
+      <% end %>
     </div>
   </div>
 </div>
@@ -78,6 +125,9 @@
         // intersecting at all" has to count as gone in its own right.
         var gone = !entry.isIntersecting || entry.intersectionRatio < SHOW_BELOW_RATIO;
         mini.classList.toggle(CLASS, gone);
+        // The tab order and the accessibility tree follow the same decision the
+        // class does. opacity and pointer-events cannot express "not here".
+        mini.inert = !gone;
       }, {
         // The navbar covers the top of the viewport, so pixels behind it are not
         // visible pixels — without this the card reads as on-screen while it is
@@ -97,6 +147,7 @@
       var mini = document.querySelector("[data-studio-identity-mini]");
       if (mini) {
         mini.classList.remove(CLASS);
+        mini.inert = true;
         if (mini._studioObserver) mini._studioObserver.disconnect();
       }
     });

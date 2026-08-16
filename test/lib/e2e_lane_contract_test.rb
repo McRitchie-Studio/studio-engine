@@ -239,24 +239,33 @@ class E2eLaneContractTest < Minitest::Test
     {
       "bar_stack.html.erb" => ["studio/banners/stack", "layouts/navbar"],
       "at_time.html.erb" => ["studio/at_time_script"],
-      # The save bar is named here for a reason worth keeping: it lived INLINE in
-      # studio/profiles/edit.html.erb, and a template needs a controller, a session
-      # and a user that this lab has none of. It was extracted to
-      # studio/profiles/_save_bar so the lab could render it BY NAME instead of
-      # copying its markup — a copy would have turned every save-bar spec into a
-      # test of the lab page.
+      # THE SAVE CONTROLS ARE NO LONGER NAMED ON THE READ PAGE, and the reason is
+      # the change itself: they used to be a bar fixed across the bottom of the
+      # viewport, which any page could render, and they now live INSIDE the
+      # editable identity card. The read lab renders identity with editable
+      # false, so it has nothing to save and nothing to name — every save-control
+      # spec moved to profile_edit.html.erb, which is where that card lives.
+      #
+      # The naming rule itself still earns its keep for the rest: a lab page that
+      # reimplements a partial turns its spec into a test of the lab page.
       "profile.html.erb" => [
         "studio/profiles/identity", "studio/profiles/name_fields",
-        "studio/profiles/save_bar", "studio/profiles/form_script",
+        "studio/profiles/form_script",
         # The modal host is named here because the lane's sharpest finding lives
         # in how it is MOUNTED: it declares no x-data of its own, so a page that
         # renders it outside an Alpine scope gets a store that opens and a dialog
         # that never appears.
         "studio/modals/scoped_host"
       ],
+      # editable_identity is what carries the save controls now — it renders
+      # studio/profiles/identity, which renders studio/profiles/save_controls into
+      # both the card and the compact bar. Naming editable_identity is therefore
+      # enough, and naming save_controls directly would be WRONG: this lab must
+      # not mount them itself, because where they mount is exactly what is under
+      # test.
       "profile_edit.html.erb" => [
         "studio/cropper_assets", "studio/profiles/editable_identity",
-        "studio/profiles/birthday_fields", "studio/profiles/save_bar",
+        "studio/profiles/birthday_fields", "studio/profiles/name_fields",
         "studio/profiles/form_script"
       ]
     }.each do |page, partials|
