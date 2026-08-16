@@ -618,16 +618,21 @@
   mask-composite: exclude;
 }
 .studio-team-glow::after {
-  /* Blurred bloom twin. Its box carries a transparent BORDER of bloom-reach on
-     top of the ring, and the mask still holes out the host's box — so the blur
+  /* Blurred bloom twin, a touch larger: its wedges reach 4px PAST the ring, which
+     is what makes the bloom read as a halo, not a soft edge on the ring. Drop the
+     4px and every WRAPPER consumer's ring visibly lightens (measured: 26% of the
+     pixels on style/_modal_specimen, 13% on the hub's release-phase-meter). The
+     box then carries a transparent BORDER of bloom-reach on top of that, and the
+     mask still holes out the host's box — so the blur
      spreads outward into that reach and is cut where it has already faded, while
      the inward half is cut at the host's edge (invisible: that edge is either the
      card's own or the wrapper child's). Mask applies AFTER filter, which is why
      the reach has to out-measure the blur — without it the halo ends on a hard
      line at the layer's own box. */
-  inset: calc(-1 * (var(--studio-team-glow-thickness) + var(--studio-team-glow-bloom) * 2));
+  inset: calc(-1 * (var(--studio-team-glow-thickness) + 4px + var(--studio-team-glow-bloom) * 2));
+  padding: calc(var(--studio-team-glow-thickness) + 4px);
   border: calc(var(--studio-team-glow-bloom) * 2) solid transparent;
-  /* The wedges stop at the padding box (the host + its ring); the border is empty
+  /* The wedges stop at the padding box (host + ring + the 4px); the border is empty
      room the blur is allowed to spread into. */
   background-clip: padding-box;
   z-index: -2;

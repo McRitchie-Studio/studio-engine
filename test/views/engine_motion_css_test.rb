@@ -212,6 +212,13 @@ class EngineMotionCssTest < Minitest::Test
       "the bloom layer needs transparent border room for the blur to fade into")
     assert_match(/background-clip:\s*padding-box/, bloom,
       "the bloom's wedges must stop at the padding box, leaving that border room empty")
+
+    # ...and that padding box must reach 4px PAST the ring — the "a touch larger"
+    # the bloom always had, respelled as padding once the hole landed. At the bare
+    # ring thickness the bloom shrinks and every WRAPPER consumer's ring lightens.
+    assert_match(/padding:\s*calc\(var\(--studio-team-glow-thickness\) \+ 4px\)/, bloom,
+      "the bloom's own padding must out-measure the ring by 4px, or its source box " \
+      "collapses onto the ring and every wrapper consumer's halo goes thin")
   end
 
   # Two opposed wedges travel the ring, so a caller with two colors to show gets
