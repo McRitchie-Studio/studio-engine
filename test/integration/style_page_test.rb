@@ -180,6 +180,37 @@ class StylePageTest < ActiveSupport::TestCase
   # The "at" format is the first specimen family that is a HELPER rather than a
   # CSS class, so REQUIRED_CLASSES cannot cover it. What makes the specimens real
   # is the pair: live stamps from the helper AND the script that localizes them.
+  # The hold-to-confirm specimens. Three, and each proves something different:
+  # the fizz on its own, the button live, and the button re-themed from an
+  # ancestor with no new CSS. A broken partial path here 500s the whole page in
+  # every host, so this renders them rather than string-matching the source.
+  test "the Tricks section stages the hold-to-confirm button and its fizz" do
+    doc = Nokogiri::HTML.fragment(render_index)
+
+    buttons = doc.css(".hold-stack > button.hold-btn")
+    assert_operator buttons.size, :>=, 2,
+      "expected a live hold button specimen and a re-themed one"
+
+    # Every staged stack has its bubbles as a SIBLING of the button — the shape
+    # that lets them sit behind it.
+    doc.css(".hold-stack").each do |stack|
+      assert stack.at_css("> .hold-fizz"), "each staged stack renders its fizz layer"
+      assert_nil stack.at_css("button.hold-btn .fizz-bit"),
+        "no bubble may render inside the button"
+    end
+
+    # The standalone fizz specimen binds a palette, so its bubbles resolve to
+    # slots rather than their fallback hues.
+    palette = doc.css(".hold-stack[style*='--fizz-c-1:']")
+    assert_operator palette.size, :>=, 1, "a specimen must show the palette binding"
+
+    # The re-themed one drives the --hold-* inputs, which is the whole claim of
+    # the third specimen: one instance restyled without touching the stylesheet.
+    rethemed = doc.at_css("[style*='--hold-success-to']")
+    assert rethemed, "expected a specimen re-theming the button from an ancestor"
+    assert rethemed.at_css(".hold-btn"), "and it must actually contain a button"
+  end
+
   test "the Tricks section stages the 'at' time-stamp primitive" do
     html = render_index
     stamps = Nokogiri::HTML.fragment(html).css("time[data-at-stamp]")

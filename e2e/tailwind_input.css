@@ -23,3 +23,14 @@
 @source "../test/dummy/app/views";
 
 @import "../app/assets/tailwind/studio_engine/engine.css";
+
+/*
+  And the OPT-IN motion / effect / action layer, exactly as a consuming app opts
+  into it (turf-monster compiles it to builds/tailwind/studio_engine_motion.css
+  and imports that). Without this line the lab serves pages where .fizz-bit has
+  no animation and .hold-stack no isolation — every computed style the hold
+  button's specs read comes back a browser default, which is a lane observing
+  nothing. The same reasoning as the @source lines above: compile what the apps
+  compile, or grade CSS that ships nowhere.
+*/
+@import "../app/assets/tailwind/studio_engine/engine-motion.css";

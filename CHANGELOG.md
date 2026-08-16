@@ -6,6 +6,53 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **The hold-to-confirm button, with its fizz — a new ACTION family in
+  `engine-motion.css`.** A press-and-hold CTA for an action a host does not want
+  taken by accident, ported from Turf Monster where it confirms a contest entry.
+  Render `studio/hold_button`; the specimens are on `/admin/style` (Tricks →
+  "Hold to confirm").
+
+  What ships:
+
+  - **`.hold-btn`** — the face and its five states: idle, `.process` (holding,
+    with the ring filling over `--duration`), `.loading` (submitted, spinning
+    arc), `.success` (confirmed, white check) and `.error` (blocked). The idle
+    face is a gradient down the primary ramp; the confirmed face is a deeper cut
+    of the SAME ramp, because an off-family success color reads as a jump to
+    some other button.
+  - **`.hold-stack` / `.hold-fizz` / `.fizz-bit`** — the carbonation. The
+    bubbles are the button's SIBLING, never its child: the button's `transform`
+    makes it a stacking context, so a bubble inside it can never get behind its
+    background. They show only where they escape its edges.
+  - **Six zones, three colors each.** The button is cut into a 3×2 grid and a
+    bubble only wears the colors of its own zone, so a six-item palette reads as
+    six things standing around the button. Bind `--fizz-c-1..18` (three per zone,
+    in order) on the stack — statically with the `fizz_colors:` local, or live
+    with `fizz_bind:` (an Alpine expression). Turf Monster's board binds the six
+    picked teams' light / dark / alt colors. Anything unbound falls back to the
+    bubble's own hue, so the effect is never colorless.
+  - **Two levels.** `fizz_level: :lively` (the default) rests at a full boil and
+    on hover DOUBLES THE BUBBLE COUNT — a second layer, seeded apart so it lands
+    in the first one's gaps, fades in over it. `fizz_level: :calm` simmers at
+    rest and boils on hover, one layer.
+  - **Per-instance theming without new CSS.** Every color reads a `--hold-*`
+    input before its default, so an ancestor can restyle one button or a page of
+    them: `--hold-bg-from` / `--hold-bg-mid` / `--hold-bg-to` for the resting
+    face, `--hold-success-from` / `--hold-success-to` / `--hold-success-glow-rgb`
+    for the confirmed one.
+  - **`prefers-reduced-motion` switches the bubbles off**, with `!important`,
+    because the state rules are more specific than anything the media query can
+    write — without it a lively button keeps fizzing at someone who asked it not
+    to.
+
+  Per-instance behavior travels as `data-*` on the button and is evaluated
+  against the surrounding `x-data` scope: `guard`, `validate` / `validate_at`,
+  `early_action` / `early_action_at` / `early_action_guard`, `on_hold_start` and
+  `on_success`. `Studio::FizzHelper` owns the bubble table and is seeded per
+  `hold_id`, so a button scatters identically on every render (a Turbo-restored
+  page matches the one it replaced) and two buttons on a page do not fizz in
+  lockstep.
+
 - **`.studio-team-glow` rings a host that paints its own background**, and can
   carry **two colors**.
 

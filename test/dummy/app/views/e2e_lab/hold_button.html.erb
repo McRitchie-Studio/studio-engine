@@ -1,0 +1,44 @@
+<%# The hold-to-confirm button's lab page.
+
+    Two stacks, rendered by name from the engine: the default LIVELY level and
+    the CALM one. Nothing here reimplements the button — the whole point of the
+    specs is the browser program inside studio/_hold_button and the computed
+    styles inside engine-motion.css, so a lab page that hand-rolled either would
+    grade itself.
+
+    The x-data wrapper is what a real caller supplies: the button evaluates its
+    guard / on_success expressions against the surrounding Alpine scope, and
+    `submitting` is the flag it refuses to start a second hold on. `duration` is
+    short so a spec can hold the button for its whole life without the lane
+    paying two seconds per press.
+
+    The palette is bound STATICALLY here (fizz_colors), which is the shape a host
+    uses when its colours are known at render time; turf-monster's board binds
+    the same slots live through fizz_bind. Six zones, three colours each, so a
+    spec can assert a zone resolves to ONE colour rather than to eighteen. %>
+<main class="p-8" x-data="{ submitting: false }">
+  <p data-test="lab-body">hold button lab</p>
+
+  <div style="max-width: 20rem">
+    <%= render "studio/hold_button",
+          hold_id: "lively",
+          duration: 600,
+          default_text: "Hold to Confirm",
+          hold_text: "Almost there…",
+          success_text: "Confirmed!",
+          fizz_colors: %w[#8b5cf6 #4c1d95 #a78bfa
+                          #22d3ee #0e7490 #67e8f9
+                          #f59e0b #78350f #fbbf24
+                          #ef4444 #7f1d1d #fca5a5
+                          #10b981 #064e3b #6ee7b7
+                          #ec4899 #831843 #f9a8d4] %>
+  </div>
+
+  <div style="max-width: 20rem; margin-top: 3rem">
+    <%= render "studio/hold_button",
+          hold_id: "calm",
+          fizz_level: :calm,
+          duration: 600,
+          default_text: "Hold to Confirm" %>
+  </div>
+</main>

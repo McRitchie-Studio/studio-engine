@@ -34,7 +34,8 @@ class EngineMotionCssTest < Minitest::Test
     "sheen"              => "sheen-sweep",
     "ping"               => "ping-pulse",
     "fade-edge"          => nil,
-    "progress-meter"     => "progress-indeterminate"
+    "progress-meter"     => "progress-indeterminate",
+    "fizz-bit"           => "fizz-boil"
   }.freeze
 
   def css
@@ -115,6 +116,39 @@ class EngineMotionCssTest < Minitest::Test
     engine_css = File.read(ENGINE_CSS_PATH)
     refute_match(/@import[^;]*engine-motion/, engine_css,
       "engine.css must NOT @import engine-motion.css — the motion layer is opt-in")
+  end
+
+  # The hold-to-confirm button + its fizz. The invariants a consumer inherits:
+  def test_hold_button_ships_its_states_keyframes_and_theme_tokens
+    %w[.hold-btn .hold-stack .hold-fizz .fizz-bit].each do |hook|
+      assert_match(/#{Regexp.escape(hook)}\b/, css, "engine-motion.css must define #{hook}")
+    end
+    %w[fizz-simmer fizz-boil fizz-burst hold-nudge hold-glow-pulse hold-tick].each do |frames|
+      assert_match(/@keyframes\s+#{Regexp.escape(frames)}\b/, css,
+        "the hold button must ship @keyframes #{frames}")
+    end
+
+    # Themed off ROLE tokens, so it wears each host's brand rather than the app
+    # it was ported from.
+    face = rule_body(".hold-btn")
+    assert_includes face, "var(--color-primary-rgb)", "the face rides the primary role"
+    assert_includes face, "var(--hold-bg-from,", "and every color reads a --hold-* input first"
+    assert_includes face, "var(--hold-success-from,", "so one instance can be re-themed"
+
+    # The bubbles are a SIBLING the button paints over. If this stack ever stops
+    # isolating, the button's z-index leaks into the host page.
+    stack = rule_body(".hold-stack")
+    assert_includes stack, "isolation: isolate", "the stack keeps its z-order private"
+    assert_match(/\.hold-stack > \.hold-btn \{[^}]*z-index: 1/m, css,
+      "the button must paint over the bubbles")
+
+    # The off switch has to beat the state rules, which are more specific than
+    # anything the media query can write.
+    guard = css[/@media \(prefers-reduced-motion: reduce\) \{\s*\.hold-stack.*?\n\}/m]
+    refute_nil guard, "the fizz must switch off under prefers-reduced-motion"
+    assert_includes guard, ".hold-fizz-extra", "including the hover layer"
+    assert_match(/animation: none !important/, guard,
+      "an off switch that loses a specificity contest is not an off switch")
   end
 
   def test_pulse_cta_ships_class_keyframe_role_token_and_reduced_motion
