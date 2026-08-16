@@ -36,28 +36,38 @@
 <div x-show="dirty" x-cloak x-transition.opacity
      data-studio-save-controls="<%= compact ? "compact" : "card" %>"
      role="status" aria-live="polite"
-     class="flex items-center <%= compact ? "gap-2" : "gap-3" %>">
-  <%# THE COUNT HIDES ON A NARROW SCREEN, in BOTH homes: the card shrinks to the
-      viewport's gutters on a phone, where the count plus two buttons does not fit
-      beside a centred avatar, and the buttons are the part you cannot do without.
+     class="studio-save-controls<%= " studio-save-controls--compact" if compact %>">
+  <%# THE COUNT IS NOW SCREEN-READER ONLY (operator's call, 2026-08-15): "1
+      unsaved change  Discard" became a simple "Discard". The number was telling
+      people something the buttons already imply — they only exist when there is
+      something to save.
 
-      OWNED CSS, NOT `hidden sm:block`, and this is not a style preference. The
-      engine ships a PREBUILT bundle, so a utility exists in a consumer only if
-      that consumer's own views already emitted it — and `sm:block` is emitted by
-      NONE of them. Measured before writing this line: zero occurrences in
-      mcritchie-studio's, mcritchie-industries' AND turf-monster's compiled
-      bundles. `hidden sm:block` would therefore have hidden the count at EVERY
-      width in every app, while staying green in this lane, which compiles the
-      engine's own views and emits utilities no consumer has. That is the same
-      blindness that shipped the calendar's grid-cols-7; the answer is the same
-      one — own the rule. %>
-  <p class="studio-save-count text-sm text-secondary whitespace-nowrap">
-    <span class="font-semibold text-heading" x-text="changeCount"></span>
+      IT IS KEPT FOR ASSISTIVE TECH RATHER THAN DELETED, because the visual and
+      the audible cue are not the same cue. Seeing two buttons appear IS the
+      notification; a screen-reader user gets no such moment, and this live region
+      is the whole of what they get. Simplifying the visible UI is not a reason to
+      take the announcement away.
+
+      `sr-only` rather than owned CSS here, unusually: it is in ALL THREE consumer
+      bundles (measured 2026-08-15) and the engine already uses it in
+      style/_modal_specimen. %>
+  <p class="sr-only">
+    <span x-text="changeCount"></span>
     <span x-text="changeCount === 1 ? 'unsaved change' : 'unsaved changes'"></span>
   </p>
-  <div class="flex items-center gap-2">
+
+  <%# ORDER IS PER-ARRANGEMENT, and deliberately so — the primary action goes
+      LAST in a row and FIRST in a stack, which is where the eye and the
+      convention both put it. Writing it out twice keeps the DOM order equal to
+      the VISUAL order in both, which a `row-reverse` or `column-reverse` would
+      break: the tab order would then run backwards through what is on screen. %>
+  <% if compact %>
     <button type="button" @click.stop="discard()" class="btn btn-outline btn-sm">Discard</button>
     <button type="submit" form="studio-profile-form" @click.stop
             class="btn btn-primary btn-sm">Save changes</button>
-  </div>
+  <% else %>
+    <button type="submit" form="studio-profile-form" @click.stop
+            class="btn btn-primary btn-sm">Save changes</button>
+    <button type="button" @click.stop="discard()" class="btn btn-outline btn-sm">Discard</button>
+  <% end %>
 </div>

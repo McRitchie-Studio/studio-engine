@@ -71,7 +71,7 @@ class ProfilePartialUtilityGuardTest < ActiveSupport::TestCase
                  "are not on the measured allowlist: #{offenders.inspect}. The engine ships a " \
                  "PREBUILT bundle — a variant a consumer's own views never emitted does not " \
                  "exist there, and the page silently renders at one width forever. Either use " \
-                 "owned CSS in the partial (see .studio-save-count in _identity_styles), or " \
+                 "owned CSS in the partial (see .studio-save-controls in _identity_styles), or " \
                  "measure the variant in all three consumer bundles and add it to PROVEN with " \
                  "the date."
   end
@@ -104,7 +104,7 @@ class ProfilePartialUtilityGuardTest < ActiveSupport::TestCase
     prose = <<~ERB
       <%# OWNED CSS, NOT `hidden sm:block` — see the note. %>
       <style>/* not `hidden sm:block` either */</style>
-      <p class="studio-save-count text-sm">1 unsaved change</p>
+      <p class="sr-only text-sm">1 unsaved change</p>
     ERB
 
     assert_empty classes_in(prose).scan(VARIANT).flatten

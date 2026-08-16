@@ -167,7 +167,7 @@ test("the save controls stay down until something actually changes", async ({ pa
   expect(pageErrors, `the page threw: ${pageErrors.join(" | ")}`).toEqual([]);
 });
 
-test("the save controls rise on an edit and count it", async ({ page }) => {
+test("the save controls rise on an edit", async ({ page }) => {
   await blockOffsiteRequests(page);
   await page.goto("/lab/profile_edit");
   await expect(page.locator(FIRST_NAME)).toHaveValue("Pat");
@@ -175,7 +175,73 @@ test("the save controls rise on an edit and count it", async ({ page }) => {
   await page.locator(FIRST_NAME).fill("Patricia");
 
   await expect(page.locator(SAVE_CONTROLS_CARD)).toBeVisible();
-  await expect(page.locator(SAVE_CONTROLS_CARD)).toContainText("1 unsaved change");
+  await expect(page.locator(SAVE_CONTROLS_CARD).getByRole("button", { name: "Save changes" })).toBeVisible();
+  await expect(page.locator(SAVE_CONTROLS_CARD).getByRole("button", { name: "Discard" })).toBeVisible();
+});
+
+// THE COUNT IS COUNTED, AND NOT SEEN. "1 unsaved change  Discard" became a
+// simple "Discard" on the operator's call — but the number stayed in the
+// document for assistive tech, because the visual and the audible cue are not
+// the same cue: two buttons appearing IS the notification for someone who can
+// see them, and this live region is the whole of it for someone who cannot.
+//
+// `not.toBeVisible()` CANNOT express this. sr-only clips to a 1px box rather
+// than removing the element, and Playwright calls a 1px box visible — so the
+// assertion has to be about the SIZE. Measuring it is also the only way to catch
+// the class being dropped, which would put "1 unsaved change" back on screen.
+test("the change count is announced but not shown", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit");
+  await page.locator(FIRST_NAME).fill("Patricia");
+  await expect(page.locator(SAVE_CONTROLS_CARD)).toBeVisible();
+
+  const controls = page.locator(SAVE_CONTROLS_CARD);
+  await expect(controls, "the count left the document — nothing announces it now")
+    .toContainText("1 unsaved change");
+
+  const box = await controls.locator("p").boundingBox();
+  expect(
+    box.width,
+    "the change count is taking up real space on screen — it should be screen-reader only"
+  ).toBeLessThanOrEqual(2);
+});
+
+// SAVE ON TOP OF DISCARD in the card (operator's call, 2026-08-15). A stack puts
+// the primary action first the same way a row puts it last, and which one is
+// where is a fact about two boxes rather than about the markup — the DOM order
+// and the visual order can disagree the moment anything reverses the flex.
+test("in the card, Save changes sits above Discard", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit");
+  await page.locator(FIRST_NAME).fill("Patricia");
+  await expect(page.locator(SAVE_CONTROLS_CARD)).toBeVisible();
+
+  const controls = page.locator(SAVE_CONTROLS_CARD);
+  const save = await controls.getByRole("button", { name: "Save changes" }).boundingBox();
+  const discard = await controls.getByRole("button", { name: "Discard" }).boundingBox();
+
+  expect(save.y + save.height, "Save changes is not above Discard").toBeLessThanOrEqual(discard.y + 1);
+
+  // STACKED, not merely ordered: a row would also satisfy "Save's bottom is above
+  // Discard's top" when both sit on the same line and rounding goes the right way.
+  expect(Math.abs(save.x - discard.x), "the two are side by side, not stacked").toBeLessThan(2);
+});
+
+// The compact bar keeps them in a ROW — it has width rather than height — with
+// the primary action last, which is the other half of the same convention.
+test("in the compact bar, the two sit side by side", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit");
+  await page.locator(FIRST_NAME).fill("Patricia");
+  await page.evaluate(() => window.scrollTo(0, 1500));
+  await expect(page.locator(MINI)).toHaveClass(/is-visible/);
+
+  const controls = page.locator(SAVE_CONTROLS_COMPACT);
+  const save = await controls.getByRole("button", { name: "Save changes" }).boundingBox();
+  const discard = await controls.getByRole("button", { name: "Discard" }).boundingBox();
+
+  expect(Math.abs(save.y - discard.y), "the compact bar stacked them — it has no room").toBeLessThan(2);
+  expect(discard.x, "Discard is not first in the row").toBeLessThan(save.x);
 });
 
 // THE SOUTH-EAST CORNER, measured rather than described. The controls are

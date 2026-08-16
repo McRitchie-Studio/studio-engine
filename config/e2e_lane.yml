@@ -319,7 +319,27 @@
 # long as it held only a picture and a name, fatal once it holds Save and Discard
 # — every spec here stayed green while both buttons were visible, focusable, and
 # completely dead to the mouse. The new spec clicks one.
-total_specs: 56
+#
+# 56 -> 59: the operator simplified the controls — "1 unsaved change  Discard"
+# became a simple "Discard", and in the card Save changes now sits ON TOP of
+# Discard rather than beside it.
+#
+# The count did not leave the document, only the screen: two buttons appearing is
+# the notification for someone who can see them, and the live region is the whole
+# of it for someone who cannot. That needed a spec of a shape this lane had not
+# used — toBeVisible() cannot express it, because sr-only clips to a 1px box
+# rather than removing the element and Playwright calls a 1px box visible. The
+# claim is about SIZE, so it is measured.
+#
+# The two arrangements are measured rather than described for the same reason as
+# the corner: DOM order and visual order part company the moment anything
+# reverses a flex, so "above" and "beside" are facts about boxes.
+#
+# `items-end` was rejected on the way: it is absent from mcritchie-industries'
+# compiled bundle (measured), so the stacking is owned CSS. `sr-only` was
+# ACCEPTED on the same test — present in all three, and already used by
+# style/_modal_specimen.
+total_specs: 59
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -331,7 +351,7 @@ total_specs: 56
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 56
+executed: 59
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

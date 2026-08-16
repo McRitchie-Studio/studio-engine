@@ -168,14 +168,33 @@
     bottom: 1.5rem;
   }
 
-  /* The unsaved-change count, hidden where there is no room for it. Owned rather
-     than `hidden sm:block` because `sm:block` is in NO consumer's compiled
-     bundle — see the note in _save_controls. 640px is Tailwind's `sm`, matched
-     deliberately so the breakpoint agrees with the rest of the page. */
-  .studio-save-count { display: none; }
+  /* THE TWO ARRANGEMENTS OF THE SAVE CONTROLS.
 
-  @media (min-width: 640px) {
-    .studio-save-count { display: block; }
+     STACKED in the card, Save on top of Discard (operator's call, 2026-08-15) —
+     the primary action goes first in a vertical stack the same way it goes last
+     in a horizontal row.
+
+     `stretch` rather than a right-alignment so both buttons take the width of
+     the wider one and the stack reads as a block rather than a ragged edge. The
+     container is absolutely positioned, so it shrinks to that width by itself.
+
+     OWNED, NOT `flex-col items-end`. `items-end` is absent from
+     mcritchie-industries' compiled bundle (measured 2026-08-15), and the engine
+     ships a PREBUILT bundle — so that class would do nothing in that app while
+     working here. Same failure as `sm:block` and `grid-cols-7`; same answer. */
+  .studio-save-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  /* The compact bar has width rather than height, so the same two buttons sit in
+     a row there — Discard first, Save last. */
+  .studio-save-controls--compact {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   @media (prefers-reduced-motion: reduce) {
