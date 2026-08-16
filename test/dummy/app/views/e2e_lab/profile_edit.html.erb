@@ -23,7 +23,26 @@
     partial's locals and nothing else. Every control below comes from an ENGINE
     partial rendered BY NAME.
 %>
-<div x-data="studioProfileForm(<%= { first_name: @user.first_name, last_name: @user.last_name, email: @user.email, birthday: "" }.to_json %>)">
+<%# THE FORM'S INITIAL STATE, DERIVED THE WAY THE REAL PAGE DERIVES IT.
+
+    This used to pass `birthday: ""` as a literal, which quietly made a whole
+    class of spec impossible: the field reads the birthday from @user while the
+    dirty check compares against THIS hash, so pinning it blank meant a lab user
+    WITH a birthday arrived with the two disagreeing — the page loaded dirty, and
+    Discard "restored" it to a birthday nobody had. Every stored-birthday spec
+    written against it would have been testing the lab's own drift.
+
+    studio/profiles/edit.html.erb builds this from the birth trio and falls back
+    to "" only when the trio is incomplete. Mirroring that is the point of a lab
+    page: the component under test must see what it sees in production. %>
+<%
+  bd = if @user.birth_year.present? && @user.birth_month.present? && @user.birth_day.present?
+         format("%04d-%02d-%02d", @user.birth_year, @user.birth_month, @user.birth_day)
+       else
+         ""
+       end
+%>
+<div x-data="studioProfileForm(<%= { first_name: @user.first_name, last_name: @user.last_name, email: @user.email, birthday: bd }.to_json %>)">
   <div class="max-w-2xl mx-auto py-8">
     <%# imageUploadHost is defined inside this partial, and editable_identity's
         x-data calls it. The cropper library it also pulls in comes from a CDN,

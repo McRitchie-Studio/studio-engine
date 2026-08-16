@@ -205,17 +205,134 @@ test("a full date fills the submitted field and raises the save bar", async ({ p
   ).toBeVisible();
 });
 
-// A PARTIAL date submits NOTHING. Month alone is not a birthday, and writing
-// "1991--" or a half-formed value would be worse than writing nothing.
-test("an incomplete date submits no value", async ({ page }) => {
+// A PARTIAL date submits NOTHING — but it is still an EDIT, and this spec used
+// to say the opposite. It asserted the save bar stayed DOWN after picking a
+// month, which is the behaviour the operator reported as a bug on 2026-08-15:
+// choose a month on an empty birthday and the page looks inert, with no way to
+// tell whether anything registered. The lane was green the whole time because
+// the spec had written the defect down as the contract.
+//
+// The two halves are separate questions and the answers differ:
+//   SUBMIT — nothing, because month alone is not a birthday.
+//   NOTICE — yes, because the person did something and the bar is how the page
+//            admits it.
+test("an incomplete date submits nothing but still raises the save bar", async ({ page }) => {
   await blockOffsiteRequests(page);
   await page.goto("/lab/profile_edit");
+  await expect(page.locator(SAVE_BAR)).toBeHidden();
 
   const row = page.locator('[data-profile-section="birthday"]');
   await row.locator("select").nth(0).selectOption("6");
 
-  await expect(page.locator(HIDDEN_BIRTHDAY)).toHaveValue("");
+  // ABSENT, not empty. The field drops its NAME while incomplete, and an input
+  // with no name is not submitted at all — which is what keeps a blank from
+  // reaching a controller that reads blank as "delete this birthday".
+  await expect(
+    page.locator(HIDDEN_BIRTHDAY),
+    "a nameless field submits nothing; a blank one submits a DELETE"
+  ).toHaveCount(0);
+
+  await expect(
+    page.locator(SAVE_BAR),
+    "picking a month is a change and the page must say so — this is the reported bug"
+  ).toBeVisible();
+});
+
+// LOADING IS NOT EDITING. The dirty signal is the three parts rather than the
+// composed date (that is what makes a partial edit visible at all), and the
+// naive version of that joins three blanks into "--", which does not equal the
+// form's initial "" — so the page would arrive already dirty, with the save bar
+// up over an untouched form and a beforeunload guard on an empty edit.
+test("an untouched empty birthday leaves the save bar down", async ({ page }) => {
+  const pageErrors = watchPageErrors(page);
+
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit");
+
+  const row = page.locator('[data-profile-section="birthday"]');
+  await expect(row.locator("select")).toHaveCount(3);
+  await expect(
+    page.locator(SAVE_BAR),
+    "nothing was touched — a save bar here means the field publishes a value " +
+      "that disagrees with the one the page loaded with"
+  ).toBeHidden();
+
+  expect(pageErrors, `the page threw: ${pageErrors.join(" | ")}`).toEqual([]);
+});
+
+// THE DATA-LOSS CASE, and the reason the two halves above had to be separated.
+//
+// A stored 31 January, switch the month to February: the 31st does not exist
+// there, so the day blanks and the date is incomplete through no choice of the
+// person editing. The form is now dirty (it is), and a Save at that moment used
+// to submit a BLANK birthday — which this controller reads as an intentional
+// delete and clears all three columns with. A half-finished edit silently
+// destroyed a stored birthday.
+test("an unfinished edit cannot wipe a stored birthday", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit?birthday=stored");
+
+  const row = page.locator('[data-profile-section="birthday"]');
+  await expect(page.locator(HIDDEN_BIRTHDAY)).toHaveValue("1991-01-31");
+
+  // A STORED birthday must also load CLEAN. The selects and the dirty check read
+  // the value from two different places, and if they disagree the page arrives
+  // with the save bar already up — which is how this lab page was built until
+  // this change (it pinned the form's initial birthday to "" while the field read
+  // the real one), and it would have made every spec below meaningless.
+  await expect(
+    page.locator(SAVE_BAR),
+    "the page loaded dirty — the field and the dirty check disagree about the stored birthday"
+  ).toBeHidden();
+
+  await row.locator("select").nth(0).selectOption("2");
+
+  // The day is gone, which is correct — February has no 31st.
+  await expect(row.locator("select").nth(1)).toHaveValue("");
+
+  // And the field must now submit NOTHING rather than a blank. This is the
+  // assertion that stands between an unfinished edit and a deleted birthday.
+  await expect(
+    page.locator(HIDDEN_BIRTHDAY),
+    "the field still submits a blank birthday — saving here DELETES the stored one"
+  ).toHaveCount(0);
+
+  await expect(page.locator(SAVE_BAR)).toBeVisible();
+});
+
+// DISCARD HAS TO REACH THE SELECTS. studioProfileForm#discard restores its
+// `fields` object, which puts back every input bound with x-model — and these
+// three are not, because they belong to the birthday component. So Discard used
+// to clear the save bar while the selects went on showing the abandoned edit and
+// the hidden input went on carrying it: the next save wrote the change that had
+// just been discarded.
+test("Discard puts the selects back where they were", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit?birthday=stored");
+
+  const row = page.locator('[data-profile-section="birthday"]');
+  await row.locator("select").nth(0).selectOption("6");
+  await expect(page.locator(SAVE_BAR)).toBeVisible();
+
+  await page.locator(SAVE_BAR).getByRole("button", { name: "Discard" }).click();
+
+  await expect(row.locator("select").nth(0), "the month kept the discarded edit").toHaveValue("1");
+  await expect(row.locator("select").nth(1)).toHaveValue("31");
+  await expect(row.locator("select").nth(2)).toHaveValue("1991");
+  await expect(page.locator(HIDDEN_BIRTHDAY)).toHaveValue("1991-01-31");
   await expect(page.locator(SAVE_BAR)).toBeHidden();
+});
+
+// THE ROW NAMES ITSELF ONCE. The section wrapper titles it "Birthday" and each
+// select is labelled MONTH / DAY / YEAR; a "Date of birth" line between them was
+// the same thing said a third time (operator's call, 2026-08-15).
+test("the row carries no redundant field label", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit");
+
+  const row = page.locator('[data-profile-section="birthday"]');
+  await expect(row).toContainText("Birthday");
+  await expect(row.getByText("Date of birth", { exact: true })).toHaveCount(0);
 });
 
 // THE DAY LIST FOLLOWS THE MONTH, which is the one thing three selects can get
@@ -257,10 +374,15 @@ test("switching to a shorter month clears an impossible day", async ({ page }) =
 
   await row.locator("select").nth(0).selectOption("2");
 
+  // The day is dropped, so the date is incomplete, so the field submits NOTHING
+  // — it is not present under that name at all. It used to submit a blank, and a
+  // blank birthday is a DELETE to this controller, which is what let an
+  // unfinished edit destroy a stored one.
+  await expect(row.locator("select").nth(1), "the day did not clear").toHaveValue("");
   await expect(
     page.locator(HIDDEN_BIRTHDAY),
     "February 31st was submitted — the day did not clear when the month lost it"
-  ).toHaveValue("");
+  ).toHaveCount(0);
 });
 
 // A birthday cannot be in the future, and the cheapest way to say so is not to
