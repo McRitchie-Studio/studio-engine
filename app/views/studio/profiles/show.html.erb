@@ -25,17 +25,22 @@
   <%= render "studio/profiles/identity", user: current_user, editable: false %>
 
   <% if @profile_sections.present? %>
-    <div class="card p-0 overflow-hidden">
-      <% @profile_sections.each_with_index do |section, index| %>
-        <section class="p-6 <%= "border-t border-subtle" unless index.zero? %>"
-                 data-profile-section="<%= section[:key] %>">
-          <% if section[:title].present? %>
-            <h2 class="text-sm font-bold text-heading mb-4"><%= section[:title] %></h2>
-          <% end %>
-          <%= render section[:partial], **section.fetch(:locals, {}).merge(user: current_user) %>
-        </section>
-      <% end %>
-    </div>
+    <%# ONE CARD PER ROW, not one card with hairlines (operator's call). The
+        identity header directly above already renders as its own `card p-6 mb-6`,
+        so a single merged card underneath it put two different treatments on one
+        page. turf-monster's /account — the reference — gives every card its own
+        `card shadow p-6 mb-6`.
+
+        The old `border-t unless index.zero?` divider is GONE rather than ported:
+        separate cards have nothing to divide. %>
+    <% @profile_sections.each do |section| %>
+      <section class="card p-6 mb-6" data-profile-section="<%= section[:key] %>">
+        <% if section[:title].present? %>
+          <h2 class="text-sm font-bold text-heading mb-4"><%= section[:title] %></h2>
+        <% end %>
+        <%= render section[:partial], **section.fetch(:locals, {}).merge(user: current_user) %>
+      </section>
+    <% end %>
   <% end %>
 </div>
 
