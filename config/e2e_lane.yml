@@ -339,7 +339,32 @@
 # compiled bundle (measured), so the stacking is owned CSS. `sr-only` was
 # ACCEPTED on the same test — present in all three, and already used by
 # style/_modal_specimen.
-total_specs: 59
+#
+# 59 -> 63: two regressions this change introduced that all 59 specs missed, plus
+# the reason they missed them. Both were found in review, not here.
+#
+# THE LANE ONLY EVER RAN AT ONE WIDTH. playwright.config.js declares no viewport,
+# so every spec ran at Chromium's default 1280x720 — and the controls-over-text
+# overlap measures exactly 0px at 640px and up. At 390px it covered 106px of the
+# name and 64px of the email, with elementFromPoint along the email returning the
+# Discard button. The corner spec could not tell the two apart: it asserts the gap
+# to the card right and bottom edges, which is true at every width, broken ones
+# included. The new cases use test.use inside a describe rather than a new
+# PROJECT, which would re-run all 59 and double this number.
+#
+# AND IT HAD NO FOCUS ASSERTIONS AT ALL. The compact bar hides with opacity 0 and
+# pointer-events none, neither of which removes an element from the tab order —
+# so on an unscrolled dirty page the first two tab stops were an INVISIBLE Discard
+# and Save, and Enter destroyed the edits with nothing on screen. This lane had
+# already made the identical observation for the MOUSE (the buttons were "visible,
+# focusable, and completely dead to the mouse") and fixed only that half.
+#
+# 63 -> 64: the gap BETWEEN the two stacked buttons is still card surface, so a
+# click landing there bubbled to the card and opened the photo picker. Both
+# buttons already stopped their own clicks; nothing owned the 8px between them.
+# Closed with one .stop on the wrapper, which covers the buttons, the gap, and
+# whatever is added there later.
+total_specs: 64
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -351,7 +376,7 @@ total_specs: 59
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 59
+executed: 64
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

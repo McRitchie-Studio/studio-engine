@@ -168,6 +168,38 @@
     bottom: 1.5rem;
   }
 
+  /* NARROW SCREENS PUT THEM BACK IN FLOW, because absolute positioning inside a
+     text-center card lands the controls ON the name and the email.
+
+     Measured on the rendered glyphs, before this rule existed: at 320px the
+     block covered 57px of the name and 99px of the email; at 390px, 106px and
+     64px; at 480px, 61px and 19px. elementFromPoint along the email line
+     returned the Discard button — the controls were the topmost paint over the
+     user's own address. It reached 0px only at 640px, which is exactly the width
+     the browser lane happens to run at, which is why every spec stayed green.
+
+     THE TRADE, STATED PLAINLY: below 640px the card DOES grow when the form goes
+     dirty, which is the thing absolute positioning was chosen to avoid. Text you
+     cannot read is worse than a card that changes height, and at this width the
+     card is the whole screen — there is nothing below it to shove out of view.
+     Above 640px the corner arrangement and its no-resize guarantee both hold.
+
+     OWNED CSS, NOT a `sm:` variant: `sm:` utilities are absent from every
+     consumer bundle (see the note in _save_controls and the guard in
+     test/views/profile_partial_utility_guard_test.rb). */
+  @media (max-width: 639px) {
+    .studio-identity-actions {
+      position: static;
+      margin-top: 1rem;
+    }
+
+    /* Full width in flow, so the two buttons read as the card's footer rather
+       than as a block shoved against one edge. */
+    .studio-save-controls {
+      align-items: stretch;
+    }
+  }
+
   /* THE TWO ARRANGEMENTS OF THE SAVE CONTROLS.
 
      STACKED in the card, Save on top of Discard (operator's call, 2026-08-15) —

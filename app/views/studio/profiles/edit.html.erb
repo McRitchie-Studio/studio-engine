@@ -77,7 +77,10 @@
         identity card, which renders ABOVE this form and outside it — so it
         reaches this form by `form="studio-profile-form"`. Rename the id and the
         button silently submits the avatar form instead, which purges the photo.
-        test/views/profile_save_controls_test.rb pins the two together. %>
+        test/views/profile_page_render_test.rb pins the two together, in
+        test_the_edit_page_renders_whole. (This named a profile_save_controls_test
+        that does not exist — a false coverage claim inside the comment warning
+        that a rename purges the photo.) %>
     <%= form_with url: profile_path, method: :patch, scope: :profile,
                   data: { turbo: false },
                   html: { "x-ref": "form", id: "studio-profile-form" } do %>

@@ -33,9 +33,15 @@
 %>
 <% compact = local_assigns.fetch(:compact, false) %>
 
+<%# ONE LIVE REGION, NOT TWO. Both copies of these controls are in the document
+    at once, so declaring role="status" on both announced "1 unsaved change"
+    twice — once from a copy sitting at opacity 0. The CARD's copy keeps it: it
+    is the one that exists on an unscrolled page, which is where an edit is made.
+    The compact copy is the same information for a reader who has scrolled, and
+    the announcement has already happened by then. %>
 <div x-show="dirty" x-cloak x-transition.opacity
      data-studio-save-controls="<%= compact ? "compact" : "card" %>"
-     role="status" aria-live="polite"
+     <%= 'role="status" aria-live="polite"'.html_safe unless compact %>
      class="studio-save-controls<%= " studio-save-controls--compact" if compact %>">
   <%# THE COUNT IS NOW SCREEN-READER ONLY (operator's call, 2026-08-15): "1
       unsaved change  Discard" became a simple "Discard". The number was telling

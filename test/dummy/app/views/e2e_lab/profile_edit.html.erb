@@ -52,9 +52,15 @@
 
         (The guard in e2e_lane_contract_test.rb refuses the literal opening tag
         of a browser program anywhere in a lab page, comments included, and that
-        bluntness is deliberate: an ERB comment ends at its FIRST `%>`, so a
-        leaked one turns its own prose into a phantom element. That is exactly
-        how the at-time defect shipped.) %>
+        bluntness is deliberate: an ERB comment ends at its FIRST terminator, so
+        a leaked one turns its own prose into a phantom element. That is exactly
+        how the at-time defect shipped.
+
+        AND THIS COMMENT COMMITTED IT. It used to spell that terminator out as a
+        literal, inside backticks — which ERB does not care about, so the comment
+        ended THERE and the remaining three lines rendered onto the page. A
+        comment explaining the defect, shipping the defect. Present on
+        origin/accepted; found in review of the save-controls change.) %>
     <%= render "studio/cropper_assets" %>
 
     <%= render "studio/profiles/editable_identity", user: @user %>

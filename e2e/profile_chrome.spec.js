@@ -433,3 +433,172 @@ test("clicking Discard inside the card does not open the picker", async ({ page 
     "Discard bubbled to the card and opened the photo picker"
   ).toBe(0);
 });
+
+// --- what the lane could not see -----------------------------------------------
+//
+// Both of these cover regressions this change introduced and every one of the 59
+// specs before them missed. They are grouped because the reason they were missed
+// is the same in both cases: the lane only ever looked at one width, and never at
+// the keyboard.
+
+// THE KEYBOARD REACHES WHAT THE MOUSE CANNOT. The compact bar hides with
+// `opacity: 0` and `pointer-events: none`, and NEITHER removes an element from
+// the tab order or the accessibility tree. This change is the first to put
+// BUTTONS in that bar, so on an unscrolled dirty page the first two tab stops
+// became an invisible Discard and Save — and _identity_mini renders BEFORE the
+// card, so they came first. Tab, Enter, and the edits were gone with nothing on
+// screen to explain it.
+//
+// This is the same observation the lane already made for the MOUSE — the buttons
+// were "visible, focusable, and completely dead to the mouse", fixed with
+// `pointer-events: auto`. The keyboard half was left open, because the lane had
+// no focus assertions at all.
+test("focus cannot reach the compact controls while the bar is hidden", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit");
+  await page.locator(FIRST_NAME).fill("Patricia");
+  await expect(page.locator(SAVE_CONTROLS_CARD)).toBeVisible();
+
+  // The bar is hidden: it has not scrolled into play.
+  await expect(page.locator(MINI)).not.toHaveClass(/is-visible/);
+
+  // Walk the first several tab stops from the top of the document. Not just one:
+  // what makes this dangerous is that the invisible controls come FIRST, and a
+  // single Tab would only catch that particular ordering.
+  await page.evaluate(() => document.body.focus());
+  for (let i = 0; i < 8; i += 1) {
+    await page.keyboard.press("Tab");
+    const inHiddenBar = await page.evaluate(() => {
+      const el = document.activeElement;
+      const bar = el && el.closest("[data-studio-identity-mini]");
+      return Boolean(bar) && !bar.classList.contains("is-visible");
+    });
+    expect(
+      inHiddenBar,
+      "focus landed inside the hidden compact bar — pressing Enter there runs Discard " +
+        "and destroys the edits, with nothing on screen"
+    ).toBe(false);
+  }
+});
+
+// AND MUST REACH THEM ONCE THE BAR IS SHOWING, or the fix above has simply made
+// them permanently unreachable — which would be a worse bug than the one it
+// closes, and an `inert` that is never removed looks identical from the outside.
+test("focus reaches the compact controls once the bar is showing", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit");
+  await page.locator(FIRST_NAME).fill("Patricia");
+  await page.evaluate(() => window.scrollTo(0, 1500));
+  await expect(page.locator(MINI)).toHaveClass(/is-visible/);
+
+  await page.locator(SAVE_CONTROLS_COMPACT).getByRole("button", { name: "Discard" }).focus();
+
+  const focused = await page.evaluate(() => {
+    const el = document.activeElement;
+    return {
+      text: el && el.textContent.trim(),
+      inBar: Boolean(el && el.closest("[data-studio-identity-mini]"))
+    };
+  });
+  expect(focused.inBar, "the controls stayed inert after the bar appeared").toBe(true);
+  expect(focused.text).toBe("Discard");
+});
+
+// THE PHONE WIDTHS, which this lane had never run. playwright.config.js declares
+// no viewport, so all 59 specs before these ran at Chromium's default 1280x720 —
+// the one width at which the overlap below measures exactly 0px.
+//
+// `test.use` inside a describe rather than a new PROJECT, deliberately: a project
+// runs every spec again and would double the lane's count, which the contract in
+// config/e2e_lane.yml calls out.
+test.describe("on a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  // THE CONTROLS MUST NOT PAINT ON THE USER'S OWN NAME AND ADDRESS. Absolute
+  // positioning inside a text-center card put them exactly there: at 390px they
+  // covered 106px of the name and 64px of the email, and elementFromPoint along
+  // the email returned the Discard button.
+  //
+  // Measured on the GLYPHS via Range, not on the <p> boxes: the paragraphs are
+  // full-width and centred, so their rects span the card and would report an
+  // overlap even when the text itself is clear.
+  test("the controls do not cover the name or the email", async ({ page }) => {
+    await blockOffsiteRequests(page);
+    await page.goto("/lab/profile_edit");
+    await page.locator(FIRST_NAME).fill("Patricia");
+    await expect(page.locator(SAVE_CONTROLS_CARD)).toBeVisible();
+
+    const overlaps = await page.evaluate(() => {
+      const card = document.querySelector("[data-studio-identity-full]");
+      const controls = document.querySelector('[data-studio-save-controls="card"]');
+      const c = controls.getBoundingClientRect();
+
+      // The glyph rects of every text node in the card's identity body.
+      const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
+      const hits = [];
+      let node;
+      while ((node = walker.nextNode())) {
+        if (!node.textContent.trim()) continue;
+        if (controls.contains(node)) continue; // the controls' own labels
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        for (const r of range.getClientRects()) {
+          const dx = Math.min(c.right, r.right) - Math.max(c.left, r.left);
+          const dy = Math.min(c.bottom, r.bottom) - Math.max(c.top, r.top);
+          if (dx > 0 && dy > 0) hits.push({ text: node.textContent.trim().slice(0, 40), dx, dy });
+        }
+      }
+      return hits;
+    });
+
+    expect(
+      overlaps,
+      `the save controls are painted over the card's own text: ${JSON.stringify(overlaps)}`
+    ).toEqual([]);
+  });
+
+  // AND THE CONTROLS ARE STILL USABLE at this width — the fix moves them, it does
+  // not hide them. A rule that pushed them off the card would satisfy the
+  // overlap assertion above perfectly.
+  test("the controls are still on screen and clickable", async ({ page }) => {
+    await blockOffsiteRequests(page);
+    await page.goto("/lab/profile_edit");
+    await page.locator(FIRST_NAME).fill("Patricia");
+
+    const discard = page.locator(SAVE_CONTROLS_CARD).getByRole("button", { name: "Discard" });
+    await expect(discard).toBeVisible();
+    await discard.click();
+
+    await expect(page.locator(FIRST_NAME)).toHaveValue("Pat");
+  });
+});
+
+// THE GAP BETWEEN THE BUTTONS IS STILL CARD SURFACE. Both buttons stop their own
+// clicks, which is what the earlier spec covers — but the 8px gap between them
+// belongs to the card, so a click landing there bubbled to the card's handler and
+// opened the file picker. Found in review by clicking the gap midpoint.
+test("clicking between the two buttons does not open the picker", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit");
+  await page.locator(FIRST_NAME).fill("Patricia");
+  await expect(page.locator(SAVE_CONTROLS_CARD)).toBeVisible();
+
+  await page.evaluate(() => {
+    window.__picks = 0;
+    const picker = document.querySelector('input[type="file"]:not([name])');
+    picker.addEventListener("click", (e) => { window.__picks += 1; e.preventDefault(); });
+  });
+
+  const controls = page.locator(SAVE_CONTROLS_CARD);
+  const save = await controls.getByRole("button", { name: "Save changes" }).boundingBox();
+  const discard = await controls.getByRole("button", { name: "Discard" }).boundingBox();
+
+  // The midpoint of the vertical gap between them — card surface, not a button.
+  const gapY = (save.y + save.height + discard.y) / 2;
+  await page.mouse.click(save.x + save.width / 2, gapY);
+
+  expect(
+    await page.evaluate(() => window.__picks),
+    "a click in the gap between the buttons bubbled to the card and opened the photo picker"
+  ).toBe(0);
+});
