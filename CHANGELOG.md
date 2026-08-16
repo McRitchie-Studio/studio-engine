@@ -4,6 +4,41 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **`.conic-surface` keeps its wash inside its own box.** The wash was an
+  OVERSIZED pseudo (`inset: -50%`) spun by a `transform` keyframe, cut back to
+  the element by the host's `overflow: hidden`. That clip is not dependable: the
+  rotating child is composited, and a `backdrop-filter` in its compositing path
+  drops it. The `.surface-glass` specimen — a backdrop-filter child of the wash
+  itself — is exactly that path, and on admin/style in Chromium the wash escaped
+  as a rotated slab across BOTH conic specimens.
+
+  The element no longer moves. The pseudo sits at `inset: 0` with
+  `border-radius: inherit`, and the sweep animates a registered
+  `--conic-surface-angle` inside the gradient — the technique §9b already used.
+  Nothing extends past the box, the rounded corners come from the pseudo, and no
+  clip has to hold. Same picture, one fewer thing that can fail.
+  `overflow: hidden` stays for the host's CONTENT.
+
+  The trade, stated: a registered-property animation repaints on the main thread
+  where a transform rode the compositor. At the default 16s sweep that is cheap,
+  and §9b already pays it at 4s.
+
+- **`.studio-team-glow` is demoed and documented as the wrapper it is.** Its two
+  wedge layers are pseudos at z-index -1/-2, and CSS paints an element's own
+  background BEFORE its negative-z descendants — so a background on the glow HOST
+  is covered BY the wedges, not the other way round, and the ring becomes a wash
+  across the whole card face. What covers the middle is an opaque CHILD, which
+  paints later; that is TM's `holo-wrap` / `holo-card` split, and what both real
+  consumers already ship.
+
+  The §9b comment claimed the opposite ("host needs an opaque background"), and
+  the Effects specimen followed it, so the style guide showed two washed slabs
+  where the selection ring belongs. The specimen, its copyable snippet, and the
+  contract comment now all state the same thing. The primitive's geometry is
+  unchanged — the consumers tuned against it are untouched.
+
 ### Added
 
 - **`studio/fields/_date_of_birth`** — the engine's one date-of-birth field,

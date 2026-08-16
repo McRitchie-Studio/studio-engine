@@ -297,12 +297,22 @@
         </div>
       <% end %>
 
+      <%# The glow host is a BARE wrapper and the opaque face is a CHILD. The ring
+          pseudos sit at z-index -1/-2, and a negative-z descendant paints ABOVE its
+          host's own background — so a background on the HOST washes the whole card
+          face and there is no ring left. The child in front is what covers the
+          middle, exactly as TM's holo-wrap / holo-card split does. See
+          engine-motion.css §9b. %>
       <%= render layout: "style/specimen",
             locals: { klass: ".studio-team-glow  (knob: --studio-team-glow-color)",
-                      usage: %(<div class="studio-team-glow rounded-xl bg-surface p-5">Selected</div>\n<div class="studio-team-glow rounded-xl bg-surface p-5" style="--studio-team-glow-color: #E11D48">Ravens</div>) } do %>
+                      usage: %(<div class="studio-team-glow rounded-xl">\n  <div class="rounded-xl bg-surface p-5">Selected</div>\n</div>) } do %>
         <div class="flex flex-wrap items-center justify-center gap-6">
-          <div class="studio-team-glow rounded-xl bg-surface border border-subtle px-5 py-4 text-sm font-semibold text-heading text-center">Selected</div>
-          <div class="studio-team-glow rounded-xl bg-surface border border-subtle px-5 py-4 text-sm font-semibold text-heading text-center" style="--studio-team-glow-color: #E11D48">Ravens</div>
+          <div class="studio-team-glow rounded-xl">
+            <div class="rounded-xl bg-surface border border-subtle px-5 py-4 text-sm font-semibold text-heading text-center">Selected</div>
+          </div>
+          <div class="studio-team-glow rounded-xl" style="--studio-team-glow-color: #E11D48">
+            <div class="rounded-xl bg-surface border border-subtle px-5 py-4 text-sm font-semibold text-heading text-center">Ravens</div>
+          </div>
         </div>
       <% end %>
 
