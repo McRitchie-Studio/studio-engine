@@ -4,6 +4,33 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`.studio-team-glow` rings a host that paints its own background**, and can
+  carry **two colors**.
+
+  The ring previously needed an opaque CHILD in front to cover its middle,
+  because both wedge layers are pseudo-elements at `z-index: -1 / -2` and CSS
+  paints an element's background BEFORE its negative-z descendants. A live board
+  card cannot supply that child: Turbo targets the card element itself for
+  replace and remove, so a wrapper host is orphaned every time a card leaves the
+  board. The primitive now cuts the host's own box out of both layers
+  (`padding` + `mask-composite`, the trick §1's `.studio-border-glow` already
+  used), so the ring works on the card directly.
+
+  **No-op for the wrapper shape** — its child was already covering that
+  interior. Verified side by side against both live consumers
+  (`style/_modal_specimen` and the hub's release-phase-meter): pixel-equivalent
+  before and after.
+
+  `--studio-team-glow-color-b` colors the SECOND of the two opposed wedges and
+  defaults to the first, so one-color callers see no change and a caller with a
+  pair to show — a Pokémon's two types — gets one per wedge.
+
+  The bloom twin needed care: a mask applies AFTER a filter, so its box carries a
+  transparent border twice the blur radius and its wedges stop at the padding
+  box. Without that room the halo ends on a hard line at its own edge.
+
 ### Fixed
 
 - **`.conic-surface` keeps its wash inside its own box.** The wash was an
