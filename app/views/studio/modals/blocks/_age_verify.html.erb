@@ -49,35 +49,11 @@
       <%= intro %>
     </p>
 
-    <%# Month / Day / Year selectors %>
-    <div class="grid grid-cols-3 gap-2 mb-4">
-      <div>
-        <label class="label-upper block mb-1">Month</label>
-        <select x-model="month" @change="onMonthChange()" class="input-field !px-3 !py-2.5 text-sm appearance-none cursor-pointer">
-          <option value="" disabled>Month</option>
-          <template x-for="m in months" :key="m.n">
-            <option :value="m.n" x-text="m.label"></option>
-          </template>
-        </select>
-      </div>
-      <div>
-        <label class="label-upper block mb-1">Day</label>
-        <select x-model="day" @change="error = ''" class="input-field !px-3 !py-2.5 text-sm appearance-none cursor-pointer">
-          <option value="" disabled>Day</option>
-          <template x-for="d in dayOptions" :key="d">
-            <option :value="d" x-text="d"></option>
-          </template>
-        </select>
-      </div>
-      <div>
-        <label class="label-upper block mb-1">Year</label>
-        <select x-model="year" @change="onMonthChange()" class="input-field !px-3 !py-2.5 text-sm appearance-none cursor-pointer">
-          <option value="" disabled>Year</option>
-          <template x-for="y in years" :key="y">
-            <option :value="y" x-text="y"></option>
-          </template>
-        </select>
-      </div>
+    <%# Month / Day / Year — the engine's one DOB field, shared with the profile
+        page's birthday row. It lived here first and turf-monster forked a second
+        copy; extracting it is what stops the two drifting. %>
+    <div class="mb-4">
+      <%= render "studio/fields/date_of_birth" %>
     </div>
 
     <%# Live too-young hint — shown once a full date is picked and it fails the

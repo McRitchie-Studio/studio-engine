@@ -1,40 +1,48 @@
-<%# The birthday calendar's Alpine component.
+<%# The birthday field's Alpine component.
 
-    Its own partial so the field markup stays readable and this can be reasoned
-    about as behaviour.
+    Supplies exactly what studio/fields/_date_of_birth binds to — month, day,
+    year, months, dayOptions, years, onMonthChange() — plus the one thing the
+    profile page needs on top: it writes the assembled ISO date into the
+    enclosing studioProfileForm's `fields.birthday`, which is what raises the
+    save bar.
 
-    WHY NOT REUSE turf-monster's contest_lock_picker. That component is the
-    nearest thing in the ecosystem and its GRID is where this one's shape came
-    from, but its navigation is built for the opposite problem: picking a lock
-    time a few weeks OUT, by stepping months from today. Stepping to 1985 that
-    way is roughly four hundred clicks. A birthday needs to JUMP — hence the year
-    and month selects in the header — and it needs the future closed off, which a
-    contest picker specifically must not do.
+    THIS REPLACED A CALENDAR POPOVER, and the replacement is the point. That
+    component shipped four defects in three days:
 
-    WHY `position: fixed` AND NOT `absolute`. The edit page renders its rows
-    inside `card p-0 overflow-hidden`, which CLIPS an absolutely-positioned child
-    — the popover would open and be invisible below the row. Fixed takes it out
-    of the clipping context entirely, at the cost of having to place it by hand
-    from the trigger's rect and re-place it while it is open. The compact identity
-    header is fixed for a related reason, so this is the file's second instance of
-    the same trade rather than a one-off.
+      · its day grid used `grid-cols-7`, which exists in NO consumer bundle, so
+        the seven weekday letters stacked into one column and the popover grew to
+        the height of the page;
+      · a flipped popover positioned itself from a hardcoded 340px height when
+        the real popover is ~245px, landing ~95px too high;
+      · place() ran on every scroll and RE-DECIDED the side, so it snapped
+        between above and below mid-scroll — a 254px jump between two 60px steps;
+      · and it came back OPEN after a browser Back.
+
+    Three selects have none of those failure modes. There is no position, no
+    flip, no popover, and no scroll listener — so there is nothing to place
+    wrongly, nothing to re-decide, and nothing to restore open.
 %>
 <script>
-  window.studioBirthdayPicker = function (initial) {
+  window.studioBirthdayFields = function (initial) {
+    var parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(initial || ""));
+
     return {
-      open: false,
-      // Which side this open chose. Set by chooseSide() when the popover opens and
-      // then left alone — see place() for why re-deciding it is the bug.
-      flipped: false,
-      value: initial || "",
-      viewYear: 0,
-      viewMonth: 0,
-      top: 0,
-      left: 0,
-      width: 0,
+      year:  parts ? String(+parts[1]) : "",
+      month: parts ? String(+parts[2]) : "",
+      day:   parts ? String(+parts[3]) : "",
+
+      months: [
+        { n: 1, label: "January" },   { n: 2, label: "February" },
+        { n: 3, label: "March" },     { n: 4, label: "April" },
+        { n: 5, label: "May" },       { n: 6, label: "June" },
+        { n: 7, label: "July" },      { n: 8, label: "August" },
+        { n: 9, label: "September" }, { n: 10, label: "October" },
+        { n: 11, label: "November" }, { n: 12, label: "December" }
+      ],
 
       // Oldest year offered. 120 covers every living person with room to spare;
-      // the point is a bounded list, because a select has to end somewhere.
+      // the newest is THIS year, because a birthday cannot be in the future and
+      // the cheapest way to say so is not to offer one.
       get years() {
         var now = new Date().getFullYear();
         var out = [];
@@ -42,153 +50,44 @@
         return out;
       },
 
-      months: ["January", "February", "March", "April", "May", "June",
-               "July", "August", "September", "October", "November", "December"],
+      // The days that exist in the chosen month — 30 in April, and 29 in a
+      // February only when the chosen year is a leap year. Day 0 of the NEXT
+      // month is the last day of this one, which is the standard trick and
+      // handles the leap rule without one being written down.
+      get dayOptions() {
+        var m = parseInt(this.month, 10);
+        var y = parseInt(this.year, 10) || 2000; // a leap year, so Feb offers 29 before a year is picked
+        if (!m) return Array.from({ length: 31 }, function (_, i) { return i + 1; });
 
-      weekdays: ["S", "M", "T", "W", "T", "F", "S"],
-
-      init() {
-        this.syncViewFromValue();
+        var count = new Date(y, m, 0).getDate();
+        return Array.from({ length: count }, function (_, i) { return i + 1; });
       },
 
-      // The month the grid opens on: the chosen birthday when there is one, else
-      // a sensible landing spot. NOT today — opening a birthday picker on the
-      // current year means everyone starts 30+ years from where they are going.
-      syncViewFromValue() {
-        var parts = this.parse(this.value);
-        var now = new Date();
-        this.viewYear = parts ? parts.y : now.getFullYear() - 30;
-        this.viewMonth = parts ? parts.m - 1 : 0;
+      get complete() {
+        return !!(this.year && this.month && this.day);
       },
 
-      parse(iso) {
-        var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
-        if (!m) return null;
-        return { y: +m[1], m: +m[2], d: +m[3] };
+      get isoValue() {
+        if (!this.complete) return "";
+        return this.year + "-" +
+          String(this.month).padStart(2, "0") + "-" +
+          String(this.day).padStart(2, "0");
       },
 
-      get displayValue() {
-        var p = this.parse(this.value);
-        if (!p) return "";
-        return this.months[p.m - 1] + " " + p.d + ", " + p.y;
+      // Named to match what the shared field binds to. Clears a day that the new
+      // month or year does not have — pick 31 January then switch to February and
+      // the 31st stops existing — then publishes.
+      onMonthChange() {
+        if (this.day && parseInt(this.day, 10) > this.dayOptions.length) this.day = "";
+        this.publish();
       },
 
-      // Leading blanks so the 1st lands under its real weekday, then the days.
-      calDays() {
-        var first = new Date(this.viewYear, this.viewMonth, 1).getDay();
-        var count = new Date(this.viewYear, this.viewMonth + 1, 0).getDate();
-        var cells = [];
-        for (var i = 0; i < first; i++) cells.push(null);
-        for (var d = 1; d <= count; d++) cells.push(d);
-        return cells;
-      },
-
-      // A birthday cannot be in the future. Checked per-DAY rather than by
-      // clamping the year, because the boundary month is half valid.
-      isFuture(day) {
-        var candidate = new Date(this.viewYear, this.viewMonth, day);
-        var today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return candidate > today;
-      },
-
-      isSelected(day) {
-        var p = this.parse(this.value);
-        return !!p && p.y === this.viewYear && p.m === this.viewMonth + 1 && p.d === day;
-      },
-
-      pick(day) {
-        if (this.isFuture(day)) return;
-        var mm = String(this.viewMonth + 1).padStart(2, "0");
-        var dd = String(day).padStart(2, "0");
-        this.value = this.viewYear + "-" + mm + "-" + dd;
-
-        // `fields` belongs to the enclosing studioProfileForm component. Alpine's
-        // scope chain makes it reachable from here, and it is the SAME object, so
-        // assigning through it is what raises the save bar. Without this line the
-        // picker would set a value the dirty check never notices.
-        if (this.fields) this.fields.birthday = this.value;
-
-        this.open = false;
-      },
-
-      clear() {
-        this.value = "";
-        if (this.fields) this.fields.birthday = "";
-        this.syncViewFromValue();
-      },
-
-      toggle() {
-        this.open = !this.open;
-        if (!this.open) return;
-
-        this.syncViewFromValue();
-
-        // Placed twice, deliberately. The first call stops the popover appearing
-        // at 0,0 for a frame; the second is the one that can MEASURE, because
-        // offsetHeight is 0 while x-show still has the element hidden — and it is
-        // also the only place the SIDE is chosen, for the life of this open.
-        this.place();
-        this.$nextTick(function () {
-          this.chooseSide();
-          this.place();
-        }.bind(this));
-      },
-
-      // Placed from the trigger's rect because the popover is fixed. Flips above
-      // the trigger when there is not room below, so it never opens off-screen on
-      // a short viewport.
-      //
-      // THE HEIGHT IS MEASURED, NOT GUESSED, and that distinction is the bug the
-      // operator reported. This used a hardcoded `estimatedHeight = 340` for both
-      // the decision AND the flipped coordinate. The real popover is about 245px,
-      // so a flip landed ~95px too high and the calendar floated visibly detached
-      // from its field — and since scroll re-runs this, it kept jumping. The
-      // arithmetic was legible in the screenshot: trigger at 640, popover at 300,
-      // and 640 - 340 - 4 = 316.
-      //
-      // The element is rendered under x-show (display is toggled, it stays in the
-      // DOM), so offsetHeight is readable as soon as it is shown. The constant
-      // survives only as the fallback for the first call, before the ref exists.
-      place() {
-        var el = this.$refs.trigger;
-        if (!el) return;
-
-        var r = el.getBoundingClientRect();
-        var popover = this.$refs.popover;
-        var height = (popover && popover.offsetHeight) || 340;
-        var GAP = 4;
-
-        this.left = r.left;
-        this.width = r.width;
-
-        // THE SIDE IS NOT RE-DECIDED HERE. place() runs on every scroll and
-        // resize event, and choosing the side each time makes the popover SNAP
-        // between above and below the moment the available space crosses the
-        // threshold. Measured on turf-monster at 60px scroll steps: ABOVE, ABOVE,
-        // ABOVE, ABOVE, then below — a 254px jump between two steps, mid-scroll,
-        // while the reader was looking at it. That is what "the date picker
-        // freaks out on scroll" was.
-        //
-        // chooseSide() runs ONCE per open; this only moves the popover.
-        this.top = this.flipped ? r.top - height - GAP : r.bottom + GAP;
-      },
-
-      // Which side to open on, decided once and then left alone. Flips above only
-      // when there is not room below AND there is room above — with neither, it
-      // stays below, attached to its field rather than pinned to the top of the
-      // viewport.
-      chooseSide() {
-        var el = this.$refs.trigger;
-        if (!el) return;
-
-        var r = el.getBoundingClientRect();
-        var popover = this.$refs.popover;
-        var height = (popover && popover.offsetHeight) || 340;
-        var GAP = 4;
-        var below = window.innerHeight - r.bottom;
-
-        this.flipped = below < height + GAP && r.top > height + GAP;
+      // `fields` belongs to the enclosing studioProfileForm. Alpine's scope chain
+      // makes it reachable and it is the SAME object, so assigning through it is
+      // what raises the save bar. Without this the field would set a value the
+      // dirty check never notices.
+      publish() {
+        if (this.fields) this.fields.birthday = this.isoValue;
       }
     };
   };
