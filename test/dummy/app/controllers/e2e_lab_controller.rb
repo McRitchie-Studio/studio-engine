@@ -197,6 +197,21 @@ class E2eLabController < ActionController::Base
     def avatar = @avatar ||= Class.new { def attached? = false }.new
   end
 
+  # AN ACCOUNT THAT ALREADY HAS A BIRTHDAY, which LabUser deliberately does not —
+  # and the difference is not cosmetic. The only way to lose a stored birthday is
+  # to have one, so every spec about NOT losing it needs this user; against
+  # LabUser they would pass by having nothing to destroy.
+  #
+  # THE 31st IS THE WHOLE POINT. January has one and February does not, so
+  # switching the month blanks the day and drops the field into the incomplete
+  # state — which is exactly how a saved birthday used to get wiped by an edit
+  # the person never finished. Any other day makes the spec inert.
+  class LabUserWithBirthday < LabUserWithAvatar
+    def birth_year = 1991
+    def birth_month = 1
+    def birth_day = 31
+  end
+
   def profile
     @user = params[:subscribed].present? ? LabSubscriber.new : LabUser.new
 
@@ -214,7 +229,7 @@ class E2eLabController < ActionController::Base
   # link with a decorative badge, the edit card is not a link and its avatar is a
   # button — and one page cannot exhibit both.
   def profile_edit
-    @user = LabUserWithAvatar.new
+    @user = params[:birthday].present? ? LabUserWithBirthday.new : LabUserWithAvatar.new
     render(:profile_edit)
   end
 

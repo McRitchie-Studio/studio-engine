@@ -27,8 +27,11 @@
       JS     — the three selects. `alpine` comes from the enclosing
                studioProfileForm and is true only once that component has booted.
 %>
-<label class="block text-sm text-secondary mb-2 font-medium" for="profile_birthday">Date of birth</label>
-
+<%# NO FIELD LABEL HERE, deliberately (operator's call, 2026-08-15). The row is
+    already titled "Birthday" by the section wrapper, and the three selects carry
+    their own MONTH / DAY / YEAR labels — a "Date of birth" line between the two
+    said the same thing a third time. The no-JS <input type="date"> keeps its id
+    so a label elsewhere could still point at it. %>
 <%
   y = user.birth_year
   m = user.birth_month
@@ -48,8 +51,27 @@
   <template x-if="alpine">
     <div>
       <%# The value the form actually submits. The selects write here; nothing
-          types into it. %>
-      <input type="hidden" name="profile[birthday]" :value="isoValue">
+          types into it.
+
+          THE NAME IS BOUND, AND THAT IS THE WHOLE POINT. A partly-filled date
+          has no ISO value, and submitting a BLANK birthday is not "no change" to
+          this controller — it is DELETE, and it clears all three columns on
+          purpose (see #birthday_attributes: someone deleting their birthday
+          means it). Those two facts met in a data-loss bug: a stored Jan 31,
+          switch the month to February, onMonthChange blanks the 31st because
+          February has no 31st, and the form is now one Save away from wiping a
+          birthday the person never asked to delete.
+
+          On THIS path a blank is always an edit in progress and never an
+          intentional clear, because the selects offer no empty option — once a
+          part is set the user cannot unset it. The intentional clear lives on
+          the no-JS <input type="date"> above, where it is a real gesture.
+
+          So while the date is incomplete the field submits NOTHING: Alpine
+          removes an attribute bound to false, an input with no name is not
+          submitted, and the controller's `return {} if raw.nil?` makes an absent
+          param a no-op. The birthday is left exactly as it was. %>
+      <input type="hidden" :name="complete ? 'profile[birthday]' : false" :value="isoValue">
 
       <%= render "studio/fields/date_of_birth" %>
     </div>
