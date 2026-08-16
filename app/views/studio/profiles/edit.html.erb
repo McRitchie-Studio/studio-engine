@@ -48,8 +48,11 @@
   <%= render "studio/cropper_assets" %>
 <% end %>
 
-<div x-data="studioProfileForm(<%= initial.to_json %>)"
-     x-bind:style="dirty ? 'padding-bottom: 96px' : ''">
+<%# NO BOTTOM PADDING ANY MORE. This reserved 96px for a save bar fixed across
+    the bottom of the viewport; the save controls now live in the identity card
+    and its compact bar, so nothing covers the last field and nothing needs to
+    make room (operator's call, 2026-08-15). %>
+<div x-data="studioProfileForm(<%= initial.to_json %>)">
   <div class="max-w-2xl mx-auto py-8">
     <%# The way back. The page heading and the Done button came off on the
         operator's call, which left browser-back as the only exit for someone who
@@ -70,8 +73,14 @@
         and refs do not cross components. %>
     <%= render "studio/profiles/editable_identity", user: current_user %>
 
+    <%# THE id IS LOAD-BEARING, not decoration. The Save button lives in the
+        identity card, which renders ABOVE this form and outside it — so it
+        reaches this form by `form="studio-profile-form"`. Rename the id and the
+        button silently submits the avatar form instead, which purges the photo.
+        test/views/profile_save_controls_test.rb pins the two together. %>
     <%= form_with url: profile_path, method: :patch, scope: :profile,
-                  data: { turbo: false }, html: { "x-ref": "form" } do %>
+                  data: { turbo: false },
+                  html: { "x-ref": "form", id: "studio-profile-form" } do %>
       <%# ONE CARD PER ROW — see show.html.erb. The merged wrapper also carried
           `overflow-hidden`, which is worth naming as it goes: the birthday
           popover is `position: fixed` and placed from the trigger's rect, so it
@@ -91,8 +100,6 @@
       <div class="mt-6" x-show="!alpine" x-cloak>
         <button type="submit" class="btn btn-primary">Save changes</button>
       </div>
-
-      <%= render "studio/profiles/save_bar" %>
     <% end %>
   </div>
 </div>

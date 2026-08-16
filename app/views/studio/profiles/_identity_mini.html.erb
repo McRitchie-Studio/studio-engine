@@ -16,33 +16,52 @@
     app that publishes nothing gets a bar at the top of the viewport rather than
     a broken one.
 
-    NOT INTERACTIVE, and aria-hidden. It duplicates content that is already on
-    the page and already reachable: the full card above is the link to editing.
-    A second link here would be a duplicate tab stop and a second announcement of
-    the same name for no gain — this is an orientation aid for people who can see
-    the screen, so it says so.
+    THE IDENTITY HALF IS aria-hidden, and only that half. It duplicates content
+    that is already on the page and already reachable: the full card above is the
+    link to editing. A second link here would be a duplicate tab stop and a
+    second announcement of the same name for no gain — this is an orientation aid
+    for people who can see the screen, so it says so.
+
+    THE aria-hidden USED TO SIT ON THE WHOLE BAR, and it had to come down one
+    level when the save controls moved in (operator's call, 2026-08-15). A
+    focusable control inside an aria-hidden subtree is a WCAG failure and a
+    practical one: screen-reader users get a button they can tab to and cannot
+    hear. The duplicated name and picture are still hidden; the controls are not.
+
+    Locals:
+      user      (required)
+      editable  (Boolean) — true on the edit page, where this bar carries the
+                save controls once the full card has scrolled away. On the read
+                page there is nothing to save and the bar stays as it was.
 %>
+<% editable = local_assigns.fetch(:editable, false) %>
+
 <div data-studio-identity-mini
-     class="studio-identity-mini"
-     aria-hidden="true">
+     class="studio-identity-mini">
   <div class="px-4">
     <div class="flex items-center gap-3 py-2">
-      <% if user.respond_to?(:avatar) && user.avatar.respond_to?(:attached?) && user.avatar.attached? %>
-        <%= image_tag user.avatar, class: "rounded-full object-cover flex-shrink-0",
-                      style: "width: 32px; height: 32px;", alt: "" %>
-      <% else %>
-        <div class="rounded-full flex items-center justify-center font-bold text-white text-xs flex-shrink-0"
-             style="width: 32px; height: 32px; background-color: <%= user.avatar_color %>">
-          <%= user.avatar_initials %>
-        </div>
-      <% end %>
-
-      <div class="min-w-0">
-        <p class="text-sm font-bold text-heading truncate"><%= user.display_name %></p>
-        <% if user.respond_to?(:email) && user.email.present? %>
-          <p class="text-xs text-muted truncate"><%= user.email %></p>
+      <div class="flex items-center gap-3 min-w-0 flex-1" aria-hidden="true">
+        <% if user.respond_to?(:avatar) && user.avatar.respond_to?(:attached?) && user.avatar.attached? %>
+          <%= image_tag user.avatar, class: "rounded-full object-cover flex-shrink-0",
+                        style: "width: 32px; height: 32px;", alt: "" %>
+        <% else %>
+          <div class="rounded-full flex items-center justify-center font-bold text-white text-xs flex-shrink-0"
+               style="width: 32px; height: 32px; background-color: <%= user.avatar_color %>">
+            <%= user.avatar_initials %>
+          </div>
         <% end %>
+
+        <div class="min-w-0">
+          <p class="text-sm font-bold text-heading truncate"><%= user.display_name %></p>
+          <% if user.respond_to?(:email) && user.email.present? %>
+            <p class="text-xs text-muted truncate"><%= user.email %></p>
+          <% end %>
+        </div>
       </div>
+
+      <% if editable %>
+        <%= render "studio/profiles/save_controls", compact: true %>
+      <% end %>
     </div>
   </div>
 </div>

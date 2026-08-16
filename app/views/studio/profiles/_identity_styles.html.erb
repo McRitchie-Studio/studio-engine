@@ -146,6 +146,36 @@
   .studio-identity-mini.is-visible {
     opacity: 1;
     transform: translateX(-50%);
+    /* POINTER EVENTS BACK ON, and this line is newer than it looks. The bar is
+       `pointer-events: none` while hidden so an invisible strip cannot swallow
+       clicks meant for the page under it — correct, and harmless for as long as
+       the bar held nothing but a picture and a name. It now carries Save and
+       Discard, and without this they are visible, focusable, and completely
+       dead to the mouse. */
+    pointer-events: auto;
+  }
+
+  /* THE SAVE CONTROLS' CORNER (operator's call, 2026-08-15). Absolute, so the
+     card keeps its height and its centred avatar keeps its centre when they
+     appear — a card that grew on the first keystroke would shove every row below
+     it down the page.
+
+     The offsets match the card's own `p-6` padding, so the controls line up with
+     its content rather than floating at an unrelated inset. */
+  .studio-identity-actions {
+    position: absolute;
+    right: 1.5rem;
+    bottom: 1.5rem;
+  }
+
+  /* The unsaved-change count, hidden where there is no room for it. Owned rather
+     than `hidden sm:block` because `sm:block` is in NO consumer's compiled
+     bundle — see the note in _save_controls. 640px is Tailwind's `sm`, matched
+     deliberately so the breakpoint agrees with the rest of the page. */
+  .studio-save-count { display: none; }
+
+  @media (min-width: 640px) {
+    .studio-save-count { display: block; }
   }
 
   @media (prefers-reduced-motion: reduce) {

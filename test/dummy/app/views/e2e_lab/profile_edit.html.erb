@@ -59,7 +59,18 @@
 
     <%= render "studio/profiles/editable_identity", user: @user %>
 
-    <form x-ref="form" data-studio-lab-form>
+    <%# THE id MIRRORS THE REAL PAGE, and the Save button depends on it. The
+        controls live in the identity card ABOVE this form and reach it by
+        `form="studio-profile-form"`; a lab form without the id would leave every
+        Save click inert and the specs would be testing the lab's own omission. %>
+    <form x-ref="form" id="studio-profile-form" data-studio-lab-form>
+      <%# Something to dirty that is not the birthday. The save controls are the
+          form's, not the birthday's, so the specs that exercise them edit a name
+          — the same field the real page's first row offers. %>
+      <div class="card p-6 mb-6">
+        <%= render "studio/profiles/name_fields", user: @user %>
+      </div>
+
       <%# THE CLIPPING CONTAINER, reproduced deliberately. `card p-0
           overflow-hidden` is what edit.html.erb wraps its rows in. A lab page
           rendering the field bare would be a different shape from the real page,
@@ -73,11 +84,12 @@
       </div>
     </form>
 
-    <%# Runway, so there is somewhere to scroll when the popover has to flip. %>
-    <div data-studio-lab-spacer style="height: 120vh;"></div>
+    <%# Runway. 300vh rather than 120vh because the observer hands the header over
+        at 60% of the card, so the page has to be tall enough for the card to
+        actually get there — the save controls ride the compact bar once it does,
+        and that handover is now part of what this page is for. %>
+    <div data-studio-lab-spacer style="height: 300vh;"></div>
   </div>
-
-  <%= render "studio/profiles/save_bar" %>
 </div>
 
 <%= render "studio/profiles/form_script" %>

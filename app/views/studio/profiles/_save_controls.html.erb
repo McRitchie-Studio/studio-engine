@@ -1,0 +1,63 @@
+<%# The edit form's save controls — the unsaved-change count, Discard, and Save.
+
+    Locals:
+      compact (Boolean, default false) — the tighter arrangement for the compact
+              identity bar, which has a strip of width rather than a card.
+
+    ONE PARTIAL, TWO HOMES (operator's call, 2026-08-15). These used to live in a
+    fixed bar across the bottom of the viewport. They now sit in the identity
+    chrome instead: the full card's south-east corner while it is on screen, and
+    the compact bar once it has scrolled away. Whichever surface is showing
+    carries them, so they are still always reachable — that was the fixed bar's
+    only real job — with one fixed element on the page instead of two.
+
+    Extracted rather than written twice because the two copies would drift on the
+    thing that matters least to look at and most to get wrong: which form the
+    Save button submits.
+
+    THE `form` ATTRIBUTE IS LOAD-BEARING. Both identity surfaces render OUTSIDE
+    the profile form — editable_identity comes before form_with, and the avatar
+    has a form of its own because nesting them is invalid HTML. A bare
+    type="submit" here would therefore submit the nearest ancestor form, which is
+    the AVATAR form, and an attachment param submitted empty PURGES the
+    attachment: saving a name would delete the photo. `form=` names the target
+    explicitly and works from anywhere in the document.
+
+    $refs.form is NOT the answer, and looks like it: inside editable_identity's
+    imageUploadHost that ref resolves to the avatar form. Two scopes, same ref
+    name, silently the wrong one.
+
+    BOTH BUTTONS STOP PROPAGATION. On the edit page the whole identity card is a
+    click target for the file picker, so a click that reached the card would open
+    a file dialog on its way to saving.
+%>
+<% compact = local_assigns.fetch(:compact, false) %>
+
+<div x-show="dirty" x-cloak x-transition.opacity
+     data-studio-save-controls="<%= compact ? "compact" : "card" %>"
+     role="status" aria-live="polite"
+     class="flex items-center <%= compact ? "gap-2" : "gap-3" %>">
+  <%# THE COUNT HIDES ON A NARROW SCREEN, in BOTH homes: the card shrinks to the
+      viewport's gutters on a phone, where the count plus two buttons does not fit
+      beside a centred avatar, and the buttons are the part you cannot do without.
+
+      OWNED CSS, NOT `hidden sm:block`, and this is not a style preference. The
+      engine ships a PREBUILT bundle, so a utility exists in a consumer only if
+      that consumer's own views already emitted it — and `sm:block` is emitted by
+      NONE of them. Measured before writing this line: zero occurrences in
+      mcritchie-studio's, mcritchie-industries' AND turf-monster's compiled
+      bundles. `hidden sm:block` would therefore have hidden the count at EVERY
+      width in every app, while staying green in this lane, which compiles the
+      engine's own views and emits utilities no consumer has. That is the same
+      blindness that shipped the calendar's grid-cols-7; the answer is the same
+      one — own the rule. %>
+  <p class="studio-save-count text-sm text-secondary whitespace-nowrap">
+    <span class="font-semibold text-heading" x-text="changeCount"></span>
+    <span x-text="changeCount === 1 ? 'unsaved change' : 'unsaved changes'"></span>
+  </p>
+  <div class="flex items-center gap-2">
+    <button type="button" @click.stop="discard()" class="btn btn-outline btn-sm">Discard</button>
+    <button type="submit" form="studio-profile-form" @click.stop
+            class="btn btn-primary btn-sm">Save changes</button>
+  </div>
+</div>

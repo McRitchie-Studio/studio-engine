@@ -24,7 +24,7 @@ const CARD = "[data-studio-identity-full]";
 const TRIGGER = "button.studio-avatar-trigger";
 const OVERLAY = ".studio-avatar-overlay";
 const HIDDEN_BIRTHDAY = 'input[type="hidden"][name="profile[birthday]"]';
-const SAVE_BAR = "[data-studio-save-bar]";
+const SAVE_BAR = '[data-studio-save-controls="card"]';
 
 async function overlayOpacity(page) {
   return await page.evaluate((sel) => {
