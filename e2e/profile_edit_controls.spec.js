@@ -24,7 +24,7 @@ const CARD = "[data-studio-identity-full]";
 const TRIGGER = "button.studio-avatar-trigger";
 const OVERLAY = ".studio-avatar-overlay";
 const HIDDEN_BIRTHDAY = 'input[type="hidden"][name="profile[birthday]"]';
-const SAVE_BAR = "[data-studio-save-bar]";
+const SAVE_CONTROLS = '[data-studio-save-controls="card"]';
 
 async function overlayOpacity(page) {
   return await page.evaluate((sel) => {
@@ -187,7 +187,7 @@ test("the birthday renders as three selects, not a popover", async ({ page }) =>
 test("a full date fills the submitted field and raises the save bar", async ({ page }) => {
   await blockOffsiteRequests(page);
   await page.goto("/lab/profile_edit");
-  await expect(page.locator(SAVE_BAR)).toBeHidden();
+  await expect(page.locator(SAVE_CONTROLS)).toBeHidden();
 
   const row = page.locator('[data-profile-section="birthday"]');
   await row.locator("select").nth(0).selectOption("6");
@@ -200,7 +200,7 @@ test("a full date fills the submitted field and raises the save bar", async ({ p
   // the save bar down and the edit unsaveable.
   await expect(page.locator(HIDDEN_BIRTHDAY)).toHaveValue("1991-06-15");
   await expect(
-    page.locator(SAVE_BAR),
+    page.locator(SAVE_CONTROLS),
     "the birthday changed but the save bar stayed down — the field never reached the dirty check"
   ).toBeVisible();
 });
@@ -219,7 +219,7 @@ test("a full date fills the submitted field and raises the save bar", async ({ p
 test("an incomplete date submits nothing but still raises the save bar", async ({ page }) => {
   await blockOffsiteRequests(page);
   await page.goto("/lab/profile_edit");
-  await expect(page.locator(SAVE_BAR)).toBeHidden();
+  await expect(page.locator(SAVE_CONTROLS)).toBeHidden();
 
   const row = page.locator('[data-profile-section="birthday"]');
   await row.locator("select").nth(0).selectOption("6");
@@ -233,7 +233,7 @@ test("an incomplete date submits nothing but still raises the save bar", async (
   ).toHaveCount(0);
 
   await expect(
-    page.locator(SAVE_BAR),
+    page.locator(SAVE_CONTROLS),
     "picking a month is a change and the page must say so — this is the reported bug"
   ).toBeVisible();
 });
@@ -252,7 +252,7 @@ test("an untouched empty birthday leaves the save bar down", async ({ page }) =>
   const row = page.locator('[data-profile-section="birthday"]');
   await expect(row.locator("select")).toHaveCount(3);
   await expect(
-    page.locator(SAVE_BAR),
+    page.locator(SAVE_CONTROLS),
     "nothing was touched — a save bar here means the field publishes a value " +
       "that disagrees with the one the page loaded with"
   ).toBeHidden();
@@ -281,7 +281,7 @@ test("an unfinished edit cannot wipe a stored birthday", async ({ page }) => {
   // this change (it pinned the form's initial birthday to "" while the field read
   // the real one), and it would have made every spec below meaningless.
   await expect(
-    page.locator(SAVE_BAR),
+    page.locator(SAVE_CONTROLS),
     "the page loaded dirty — the field and the dirty check disagree about the stored birthday"
   ).toBeHidden();
 
@@ -297,7 +297,7 @@ test("an unfinished edit cannot wipe a stored birthday", async ({ page }) => {
     "the field still submits a blank birthday — saving here DELETES the stored one"
   ).toHaveCount(0);
 
-  await expect(page.locator(SAVE_BAR)).toBeVisible();
+  await expect(page.locator(SAVE_CONTROLS)).toBeVisible();
 });
 
 // DISCARD HAS TO REACH THE SELECTS. studioProfileForm#discard restores its
@@ -312,15 +312,15 @@ test("Discard puts the selects back where they were", async ({ page }) => {
 
   const row = page.locator('[data-profile-section="birthday"]');
   await row.locator("select").nth(0).selectOption("6");
-  await expect(page.locator(SAVE_BAR)).toBeVisible();
+  await expect(page.locator(SAVE_CONTROLS)).toBeVisible();
 
-  await page.locator(SAVE_BAR).getByRole("button", { name: "Discard" }).click();
+  await page.locator(SAVE_CONTROLS).getByRole("button", { name: "Discard" }).click();
 
   await expect(row.locator("select").nth(0), "the month kept the discarded edit").toHaveValue("1");
   await expect(row.locator("select").nth(1)).toHaveValue("31");
   await expect(row.locator("select").nth(2)).toHaveValue("1991");
   await expect(page.locator(HIDDEN_BIRTHDAY)).toHaveValue("1991-01-31");
-  await expect(page.locator(SAVE_BAR)).toBeHidden();
+  await expect(page.locator(SAVE_CONTROLS)).toBeHidden();
 });
 
 // THE ROW NAMES ITSELF ONCE. The section wrapper titles it "Birthday" and each

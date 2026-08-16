@@ -275,7 +275,160 @@
 # The lab grew LabUserWithBirthday for these: the only way to lose a stored
 # birthday is to have one, and against the default LabUser (no birthday) the two
 # data-loss specs would pass by having nothing to destroy.
-total_specs: 52
+#
+# 52 -> 55: the save controls left the fixed bottom bar for the identity chrome
+# (operator's call, 2026-08-15) — the card's south-east corner while it is on
+# screen, the compact bar once it has scrolled away.
+#
+# TWO SPECS ASSERTED THE OLD DESIGN LITERALLY — `bar.y + bar.height ===
+# viewport.height` — so they could not survive it. They were REWRITTEN rather
+# than deleted, because the REQUIREMENT survived even though the implementation
+# did not: a save control "not dependent on where you are in the scroll
+# context". The old design met it by pinning to the viewport bottom; the new one
+# meets it by riding a bar already fixed under the nav. The assertion is now the
+# requirement itself — still on screen after scrolling — instead of one
+# implementation of it, which is what let the rewrite be honest.
+#
+# The five moved PAGE as well. /lab/profile renders the READ identity, which is
+# not editable and now carries no controls at all; /lab/profile_edit is where the
+# editable card lives, so it grew a name field to dirty and a 300vh runway so the
+# compact bar actually takes over.
+#
+# The three genuinely new ones cover what moving them INTO a card created:
+#
+#   · the corner is a fact about two boxes (inside the card, bottom half, right
+#     half) that no markup assertion can reach;
+#   · the card must not CHANGE HEIGHT when they appear, or the first keystroke
+#     shoves every row below it down the page — which is why they are absolute;
+#   · Discard must not open the FILE PICKER. The whole editable card is a click
+#     target for the photo picker, so a control inside it that lets its click
+#     bubble opens a file dialog on its way to doing its own job.
+#
+# ONE DEFECT THIS ROUND WAS CAUGHT BY MEASURING RATHER THAN BY A SPEC, and it is
+# the lane's known blind spot again: `hidden sm:block` on the change count. The
+# engine ships a PREBUILT bundle, and `sm:block` occurs in ZERO consumer bundles
+# (checked: mcritchie-studio, mcritchie-industries, turf-monster). The count
+# would have been hidden at EVERY width in every app while this lane — which
+# compiles the engine's own views — stayed green, exactly as it did for the
+# calendar's grid-cols-7. Same answer as then: own the rule
+# (.studio-save-count), do not depend on the utility.
+#
+# 55 -> 56: the compact controls must be CLICKABLE, not merely on screen.
+# Measuring a bounding box is not the same claim, and the difference was found by
+# mutation: with the compact bar left at `pointer-events: none` — correct for as
+# long as it held only a picture and a name, fatal once it holds Save and Discard
+# — every spec here stayed green while both buttons were visible, focusable, and
+# completely dead to the mouse. The new spec clicks one.
+#
+# 56 -> 59: the operator simplified the controls — "1 unsaved change  Discard"
+# became a simple "Discard", and in the card Save changes now sits ON TOP of
+# Discard rather than beside it.
+#
+# The count did not leave the document, only the screen: two buttons appearing is
+# the notification for someone who can see them, and the live region is the whole
+# of it for someone who cannot. That needed a spec of a shape this lane had not
+# used — toBeVisible() cannot express it, because sr-only clips to a 1px box
+# rather than removing the element and Playwright calls a 1px box visible. The
+# claim is about SIZE, so it is measured.
+#
+# The two arrangements are measured rather than described for the same reason as
+# the corner: DOM order and visual order part company the moment anything
+# reverses a flex, so "above" and "beside" are facts about boxes.
+#
+# `items-end` was rejected on the way: it is absent from mcritchie-industries'
+# compiled bundle (measured), so the stacking is owned CSS. `sr-only` was
+# ACCEPTED on the same test — present in all three, and already used by
+# style/_modal_specimen.
+#
+# 59 -> 63: two regressions this change introduced that all 59 specs missed, plus
+# the reason they missed them. Both were found in review, not here.
+#
+# THE LANE ONLY EVER RAN AT ONE WIDTH. playwright.config.js declares no viewport,
+# so every spec ran at Chromium's default 1280x720 — and the controls-over-text
+# overlap measures exactly 0px at 640px and up. At 390px it covered 106px of the
+# name and 64px of the email, with elementFromPoint along the email returning the
+# Discard button. The corner spec could not tell the two apart: it asserts the gap
+# to the card right and bottom edges, which is true at every width, broken ones
+# included. The new cases use test.use inside a describe rather than a new
+# PROJECT, which would re-run all 59 and double this number.
+#
+# AND IT HAD NO FOCUS ASSERTIONS AT ALL. The compact bar hides with opacity 0 and
+# pointer-events none, neither of which removes an element from the tab order —
+# so on an unscrolled dirty page the first two tab stops were an INVISIBLE Discard
+# and Save, and Enter destroyed the edits with nothing on screen. This lane had
+# already made the identical observation for the MOUSE (the buttons were "visible,
+# focusable, and completely dead to the mouse") and fixed only that half.
+#
+# 63 -> 64: the gap BETWEEN the two stacked buttons is still card surface, so a
+# click landing there bubbled to the card and opened the photo picker. Both
+# buttons already stopped their own clicks; nothing owned the 8px between them.
+# Closed with one .stop on the wrapper, which covers the buttons, the gap, and
+# whatever is added there later.
+#
+# 64 -> 66: the overlap fix closed the measured INSTANCE, not the PROPERTY, and
+# review caught it a second time.
+#
+# The 639px media query was written against phone-width measurements and it did
+# close those. But the overlap was never about the viewport — it is about whether
+# the CENTRED TEXT is long enough to reach the corner. At 1280px WITH that fix in
+# place: a 30-character name lost 27px, a 33-character name 51px, a 64-character
+# email 19px, elementFromPoint over the email returning the Discard button.
+#
+# ALL 64 SPECS STAYED GREEN because the lab fixture is "Pat Studio" /
+# "pat@example.com" — short enough to measure exactly 0px at every width there is.
+# The phone spec had 10.77px of margin on the name and ZERO on the email: green,
+# and one character away from reporting success on a broken page. A fixture that
+# cannot express the defect is not coverage.
+#
+# So the lab grew LabUserWithLongIdentity (33-character double-barrelled name,
+# 64-character corporate address — neither extreme, deliberately: a fixture that
+# had to be absurd would be arguing the defect does not matter), both overlap
+# specs now run against it, and a third asserts the fix's ARITHMETIC holds — the
+# text gutter must stay wider than the controls' RENDERED width, so a longer
+# button label cannot silently reopen the overlap.
+#
+# 66 -> 67: the compact bar never got a narrow-width treatment. Its controls are
+# not inside .studio-identity-actions, so the in-flow media query missed it and it
+# kept the corner arrangement's assumptions in a strip with no room for them: at
+# 320px, scrolled and dirty, the name had 13px of clientWidth against 71px of
+# content and rendered "P.", the address "p..". The address now yields at that
+# width and the name gets the room, since identifying the account is the bar's
+# only job.
+#
+# Measured as clientWidth against scrollWidth, because `truncate` CLIPS: the
+# element stays present and visible at every width, so no visibility assertion can
+# see the problem.
+#
+# 67 -> 72: e2e/hold_button.spec.js. The hold-to-confirm button and its fizz. The
+# response bytes are the same whether ANY of it works: the partial always renders a
+# button, two layers and sixty bubbles, and what it cannot render is the press-and-hold
+# TIMER that decides the press counted, or the computed styles that decide where the
+# bubbles sit, what colour they resolve to and whether they move. Five specs, each
+# verified RED against its own defect reintroduced, with the lab server rebooted
+# between runs (docs/E2E_LANE.md):
+#
+#   the hold timer never fires        -> 1 red   .hold-stack loses its isolation -> 1 red
+#   hover speeds the bubbles up
+#     instead of revealing the layer  -> 1 red   bubbles ignore their colour slot -> 1 red
+#   the reduced-motion guard loses
+#     its !important                  -> 1 red
+#
+# The fourth is the zone claim: a bubble carries --fc: var(--fizz-c-N, <own hue>), and
+# whether that lands on the bound palette or the fallback is a var RESOLUTION. Drop the
+# slot and every zone still renders five bubbles — in five different colours, which is
+# the confetti the zones exist to replace, and which no markup assertion can see.
+#
+# The fifth is the one that already earned its keep: the guard's first cut was less
+# specific than `.hold-stack.fizz-lively .fizz-bit`, so it lost the cascade silently and
+# a lively button kept fizzing at a viewer who had asked for less motion. Every
+# server-side assertion was green the whole time.
+#
+# This spec file also moved e2e/tailwind_input.css: the lab now imports the OPT-IN
+# engine-motion.css, the way a consuming app opts into it. Without that the lab served
+# pages where .fizz-bit had no animation and .hold-stack no isolation, and every
+# computed style these specs read came back a browser default — a lane observing
+# nothing, which is the failure mode the @source lines above exist to prevent.
+total_specs: 72
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -287,7 +440,7 @@ total_specs: 52
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 52
+executed: 72
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

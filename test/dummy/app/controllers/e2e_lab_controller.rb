@@ -106,6 +106,14 @@ class E2eLabController < ActionController::Base
   # RAILS_ENV=test renders a real bar with no stubbing at all.
   def bar_stack = render(:bar_stack)
 
+  # The hold-to-confirm button, both levels.
+  #
+  # Renders studio/_hold_button by name. The button's browser half is an inline
+  # script in that partial and its look is computed style from engine-motion.css
+  # — neither is observable from the response bytes, which are identical whether
+  # the script runs or not.
+  def hold_button = render(:hold_button)
+
   # DEFECT 3's page — the @-time localiser script.
   #
   # Renders studio/_at_time_script plus stamps for it to localise. The script is the
@@ -228,8 +236,31 @@ class E2eLabController < ActionController::Base
   # and edit headers are deliberately different components — the read card is a
   # link with a decorative badge, the edit card is not a link and its avatar is a
   # button — and one page cannot exhibit both.
+  # AN ACCOUNT WITH A LONG NAME AND A LONG ADDRESS, because the default fixture
+  # is what hid this bug through two review rounds. "Pat Studio" /
+  # "pat@example.com" is short enough to measure EXACTLY 0px of overlap against
+  # the save controls at every width, so every geometry spec passed while an
+  # ordinary long name lost 51px of itself to the Discard button.
+  #
+  # NEITHER VALUE IS EXTREME, deliberately. 33 characters is a double-barrelled
+  # name; 64 is a corporate address with a first name, a surname and a real
+  # domain. A fixture that had to be absurd to reproduce the defect would be
+  # arguing the defect is not worth fixing.
+  class LabUserWithLongIdentity < LabUserWithAvatar
+    def display_name = "Bartholomew Fitzgerald-Wellington"
+    def email = "bartholomew.fitzgerald-wellington@northwind-trading.example.com"
+    def avatar_initials = "BF"
+  end
+
   def profile_edit
-    @user = params[:birthday].present? ? LabUserWithBirthday.new : LabUserWithAvatar.new
+    @user =
+      if params[:identity] == "long"
+        LabUserWithLongIdentity.new
+      elsif params[:birthday].present?
+        LabUserWithBirthday.new
+      else
+        LabUserWithAvatar.new
+      end
     render(:profile_edit)
   end
 
