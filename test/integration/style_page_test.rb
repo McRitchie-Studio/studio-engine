@@ -606,6 +606,61 @@ class StylePageTest < ActiveSupport::TestCase
       "the rainbow border glow specimen is still in the bag"
   end
 
+  # THE RING NEEDS AN OPAQUE CHILD, AND THE HOST'S OWN BACKGROUND CANNOT BE IT.
+  #
+  # .studio-team-glow paints its two wedge layers on pseudos at z-index -1 / -2,
+  # and CSS paints an element's background FIRST and its negative-z descendants
+  # ON TOP of it (CSS 2.1 Appendix E, steps 1 and 2). So a background on the glow
+  # HOST does not cover the wedges — the wedges cover IT, the ring stops being a
+  # ring, and the whole card face is washed with the conic gradient. Only an
+  # in-flow CHILD paints late enough (step 3) to cover the middle. That is TM's
+  # holo-wrap / holo-card split, and it is what the two real consumers ship.
+  #
+  # The Effects specimen shipped the broken form — `bg-surface` on the glow
+  # element — and the style guide showed two washed slabs where the ring belongs.
+  # A class-list check catches that, where a substring check on the page would
+  # not: the same tokens are present either way, only their OWNER moved.
+  test "every selection-glow host is a bare wrapper with a child in front of the ring" do
+    doc   = Nokogiri::HTML.fragment(render_index)
+    hosts = doc.css(".studio-team-glow")
+    refute_empty hosts, "expected the page to stage .studio-team-glow"
+
+    hosts.each do |host|
+      own_background = host["class"].to_s.split.grep(/\Abg-/)
+      assert_empty own_background,
+        "a .studio-team-glow host must carry NO background of its own (saw " \
+        "#{own_background.join(' ')}) — the wedges paint above it, so it washes the " \
+        "card face instead of ringing the edge"
+      refute_match(/background/, host["style"].to_s,
+        "a .studio-team-glow host must not set an inline background either")
+      refute_empty host.element_children,
+        "a .studio-team-glow host needs an opaque child in front to cover its middle"
+    end
+  end
+
+  # ...and the specimen must both STAGE the fixed shape and TEACH it: the snippet
+  # beside it is copy-paste fuel for an agent, so a recipe that puts the
+  # background back on the host would re-ship the defect everywhere it is pasted.
+  test "the selection-glow specimen stages and teaches the opaque child face" do
+    doc = Nokogiri::HTML.fragment(render_index)
+
+    faces = doc.css(".studio-team-glow > *").select do |el|
+      el["class"].to_s.split.include?("bg-surface")
+    end
+    assert_operator faces.size, :>=, 2,
+      "both selection-glow specimens must put their opaque face in a CHILD element"
+
+    snippet = doc.css("code[x-ref=snippet]").map(&:text).find { |t| t.include?("studio-team-glow") }
+    refute_nil snippet, "the selection-glow specimen must ship a copyable usage snippet"
+
+    host_line, face_lines = snippet.lines.partition { |l| l.include?("studio-team-glow") }
+    refute_match(/\bbg-/, host_line.join,
+      "the copyable recipe must not put a background on the glow host — that is the " \
+      "shape that washes the card face. Saw: #{host_line.join.strip.inspect}")
+    assert_match(/\bbg-/, face_lines.join,
+      "the recipe must show the opaque face on the CHILD, or it teaches half a contract")
+  end
+
   # PROFILE — crop / upload ACTUALLY open: cropper_assets is rendered on the
   # page (loading cropper.js + the factory) and the specimens open crop-photo.
   test "the Profile crop/upload modals are wired to open live" do

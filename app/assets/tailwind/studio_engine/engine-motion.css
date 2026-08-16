@@ -521,10 +521,22 @@
    transition, so a consumer can fade the glow in/out (the living style guide
    slides it between step cards as a modal's step machine advances).
 
-   Host needs an opaque background (the ring shows only around the edge) and must
-   NOT be clipped by an overflow-hidden ancestor near its border.
+   THE HOST IS A BARE WRAPPER, NOT THE CARD. Both wedge layers are pseudo-elements
+   at z-index -1 / -2, and CSS paints an element's own background FIRST, then its
+   negative-z descendants on top of it (CSS 2.1 Appendix E, steps 1 and 2). So a
+   background on the HOST cannot cover the wedges — they wash its whole face, and
+   the ring is gone. What covers the middle is an opaque CHILD in front: in-flow
+   descendants paint later (step 3), leaving only the thickness-wide band around
+   the edge. That is TM's holo-wrap / holo-card split, and it is what both
+   consumers ship — the engine's style/_modal_specimen (bare glow wrapper + the
+   opaque .card article) and the hub's release-phase-meter (bare host + the bar's
+   own fill). Demoing it the other way is what shipped a washed card to
+   admin/style; the host also must NOT be clipped by an overflow-hidden ancestor
+   near its border.
 
-   Usage:  <div class="studio-team-glow rounded-xl bg-surface p-5">Selected</div>
+   Usage:  <div class="studio-team-glow rounded-xl">
+             <div class="rounded-xl bg-surface p-5">Selected</div>
+           </div>
            red glow:  style="--studio-team-glow-color: #E11D48"
    Tune:   --studio-team-glow-color / -opacity / -speed / -thickness / -bloom
    ========================================================================== */
@@ -604,12 +616,36 @@
    11. conic-surface — slow rotating conic-gradient wash (authored fresh)
    A subtle animated ambient background for hero panels / empty states: a conic
    gradient sweeps between two themed stops (CTA -> surface by default) on a slow
-   rotation. The gradient lives on a ::before that rotates, so content kept above
-   it stays crisp. The element's radius clips the wash; give it one.
+   rotation. The gradient lives on a ::before behind the content, so content kept
+   above it stays crisp.
+
+   THE WASH IS CONTAINED BY CONSTRUCTION, NOT BY A CLIP. The first cut rotated an
+   OVERSIZED child (`inset: -50%` + `transform: rotate`) and leaned on the host's
+   `overflow: hidden` to cut it back to the box. That clip is not dependable: the
+   rotating child is composited, and a `backdrop-filter` anywhere in its
+   compositing path (its OWN .surface-glass child on the style guide, or an
+   unrelated overlay elsewhere on the page) drops the clip — the wash then paints
+   outside the box as a rotated slab. Observed on admin/style in Chromium, on both
+   conic specimens, with the .surface-glass demo the reliable trigger.
+
+   So the element never moves. The ::before sits at `inset: 0` with
+   `border-radius: inherit`, and the sweep animates a registered @property angle
+   inside the gradient — the same technique §9b uses. Nothing extends past the
+   box, the rounded corners come from the pseudo itself, and no clip has to hold.
+   `overflow: hidden` stays for the host's CONTENT, not for the wash.
+
+   The cost of the trade, stated: a registered-property animation repaints the
+   gradient on the main thread each frame, where a transform rode the compositor.
+   At the default 16s sweep that is cheap, and §9b already pays it at 4s.
 
    Usage:  <div class="conic-surface rounded-2xl p-8"> ...content... </div>
    Tune:   --conic-surface-from / --conic-surface-to / --conic-surface-duration
    ========================================================================== */
+@property --conic-surface-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
 .conic-surface {
   position: relative;
   isolation: isolate;
@@ -619,10 +655,11 @@
 .conic-surface::before {
   content: "";
   position: absolute;
-  inset: -50%;
+  inset: 0;
+  border-radius: inherit;
   z-index: -1;
   background: conic-gradient(
-    from 0deg,
+    from var(--conic-surface-angle),
     var(--conic-surface-from, var(--color-cta)),
     var(--conic-surface-to, var(--color-surface)),
     var(--conic-surface-from, var(--color-cta))
@@ -631,7 +668,7 @@
 }
 
 @keyframes conic-surface-spin {
-  to { transform: rotate(360deg); }
+  to { --conic-surface-angle: 360deg; }
 }
 
 /* =============================================================================

@@ -82,12 +82,64 @@
         this.publish();
       },
 
-      // `fields` belongs to the enclosing studioProfileForm. Alpine's scope chain
-      // makes it reachable and it is the SAME object, so assigning through it is
-      // what raises the save bar. Without this the field would set a value the
-      // dirty check never notices.
+      // WHAT THE DIRTY CHECK IS SHOWN, and why it is not isoValue.
+      //
+      // isoValue is "" for EVERY incomplete date, so publishing it made a whole
+      // class of edit invisible: on an empty birthday, choosing a month wrote ""
+      // over "" and the save bar never appeared. The operator reported exactly
+      // that. Choosing a month IS a change — the form just had no way to see it.
+      //
+      // So the signal is the three parts, which differ whenever any one of them
+      // does. It stays equal to isoValue for a COMPLETE date (same string, same
+      // shape) so a finished edit compares correctly against the value the page
+      // loaded with, and Discard restores it to that same string.
+      //
+      // `fields` belongs to the enclosing studioProfileForm — Alpine's scope
+      // chain makes it reachable and it is the SAME object, so assigning through
+      // it is what raises the save bar.
+      // THE EMPTY CASE IS NOT A PARTIAL ONE, and conflating them makes the page
+      // arrive already dirty. studioProfileForm's initial.birthday is "" for a
+      // person with no birthday on file, so an untouched empty field must also
+      // read "" — joining three blanks gives "--", which compares as a change and
+      // would raise the save bar on load, before anyone touched anything.
+      get signature() {
+        if (this.complete) return this.isoValue;
+        if (!this.year && !this.month && !this.day) return "";
+        return [this.year, this.month, this.day].join("-");
+      },
+
       publish() {
-        if (this.fields) this.fields.birthday = this.isoValue;
+        if (this.fields) this.fields.birthday = this.signature;
+      },
+
+      // DISCARD MUST REACH THE SELECTS. studioProfileForm#discard reassigns its
+      // `fields` object, which restores every input bound with x-model — and the
+      // three selects are not, because they are bound to THIS component's own
+      // month/day/year. So Discard used to leave them showing the abandoned edit
+      // while the bar disappeared, and the hidden input went on carrying it: the
+      // next save would write the change the user had just discarded.
+      //
+      // Watching `fields.birthday` is what joins them. Discard sets it back to
+      // the initial string, this fires, and the selects follow — and because the
+      // guard below returns early when the value already matches, the publish →
+      // watch → publish path cannot loop.
+      init() {
+        var self = this;
+        this.publish();
+        this.$watch("fields.birthday", function (value) {
+          if (value === self.signature) return;
+          self.adopt(value);
+        });
+      },
+
+      // Takes an ISO date (or a blank) and puts the selects on it. Anything that
+      // is not a full date empties all three, which is what an initial blank and
+      // a cleared birthday both mean.
+      adopt(value) {
+        var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+        this.year  = m ? String(+m[1]) : "";
+        this.month = m ? String(+m[2]) : "";
+        this.day   = m ? String(+m[3]) : "";
       }
     };
   };
