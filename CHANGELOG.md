@@ -4,6 +4,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **Each `/profile` row is its own card.** They were rendered inside one merged
+  card separated by hairlines; they now get `card p-6 mb-6` each, matching
+  turf-monster's `/account` — the operator's reference — and matching the
+  identity header directly above them, which has always been its own card. A
+  merged card underneath it put two different treatments on one page.
+
+  The `border-t` divider is gone rather than ported: separate cards have nothing
+  to divide, and a leftover border draws a stray line inside every card.
+
+  The edit page's merged wrapper also carried `overflow-hidden`. Named here
+  because it looks load-bearing and is not: the birthday popover is
+  `position: fixed`, placed from the trigger's rect, so it never relied on that
+  wrapper as a containing block.
+
+
 ### Added
 
 - **`Studio.after_newsletter_change`** — a seam so a host can react to a

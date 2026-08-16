@@ -526,6 +526,31 @@ class ProfilePageRenderTest < Minitest::Test
     assert_equal %w[google newsletter], doc.css("[data-profile-section]").map { |x| x["data-profile-section"] }
   end
 
+  # ONE CARD PER ROW (operator's call). The identity header above already renders
+  # as its own card, so a single merged card underneath it read as two different
+  # treatments on one page. turf-monster's /account is the reference.
+  def test_each_row_gets_its_own_spaced_card
+    doc = Nokogiri::HTML5.fragment(
+      render_page(Studio::ProfileSections.defaults.select { |x| x[:page] == :show })
+    )
+    sections = doc.css("[data-profile-section]")
+
+    refute_empty sections
+    sections.each do |section|
+      assert_includes section["class"], "card", "each row is its own card now"
+      assert_includes section["class"], "mb-6", "without the margin they stack flush and there is no space"
+    end
+  end
+
+  # The hairline divider is GONE rather than ported — separate cards have nothing
+  # to divide, and a leftover border draws a line inside every card.
+  def test_no_leftover_divider_between_rows
+    html = render_page(Studio::ProfileSections.defaults.select { |x| x[:page] == :show })
+
+    refute_includes html, "border-t border-subtle",
+      "a divider inside a standalone card is a stray line, not a separator"
+  end
+
   def test_a_read_page_with_no_rows_still_renders_the_identity
     html = render_page([])
 
