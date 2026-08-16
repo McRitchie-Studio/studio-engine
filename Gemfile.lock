@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    studio-engine (0.53.0)
+    studio-engine (0.53.1)
       aws-sdk-s3 (~> 1.218)
       faker (>= 2.0, < 4.0)
       mini_magick (~> 5.0)
