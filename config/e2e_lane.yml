@@ -364,7 +364,41 @@
 # buttons already stopped their own clicks; nothing owned the 8px between them.
 # Closed with one .stop on the wrapper, which covers the buttons, the gap, and
 # whatever is added there later.
-total_specs: 64
+#
+# 64 -> 66: the overlap fix closed the measured INSTANCE, not the PROPERTY, and
+# review caught it a second time.
+#
+# The 639px media query was written against phone-width measurements and it did
+# close those. But the overlap was never about the viewport — it is about whether
+# the CENTRED TEXT is long enough to reach the corner. At 1280px WITH that fix in
+# place: a 30-character name lost 27px, a 33-character name 51px, a 64-character
+# email 19px, elementFromPoint over the email returning the Discard button.
+#
+# ALL 64 SPECS STAYED GREEN because the lab fixture is "Pat Studio" /
+# "pat@example.com" — short enough to measure exactly 0px at every width there is.
+# The phone spec had 10.77px of margin on the name and ZERO on the email: green,
+# and one character away from reporting success on a broken page. A fixture that
+# cannot express the defect is not coverage.
+#
+# So the lab grew LabUserWithLongIdentity (33-character double-barrelled name,
+# 64-character corporate address — neither extreme, deliberately: a fixture that
+# had to be absurd would be arguing the defect does not matter), both overlap
+# specs now run against it, and a third asserts the fix's ARITHMETIC holds — the
+# text gutter must stay wider than the controls' RENDERED width, so a longer
+# button label cannot silently reopen the overlap.
+#
+# 66 -> 67: the compact bar never got a narrow-width treatment. Its controls are
+# not inside .studio-identity-actions, so the in-flow media query missed it and it
+# kept the corner arrangement's assumptions in a strip with no room for them: at
+# 320px, scrolled and dirty, the name had 13px of clientWidth against 71px of
+# content and rendered "P.", the address "p..". The address now yields at that
+# width and the name gets the room, since identifying the account is the bar's
+# only job.
+#
+# Measured as clientWidth against scrollWidth, because `truncate` CLIPS: the
+# element stays present and visible at every width, so no visibility assertion can
+# see the problem.
+total_specs: 67
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -376,7 +410,7 @@ total_specs: 64
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 64
+executed: 67
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

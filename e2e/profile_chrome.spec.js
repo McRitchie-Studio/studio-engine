@@ -134,6 +134,36 @@ test("the compact header matches the card's width rather than the viewport's", a
   expect(Math.abs(mini.width - card.width)).toBeLessThan(2);
 });
 
+
+// The overlap between the save controls and the card's OWN text, measured on the
+// rendered GLYPHS. Range rather than the <p> boxes, because the paragraphs are
+// full-width and centred: their rects span the card and would report an overlap
+// even when the text itself is nowhere near the controls.
+async function textOverlaps(page) {
+  return await page.evaluate(() => {
+    const card = document.querySelector("[data-studio-identity-full]");
+    const controls = document.querySelector('[data-studio-save-controls="card"]');
+    const c = controls.getBoundingClientRect();
+    const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
+    const hits = [];
+    let node;
+    while ((node = walker.nextNode())) {
+      if (!node.textContent.trim()) continue;
+      if (controls.contains(node)) continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      for (const r of range.getClientRects()) {
+        const dx = Math.min(c.right, r.right) - Math.max(c.left, r.left);
+        const dy = Math.min(c.bottom, r.bottom) - Math.max(c.top, r.top);
+        if (dx > 0 && dy > 0) {
+          hits.push({ text: node.textContent.trim().slice(0, 44), dx: Math.round(dx) });
+        }
+      }
+    }
+    return hits;
+  });
+}
+
 // --- the save controls ---------------------------------------------------------
 //
 // THEY MOVED, AND SO DID THESE SPECS (operator's call, 2026-08-15). The controls
@@ -522,41 +552,33 @@ test.describe("on a phone", () => {
   // Measured on the GLYPHS via Range, not on the <p> boxes: the paragraphs are
   // full-width and centred, so their rects span the card and would report an
   // overlap even when the text itself is clear.
+  // AGAINST THE LONG IDENTITY, like its desktop counterpart. Run against the
+  // default fixture this spec passed with 10.77px of margin on the name and
+  // ZERO on the email — technically green, and one character from being a spec
+  // that reports success on a broken page.
   test("the controls do not cover the name or the email", async ({ page }) => {
     await blockOffsiteRequests(page);
-    await page.goto("/lab/profile_edit");
+    await page.goto("/lab/profile_edit?identity=long");
     await page.locator(FIRST_NAME).fill("Patricia");
     await expect(page.locator(SAVE_CONTROLS_CARD)).toBeVisible();
 
-    const overlaps = await page.evaluate(() => {
-      const card = document.querySelector("[data-studio-identity-full]");
-      const controls = document.querySelector('[data-studio-save-controls="card"]');
-      const c = controls.getBoundingClientRect();
-
-      // The glyph rects of every text node in the card's identity body.
-      const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
-      const hits = [];
-      let node;
-      while ((node = walker.nextNode())) {
-        if (!node.textContent.trim()) continue;
-        if (controls.contains(node)) continue; // the controls' own labels
-        const range = document.createRange();
-        range.selectNodeContents(node);
-        for (const r of range.getClientRects()) {
-          const dx = Math.min(c.right, r.right) - Math.max(c.left, r.left);
-          const dy = Math.min(c.bottom, r.bottom) - Math.max(c.top, r.top);
-          if (dx > 0 && dy > 0) hits.push({ text: node.textContent.trim().slice(0, 40), dx, dy });
-        }
-      }
-      return hits;
-    });
-
+    const overlaps = await textOverlaps(page);
     expect(
       overlaps,
       `the save controls are painted over the card's own text: ${JSON.stringify(overlaps)}`
     ).toEqual([]);
   });
 
+  // THE COMPACT BAR MUST STILL SAY WHOSE PAGE THIS IS. It is not inside
+  // .studio-identity-actions, so the in-flow rule for the card never reached it,
+  // and it kept the corner arrangement's assumptions in a strip with no room for
+  // them: at 320px, scrolled and dirty, the name had 13px of clientWidth against
+  // 71px of content and rendered as "P.", the address as "p..". Telling you whose
+  // page you are on is the bar's only job.
+  //
+  // Measured as clientWidth against scrollWidth, which is what "this text is
+  // truncated" actually means — `truncate` clips with an ellipsis, so the element
+  // is present and visible at any width and no visibility assertion can see it.
   // AND THE CONTROLS ARE STILL USABLE at this width — the fix moves them, it does
   // not hide them. A rule that pushed them off the card would satisfy the
   // overlap assertion above perfectly.
@@ -601,4 +623,92 @@ test("clicking between the two buttons does not open the picker", async ({ page 
     await page.evaluate(() => window.__picks),
     "a click in the gap between the buttons bubbled to the card and opened the photo picker"
   ).toBe(0);
+});
+
+// --- the overlap PROPERTY, not one instance of it ------------------------------
+//
+// THIS SHIPPED TWICE. The first version put the controls in the card's corner and
+// they painted over the user's name and email; the fix was a 639px media query,
+// written against review's phone-width measurements. It closed those widths and
+// left the property open, because the property was never about the viewport — it
+// is about whether the CENTRED TEXT is long enough to reach the corner.
+//
+// Measured at 1280px with that media query in place: a 30-character name lost
+// 27px, a 33-character name 51px, a 64-character email 19px, and elementFromPoint
+// over the email returned the Discard button. All 64 specs stayed green, because
+// the lab fixture is "Pat Studio" — short enough to measure exactly 0px at every
+// width there is.
+//
+// So these run against ?identity=long, and they are the specs that would have
+// caught it the first time.
+
+test("long text does not reach the controls at desktop width", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit?identity=long");
+  await page.locator(FIRST_NAME).fill("Patricia");
+  await expect(page.locator(SAVE_CONTROLS_CARD)).toBeVisible();
+
+  const overlaps = await textOverlaps(page);
+  expect(
+    overlaps,
+    `the save controls are painted over the card's own text: ${JSON.stringify(overlaps)}`
+  ).toEqual([]);
+});
+
+// THE GUTTER MUST STAY WIDER THAN THE CONTROLS. The fix is arithmetic — the text
+// is padded by more than the controls occupy — and arithmetic quietly stops
+// holding when one of its terms changes. A longer button label ("Save all
+// changes") would widen the controls past a fixed gutter and reopen the overlap
+// with no spec noticing, which is precisely how this reached review twice.
+test("the text gutter stays wider than the controls it makes room for", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit?identity=long");
+  await page.locator(FIRST_NAME).fill("Patricia");
+  await expect(page.locator(SAVE_CONTROLS_CARD)).toBeVisible();
+
+  const { gutter, controls } = await page.evaluate(() => {
+    const card = document.querySelector("[data-studio-identity-full]");
+    const value = getComputedStyle(card).getPropertyValue("--studio-actions-gutter");
+    const probe = document.createElement("div");
+    probe.style.width = value;
+    card.appendChild(probe);
+    const px = probe.getBoundingClientRect().width;
+    probe.remove();
+    return {
+      gutter: px,
+      controls: document.querySelector('[data-studio-save-controls="card"]').getBoundingClientRect().width
+    };
+  });
+
+  expect(
+    gutter,
+    `the gutter is ${Math.round(gutter)}px but the controls are ${Math.round(controls)}px — ` +
+      "the text can reach them again"
+  ).toBeGreaterThan(controls);
+});
+
+// A NARROWER PHONE STILL. Its own describe rather than a `test.use` inside the
+// 390px block, because test.use applies to the WHOLE describe wherever it sits —
+// dropping one in mid-block silently re-ran the overlap specs at 320px too.
+test.describe("on the narrowest phone", () => {
+  test.use({ viewport: { width: 320, height: 800 } });
+
+  test("the compact bar's name is still readable", async ({ page }) => {
+    await blockOffsiteRequests(page);
+    await page.goto("/lab/profile_edit?identity=long");
+    await page.locator(FIRST_NAME).fill("Patricia");
+    await page.evaluate(() => window.scrollTo(0, 1500));
+    await expect(page.locator(MINI)).toHaveClass(/is-visible/);
+
+    const name = await page.evaluate(() => {
+      const el = document.querySelector("[data-studio-identity-mini] p");
+      return { shown: el.clientWidth, needed: el.scrollWidth, text: el.textContent.trim() };
+    });
+
+    expect(
+      name.shown,
+      `the name is clipped to ${name.shown}px of ${name.needed}px — nothing legible is left of ` +
+        `"${name.text}"`
+    ).toBeGreaterThan(60);
+  });
 });

@@ -168,6 +168,49 @@
     bottom: 1.5rem;
   }
 
+  /* THE TEXT MAY NOT REACH THE CONTROLS — the gate is TEXT LENGTH, not viewport
+     width, and getting that wrong is how this shipped twice.
+
+     The first fix was a 639px media query, written against review's measurements
+     at 320/375/390/480. It closed those widths and left the PROPERTY open: the
+     overlap was never about the viewport, it was about whether the centred text
+     is long enough to reach into the corner. Measured at 1280px WITH that fix in
+     place: a 30-character display name lost 27px to the controls, a
+     33-character one 51px, and a 64-character email 19px — with
+     elementFromPoint over the email returning the Discard button. Every spec
+     stayed green because the lab fixture is "Pat Studio".
+
+     THE GUTTER IS THE FIX. The name and the email are centred full-width
+     paragraphs, so padding them symmetrically keeps them centred while making it
+     ARITHMETICALLY impossible for either to enter the controls' column: the text
+     box is now 2 x gutter narrower than the card, and the controls are 107px
+     wide against a 128px gutter.
+
+     TIED TO A MEASUREMENT, NOT GUESSED. The value is a custom property so
+     e2e/profile_chrome.spec.js can assert it stays >= the controls' RENDERED
+     width — otherwise a longer button label ("Save all changes") would silently
+     reopen the overlap, which is exactly the class of regression that put this
+     card through two review rounds.
+
+     THE COST, WHICH IS THE OPERATOR'S CALL (2026-08-16): a long name now wraps a
+     line earlier, so the card is taller for those accounts — on a resting page as
+     well as a dirty one. Chosen over putting the controls in flow because it
+     keeps BOTH guarantees this card was asked for: the south-east corner, and a
+     card that does not change height when the controls appear.
+
+     SCOPED TO THE EDITABLE CARD. The read page renders the same body through
+     .studio-identity-card and has no controls to avoid, so it keeps the full
+     width. */
+  .studio-identity-card-editable {
+    --studio-actions-gutter: 8rem;
+  }
+
+  @media (min-width: 640px) {
+    .studio-identity-card-editable > p {
+      padding-inline: var(--studio-actions-gutter);
+    }
+  }
+
   /* NARROW SCREENS PUT THEM BACK IN FLOW, because absolute positioning inside a
      text-center card lands the controls ON the name and the email.
 
@@ -193,10 +236,30 @@
       margin-top: 1rem;
     }
 
-    /* Full width in flow, so the two buttons read as the card's footer rather
-       than as a block shoved against one edge. */
-    .studio-save-controls {
-      align-items: stretch;
+    /* THE COMPACT BAR WRAPS instead. That bar is not inside
+       .studio-identity-actions, so the in-flow rule above never reached it, and
+       it kept the corner arrangement's assumptions in a strip with no room for
+       them: at 320px, scrolled and dirty, the name had 13px of clientWidth
+       against 244px of content and rendered as "P.".
+
+       HIDING THE ADDRESS WAS THE FIRST ATTEMPT AND DID NOT WORK, which is worth
+       recording because it looked obvious. Measured at 320px: the bar is 288px,
+       the avatar 32px — and the two side-by-side buttons are 187px. The text was
+       never the thing taking the room. Removing a 100px line to recover space in
+       a 49px gap fixed nothing, and the spec written for it passed only because
+       it had inherited a 390px viewport where the problem does not exist.
+
+       Wrapping gives the identity a whole line and puts the controls on their
+       own. The bar is taller for it, but only while the form is dirty — the
+       controls do not render otherwise — and a bar that says "P." is not worth
+       the height it saves. */
+    .studio-identity-mini-row {
+      flex-wrap: wrap;
+    }
+
+    .studio-identity-mini-row > [data-studio-save-controls] {
+      width: 100%;
+      justify-content: flex-end;
     }
   }
 

@@ -57,7 +57,7 @@
      class="studio-identity-mini"
      inert>
   <div class="px-4">
-    <div class="flex items-center gap-3 py-2">
+    <div class="studio-identity-mini-row flex items-center gap-3 py-2">
       <div class="flex items-center gap-3 min-w-0 flex-1" aria-hidden="true">
         <% if user.respond_to?(:avatar) && user.avatar.respond_to?(:attached?) && user.avatar.attached? %>
           <%= image_tag user.avatar, class: "rounded-full object-cover flex-shrink-0",
@@ -72,6 +72,16 @@
         <div class="min-w-0">
           <p class="text-sm font-bold text-heading truncate"><%= user.display_name %></p>
           <% if user.respond_to?(:email) && user.email.present? %>
+            <%# THE ADDRESS YIELDS FIRST on a narrow screen. This bar is a strip,
+                and once it carries Save and Discard there is not room for an
+                avatar, two lines of text and two buttons: at 320px the name
+                measured 13px of clientWidth against 71px of content and rendered
+                as "P.", the address as "p..". Neither told anyone whose page
+                they were on, which is the only reason this bar exists.
+
+                Dropping the address gives the NAME that space back. It is the
+                line that identifies the account, and it is already on the page
+                above in full. %>
             <p class="text-xs text-muted truncate"><%= user.email %></p>
           <% end %>
         </div>
