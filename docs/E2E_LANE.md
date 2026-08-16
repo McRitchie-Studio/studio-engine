@@ -17,6 +17,7 @@ engine-side, and both reached a human:
 | Defect | What shipped | What every green tier saw |
 |---|---|---|
 | `fix-navbar-offset-jump` | The header painted at a server-rendered estimate of the bar stack's height, then moved when a `ResizeObserver` published the real one. | Two markup tests asserting "exactly one pinned header". Both correct. Neither can observe a post-paint move. |
+| `fizz-hold-button-primitive` | A `prefers-reduced-motion` guard that was less specific than the state rules it had to beat, so it lost the cascade and a lively button kept animating for a viewer who had asked it not to. | Every markup and CSS-source assertion — the rule was **present and correct**, and losing a specificity contest is not something either tier can observe. |
 | `propagate-at-format-gem` | An ERB comment terminated early; the leaked prose contained a literal script open tag, which opened a phantom element that swallowed the real script. Dead in every browser, on every page of every host. | `assert_includes html, "__atTimeFmt"` — **green**, because the token survived inside the text the phantom element ate. |
 
 The second one is the whole argument for this lane. The guard written to catch
@@ -115,6 +116,41 @@ either program works. Seven mutations, each verified red:
 | Discard lowers the bar without restoring the fields | 1 |
 | the save bar is `absolute`, not `fixed` | 1 |
 | `dirty` is always true | 3 |
+
+**The hold-to-confirm button — a timer and a cascade, neither of them in the
+bytes.** The button confirms on a press held to term, and carbonates while it
+waits. Its partial always renders the same markup: a button, two bubble layers,
+sixty bubbles. What that markup cannot say is whether the timer ever fires, where
+the bubbles sit, what colour they resolve to, or whether they move. Five
+mutations, each verified red, with the lab server rebooted between runs:
+
+| Mutation | Specs red |
+|---|---|
+| the hold timer never fires (the press never counts) | 1 |
+| `.hold-stack` loses its `isolation` (its z-order leaks into the host) | 1 |
+| hover speeds the bubbles up instead of revealing the second layer | 1 |
+| bubbles ignore their colour slot and fall back to their own hue | 1 |
+| the reduced-motion guard loses its `!important` | 1 |
+
+*The fourth is the zone claim.* A bubble carries `--fc: var(--fizz-c-N, <own
+hue>)`, so whether it wears the bound palette or its fallback is a **var
+resolution**. Drop the slot and every zone still renders five bubbles — in five
+different colours, which is exactly the confetti the zones exist to replace, and
+which no markup assertion can see.
+
+*The fifth had already earned its keep before it was written.* The guard's first
+cut was less specific than `.hold-stack.fizz-lively .fizz-bit`, so it lost the
+cascade silently: a lively button kept fizzing at a viewer who had asked for less
+motion, while every server-side assertion stayed green. A media query adds no
+specificity — an off switch that can lose a specificity contest is not an off
+switch.
+
+*And this spec file moved the lane's own Tailwind entry.* `e2e/tailwind_input.css`
+imported `engine.css` only, so the lab served pages where `.fizz-bit` had no
+animation and `.hold-stack` no isolation, and the first run of these specs read
+browser defaults for everything. It now imports the opt-in `engine-motion.css`
+too, the way a consuming app opts into it — same reasoning as the `@source`
+lines: compile what the apps compile, or grade CSS that ships nowhere.
 
 **Two things this run taught, both worth more than the specs.**
 

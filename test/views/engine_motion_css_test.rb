@@ -34,11 +34,25 @@ class EngineMotionCssTest < Minitest::Test
     "sheen"              => "sheen-sweep",
     "ping"               => "ping-pulse",
     "fade-edge"          => nil,
-    "progress-meter"     => "progress-indeterminate"
+    "progress-meter"     => "progress-indeterminate",
+    "fizz-bit"           => "fizz-boil"
   }.freeze
 
   def css
     @css ||= File.read(CSS_PATH)
+  end
+
+  # The declaration block of ONE rule. No rule in this file nests braces, so a
+  # non-greedy scan to the first `}` is exact — and anchoring the selector to the
+  # start of a line followed by `{` keeps `.conic-surface` from matching
+  # `.conic-surface::before`. The lookbehind is what makes a selector that also
+  # appears as the TAIL of a list resolve to its own rule: `.studio-team-glow::after`
+  # closes the shared `::before, ::after` list too, and without this it would hand
+  # back the shared block instead of the bloom's own.
+  def rule_body(selector)
+    match = css.match(/(?<!,\n)^#{Regexp.escape(selector)}\s*\{([^}]*)\}/)
+    refute_nil match, "expected engine-motion.css to define #{selector}"
+    match[1]
   end
 
   def test_stylesheet_exists_at_the_engine_tailwind_namespace_path
@@ -104,6 +118,39 @@ class EngineMotionCssTest < Minitest::Test
       "engine.css must NOT @import engine-motion.css — the motion layer is opt-in")
   end
 
+  # The hold-to-confirm button + its fizz. The invariants a consumer inherits:
+  def test_hold_button_ships_its_states_keyframes_and_theme_tokens
+    %w[.hold-btn .hold-stack .hold-fizz .fizz-bit].each do |hook|
+      assert_match(/#{Regexp.escape(hook)}\b/, css, "engine-motion.css must define #{hook}")
+    end
+    %w[fizz-simmer fizz-boil fizz-burst hold-nudge hold-glow-pulse hold-tick].each do |frames|
+      assert_match(/@keyframes\s+#{Regexp.escape(frames)}\b/, css,
+        "the hold button must ship @keyframes #{frames}")
+    end
+
+    # Themed off ROLE tokens, so it wears each host's brand rather than the app
+    # it was ported from.
+    face = rule_body(".hold-btn")
+    assert_includes face, "var(--color-primary-rgb)", "the face rides the primary role"
+    assert_includes face, "var(--hold-bg-from,", "and every color reads a --hold-* input first"
+    assert_includes face, "var(--hold-success-from,", "so one instance can be re-themed"
+
+    # The bubbles are a SIBLING the button paints over. If this stack ever stops
+    # isolating, the button's z-index leaks into the host page.
+    stack = rule_body(".hold-stack")
+    assert_includes stack, "isolation: isolate", "the stack keeps its z-order private"
+    assert_match(/\.hold-stack > \.hold-btn \{[^}]*z-index: 1/m, css,
+      "the button must paint over the bubbles")
+
+    # The off switch has to beat the state rules, which are more specific than
+    # anything the media query can write.
+    guard = css[/@media \(prefers-reduced-motion: reduce\) \{\s*\.hold-stack.*?\n\}/m]
+    refute_nil guard, "the fizz must switch off under prefers-reduced-motion"
+    assert_includes guard, ".hold-fizz-extra", "including the hover layer"
+    assert_match(/animation: none !important/, guard,
+      "an off switch that loses a specificity contest is not an off switch")
+  end
+
   def test_pulse_cta_ships_class_keyframe_role_token_and_reduced_motion
     # The class + its namespaced keyframe both ship.
     assert_match(/\.pulse-cta\b/, css,
@@ -123,6 +170,104 @@ class EngineMotionCssTest < Minitest::Test
     # contract (ComponentCssTest), and this is a plain motion-layer effect.
     refute_match(/\.btn-pulse\b/, css,
       "the pulse must stay .pulse-cta, not a .btn-* component variant")
+  end
+
+  # THE CONIC WASH IS CONTAINED BY CONSTRUCTION, NOT BY A CLIP.
+  #
+  # The first cut rotated an OVERSIZED pseudo (`inset: -50%` + a transform
+  # keyframe) and leaned on the host's `overflow: hidden` to cut it back to the
+  # box. That clip does not hold: the rotating child is composited, and a
+  # `backdrop-filter` in its compositing path drops it — the wash then paints
+  # outside the box as a rotated slab. Measured, not reasoned about: on
+  # admin/style in Chromium it escaped on BOTH conic specimens, with the
+  # .surface-glass demo (a backdrop-filter child of the wash itself) the reliable
+  # trigger.
+  #
+  # So this asserts the SHAPE that cannot escape rather than the clip that was
+  # supposed to save it — a pseudo pinned to the host's own box, rounded with it,
+  # swept by a registered angle inside the gradient. Reintroduce the oversized
+  # rotating child and this fails here, not on somebody's screen.
+  def test_conic_surface_wash_cannot_paint_outside_its_own_box
+    assert_match(/@property\s+--conic-surface-angle\s*\{[^}]*syntax:\s*"<angle>"/m, css,
+      "the conic wash must register --conic-surface-angle to sweep the gradient")
+
+    wash = rule_body(".conic-surface::before")
+
+    assert_match(/\binset:\s*0\s*;/, wash,
+      ".conic-surface::before must sit at inset: 0 — an oversized pseudo stays inside " \
+      "the box only while a clip holds, and that clip is lost next to a backdrop-filter")
+    refute_match(/\binset:\s*-/, wash,
+      ".conic-surface::before must never be oversized")
+    assert_match(/border-radius:\s*inherit/, wash,
+      ".conic-surface::before must inherit the host's radius — square corners would be " \
+      "rounded only by overflow:hidden, which is the clip this shape stops trusting")
+    assert_match(/conic-gradient\(\s*from\s+var\(--conic-surface-angle\)/m, wash,
+      "the sweep must rotate the GRADIENT (the registered angle), not the element")
+
+    # Pin the whole keyframe body: it animates the angle, and nothing else. A
+    # transform here would move the pseudo again and put the escape back.
+    assert_match(
+      /@keyframes\s+conic-surface-spin\s*\{\s*to\s*\{\s*--conic-surface-angle:\s*360deg;?\s*\}\s*\}/m,
+      css,
+      "conic-surface-spin must animate --conic-surface-angle to 360deg and nothing else"
+    )
+  end
+
+  # THE RING MUST WORK ON A HOST THAT PAINTS ITS OWN BACKGROUND.
+  #
+  # Both wedge layers are pseudo-elements at z-index -1 / -2, and CSS paints an
+  # element's background BEFORE its negative-z descendants (CSS 2.1 Appendix E,
+  # steps 1 and 2). So the host's own background cannot cover the wedges — a card
+  # that wears this class directly would be WASHED by them. Two things can cover
+  # the middle: an opaque child, or cutting the host's box out of the layers.
+  #
+  # A live board card can only have the second. Turbo targets the card element for
+  # both replace and remove, so a wrapper host is orphaned every time a card leaves
+  # the board — the child shape is not available to it at all. This asserts the
+  # hole is there, on BOTH layers, because losing it on either one silently returns
+  # the wash (the ::after alone would haze the whole face through its blur).
+  def test_selection_glow_cuts_the_host_box_out_of_both_wedge_layers
+    wedges = rule_body(".studio-team-glow::before,\n.studio-team-glow::after")
+
+    assert_match(/padding:\s*var\(--studio-team-glow-thickness\)/, wedges,
+      "each wedge layer needs padding equal to the ring thickness — that is what makes " \
+      "its content box the host's own box, the thing being punched out")
+    assert_match(/mask-composite:\s*exclude/, wedges,
+      "the wedge layers must exclude the host's box from the mask (the hole)")
+    assert_match(/-webkit-mask-composite:\s*xor/, wedges,
+      "ship the -webkit- mask-composite fallback alongside the standard one")
+    assert_match(/mask:\s*\n?\s*linear-gradient\(#000 0 0\) content-box/, wedges,
+      "the punched-out region is the CONTENT box — the host's own box")
+
+    # The bloom twin blurs BEFORE the mask applies, so its box has to out-measure
+    # the blur or the halo ends on a hard line at its own edge.
+    bloom = rule_body(".studio-team-glow::after")
+    assert_match(/border:\s*calc\(var\(--studio-team-glow-bloom\) \* 2\) solid transparent/, bloom,
+      "the bloom layer needs transparent border room for the blur to fade into")
+    assert_match(/background-clip:\s*padding-box/, bloom,
+      "the bloom's wedges must stop at the padding box, leaving that border room empty")
+
+    # ...and that padding box must reach 4px PAST the ring — the "a touch larger"
+    # the bloom always had, respelled as padding once the hole landed. At the bare
+    # ring thickness the bloom shrinks and every WRAPPER consumer's ring lightens.
+    assert_match(/padding:\s*calc\(var\(--studio-team-glow-thickness\) \+ 4px\)/, bloom,
+      "the bloom's own padding must out-measure the ring by 4px, or its source box " \
+      "collapses onto the ring and every wrapper consumer's halo goes thin")
+  end
+
+  # Two opposed wedges travel the ring, so a caller with two colors to show gets
+  # one per wedge. The default aliases the first color, which is what keeps every
+  # existing one-color consumer rendering exactly as before.
+  def test_selection_glow_second_wedge_takes_its_own_color
+    assert_match(/--studio-team-glow-color-b:\s*var\(--studio-team-glow-color\)/, css,
+      "--studio-team-glow-color-b must default to the first color (no change for one-color callers)")
+
+    wedges = rule_body(".studio-team-glow::before,\n.studio-team-glow::after")
+    assert_match(/var\(--studio-team-glow-color\)\s+12%/, wedges,
+      "the first wedge reads --studio-team-glow-color")
+    assert_match(/var\(--studio-team-glow-color-b\)\s+62%/, wedges,
+      "the SECOND wedge must read --studio-team-glow-color-b, or a two-color caller " \
+      "gets one color twice")
   end
 
   def test_gem_packages_the_stylesheet

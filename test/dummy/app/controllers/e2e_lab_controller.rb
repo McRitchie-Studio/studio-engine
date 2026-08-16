@@ -106,6 +106,14 @@ class E2eLabController < ActionController::Base
   # RAILS_ENV=test renders a real bar with no stubbing at all.
   def bar_stack = render(:bar_stack)
 
+  # The hold-to-confirm button, both levels.
+  #
+  # Renders studio/_hold_button by name. The button's browser half is an inline
+  # script in that partial and its look is computed style from engine-motion.css
+  # — neither is observable from the response bytes, which are identical whether
+  # the script runs or not.
+  def hold_button = render(:hold_button)
+
   # DEFECT 3's page — the @-time localiser script.
   #
   # Renders studio/_at_time_script plus stamps for it to localise. The script is the

@@ -272,7 +272,7 @@
       <h3 class="text-xl font-bold text-heading">Effects</h3>
       <p class="text-muted text-sm">
         The <code class="font-mono text-2xs">engine-motion.css</code> visual-effect primitives beyond motion -
-        gradient text, a soft glow halo, a single-color rotating <strong>selection glow</strong>
+        gradient text, a soft glow halo, a one- or two-color rotating <strong>selection glow</strong>
         (ported from Turf Monster's selected-team-card ring), frosted glass, and a conic wash. Each is
         themed through the role tokens and tunable via CSS-var knobs.
       </p>
@@ -297,12 +297,18 @@
         </div>
       <% end %>
 
+      <%# The CARD shape: the host carries its own background and the ring still
+          rings, because the primitive punches the host's box out of both wedge
+          layers. The WRAPPER shape (bare host + opaque child) is staged by the
+          Modals section's glow cards — both are documented in engine-motion.css
+          §9b. Two wedges travel the edge, so a pair of colors reads as a pair. %>
       <%= render layout: "style/specimen",
-            locals: { klass: ".studio-team-glow  (knob: --studio-team-glow-color)",
-                      usage: %(<div class="studio-team-glow rounded-xl bg-surface p-5">Selected</div>\n<div class="studio-team-glow rounded-xl bg-surface p-5" style="--studio-team-glow-color: #E11D48">Ravens</div>) } do %>
+            locals: { klass: ".studio-team-glow  (knobs: --studio-team-glow-color / -color-b)",
+                      usage: %(<div class="studio-team-glow rounded-xl bg-surface p-5">Selected</div>\n<div class="studio-team-glow rounded-xl bg-surface p-5"\n     style="--studio-team-glow-color: #F08030; --studio-team-glow-color-b: #6890F0">Fire / Flying</div>) } do %>
         <div class="flex flex-wrap items-center justify-center gap-6">
           <div class="studio-team-glow rounded-xl bg-surface border border-subtle px-5 py-4 text-sm font-semibold text-heading text-center">Selected</div>
-          <div class="studio-team-glow rounded-xl bg-surface border border-subtle px-5 py-4 text-sm font-semibold text-heading text-center" style="--studio-team-glow-color: #E11D48">Ravens</div>
+          <div class="studio-team-glow rounded-xl bg-surface border border-subtle px-5 py-4 text-sm font-semibold text-heading text-center"
+               style="--studio-team-glow-color: #F08030; --studio-team-glow-color-b: #6890F0">Fire / Flying</div>
         </div>
       <% end %>
 
@@ -320,6 +326,65 @@
         <div class="conic-surface w-full max-w-xs rounded-2xl p-8 text-center">
           <p class="text-heading font-bold">Ambient wash</p>
           <p class="text-body text-xs mt-1">Content stays crisp above the rotating gradient.</p>
+        </div>
+      <% end %>
+    </div>
+  </section>
+
+  <!-- Hold to confirm -->
+  <section class="space-y-5">
+    <div class="space-y-1">
+      <h3 class="text-xl font-bold text-heading">Hold to confirm</h3>
+      <p class="text-muted text-sm max-w-2xl">
+        A press-and-hold CTA for an action you do not want taken by accident, and the
+        carbonation behind it. Ported from Turf Monster, where it confirms a contest entry.
+        The bubbles sit <em>behind</em> the button and show only where they escape its edges;
+        they simmer at rest, boil on hover and through the hold, then burst outward on
+        success. The whole thing themes off the primary role token, so it wears this app&rsquo;s
+        brand — and every color also reads a <code class="font-mono text-2xs">--hold-*</code>
+        input, so one instance can be re-themed from any ancestor.
+        <code class="font-mono text-2xs">prefers-reduced-motion</code> switches the bubbles off.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%# 1. The fizz on its own: no button, just the layers. %>
+      <%= render layout: "style/specimen",
+            locals: { klass: ".hold-stack > .hold-fizz  (.fizz-bit)",
+                      usage: %(render "studio/fizz_layer", seed: "demo") } do %>
+        <div class="w-full max-w-xs">
+          <span class="hold-stack fizz-lively" style="height:3rem;--fizz-c-1:#8b5cf6;--fizz-c-4:#22d3ee;--fizz-c-7:#f59e0b;--fizz-c-10:#ef4444;--fizz-c-13:#10b981;--fizz-c-16:#ec4899">
+            <%= render "studio/fizz_layer", seed: "style-fizz" %>
+            <%= render "studio/fizz_layer", seed: "style-fizz~extra", extra: true %>
+            <span class="flex items-center justify-center h-12 text-xs text-muted">six zones, six colors</span>
+          </span>
+        </div>
+      <% end %>
+
+      <%# 2. The button itself, live: press and hold for two seconds. %>
+      <%= render layout: "style/specimen",
+            locals: { klass: ".hold-btn  (studio/hold_button)",
+                      usage: %(render "studio/hold_button", hold_id: "confirm", duration: 2000) } do %>
+        <div class="w-full max-w-xs" x-data="{ submitting: false }">
+          <%= render "studio/hold_button", hold_id: "style-hold", duration: 2000,
+                default_text: "Hold to Confirm", hold_text: "Almost there…", success_text: "Confirmed!" %>
+          <button type="button" class="btn btn-neutral btn-sm mt-3 mx-auto block"
+                  @click="document.querySelector('.hold-btn[data-hold-id=style-hold]').classList.remove('process','success','error','loading')">Reset</button>
+        </div>
+      <% end %>
+
+      <%# 3. The same button, re-themed from an ancestor — no new CSS. %>
+      <%= render layout: "style/specimen",
+            locals: { klass: ".hold-btn  (--hold-* overrides)",
+                      usage: %(<div style="--hold-bg-from:#f0abfc;--hold-success-to:#4c1d95">…</div>) } do %>
+        <div class="w-full max-w-xs" x-data="{ submitting: false }"
+             style="--hold-bg-from:#f0abfc;--hold-bg-mid:#a855f7;--hold-bg-to:#6b21a8;
+                    --hold-success-from:#c4b5fd;--hold-success-to:#4c1d95;--hold-success-glow-rgb:139 92 246">
+          <%= render "studio/hold_button", hold_id: "style-hold-custom", duration: 2000,
+                default_text: "Hold to Confirm", success_text: "Confirmed!",
+                fizz_colors: %w[#f0abfc #6b21a8 #a855f7 #a5b4fc #312e81 #6366f1 #fbcfe8 #831843 #ec4899
+                                #bae6fd #0c4a6e #0ea5e9 #ddd6fe #4c1d95 #8b5cf6 #fde68a #78350f #f59e0b] %>
+          <button type="button" class="btn btn-neutral btn-sm mt-3 mx-auto block"
+                  @click="document.querySelector('.hold-btn[data-hold-id=style-hold-custom]').classList.remove('process','success','error','loading')">Reset</button>
         </div>
       <% end %>
     </div>

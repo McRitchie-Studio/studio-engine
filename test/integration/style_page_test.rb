@@ -180,6 +180,37 @@ class StylePageTest < ActiveSupport::TestCase
   # The "at" format is the first specimen family that is a HELPER rather than a
   # CSS class, so REQUIRED_CLASSES cannot cover it. What makes the specimens real
   # is the pair: live stamps from the helper AND the script that localizes them.
+  # The hold-to-confirm specimens. Three, and each proves something different:
+  # the fizz on its own, the button live, and the button re-themed from an
+  # ancestor with no new CSS. A broken partial path here 500s the whole page in
+  # every host, so this renders them rather than string-matching the source.
+  test "the Tricks section stages the hold-to-confirm button and its fizz" do
+    doc = Nokogiri::HTML.fragment(render_index)
+
+    buttons = doc.css(".hold-stack > button.hold-btn")
+    assert_operator buttons.size, :>=, 2,
+      "expected a live hold button specimen and a re-themed one"
+
+    # Every staged stack has its bubbles as a SIBLING of the button — the shape
+    # that lets them sit behind it.
+    doc.css(".hold-stack").each do |stack|
+      assert stack.at_css("> .hold-fizz"), "each staged stack renders its fizz layer"
+      assert_nil stack.at_css("button.hold-btn .fizz-bit"),
+        "no bubble may render inside the button"
+    end
+
+    # The standalone fizz specimen binds a palette, so its bubbles resolve to
+    # slots rather than their fallback hues.
+    palette = doc.css(".hold-stack[style*='--fizz-c-1:']")
+    assert_operator palette.size, :>=, 1, "a specimen must show the palette binding"
+
+    # The re-themed one drives the --hold-* inputs, which is the whole claim of
+    # the third specimen: one instance restyled without touching the stylesheet.
+    rethemed = doc.at_css("[style*='--hold-success-to']")
+    assert rethemed, "expected a specimen re-theming the button from an ancestor"
+    assert rethemed.at_css(".hold-btn"), "and it must actually contain a button"
+  end
+
   test "the Tricks section stages the 'at' time-stamp primitive" do
     html = render_index
     stamps = Nokogiri::HTML.fragment(html).css("time[data-at-stamp]")
@@ -604,6 +635,65 @@ class StylePageTest < ActiveSupport::TestCase
       "Tricks renders a studio-team-glow specimen"
     assert_includes html, "studio-border-glow",
       "the rainbow border glow specimen is still in the bag"
+  end
+
+  # THE PAGE MUST STAGE BOTH SHAPES THE RING SUPPORTS, BECAUSE IT SUPPORTS TWO.
+  #
+  # .studio-team-glow paints its wedges on pseudos at z-index -1 / -2, and CSS
+  # paints an element's background FIRST and its negative-z descendants ON TOP of
+  # it (CSS 2.1 Appendix E, steps 1 and 2). Something has to cover the middle or
+  # the "ring" washes the whole face. Two things can:
+  #
+  #   · an opaque CHILD in front (step 3) — the WRAPPER shape, TM's holo-wrap /
+  #     holo-card split, what the Modals section's glow cards ship;
+  #   · the hole the primitive itself cuts — the CARD shape, a host with its own
+  #     background, which is the only shape a live board card can wear (Turbo
+  #     targets the card element for replace and remove, so a wrapper around it is
+  #     orphaned on every remove).
+  #
+  # An earlier version of this guard demanded the wrapper shape of EVERY host,
+  # which was right while the wrapper was the only shape and wrong the moment the
+  # hole landed. So it asserts what is still load-bearing: the page demonstrates
+  # both, so neither can quietly stop working. That the hole exists at all is
+  # asserted in CSS by EngineMotionCssTest.
+  test "the selection glow is staged in both of its documented shapes" do
+    doc   = Nokogiri::HTML.fragment(render_index)
+    hosts = doc.css(".studio-team-glow")
+    refute_empty hosts, "expected the page to stage .studio-team-glow"
+
+    card_shape, wrapper_shape = hosts.partition do |host|
+      host["class"].to_s.split.grep(/\Abg-/).any?
+    end
+
+    refute_empty card_shape,
+      "the Effects specimen must stage the CARD shape — the host carrying its own " \
+      "background — since that is the only shape a board card can wear"
+    refute_empty wrapper_shape,
+      "the Modals glow cards must still stage the WRAPPER shape (bare host + opaque child)"
+
+    wrapper_shape.each do |host|
+      refute_empty host.element_children,
+        "a background-free glow host has nothing covering its middle unless it has a " \
+        "child in front"
+    end
+  end
+
+  # ...and the specimen must TEACH what it stages: the snippet beside it is
+  # copy-paste fuel for an agent, so it has to show the shape that rings AND the
+  # second color knob, which is the whole reason a two-type caller reaches for it.
+  test "the selection-glow snippet teaches the card shape and the second color" do
+    doc = Nokogiri::HTML.fragment(render_index)
+
+    snippet = doc.css("code[x-ref=snippet]").map(&:text).find { |t| t.include?("studio-team-glow") }
+    refute_nil snippet, "the selection-glow specimen must ship a copyable usage snippet"
+
+    host_lines = snippet.lines.select { |l| l.include?("studio-team-glow") }
+    assert host_lines.any? { |l| l.match?(/\bbg-/) },
+      "the recipe must show the glow class and a background on the SAME element — the " \
+      "card shape. Saw: #{host_lines.join.strip.inspect}"
+    assert_includes snippet, "--studio-team-glow-color-b",
+      "the recipe must show the second wedge's color knob, or a two-color caller has " \
+      "no way to discover it"
   end
 
   # PROFILE — crop / upload ACTUALLY open: cropper_assets is rendered on the

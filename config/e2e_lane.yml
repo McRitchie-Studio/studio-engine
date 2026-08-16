@@ -398,7 +398,37 @@
 # Measured as clientWidth against scrollWidth, because `truncate` CLIPS: the
 # element stays present and visible at every width, so no visibility assertion can
 # see the problem.
-total_specs: 67
+#
+# 67 -> 72: e2e/hold_button.spec.js. The hold-to-confirm button and its fizz. The
+# response bytes are the same whether ANY of it works: the partial always renders a
+# button, two layers and sixty bubbles, and what it cannot render is the press-and-hold
+# TIMER that decides the press counted, or the computed styles that decide where the
+# bubbles sit, what colour they resolve to and whether they move. Five specs, each
+# verified RED against its own defect reintroduced, with the lab server rebooted
+# between runs (docs/E2E_LANE.md):
+#
+#   the hold timer never fires        -> 1 red   .hold-stack loses its isolation -> 1 red
+#   hover speeds the bubbles up
+#     instead of revealing the layer  -> 1 red   bubbles ignore their colour slot -> 1 red
+#   the reduced-motion guard loses
+#     its !important                  -> 1 red
+#
+# The fourth is the zone claim: a bubble carries --fc: var(--fizz-c-N, <own hue>), and
+# whether that lands on the bound palette or the fallback is a var RESOLUTION. Drop the
+# slot and every zone still renders five bubbles — in five different colours, which is
+# the confetti the zones exist to replace, and which no markup assertion can see.
+#
+# The fifth is the one that already earned its keep: the guard's first cut was less
+# specific than `.hold-stack.fizz-lively .fizz-bit`, so it lost the cascade silently and
+# a lively button kept fizzing at a viewer who had asked for less motion. Every
+# server-side assertion was green the whole time.
+#
+# This spec file also moved e2e/tailwind_input.css: the lab now imports the OPT-IN
+# engine-motion.css, the way a consuming app opts into it. Without that the lab served
+# pages where .fizz-bit had no animation and .hold-stack no isolation, and every
+# computed style these specs read came back a browser default — a lane observing
+# nothing, which is the failure mode the @source lines above exist to prevent.
+total_specs: 72
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -410,7 +440,7 @@ total_specs: 67
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 67
+executed: 72
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

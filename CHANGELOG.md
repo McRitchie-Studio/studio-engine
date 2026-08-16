@@ -6,6 +6,115 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **The hold-to-confirm button, with its fizz — a new ACTION family in
+  `engine-motion.css`.** A press-and-hold CTA for an action a host does not want
+  taken by accident, ported from Turf Monster where it confirms a contest entry.
+  Render `studio/hold_button`; the specimens are on `/admin/style` (Tricks →
+  "Hold to confirm").
+
+  What ships:
+
+  - **`.hold-btn`** — the face and its five states: idle, `.process` (holding,
+    with the ring filling over `--duration`), `.loading` (submitted, spinning
+    arc), `.success` (confirmed, white check) and `.error` (blocked). The idle
+    face is a gradient down the primary ramp; the confirmed face is a deeper cut
+    of the SAME ramp, because an off-family success color reads as a jump to
+    some other button.
+  - **`.hold-stack` / `.hold-fizz` / `.fizz-bit`** — the carbonation. The
+    bubbles are the button's SIBLING, never its child: the button's `transform`
+    makes it a stacking context, so a bubble inside it can never get behind its
+    background. They show only where they escape its edges.
+  - **Six zones, three colors each.** The button is cut into a 3×2 grid and a
+    bubble only wears the colors of its own zone, so a six-item palette reads as
+    six things standing around the button. Bind `--fizz-c-1..18` (three per zone,
+    in order) on the stack — statically with the `fizz_colors:` local, or live
+    with `fizz_bind:` (an Alpine expression). Turf Monster's board binds the six
+    picked teams' light / dark / alt colors. Anything unbound falls back to the
+    bubble's own hue, so the effect is never colorless.
+  - **Two levels.** `fizz_level: :lively` (the default) rests at a full boil and
+    on hover DOUBLES THE BUBBLE COUNT — a second layer, seeded apart so it lands
+    in the first one's gaps, fades in over it. `fizz_level: :calm` simmers at
+    rest and boils on hover, one layer.
+  - **Per-instance theming without new CSS.** Every color reads a `--hold-*`
+    input before its default, so an ancestor can restyle one button or a page of
+    them: `--hold-bg-from` / `--hold-bg-mid` / `--hold-bg-to` for the resting
+    face, `--hold-success-from` / `--hold-success-to` / `--hold-success-glow-rgb`
+    for the confirmed one.
+  - **`prefers-reduced-motion` switches the bubbles off**, with `!important`,
+    because the state rules are more specific than anything the media query can
+    write — without it a lively button keeps fizzing at someone who asked it not
+    to.
+
+  Per-instance behavior travels as `data-*` on the button and is evaluated
+  against the surrounding `x-data` scope: `guard`, `validate` / `validate_at`,
+  `early_action` / `early_action_at` / `early_action_guard`, `on_hold_start` and
+  `on_success`. `Studio::FizzHelper` owns the bubble table and is seeded per
+  `hold_id`, so a button scatters identically on every render (a Turbo-restored
+  page matches the one it replaced) and two buttons on a page do not fizz in
+  lockstep.
+
+- **`.studio-team-glow` rings a host that paints its own background**, and can
+  carry **two colors**.
+
+  The ring previously needed an opaque CHILD in front to cover its middle,
+  because both wedge layers are pseudo-elements at `z-index: -1 / -2` and CSS
+  paints an element's background BEFORE its negative-z descendants. A live board
+  card cannot supply that child: Turbo targets the card element itself for
+  replace and remove, so a wrapper host is orphaned every time a card leaves the
+  board. The primitive now cuts the host's own box out of both layers
+  (`padding` + `mask-composite`, the trick §1's `.studio-border-glow` already
+  used), so the ring works on the card directly.
+
+  **No-op for the wrapper shape** — its child was already covering that
+  interior. Verified side by side against both live consumers
+  (`style/_modal_specimen` and the hub's release-phase-meter): pixel-equivalent
+  before and after.
+
+  `--studio-team-glow-color-b` colors the SECOND of the two opposed wedges and
+  defaults to the first, so one-color callers see no change and a caller with a
+  pair to show — a Pokémon's two types — gets one per wedge.
+
+  The bloom twin needed care: a mask applies AFTER a filter, so its box carries a
+  transparent border twice the blur radius and its wedges stop at the padding
+  box. Without that room the halo ends on a hard line at its own edge.
+
+### Fixed
+
+- **`.conic-surface` keeps its wash inside its own box.** The wash was an
+  OVERSIZED pseudo (`inset: -50%`) spun by a `transform` keyframe, cut back to
+  the element by the host's `overflow: hidden`. That clip is not dependable: the
+  rotating child is composited, and a `backdrop-filter` in its compositing path
+  drops it. The `.surface-glass` specimen — a backdrop-filter child of the wash
+  itself — is exactly that path, and on admin/style in Chromium the wash escaped
+  as a rotated slab across BOTH conic specimens.
+
+  The element no longer moves. The pseudo sits at `inset: 0` with
+  `border-radius: inherit`, and the sweep animates a registered
+  `--conic-surface-angle` inside the gradient — the technique §9b already used.
+  Nothing extends past the box, the rounded corners come from the pseudo, and no
+  clip has to hold. Same picture, one fewer thing that can fail.
+  `overflow: hidden` stays for the host's CONTENT.
+
+  The trade, stated: a registered-property animation repaints on the main thread
+  where a transform rode the compositor. At the default 16s sweep that is cheap,
+  and §9b already pays it at 4s.
+
+- **`.studio-team-glow` is demoed and documented as the wrapper it is.** Its two
+  wedge layers are pseudos at z-index -1/-2, and CSS paints an element's own
+  background BEFORE its negative-z descendants — so a background on the glow HOST
+  is covered BY the wedges, not the other way round, and the ring becomes a wash
+  across the whole card face. What covers the middle is an opaque CHILD, which
+  paints later; that is TM's `holo-wrap` / `holo-card` split, and what both real
+  consumers already ship.
+
+  The §9b comment claimed the opposite ("host needs an opaque background"), and
+  the Effects specimen followed it, so the style guide showed two washed slabs
+  where the selection ring belongs. The specimen, its copyable snippet, and the
+  contract comment now all state the same thing. The primitive's geometry is
+  unchanged — the consumers tuned against it are untouched.
+
+### Added
+
 - **`studio/fields/_date_of_birth`** — the engine's one date-of-birth field,
   three selects (Month / Day / Year). Rendered by
   `studio/modals/blocks/_age_verify` and by `/profile/edit`'s birthday row.
