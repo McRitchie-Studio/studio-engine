@@ -4,6 +4,42 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`studio/fields/_date_of_birth`** — the engine's one date-of-birth field,
+  three selects (Month / Day / Year). Rendered by
+  `studio/modals/blocks/_age_verify` and by `/profile/edit`'s birthday row.
+
+  **It was already duplicated**, which is the real argument for extracting it:
+  those selects lived in the age-verify block, and turf-monster forked a second
+  copy into its own `modals/_age_verify`. Two copies of one field is how they
+  drift.
+
+### Changed
+
+- **`/profile/edit`'s birthday drops the calendar popover** for that shared
+  field (operator's call). The calendar shipped **four defects in three days**:
+  its day grid used `grid-cols-7`, which exists in no consumer bundle, so the
+  weekday letters stacked into one column and it grew to the height of the page;
+  a flipped popover positioned from a hardcoded 340px height when the real one
+  is ~245px; `place()` re-decided the side on every scroll so it snapped
+  mid-scroll; and it came back open after a browser Back.
+
+  Three selects have none of those failure modes — no position, no flip, no
+  popover, no scroll listener. Their utilities are also **proven across the
+  fleet**: `grid-cols-3` and `label-upper` are present in all three consumers'
+  compiled bundles, which `grid-cols-7` never was.
+
+  The **no-JavaScript path is unchanged**: the native `<input type="date">` still
+  renders under `template x-if`, so only one branch is ever in the DOM.
+
+  Nine browser specs retired with the popover — all of them about positioning —
+  and six replaced them, testing where a select-based field can actually be
+  wrong: the day list following the month (30 in April, 29 in a leap February),
+  clearing a day the new month lost, refusing a partial date, and a year list
+  that stops at this year.
+
+
 ### Changed
 
 - **Each `/profile` row is its own card.** They were rendered inside one merged

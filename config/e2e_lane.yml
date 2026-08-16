@@ -44,7 +44,7 @@
 ---
 # Every `test(...)` committed under e2e/. Verified against Playwright's own model,
 # not prose:
-#   npx playwright test --list   ->  51 tests in 7 files
+#   npx playwright test --list   ->  48 tests in 7 files
 #
 # 5 -> 7: e2e/email_banner_frames.spec.js. The email manager shows a fluid artwork
 # frame beside the email's own FIXED 600px banner table; measured side by side they
@@ -223,7 +223,28 @@
 #
 # Mutation: moving the side decision back inside place() reddens it.
 
-total_specs: 51
+# 51 -> 48: the birthday's calendar popover was REPLACED by the engine's shared
+# three-select date field — the same one studio/modals/blocks/_age_verify uses —
+# so the count went DOWN: NINE specs retired and six replaced them. The nine were
+# the seven-column grid, fitting on screen, not being clipped by its card,
+# staying anchored through a scroll, flipping above when short of room, keeping
+# the side it opened on, opening at all, picking a day, and refusing a future
+# date.
+#
+# EVERY ONE OF THOSE WAS ABOUT POSITIONING, and every one existed because a
+# previous version of that positioning had shipped broken — four defects in three
+# days. Three selects have no position, no flip, no popover and no scroll
+# listener, so those specs have nothing left to assert. Deleting them is the
+# honest move rather than keeping green tests against a component that is gone.
+#
+# What replaced them tests where a SELECT-based field can actually be wrong: the
+# day list following the month (30 in April, 29 in a leap February, 28 otherwise),
+# clearing a day the new month does not have, refusing to submit a partial date,
+# and a year list that stops at this year. Four mutations, each red on the test
+# that names it: a flat 1-31 day list, dropping the out-of-range clear, publishing
+# an incomplete date, and not writing to the dirty check.
+
+total_specs: 48
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -235,7 +256,7 @@ total_specs: 51
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 51
+executed: 48
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

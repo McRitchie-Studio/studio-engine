@@ -1,0 +1,80 @@
+<%# A date of birth, as three selects. The engine's one DOB field.
+
+    Locals (all optional):
+      label_month / label_day / label_year — the field labels. Defaults below.
+      on_change — Alpine expression run when ANY of the three changes, so a call
+                  site can recompute whatever it derives. Defaults to the
+                  age-gate's onMonthChange(), which every current caller has.
+
+                  ONE HOOK FOR ALL THREE, where age_verify used onMonthChange()
+                  for month/year and `error = ''` for day. That is not a
+                  behaviour change: onMonthChange() clears an out-of-range day
+                  and then clears the error, and a day just chosen FROM
+                  dayOptions is never out of range — so on the day select it
+                  reduces to exactly `error = ''`. Checked rather than assumed,
+                  because an extraction that quietly alters a call site is worse
+                  than no extraction.
+
+    WHAT THE ENCLOSING ALPINE COMPONENT MUST SUPPLY. This partial is markup
+    only; it binds to the component it is rendered inside:
+
+      month, day, year   — x-model targets
+      months             — [{ n: 1, label: "January" }, …]
+      dayOptions         — the days valid for the selected month/year
+      years              — the year range this caller offers
+
+    EXTRACTED BECAUSE IT WAS ALREADY DUPLICATED: these selects lived in
+    studio/modals/blocks/_age_verify, and turf-monster forked a second copy into
+    its own modals/_age_verify. Two copies of one field is how they drift.
+
+    AND BECAUSE IT REPLACED SOMETHING WORSE. /profile/edit used a custom calendar
+    popover, which shipped four defects in three days — its grid collapsed in
+    every consumer (grid-cols-7 exists in no consumer bundle), a flipped popover
+    used a hardcoded height and landed ~95px wrong, place() re-decided the side on
+    every scroll so it snapped mid-scroll, and it came back OPEN after a browser
+    Back. Three selects have none of those failure modes: no positioning, no
+    flip, no popover, no scroll listener.
+
+    ITS UTILITIES ARE PROVEN, which the calendar's were not. Measured across the
+    fleet: grid-cols-3 and label-upper are present in turf-monster,
+    mcritchie-studio AND mcritchie-industries' compiled bundles. The engine ships
+    a prebuilt bundle, so a utility exists in a consumer only if that consumer
+    already emitted it — this field's do. %>
+<%
+  label_month = local_assigns.fetch(:label_month, "Month")
+  label_day   = local_assigns.fetch(:label_day, "Day")
+  label_year  = local_assigns.fetch(:label_year, "Year")
+  on_change   = local_assigns.fetch(:on_change, "onMonthChange()")
+%>
+<div class="grid grid-cols-3 gap-2">
+  <div>
+    <label class="label-upper block mb-1"><%= label_month %></label>
+    <select x-model="month" @change="<%= on_change %>"
+            class="input-field !px-3 !py-2.5 text-sm appearance-none cursor-pointer">
+      <option value="" disabled><%= label_month %></option>
+      <template x-for="m in months" :key="m.n">
+        <option :value="m.n" x-text="m.label"></option>
+      </template>
+    </select>
+  </div>
+  <div>
+    <label class="label-upper block mb-1"><%= label_day %></label>
+    <select x-model="day" @change="<%= on_change %>"
+            class="input-field !px-3 !py-2.5 text-sm appearance-none cursor-pointer">
+      <option value="" disabled><%= label_day %></option>
+      <template x-for="d in dayOptions" :key="d">
+        <option :value="d" x-text="d"></option>
+      </template>
+    </select>
+  </div>
+  <div>
+    <label class="label-upper block mb-1"><%= label_year %></label>
+    <select x-model="year" @change="<%= on_change %>"
+            class="input-field !px-3 !py-2.5 text-sm appearance-none cursor-pointer">
+      <option value="" disabled><%= label_year %></option>
+      <template x-for="y in years" :key="y">
+        <option :value="y" x-text="y"></option>
+      </template>
+    </select>
+  </div>
+</div>

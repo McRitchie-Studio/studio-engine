@@ -10,22 +10,19 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 //     ever VISIBLE is a computed opacity set by a CSS hover rule, and whether
 //     clicking it reaches the file picker is an event that only fires in a
 //     browser.
-//   · The calendar popover is `position: fixed`, and proving that took two specs
-//     rather than one. At scroll 0 fixed and absolute render in the SAME PLACE,
-//     so swapping them left every geometry assertion green; the difference only
-//     appears once the page moves, because place() writes viewport coordinates
-//     that absolute reinterprets as document ones. Either way the failure renders
-//     perfectly correct markup and is simply in the wrong place — the defect class
-//     no String assertion can reach.
+//   · The birthday's day list has to FOLLOW the month — 30 in April, 29 in a leap
+//     February — and clear a day the new month does not have. That is date
+//     arithmetic running in a browser; the markup is identical whether it is
+//     right or wrong.
 //
-// The lab page reproduces the edit page's `overflow-hidden` container on purpose,
-// so these specs run against a page shaped like the real one.
+// The calendar popover this file used to test is GONE, replaced by the engine's
+// shared three-select date field (the same one the age-verify modal uses). Six
+// specs went with it — all of them about positioning, and all of them written
+// because a previous version of that positioning had shipped broken.
 
 const CARD = "[data-studio-identity-full]";
 const TRIGGER = "button.studio-avatar-trigger";
 const OVERLAY = ".studio-avatar-overlay";
-const POPOVER = ".studio-birthday-popover";
-const DATE_TRIGGER = '[x-ref="trigger"]';
 const HIDDEN_BIRTHDAY = 'input[type="hidden"][name="profile[birthday]"]';
 const SAVE_BAR = "[data-studio-save-bar]";
 
@@ -155,255 +152,128 @@ test("clicking the avatar reaches the file picker", async ({ page }) => {
   ).toBe(true);
 });
 
-// --- the birthday calendar ----------------------------------------------------
+// --- the birthday, as three selects -------------------------------------------
+//
+// THIS REPLACED A CALENDAR POPOVER, and the specs it replaced are worth naming
+// as they go. There were six, covering: the seven-column grid, fitting on
+// screen, not being clipped by its card, staying anchored through a scroll,
+// flipping above when short of room, and keeping the side it opened on. Every
+// one of them described a positioning problem, and every one existed because a
+// previous version of that positioning had shipped broken.
+//
+// Three selects have no position, no flip, no popover and no scroll listener, so
+// none of those specs has anything left to assert. What IS worth asserting moved
+// to the date arithmetic — which is where a select-based field can actually be
+// wrong.
 
-test("the birthday field opens a calendar rather than a text box", async ({ page }) => {
+test("the birthday renders as three selects, not a popover", async ({ page }) => {
   const pageErrors = watchPageErrors(page);
 
   await blockOffsiteRequests(page);
   await page.goto("/lab/profile_edit");
 
-  // The native input is the JS-less branch and must NOT be in the DOM once Alpine
-  // has booted — two inputs sharing name="profile[birthday]" would submit both,
-  // and the last duplicate wins in Rack's params.
-  await expect(page.locator(DATE_TRIGGER)).toBeVisible();
-  await expect(page.locator('input[type="date"]')).toHaveCount(0);
+  const row = page.locator('[data-profile-section="birthday"]');
+  await expect(row.locator("select")).toHaveCount(3);
 
-  await expect(page.locator(POPOVER)).toBeHidden();
+  // The native input is the JS-less branch and must NOT be in the DOM once
+  // Alpine has booted — two inputs sharing name="profile[birthday]" would submit
+  // both, and the last duplicate wins in Rack's params.
+  await expect(page.locator('input[type="date"]')).toHaveCount(0);
+  await expect(page.locator(".studio-birthday-popover")).toHaveCount(0);
 
   expect(pageErrors, `the page threw: ${pageErrors.join(" | ")}`).toEqual([]);
 });
 
-test("the calendar is not clipped by the card it opens inside", async ({ page }) => {
-  await blockOffsiteRequests(page);
-  await page.goto("/lab/profile_edit");
-  await page.locator(DATE_TRIGGER).click();
-
-  await expect(page.locator(POPOVER)).toBeVisible();
-
-  const box = await page.locator(POPOVER).boundingBox();
-  const viewport = page.viewportSize();
-
-  expect(box, "the popover has no box at all — it did not render").not.toBeNull();
-  expect(box.width, "the popover collapsed to nothing").toBeGreaterThan(100);
-  expect(box.y, "the popover opened above the viewport").toBeGreaterThanOrEqual(0);
-  expect(
-    box.y + box.height,
-    "the popover's bottom is off-screen — it was clipped or placed past the fold"
-  ).toBeLessThanOrEqual(viewport.height + 1);
-});
-
-test("the calendar stays anchored to its field when the page scrolls", async ({ page }) => {
-  await blockOffsiteRequests(page);
-  await page.goto("/lab/profile_edit");
-  await page.locator(DATE_TRIGGER).click();
-  await expect(page.locator(POPOVER)).toBeVisible();
-
-  // THIS IS WHERE FIXED AND ABSOLUTE ACTUALLY DIVERGE, and the previous spec does
-  // not reach it: at scroll 0 the two render in the same place, so swapping
-  // `position: fixed` for `absolute` left every assertion above green.
-  //
-  // place() writes VIEWPORT coordinates from the trigger's rect. Fixed keeps
-  // them meaningful as the page moves; absolute reinterprets them as document
-  // coordinates, so the popover drifts by exactly the scroll offset and detaches
-  // from the field it belongs to.
-  await page.evaluate(() => window.scrollBy(0, 300));
-  await page.waitForTimeout(100);
-
-  const trigger = await page.locator(DATE_TRIGGER).boundingBox();
-  const popover = await page.locator(POPOVER).boundingBox();
-
-  expect(
-    Math.abs(popover.y - (trigger.y + trigger.height)),
-    "the calendar detached from its field after a scroll — it is positioned in document space, not viewport space"
-  ).toBeLessThan(24);
-});
-
-test("picking a day fills the field and raises the save bar", async ({ page }) => {
+test("a full date fills the submitted field and raises the save bar", async ({ page }) => {
   await blockOffsiteRequests(page);
   await page.goto("/lab/profile_edit");
   await expect(page.locator(SAVE_BAR)).toBeHidden();
 
-  await page.locator(DATE_TRIGGER).click();
-  await page.locator(POPOVER).locator("select").first().selectOption("5"); // June
-  await page.locator(POPOVER).getByRole("button", { name: "15", exact: true }).click();
+  const row = page.locator('[data-profile-section="birthday"]');
+  await row.locator("select").nth(0).selectOption("6");
+  await row.locator("select").nth(1).selectOption("15");
+  await row.locator("select").nth(2).selectOption("1991");
 
-  // The submitted value, and the dirty check, are two different objects — the
-  // picker writes the hidden input AND reaches through Alpine's scope chain into
-  // the enclosing form's `fields`. A picker that set only its own state would
-  // leave the save bar down and the edit unsaveable.
-  await expect(page.locator(HIDDEN_BIRTHDAY)).toHaveValue(/^\d{4}-06-15$/);
+  // The submitted value and the dirty check are two different objects: the field
+  // writes the hidden input AND reaches through Alpine's scope chain into the
+  // enclosing form's `fields`. A field that set only its own state would leave
+  // the save bar down and the edit unsaveable.
+  await expect(page.locator(HIDDEN_BIRTHDAY)).toHaveValue("1991-06-15");
   await expect(
     page.locator(SAVE_BAR),
-    "the birthday changed but the save bar stayed down — the picker never reached the dirty check"
+    "the birthday changed but the save bar stayed down — the field never reached the dirty check"
   ).toBeVisible();
-  await expect(page.locator(POPOVER)).toBeHidden();
 });
 
-test("a birthday cannot be set in the future", async ({ page }) => {
+// A PARTIAL date submits NOTHING. Month alone is not a birthday, and writing
+// "1991--" or a half-formed value would be worse than writing nothing.
+test("an incomplete date submits no value", async ({ page }) => {
   await blockOffsiteRequests(page);
   await page.goto("/lab/profile_edit");
-  await page.locator(DATE_TRIGGER).click();
 
-  // Drive the view to THIS month, where the boundary actually falls — a whole
-  // future year would be a weaker test, because every cell in it is future and a
-  // naive year-level clamp would pass.
-  const now = await page.evaluate(() => ({ y: new Date().getFullYear(), m: new Date().getMonth(), d: new Date().getDate() }));
-  const selects = page.locator(POPOVER).locator("select");
-  await selects.nth(1).selectOption(String(now.y));
-  await selects.nth(0).selectOption(String(now.m));
+  const row = page.locator('[data-profile-section="birthday"]');
+  await row.locator("select").nth(0).selectOption("6");
 
-  const lastDay = await page.evaluate(({ y, m }) => new Date(y, m + 1, 0).getDate(), now);
+  await expect(page.locator(HIDDEN_BIRTHDAY)).toHaveValue("");
+  await expect(page.locator(SAVE_BAR)).toBeHidden();
+});
 
-  if (lastDay > now.d) {
-    await expect(
-      page.locator(POPOVER).getByRole("button", { name: String(lastDay), exact: true }),
-      "a day later this month is selectable — a birthday cannot be in the future"
-    ).toBeDisabled();
-  }
+// THE DAY LIST FOLLOWS THE MONTH, which is the one thing three selects can get
+// wrong that a calendar could not: a calendar draws only the days that exist,
+// while a static 1–31 list happily offers the 31st of February.
+test("the day list matches the month, leap years included", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit");
 
-  // Today itself is a legal birthday (someone born today), and the same guard
-  // must not swallow it.
+  const row = page.locator('[data-profile-section="birthday"]');
+  const month = row.locator("select").nth(0);
+  const day = row.locator("select").nth(1);
+  const year = row.locator("select").nth(2);
+  // minus the disabled placeholder option
+  const days = async () => (await day.locator("option").count()) - 1;
+
+  await year.selectOption("1991");
+  await month.selectOption("4");
+  expect(await days(), "April has 30 days").toBe(30);
+
+  await month.selectOption("2");
+  expect(await days(), "February 1991 is not a leap year").toBe(28);
+
+  await year.selectOption("1992");
+  expect(await days(), "February 1992 IS a leap year").toBe(29);
+});
+
+// Pick the 31st, then a month without one. The day must CLEAR rather than submit
+// a date that does not exist.
+test("switching to a shorter month clears an impossible day", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/profile_edit");
+
+  const row = page.locator('[data-profile-section="birthday"]');
+  await row.locator("select").nth(2).selectOption("1991");
+  await row.locator("select").nth(0).selectOption("1");
+  await row.locator("select").nth(1).selectOption("31");
+  await expect(page.locator(HIDDEN_BIRTHDAY)).toHaveValue("1991-01-31");
+
+  await row.locator("select").nth(0).selectOption("2");
+
   await expect(
-    page.locator(POPOVER).getByRole("button", { name: String(now.d), exact: true })
-  ).toBeEnabled();
+    page.locator(HIDDEN_BIRTHDAY),
+    "February 31st was submitted — the day did not clear when the month lost it"
+  ).toHaveValue("");
 });
 
-// --- the calendar's own layout ------------------------------------------------
-
-// THE BUG THE OPERATOR SAW, and the one this lane was structurally blind to.
-//
-// The popover first shipped using `grid grid-cols-7`. The engine ships a PREBUILT
-// bundle, so a Tailwind utility exists in a consuming app only if that app's own
-// views already emitted it — and `grid-cols-7` is rare enough that none had.
-// Measured in mcritchie-studio's compiled bundle: zero occurrences. With no grid
-// the seven weekday letters stacked into one vertical column and the popover grew
-// to the height of the page.
-//
-// THIS SPEC ALONE WOULD NOT HAVE CAUGHT IT, and that is worth saying plainly:
-// e2e/tailwind_input.css carries `@source "../app/views"`, so the lane compiles
-// the ENGINE's views and emits grid-cols-7 that no consumer has. What makes the
-// assertion meaningful now is that the rule is OWNED CSS shipped in the partial,
-// which is true in every app regardless of what its bundle emitted.
-test("the calendar lays out as seven columns", async ({ page }) => {
-  await blockOffsiteRequests(page);
-  await page.goto("/lab/profile_edit");
-  await page.locator(DATE_TRIGGER).click();
-  await expect(page.locator(POPOVER)).toBeVisible();
-
-  const grid = await page.evaluate(() => {
-    const el = document.querySelector(".studio-birthday-grid");
-    if (!el) return null;
-    const s = window.getComputedStyle(el);
-    return { display: s.display, tracks: s.gridTemplateColumns.split(" ").length };
-  });
-
-  expect(grid, "no .studio-birthday-grid — the calendar is not using its own layout").not.toBeNull();
-  expect(grid.display, "the day grid is not a grid at all — this is the stacked-column bug").toBe("grid");
-  expect(grid.tracks, "a week has seven days; anything else means the columns did not resolve").toBe(7);
-});
-
-// The popover must not be taller than the viewport it has to be placed inside.
-// When the grid collapsed, it became as tall as the page — which is what made the
-// placement look, in the operator's words, like it "freaks out" on scroll.
-test("the calendar fits on screen", async ({ page }) => {
-  await blockOffsiteRequests(page);
-  await page.goto("/lab/profile_edit");
-  await page.locator(DATE_TRIGGER).click();
-  await expect(page.locator(POPOVER)).toBeVisible();
-
-  const box = await page.locator(POPOVER).boundingBox();
-  const viewport = page.viewportSize();
-
-  expect(
-    box.height,
-    "the popover is taller than the viewport — its rows are stacking instead of gridding"
-  ).toBeLessThan(viewport.height);
-});
-
-// THE FLIP BRANCH, which no earlier spec ever ran.
-//
-// The lab page's birthday field sits near the top with plenty of room below, so
-// every placement assertion above exercised the BELOW branch only. The flip path
-// — used whenever the field is near the bottom of the viewport — shipped
-// untested, and it was wrong: it placed the popover using a hardcoded
-// `estimatedHeight = 340` while the real popover is about 245px, so a flipped
-// calendar floated ~95px above its field and jumped on every scroll. The operator
-// found it in turf-monster.
-//
-// "It fits on screen" could not catch that. A popover 95px too high still fits.
-// The property that separates right from wrong is that its BOTTOM edge sits
-// against the trigger's TOP edge.
-test("the calendar flips above its field and stays attached to it", async ({ page }) => {
+// A birthday cannot be in the future, and the cheapest way to say so is not to
+// offer one: the year list ends at the current year.
+test("the year list does not offer the future", async ({ page }) => {
   await blockOffsiteRequests(page);
   await page.goto("/lab/profile_edit");
 
-  // Put the field near the bottom of the viewport so there is no room below and
-  // the flip branch is the one that runs.
-  await page.locator(DATE_TRIGGER).evaluate((el) => el.scrollIntoView({ block: "end" }));
-  await page.evaluate(() => window.scrollBy(0, -40));
+  const years = await page.locator('[data-profile-section="birthday"] select').nth(2)
+    .locator("option").allTextContents();
+  const numeric = years.map(Number).filter((n) => !Number.isNaN(n) && n > 0);
+  const thisYear = new Date().getFullYear();
 
-  await page.locator(DATE_TRIGGER).click();
-  await expect(page.locator(POPOVER)).toBeVisible();
-
-  const trigger = await page.locator(DATE_TRIGGER).boundingBox();
-  const popover = await page.locator(POPOVER).boundingBox();
-  const viewport = page.viewportSize();
-
-  // It really did flip — otherwise this spec is silently re-testing the below
-  // branch and proves nothing about the one that was broken.
-  expect(
-    popover.y,
-    "the popover opened BELOW the field — this spec did not exercise the flip branch it exists for"
-  ).toBeLessThan(trigger.y);
-
-  // THE ASSERTION THE ESTIMATE FAILED. Bottom edge against the field's top edge.
-  expect(
-    Math.abs(trigger.y - (popover.y + popover.height)),
-    "the flipped calendar is detached from its field — its height was guessed, not measured"
-  ).toBeLessThan(12);
-
-  expect(popover.y, "the flip pushed it off the top of the viewport").toBeGreaterThanOrEqual(0);
-  expect(popover.y + popover.height).toBeLessThanOrEqual(viewport.height + 1);
-});
-
-// THE SIDE MUST NOT CHANGE AFTER IT OPENS.
-//
-// place() runs on every scroll and resize. When it also CHOSE the side, the
-// popover snapped between above and below the instant the available space
-// crossed the threshold — measured on turf-monster at 60px scroll steps: ABOVE,
-// ABOVE, ABOVE, ABOVE, then below, a 254px jump between two steps while the
-// reader was looking at it. That is what "the date picker freaks out on scroll"
-// was, and no existing spec could see it: the flip spec opens and asserts ONCE,
-// so a side that changes later is invisible to it.
-test("the calendar keeps the side it opened on while you scroll", async ({ page }) => {
-  await blockOffsiteRequests(page);
-  await page.goto("/lab/profile_edit");
-
-  // Open with the field near the bottom, so it opens FLIPPED — the interesting
-  // direction, because scrolling from here is what used to open room below.
-  await page.locator(DATE_TRIGGER).evaluate((el) => el.scrollIntoView({ block: "end" }));
-  await page.evaluate(() => window.scrollBy(0, -40));
-  await page.locator(DATE_TRIGGER).click();
-  await expect(page.locator(POPOVER)).toBeVisible();
-
-  const sideNow = async () => {
-    const t = await page.locator(DATE_TRIGGER).boundingBox();
-    const p = await page.locator(POPOVER).boundingBox();
-    return p.y < t.y ? "above" : "below";
-  };
-
-  const opened = await sideNow();
-  expect(opened, "this spec needs to open FLIPPED or it proves nothing").toBe("above");
-
-  // Scroll in steps, the way a reader does — the old bug appeared between two of
-  // them, not at the extremes.
-  for (let i = 0; i < 5; i++) {
-    await page.evaluate(() => window.scrollBy(0, 60));
-    await page.waitForTimeout(80);
-    expect(
-      await sideNow(),
-      `the calendar switched sides mid-scroll (step ${i + 1}) — place() is re-deciding instead of moving`
-    ).toBe(opened);
-  }
+  expect(Math.max(...numeric), "a year later than this one is selectable").toBeLessThanOrEqual(thisYear);
+  expect(numeric.length, "the list should span a lifetime, not a handful of years").toBeGreaterThan(100);
 });
