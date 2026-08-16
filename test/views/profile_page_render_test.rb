@@ -54,7 +54,7 @@ class ProfilePageRenderTest < Minitest::Test
 
   # THE EDIT PAGE, rendered whole. The read page above has had this since it shipped;
   # the edit page did not, and the gap had teeth: its save bar was extracted into
-  # studio/profiles/_save_bar so the browser lane could mount it, and a mistyped
+  # a partial so the browser lane could mount it, and a mistyped
   # partial name in that extraction raises at request time and nowhere else. The
   # browser lane renders the partial DIRECTLY on its lab page, so it would stay green
   # while /profile/edit 500s.

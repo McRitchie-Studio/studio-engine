@@ -23,8 +23,10 @@
     LOCALS ONLY. Per test/lib/e2e_lane_contract_test.rb this page may set a
     partial's locals and nothing else. The save bar is rendered by name for that
     reason: it lived inline in edit.html.erb and was extracted into
-    studio/profiles/_save_bar so there was a name to render, rather than copied
-    here — a copy would make the spec a test of the lab.
+    a partial so there was a name to render, rather than copied here — a copy
+    would make the spec a test of the lab. (The save controls themselves have
+    since moved into the identity card and off this page, which renders the READ
+    identity and has nothing to save.)
 
     THE SPACER is layout, not behaviour: the observer needs somewhere to scroll
     to, and a viewport-height column of nothing is the cheapest honest way to
