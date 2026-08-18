@@ -85,6 +85,15 @@
     `spin` is kept because it is byte-identical to Tailwind's built-in.
 */
 
+/* CASCADE LAYER — read before removing.
+   Everything below sits in @layer components so a CONSUMER's own utility
+   keeps winning until it deliberately adopts the primitive. Unlayered CSS
+   outranks every layered rule, so an unlayered engine sheet silently
+   overrode a consumer's same-named utility class the moment its lock bumped —
+   nothing in the consumer's own repo had to change for its styling to move.
+   @property blocks stay OUTSIDE: they are global registrations, not rules. */
+
+@layer components {
 /* =============================================================================
    1. studio-border-glow — mask-composite rainbow border glow
    Extracted verbatim from mcritchie-studio app/assets/tailwind/application.css.
@@ -523,7 +532,9 @@
    can carry two colors: --studio-team-glow-color-b defaults to the first, so a
    one-color caller sees no change, and a caller with a pair to show (a Pokémon's
    two types) gets one per wedge. The wedges are swept by animating a registered
+}
    @property angle (rotating the GRADIENT, not the element — so no oversized-child
+@layer components {
    clipping trick is needed). Opacity is a var (--studio-team-glow-opacity) with a
    transition, so a consumer can fade the glow in/out (the living style guide
    slides it between step cards as a modal's step machine advances).
@@ -562,11 +573,13 @@
    Tune:   --studio-team-glow-color / -color-b / -opacity / -speed / -thickness /
            -bloom
    ========================================================================== */
+}
 @property --studio-team-glow-angle {
   syntax: "<angle>";
   inherits: false;
   initial-value: 0deg;
 }
+@layer components {
 .studio-team-glow {
   --studio-team-glow-color: var(--color-cta);
   /* The SECOND wedge's color. Defaults to the first, so a one-color caller sees
@@ -701,11 +714,13 @@
    Usage:  <div class="conic-surface rounded-2xl p-8"> ...content... </div>
    Tune:   --conic-surface-from / --conic-surface-to / --conic-surface-duration
    ========================================================================== */
+}
 @property --conic-surface-angle {
   syntax: "<angle>";
   inherits: false;
   initial-value: 0deg;
 }
+@layer components {
 .conic-surface {
   position: relative;
   isolation: isolate;
@@ -1039,12 +1054,14 @@
 
 /* Registered custom property — makes --bar-progress interpolatable so a single
    transition animates all five segment widths together (one ease, not five). */
+}
 @property --bar-progress {
   syntax: "<number>";
   initial-value: 0;
   inherits: true;
 }
 
+@layer components {
 /* The motion PROPERTIES (transition / animation) live on these classes — NOT on
    the view's inline style — precisely so the reduced-motion override below can
    reach and cancel them. An inline `style="transition: …"` beats a class rule on
@@ -1808,4 +1825,5 @@ body.modal-open { overflow: hidden; }
     opacity: 0 !important;
     transition: none !important;
   }
+}
 }
