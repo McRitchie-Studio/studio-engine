@@ -270,6 +270,47 @@ class EngineMotionCssTest < Minitest::Test
       "gets one color twice")
   end
 
+  # THE IMPLICIT-FROM TRAP. A keyframe that declares only `to` takes its `from`
+  # from whatever transform the element already carries. `@keyframes spin` is
+  # `to`-only, which is CORRECT for `.spinner` (no base transform, so from is
+  # 0deg and it sweeps a clean 360). It was WRONG for the hold button's loading
+  # icon, which carries `rotate(-90deg)` as its ring origin: the animation swept
+  # -90 -> 360, i.e. 450deg per 0.8s iteration, and snapped back across a 90deg
+  # seam 1.25 times a second — on the state a user watches while a payment is in
+  # flight. Shipped knowingly in rel-20260818-63bdb8 and fixed here.
+  #
+  # Nothing in a green suite could see it: the CSS was valid, the animation ran,
+  # and only the ARITHMETIC between the base transform and the implicit start was
+  # wrong. So this guard asserts the arithmetic — the rotating keyframe used by an
+  # element with a rotated base must declare BOTH stops, and they must differ by
+  # exactly one turn.
+  def test_the_hold_button_spinner_declares_both_stops_and_turns_exactly_once
+    body = css[/@keyframes hold-spin-progress\s*\{.*?\n\}/m]
+
+    assert body, "the hold button's loading icon must NOT reuse the `to`-only `spin` keyframe: " \
+                 "its base transform is rotate(-90deg), so an implicit `from` makes it sweep 450deg"
+
+    from_deg = body[/from\s*\{[^}]*rotate\((-?[\d.]+)deg\)/m, 1]
+    to_deg   = body[/\bto\s*\{[^}]*rotate\((-?[\d.]+)deg\)/m, 1]
+
+    assert from_deg, "hold-spin-progress must declare an explicit `from` — an implicit one inherits " \
+                     "the element's base rotation and is exactly the defect this replaced"
+    assert to_deg, "hold-spin-progress must declare an explicit `to`"
+
+    assert_equal 360.0, (to_deg.to_f - from_deg.to_f).abs,
+                 "hold-spin-progress must turn exactly once: from #{from_deg}deg to #{to_deg}deg " \
+                 "is #{(to_deg.to_f - from_deg.to_f).abs}deg, which leaves a visible seam at the wrap"
+
+    base = css[/\.hold-btn > \.hold-icon svg\.progress \{[^}]*\}/m]
+    assert_includes base.to_s, "rotate(#{from_deg}deg)",
+                    "the keyframe's `from` must match the element's base rotation, or the first frame jumps"
+
+    assert_match(/animation:\s*hold-spin-progress/, css,
+                 "the loading icon must actually USE the dedicated keyframe")
+    refute_match(/\.hold-btn\.loading[^{]*\{[^}]*animation:\s*spin\b/m, css,
+                 "the loading icon must not fall back to the shared `to`-only `spin`")
+  end
+
   # The CASCADE LAYER invariant. Unlayered CSS outranks EVERY layered rule, so an
   # unlayered engine sheet silently overrides a consumer's same-named `@utility`
   # the moment that consumer's lock bumps — nothing in the consumer's own repo has
