@@ -311,6 +311,52 @@ class EngineMotionCssTest < Minitest::Test
                  "the loading icon must not fall back to the shared `to`-only `spin`")
   end
 
+  # The CASCADE LAYER invariant. Unlayered CSS outranks EVERY layered rule, so an
+  # unlayered engine sheet silently overrides a consumer's same-named `@utility`
+  # the moment that consumer's lock bumps — nothing in the consumer's own repo has
+  # to change for its styling to move. Measured 2026-08-16: the engine's `.hold-btn`,
+  # `.nudge-debug` and `.hold-stack` all collided with turf-monster's own
+  # `@utility` blocks of the same names, and the engine would have won.
+  #
+  # `components` is the layer, not a bespoke one: Tailwind v4 declares
+  # `theme, base, components, utilities` and later layers win, so a consumer
+  # utility beats an engine primitive — which is the whole point. A NEW layer name
+  # would be appended AFTER `utilities` and lose the property this guards.
+  #
+  # `@property` stays OUTSIDE: it is a global registration, not a style rule.
+  #
+  # Asserted POSITIVELY — every top-level construct is `@layer` or `@property` —
+  # rather than by listing selectors that must be wrapped. A new primitive added
+  # outside the layer fails here without anyone remembering to enrol it.
+  def test_every_rule_ships_inside_a_cascade_layer
+    # Blank comments while preserving line numbers, so a brace inside prose cannot
+    # desynchronise the depth count.
+    stripped = css.gsub(%r{/\*.*?\*/}m) { |c| c.gsub(/[^\n]/, " ") }
+
+    depth = 0
+    escaped = []
+    stripped.lines.each_with_index do |line, i|
+      text = line.strip
+      if depth.zero? && !text.empty? && !text.start_with?("@layer", "@property", "}")
+        escaped << "line #{i + 1}: #{text[0, 70]}"
+      end
+      depth += line.count("{") - line.count("}")
+    end
+
+    assert_empty escaped,
+                 "these ship UNLAYERED, so they outrank every consumer utility of the same name " \
+                 "and will silently re-skin a consumer on its next lock bump:\n  " +
+                 escaped.first(12).join("\n  ")
+
+    assert_includes css, "@layer components {",
+                    "the sheet must place its rules in `components` so a consumer `@utility` " \
+                    "(which lands in `utilities`, a LATER layer) still wins"
+
+    refute_match(/@layer\s+(?!components\b)[a-zA-Z-]+\s*\{/, css,
+                 "only `components` may be used: any other layer name is declared AFTER " \
+                 "`utilities` and would restore the override this guards against")
+  end
+
   def test_gem_packages_the_stylesheet
     spec = Gem::Specification.load(File.expand_path("../../studio-engine.gemspec", __dir__))
     assert_includes spec.files, "app/assets/tailwind/studio_engine/engine-motion.css",
