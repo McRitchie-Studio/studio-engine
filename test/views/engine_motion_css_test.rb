@@ -270,6 +270,93 @@ class EngineMotionCssTest < Minitest::Test
       "gets one color twice")
   end
 
+  # THE IMPLICIT-FROM TRAP. A keyframe that declares only `to` takes its `from`
+  # from whatever transform the element already carries. `@keyframes spin` is
+  # `to`-only, which is CORRECT for `.spinner` (no base transform, so from is
+  # 0deg and it sweeps a clean 360). It was WRONG for the hold button's loading
+  # icon, which carries `rotate(-90deg)` as its ring origin: the animation swept
+  # -90 -> 360, i.e. 450deg per 0.8s iteration, and snapped back across a 90deg
+  # seam 1.25 times a second — on the state a user watches while a payment is in
+  # flight. Shipped knowingly in rel-20260818-63bdb8 and fixed here.
+  #
+  # Nothing in a green suite could see it: the CSS was valid, the animation ran,
+  # and only the ARITHMETIC between the base transform and the implicit start was
+  # wrong. So this guard asserts the arithmetic — the rotating keyframe used by an
+  # element with a rotated base must declare BOTH stops, and they must differ by
+  # exactly one turn.
+  def test_the_hold_button_spinner_declares_both_stops_and_turns_exactly_once
+    body = css[/@keyframes hold-spin-progress\s*\{.*?\n\}/m]
+
+    assert body, "the hold button's loading icon must NOT reuse the `to`-only `spin` keyframe: " \
+                 "its base transform is rotate(-90deg), so an implicit `from` makes it sweep 450deg"
+
+    from_deg = body[/from\s*\{[^}]*rotate\((-?[\d.]+)deg\)/m, 1]
+    to_deg   = body[/\bto\s*\{[^}]*rotate\((-?[\d.]+)deg\)/m, 1]
+
+    assert from_deg, "hold-spin-progress must declare an explicit `from` — an implicit one inherits " \
+                     "the element's base rotation and is exactly the defect this replaced"
+    assert to_deg, "hold-spin-progress must declare an explicit `to`"
+
+    assert_equal 360.0, (to_deg.to_f - from_deg.to_f).abs,
+                 "hold-spin-progress must turn exactly once: from #{from_deg}deg to #{to_deg}deg " \
+                 "is #{(to_deg.to_f - from_deg.to_f).abs}deg, which leaves a visible seam at the wrap"
+
+    base = css[/\.hold-btn > \.hold-icon svg\.progress \{[^}]*\}/m]
+    assert_includes base.to_s, "rotate(#{from_deg}deg)",
+                    "the keyframe's `from` must match the element's base rotation, or the first frame jumps"
+
+    assert_match(/animation:\s*hold-spin-progress/, css,
+                 "the loading icon must actually USE the dedicated keyframe")
+    refute_match(/\.hold-btn\.loading[^{]*\{[^}]*animation:\s*spin\b/m, css,
+                 "the loading icon must not fall back to the shared `to`-only `spin`")
+  end
+
+  # The CASCADE LAYER invariant. Unlayered CSS outranks EVERY layered rule, so an
+  # unlayered engine sheet silently overrides a consumer's same-named `@utility`
+  # the moment that consumer's lock bumps — nothing in the consumer's own repo has
+  # to change for its styling to move. Measured 2026-08-16: the engine's `.hold-btn`,
+  # `.nudge-debug` and `.hold-stack` all collided with turf-monster's own
+  # `@utility` blocks of the same names, and the engine would have won.
+  #
+  # `components` is the layer, not a bespoke one: Tailwind v4 declares
+  # `theme, base, components, utilities` and later layers win, so a consumer
+  # utility beats an engine primitive — which is the whole point. A NEW layer name
+  # would be appended AFTER `utilities` and lose the property this guards.
+  #
+  # `@property` stays OUTSIDE: it is a global registration, not a style rule.
+  #
+  # Asserted POSITIVELY — every top-level construct is `@layer` or `@property` —
+  # rather than by listing selectors that must be wrapped. A new primitive added
+  # outside the layer fails here without anyone remembering to enrol it.
+  def test_every_rule_ships_inside_a_cascade_layer
+    # Blank comments while preserving line numbers, so a brace inside prose cannot
+    # desynchronise the depth count.
+    stripped = css.gsub(%r{/\*.*?\*/}m) { |c| c.gsub(/[^\n]/, " ") }
+
+    depth = 0
+    escaped = []
+    stripped.lines.each_with_index do |line, i|
+      text = line.strip
+      if depth.zero? && !text.empty? && !text.start_with?("@layer", "@property", "}")
+        escaped << "line #{i + 1}: #{text[0, 70]}"
+      end
+      depth += line.count("{") - line.count("}")
+    end
+
+    assert_empty escaped,
+                 "these ship UNLAYERED, so they outrank every consumer utility of the same name " \
+                 "and will silently re-skin a consumer on its next lock bump:\n  " +
+                 escaped.first(12).join("\n  ")
+
+    assert_includes css, "@layer components {",
+                    "the sheet must place its rules in `components` so a consumer `@utility` " \
+                    "(which lands in `utilities`, a LATER layer) still wins"
+
+    refute_match(/@layer\s+(?!components\b)[a-zA-Z-]+\s*\{/, css,
+                 "only `components` may be used: any other layer name is declared AFTER " \
+                 "`utilities` and would restore the override this guards against")
+  end
+
   def test_gem_packages_the_stylesheet
     spec = Gem::Specification.load(File.expand_path("../../studio-engine.gemspec", __dir__))
     assert_includes spec.files, "app/assets/tailwind/studio_engine/engine-motion.css",
