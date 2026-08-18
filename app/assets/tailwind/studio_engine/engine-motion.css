@@ -1563,8 +1563,24 @@ body.modal-open { overflow: hidden; }
 }
 
 .hold-btn.loading > .hold-icon svg.progress {
-  animation: spin 0.8s linear infinite;
+  /* NOT the shared `spin` keyframe. `spin` declares only `to`, so its implicit
+     `from` is whatever the element already carries — and this element carries
+     `rotate(-90deg)` (the ring's 12-o'clock origin, set above). That made the
+     loading icon sweep -90deg -> 360deg, i.e. 450deg per iteration, and snap
+     back across a 90deg seam 1.25x a second. `spin` stays correct for `.spinner`,
+     which has no base transform, so this needs its own keyframe rather than an
+     edit there. The scale is carried through so the animation does not drop it. */
+  animation: hold-spin-progress 0.8s linear infinite;
   transition: none;
+}
+
+@keyframes hold-spin-progress {
+  from {
+    transform: rotate(-90deg) scale(var(--progress-scale, 1));
+  }
+  to {
+    transform: rotate(270deg) scale(var(--progress-scale, 1));
+  }
 }
 
 .hold-btn.loading > .hold-icon svg.progress circle {
