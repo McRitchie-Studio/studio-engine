@@ -95,7 +95,10 @@ abort "e2e/boot: tailwind build produced nothing at #{css_out}" if File.size?(cs
 # rather than regenerating them is the point: the bytes a spec drives here are the
 # bytes a consumer gets. E2eLabController::AssetDelivery serves them from these
 # paths in place of the host asset pipeline the dummy does not have.
-{ "javascripts" => "js", "stylesheets" => "css" }.each do |source_dir, public_sub|
+# app/assets/fonts/studio/*.woff2 rides the same rule: the head declares its
+# @font-face against those exact bytes, so a spec that measures text is measuring the
+# font a consumer ships rather than whatever the runner happens to have installed.
+{ "javascripts" => "js", "stylesheets" => "css", "fonts" => "fonts" }.each do |source_dir, public_sub|
   source = File.join(ROOT, "app", "assets", source_dir, "studio")
   next unless Dir.exist?(source)
 
