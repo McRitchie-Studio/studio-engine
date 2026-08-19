@@ -60,6 +60,7 @@ jobs:
   engine-suite:
     name: engine suite (bin/release-check)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout engine
@@ -130,6 +131,7 @@ jobs:
   playwright:
     name: browser lane (playwright)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout engine
@@ -199,6 +201,7 @@ jobs:
   e2e_executed_set:
     name: browser lane executed-set
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     needs: playwright
     if: always()
 
