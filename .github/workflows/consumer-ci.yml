@@ -81,6 +81,7 @@ jobs:
             needs_solana_admin_key: false
             needs_tailwind_build: true
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     services:
       postgres:
