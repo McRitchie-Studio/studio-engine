@@ -338,6 +338,53 @@ class GeoGateTest < ActionDispatch::IntegrationTest
                  "the namespaced param key would be read by nobody")
   end
 
+  # THE PAGE MUST SHOW THE GATE'S ACTUAL STATE. An operator reads the kill switch
+  # to decide whether the gate is live; a box that renders unchecked while the
+  # gate is ENFORCING is worse than no page at all, because the next Save posts
+  # that lie back and silently disables enforcement.
+  test "the kill switch renders checked when the gate is live" do
+    sign_in_admin
+    enable_gate(subdivisions: %w[WA])
+
+    get "/admin/geo"
+
+    assert_match(/checked/, enabled_input, "the box must be checked while the gate is enforcing:\n#{enabled_input}")
+  end
+
+  test "the kill switch renders unchecked when the gate is off" do
+    sign_in_admin
+    enable_gate(subdivisions: %w[WA], enabled: false)
+
+    get "/admin/geo"
+
+    refute_match(/checked/, enabled_input)
+  end
+
+  # THE GRID MUST ANSWER A CLICK. It paints from the checkbox — the server sets
+  # `checked`, one CSS rule paints it — so a click repaints instantly with no JS.
+  # Painting from a server-rendered class instead (the first version of this page)
+  # meant a click changed nothing on screen until Save: the operator toggling
+  # squares reasonably read the grid as dead while it was recording every click.
+  #
+  # Asserted structurally, because that is what a request test can honestly see:
+  # a blocked square's input carries `checked`, an allowed one does not, and the
+  # paint hangs off that state rather than off a class baked into the markup.
+  test "a blocked square is marked on its checkbox, not baked into its class" do
+    sign_in_admin
+    enable_gate(subdivisions: %w[WA])
+
+    get "/admin/geo"
+
+    assert_match(/checked/, grid_input("WA"), "WA is blocked, so its box must be checked")
+    refute_match(/checked/, grid_input("CO"), "CO is not blocked")
+
+    # The rule that does the painting, and the class that hangs it on the state.
+    assert_match(/\.geo-grid label:has\(input:checked\)/, response.body,
+                 "the blocked look must follow the checkbox, or a click paints nothing")
+    refute_match(/class="[^"]*text-red-400[^"]*"[^>]*>\s*<input[^>]*value="WA"/m, response.body,
+                 "no server-baked red class on the square itself")
+  end
+
   test "an operator saves a policy from the page" do
     sign_in_admin
 
@@ -405,6 +452,21 @@ class GeoGateTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  # The CHECKBOX for the kill switch — not the hidden "0" companion Rails emits
+  # right before it, which carries the same name and would answer every question
+  # about it wrongly.
+  def enabled_input
+    response.body.scan(/<input[^>]*name="geo_setting\[enabled\]"[^>]*>/)
+            .find { |tag| tag.include?(%(type="checkbox")) } ||
+      raise("no geo_setting[enabled] checkbox on the page")
+  end
+
+  # The grid checkbox for one subdivision code.
+  def grid_input(code)
+    response.body[/<input[^>]*name="geo_setting\[banned_subdivisions\]\[\]"[^>]*value="#{code}"[^>]*>/] ||
+      raise("no grid checkbox for #{code}")
+  end
 
   def enable_gate(subdivisions: [], countries: [], enabled: true)
     Studio::GeoSetting.create!(app_name: Studio.app_name, enabled: enabled,

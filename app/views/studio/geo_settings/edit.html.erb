@@ -11,6 +11,22 @@
   sim_region     = @simulated_region
   sim_place      = sim_region ? Studio::Geo.parse_region(sim_region, home_country: home_country).compact.last : nil
 %>
+<style>
+  /* A blocked square paints from the CHECKBOX, so a click shows immediately.
+     The unchecked look stays on the theme's own utility classes below; only the
+     blocked state is written here, in plain CSS rather than a `has-[:checked]:`
+     Tailwind variant, because a host's build may not scan this gem's views for a
+     class string that appears nowhere else in that app.
+     Unlayered on purpose: it must win over the utility classes it overrides. */
+  .geo-grid label:has(input:checked) {
+    background-color: rgb(239 68 68 / 0.1);
+    border-color: rgb(239 68 68 / 0.3);
+    color: rgb(248 113 113);
+  }
+  /* Keyboard users get the same affordance the mouse gets. */
+  .geo-grid label:focus-within { outline: 2px solid rgb(239 68 68 / 0.5); outline-offset: 1px; }
+</style>
+
 <div class="max-w-3xl mx-auto">
   <h1 class="text-2xl font-extrabold text-heading mb-6">Geo Settings</h1>
 
@@ -81,19 +97,28 @@
           Blocked regions in <%= home_country %>
         </h3>
         <% if home_grid.any? %>
-          <p class="text-xs text-muted mb-4">Check the states where this app may not operate.</p>
+          <p class="text-xs text-muted mb-4">
+            Check the states where this app may not operate. Changes apply when you save.
+          </p>
           <%# One hidden field so UNCHECKING the last box posts an empty list rather
               than posting nothing — which Rails would read as "no change" and the
               operator would read as a save that silently did nothing. %>
           <%= hidden_field_tag "geo_setting[banned_subdivisions][]", "" %>
-          <div class="grid grid-cols-5 md:grid-cols-10 gap-2">
+          <div class="geo-grid grid grid-cols-5 md:grid-cols-10 gap-2">
             <% home_grid.each do |code| %>
+              <%# The checkbox is the ONE source of truth for how this square looks:
+                  the server sets `checked`, the CSS below paints it, and a click
+                  repaints it immediately. Painting from a server-rendered class
+                  instead — which this page did first — meant a click changed
+                  nothing on screen until Save, so an operator toggling squares
+                  reasonably concluded the grid was dead while it was in fact
+                  recording every click. %>
               <label title="<%= Studio::Geo.subdivision_name(code) || code %>"
                 class="flex items-center justify-center gap-1 p-2 rounded border cursor-pointer transition text-xs font-mono
-                <%= banned_codes.include?(code) ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-surface-alt border-subtle text-secondary hover:border-strong' %>">
+                       bg-surface-alt border-subtle text-secondary hover:border-strong">
                 <input type="checkbox" name="geo_setting[banned_subdivisions][]" value="<%= code %>"
                   <%= 'checked' if banned_codes.include?(code) %>
-                  class="hidden">
+                  class="sr-only">
                 <%= code %>
               </label>
             <% end %>
