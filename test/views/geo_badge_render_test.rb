@@ -96,11 +96,28 @@ class GeoBadgeRenderTest < Minitest::Test
 
     assert_nil helper.geo_subdivision_flag_path("CA", country: "CA"),
                "a Canadian region must not resolve the California flag"
+    assert_nil helper.geo_subdivision_flag_path("CA", country: "XX!"),
+               "an unparseable country is not the home country either"
+    assert_nil helper.geo_subdivision_flag_path("CA", country: nil),
+               "and neither is no country at all"
     assert_equal "/assets/state-flags/ca.svg", helper.geo_subdivision_flag_path("CA", country: "US")
   end
 
   # No art shipped for this code — a normal answer, not an error. The badge then
   # renders the code text-only.
+  # THE CASE A MUTATION FOUND (in turf-monster's suite, before this moved here).
+  # The renders above pass even without the country guard, because a country flag
+  # takes the `if` and the subdivision branch is never reached. The guard only
+  # bites where NO country flag is possible and the region code still collides:
+  # an unparseable country plus a state-shaped region. Without it, that visitor is
+  # served the California flag.
+  def test_an_unparseable_country_still_gets_no_subdivision_flag
+    doc = render_badge(subdivision: "CA", country: "XX!")
+
+    assert_nil doc.at_css("img"), "no country flag is possible here — that must mean NO flag, not California's"
+    assert_includes doc.text, "CA", "the region text still renders"
+  end
+
   def test_the_flag_lookup_is_nil_for_a_subdivision_with_no_art
     helper = Object.new.extend(Studio::GeoHelper)
     def helper.image_path(path) = "/assets/#{path}"

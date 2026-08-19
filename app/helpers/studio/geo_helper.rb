@@ -38,8 +38,16 @@ module Studio
     # one: the lookup matches a bare two-letter code, so an Italian region
     # normalising to "CA" would otherwise be handed the CALIFORNIA flag — a wrong
     # answer that looks right.
+    #
+    # The guard is `== home`, NOT `unless foreign?`, and the difference is a case
+    # a mutation found in turf-monster's suite: an UNPARSEABLE country ("XX!")
+    # is not foreign by `foreign?` — deliberately, so the policy's fail-closed
+    # branch still treats it as home — and would therefore have been handed a
+    # home subdivision flag. Rendering art is the stricter question: show it only
+    # when the country is positively the home one.
     def geo_subdivision_flag_path(code, country: Studio.geo_home_country)
-      return nil if Studio::Geo.foreign?(country, home_country: Studio.geo_home_country)
+      home = Studio::Geo.normalize_country(Studio.geo_home_country)
+      return nil unless Studio::Geo.normalize_country(country) == home
 
       subdivision = Studio::Geo.normalize_subdivision(code)
       return nil if subdivision.nil?
