@@ -47,6 +47,8 @@ module Studio
         studio/canvas_confetti.js
         studio/studio_confetti.js
         studio/sortable.js
+        studio/montserrat-latin.woff2
+        studio/montserrat-latin-ext.woff2
       ]
 
       # The INHERITED default email banners (Studio::EmailImage). They ride the

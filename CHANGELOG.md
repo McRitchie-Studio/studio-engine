@@ -78,6 +78,45 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   transparent border twice the blur radius and its wedges stop at the padding
   box. Without that room the halo ends on a hard line at its own edge.
 
+### Changed
+
+- **Montserrat is vendored into the engine and can no longer re-measure the page.**
+  `layouts/studio/_head` linked the family from `fonts.googleapis.com` with
+  `display=swap`. The stylesheet blocks the load event; the font FILES do not — so
+  every app went interactive in the fallback font and re-measured every glyph when
+  Montserrat landed. That reflow swallowed a synthesized click three times in one CI
+  day (root-caused in `close-board-filter-flake`: `pointerdown` and `pointerup` hit
+  different elements, so the browser fired `click` on their common ancestor), and on a
+  cold cache it moved a filter chip under a real finger. Montserrat was the last
+  third-party asset in the head; Alpine, SortableJS and canvas-confetti were already
+  vendored.
+
+  What ships:
+
+  - **Two woff2 files** — `studio/montserrat-latin.woff2` (35KB) and
+    `studio/montserrat-latin-ext.woff2` (68KB), served through the asset pipeline and
+    precompiled for Sprockets hosts. The `fonts.googleapis.com` and `fonts.gstatic.com`
+    preconnects are gone, and the head reaches no third party at all.
+  - **`font-display: optional`, not `swap`.** This is the fix, not the self-hosting.
+    `swap` has an unbounded swap period, so a late font always reflows wherever it is
+    served from; `optional` has none, so a font that misses the block period is
+    abandoned for that navigation instead of shifting the layout. The cost is named: a
+    first visit on a slow link can render one page in the fallback. A `crossorigin`
+    preload of the latin subset is what keeps that rare.
+  - **One face per subset spanning `100 900`.** Montserrat v31 is a VARIABLE font — the
+    six weights the old link requested all resolved to the same bytes — so every weight
+    the fleet uses renders from real outlines rather than a synthesized fake, and asking
+    for fewer weights would not have saved a byte.
+  - **Only latin and latin-ext.** cyrillic, cyrillic-ext and vietnamese occur zero times
+    in the engine's views, the consumers' views, and their seed and locale data, so they
+    are not shipped. `unicode-range` means a page only downloads the subsets it renders,
+    so keeping latin-ext (for roster names like Modrić and Çalhanoğlu) costs an English
+    page nothing.
+
+  No consumer action is required: the family, the weights, and the Tailwind `sans` stack
+  are unchanged. An app that sets its own `font-display` or preloads Montserrat itself
+  should drop that.
+
 ### Fixed
 
 - **`.conic-surface` keeps its wash inside its own box.** The wash was an

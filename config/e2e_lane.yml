@@ -428,7 +428,36 @@
 # pages where .fizz-bit had no animation and .hold-stack no isolation, and every
 # computed style these specs read came back a browser default — a lane observing
 # nothing, which is the failure mode the @source lines above exist to prevent.
-total_specs: 72
+# 72 -> 75: e2e/vendored_montserrat.spec.js. Montserrat left fonts.googleapis.com for
+# the asset pipeline, and the unit guard (test/lib/vendored_montserrat_test.rb) can only
+# read SOURCE — it proves the head names no Google host, declares two same-origin faces
+# at font-display: optional, and that the vendored woff2 files carry an fvar table. None
+# of that means the browser RECEIVES a usable font, and none of it can reach the property
+# the change exists for, which is a fact about two measurements taken at different times.
+#
+# The origin is PROVEN rather than asserted, the same way the Alpine specs do it:
+# blockOffsiteRequests answers every non-localhost request with an empty 200, so a face
+# that reaches "loaded" can only have come from the pipeline. Restoring the CDN link
+# fails all three.
+#
+# THE THIRD ONE IS THE TASK. layouts/studio/_head used to link the family with
+# display=swap: the stylesheet blocks the load event, the font FILES do not, so the page
+# went interactive in the fallback and every glyph was re-measured when Montserrat
+# landed. That swallowed a synthesized click three times in one CI day
+# (close-board-filter-flake) because pointerdown and pointerup hit different elements.
+#
+# It is worth saying why this one is not flaky, since a timing test is right to be
+# distrusted — and the old defect was ITSELF unreproducible locally, green in five
+# attempts, because a dev machine already had the font cached. The spec does not wait for
+# the font to be fast. It DELAYS the font 800ms, far past any swap, and then asserts the
+# layout did not move. Under font-display: optional there is no swap period, so a late
+# font is abandoned rather than applied and the assertion holds by construction; under
+# swap it is deterministically false. Verified 3/3 red against the swap mutation at an
+# identical measurement (190.73px -> 203.38px on one line of text) and 3/3 green
+# restored. Dropping unicode-range reddens the second spec, which is the guard on the
+# latin-ext decision: shipping a second 68KB subset is only free while a page declines
+# to download the subset it renders no glyph from.
+total_specs: 75
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -440,7 +469,7 @@ total_specs: 72
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 72
+executed: 75
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

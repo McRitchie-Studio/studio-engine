@@ -50,6 +50,23 @@ class E2eLabController < ActionController::Base
   module AssetDelivery
     ENGINE_STYLESHEETS = { "studio/sticky_table_header" => "/e2e/css/studio/sticky_table_header.css" }.freeze
 
+    # The head's @font-face and preload address Montserrat by LOGICAL path through
+    # asset_path, which is the host pipeline's job like the tags below. Without this
+    # the dummy's plain ActionView asset_path returns "/studio/montserrat-latin.woff2"
+    # — nothing serves that, the font 404s, and a lane that measures text would be
+    # measuring the FALLBACK while reporting success. e2e/boot.rb copies the real
+    # app/assets/fonts bytes to the path on the right.
+    ENGINE_FONTS = %w[
+      studio/montserrat-latin.woff2
+      studio/montserrat-latin-ext.woff2
+    ].freeze
+
+    def asset_path(source, **options)
+      return "/e2e/fonts/#{source}" if ENGINE_FONTS.include?(source.to_s)
+
+      super
+    end
+
     def stylesheet_link_tag(*sources, **options)
       links = sources.filter_map do |source|
         # "tailwind" is the compiled bundle e2e/boot.rb builds; "application" is the

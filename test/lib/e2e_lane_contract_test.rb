@@ -104,10 +104,16 @@ class E2eLaneContractTest < Minitest::Test
   # A TEST THAT COUNTS CONSOLE ERRORS MUST ALSO CLOSE THE NETWORK.
   #
   # `watchPageErrors` fails a spec on any console.error, and a FAILED RESOURCE LOAD is
-  # one. Every lab page links Montserrat from fonts.googleapis.com through
-  # layouts/studio/_head, so a spec that counts console errors with the network open
-  # fails on a slow or unreachable font — naming an assertion that had nothing to do
-  # with fonts. Measured at 2 failures in 10 runs before the helper existed.
+  # one. The measured instance was Montserrat: every lab page linked it from
+  # fonts.googleapis.com through layouts/studio/_head, so a spec that counted console
+  # errors with the network open failed on a slow or unreachable font — naming an
+  # assertion that had nothing to do with fonts. Measured at 2 failures in 10 runs
+  # before the helper existed.
+  #
+  # THE ENGINE VENDORS MONTSERRAT NOW, so that specific request is gone. This guard is
+  # not, and the distinction matters: it holds a property about OFF-ORIGIN REQUESTS IN
+  # GENERAL, and closing the one instance we happened to measure would leave the next
+  # one to be discovered the same expensive way.
   #
   # WHY THIS IS A GUARD AND NOT FOUR EDITS. The helper was written for exactly this and
   # then applied only to the specs added AFTER it; the four older files kept counting
@@ -140,10 +146,11 @@ class E2eLaneContractTest < Minitest::Test
         title = body.lines.first.to_s.strip[0, 70] || "##{index + 1}"
 
         flunk "#{name}: the test \"#{title}\" counts console errors (watchPageErrors) but never " \
-              "calls blockOffsiteRequests. Every lab page links Montserrat from a third party, so " \
-              "this spec fails whenever that fetch is slow or unreachable — reporting it as a " \
-              "failure of whatever it actually asserts. Add `await blockOffsiteRequests(page);` " \
-              "before the navigation (or in a beforeEach if the file navigates there)."
+              "calls blockOffsiteRequests. Any off-origin request a lab page makes fails this spec " \
+              "whenever that fetch is slow or unreachable — reporting it as a failure of whatever " \
+              "the spec actually asserts, which is how this was found. Add " \
+              "`await blockOffsiteRequests(page);` before the navigation (or in a beforeEach if " \
+              "the file navigates there)."
       end
     end
   end

@@ -41,8 +41,9 @@ const LIVELY_STACK = '.hold-stack:has(> .hold-btn[data-hold-id="lively"])';
 
 test("a press held to term confirms, and a press let go early does not", async ({ page }) => {
   const errors = watchPageErrors(page);
-  // Every lab page links Montserrat from a third party; a slow fetch would land
-  // in the error list and read as a failure of the hold itself.
+  // Any off-origin request a lab page makes would land in the error list on a slow or
+  // refused fetch and read as a failure of the hold itself. (The instance that taught
+  // the lane this was Montserrat, which the engine now vendors.)
   await blockOffsiteRequests(page);
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/lab/hold_button");

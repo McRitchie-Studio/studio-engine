@@ -85,12 +85,18 @@ async function sampleAcrossFrames(page, { perturb, read, frames = 30 }) {
 // Refuse every request that leaves this origin, so the lane cannot depend on the
 // public internet.
 //
-// WHY THIS IS NEEDED AND NOT PARANOIA. layouts/studio/_head — the engine's real head
-// partial, which the lab renders on purpose — links Montserrat from
-// fonts.gstatic.com. A slow or refused fetch there surfaces to the page as
-// `console.error: Failed to load resource`, which watchPageErrors counts, which
-// fails a spec that has nothing to do with fonts. Measured: 2 runs in 10 on a normal
-// connection, and the failure names the assertion rather than the cause.
+// WHY THIS IS NEEDED AND NOT PARANOIA. It was written for a real, measured flake:
+// layouts/studio/_head — the engine's real head partial, which the lab renders on
+// purpose — used to link Montserrat from fonts.gstatic.com, and a slow or refused
+// fetch there surfaces to the page as `console.error: Failed to load resource`, which
+// watchPageErrors counts, which fails a spec that has nothing to do with fonts.
+// Measured: 2 runs in 10 on a normal connection, and the failure named the assertion
+// rather than the cause.
+//
+// THAT PARTICULAR REQUEST IS GONE — the engine vendors Montserrat now — and the guard
+// stays, because the property it holds was never about fonts. Any off-origin request
+// any lab page ever grows has the same failure mode, and this is the only place that
+// can close it once for all of them.
 //
 // ANSWERED, NOT ABORTED, and that distinction is the whole implementation. Calling
 // route.abort() here fails the request, which Chromium reports to the page as
@@ -103,9 +109,13 @@ async function sampleAcrossFrames(page, { perturb, read, frames = 30 }) {
 // recognise a string Chromium chose, and it would also forgive a genuine 404 on an
 // ENGINE asset — which is a defect this lane must fail on.
 //
-// The cost is named: specs downstream of this see the fallback font, so nothing here
-// may assert a measurement that depends on Montserrat's metrics. Container widths and
-// fixed-position offsets do not.
+// THE COST THIS USED TO CARRY IS PAID OFF, and the change is worth knowing about
+// because it opened a door. While Montserrat came from fonts.gstatic.com, every spec
+// downstream of this helper saw the FALLBACK font, so nothing here could assert a
+// measurement that depended on Montserrat's metrics. Montserrat is same-origin now, so
+// it is no longer blocked — it arrives from the asset pipeline like any engine asset,
+// and text measurements are fair game. e2e/vendored_montserrat.spec.js is the first
+// spec to take one, and it could not have been written before.
 async function blockOffsiteRequests(page) {
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url());
