@@ -35,6 +35,7 @@
 #
 # ASSERTED POSITIVELY over every workflow file, rather than listing today's jobs:
 # a lane added tomorrow fails here without anyone remembering to enrol it.
+require "bundler/setup"
 require "minitest/autorun"
 require "yaml"
 
