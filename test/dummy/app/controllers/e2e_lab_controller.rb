@@ -47,6 +47,12 @@ class E2eLabController < ActionController::Base
   # engine and arrives through javascript_include_tag, like every other engine asset).
   # There is no Turbo in the lab, so `turbo:load`/`turbo:render` listeners never fire
   # and the lane cannot observe Turbo-navigation behavior. docs/E2E_LANE.md records it.
+  # Where the lab visitor is standing. A host supplies these from
+  # Studio::GeoDetection; the lab supplies them as locals-of-the-page, which is
+  # the same relationship every other lab page has to its partial.
+  LAB_COUNTRY = "US"
+  LAB_SUBDIVISION = "CO"
+
   module AssetDelivery
     ENGINE_STYLESHEETS = { "studio/sticky_table_header" => "/e2e/css/studio/sticky_table_header.css" }.freeze
 
@@ -96,11 +102,24 @@ class E2eLabController < ActionController::Base
 
   layout "e2e_lab"
 
-  helper_method :logged_in?, :root_path, :current_user
+  helper_method :logged_in?, :root_path, :current_user,
+                :geo_country, :geo_state, :geo_blocked?, :geo_override_active?
 
   def logged_in? = false
 
   def root_path = "/"
+
+  # The geo page and the badge read these off the controller in every host. Here
+  # they are the lab visitor's fixed location — see #geo_settings.
+  def geo_country = LAB_COUNTRY
+
+  def geo_state = LAB_SUBDIVISION
+
+  # False on purpose: the interesting states are the ones a CLICK produces, and a
+  # page that arrived already blocked could not show the transition into it.
+  def geo_blocked? = false
+
+  def geo_override_active? = false
 
   # THE PROFILE REGISTRY ASKS THE VIEW FOR THIS. Studio::ProfileSections#resolve
   # reads `view.current_user` to run each row's `requires:` gate, and a nil user
@@ -130,6 +149,31 @@ class E2eLabController < ActionController::Base
   # — neither is observable from the response bytes, which are identical whether
   # the script runs or not.
   def hold_button = render(:hold_button)
+
+  # The geo manager, rendered as a host renders it: the engine's own template plus
+  # the badge a host puts in its navbar.
+  #
+  # Everything the page decides is under test here — the squares paint from their
+  # checkboxes, the summary chips rebuild from the editor, the tabs swap panels,
+  # and the inline preview repaints the badge for THIS visitor's region. None of
+  # that is observable in the response bytes: the markup is identical whether the
+  # script runs, whether the CSS resolves, or whether a click is heard at all.
+  #
+  # The four geo helpers are fixtures, not stubs of the thing under test: they say
+  # where this lab visitor is standing (US-CO), which is exactly what a host's
+  # Studio::GeoDetection would have resolved. Resolving it for real would put a
+  # network geocoder lookup inside a browser lane.
+  def geo_settings
+    @geo_setting = Studio::GeoSetting.new(
+      app_name: Studio.app_name,
+      enabled: true,
+      banned_subdivisions: %w[US-WA US-ID],
+      banned_countries: %w[CU]
+    )
+    @tab = params[:tab] == "countries" ? "countries" : "states"
+    @simulated_region = "US-WA"
+    render(:geo_settings)
+  end
 
   # DEFECT 3's page — the @-time localiser script.
   #
