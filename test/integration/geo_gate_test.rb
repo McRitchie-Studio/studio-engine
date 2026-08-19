@@ -300,6 +300,21 @@ class GeoGateTest < ActionDispatch::IntegrationTest
     assert_match(/Geo Settings/, response.body)
   end
 
+  # THE FORM'S OWN FIELD NAMES, not hand-posted params. A namespaced model's
+  # param key is `studio_geo_setting`, so a bare form_with here would post fields
+  # the controller never reads — a Save that redirects with "updated" and changes
+  # nothing, which every hand-rolled params test in the world stays green through.
+  test "the page posts the field names the controller reads" do
+    sign_in_admin
+    get "/admin/geo"
+
+    assert_match(/name="geo_setting\[enabled\]"/, response.body)
+    assert_match(/name="geo_setting\[banned_subdivisions\]\[\]"/, response.body)
+    assert_match(/name="geo_setting\[banned_countries\]"/, response.body)
+    refute_match(/name="studio_geo_setting\[/, response.body,
+                 "the namespaced param key would be read by nobody")
+  end
+
   test "an operator saves a policy from the page" do
     sign_in_admin
 
