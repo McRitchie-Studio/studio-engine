@@ -9,6 +9,11 @@ Studio.draw_admin_emails_routes = true
 # onboarding_skip_first_name_path until its adoption task deletes the local pair.
 Studio.draw_onboarding_routes = true
 
+# Opt in to the shared geo manager (/admin/geo) + probe (/geo/check), as a
+# consuming app does. OFF by default because turf-monster owns all four helper
+# names until its adoption lands — see Studio.draw_geo_routes.
+Studio.draw_geo_routes = true
+
 Rails.application.routes.draw do
   # Draw the engine's shared route table the same way every consuming app does
   # (Studio.routes(self), not `mount`). The boot test asserts the named path
@@ -42,4 +47,9 @@ Rails.application.routes.draw do
   get "lab/profile", to: "e2e_lab#profile"
   get "lab/profile_edit", to: "e2e_lab#profile_edit"
   get "lab/hold_button", to: "e2e_lab#hold_button"
+
+  # A host app's own pages, one open and one geo-LOCKED, for the geo suite.
+  get "lab/geo", to: "geo_lab#open"
+  get "lab/geo_locked", to: "geo_lab#locked"
+  post "lab/sign_in", to: "geo_lab_sessions#create"
 end

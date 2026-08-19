@@ -24,6 +24,7 @@ Then `bundle install`. The current release is **v0.6.1**; see [`CHANGELOG.md`](.
 - **Operator tooling**: Shared `studio/banners/environment` banner with Dev Mode + email connector controls, `studio/banners/impersonation`, and an opt-in `Studio::Impersonation` concern for Act As session conventions.
 - **Sluggable concern**: `before_save :set_slug` with `to_param` for human-readable URLs
 - **ThemeSetting model**: Per-app DB overrides with fallback to config defaults
+- **Geo**: `Studio::GeoDetection` places every visitor (IP → country + subdivision, session-cached), `Studio::GeoSetting` stores the operator's blocked countries and regions, `require_geo_allowed` locks whichever surfaces an app chooses, and the shared badge + `/admin/geo` manager ship with it. See [`docs/GEO.md`](docs/GEO.md).
 - **Transactional emails**: `Studio::EmailCatalog` — every email an app sends, its type, a live preview, and its banner — plus the shared `/admin/emails` page. Every app inherits the standard emails and their artwork on day one, and can register its own workflows and upload its own banners. See [Transactional emails](#transactional-emails).
 
 ## Configuration
@@ -105,7 +106,7 @@ Rails.application.routes.draw do
 end
 ```
 
-This draws the enabled auth routes (`/login`, `/signup`, `/logout`, `POST /magic_link` to request a link, `GET`/`POST /l/:token` for the link itself, Solana routes), OAuth callbacks, optional SSO routes, `/error_logs`, and `/admin/theme`. Magic-link emails point at the inert `GET /l/:token` confirmation page; the single-use token is burned only by the CSRF-protected `POST` to `link_consume_path`.
+This draws the enabled auth routes (`/login`, `/signup`, `/logout`, `POST /magic_link` to request a link, `GET`/`POST /l/:token` for the link itself, Solana routes), OAuth callbacks, optional SSO routes, `/error_logs`, and `/admin/theme`. Set `Studio.draw_geo_routes = true` to add the geo manager (`/admin/geo`) and its public probe (`/geo/check`) — off by default because turf-monster owns those helper names until its adoption lands. Magic-link emails point at the inert `GET /l/:token` confirmation page; the single-use token is burned only by the CSRF-protected `POST` to `link_consume_path`.
 
 **Magic links need the `studio_links` table.** Install it with `bin/rails studio_engine:install:migrations && bin/rails db:migrate` (install all of them) before enabling `:magic_link` — never by hand-copying the migration, which collides with the task's own copy on `class CreateStudioLinks`. Without the table, the first sign-in raises `Studio::Link::MissingTable`.
 

@@ -37,4 +37,8 @@ Gem::Specification.new do |spec|
   # 500'd a host app's task board — declaring it here makes that impossible to repeat.
   spec.add_dependency "redis", ">= 4.0.1"
   spec.add_dependency "turbo-rails", ">= 1.0"
+  # IP -> location for Studio::Geo. A dependency rather than a host concern
+  # because the point of the geo primitive is that EVERY app has the capacity:
+  # an app that has to add a gem before it can place a visitor does not.
+  spec.add_dependency "geocoder", ">= 1.8", "< 2.0"
 end

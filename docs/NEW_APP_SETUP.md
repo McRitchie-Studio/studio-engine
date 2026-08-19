@@ -175,7 +175,8 @@ an auto-submitting POST form to `/auth/google_oauth2`, not redirect with GET.
 ### Engine migrations — install these FIRST
 
 The engine ships its own migrations (the email outbox, `Studio::Link`,
-`Studio::Enumeral`, and an `image_caches` column relaxation). Copy them in with
+`Studio::Enumeral`, the geo settings table, and an `image_caches` column
+relaxation). Copy them in with
 the standard Rails engine task — note the task is `studio_engine:`, not
 `studio:`, and each copied file lands with a `.studio_engine.rb` suffix and a
 provenance comment naming the original timestamp:
@@ -349,6 +350,14 @@ host-level token validation you add.
 ```ruby
 class ApplicationController < ActionController::Base
   include Studio::ErrorHandling
+
+  # Optional: place every visitor (IP -> country + subdivision, session-cached)
+  # and gain `geo_country` / `geo_state` / `geo_blocked?` in every view, plus
+  # `require_geo_allowed` to lock whichever surfaces this app must not serve
+  # from a blocked location. See docs/GEO.md — the policy is configured in
+  # config/initializers/studio.rb, and the manager at /admin/geo is drawn with
+  # `config.draw_geo_routes = true`.
+  include Studio::GeoDetection
 end
 ```
 

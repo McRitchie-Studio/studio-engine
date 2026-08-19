@@ -16,6 +16,8 @@ require "active_support/core_ext/object/blank"
 require_relative "../lib/studio/version"
 require_relative "../lib/studio/color_scale"
 require_relative "../lib/studio/log_rotation"
+require_relative "../lib/studio/geo"
+require_relative "../lib/studio/geo/lookup"
 require_relative "../lib/studio/environment_banner"
 require_relative "../lib/studio/sidebar_sections"
 require_relative "../lib/studio/profile_sections"
@@ -54,6 +56,21 @@ module Studio
   # mirror has to carry the real default rather than a convenient one.
   mattr_accessor :profile_sections,     default: nil
   mattr_accessor :draw_profile_routes,  default: true
+  # Mirrors the geo accessors in lib/studio.rb. Studio::GeoHelper and
+  # Studio::Geo::Lookup read them, so the unit suite needs them defined; tests
+  # that depend on a specific value set it explicitly and restore it.
+  mattr_accessor :geo_home_country, default: "US"
+  mattr_accessor :geo_default_banned_countries, default: []
+  mattr_accessor :geo_default_banned_subdivisions, default: []
+  mattr_accessor :geo_fail_closed, default: true
+  mattr_accessor :geo_ttl, default: 24.hours
+  mattr_accessor :geo_retry_ttl, default: 5.minutes
+  mattr_accessor :geo_development_region, default: nil
+  mattr_accessor :geo_simulated_region, default: nil
+  mattr_accessor :geo_ip_provider, default: :ipinfo_io
+  mattr_accessor :geo_ip_api_key, default: nil
+  mattr_accessor :geo_lookup_timeout, default: 3
+  mattr_accessor :geo_cache_ttl, default: 24.hours
   # Mirrors lib/studio.rb. Studio::OauthIdentity gates the orphan guard on this,
   # so the unit suite needs it defined; the tests that depend on a specific value
   # set it explicitly and restore it in teardown.

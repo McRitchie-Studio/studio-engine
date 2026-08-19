@@ -1,0 +1,119 @@
+<%# /admin/geo — the shared geo manager.
+    Three sections, in the order an operator asks the questions: where does this
+    server think I am, is the gate on, and what does it block. %>
+<%
+  setting        = @geo_setting
+  home_country   = Studio.geo_home_country
+  home_grid      = home_country == "US" ? Studio::Geo::US_SUBDIVISION_CODES : []
+  banned_codes   = setting.subdivision_codes(country: home_country)
+  other_tokens   = Array(setting.banned_subdivisions).reject { |t| t.to_s.start_with?("#{home_country}-") }
+  banned_nations = Array(setting.banned_countries)
+%>
+<div class="max-w-3xl mx-auto">
+  <h1 class="text-2xl font-extrabold text-heading mb-6">Geo Settings</h1>
+
+  <%# -- What the server thinks of THIS visitor ---------------------------- %>
+  <div class="card p-6 mb-6">
+    <h2 class="text-lg font-bold text-heading mb-4">Current Detection</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-inset rounded-lg p-4 text-center">
+        <div class="text-xs text-muted uppercase tracking-wider mb-1">Country</div>
+        <div class="text-2xl font-bold text-heading font-mono"><%= geo_country || "??" %></div>
+      </div>
+      <div class="bg-inset rounded-lg p-4 text-center">
+        <div class="text-xs text-muted uppercase tracking-wider mb-1">Subdivision</div>
+        <div class="text-2xl font-bold text-heading font-mono"><%= geo_state || "??" %></div>
+      </div>
+      <div class="bg-inset rounded-lg p-4 text-center">
+        <div class="text-xs text-muted uppercase tracking-wider mb-1">Blocked?</div>
+        <div class="text-2xl font-bold font-mono <%= geo_blocked? ? 'text-red-400' : 'text-primary' %>"><%= geo_blocked? ? "YES" : "NO" %></div>
+      </div>
+      <div class="bg-inset rounded-lg p-4 text-center">
+        <div class="text-xs text-muted uppercase tracking-wider mb-1">Simulation</div>
+        <div class="text-2xl font-bold font-mono <%= geo_override_active? ? 'text-red-400' : 'text-muted' %>"><%= geo_override_active? ? session[:geo_override] : "OFF" %></div>
+      </div>
+    </div>
+    <div class="mt-4 flex flex-wrap gap-3 items-center">
+      <%= button_to geo_override_active? ? "Clear simulation" : "Simulate a blocked location",
+            admin_geo_toggle_path, method: :post,
+            class: "btn #{geo_override_active? ? 'btn-danger' : 'btn-outline'} btn-sm" %>
+      <span class="text-xs text-muted">
+        Simulation pins your session to a blocked region so you can walk the blocked experience without a VPN.
+      </span>
+    </div>
+  </div>
+
+  <%= form_with(model: setting, url: admin_geo_update_path, method: :patch, local: true) do |f| %>
+    <div class="card p-6 mb-6">
+      <h2 class="text-lg font-bold text-heading mb-4">Configuration</h2>
+
+      <div class="mb-6">
+        <label class="flex items-center gap-3 cursor-pointer">
+          <%= f.check_box :enabled, class: "w-5 h-5 rounded accent-primary" %>
+          <span class="text-heading font-bold">Enable geo-blocking</span>
+        </label>
+        <p class="text-sm text-muted mt-1 ml-8">
+          The kill switch. While this is off nothing is geo-restricted — including visitors this app cannot place.
+        </p>
+      </div>
+
+      <%# -- Countries ---------------------------------------------------- %>
+      <div class="mb-6">
+        <h3 class="text-sm font-bold text-heading mb-2">Blocked countries</h3>
+        <p class="text-xs text-muted mb-3">
+          ISO country codes, comma separated — <span class="font-mono">CU, IR</span>. A blocked country blocks
+          every visitor placed there, whatever their region.
+        </p>
+        <%= text_field_tag "geo_setting[banned_countries]", banned_nations.join(", "),
+              class: "input w-full font-mono", placeholder: "CU, IR" %>
+      </div>
+
+      <%# -- Subdivisions of the home country ------------------------------ %>
+      <div>
+        <h3 class="text-sm font-bold text-heading mb-2">
+          Blocked regions in <%= home_country %>
+        </h3>
+        <% if home_grid.any? %>
+          <p class="text-xs text-muted mb-4">Check the states where this app may not operate.</p>
+          <%# One hidden field so UNCHECKING the last box posts an empty list rather
+              than posting nothing — which Rails would read as "no change" and the
+              operator would read as a save that silently did nothing. %>
+          <%= hidden_field_tag "geo_setting[banned_subdivisions][]", "" %>
+          <div class="grid grid-cols-5 md:grid-cols-10 gap-2">
+            <% home_grid.each do |code| %>
+              <label title="<%= Studio::Geo.subdivision_name(code) || code %>"
+                class="flex items-center justify-center gap-1 p-2 rounded border cursor-pointer transition text-xs font-mono
+                <%= banned_codes.include?(code) ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-surface-alt border-subtle text-secondary hover:border-strong' %>">
+                <input type="checkbox" name="geo_setting[banned_subdivisions][]" value="<%= code %>"
+                  <%= 'checked' if banned_codes.include?(code) %>
+                  class="hidden">
+                <%= code %>
+              </label>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-xs text-muted mb-3">
+            Region codes for <%= home_country %>, comma separated — <span class="font-mono">AB, BC</span>.
+          </p>
+          <%= text_field_tag "geo_setting[banned_subdivisions]", banned_codes.join(", "),
+                class: "input w-full font-mono" %>
+        <% end %>
+      </div>
+
+      <% if other_tokens.any? %>
+        <div class="mt-6">
+          <h3 class="text-sm font-bold text-heading mb-2">Blocked regions elsewhere</h3>
+          <p class="text-xs text-muted mb-3">
+            Regions outside <%= home_country %>, written as <span class="font-mono">COUNTRY-REGION</span>.
+          </p>
+          <%= text_field_tag "geo_setting[banned_subdivisions][]", other_tokens.join(", "),
+                class: "input w-full font-mono" %>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="flex justify-end">
+      <%= f.submit "Save Settings", class: "btn btn-primary" %>
+    </div>
+  <% end %>
+</div>

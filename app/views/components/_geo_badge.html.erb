@@ -1,0 +1,49 @@
+<%# The visitor's detected location — PUBLIC, no sign-in required.
+
+    Detection is IP-based and runs for every request (Studio::GeoDetection), so
+    the badge can always say where the browser appears to be:
+
+      · a subdivision flag + code for a home-country visitor ("WA")
+      · a country flag emoji + region name for anyone else ("🇨🇦 Alberta")
+      · a red "??" when the location cannot be resolved at all — which is not a
+        cosmetic state: under the fail-closed rule an undetectable home-country
+        visitor is treated as BLOCKED, and the badge has to say so rather than
+        quietly render nothing
+
+    Red also means blocked-by-policy, or a simulated location an operator has
+    pinned from /admin/geo.
+
+    Locals are optional. With none, the badge reads the request's own detection;
+    passing them renders a specimen (the style guide, a view test) with no
+    session at all. %>
+<%
+  subdivision = local_assigns.key?(:subdivision) ? local_assigns[:subdivision] : geo_state
+  country     = local_assigns.key?(:country)     ? local_assigns[:country]     : geo_country
+  blocked     = local_assigns.key?(:blocked)     ? local_assigns[:blocked]     : geo_blocked?
+  simulated   = local_assigns.key?(:simulated)   ? local_assigns[:simulated]   : geo_override_active?
+
+  # A home-country subdivision flag is ONLY correct for a home-country visitor.
+  # The lookup matches a bare two-letter code, so a foreign region normalising to
+  # "CA" would be shown the CALIFORNIA flag — wrong, and wrong in the way that
+  # looks right. Outside the home country we render the country's emoji flag and
+  # never consult the subdivision art at all.
+  foreign       = geo_foreign?(country)
+  country_flag  = foreign ? geo_country_flag_emoji(country) : nil
+  flag_path     = foreign ? nil : geo_subdivision_flag_path(subdivision, country: country)
+  label         = subdivision.presence || (foreign ? country : nil) || "??"
+%>
+<span class="geo-badge inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-lg whitespace-nowrap
+  <%= if simulated || blocked
+        'bg-red-500/10 text-red-400 border border-red-500/30'
+      elsif subdivision.present?
+        'bg-surface-alt text-secondary border border-subtle'
+      else
+        'bg-surface-alt text-muted border border-subtle'
+      end %>">
+  <% if country_flag %>
+    <span aria-label="<%= country %>" role="img" style="line-height: 1; flex-shrink: 0;"><%= country_flag %></span>
+  <% elsif flag_path %>
+    <img src="<%= flag_path %>" alt="<%= subdivision %>" class="rounded-sm" style="height: 12px; width: 16px; object-fit: cover; flex-shrink: 0;">
+  <% end %>
+  <%= label %>
+</span>
