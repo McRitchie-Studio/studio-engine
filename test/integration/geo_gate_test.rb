@@ -333,7 +333,7 @@ class GeoGateTest < ActionDispatch::IntegrationTest
 
     assert_match(/name="geo_setting\[enabled\]"/, response.body)
     assert_match(/name="geo_setting\[banned_subdivisions\]\[\]"/, response.body)
-    assert_match(/name="geo_setting\[banned_countries\]"/, response.body)
+    assert_match(/name="geo_setting\[banned_countries\]\[\]"/, response.body)
     refute_match(/name="studio_geo_setting\[/, response.body,
                  "the namespaced param key would be read by nobody")
   end
@@ -383,6 +383,111 @@ class GeoGateTest < ActionDispatch::IntegrationTest
                  "the blocked look must follow the checkbox, or a click paints nothing")
     refute_match(/class="[^"]*text-red-400[^"]*"[^>]*>\s*<input[^>]*value="WA"/m, response.body,
                  "no server-baked red class on the square itself")
+  end
+
+  # --- the two editors ------------------------------------------------------
+
+  # Countries are a GRID now, not a comma-separated field: the same click that
+  # blocks a state blocks a country, with the country's flag beside it.
+  test "the page offers both editors, with flags" do
+    sign_in_admin
+
+    get "/admin/geo"
+
+    # States: a checkbox per subdivision, each with its small flag raster.
+    assert_match(/name="geo_setting\[banned_subdivisions\]\[\]"[^>]*value="WA"/, response.body)
+    assert_match(%r{state-flags/thumb/wa\.png}, response.body, "the state square carries its flag")
+
+    # "CO" is Colorado AND Colombia, so the two grids carry distinct classes —
+    # a selector that reached both would be ambiguous for every later reader.
+    assert_match(/geo-grid-states/, response.body)
+    assert_match(/geo-grid-countries/, response.body)
+
+    # Countries: a checkbox per country, each with its emoji flag.
+    assert_match(/name="geo_setting\[banned_countries\]\[\]"[^>]*value="CU"/, response.body)
+    assert_includes response.body, "🇨🇺", "the country square carries its flag"
+    assert_includes response.body, "Cuba", "and its name, for the operator who does not read codes"
+  end
+
+  # THE SUMMARY CARD answers "what does this app block?" without reading a
+  # 52-square grid — the switch and what it switches on, together.
+  test "the configuration card summarises what is blocked" do
+    sign_in_admin
+    enable_gate(subdivisions: %w[WA ID], countries: %w[CU])
+
+    get "/admin/geo"
+
+    states = response.body[/data-geo-summary="states".*?<\/div>/m]
+    countries = response.body[/data-geo-summary="countries".*?<\/div>/m]
+
+    assert_match(/geo-chip.*?\bID\b/m, states, "each blocked region gets a chip")
+    assert_match(/geo-chip.*?\bWA\b/m, states)
+    assert_match(%r{state-flags/thumb/wa\.png}, states, "with its flag")
+    assert_match(/geo-chip.*?\bCU\b/m, countries)
+    assert_includes countries, "🇨🇺"
+    # The counts beside the headings — and the same numbers on the tabs, because
+    # a page showing two different counts for one list is its own bug report.
+    assert_equal 2, response.body.scan(/data-geo-summary-count="states"[^>]*>2</).size
+    assert_equal 2, response.body.scan(/data-geo-summary-count="countries"[^>]*>1</).size
+  end
+
+  test "the summary says so when nothing is blocked" do
+    sign_in_admin
+    enable_gate(subdivisions: [], countries: [])
+
+    get "/admin/geo"
+
+    assert_includes response.body, "Nothing blocked yet."
+    assert_match(/data-geo-summary-count="states"[^>]*>0</, response.body)
+  end
+
+  test "an operator blocks a country from the grid" do
+    sign_in_admin
+
+    patch "/admin/geo", params: {
+      geo_setting: { enabled: "1", banned_countries: ["", "CU", "IR"] }, tab: "countries"
+    }
+
+    assert_equal %w[CU IR], Studio::GeoSetting.current.banned_countries
+  end
+
+  # The tab rides in the form, so a save lands back in the editor the operator
+  # was working in rather than snapping to states every time.
+  test "saving returns to the editor you were in" do
+    sign_in_admin
+
+    patch "/admin/geo", params: { geo_setting: { enabled: "1" }, tab: "countries" }
+
+    assert_redirected_to "/admin/geo?tab=countries"
+    follow_redirect!
+    assert_match(/id="geo_tab_countries"[^>]*checked/, response.body)
+  end
+
+  # A tab value goes into a redirect URL, so it is whitelisted rather than echoed.
+  test "an unknown tab is ignored rather than reflected" do
+    sign_in_admin
+
+    patch "/admin/geo", params: { geo_setting: { enabled: "1" }, tab: "javascript:alert(1)" }
+
+    assert_redirected_to "/admin/geo"
+  end
+
+  # --- the live preview -----------------------------------------------------
+
+  # Ticking your OWN region repaints the badge before anything is saved, so an
+  # operator sees what a rule does to a real visitor instead of saving to find
+  # out. The browser half is asserted in a consuming app's lane; what a request
+  # test can honestly see is that the page carries the inputs that computation
+  # needs — the visitor's own region, and the fail-closed setting.
+  test "the page carries what the live preview computes from" do
+    sign_in_admin
+
+    get "/admin/geo"
+
+    assert_match(/data-geo-home="US"/, response.body)
+    assert_match(/data-geo-fail-closed="true"/, response.body)
+    assert_match(/data-geo-verdict/, response.body)
+    assert_match(/data-geo-preview/, response.body, "one attribute drives badge and verdict alike")
   end
 
   test "an operator saves a policy from the page" do

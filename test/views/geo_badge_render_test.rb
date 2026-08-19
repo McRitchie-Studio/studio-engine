@@ -62,10 +62,15 @@ class GeoBadgeRenderTest < Minitest::Test
     assert_includes doc.text, "CA"
   end
 
+  # The blocked look is an ATTRIBUTE — one rule paints it — so anything that
+  # learns the policy changed can repaint the badge by flipping it. /admin/geo's
+  # live preview does exactly that while an operator ticks regions.
   def test_a_blocked_visitor_reads_as_blocked
     doc = render_badge(subdivision: "WA", country: "US", blocked: true)
 
-    assert_includes doc.at_css("span")["class"], "text-red-400"
+    assert_equal "true", doc.at_css("[data-geo-badge]")["data-blocked"]
+    assert_match(/\.geo-badge\[data-blocked="true"\]/, doc.to_html,
+                 "the rule that paints it must ship with it")
   end
 
   # A simulated location is an operator standing somewhere on purpose. It reads
@@ -74,13 +79,24 @@ class GeoBadgeRenderTest < Minitest::Test
   def test_a_simulated_location_reads_as_blocked
     doc = render_badge(subdivision: "WA", country: "US", simulated: true)
 
-    assert_includes doc.at_css("span")["class"], "text-red-400"
+    assert_equal "true", doc.at_css("[data-geo-badge]")["data-blocked"]
   end
 
   def test_an_ordinary_allowed_location_is_not_red
     doc = render_badge(subdivision: "CO", country: "US")
 
-    refute_includes doc.at_css("span")["class"], "text-red-400"
+    assert_equal "false", doc.at_css("[data-geo-badge]")["data-blocked"]
+  end
+
+  # The preview needs to know WHERE the badge is standing, not just whether it is
+  # red right now: /admin/geo recomputes the verdict from the operator's unsaved
+  # ticks, and that computation is against this visitor's own region.
+  def test_the_badge_carries_the_region_it_is_showing
+    doc = render_badge(subdivision: "CO", country: "US")
+    badge = doc.at_css("[data-geo-badge]")
+
+    assert_equal "US", badge["data-country"]
+    assert_equal "CO", badge["data-subdivision"]
   end
 
   # --- the helper the partial leans on --------------------------------------

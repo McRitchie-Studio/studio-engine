@@ -45,14 +45,26 @@ module Studio
     # branch still treats it as home — and would therefore have been handed a
     # home subdivision flag. Rendering art is the stricter question: show it only
     # when the country is positively the home one.
-    def geo_subdivision_flag_path(code, country: Studio.geo_home_country)
+    # The small raster of the same flag, for a page that renders dozens at once.
+    # The SVG set is real vector art — several files run past a megabyte — so a
+    # 52-square grid of them is ~10 MB of downloads for something painted at 16px.
+    # These are 64x48 PNGs, ~4 KB each, rendered from the same source art.
+    def geo_subdivision_flag_thumb_path(code, country: Studio.geo_home_country)
+      geo_subdivision_flag_path(code, country: country, variant: "thumb/", extension: "png")
+    end
+
+    def geo_country_name(code)
+      Studio::Geo.country_name(code)
+    end
+
+    def geo_subdivision_flag_path(code, country: Studio.geo_home_country, variant: "", extension: "svg")
       home = Studio::Geo.normalize_country(Studio.geo_home_country)
       return nil unless Studio::Geo.normalize_country(country) == home
 
       subdivision = Studio::Geo.normalize_subdivision(code)
       return nil if subdivision.nil?
 
-      file = "#{subdivision.downcase}.svg"
+      file = "#{variant}#{subdivision.downcase}.#{extension}"
       return nil unless File.exist?(File.join(FLAG_ASSET_DIR, file))
 
       image_path("state-flags/#{file}")

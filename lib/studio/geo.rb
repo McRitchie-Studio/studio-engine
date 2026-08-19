@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "geo/countries"
+
 module Studio
   # The house geo primitive: where a visitor appears to be, and whether this app
   # is willing to serve them there.
@@ -128,6 +130,10 @@ module Studio
     def normalize_region_token(token, home_country: "US")
       country, subdivision = parse_region(token, home_country: home_country)
       region_token(country, subdivision)
+    end
+
+    def country_name(code)
+      COUNTRIES[normalize_country(code)]
     end
 
     def subdivision_name(code, country: "US")

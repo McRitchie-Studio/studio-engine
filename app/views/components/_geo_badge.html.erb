@@ -13,6 +13,11 @@
     Red also means blocked-by-policy, or a simulated location an operator has
     pinned from /admin/geo.
 
+    THE BLOCKED LOOK IS AN ATTRIBUTE, not a class list, so anything that knows
+    the policy changed can repaint the badge by flipping one attribute — which is
+    exactly what /admin/geo's live preview does while an operator ticks regions,
+    before anything is saved.
+
     Locals are optional. With none, the badge reads the request's own detection;
     passing them renders a specimen (the style guide, a view test) with no
     session at all. %>
@@ -32,14 +37,23 @@
   flag_path     = foreign ? nil : geo_subdivision_flag_path(subdivision, country: country)
   label         = subdivision.presence || (foreign ? country : nil) || "??"
 %>
+<% unless @_studio_geo_badge_css %>
+  <% @_studio_geo_badge_css = true %>
+  <style>
+    /* One rule owns the blocked look, so a repaint is one attribute. */
+    .geo-badge[data-blocked="true"] {
+      background-color: rgb(239 68 68 / 0.1);
+      border-color: rgb(239 68 68 / 0.3);
+      color: rgb(248 113 113);
+    }
+  </style>
+<% end %>
 <span class="geo-badge inline-flex items-center gap-1.5 text-xs font-mono px-2 py-0.5 rounded-lg whitespace-nowrap
-  <%= if simulated || blocked
-        'bg-red-500/10 text-red-400 border border-red-500/30'
-      elsif subdivision.present?
-        'bg-surface-alt text-secondary border border-subtle'
-      else
-        'bg-surface-alt text-muted border border-subtle'
-      end %>">
+  <%= subdivision.present? ? 'bg-surface-alt text-secondary border border-subtle' : 'bg-surface-alt text-muted border border-subtle' %>"
+  data-geo-badge
+  data-country="<%= country %>"
+  data-subdivision="<%= subdivision %>"
+  data-blocked="<%= (simulated || blocked).to_s %>">
   <% if country_flag %>
     <span aria-label="<%= country %>" role="img" style="line-height: 1; flex-shrink: 0;"><%= country_flag %></span>
   <% elsif flag_path %>

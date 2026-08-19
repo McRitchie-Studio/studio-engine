@@ -55,8 +55,13 @@ module Studio
       }
     end
 
+    TABS = %w[states countries].freeze
+
     def edit
       @geo_setting = Studio::GeoSetting.current
+      # Which editor is open. It rides in the URL so a save can send the operator
+      # back to the one they were working in rather than resetting to states.
+      @tab = TABS.include?(params[:tab]) ? params[:tab] : "states"
       # Where the simulate button would put you. The page NAMES it — "Simulate
       # WA" beats "Simulate a blocked location", because the operator is about to
       # be moved and should read where to.
@@ -71,9 +76,9 @@ module Studio
       @geo_setting.banned_countries = submitted_countries
       @geo_setting.save!
 
-      redirect_to admin_geo_path, notice: "Geo settings updated."
+      redirect_to admin_geo_path(tab: submitted_tab), notice: "Geo settings updated."
     rescue StandardError => e
-      redirect_to admin_geo_path, alert: "Failed to update: #{e.message}"
+      redirect_to admin_geo_path(tab: submitted_tab), alert: "Failed to update: #{e.message}"
     end
 
     # POST /admin/geo/toggle — stand in a blocked location, or stop.
@@ -110,6 +115,12 @@ module Studio
 
     def submitted_countries
       split_list(params.dig(:geo_setting, :banned_countries))
+    end
+
+    # The tab radio posts with the form, so "save" lands back where the operator
+    # was. Whitelisted rather than echoed: this value goes into a redirect URL.
+    def submitted_tab
+      TABS.include?(params[:tab]) ? params[:tab] : nil
     end
 
     def split_list(raw)

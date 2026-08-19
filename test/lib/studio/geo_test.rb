@@ -123,6 +123,29 @@ class StudioGeoTest < Minitest::Test
     assert_nil Geo.subdivision_name("AB", country: "CA")
   end
 
+  # --- the country table ----------------------------------------------------
+
+  # A country picker needs the whole list; an app should not have to add a gem or
+  # hand-type 249 rows to render one.
+  def test_the_country_table_covers_iso_3166
+    assert_operator Geo::COUNTRIES.size, :>=, 240
+    assert_equal "United States", Geo.country_name("us")
+    assert_equal "Cuba", Geo.country_name("CU")
+    assert_nil Geo.country_name("ZZ")
+    assert_nil Geo.country_name(nil)
+  end
+
+  def test_every_country_code_is_a_two_letter_code_with_a_name
+    bad = Geo::COUNTRIES.reject { |code, name| code.match?(/\A[A-Z]{2}\z/) && name.to_s.length.positive? }
+
+    assert_empty bad, "every entry must be a usable code => name pair"
+  end
+
+  # The grid renders in this order, so it has to be a stable one.
+  def test_country_codes_are_sorted
+    assert_equal Geo::COUNTRY_CODES.sort, Geo::COUNTRY_CODES
+  end
+
   # --- freshness ------------------------------------------------------------
 
   def test_never_detected_is_stale

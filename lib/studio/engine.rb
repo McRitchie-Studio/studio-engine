@@ -81,10 +81,14 @@ module Studio
 
     # Logical asset paths ("state-flags/wa.svg") for every subdivision flag the
     # gem ships.
+    # Both the vector art and the small rasters behind it: the badge renders one
+    # SVG, /admin/geo's grid renders 52 PNGs (the SVG set is ~10 MB of real
+    # vector art, which is not a page's worth of downloads for 16px squares).
     def self.subdivision_flag_logical_paths
-      Dir[File.expand_path("../../app/assets/images/state-flags/*", __dir__)]
+      Dir[File.expand_path("../../app/assets/images/state-flags/*", __dir__),
+          File.expand_path("../../app/assets/images/state-flags/thumb/*", __dir__)]
         .select { |path| File.file?(path) }
-        .map { |path| "state-flags/#{File.basename(path)}" }
+        .map { |path| path.include?("/thumb/") ? "state-flags/thumb/#{File.basename(path)}" : "state-flags/#{File.basename(path)}" }
         .sort
     end
 
