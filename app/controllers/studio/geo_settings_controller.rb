@@ -57,6 +57,10 @@ module Studio
 
     def edit
       @geo_setting = Studio::GeoSetting.current
+      # Where the simulate button would put you. The page NAMES it — "Simulate
+      # WA" beats "Simulate a blocked location", because the operator is about to
+      # be moved and should read where to.
+      @simulated_region = simulated_region
     end
 
     def update

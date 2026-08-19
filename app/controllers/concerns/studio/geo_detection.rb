@@ -50,9 +50,15 @@ module Studio
       return if session[:geo_override].present?
 
       ip_changed = session[:geo_ip] != request.remote_ip
+      # `now: Time.current`, NOT the module's Rails-free Time.now default. The
+      # stamp written below is `Time.current.to_s` — "2026-08-19 05:00:00 UTC" —
+      # and the comparison is textual, so a local-zone Time.now would produce
+      # "2026-08-18 23:00:00 -0600" and compare as a DIFFERENT DAY. Measured in
+      # turf-monster's suite: the self-heal retry never fired.
       stale = Studio::Geo.stale?(
         detected_at: session[:geo_detected_at],
         resolved: session[:geo_state].present?,
+        now: Time.current,
         ttl: Studio.geo_ttl,
         retry_ttl: Studio.geo_retry_ttl
       )

@@ -184,5 +184,27 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
           MANAGED_WALLET_ENCRYPTION_KEY: ${{ matrix.managed_wallet_encryption_key }}
         run: |
+          # Install THIS engine's migrations into the consumer before its suite
+          # runs, and migrate them in.
+          #
+          # An engine release that adds a migration is otherwise unshippable. Each
+          # consumer asserts "every migration the resolved engine ships has been
+          # installed here" (EnginePinContractTest) — a real invariant, because the
+          # install is a manual step and an app that skips it boots fine while
+          # missing columns the gem writes to. But in THIS lane the engine is a
+          # local path checkout that is ahead of every consumer by construction,
+          # so the guard fires on a to-do rather than on drift, and it fires in
+          # the engine's PR, where no consumer commit can answer it.
+          #
+          # Installing here keeps the invariant where it belongs — each consumer's
+          # OWN CI still runs that guard against its RELEASED gem, which is the
+          # question it was written to ask — and makes this lane exercise the
+          # install path an adopting app walks.
+          #
+          # db:migrate rather than db:test:prepare alone: a freshly copied
+          # migration is PENDING against the schema-loaded test DB, and Rails
+          # refuses to run a suite with pending migrations.
+          bundle exec rails studio_engine:install:migrations
           bundle exec rails db:test:prepare
+          bundle exec rails db:migrate
           bundle exec rails test

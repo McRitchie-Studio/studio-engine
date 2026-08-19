@@ -8,6 +8,8 @@
   banned_codes   = setting.subdivision_codes(country: home_country)
   other_tokens   = Array(setting.banned_subdivisions).reject { |t| t.to_s.start_with?("#{home_country}-") }
   banned_nations = Array(setting.banned_countries)
+  sim_region     = @simulated_region
+  sim_place      = sim_region ? Studio::Geo.parse_region(sim_region, home_country: home_country).compact.last : nil
 %>
 <div class="max-w-3xl mx-auto">
   <h1 class="text-2xl font-extrabold text-heading mb-6">Geo Settings</h1>
@@ -34,7 +36,7 @@
       </div>
     </div>
     <div class="mt-4 flex flex-wrap gap-3 items-center">
-      <%= button_to geo_override_active? ? "Clear simulation" : "Simulate a blocked location",
+      <%= button_to geo_override_active? ? "Clear simulation" : "Simulate #{sim_place || 'a blocked location'}",
             admin_geo_toggle_path, method: :post,
             class: "btn #{geo_override_active? ? 'btn-danger' : 'btn-outline'} btn-sm" %>
       <span class="text-xs text-muted">

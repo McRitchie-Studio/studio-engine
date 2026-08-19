@@ -9,6 +9,7 @@ require "minitest/autorun"
 require "active_support/test_case"
 require "action_dispatch"
 require "action_dispatch/testing/integration"
+require "active_support/testing/time_helpers"
 
 # Drive the real dummy app through the full router -> controller stack.
 ActionDispatch::IntegrationTest.app = Rails.application
@@ -38,6 +39,8 @@ end
 # engine documents. So what runs here is the seam an app actually writes, not
 # the concern's methods called directly.
 class GeoGateTest < ActionDispatch::IntegrationTest
+  include ActiveSupport::Testing::TimeHelpers
+
   # A Geocoder result, in the only two shapes that matter: one that places the
   # visitor, and one that cannot.
   FakeResult = Struct.new(:state_code, :country_code, :region_code, :region, keyword_init: true)
@@ -139,6 +142,26 @@ class GeoGateTest < ActionDispatch::IntegrationTest
 
     get "/lab/geo"
     assert_equal 1, @lookups.length, "a resolved region is trusted for the full TTL"
+  end
+
+  # THE SELF-HEAL, and the clock bug hiding under it. A blank result is retried
+  # within minutes; the stamp is written as `Time.current.to_s` (UTC), so the
+  # comparison must be made against the same clock. Against a local-zone Time.now
+  # the two strings differ by the offset and read as a different DAY — the retry
+  # then never fires and an unplaceable visitor stays locked out for 24 hours.
+  test "a blank result is retried within minutes, on the Rails clock" do
+    stub_geocoder(nil)
+    get "/lab/geo"
+    assert_equal 1, @lookups.length
+
+    get "/lab/geo"
+    assert_equal 1, @lookups.length, "not on every single request"
+
+    stub_geocoder(FakeResult.new(state_code: "CO", country_code: "US"))
+    travel(Studio.geo_retry_ttl + 1.minute) { get "/lab/geo" }
+
+    assert_equal 2, @lookups.length, "the short retry window must expire"
+    assert_equal "US | CO | ALLOWED", response.body
   end
 
   # Outside the home country the provider's only answer is often the region NAME.
@@ -339,6 +362,18 @@ class GeoGateTest < ActionDispatch::IntegrationTest
     patch "/admin/geo", params: { geo_setting: { enabled: "1", banned_subdivisions: [""] } }
 
     assert_empty Studio::GeoSetting.current.banned_subdivisions
+  end
+
+  # The button NAMES the place. An operator about to be moved should read where
+  # to — and it is the assertion that keeps a consuming app's browser lane, which
+  # clicks "Simulate WA" by name, from silently matching nothing.
+  test "the simulate button names the region it would pin" do
+    sign_in_admin
+    enable_gate(subdivisions: %w[WA])
+
+    get "/admin/geo"
+
+    assert_match(/Simulate WA/, response.body)
   end
 
   # Simulation is how an operator walks the blocked experience without a VPN.
