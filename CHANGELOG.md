@@ -24,10 +24,15 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   - **`Studio::GeoSetting`** (`studio_geo_settings`) — the operator's stored
     policy: the kill switch, blocked countries, blocked regions. Install with
     `bin/rails studio_engine:install:migrations && bin/rails db:migrate`.
-  - **`/admin/geo` + `/geo/check`** — the manager (kill switch, country list,
-    US state grid, and a simulator that pins your session to a blocked region so
-    the blocked experience can be walked without a VPN) and the public detection
-    probe. **Opt-in** via `Studio.draw_geo_routes = true`: turf-monster owns all
+  - **`/admin/geo` + `/geo/check`** — the manager and the public detection probe.
+    Three cards: what the server thinks of you, a summary of what this app blocks
+    (flag chips plus the kill switch), and two editors behind a tab — the home
+    country's regions and all 249 countries, every square carrying its flag. It
+    answers a click immediately: squares paint from their own checkbox, the
+    summary follows the editor, and ticking your OWN region repaints the navbar
+    badge and the verdict tile before anything is saved. A simulator pins your
+    session to a blocked region so the blocked experience can be walked without
+    a VPN. **Opt-in** via `Studio.draw_geo_routes = true`: turf-monster owns all
     four helper names today, and a duplicate route name raises while that app's
     `routes.rb` loads, taking its whole route set down.
   - **`components/_geo_badge` + the 52 US subdivision flags** (states + DC + PR,

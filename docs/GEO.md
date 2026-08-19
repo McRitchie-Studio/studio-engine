@@ -138,10 +138,25 @@ Opt in with `Studio.draw_geo_routes = true`. It draws four routes:
 > that app's `routes.rb` is loading, which takes down **every** route in it — not
 > just this page. Flip the default once no consumer's `main` owns the names.
 
-The page shows what the server thinks of *you* (country, subdivision, blocked,
-simulation), the kill switch, a comma-separated country list, and — when the home
-country is the US — the 50-state grid. Regions outside the home country are
-edited as tokens.
+Three cards, in the order an operator asks the questions:
+
+1. **Current Detection** — what the server thinks of *you*: country, subdivision,
+   blocked, simulation, each with its flag.
+2. **Configuration** — the kill switch, then the summary: a row of blocked
+   regions and a row of blocked countries as flag chips, so "what does this app
+   block?" is answered without reading a 52-square grid.
+3. **The editors** — two grids behind a tab, one open at a time. Regions in the
+   home country (the 50-state grid when that country is the US), and Countries
+   (all 249, `Studio::Geo::COUNTRIES`). Regions outside the home country are
+   edited as tokens.
+
+**Everything on the page answers a click immediately.** A square paints from its
+own checkbox, the summary chips and counts rebuild from the editor, and — the
+part worth knowing about — ticking *your own* region repaints the navbar badge
+and the Blocked? tile, so a rule can be seen before it is saved. That preview
+mirrors `Studio::Geo.blocked?` in the browser (same three rules, same fail-closed
+narrowing) and decides nothing: the server re-decides on save and on every
+request afterwards.
 
 **Simulation** pins your session to a blocked region so you can walk the blocked
 experience without a VPN. It picks `Studio.geo_simulated_region` if set, else the
@@ -156,6 +171,10 @@ so, rather than pinning you somewhere indistinguishable from where you are.
 
 `state` is the legacy key turf-monster's client already reads; it is the same
 value as `subdivision`.
+
+**The badge's blocked look is an attribute** — `data-blocked="true"` plus one CSS
+rule that ships with the partial — so anything that learns the policy changed can
+repaint it by flipping one attribute. That is what the live preview does.
 
 ---
 
@@ -174,11 +193,17 @@ Pass locals to render a specimen with no session (a style guide, a view test):
 <%= render "components/geo_badge", subdivision: "WA", country: "US", blocked: true, simulated: false %>
 ```
 
-**Flag art.** The gem ships the 52 US subdivision flags (states + DC + PR) at
-`app/assets/images/state-flags/`, ~10 MB, so an app gets the complete badge from
-an empty repository. Every other country renders an emoji flag, which costs no
-bytes — shipping ~250 country SVGs for a 16px badge is not a trade worth making.
-A subdivision with no art renders text-only, which is a normal answer.
+**Flag art.** The gem ships the 52 US subdivision flags (states + DC + PR) twice:
+the vector originals at `app/assets/images/state-flags/` (~10 MB — real art,
+several files past a megabyte) and 64x48 rasters of the same art under
+`thumb/` (~200 KB for the set). The badge renders one flag per page and uses the
+SVG; a 52-square grid uses the rasters, because ten megabytes of downloads for
+images painted at 16px is not a trade worth making. Helpers:
+`geo_subdivision_flag_path` and `geo_subdivision_flag_thumb_path`.
+
+Every other country renders an emoji flag, which costs no bytes — shipping ~250
+country SVGs is the same trade, refused again. A subdivision with no art renders
+text-only, which is a normal answer.
 
 ---
 

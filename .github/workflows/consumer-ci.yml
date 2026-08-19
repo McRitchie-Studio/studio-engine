@@ -127,7 +127,13 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
 
+      # Bounded, because an Ubuntu mirror that stops answering otherwise burns the
+      # whole 45-minute job before anyone can retry — measured twice on one PR
+      # (2026-08-19), 45 minutes each, while the other consumers passed on the
+      # same commit. A hung mirror now fails in 10, and the retry is a re-run of
+      # one job rather than an afternoon.
       - name: Install system packages
+        timeout-minutes: 10
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev libvips imagemagick postgresql-client
 
       - name: Set up Ruby
