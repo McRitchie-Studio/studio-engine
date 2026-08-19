@@ -50,11 +50,42 @@ on:
     # NOT a special case for gems. mcritchie-studio's ci.yml has built
     # [main, release, accepted] all along; this repo simply never followed.
     #
-    # `accepted` is deliberately NOT here. Every commit reaches it through a PR,
-    # which the pull_request trigger above already builds, so adding it would run
-    # the whole matrix a second time on the identical tree. `release` needs it
-    # precisely BECAUSE the version commit arrives outside a PR.
-    branches: [main, release]
+    # `accepted` IS here as of 2026-08-18, and this comment used to argue the
+    # opposite. The old argument was: "every commit reaches it through a PR, which
+    # the pull_request trigger above already builds, so adding it would run the
+    # whole matrix a second time on the identical tree."
+    #
+    # THAT PREMISE IS FALSE, and the word doing the damage is "identical". A
+    # pull_request run builds the PR head merged into the base AS THE BASE STOOD AT
+    # THAT MOMENT. Review lands several approved PRs onto `accepted` in sequence, so
+    # after PR A merges, PR B's existing green run describes B-on-top-of-base-without-A
+    # — a tree that no longer exists. The tree actually sitting on `accepted` is A+B,
+    # and no run has ever executed it. That is the same argument that puts `release`
+    # here, one rung earlier; it is not a duplicate build, it is the only build.
+    #
+    # AND THE COST OF BEING WRONG WAS NOT A MISSING BUILD — IT WAS A DISARMED GUARD.
+    # `bin/release prepare` refuses to promote a RED `accepted` (refuse_red_accepted!)
+    # by reading this repo's verdict for the branch. With no run here that verdict
+    # resolved to :none, which deliberately does NOT block — refusing on an absent
+    # verdict would wedge the release lane on every race. So the guard passed over
+    # studio-engine in every release without ever having been CAPABLE of failing,
+    # while its success line named this repo among those it had checked.
+    #
+    # `release` remains here for its own additional reason: a gem release pushes a
+    # version + Gemfile.lock commit DIRECTLY onto it, outside any PR.
+    #
+    # This is the DECLARED suite workflow for studio-engine (Ci::BranchGate resolves
+    # the repo's verdict to the "Engine CI" name), which is why the trigger belongs
+    # here specifically. Certified fleet-wide by Release::AcceptedCertification in
+    # mcritchie-studio, which refuses a promote naming any repo whose declared suite
+    # workflow cannot build this branch.
+    #
+    # NO `concurrency:` BLOCK — deliberately. A cancelled run's conclusion is
+    # `cancelled`, CiStatus folds that as RED, and every reader is SHA-addressed, so a
+    # run superseded by the next merge is indistinguishable from a genuine failure and
+    # the sweep's own guard would refuse a healthy branch. Back-to-back pushes to
+    # `accepted` are NORMAL. mcritchie-studio's ci.yml carries the full argument.
+    branches: [main, release, accepted]
 
 jobs:
   engine-suite:
