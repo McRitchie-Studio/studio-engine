@@ -93,7 +93,7 @@ module Studio
       end
 
       session[:geo_override] = region
-      redirect_back fallback_location: admin_geo_path, notice: "Simulating #{region}."
+      redirect_back fallback_location: admin_geo_path, notice: "Simulating #{place_name(region)}."
     end
 
     private
@@ -121,6 +121,12 @@ module Studio
     # no policy at all there is nothing to simulate, so it falls back to the home
     # country's own first blocked subdivision — or, failing that, the home
     # country itself, which at least exercises the resolved-location path.
+    # "US-WA" -> "WA" at home, "CU-" -> "CU" abroad. The token is the storage
+    # form; a person reading a flash message wants the place.
+    def place_name(region)
+      Studio::Geo.parse_region(region, home_country: Studio.geo_home_country).compact.last || region
+    end
+
     def simulated_region
       configured = Studio.geo_simulated_region.presence
       return Studio::Geo.normalize_region_token(configured, home_country: Studio.geo_home_country) if configured

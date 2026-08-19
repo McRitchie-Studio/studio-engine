@@ -383,6 +383,9 @@ class GeoGateTest < ActionDispatch::IntegrationTest
     stub_geocoder(FakeResult.new(state_code: "CO", country_code: "US"))
 
     post "/admin/geo/toggle"
+    # The flash names the PLACE, not the storage token: "Simulating WA", never
+    # "Simulating US-WA". A consuming app's browser lane reads this string.
+    assert_equal "Simulating WA.", flash[:notice]
     get "/lab/geo"
     assert_equal "US | WA | BLOCKED", response.body
 
