@@ -99,9 +99,10 @@ module Studio
       # ipinfo silently returns nothing), a 3s timeout, and a Rails.cache-backed
       # IP cache. AFTER initialize, because the cache duck needs Rails.cache to
       # exist. An app that configures Geocoder itself sets
-      # Studio.configure_geocoder = false; an app with no geocoder gem is
+      # Studio.configure_geocoder = false — or simply configures Geocoder itself,
+      # which `force: false` leaves alone. An app with no geocoder gem is
       # unaffected either way (configure! returns false and does nothing).
-      Studio::Geo::Lookup.configure! if Studio.configure_geocoder
+      Studio::Geo::Lookup.configure!(force: false) if Studio.configure_geocoder
 
       # Validate the host app's User model satisfies the engine's contract.
       # See docs/USER_CONTRACT.md. Opt out with Studio.validate_user_contract = false.

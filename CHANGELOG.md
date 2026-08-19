@@ -38,7 +38,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   - **Geocoder configured on boot** for every app that has the gem: ipinfo over
     **HTTPS** (without which every lookup silently returns nothing and every geo
     gate fails closed), a 3s timeout, and a `Rails.cache`-backed IP cache
-    (without which a shared-egress rate limit blanks every visitor). Opt out with
+    (without which a shared-egress rate limit blanks every visitor). An app that
+    already configured Geocoder itself is **left alone** — the host wins, so a
+    gem bump cannot change a shipped app's IP provider. Opt out entirely with
     `Studio.configure_geocoder = false`; `geocoder` is now a gem dependency.
 
   Two rules worth reading before adopting:

@@ -202,9 +202,11 @@ Set `IPINFO_API_TOKEN` to lift the anonymous rate limit. A blank token is a safe
 no-op (the anonymous tier), so this stays dormant rather than failing closed on a
 missing secret.
 
-An app that configures Geocoder itself sets `Studio.configure_geocoder = false`.
-An app with no `geocoder` gem places nobody, and every gate then behaves as it
-does for an unplaceable visitor.
+**The host wins.** An app that has already configured Geocoder — anything with
+its own cache store — is left alone, because an engine that overwrote it would
+change a shipped app's IP provider on a gem bump. `Studio.configure_geocoder =
+false` opts out entirely. An app with no `geocoder` gem places nobody, and every
+gate then behaves as it does for an unplaceable visitor.
 
 **Freshness.** A resolved region is trusted for `Studio.geo_ttl` (a day). A blank
 one is retried after `Studio.geo_retry_ttl` (five minutes), so a provider blip

@@ -46,15 +46,27 @@ module Studio
 
       module_function
 
-      # Returns true when the provider was configured, false when this app has no
-      # geocoder gem installed. False is a normal answer: an app can include
-      # Studio::GeoDetection with no lookup at all and simply never place anyone
-      # — every gate then behaves as it does for an unplaceable visitor.
+      # Returns true when the provider was configured, false when it was left
+      # alone. Both are normal answers:
+      #
+      #   · no geocoder gem — an app can include Studio::GeoDetection with no
+      #     lookup at all and simply never place anyone; every gate then behaves
+      #     as it does for an unplaceable visitor;
+      #   · the HOST already configured Geocoder — its own configuration wins.
+      #     A host that has set a cache store has set this up deliberately, and
+      #     an engine that overwrote it would be changing a shipped app's IP
+      #     provider on a gem bump. Measured: turf-monster's suite asserts its
+      #     own cache class, and this method used to replace it.
+      #
+      # `force:` is how the engine's own re-configuration (and a host that wants
+      # the shared setup back) says "yes, mine".
       def configure!(provider: Studio.geo_ip_provider,
                      api_key: nil,
                      timeout: Studio.geo_lookup_timeout,
-                     cache_ttl: Studio.geo_cache_ttl)
+                     cache_ttl: Studio.geo_cache_ttl,
+                     force: true)
         return false unless available?
+        return false if !force && host_configured?
 
         api_key ||= resolved_api_key
 
@@ -73,6 +85,13 @@ module Studio
 
         ::Geocoder.configure(**options)
         true
+      end
+
+      # The marker of a deliberate host setup. Geocoder ships with no cache store
+      # at all, and every configuration worth respecting sets one — including
+      # this module's.
+      def host_configured?
+        !::Geocoder.config.cache.nil?
       end
 
       def available?
