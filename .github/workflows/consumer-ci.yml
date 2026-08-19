@@ -127,14 +127,28 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
 
-      # Bounded, because an Ubuntu mirror that stops answering otherwise burns the
-      # whole 45-minute job before anyone can retry — measured twice on one PR
-      # (2026-08-19), 45 minutes each, while the other consumers passed on the
-      # same commit. A hung mirror now fails in 10, and the retry is a re-run of
-      # one job rather than an afternoon.
+      # Bounded AND retried, because an Ubuntu mirror that stops answering is the
+      # single most common way this lane dies. Measured on one PR (2026-08-19):
+      # three separate jobs hung here — twice for the full 45-minute job budget
+      # before the step bound existed, once for 10 after — while the other
+      # consumers passed on the identical commit.
+      #
+      # Each attempt is bounded on its own (`timeout`), so a HANG is retried
+      # rather than waited out; a healthy install takes well under a minute, and
+      # the worst case is two bounded attempts inside the step's own 13.
       - name: Install system packages
-        timeout-minutes: 10
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev libvips imagemagick postgresql-client
+        timeout-minutes: 13
+        run: |
+          for attempt in 1 2; do
+            if timeout 120 sudo apt-get update && \
+               timeout 240 sudo apt-get install --no-install-recommends -y \
+                 libpq-dev libvips imagemagick postgresql-client; then
+              exit 0
+            fi
+            echo "::warning::apt attempt $attempt failed or hung; retrying"
+            sleep 10
+          done
+          exit 1
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
