@@ -8,12 +8,24 @@ Shared Rails engine for McRitchie apps. Provides authentication, error handling,
 
 ```ruby
 # Gemfile — install from RubyGems (recommended)
-gem "studio-engine", "~> 0.6"
+gem "studio-engine", "~> 0.56"   # EXAMPLE — pin the floor YOUR app needs
 ```
 
-Then `bundle install`. The current release is **v0.6.1**; see [`CHANGELOG.md`](./CHANGELOG.md) for the history.
+Then `bundle install`. That number is an example, not a statement about the
+current release: this README deliberately makes no such claim, because a
+hand-written one rots silently — it read `v0.6.1` for fifty minors. For what is
+live, see [RubyGems](https://rubygems.org/gems/studio-engine); for what changed,
+[`CHANGELOG.md`](./CHANGELOG.md).
 
-> Published to RubyGems as of v0.4.0 (2026-05-17). New installs should use the RubyGems form, which the consumer Rails apps (`mcritchie-studio`, `turf-monster`) already use.
+Pin the floor your app actually needs rather than copying the example. Each
+consumer pins its own and records WHY beside it, and they differ on purpose. A
+two-segment `~>` admits everything under `1.0`, so the pin documents the floor
+rather than constraining the resolve — read the `Gemfile.lock` for what really
+resolved.
+
+> Published to RubyGems as of v0.4.0 (2026-05-17). New installs should use the
+> RubyGems form, which all three consumer Rails apps (`mcritchie-studio`,
+> `turf-monster`, `mcritchie-industries`) already use.
 
 ## What It Provides
 
@@ -24,6 +36,7 @@ Then `bundle install`. The current release is **v0.6.1**; see [`CHANGELOG.md`](.
 - **Operator tooling**: Shared `studio/banners/environment` banner with Dev Mode + email connector controls, `studio/banners/impersonation`, and an opt-in `Studio::Impersonation` concern for Act As session conventions.
 - **Sluggable concern**: `before_save :set_slug` with `to_param` for human-readable URLs
 - **ThemeSetting model**: Per-app DB overrides with fallback to config defaults
+- **Geo**: `Studio::GeoDetection` places every visitor (IP → country + subdivision, session-cached), `Studio::GeoSetting` stores the operator's blocked countries and regions, `require_geo_allowed` locks whichever surfaces an app chooses, and the shared badge + `/admin/geo` manager ship with it. See [`docs/GEO.md`](docs/GEO.md).
 - **Transactional emails**: `Studio::EmailCatalog` — every email an app sends, its type, a live preview, and its banner — plus the shared `/admin/emails` page. Every app inherits the standard emails and their artwork on day one, and can register its own workflows and upload its own banners. See [Transactional emails](#transactional-emails).
 
 ## Configuration
@@ -105,7 +118,7 @@ Rails.application.routes.draw do
 end
 ```
 
-This draws the enabled auth routes (`/login`, `/signup`, `/logout`, `POST /magic_link` to request a link, `GET`/`POST /l/:token` for the link itself, Solana routes), OAuth callbacks, optional SSO routes, `/error_logs`, and `/admin/theme`. Magic-link emails point at the inert `GET /l/:token` confirmation page; the single-use token is burned only by the CSRF-protected `POST` to `link_consume_path`.
+This draws the enabled auth routes (`/login`, `/signup`, `/logout`, `POST /magic_link` to request a link, `GET`/`POST /l/:token` for the link itself, Solana routes), OAuth callbacks, optional SSO routes, `/error_logs`, and `/admin/theme`. Set `Studio.draw_geo_routes = true` to add the geo manager (`/admin/geo`) and its public probe (`/geo/check`) — off by default because turf-monster owns those helper names until its adoption lands. Magic-link emails point at the inert `GET /l/:token` confirmation page; the single-use token is burned only by the CSRF-protected `POST` to `link_consume_path`.
 
 **Magic links need the `studio_links` table.** Install it with `bin/rails studio_engine:install:migrations && bin/rails db:migrate` (install all of them) before enabling `:magic_link` — never by hand-copying the migration, which collides with the task's own copy on `class CreateStudioLinks`. Without the table, the first sign-in raises `Studio::Link::MissingTable`.
 
@@ -612,11 +625,13 @@ that touches that file. Update [`CHANGELOG.md`](./CHANGELOG.md) under
 `Unreleased` (that is *not* gated), run `bin/release-check --build`, and open
 your PR into `accepted`. That is the whole of your part.
 
-**Conducting the release?** Commit the computed version — with `Gemfile.lock`,
-which pins the engine's own path-gem version — directly onto `accepted`, then
-run `bin/release prepare` from mcritchie-studio; it publishes, tags, and bumps
-each consumer's lock. Details and the exact commands are in
-[`docs/RELEASE.md`](./docs/RELEASE.md).
+**Conducting the release?** Run `bin/release prepare` from mcritchie-studio and
+let it allocate the version — it derives the bump, commits `lib/studio/version.rb`
+with its `Gemfile.lock` onto **`origin/release`**, then publishes, tags, and bumps
+each consumer's lock. **Do not set the version by hand.** A hand-set number makes
+the allocation read the current version as already past the last tag and skip, so
+the hand number silently wins over the derived one. Details and the exact commands
+are in [`docs/RELEASE.md`](./docs/RELEASE.md).
 
 **Semver guide** — the release *derives* the bump from its members (a `breaking`
 risk tag → major, a `feature` → minor, otherwise patch), so this is what those

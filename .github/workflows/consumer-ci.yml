@@ -127,8 +127,28 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
 
+      # Bounded AND retried, because an Ubuntu mirror that stops answering is the
+      # single most common way this lane dies. Measured on one PR (2026-08-19):
+      # three separate jobs hung here — twice for the full 45-minute job budget
+      # before the step bound existed, once for 10 after — while the other
+      # consumers passed on the identical commit.
+      #
+      # Each attempt is bounded on its own (`timeout`), so a HANG is retried
+      # rather than waited out; a healthy install takes well under a minute, and
+      # the worst case is two bounded attempts inside the step's own 13.
       - name: Install system packages
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev libvips imagemagick postgresql-client
+        timeout-minutes: 13
+        run: |
+          for attempt in 1 2; do
+            if timeout 120 sudo apt-get update && \
+               timeout 240 sudo apt-get install --no-install-recommends -y \
+                 libpq-dev libvips imagemagick postgresql-client; then
+              exit 0
+            fi
+            echo "::warning::apt attempt $attempt failed or hung; retrying"
+            sleep 10
+          done
+          exit 1
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -184,5 +204,27 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
           MANAGED_WALLET_ENCRYPTION_KEY: ${{ matrix.managed_wallet_encryption_key }}
         run: |
+          # Install THIS engine's migrations into the consumer before its suite
+          # runs, and migrate them in.
+          #
+          # An engine release that adds a migration is otherwise unshippable. Each
+          # consumer asserts "every migration the resolved engine ships has been
+          # installed here" (EnginePinContractTest) — a real invariant, because the
+          # install is a manual step and an app that skips it boots fine while
+          # missing columns the gem writes to. But in THIS lane the engine is a
+          # local path checkout that is ahead of every consumer by construction,
+          # so the guard fires on a to-do rather than on drift, and it fires in
+          # the engine's PR, where no consumer commit can answer it.
+          #
+          # Installing here keeps the invariant where it belongs — each consumer's
+          # OWN CI still runs that guard against its RELEASED gem, which is the
+          # question it was written to ask — and makes this lane exercise the
+          # install path an adopting app walks.
+          #
+          # db:migrate rather than db:test:prepare alone: a freshly copied
+          # migration is PENDING against the schema-loaded test DB, and Rails
+          # refuses to run a suite with pending migrations.
+          bundle exec rails studio_engine:install:migrations
           bundle exec rails db:test:prepare
+          bundle exec rails db:migrate
           bundle exec rails test

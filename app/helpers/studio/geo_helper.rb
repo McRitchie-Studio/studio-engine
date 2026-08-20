@@ -1,0 +1,73 @@
+# frozen_string_literal: true
+
+module Studio
+  # View-side geo: the flag art and the words. The decisions all live in
+  # Studio::Geo — this is the thin layer that turns a code into something a page
+  # can render, and it is where the asset lookup lives because only a view knows
+  # about the asset pipeline.
+  #
+  # Method names are `geo_`-prefixed on purpose. Rails includes every helper
+  # module into every view, so an unprefixed `country_flag_emoji` here would
+  # collide with a host app's own helper of that name during the window between
+  # this gem release and that app deleting its copy — and the collision resolves
+  # silently, by include order, to whichever was loaded last.
+  module GeoHelper
+    # Subdivision flags ship WITH the gem (app/assets/images/state-flags) so an
+    # app gets the complete badge from an empty repository. Only the US set is
+    # shipped today; every other country renders the emoji flag instead, which
+    # needs no bytes at all.
+    FLAG_ASSET_DIR = File.expand_path("../../assets/images/state-flags", __dir__)
+
+    def geo_country_flag_emoji(alpha2)
+      Studio::Geo.country_flag_emoji(alpha2)
+    end
+
+    def geo_foreign?(country)
+      Studio::Geo.foreign?(country, home_country: Studio.geo_home_country)
+    end
+
+    def geo_subdivision_name(code, country: Studio.geo_home_country)
+      Studio::Geo.subdivision_name(code, country: country)
+    end
+
+    # The asset path for a subdivision's flag, or nil when the gem ships no art
+    # for it. Nil is a normal answer, not an error: the badge renders the code
+    # text-only, which is exactly what a country outside the shipped set gets.
+    #
+    # Guarded on the COUNTRY as well as the code, and that guard is the important
+    # one: the lookup matches a bare two-letter code, so an Italian region
+    # normalising to "CA" would otherwise be handed the CALIFORNIA flag — a wrong
+    # answer that looks right.
+    #
+    # The guard is `== home`, NOT `unless foreign?`, and the difference is a case
+    # a mutation found in turf-monster's suite: an UNPARSEABLE country ("XX!")
+    # is not foreign by `foreign?` — deliberately, so the policy's fail-closed
+    # branch still treats it as home — and would therefore have been handed a
+    # home subdivision flag. Rendering art is the stricter question: show it only
+    # when the country is positively the home one.
+    # The small raster of the same flag, for a page that renders dozens at once.
+    # The SVG set is real vector art — several files run past a megabyte — so a
+    # 52-square grid of them is ~10 MB of downloads for something painted at 16px.
+    # These are 64x48 PNGs, ~4 KB each, rendered from the same source art.
+    def geo_subdivision_flag_thumb_path(code, country: Studio.geo_home_country)
+      geo_subdivision_flag_path(code, country: country, variant: "thumb/", extension: "png")
+    end
+
+    def geo_country_name(code)
+      Studio::Geo.country_name(code)
+    end
+
+    def geo_subdivision_flag_path(code, country: Studio.geo_home_country, variant: "", extension: "svg")
+      home = Studio::Geo.normalize_country(Studio.geo_home_country)
+      return nil unless Studio::Geo.normalize_country(country) == home
+
+      subdivision = Studio::Geo.normalize_subdivision(code)
+      return nil if subdivision.nil?
+
+      file = "#{variant}#{subdivision.downcase}.#{extension}"
+      return nil unless File.exist?(File.join(FLAG_ASSET_DIR, file))
+
+      image_path("state-flags/#{file}")
+    end
+  end
+end

@@ -61,6 +61,13 @@ module Studio
       # Named on the CLASS, not bare: an initializer block is instance_exec'd on
       # an Engine INSTANCE, where a bare call resolves to nothing and boots red.
       app.config.assets.precompile += Studio::Engine.default_email_banner_logical_paths
+
+      # The subdivision flags behind the shared geo badge. Same reasoning as the
+      # banners above: a sprockets host needs each logical path enumerated, and
+      # enumerating from disk means adding a flag is a one-file change. Only the
+      # US set ships — every other country's badge renders an emoji flag, which
+      # costs no bytes at all.
+      app.config.assets.precompile += Studio::Engine.subdivision_flag_logical_paths
     end
 
     # Logical asset paths ("emails/magic-link.png") for every default banner the
@@ -72,12 +79,35 @@ module Studio
         .sort
     end
 
+    # Logical asset paths ("state-flags/wa.svg") for every subdivision flag the
+    # gem ships.
+    # Both the vector art and the small rasters behind it: the badge renders one
+    # SVG, /admin/geo's grid renders 52 PNGs (the SVG set is ~10 MB of real
+    # vector art, which is not a page's worth of downloads for 16px squares).
+    def self.subdivision_flag_logical_paths
+      Dir[File.expand_path("../../app/assets/images/state-flags/*", __dir__),
+          File.expand_path("../../app/assets/images/state-flags/thumb/*", __dir__)]
+        .select { |path| File.file?(path) }
+        .map { |path| path.include?("/thumb/") ? "state-flags/thumb/#{File.basename(path)}" : "state-flags/#{File.basename(path)}" }
+        .sort
+    end
+
     rake_tasks do
       load File.expand_path("../tasks/studio_email.rake", __dir__)
       load File.expand_path("../tasks/studio_ses.rake", __dir__)
     end
 
     config.after_initialize do
+      # Configure the IP -> location provider for every app that has the gem,
+      # so geo detection works the same way everywhere: HTTPS (without which
+      # ipinfo silently returns nothing), a 3s timeout, and a Rails.cache-backed
+      # IP cache. AFTER initialize, because the cache duck needs Rails.cache to
+      # exist. An app that configures Geocoder itself sets
+      # Studio.configure_geocoder = false — or simply configures Geocoder itself,
+      # which `force: false` leaves alone. An app with no geocoder gem is
+      # unaffected either way (configure! returns false and does nothing).
+      Studio::Geo::Lookup.configure!(force: false) if Studio.configure_geocoder
+
       # Validate the host app's User model satisfies the engine's contract.
       # See docs/USER_CONTRACT.md. Opt out with Studio.validate_user_contract = false.
       if defined?(::User) && ::User.is_a?(Class) &&

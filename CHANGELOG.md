@@ -1,10 +1,65 @@
 # Changelog
 
-The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package with `gem "studio-engine", "~> 0.6"`; bumping the gem version and updating consumer lockfiles is a release.
+The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package and pin the floor each one needs — the pins differ on purpose, and every consumer records why beside its own. Bumping the gem version and updating consumer lockfiles is a release; `bin/release prepare` allocates the version and does both (see [`docs/RELEASE.md`](./docs/RELEASE.md)).
 
 ## Unreleased
 
 ### Added
+
+- **Geo — validation for every app, locking for the apps that need it.**
+  Turf Monster's geo stack, lifted into the engine and generalised from
+  US-states-only to country + subdivision. Full guide:
+  [`docs/GEO.md`](docs/GEO.md).
+
+  What ships:
+
+  - **`Studio::Geo`** — the pure half: normalization, the region-token
+    vocabulary, country flag glyphs, the freshness policy, and `blocked?`, the
+    whole blocking decision in one Rails-free method.
+  - **`Studio::GeoDetection`** — one `include` in `ApplicationController` gives
+    an app IP → region detection with a session cache, the `geo_country` /
+    `geo_state` / `geo_region_token` / `geo_blocked?` / `geo_override_active?`
+    helpers, and `require_geo_allowed`, the before_action an app hangs on
+    whatever it must not serve from a blocked location.
+  - **`Studio::GeoSetting`** (`studio_geo_settings`) — the operator's stored
+    policy: the kill switch, blocked countries, blocked regions. Install with
+    `bin/rails studio_engine:install:migrations && bin/rails db:migrate`.
+  - **`/admin/geo` + `/geo/check`** — the manager and the public detection probe.
+    Three cards: what the server thinks of you, a summary of what this app blocks
+    (flag chips plus the kill switch), and two editors behind a tab — the home
+    country's regions and all 249 countries, every square carrying its flag. It
+    answers a click immediately: squares paint from their own checkbox, the
+    summary follows the editor, and ticking your OWN region repaints the navbar
+    badge and the verdict tile before anything is saved. A simulator pins your
+    session to a blocked region so the blocked experience can be walked without
+    a VPN. **Opt-in** via `Studio.draw_geo_routes = true`: turf-monster owns all
+    four helper names today, and a duplicate route name raises while that app's
+    `routes.rb` loads, taking its whole route set down.
+  - **`components/_geo_badge` + the 52 US subdivision flags** (states + DC + PR,
+    ~10 MB under `app/assets/images/state-flags/`), so an app gets the complete
+    badge from an empty repository. Non-US visitors render an emoji country
+    flag — shipping ~250 country SVGs for a 16px badge is not a trade worth
+    making.
+  - **Geocoder configured on boot** for every app that has the gem: ipinfo over
+    **HTTPS** (without which every lookup silently returns nothing and every geo
+    gate fails closed), a 3s timeout, and a `Rails.cache`-backed IP cache
+    (without which a shared-egress rate limit blanks every visitor). An app that
+    already configured Geocoder itself is **left alone** — the host wins, so a
+    gem bump cannot change a shipped app's IP provider. Opt out entirely with
+    `Studio.configure_geocoder = false`; `geocoder` is now a gem dependency.
+
+  Two rules worth reading before adopting:
+
+  **The region token.** `CA` is California *and* Canada, so the ban list stores
+  `US-WA`, never `WA`. Bare codes are accepted on input and normalized against
+  `Studio.geo_home_country`, so a checkbox grid and a legacy US-only list both
+  keep working.
+
+  **Fail closed.** An unplaceable *home-country* visitor is blocked — a blank
+  region could be any blocked region behind a VPN. Narrower than "block every
+  blank" on purpose: it fires only when subdivision rules for the home country
+  exist, and a *resolved foreign* country with no region stays allowed. Opt out
+  with `Studio.geo_fail_closed = false`.
 
 - **The hold-to-confirm button, with its fizz — a new ACTION family in
   `engine-motion.css`.** A press-and-hold CTA for an action a host does not want

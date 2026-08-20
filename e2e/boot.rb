@@ -124,9 +124,46 @@ FileUtils.mkdir_p(IMG_DIR)
   FileUtils.cp(source, File.join(IMG_DIR, target_name)) if File.exist?(source)
 end
 
+# ---- The geo grid's flag art -------------------------------------------------
+#
+# The geo lab page renders 52 subdivision squares, each with its flag. The dummy
+# has no asset pipeline, so `image_path` resolves to /images/<logical path> and
+# these have to exist under public/ or every square 404s — which this lane counts
+# as console noise, not as the missing pictures they are.
+FLAG_SOURCE = File.join(ROOT, "app", "assets", "images", "state-flags", "thumb")
+FLAG_DIR = File.join(ROOT, "test", "dummy", "public", "images", "state-flags", "thumb")
+if Dir.exist?(FLAG_SOURCE)
+  FileUtils.mkdir_p(FLAG_DIR)
+  FileUtils.cp_r(Dir.glob(File.join(FLAG_SOURCE, "*")), FLAG_DIR)
+end
+
 # ---- Serve -------------------------------------------------------------------
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../test/dummy/config/environment"
+
+# ---- The geo table -----------------------------------------------------------
+#
+# The one lab page that needs a SCHEMA. It runs the REAL migration the gem ships
+# rather than a hand-written CREATE, so the lane also proves that migration runs
+# on a non-Postgres adapter — the reason it picks its json type at runtime.
+#
+# ON A FILE, NOT `:memory:`, and that is the whole trick: an in-memory sqlite
+# database belongs to ONE CONNECTION, so a table created here is invisible to the
+# pooled connection that serves the request — which is exactly how this first
+# failed ("Could not find table 'studio_geo_settings'" on a page whose migration
+# had just run). The file is this boot's own, created fresh each time and never
+# shared with a minitest run, so the header's rule above still holds: the lab
+# seeds its own state and reaches for nobody else's database.
+require_relative "../db/migrate/20260818120000_create_studio_geo_settings"
+
+lab_db = File.join(ROOT, "tmp", "e2e-lab.sqlite3")
+FileUtils.mkdir_p(File.dirname(lab_db))
+FileUtils.rm_f(lab_db)
+ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: lab_db)
+ActiveRecord::Migration.suppress_messages do
+  CreateStudioGeoSettings.new.migrate(:up)
+end
+abort "e2e/boot: geo table missing" unless ActiveRecord::Base.connection.table_exists?(:studio_geo_settings)
 
 require "puma"
 require "puma/server"

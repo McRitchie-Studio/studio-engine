@@ -1,6 +1,8 @@
 require "studio/version"
 require "studio/log_rotation"
 require "studio/ip_locations"
+require "studio/geo"
+require "studio/geo/lookup"
 require "studio/engine"
 require "studio/color_scale"
 require "studio/environment_banner"
@@ -243,6 +245,74 @@ module Studio
   #     OnboardingFlow.new(user, session).remaining.map(&:to_s)
   #   }
   mattr_accessor :onboarding_steps_resolver, default: ->(_user, _session) { [] }
+
+  # ---- Geo (Studio::Geo, Studio::GeoSetting, Studio::GeoDetection) ---------
+  #
+  # An app gets geo VALIDATION — where is this visitor, render their flag, is
+  # this location allowed — by including Studio::GeoDetection. It gets geo
+  # LOCKING by hanging `require_geo_allowed` on the surfaces it must not serve
+  # there. The engine deliberately does not decide which surfaces those are; see
+  # docs/GEO.md.
+
+  # This app's own country, ISO alpha-2. Two things read it: a bare subdivision
+  # code ("WA") is resolved as a subdivision OF this country, and the fail-closed
+  # rule fires only for visitors placed HERE with no detectable subdivision.
+  mattr_accessor :geo_home_country, default: "US"
+
+  # The policy a fresh app enforces before an operator has saved anything at
+  # /admin/geo. Countries are alpha-2 codes; subdivisions are region tokens
+  # ("US-WA"), though bare codes are accepted and normalized.
+  mattr_accessor :geo_default_banned_countries, default: []
+  mattr_accessor :geo_default_banned_subdivisions, default: []
+
+  # How to treat a HOME-COUNTRY visitor whose subdivision cannot be resolved (a
+  # VPN, a datacenter IP, a provider outage). true = blocked, because a blank
+  # could be any of the blocked regions masked by a failed lookup. An app whose
+  # geo rules are advisory rather than legal sets this false.
+  mattr_accessor :geo_fail_closed, default: true
+
+  # Freshness windows for the session-cached lookup. A RESOLVED region is trusted
+  # for a day; a BLANK one is retried within minutes, so a provider blip does not
+  # cache "nowhere" — and fail every gate closed — for 24 hours.
+  mattr_accessor :geo_ttl, default: 24.hours
+  mattr_accessor :geo_retry_ttl, default: 5.minutes
+
+  # Where a DEVELOPMENT session stands. Loopback never geocodes, so without this
+  # every geo-gated feature fails closed on a developer's own machine. Development
+  # only — test and production must report an unplaceable visitor honestly.
+  #
+  #   config.geo_development_region = ENV.fetch("DEV_GEO_STATE", "US-CO")
+  mattr_accessor :geo_development_region, default: nil
+
+  # The region /admin/geo's "simulate" button puts the operator in, so a blocked
+  # experience can be walked without a VPN. Defaults to the first blocked
+  # subdivision the app actually has, which is the one worth testing.
+  mattr_accessor :geo_simulated_region, default: nil
+
+  # What a blocked visitor is told, and where an HTML request lands. The message
+  # takes (subdivision, country) — both may be nil on the fail-closed path, which
+  # is why the default omits an empty "( )" rather than printing one.
+  mattr_accessor :geo_blocked_message, default: lambda { |subdivision, _country|
+    place = subdivision.present? ? " (#{subdivision})" : ""
+    "This feature is not available in your area#{place}."
+  }
+  mattr_accessor :geo_blocked_redirect, default: nil
+
+  # Draw /admin/geo + /geo/check from Studio.routes. OFF by default, for the same
+  # hard reason as draw_admin_emails_routes: turf-monster already owns
+  # admin_geo_path, admin_geo_update_path, admin_geo_toggle_path and
+  # geo_check_path, and a duplicate route NAME raises while that app's routes.rb
+  # is loading — taking its entire route set down, not just this page.
+  mattr_accessor :draw_geo_routes, default: false
+
+  # Whether the engine configures Geocoder on boot (provider, HTTPS, timeout, and
+  # a Rails.cache-backed IP cache). An app that configures Geocoder itself sets
+  # this false; an app with no geocoder gem is unaffected either way.
+  mattr_accessor :configure_geocoder, default: true
+  mattr_accessor :geo_ip_provider, default: :ipinfo_io
+  mattr_accessor :geo_ip_api_key, default: nil
+  mattr_accessor :geo_lookup_timeout, default: 3
+  mattr_accessor :geo_cache_ttl, default: 24.hours
 
   # Session key recording "asked, and they said not now". Session-scoped
   # DELIBERATELY: skipping means not now, not never — the field stays blank, so a
@@ -731,6 +801,25 @@ module Studio
       patch "admin/theme",            to: "theme_settings#update",     as: :admin_theme_update
       post  "admin/theme/regenerate", to: "theme_settings#regenerate", as: :admin_theme_regenerate
       get   "admin/schema",           to: "schema#index",              as: :admin_schema
+
+      # The shared geo manager (/admin/geo) + the public detection probe
+      # (/geo/check). OPT-IN — see Studio.draw_geo_routes: turf-monster owns all
+      # four of these helper names today, and drawing a name an app already has
+      # raises `Invalid route name, already in use` while that app's routes.rb
+      # loads, which kills every route in it. An app opts in from its initializer
+      # once its local copies are deleted:
+      #
+      #   config.draw_geo_routes = true
+      #
+      # This gates only the PAGE and the probe. Detection, the badge, the policy
+      # and the gate are always available to an app that includes
+      # Studio::GeoDetection — an app is geo-aware whether or not it draws these.
+      if Studio.draw_geo_routes
+        get   "geo/check",        to: "studio/geo_settings#check",           as: :geo_check
+        get   "admin/geo",        to: "studio/geo_settings#edit",            as: :admin_geo
+        patch "admin/geo",        to: "studio/geo_settings#update",          as: :admin_geo_update
+        post  "admin/geo/toggle", to: "studio/geo_settings#toggle_override", as: :admin_geo_toggle
+      end
       # The living style guide. Canonical at /admin/style (StyleController#index);
       # /admin/design_system redirects here but KEEPS its admin_design_system_path
       # helper so a shipped host sidebar link on the old helper still resolves.

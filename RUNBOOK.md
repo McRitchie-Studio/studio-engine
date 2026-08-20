@@ -6,11 +6,11 @@ Troubleshooting guide for autonomous agents. Format: problem, diagnosis, fix.
 
 **`Bundler::GemNotFound` for studio**
 - Diagnosis: Gemfile expects `studio-engine` from RubyGems but Bundler cannot resolve it. Network, RubyGems, or lockfile issue.
-- Fix: Check `gem "studio-engine", "~> 0.6"` is in the consuming app's Gemfile. Run `bundle install --verbose`. If a just-published release is missing, confirm RubyGems shows it before retrying.
+- Fix: Check the consuming app's Gemfile declares `gem "studio-engine"` (each app pins its own floor — read the pin there rather than assuming a number). Run `bundle install --verbose`. If a just-published release is missing, confirm RubyGems shows it before retrying.
 
 **Engine classes not available (NameError)**
 - Diagnosis: `ErrorLog`, `Sluggable`, or `Studio::ErrorHandling` not found. Engine not loaded.
-- Fix: Verify `gem "studio-engine", "~> 0.6"` is in the consuming app's Gemfile. Run `bundle install`. Check `config/initializers/studio.rb` exists with a `Studio.configure` block. Verify `Studio.routes(self)` is in `config/routes.rb`.
+- Fix: Verify the consuming app's Gemfile declares `gem "studio-engine"` (each app pins its own floor). Run `bundle install`. Check `config/initializers/studio.rb` exists with a `Studio.configure` block. Verify `Studio.routes(self)` is in `config/routes.rb`.
 
 **`Studio` constant undefined at boot**
 - Diagnosis: Initializer runs before engine loads.
@@ -23,7 +23,7 @@ Troubleshooting guide for autonomous agents. Format: problem, diagnosis, fix.
 - Fix: The override path must match exactly. Engine view at `studio/app/views/sessions/new.html.erb` is overridden by `myapp/app/views/sessions/new.html.erb`. Check for typos in directory names. Common overrides: `sessions/new`, `registrations/new`, `sessions/_sso_continue`, `components/_admin_dropdown`.
 
 **Cached view showing old engine version**
-- Diagnosis: After `bundle update studio-engine`, Rails may serve a cached view from the previous engine version.
+- Diagnosis: After `bundle update --conservative studio-engine`, Rails may serve a cached view from the previous engine version.
 - Fix: Restart the Rails server. In development: `bin/rails tmp:cache:clear`. On Heroku, deploys clear the cache automatically.
 
 **Partial not found after engine update**
@@ -82,14 +82,21 @@ release, `bin/release prepare` does all of it — it publishes the gem, tags it,
 and commits each consumer's `Gemfile.lock` bump onto that consumer's `release`
 branch. Reach for these only outside the conductor path:
 
-4. In McRitchie Studio: `cd /Users/alex/projects/mcritchie-studio && bundle update studio-engine`
-5. In Turf Monster: `cd /Users/alex/projects/turf-monster && bundle update studio-engine`
-6. Test both apps and prove the local URLs still boot
-7. Deploy consumers after app-level verification passes
+4. In McRitchie Studio: `cd /Users/alex/projects/mcritchie-studio && bundle update --conservative studio-engine`
+5. In Turf Monster: `cd /Users/alex/projects/turf-monster && bundle update --conservative studio-engine`
+6. In McRitchie Industries: `cd /Users/alex/projects/mcritchie-industries && bundle update --conservative studio-engine`
+7. Test all three apps and prove the local URLs still boot
+8. Deploy consumers after app-level verification passes
+
+`--conservative` on purpose: a bare `bundle update studio-engine` is free to
+float the rest of the dependency graph, turning a one-line engine bump into an
+unreviewable lockfile diff. Verify each `Gemfile.lock` resolves what you expect —
+the lockfile, not the Gemfile pin, since a two-segment `~>` admits far more than
+it appears to.
 
 **Consumer locked to old version**
-- Diagnosis: `bundle update studio-engine` does not pull the latest published version.
-- Fix: Confirm RubyGems has the target version. Check `Gemfile.lock` for the resolved version, then retry `bundle update studio-engine`. If the app has a local Bundler override, clear it with `bundle config unset --local local.studio`.
+- Diagnosis: `bundle update --conservative studio-engine` does not pull the latest published version.
+- Fix: Confirm RubyGems has the target version. Check `Gemfile.lock` for the resolved version, then retry `bundle update --conservative studio-engine`. If the app has a local Bundler override, clear it with `bundle config unset --local local.studio`.
 
 **Engine test approach**
 - Diagnosis: Some engine behavior is pure Ruby and some only proves out inside a consuming Rails app.
