@@ -79,6 +79,28 @@ class ConsumerCiShardContractTest < Minitest::Test
                     "removed deliberately, remove the matrix entries and this guard together."
   end
 
+  def test_unit_no_expression_carries_shell_quote_escaping
+    # BORN FROM A REAL FAILURE. Generating this workflow with a shell heredoc leaked the
+    # `'"'"'` idiom into an expression:
+    #
+    #   CI_RECEIPT_OUT: ${{ matrix.shard && format('"'"'{0}/...'"'"', ...) || '"''"' }}
+    #
+    # GitHub REJECTED the whole workflow — zero jobs, no log, `conclusion: failure` at 0
+    # minutes, which reads like an infrastructure blip rather than a syntax error. YAML
+    # parsing does not catch it either: a mangled expression is still a perfectly valid
+    # YAML string, so the guard above passed on the broken file.
+    #
+    # This is the cheapest possible check for the class: nothing in a workflow expression
+    # should ever contain a shell quote-escape sequence.
+    text = File.read(WORKFLOW)
+    offenders = text.lines.each_with_index.select { |line, _| line.include?(%q('"'"')) }
+
+    assert_empty offenders.map { |line, i| "line #{i + 1}: #{line.strip[0, 70]}" },
+                 "a shell quote-escape sequence leaked into the workflow. GitHub rejects the " \
+                 "file outright — zero jobs, no log — which is easy to misread as a runner " \
+                 "problem. Write the expression with plain single quotes."
+  end
+
   def test_unit_the_executed_set_gate_runs_unconditionally
     gate = workflow.dig("jobs", "hub-executed-set")
     refute_nil gate, "consumer-ci has no hub-executed-set job — four green shards over the " \

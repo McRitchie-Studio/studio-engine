@@ -53,7 +53,7 @@ on:
 
 jobs:
   consumer-tests:
-    name: ${{ matrix.consumer }} suite vs this engine${{ matrix.shard && format( '(shard {0}/{1})', matrix.shard, matrix.shards) || '' }}
+    name: ${{ matrix.consumer }} suite vs this engine${{ matrix.shard && format('(shard {0}/{1})', matrix.shard, matrix.shards) || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -246,7 +246,7 @@ jobs:
           MANAGED_WALLET_ENCRYPTION_KEY: ${{ matrix.managed_wallet_encryption_key }}
           # The consumer's own minitest plugin writes this; it is INERT when unset, so the
           # unsharded consumers below simply never produce one.
-          CI_RECEIPT_OUT: ${{ matrix.shard && format('"'"'{0}/rails-report-shard-{1}.json'"'"', github.workspace, matrix.shard) || '"''"' }}
+          CI_RECEIPT_OUT: ${{ matrix.shard && format('{0}/rails-report-shard-{1}.json', github.workspace, matrix.shard) || '' }}
           CI_RECEIPT_SHARD: ${{ matrix.shard }}
           CI_RECEIPT_SHARD_TOTAL: ${{ matrix.shards }}
         run: |
