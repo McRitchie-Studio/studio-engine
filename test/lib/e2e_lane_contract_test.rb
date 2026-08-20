@@ -344,6 +344,34 @@ class E2eLaneContractTest < Minitest::Test
     end
   end
 
+  # THE `accepted` RUNG MUST BE BUILDABLE — by the DECLARED suite workflow.
+  #
+  # Scoped to engine-ci.yml alone, and the scope is the point rather than an omission.
+  # Ci::BranchGate resolves this repo's verdict through its DECLARED suite workflow
+  # name ("Engine CI"), never "any run on the branch" — a rule added after an unrelated
+  # downstream run once authorised a merge on its own. So Consumer CI building
+  # `accepted` would not make this repo certified, and its absence does not make it
+  # blind. Whether the consumer matrix should build the rung is a separate question
+  # about consumer coverage, deliberately not settled here.
+  #
+  # WHAT WENT WRONG WITHOUT IT. `bin/release prepare` refuses to promote a RED
+  # `accepted` (refuse_red_accepted!). With no run on this branch the verdict resolved
+  # to :none, which by design does not block — refusing on an absent verdict would
+  # wedge the release lane on every race. The guard therefore passed over studio-engine
+  # in every release without ever having been CAPABLE of failing, while naming it as
+  # checked. Measured 2026-08-18, task certify-accepted-everywhere.
+  def test_integration_the_declared_suite_workflow_builds_the_accepted_branch
+    triggers = File.read(File.join(ROOT, ".github", "workflows", "engine-ci.yml"))[/^on:\n(?:.*\n)*?(?=^jobs:)/]
+
+    refute_nil triggers, "engine-ci.yml has no `on:` block above `jobs:`"
+    assert_match(/^\s*branches:.*\baccepted\b/, triggers,
+                 "engine-ci.yml does not build `accepted`. Review merges several approved PRs onto " \
+                 "that branch, producing a combination no run has executed — a pull_request run only " \
+                 "ever built its own head against the base AS IT THEN STOOD. Without this trigger the " \
+                 "sweep's accepted guard reads :none for this repo and silently loses the ability to " \
+                 "fail at all.")
+  end
+
   # No quarantine, and no quiet arrival of one. The concept is refused in the
   # contract, the config and the CI command at once, because it only takes one of the
   # three to reintroduce an exclusion.
