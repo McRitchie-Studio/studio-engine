@@ -156,6 +156,36 @@ jobs:
       # bare ubuntu runner. Without it the browser downloads fine and then fails to
       # launch, which reads as a mysterious lane failure rather than a missing apt
       # package.
+      # CACHE THE BROWSER — the saving this lane's own header asked for by name: "Note
+      # where the minute goes: the SPECS are 4 seconds. The rest is npm ci and the chromium
+      # download. If this ever needs to be cheaper, cache the browser — do not delete
+      # specs." Measured on the latest green run: the lane is 82s, of which this step is
+      # 26s and the specs are 39s.
+      #
+      # The key comes from package-lock.json, so a Playwright bump invalidates it on its
+      # own and there is no version to remember to bump here.
+      #
+      # WHAT IT DOES NOT DO, said plainly so nobody measures it and thinks it failed:
+      #   · the FIRST run on a branch is a MISS — it populates the cache rather than using
+      #     one — and GitHub shares a cache only within a branch or from the default
+      #     branch, so the saving appears once this reaches `main`, not on this PR;
+      #   · engine-ci is NOT this repo's critical path. consumer-ci is, at ~9.6min, 83% of
+      #     which is the hub's unsharded suite. This shortens runner time and engine-only
+      #     iteration; the PR wait is /tasks/shard-consumer-ci-suites, which is blocked
+      #     until the hub's sharding reaches the hub's DEFAULT branch.
+      #
+      # `--with-deps` still runs on a HIT, deliberately: the cache holds the browser, not
+      # the apt libraries headless Chromium needs to launch, and a restored browser that
+      # cannot start reads as a mysterious lane failure rather than a missing package. A
+      # cache miss therefore degrades to exactly today's behaviour.
+      - name: Cache the Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
