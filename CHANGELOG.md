@@ -6,6 +6,20 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **A Geo row in the shared admin dropdown, with signage when it is off.** Every
+  app's gear menu now carries **Geo** beside Theme and Error Logs. It links
+  `/admin/geo` when `ENABLE_GEO_BLOCKING` is truthy and the geo routes are drawn;
+  otherwise it renders DISABLED and names the missing prerequisite — "Set
+  ENABLE_GEO_BLOCKING=true" or "Draw the geo routes first".
+
+  Disabled rather than hidden on purpose: an app that has not turned geo on still
+  learns the feature exists and what to set.
+
+  **The variable governs the LINK, never the gate.** An app with it unset still
+  detects, still blocks, still enforces — a default-off variable that switched
+  enforcement would silently stop a live legal blocklist on the next deploy. An
+  app that would rather decide in code sets `config.geo_blocking_enabled`.
+
 - **Geo — validation for every app, locking for the apps that need it.**
   Turf Monster's geo stack, lifted into the engine and generalised from
   US-states-only to country + subdivision. Full guide:

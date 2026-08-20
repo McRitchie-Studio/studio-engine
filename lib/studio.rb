@@ -298,6 +298,29 @@ module Studio
   }
   mattr_accessor :geo_blocked_redirect, default: nil
 
+  # THE OPERATOR-FACING SWITCH for the geo manager's place in the admin chrome:
+  # ENABLE_GEO_BLOCKING, a plain true/false environment variable in the house
+  # ENABLE_* family (ENABLE_COINFLOW, ENABLE_AGE_GATE).
+  #
+  # It governs the LINK AND ITS SIGNAGE, nothing else. An app with it unset still
+  # detects, still blocks, still enforces — this deliberately does NOT gate the
+  # gate. A default-off variable that switched enforcement would silently stop a
+  # live legal blocklist on the next deploy, which is the opposite of what a
+  # signpost is for.
+  #
+  # What it changes: the shared admin dropdown shows Geo as a DISABLED item naming
+  # the variable to set, so an app that has not turned the feature on still learns
+  # it exists and how to reach it — instead of the feature being invisible.
+  mattr_accessor :geo_blocking_enabled, default: nil
+
+  # nil (the default) means "read the environment"; an app that wants to decide in
+  # code sets true/false in its initializer and the variable is ignored.
+  def self.geo_blocking_enabled?
+    return !!geo_blocking_enabled unless geo_blocking_enabled.nil?
+
+    env_truthy?(ENV["ENABLE_GEO_BLOCKING"])
+  end
+
   # Draw /admin/geo + /geo/check from Studio.routes. OFF by default, for the same
   # hard reason as draw_admin_emails_routes: turf-monster already owns
   # admin_geo_path, admin_geo_update_path, admin_geo_toggle_path and
