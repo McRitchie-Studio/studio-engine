@@ -53,13 +53,54 @@ on:
 
 jobs:
   consumer-tests:
-    name: ${{ matrix.consumer }} suite vs this engine
+    name: ${{ matrix.consumer }} suite vs this engine${{ matrix.shard && format('(shard {0}/{1})', matrix.shard, matrix.shards) || '' }}
     strategy:
       fail-fast: false
       matrix:
         include:
+          # THE HUB LANE IS SHARDED FOUR WAYS. Measured on run 32334594299: this lane was
+          # 502s, of which 416s (83%) was `bundle exec rails test` — the hub's own suite,
+          # unsharded, run a second time against the engine commit. It was the engine's
+          # critical path while engine-ci.yml finished in 2min.
+          #
+          # It shards now because the hub's tooling reached the hub's DEFAULT branch, which
+          # is what this lane checks out (actions/checkout with no `ref:`). Until then the
+          # sharded path could not execute at all, and shipping a matrix whose active branch
+          # has never run is how a dead path ships.
+          #
+          # FOUR EXPLICIT ENTRIES rather than a `shard` dimension: this is an `include:`-only
+          # matrix, so a second dimension would cross-product onto turf and industries, which
+          # have no bin/ci-shard and must keep running whole. GitHub Actions does not support
+          # YAML anchors, so the repetition is the honest cost of keeping the other two lanes
+          # untouched.
           - consumer: mcritchie_studio
             repo: mcritchie-studio
+            shard: 1
+            shards: 4
+            managed_wallet_encryption_key: ""
+            needs_rails_credentials: false
+            needs_solana_admin_key: false
+            needs_tailwind_build: false
+          - consumer: mcritchie_studio
+            repo: mcritchie-studio
+            shard: 2
+            shards: 4
+            managed_wallet_encryption_key: ""
+            needs_rails_credentials: false
+            needs_solana_admin_key: false
+            needs_tailwind_build: false
+          - consumer: mcritchie_studio
+            repo: mcritchie-studio
+            shard: 3
+            shards: 4
+            managed_wallet_encryption_key: ""
+            needs_rails_credentials: false
+            needs_solana_admin_key: false
+            needs_tailwind_build: false
+          - consumer: mcritchie_studio
+            repo: mcritchie-studio
+            shard: 4
+            shards: 4
             managed_wallet_encryption_key: ""
             needs_rails_credentials: false
             needs_solana_admin_key: false
@@ -203,6 +244,11 @@ jobs:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
           REDIS_URL: redis://localhost:6379/0
           MANAGED_WALLET_ENCRYPTION_KEY: ${{ matrix.managed_wallet_encryption_key }}
+          # The consumer's own minitest plugin writes this; it is INERT when unset, so the
+          # unsharded consumers below simply never produce one.
+          CI_RECEIPT_OUT: ${{ matrix.shard && format('{0}/rails-report-shard-{1}.json', github.workspace, matrix.shard) || '' }}
+          CI_RECEIPT_SHARD: ${{ matrix.shard }}
+          CI_RECEIPT_SHARD_TOTAL: ${{ matrix.shards }}
         run: |
           # Install THIS engine's migrations into the consumer before its suite
           # runs, and migrate them in.
@@ -227,4 +273,127 @@ jobs:
           bundle exec rails studio_engine:install:migrations
           bundle exec rails db:test:prepare
           bundle exec rails db:migrate
-          bundle exec rails test
+
+          # `--print` RATHER THAN RUNNING bin/ci-shard DIRECTLY, and the reason is the three
+          # lines above. bin/ci-shard runs its own `db:test:prepare test:prepare` before the
+          # suite, which reloads the test schema — undoing the engine migrations this lane
+          # just installed and migrated in, and leaving the suite against a database missing
+          # the very columns the new gem writes to. So the lane keeps its own preparation and
+          # uses the planner only to decide WHICH FILES this shard owns.
+          #
+          # THE DEGENERATE CASE FAILS SAFE. If the substitution comes back empty, this is
+          # `bundle exec rails test` — the WHOLE suite, not none of it. Sharding normally
+          # inverts that (an empty shard exits 0 silently), which is why the hub needed a
+          # receipt gate; here the same accident runs more, not less. The receipt below is
+          # still emitted and still audited, because "fails safe" is a weaker claim than
+          # "the union was verified".
+          if [ -x bin/ci-shard ]; then
+            # `test:prepare` EXPLICITLY, and this line is the whole reason the first sharded
+            # run failed with 84 errors of
+            #   ActionView::Template::Error: The asset "tailwind.css" is not present
+            #
+            # Rails SKIPS its own `test:prepare` hook — the one tailwindcss-rails enhances
+            # with `tailwindcss:build`, producing the gitignored app/assets/builds/tailwind.css
+            # — whenever an argument to `rails test` looks like a PATH. An ARGLESS
+            # `bundle exec rails test`, which is what this lane ran before sharding, fires it
+            # for free. That is exactly why nothing here ever had to ask for it, and exactly
+            # why sharding broke it: every shard passes paths.
+            #
+            # bin/ci-shard runs `db:test:prepare test:prepare` itself for this reason, and we
+            # deliberately do NOT call it that way here — its db:test:prepare would reload the
+            # schema and drop the engine migrations installed above. So the hook is invoked
+            # directly: it builds the CSS and touches no database.
+            bundle exec rails test:prepare
+            bundle exec rails test $(bin/ci-shard --print --shard=${{ matrix.shard }}/${{ matrix.shards }})
+          else
+            bundle exec rails test
+          fi
+
+      # ALWAYS, not `if: failure()`. A FAILING test still RAN — the executed-set gate must
+      # see the receipt to count it. `matrix.shard` scopes this to the sharded hub entries;
+      # turf and industries run whole and produce no receipt, which is why the gate below
+      # expects exactly the hub's shards and not one per matrix entry.
+      - name: Upload this shard's executed-set receipt
+        if: always() && matrix.shard
+        uses: actions/upload-artifact@v4
+        with:
+          name: rails-report-shard-${{ matrix.shard }}
+          path: ${{ github.workspace }}/rails-report-shard-${{ matrix.shard }}.json
+          if-no-files-found: error
+
+  # THE EXECUTED-SET GATE for the sharded hub lane.
+  #
+  # The four shards above can prove their tests PASSED; they cannot prove they RAN THEM ALL.
+  # In THIS lane an empty shard would fail safe — an empty file list makes `rails test` run
+  # the whole suite — but "fails safe" is a weaker claim than "the union was verified", and
+  # a mis-packed shard that runs THREE files rather than none is not safe at all. So the
+  # receipts are audited the same way the hub audits its own.
+  #
+  # It runs the CONSUMER's own gate against the CONSUMER's own contract, checked out here:
+  # bin/rails-executed-set-check re-derives the expected file set from that tree, so it
+  # audits the suite that actually ran rather than anything this repo asserts about it.
+  #
+  # `if: always()` is LOAD-BEARING and the only condition it may carry: on `needs:` alone a
+  # red shard SKIPS this job, and a skipped required check reports no failure — so the one
+  # gate that would say "the lane ran fewer files than it claims" goes quiet exactly when it
+  # matters.
+  hub-executed-set:
+    name: mcritchie_studio executed-set
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: consumer-tests
+    if: always()
+
+    steps:
+      - name: Mint consumer checkout token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.MCRITCHIE_AGENT_APP_ID }}
+          private-key: ${{ secrets.MCRITCHIE_AGENT_PRIVATE_KEY }}
+          owner: McRitchie-Studio
+
+      # The gate, its contract and the expected file set all live in the CONSUMER.
+      - name: Checkout mcritchie_studio
+        uses: actions/checkout@v4
+        with:
+          repository: McRitchie-Studio/mcritchie-studio
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3.11
+          bundler-cache: false
+
+      - name: Download every shard's receipt
+        uses: actions/download-artifact@v4
+        with:
+          pattern: rails-report-shard-*
+          path: rails-reports
+          merge-multiple: true
+
+      # FILE COVERAGE IS THIS LANE'S QUESTION; THE SKIP CEILING IS THE HUB'S.
+      #
+      # bin/rails-executed-set-check asserts two things: that every committed test file
+      # executed, and that runtime skips stay under `max_skips` in the hub's contract. The
+      # first is exactly what this lane needs. The second is the hub's own hygiene
+      # invariant, enforced in the hub's own CI — and it does not survive the trip.
+      #
+      # MEASURED on the first green sharded run: this lane reports 12 skips where the hub's
+      # own CI reports 11, and the extra one is a single test in
+      # test/lib/agent_worktree_test.rb. That is not drift; it is the ENVIRONMENT. Here the
+      # engine is a path gem with its migrations installed and migrated in, which is the
+      # whole point of the lane and is not the tree the hub's ceiling was measured against.
+      #
+      # Enforcing a ceiling from one environment against a different one produces a FALSE
+      # RED, and this ecosystem has already written down what those cost: "a false refusal
+      # wedges the release lane far more often than the runs it saves" (ci.yml, on why there
+      # is no concurrency group). So the ceiling is dropped for THIS lane only, in the open,
+      # with the measurement attached — and the file-coverage assertion, which is what an
+      # engine PR actually needs to know, keeps its full strength.
+      - name: Assert the lane executed exactly the files it claims to
+        run: |
+          ruby -ryaml -e 'c = YAML.safe_load_file("config/rails_lane.yml"); c.delete("max_skips"); File.write("consumer-lane.yml", c.to_yaml)'
+          bin/rails-executed-set-check rails-reports --contract consumer-lane.yml
+
