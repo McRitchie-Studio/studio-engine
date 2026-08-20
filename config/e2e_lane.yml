@@ -457,7 +457,28 @@
 # restored. Dropping unicode-range reddens the second spec, which is the guard on the
 # latin-ext decision: shipping a second 68KB subset is only free while a page declines
 # to download the subset it renders no glyph from.
-total_specs: 75
+# 75 -> 83: e2e/geo_settings.spec.js. The geo manager. Its response bytes are the
+# same whether ANY of it works — the squares always render checked, the summary
+# always renders chips, both panels always render, and the badge always renders a
+# location. What the markup cannot say is whether a CLICK changes any of it, and
+# that is not hypothetical here: the page shipped once painting its squares from a
+# server-rendered class, so a click changed nothing on screen while the database
+# recorded every one, and the operator's report was "the state buttons don't seem
+# to be working". Eight specs, each verified RED against its own defect
+# reintroduced (docs/E2E_LANE.md):
+#
+#   a ticked square never repaints    -> 1 red   the tab stops swapping panels   -> 1 red
+#   an unticked square stays red      -> 1 red   a blocked country stops
+#   the badge preview never fires     -> 1 red     previewing                    -> 1 red
+#   the preview ignores the kill
+#     switch                          -> 1 red   a flag 404s in the grid         -> 1 red
+#   the summary stops following
+#     the editor                      -> 1 red
+#
+# The badge specs read the badge's TEXT tone and the square specs its background
+# wash — two different reds, and the first draft of this file asserted the wrong
+# one against the badge, which is the sort of thing a lane catches about itself.
+total_specs: 83
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -469,7 +490,7 @@ total_specs: 75
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 75
+executed: 83
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

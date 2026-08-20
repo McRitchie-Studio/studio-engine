@@ -1,0 +1,368 @@
+<%# /admin/geo — the shared geo manager.
+    Three sections, in the order an operator asks the questions: where does this
+    server think I am, is the gate on, and what does it block. %>
+<%
+  setting        = @geo_setting
+  home_country   = Studio.geo_home_country
+  home_grid      = home_country == "US" ? Studio::Geo::US_SUBDIVISION_CODES : []
+  banned_codes   = setting.subdivision_codes(country: home_country)
+  other_tokens   = Array(setting.banned_subdivisions).reject { |t| t.to_s.start_with?("#{home_country}-") }
+  banned_nations = Array(setting.banned_countries)
+  sim_region     = @simulated_region
+  sim_place      = sim_region ? Studio::Geo.parse_region(sim_region, home_country: home_country).compact.last : nil
+  on_countries   = @tab == "countries"
+%>
+<style>
+  /* A blocked square paints from the CHECKBOX, so a click shows immediately.
+     The unchecked look stays on the theme's own utility classes below; only the
+     blocked state is written here, in plain CSS rather than a `has-[:checked]:`
+     Tailwind variant, because a host's build may not scan this gem's views for a
+     class string that appears nowhere else in that app.
+     Unlayered on purpose: it must win over the utility classes it overrides. */
+  .geo-grid label:has(input:checked) {
+    background-color: rgb(239 68 68 / 0.1);
+    border-color: rgb(239 68 68 / 0.3);
+    color: rgb(248 113 113);
+  }
+  /* Keyboard users get the same affordance the mouse gets. */
+  .geo-grid label:focus-within { outline: 2px solid rgb(239 68 68 / 0.5); outline-offset: 1px; }
+
+  /* Summary chips wear the blocked look, because that is what they are. */
+  .geo-chip {
+    background-color: rgb(239 68 68 / 0.1);
+    border: 1px solid rgb(239 68 68 / 0.3);
+    color: rgb(248 113 113);
+  }
+  /* "Nothing blocked yet." shows only when the row is otherwise empty — one rule
+     instead of a server-side branch AND a client-side one that could disagree. */
+  [data-geo-summary]:has(.geo-chip) .geo-summary-empty { display: none; }
+
+  /* The two editors share one space; the checked radio decides which is open.
+     CSS rather than JavaScript so the tabs work before (and without) any script,
+     and because the radio is what carries the choice back through a save. */
+  .geo-panel { display: none; }
+  .geo-tabs:has(#geo_tab_states:checked) .geo-panel-states { display: block; }
+  .geo-tabs:has(#geo_tab_countries:checked) .geo-panel-countries { display: block; }
+  .geo-tab-label { cursor: pointer; }
+  .geo-tabs:has(#geo_tab_states:checked) label[for="geo_tab_states"],
+  .geo-tabs:has(#geo_tab_countries:checked) label[for="geo_tab_countries"] {
+    background-color: rgb(148 163 184 / 0.16);
+    color: inherit;
+  }
+</style>
+
+<div class="max-w-3xl mx-auto"
+  data-geo-page
+  data-geo-home="<%= home_country %>"
+  data-geo-country="<%= geo_country %>"
+  data-geo-subdivision="<%= geo_state %>"
+  data-geo-fail-closed="<%= Studio.geo_fail_closed %>">
+  <h1 class="text-2xl font-extrabold text-heading mb-6">Geo Settings</h1>
+
+  <%# -- What the server thinks of THIS visitor ---------------------------- %>
+  <div class="card p-6 mb-6">
+    <h2 class="text-lg font-bold text-heading mb-4">Current Detection</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-inset rounded-lg p-4 text-center">
+        <div class="text-xs text-muted uppercase tracking-wider mb-1">Country</div>
+        <div class="text-2xl font-bold text-heading font-mono flex items-center justify-center gap-2">
+          <span role="img" aria-hidden="true"><%= geo_country_flag_emoji(geo_country) %></span>
+          <%= geo_country || "??" %>
+        </div>
+      </div>
+      <div class="bg-inset rounded-lg p-4 text-center">
+        <div class="text-xs text-muted uppercase tracking-wider mb-1">Subdivision</div>
+        <div class="text-2xl font-bold text-heading font-mono flex items-center justify-center gap-2">
+          <% if (here = geo_subdivision_flag_thumb_path(geo_state, country: geo_country)) %>
+            <img src="<%= here %>" alt="" class="rounded-sm" style="height: 16px; width: 21px; object-fit: cover;">
+          <% end %>
+          <%= geo_state || "??" %>
+        </div>
+      </div>
+      <%# The verdict, and the one tile the live preview rewrites: tick your own
+          region below and this answers before you save. %>
+      <div class="bg-inset rounded-lg p-4 text-center">
+        <div class="text-xs text-muted uppercase tracking-wider mb-1">Blocked?</div>
+        <div class="text-2xl font-bold font-mono" data-geo-verdict>
+          <span class="geo-when-blocked text-red-400">YES</span>
+          <span class="geo-when-allowed text-primary">NO</span>
+        </div>
+      </div>
+      <div class="bg-inset rounded-lg p-4 text-center">
+        <div class="text-xs text-muted uppercase tracking-wider mb-1">Simulation</div>
+        <div class="text-2xl font-bold font-mono <%= geo_override_active? ? 'text-red-400' : 'text-muted' %>"><%= geo_override_active? ? session[:geo_override] : "OFF" %></div>
+      </div>
+    </div>
+    <div class="mt-4 flex flex-wrap gap-3 items-center">
+      <%= button_to geo_override_active? ? "Clear simulation" : "Simulate #{sim_place || 'a blocked location'}",
+            admin_geo_toggle_path, method: :post,
+            class: "btn #{geo_override_active? ? 'btn-danger' : 'btn-outline'} btn-sm" %>
+      <span class="text-xs text-muted">
+        Simulation pins your session to a blocked region so you can walk the blocked experience without a VPN.
+      </span>
+    </div>
+  </div>
+
+  <%# scope: :geo_setting is REQUIRED, not stylistic. A namespaced model's param
+      key is `studio_geo_setting`, so a bare form_with would post fields the
+      controller (which reads params[:geo_setting]) never looks at — a Save that
+      redirects with "updated" and changes nothing. %>
+  <%= form_with(model: setting, scope: :geo_setting, url: admin_geo_update_path,
+                method: :patch, local: true) do |f| %>
+    <%# THE SUMMARY CARD. The switch, and what it is switching on — so the answer
+        to "what does this app block?" is the first thing on the page rather than
+        something you assemble by reading a 52-square grid. The chips follow the
+        editor live, so they describe the policy you are about to save. %>
+    <div class="card p-6 mb-6">
+      <h2 class="text-lg font-bold text-heading mb-4">Configuration</h2>
+
+      <div class="mb-6">
+        <label class="flex items-center gap-3 cursor-pointer">
+          <%= f.check_box :enabled, class: "w-5 h-5 rounded accent-primary" %>
+          <span class="text-heading font-bold">Enable geo-blocking</span>
+        </label>
+        <p class="text-sm text-muted mt-1 ml-8">
+          The kill switch. While this is off nothing is geo-restricted — including visitors this app cannot place.
+        </p>
+      </div>
+
+      <div class="mb-4">
+        <h3 class="text-xs text-muted uppercase tracking-wider mb-2">
+          Blocked regions in <%= home_country %>
+          <span class="font-mono">(<span data-geo-summary-count="states"><%= banned_codes.size %></span>)</span>
+        </h3>
+        <div class="flex flex-wrap gap-1.5" data-geo-summary="states">
+          <% banned_codes.sort.each do |code| %>
+            <span class="geo-chip inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-mono">
+              <% if (flag = geo_subdivision_flag_thumb_path(code, country: home_country)) %>
+                <img src="<%= flag %>" alt="" class="rounded-sm" style="height: 12px; width: 16px; object-fit: cover;">
+              <% end %>
+              <%= code %>
+            </span>
+          <% end %>
+          <span class="text-xs text-muted geo-summary-empty">Nothing blocked yet.</span>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="text-xs text-muted uppercase tracking-wider mb-2">
+          Blocked countries
+          <span class="font-mono">(<span data-geo-summary-count="countries"><%= banned_nations.size %></span>)</span>
+        </h3>
+        <div class="flex flex-wrap gap-1.5" data-geo-summary="countries">
+          <% banned_nations.sort.each do |code| %>
+            <span class="geo-chip inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-mono">
+              <span role="img" aria-hidden="true" style="line-height: 1;"><%= geo_country_flag_emoji(code) %></span>
+              <%= code %>
+            </span>
+          <% end %>
+          <span class="text-xs text-muted geo-summary-empty">Nothing blocked yet.</span>
+        </div>
+      </div>
+    </div>
+
+    <%# THE EDITORS. Two grids, one open at a time. %>
+    <div class="card p-6 mb-6">
+      <div class="geo-tabs">
+        <%# The radios ride INSIDE the form on purpose: the browser posts the
+            checked one, so the controller can send you back to the tab you were
+            editing instead of resetting to states on every save. %>
+        <input type="radio" name="tab" id="geo_tab_states" value="states" class="sr-only" <%= "checked" unless on_countries %>>
+        <input type="radio" name="tab" id="geo_tab_countries" value="countries" class="sr-only" <%= "checked" if on_countries %>>
+
+        <div class="inline-flex gap-1 p-1 rounded-lg bg-inset border border-subtle mb-4 text-sm">
+          <label for="geo_tab_states" class="geo-tab-label px-3 py-1.5 rounded-md text-secondary">
+            Regions in <%= home_country %>
+            <span class="text-xs text-muted">(<span data-geo-summary-count="states"><%= banned_codes.size %></span>)</span>
+          </label>
+          <label for="geo_tab_countries" class="geo-tab-label px-3 py-1.5 rounded-md text-secondary">
+            Countries
+            <span class="text-xs text-muted">(<span data-geo-summary-count="countries"><%= banned_nations.size %></span>)</span>
+          </label>
+        </div>
+
+        <%# -- Subdivisions of the home country ---------------------------- %>
+        <div class="geo-panel geo-panel-states">
+          <% if home_grid.any? %>
+            <p class="text-xs text-muted mb-4">
+              Check the states where this app may not operate. Changes apply when you save.
+            </p>
+            <%# One hidden field so UNCHECKING the last box posts an empty list rather
+                than posting nothing — which Rails would read as "no change" and the
+                operator would read as a save that silently did nothing. %>
+            <%= hidden_field_tag "geo_setting[banned_subdivisions][]", "" %>
+            <div class="geo-grid geo-grid-states grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+              <% home_grid.each do |code| %>
+                <%# The checkbox is the ONE source of truth for how this square looks:
+                    the server sets `checked`, the CSS above paints it, and a click
+                    repaints it immediately. Painting from a server-rendered class
+                    instead — which this page did first — meant a click changed
+                    nothing on screen until Save, so an operator toggling squares
+                    reasonably concluded the grid was dead while it was in fact
+                    recording every click. %>
+                <label title="<%= Studio::Geo.subdivision_name(code) || code %>"
+                  class="flex items-center justify-center gap-1.5 p-2 rounded border cursor-pointer transition text-xs font-mono
+                         bg-surface-alt border-subtle text-secondary hover:border-strong">
+                  <input type="checkbox" name="geo_setting[banned_subdivisions][]" value="<%= code %>"
+                    <%= 'checked' if banned_codes.include?(code) %>
+                    class="sr-only">
+                  <% if (flag = geo_subdivision_flag_thumb_path(code, country: home_country)) %>
+                    <img src="<%= flag %>" alt="" class="rounded-sm"
+                         style="height: 12px; width: 16px; object-fit: cover; flex-shrink: 0;">
+                  <% end %>
+                  <%= code %>
+                </label>
+              <% end %>
+            </div>
+          <% else %>
+            <p class="text-xs text-muted mb-3">
+              Region codes for <%= home_country %>, comma separated — <span class="font-mono">AB, BC</span>.
+            </p>
+            <%= text_field_tag "geo_setting[banned_subdivisions]", banned_codes.join(", "),
+                  class: "input w-full font-mono" %>
+          <% end %>
+
+          <% if other_tokens.any? %>
+            <div class="mt-6">
+              <h3 class="text-sm font-bold text-heading mb-2">Blocked regions elsewhere</h3>
+              <p class="text-xs text-muted mb-3">
+                Regions outside <%= home_country %>, written as <span class="font-mono">COUNTRY-REGION</span>.
+              </p>
+              <%= text_field_tag "geo_setting[banned_subdivisions][]", other_tokens.join(", "),
+                    class: "input w-full font-mono" %>
+            </div>
+          <% end %>
+        </div>
+
+        <%# -- Countries ---------------------------------------------------- %>
+        <div class="geo-panel geo-panel-countries">
+          <p class="text-xs text-muted mb-4">
+            Check the countries this app refuses outright. A blocked country blocks every visitor placed
+            there, whatever their region. Changes apply when you save.
+          </p>
+          <%= hidden_field_tag "geo_setting[banned_countries][]", "" %>
+          <div class="geo-grid geo-grid-countries grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-96 overflow-y-auto pr-1">
+            <% Studio::Geo::COUNTRY_CODES.each do |code| %>
+              <label title="<%= Studio::Geo.country_name(code) || code %>"
+                class="flex items-center justify-center gap-1.5 p-2 rounded border cursor-pointer transition text-xs font-mono
+                       bg-surface-alt border-subtle text-secondary hover:border-strong">
+                <input type="checkbox" name="geo_setting[banned_countries][]" value="<%= code %>"
+                  <%= 'checked' if banned_nations.include?(code) %>
+                  class="sr-only">
+                <span role="img" aria-hidden="true" style="line-height: 1; flex-shrink: 0;"><%= geo_country_flag_emoji(code) %></span>
+                <%= code %>
+              </label>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex justify-end">
+      <%= f.submit "Save Settings", class: "btn btn-primary" %>
+    </div>
+  <% end %>
+</div>
+
+<script>
+  // LIVE PREVIEW. Tick your own region and the navbar badge (and the Blocked?
+  // tile) answer immediately, before anything is saved — so an operator can see
+  // what a rule will do to a real visitor rather than saving to find out.
+  //
+  // This mirrors Studio::Geo.blocked? on the client, deliberately and narrowly:
+  // same three rules, same order, same fail-closed narrowing. It decides nothing
+  // — the server re-decides on save and on every request afterwards — but a
+  // mirror can still drift, so turf-monster's browser lane asserts the painted
+  // result against a policy the server also enforces.
+  (function () {
+    var page = document.querySelector("[data-geo-page]");
+    if (!page) return;
+
+    var home = page.dataset.geoHome;
+    var country = page.dataset.geoCountry;
+    var subdivision = page.dataset.geoSubdivision;
+    var failClosed = page.dataset.geoFailClosed === "true";
+    var enabledBox = page.querySelector('input[type="checkbox"][name="geo_setting[enabled]"]');
+
+    function checkedValues(selector) {
+      return Array.prototype.map.call(page.querySelectorAll(selector + ":checked"), function (el) {
+        return el.value;
+      });
+    }
+
+    function blocked() {
+      if (!enabledBox || !enabledBox.checked) return false;
+
+      var countries = checkedValues('input[name="geo_setting[banned_countries][]"]');
+      if (country && countries.indexOf(country) !== -1) return true;
+
+      var subdivisions = checkedValues('input[name="geo_setting[banned_subdivisions][]"]');
+      if (subdivision && country === home && subdivisions.indexOf(subdivision) !== -1) return true;
+
+      // Fail closed, narrowed exactly as the server narrows it: only a
+      // home-country visitor with NO region, and only when region rules exist.
+      if (!failClosed) return false;
+      if (subdivision) return false;
+      if (country !== home) return false;
+      return subdivisions.length > 0;
+    }
+
+    // The summary chips are rebuilt from the editor's own squares, so they
+    // describe the policy you are ABOUT to save rather than the one on disk —
+    // and they are built from the square's own flag, so there is no second copy
+    // of the artwork to keep in step.
+    function refreshSummary(kind, selector) {
+      var row = page.querySelector('[data-geo-summary="' + kind + '"]');
+      var counts = page.querySelectorAll('[data-geo-summary-count="' + kind + '"]');
+      if (!row) return;
+
+      Array.prototype.forEach.call(row.querySelectorAll(".geo-chip"), function (chip) {
+        chip.remove();
+      });
+
+      var boxes = Array.prototype.filter.call(page.querySelectorAll(selector), function (box) {
+        return box.checked;
+      });
+      boxes.sort(function (a, b) { return a.value.localeCompare(b.value); });
+
+      boxes.forEach(function (box) {
+        var square = box.closest("label");
+        var chip = document.createElement("span");
+        chip.className = "geo-chip inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-mono";
+        var art = square && square.querySelector("img, span[role='img']");
+        if (art) chip.appendChild(art.cloneNode(true));
+        chip.appendChild(document.createTextNode(box.value));
+        row.insertBefore(chip, row.querySelector(".geo-summary-empty"));
+      });
+
+      // The tab label and the summary heading carry the same number; a page that
+      // showed two different counts for one list would be its own bug report.
+      Array.prototype.forEach.call(counts, function (el) { el.textContent = boxes.length; });
+    }
+
+    function paint() {
+      refreshSummary("states", 'input[name="geo_setting[banned_subdivisions][]"]');
+      refreshSummary("countries", 'input[name="geo_setting[banned_countries][]"]');
+
+      var value = blocked() ? "blocked" : "allowed";
+      document.documentElement.setAttribute("data-geo-preview", value);
+      Array.prototype.forEach.call(document.querySelectorAll("[data-geo-badge]"), function (badge) {
+        // Only the badge showing THIS visitor's location previews; a specimen
+        // badge rendered with other locals keeps whatever it was given.
+        if (badge.dataset.country === country && (badge.dataset.subdivision || "") === (subdivision || "")) {
+          badge.setAttribute("data-blocked", blocked() ? "true" : "false");
+        }
+      });
+    }
+
+    page.addEventListener("change", paint);
+    paint();
+  })();
+</script>
+
+<style>
+  /* The verdict tile follows the same one attribute the badge does. */
+  .geo-when-blocked, .geo-when-allowed { display: none; }
+  [data-geo-preview="blocked"] .geo-when-blocked { display: inline; }
+  [data-geo-preview="allowed"] .geo-when-allowed { display: inline; }
+</style>

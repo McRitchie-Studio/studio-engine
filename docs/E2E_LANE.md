@@ -197,6 +197,40 @@ failure is an intermittent third-party fetch, so it cannot be reproduced on dema
 prove a spec catches it. The structural property can be proven, and was — dropping the
 call from a test body and from a `beforeEach` each redden the guard.
 
+## The geo manager, and what a lab page had to learn
+
+`e2e/geo_settings.spec.js` drives `/admin/geo` through `/lab/geo_settings`, which
+renders the engine's own template plus the badge a host puts in its navbar — both
+BY NAME, per the lab's rule. Eight specs, each verified RED against its own defect
+reintroduced (server rebooted between mutations, per the warning above):
+
+| Mutation | Red |
+|---|---|
+| delete the badge repaint from the preview script | 3 |
+| delete `.geo-grid label:has(input:checked)` | 2 |
+
+The page is worth this because its response bytes are identical whether any of it
+works: the squares always render `checked`, both panels always render, the summary
+always renders chips, and the badge always renders a location. It shipped once
+painting its squares from a SERVER-RENDERED class, and the operator's report was
+"the state buttons don't seem to be working" while the database was recording
+every click. A String assertion cannot tell those two pages apart.
+
+**Two things this lab page had to learn, both measured rather than reasoned:**
+
+*An in-memory sqlite database belongs to ONE CONNECTION.* The migration ran at
+boot and the page still 500'd on `Could not find table 'studio_geo_settings'`,
+because the pooled connection serving the request had its own empty database. The
+lab now migrates a FILE database it creates fresh each boot — still its own, still
+shared with nobody, so this file's rule about not reaching for someone else's
+database holds. It also means the lane proves the gem's migration runs on a
+non-Postgres adapter, which is why that migration picks its json type at runtime.
+
+*The two reds are not interchangeable.* A blocked SQUARE gets `rgb(239 68 68 / .1)`
+as its background; a blocked BADGE gets `rgb(248 113 113)` as its text. The first
+draft of the spec asserted the wash against the badge's colour and failed against a
+page that was working correctly — the lane catching a defect in itself.
+
 ## What the lane's OWN Tailwind build cannot see
 
 `e2e/tailwind_input.css` carries `@source "../app/views"`, so the lane compiles

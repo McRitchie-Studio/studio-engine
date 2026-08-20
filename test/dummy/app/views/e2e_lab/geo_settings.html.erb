@@ -1,0 +1,23 @@
+<%# The geo manager's lab page.
+
+    Two renders BY NAME, and nothing else: the badge a host puts in its navbar,
+    and the engine's own /admin/geo template. Everything the specs drive — the
+    squares' paint, the summary chips, the tabs, the live preview — belongs to
+    those two files. A lab page that hand-rolled any of it would grade itself.
+
+    The badge is given the SAME location the controller reports as this visitor's
+    (US-CO), because that pairing is the preview's whole subject: the script
+    repaints the badge showing where you are, and leaves any other badge alone. %>
+<main class="p-8">
+  <p data-test="lab-body">geo settings lab</p>
+
+  <nav class="mb-6">
+    <%= render "components/geo_badge",
+          subdivision: E2eLabController::LAB_SUBDIVISION,
+          country: E2eLabController::LAB_COUNTRY,
+          blocked: false,
+          simulated: false %>
+  </nav>
+
+  <%= render template: "studio/geo_settings/edit" %>
+</main>
