@@ -170,11 +170,13 @@ dirty the form (or scroll the page) first, so the spec watches something *become
 hidden. A third spec made the same claim as an existing transition spec and was
 deleted rather than kept, following the precedent in `config/e2e_lane.yml`.
 
-**The lane no longer touches the network.** `layouts/studio/_head` links Montserrat
-from `fonts.gstatic.com`, and a slow fetch there surfaces as
-`console.error: Failed to load resource`, which `watchPageErrors` counts — measured
-at 2 failures in 10 runs, each naming an assertion that had nothing to do with
-fonts. `blockOffsiteRequests` in `e2e/helpers.js` answers every off-origin request
+**The lane no longer touches the network.** The instance that proved it necessary was
+Montserrat: `layouts/studio/_head` linked it from `fonts.gstatic.com`, and a slow fetch
+there surfaces as `console.error: Failed to load resource`, which `watchPageErrors`
+counts — measured at 2 failures in 10 runs, each naming an assertion that had nothing to
+do with fonts. The engine vendors Montserrat now, so that request is gone; the guard
+stays, because it holds a property about off-origin requests in general rather than
+about one of them. `blockOffsiteRequests` in `e2e/helpers.js` answers every off-origin request
 with an empty 200. It **answers** rather than aborts on purpose: `route.abort()`
 produces `net::ERR_FAILED`, which is the same console error fired deterministically
 (3 of 9 specs red on every run). Filtering the message afterwards was rejected — it

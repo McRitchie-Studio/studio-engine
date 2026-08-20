@@ -40,9 +40,10 @@ class VendoredAlpineTest < Minitest::Test
   def rendered_head = head.gsub(/<%#.*?%>/m, "")
 
   def test_the_head_loads_no_script_from_a_third_party
-    # Only SCRIPT srcs — the Google Fonts stylesheet/preconnect above is a separate
-    # decision with a separate trade-off, and folding it in here would make this
-    # test fail for a reason it is not about.
+    # Only SCRIPT srcs, still — but not because the font question is open. It was a
+    # separate decision with a separate trade-off, it has since been made, and
+    # test/lib/vendored_montserrat_test.rb holds it. Keeping the two apart means a
+    # failure here names the script that regressed instead of a whole head.
     remote = rendered_head.scan(/<script[^>]+src=["'](https?:[^"']+)["']/i).flatten
 
     assert_empty remote,
