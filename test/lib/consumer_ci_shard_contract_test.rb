@@ -101,6 +101,36 @@ class ConsumerCiShardContractTest < Minitest::Test
                  "problem. Write the expression with plain single quotes."
   end
 
+  def test_unit_a_path_argument_run_still_fires_the_test_prepare_hook
+    # BORN FROM 84 ERRORS. The first sharded run failed with
+    #   ActionView::Template::Error: The asset "tailwind.css" is not present
+    # on every view-rendering test, because Rails SKIPS its own `test:prepare` hook — the
+    # one tailwindcss-rails enhances with `tailwindcss:build` — whenever an argument to
+    # `rails test` looks like a PATH.
+    #
+    # An ARGLESS `bundle exec rails test`, which this lane ran before sharding, fires that
+    # hook for free. That is why nothing here ever had to ask for it, and why sharding broke
+    # it: every shard passes paths. The failure does not look like a build-step problem —
+    # it looks like the app is broken, 84 times.
+    step = workflow.dig("jobs", "consumer-tests", "steps").find { |s| s["run"].to_s.include?("rails test") }
+    refute_nil step, "consumer-ci no longer has a step that runs the consumer suite"
+
+    run = step["run"].to_s
+    # Only the lines that actually execute; the explanation above them is prose.
+    commands = run.lines.map(&:strip).reject { |l| l.start_with?("#") || l.empty? }
+    passes_paths = commands.any? { |l| l.match?(/rails test .*\$\(/) }
+
+    return unless passes_paths
+
+    assert(commands.any? { |l| l.match?(/rails\s+test:prepare\b/) },
+           "this lane passes PATHS to `rails test`, which suppresses Rails' `test:prepare` " \
+           "hook — so app/assets/builds/tailwind.css is never built and every view-rendering " \
+           "test dies with `The asset \"tailwind.css\" is not present`. Invoke " \
+           "`rails test:prepare` explicitly before the sharded run. (Do NOT swap in " \
+           "bin/ci-shard's own prepare: its db:test:prepare reloads the schema and drops the " \
+           "engine migrations installed earlier in this step.)")
+  end
+
   def test_unit_the_executed_set_gate_runs_unconditionally
     gate = workflow.dig("jobs", "hub-executed-set")
     refute_nil gate, "consumer-ci has no hub-executed-set job — four green shards over the " \

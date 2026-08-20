@@ -288,6 +288,22 @@ jobs:
           # still emitted and still audited, because "fails safe" is a weaker claim than
           # "the union was verified".
           if [ -x bin/ci-shard ]; then
+            # `test:prepare` EXPLICITLY, and this line is the whole reason the first sharded
+            # run failed with 84 errors of
+            #   ActionView::Template::Error: The asset "tailwind.css" is not present
+            #
+            # Rails SKIPS its own `test:prepare` hook — the one tailwindcss-rails enhances
+            # with `tailwindcss:build`, producing the gitignored app/assets/builds/tailwind.css
+            # — whenever an argument to `rails test` looks like a PATH. An ARGLESS
+            # `bundle exec rails test`, which is what this lane ran before sharding, fires it
+            # for free. That is exactly why nothing here ever had to ask for it, and exactly
+            # why sharding broke it: every shard passes paths.
+            #
+            # bin/ci-shard runs `db:test:prepare test:prepare` itself for this reason, and we
+            # deliberately do NOT call it that way here — its db:test:prepare would reload the
+            # schema and drop the engine migrations installed above. So the hook is invoked
+            # directly: it builds the CSS and touches no database.
+            bundle exec rails test:prepare
             bundle exec rails test $(bin/ci-shard --print --shard=${{ matrix.shard }}/${{ matrix.shards }})
           else
             bundle exec rails test
