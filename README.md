@@ -8,12 +8,24 @@ Shared Rails engine for McRitchie apps. Provides authentication, error handling,
 
 ```ruby
 # Gemfile — install from RubyGems (recommended)
-gem "studio-engine", "~> 0.6"
+gem "studio-engine", "~> 0.56"   # EXAMPLE — pin the floor YOUR app needs
 ```
 
-Then `bundle install`. The current release is **v0.6.1**; see [`CHANGELOG.md`](./CHANGELOG.md) for the history.
+Then `bundle install`. That number is an example, not a statement about the
+current release: this README deliberately makes no such claim, because a
+hand-written one rots silently — it read `v0.6.1` for fifty minors. For what is
+live, see [RubyGems](https://rubygems.org/gems/studio-engine); for what changed,
+[`CHANGELOG.md`](./CHANGELOG.md).
 
-> Published to RubyGems as of v0.4.0 (2026-05-17). New installs should use the RubyGems form, which the consumer Rails apps (`mcritchie-studio`, `turf-monster`) already use.
+Pin the floor your app actually needs rather than copying the example. Each
+consumer pins its own and records WHY beside it, and they differ on purpose. A
+two-segment `~>` admits everything under `1.0`, so the pin documents the floor
+rather than constraining the resolve — read the `Gemfile.lock` for what really
+resolved.
+
+> Published to RubyGems as of v0.4.0 (2026-05-17). New installs should use the
+> RubyGems form, which all three consumer Rails apps (`mcritchie-studio`,
+> `turf-monster`, `mcritchie-industries`) already use.
 
 ## What It Provides
 
@@ -612,11 +624,13 @@ that touches that file. Update [`CHANGELOG.md`](./CHANGELOG.md) under
 `Unreleased` (that is *not* gated), run `bin/release-check --build`, and open
 your PR into `accepted`. That is the whole of your part.
 
-**Conducting the release?** Commit the computed version — with `Gemfile.lock`,
-which pins the engine's own path-gem version — directly onto `accepted`, then
-run `bin/release prepare` from mcritchie-studio; it publishes, tags, and bumps
-each consumer's lock. Details and the exact commands are in
-[`docs/RELEASE.md`](./docs/RELEASE.md).
+**Conducting the release?** Run `bin/release prepare` from mcritchie-studio and
+let it allocate the version — it derives the bump, commits `lib/studio/version.rb`
+with its `Gemfile.lock` onto **`origin/release`**, then publishes, tags, and bumps
+each consumer's lock. **Do not set the version by hand.** A hand-set number makes
+the allocation read the current version as already past the last tag and skip, so
+the hand number silently wins over the derived one. Details and the exact commands
+are in [`docs/RELEASE.md`](./docs/RELEASE.md).
 
 **Semver guide** — the release *derives* the bump from its members (a `breaking`
 risk tag → major, a `feature` → minor, otherwise patch), so this is what those
