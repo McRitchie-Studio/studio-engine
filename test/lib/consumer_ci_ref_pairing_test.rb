@@ -45,6 +45,8 @@ require "minitest/autorun"
 require "yaml"
 require "open3"
 require "tmpdir"
+require "json"
+require "fileutils"
 
 class ConsumerCiRefPairingTest < Minitest::Test
   ROOT = File.expand_path("../..", __dir__)
@@ -240,5 +242,103 @@ class ConsumerCiRefPairingTest < Minitest::Test
                              existing_branches: LADDER + [stray]),
                  "an off-ladder branch paired just because the consumer happened to have one. " \
                  "Only #{LADDER.join(", ")} may pair; everything else takes the default branch."
+  end
+
+  # ==== the RUNG is not enough — the COMMIT has to match too ===========================
+  #
+  # Everything above pins the two jobs to the same LADDER RUNG. It cannot pin them to the
+  # same COMMIT: a branch name is a moving target, and the shards resolve it when the
+  # matrix starts while the gate resolves it again after all four have finished.
+  #
+  # MEASURED (run 32495361932, 2026-08-21). Shards checked out hub `accepted` at 15:02:17,
+  # this job at 15:06:17; hub PR #979 merged f9a440e5 at 15:04:07 adding two test files.
+  # bin/rails-executed-set-check audited 482 committed files against receipts written over
+  # 480 and called the two newcomers files that "executed NOTHING" — they had run green in
+  # the hub's own lane minutes earlier and simply had not existed when the shards started.
+  # The receipts' union was byte-identical to the lane's file set at f9a440e5^. A false
+  # coverage hole reads exactly like a true one, so it reddened every engine PR based on
+  # `accepted` and blocked #187 behind a hub change unrelated to it.
+
+  def repoint_step
+    @repoint_step ||= steps_for("hub-executed-set")
+                      .find { |s| s["name"].to_s.include?("Stand this checkout on the commit") }
+  end
+
+  def test_unit_the_gate_checkout_keeps_full_depth_so_the_repoint_can_reach_the_shards_commit
+    gate = checkout_steps.find do |job, s|
+      job == "hub-executed-set" && s.dig("with", "repository").to_s.end_with?("mcritchie-studio")
+    end
+    refute_nil gate, "the executed-set gate no longer checks the hub out"
+
+    assert_equal 0, gate.last.dig("with", "fetch-depth"),
+                 "the gate stands itself on the commit the SHARDS ran, and that commit is normally " \
+                 "an ANCESTOR of the branch tip. A depth-1 fetch does not contain it, so the " \
+                 "re-point would silently no-op and the gate would go back to auditing two trees " \
+                 "as though they were one."
+  end
+
+  def test_unit_the_gate_stands_on_the_shards_commit_between_the_receipts_and_the_audit
+    names = steps_for("hub-executed-set").map { |s| s["name"].to_s }
+    download = names.index { |n| n.include?("Download every shard's receipt") }
+    repoint  = names.index { |n| n.include?("Stand this checkout on the commit") }
+    audit    = names.index { |n| n.include?("Assert the lane executed") }
+
+    refute_nil repoint, "the gate no longer re-points at the commit its receipts name, so a hub " \
+                        "merge landing mid-run puts it back to auditing a NEWER tree than the " \
+                        "shards ran — the 2026-08-21 false 'executed NOTHING' verdict"
+    refute_nil download
+    refute_nil audit
+
+    assert_operator download, :<, repoint,
+                    "the commit is READ OUT of the receipts, so they must be downloaded first"
+    assert_operator repoint, :<, audit,
+                    "re-pointing after the audit would change nothing the audit saw"
+  end
+
+  # ==== [integration] the shipped resolver, executed ===================================
+
+  # The ruby the workflow really runs, lifted out of the step rather than restated — a
+  # restated copy proves only that the copy works.
+  def repoint_resolver
+    @repoint_resolver ||= repoint_step.fetch("run")[/ruby -rjson -e '(.*?)'\s*\)"/m, 1] ||
+                          flunk("could not lift the resolver out of the re-point step")
+  end
+
+  def resolve_commit(receipt_commits)
+    Dir.mktmpdir do |dir|
+      reports = File.join(dir, "rails-reports")
+      FileUtils.mkdir_p(reports)
+      receipt_commits.each_with_index do |sha, index|
+        payload = { "shard" => (index + 1).to_s, "shards" => receipt_commits.length.to_s,
+                    "files" => {}, "totals" => {}, "unattributed" => [] }
+        payload["commit"] = sha unless sha.nil?
+        File.write(File.join(reports, "rails-report-shard-#{index + 1}.json"), JSON.generate(payload))
+      end
+
+      out, = Open3.capture2("ruby", "-rjson", "-e", repoint_resolver, chdir: dir)
+      out
+    end
+  end
+
+  def test_integration_the_shipped_resolver_names_a_commit_only_when_the_shards_agree
+    old = "f4d28230f7d075ffb40565474c2330dedbf959fe"
+    new = "f9a440e58d01811ac63aaa7e207c10b43b050919"
+
+    assert_equal old, resolve_commit([ old ] * 4),
+                 "four shards agreeing on a commit is the ordinary case, and the whole point: the " \
+                 "gate audits THAT tree, so the expected set and the executed set describe one tree"
+
+    assert_equal "", resolve_commit([ old, old, new, old ]),
+                 "shards that STRADDLED a merge must not elect a winner here. Their union is a set " \
+                 "no single tree ever held; the hub's gate refuses it by name, and this step must " \
+                 "leave the tip alone rather than pick the majority and manufacture a green"
+
+    assert_equal "", resolve_commit([ nil ] * 4),
+                 "receipts from a hub older than the commit field name nothing, and this lane must " \
+                 "degrade to auditing the tip exactly as it always did — never fail the checkout"
+
+    assert_equal "", resolve_commit([]),
+                 "no receipts at all is the condition the executed-set gate exists to refuse. This " \
+                 "step must hand that verdict to the gate, not pre-empt it"
   end
 end
