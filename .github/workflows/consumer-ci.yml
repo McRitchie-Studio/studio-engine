@@ -18,7 +18,9 @@
 #
 # How it works:
 #   1. Checks out this engine PR/commit into ./studio
-#   2. Checks out the consumer repo into ./<consumer>
+#   2. Checks out the consumer repo into ./<consumer>, at the LADDER RUNG that
+#      matches the engine ref under test (release↔release, main↔main, a PR
+#      against its own base) — see "Resolve the consumer ref" below
 #   3. Rewrites the consumer's Gemfile `studio-engine` entry to
 #      `path: "../studio"`
 #      (matches the local engine HEAD, not whatever tag the consumer pinned)
@@ -63,10 +65,12 @@ jobs:
           # unsharded, run a second time against the engine commit. It was the engine's
           # critical path while engine-ci.yml finished in 2min.
           #
-          # It shards now because the hub's tooling reached the hub's DEFAULT branch, which
-          # is what this lane checks out (actions/checkout with no `ref:`). Until then the
-          # sharded path could not execute at all, and shipping a matrix whose active branch
-          # has never run is how a dead path ships.
+          # It shards now because the hub's tooling (bin/ci-shard, config/rails_lane.yml)
+          # reached every rung this lane can check out. Until then the sharded path could not
+          # execute at all, and shipping a matrix whose active branch has never run is how a
+          # dead path ships. VERIFIED when the rung pairing below landed: bin/ci-shard,
+          # bin/rails-executed-set-check and `shards: 4` are all present on the hub's `main`,
+          # `release` AND `accepted`, so no reachable pairing lands on a tree that cannot cut.
           #
           # FOUR EXPLICIT ENTRIES rather than a `shard` dimension: this is an `include:`-only
           # matrix, so a second dimension would cross-product onto turf and industries, which
@@ -155,15 +159,85 @@ jobs:
           private-key: ${{ secrets.MCRITCHIE_AGENT_PRIVATE_KEY }}
           owner: McRitchie-Studio
 
+      # THE CONSUMER IS CHECKED OUT AT THE SAME LADDER RUNG AS THE ENGINE REF UNDER
+      # TEST — never at whatever its default branch happens to be.
+      #
+      # A ref-less checkout takes the consumer's DEFAULT branch, which for every
+      # consumer is `main` = the LAST SHIPPED state. This lane then runs that tree's
+      # ENTIRE suite, hub-internal guards included — and some of those guards assert
+      # things about the hub's own CROSS-BRANCH state, which a stale checkout gets
+      # wrong for reasons that have nothing to do with the engine commit on trial.
+      #
+      # THAT PAIRING DEADLOCKED A RELEASE. On 2026-08-21, against engine release tip
+      # 15024aa2 (run 32455620696), two hub guards went red on an engine commit that
+      # broke neither of them:
+      #
+      #   · E2eQuarantineRatchetTest — "Expected 15 to be <= 12". The hub's
+      #     config/e2e_lane.yml carries `quarantined: 15` on `main` and `12` on
+      #     `release`, and the ratchet baselines off `origin/release` INSIDE this
+      #     checkout. So a `main` tree that merely LAGS `release` reads as a ceiling
+      #     RISE. It fires on every candidate that REPAIRS a quarantined spec — which
+      #     is to say on exactly the commits the ratchet exists to encourage.
+      #   · CiTestCommandTest's pin anti-vacuity assert — "Expected [] to not be
+      #     empty". Fixed on the hub's `accepted` by d620526f; absent from `main`.
+      #
+      # Neither red is reachable from the engine side, and the hub's `main` only
+      # advances through `bin/release ship` → which needs the candidate assembled →
+      # which needs the gem published → which needs THIS lane green. A closed loop,
+      # with `studio_engine 0.58.0` sitting unpublished inside it.
+      #
+      # THE RULE IS THE RUNG. Engine `release` is a release candidate and is tested
+      # against the consumer's `release` — they ship together. Engine `main` against
+      # the consumer's `main`. A pull request against the consumer branch matching the
+      # PR's BASE, because the base is the rung the engine change is joining. Anything
+      # off-ladder, or absent from a given consumer, falls back to that consumer's
+      # default branch rather than failing the checkout.
+      - name: Resolve the consumer ref to pair with this engine ref
+        id: consumer-ref
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          CANDIDATE: ${{ github.base_ref || github.ref_name }}
+          CONSUMER_REPO: ${{ matrix.repo }}
+        run: |
+          set -euo pipefail
+
+          # ONLY THE THREE LADDER RUNGS PAIR. An engine PR based on a feature branch
+          # takes the consumer's default branch, exactly as this lane always did, and a
+          # consumer that happens to carry a same-named branch is NOT a pairing.
+          ref=""
+          case "${CANDIDATE}" in
+            main|release|accepted)
+              if gh api "repos/McRitchie-Studio/${CONSUMER_REPO}/branches/${CANDIDATE}" --silent >/dev/null 2>&1; then
+                ref="${CANDIDATE}"
+              else
+                echo "::notice::${CONSUMER_REPO} has no '${CANDIDATE}' branch; pairing with its default branch"
+              fi
+              ;;
+            *)
+              echo "::notice::engine ref '${CANDIDATE}' is off-ladder; pairing ${CONSUMER_REPO} with its default branch"
+              ;;
+          esac
+
+          # An EMPTY ref is actions/checkout's "use the default branch", which is the
+          # fallback this lane wants: a consumer missing the rung must not fail hard.
+          echo "ref=${ref}" >> "${GITHUB_OUTPUT}"
+          echo "engine '${CANDIDATE}' -> ${CONSUMER_REPO} '${ref:-<default branch>}'"
+
       # fetch-depth: 0 IS LOAD-BEARING — do not "optimize" it back to the default.
       # The hub's e2e quarantine ratchet (test/lib/e2e_quarantine_ratchet_test.rb)
       # reads its baseline from `origin/release` inside THIS checkout; the default
       # depth-1 single-ref fetch leaves that ref unresolvable and the ratchet goes
       # red by design. Mirrors the hub's own ci.yml, which documents the same trap.
+      #
+      # It works WITH the `ref:` above, not instead of it. Full depth is what makes
+      # `origin/release` RESOLVABLE inside the checkout; the paired ref is what makes
+      # the comparison against it MEANINGFUL. Drop either and the ratchet is wrong in
+      # a different direction — unresolvable, or resolved against a stranger.
       - name: Checkout ${{ matrix.consumer }}
         uses: actions/checkout@v4
         with:
           repository: McRitchie-Studio/${{ matrix.repo }}
+          ref: ${{ steps.consumer-ref.outputs.ref }}
           path: ${{ matrix.consumer }}
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
@@ -353,11 +427,52 @@ jobs:
           private-key: ${{ secrets.MCRITCHIE_AGENT_PRIVATE_KEY }}
           owner: McRitchie-Studio
 
-      # The gate, its contract and the expected file set all live in the CONSUMER.
+      # The gate, its contract and the expected file set all live in the CONSUMER —
+      # and bin/rails-executed-set-check RE-DERIVES the expected file set from THIS
+      # tree. So this checkout has to stand on the same rung the shards ran on, or the
+      # gate audits one branch's receipts against another branch's file list and
+      # reports "drift" that is only ever two branches being two branches.
+      #
+      # Same resolution as the lane above, and byte-identical to it by contract:
+      # test/lib/consumer_ci_ref_pairing_test.rb refuses a workflow whose two resolve
+      # steps have drifted apart. GitHub Actions has no YAML anchors, so a guarded
+      # duplicate is the honest cost.
+      - name: Resolve the consumer ref to pair with this engine ref
+        id: consumer-ref
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          CANDIDATE: ${{ github.base_ref || github.ref_name }}
+          CONSUMER_REPO: mcritchie-studio
+        run: |
+          set -euo pipefail
+
+          # ONLY THE THREE LADDER RUNGS PAIR. An engine PR based on a feature branch
+          # takes the consumer's default branch, exactly as this lane always did, and a
+          # consumer that happens to carry a same-named branch is NOT a pairing.
+          ref=""
+          case "${CANDIDATE}" in
+            main|release|accepted)
+              if gh api "repos/McRitchie-Studio/${CONSUMER_REPO}/branches/${CANDIDATE}" --silent >/dev/null 2>&1; then
+                ref="${CANDIDATE}"
+              else
+                echo "::notice::${CONSUMER_REPO} has no '${CANDIDATE}' branch; pairing with its default branch"
+              fi
+              ;;
+            *)
+              echo "::notice::engine ref '${CANDIDATE}' is off-ladder; pairing ${CONSUMER_REPO} with its default branch"
+              ;;
+          esac
+
+          # An EMPTY ref is actions/checkout's "use the default branch", which is the
+          # fallback this lane wants: a consumer missing the rung must not fail hard.
+          echo "ref=${ref}" >> "${GITHUB_OUTPUT}"
+          echo "engine '${CANDIDATE}' -> ${CONSUMER_REPO} '${ref:-<default branch>}'"
+
       - name: Checkout mcritchie_studio
         uses: actions/checkout@v4
         with:
           repository: McRitchie-Studio/mcritchie-studio
+          ref: ${{ steps.consumer-ref.outputs.ref }}
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Set up Ruby
