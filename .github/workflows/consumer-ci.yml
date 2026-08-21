@@ -468,12 +468,17 @@ jobs:
           echo "ref=${ref}" >> "${GITHUB_OUTPUT}"
           echo "engine '${CANDIDATE}' -> ${CONSUMER_REPO} '${ref:-<default branch>}'"
 
+      # fetch-depth: 0 IS LOAD-BEARING HERE TOO, for a different reason than the lane
+      # above: the step after the receipts download stands this checkout on the commit
+      # the SHARDS ran, and that commit is normally an ANCESTOR of the branch tip. A
+      # depth-1 fetch does not contain it, and the re-point would silently no-op.
       - name: Checkout mcritchie_studio
         uses: actions/checkout@v4
         with:
           repository: McRitchie-Studio/mcritchie-studio
           ref: ${{ steps.consumer-ref.outputs.ref }}
           token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -487,6 +492,60 @@ jobs:
           pattern: rails-report-shard-*
           path: rails-reports
           merge-multiple: true
+
+      # THE RUNG IS NOT ENOUGH — THE COMMIT HAS TO MATCH TOO.
+      #
+      # The resolve step above pins this job to the same LADDER RUNG the shards ran on.
+      # It cannot pin it to the same COMMIT, because a branch name is a moving target and
+      # the two jobs read it minutes apart: the shards resolve `accepted` when the matrix
+      # starts, and this job resolves it again after all four have finished.
+      #
+      # MEASURED, and it deadlocked a release. Run 32495361932: the shards checked out hub
+      # `accepted` at 15:02:17 and this job at 15:06:17. Hub PR #979 merged f9a440e5 at
+      # 15:04:07, adding test/docs/agent_portrait_extension_docs_test.rb and
+      # test/lib/agent_avatar_generator_test.rb. bin/rails-executed-set-check then audited
+      # 482 committed files against receipts written over 480 and reported the two
+      # newcomers as files that "executed NOTHING". Both had run green in the hub's own
+      # lane on the same branch minutes earlier; they had not failed to run, they had not
+      # yet EXISTED. The receipts' union was byte-identical to the lane's file set at
+      # f9a440e5^. A false coverage hole reads exactly like a true one, so the lane went
+      # red on every engine PR based on `accepted` until someone read the receipts by hand.
+      #
+      # Each receipt names the commit its shard ran (the hub's
+      # test/minitest/ci_receipt_plugin.rb writes it). Standing this checkout on that
+      # commit is what makes the comparison honest — the expected set and the executed set
+      # then describe ONE tree instead of two.
+      #
+      # IT FAILS OPEN IN THE TWO CASES THAT ARE NOT THIS BUG, and neither goes quietly
+      # green: the hub's gate owns every verdict either way.
+      #   · Receipts naming NO commit — a hub older than the field. Audit the tip exactly
+      #     as this lane always did.
+      #   · Receipts DISAGREEING with each other — shards that straddled a merge. Leave the
+      #     tip alone; their union is a set no single tree ever held, and the hub's gate
+      #     refuses it by name rather than letting this step pick a winner.
+      - name: Stand this checkout on the commit the shards actually ran
+        run: |
+          set -euo pipefail
+
+          commit="$(ruby -rjson -e '
+            shas = Dir.glob("rails-reports/**/*.json").filter_map do |f|
+              (JSON.parse(File.read(f))["commit"].to_s.strip rescue nil)
+            end.reject(&:empty?).uniq
+            print(shas.length == 1 ? shas.first : "")
+          ')"
+
+          if [ -z "${commit}" ]; then
+            echo "::notice::the receipts name no single commit — auditing the branch tip, as before"
+            exit 0
+          fi
+
+          if ! git cat-file -e "${commit}^{commit}" 2>/dev/null; then
+            echo "::warning::the receipts name ${commit}, which this checkout does not contain — auditing the branch tip"
+            exit 0
+          fi
+
+          echo "shards ran ${commit}; branch tip is $(git rev-parse HEAD) — auditing at the shards' commit"
+          git checkout --force --detach "${commit}"
 
       # FILE COVERAGE IS THIS LANE'S QUESTION; THE SKIP CEILING IS THE HUB'S.
       #
