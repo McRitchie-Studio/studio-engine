@@ -2,14 +2,16 @@
 
     WHY IT IS ITS OWN PARTIAL, and not a block inside the dropdown. 0.58.0 put
     this row in components/_admin_dropdown on the premise that the shared
-    dropdown reaches every app "from one change". It does not, and the count was
-    one app of three:
+    dropdown reaches every app "from one change". It does not. Counted against
+    the apps that actually consume this engine, the row reached NONE of them:
 
       * an app whose admin menu is the LINK SIDEBAR never renders the dropdown —
         studio_sidebar_replaces_admin_menu? suppresses it so the two cog glyphs
-        do not read as a double gear (mcritchie-studio);
-      * an app that forks the navbar outright renders neither (turf-monster);
-      * only an app on the plain engine navbar saw the row at all.
+        do not read as a double gear. Both mcritchie-studio and
+        mcritchie-industries declare an admin-flagged section, so both are that;
+      * an app that forks the navbar outright renders neither — turf-monster
+        forks _user_nav and _navbar and owns components/_gear_sidebar;
+      * nobody was left on the plain engine navbar to see it.
 
     So the policy below now has ONE home, and BOTH engine-owned chromes render
     it: components/_admin_dropdown and components/_link_sidebar. A host that

@@ -191,12 +191,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **The Geo signpost now reaches every app whose admin chrome the engine owns.**
   The row added last release went into `components/_admin_dropdown` alone, on the
   premise that the shared dropdown reaches every app from one change. It does
-  not, and the count was **one app of three**: wherever a host declares an
-  admin-flagged sidebar section, `studio_sidebar_replaces_admin_menu?`
-  SUPPRESSES the dropdown and the link sidebar is the admin menu
-  (`mcritchie-studio`); an app that forks its navbar outright renders neither
-  (`turf-monster`). So the app carrying the largest admin surface in the
-  ecosystem was the one guaranteed never to see the row.
+  not, and counted against the apps that actually consume this engine it reached
+  **none of them**. Wherever a host declares an admin-flagged sidebar section,
+  `studio_sidebar_replaces_admin_menu?` SUPPRESSES the dropdown and the link
+  sidebar is the admin menu — that is both `mcritchie-studio` and
+  `mcritchie-industries`. An app that forks its navbar outright renders neither,
+  which is `turf-monster`. Nobody was left on the plain engine navbar to see it,
+  so the app carrying the largest admin surface in the ecosystem was among those
+  guaranteed never to.
 
   The row moved into its own partial, **`components/_geo_signpost`**, and BOTH
   engine chromes render it — the dropdown as before, and
