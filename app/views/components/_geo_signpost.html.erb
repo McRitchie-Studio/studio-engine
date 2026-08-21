@@ -1,0 +1,92 @@
+<%# THE GEO SIGNPOST — one row, rendered into whichever admin chrome the app has.
+
+    WHY IT IS ITS OWN PARTIAL, and not a block inside the dropdown. 0.58.0 put
+    this row in components/_admin_dropdown on the premise that the shared
+    dropdown reaches every app "from one change". It does not. Counted against
+    the apps that actually consume this engine, the row reached NONE of them:
+
+      * an app whose admin menu is the LINK SIDEBAR never renders the dropdown —
+        studio_sidebar_replaces_admin_menu? suppresses it so the two cog glyphs
+        do not read as a double gear. Both mcritchie-studio and
+        mcritchie-industries declare an admin-flagged section, so both are that;
+      * an app that forks the navbar outright renders neither — turf-monster
+        forks _user_nav and _navbar and owns components/_gear_sidebar;
+      * nobody was left on the plain engine navbar to see it.
+
+    So the policy below now has ONE home, and BOTH engine-owned chromes render
+    it: components/_admin_dropdown and components/_link_sidebar. A host that
+    forks its chrome adopts it in one line, inside its own admin block — an ERB
+    render tag around:
+
+      render "components/geo_signpost",
+             variant: :sidebar, close_action: "$store.sidebars.gearOpen = false"
+
+    Locals:
+      variant      — :dropdown (default), the gear dropdown's narrow rows;
+                     :sidebar, the link sidebar's wide emoji rows.
+      close_action — optional Alpine expression run on click, so the panel the
+                     row lives in closes behind it. The flag is the CALLER's
+                     (linkTreeOpen here, gearOpen in a forked chrome), which is
+                     exactly why this partial must not hardcode one.
+
+    ADMIN CHROME, self-gated. The gate lives HERE rather than in each caller so
+    no caller can forget it: the dropdown shipped without one once and offered
+    /admin/theme and /error_logs to signed-out strangers on a public page.
+%>
+<% if respond_to?(:admin?) && admin? %>
+  <%# The two prerequisites, resolved ONCE and shared by both variants — the
+      point of a single partial is that the two chromes cannot drift into
+      disagreeing about whether geo is reachable.
+
+      The route check is not decoration: where draw_geo_routes is false,
+      `admin_geo_path` is not defined at all, so the disabled branch must never
+      reach for it. A NoMethodError here takes down admin chrome on EVERY page.
+
+      They are named separately because they are FIXED in different places — an
+      env var on the dyno, a line in the app's initializer — so the row says
+      which one is missing rather than a vague "unavailable". %>
+  <% geo_routes = respond_to?(:admin_geo_path) %>
+  <% geo_live   = Studio.geo_blocking_enabled? && geo_routes %>
+  <% geo_hint   = geo_routes ? "Set ENABLE_GEO_BLOCKING=true" : "Draw the geo routes first" %>
+  <% geo_title  = geo_routes ? "Set ENABLE_GEO_BLOCKING=true to manage geo blocking" : "Set config.draw_geo_routes = true in config/initializers/studio.rb, then ENABLE_GEO_BLOCKING=true" %>
+  <% geo_close  = local_assigns[:close_action].presence %>
+
+  <% if local_assigns.fetch(:variant, :dropdown).to_sym == :sidebar %>
+    <%# Sidebar variant: the wide emoji row the link sidebar's own sections use,
+        so an engine-owned row is indistinguishable from a host-declared one. %>
+    <% if geo_live %>
+      <%= link_to admin_geo_path,
+            class: "group flex items-start gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition",
+            "@click": geo_close do %>
+        <span class="text-lg leading-none flex-shrink-0">🌍</span>
+        <span class="min-w-0">
+          <span class="block font-medium truncate">Geo</span>
+          <span class="block text-xs text-muted leading-snug mt-0.5">Country and subdivision blocking</span>
+        </span>
+      <% end %>
+    <% else %>
+      <span class="flex items-start gap-3 px-4 py-3 text-sm text-muted cursor-not-allowed select-none"
+            data-test="geo-signpost-disabled"
+            title="<%= geo_title %>">
+        <span class="text-lg leading-none flex-shrink-0">🌍</span>
+        <span class="min-w-0">
+          <span class="block font-medium truncate">Geo</span>
+          <span class="block text-xs text-muted leading-snug mt-0.5"><%= geo_hint %></span>
+        </span>
+      </span>
+    <% end %>
+  <% else %>
+    <%# Dropdown variant: the narrow row that shipped in 0.58.0, unchanged apart
+        from the test hook, which no longer names one chrome. %>
+    <% if geo_live %>
+      <a href="<%= admin_geo_path %>" class="block px-4 py-2 text-sm text-body hover:text-heading hover:bg-surface-alt transition">Geo</a>
+    <% else %>
+      <span class="block px-4 py-2 text-sm text-muted cursor-not-allowed select-none"
+            data-test="geo-signpost-disabled"
+            title="<%= geo_title %>">
+        Geo
+        <span class="block text-xs text-muted"><%= geo_hint %></span>
+      </span>
+    <% end %>
+  <% end %>
+<% end %>

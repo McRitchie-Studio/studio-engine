@@ -30,17 +30,25 @@ class AdminDropdownTest < Minitest::Test
     assert_includes html, "/error_logs"
   end
 
-  # --- the geo signpost -----------------------------------------------------
+  # --- the geo signpost, THROUGH this chrome ---------------------------------
   #
   # A DISABLED row rather than a hidden one, because the point is signage: an app
   # that has not turned geo on should still learn the feature exists and what to
   # set. Hiding it teaches nobody anything.
+  #
+  # The row itself now lives in components/_geo_signpost and is covered
+  # variant-by-variant in test/views/geo_signpost_test.rb. What these keep is the
+  # CALL SITE: that this dropdown still composes the row, in every state, beside
+  # the chrome it must not cost. The test hook lost its `admin-dropdown-` prefix
+  # in the same change — the row renders in two chromes now, so a name claiming
+  # one of them was a lie. Grepped ecosystem-wide first: it appeared only here
+  # and in the engine's own partial, in no consumer.
 
   def test_geo_links_the_manager_when_the_flag_and_the_routes_are_both_there
     html = render_dropdown(admin: true, geo_flag: true, geo_routes: true)
 
     assert_includes html, "/admin/geo", "an app with geo on gets a live link"
-    refute_includes html, "admin-dropdown-geo-disabled"
+    refute_includes html, "geo-signpost-disabled"
   end
 
   # THE VARIABLE IS THE SWITCH the operator asked for. Off, the row is still
@@ -48,7 +56,7 @@ class AdminDropdownTest < Minitest::Test
   def test_geo_is_disabled_and_names_the_variable_when_the_flag_is_off
     html = render_dropdown(admin: true, geo_flag: false, geo_routes: true)
 
-    assert_includes html, "admin-dropdown-geo-disabled"
+    assert_includes html, "geo-signpost-disabled"
     assert_includes html, "ENABLE_GEO_BLOCKING", "the disabled row must say what to set"
     refute_includes html, "/admin/geo", "and must not link a page it is telling you is off"
   end
@@ -60,7 +68,7 @@ class AdminDropdownTest < Minitest::Test
   def test_geo_is_disabled_without_reaching_for_a_route_that_does_not_exist
     html = render_dropdown(admin: true, geo_flag: true, geo_routes: false)
 
-    assert_includes html, "admin-dropdown-geo-disabled"
+    assert_includes html, "geo-signpost-disabled"
     assert_includes html, "Draw the geo routes first"
     refute_includes html, "/admin/geo"
   end

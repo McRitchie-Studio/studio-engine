@@ -188,6 +188,49 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **The Geo signpost now reaches every app whose admin chrome the engine owns.**
+  The row added last release went into `components/_admin_dropdown` alone, on the
+  premise that the shared dropdown reaches every app from one change. It does
+  not, and counted against the apps that actually consume this engine it reached
+  **none of them**. Wherever a host declares an admin-flagged sidebar section,
+  `studio_sidebar_replaces_admin_menu?` SUPPRESSES the dropdown and the link
+  sidebar is the admin menu — that is both `mcritchie-studio` and
+  `mcritchie-industries`. An app that forks its navbar outright renders neither,
+  which is `turf-monster`. Nobody was left on the plain engine navbar to see it,
+  so the app carrying the largest admin surface in the ecosystem was among those
+  guaranteed never to.
+
+  The row moved into its own partial, **`components/_geo_signpost`**, and BOTH
+  engine chromes render it — the dropdown as before, and
+  `components/_link_sidebar` under its own admin-chipped `Geo` heading. Nothing
+  to configure: a host on either chrome gets the signage from the version bump.
+
+  **Exactly one of them, never both.** The sidebar carries the row only where it
+  IS the admin menu (the host declared an admin-flagged section, so the dropdown
+  is suppressed). A host declaring only public sections renders BOTH chromes by
+  design, and there the dropdown keeps the row — fixing a reach gap by showing
+  an admin the same row twice is not a fix.
+
+  **A forked chrome still needs one line**, because the engine cannot reach a
+  fork by rendering. Inside your own admin block:
+
+  ```erb
+  <%= render "components/geo_signpost",
+        variant: :sidebar, close_action: "$store.sidebars.gearOpen = false" %>
+  ```
+
+  `variant:` picks the chrome's row shape (`:dropdown`, the default, or
+  `:sidebar`); `close_action:` is the Alpine expression that closes YOUR panel
+  behind the row — the store flag belongs to the caller, so the partial never
+  hardcodes one. See [`docs/GEO.md`](docs/GEO.md#finding-the-page--the-signpost-in-whichever-chrome-the-app-has).
+
+  Behavior is otherwise unchanged: same three states, same words, same
+  self-gating on `admin?`, and `ENABLE_GEO_BLOCKING` still governs the LINK and
+  never the gate. One test hook was renamed — `data-test="geo-signpost-disabled"`,
+  was `admin-dropdown-geo-disabled` — since the row renders in two chromes now
+  and a name claiming one of them was a lie. Grepped ecosystem-wide first: it
+  appeared in no consumer.
+
 - **`.conic-surface` keeps its wash inside its own box.** The wash was an
   OVERSIZED pseudo (`inset: -50%`) spun by a `transform` keyframe, cut back to
   the element by the host's `overflow: hidden`. That clip is not dependable: the
