@@ -132,7 +132,16 @@ true, and otherwise renders **disabled, naming the one that is missing**:
 |---|---|
 | `ENABLE_GEO_BLOCKING` truthy **and** routes drawn | links the manager |
 | routes drawn, variable off | disabled — "Set ENABLE_GEO_BLOCKING=true" |
-| routes not drawn | disabled — "Draw the geo routes first" |
+| routes not drawn | disabled — "Draw the geo routes first `config.draw_geo_routes = true`" |
+
+**The disabled row hands over a string, so it is built to be copied.** The
+machine string is its own `<code>` element, which is what keeps it inside the
+dropdown's narrow panel — it carries `break-all` alone, so it wraps mid-token
+while the prose beside it still breaks at word boundaries. The row carries no
+`select-none`: an operator must be able to select the thing they came for. It
+announces as `role="link"` with `aria-disabled="true"`, and the fix is VISIBLE
+text rather than a mouse-only `title` — the hover title keeps the long form with
+the file path, but nothing lives there alone.
 
 **Disabled rather than hidden, on purpose.** An app that has not turned geo on
 still learns the feature exists and what to set; hiding the row teaches nobody

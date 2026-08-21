@@ -116,16 +116,90 @@ class GeoSignpostTest < Minitest::Test
     assert_equal named, bare
   end
 
+  # --- operator ergonomics on the disabled row -------------------------------
+  #
+  # The disabled row is not decoration: it is the ONLY place the engine hands an
+  # operator the string that turns geo on. These pin that it can actually be
+  # read, copied, and announced.
+
+  # OVERFLOW. The machine string is one unbreakable token — no spaces, and
+  # neither "_" nor "=" is a break opportunity — and as one run of text it
+  # painted ~28px past the w-44 dropdown's right border. It is its own element
+  # now so the break class lands on it ALONE, leaving prose to wrap normally.
+  def test_the_machine_string_is_its_own_breakable_element
+    VARIANTS.each do |variant|
+      [true, false].each do |routes|
+        node = Nokogiri::HTML5.fragment(
+          render_signpost(variant: variant, admin: true, geo_flag: false, geo_routes: routes)
+        ).at_css("[data-test='geo-signpost-disabled'] code")
+
+        refute_nil node, "#{variant}/routes=#{routes}: the copyable string must be its own element"
+        assert_includes node["class"].to_s.split, "break-all",
+                        "#{variant}/routes=#{routes}: an unbreakable token needs the break class ON IT"
+        refute_includes node.text, " the ", "#{variant}/routes=#{routes}: prose must stay outside the break-all"
+      end
+    end
+  end
+
+  # SELECT. select-none on the outer span made the very string the row exists to
+  # hand over impossible to select with a mouse.
+  def test_the_disabled_row_does_not_block_selecting_its_string
+    VARIANTS.each do |variant|
+      html = render_signpost(variant: variant, admin: true, geo_flag: false, geo_routes: true)
+
+      refute_includes html, "select-none",
+                       "#{variant}: the row's whole job is handing over a string to copy"
+    end
+  end
+
+  # A11Y. A bare span announces as plain text, so a screen reader gets no hint
+  # that this is a destination and that the destination is unavailable.
+  def test_the_disabled_row_announces_itself_as_an_unavailable_destination
+    VARIANTS.each do |variant|
+      node = Nokogiri::HTML5.fragment(
+        render_signpost(variant: variant, admin: true, geo_flag: false, geo_routes: true)
+      ).at_css("[data-test='geo-signpost-disabled']")
+
+      assert_equal "true", node["aria-disabled"], "#{variant}: a disabled control must say so"
+      assert_equal "link", node["role"], "#{variant}: it is a destination, not a paragraph"
+    end
+  end
+
+  # A11Y, second half. The initializer line lived ONLY in the title attribute,
+  # which is mouse-only — invisible on touch, where an operator is just as likely
+  # to be reading this. Strip every attribute and it must still be on the page.
+  def test_the_initializer_line_is_visible_not_only_on_hover
+    VARIANTS.each do |variant|
+      node = Nokogiri::HTML5.fragment(
+        render_signpost(variant: variant, admin: true, geo_flag: false, geo_routes: false)
+      ).at_css("[data-test='geo-signpost-disabled']")
+      node.traverse { |n| n.attribute_nodes.each(&:remove) if n.element? }
+
+      assert_includes node.text, "config.draw_geo_routes = true",
+                      "#{variant}: the fix must be readable without a mouse"
+    end
+  end
+
+  # THE RAISE A `fetch` DEFAULT DOES NOT CATCH. fetch only defaults an ABSENT
+  # key, so a caller computing the variant inline — `variant: sidebar? &&
+  # :sidebar` — passes an explicit nil, and `nil.to_sym` took down admin chrome
+  # on every page of that app.
+  def test_an_explicit_nil_variant_falls_back_to_the_dropdown
+    explicit = render_signpost(admin: true, geo_flag: true, geo_routes: true, variant: nil, pass_variant: true)
+
+    assert_equal render_signpost(variant: :dropdown, admin: true, geo_flag: true, geo_routes: true), explicit
+  end
+
   private
 
-  def render_signpost(admin:, variant: nil, geo_flag: nil, geo_routes: false, close_action: nil)
+  def render_signpost(admin:, variant: nil, geo_flag: nil, geo_routes: false, close_action: nil, pass_variant: false)
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
     view.define_singleton_method(:admin?) { admin } unless admin.nil?
     # The host's route helper, present only where the app drew the geo routes.
     view.define_singleton_method(:admin_geo_path) { "/admin/geo" } if geo_routes
 
     locals = {}
-    locals[:variant] = variant if variant
+    locals[:variant] = variant if variant || pass_variant
     locals[:close_action] = close_action if close_action
 
     previous = Studio.geo_blocking_enabled

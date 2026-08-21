@@ -47,11 +47,40 @@
       which one is missing rather than a vague "unavailable". %>
   <% geo_routes = respond_to?(:admin_geo_path) %>
   <% geo_live   = Studio.geo_blocking_enabled? && geo_routes %>
-  <% geo_hint   = geo_routes ? "Set ENABLE_GEO_BLOCKING=true" : "Draw the geo routes first" %>
-  <% geo_title  = geo_routes ? "Set ENABLE_GEO_BLOCKING=true to manage geo blocking" : "Set config.draw_geo_routes = true in config/initializers/studio.rb, then ENABLE_GEO_BLOCKING=true" %>
-  <% geo_close  = local_assigns[:close_action].presence %>
 
-  <% if local_assigns.fetch(:variant, :dropdown).to_sym == :sidebar %>
+  <%# THE HINT IS TWO PIECES, prose and machine string, and they are separate
+      elements on purpose. The subtitle exists to hand the operator a string to
+      copy, and that string is one unbreakable token — no spaces, and neither an
+      underscore nor an "=" is a break opportunity. Left as one run of text it
+      measured 187px inside the dropdown's 142px content box and painted past the
+      panel's right border, in every theme and at every width.
+
+      Splitting it lets the break class land on the token ALONE: prose still
+      wraps at word boundaries, and only the machine string breaks mid-character.
+      The class is `break-all`, not `break-words`, deliberately — the engine
+      ships no compiled CSS of its own, so a utility reaches a consumer only when
+      that consumer's Tailwind build scans these views. `break-all` is already
+      carried by engine views that print S3 keys, emails and magic URLs, so it is
+      in every consumer's output today; `break-words` appears nowhere in the
+      engine, and a consumer on a stale build would silently render this row with
+      no break at all — the bug again, in production. Widening the panel was the
+      third option and was declined: w-44 is the shared admin menu for every app,
+      and one row's subtitle is not a reason to move it.
+
+      The code string is also the ANSWER to the title-only instruction. In the
+      no-routes branch the initializer line used to live only in `title`, which
+      is mouse-only and invisible on touch; it is visible text now, and `title`
+      keeps the long form with the file path. %>
+  <% geo_lead  = geo_routes ? "Set" : "Draw the geo routes first" %>
+  <% geo_code  = geo_routes ? "ENABLE_GEO_BLOCKING=true" : "config.draw_geo_routes = true" %>
+  <% geo_title = geo_routes ? "Set ENABLE_GEO_BLOCKING=true to manage geo blocking" : "Set config.draw_geo_routes = true in config/initializers/studio.rb, then ENABLE_GEO_BLOCKING=true" %>
+  <% geo_close = local_assigns[:close_action].presence %>
+
+  <%# `local_assigns[...].presence`, not `fetch(:variant, :dropdown)`. fetch only
+      defaults an ABSENT key, so a caller computing the variant inline —
+      `variant: sidebar? && :sidebar` — hands over an explicit nil, and the old
+      `nil.to_sym` raised NoMethodError inside admin chrome on every page. %>
+  <% if local_assigns[:variant].presence&.to_sym == :sidebar %>
     <%# Sidebar variant: the wide emoji row the link sidebar's own sections use,
         so an engine-owned row is indistinguishable from a host-declared one. %>
     <% if geo_live %>
@@ -65,13 +94,21 @@
         </span>
       <% end %>
     <% else %>
-      <span class="flex items-start gap-3 px-4 py-3 text-sm text-muted cursor-not-allowed select-none"
+      <%# No `select-none` here, and that is the fix rather than an omission: the
+          row's whole job in this state is to hand over the string below, and
+          select-none made it unselectable. role/aria-disabled give a screen
+          reader the "unavailable destination" this paints for a sighted eye. %>
+      <span class="flex items-start gap-3 px-4 py-3 text-sm text-muted cursor-not-allowed"
+            role="link"
+            aria-disabled="true"
             data-test="geo-signpost-disabled"
             title="<%= geo_title %>">
         <span class="text-lg leading-none flex-shrink-0">🌍</span>
         <span class="min-w-0">
           <span class="block font-medium truncate">Geo</span>
-          <span class="block text-xs text-muted leading-snug mt-0.5"><%= geo_hint %></span>
+          <span class="block text-xs text-muted leading-snug mt-0.5"><%= geo_lead %>
+            <code class="font-mono break-all"><%= geo_code %></code>
+          </span>
         </span>
       </span>
     <% end %>
@@ -81,11 +118,15 @@
     <% if geo_live %>
       <a href="<%= admin_geo_path %>" class="block px-4 py-2 text-sm text-body hover:text-heading hover:bg-surface-alt transition">Geo</a>
     <% else %>
-      <span class="block px-4 py-2 text-sm text-muted cursor-not-allowed select-none"
+      <span class="block px-4 py-2 text-sm text-muted cursor-not-allowed"
+            role="link"
+            aria-disabled="true"
             data-test="geo-signpost-disabled"
             title="<%= geo_title %>">
         Geo
-        <span class="block text-xs text-muted"><%= geo_hint %></span>
+        <span class="block text-xs text-muted"><%= geo_lead %>
+          <code class="font-mono break-all"><%= geo_code %></code>
+        </span>
       </span>
     <% end %>
   <% end %>
