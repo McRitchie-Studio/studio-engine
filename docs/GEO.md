@@ -151,11 +151,11 @@ A signpost is only signage where someone looks, so read this before assuming a
 gem bump put Geo in front of your admins. The engine has **two** admin chromes
 and a host may fork a **third**:
 
-| The app's sections | Its admin menu | Where Geo appears | What you do |
+| What the app declares | Its admin menu | Where Geo appears | What you do |
 |---|---|---|---|
-| none, or public-only | `components/_admin_dropdown` | the dropdown | nothing |
-| at least one `admin: true` | `components/_link_sidebar` | the sidebar, under its own admin-chipped `Geo` heading | nothing |
-| a FORKED navbar/sidebar of the host's own | the fork | **nowhere** | render the partial, below |
+| no sidebar sections, or public-only ones | `components/_admin_dropdown` | the dropdown | nothing |
+| at least one `admin: true` section | `components/_link_sidebar` | the sidebar, under its own admin-chipped `Geo` heading | nothing |
+| a forked navbar or sidebar of its own | the fork | **nowhere** | render the partial, below |
 
 The first two need no host change at all, and the row appears in **exactly
 one** of them. Declaring an admin-flagged section is what flips an app from the

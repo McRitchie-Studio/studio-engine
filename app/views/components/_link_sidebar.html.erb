@@ -142,11 +142,12 @@
         This panel IS the admin menu wherever the host declares an admin-flagged
         section (studio_sidebar_replaces_admin_menu?), and in exactly that case
         the engine suppresses components/_admin_dropdown — so before this block
-        the app carrying the largest admin surface in the ecosystem was the one
-        app guaranteed NEVER to see the row the 0.58.0 signpost added.
-        mcritchie-studio is that app: app/views/layouts/application.html.erb
-        renders this partial, and app/helpers/link_tree_helper.rb stamps
-        `admin: true` on every admin section it declares.
+        every app on this chrome was guaranteed NEVER to see the row the 0.58.0
+        signpost added, including the one carrying the largest admin surface in
+        the ecosystem. mcritchie-studio is that one:
+        app/views/layouts/application.html.erb renders this partial, and
+        app/helpers/link_tree_helper.rb stamps `admin: true` on every admin
+        section it declares. mcritchie-industries is the other.
 
         Engine-owned rather than host-declared on purpose. Appending it to
         Studio.sidebar_sections instead would make studio_sidebar? and
