@@ -67,6 +67,17 @@ module Studio
   mattr_accessor :geo_retry_ttl, default: 5.minutes
   mattr_accessor :geo_development_region, default: nil
   mattr_accessor :geo_simulated_region, default: nil
+  # Mirrors lib/studio.rb. The admin dropdown asks Studio.geo_blocking_enabled?,
+  # so the mirror carries the accessor AND the predicate — nil means "read
+  # ENABLE_GEO_BLOCKING", which is what the real one does.
+  mattr_accessor :geo_blocking_enabled, default: nil
+
+  def self.geo_blocking_enabled?
+    return !!geo_blocking_enabled unless geo_blocking_enabled.nil?
+
+    %w[1 true yes on].include?(ENV["ENABLE_GEO_BLOCKING"].to_s.strip.downcase)
+  end
+
   mattr_accessor :geo_ip_provider, default: :ipinfo_io
   mattr_accessor :geo_ip_api_key, default: nil
   mattr_accessor :geo_lookup_timeout, default: 3

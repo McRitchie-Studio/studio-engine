@@ -122,6 +122,29 @@ operator flips to when the gate is misfiring, so it has to release everyone.
 
 ---
 
+## Finding the page — the admin dropdown
+
+The shared admin dropdown (the gear, beside Theme and Error Logs) carries a
+**Geo** row in every app. It links `/admin/geo` when two things are true, and
+otherwise renders **disabled, naming the one that is missing**:
+
+| State | What the row does |
+|---|---|
+| `ENABLE_GEO_BLOCKING` truthy **and** routes drawn | links the manager |
+| routes drawn, variable off | disabled — "Set ENABLE_GEO_BLOCKING=true" |
+| routes not drawn | disabled — "Draw the geo routes first" |
+
+**Disabled rather than hidden, on purpose.** An app that has not turned geo on
+still learns the feature exists and what to set; hiding the row teaches nobody
+anything, and the feature stays invisible until someone reads this file.
+
+**`ENABLE_GEO_BLOCKING` governs the LINK, never the gate.** An app with it unset
+still detects, still blocks, still enforces its exclusion list. A default-off
+variable that switched enforcement would silently stop a live legal blocklist on
+the next deploy — the opposite of what a signpost is for. An app that prefers to
+decide in code sets `config.geo_blocking_enabled = true` and the variable is
+ignored.
+
 ## The operator's page — `/admin/geo`
 
 Opt in with `Studio.draw_geo_routes = true`. It draws four routes:
@@ -254,6 +277,7 @@ does not cache "nowhere" — and fail every gate closed — for 24 hours.
 | `geo_blocked_message` | lambda | what a blocked visitor is told |
 | `geo_blocked_redirect` | `nil` | where an HTML request lands (default `root_path`) |
 | `draw_geo_routes` | `false` | draw `/admin/geo` + `/geo/check` |
+| `geo_blocking_enabled` | `nil` | `nil` reads `ENABLE_GEO_BLOCKING`; true/false decides in code. Governs the admin dropdown's Geo row only |
 | `configure_geocoder` | `true` | let the engine configure the lookup |
 | `geo_ip_provider` | `:ipinfo_io` | Geocoder `ip_lookup` |
 | `geo_ip_api_key` | `nil` | falls back to `ENV["IPINFO_API_TOKEN"]` |
