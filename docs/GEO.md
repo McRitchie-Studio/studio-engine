@@ -122,11 +122,11 @@ operator flips to when the gate is misfiring, so it has to release everyone.
 
 ---
 
-## Finding the page — the admin dropdown
+## Finding the page — the signpost, in whichever chrome the app has
 
-The shared admin dropdown (the gear, beside Theme and Error Logs) carries a
-**Geo** row in every app. It links `/admin/geo` when two things are true, and
-otherwise renders **disabled, naming the one that is missing**:
+The **Geo** row is one partial, `components/_geo_signpost`, and both
+engine-owned admin chromes render it. It links `/admin/geo` when two things are
+true, and otherwise renders **disabled, naming the one that is missing**:
 
 | State | What the row does |
 |---|---|
@@ -144,6 +144,45 @@ variable that switched enforcement would silently stop a live legal blocklist on
 the next deploy — the opposite of what a signpost is for. An app that prefers to
 decide in code sets `config.geo_blocking_enabled = true` and the variable is
 ignored.
+
+### Which chrome an app gets, and what that costs
+
+A signpost is only signage where someone looks, so read this before assuming a
+gem bump put Geo in front of your admins. The engine has **two** admin chromes
+and a host may fork a **third**:
+
+| The app's admin menu | Where Geo appears | What you do |
+|---|---|---|
+| `components/_admin_dropdown` (the gear dropdown) | automatic | nothing |
+| `components/_link_sidebar` (the link sidebar) | automatic | nothing |
+| a FORKED navbar/sidebar of the host's own | **nowhere** | render the partial, below |
+
+The first two need no host change at all: the dropdown carries the row, and the
+link sidebar carries it under its own `Geo` heading for admin viewers. Note the
+two are mutually exclusive by design — where the host declares an admin-flagged
+sidebar section, `studio_sidebar_replaces_admin_menu?` suppresses the dropdown
+so the two cog glyphs do not read as a double gear — which is exactly why the
+row has to live in both.
+
+**A forked chrome renders neither, and the engine cannot reach it.** Adopt the
+signpost in one line, inside the fork's own admin block:
+
+```erb
+<%= render "components/geo_signpost",
+      variant: :sidebar, close_action: "$store.sidebars.gearOpen = false" %>
+```
+
+`variant:` is `:dropdown` (narrow rows) or `:sidebar` (wide emoji rows).
+`close_action:` is the Alpine expression that closes **your** panel behind the
+row — the flag is the caller's, so the partial never hardcodes one. The row
+self-gates on `admin?`; do not re-gate it, and do not copy the branching into
+your fork, or the two chromes drift into disagreeing about whether geo is
+reachable.
+
+**Live today:** `turf-monster` is the forked chrome
+(`app/views/components/_gear_sidebar.html.erb`), so its admins reach
+`/admin/geo` by URL until that one line lands — worth knowing before setting
+`ENABLE_GEO_BLOCKING=true` there and expecting a link to appear.
 
 ## The operator's page — `/admin/geo`
 

@@ -136,6 +136,30 @@
         <% end %>
       <% end %>
     <% end %>
+
+    <%# THE GEO SIGNPOST — how a sidebar-chrome app gets geo signage at all.
+
+        This panel IS the admin menu wherever the host declares an admin-flagged
+        section (studio_sidebar_replaces_admin_menu?), and in exactly that case
+        the engine suppresses components/_admin_dropdown — so before this block
+        the app carrying the largest admin surface in the ecosystem was the one
+        app guaranteed NEVER to see the row the 0.58.0 signpost added.
+        mcritchie-studio is that app: app/views/layouts/application.html.erb
+        renders this partial, and app/helpers/link_tree_helper.rb stamps
+        `admin: true` on every admin section it declares.
+
+        Engine-owned rather than host-declared on purpose. Appending it to
+        Studio.sidebar_sections instead would make studio_sidebar? and
+        studio_sidebar_replaces_admin_menu? true for apps that declare NO
+        sections — raising a sidebar where none existed and taking Theme,
+        Navbar and Error Logs away from apps that rely on the dropdown. %>
+    <% if sidebar_admin %>
+      <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
+        <span>Geo</span>
+        <span class="rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-mono text-primary">ADMIN</span>
+      </div>
+      <%= render "components/geo_signpost", variant: :sidebar, close_action: close_action %>
+    <% end %>
   </nav>
 <% end %>
 

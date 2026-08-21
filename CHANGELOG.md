@@ -188,6 +188,41 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **The Geo signpost now reaches every app whose admin chrome the engine owns.**
+  The row added last release went into `components/_admin_dropdown` alone, on the
+  premise that the shared dropdown reaches every app from one change. It does
+  not, and the count was **one app of three**: wherever a host declares an
+  admin-flagged sidebar section, `studio_sidebar_replaces_admin_menu?`
+  SUPPRESSES the dropdown and the link sidebar is the admin menu
+  (`mcritchie-studio`); an app that forks its navbar outright renders neither
+  (`turf-monster`). So the app carrying the largest admin surface in the
+  ecosystem was the one guaranteed never to see the row.
+
+  The row moved into its own partial, **`components/_geo_signpost`**, and BOTH
+  engine chromes render it — the dropdown as before, and
+  `components/_link_sidebar` under its own admin-chipped `Geo` heading. Nothing
+  to configure: a host on either chrome gets the signage from the version bump.
+
+  **A forked chrome still needs one line**, because the engine cannot reach a
+  fork by rendering. Inside your own admin block:
+
+  ```erb
+  <%= render "components/geo_signpost",
+        variant: :sidebar, close_action: "$store.sidebars.gearOpen = false" %>
+  ```
+
+  `variant:` picks the chrome's row shape (`:dropdown`, the default, or
+  `:sidebar`); `close_action:` is the Alpine expression that closes YOUR panel
+  behind the row — the store flag belongs to the caller, so the partial never
+  hardcodes one. See [`docs/GEO.md`](docs/GEO.md#finding-the-page--the-signpost-in-whichever-chrome-the-app-has).
+
+  Behavior is otherwise unchanged: same three states, same words, same
+  self-gating on `admin?`, and `ENABLE_GEO_BLOCKING` still governs the LINK and
+  never the gate. One test hook was renamed — `data-test="geo-signpost-disabled"`,
+  was `admin-dropdown-geo-disabled` — since the row renders in two chromes now
+  and a name claiming one of them was a lie. Grepped ecosystem-wide first: it
+  appeared in no consumer.
+
 - **`.conic-surface` keeps its wash inside its own box.** The wash was an
   OVERSIZED pseudo (`inset: -50%`) spun by a `transform` keyframe, cut back to
   the element by the host's `overflow: hidden`. That clip is not dependable: the
