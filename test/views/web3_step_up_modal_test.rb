@@ -79,6 +79,13 @@ class Web3StepUpModalTest < ActiveSupport::TestCase
     # the provider arrives as a prop — so BOTH must ship in the markup.
     assert_includes html, 'x-text="providerLabel"', "the remembered-brand row"
     assert_includes html, "Connect your wallet", "the no-brand fallback"
+    # ...and the fallback's mark is a DRAWN wallet, not an emoji. The first pass
+    # used U+1F45B PURSE, which renders as a pink handbag inches from Phantom's
+    # real brand mark — the one thing on the card belonging to no design system.
+    # Pinned by codepoint because the next well-meaning emoji looks fine in a
+    # commit diff and wrong on screen.
+    assert_not_includes html, "\u{1F45B}"
+    assert_not_includes html, "&#128091;"
     assert_includes html, "get canOneClick() { return !!this.provider && !this.providerMissing; }"
   end
 
