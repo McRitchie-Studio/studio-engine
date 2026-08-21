@@ -4,8 +4,10 @@
 #
 # The mcritchie_studio lane was 83% of this workflow's wall time (416s of a 502s job on run
 # 32334594299) — the hub's own suite, unsharded, run a second time against the engine
-# commit. It shards now because the hub's tooling reached the hub's DEFAULT branch, which
-# is what this lane checks out.
+# commit. It shards now because the hub's tooling reached every rung this lane checks out.
+# The lane no longer takes the hub's default branch at all: since 2026-08-21 it pairs the
+# consumer checkout to the ladder rung of the engine ref under test, guarded by
+# test/lib/consumer_ci_ref_pairing_test.rb.
 #
 # THE COUPLING THIS FILE EXISTS FOR. The shard denominator lives in TWO repos: the matrix
 # below, and `shards:` in the hub's config/rails_lane.yml. bin/ci-shard ABORTS loudly when
