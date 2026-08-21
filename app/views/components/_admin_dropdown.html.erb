@@ -13,29 +13,10 @@
   <div x-show="open" x-cloak @click.outside="open = false" x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="absolute right-0 mt-2 w-44 bg-surface border border-subtle rounded-lg shadow-lg z-50 py-1">
     <a href="/admin/theme" class="block px-4 py-2 text-sm text-body hover:text-heading hover:bg-surface-alt transition">Theme</a>
     <a href="/admin/navbar" class="block px-4 py-2 text-sm text-body hover:text-heading hover:bg-surface-alt transition">Navbar</a>
-    <%# GEO — shown in every app, LIVE only where it can actually be used.
-        A disabled row rather than a hidden one is the whole point: an app that has
-        not turned geo on still learns the feature exists and what to set, instead
-        of it being invisible until someone reads the gem's docs.
-
-        Two prerequisites, and the row says WHICH is missing, because they are
-        fixed in different places — an env var on the dyno, a line in the app's
-        initializer. The route check is not decoration: where draw_geo_routes is
-        false, `admin_geo_path` does not exist and calling it RAISES, so the
-        disabled branch must never reach for the helper. %>
-    <% geo_routes = respond_to?(:admin_geo_path) %>
-    <% if Studio.geo_blocking_enabled? && geo_routes %>
-      <a href="<%= admin_geo_path %>" class="block px-4 py-2 text-sm text-body hover:text-heading hover:bg-surface-alt transition">Geo</a>
-    <% else %>
-      <span class="block px-4 py-2 text-sm text-muted cursor-not-allowed select-none"
-            data-test="admin-dropdown-geo-disabled"
-            title="<%= geo_routes ? "Set ENABLE_GEO_BLOCKING=true to manage geo blocking" : "Set config.draw_geo_routes = true in config/initializers/studio.rb, then ENABLE_GEO_BLOCKING=true" %>">
-        Geo
-        <span class="block text-xs text-muted">
-          <%= geo_routes ? "Set ENABLE_GEO_BLOCKING=true" : "Draw the geo routes first" %>
-        </span>
-      </span>
-    <% end %>
+    <%# GEO — the signpost lives in components/_geo_signpost, because this
+        dropdown is only ONE of the engine's two admin chromes and an app on the
+        other one never renders this file. Same row, same policy, both chromes. %>
+    <%= render "components/geo_signpost" %>
     <a href="/error_logs" class="block px-4 py-2 text-sm text-body hover:text-heading hover:bg-surface-alt transition">Error Logs</a>
   </div>
 </div>

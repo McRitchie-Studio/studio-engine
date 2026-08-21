@@ -136,6 +136,47 @@
         <% end %>
       <% end %>
     <% end %>
+
+    <%# THE GEO SIGNPOST — how a sidebar-chrome app gets geo signage at all.
+
+        This panel IS the admin menu wherever the host declares an admin-flagged
+        section (studio_sidebar_replaces_admin_menu?), and in exactly that case
+        the engine suppresses components/_admin_dropdown — so before this block
+        every app on this chrome was guaranteed NEVER to see the row the 0.58.0
+        signpost added, including the one carrying the largest admin surface in
+        the ecosystem. mcritchie-studio is that one:
+        app/views/layouts/application.html.erb renders this partial, and
+        app/helpers/link_tree_helper.rb stamps `admin: true` on every admin
+        section it declares. mcritchie-industries is the other.
+
+        Engine-owned rather than host-declared on purpose. Appending it to
+        Studio.sidebar_sections instead would make studio_sidebar? and
+        studio_sidebar_replaces_admin_menu? true for apps that declare NO
+        sections — raising a sidebar where none existed and taking Theme,
+        Navbar and Error Logs away from apps that rely on the dropdown.
+
+        EXACTLY ONE HOME PER APP, which is what the second half of the gate
+        buys. A host that declares only PUBLIC sections keeps the dropdown —
+        the engine navbar renders BOTH chromes for that shape, deliberately, so
+        its admins never lose Theme, Navbar and Error Logs. Signposting geo here
+        as well would show such an admin the same row twice, in two menus open
+        at the same time. So the row goes wherever the admin menu IS: the
+        dropdown for that shape, this panel for the shape that suppresses the
+        dropdown.
+
+        The predicate is `studio_sidebar_replaces_admin_menu?` (see
+        StudioSidebarHelper), computed here from the sections already in hand
+        rather than called: this partial renders in hosts and test rigs that
+        provide studio_sidebar_sections without the rest of the helper, and a
+        bare call would raise for them. The two must stay the same question —
+        if the helper's rule changes, this changes with it. %>
+    <% if sidebar_admin && sections.any? { |section| section[:admin] } %>
+      <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
+        <span>Geo</span>
+        <span class="rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-mono text-primary">ADMIN</span>
+      </div>
+      <%= render "components/geo_signpost", variant: :sidebar, close_action: close_action %>
+    <% end %>
   </nav>
 <% end %>
 
