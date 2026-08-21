@@ -203,6 +203,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `components/_link_sidebar` under its own admin-chipped `Geo` heading. Nothing
   to configure: a host on either chrome gets the signage from the version bump.
 
+  **Exactly one of them, never both.** The sidebar carries the row only where it
+  IS the admin menu (the host declared an admin-flagged section, so the dropdown
+  is suppressed). A host declaring only public sections renders BOTH chromes by
+  design, and there the dropdown keeps the row — fixing a reach gap by showing
+  an admin the same row twice is not a fix.
+
   **A forked chrome still needs one line**, because the engine cannot reach a
   fork by rendering. Inside your own admin block:
 

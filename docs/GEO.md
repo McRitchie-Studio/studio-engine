@@ -151,18 +151,19 @@ A signpost is only signage where someone looks, so read this before assuming a
 gem bump put Geo in front of your admins. The engine has **two** admin chromes
 and a host may fork a **third**:
 
-| The app's admin menu | Where Geo appears | What you do |
-|---|---|---|
-| `components/_admin_dropdown` (the gear dropdown) | automatic | nothing |
-| `components/_link_sidebar` (the link sidebar) | automatic | nothing |
-| a FORKED navbar/sidebar of the host's own | **nowhere** | render the partial, below |
+| The app's sections | Its admin menu | Where Geo appears | What you do |
+|---|---|---|---|
+| none, or public-only | `components/_admin_dropdown` | the dropdown | nothing |
+| at least one `admin: true` | `components/_link_sidebar` | the sidebar, under its own admin-chipped `Geo` heading | nothing |
+| a FORKED navbar/sidebar of the host's own | the fork | **nowhere** | render the partial, below |
 
-The first two need no host change at all: the dropdown carries the row, and the
-link sidebar carries it under its own `Geo` heading for admin viewers. Note the
-two are mutually exclusive by design — where the host declares an admin-flagged
-sidebar section, `studio_sidebar_replaces_admin_menu?` suppresses the dropdown
-so the two cog glyphs do not read as a double gear — which is exactly why the
-row has to live in both.
+The first two need no host change at all, and the row appears in **exactly
+one** of them. Declaring an admin-flagged section is what flips an app from the
+first row to the second: `studio_sidebar_replaces_admin_menu?` then suppresses
+the dropdown so two cog glyphs do not read as a double gear. Declaring only
+public sections keeps the dropdown — both chromes render for that shape, on
+purpose — so the sidebar leaves the signpost to the dropdown rather than
+showing an admin the same row twice.
 
 **A forked chrome renders neither, and the engine cannot reach it.** Adopt the
 signpost in one line, inside the fork's own admin block:

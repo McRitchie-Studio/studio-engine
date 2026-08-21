@@ -145,6 +145,20 @@ class LinkSidebarTest < Minitest::Test
     refute_includes html, "/admin/geo"
   end
 
+  # EXACTLY ONE HOME PER APP. A host declaring only PUBLIC sections keeps the
+  # admin dropdown — the engine navbar renders BOTH chromes for that shape,
+  # deliberately, so its admins never lose Theme/Navbar/Error Logs. Signposting
+  # geo here as well would show such an admin the same row twice, in two menus
+  # open at the same time. Fixing a reach gap by double-signing is not a fix.
+  def test_the_sidebar_yields_the_signpost_when_it_is_not_the_admin_menu
+    html = render_sidebar(sections: [SECTIONS.first], admin: true, geo_flag: true, geo_routes: true)
+
+    refute_includes html, ">ADMIN<",
+                     "precondition: no admin-flagged section, so the dropdown is NOT suppressed"
+    refute_includes html, "/admin/geo", "the dropdown carries the row for this shape"
+    refute_includes html, ">Geo<"
+  end
+
   # The panel closes behind the row, driven by THIS panel's store flag — the
   # partial takes the expression from its caller so a forked chrome can pass its
   # own (turf-monster's gear sidebar drives gearOpen, not linkTreeOpen).
