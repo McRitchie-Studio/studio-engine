@@ -340,6 +340,14 @@
         <template x-if="$store.dsModals.current().id === 'wallet-connect'">
           <div><%= render "style/modals/wallet_connect" %></div>
         </template>
+        <%# web3-step-up — the REAL shared partial, not a style-guide specimen.
+            The other Web3 cards here render style/modals/* demos while each app
+            keeps its own live modal; this one renders studio/modals/* — the
+            same file a host renders in production — so what is reviewed here IS
+            the shipped card. modal_store mounts it on this page's own host. %>
+        <template x-if="$store.dsModals.current().id === 'web3-step-up'">
+          <div><%= render "studio/modals/web3_step_up", modal_store: "dsModals" %></div>
+        </template>
         <template x-if="$store.dsModals.current().id === 'onchain-tx'">
           <div><%= render "style/modals/onchain_tx" %></div>
         </template>
@@ -796,6 +804,16 @@
         marks inline from the engine</strong>
         (<code class="font-mono text-2xs">studio/modals/blocks/_wallet_brand_sprite</code>),
         so every app inherits them with no per-app icon files.
+        The two <strong>Web3 step-up</strong> cards are a different kind of thing
+        from the rest of this section: they render
+        <code class="font-mono text-2xs">studio/modals/_web3_step_up</code> &mdash;
+        the <strong>REAL shared partial a host renders in production</strong>,
+        not a style-guide copy of it &mdash; so what you review here is the
+        shipped card, and it cannot drift from what users see. They also carry the
+        <strong>standard web3 auth button</strong>: a wallet row (brand mark, the
+        wallet&rsquo;s own name, Installed badge, chevron) rather than a filled
+        CTA, glowing via <code class="font-mono text-2xs">pulse-cta</code> because
+        it is the one thing to press.
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -853,6 +871,36 @@
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
           <div class="text-2xl leading-none">⚠️</div>
           <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+        </div>
+      <% end %>
+
+      <%# Web3 step-up — the web2-session-on-a-wallet-account card. NOT part of
+          the three-card walk above: that walk is one on-chain transaction, this
+          is an AUTH state that precedes any of it. Two specimens because the
+          card has exactly two shapes, and the second is what every wallet linked
+          before a host recorded brands will see. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Web3 step-up (remembered wallet)",
+            reference: %(the Web3 Contest "Web3 step-up" card (studio/modals/_web3_step_up — the REAL shared partial, not a specimen copy) — shown to an account that holds a self-custody wallet but authenticated this session with a web2 credential. One wallet row, glowing, because it is the only thing to press. Open with $store.dsModals.open('web3-step-up', { provider: 'phantom', providerLabel: 'Phantom', walletHint: '7xKp…JZ2Q' })),
+            open_expr: "$store.dsModals.open('web3-step-up', { provider: 'phantom', providerLabel: 'Phantom', walletHint: '7xKp…JZ2Q' })",
+            glow_when: ds_glow.call("web3-step-up"),
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">🔐</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-7 w-full rounded-lg border" style="border-color: var(--color-border-strong)"></span>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Web3 step-up (no remembered wallet)",
+            reference: %(the Web3 Contest "Web3 step-up" card with NO remembered brand (studio/modals/_web3_step_up) — every wallet linked before a host recorded brands lands here, so it is a live population and not a defensive branch. The row falls back to the picker rather than dead-ending. Open with $store.dsModals.open('web3-step-up', {})),
+            open_expr: "$store.dsModals.open('web3-step-up', {})",
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">🔐</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-7 w-full rounded-lg border border-dashed" style="border-color: var(--color-border-strong)"></span>
         </div>
       <% end %>
 
