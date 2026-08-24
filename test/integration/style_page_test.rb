@@ -902,4 +902,160 @@ class StylePageTest < ActiveSupport::TestCase
     assert_includes html, ".pulse-cta",
       "the pulse specimen surfaces the .pulse-cta class name"
   end
+  # --- 11. the onboarding chain is shown as ONE sequence ----------------------
+  #
+  # The chain is three modals sharing ONE progress pill, and until 2026-08-24 the
+  # page rendered step 1 in the Onboarding section, step 2 in "Contest entry &
+  # eligibility", and step 3 nowhere at all — so it showed a 1-of-3 pill and a
+  # 2-of-3 pill and never a 3-of-3, which is the one thing a pill exists to be
+  # read against. These tests hold the reunification in place; a card drifting
+  # back out of the section is exactly the regression they exist to catch.
+
+  # Nokogiri, not string matching: "does this label appear on the page" cannot
+  # tell WHICH section it appears in, and the section is the whole point here.
+  def section_html(heading)
+    doc = Nokogiri::HTML(render_index)
+    h3  = doc.css("h3").find { |n| n.text.strip == heading }
+    assert h3, "no section heading #{heading.inspect} on the page"
+    h3.ancestors("section").first.to_html
+  end
+
+  ONBOARDING_CHAIN = ["First name", "Age gate (DOB)", "Wallet setup"].freeze
+
+  # Rails.root is the DUMMY app in this suite, not the engine — a source read
+  # rooted there silently looks in test/dummy and raises ENOENT. Engine files
+  # resolve through Studio::Engine.root.
+  WALLET_SETUP_SPECIMEN =
+    Studio::Engine.root.join("app/views/style/modals/_wallet_setup.html.erb").freeze
+
+  test "the Onboarding section carries all three chain steps, in walked order" do
+    section = section_html("Onboarding")
+    positions = ONBOARDING_CHAIN.map do |label|
+      idx = section.index(label)
+      assert idx, "chain step #{label.inspect} is missing from the Onboarding section"
+      idx
+    end
+    assert_equal positions.sort, positions,
+      "the chain steps must appear in walked order #{ONBOARDING_CHAIN.join(' -> ')} — " \
+      "the pill sequence is unreadable if the cards are out of order"
+  end
+
+  test "the age gate no longer sits in the contest-entry section" do
+    # It is ENFORCED at contest entry, which is why it lived there; its CARD
+    # belongs with the chain it walks. The section keeps a note saying so.
+    section = section_html("Contest entry & eligibility")
+    assert_not_includes section, "Age gate (DOB)",
+      "the age gate specimen moved to Onboarding — a copy here splits the pill sequence again"
+  end
+
+  test "the contest-entry walk still resumes from the age gate after the move" do
+    # The move must not break the demo: confirming the gate advances to Entry
+    # tokens through page-level wiring on the primitive's own 'age-verified' hook.
+    html = render_index
+    assert_includes html, "@age-verified.window=",
+      "the page-level age-verified wiring is what carries the entry walk"
+    assert_includes html, "$store.dsModals.open('entry-tokens', { step: 'picker' })",
+      "confirming the age gate must still advance to the Entry tokens picker"
+  end
+
+  # --- 12. the wallet-setup specimen ------------------------------------------
+
+  test "the wallet setup specimen renders and is registered on the guide's host" do
+    html = render_index
+    assert_includes html, "$store.dsModals.current().id === 'wallet-setup'",
+      "the specimen needs a registration on the page-scoped host or the card opens blank"
+    assert_includes html, "Set up your wallet",
+      "the wallet setup card renders its title"
+  end
+
+  test "the wallet setup specimen fills the 3-of-3 pill" do
+    # This card is the ONLY one that completes the chain's pill. If it stops
+    # rendering the pill, the section's whole reason for grouping evaporates.
+    section = section_html("Onboarding")
+    assert_includes section, "Wallet setup"
+    html = render_index
+    assert_includes html, "$store.dsModals.open('wallet-setup', { detected: opts.detected })",
+      "the card opens through its own detected toggle"
+  end
+
+  test "the wallet setup specimen composes engine chrome rather than copying it" do
+    # The Tier-2 contract: an app-specific flow may live here, but only if it is
+    # built from engine blocks. A specimen that hand-rolls its own chrome is a
+    # second copy of the shell/pill/brand marks, which is what this catches.
+    source = WALLET_SETUP_SPECIMEN.read
+    %w[shell progress_pill wallet_brand_sprite].each do |block|
+      assert_includes source, %(studio/modals/blocks/#{block}),
+        "the specimen must compose the engine's #{block} block, not re-draw it"
+    end
+  end
+
+  test "the wallet setup specimen keeps its x-data free of quote killers" do
+    # Same failure mode the host apps guard: a double quote inside the
+    # double-quoted x-data closes the attribute early and Alpine mounts the
+    # component as a SILENT no-op — every markup assertion above still passes
+    # while the card is dead in a browser.
+    source = WALLET_SETUP_SPECIMEN.read
+    x_data = source[/x-data="(\{.*?\})"\s*\n/m, 1]
+    assert x_data.present?, "could not locate the x-data attribute — did the root element change?"
+    assert_not_includes x_data, %("), "a double quote closes the attribute early and kills the modal"
+    assert_not_includes x_data, "`", "a backtick in an ERB-rendered attribute is the other way this dies"
+  end
+
+  # --- 13. one modal id, two cards: the glow must tell them apart --------------
+
+  test "both web3 step-up specimens carry a glow discriminator" do
+    # The pair opens the SAME modal id. Before this discriminator existed only
+    # the first card passed a glow_when, so opening the SECOND card lit the
+    # FIRST — the precise bug a glow helper exists to prevent. ds_glow gained a
+    # provider: presence check because the brand is a free-form string with no
+    # fixed value for step:/state: to match.
+    #
+    # ASSERT ON THE FULL CONJUNCT, never the bare expression. "!$store…provider"
+    # is a SUBSTRING of "!!$store…provider", so a naive assert_includes for the
+    # no-brand form matches the remembered card's expression and passes even when
+    # the no-brand card has no glow at all. That is precisely how this test first
+    # went green against a deliberately broken page. The "&& " prefix is what
+    # makes the two forms mutually exclusive.
+    html = render_index
+    present = "&& !!$store.dsModals.current().props.provider"
+    absent  = "&& !$store.dsModals.current().props.provider"
+    refute absent.include?(present) || present.include?(absent),
+      "the two glow forms must not be substrings of one another, or neither assertion below bites"
+
+    assert_includes html, present,
+      "the remembered-brand card must glow only when a provider is present"
+    assert_includes html, absent,
+      "the no-brand card must glow only when a provider is absent"
+  end
+
+  test "the two step-up thumbnails are visually distinguishable" do
+    # They used to differ by ONE border-dashed class on a 20px row, which no
+    # reviewer can see — and these two are the likeliest pair on the page to be
+    # mistaken for duplicates, because they share a modal id AND a title.
+    section = section_html("Web3 Contest")
+    assert_includes section, "border border-dashed",
+      "the no-brand thumbnail keeps its dashed empty slot"
+    assert_includes section, %(<span class="w-4 h-4 rounded shrink-0" style="background: var(--color-primary)"></span>),
+      "the remembered thumbnail needs a filled brand tile — a dashed border alone is not a visible difference"
+  end
+
+  # --- 14. the Web3 Contest section reads as runs, not a flat list -------------
+
+  test "the Web3 Contest section labels its three runs" do
+    # The section advertises a walked flow but had grown to eight cards, only
+    # three of which were that walk.
+    #
+    # ASSERT ON THE h4 ELEMENTS, not on the section's text. Every run name is
+    # ALSO written in the section's prose paragraph, so an assert_includes
+    # against the section HTML matches the prose and passes with the headings
+    # deleted — this test went green against a mutated heading before it read
+    # the elements.
+    doc     = Nokogiri::HTML(section_html("Web3 Contest"))
+    headings = doc.css("h4").map { |h| h.text.split("—").first.to_s.strip }
+
+    ["The walk", "Proving a wallet", "Funding & confirmation"].each do |run|
+      assert_includes headings, run,
+        "the Web3 Contest section is missing its #{run.inspect} run heading (found: #{headings.inspect})"
+    end
+  end
 end
