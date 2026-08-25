@@ -26,9 +26,14 @@
   CRITICAL — the engine hardcodes NO legal policy. It renders the modal UI, the
   DOB fields, and the submit; everything legal is app-supplied:
 
-    min_age     (Integer, REQUIRED) — the app's minimum age. There is NO engine
+    min_age     (Integer, OPTIONAL) — the app's minimum age. There is NO engine
                 default (18 is itself a policy value); the app resolves it from
                 its own policy against its own server-detected jurisdiction.
+                ABSENT (or 0) = this app asks for a birthday and does not gate on
+                it. That is a first-class mode, not a degraded one: a hub app may
+                want the date for a greeting and have no bar at all, and the card
+                then drops the age line, the eligibility wording and the refusal
+                handoff rather than rendering "You must be 0+".
     submit_url  (String, REQUIRED)  — the app endpoint the DOB POSTs to. The
                 app owns the authoritative recompute + DOB persistence; the modal
                 only shows the response.
@@ -58,12 +63,22 @@
   never runs). Single root element (modal-host template mount rule).
 %>
 <%
-  min_age     = local_assigns.fetch(:min_age)
+  # min_age is OPTIONAL now. Absent (or 0) means this app asks for a birthday and
+  # does not gate on it — McRitchie Studio wants the date for a greeting, not for
+  # eligibility. Present means the app validates, and the shape of that validation
+  # is the APP's: turf-monster's varies by jurisdiction, which is exactly why the
+  # engine takes a resolved number and a passive label rather than a rule.
+  min_age     = local_assigns[:min_age]
+  validates   = min_age.to_i.positive?
   submit_url  = local_assigns.fetch(:submit_url)
   state       = local_assigns[:state].to_s.strip
   title       = local_assigns.fetch(:title, "Your birthday")
-  intro       = local_assigns.fetch(:intro, "Enter your date of birth to confirm you're eligible — we only ask once.")
-  fine_print  = local_assigns.fetch(:fine_print, "We use your date of birth only to confirm eligibility.")
+  intro       = local_assigns.fetch(:intro,
+                  validates ? "Enter your date of birth to confirm you're eligible — we only ask once."
+                            : "Enter your date of birth — we only ask once.")
+  fine_print  = local_assigns.fetch(:fine_print,
+                  validates ? "We use your date of birth only to confirm eligibility."
+                            : "We use your date of birth only to know when to wish you a happy birthday.")
   modal_store = local_assigns.fetch(:modal_store, "modals")
   demo        = local_assigns.fetch(:demo, false)
   demo_underage     = local_assigns.fetch(:demo_underage, false)
@@ -71,8 +86,13 @@
 %>
 <div x-data="birthdayModal({ minAge: <%= min_age.to_i %>, state: '<%= j state %>', url: '<%= j submit_url %>', store: '<%= j modal_store %>', demo: <%= demo ? 'true' : 'false' %>, demoUnderage: <%= demo_underage ? 'true' : 'false' %>, gateId: '<%= j age_gate_modal_id.to_s %>' })">
   <%= render layout: "studio/modals/blocks/shell", locals: { title: title, modal_store: modal_store } do %>
+    <%# The age line only exists when the app HAS a bar. A card that says
+        "You must be 0+" is what an unconditional line produces for a host that
+        just wants the date. %>
     <p class="text-sm text-muted mb-4">
-      You must be <span class="text-heading font-semibold"><%= min_age %>+</span><%= state.present? ? " in #{state}" : "" %>.
+      <% if validates %>
+        You must be <span class="text-heading font-semibold"><%= min_age %>+</span><%= state.present? ? " in #{state}" : "" %>.
+      <% end %>
       <%= intro %>
     </p>
 

@@ -113,9 +113,14 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
       refute_includes body, "AgePolicy", "the engine must not reach into the app's AgePolicy"
     end
 
-    # min_age is REQUIRED with NO engine default — 18 is itself a policy value.
-    assert_match(/local_assigns\.fetch\(:min_age\)\s*$/, src,
-      "min_age must be a bare required fetch (no defaulted value)")
+    # min_age carries NO engine default — 18 is itself a policy value. It became
+    # OPTIONAL on 2026-08-25 (absent = this app does not gate on the date), which
+    # is a different thing from defaulted: absent must read as nil and disable the
+    # bar, never as a number the engine picked.
+    assert_match(/local_assigns\[:min_age\]\s*$/, src,
+      "min_age must be read WITHOUT a default (local_assigns[:min_age], not fetch with a fallback)")
+    refute_match(/fetch\(:min_age,/, src,
+      "a fetch default for min_age is the engine choosing a legal policy")
     refute_match(/min_age.*\|\|\s*18/, src,     "the engine primitive must not default the minimum age to 18")
     refute_match(/\|\|\s*18/,          factory, "the engine factory must not default the minimum age to 18")
   end
@@ -147,22 +152,26 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
       "the birthday factory must ship at page level so the modal opens live"
     assert_includes html, "$store.dsModals.current().id === 'birthday'",
       "the overlay registers the birthday modal"
-    assert_includes html, "$store.dsModals.open('birthday')",
-      "the birthday specimen is wired + openable"
+    assert_includes html, "$store.dsModals.open('birthday', { validates: opts.validates })",
+      "the birthday specimen is wired + openable through its validation toggle"
     # The refusal card is a SECOND registration. Without it the handoff opens an
     # id nothing renders and the modal goes blank mid-flow.
     assert_includes html, "$store.dsModals.current().id === 'age-gate'",
       "the overlay registers the age-gate refusal card the birthday card hands off to"
   end
 
-  test "with :age_gate OFF the age-gate specimen is disabled-but-present-yet-openable" do
+  test "the birthday + age-gate specimens do not report this app's feature flag" do
+    # They used to grey out and badge "age gate off" from Studio.feature?(:age_gate).
+    # That is the wrong question for these two cards: whether an age RULE exists,
+    # and what it is, is per-app — turf-monster's is jurisdiction-dependent, a hub
+    # app may have none. The card now carries an "Age validation" TOGGLE showing
+    # both modes, so the flag has nothing left to say about it.
     with_features([]) do
       html = render_index
-      assert_includes html, "$store.dsModals.open('birthday')",
-        "the birthday specimen stays present + openable when the flag is off"
-      assert_includes html, "age gate off", "the specimen is flagged disabled"
-      assert_includes html, "opacity-60 grayscale",
-        "a disabled-but-openable specimen keeps its click affordance"
+      assert_includes html, "$store.dsModals.open('birthday', { validates: opts.validates })",
+        "the birthday specimen stays openable with the app flag off"
+      assert_includes html, "Age validation",
+        "the toggle describes the RULE, which is what varies between apps"
     end
   end
 
@@ -285,9 +294,13 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
 
   test "the style guide walks the handoff, not just the two cards" do
     html = render_index
-    assert_includes html, "$store.dsModals.open('birthday', { demoUnderage: true })",
-      "a specimen must open the birthday card down its REFUSED branch"
+    assert_includes html, "$store.dsModals.open('birthday', { validates: opts.validates })",
+      "the specimen opens the card through its validation toggle"
     assert_includes html, "demoUnderage",
       "the factory takes a demo flag so the guide can walk the refusal with no backend"
+    # With validation ON the specimen wrapper renders the card in its refused
+    # demo mode, which is what makes the handoff walkable on this page.
+    assert_includes html, "$store.dsModals.current().id === 'age-gate'",
+      "the card it hands off to must be registered or the handoff opens a blank shell"
   end
 end

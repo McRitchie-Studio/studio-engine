@@ -55,7 +55,7 @@
         handoff to have run. %>
     <button type="button" data-test="open-age-gate"
             class="btn btn-outline"
-            @click="$store.labModals.open('age-gate', { minAge: 21, state: 'CA' })">
+            @click="$store.labModals.open('age-gate', { minAge: 21, state: 'CA', dobYear: new Date().getFullYear() - 16, dobMonth: 6, dobDay: 15 })">
       Open age gate
     </button>
   </div>

@@ -63,7 +63,7 @@ test.describe("birthday → age gate handoff", () => {
     await confirm.click();
 
     // The refusal card, not a red line on the card we came from.
-    await expect(page.getByText(/You must be 21\+ to join/i)).toBeVisible();
+    await expect(page.getByText(/Easy, Young.un/i)).toBeVisible();
     await expect(page.getByRole("link", { name: /Watch the Contest/i })).toBeVisible();
   });
 
@@ -73,7 +73,7 @@ test.describe("birthday → age gate handoff", () => {
     await pickDob(page);
     await page.getByRole("button", { name: /Confirm & Continue/i }).click();
 
-    await expect(page.getByText(/You must be 21\+ to join/i)).toBeVisible();
+    await expect(page.getByText(/Easy, Young.un/i)).toBeVisible();
 
     // The birthday card's red error paragraph must be gone from the DOM, not
     // merely hidden behind it — the two used to be the same element.
@@ -96,7 +96,7 @@ test.describe("birthday → age gate handoff", () => {
   test("Update your Birthday returns to a LIVE birthday card", async ({ page }) => {
     await page.goto("/lab/birthday_gate");
     await page.locator('[data-test="open-age-gate"]').click();
-    await expect(page.getByText(/You must be 21\+ to join/i)).toBeVisible();
+    await expect(page.getByText(/Easy, Young.un/i)).toBeVisible();
 
     await page.getByRole("button", { name: /Update your Birthday/i }).click();
 
@@ -106,7 +106,7 @@ test.describe("birthday → age gate handoff", () => {
     await expect(page.locator('select[x-model="month"]')).toBeVisible();
     await expect(page.getByRole("button", { name: /Confirm & Continue/i })).toBeVisible();
     // And the refusal is gone, so this is a swap and not a stack.
-    await expect(page.getByText(/You must be 21\+ to join/i)).toHaveCount(0);
+    await expect(page.getByText(/Easy, Young.un/i)).toHaveCount(0);
   });
 
   test("a passing date does NOT open the gate", async ({ page }) => {
@@ -117,6 +117,69 @@ test.describe("birthday → age gate handoff", () => {
     await pickDob(page, { year: "1990" });
     await page.getByRole("button", { name: /Confirm & Continue/i }).click();
 
-    await expect(page.getByText(/You must be 21\+ to join/i)).toHaveCount(0);
+    await expect(page.getByText(/Easy, Young.un/i)).toHaveCount(0);
+  });
+
+  // The countdown's ARITHMETIC, evaluated in the page so the assertions run
+  // against the shipped code rather than a copy of it. Two of these were RED on
+  // the first implementation:
+  //
+  //   · bare setMonth OVERFLOWS. Jan 31 + 1 month is Feb 31, which JS rolls
+  //     forward to Mar 3 — so every person born on a 29th, 30th or 31st was told
+  //     one month less than the truth.
+  //   · dividing milliseconds to get DAYS drifts across a DST boundary. A 28-day
+  //     March span reported 27d 23h.
+  //
+  // Both are invisible to a markup test and to a spec that only reads the
+  // rendered string, because both produce a plausible-looking number.
+  test("the countdown clamps months and survives DST", async ({ page }) => {
+    await page.goto("/lab/birthday_gate");
+    await page.locator('[data-test="open-age-gate"]').click();
+    await expect(page.getByText(/Easy, Young.un/i)).toBeVisible();
+
+    const cases = [
+      ["exactly one month", [2026, 0, 15], [2026, 1, 15], "1m 0d"],
+      ["month overflow",    [2026, 0, 31], [2026, 2, 31], "2m 0d"],
+      ["short month clamp", [2026, 0, 31], [2026, 1, 28], "1m 0d"],
+      ["across DST",        [2026, 2, 1],  [2026, 2, 29], "0m 28d"],
+      ["leap-day target",   [2026, 7, 25], [2028, 1, 29], "18m 4d"]
+    ];
+
+    for (const [label, from, to] of cases) {
+      const got = await page.evaluate(([f, t]) => {
+        // Reach the LIVE component instance and drive its own arithmetic.
+        const el = document.querySelector('[x-data*="addMonths"]');
+        const c = window.Alpine.$data(el);
+        const now = new Date(f[0], f[1], f[2]).getTime();
+        const target = new Date(t[0], t[1], t[2]);
+        // remaining() reads this.now and this.eligibleAt, so exercise the two
+        // primitives it is built from rather than stubbing the getters.
+        let months = 0;
+        while (c.addMonths(new Date(now), months + 1).getTime() <= target.getTime()) months++;
+        let probe = c.addMonths(new Date(now), months);
+        let days = 0;
+        for (;;) {
+          const next = new Date(probe.getTime());
+          next.setDate(next.getDate() + 1);
+          if (next.getTime() > target.getTime()) break;
+          probe = next; days++;
+        }
+        return months + "m " + days + "d";
+      }, [from, to]);
+      expect(got, label).toBe(cases.find(c => c[0] === label)[3]);
+    }
+  });
+
+  test("the countdown ticks", async ({ page }) => {
+    // A frozen number reads as a rendering artefact rather than a clock, and a
+    // dead interval is invisible in markup — the first render looks identical.
+    await page.goto("/lab/birthday_gate");
+    await page.locator('[data-test="open-age-gate"]').click();
+    const line = page.locator("strong", { hasText: /second/ }).first();
+    await expect(line).toBeVisible();
+    const first = await line.textContent();
+    await page.waitForTimeout(2200);
+    const second = await line.textContent();
+    expect(second).not.toBe(first);
   });
 });

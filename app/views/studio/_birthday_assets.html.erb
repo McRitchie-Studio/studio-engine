@@ -114,7 +114,14 @@
             Alpine.store(this.store).swap(this.gateId, {
               minAge: this.minAge,
               state: this.stateCode,
-              message: message || ""
+              message: message || "",
+              // The DATE, so the gate card can say WHEN rather than only "no".
+              // Passed as parts rather than a Date: this crosses a store, and a
+              // Date through Alpine's reactive proxy is a class waiting to be
+              // stringified by something downstream.
+              dobYear: parseInt(this.year, 10) || null,
+              dobMonth: parseInt(this.month, 10) || null,
+              dobDay: parseInt(this.day, 10) || null
             });
           } catch (e) {
             this.error = message || this._refusalLine();

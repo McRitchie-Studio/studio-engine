@@ -1,30 +1,25 @@
 <%#
-  Living style guide specimen for the engine BIRTHDAY DOB modal
+  Living style guide specimen for the engine BIRTHDAY DOB card
   (studio/modals/blocks/_birthday, renamed from _age_verify on 2026-08-24).
   Opened on the page-scoped dsModals host.
 
-  The whole point of this specimen is the SEAM: every legal value here is a DEMO
-  the app feeds — the engine primitive hardcodes none of it. So we pass an
-  illustrative policy (21+ in CA) and a demo fine_print that SAYS so, and run in
-  demo mode (no backend — submit resolves locally). A real app swaps these for
-  its own min_age / state / submit_url / legal copy resolved server-side.
+  TWO MODES, ONE CARD, chosen by props.validates — the same choice a host makes
+  by passing min_age or leaving it out:
 
-  TWO OUTCOMES, ONE CARD. props.demoUnderage picks which branch the local resolve
-  takes, so the guide can walk both the pass and the refusal with no backend —
-  and the refusal is the interesting one, because it hands off to the age-gate
-  card rather than turning this one red.
+    validates: true   the app HAS a bar. min_age + state ride in, the card says
+                      what the rule is, and submitting takes the refused branch
+                      so the guide can walk the handoff to the age-gate card.
+    validates: false  the app has NO bar. No min_age at all: the card is a plain
+                      birthday asker, which is what a hub app wants when it
+                      collects the date for a greeting rather than for entry.
+
+  The point of the seam: every legal value here is a DEMO the app feeds. The
+  engine primitive hardcodes no age and no state table, which is why the same
+  partial serves an app whose minimum is jurisdiction-dependent and an app with
+  no minimum at all.
 %>
 <div x-data="{ get props() { var c = $store.dsModals.current(); return (c && c.props) || {} } }">
-  <template x-if="!props.demoUnderage">
-    <div><%= render "studio/modals/blocks/birthday",
-          min_age:     21,
-          state:       "CA",
-          submit_url:  "#demo-birthday",
-          modal_store: "dsModals",
-          demo:        true,
-          fine_print:  "Demo policy the app supplies: 21+ in CA. The engine hardcodes no age and no state table — your app passes min_age, the jurisdiction label, this copy, and the endpoint that recomputes it server-side." %></div>
-  </template>
-  <template x-if="props.demoUnderage">
+  <template x-if="props.validates">
     <div><%= render "studio/modals/blocks/birthday",
           min_age:       21,
           state:         "CA",
@@ -32,6 +27,16 @@
           modal_store:   "dsModals",
           demo:          true,
           demo_underage: true,
-          fine_print:    "Demo policy the app supplies: 21+ in CA. Submitting from here takes the REFUSED branch, so you land on the age-gate card." %></div>
+          fine_print:    "Demo policy the app supplies: 21+ in CA. The engine hardcodes no age and no state table. Submitting from here takes the REFUSED branch, so you land on the age-gate card." %></div>
+  </template>
+
+  <%# No min_age at all — not min_age: 0, which would be the app claiming a bar
+      of zero. Omitting it is how a host says "I do not gate on this". %>
+  <template x-if="!props.validates">
+    <div><%= render "studio/modals/blocks/birthday",
+          submit_url:  "#demo-birthday",
+          modal_store: "dsModals",
+          demo:        true,
+          fine_print:  "No age bar on this app. The card asks for the date and nothing gates on it — the eligibility wording and the refusal handoff are both absent." %></div>
   </template>
 </div>
