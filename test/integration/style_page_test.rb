@@ -941,6 +941,10 @@ class StylePageTest < ActiveSupport::TestCase
     "Connect wallet", "Setup Wallet",
     "Sign Wallet", "Sign Wallet (no remembered brand)",
     "Processing on-chain tx", "On-chain success", "On-chain error",
+    # Co-sign refused sits WITH the other failure deliberately: On-chain error is
+    # the chain saying no, this is the SERVER saying no. Reading either alone
+    # leaves you unaware the other exists.
+    "Co-sign refused",
     "Wallet deposit", "Entry confirmed"
   ].freeze
 
@@ -1027,6 +1031,76 @@ class StylePageTest < ActiveSupport::TestCase
     refute_match(/x-if="props\.validates"/, source,
       "the branches must read the shared getter, not the raw prop, or the default " \
       "lives in two places and they will disagree")
+  end
+
+  # --- the ported specimens (batch 2 of the /admin/modals migration) ----------
+  #
+  # Each of these replaced a card that existed ONLY in turf-monster's own gallery,
+  # which is deprecated and cannot be deleted until every state it shows has a
+  # home here. A missing registration is the failure that matters: the card opens
+  # a blank shell, which looks like a styling bug rather than a missing partial.
+
+  PORTED_SPECIMENS = {
+    "cosign-rejected"      => "Co-sign refused",
+    "unsubscribe-confirm"  => "Leave the newsletter?",
+    "unsubscribe-goodbye"  => "See you later",
+    "quest-success"        => "Quest success (off-page)"
+  }.freeze
+
+  # Registered ids, read off the <template x-if> ELEMENTS.
+  #
+  # NOT a substring search for "current().id === '<id>'": ds_glow builds the glow
+  # expression from that exact text, so every carded modal contains it whether or
+  # not it is registered. The first version of this test asserted the substring,
+  # passed with a registration deliberately deleted, and would have shipped a card
+  # that opens a blank shell. Third time this shape of trap has bitten in this
+  # file — assert the ELEMENT, not the string.
+  def registered_modal_ids(html = render_index)
+    Nokogiri::HTML(html).css("template[x-if]").filter_map { |t|
+      t["x-if"][/\A\$store\.dsModals\.current\(\)\.id === '([a-z0-9-]+)'\z/, 1]
+    }
+  end
+
+  test "every ported specimen is both carded AND registered on the host" do
+    html  = render_index
+    cards = html.scan(/aria-label="Open the (.+?) modal"/).flatten
+    ids   = registered_modal_ids(html)
+
+    PORTED_SPECIMENS.each do |modal_id, label|
+      assert_includes cards, label, "no specimen card for #{modal_id}"
+      assert_includes ids, modal_id,
+        "#{modal_id} has a card but NO host registration — it opens a blank shell " \
+        "(registered: #{ids.inspect})"
+    end
+  end
+
+  test "the unsubscribe pair is registered together, because one swaps to the other" do
+    # The confirm card swaps to the goodbye beat. A handoff to an unregistered id
+    # renders nothing, and an empty modal reads as a styling bug — the same defect
+    # class the birthday/age-gate pair carries a guard for.
+    html = render_index
+    assert_includes html, "$store.dsModals.swap('unsubscribe-goodbye')",
+      "the confirm card must hand off to the goodbye beat"
+    assert_includes registered_modal_ids(html), "unsubscribe-goodbye",
+      "the card it hands off to must be REGISTERED — a glow expression mentioning " \
+      "the id is not a registration"
+  end
+
+  test "the ported specimens compose engine chrome rather than copying it" do
+    # The Tier-2 contract. Each of these four already rendered card_header in
+    # turf-monster, so a specimen that hand-rolls its own header is a SECOND copy
+    # of chrome the app already borrows — which is what style/modals/_wallet_deposit
+    # is, and what this batch was written not to add.
+    root = Studio::Engine.root.join("app/views/style/modals")
+    %w[_cosign_rejected _unsubscribe_confirm _unsubscribe_goodbye _quest_success].each do |f|
+      source = root.join("#{f}.html.erb").read
+      assert_includes source, "studio/modals/blocks/card_header",
+        "#{f} must compose the engine's card_header, not re-draw it"
+    end
+    # quest-success also borrows the leveling seeds bar, which is the engine's.
+    assert_includes root.join("_quest_success.html.erb").read,
+      "studio/modals/blocks/seeds_bar",
+      "the quest celebration's bar is an engine :leveling primitive, not a copy"
   end
 
   test "the contest-entry section still resumes from the birthday card" do
