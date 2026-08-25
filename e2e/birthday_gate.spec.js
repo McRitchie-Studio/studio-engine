@@ -105,6 +105,15 @@ test.describe("birthday → age gate handoff", () => {
     // also absent — the selects prove something actually mounted.
     await expect(page.locator('select[x-model="month"]')).toBeVisible();
     await expect(page.getByRole("button", { name: /Confirm & Continue/i })).toBeVisible();
+
+    // AND IT IS THE VALIDATING CARD. "a live card came back" was all this
+    // asserted until 2026-08-25, and that is exactly the hole a real defect went
+    // through: the style guide's specimen chose its mode from a prop, back()
+    // swaps with EMPTY props, and undefined-is-falsy landed the return trip on
+    // the NO-BAR card — where resubmitting the same under-age date was accepted.
+    // A card with no age line looks identical to one with it unless you look.
+    await expect(page.getByText(/must be\s*21\+/i)).toBeVisible();
+
     // And the refusal is gone, so this is a swap and not a stack.
     await expect(page.getByText(/Easy, Young.un/i)).toHaveCount(0);
   });

@@ -4,6 +4,51 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Breaking
+
+- **The age-gate DOB modal is renamed, and the refusal moved to its own card.**
+  A host that renders these paths from the released gem must update them:
+
+  | Was | Is now |
+  |-----|--------|
+  | `studio/modals/blocks/_age_verify` | `studio/modals/blocks/_birthday` |
+  | `studio/_age_verify_assets` | `studio/_birthday_assets` |
+  | `window.ageVerifyModal` | `window.birthdayModal` |
+
+  Nothing in `mcritchie-studio`, `turf-monster`, `mcritchie-industries` or `rolio`
+  rendered the old paths at the time of this change (each app that shows an age
+  gate ships its own card and shares only `studio/fields/_date_of_birth`), so the
+  rename lands with no consumer edit — but the old paths are GONE, not aliased, so
+  a future adopter reaching for `blocks/age_verify` needs this table.
+
+  **`age-verified` is deliberately unchanged.** The success event and
+  `session.ageVerified` are what consuming apps already listen on, so the rename
+  stopped short of them and no host wiring moves.
+
+- **`min_age` is now OPTIONAL on the birthday card** (was REQUIRED). Absent — or
+  `0` — means the app asks for a birthday and does not gate on it: the card drops
+  the age line, the eligibility wording and the refusal handoff. Existing callers
+  that pass a number are unaffected. There is still NO engine default, because 18
+  is itself a policy value.
+
+- **An under-age date now SUBMITS.** It used to disable the card's own submit
+  button and turn the card red — the one screen state with nothing to press. The
+  factory routes on the RESPONSE instead: `body.underage === true`, or HTTP 403,
+  opens the age-gate card; anything else non-verified stays on the error line. An
+  app adopting this must make its verify endpoint answer "too young" distinctly
+  from "bad request", because a client that blocks submission never had to.
+
+### Added
+
+- **`studio/modals/blocks/_age_gate` — the refusal card.** Where the birthday card
+  hands off when the date is under the app's bar. Headed "Easy, Young'un" under a
+  teddy bear rather than a red X, because a person who will be welcome later is
+  not an error state. Carries a LIVE COUNTDOWN to the day they qualify, built from
+  the date the birthday card passes across the store, plus the two ways out: a
+  primary CTA to watch instead (app-supplied `watch_url`, dropped entirely when
+  absent rather than rendered dead) and a back link that returns to the birthday
+  card. Displays `min_age` / `state`; computes no eligibility of its own.
+
 ### Added
 
 - **A Geo row in the shared admin dropdown, with signage when it is off.** Every

@@ -44,8 +44,9 @@
   <%= render layout: "studio/modals/blocks/shell",
         locals: { title: "Set up your wallet", modal_store: "dsModals" } do %>
 
-    <%# Chain position. The whole reason this card now lives in the Onboarding
-        section: it is the only one of the three chain steps that fills the pill. %>
+    <%# Chain position — the HOST's, not this page's. It is the only one of the
+        three onboarding steps that fills the pill, which is why the pill is here
+        even though the card sits in the Web3 section beside the wallet cards. %>
     <div class="mb-3">
       <%= render "studio/modals/blocks/progress_pill", current: 3, total: 3 %>
     </div>

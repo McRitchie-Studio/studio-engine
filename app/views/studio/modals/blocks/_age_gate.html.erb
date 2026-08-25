@@ -38,6 +38,10 @@
                 Default "birthday". Pass nil to drop the link.
     back_label  (String, optional)  — default "Update your Birthday".
     title       (String, optional)  — default is built from min_age.
+    countdown   (Boolean, optional) — default true. FALSE drops the countdown line
+                entirely and falls back to the plain rule sentence. It does not
+                merely stop the clock: a frozen countdown reads as a rendering
+                artefact, which is the very thing this card exists not to be.
     modal_store (String, optional)  — Alpine store name. Default "modals".
 
   Single root element (modal-host template mount rule).
@@ -121,9 +125,16 @@
          var r = this.remaining;
          if (!r) return '';
          var unit = function (n, one) { return n + ' ' + one + (n === 1 ? '' : 's'); };
+         // YEARS, because the whole point of this line is that nobody should have
+         // to divide. Ninety months — the reachable worst case for a 13-year-old
+         // at a 21 bar — is exactly the is-that-a-week-or-a-decade arithmetic the
+         // comment below claims to remove. Months carry the remainder.
+         // (No double quotes in here: this whole object is one HTML attribute.)
+         var years = Math.floor(r.months / 12), months = r.months % 12;
          var parts = [];
-         if (r.months) parts.push(unit(r.months, 'month'));
-         if (r.days || r.months) parts.push(unit(r.days, 'day'));
+         if (years) parts.push(unit(years, 'year'));
+         if (months || years) parts.push(unit(months, 'month'));
+         if (r.days || months || years) parts.push(unit(r.days, 'day'));
          return parts.join(' ') + (parts.length ? ', ' : '') +
            unit(r.hours, 'hour') + ', ' + unit(r.minutes, 'minute') + ', ' + unit(r.seconds, 'second');
        },
@@ -155,7 +166,7 @@
         to work out whether that means a week or a decade; the countdown answers
         it in the units they actually feel. It ticks live because a frozen
         number reads as a rendering artefact rather than a clock. %>
-    <template x-if="countdownText">
+    <template x-if="<%= countdown ? 'countdownText' : 'false' %>">
       <p class="text-sm text-body">
         You have <strong class="text-heading" x-text="countdownText"></strong>
         before you can join your first contest.
@@ -168,7 +179,7 @@
 
     <%# No date to count from (the card was opened directly, or the handoff
         carried no DOB). Say the rule plainly rather than an empty sentence. %>
-    <template x-if="!countdownText">
+    <template x-if="<%= countdown ? '!countdownText' : 'true' %>">
       <p class="text-sm text-body">
         <span x-show="stateCode" x-cloak>
           The minimum age <span x-text="'in ' + stateCode"></span> is

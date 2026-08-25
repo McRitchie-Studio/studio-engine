@@ -1012,6 +1012,23 @@ class StylePageTest < ActiveSupport::TestCase
       "the toggle is labelled for the RULE, not for this app's feature flag"
   end
 
+  # The e2e lane drives the LAB, whose two modes are separate registrations with
+  # baked-in locals — so it cannot see this. The specimen picks its mode from a
+  # PROP, and the age gate's back() swaps with empty props, so the default is
+  # load-bearing: read `undefined` as "no bar" and the return trip from the gate
+  # lands on the card with no age line, where the same under-age date is accepted.
+  # That shipped once (caught in review 2026-08-25); this is the guard.
+  test "the birthday specimen treats an absent validates prop as VALIDATING" do
+    source = Studio::Engine.root.join("app/views/style/modals/_birthday.html.erb").read
+
+    assert_includes source, "this.props.validates !== false",
+      "absent validates must mean validating — a bare truthiness test sends the " \
+      "gate's empty-props return trip to the no-bar card"
+    refute_match(/x-if="props\.validates"/, source,
+      "the branches must read the shared getter, not the raw prop, or the default " \
+      "lives in two places and they will disagree")
+  end
+
   test "the contest-entry section still resumes from the birthday card" do
     # Moving the CARD must not break the demo walk: confirming still advances to
     # Entry tokens through the page-level 'age-verified' hook, which the rename

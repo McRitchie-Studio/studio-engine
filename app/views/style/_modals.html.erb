@@ -354,9 +354,11 @@
                     resolve_expr: "$store.dsModals.close()" %></div>
         </template>
 
-        <%# wallet-setup — the onboarding chain's step 3. Registered with the
-            chain (not with Web3 below) because that is where its card lives:
-            it is the step that FILLS the 3-of-3 pill. %>
+        <%# wallet-setup — registered here with the other cards this page opens.
+            Its CARD lives in the Web3 section (it is about getting a wallet); the
+            3-of-3 pill it renders is the HOST's onboarding chain position, which
+            is not this page's business. The Onboarding section that used to own
+            it was folded into Profile on 2026-08-24. %>
         <template x-if="$store.dsModals.current().id === 'wallet-setup'">
           <div><%= render "style/modals/wallet_setup" %></div>
         </template>
@@ -911,8 +913,8 @@
         <strong>standard web3 auth button</strong>: a wallet row (brand mark, the
         wallet&rsquo;s own name, Installed badge, chevron) rather than a filled
         CTA, glowing via <code class="font-mono text-2xs">pulse-cta</code> because
-        it is the one thing to press. Do not confuse them with <strong>Wallet
-        setup</strong>, two cards up: that one asks an account to
+        it is the one thing to press. Do not confuse them with <strong>Setup
+        Wallet</strong>, directly above: that one asks an account to
         <strong>get</strong> a wallet, these ask an account to
         <strong>prove</strong> the one it already has &mdash; opposite populations
         (<code class="font-mono text-2xs">WalletSetupPolicy</code> exits at its own
@@ -921,12 +923,13 @@
         straight when you can read them side by side.
       </p>
     </div>
-    <%# Three RUNS, not one flat list. The section advertises a walked flow, but
-        it had grown to eight cards of which only the first three were that walk —
-        so a reviewer met an undifferentiated grid and had to infer which cards
-        belonged together. The runs are labelled in place rather than split into
-        separate sections because all of them are web3-gated and share the
-        wallet-row idiom; what differs is WHEN in a player's life each appears. %>
+    <%# ONE ordered run, read left to right as a player meets it: get a wallet,
+        prove it, spend from it. This carried three labelled h4 runs for a day
+        (The walk / Proving a wallet / Funding & confirmation) and they were
+        removed on 2026-08-25 — the player order already groups the cards, and the
+        headings were a second, competing structure over the same nine. What holds
+        the order now is a test (style_page_test's WEB3_ORDER), not a label a
+        reader has to trust. %>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%# 1. Connect wallet — the walk's entry; picking a wallet swaps to Processing. %>
       <%= render layout: "style/modal_specimen", locals: {
