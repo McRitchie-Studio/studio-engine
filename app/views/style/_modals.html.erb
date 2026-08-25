@@ -363,6 +363,26 @@
           <div><%= render "style/modals/wallet_setup" %></div>
         </template>
 
+        <%# --- Batch 3: the modals that had no card on EITHER page --- %>
+        <template x-if="$store.dsModals.current().id === 'it-begins'">
+          <div><%= render "style/modals/it_begins" %></div>
+        </template>
+        <template x-if="$store.dsModals.current().id === 'newsletter-email'">
+          <div><%= render "style/modals/newsletter_email" %></div>
+        </template>
+        <template x-if="$store.dsModals.current().id === 'email-change-pending'">
+          <div><%= render "style/modals/email_change_pending" %></div>
+        </template>
+        <template x-if="$store.dsModals.current().id === 'network-guard'">
+          <div><%= render "style/modals/network_guard" %></div>
+        </template>
+        <template x-if="$store.dsModals.current().id === 'rate-limit-general'">
+          <div><%= render "style/modals/rate_limit_general" %></div>
+        </template>
+        <template x-if="$store.dsModals.current().id === 'wallet-changed'">
+          <div><%= render "style/modals/wallet_changed" %></div>
+        </template>
+
         <%# --- Newsletter exit + the off-page quest celebration --- %>
         <template x-if="$store.dsModals.current().id === 'quest-success'">
           <div><%= render "style/modals/quest_success" %></div>
@@ -763,6 +783,24 @@
           <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
         </div>
       <% end %>
+
+      <%# email-change-pending — the informational handoff after an email change.
+          NOT a success card: nothing has changed yet, and the confirmation goes
+          to the CURRENT address so an unrequested change gets noticed. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Email change pending",
+            reference: %(the Profile "Confirm your email change" handoff (style/modals/_email_change_pending) — turf-monster's modals/_email_change_pending. Composes the engine's blocks/_card_header; the pending change and the confirmation mail are the app's (AccountsController#update). It is an INFORMATIONAL handoff, not a celebration — nothing has changed yet, and a card that read as success would tell the person the opposite of the truth. The link goes to the CURRENT address precisely so someone who did NOT request the change finds out, which is why both addresses are shown. Distinct from the check-email card: no resend, no contest wiring, one button that closes. Open with $store.dsModals.open('email-change-pending', { currentEmail: 'you@example.com', newEmail: 'new@example.com' })),
+            open_expr: "$store.dsModals.open('email-change-pending', { currentEmail: 'you@example.com', newEmail: 'new@example.com' })",
+            glow_when: ds_glow.call("email-change-pending") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">📬</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <%# both addresses, which is the card's point %>
+          <span class="block h-1.5 w-28 mx-auto rounded" style="background: var(--color-text); opacity: .3"></span>
+          <span class="block h-1.5 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .3"></span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
     </div>
   </section>
 
@@ -937,6 +975,22 @@
             <span class="flex-1 h-2 rounded" style="background: var(--color-cta); opacity:.4"></span>
             <span class="flex-1 h-2 rounded" style="background: var(--color-cta); opacity:.2"></span>
           </span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+
+      <%# newsletter-email — the branch a wallet-only account has to take: no
+          email on file, so the quest asks for one mid-flight. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Newsletter email",
+            reference: %(the web3 newsletter email capture (style/modals/_newsletter_email) — turf-monster's modals/_newsletter_email. Composes the engine's blocks/_card_header; the newsletter and the seeds are the app's. It exists because an account signed in with a WALLET has no email on file — every other newsletter path can assume one, and this is the branch that cannot. It asks mid-quest rather than up front, where it would read as a signup wall on a product that deliberately has none. The real card hands the address BACK to props.onSubmit and closes, so the app keeps ONE subscribe path instead of two; the specimen resolves locally so it stays on screen. Open with $store.dsModals.open('newsletter-email')),
+            open_expr: "$store.dsModals.open('newsletter-email')",
+            glow_when: ds_glow.call("newsletter-email") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">📬</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <%# the ask itself — an email field, which no other newsletter card has %>
+          <span class="block h-5 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
           <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
         </div>
       <% end %>
@@ -1207,6 +1261,57 @@
           <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
         </div>
       <% end %>
+
+      <%# network-guard — the explicit acknowledgement before a wallet request.
+          Continue stays INERT until the box is ticked and Cancel carries equal
+          weight: a confirmation whose safe path is harder to reach is theatre. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Network guard",
+            reference: %(the Web3 network confirmation (style/modals/_network_guard) — turf-monster's modals/_network_guard, shown before a wallet request when the app wants the network acknowledged. Composes the engine's blocks/_card_header and nothing else: the engine detects no network and no environment, so every label here is app-supplied and only ever DISPLAYED. A request signed against the wrong network looks identical to a correct one until it is irreversible, so the card NAMES both facts, keeps Continue inert until an explicit tick, and gives Cancel equal visual weight rather than burying it. Open with $store.dsModals.open('network-guard', { networkLabel: 'devnet', environmentLabel: 'QA' })),
+            open_expr: "$store.dsModals.open('network-guard', { networkLabel: 'devnet', environmentLabel: 'QA' })",
+            glow_when: ds_glow.call("network-guard"),
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">⚠️</div>
+          <%# the two named facts, then the tick that gates Continue %>
+          <span class="block h-1.5 w-full rounded" style="background: var(--color-text); opacity: .3"></span>
+          <span class="block h-1.5 w-full rounded" style="background: var(--color-text); opacity: .3"></span>
+          <span class="flex items-center gap-1.5">
+            <span class="block h-2.5 w-2.5 rounded-sm border" style="border-color: var(--color-border-strong)"></span>
+            <span class="block h-1.5 flex-1 rounded" style="background: var(--color-text); opacity: .18"></span>
+          </span>
+          <%# equal weight, deliberately %>
+          <span class="grid grid-cols-2 gap-1.5">
+            <span class="block h-4 rounded border" style="border-color: var(--color-border-strong)"></span>
+            <span class="block h-4 rounded" style="background: var(--color-cta); opacity: .5"></span>
+          </span>
+        </div>
+      <% end %>
+
+      <%# wallet-changed — the extension switched accounts underneath the session.
+          Both addresses are shown because recognising your own is the only way to
+          tell a deliberate switch from an accident. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Wallet changed",
+            reference: %(the Web3 "Wallet changed" reconciliation (style/modals/_wallet_changed) — turf-monster's modals/_wallet_changed, fired when the person switches accounts inside their wallet extension while signed in. Composes the engine's blocks/_card_header; the switch itself belongs to turf's wallet store (continueSwitch) and the engine owns no wallet. Nothing is broken — but the session and the extension now disagree about who this is, and every on-chain action from here would use an identity the page is not showing. So it prints BOTH addresses, truncated the Solana way, because recognising your own is the one check the app cannot make for you. Continuing re-derives a session against the new wallet, which is a round trip, so the button carries a busy state rather than looking dead. Open with $store.dsModals.open('wallet-changed', { currentAddress: '…', newAddress: '…' })),
+            open_expr: "$store.dsModals.open('wallet-changed', { currentAddress: '7xKpDemoSignedInWallet9JZ2Q', newAddress: '9mQtDemoSwitchedWalletLd4V' })",
+            glow_when: ds_glow.call("wallet-changed"),
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">🔀</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <%# the two truncated addresses — the comparison IS the card %>
+          <span class="flex items-center justify-between gap-2">
+            <span class="block h-1.5 w-10 rounded" style="background: var(--color-text); opacity: .18"></span>
+            <span class="block h-1.5 w-12 rounded" style="background: var(--color-text); opacity: .35"></span>
+          </span>
+          <span class="flex items-center justify-between gap-2">
+            <span class="block h-1.5 w-10 rounded" style="background: var(--color-text); opacity: .18"></span>
+            <span class="block h-1.5 w-12 rounded" style="background: var(--color-text); opacity: .35"></span>
+          </span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
     </div>
   </section>
 
@@ -1339,6 +1444,25 @@
           <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
         </div>
       <% end %>
+
+      <%# it-begins — the moment a contest locks. The DRAINING CTA is the whole
+          card: it interrupts someone mid-page at a moment they did not choose,
+          and the drain is what gives them a say in what happens next. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "It Begins",
+            reference: %(the contest-lock announcement (style/modals/_it_begins) — turf-monster's modals/_it_begins, fired when a contest's lock countdown reaches zero. APP-SPECIFIC: the engine owns no contests and no lock. It lends blocks/_cta_redirect — the DRAINING button, which is the whole reason this card is worth a specimen and the one part you have to WATCH rather than read, because a timer is not visible in markup. This card interrupts someone mid-page at a moment they did not choose: a dismissible modal would leave them on a stale board, a hard redirect would yank the page away, and the drain is the middle — it announces what is about to happen and gives them the length of the bar to opt out. Shortened to 4 seconds here (production runs 8) so the drain can be watched twice; it lands on this page's own anchor rather than a 404. Open with $store.dsModals.open('it-begins')),
+            open_expr: "$store.dsModals.open('it-begins')",
+            glow_when: ds_glow.call("it-begins") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">🏟️</div>
+          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-28 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+          <%# the CTA mid-drain — the bar empties, and leaving is the way out %>
+          <span class="block h-5 w-full rounded overflow-hidden" style="background: color-mix(in srgb, var(--color-cta) 25%, transparent)">
+            <span class="block h-full rounded" style="width: 55%; background: var(--color-cta)"></span>
+          </span>
+        </div>
+      <% end %>
     </div>
   </section>
 
@@ -1399,6 +1523,23 @@
             <div style="height: 100%; width: 60%; border-radius: 9999px; background: var(--color-cta)"></div>
           </div>
           <span class="block h-1.5 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+        </div>
+      <% end %>
+
+      <%# rate-limit-general — the SOFT cap. Dismissible, apologetic, and it
+          auto-closes when the wait elapses rather than making anyone
+          acknowledge a penalty for clicking too fast. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Rate limited (soft)",
+            reference: %(the soft rate-limit wait (style/modals/_rate_limit_general) — turf-monster's modals/_rate_limit_general, opened by the authedFetch 429 interceptor when a general-tier cap trips. Composes the engine's blocks/_card_header; the engine throttles nothing. THE TONE IS THE DESIGN: this is a soft cap on someone who did nothing wrong, so the card is dismissible, the copy is "Easy there" rather than an error, and it AUTO-CLOSES when the wait elapses instead of demanding an acknowledgement. The countdown is seeded from the 429's own Retry-After, so the number is the server's rather than a guess. It also clears its interval in a destroy() METHOD — Alpine 3 dispatches no "destroy" DOM event, so an @destroy listener never fires and the timer outlives every close. Shortened to 10 seconds here so the auto-close can be watched. Open with $store.dsModals.open('rate-limit-general', { secondsLeft: 10 })),
+            open_expr: "$store.dsModals.open('rate-limit-general', { secondsLeft: 10 })",
+            glow_when: ds_glow.call("rate-limit-general") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">✋</div>
+          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-28 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+          <%# a dismiss link, not a button — the soft cap has no penalty to accept %>
+          <span class="block h-1.5 w-12 mx-auto rounded" style="background: var(--color-text); opacity: .3"></span>
         </div>
       <% end %>
     </div>

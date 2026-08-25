@@ -1,0 +1,70 @@
+<%#
+  Living style guide specimen — the wallet switched underneath the session.
+
+  APP-SPECIFIC, engine chrome only (`blocks/_card_header`). The switch itself is
+  the host's: turf's wallet store owns continueSwitch, and the engine owns no
+  wallet.
+
+  THE SITUATION IT NAMES: the person changed accounts inside their wallet
+  extension while signed in here. Nothing is broken and nobody did anything
+  wrong — but the session and the extension now disagree about who this is, and
+  every on-chain action from here would use an identity the page is not showing.
+
+  SO IT SHOWS BOTH ADDRESSES, truncated the way every Solana UI truncates them
+  (4 leading, 4 trailing). Recognising your own address is the only way to tell a
+  deliberate switch from an accident, and it is the one check the app cannot make
+  for them.
+
+  The busy state matters: continuing re-derives a session against the new wallet,
+  which is a round trip. Without it the button looks dead and gets double-clicked.
+
+  Single root; x-data single-quoted throughout.
+%>
+<div x-data="{
+       busy: false,
+       get props() { var c = $store.dsModals.current(); return (c && c.props) || {} },
+       short(addr) {
+         addr = addr || '';
+         return addr.length > 12 ? (addr.slice(0, 6) + '...' + addr.slice(-4)) : addr;
+       },
+       go() {
+         if (this.busy) return;
+         this.busy = true;
+         var s = this;
+         // Demo: the real card awaits the host's wallet store. Hold briefly so
+         // the pending state is visible rather than skipped.
+         setTimeout(function () { s.busy = false; $store.dsModals.close(); }, 600);
+       }
+     }">
+  <%= render "studio/modals/blocks/card_header",
+        icon_emoji: "🔀",
+        title: "Wallet changed" do %>
+    <p class="text-sm text-body">
+      Your wallet is now on a different account than the one you signed in with.
+      Continue with the new one, or switch back in your wallet.
+    </p>
+  <% end %>
+
+  <div class="rounded-lg border border-subtle bg-surface-alt p-3 mb-4 text-sm">
+    <div class="flex items-center justify-between gap-3">
+      <span class="text-secondary">Signed in as</span>
+      <span class="font-mono text-heading" x-text="short(props.currentAddress) || '7xKp...JZ2Q'"></span>
+    </div>
+    <div class="flex items-center justify-between gap-3 mt-2">
+      <span class="text-secondary">Wallet now</span>
+      <span class="font-mono text-heading" x-text="short(props.newAddress) || '9mQt...Ld4V'"></span>
+    </div>
+  </div>
+
+  <button type="button" @click="go()" :disabled="busy"
+          class="btn btn-primary btn-lg w-full disabled:opacity-60">
+    <span x-show="!busy">Continue with this wallet</span>
+    <span x-show="busy" class="inline-flex items-center justify-center gap-2" style="display: none;">
+      <span class="spinner" aria-hidden="true"></span>
+      Switching&hellip;
+    </span>
+  </button>
+
+  <button type="button" @click="$store.dsModals.close()"
+          class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">Not now</button>
+</div>

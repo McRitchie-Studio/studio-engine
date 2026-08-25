@@ -934,7 +934,11 @@ class StylePageTest < ActiveSupport::TestCase
 
   PROFILE_ORDER = [
     "First name", "Birthday", "Age gate",
-    "Image upload", "Crop photo", "Saving card"
+    "Image upload", "Crop photo", "Saving card",
+    # The email-change handoff reads LAST because it is the only Profile card
+    # that changes nothing when it is shown: the change is held until a link in
+    # the person's CURRENT inbox is clicked.
+    "Email change pending"
   ].freeze
 
   WEB3_ORDER = [
@@ -945,7 +949,13 @@ class StylePageTest < ActiveSupport::TestCase
     # the chain saying no, this is the SERVER saying no. Reading either alone
     # leaves you unaware the other exists.
     "Co-sign refused",
-    "Wallet deposit", "Entry confirmed"
+    "Wallet deposit", "Entry confirmed",
+    # The two reconciliation cards close the section, after the happy path they
+    # interrupt: Network guard is asked BEFORE a request is signed, Wallet
+    # changed AFTER the extension moves underneath a live session. Both read
+    # as noise anywhere earlier, because neither makes sense until you know what
+    # a normal wallet run looks like.
+    "Network guard", "Wallet changed"
   ].freeze
 
   # Rails.root is the DUMMY app in this suite, not the engine — a source read
@@ -985,8 +995,13 @@ class StylePageTest < ActiveSupport::TestCase
     # built from engine blocks. A specimen that hand-rolls its own chrome is a
     # second copy of the shell/pill/brand marks, which is what this catches.
     source = WALLET_SETUP_SPECIMEN.read
+    # Match the QUOTED path, not the bare one. The bare form also matches this
+    # file's own header comment, which lists all three blocks by name — so the
+    # test passed with every render call DELETED. Proved by mutation while
+    # control-checking batch 3; the quotes are what tie the assertion to a real
+    # render rather than to prose about one.
     %w[shell progress_pill wallet_brand_sprite].each do |block|
-      assert_includes source, %(studio/modals/blocks/#{block}),
+      assert_includes source, %("studio/modals/blocks/#{block}"),
         "the specimen must compose the engine's #{block} block, not re-draw it"
     end
   end
@@ -1094,12 +1109,15 @@ class StylePageTest < ActiveSupport::TestCase
     root = Studio::Engine.root.join("app/views/style/modals")
     %w[_cosign_rejected _unsubscribe_confirm _unsubscribe_goodbye _quest_success].each do |f|
       source = root.join("#{f}.html.erb").read
-      assert_includes source, "studio/modals/blocks/card_header",
+      # The trailing quote+comma matters: a bare path is a PREFIX of any longer
+      # name, so the old form passed against a hand-rolled "…/card_header_custom"
+      # — a second copy of the chrome, which is the one thing this refuses.
+      assert_includes source, %(render "studio/modals/blocks/card_header",),
         "#{f} must compose the engine's card_header, not re-draw it"
     end
     # quest-success also borrows the leveling seeds bar, which is the engine's.
     assert_includes root.join("_quest_success.html.erb").read,
-      "studio/modals/blocks/seeds_bar",
+      %(render "studio/modals/blocks/seeds_bar",),
       "the quest celebration's bar is an engine :leveling primitive, not a copy"
   end
 
@@ -1150,6 +1168,125 @@ class StylePageTest < ActiveSupport::TestCase
       "the no-brand thumbnail keeps its dashed empty slot"
     assert_includes section, %(<span class="w-4 h-4 rounded shrink-0" style="background: var(--color-primary)"></span>),
       "the remembered thumbnail needs a filled brand tile — a dashed border alone is not a visible difference"
+  end
+
+
+  # --- 14. batch 3: the modals that had a card on NEITHER page -----------------
+  #
+  # Batches 1 and 2 ported cards that at least existed in turf-monster's own
+  # gallery. These six existed only in the running app: no card here, no card
+  # there. A state with no card anywhere is a state nobody reviews, which is how
+  # the age-gate timer leak survived a full cycle.
+
+  BATCH3_SPECIMENS = {
+    "email-change-pending" => "Email change pending",
+    "newsletter-email"     => "Newsletter email",
+    "network-guard"        => "Network guard",
+    "wallet-changed"       => "Wallet changed",
+    "it-begins"            => "It Begins",
+    "rate-limit-general"   => "Rate limited (soft)"
+  }.freeze
+
+  test "every batch-3 specimen is both carded AND registered on the host" do
+    html  = render_index
+    cards = html.scan(/aria-label="Open the (.+?) modal"/).flatten
+    ids   = registered_modal_ids(html)
+
+    BATCH3_SPECIMENS.each do |modal_id, label|
+      assert_includes cards, label, "no specimen card for #{modal_id}"
+      assert_includes ids, modal_id,
+        "#{modal_id} has a card but NO host registration — it opens a blank shell " \
+        "(registered: #{ids.inspect})"
+    end
+  end
+
+  BATCH3_SOURCES = Studio::Engine.root.join("app/views/style/modals").freeze
+
+  test "the batch-3 specimens compose engine chrome rather than copying it" do
+    # The Tier-2 contract, same as batch 2. Five of the six are card_header
+    # compositions. It Begins is the exception ON PURPOSE: it hand-rolls its
+    # heading because the block it borrows is the DRAINING CTA, which is the only
+    # part of that card worth a specimen.
+    # Assert the CLOSING quote too. A bare path is a PREFIX of any longer name,
+    # so "studio/modals/blocks/card_header" matches a hand-rolled
+    # "…/card_header_custom" — a second copy of the chrome, which is the one
+    # thing this test exists to refuse. Control-checking this batch caught the
+    # weak form passing against exactly that mutant.
+    %w[_email_change_pending _newsletter_email _network_guard
+       _rate_limit_general _wallet_changed].each do |f|
+      assert_includes BATCH3_SOURCES.join("#{f}.html.erb").read,
+        %(render "studio/modals/blocks/card_header",),
+        "#{f} must compose the engine's card_header, not re-draw it"
+    end
+
+    assert_includes BATCH3_SOURCES.join("_it_begins.html.erb").read,
+      %(render "studio/modals/blocks/cta_redirect",),
+      "It Begins exists to demo the engine's draining CTA — without that block it " \
+      "is a plain announcement and has no reason to be here"
+  end
+
+  test "no batch-3 x-data is truncated by an inner double quote" do
+    # An inner double quote CLOSES the attribute, and Alpine then mounts a silent
+    # no-op: the card renders, looks fine, and does nothing. Nothing raises.
+    #
+    # The read is deliberately naive — /x-data="(.*?)"/ stops at the FIRST double
+    # quote — because that is exactly what the browser does. A well-formed
+    # attribute therefore ends at the object literal's closing brace; a truncated
+    # one ends mid-expression. Asserting the brace is what makes a truncation
+    # visible instead of silently shortening the captured string.
+    %w[_email_change_pending _newsletter_email _network_guard
+       _rate_limit_general _wallet_changed].each do |f|
+      source = BATCH3_SOURCES.join("#{f}.html.erb").read
+      body   = source[/x-data="(.*?)"/m, 1]
+      assert body, "#{f} declares no x-data — this guard has nothing to check"
+      assert body.strip.end_with?("}"),
+        "#{f}'s x-data is cut short at a double quote — Alpine will mount a silent " \
+        "no-op (captured tail: #{body.strip[-40..].inspect})"
+    end
+  end
+
+  test "It Begins drives the guide's store, not the app's" do
+    # cta_redirect defaults to $store.modals — the REAL host, which the style
+    # guide does not run. Left at the default the drain completes and then calls
+    # close() on an undefined store, throwing inside the timer where nothing
+    # surfaces it.
+    assert_includes BATCH3_SOURCES.join("_it_begins.html.erb").read,
+      %(modal_store:      "dsModals"),
+      "the specimen must point the drain at the page-scoped store"
+  end
+
+  test "the network guard keeps Continue inert until the box is ticked" do
+    # The card's entire reason to exist. A request signed against the wrong
+    # network looks identical to a correct one until it is irreversible, so the
+    # acknowledgement has to be explicit rather than implied by the click.
+    source = BATCH3_SOURCES.join("_network_guard.html.erb").read
+    assert_includes source, %(:disabled="!checked"),
+      "Continue must be inert until the acknowledgement is ticked"
+    assert_includes source, %(x-model="checked"),
+      "the tick has to bind to the same flag Continue reads"
+  end
+
+  test "the soft rate limit clears its interval in a destroy() METHOD" do
+    # Alpine 3 dispatches no "destroy" DOM event, so @destroy="stop()" never
+    # fires and a 1 Hz interval outlives every close. That shipped once, on
+    # blocks/_age_gate, and was caught in review rather than by a test — so this
+    # card carries the guard the age gate now also carries.
+    source = BATCH3_SOURCES.join("_rate_limit_general.html.erb").read
+    assert_includes source, "destroy() { this.stop(); }",
+      "cleanup must be a destroy() method on the x-data — the idiom Alpine invokes"
+    assert_not_includes source, "@destroy=",
+      "an @destroy listener never fires in Alpine 3; the timer would survive the close"
+  end
+
+  test "the wallet-changed card shows BOTH addresses" do
+    # Recognising your own address is the only way to tell a deliberate account
+    # switch from an accident, and it is the one check the app cannot make for
+    # the person. One address alone answers nothing.
+    source = BATCH3_SOURCES.join("_wallet_changed.html.erb").read
+    assert_includes source, %(x-text="short(props.currentAddress)),
+      "the session's address must be printed"
+    assert_includes source, %(x-text="short(props.newAddress)),
+      "the extension's new address must be printed beside it"
   end
 
 end

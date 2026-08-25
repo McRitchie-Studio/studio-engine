@@ -1,0 +1,39 @@
+<%#
+  Living style guide specimen — the email-change handoff.
+
+  APP-SPECIFIC, engine chrome only (`blocks/_card_header`). The engine sends no
+  confirmation mail and holds no pending change; turf's AccountsController#update
+  does both.
+
+  IT IS AN INFORMATIONAL HANDOFF, NOT A CELEBRATION, and the distinction is the
+  card's whole job. Nothing has happened yet: the change is HELD until the person
+  clicks a link sent to their CURRENT address, not the new one. A card that read
+  as success would tell them the opposite of the truth.
+
+  Deliberately distinct from the check-email card, which says "finish entering"
+  and carries a resend CTA wired to the contest board. This one has no resend and
+  no contest wiring — one button, which closes.
+
+  Both addresses are shown because the point of confirming to the OLD address is
+  that someone who did not make the request finds out. Seeing both is how they
+  notice.
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div x-data="{ get props() { var c = $store.dsModals.current(); return (c && c.props) || {} } }">
+  <%= render "studio/modals/blocks/card_header",
+        icon_emoji: "📬",
+        title: "Confirm your email change" do %>
+    <p class="text-sm text-body">
+      We sent a confirmation link to
+      <span class="text-heading font-medium" x-text="props.currentEmail || 'you@example.com'"></span>
+      (your current address). Click the link in that email to confirm changing your
+      email to
+      <span class="text-heading font-medium" x-text="props.newEmail || 'new@example.com'"></span>.
+      Your email won&rsquo;t change until you do &mdash; the link expires in 30 minutes.
+    </p>
+  <% end %>
+
+  <button type="button" @click="$store.dsModals.close()"
+          class="btn btn-primary btn-lg w-full">Got it</button>
+</div>
