@@ -1,0 +1,97 @@
+<%# The birthday / age-gate lab page.
+
+    WHAT ONLY A BROWSER CAN SEE HERE. The server's bytes are identical whether
+    the handoff works: both cards render, both carry their CTAs, and every
+    String assertion in test/views passes either way. What the markup cannot
+    contain is the PROGRAM — birthdayModal's submit(), which decides that an
+    under-age date is a refusal rather than an error and swaps one card for
+    another on the store. Until 2026-08-24 that path did not exist; the card
+    turned red and disabled its own button, and the tests that "covered" it were
+    asserting on text that was present in both states.
+
+    The lab sets up LOCALS and nothing else. Both cards are the engine's own
+    partials rendered by name; the page reimplements neither, or the spec would
+    be grading the lab. demo: true keeps it off the network — there is no
+    /age/verify in the dummy, and inventing one would test the fiction rather
+    than the handoff. demo_underage is what steers the local resolve down the
+    refused branch, which is the whole subject of the spec.
+
+    Two hosts' worth of ids on ONE store, because the handoff crosses them: the
+    birthday card swaps to 'age-gate', so both must be registered or the swap
+    lands on an id nothing renders and the modal goes blank. That blankness is
+    itself a defect this page can catch. %>
+<main class="p-8" x-data>
+  <p data-test="lab-body">birthday gate lab</p>
+
+  <%# The factory, at PAGE level — not inside the host below. A <script> cloned
+      out of an Alpine <template> never runs, which is why the engine homes
+      birthdayModal in its own partial and asks every consumer to render it once
+      in the layout. Omitting it is silent: x-data="birthdayModal(...)" throws,
+      the component never mounts, and the card renders as an empty shell with no
+      DOB selects and no submit button. This lab page shipped without it for one
+      run, and the browser lane is what said so — every server-side assertion
+      about that same card was green at the time. %>
+  <%= render "studio/birthday_assets" %>
+
+  <div class="flex flex-wrap gap-3 mb-6">
+    <%# Opens the card down the PASSING branch — submit resolves to success. %>
+    <button type="button" data-test="open-birthday"
+            class="btn btn-primary"
+            @click="$store.labModals.open('birthday', {})">
+      Open birthday
+    </button>
+
+    <%# The refused branch. demo_underage is a server-side LOCAL, not a prop, so
+        this is a second registration of the SAME partial rather than a prop on
+        the first — the style guide reaches the same place through a wrapper that
+        reads props; the lab takes the shorter road. %>
+    <button type="button" data-test="open-birthday-underage"
+            class="btn btn-outline"
+            @click="$store.labModals.open('birthday-underage', {})">
+      Open birthday (underage)
+    </button>
+
+    <%# The refusal card on its own, for the assertions that do not need the
+        handoff to have run. %>
+    <button type="button" data-test="open-age-gate"
+            class="btn btn-outline"
+            @click="$store.labModals.open('age-gate', { minAge: 21, state: 'CA', dobYear: new Date().getFullYear() - 16, dobMonth: 6, dobDay: 15 })">
+      Open age gate
+    </button>
+  </div>
+
+  <%= render "studio/modals/scoped_host", store: "labModals" do %>
+    <template x-if="$store.labModals.current().id === 'birthday'">
+      <div><%= render "studio/modals/blocks/birthday",
+            min_age:       21,
+            state:         "CA",
+            submit_url:    "#lab-birthday",
+            modal_store:   "labModals",
+            demo:          true,
+            demo_underage: false,
+            fine_print:    "Lab policy: 21+ in CA." %></div>
+    </template>
+
+    <%# The refused twin. Same partial, demo_underage flipped — the id is chosen
+        by the opener's prop, which the two templates below read. %>
+    <template x-if="$store.labModals.current().id === 'birthday-underage'">
+      <div><%= render "studio/modals/blocks/birthday",
+            min_age:       21,
+            state:         "CA",
+            submit_url:    "#lab-birthday",
+            modal_store:   "labModals",
+            demo:          true,
+            demo_underage: true,
+            fine_print:    "Lab policy: 21+ in CA." %></div>
+    </template>
+
+    <template x-if="$store.labModals.current().id === 'age-gate'">
+      <div><%= render "studio/modals/blocks/age_gate",
+            min_age:           21,
+            state:             "CA",
+            watch_url:         "/lab/birthday_gate?watched=1",
+            birthday_modal_id: "birthday",
+            modal_store:       "labModals" %></div>
+    </template>
+  <% end %>
+</main>

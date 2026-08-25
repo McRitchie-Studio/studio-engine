@@ -12,7 +12,7 @@ require "action_view"
 # [component] Guard for engine 0.21's Phase-2 modal convergence:
 #
 #   A. The age-gate DOB modal is an ENGINE PRIMITIVE
-#      (studio/modals/blocks/_age_verify) that renders from APP-SUPPLIED policy
+#      (studio/modals/blocks/_birthday) that renders from APP-SUPPLIED policy
 #      props and hardcodes NO legal policy — no state->age table, no AgePolicy, no
 #      minimum-age default (18 is itself a policy value). This is the load-bearing
 #      seam: the engine renders the modal UI + DOB fields + submit; the app owns
@@ -25,8 +25,8 @@ require "action_view"
 #      present-yet-openable when off, like the web3 specimens.
 class AgeGateEntryTokenTest < ActiveSupport::TestCase
   ENGINE_ROOT     = File.expand_path("../..", __dir__)
-  AGE_VERIFY_ERB  = File.join(ENGINE_ROOT, "app/views/studio/modals/blocks/_age_verify.html.erb")
-  AGE_FACTORY_ERB = File.join(ENGINE_ROOT, "app/views/studio/_age_verify_assets.html.erb")
+  BIRTHDAY_ERB    = File.join(ENGINE_ROOT, "app/views/studio/modals/blocks/_birthday.html.erb")
+  BIRTHDAY_FACTORY_ERB = File.join(ENGINE_ROOT, "app/views/studio/_birthday_assets.html.erb")
 
   # The jurisdictions TM's AgePolicy encodes. Their presence in an engine file (or
   # in the primitive rendered from neutral copy) means legal policy leaked across
@@ -43,7 +43,15 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
   end
 
   def render_age_verify(**locals)
-    view.render(partial: "studio/modals/blocks/age_verify", locals: locals)
+    render_partial("studio/modals/blocks/birthday", **locals)
+  end
+
+  # Any engine partial, rendered the way a host would. Used by the age-gate
+  # tests, which assert against RENDERED markup rather than ERB source — an
+  # interpolated quote that closes an attribute early does not exist until
+  # render, so source reading cannot see it.
+  def render_partial(partial, **locals)
+    view.render(partial: partial, locals: locals)
   end
 
   def render_index
@@ -64,8 +72,8 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
     html = render_age_verify(min_age: 21, state: "CA", submit_url: "/age/verify",
                              fine_print: "App-supplied legal copy.")
     # Modal chrome + the Alpine factory reference.
-    assert_includes html, "Verify your age"
-    assert_includes html, "ageVerifyModal("
+    assert_includes html, "Your birthday"
+    assert_includes html, "birthdayModal("
     # DOB Month / Day / Year fields.
     assert_includes html, 'x-model="month"'
     assert_includes html, 'x-model="day"'
@@ -94,8 +102,8 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
   end
 
   test "the primitive + factory source hardcode no state table, no AgePolicy, no age default" do
-    src     = File.read(AGE_VERIFY_ERB)
-    factory = File.read(AGE_FACTORY_ERB)
+    src     = File.read(BIRTHDAY_ERB)
+    factory = File.read(BIRTHDAY_FACTORY_ERB)
 
     POLICY_STATE_CODES.each do |code|
       refute_match(/\b#{code}\b/, src,     "the age-gate primitive must not hardcode jurisdiction #{code}")
@@ -105,9 +113,14 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
       refute_includes body, "AgePolicy", "the engine must not reach into the app's AgePolicy"
     end
 
-    # min_age is REQUIRED with NO engine default — 18 is itself a policy value.
-    assert_match(/local_assigns\.fetch\(:min_age\)\s*$/, src,
-      "min_age must be a bare required fetch (no defaulted value)")
+    # min_age carries NO engine default — 18 is itself a policy value. It became
+    # OPTIONAL on 2026-08-25 (absent = this app does not gate on the date), which
+    # is a different thing from defaulted: absent must read as nil and disable the
+    # bar, never as a number the engine picked.
+    assert_match(/local_assigns\[:min_age\]\s*$/, src,
+      "min_age must be read WITHOUT a default (local_assigns[:min_age], not fetch with a fallback)")
+    refute_match(/fetch\(:min_age,/, src,
+      "a fetch default for min_age is the engine choosing a legal policy")
     refute_match(/min_age.*\|\|\s*18/, src,     "the engine primitive must not default the minimum age to 18")
     refute_match(/\|\|\s*18/,          factory, "the engine factory must not default the minimum age to 18")
   end
@@ -133,24 +146,32 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
 
   # --- C. the age-gate specimen is capability-gated on :age_gate -------------
 
-  test "the style page ships the ageVerifyModal factory at page level" do
+  test "the style page ships the birthdayModal factory at page level" do
     html = render_index
-    assert_includes html, "window.ageVerifyModal",
-      "the age-verify factory must ship at page level so the modal opens live"
-    assert_includes html, "$store.dsModals.current().id === 'age-verify'",
-      "the overlay registers the age-verify modal"
-    assert_includes html, "$store.dsModals.open('age-verify')",
-      "the age-gate specimen is wired + openable"
+    assert_includes html, "window.birthdayModal",
+      "the birthday factory must ship at page level so the modal opens live"
+    assert_includes html, "$store.dsModals.current().id === 'birthday'",
+      "the overlay registers the birthday modal"
+    assert_includes html, "$store.dsModals.open('birthday', { validates: opts.validates })",
+      "the birthday specimen is wired + openable through its validation toggle"
+    # The refusal card is a SECOND registration. Without it the handoff opens an
+    # id nothing renders and the modal goes blank mid-flow.
+    assert_includes html, "$store.dsModals.current().id === 'age-gate'",
+      "the overlay registers the age-gate refusal card the birthday card hands off to"
   end
 
-  test "with :age_gate OFF the age-gate specimen is disabled-but-present-yet-openable" do
+  test "the birthday + age-gate specimens do not report this app's feature flag" do
+    # They used to grey out and badge "age gate off" from Studio.feature?(:age_gate).
+    # That is the wrong question for these two cards: whether an age RULE exists,
+    # and what it is, is per-app — turf-monster's is jurisdiction-dependent, a hub
+    # app may have none. The card now carries an "Age validation" TOGGLE showing
+    # both modes, so the flag has nothing left to say about it.
     with_features([]) do
       html = render_index
-      assert_includes html, "$store.dsModals.open('age-verify')",
-        "the age-gate specimen stays present + openable when the flag is off"
-      assert_includes html, "age gate off", "the specimen is flagged disabled"
-      assert_includes html, "opacity-60 grayscale",
-        "a disabled-but-openable specimen keeps its click affordance"
+      assert_includes html, "$store.dsModals.open('birthday', { validates: opts.validates })",
+        "the birthday specimen stays openable with the app flag off"
+      assert_includes html, "Age validation",
+        "the toggle describes the RULE, which is what varies between apps"
     end
   end
 
@@ -170,7 +191,7 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
     html = render_index
     assert_includes html, "--studio-team-glow-opacity",
       "the specimens carry the active-card glow opacity var"
-    %w[age-verify entry-tokens].each do |id|
+    %w[birthday age-gate entry-tokens].each do |id|
       assert_includes html, "$store.dsModals.current() && $store.dsModals.current().id === '#{id}'",
         "the #{id} specimen card must glow when its modal is the current one"
     end
@@ -190,10 +211,109 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
   end
 
   test "the age-gate engine primitive carries no demo flow/advance logic" do
-    src = File.read(AGE_VERIFY_ERB)
+    src = File.read(BIRTHDAY_ERB)
     ["entry-tokens", "age-verified", "advance(", "swap(", "dsModals"].each do |needle|
       refute_includes src, needle,
         "the engine primitive must stay flow-agnostic (no #{needle} in the primitive)"
     end
+  end
+
+  # --- E. the refusal is a HANDOFF, not a dead end (2026-08-24) ---------------
+  #
+  # The birthday card used to own both halves: it asked for the date AND, when
+  # the date failed, turned red and disabled its own submit button. That is the
+  # one screen state with nothing to press. The refusal now lives on its own
+  # card with two ways out. These tests hold that apart.
+
+  test "the birthday card never disables itself over an under-age date" do
+    html = render_age_verify(min_age: 21, state: "CA", submit_url: "/age/verify")
+    # The disabled binding must gate on completeness and in-flight only. If
+    # computedAge creeps back into it, the dead end is back.
+    assert_includes html, ':disabled="!complete || submitting"',
+      "the submit button gates on completeness and in-flight ONLY"
+    refute_includes html, "computedAge < minAge",
+      "an under-age date must SUBMIT and route to the age-gate card, not disable the button"
+  end
+
+  test "the birthday card carries no inline refusal text" do
+    html = render_age_verify(min_age: 21, state: "CA", submit_url: "/age/verify")
+    # The error line stays — an invalid date is a real error. What must be gone
+    # is the too-young paragraph, which is a verdict wearing an error's clothes.
+    assert_includes html, 'x-text="error"', "genuine errors still surface here"
+    refute_includes html, "'You must be ' + minAge",
+      "the inline too-young line moved to the age-gate card"
+  end
+
+  test "the birthday card is told which card to hand off to" do
+    html = render_age_verify(min_age: 21, state: "CA", submit_url: "/age/verify")
+    assert_includes html, "gateId: 'age-gate'",
+      "the default handoff target rides into the factory"
+  end
+
+  test "the age-gate card offers BOTH ways out" do
+    html = render_partial("studio/modals/blocks/age_gate",
+                          min_age: 21, state: "CA",
+                          watch_url: "/contests/demo", modal_store: "modals")
+    # The thing they CAN do. Too young to enter is not too young to watch.
+    assert_includes html, "Watch the Contest", "the primary CTA offers the alternative"
+    assert_includes html, "/contests/demo", "the CTA points at the app-supplied target"
+    # The thing they might NEED — a mis-picked year is an ordinary typo.
+    assert_includes html, "Update your Birthday", "the back link is present"
+    assert_includes html, "swap('birthday'", "the back link RETURNS to the birthday card"
+  end
+
+  test "the age-gate card drops a CTA it was given no target for" do
+    # A dead button is worse than no button: it reads as broken rather than absent.
+    html = render_partial("studio/modals/blocks/age_gate", min_age: 21, modal_store: "modals")
+    refute_includes html, "Watch the Contest",
+      "with no watch_url the CTA must be dropped, not rendered dead"
+    assert_includes html, "Update your Birthday",
+      "the back link does not depend on the app supplying a watch target"
+  end
+
+  test "the countdown clock is cleaned up the way Alpine actually tears down" do
+    # The card starts a 1s setInterval. Alpine 3 calls destroy() ON THE DATA
+    # OBJECT at teardown and dispatches no `destroy` DOM event, so an `@destroy`
+    # listener is dead wiring and the interval outlives every close. A source
+    # `clearInterval` assertion passes in BOTH worlds, so assert the WIRING.
+    html = render_partial("studio/modals/blocks/age_gate",
+                          min_age: 21, state: "CA", modal_store: "modals")
+    assert_includes html, "destroy() {",
+      "cleanup must be a destroy() method on the x-data — the idiom Alpine invokes"
+    refute_match(/\s@destroy\s*=/, html,
+      "an @destroy listener is dead wiring: Alpine dispatches no such DOM event")
+  end
+
+  test "the age-gate card computes no eligibility of its own" do
+    # Same rule the birthday card follows: the engine displays policy, never
+    # decides it. A comparison here would be the engine growing a legal opinion.
+    source = File.read(File.join(ENGINE_ROOT, "app/views/studio/modals/blocks/_age_gate.html.erb"))
+    refute_match(/computedAge|< *minAge|>= *minAge/, source,
+      "the refusal card must DISPLAY min_age, never compare against it")
+  end
+
+  test "the age-gate x-data survives ERB interpolation" do
+    # Rendered, not read from source: the bug this catches is an interpolated
+    # value that emits a DOUBLE quote and closes the attribute early. Reading the
+    # ERB cannot see it, because the offending quote does not exist until render.
+    html = render_partial("studio/modals/blocks/age_gate",
+                          min_age: 21, state: "CA", watch_url: "/x",
+                          title: "Sorry, not yet", modal_store: "modals")
+    x_data = html[/x-data="(\{.*?\})"/m, 1]
+    assert x_data.present?, "the x-data attribute did not survive rendering intact"
+    refute_includes x_data, %("),
+      "an interpolated double quote closes x-data early and mounts a silent no-op"
+  end
+
+  test "the style guide walks the handoff, not just the two cards" do
+    html = render_index
+    assert_includes html, "$store.dsModals.open('birthday', { validates: opts.validates })",
+      "the specimen opens the card through its validation toggle"
+    assert_includes html, "demoUnderage",
+      "the factory takes a demo flag so the guide can walk the refusal with no backend"
+    # With validation ON the specimen wrapper renders the card in its refused
+    # demo mode, which is what makes the handoff walkable on this page.
+    assert_includes html, "$store.dsModals.current().id === 'age-gate'",
+      "the card it hands off to must be registered or the handoff opens a blank shell"
   end
 end

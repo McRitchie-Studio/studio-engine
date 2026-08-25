@@ -5,8 +5,8 @@
   inside a modal host's single-root template, and a script cloned out of a template
   never runs. So a consumer renders THIS once in its layout (like the other shared
   Alpine factories), and the modal partial anywhere below just references
-  window.levelingActionModal. Mirrors how studio/_age_verify_assets homes the
-  ageVerifyModal factory.
+  window.levelingActionModal. Mirrors how studio/_birthday_assets homes the
+  birthdayModal factory.
 
   CRITICAL BOUNDARY — this factory is UI ONLY. It POSTs to an app-supplied
   submitUrl and reacts to a NEUTRAL JSON contract; it holds ZERO on-chain logic,
