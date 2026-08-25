@@ -52,13 +52,24 @@
   #   crop:         the two crop-photo variants (:picker vs :crop), on props.cropReady.
   #   celebrate:    the input specimen (form) vs the "updated" (celebrate) specimen
   #                 of the SAME leveling modal id.
-  ds_glow = lambda do |id, step: nil, step_default: "credentials", crop: nil, celebrate: nil, state: nil|
+  #   provider:     PRESENCE, not a value — the two web3-step-up specimens differ
+  #                 only by whether a wallet BRAND is remembered, and the brand is
+  #                 a free-form string (phantom / solflare / backpack, or nil), so
+  #                 there is no fixed value to match on the way step: and state:
+  #                 match. true = the remembered-brand card, false = the picker
+  #                 fallback. Without this the pair shared one id with no
+  #                 discriminator, only the first card carried a glow_when, and
+  #                 opening the SECOND card lit the FIRST — the one bug a glow
+  #                 helper exists to prevent.
+  ds_glow = lambda do |id, step: nil, step_default: "credentials", crop: nil, celebrate: nil, state: nil,
+                       provider: nil|
     cur  = "$store.dsModals.current()"
     expr = "#{cur} && #{cur}.id === '#{id}'"
     expr += " && (#{cur}.props.step || '#{step_default}') === '#{step}'" if step
     expr += " && #{cur}.props.state === '#{state}'" if state
     expr += (crop == :crop ? " && !!#{cur}.props.cropReady" : " && !#{cur}.props.cropReady") unless crop.nil?
     expr += (celebrate ? " && !!#{cur}.props.celebrate" : " && !#{cur}.props.celebrate") unless celebrate.nil?
+    expr += (provider ? " && !!#{cur}.props.provider" : " && !#{cur}.props.provider") unless provider.nil?
     expr
   end
 %>
@@ -279,10 +290,10 @@
       defines the factory inline; no importmap change). %>
   <%= render "studio/cropper_assets" %>
 
-  <%# ageVerifyModal factory — rendered here at page level (never inside the
+  <%# birthdayModal factory — rendered here at page level (never inside the
       overlay template, where a cloned script would not run) so the age-gate
       specimen opens live. A consumer app renders this in its layout the same way. %>
-  <%= render "studio/age_verify_assets" %>
+  <%= render "studio/birthday_assets" %>
 
   <%# levelingActionModal factory — page level (never inside the overlay template,
       where a cloned script would not run) so the change-username + join-newsletter
@@ -309,7 +320,7 @@
           <div><%= render "style/modals/auth" %></div>
         </template>
 
-        <%# --- Onboarding --- %>
+        <%# --- Onboarding step (its card now lives in Profile) --- %>
         <%# The REAL engine partial, mounted on the page-scoped host: what the
             style page shows is exactly what a consumer renders, not a copy. %>
         <template x-if="$store.dsModals.current().id === 'onboarding-first-name'">
@@ -318,8 +329,15 @@
         </template>
 
         <%# --- Eligibility + entry --- %>
-        <template x-if="$store.dsModals.current().id === 'age-verify'">
-          <div><%= render "style/modals/age_verify" %></div>
+        <%# The birthday card and the age-gate card it hands off to. TWO ids,
+            because they are two cards: one asks, the other answers when the
+            answer is no. Registered together so the handoff round-trips on this
+            page exactly as it does in an app. %>
+        <template x-if="$store.dsModals.current().id === 'birthday'">
+          <div><%= render "style/modals/birthday" %></div>
+        </template>
+        <template x-if="$store.dsModals.current().id === 'age-gate'">
+          <div><%= render "style/modals/age_gate" %></div>
         </template>
         <template x-if="$store.dsModals.current().id === 'entry-tokens'">
           <div><%= render "style/modals/entry_tokens" %></div>
@@ -336,7 +354,32 @@
                     resolve_expr: "$store.dsModals.close()" %></div>
         </template>
 
+        <%# wallet-setup — registered here with the other cards this page opens.
+            Its CARD lives in the Web3 section (it is about getting a wallet); the
+            3-of-3 pill it renders is the HOST's onboarding chain position, which
+            is not this page's business. The Onboarding section that used to own
+            it was folded into Profile on 2026-08-24. %>
+        <template x-if="$store.dsModals.current().id === 'wallet-setup'">
+          <div><%= render "style/modals/wallet_setup" %></div>
+        </template>
+
+        <%# --- Newsletter exit + the off-page quest celebration --- %>
+        <template x-if="$store.dsModals.current().id === 'quest-success'">
+          <div><%= render "style/modals/quest_success" %></div>
+        </template>
+        <template x-if="$store.dsModals.current().id === 'unsubscribe-confirm'">
+          <div><%= render "style/modals/unsubscribe_confirm" %></div>
+        </template>
+        <%# Registered alongside its confirm card, because unsubscribe-confirm
+            SWAPS to it — a handoff to an unregistered id renders a blank shell. %>
+        <template x-if="$store.dsModals.current().id === 'unsubscribe-goodbye'">
+          <div><%= render "style/modals/unsubscribe_goodbye" %></div>
+        </template>
+
         <%# --- Web3 --- %>
+        <template x-if="$store.dsModals.current().id === 'cosign-rejected'">
+          <div><%= render "style/modals/cosign_rejected" %></div>
+        </template>
         <template x-if="$store.dsModals.current().id === 'wallet-connect'">
           <div><%= render "style/modals/wallet_connect" %></div>
         </template>
@@ -478,44 +521,6 @@
     </div>
   </template>
 
-  <%# ===================================================================== %>
-  <%# 0. ONBOARDING — the post-auth chain's shared step %>
-  <%# ===================================================================== %>
-  <section class="space-y-5">
-    <div class="space-y-1">
-      <h3 class="text-xl font-bold text-heading">Onboarding</h3>
-      <p class="text-muted text-sm">
-        The step every Studio app asks a brand-new account, ported from Turf
-        Monster
-        (<code class="font-mono text-2xs">studio/modals/onboarding/_first_name</code>).
-        It is <strong>one step, not a flow</strong>: the host owns the SEQUENCE
-        around it — Turf walks <strong>welcome &rarr; first name &rarr; age gate
-        &rarr; wallet setup</strong>, while a hub app may ask nothing else — so
-        this partial never opens another modal. It reports what remains on its
-        <code class="font-mono text-2xs">done_event</code> and closes, and the host
-        decides what comes next. Every endpoint and label is a local with a
-        default, so mounting it under different routes needs no fork.
-        <strong>Both</strong> the &times; and the "Skip for now" link SKIP (a close
-        that silently abandons the chain is how a host ends up with a step nobody
-        can answer again), and the field focuses itself on open.
-      </p>
-    </div>
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "First name",
-            reference: %(the shared onboarding first-name step (studio-engine studio/modals/onboarding/_first_name) — open with $store.dsModals.open('onboarding-first-name'). Posts to submit_path/skip_path (defaults /onboarding/first_name and /onboarding/skip_first_name) and dispatches its done_event with the steps the SERVER says remain),
-            open_expr: "$store.dsModals.open('onboarding-first-name')",
-            glow_when: ds_glow.call("onboarding-first-name")
-          } do %>
-        <p class="text-muted text-2xs">
-          Saving or skipping dispatches
-          <code class="font-mono">ds-onboarding-step-done</code> here rather than
-          the app-level event, so the specimen cannot drive a real chain.
-        </p>
-      <% end %>
-    </div>
-  </section>
-
   <%# 1. AUTH suite %>
   <%# ===================================================================== %>
   <section class="space-y-5">
@@ -594,21 +599,128 @@
   </section>
 
   <%# ===================================================================== %>
-  <%# 2. PROFILE — crop / upload, live via cropper_assets %>
+  <%# 2. PROFILE — who the account is, plus the avatar modals %>
   <%# ===================================================================== %>
+  <%# The Onboarding section folded in here on 2026-08-24. It held the post-auth
+      chain, but "onboarding" describes WHEN a card is shown, not what it is
+      about — and the cards are about the same subject this section already
+      owns: the person's name, their birthday, their picture. Grouping by
+      subject rather than by moment also stops the guide claiming a chain it
+      cannot show, now that the wallet step lives with the wallet cards. %>
   <section class="space-y-5">
     <div class="space-y-1">
       <h3 class="text-xl font-bold text-heading">Profile</h3>
       <p class="text-muted text-sm">
-        The avatar / photo modals ship from the engine
+        Who the account IS &mdash; the name it goes by, the birthday that decides
+        eligibility, and the picture. The first three cards are asked at signup
+        (a host walks them post-auth), the last three are reachable forever from
+        the profile page; all six are engine primitives.
+      </p>
+      <p class="text-muted text-sm">
+        <strong>Birthday and Age gate are one flow, deliberately split into two
+        cards.</strong> The birthday card ASKS; when the answer is too young the
+        age-gate card ANSWERS, carrying a countdown to the day they qualify, a way
+        to watch instead, and a way back to fix a mistyped year. Until 2026-08-24
+        that refusal lived inside the birthday card as red text beside a disabled
+        button &mdash; a state with nothing to press. Open <strong>Birthday</strong>
+        with <strong>Age validation</strong> on and submit any date to walk the
+        handoff; switch the toggle off for the other mode, an app with no age bar
+        that just wants the date.
+      </p>
+      <p class="text-muted text-sm">
+        The avatar modals
         (<code class="font-mono text-2xs">studio/modals/_crop_photo</code>,
-        <code class="font-mono text-2xs">studio/modals/_image_upload</code>) and
-        open live here — <code class="font-mono text-2xs">studio/cropper_assets</code>
-        is rendered above, so cropper.js loads and the modals mount on this page's
-        host.
+        <code class="font-mono text-2xs">studio/modals/_image_upload</code>)
+        open live here &mdash;
+        <code class="font-mono text-2xs">studio/cropper_assets</code> is rendered
+        above, so cropper.js loads and the modals mount on this page's host.
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "First name",
+            reference: %(the shared onboarding first-name step (studio-engine studio/modals/onboarding/_first_name) — open with $store.dsModals.open('onboarding-first-name'). Posts to submit_path/skip_path (defaults /onboarding/first_name and /onboarding/skip_first_name) and dispatches its done_event with the steps the SERVER says remain),
+            open_expr: "$store.dsModals.open('onboarding-first-name')",
+            glow_when: ds_glow.call("onboarding-first-name")
+          } do %>
+        <%# Every other card in this section shows the shape of the modal it
+            opens; this one showed a paragraph of prose, so the row read as a
+            missing thumbnail rather than a deliberate difference. It is a
+            labelled text field and a submit — draw that. %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
+          <span class="block h-2 w-20 rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-7 w-full rounded-lg border" style="border-color: var(--color-border-strong)"></span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+          <%# the skip link that sits under the button, and is also a skip %>
+          <span class="block h-1.5 w-14 mx-auto rounded" style="background: var(--color-text); opacity: .25"></span>
+        </div>
+        <p class="text-muted text-2xs mt-3">
+          Saving or skipping dispatches
+          <code class="font-mono">ds-onboarding-step-done</code> here rather than
+          the app-level event, so the specimen cannot drive a real chain.
+        </p>
+      <% end %>
+
+      <%# BIRTHDAY — the ask. ONE card, two modes, because the difference between
+          them is a LOCAL the host sets and not a different card:
+
+            age validation ON  — the app has a bar, so the card says what it is
+                                 and an under-age date hands off to the age gate.
+            age validation OFF — the app just wants the date. McRitchie Studio
+                                 has no gate and still wants a birthday to wish
+                                 you a happy one; the card then drops the age
+                                 line, the eligibility wording and the handoff.
+
+          It was two cards until 2026-08-25 ("Birthday" and "Birthday (underage)"),
+          which read as two components and hid the fact that the second was the
+          first with a prop flipped. The toggle is the honest shape — the same one
+          Profile Leveling and the Processing card use.
+
+          THE BADGE SAYS "age validation", NOT "age gate off". The old badge
+          reported this app's Studio.feature?(:age_gate) flag, which is the wrong
+          question for a card whose whole point is that the RULE is per-app:
+          turf-monster's is jurisdiction-dependent, a hub app's may not exist. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Birthday",
+            reference: %(the "Birthday" DOB card (studio-engine studio/modals/blocks/_birthday, renamed from _age_verify) — an engine primitive that ASKS for a date. Toggle "Age validation" to switch the two modes a host chooses between: ON, the app supplies min_age / state and an under-age date hands off to the age-gate card; OFF, there is no bar at all and the card is a plain birthday asker (a hub app wanting the date for a greeting). The engine hardcodes no policy either way — turf-monster's minimum is jurisdiction-dependent and resolved server-side. With validation ON, submitting takes the REFUSED branch so you can walk the handoff. Open with $store.dsModals.open('birthday', { validates: true })),
+            card_data: "opts: { validates: true }",
+            toggles:   [{ model: "opts.validates", label: "Age validation" }],
+            open_expr: "$store.dsModals.open('birthday', { validates: opts.validates })",
+            glow_when: ds_glow.call("birthday"),
+            openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2 text-center">
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <%# month / day / year %>
+          <div class="grid grid-cols-3 gap-1">
+            <span class="h-6 rounded border" style="border-color: var(--color-border-strong)"></span>
+            <span class="h-6 rounded border" style="border-color: var(--color-border-strong)"></span>
+            <span class="h-6 rounded border" style="border-color: var(--color-border-strong)"></span>
+          </div>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+
+      <%# AGE GATE — the answer, when the answer is no. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Age gate",
+            reference: %(the "Age gate" refusal card (studio-engine studio/modals/blocks/_age_gate, NEW) — where the birthday card hands off when the date is under the app's bar. Headed "Easy, Young'un" under a teddy bear rather than a red X, because a person who will be welcome later is not an error state. The body runs a LIVE countdown to the day they become eligible, built from the date the birthday card handed across — a refusal that only says "not yet" leaves someone to guess whether that is a week or a decade. Carries the two ways out: a primary CTA to WATCH the contest instead (app-supplied watch_url) and a back link that swaps to the birthday card, because a mis-picked year is a typo and a gate with no way back turns a typo into a locked door. Displays min_age / state; computes no eligibility of its own. Open with $store.dsModals.open('age-gate', { minAge: 21, state: 'CA', dobYear: ..., dobMonth: 6, dobDay: 15 })),
+            open_expr: "$store.dsModals.open('age-gate', { minAge: 21, state: 'CA', dobYear: new Date().getFullYear() - 16, dobMonth: 6, dobDay: 15 })",
+            glow_when: ds_glow.call("age-gate"),
+            openable: true } do %>
+        <%# A teddy bear, not the red X pill — the card is not an error state and
+            its thumbnail should not promise one. %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2 text-center">
+          <div class="text-2xl leading-none">&#129528;</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <%# the countdown line, which is the widest thing on the real card %>
+          <span class="block h-1.5 w-full rounded" style="background: var(--color-text); opacity: .3"></span>
+          <%# primary = watch instead; secondary = go fix the date %>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+          <span class="block h-1.5 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .25"></span>
+        </div>
+      <% end %>
+
+
       <%# Image upload FIRST — the empty picker (crop-photo opened with no imageUrl).
           cropReady: false is the defined starting sub-state; the crop factory
           flips it true once an image is picked, moving the glow to Crop photo. %>
@@ -770,17 +882,75 @@
           <span class="block h-1.5 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
         </div>
       <% end %>
+
+      <%# THE WAY OUT. The three cards above walk a user IN; a section that only
+          ever demonstrates opt-in is showing the happy half of a flow, not the
+          flow. These two are the exit, and they are a PAIR — the confirm card
+          swaps to the goodbye beat, so reviewing either alone misses the handoff.
+          App-specific (the engine owns no newsletter); engine chrome only. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Leave the newsletter?",
+            reference: %(the unsubscribe CONFIRM card (style/modals/_unsubscribe_confirm) — turf-monster's modals/_unsubscribe_confirm, which POSTs newsletter_unsubscribe_path and swaps to the goodbye beat on success. Here the POST resolves locally so the handoff is walkable with no backend: press Unsubscribe and you land on "See you later". The destructive action wears the primary button and the never-mind out is the quiet Close link below it — a confirmation whose safe path is harder to find than its destructive one is a formality, not a confirmation. Open with $store.dsModals.open('unsubscribe-confirm')),
+            open_expr: "$store.dsModals.open('unsubscribe-confirm')",
+            glow_when: ds_glow.call("unsubscribe-confirm") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">&#128237;</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+          <%# the quiet out, deliberately smaller than the destructive action %>
+          <span class="block h-1.5 w-12 mx-auto rounded" style="background: var(--color-text); opacity: .25"></span>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "See you later",
+            reference: %(the unsubscribe GOODBYE beat (style/modals/_unsubscribe_goodbye) — where the confirm card lands. The smallest card in the guide, and the copy is a door left open rather than a plea: "Change your mind anytime from your account". Worth preserving if it is ever reworded. Open with $store.dsModals.open('unsubscribe-goodbye')),
+            open_expr: "$store.dsModals.open('unsubscribe-goodbye')",
+            glow_when: ds_glow.call("unsubscribe-goodbye") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">&#9996;&#65039;</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-28 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+
+      <%# THE SAME BEAT, REACHED FROM SOMEWHERE ELSE. Great Username (two cards up)
+          celebrates INSIDE the modal that did the work. This one is what a host
+          shows when the quest completed somewhere with no card to advance in
+          place — turf's /account username change — so the celebration arrives on
+          its own. The toggle is the fork at its foot, which is the whole reason
+          it is one card and not two. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Quest success (off-page)",
+            reference: %(the off-page quest celebration (style/modals/_quest_success) — turf-monster's modals/_quest_success, shown when a quest completes away from any quest card. Composes the engine's card_header AND blocks/_seeds_bar (a :leveling primitive: the bar is the engine's, the numbers are app-supplied). Toggle "Subscribed" to switch the fork at the foot: NOT subscribed offers the newsletter as the next quest, so the celebration doubles as the funnel; subscribed sends them to the contest where the remaining quests live. In the real card that gate is SERVER-rendered from current_user.subscribed_to_newsletter?, precisely so the CTA never flashes the wrong option at someone already in. Open with $store.dsModals.open('quest-success', { subscribed: false })),
+            card_data: "opts: { subscribed: false }",
+            toggles:   [{ model: "opts.subscribed", label: "Subscribed" }],
+            open_expr: "$store.dsModals.open('quest-success', { subscribed: opts.subscribed, seedsTotal: 25 })",
+            glow_when: ds_glow.call("quest-success") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">&#127793;</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <%# the seeds bar, which is the card's middle and the engine's %>
+          <span class="flex gap-1">
+            <span class="flex-1 h-2 rounded" style="background: var(--color-cta)"></span>
+            <span class="flex-1 h-2 rounded" style="background: var(--color-cta); opacity:.4"></span>
+            <span class="flex-1 h-2 rounded" style="background: var(--color-cta); opacity:.2"></span>
+          </span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
     </div>
   </section>
 
   <%# ===================================================================== %>
-  <%# 2. WEB3 CONTEST — the walked wallet -> on-chain flow (glow follows it). %>
+  <%# 2. WEB3 — the wallet + on-chain modals, in the order a player meets them. %>
   <%# Gated by :web3; off = disabled-but-present-yet-openable. %>
   <%# ===================================================================== %>
   <section class="space-y-5">
     <div class="space-y-1">
       <div class="flex flex-wrap items-center gap-3">
-        <h3 class="text-xl font-bold text-heading">Web3 Contest</h3>
+        <h3 class="text-xl font-bold text-heading">Web3</h3>
         <% if web3_on %>
           <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">enabled on this app</span>
         <% else %>
@@ -792,10 +962,14 @@
         <code class="font-mono text-2xs">Studio.feature?(:web3)</code>. Web3 is
         <strong><%= web3_on ? "on" : "off" %></strong> here, so these render
         <%= web3_on ? "live." : "greyed and badged — but STILL openable as a preview." %>
-        The first three cards are a <strong>walked flow</strong> &mdash;
-        <strong>Connect Wallet &rarr; Processing on-chain transaction &rarr; On-chain
-        success</strong> &mdash; and the live card <strong>glows</strong>, following the
-        flow as it advances (open Connect Wallet and pick a wallet to watch it walk).
+        The cards run in the order a player meets them &mdash; <strong>get a wallet,
+        prove it, spend from it</strong>: Connect wallet &rarr; Setup Wallet &rarr;
+        the two Sign Wallet states &rarr; Processing &rarr; success or error &rarr;
+        top-up &rarr; Entry confirmed. Inside that, <strong>Connect Wallet &rarr;
+        Processing on-chain transaction &rarr; On-chain success</strong> is a
+        <strong>walked flow</strong> and the live card <strong>glows</strong>,
+        following it as it advances (open Connect Wallet and pick a wallet to watch
+        it walk).
         The <strong>Processing</strong> card is a load modal: its
         <strong>success/error toggle</strong> chooses whether it resolves to success
         or the error state, after the <strong>minimum-visible duration</strong>
@@ -804,7 +978,7 @@
         marks inline from the engine</strong>
         (<code class="font-mono text-2xs">studio/modals/blocks/_wallet_brand_sprite</code>),
         so every app inherits them with no per-app icon files.
-        The two <strong>Web3 step-up</strong> cards are a different kind of thing
+        The two <strong>Sign Wallet</strong> cards are a different kind of thing
         from the rest of this section: they render
         <code class="font-mono text-2xs">studio/modals/_web3_step_up</code> &mdash;
         the <strong>REAL shared partial a host renders in production</strong>,
@@ -813,28 +987,136 @@
         <strong>standard web3 auth button</strong>: a wallet row (brand mark, the
         wallet&rsquo;s own name, Installed badge, chevron) rather than a filled
         CTA, glowing via <code class="font-mono text-2xs">pulse-cta</code> because
-        it is the one thing to press.
+        it is the one thing to press. Do not confuse them with <strong>Setup
+        Wallet</strong>, immediately before them: that one asks an account to
+        <strong>get</strong> a wallet, these ask an account to
+        <strong>prove</strong> the one it already has &mdash; opposite populations
+        (<code class="font-mono text-2xs">WalletSetupPolicy</code> exits at its own
+        step 1 for an account that holds a wallet), so no user ever meets both.
+        They sit next to each other anyway, because the pair is easiest to keep
+        straight when you can read them side by side.
       </p>
     </div>
+    <%# ONE ordered run, read left to right as a player meets it: get a wallet,
+        prove it, spend from it. This carried three labelled h4 runs for a day
+        (The walk / Proving a wallet / Funding & confirmation) and they were
+        removed on 2026-08-25 — the player order already groups the cards, and the
+        headings were a second, competing structure over the same nine. What holds
+        the order now is a test (style_page_test's WEB3_ORDER), not a label a
+        reader has to trust. %>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%# 1. Connect wallet — the walk's entry; picking a wallet swaps to Processing. %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Connect wallet",
-            reference: %(the Web3 Contest "Connect wallet" picker (studio-engine style/modals/_wallet_connect) — the walk's entry: picking a wallet runs a brief connecting state then swaps to the on-chain Processing modal. Open with $store.dsModals.open('wallet-connect')),
+            reference: %(the Web3 "Connect wallet" picker (studio-engine style/modals/_wallet_connect) — the walk's entry: picking a wallet runs a brief connecting state then swaps to the on-chain Processing modal. Open with $store.dsModals.open('wallet-connect')),
             open_expr: "$store.dsModals.open('wallet-connect')",
             glow_when: ds_glow.call("wallet-connect"),
             disabled: !web3_on, openable: true } do %>
+        <%# A PICKER: brand tiles with names beside them, which is what this modal
+            actually is. Two empty outlines said "form with two inputs" and were
+            the least informative sketch in the section — the one card whose
+            subject is a LIST of wallets showed no wallets at all. Three rows,
+            because the picker ships Phantom / Solflare / Backpack marks inline. %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
-          <span class="block h-2 w-20 rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
-          <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <% [0.9, 0.6, 0.45].each do |tint| %>
+            <span class="flex items-center gap-1.5 h-6 w-full rounded-lg border px-1.5" style="border-color: var(--color-border-strong)">
+              <span class="w-3.5 h-3.5 rounded shrink-0" style="background: var(--color-primary); opacity: <%= tint %>"></span>
+              <span class="block h-1.5 w-9 rounded" style="background: var(--color-text); opacity: .35"></span>
+              <span class="block h-1.5 w-1.5 ml-auto rounded-full" style="background: var(--color-text); opacity: .25"></span>
+            </span>
+          <% end %>
+        </div>
+      <% end %>
+
+      <%# WALLET SETUP — new 2026-08-24, and moved here from Onboarding the same
+          day. It is grouped with the wallet cards rather than with the signup
+          chain because that is what it IS: getting a wallet. The card still
+          renders a 3-of-3 pill, which is the host's chain position and not this
+          section's business.
+          ONE card with a "Wallet detected" toggle rather than two cards sharing a
+          modal id: the two Sign Wallet cards below are what that shape costs. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Setup Wallet",
+            reference: %(the "Set up your wallet" card (style/modals/_wallet_setup) — how an account with NO wallet gets one, and the host's third onboarding step (it renders a 3-of-3 pill, which is the host's chain position, not this section's). An APP-SPECIFIC flow: the engine owns only the chrome (shell, progress_pill, wallet_brand_sprite) and the house wallet-row idiom, while extension detection, the 90-second walkthrough video, the Detailed Guide route and the managed-wallet fallback stay in the host (turf-monster's own is ~576 lines). Toggle "Wallet detected" to swap the row between INSTALL and Installed. NOTE it is the OPPOSITE population to the two Sign Wallet cards immediately below — WalletSetupPolicy exits at its own step 1 for an account that already holds a wallet, so no user ever meets both. Open with $store.dsModals.open('wallet-setup', { detected: false })),
+            card_data: "opts: { detected: false }",
+            toggles:   [{ model: "opts.detected", label: "Wallet detected" }],
+            open_expr: "$store.dsModals.open('wallet-setup', { detected: opts.detected })",
+            glow_when: ds_glow.call("wallet-setup"),
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
+          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <%# the 3-of-3 pill, filled — the whole reason this card sits here %>
+          <span class="flex gap-1">
+            <span class="flex-1 h-1.5 rounded" style="background: var(--color-cta)"></span>
+            <span class="flex-1 h-1.5 rounded" style="background: var(--color-cta)"></span>
+            <span class="flex-1 h-1.5 rounded" style="background: var(--color-cta)"></span>
+          </span>
+          <span class="flex items-center gap-1.5 h-7 w-full rounded-lg border px-1.5" style="border-color: var(--color-border-strong)">
+            <span class="w-4 h-4 rounded shrink-0" style="background: var(--color-primary)"></span>
+            <span class="block h-1.5 w-8 rounded" style="background: var(--color-text); opacity: .35"></span>
+          </span>
+          <%# the walkthrough placeholder, the card's second half %>
+          <span class="block w-full rounded" style="height: 1.6rem; background: var(--color-text); opacity: .10"></span>
+        </div>
+      <% end %>
+
+      <%# SIGN WALLET — the web2-session-on-a-wallet-account card. NOT part of the
+          walk above: that walk is one on-chain transaction, this is an AUTH state
+          that precedes any of it. Two specimens because the card has exactly two
+          shapes, and the second is what every wallet linked before a host recorded
+          brands will see.
+
+          OPPOSITE POPULATION to the "Setup Wallet" card two up in this
+          section, and worth stating because the two look alike: that one asks
+          "get a wallet", this one asks "prove the wallet you already have".
+          WalletSetupPolicy exits at its own step 1 for an account that holds a
+          wallet, so no user can ever meet both. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Sign Wallet",
+            reference: %(the Web3 "Sign Wallet" card (studio/modals/_web3_step_up — the REAL shared partial, not a specimen copy) — shown to an account that holds a self-custody wallet but authenticated this session with a web2 credential. One wallet row, glowing, because it is the only thing to press. Open with $store.dsModals.open('web3-step-up', { provider: 'phantom', providerLabel: 'Phantom', walletHint: '7xKp…JZ2Q' })),
+            open_expr: "$store.dsModals.open('web3-step-up', { provider: 'phantom', providerLabel: 'Phantom', walletHint: '7xKp…JZ2Q' })",
+            glow_when: ds_glow.call("web3-step-up", provider: true),
+            disabled: !web3_on, openable: true } do %>
+        <%# A FILLED row: brand tile, the wallet's name, an Installed badge. The
+            two step-up thumbnails used to differ by a single border-dashed class
+            on a 20px row, which is not a difference anyone can see at thumbnail
+            size — and these two cards are the pair most likely to be mistaken for
+            duplicates, because they share a modal id AND a title. So the sketch
+            now shows the actual distinction: this card KNOWS which wallet. %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">🔐</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="flex items-center gap-1.5 h-7 w-full rounded-lg border px-1.5" style="border-color: var(--color-border-strong)">
+            <span class="w-4 h-4 rounded shrink-0" style="background: var(--color-primary)"></span>
+            <span class="block h-1.5 w-8 rounded" style="background: var(--color-text); opacity: .35"></span>
+            <span class="block h-2.5 w-7 ml-auto rounded-full border" style="border-color: var(--color-primary)"></span>
+          </span>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Sign Wallet (no remembered brand)",
+            reference: %(the Web3 "Sign Wallet" card with NO remembered brand (studio/modals/_web3_step_up) — every wallet linked before a host recorded brands lands here, so it is a live population and not a defensive branch. The row falls back to the picker rather than dead-ending. Open with $store.dsModals.open('web3-step-up', {})),
+            open_expr: "$store.dsModals.open('web3-step-up', {})",
+            glow_when: ds_glow.call("web3-step-up", provider: false),
+            disabled: !web3_on, openable: true } do %>
+        <%# An EMPTY slot: dashed outline, no brand tile, a "?" where the wallet's
+            name would be. Reads at a glance as "we do not know which wallet",
+            which is the whole difference between this card and the one before it. %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">🔐</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="flex items-center justify-center h-7 w-full rounded-lg border border-dashed" style="border-color: var(--color-border-strong)">
+            <span class="text-xs font-bold text-muted leading-none">?</span>
+          </span>
         </div>
       <% end %>
 
       <%# 2. Processing — the load modal; the success/error toggle picks the resolution. %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Processing on-chain tx",
-            reference: %(the Web3 Contest "Processing" on-chain load modal (style/modals/_onchain_tx via $store.dsSolanaModal) — holds the spinner at least MIN_LOAD_MS, then auto-resolves to success (or the error state when the toggle is set). Open with $store.dsModals.open('onchain-tx', { state: 'processing', demoResolve: true, demoError: false })),
+            reference: %(the Web3 "Processing" on-chain load modal (style/modals/_onchain_tx via $store.dsSolanaModal) — holds the spinner at least MIN_LOAD_MS, then auto-resolves to success (or the error state when the toggle is set). Open with $store.dsModals.open('onchain-tx', { state: 'processing', demoResolve: true, demoError: false })),
             card_data: "opts: { demoError: false }",
             toggles:   [{ model: "opts.demoError", label: "Resolve to error" }],
             open_expr: "$store.dsModals.open('onchain-tx', { state: 'processing', title: 'Confirming on-chain', message: 'Waiting for the wallet signature…', demoResolve: true, demoError: opts.demoError })",
@@ -849,7 +1131,7 @@
       <%# 3. On-chain success — the resolved success end-state (the walk's finish). %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "On-chain success",
-            reference: %(the Web3 Contest "On-chain success" state (style/modals/_onchain_tx + studio/modals/blocks/_onchain_success) — the resolved success card the walk lands on. Open with $store.dsModals.open('onchain-tx', { state: 'success', txSignature: '…', successTitle: 'Mint complete' })),
+            reference: %(the Web3 "On-chain success" state (style/modals/_onchain_tx + studio/modals/blocks/_onchain_success) — the resolved success card the walk lands on. Open with $store.dsModals.open('onchain-tx', { state: 'success', txSignature: '…', successTitle: 'Mint complete' })),
             open_expr: "$store.dsModals.open('onchain-tx', { state: 'success', txSignature: '5xTrDemoSignature1234567890', successTitle: 'Mint complete', successSubtitle: 'Your on-chain action confirmed.', ctaLabel: 'View wallet', ctaHref: null })",
             glow_when: ds_glow.call("onchain-tx", state: "success"),
             disabled: !web3_on, openable: true } do %>
@@ -864,7 +1146,7 @@
       <%# On-chain error — the resolved error end-state (the toggle's other branch). %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "On-chain error",
-            reference: %(the Web3 Contest "On-chain error" state (style/modals/_onchain_tx) — the resolved error card the Processing toggle resolves to. Open with $store.dsModals.open('onchain-tx', { state: 'error', title: "Couldn't confirm", errorMessage: 'The transaction was rejected. Give it another try.' })),
+            reference: %(the Web3 "On-chain error" state (style/modals/_onchain_tx) — the resolved error card the Processing toggle resolves to. Open with $store.dsModals.open('onchain-tx', { state: 'error', title: "Couldn't confirm", errorMessage: 'The transaction was rejected. Give it another try.' })),
             open_expr: "$store.dsModals.open('onchain-tx', { state: 'error', title: 'Could not confirm', errorMessage: 'The transaction was rejected. Give it another try.' })",
             glow_when: ds_glow.call("onchain-tx", state: "error"),
             disabled: !web3_on, openable: true } do %>
@@ -874,40 +1156,30 @@
         </div>
       <% end %>
 
-      <%# Web3 step-up — the web2-session-on-a-wallet-account card. NOT part of
-          the three-card walk above: that walk is one on-chain transaction, this
-          is an AUTH state that precedes any of it. Two specimens because the
-          card has exactly two shapes, and the second is what every wallet linked
-          before a host recorded brands will see. %>
+      <%# THE OTHER FAILURE, and it is a different KIND of failure from the one
+          above. On-chain error is the chain saying no. This is the SERVER saying
+          no — refusing to co-sign because the transaction it was handed did not
+          match the entry it prepared. They sit together because a reviewer
+          reading either alone would not know the other existed. %>
       <%= render layout: "style/modal_specimen", locals: {
-            label:     "Web3 step-up (remembered wallet)",
-            reference: %(the Web3 Contest "Web3 step-up" card (studio/modals/_web3_step_up — the REAL shared partial, not a specimen copy) — shown to an account that holds a self-custody wallet but authenticated this session with a web2 credential. One wallet row, glowing, because it is the only thing to press. Open with $store.dsModals.open('web3-step-up', { provider: 'phantom', providerLabel: 'Phantom', walletHint: '7xKp…JZ2Q' })),
-            open_expr: "$store.dsModals.open('web3-step-up', { provider: 'phantom', providerLabel: 'Phantom', walletHint: '7xKp…JZ2Q' })",
-            glow_when: ds_glow.call("web3-step-up"),
+            label:     "Co-sign refused",
+            reference: %(the "Transaction not signed" card (style/modals/_cosign_rejected) — turf-monster's modals/_cosign_rejected, opened when POST confirm_onchain_entry answers 422 with code tx_rejected: the server refused to co-sign because the submitted transaction did not match the entry it had prepared. APP-SPECIFIC — the engine owns no entry preparation, no co-signing and no verdict; it lends card_header and nothing else. THE COPY IS DELIBERATELY VAGUE and should stay that way: good actors never see this card (it fires on a tampered or mismatched transaction), so naming WHICH server-side check failed would help an attacker probe the validation. What the copy does commit to is the part the one honest user needs — nothing was submitted, the funds are safe. Open with $store.dsModals.open('cosign-rejected')),
+            open_expr: "$store.dsModals.open('cosign-rejected')",
+            glow_when: ds_glow.call("cosign-rejected"),
             disabled: !web3_on, openable: true } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <div class="text-2xl leading-none">🔐</div>
+          <div class="text-2xl leading-none">&#128737;&#65039;</div>
           <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="block h-7 w-full rounded-lg border" style="border-color: var(--color-border-strong)"></span>
-        </div>
-      <% end %>
-
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Web3 step-up (no remembered wallet)",
-            reference: %(the Web3 Contest "Web3 step-up" card with NO remembered brand (studio/modals/_web3_step_up) — every wallet linked before a host recorded brands lands here, so it is a live population and not a defensive branch. The row falls back to the picker rather than dead-ending. Open with $store.dsModals.open('web3-step-up', {})),
-            open_expr: "$store.dsModals.open('web3-step-up', {})",
-            disabled: !web3_on, openable: true } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <div class="text-2xl leading-none">🔐</div>
-          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="block h-7 w-full rounded-lg border border-dashed" style="border-color: var(--color-border-strong)"></span>
+          <span class="block h-1.5 w-full rounded" style="background: var(--color-text); opacity: .3"></span>
+          <span class="block h-1.5 w-28 mx-auto rounded" style="background: var(--color-text); opacity: .3"></span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
         </div>
       <% end %>
 
       <%# Wallet deposit — standalone top-up card (not part of the walk). %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Wallet deposit",
-            reference: %(the Web3 Contest "Wallet deposit" top-up card (style/modals/_wallet_deposit) — open with $store.dsModals.open('wallet-deposit', { neededCents: 500, usdcCents: 120, usdtCents: 0, address: 'Fo1L5…' })),
+            reference: %(the Web3 "Wallet deposit" top-up card (style/modals/_wallet_deposit) — open with $store.dsModals.open('wallet-deposit', { neededCents: 500, usdcCents: 120, usdtCents: 0, address: 'Fo1L5…' })),
             open_expr: "$store.dsModals.open('wallet-deposit', { neededCents: 500, usdcCents: 120, usdtCents: 0, address: 'Fo1L5demoWALLETaddr9xQ2' })",
             disabled: !web3_on, openable: true } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
@@ -923,7 +1195,7 @@
           Rewards below (gated by :leveling). %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Entry confirmed",
-            reference: %(the Web3 Contest "Entry confirmed" celebration (studio/modals/blocks/_entry_confirmed, composed via _success_card's yield — branded tx link + heading + drain CTA; the seeds bar is gated off by :leveling and stays hidden here) — open with $store.dsModals.open('entry-confirmed', { txSignature: '…', lobbyUrl: null, seedsEarned: 0 })),
+            reference: %(the Web3 "Entry confirmed" celebration (studio/modals/blocks/_entry_confirmed, composed via _success_card's yield — branded tx link + heading + drain CTA; the seeds bar is gated off by :leveling and stays hidden here) — open with $store.dsModals.open('entry-confirmed', { txSignature: '…', lobbyUrl: null, seedsEarned: 0 })),
             open_expr: "$store.dsModals.open('entry-confirmed', { txSignature: '5xTrDemoSignature1234567890abcXYZ', lobbyUrl: null, seedsEarned: 0, seedsTotal: 40 })",
             disabled: !web3_on, openable: true } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
@@ -939,7 +1211,7 @@
   </section>
 
   <%# ===================================================================== %>
-  <%# 3. CONTEST ENTRY & ELIGIBILITY — moved directly under Web3 Contest. The %>
+  <%# 3. CONTEST ENTRY & ELIGIBILITY — moved directly under Web3. The %>
   <%# walked entry flow (glow follows), plus the honest web2/web3 map. %>
   <%# ===================================================================== %>
   <section class="space-y-5">
@@ -953,17 +1225,20 @@
         <% end %>
       </div>
       <p class="text-muted text-sm">
-        The pre-entry gate and the full entry flow. The <strong>age gate</strong>
-        (<code class="font-mono text-2xs">studio/modals/blocks/_age_verify</code>) is an
-        engine primitive gated by
-        <code class="font-mono text-2xs">Studio.feature?(:age_gate)</code> &mdash; a DOB
-        modal whose minimum age, jurisdiction label, endpoint, and legal copy are all
+        The pre-entry gate and the full entry flow. The age bar is enforced HERE,
+        but its two cards &mdash;
+        <code class="font-mono text-2xs">studio/modals/blocks/_birthday</code> (the
+        ask) and <code class="font-mono text-2xs">_age_gate</code> (the refusal)
+        &mdash; are shown in the <strong>Profile</strong> section, because they are
+        about who the account is. Both are engine primitives gated by
+        <code class="font-mono text-2xs">Studio.feature?(:age_gate)</code>, and their
+        minimum age, jurisdiction label, endpoint, and legal copy are all
         <strong>app-supplied</strong> (the engine hardcodes no policy). The entry flow is
         a <strong>walked sequence</strong> &mdash; <strong>Entry tokens &rarr; Payment
         processing &rarr; Entry Tokens Minted &rarr; Contest enter processing &rarr;
         Contest entered</strong> &mdash; and the live card <strong>glows</strong>,
         following the step machine (the two load steps honor the same min-duration
-        convention as Web3 Contest above).
+        convention as Web3 above).
       </p>
       <%# The web2/web3 finding — a real divergence, stated honestly, not invented. %>
       <div class="mt-2 rounded-lg border border-subtle bg-surface p-3 text-xs text-secondary leading-snug">
@@ -986,23 +1261,14 @@
       </div>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <%# Age gate — engine primitive, gated on :age_gate (disabled-but-present). %>
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Age gate (DOB)",
-            reference: %(the "Age gate" DOB modal (studio-engine studio/modals/blocks/_age_verify) — an engine primitive; the app supplies min_age / state / submit_url / fine_print and the engine hardcodes no legal policy. In this demo, Confirm & Continue advances to the Entry tokens purchase (page-level dsModals wiring on the primitive's 'age-verified' hook; the primitive's real submit posts to submit_url). Open with $store.dsModals.open('age-verify')),
-            open_expr: "$store.dsModals.open('age-verify')",
-            glow_when: ds_glow.call("age-verify"),
-            disabled: !age_gate_on, openable: true, disabled_label: "age gate off" } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2 text-center">
-          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <div class="grid grid-cols-3 gap-1">
-            <span class="h-6 rounded border" style="border-color: var(--color-border-strong)"></span>
-            <span class="h-6 rounded border" style="border-color: var(--color-border-strong)"></span>
-            <span class="h-6 rounded border" style="border-color: var(--color-border-strong)"></span>
-          </div>
-          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
-        </div>
-      <% end %>
+      <%# The birthday / age-gate CARDS live in the Profile section — they are
+          about who the account is, and grouping them by subject beats grouping
+          them by the moment they happen to be asked. ENFORCEMENT still lives
+          here: the bar is checked at contest entry, which is what this section is
+          named for. The demo walk is unbroken — confirming the birthday card
+          still advances to Entry tokens below, via the page-level 'age-verified'
+          wiring, which the rename did NOT touch precisely because consuming apps
+          already listen on it. %>
 
       <%# 1. Entry tokens — the picker (walk's entry). Picking a pack advances. %>
       <%= render layout: "style/modal_specimen", locals: {

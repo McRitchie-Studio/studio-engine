@@ -1,0 +1,225 @@
+<%#
+  Age gate — the REFUSAL card. New 2026-08-24, and it exists because a refusal
+  needs somewhere to go.
+
+  WHAT IT REPLACED. blocks/_birthday (then blocks/_age_verify) used to carry the
+  refusal itself: enter an under-age date and the card turned red and disabled
+  its own submit button. That is the one screen state with nothing to press —
+  the person is told no and handed no next move, on a card whose only other
+  control closes it. This card is that next move.
+
+  THE TWO WAYS OUT, and both are real:
+    watch_url  — the thing they CAN do. Being too young to enter is not being too
+                 young to watch, so the primary CTA is a way to stay rather than
+                 a way to leave. App-supplied: the engine has no idea what a
+                 contest is.
+    the back link — the thing they might NEED. A wrong birthday is an ordinary
+                 typo (a mis-picked year is one scroll away), and a gate with no
+                 way back turns a typo into a locked door. swap()s back to the
+                 birthday card, so this is a correction, not a restart.
+
+  DELIBERATELY NOT DISMISSIBLE-BY-DEFAULT-ONLY: the host still decides via
+  props.dismissible at open() time, exactly like every other card. What this
+  partial guarantees is that there is always a visible way forward even when the
+  host locks the backdrop.
+
+  NO LEGAL POLICY LIVES HERE, same rule as the birthday card. min_age and state
+  are passed in and only ever displayed; nothing here computes eligibility.
+
+  Locals:
+    min_age     (Integer, optional) — for the headline. Falls back to props.minAge,
+                which _birthday's _reject passes, so a host that opens this card
+                through the handoff needs to supply nothing at all.
+    state       (String, optional)  — passive jurisdiction label. Same fallback.
+    watch_url   (String, optional)  — the primary CTA target. Omit and the CTA is
+                dropped rather than rendered dead.
+    watch_label (String, optional)  — default "Watch the Contest".
+    birthday_modal_id (String, optional) — the card the back link returns to.
+                Default "birthday". Pass nil to drop the link.
+    back_label  (String, optional)  — default "Update your Birthday".
+    title       (String, optional)  — default is built from min_age.
+    countdown   (Boolean, optional) — default true. FALSE drops the countdown line
+                entirely and falls back to the plain rule sentence. It does not
+                merely stop the clock: a frozen countdown reads as a rendering
+                artefact, which is the very thing this card exists not to be.
+    modal_store (String, optional)  — Alpine store name. Default "modals".
+
+  Single root element (modal-host template mount rule).
+%>
+<%
+  min_age           = local_assigns[:min_age]
+  state             = local_assigns[:state].to_s.strip
+  countdown         = local_assigns.fetch(:countdown, true)
+  watch_url         = local_assigns[:watch_url].to_s
+  watch_label       = local_assigns.fetch(:watch_label, "Watch the Contest")
+  birthday_modal_id = local_assigns.fetch(:birthday_modal_id, "birthday")
+  back_label        = local_assigns.fetch(:back_label, "Update your Birthday")
+  title             = local_assigns[:title]
+  modal_store       = local_assigns.fetch(:modal_store, "modals")
+%>
+<div x-data="{
+       now: Date.now(),
+       _tick: null,
+       get props() { var c = $store.<%= modal_store %>.current(); return (c && c.props) || {}; },
+       get minAge() { return <%= min_age.present? ? min_age.to_i : 0 %> || this.props.minAge || null; },
+       get stateCode() { return '<%= j state %>' || this.props.state || ''; },
+       get headline() {
+         // Single-quoted + j-escaped, NOT to_json: to_json emits DOUBLE quotes,
+         // which close this double-quoted x-data attribute and mount the
+         // component as a silent no-op. The markup still renders, so every
+         // assertion passes while the card is dead in a browser.
+         var t = '<%= j title.to_s %>';
+         return t ? t : 'Easy, Young’un';
+       },
+       // The date they become eligible: their birthday, plus the app's minimum
+       // age in years. Built from PARTS the birthday card handed across the
+       // store, because a Date through a reactive proxy is a class waiting to be
+       // stringified by something downstream.
+       get eligibleAt() {
+         var p = this.props, y = p.dobYear, m = p.dobMonth, d = p.dobDay;
+         if (!y || !m || !d || !this.minAge) return null;
+         return new Date(y + this.minAge, m - 1, d);
+       },
+       // Add n months and CLAMP to the end of the target month. Bare setMonth
+       // overflows: Jan 31 + 1 month is Feb 31, which JS rolls forward to Mar 3,
+       // and the countdown then reports one month less than it should for every
+       // person born on a 29th, 30th or 31st.
+       addMonths(d, n) {
+         var day = d.getDate();
+         var r = new Date(d.getTime());
+         r.setDate(1);
+         r.setMonth(r.getMonth() + n);
+         var lastDay = new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate();
+         r.setDate(day < lastDay ? day : lastDay);
+         return r;
+       },
+       get remaining() {
+         var target = this.eligibleAt;
+         if (!target) return null;
+         if (target.getTime() - this.now <= 0) return null;
+
+         // Calendar months and days, not 30-day approximations — this number is
+         // read as a real date difference and a rounded one is wrong by days.
+         var from = new Date(this.now), months = 0;
+         while (this.addMonths(from, months + 1).getTime() <= target.getTime()) months++;
+         var probe = this.addMonths(from, months);
+
+         // Days walked with setDate, NOT by dividing milliseconds: a day across a
+         // DST boundary is 23 or 25 hours, and ms-division reports 27d 23h where
+         // the calendar says 28d.
+         var days = 0;
+         while (true) {
+           var next = new Date(probe.getTime());
+           next.setDate(next.getDate() + 1);
+           if (next.getTime() > target.getTime()) break;
+           probe = next; days++;
+         }
+
+         var rest = target.getTime() - probe.getTime();
+         var hours = Math.floor(rest / 3600000); rest -= hours * 3600000;
+         var mins = Math.floor(rest / 60000); rest -= mins * 60000;
+         var secs = Math.floor(rest / 1000);
+         return { months: months, days: days, hours: hours, minutes: mins, seconds: secs };
+       },
+       get countdownText() {
+         var r = this.remaining;
+         if (!r) return '';
+         var unit = function (n, one) { return n + ' ' + one + (n === 1 ? '' : 's'); };
+         // YEARS, because the whole point of this line is that nobody should have
+         // to divide. Ninety months — the reachable worst case for a 13-year-old
+         // at a 21 bar — is exactly the is-that-a-week-or-a-decade arithmetic the
+         // comment below claims to remove. Months carry the remainder.
+         // (No double quotes in here: this whole object is one HTML attribute.)
+         var years = Math.floor(r.months / 12), months = r.months % 12;
+         var parts = [];
+         if (years) parts.push(unit(years, 'year'));
+         if (months || years) parts.push(unit(months, 'month'));
+         if (r.days || months || years) parts.push(unit(r.days, 'day'));
+         return parts.join(' ') + (parts.length ? ', ' : '') +
+           unit(r.hours, 'hour') + ', ' + unit(r.minutes, 'minute') + ', ' + unit(r.seconds, 'second');
+       },
+       start() { var s = this; this._tick = setInterval(function () { s.now = Date.now(); }, 1000); },
+       stop() { if (this._tick) { clearInterval(this._tick); this._tick = null; } },
+       // Alpine 3 calls destroy() ON THE DATA OBJECT at teardown and dispatches
+       // no `destroy` DOM event, so the `@destroy` listener this used to carry
+       // never fired and the interval outlived every close. Same idiom as the
+       // sibling cards that poll: modals/_web3_step_up, blocks/_cta_redirect,
+       // blocks/_seeds_bar.
+       destroy() { this.stop(); },
+       back() { $store.<%= modal_store %>.swap('<%= j birthday_modal_id.to_s %>', {}); }
+     }"
+     <% if countdown %>x-init="start()"<% end %>
+     class="relative">
+  <%# A TEDDY BEAR, not a red X. The X pill is the engine's error icon and this
+      is not an error — it is a person who will be welcome later. The card that
+      turns someone away is the last place to reach for alarm styling; the copy
+      does the same work ("Easy, Young’un" rather than "You must be 21+"),
+      and the two have to agree or the card reads as scolding.
+
+      title_key, not title: the headline may arrive as a LOCAL or fall back to
+      the default, and the block below replaces the subtitle area. %>
+  <%= render "studio/modals/blocks/card_header",
+        size: :lg,
+        icon_emoji: "🧸",
+        title_key: "headline" do %>
+    <%# WHEN, not just no. A refusal that only says "not yet" leaves the person
+        to work out whether that means a week or a decade; the countdown answers
+        it in the units they actually feel. It ticks live because a frozen
+        number reads as a rendering artefact rather than a clock. %>
+    <template x-if="<%= countdown ? 'countdownText' : 'false' %>">
+      <p class="text-sm text-body">
+        You have <strong class="text-heading" x-text="countdownText"></strong>
+        before you can join your first contest.
+        <span x-show="stateCode" x-cloak>
+          The minimum age <span x-text="'in ' + stateCode"></span> is
+          <strong class="text-heading" x-text="minAge"></strong>.
+        </span>
+      </p>
+    </template>
+
+    <%# No date to count from (the card was opened directly, or the handoff
+        carried no DOB). Say the rule plainly rather than an empty sentence. %>
+    <template x-if="<%= countdown ? '!countdownText' : 'true' %>">
+      <p class="text-sm text-body">
+        <span x-show="stateCode" x-cloak>
+          The minimum age <span x-text="'in ' + stateCode"></span> is
+          <strong class="text-heading" x-text="minAge"></strong>.
+        </span>
+        <span x-show="!stateCode">You are not old enough to enter this contest yet.</span>
+      </p>
+    </template>
+
+    <%# A server-authored reason, when there is one. Never invented here. %>
+    <template x-if="props.message">
+      <p class="text-sm text-muted mt-2" x-text="props.message"></p>
+    </template>
+  <% end %>
+
+  <%# Breathing room before the CTA. card_header's block sits flush against
+      whatever follows it, and a full-width primary button landing directly on
+      the last line of body copy reads as one block rather than as a sentence
+      and then a choice. %>
+  <div class="mt-5"></div>
+
+  <% if watch_url.present? %>
+    <%# The primary action is the thing they CAN do. Too young to enter is not
+        too young to watch, so this keeps them in rather than showing them out. %>
+    <%= link_to watch_label, watch_url,
+          class: "btn btn-primary btn-lg w-full",
+          "@click": "$store.#{modal_store}.close()" %>
+  <% end %>
+
+  <% if birthday_modal_id.present? %>
+    <%# The correction path. A mis-picked year is one scroll away from a right
+        one, and without this the typo is indistinguishable from the verdict. %>
+    <button type="button" @click="back()"
+            class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition underline-offset-2 hover:underline">
+      <%= back_label %>
+    </button>
+  <% end %>
+
+  <button type="button" @click="$store.<%= modal_store %>.close()"
+          class="block mx-auto mt-3 text-sm text-muted hover:text-secondary transition">
+    Close
+  </button>
+</div>

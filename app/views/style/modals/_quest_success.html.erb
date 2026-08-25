@@ -1,0 +1,55 @@
+<%#
+  Living style guide specimen — the off-page quest celebration.
+
+  WHY IT EXISTS ALONGSIDE "Great Username", which looks almost identical: they
+  are the same beat reached two different ways, and the difference is where the
+  user is standing. The leveling-activity celebration fires INSIDE the modal that
+  did the work. This card is what a host shows when the quest completed somewhere
+  with no quest card to advance in place — turf's /account username change — so
+  the celebration has to arrive on its own.
+
+  APP-SPECIFIC FLOW, engine chrome only. The engine lends `blocks/_card_header`
+  and `blocks/_seeds_bar` (a :leveling primitive — the bar is the engine's, the
+  NUMBERS are app-supplied Alpine expressions). What stays the host's: which
+  quests exist, what they pay, and where "Next Quest" goes.
+
+  THE FORK AT THE BOTTOM is the interesting part and the reason this is one card
+  with a toggle rather than two cards. A viewer who has NOT joined the newsletter
+  is offered it as the next quest — the celebration doubles as the funnel. One who
+  already has is sent to the contest, where the remaining quests live. In the real
+  card that gate is SERVER-rendered from current_user.subscribed_to_newsletter?,
+  precisely so the CTA never flashes the wrong option at someone already in.
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div x-data="{ get props() { var c = $store.dsModals.current(); return (c && c.props) || {} } }">
+  <%= render "studio/modals/blocks/card_header",
+        size: :lg,
+        icon_emoji: "🌱",
+        title: "Great Username",
+        subtitle: "Nice — you earned 25 seeds by completing a quest. Complete more quests to earn a Free Entry Token." %>
+
+  <%# The engine's bar, fed demo numbers. A host passes its own live totals; the
+      bar decides on its own whether a level was crossed and runs the flourish. %>
+  <div class="mb-5">
+    <%= render "studio/modals/blocks/seeds_bar",
+          seeds_earned_key: "25",
+          seeds_total_key:  "props.seedsTotal || 25",
+          free_entry_label: "Free Entry Token 🎟️" %>
+  </div>
+
+  <template x-if="props.subscribed">
+    <button type="button" @click="$store.dsModals.close()"
+            class="btn btn-primary btn-lg w-full">Next Quest</button>
+  </template>
+  <template x-if="!props.subscribed">
+    <%# Not subscribed: the celebration hands off to the newsletter quest. %>
+    <button type="button" @click="$store.dsModals.swap('join-newsletter', { demo: true, leveling: true })"
+            class="btn btn-primary btn-lg w-full">Next Quest</button>
+  </template>
+
+  <button type="button" @click="$store.dsModals.close()"
+          class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+    Close
+  </button>
+</div>

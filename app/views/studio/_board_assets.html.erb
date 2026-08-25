@@ -3,7 +3,7 @@
   (studio/board/_board). Ships here at PAGE level on purpose: a <script> inside the
   board component template would be cloned/re-parsed and never run, so a consumer
   renders THIS once in its layout (like studio/_leveling_activity_assets homes
-  levelingActionModal and studio/_age_verify_assets homes ageVerifyModal), and the
+  levelingActionModal and studio/_birthday_assets homes birthdayModal), and the
   board anywhere below just references window.studioBoard. SortableJS is loaded
   globally by layouts/studio/_head (vendored, no CDN); this factory drives it.
 

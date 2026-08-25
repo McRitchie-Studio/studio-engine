@@ -1,27 +1,39 @@
 <%#
-  ageVerifyModal factory — the Alpine data for the engine age-gate DOB modal
-  (studio/modals/blocks/_age_verify). Ships here, at PAGE level, on purpose: the
+  birthdayModal factory — the Alpine data for the engine birthday DOB modal
+  (studio/modals/blocks/_birthday). Ships here, at PAGE level, on purpose: the
   modal partial mounts inside a modal host's single-root template, and a script
   cloned out of a template never runs. So a consumer renders THIS once in its
   layout (like the shared alpine factories), and the modal partial anywhere below
-  just references window.ageVerifyModal. Mirrors how studio/_cropper_assets homes
+  just references window.birthdayModal. Mirrors how studio/_cropper_assets homes
   the cropPhotoModal factory for the crop modal.
 
   The factory holds ZERO legal policy — no age default, no state table. minAge is
   whatever the app hands it (a required prop upstream); the client "too young"
   hint is UX only, and the server recompute at submit_url stays authoritative.
 
-  opts: { minAge, state, url, store, demo }.
+  opts: { minAge, state, url, store, demo, demoUnderage, gateId }.
     minAge  app-supplied minimum age (no engine fallback — 0 means unsupplied).
     state   passive jurisdiction label (server-detected upstream; never editable).
     url     app endpoint the DOB POSTs to (the app owns the authoritative check).
     store   Alpine modal store name backing close() (default "modals").
     demo    style-guide preview: resolve locally, skip the network POST.
+    demoUnderage  demo only — take the REFUSED branch, so the style guide can
+            walk the handoff with no backend.
+    gateId  modal id opened on a refusal (default "age-gate"). Blank falls back
+            to the inline error line, for a host mid-adoption that has not
+            registered the second card yet.
+
+  THE REFUSAL IS A HANDOFF, NOT AN ERROR (2026-08-24). This factory used to
+  early-return on an under-age date, leaving the modal red with its own button
+  disabled — the one state with nothing to press. `_reject` now opens the
+  age-gate card instead. `_finish` is unchanged: the success path still flips
+  session.ageVerified and dispatches `age-verified`, which is the hook consuming
+  apps already listen on, so nothing downstream had to change.
 %>
 <script>
   (function () {
-    if (window.ageVerifyModal) return;
-    window.ageVerifyModal = function (opts) {
+    if (window.birthdayModal) return;
+    window.birthdayModal = function (opts) {
       opts = opts || {};
       var now = new Date();
       return {
@@ -34,6 +46,10 @@
         url: opts.url || "",
         store: opts.store || "modals",
         demo: !!opts.demo,
+        demoUnderage: !!opts.demoUnderage,
+        // Blank gateId => no second card registered yet; the refusal falls back
+        // to the error line so a host mid-adoption still SAYS something.
+        gateId: opts.gateId || "",
         months: [
           { n: 1, label: "January" }, { n: 2, label: "February" }, { n: 3, label: "March" },
           { n: 4, label: "April" }, { n: 5, label: "May" }, { n: 6, label: "June" },
@@ -83,17 +99,58 @@
           try { Alpine.store(this.store).close(); } catch (e) {}
           window.dispatchEvent(new CustomEvent("age-verified"));
         },
+        // Refusal path: hand off to the age-gate card, which owns the CTAs
+        // ("watch instead", "fix your birthday"). Deliberately NOT an error —
+        // the card that refuses is also the card that offers somewhere to go.
+        // swap(), not open(), so the back-link on that card returns HERE.
+        _reject(message) {
+          if (!this.gateId) {
+            // No gate registered (host mid-adoption): say it inline rather than
+            // closing silently, which would look like the date was accepted.
+            this.error = message || this._refusalLine();
+            return;
+          }
+          try {
+            Alpine.store(this.store).swap(this.gateId, {
+              minAge: this.minAge,
+              state: this.stateCode,
+              message: message || "",
+              // The DATE, so the gate card can say WHEN rather than only "no".
+              // Passed as parts rather than a Date: this crosses a store, and a
+              // Date through Alpine's reactive proxy is a class waiting to be
+              // stringified by something downstream.
+              dobYear: parseInt(this.year, 10) || null,
+              dobMonth: parseInt(this.month, 10) || null,
+              dobDay: parseInt(this.day, 10) || null
+            });
+          } catch (e) {
+            this.error = message || this._refusalLine();
+          }
+        },
+        _refusalLine() {
+          return "You must be " + this.minAge + "+" +
+            (this.stateCode ? " in " + this.stateCode : "") + ".";
+        },
+        get isUnderage() {
+          return this.computedAge !== null && !!this.minAge && this.computedAge < this.minAge;
+        },
         submit() {
           if (!this.complete || this.submitting) return;
           this.error = "";
-          // Client courtesy gate only — the server recompute is authoritative.
-          if (this.computedAge !== null && this.minAge && this.computedAge < this.minAge) return;
+          // NO client-side refusal. This used to early-return on an under-age
+          // date, which is what left the card red with a disabled button. The
+          // date goes to the server like any other; the server recompute is and
+          // always was the authoritative check, and its verdict routes here.
           this.submitting = true;
           var self = this;
           if (this.demo) {
-            // Style-guide preview: no backend, resolve locally so the modal
-            // demonstrates the success handoff without an endpoint.
-            setTimeout(function () { self.submitting = false; self._finish(); }, 450);
+            // Style-guide preview: no backend. demoUnderage picks which branch
+            // the local resolve takes, so the guide can walk BOTH outcomes.
+            setTimeout(function () {
+              self.submitting = false;
+              if (self.demoUnderage || self.isUnderage) self._reject();
+              else self._finish();
+            }, 450);
             return;
           }
           var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || "";
@@ -102,11 +159,20 @@
             headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf, "Accept": "application/json" },
             body: JSON.stringify({ year: this.year, month: this.month, day: this.day })
           })
-            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
             .then(function (res) {
               self.submitting = false;
               if (res.ok && res.body && res.body.verified) { self._finish(); return; }
-              self.error = (res.body && res.body.error) ||
+              // The app distinguishes "too young" from "bad request". An explicit
+              // underage verdict — body.underage, or a 403 — is a REFUSAL and
+              // routes to the gate card; anything else is a real error and stays
+              // on the red line here.
+              var body = res.body || {};
+              if (body.underage === true || res.status === 403) {
+                self._reject(body.error || body.message || "");
+                return;
+              }
+              self.error = body.error ||
                 "We couldn't verify your age. Please check the date and try again.";
             })
             .catch(function () {

@@ -373,11 +373,15 @@ class StylePageTest < ActiveSupport::TestCase
     end
   end
 
-  # --- 6c. Web3 Contest + Contest entry & eligibility flows -------------------
+  # --- 6c. Web3 + Contest entry & eligibility flows ---------------------------
 
-  # The Modals sub-sections rename ("Web3" -> "Web3 Contest", "Eligibility &
-  # entry" -> "Contest entry & eligibility") and reorder (entry sits DIRECTLY
-  # under Web3 Contest).
+  # The Modals sub-section names and their ORDER: entry sits DIRECTLY under Web3.
+  #
+  # That heading has been renamed twice. It was "Web3", became "Web3 Contest" in
+  # 0.27, and went back to "Web3" on 2026-08-25 — the section stopped being only
+  # about contest entry once Setup Wallet and the Sign Wallet pair moved into it,
+  # and the longer name was describing a subset of its own cards. What has held
+  # across both renames is the ORDER, which is what this asserts.
   def modals_subheadings(html)
     modals_start = html.index('id="modals"')
     tricks_start = html.index('id="tricks"')
@@ -387,29 +391,30 @@ class StylePageTest < ActiveSupport::TestCase
     slice.scan(%r{text-xl font-bold text-heading">([^<]+)</h3>}).flatten
   end
 
-  test "the Modals sub-sections rename Web3 Contest + Contest entry, in the right order" do
+  test "the Modals sub-sections carry the right names, in the right order" do
     headings = modals_subheadings(render_index)
 
-    web3     = headings.index("Web3 Contest")
+    web3     = headings.index("Web3")
     entry    = headings.index("Contest entry &amp; eligibility")
     leveling = headings.index("Profile Leveling")
 
-    refute_nil web3,  "the Web3 section is renamed to Web3 Contest"
-    refute_nil entry, "the section is renamed to Contest entry & eligibility"
+    refute_nil web3,  "the wallet + on-chain section is named Web3"
+    refute_nil entry, "the section is named Contest entry & eligibility"
     refute_nil leveling, "Profile Leveling still present"
 
-    refute_includes headings, "Web3", "the bare 'Web3' heading is gone (renamed to Web3 Contest)"
+    refute_includes headings, "Web3 Contest",
+      "the section covers more than contest entry now (Setup Wallet, the Sign Wallet pair)"
     refute_includes headings, "Eligibility &amp; entry", "the old heading is gone"
 
-    assert_operator leveling, :<, web3, "Web3 Contest follows Profile Leveling"
+    assert_operator leveling, :<, web3, "Web3 follows Profile Leveling"
     assert_equal web3 + 1, entry,
-      "Contest entry & eligibility sits DIRECTLY under Web3 Contest (no section between)"
+      "Contest entry & eligibility sits DIRECTLY under Web3 (no section between)"
   end
 
-  test "the Web3 Contest walk + Contest entry flow wire every specimen Open affordance" do
+  test "the Web3 walk + Contest entry flow wire every specimen Open affordance" do
     html = render_index
 
-    # Web3 Contest walk: Connect Wallet -> Processing -> On-chain success/error.
+    # Web3 walk: Connect Wallet -> Processing -> On-chain success/error.
     assert_includes html, "$store.dsModals.open('wallet-connect')"
     assert_includes html, "$store.dsModals.open('onchain-tx', { state: 'processing'"
     assert_includes html, "$store.dsModals.open('onchain-tx', { state: 'success'"
@@ -902,4 +907,249 @@ class StylePageTest < ActiveSupport::TestCase
     assert_includes html, ".pulse-cta",
       "the pulse specimen surfaces the .pulse-cta class name"
   end
+  # --- 11. sections group by SUBJECT, not by moment ---------------------------
+  #
+  # The Onboarding section folded into Profile on 2026-08-24. It grouped cards by
+  # WHEN they are shown ("just after signup"), which put the birthday card in one
+  # section and the picture cards in another despite both being about who the
+  # account is. Grouping by subject also let the wallet step move to the wallet
+  # cards, where it belongs.
+
+  # Nokogiri, not string matching: "does this label appear on the page" cannot
+  # tell WHICH section it appears in, and the section is the whole point here.
+  def section_html(heading)
+    doc = Nokogiri::HTML(render_index)
+    h3  = doc.css("h3").find { |n| n.text.strip == heading }
+    assert h3, "no section heading #{heading.inspect} on the page"
+    h3.ancestors("section").first.to_html
+  end
+
+  # The specimen cards a section renders, in page order. Read off the open-button
+  # aria-label, which is the one place a card's own name appears verbatim — the
+  # visible header is uppercased by CSS and the reference prose mentions other
+  # cards by name.
+  def section_cards(heading)
+    section_html(heading).scan(/aria-label="Open the (.+?) modal"/).flatten
+  end
+
+  PROFILE_ORDER = [
+    "First name", "Birthday", "Age gate",
+    "Image upload", "Crop photo", "Saving card"
+  ].freeze
+
+  WEB3_ORDER = [
+    "Connect wallet", "Setup Wallet",
+    "Sign Wallet", "Sign Wallet (no remembered brand)",
+    "Processing on-chain tx", "On-chain success", "On-chain error",
+    # Co-sign refused sits WITH the other failure deliberately: On-chain error is
+    # the chain saying no, this is the SERVER saying no. Reading either alone
+    # leaves you unaware the other exists.
+    "Co-sign refused",
+    "Wallet deposit", "Entry confirmed"
+  ].freeze
+
+  # Rails.root is the DUMMY app in this suite, not the engine — a source read
+  # rooted there silently looks in test/dummy and raises ENOENT. Engine files
+  # resolve through Studio::Engine.root.
+  WALLET_SETUP_SPECIMEN =
+    Studio::Engine.root.join("app/views/style/modals/_wallet_setup.html.erb").freeze
+
+  test "the Onboarding section is gone, folded into Profile" do
+    doc = Nokogiri::HTML(render_index)
+    headings = doc.css("h3").map { |n| n.text.strip }
+    assert_not_includes headings, "Onboarding",
+      "Onboarding grouped by MOMENT; its cards moved to the sections that own their subject"
+  end
+
+  test "the Profile section carries who-the-account-is, in order" do
+    assert_equal PROFILE_ORDER, section_cards("Profile"),
+      "Profile runs name -> birthday -> the refusal -> picture; the birthday pair must stay adjacent"
+  end
+
+  test "the Web3 section runs get-a-wallet then spend-from-it, in order" do
+    assert_equal WEB3_ORDER, section_cards("Web3"),
+      "the wallet cards run in the order a player meets them"
+  end
+
+  test "wallet setup sits with the wallet cards, not with the signup chain" do
+    # It moved out of Onboarding on 2026-08-24: it is about GETTING a wallet, so
+    # it belongs beside the card that asks a player to PROVE one.
+    assert_not_includes section_cards("Profile"), "Setup Wallet"
+    cards = section_cards("Web3")
+    assert_operator cards.index("Setup Wallet"), :<, cards.index("Sign Wallet"),
+      "get-a-wallet reads before prove-your-wallet"
+  end
+
+  test "the wallet setup specimen composes engine chrome rather than copying it" do
+    # The Tier-2 contract: an app-specific flow may live here, but only if it is
+    # built from engine blocks. A specimen that hand-rolls its own chrome is a
+    # second copy of the shell/pill/brand marks, which is what this catches.
+    source = WALLET_SETUP_SPECIMEN.read
+    %w[shell progress_pill wallet_brand_sprite].each do |block|
+      assert_includes source, %(studio/modals/blocks/#{block}),
+        "the specimen must compose the engine's #{block} block, not re-draw it"
+    end
+  end
+
+  test "the wallet setup specimen renders and is registered on the guide's host" do
+    html = render_index
+    assert_includes html, "$store.dsModals.current().id === 'wallet-setup'",
+      "the specimen needs a registration on the page-scoped host or the card opens blank"
+    assert_includes html, "Set up your wallet", "the wallet setup card renders its title"
+  end
+
+  # --- 12. the birthday / age-gate split --------------------------------------
+
+  test "the birthday card is ONE card with a validation toggle" do
+    # It was two specimens ("Birthday" and "Birthday (underage)") until
+    # 2026-08-25, which read as two components while the second was the first
+    # with a prop flipped. The toggle is the honest shape.
+    cards = section_cards("Profile")
+    assert_includes cards, "Birthday"
+    assert_not_includes cards, "Birthday (underage)",
+      "the refused branch is a TOGGLE on the birthday card, not a second specimen"
+
+    html = render_index
+    assert_includes html, "$store.dsModals.open('birthday', { validates: opts.validates })",
+      "the card opens through its own age-validation toggle"
+    assert_includes html, "Age validation",
+      "the toggle is labelled for the RULE, not for this app's feature flag"
+  end
+
+  # The e2e lane drives the LAB, whose two modes are separate registrations with
+  # baked-in locals — so it cannot see this. The specimen picks its mode from a
+  # PROP, and the age gate's back() swaps with empty props, so the default is
+  # load-bearing: read `undefined` as "no bar" and the return trip from the gate
+  # lands on the card with no age line, where the same under-age date is accepted.
+  # That shipped once (caught in review 2026-08-25); this is the guard.
+  test "the birthday specimen treats an absent validates prop as VALIDATING" do
+    source = Studio::Engine.root.join("app/views/style/modals/_birthday.html.erb").read
+
+    assert_includes source, "this.props.validates !== false",
+      "absent validates must mean validating — a bare truthiness test sends the " \
+      "gate's empty-props return trip to the no-bar card"
+    refute_match(/x-if="props\.validates"/, source,
+      "the branches must read the shared getter, not the raw prop, or the default " \
+      "lives in two places and they will disagree")
+  end
+
+  # --- the ported specimens (batch 2 of the /admin/modals migration) ----------
+  #
+  # Each of these replaced a card that existed ONLY in turf-monster's own gallery,
+  # which is deprecated and cannot be deleted until every state it shows has a
+  # home here. A missing registration is the failure that matters: the card opens
+  # a blank shell, which looks like a styling bug rather than a missing partial.
+
+  PORTED_SPECIMENS = {
+    "cosign-rejected"      => "Co-sign refused",
+    "unsubscribe-confirm"  => "Leave the newsletter?",
+    "unsubscribe-goodbye"  => "See you later",
+    "quest-success"        => "Quest success (off-page)"
+  }.freeze
+
+  # Registered ids, read off the <template x-if> ELEMENTS.
+  #
+  # NOT a substring search for "current().id === '<id>'": ds_glow builds the glow
+  # expression from that exact text, so every carded modal contains it whether or
+  # not it is registered. The first version of this test asserted the substring,
+  # passed with a registration deliberately deleted, and would have shipped a card
+  # that opens a blank shell. Third time this shape of trap has bitten in this
+  # file — assert the ELEMENT, not the string.
+  def registered_modal_ids(html = render_index)
+    Nokogiri::HTML(html).css("template[x-if]").filter_map { |t|
+      t["x-if"][/\A\$store\.dsModals\.current\(\)\.id === '([a-z0-9-]+)'\z/, 1]
+    }
+  end
+
+  test "every ported specimen is both carded AND registered on the host" do
+    html  = render_index
+    cards = html.scan(/aria-label="Open the (.+?) modal"/).flatten
+    ids   = registered_modal_ids(html)
+
+    PORTED_SPECIMENS.each do |modal_id, label|
+      assert_includes cards, label, "no specimen card for #{modal_id}"
+      assert_includes ids, modal_id,
+        "#{modal_id} has a card but NO host registration — it opens a blank shell " \
+        "(registered: #{ids.inspect})"
+    end
+  end
+
+  test "the unsubscribe pair is registered together, because one swaps to the other" do
+    # The confirm card swaps to the goodbye beat. A handoff to an unregistered id
+    # renders nothing, and an empty modal reads as a styling bug — the same defect
+    # class the birthday/age-gate pair carries a guard for.
+    html = render_index
+    assert_includes html, "$store.dsModals.swap('unsubscribe-goodbye')",
+      "the confirm card must hand off to the goodbye beat"
+    assert_includes registered_modal_ids(html), "unsubscribe-goodbye",
+      "the card it hands off to must be REGISTERED — a glow expression mentioning " \
+      "the id is not a registration"
+  end
+
+  test "the ported specimens compose engine chrome rather than copying it" do
+    # The Tier-2 contract. Each of these four already rendered card_header in
+    # turf-monster, so a specimen that hand-rolls its own header is a SECOND copy
+    # of chrome the app already borrows — which is what style/modals/_wallet_deposit
+    # is, and what this batch was written not to add.
+    root = Studio::Engine.root.join("app/views/style/modals")
+    %w[_cosign_rejected _unsubscribe_confirm _unsubscribe_goodbye _quest_success].each do |f|
+      source = root.join("#{f}.html.erb").read
+      assert_includes source, "studio/modals/blocks/card_header",
+        "#{f} must compose the engine's card_header, not re-draw it"
+    end
+    # quest-success also borrows the leveling seeds bar, which is the engine's.
+    assert_includes root.join("_quest_success.html.erb").read,
+      "studio/modals/blocks/seeds_bar",
+      "the quest celebration's bar is an engine :leveling primitive, not a copy"
+  end
+
+  test "the contest-entry section still resumes from the birthday card" do
+    # Moving the CARD must not break the demo walk: confirming still advances to
+    # Entry tokens through the page-level 'age-verified' hook, which the rename
+    # deliberately left alone because consuming apps already listen on it.
+    html = render_index
+    assert_includes html, "@age-verified.window=",
+      "the page-level age-verified wiring is what carries the entry walk"
+    assert_includes html, "$store.dsModals.open('entry-tokens', { step: 'picker' })",
+      "confirming the birthday card must still advance to the Entry tokens picker"
+  end
+
+  # --- 13. one modal id, two cards: the glow must tell them apart --------------
+
+  test "both web3 step-up specimens carry a glow discriminator" do
+    # The pair opens the SAME modal id. Before this discriminator existed only
+    # the first card passed a glow_when, so opening the SECOND card lit the
+    # FIRST — the precise bug a glow helper exists to prevent. ds_glow gained a
+    # provider: presence check because the brand is a free-form string with no
+    # fixed value for step:/state: to match.
+    #
+    # ASSERT ON THE FULL CONJUNCT, never the bare expression. "!$store…provider"
+    # is a SUBSTRING of "!!$store…provider", so a naive assert_includes for the
+    # no-brand form matches the remembered card's expression and passes even when
+    # the no-brand card has no glow at all. That is precisely how this test first
+    # went green against a deliberately broken page. The "&& " prefix is what
+    # makes the two forms mutually exclusive.
+    html = render_index
+    present = "&& !!$store.dsModals.current().props.provider"
+    absent  = "&& !$store.dsModals.current().props.provider"
+    refute absent.include?(present) || present.include?(absent),
+      "the two glow forms must not be substrings of one another, or neither assertion below bites"
+
+    assert_includes html, present,
+      "the remembered-brand card must glow only when a provider is present"
+    assert_includes html, absent,
+      "the no-brand card must glow only when a provider is absent"
+  end
+
+  test "the two step-up thumbnails are visually distinguishable" do
+    # They used to differ by ONE border-dashed class on a 20px row, which no
+    # reviewer can see — and these two are the likeliest pair on the page to be
+    # mistaken for duplicates, because they share a modal id AND a title.
+    section = section_html("Web3")
+    assert_includes section, "border border-dashed",
+      "the no-brand thumbnail keeps its dashed empty slot"
+    assert_includes section, %(<span class="w-4 h-4 rounded shrink-0" style="background: var(--color-primary)"></span>),
+      "the remembered thumbnail needs a filled brand tile — a dashed border alone is not a visible difference"
+  end
+
 end

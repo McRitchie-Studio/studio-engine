@@ -1,0 +1,30 @@
+<%#
+  Living style guide specimen — the final beat after a confirmed unsubscribe.
+
+  The smallest card in the guide, and it earns its place: it is the half of the
+  newsletter story the guide could not previously show. The Profile Leveling
+  section already walked the way IN (Join the Newsletter → Subscribed!); this and
+  its sibling walk the way OUT. A section that only ever demonstrates opt-in is
+  not showing the flow, it is showing the happy half of it.
+
+  APP-SPECIFIC, engine chrome only: the engine owns no newsletter. It lends
+  `blocks/_card_header` and the tone.
+
+  NOTE THE COPY IS NOT A GUILT TRIP — "Change your mind anytime from your
+  account" is a door left open, not a plea. Worth preserving if this is ever
+  reworded.
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div x-data="{}">
+  <%= render "studio/modals/blocks/card_header",
+        size: :lg,
+        icon_emoji: "✌️",
+        title: "See you later",
+        subtitle: "You're off the list. Change your mind anytime from your account." %>
+
+  <button type="button" @click="$store.dsModals.close()"
+          class="btn btn-primary btn-lg w-full">
+    Close
+  </button>
+</div>

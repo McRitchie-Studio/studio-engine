@@ -1,0 +1,59 @@
+<%#
+  Living style guide specimen for the engine BIRTHDAY DOB card
+  (studio/modals/blocks/_birthday, renamed from _age_verify on 2026-08-24).
+  Opened on the page-scoped dsModals host.
+
+  TWO MODES, ONE CARD, chosen by props.validates — the same choice a host makes
+  by passing min_age or leaving it out:
+
+    validates: true   the app HAS a bar. min_age + state ride in, the card says
+                      what the rule is, and submitting takes the refused branch
+                      so the guide can walk the handoff to the age-gate card.
+    validates: false  the app has NO bar. No min_age at all: the card is a plain
+                      birthday asker, which is what a hub app wants when it
+                      collects the date for a greeting rather than for entry.
+
+  The point of the seam: every legal value here is a DEMO the app feeds. The
+  engine primitive hardcodes no age and no state table, which is why the same
+  partial serves an app whose minimum is jurisdiction-dependent and an app with
+  no minimum at all.
+%>
+<%# ABSENT `validates` MEANS VALIDATING, and the default has exactly one home
+    here so the two branches cannot disagree about it.
+
+    Why absent is not "no bar": the only card that can REACH the age gate is the
+    validating one — the no-bar card carries no min_age, so the factory's _reject
+    never fires. So every arrival with no props is a return trip from the gate,
+    and `back()` swaps with EMPTY props by design (blocks/_age_gate.html.erb).
+    Reading undefined as falsy sent that return trip to the NO-BAR card, where
+    resubmitting the SAME under-age date was accepted — the guide demonstrating an
+    age gate being bypassed. Caught in review, 2026-08-25.
+
+    The engine primitive is right and is NOT changed: in a real host the mode
+    comes from ERB locals, not from a prop, so this is a two-mode SPECIMEN's
+    problem alone. %>
+<div x-data="{
+       get props() { var c = $store.dsModals.current(); return (c && c.props) || {} },
+       get validates() { return this.props.validates !== false; }
+     }">
+  <template x-if="validates">
+    <div><%= render "studio/modals/blocks/birthday",
+          min_age:       21,
+          state:         "CA",
+          submit_url:    "#demo-birthday",
+          modal_store:   "dsModals",
+          demo:          true,
+          demo_underage: true,
+          fine_print:    "Demo policy the app supplies: 21+ in CA. The engine hardcodes no age and no state table. Submitting from here takes the REFUSED branch, so you land on the age-gate card." %></div>
+  </template>
+
+  <%# No min_age at all — not min_age: 0, which would be the app claiming a bar
+      of zero. Omitting it is how a host says "I do not gate on this". %>
+  <template x-if="!validates">
+    <div><%= render "studio/modals/blocks/birthday",
+          submit_url:  "#demo-birthday",
+          modal_store: "dsModals",
+          demo:        true,
+          fine_print:  "No age bar on this app. The card asks for the date and nothing gates on it — the eligibility wording and the refusal handoff are both absent." %></div>
+  </template>
+</div>

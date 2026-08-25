@@ -1,0 +1,36 @@
+<%#
+  Living style guide specimen — the "we did not co-sign that" refusal.
+
+  APP-SPECIFIC FLOW, engine chrome only. What this card names is turf-monster's:
+  POST confirm_onchain_entry answered 422 with code `tx_rejected`, meaning the
+  server refused to co-sign because the submitted transaction did not match the
+  entry it had prepared. The engine owns no entry preparation, no co-signing and
+  no verdict — it lends `blocks/_card_header` and nothing else, exactly as
+  style/modals/_entry_tokens borrows chrome for a flow the engine does not own.
+
+  WHY THE COPY IS VAGUE, and why a reviewer should not "improve" it: good actors
+  never see this card. It fires on a tampered or mismatched transaction, so the
+  copy is deliberately reassuring and deliberately silent about WHICH
+  server-side check failed — naming the check would help an attacker probe the
+  validation. The reassurance ("nothing was submitted and your funds are safe")
+  is the part that matters to the one honest user who ever hits it.
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div x-data="{}">
+  <%= render "studio/modals/blocks/card_header",
+        icon_emoji: "🛡️",
+        title: "Transaction not signed" do %>
+    <p class="text-sm text-body">
+      For your security we didn&rsquo;t co-sign this transaction &mdash; it
+      didn&rsquo;t match the entry we prepared, so nothing was submitted and your
+      funds are safe. Please close this and try entering again. If it keeps
+      happening, <span class="text-primary">contact support</span>.
+    </p>
+  <% end %>
+
+  <%# One button, because there is exactly one thing to do. The host also closes
+      on escape and click-outside; this card is dismissible by design. %>
+  <button type="button" @click="$store.dsModals.close()"
+          class="btn btn-primary btn-lg w-full">Got it</button>
+</div>
