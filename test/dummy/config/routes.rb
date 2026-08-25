@@ -44,6 +44,7 @@ Rails.application.routes.draw do
   get "lab/at_time", to: "e2e_lab#at_time"
   get "lab/email_banner_frames", to: "e2e_lab#email_banner_frames"
   get "lab/email_banner_editor", to: "e2e_lab#email_banner_editor"
+  get "lab/birthday_gate", to: "e2e_lab#birthday_gate"
   get "lab/profile", to: "e2e_lab#profile"
   get "lab/profile_edit", to: "e2e_lab#profile_edit"
   get "lab/hold_button", to: "e2e_lab#hold_button"
