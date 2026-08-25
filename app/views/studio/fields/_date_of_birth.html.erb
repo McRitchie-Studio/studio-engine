@@ -6,7 +6,7 @@
                   site can recompute whatever it derives. Defaults to the
                   age-gate's onMonthChange(), which every current caller has.
 
-                  ONE HOOK FOR ALL THREE, where age_verify used onMonthChange()
+                  ONE HOOK FOR ALL THREE, where the birthday modal used onMonthChange()
                   for month/year and `error = ''` for day. That is not a
                   behaviour change: onMonthChange() clears an out-of-range day
                   and then clears the error, and a day just chosen FROM
@@ -24,8 +24,9 @@
       years              — the year range this caller offers
 
     EXTRACTED BECAUSE IT WAS ALREADY DUPLICATED: these selects lived in
-    studio/modals/blocks/_age_verify, and turf-monster forked a second copy into
-    its own modals/_age_verify. Two copies of one field is how they drift.
+    studio/modals/blocks/_birthday (named _age_verify until 2026-08-24), and
+    turf-monster forked a second copy into its own modals/_age_verify. Two copies
+    of one field is how they drift.
 
     AND BECAUSE IT REPLACED SOMETHING WORSE. /profile/edit used a custom calendar
     popover, which shipped four defects in three days — its grid collapsed in

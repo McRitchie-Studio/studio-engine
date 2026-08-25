@@ -1,0 +1,114 @@
+<%#
+  Age gate — the REFUSAL card. New 2026-08-24, and it exists because a refusal
+  needs somewhere to go.
+
+  WHAT IT REPLACED. blocks/_birthday (then blocks/_age_verify) used to carry the
+  refusal itself: enter an under-age date and the card turned red and disabled
+  its own submit button. That is the one screen state with nothing to press —
+  the person is told no and handed no next move, on a card whose only other
+  control closes it. This card is that next move.
+
+  THE TWO WAYS OUT, and both are real:
+    watch_url  — the thing they CAN do. Being too young to enter is not being too
+                 young to watch, so the primary CTA is a way to stay rather than
+                 a way to leave. App-supplied: the engine has no idea what a
+                 contest is.
+    the back link — the thing they might NEED. A wrong birthday is an ordinary
+                 typo (a mis-picked year is one scroll away), and a gate with no
+                 way back turns a typo into a locked door. swap()s back to the
+                 birthday card, so this is a correction, not a restart.
+
+  DELIBERATELY NOT DISMISSIBLE-BY-DEFAULT-ONLY: the host still decides via
+  props.dismissible at open() time, exactly like every other card. What this
+  partial guarantees is that there is always a visible way forward even when the
+  host locks the backdrop.
+
+  NO LEGAL POLICY LIVES HERE, same rule as the birthday card. min_age and state
+  are passed in and only ever displayed; nothing here computes eligibility.
+
+  Locals:
+    min_age     (Integer, optional) — for the headline. Falls back to props.minAge,
+                which _birthday's _reject passes, so a host that opens this card
+                through the handoff needs to supply nothing at all.
+    state       (String, optional)  — passive jurisdiction label. Same fallback.
+    watch_url   (String, optional)  — the primary CTA target. Omit and the CTA is
+                dropped rather than rendered dead.
+    watch_label (String, optional)  — default "Watch the Contest".
+    birthday_modal_id (String, optional) — the card the back link returns to.
+                Default "birthday". Pass nil to drop the link.
+    back_label  (String, optional)  — default "Update your Birthday".
+    title       (String, optional)  — default is built from min_age.
+    modal_store (String, optional)  — Alpine store name. Default "modals".
+
+  Single root element (modal-host template mount rule).
+%>
+<%
+  min_age           = local_assigns[:min_age]
+  state             = local_assigns[:state].to_s.strip
+  watch_url         = local_assigns[:watch_url].to_s
+  watch_label       = local_assigns.fetch(:watch_label, "Watch the Contest")
+  birthday_modal_id = local_assigns.fetch(:birthday_modal_id, "birthday")
+  back_label        = local_assigns.fetch(:back_label, "Update your Birthday")
+  title             = local_assigns[:title]
+  modal_store       = local_assigns.fetch(:modal_store, "modals")
+%>
+<div x-data="{
+       get props() { var c = $store.<%= modal_store %>.current(); return (c && c.props) || {}; },
+       get minAge() { return <%= min_age.present? ? min_age.to_i : 0 %> || this.props.minAge || null; },
+       get stateCode() { return '<%= j state %>' || this.props.state || ''; },
+       get headline() {
+         // Single-quoted + j-escaped, NOT to_json: to_json emits DOUBLE quotes,
+         // which close this double-quoted x-data attribute and mount the
+         // component as a silent no-op. The markup still renders, so every
+         // assertion passes while the card is dead in a browser.
+         var t = '<%= j title.to_s %>';
+         if (t) return t;
+         var age = this.minAge;
+         return age ? ('You must be ' + age + '+ to join') : 'You are not eligible to join';
+       },
+       back() { $store.<%= modal_store %>.swap('<%= j birthday_modal_id.to_s %>', {}); }
+     }"
+     class="relative">
+  <%# title_key, not title: the headline is computed from min_age, which may
+      arrive as a LOCAL or as a prop off the handoff. The header block below
+      replaces the subtitle area. %>
+  <%= render "studio/modals/blocks/card_header",
+        size: :lg,
+        icon: :error,
+        title_key: "headline" do %>
+    <p class="text-sm text-body">
+      <%# The jurisdiction clause is the app's, and it is only ever DISPLAYED. %>
+      <span x-show="stateCode" x-cloak>
+        The minimum age <span x-text="'in ' + stateCode"></span> is
+        <span class="text-heading font-semibold" x-text="minAge"></span>.
+      </span>
+      <span x-show="!stateCode">You are not old enough to enter this contest yet.</span>
+    </p>
+    <%# A server-authored reason, when there is one. Never invented here. %>
+    <template x-if="props.message">
+      <p class="text-sm text-muted mt-2" x-text="props.message"></p>
+    </template>
+  <% end %>
+
+  <% if watch_url.present? %>
+    <%# The primary action is the thing they CAN do. Too young to enter is not
+        too young to watch, so this keeps them in rather than showing them out. %>
+    <%= link_to watch_label, watch_url,
+          class: "btn btn-primary btn-lg w-full",
+          "@click": "$store.#{modal_store}.close()" %>
+  <% end %>
+
+  <% if birthday_modal_id.present? %>
+    <%# The correction path. A mis-picked year is one scroll away from a right
+        one, and without this the typo is indistinguishable from the verdict. %>
+    <button type="button" @click="back()"
+            class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition underline-offset-2 hover:underline">
+      <%= back_label %>
+    </button>
+  <% end %>
+
+  <button type="button" @click="$store.<%= modal_store %>.close()"
+          class="block mx-auto mt-3 text-sm text-muted hover:text-secondary transition">
+    Close
+  </button>
+</div>

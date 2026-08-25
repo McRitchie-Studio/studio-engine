@@ -1,0 +1,21 @@
+<%#
+  Living style guide specimen for the engine AGE GATE refusal card
+  (studio/modals/blocks/_age_gate). New 2026-08-24.
+
+  It is reached two ways, and both are worth seeing:
+    - directly, from its own card here
+    - as the HANDOFF from the birthday card's refused branch, which is how a
+      real person meets it
+
+  Demo values only. watch_url points at an anchor rather than a route because the
+  engine has no idea what a contest is — the target is app-supplied, and a host
+  passes its own contest path. The back link swaps to 'birthday', the id this
+  page registers for the DOB card, so the round trip works on this page exactly
+  as it does in an app.
+%>
+<%= render "studio/modals/blocks/age_gate",
+      min_age:           21,
+      state:             "CA",
+      watch_url:         "#demo-watch-contest",
+      birthday_modal_id: "birthday",
+      modal_store:       "dsModals" %>

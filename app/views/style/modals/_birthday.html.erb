@@ -1,0 +1,37 @@
+<%#
+  Living style guide specimen for the engine BIRTHDAY DOB modal
+  (studio/modals/blocks/_birthday, renamed from _age_verify on 2026-08-24).
+  Opened on the page-scoped dsModals host.
+
+  The whole point of this specimen is the SEAM: every legal value here is a DEMO
+  the app feeds — the engine primitive hardcodes none of it. So we pass an
+  illustrative policy (21+ in CA) and a demo fine_print that SAYS so, and run in
+  demo mode (no backend — submit resolves locally). A real app swaps these for
+  its own min_age / state / submit_url / legal copy resolved server-side.
+
+  TWO OUTCOMES, ONE CARD. props.demoUnderage picks which branch the local resolve
+  takes, so the guide can walk both the pass and the refusal with no backend —
+  and the refusal is the interesting one, because it hands off to the age-gate
+  card rather than turning this one red.
+%>
+<div x-data="{ get props() { var c = $store.dsModals.current(); return (c && c.props) || {} } }">
+  <template x-if="!props.demoUnderage">
+    <div><%= render "studio/modals/blocks/birthday",
+          min_age:     21,
+          state:       "CA",
+          submit_url:  "#demo-birthday",
+          modal_store: "dsModals",
+          demo:        true,
+          fine_print:  "Demo policy the app supplies: 21+ in CA. The engine hardcodes no age and no state table — your app passes min_age, the jurisdiction label, this copy, and the endpoint that recomputes it server-side." %></div>
+  </template>
+  <template x-if="props.demoUnderage">
+    <div><%= render "studio/modals/blocks/birthday",
+          min_age:       21,
+          state:         "CA",
+          submit_url:    "#demo-birthday",
+          modal_store:   "dsModals",
+          demo:          true,
+          demo_underage: true,
+          fine_print:    "Demo policy the app supplies: 21+ in CA. Submitting from here takes the REFUSED branch, so you land on the age-gate card." %></div>
+  </template>
+</div>
