@@ -320,7 +320,7 @@
           <div><%= render "style/modals/auth" %></div>
         </template>
 
-        <%# --- Onboarding --- %>
+        <%# --- Onboarding step (its card now lives in Profile) --- %>
         <%# The REAL engine partial, mounted on the page-scoped host: what the
             style page shows is exactly what a consumer renders, not a copy. %>
         <template x-if="$store.dsModals.current().id === 'onboarding-first-name'">
@@ -914,7 +914,7 @@
         wallet&rsquo;s own name, Installed badge, chevron) rather than a filled
         CTA, glowing via <code class="font-mono text-2xs">pulse-cta</code> because
         it is the one thing to press. Do not confuse them with <strong>Setup
-        Wallet</strong>, directly above: that one asks an account to
+        Wallet</strong>, immediately before them: that one asks an account to
         <strong>get</strong> a wallet, these ask an account to
         <strong>prove</strong> the one it already has &mdash; opposite populations
         (<code class="font-mono text-2xs">WalletSetupPolicy</code> exits at its own
