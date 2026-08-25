@@ -42,13 +42,14 @@
                 geography and never offers an editable state field (a spoofable
                 client state must not be able to lower the bar). Blank => the
                 jurisdiction clause is dropped.
-    title       (String, optional)  — modal title. Default "Verify your age".
+    title       (String, optional)  — modal title. Default "Your birthday"
+                (it was "Verify your age" under the old _age_verify name).
     intro       (String, optional)  — the lead sentence after the age line.
     fine_print  (String, optional)  — the app's legal / jurisdiction copy (e.g.
                 its per-state age table). The engine ships only a neutral,
                 policy-free default; the app passes its real copy here.
     modal_store (String, optional)  — Alpine store backing close(). Default "modals".
-    age_gate_modal_id (String, optional) — the id opened when the app'"'"'s verdict is
+    age_gate_modal_id (String, optional) — the id opened when the app’s verdict is
                 UNDER age. Default "age-gate". Pass nil to keep the old
                 inline-refusal behaviour (the refusal then falls back to the
                 error line), which exists only so a host mid-adoption is not
@@ -59,7 +60,7 @@
                 handoff without a backend. Ignored unless demo.
 
   Requires window.birthdayModal — render studio/_birthday_assets once at
-  layout level (the factory can'"'"'t ship inside this template; a cloned script
+  layout level (the factory can’t ship inside this template; a cloned script
   never runs). Single root element (modal-host template mount rule).
 %>
 <%
@@ -117,7 +118,7 @@
     <%# Disabled ONLY for an incomplete date or an in-flight submit. It used to be
         disabled for an under-age date too, which is precisely the dead end: the
         one state where the card had nothing to press. An under-age date now
-        submits like any other and the app'"'"'s verdict opens the age-gate card. %>
+        submits like any other and the app’s verdict opens the age-gate card. %>
     <button type="button" @click="submit()"
             class="btn btn-primary btn-lg w-full"
             :disabled="!complete || submitting">
