@@ -1,0 +1,52 @@
+<%#
+  Living style guide specimen — the unsubscribe confirmation, and the handoff to
+  its goodbye beat.
+
+  APP-SPECIFIC FLOW, engine chrome only. The real card POSTs the host's
+  newsletter_unsubscribe_path and swaps to the goodbye card on success; the engine
+  owns no newsletter and no endpoint. Here the POST resolves locally so the guide
+  can walk the handoff with no backend — the SWAP is the thing worth reviewing,
+  and you cannot see a handoff by looking at either card alone.
+
+  THE BOTTOM LINK IS THE POINT OF THE CARD. "Close" is the never-mind out, and it
+  is deliberately the quiet option while the destructive action wears the primary
+  button. A confirmation dialog whose safe path is harder to find than its
+  destructive one is not a confirmation, it is a formality.
+
+  Single root: the outer <div> is the host's required root, and everything inside
+  the double-quoted x-data is single-quoted — an inner double quote closes the
+  attribute and mounts the component as a silent no-op.
+%>
+<div x-data="{
+       saving: false,
+       unsubscribe() {
+         if (this.saving) return;
+         this.saving = true;
+         var s = this;
+         // Demo: the real card awaits a POST. Hold briefly so the pending state
+         // is visible rather than skipped, then hand off exactly as it does.
+         setTimeout(function () {
+           s.saving = false;
+           $store.dsModals.swap('unsubscribe-goodbye');
+         }, 450);
+       }
+     }">
+  <%= render "studio/modals/blocks/card_header",
+        icon_emoji: "📭",
+        title: "Leave the newsletter?",
+        subtitle: "You'll stop getting sports news and contest updates. You can rejoin anytime." %>
+
+  <button type="button" @click="unsubscribe()" :disabled="saving"
+          class="btn btn-primary btn-lg w-full disabled:opacity-60">
+    <span x-show="!saving">Unsubscribe</span>
+    <span x-show="saving" class="inline-flex items-center justify-center gap-2" style="display: none;">
+      <span class="spinner" aria-hidden="true"></span>
+      Unsubscribing&hellip;
+    </span>
+  </button>
+
+  <button type="button" @click="$store.dsModals.close()"
+          class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+    Close
+  </button>
+</div>

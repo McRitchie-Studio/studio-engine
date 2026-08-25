@@ -363,7 +363,23 @@
           <div><%= render "style/modals/wallet_setup" %></div>
         </template>
 
+        <%# --- Newsletter exit + the off-page quest celebration --- %>
+        <template x-if="$store.dsModals.current().id === 'quest-success'">
+          <div><%= render "style/modals/quest_success" %></div>
+        </template>
+        <template x-if="$store.dsModals.current().id === 'unsubscribe-confirm'">
+          <div><%= render "style/modals/unsubscribe_confirm" %></div>
+        </template>
+        <%# Registered alongside its confirm card, because unsubscribe-confirm
+            SWAPS to it — a handoff to an unregistered id renders a blank shell. %>
+        <template x-if="$store.dsModals.current().id === 'unsubscribe-goodbye'">
+          <div><%= render "style/modals/unsubscribe_goodbye" %></div>
+        </template>
+
         <%# --- Web3 --- %>
+        <template x-if="$store.dsModals.current().id === 'cosign-rejected'">
+          <div><%= render "style/modals/cosign_rejected" %></div>
+        </template>
         <template x-if="$store.dsModals.current().id === 'wallet-connect'">
           <div><%= render "style/modals/wallet_connect" %></div>
         </template>
@@ -866,6 +882,64 @@
           <span class="block h-1.5 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
         </div>
       <% end %>
+
+      <%# THE WAY OUT. The three cards above walk a user IN; a section that only
+          ever demonstrates opt-in is showing the happy half of a flow, not the
+          flow. These two are the exit, and they are a PAIR — the confirm card
+          swaps to the goodbye beat, so reviewing either alone misses the handoff.
+          App-specific (the engine owns no newsletter); engine chrome only. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Leave the newsletter?",
+            reference: %(the unsubscribe CONFIRM card (style/modals/_unsubscribe_confirm) — turf-monster's modals/_unsubscribe_confirm, which POSTs newsletter_unsubscribe_path and swaps to the goodbye beat on success. Here the POST resolves locally so the handoff is walkable with no backend: press Unsubscribe and you land on "See you later". The destructive action wears the primary button and the never-mind out is the quiet Close link below it — a confirmation whose safe path is harder to find than its destructive one is a formality, not a confirmation. Open with $store.dsModals.open('unsubscribe-confirm')),
+            open_expr: "$store.dsModals.open('unsubscribe-confirm')",
+            glow_when: ds_glow.call("unsubscribe-confirm") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">&#128237;</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+          <%# the quiet out, deliberately smaller than the destructive action %>
+          <span class="block h-1.5 w-12 mx-auto rounded" style="background: var(--color-text); opacity: .25"></span>
+        </div>
+      <% end %>
+
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "See you later",
+            reference: %(the unsubscribe GOODBYE beat (style/modals/_unsubscribe_goodbye) — where the confirm card lands. The smallest card in the guide, and the copy is a door left open rather than a plea: "Change your mind anytime from your account". Worth preserving if it is ever reworded. Open with $store.dsModals.open('unsubscribe-goodbye')),
+            open_expr: "$store.dsModals.open('unsubscribe-goodbye')",
+            glow_when: ds_glow.call("unsubscribe-goodbye") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">&#9996;&#65039;</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-28 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+
+      <%# THE SAME BEAT, REACHED FROM SOMEWHERE ELSE. Great Username (two cards up)
+          celebrates INSIDE the modal that did the work. This one is what a host
+          shows when the quest completed somewhere with no card to advance in
+          place — turf's /account username change — so the celebration arrives on
+          its own. The toggle is the fork at its foot, which is the whole reason
+          it is one card and not two. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Quest success (off-page)",
+            reference: %(the off-page quest celebration (style/modals/_quest_success) — turf-monster's modals/_quest_success, shown when a quest completes away from any quest card. Composes the engine's card_header AND blocks/_seeds_bar (a :leveling primitive: the bar is the engine's, the numbers are app-supplied). Toggle "Subscribed" to switch the fork at the foot: NOT subscribed offers the newsletter as the next quest, so the celebration doubles as the funnel; subscribed sends them to the contest where the remaining quests live. In the real card that gate is SERVER-rendered from current_user.subscribed_to_newsletter?, precisely so the CTA never flashes the wrong option at someone already in. Open with $store.dsModals.open('quest-success', { subscribed: false })),
+            card_data: "opts: { subscribed: false }",
+            toggles:   [{ model: "opts.subscribed", label: "Subscribed" }],
+            open_expr: "$store.dsModals.open('quest-success', { subscribed: opts.subscribed, seedsTotal: 25 })",
+            glow_when: ds_glow.call("quest-success") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">&#127793;</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <%# the seeds bar, which is the card's middle and the engine's %>
+          <span class="flex gap-1">
+            <span class="flex-1 h-2 rounded" style="background: var(--color-cta)"></span>
+            <span class="flex-1 h-2 rounded" style="background: var(--color-cta); opacity:.4"></span>
+            <span class="flex-1 h-2 rounded" style="background: var(--color-cta); opacity:.2"></span>
+          </span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
     </div>
   </section>
 
@@ -1079,6 +1153,26 @@
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
           <div class="text-2xl leading-none">⚠️</div>
           <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+        </div>
+      <% end %>
+
+      <%# THE OTHER FAILURE, and it is a different KIND of failure from the one
+          above. On-chain error is the chain saying no. This is the SERVER saying
+          no — refusing to co-sign because the transaction it was handed did not
+          match the entry it prepared. They sit together because a reviewer
+          reading either alone would not know the other existed. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Co-sign refused",
+            reference: %(the "Transaction not signed" card (style/modals/_cosign_rejected) — turf-monster's modals/_cosign_rejected, opened when POST confirm_onchain_entry answers 422 with code tx_rejected: the server refused to co-sign because the submitted transaction did not match the entry it had prepared. APP-SPECIFIC — the engine owns no entry preparation, no co-signing and no verdict; it lends card_header and nothing else. THE COPY IS DELIBERATELY VAGUE and should stay that way: good actors never see this card (it fires on a tampered or mismatched transaction), so naming WHICH server-side check failed would help an attacker probe the validation. What the copy does commit to is the part the one honest user needs — nothing was submitted, the funds are safe. Open with $store.dsModals.open('cosign-rejected')),
+            open_expr: "$store.dsModals.open('cosign-rejected')",
+            glow_when: ds_glow.call("cosign-rejected"),
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">&#128737;&#65039;</div>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-full rounded" style="background: var(--color-text); opacity: .3"></span>
+          <span class="block h-1.5 w-28 mx-auto rounded" style="background: var(--color-text); opacity: .3"></span>
+          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
         </div>
       <% end %>
 
