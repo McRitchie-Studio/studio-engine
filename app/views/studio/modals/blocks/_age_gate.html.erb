@@ -129,9 +129,15 @@
        },
        start() { var s = this; this._tick = setInterval(function () { s.now = Date.now(); }, 1000); },
        stop() { if (this._tick) { clearInterval(this._tick); this._tick = null; } },
+       // Alpine 3 calls destroy() ON THE DATA OBJECT at teardown and dispatches
+       // no `destroy` DOM event, so the `@destroy` listener this used to carry
+       // never fired and the interval outlived every close. Same idiom as the
+       // sibling cards that poll: modals/_web3_step_up, blocks/_cta_redirect,
+       // blocks/_seeds_bar.
+       destroy() { this.stop(); },
        back() { $store.<%= modal_store %>.swap('<%= j birthday_modal_id.to_s %>', {}); }
      }"
-     <% if countdown %>x-init="start()" @destroy="stop()"<% end %>
+     <% if countdown %>x-init="start()"<% end %>
      class="relative">
   <%# A TEDDY BEAR, not a red X. The X pill is the engine's error icon and this
       is not an error — it is a person who will be welcome later. The card that

@@ -271,6 +271,19 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
       "the back link does not depend on the app supplying a watch target"
   end
 
+  test "the countdown clock is cleaned up the way Alpine actually tears down" do
+    # The card starts a 1s setInterval. Alpine 3 calls destroy() ON THE DATA
+    # OBJECT at teardown and dispatches no `destroy` DOM event, so an `@destroy`
+    # listener is dead wiring and the interval outlives every close. A source
+    # `clearInterval` assertion passes in BOTH worlds, so assert the WIRING.
+    html = render_partial("studio/modals/blocks/age_gate",
+                          min_age: 21, state: "CA", modal_store: "modals")
+    assert_includes html, "destroy() {",
+      "cleanup must be a destroy() method on the x-data — the idiom Alpine invokes"
+    refute_match(/\s@destroy\s*=/, html,
+      "an @destroy listener is dead wiring: Alpine dispatches no such DOM event")
+  end
+
   test "the age-gate card computes no eligibility of its own" do
     # Same rule the birthday card follows: the engine displays policy, never
     # decides it. A comparison here would be the engine growing a legal opinion.
