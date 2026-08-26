@@ -390,6 +390,15 @@
         <template x-if="$store.dsModals.current().id === 'ds-onramp-hub'">
           <div><%= render "style/modals/ds_onramp_hub" %></div>
         </template>
+        <template x-if="$store.dsModals.current().id === 'ds-buy-entry-token'">
+          <div><%= render "style/modals/ds_buy_entry_token" %></div>
+        </template>
+        <template x-if="$store.dsModals.current().id === 'ds-cdp-ramp'">
+          <div><%= render "style/modals/ds_cdp_ramp" %></div>
+        </template>
+        <template x-if="$store.dsModals.current().id === 'ds-newsletter-success'">
+          <div><%= render "style/modals/ds_newsletter_success" %></div>
+        </template>
         <template x-if="$store.dsModals.current().id === 'rate-limit-general'">
           <div><%= render "style/modals/rate_limit_general" %></div>
         </template>
@@ -935,6 +944,28 @@
         </div>
       <% end %>
 
+      <%# ds-newsletter-success — the STANDALONE celebration, and its two forks. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Subscribed! (standalone)",
+            reference: %(the standalone newsletter celebration (style/modals/_ds_newsletter_success) — turf-monster's modals/_newsletter_success. Distinct from the card above, which is the leveling activity celebrating IN PLACE on the card the person was already on; this one arrives on its own — swapped in from the subscribe modal, or opened from the /account newsletter row — so it has to carry its own way forward. TWO FORKS, NEITHER VISIBLE IN THE MARKUP, which is why it is carded separately rather than folded in. THE SEEDS BAR IS FIRST-JOIN ONLY: a re-subscribe earns nothing, and the card HIDES the bar rather than showing a flat "0 seeds", which would read to the person as a bug about their own account rather than an accurate zero. THE CTA IS SERVER-DECIDED: with the username quest still open (current_user.next_quest == :username) the button nudges straight into it, otherwise it sends them to browse contests — showing only one of those hides the funnel this celebration doubles as. Both are toggles here so the cabinet can walk all four combinations; in the app the CTA fork is SERVER-rendered, precisely so the button never flashes the wrong option at someone whose quest is already done. Open with $store.dsModals.open('ds-newsletter-success', { firstJoin: true, questOpen: true })),
+            card_data: "opts: { firstJoin: true, questOpen: true }",
+            toggles:   [{ model: "opts.firstJoin", label: "First join" },
+                        { model: "opts.questOpen", label: "Quest open" }],
+            open_expr: "$store.dsModals.open('ds-newsletter-success', { firstJoin: opts.firstJoin, questOpen: opts.questOpen })",
+            glow_when: ds_glow.call("ds-newsletter-success") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
+          <div class="text-2xl leading-none">🌱</div>
+          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <%# the first-join seeds bar %>
+          <span class="flex gap-1">
+            <span class="flex-1 h-2 rounded" style="background: var(--color-cta)"></span>
+            <span class="flex-1 h-2 rounded" style="background: var(--color-cta); opacity:.35"></span>
+            <span class="flex-1 h-2 rounded" style="background: var(--color-cta); opacity:.18"></span>
+          </span>
+          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
+        </div>
+      <% end %>
+
       <%# THE WAY OUT. The three cards above walk a user IN; a section that only
           ever demonstrates opt-in is showing the happy half of a flow, not the
           flow. These two are the exit, and they are a PAIR — the confirm card
@@ -1301,6 +1332,42 @@
               <span class="block h-1 flex-1 rounded" style="background: var(--color-text); opacity: .12"></span>
             </span>
           <% end %>
+        </div>
+      <% end %>
+
+      <%# ds-buy-entry-token — reached with a lineup picked and no way to pay. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Buy entry token",
+            reference: %(the entry-token purchase (style/modals/_ds_buy_entry_token) — turf-monster's modals/_buy_entry_token, built from blocks/_close_x and two blocks/_rail_row. Reached when a player has picked a lineup and has no way to pay for it, which is why the copy says the lineup is SAVED: losing their picks is the one thing they are afraid of at that moment. The ranking is a PRODUCT decision rather than a visual one — Coinflow leads and carries the "New" badge because it mints a spendable entry token directly, the shortest path from here to being in the contest, while Stripe swaps into the auth wizard's tokens picker, the older and longer path, and defers. Open with $store.dsModals.open('ds-buy-entry-token')),
+            open_expr: "$store.dsModals.open('ds-buy-entry-token')",
+            glow_when: ds_glow.call("ds-buy-entry-token"),
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="flex items-center gap-1.5 rounded-md p-1.5" style="border: 2px solid var(--color-primary)">
+            <span class="block h-4 w-4 rounded" style="background: var(--color-cta)"></span>
+            <span class="block h-1.5 flex-1 rounded" style="background: var(--color-text); opacity: .3"></span>
+          </span>
+          <span class="flex items-center gap-1.5 rounded-md p-1.5 border border-subtle">
+            <span class="block h-4 w-4 rounded" style="background: var(--color-text); opacity: .25"></span>
+            <span class="block h-1.5 flex-1 rounded" style="background: var(--color-text); opacity: .18"></span>
+          </span>
+        </div>
+      <% end %>
+
+      <%# ds-cdp-ramp — ONE of thirteen states, and the card says so. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Coinbase ramp (preflight)",
+            reference: %(the Coinbase ramp's BUY PREFLIGHT (style/modals/_ds_cdp_ramp) — turf-monster's modals/_cdp_ramp. DELIBERATELY PARTIAL: that modal is a TWO-FLOW step machine (buy and cash-out) across THIRTEEN states — preflight, opening, waiting, awaiting-cdp, send, settling and the rest — and this cards exactly one of them, the buy preflight, which is the state both funding cards hand off to and therefore the only one a player reaches without already being mid-flow. The other twelve are uncarded BY DECISION (operator, 2026-08-26), which is a different thing from an oversight — a cabinet that shows one state of a thirteen-state machine without admitting it teaches a reader that the machine is simpler than it is. /tasks/port-cdp-ramp-specimen holds the full state map if that decision reverses. Open with $store.dsModals.open('ds-cdp-ramp')),
+            open_expr: "$store.dsModals.open('ds-cdp-ramp')",
+            glow_when: ds_glow.call("ds-cdp-ramp"),
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2 relative">
+          <span class="absolute top-1 right-2 text-secondary leading-none">&times;</span>
+          <span class="block h-2 w-28 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-full rounded" style="background: var(--color-text); opacity: .12"></span>
+          <span class="block h-1.5 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
         </div>
       <% end %>
 

@@ -1,0 +1,40 @@
+<%#
+  Living style guide specimen — Buy an Entry Token.
+
+  APP-SPECIFIC flow, engine chrome throughout (blocks/_close_x + two
+  blocks/_rail_row). Reached when a player has picked a lineup and has no way to
+  pay for it, which is why the copy says the lineup is SAVED: the one thing they
+  are afraid of at that moment is losing their picks.
+
+  TWO RAILS, RANKED, and the ranking is a product decision rather than a visual
+  one. Coinflow leads and carries the "New" badge because it mints a spendable
+  entry token directly — it is the shortest path from here to being in the
+  contest. Stripe still swaps into the auth wizard's tokens picker, which is the
+  older, longer path, so it defers.
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div class="relative">
+  <%= render "studio/modals/blocks/close_x", modal_store: "dsModals" %>
+
+  <div class="text-center pt-1 mb-2">
+    <h3 class="text-heading font-bold text-lg leading-tight">Buy an Entry Token</h3>
+  </div>
+  <p class="text-xs text-body mb-4 text-center">
+    1 token = 1 contest entry. Your lineup is saved &mdash; pick how to pay.
+  </p>
+
+  <div class="space-y-3">
+    <%= render "studio/modals/blocks/rail_row",
+          emphasis: :primary, on_click: "$store.dsModals.close()",
+          icon_label: "CF", icon_bg: "#14B8A6",
+          title: "Coinflow · $19", subtitle: "Buy 1 entry with a card · fastest",
+          badge: "New", data: { ds_rail: "coinflow" } %>
+
+    <%= render "studio/modals/blocks/rail_row",
+          on_click: "$store.dsModals.close()",
+          icon_label: "S", icon_bg: "#635BFF",
+          title: "Card · $19", subtitle: "Buy an entry token with a card",
+          data: { ds_rail: "stripe" } %>
+  </div>
+</div>

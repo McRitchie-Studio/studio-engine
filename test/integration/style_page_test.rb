@@ -953,6 +953,7 @@ class StylePageTest < ActiveSupport::TestCase
     # three ways: deposit an address, top up with a rail, or see every rail. A
     # reader comparing them has to have them adjacent.
     "Wallet deposit", "Top up wallet", "Add funds hub",
+    "Buy entry token", "Coinbase ramp (preflight)",
     "Entry confirmed",
     # The two reconciliation cards close the section, after the happy path they
     # interrupt: Network guard is asked BEFORE a request is signed, Wallet
@@ -1533,6 +1534,98 @@ class StylePageTest < ActiveSupport::TestCase
     # leaves the second face in the DOM and unreachable: a card nobody reviews.
     assert_includes render_index, %(<input type="checkbox" x-model="opts.tokenFallback"),
       "the specimen card needs the toggle that reaches the second face"
+  end
+
+
+  # --- 17. the last three: the catalogue closes at 33 of 33 ------------------
+
+  LAST_SPECIMENS = {
+    "ds-newsletter-success" => "Subscribed! (standalone)",
+    "ds-buy-entry-token"    => "Buy entry token",
+    "ds-cdp-ramp"           => "Coinbase ramp (preflight)"
+  }.freeze
+
+  test "the last three specimens are carded AND registered" do
+    html  = render_index
+    cards = html.scan(/aria-label="Open the (.+?) modal"/).flatten
+    ids   = registered_modal_ids(html)
+
+    LAST_SPECIMENS.each do |modal_id, label|
+      assert_includes cards, label, "no specimen card for #{modal_id}"
+      assert_includes ids, modal_id,
+        "#{modal_id} has a card but NO host registration — it opens a blank shell"
+    end
+  end
+
+  test "the standalone Subscribed card walks BOTH of its forks" do
+    # Two forks, neither visible in the markup, which is why this card exists
+    # apart from the in-place leveling beat. Read each branch out of ITS OWN
+    # template: both live inside <template> elements, so both are in the DOM
+    # whatever the conditions say and a presence check proves nothing — the same
+    # trap that let three assertions pass against a broken fork on the top-up
+    # card.
+    block = specimen_block("ds-newsletter-success")
+    assert block, "the standalone Subscribed specimen did not render"
+
+    quest = block[/<template x-if="questOpen">.*?<\/template>/m]
+    other = block[/<template x-if="!questOpen">.*?<\/template>/m]
+    assert quest, "the open-quest CTA must be gated on the quest being open"
+    assert other, "the browse-contests CTA must be gated on it being closed"
+
+    assert_includes quest, "Next Quest"
+    assert_not_includes quest, "Check Out Contests",
+      "showing both hides the fork that decides where the person goes next"
+    assert_includes other, "Check Out Contests"
+    assert_not_includes other, "Next Quest"
+
+    # The seeds bar is FIRST-JOIN only. A re-subscribe earns nothing, and a flat
+    # "0 seeds" would read as a bug about the person's own account.
+    assert_includes block, %(x-if="firstJoin"),
+      "the seeds bar must be gated on a first-ever join"
+
+    # ...and the card offers both toggles. Asserted as the rendered checkboxes:
+    # the bare model strings also appear in the card's open_expr, so a string
+    # match survives deleting the toggles and leaves both forks unreachable.
+    %w[firstJoin questOpen].each do |opt|
+      assert_includes render_index, %(<input type="checkbox" x-model="opts.#{opt}"),
+        "the card needs the #{opt} toggle to reach that fork"
+    end
+  end
+
+  test "the cdp-ramp card admits it shows one state of thirteen" do
+    # A cabinet that shows one state of a thirteen-state machine WITHOUT saying
+    # so teaches a reader that the machine is simpler than it is. The partial
+    # coverage is a decision (operator, 2026-08-26: minimal migration is fine
+    # here), and a decision has to be legible to be reviewable.
+    section = section_html("Web3")
+
+    assert_includes section, "THIRTEEN states",
+      "the reference must name the real size of the machine"
+    assert_includes section, "BY DECISION",
+      "and say the gap is a decision rather than an oversight"
+  end
+
+  test "the last three compose engine chrome rather than copies" do
+    root = Studio::Engine.root.join("app/views/style/modals")
+
+    # buy-entry-token is a rail picker; cdp-ramp is a centred card. Both borrow.
+    %w[_ds_buy_entry_token _ds_cdp_ramp].each do |f|
+      source = root.join("#{f}.html.erb").read
+      assert_includes source, %(render "studio/modals/blocks/close_x"),
+        "#{f} must render the engine's close mark"
+      assert_not_includes source, "absolute top-0 right-0 -mt-2 -mr-2",
+        "#{f} must not carry its own copy of it"
+    end
+
+    buy = root.join("_ds_buy_entry_token.html.erb").read
+    assert_equal 2, buy.scan(%(render "studio/modals/blocks/rail_row")).size,
+      "two rails, one ranked above the other"
+
+    news = root.join("_ds_newsletter_success.html.erb").read
+    assert_includes news, %(render "studio/modals/blocks/card_header"),
+      "the celebration borrows the engine's header"
+    assert_includes news, %(render "studio/modals/blocks/seeds_bar"),
+      "and the engine's :leveling seeds bar — the bar is the engine's, the numbers are the app's"
   end
 
 end
