@@ -1,0 +1,32 @@
+<%#
+  Top-right close × for a modal that centres its own title.
+
+  WHY THIS EXISTS ALONGSIDE blocks/_shell, which already offers a title row and a
+  close. The shell puts the title on the LEFT with the close beside it; the
+  funding modals centre their title and absolutely-position the close above it.
+  Both are legitimate, and retrofitting _shell onto the centred family would move
+  eight titles — a visual change wearing a refactor's clothes. So this homes the
+  mark those eight already draw, byte for byte, and leaves the layout question
+  alone.
+
+  PORTED FROM turf-monster, where this exact markup appears in EIGHT files:
+  modals/_wallet_deposit, _wallet_topup, _cdp_ramp, _onramp_hub, _buy_entry_token
+  and three under modals/auth/ (_paypal_tokens, _usdc_funding, _tokens).
+
+  THE PARENT MUST BE POSITIONED. This is `absolute`, so it anchors to the nearest
+  positioned ancestor — every callsite wraps its card in `class="relative"`. On an
+  unpositioned parent the × climbs to whatever is positioned above it, which in a
+  modal is the host's backdrop, and lands in the page corner. Nothing errors.
+
+  Locals:
+    modal_store — Alpine store name backing close(). Default "modals". The style
+                  guide passes "dsModals" (its own page-scoped host).
+    label       — aria-label. Default "Close".
+%>
+<%
+  modal_store = local_assigns.fetch(:modal_store, "modals")
+  label       = local_assigns.fetch(:label, "Close")
+%>
+<button type="button" @click="$store.<%= modal_store %>.close()"
+        class="absolute top-0 right-0 -mt-2 -mr-2 text-secondary hover:text-heading text-xl leading-none z-10"
+        aria-label="<%= label %>">&times;</button>

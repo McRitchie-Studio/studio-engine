@@ -1,0 +1,78 @@
+<%#
+  A funding RAIL ROW — icon tile, title, subtitle, chevron; the whole row is the
+  button. Used where a modal offers several ways to do one thing and the choice
+  itself is the screen.
+
+  PORTED FROM turf-monster, where this markup appears TEN times across three
+  files: modals/_onramp_hub (x6), _buy_entry_token (x2) and _wallet_topup (x2).
+  All ten share the same base class string and differ only in EMPHASIS, which is
+  why that is a named local rather than a class passthrough — a passthrough would
+  have let the eleventh copy drift on day one, which is how ten happened.
+
+  THE EMPHASIS IS A RANKING, not decoration. A hub full of equally-weighted rails
+  asks the person to compare payment processors, which is not a question they can
+  answer. Exactly one rail should be :primary — the one the app wants taken —
+  and it reads louder in three places at once (a doubled border, a filled hover,
+  a coloured chevron) because one of the three alone is not visible on a 56px row.
+
+  Locals:
+    on_click    (String, REQUIRED) — Alpine expression run on click.
+    title       (String, REQUIRED) — the rail's name.
+    subtitle    (String, optional) — the one line under it.
+    emphasis    (:primary | :neutral) — default :neutral.
+    icon_label  (String, optional) — short letters ("CF") or an emoji, drawn in
+                the tile. Omit for a tile with no glyph.
+    icon_bg     (String, optional) — a CSS colour for the tile (e.g. "#0052FF"),
+                which is how a brand mark is carried without shipping an asset.
+                Absent = the app's primary token.
+    icon_class  (String, optional) — extra classes on the tile. Default suits
+                letters ("text-white font-extrabold text-lg"); an EMOJI tile wants
+                "text-xl" instead, because the bold-white treatment renders an
+                emoji as a fuzzy white blob.
+    badge       (String, optional) — a small uppercase pill beside the title
+                ("New"). Dropped when absent rather than rendered empty.
+    data        (Hash, optional) — data-* attributes, for the app's own test
+                hooks (turf uses data-onramp-rail / data-buy-rail / data-topup-rail).
+
+  NOT A LINK. It is a <button> running an Alpine expression, because every real
+  callsite either swaps modals or calls a JS funding helper — none navigates. A
+  rail that must navigate should be a plain <a> and not this.
+%>
+<%
+  on_click   = local_assigns.fetch(:on_click)
+  title      = local_assigns.fetch(:title)
+  subtitle   = local_assigns[:subtitle]
+  emphasis   = local_assigns.fetch(:emphasis, :neutral).to_sym
+  icon_label = local_assigns[:icon_label]
+  icon_bg    = local_assigns[:icon_bg]
+  icon_class = local_assigns.fetch(:icon_class, "text-white font-extrabold text-lg")
+  badge      = local_assigns[:badge]
+  data_attrs = local_assigns.fetch(:data, {})
+
+  border_class  = emphasis == :primary ? "border-2 border-primary hover:bg-surface" : "border border-strong hover:border-primary"
+  chevron_class = emphasis == :primary ? "text-primary" : "text-muted"
+  tile_style    = icon_bg.present? ? "background-color:#{icon_bg}" : nil
+  tile_bg_class = icon_bg.present? ? nil : "bg-primary"
+%>
+<button type="button" @click="<%= on_click %>"
+        <%= tag.attributes(data: data_attrs) if data_attrs.present? %>
+        class="w-full flex items-center gap-4 p-4 rounded-xl <%= border_class %> bg-inset transition text-left">
+  <span class="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center <%= icon_class %> <%= tile_bg_class %>"
+        style="<%= tile_style %>"><%= icon_label %></span>
+  <span class="flex-1 min-w-0">
+    <% if badge.present? %>
+      <span class="flex items-center gap-2">
+        <span class="text-heading font-semibold text-sm"><%= title %></span>
+        <span class="shrink-0 text-[10px] uppercase tracking-widest font-bold text-primary bg-surface border border-primary rounded-full px-2 py-0.5"><%= badge %></span>
+      </span>
+    <% else %>
+      <span class="block text-heading font-semibold text-sm"><%= title %></span>
+    <% end %>
+    <% if subtitle.present? %>
+      <span class="block text-xs text-secondary"><%= subtitle %></span>
+    <% end %>
+  </span>
+  <svg class="shrink-0 w-4 h-4 <%= chevron_class %>" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+  </svg>
+</button>

@@ -1334,4 +1334,80 @@ class StylePageTest < ActiveSupport::TestCase
       "the extension's new address must be printed beside it"
   end
 
+
+  # --- 15. the funding chrome primitives -------------------------------------
+
+  FUNDING_CHROME_SPECIMENS = {
+    "ds-rail-row" => "Rail row",
+    "ds-close-x"  => "Close ×"
+  }.freeze
+
+  test "both funding chrome specimens are carded AND registered" do
+    html  = render_index
+    cards = html.scan(/aria-label="Open the (.+?) modal"/).flatten
+    ids   = registered_modal_ids(html)
+
+    FUNDING_CHROME_SPECIMENS.each do |modal_id, label|
+      assert_includes cards, label, "no specimen card for #{modal_id}"
+      assert_includes ids, modal_id,
+        "#{modal_id} has a card but NO host registration — it opens a blank shell " \
+        "(registered: #{ids.inspect})"
+    end
+  end
+
+  test "the rail-row specimen ranks exactly one rail" do
+    # The arrangement IS the demo. Three equally-weighted rails would show the
+    # primitive while teaching the opposite of what it is for — a hub that asks
+    # the person to compare payment processors. Read the rendered specimen, not
+    # its source: the source could pass `emphasis: :primary` three times and this
+    # would still be the assertion that noticed.
+    # SCOPED TO THE SPECIMEN'S OWN TEMPLATE. Page-wide counts answer a different
+    # question: `border border-strong hover:border-primary` is a generic Tailwind
+    # combination and seven of them render elsewhere on this page, so a page-wide
+    # neutral count would sit at 7 whether this specimen drew two rails or none.
+    block = render_index[/id === 'ds-rail-row'.*?<\/template>/m]
+    assert block, "the rail-row specimen did not render"
+
+    assert_equal 1, block.scan("border-2 border-primary hover:bg-surface").size,
+      "exactly one rail may carry the primary emphasis"
+    assert_equal 2, block.scan("border border-strong hover:border-primary").size,
+      "the other two rails must render, and render neutral"
+  end
+
+  test "the guide's funding chrome closes the PAGE-SCOPED store" do
+    # Both specimens render the engine's close_x, whose default store is the real
+    # host (`modals`) — which this page does not run. Left at the default the mark
+    # renders, looks right, and throws inside a click handler where nothing
+    # surfaces it. Assert on the SPECIMEN SOURCES: the page carries other cards
+    # that legitimately mention $store.modals, so a page-wide count would answer
+    # a different question.
+    root = Studio::Engine.root.join("app/views/style/modals")
+    %w[_ds_rail_row _ds_close_x].each do |f|
+      source = root.join("#{f}.html.erb").read
+      assert_includes source, %(modal_store: "dsModals"),
+        "#{f} must point the close mark at the page-scoped store"
+    end
+  end
+
+  test "the funding chrome specimens compose the primitives rather than redrawing them" do
+    # The Tier-2 contract, and the one most at risk here: these two specimens
+    # exist BECAUSE the markup was being copied, so a specimen that hand-rolls it
+    # would be the eleventh copy sitting in the cabinet meant to stop them.
+    root = Studio::Engine.root.join("app/views/style/modals")
+
+    rail = root.join("_ds_rail_row.html.erb").read
+    assert_includes rail, %(render "studio/modals/blocks/rail_row"),
+      "the rail specimen must render the engine block"
+    assert_equal 3, rail.scan(%(render "studio/modals/blocks/rail_row")).size,
+      "three rails, so the ranking has something to rank"
+    assert_not_includes rail, "w-full flex items-center gap-4 p-4 rounded-xl",
+      "the specimen must not carry its own copy of the row's class string"
+
+    close = root.join("_ds_close_x.html.erb").read
+    assert_includes close, %(render "studio/modals/blocks/close_x"),
+      "the close specimen must render the engine block"
+    assert_not_includes close, "absolute top-0 right-0 -mt-2 -mr-2",
+      "nor its own copy of the mark"
+  end
+
 end

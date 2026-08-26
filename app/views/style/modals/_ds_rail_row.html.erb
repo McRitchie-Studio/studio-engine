@@ -1,0 +1,56 @@
+<%#
+  Living style guide specimen — the funding rail picker.
+
+  Three rows through the ENGINE's blocks/_rail_row, arranged the way a real hub
+  arranges them: exactly ONE primary, the rest neutral. That ranking is the thing
+  to look at. A hub of equally-weighted rails asks the person to compare payment
+  processors, which is not a question they can answer; the emphasis answers it
+  for them.
+
+  Watch the three signals move together on the top row — a doubled border, a
+  filled hover, a coloured chevron. Each alone is invisible on a 56px row, which
+  is why the primitive ships them as one `emphasis:` rather than three classes a
+  callsite could half-apply.
+
+  The brand tiles carry their colour as an inline `icon_bg`, which is how a rail
+  wears a processor's mark without the engine shipping an asset for it. The last
+  row is an EMOJI tile, and it passes icon_class: "text-xl" — the default
+  bold-white treatment renders an emoji as a fuzzy white blob.
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div class="relative">
+  <%= render "studio/modals/blocks/close_x", modal_store: "dsModals" %>
+
+  <div class="text-center pt-1 mb-3">
+    <h3 class="text-heading font-bold text-lg leading-tight">Add funds</h3>
+  </div>
+
+  <div class="space-y-3">
+    <%= render "studio/modals/blocks/rail_row",
+          emphasis:   :primary,
+          on_click:   "$store.dsModals.close()",
+          icon_label: "C",
+          icon_bg:    "#0052FF",
+          title:      "Coinbase",
+          subtitle:   "Card or bank · funds your entry",
+          data:       { ds_rail: "coinbase" } %>
+
+    <%= render "studio/modals/blocks/rail_row",
+          on_click:   "$store.dsModals.close()",
+          icon_label: "CF",
+          icon_bg:    "#14B8A6",
+          title:      "Coinflow · $19",
+          subtitle:   "Buy 1 entry token with a card",
+          badge:      "New",
+          data:       { ds_rail: "coinflow" } %>
+
+    <%= render "studio/modals/blocks/rail_row",
+          on_click:   "$store.dsModals.close()",
+          icon_label: "🎟️",
+          icon_class: "text-xl",
+          title:      "Entry tokens",
+          subtitle:   "1 token = 1 contest entry",
+          data:       { ds_rail: "tokens" } %>
+  </div>
+</div>
