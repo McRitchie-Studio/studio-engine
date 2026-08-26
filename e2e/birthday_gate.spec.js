@@ -118,6 +118,68 @@ test.describe("birthday → age gate handoff", () => {
     await expect(page.getByText(/Easy, Young.un/i)).toHaveCount(0);
   });
 
+  // THE ROUND TRIP, walked end to end. Only a browser can answer this: the
+  // server's bytes are the same three empty <select>s whether the date comes
+  // back, because the values are chosen after mount. The unit lane
+  // (test/views/birthday_return_trip_test.rb) executes both halves of the seam
+  // under node and proves the PAYLOAD travels; what it has no DOM for is whether
+  // the selects actually re-pick — which is the half that failed for a person.
+  //
+  // It failed here for a real reason worth keeping: Alpine walks
+  // <select x-model="month"> BEFORE the <template x-for> that fills it, so a
+  // value assigned during init lands on an empty option list and is dropped. The
+  // component state would be perfect and all three selects would still read
+  // blank. The factory defers its seeding to $nextTick for exactly that, and this
+  // spec is the only thing that can see the difference.
+  test("Update your Birthday brings the date back", async ({ page }) => {
+    await page.goto("/lab/birthday_gate");
+    await page.locator('[data-test="open-birthday-underage"]').click();
+    await pickDob(page);
+    await page.getByRole("button", { name: /Confirm & Continue/i }).click();
+    await expect(page.getByText(/Easy, Young.un/i)).toBeVisible();
+
+    await page.getByRole("button", { name: /Update your Birthday/i }).click();
+
+    // All three, not just the year. The defect discarded the whole props bag, so
+    // asserting one field would pass against a fix that carried one field.
+    await expect(page.locator('select[x-model="month"]')).toHaveValue("6");
+    await expect(page.locator('select[x-model="day"]')).toHaveValue("15");
+    await expect(page.locator('select[x-model="year"]')).toHaveValue("2010");
+
+    // And the card is IMMEDIATELY submittable. A returning date that leaves the
+    // button disabled is the same dead end in a nicer coat — the person can see
+    // their date and still cannot act on it.
+    await expect(page.getByRole("button", { name: /Confirm & Continue/i })).toBeEnabled();
+  });
+
+  test("a date brought back is still RE-JUDGED on submit", async ({ page }) => {
+    // The gate must not be weakened by the convenience. Restoring the date
+    // restores the DATE, never the verdict — and "the card came back filled in"
+    // and "the card came back filled in and now accepts what it just refused"
+    // are the same screen until this is asked.
+    await page.goto("/lab/birthday_gate");
+    await page.locator('[data-test="open-birthday-underage"]').click();
+    await pickDob(page);
+    await page.getByRole("button", { name: /Confirm & Continue/i }).click();
+    await expect(page.getByText(/Easy, Young.un/i)).toBeVisible();
+
+    await page.getByRole("button", { name: /Update your Birthday/i }).click();
+    await expect(page.locator('select[x-model="year"]')).toHaveValue("2010");
+
+    // Untouched, resubmitted, refused again.
+    await page.getByRole("button", { name: /Confirm & Continue/i }).click();
+    await expect(page.getByText(/Easy, Young.un/i)).toBeVisible();
+
+    // And correcting the year is now ONE change, which is the entire promise the
+    // card's header comment makes: a correction, not a restart.
+    await page.getByRole("button", { name: /Update your Birthday/i }).click();
+    await page.selectOption('select[x-model="year"]', "1990");
+    await expect(page.locator('select[x-model="month"]')).toHaveValue("6");
+    await expect(page.locator('select[x-model="day"]')).toHaveValue("15");
+    await page.getByRole("button", { name: /Confirm & Continue/i }).click();
+    await expect(page.getByText(/Easy, Young.un/i)).toHaveCount(0);
+  });
+
   test("a passing date does NOT open the gate", async ({ page }) => {
     // The control for every assertion above: if the gate opened on every submit,
     // all four would still pass and the card would be broken for everyone.

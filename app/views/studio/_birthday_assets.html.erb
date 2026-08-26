@@ -29,6 +29,13 @@
   age-gate card instead. `_finish` is unchanged: the success path still flips
   session.ageVerified and dispatches `age-verified`, which is the hook consuming
   apps already listen on, so nothing downstream had to change.
+
+  AND THE HANDOFF RETURNS (2026-08-26). `_reject` sends dobYear/dobMonth/dobDay
+  across the store; the gate card's back() hands the same three parts back; and
+  `init` re-picks the three selects from them, so the correction the gate card
+  offers costs one scroll rather than all three fields. The date is restored,
+  never the VERDICT: the card comes back submittable and the app's endpoint
+  re-decides on the next submit exactly as it did on the first.
 %>
 <script>
   (function () {
@@ -88,6 +95,56 @@
         onMonthChange() {
           if (this.day && parseInt(this.day, 10) > this.dayOptions.length) this.day = "";
           this.error = "";
+        },
+        // THE RETURN TRIP. _reject writes dobYear/dobMonth/dobDay onto the store
+        // on the way out to the age-gate card, and that card's back() hands the
+        // same three parts straight back — so a card mounted from a return trip
+        // finds the person's date on its own modal entry and re-picks the three
+        // selects. Without this the factory started at "" whatever it was handed,
+        // and a mistyped year cost all three fields (fixed 2026-08-26).
+        //
+        // Read off the STORE rather than taken as an opt: that is where this
+        // factory already meets the store (_reject writes to the same object
+        // through the same guard), the ERB locals in blocks/_birthday are
+        // server-side and cannot carry a client value anyway, and it means a
+        // consuming app that renders the card needs no change at all.
+        //
+        // STRINGS, because that is what the selects produce: the options render
+        // :value="m.n" — a number stringified by the DOM — and x-model writes
+        // that string back. Seeding a Number would leave the field holding a type
+        // the person's own pick never produces.
+        _returnedDob() {
+          var props;
+          try {
+            var entry = Alpine.store(this.store).current();
+            props = (entry && entry.props) || {};
+          } catch (e) {
+            return null;
+          }
+          var y = parseInt(props.dobYear, 10),
+              m = parseInt(props.dobMonth, 10),
+              d = parseInt(props.dobDay, 10);
+          if (!y || !m || !d) return null;
+          return { year: String(y), month: String(m), day: String(d) };
+        },
+        // Alpine calls init() on the data object at MOUNT, synchronously, inside
+        // the x-data directive and before it walks the three <select>s below
+        // (Alpine 3.16.1 as vendored: `a.init && T(t, a.init)`). So this is the
+        // fields' initial state rather than a later mutation of them, and x-model
+        // paints the selects from it. Measured in chromium: all three hold the
+        // restored values on the FIRST frame the card exists, six runs out of six
+        // — no deferral needed, and e2e/birthday_gate.spec.js is what watches it.
+        init() {
+          var dob = this._returnedDob();
+          if (!dob) return;
+          this.year = dob.year;
+          this.month = dob.month;
+          // Day LAST, and clamped: dayOptions is only the restored month's list
+          // once month and year are set, and an impossible pair from a hand-built
+          // props bag (Feb 30) must land empty rather than leave the select
+          // holding a value its own options do not contain — which would read as
+          // complete and submit a date nobody picked.
+          this.day = parseInt(dob.day, 10) <= this.dayOptions.length ? dob.day : "";
         },
         // Success path: flip a session flag if present, close via the app's store,
         // and let the app resume its own flow (the entry gate listens for this).

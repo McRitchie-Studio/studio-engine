@@ -170,6 +170,45 @@ dirty the form (or scroll the page) first, so the spec watches something *become
 hidden. A third spec made the same claim as an existing transition spec and was
 deleted rather than kept, following the precedent in `config/e2e_lane.yml`.
 
+**The age gate's return trip — a date that has to survive a card swap.** The
+refusal card's back link promised "a correction, not a restart" in its own header
+comment and delivered a restart: `back()` swapped to the birthday card with an
+empty props bag, discarding the three DOB parts the factory had just handed
+across the store, so a mistyped year cost all three picks. The server cannot
+betray this either — three empty `<select>`s render identically whether the values
+come back, because they are chosen after mount. Two mutations, each verified red,
+with the lab server killed between runs:
+
+| Mutation | Specs red |
+|---|---|
+| `back()` swaps with `{}` again (the shipped defect) | 2 |
+| the factory stops seeding its fields from the returned props | 2 |
+
+The second spec is the gate's own guard: it re-submits the restored date and
+asserts it is refused **again**, then corrects one field and asserts that passes.
+Restoring a date must restore the date and not the verdict, and a card that came
+back filled in looks exactly like one that came back filled in and now accepts
+what it just refused.
+
+*A third mutation belongs to the unit lane, not this one.* `back()` forwarding the
+WHOLE props bag rather than three named keys is invisible in a browser — the date
+still comes back — but it would hand the next card a stale `validates`, which is
+the prop the style guide specimen reads to choose its mode, and that hole once sent
+a return trip to the no-bar card where the same under-age date was accepted.
+`test/views/birthday_return_trip_test.rb` asserts the forwarded key set exactly,
+and reddens on it.
+
+*What this spec pair does NOT prove, measured rather than assumed.* The obvious
+worry was ordering: Alpine calls `init()` synchronously inside the `x-data`
+directive, before it walks the three `<select>`s, so a value assigned there could
+land on a select whose `x-for` options do not exist yet — the component state
+perfect, all three selects blank. It does not happen. Sampling once per animation
+frame across six runs, all three selects hold the restored values on the **first
+frame the card exists**, with the option lists already populated. The seeding is
+therefore written plainly, with no `$nextTick` deferral and no comment claiming a
+hazard that could not be reproduced. The draft of this section had that table row
+in it; the measurement removed it.
+
 **The lane no longer touches the network.** The instance that proved it necessary was
 Montserrat: `layouts/studio/_head` linked it from `fonts.gstatic.com`, and a slow fetch
 there surfaces as `console.error: Failed to load resource`, which `watchPageErrors`

@@ -233,6 +233,31 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **The age gate's back link now returns the date the person already entered.**
+  `blocks/_age_gate`'s "Update your Birthday" swapped back to `blocks/_birthday`
+  with an EMPTY props object, discarding the `dobYear`/`dobMonth`/`dobDay` parts
+  the birthday factory had just handed across the store — and the factory started
+  its three fields at `""` and never read them anyway. So the correction path came
+  back BLANK: a mistyped year cost all three picks, on a card whose own header
+  comment promised "a correction, not a restart".
+
+  Both sides of the seam moved. `back()` forwards the three date parts — and only
+  those three, deliberately: `minAge`, `state` and `message` describe the refusal,
+  and `validates` is load-bearing by its ABSENCE (the style guide specimen reads an
+  absent prop as validating, and a forwarded stale one would let the refusal pick
+  the next card's mode). `window.birthdayModal` gained an `init` that re-picks the
+  three selects from the props of the modal entry it mounted in, clamping a day
+  that the restored month cannot hold.
+
+  **The gate is not weakened.** Restoring the date restores the DATE and never the
+  verdict: the card comes back submittable and the app's endpoint re-decides on the
+  next submit exactly as it did on the first. `e2e/birthday_gate.spec.js` asserts a
+  restored under-age date is refused again.
+
+  **No consumer action.** A host that renders `blocks/_age_gate` and
+  `studio/_birthday_assets` gets this by upgrading; nothing in the call signature
+  changed and no host wiring moves.
+
 - **The Geo signpost now reaches every app whose admin chrome the engine owns.**
   The row added last release went into `components/_admin_dropdown` alone, on the
   premise that the shared dropdown reaches every app from one change. It does
