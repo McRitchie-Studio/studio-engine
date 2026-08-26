@@ -1,0 +1,57 @@
+<%#
+  Living style guide specimen — web3 email capture.
+
+  APP-SPECIFIC, engine chrome only (`blocks/_card_header`). The engine owns no
+  newsletter and no seeds.
+
+  WHY THIS CARD EXISTS AT ALL, which is the thing worth understanding: a web3
+  account signed in with a wallet has NO EMAIL ON FILE. Every other newsletter
+  path can assume one. This is the branch that cannot, so it asks — and it asks
+  at the last possible moment, mid-quest, rather than up front where it would
+  read as a signup wall on a product that deliberately does not have one.
+
+  It hands the address BACK rather than posting it: the real card closes itself
+  and calls props.onSubmit, so the caller owns the POST. That keeps one subscribe
+  path instead of two. Here the callback resolves locally.
+
+  Single root, and everything inside the double-quoted x-data is single-quoted —
+  an inner double quote closes the attribute and mounts a silent no-op.
+%>
+<div x-data="{
+       email: '',
+       submitted: false,
+       get valid() { return (this.email || '').trim().indexOf('@') > 0; },
+       submit() {
+         if (!this.valid) return;
+         // Demo: the real card closes and hands the address to props.onSubmit.
+         // Showing the acknowledgement instead keeps the specimen on screen.
+         this.submitted = true;
+       }
+     }">
+  <%= render "studio/modals/blocks/card_header",
+        size: :md,
+        icon_emoji: "📬",
+        title: "One more thing" do %>
+    <p class="text-sm text-body">
+      Drop your email to join the list and claim your 25 seeds. We only use it for
+      the newsletter.
+    </p>
+  <% end %>
+
+  <template x-if="!submitted">
+    <div>
+      <input type="email" x-model="email" @keydown.enter.prevent="submit()"
+             placeholder="you@example.com" autocomplete="email"
+             class="w-full bg-inset border border-subtle rounded-lg px-3 py-2 text-sm text-heading mb-3 focus:border-primary/50 focus:outline-none">
+      <button type="button" @click="submit()" :disabled="!valid"
+              class="btn btn-primary w-full disabled:opacity-60">Join &amp; Claim 25 Seeds</button>
+    </div>
+  </template>
+
+  <template x-if="submitted">
+    <p class="text-sm text-center text-secondary">
+      Handed <span class="text-heading font-medium" x-text="email"></span> back to the
+      caller &mdash; the app owns the POST from here.
+    </p>
+  </template>
+</div>
