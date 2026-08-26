@@ -1038,10 +1038,13 @@ class StylePageTest < ActiveSupport::TestCase
 
   # The e2e lane drives the LAB, whose two modes are separate registrations with
   # baked-in locals — so it cannot see this. The specimen picks its mode from a
-  # PROP, and the age gate's back() swaps with empty props, so the default is
-  # load-bearing: read `undefined` as "no bar" and the return trip from the gate
-  # lands on the card with no age line, where the same under-age date is accepted.
-  # That shipped once (caught in review 2026-08-25); this is the guard.
+  # PROP, and the age gate's back() forwards only the three DOB parts, so
+  # `validates` is absent on every return trip and the default is load-bearing:
+  # read `undefined` as "no bar" and the return trip from the gate lands on the
+  # card with no age line, where the same under-age date is accepted. That
+  # shipped once (caught in review 2026-08-25); this is the guard. It survived
+  # back() starting to carry the date (2026-08-26) precisely because that change
+  # forwards three named keys rather than the whole props bag.
   test "the birthday specimen treats an absent validates prop as VALIDATING" do
     source = Studio::Engine.root.join("app/views/style/modals/_birthday.html.erb").read
 
