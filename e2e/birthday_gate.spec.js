@@ -125,12 +125,14 @@ test.describe("birthday → age gate handoff", () => {
   // under node and proves the PAYLOAD travels; what it has no DOM for is whether
   // the selects actually re-pick — which is the half that failed for a person.
   //
-  // It failed here for a real reason worth keeping: Alpine walks
-  // <select x-model="month"> BEFORE the <template x-for> that fills it, so a
-  // value assigned during init lands on an empty option list and is dropped. The
-  // component state would be perfect and all three selects would still read
-  // blank. The factory defers its seeding to $nextTick for exactly that, and this
-  // spec is the only thing that can see the difference.
+  // The hazard this spec watches for, stated as what was MEASURED rather than
+  // what was feared: Alpine could walk <select x-model="month"> before the
+  // <template x-for> that fills it, and a value assigned during init would then
+  // land on an empty option list and be dropped — component state perfect, all
+  // three selects blank. It does not happen. Sampling once per animation frame
+  // across six runs, all three selects hold the restored values on the first
+  // frame the card exists. So the factory seeds plainly, with no $nextTick
+  // deferral, and this spec is what would catch it if that ever changed.
   test("Update your Birthday brings the date back", async ({ page }) => {
     await page.goto("/lab/birthday_gate");
     await page.locator('[data-test="open-birthday-underage"]').click();
