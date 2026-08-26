@@ -23,11 +23,17 @@
 
     Why absent is not "no bar": the only card that can REACH the age gate is the
     validating one — the no-bar card carries no min_age, so the factory's _reject
-    never fires. So every arrival with no props is a return trip from the gate,
-    and `back()` swaps with EMPTY props by design (blocks/_age_gate.html.erb).
-    Reading undefined as falsy sent that return trip to the NO-BAR card, where
-    resubmitting the SAME under-age date was accepted — the guide demonstrating an
-    age gate being bypassed. Caught in review, 2026-08-25.
+    never fires. So every arrival with no `validates` is a return trip from the
+    gate, and `back()` never sends one: it forwards the dobYear/dobMonth/dobDay
+    parts and NOTHING ELSE, deliberately, so the refusal cannot pick this
+    specimen's mode (blocks/_age_gate.html.erb). Reading undefined as falsy sent
+    that return trip to the NO-BAR card, where resubmitting the SAME under-age
+    date was accepted — the guide demonstrating an age gate being bypassed.
+    Caught in review, 2026-08-25.
+
+    So the default is still load-bearing, and it is load-bearing in the same way
+    after the gate started carrying the date back (2026-08-26): the props bag on
+    a return trip is no longer empty, but `validates` is still absent from it.
 
     The engine primitive is right and is NOT changed: in a real host the mode
     comes from ERB locals, not from a prop, so this is a two-mode SPECIMEN's
