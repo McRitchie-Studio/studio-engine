@@ -1371,7 +1371,9 @@ class StylePageTest < ActiveSupport::TestCase
     assert_equal 1, block.scan("border-2 border-primary hover:bg-surface").size,
       "exactly one rail may carry the primary emphasis"
     assert_equal 2, block.scan("border border-strong hover:border-primary").size,
-      "the other two rails must render, and render neutral"
+      "two rails must render neutral"
+    assert_equal 1, block.scan("border border-subtle opacity-60").size,
+      "and one must show the announced-but-not-wired shape"
   end
 
   test "the guide's funding chrome closes the PAGE-SCOPED store" do
@@ -1398,8 +1400,9 @@ class StylePageTest < ActiveSupport::TestCase
     rail = root.join("_ds_rail_row.html.erb").read
     assert_includes rail, %(render "studio/modals/blocks/rail_row"),
       "the rail specimen must render the engine block"
-    assert_equal 3, rail.scan(%(render "studio/modals/blocks/rail_row")).size,
-      "three rails, so the ranking has something to rank"
+    assert_equal 4, rail.scan(%(render "studio/modals/blocks/rail_row")).size,
+      "four rails: one primary, two neutral, one :soon — the ranking needs " \
+      "something to rank, and the third shape needs somewhere to be seen"
     assert_not_includes rail, "w-full flex items-center gap-4 p-4 rounded-xl",
       "the specimen must not carry its own copy of the row's class string"
 

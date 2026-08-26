@@ -52,5 +52,17 @@
           title:      "Entry tokens",
           subtitle:   "1 token = 1 contest entry",
           data:       { ds_rail: "tokens" } %>
+
+    <%# The THIRD shape — a rail announced before it is wired. Not a disabled
+        button: a <div>, so there is no focus stop and nothing for a keyboard
+        user to land on and wonder about, and the badge REPLACES the chevron
+        rather than dimming it, because a chevron says "this goes somewhere". %>
+    <%= render "studio/modals/blocks/rail_row",
+          state:      :soon,
+          icon_label: "P",
+          icon_bg:    "#003087",
+          title:      "PayPal",
+          subtitle:   "Pay with your PayPal balance",
+          data:       { ds_rail: "paypal" } %>
   </div>
 </div>

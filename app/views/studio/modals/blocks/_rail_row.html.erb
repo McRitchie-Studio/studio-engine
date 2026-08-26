@@ -33,13 +33,31 @@
                 ("New"). Dropped when absent rather than rendered empty.
     data        (Hash, optional) — data-* attributes, for the app's own test
                 hooks (turf uses data-onramp-rail / data-buy-rail / data-topup-rail).
+    state       (:available | :soon) — default :available. :soon renders the
+                ANNOUNCED-BUT-NOT-WIRED rail: a non-interactive <div>, dimmed,
+                with a muted badge where the chevron goes. on_click is then
+                OPTIONAL and ignored.
+    soon_label  (String, optional) — the badge text for :soon. Default "Soon".
 
-  NOT A LINK. It is a <button> running an Alpine expression, because every real
-  callsite either swaps modals or calls a JS funding helper — none navigates. A
-  rail that must navigate should be a plain <a> and not this.
+  :soon IS A THIRD SHAPE, not a disabled button, and the distinction is the
+  reason it is here. turf's onramp hub announces PayPal and Venmo before they are
+  wired, and it does so with a <div> rather than a `disabled` <button> — so there
+  is no focus stop, no pointer, and nothing for a keyboard user to land on and
+  wonder about. The chevron is replaced rather than dimmed, because a chevron
+  says "this goes somewhere" and that is the one thing this row must not say.
+
+  NOT A LINK. An :available rail is a <button> running an Alpine expression,
+  because every real callsite either swaps modals or calls a JS funding helper —
+  none navigates. A rail that must navigate should be a plain <a> and not this.
 %>
 <%
-  on_click   = local_assigns.fetch(:on_click)
+  state      = local_assigns.fetch(:state, :available).to_sym
+  soon       = state == :soon
+  # on_click is required for a rail that DOES something, and meaningless for one
+  # that only announces itself — fetching it unconditionally would force every
+  # placeholder callsite to invent a no-op.
+  on_click   = soon ? nil : local_assigns.fetch(:on_click)
+  soon_label = local_assigns.fetch(:soon_label, "Soon")
   title      = local_assigns.fetch(:title)
   subtitle   = local_assigns[:subtitle]
   emphasis   = local_assigns.fetch(:emphasis, :neutral).to_sym
@@ -49,14 +67,21 @@
   badge      = local_assigns[:badge]
   data_attrs = local_assigns.fetch(:data, {})
 
-  border_class  = emphasis == :primary ? "border-2 border-primary hover:bg-surface" : "border border-strong hover:border-primary"
+  border_class  = if soon
+                    "border border-subtle opacity-60"
+                  elsif emphasis == :primary
+                    "border-2 border-primary hover:bg-surface"
+                  else
+                    "border border-strong hover:border-primary"
+                  end
   chevron_class = emphasis == :primary ? "text-primary" : "text-muted"
   tile_style    = icon_bg.present? ? "background-color:#{icon_bg}" : nil
   tile_bg_class = icon_bg.present? ? nil : "bg-primary"
 %>
-<button type="button" @click="<%= on_click %>"
-        <%= tag.attributes(data: data_attrs) if data_attrs.present? %>
-        class="w-full flex items-center gap-4 p-4 rounded-xl <%= border_class %> bg-inset transition text-left">
+<%= content_tag(soon ? :div : :button, type: (soon ? nil : "button"),
+      "@click": on_click,
+      class: "w-full flex items-center gap-4 p-4 rounded-xl #{border_class} bg-inset#{soon ? '' : ' transition text-left'}",
+      data: data_attrs.presence) do %>
   <span class="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center <%= icon_class %> <%= tile_bg_class %>"
         style="<%= tile_style %>"><%= icon_label %></span>
   <span class="flex-1 min-w-0">
@@ -72,7 +97,13 @@
       <span class="block text-xs text-secondary"><%= subtitle %></span>
     <% end %>
   </span>
-  <svg class="shrink-0 w-4 h-4 <%= chevron_class %>" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
-  </svg>
-</button>
+  <% if soon %>
+    <%# A badge where the chevron would be. Replacing it, not dimming it: a
+        chevron says "this goes somewhere", and that is what this row must not say. %>
+    <span class="shrink-0 text-[10px] uppercase tracking-widest font-bold text-muted bg-surface border border-subtle rounded-full px-2 py-0.5"><%= soon_label %></span>
+  <% else %>
+    <svg class="shrink-0 w-4 h-4 <%= chevron_class %>" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+    </svg>
+  <% end %>
+<% end %>

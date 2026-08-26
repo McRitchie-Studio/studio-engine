@@ -113,6 +113,53 @@ class FundingChromeBlocksTest < Minitest::Test
     refute_includes html, "font-extrabold"
   end
 
+  # --- :soon, the announced-but-not-wired rail -------------------------------
+  #
+  # FOUND WHILE BUILDING THE SPECIMENS, not from the spec. The first cut of this
+  # primitive covered eight of the ten copies; turf's onramp hub announces PayPal
+  # and Venmo with a THIRD shape, and a rail_row that could not express it would
+  # have left two hand-rolled copies behind in the file the extraction was for.
+
+  def test_a_soon_rail_is_not_interactive_at_all
+    html = render_rail(state: :soon, title: "PayPal")
+
+    assert_includes html, "<div", "a :soon rail is a div"
+    refute_includes html, "<button", "not a disabled button — no focus stop, no pointer"
+    refute_includes html, "@click", "and nothing to fire"
+  end
+
+  def test_a_soon_rail_needs_no_click_handler
+    # on_click is fetched unconditionally for an available rail. Requiring it for
+    # a placeholder would make every announcement invent a no-op.
+    view.render(partial: "studio/modals/blocks/rail_row",
+                locals: { title: "Venmo", state: :soon })
+  end
+
+  def test_a_soon_rail_replaces_the_chevron_rather_than_dimming_it
+    # A chevron says "this goes somewhere", which is the one thing this row must
+    # not say. So the badge takes its place instead of sitting beside it.
+    html = render_rail(state: :soon)
+
+    assert_includes html, ">Soon<"
+    refute_includes html, "M8.25 4.5l7.5 7.5-7.5 7.5", "the chevron path must be gone"
+  end
+
+  def test_a_soon_rail_is_dimmed_and_quietly_bordered
+    html = render_rail(state: :soon)
+
+    assert_includes html, "opacity-60"
+    assert_includes html, "border border-subtle"
+    refute_includes html, "hover:", "nothing about it may respond to a pointer"
+  end
+
+  def test_the_soon_label_is_the_callers_word
+    assert_includes render_rail(state: :soon, soon_label: "Waitlist"), ">Waitlist<"
+  end
+
+  def test_available_is_the_default_state
+    assert_equal render_rail(state: :available), render_rail
+  end
+
   # --- the optional bits drop rather than render empty ----------------------
 
   def test_the_badge_is_dropped_when_absent
