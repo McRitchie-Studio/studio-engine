@@ -949,7 +949,11 @@ class StylePageTest < ActiveSupport::TestCase
     # the chain saying no, this is the SERVER saying no. Reading either alone
     # leaves you unaware the other exists.
     "Co-sign refused",
-    "Wallet deposit", "Entry confirmed",
+    # The three FUNDING cards run together, because they are one question asked
+    # three ways: deposit an address, top up with a rail, or see every rail. A
+    # reader comparing them has to have them adjacent.
+    "Wallet deposit", "Top up wallet", "Add funds hub",
+    "Entry confirmed",
     # The two reconciliation cards close the section, after the happy path they
     # interrupt: Network guard is asked BEFORE a request is signed, Wallet
     # changed AFTER the extension moves underneath a live session. Both read
@@ -1074,6 +1078,36 @@ class StylePageTest < ActiveSupport::TestCase
     Nokogiri::HTML(html).css("template[x-if]").filter_map { |t|
       t["x-if"][/\A\$store\.dsModals\.current\(\)\.id === '([a-z0-9-]+)'\z/, 1]
     }
+  end
+
+  # The full <template> a specimen is registered in, nesting-aware.
+  #
+  # A non-greedy /id === '...'.*?<\/template>/ stops at the FIRST closing tag,
+  # which for any specimen containing its own <template x-if> is an INNER one —
+  # so the captured block silently excludes the half of the card the test was
+  # written to check. That is how the top-up fork's second face read as missing
+  # from a page rendering it correctly. Count depth instead.
+  def specimen_block(modal_id, html = render_index)
+    at = html.index("id === '#{modal_id}'")
+    return nil unless at
+
+    # Walk back to the <template that OPENS this registration. Counting from the
+    # id instead starts at depth 0 mid-tag, so the first closing tag seen is the
+    # inner one and the block ends before the half the test cares about.
+    start = html.rindex("<template", at)
+    return nil unless start
+
+    depth = 0
+    pos   = start
+    while (m = html.match(/<\/?template\b/, pos))
+      depth += m[0].start_with?("</") ? -1 : 1
+      pos = m.end(0)
+      if depth.zero?
+        close = html.index(">", pos)
+        return html[start..close]
+      end
+    end
+    nil
   end
 
   test "every ported specimen is both carded AND registered on the host" do
@@ -1365,7 +1399,7 @@ class StylePageTest < ActiveSupport::TestCase
     # question: `border border-strong hover:border-primary` is a generic Tailwind
     # combination and seven of them render elsewhere on this page, so a page-wide
     # neutral count would sit at 7 whether this specimen drew two rails or none.
-    block = render_index[/id === 'ds-rail-row'.*?<\/template>/m]
+    block = specimen_block("ds-rail-row")
     assert block, "the rail-row specimen did not render"
 
     assert_equal 1, block.scan("border-2 border-primary hover:bg-surface").size,
@@ -1411,6 +1445,94 @@ class StylePageTest < ActiveSupport::TestCase
       "the close specimen must render the engine block"
     assert_not_includes close, "absolute top-0 right-0 -mt-2 -mr-2",
       "nor its own copy of the mark"
+  end
+
+
+  # --- 16. the funding modals the primitives were extracted for --------------
+
+  FUNDING_MODAL_SPECIMENS = {
+    "ds-wallet-topup" => "Top up wallet",
+    "ds-onramp-hub"   => "Add funds hub"
+  }.freeze
+
+  test "both funding modal specimens are carded AND registered" do
+    html  = render_index
+    cards = html.scan(/aria-label="Open the (.+?) modal"/).flatten
+    ids   = registered_modal_ids(html)
+
+    FUNDING_MODAL_SPECIMENS.each do |modal_id, label|
+      assert_includes cards, label, "no specimen card for #{modal_id}"
+      assert_includes ids, modal_id,
+        "#{modal_id} has a card but NO host registration — it opens a blank shell"
+    end
+  end
+
+  test "the funding specimens are built from the primitives, not from copies" do
+    # This is the whole reason the primitives were extracted first. A specimen
+    # that hand-rolled a rail would be the eleventh copy, sitting in the cabinet
+    # meant to stop them — and it would look completely fine.
+    root = Studio::Engine.root.join("app/views/style/modals")
+
+    %w[_ds_wallet_topup _ds_onramp_hub].each do |f|
+      source = root.join("#{f}.html.erb").read
+      assert_includes source, %(render "studio/modals/blocks/rail_row"),
+        "#{f} must render the engine's rail"
+      assert_includes source, %(render "studio/modals/blocks/close_x"),
+        "#{f} must render the engine's close mark"
+      assert_not_includes source, "w-full flex items-center gap-4 p-4 rounded-xl",
+        "#{f} must not carry its own copy of the rail's class string"
+      assert_not_includes source, "absolute top-0 right-0 -mt-2 -mr-2",
+        "#{f} must not carry its own copy of the close mark"
+    end
+  end
+
+  test "the hub ranks exactly one of its six rails" do
+    # Six is where ranking starts to matter: a hub of equal rails answers "which
+    # do I press" by asking the person to compare payment processors. Scoped to
+    # the specimen's own template — the page renders other rails elsewhere.
+    block = specimen_block("ds-onramp-hub")
+    assert block, "the hub specimen did not render"
+
+    assert_equal 1, block.scan("border-2 border-primary hover:bg-surface").size,
+      "exactly one rail leads"
+    assert_equal 3, block.scan("border border-strong hover:border-primary").size,
+      "three rails defer to it"
+    assert_equal 2, block.scan("border border-subtle opacity-60").size,
+      "and two are announced but not wired"
+  end
+
+  test "the top-up card carries its safety fork on ONE card" do
+    # The fork is a safety one: a web2 viewer with the USDC kill-switch on cannot
+    # pay an entry with USDC, so the primary rail becomes the token instead. Two
+    # cards would read as two products; the point is a player never sees both.
+    block = specimen_block("ds-wallet-topup")
+    assert block, "the top-up specimen did not render"
+
+    # ASSERT THE GATING, NOT THE PRESENCE. Both faces sit inside <template>s, so
+    # both strings are in the DOM no matter what the conditions say — a presence
+    # check stays green with the fork welded open, welded shut, or deleted. This
+    # was proved by mutation: three separate breakages all passed the first
+    # version of this test. So read each face out of ITS OWN template.
+    default  = block[/<template x-if="!tokenFallback">.*?<\/template>/m]
+    fallback = block[/<template x-if="tokenFallback">.*?<\/template>/m]
+
+    assert default,  "the default face must be gated on the kill-switch being OFF"
+    assert fallback, "the fallback face must be gated on it being ON"
+
+    assert_includes default, "Buy USDC with Coinbase"
+    assert_not_includes default, "Buy Entry Tokens",
+      "the two faces must be mutually exclusive — a player never sees both"
+
+    assert_includes fallback, "Buy Entry Tokens"
+    assert_not_includes fallback, "Buy USDC with Coinbase",
+      "pitching USDC to the audience that cannot spend it is the bug this fork exists to avoid"
+
+    # ...and the card offers the toggle that walks between them. Assert the
+    # rendered CHECKBOX, not the string "opts.tokenFallback" — that also appears
+    # in the card's open_expr, so a bare match survives deleting the toggle and
+    # leaves the second face in the DOM and unreachable: a card nobody reviews.
+    assert_includes render_index, %(<input type="checkbox" x-model="opts.tokenFallback"),
+      "the specimen card needs the toggle that reaches the second face"
   end
 
 end

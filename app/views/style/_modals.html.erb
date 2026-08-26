@@ -383,6 +383,13 @@
         <template x-if="$store.dsModals.current().id === 'ds-close-x'">
           <div><%= render "style/modals/ds_close_x" %></div>
         </template>
+        <%# --- the funding modals those primitives were extracted for --- %>
+        <template x-if="$store.dsModals.current().id === 'ds-wallet-topup'">
+          <div><%= render "style/modals/ds_wallet_topup" %></div>
+        </template>
+        <template x-if="$store.dsModals.current().id === 'ds-onramp-hub'">
+          <div><%= render "style/modals/ds_onramp_hub" %></div>
+        </template>
         <template x-if="$store.dsModals.current().id === 'rate-limit-general'">
           <div><%= render "style/modals/rate_limit_general" %></div>
         </template>
@@ -1247,6 +1254,53 @@
           <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
           <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
           <span class="block h-5 w-full rounded border" style="border-color: var(--color-border-strong)"></span>
+        </div>
+      <% end %>
+
+      <%# ds-wallet-topup — the FIRST funds modal, and a safety fork. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Top up wallet",
+            reference: %(the first funds modal a player meets (style/modals/_ds_wallet_topup) — turf-monster's modals/_wallet_topup, built here from blocks/_close_x and blocks/_rail_row. THE TOGGLE IS THE CARD: this is one modal with two faces, and the fork is a SAFETY one rather than a preference. A web2 viewer running with ENABLE_WEB2_USDC_ENTRY off cannot pay an entry with USDC at all, so pitching "Buy USDC" would sell them a thing that cannot do the job they came to do — for exactly that audience the primary rail becomes the entry token, and the balance line follows, because the currency it names has to be the one that can pay. Shown as ONE card with a toggle rather than two, because two would read as two products and the point is that a player never sees both. Open with $store.dsModals.open('ds-wallet-topup', { tokenFallback: false })),
+            card_data: "opts: { tokenFallback: false }",
+            toggles:   [{ model: "opts.tokenFallback", label: "web2 kill-switch" }],
+            open_expr: "$store.dsModals.open('ds-wallet-topup', { tokenFallback: opts.tokenFallback })",
+            glow_when: ds_glow.call("ds-wallet-topup"),
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
+          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="flex items-center gap-1.5 rounded-md p-1.5" style="border: 2px solid var(--color-primary)">
+            <span class="block h-4 w-4 rounded" style="background: var(--color-cta)"></span>
+            <span class="block h-1.5 flex-1 rounded" style="background: var(--color-text); opacity: .3"></span>
+          </span>
+          <span class="block h-1.5 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+        </div>
+      <% end %>
+
+      <%# ds-onramp-hub — every rail at once, which is where ranking earns its keep. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Add funds hub",
+            reference: %(the full Add Funds hub (style/modals/_ds_onramp_hub) — turf-monster's modals/_onramp_hub, and the card blocks/_rail_row was extracted FOR: turf draws these six by hand today, which is six chances for the seventh to drift. Six rails is enough that "which one do I press" becomes a real question, and a hub where every rail carries equal weight answers it by asking the person to compare payment processors — not a question anyone can answer about their own life. Exactly ONE rail is :primary and the other five defer to it. PayPal and Venmo show the THIRD shape, :soon — announced before they are wired, so plain divs rather than disabled buttons, with a badge where the chevron would be, because even a dimmed chevron still promises somewhere to go. Open with $store.dsModals.open('ds-onramp-hub')),
+            open_expr: "$store.dsModals.open('ds-onramp-hub')",
+            glow_when: ds_glow.call("ds-onramp-hub"),
+            disabled: !web3_on, openable: true } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-3 space-y-1.5">
+          <span class="flex items-center gap-1.5 rounded p-1" style="border: 2px solid var(--color-primary)">
+            <span class="block h-3 w-3 rounded-sm" style="background: var(--color-cta)"></span>
+            <span class="block h-1 flex-1 rounded" style="background: var(--color-text); opacity: .3"></span>
+          </span>
+          <% 3.times do %>
+            <span class="flex items-center gap-1.5 rounded p-1 border border-subtle">
+              <span class="block h-3 w-3 rounded-sm" style="background: var(--color-text); opacity: .25"></span>
+              <span class="block h-1 flex-1 rounded" style="background: var(--color-text); opacity: .18"></span>
+            </span>
+          <% end %>
+          <%# the two :soon rails, dimmed %>
+          <% 2.times do %>
+            <span class="flex items-center gap-1.5 rounded p-1 border border-subtle" style="opacity: .5">
+              <span class="block h-3 w-3 rounded-sm" style="background: var(--color-text); opacity: .25"></span>
+              <span class="block h-1 flex-1 rounded" style="background: var(--color-text); opacity: .12"></span>
+            </span>
+          <% end %>
         </div>
       <% end %>
 
