@@ -1,0 +1,30 @@
+<%#
+  Living style guide specimen — the centred-title card and its close ×.
+
+  The mark itself is one button, so what is worth showing is the RELATIONSHIP it
+  depends on: the × is absolutely positioned, and it anchors to the nearest
+  POSITIONED ancestor. This card wraps its content in `class="relative"`, which
+  is the contract. Drop that one class and the × does not disappear — it climbs
+  to whatever is positioned above, which inside a modal is the host's backdrop,
+  and lands in the corner of the page looking like a stray glyph. Nothing errors,
+  and nothing in the markup reads as wrong.
+
+  Shown next to a centred title because that pairing is the reason this exists
+  rather than blocks/_shell, whose title sits left with the close beside it.
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div class="relative">
+  <%= render "studio/modals/blocks/close_x", modal_store: "dsModals" %>
+
+  <div class="text-center pt-1 mb-3">
+    <h3 class="text-heading font-bold text-lg leading-tight">Top Up Your Wallet</h3>
+  </div>
+  <p class="text-xs text-body mb-4 text-center">
+    The × above sits in this card&rsquo;s own corner because the card is
+    <code class="font-mono text-2xs">relative</code>. That single class is the
+    whole contract.
+  </p>
+  <button type="button" @click="$store.dsModals.close()"
+          class="btn btn-primary btn-lg w-full">Done</button>
+</div>
