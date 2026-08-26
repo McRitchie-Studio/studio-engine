@@ -1,0 +1,67 @@
+<%#
+  Living style guide specimen — Subscribed!, the standalone newsletter
+  celebration.
+
+  APP-SPECIFIC, engine chrome (blocks/_card_header at :lg). Distinct from the
+  Profile Leveling "Subscribed!" beat, which is the leveling activity celebrating
+  IN PLACE on the card the person was already on. This one arrives on its own —
+  swapped in from the subscribe modal, or opened from the /account newsletter
+  row — so it has to carry its own way forward.
+
+  TWO FORKS, AND NEITHER IS VISIBLE TO A READER OF THE MARKUP. That is the whole
+  reason this card exists separately rather than being folded into the leveling
+  beat:
+
+    · THE SEEDS BAR IS FIRST-JOIN ONLY. A re-subscribe earns nothing, and the
+      card HIDES the bar rather than showing a flat "0 seeds" — which would read
+      to the person as a bug about their own account rather than as an accurate
+      zero.
+    · THE CTA IS SERVER-DECIDED. If the username quest is still open
+      (current_user.next_quest == :username) the button nudges straight into it;
+      otherwise it sends them off to browse contests. Showing only one of those
+      hides the funnel that this celebration doubles as.
+
+  Both are gated on props here so the cabinet can walk all four combinations.
+  In the app the CTA fork is SERVER-rendered, precisely so the button never
+  flashes the wrong option at someone whose quest is already done.
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div x-data="{
+       get props() { var c = $store.dsModals.current(); return (c && c.props) || {} },
+       get firstJoin() { return !!this.props.firstJoin },
+       get questOpen() { return !!this.props.questOpen }
+     }">
+  <%= render "studio/modals/blocks/card_header",
+        size: :lg,
+        icon_emoji: "🌱",
+        title: "Subscribed!",
+        subtitle: "You're on the list. We'll keep the sports news and contest updates coming." %>
+
+  <%# First join only. The engine's :leveling seeds bar — the bar is the
+      engine's, the numbers are the app's. %>
+  <template x-if="firstJoin">
+    <div class="mb-5">
+      <%= render "studio/modals/blocks/seeds_bar",
+            seeds_earned_key: "25",
+            seeds_total_key:  "125",
+            seeds_per_level:  100,
+            free_entry_label: "Free Entry Token 🎟️" %>
+    </div>
+  </template>
+
+  <template x-if="questOpen">
+    <button type="button" @click="$store.dsModals.close()"
+            class="btn btn-primary btn-lg w-full">Next Quest</button>
+  </template>
+
+  <template x-if="!questOpen">
+    <button type="button" @click="$store.dsModals.close()"
+            class="btn btn-primary btn-lg w-full">Check Out Contests</button>
+  </template>
+
+  <button type="button" @click="$store.dsModals.close()"
+          class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+    Close
+  </button>
+</div>

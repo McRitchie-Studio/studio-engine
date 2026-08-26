@@ -16,7 +16,14 @@
     the back link — the thing they might NEED. A wrong birthday is an ordinary
                  typo (a mis-picked year is one scroll away), and a gate with no
                  way back turns a typo into a locked door. swap()s back to the
-                 birthday card, so this is a correction, not a restart.
+                 birthday card CARRYING THE DATE, so a mistyped year costs one
+                 scroll and not all three fields. That is what makes this a
+                 correction rather than a restart: back() forwards the dobYear /
+                 dobMonth / dobDay parts _reject handed across the store on the
+                 way in, and the birthday factory seeds its three selects from
+                 them. Until 2026-08-26 it swapped with an EMPTY props object and
+                 the card came back blank, which is the restart this paragraph
+                 disclaimed.
 
   DELIBERATELY NOT DISMISSIBLE-BY-DEFAULT-ONLY: the host still decides via
   props.dismissible at open() time, exactly like every other card. What this
@@ -146,7 +153,26 @@
        // sibling cards that poll: modals/_web3_step_up, blocks/_cta_redirect,
        // blocks/_seeds_bar.
        destroy() { this.stop(); },
-       back() { $store.<%= modal_store %>.swap('<%= j birthday_modal_id.to_s %>', {}); }
+       // THE DATE RIDES BACK. _reject put these three parts on the store on the
+       // way here so this card could say WHEN; handing them back is what makes
+       // the return trip a correction instead of a blank form. This swapped with
+       // an empty object until 2026-08-26, and a mistyped year cost all three
+       // picks.
+       //
+       // THE THREE PARTS ONLY, deliberately not the whole props bag. minAge,
+       // state and message describe the REFUSAL: message would land as an error
+       // line on a card nobody has submitted yet, and `validates` is load-bearing
+       // by its ABSENCE — the style guide specimen reads an absent prop as
+       // validating, so forwarding a stale one would let this card pick the next
+       // card's mode (style/modals/_birthday.html.erb).
+       back() {
+         var p = this.props;
+         $store.<%= modal_store %>.swap('<%= j birthday_modal_id.to_s %>', {
+           dobYear: p.dobYear || null,
+           dobMonth: p.dobMonth || null,
+           dobDay: p.dobDay || null
+         });
+       }
      }"
      <% if countdown %>x-init="start()"<% end %>
      class="relative">
@@ -211,7 +237,9 @@
 
   <% if birthday_modal_id.present? %>
     <%# The correction path. A mis-picked year is one scroll away from a right
-        one, and without this the typo is indistinguishable from the verdict. %>
+        one, and without this the typo is indistinguishable from the verdict.
+        back() carries the date across, so what comes back is the same three
+        picks with the wrong one still selected. %>
     <button type="button" @click="back()"
             class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition underline-offset-2 hover:underline">
       <%= back_label %>

@@ -492,14 +492,32 @@
 # What only a browser sees is birthdayModal's submit() deciding the refusal is
 # not an error and swapping the store.
 #
-# 90 -> 94: e2e/modal_focus_trap.spec.js, four specs on the modal host's FOCUS
-# contract. They are in this lane for the same reason the birthday handoff above
-# is: every assertion is about document.activeElement — where focus actually IS —
-# and the server's bytes are identical whether focus works or not. A test/views
-# assertion can confirm tabindex="-1" and an aria-label are in the HTML and stay
-# green while a keyboard user sits focused behind the overlay, which is exactly the
-# measured defect.
-total_specs: 94
+# 2026-08-26: 90 -> 92. Two more in e2e/birthday_gate.spec.js for the age gate's
+# RETURN TRIP — the back link handing the entered date back to the birthday card,
+# and that the restored date is still RE-JUDGED on submit. Neither is visible to a
+# markup test: three empty <select>s render identically whether the values come
+# back, because they are chosen after mount. Both were verified RED against the
+# shipped defect (back() swapping with an empty props bag) and against the factory
+# not seeding from what it is handed, with the lab server killed between runs.
+#
+# The second spec is the one that keeps the convenience honest: a restored date
+# must still be REFUSED on resubmit. "The card came back filled in" and "the card
+# came back filled in and now accepts what it just refused" are the same screen.
+#
+# 2026-08-26: 92 -> 96. e2e/modal_focus_trap.spec.js, four specs on the modal
+# host's FOCUS contract. They are in this lane for the same reason the birthday
+# handoff above is: every assertion is about document.activeElement — where focus
+# actually IS — and the server's bytes are identical whether focus works or not. A
+# test/views assertion can confirm tabindex="-1" and an aria-label are in the HTML
+# and stay green while a keyboard user sits focused behind the overlay, which is
+# exactly the measured defect.
+#
+# This number is 96, not the 94 this branch carried before it was merged up: the
+# age-gate lane change above (90 -> 92) landed on `accepted` while this branch was
+# in review, so the two additions STACK. Both sides had computed against a
+# 90-baseline that had already moved. The counter is re-derived on the MERGED tree
+# below, never incremented and never resolved by taking one side.
+total_specs: 96
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -511,11 +529,14 @@ total_specs: 94
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-# Re-derived on this tree, never by arithmetic:
-# `npx playwright test --list` -> 94 tests in 13 files, and the chromium-only list
-# is the same 94 (one project, no quarantine), so executed == total_specs and
-# test/lib/e2e_lane_contract_test.rb's equality assertion still holds.
-executed: 94
+# Re-derived on the MERGED tree (this branch + `accepted` carrying the age-gate
+# specs), never by arithmetic and never by taking a side of the merge conflict:
+#   npx playwright test --list                                    -> 96 tests, 13 files
+#   npx playwright test --list --grep "@devnet"                   -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium -> 96
+# executed = total - devnet - allowed_skips = 96 - 0 - 0 = 96, so executed ==
+# total_specs and test/lib/e2e_lane_contract_test.rb's equality assertion holds.
+executed: 96
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
