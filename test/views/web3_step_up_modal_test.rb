@@ -11,7 +11,7 @@ require "action_view"
 
 # [unit] studio/modals/_web3_step_up — the shared WEB3 STEP-UP card.
 #
-# This partial is unusual for the Web3 Contest section, and the difference is
+# This partial is unusual for the Web3 section, and the difference is
 # what most of these tests defend: the other cards there are style-guide
 # SPECIMENS while each app keeps its own live modal, but this one is the REAL
 # partial a host renders in production. So the style guide and the shipped card
@@ -179,11 +179,14 @@ class Web3StepUpModalTest < ActiveSupport::TestCase
     end
   end
 
-  test "both step-up specimens appear in the Web3 Contest section" do
+  # Renamed 2026-08-25: the pair are "Sign Wallet" cards now, in a section called
+  # "Web3" rather than "Web3 Contest" — the section stopped being only about
+  # contest entry once Setup Wallet and this pair moved into it.
+  test "both Sign Wallet specimens appear in the Web3 section" do
     with_features(%i[web3]) do
       html = render_index
-      assert_includes html, "Web3 step-up (remembered wallet)"
-      assert_includes html, "Web3 step-up (no remembered wallet)"
+      assert_includes html, "Sign Wallet"
+      assert_includes html, "Sign Wallet (no remembered brand)"
     end
   end
 
@@ -192,7 +195,7 @@ class Web3StepUpModalTest < ActiveSupport::TestCase
     # is off greys the card and badges it, but never hides a state from review.
     with_features([]) do
       html = render_index
-      assert_includes html, "Web3 step-up (remembered wallet)"
+      assert_includes html, "Sign Wallet"
       assert_includes html, "$store.dsModals.current().id === 'web3-step-up'"
     end
   end

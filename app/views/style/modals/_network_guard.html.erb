@@ -1,0 +1,55 @@
+<%#
+  Living style guide specimen — the network confirmation before a wallet request.
+
+  APP-SPECIFIC, engine chrome only (`blocks/_card_header`). The engine knows
+  nothing about networks or environments; every label here is app-supplied and
+  only ever DISPLAYED.
+
+  THE CHECKBOX IS THE POINT, and it is not friction for its own sake. A wallet
+  request signed against the wrong network is the kind of mistake that looks
+  identical to a correct one until it is irreversible — mainnet money moved on a
+  devnet assumption, or the reverse. So the card does three things a plain
+  confirm cannot: it NAMES both the network and the environment, it makes
+  Continue INERT until the person has ticked an explicit acknowledgement, and it
+  gives Cancel equal visual weight rather than burying it.
+
+  A confirmation whose safe path is harder to reach than its risky one is a
+  formality. This one is deliberately not.
+
+  Single root; x-data single-quoted throughout.
+%>
+<div x-data="{
+       checked: false,
+       get props() { var c = $store.dsModals.current(); return (c && c.props) || {} }
+     }">
+  <%= render "studio/modals/blocks/card_header",
+        icon_emoji: "⚠️",
+        title_key: "props.title || 'Check Network'" do %>
+    <p class="text-sm text-body"
+       x-text="props.message || 'This request will be signed on the network shown below.'"></p>
+  <% end %>
+
+  <%# Both facts, named. The app supplies them; the engine never detects either. %>
+  <div class="rounded-lg border border-subtle bg-surface-alt p-3 mb-4 text-sm">
+    <div class="flex items-center justify-between gap-3">
+      <span class="text-secondary">App network</span>
+      <span class="font-semibold text-heading" x-text="props.networkLabel || 'devnet'"></span>
+    </div>
+    <div class="flex items-center justify-between gap-3 mt-2">
+      <span class="text-secondary">Environment</span>
+      <span class="font-semibold text-heading" x-text="props.environmentLabel || 'QA'"></span>
+    </div>
+  </div>
+
+  <label class="flex items-start gap-3 rounded-lg border border-subtle p-3 mb-4 cursor-pointer">
+    <input type="checkbox" x-model="checked" class="mt-1">
+    <span class="text-sm text-secondary">I understand this wallet request will use the network shown above.</span>
+  </label>
+
+  <%# Equal weight, deliberately. Cancel is not the quiet option here. %>
+  <div class="grid grid-cols-2 gap-3">
+    <button type="button" class="btn btn-secondary btn-lg" @click="$store.dsModals.close()">Cancel</button>
+    <button type="button" class="btn btn-primary btn-lg" :disabled="!checked"
+            @click="$store.dsModals.close()">Continue</button>
+  </div>
+</div>

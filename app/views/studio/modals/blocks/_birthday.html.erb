@@ -1,0 +1,134 @@
+<%#
+  Birthday modal — engine primitive. Collects a real date of birth
+  (Month / Day / Year) and submits it. Homed in the engine as the heavier sibling
+  of studio/modals/shared/_age_attestation (the lighter one-checkbox legal
+  attestation). RUN ONE OR THE OTHER, not both: the attestation is a signup-time
+  "I confirm I'm of legal age" checkbox; this is an entry-time DOB gate that a
+  server can recompute and stamp.
+
+  RENAMED 2026-08-24, and the rename carries a behaviour change. This partial was
+  `blocks/_age_verify` and it owned BOTH halves of the question: it collected the
+  date AND, when the date failed, it turned red and disabled its own button. That
+  is a dead end — the one screen state with nothing to press and nowhere to go.
+  The two halves are now two cards:
+
+    THIS ONE (birthday)  — asks. Always submittable.
+    blocks/_age_gate     — answers, when the answer is no. Carries the CTAs
+                           (watch instead / fix the date), so the refusal is a
+                           card with somewhere to go rather than red text.
+
+  So an under-age date no longer disables the button; it SUBMITS, and the app's
+  verdict opens the age-gate card. The inline red text that used to carry the
+  refusal is gone. What remains red here is a genuine ERROR — an invalid date, a
+  network failure — which is a different thing from "you are too young", and
+  conflating the two is what made the old state a dead end.
+
+  CRITICAL — the engine hardcodes NO legal policy. It renders the modal UI, the
+  DOB fields, and the submit; everything legal is app-supplied:
+
+    min_age     (Integer, OPTIONAL) — the app's minimum age. There is NO engine
+                default (18 is itself a policy value); the app resolves it from
+                its own policy against its own server-detected jurisdiction.
+                ABSENT (or 0) = this app asks for a birthday and does not gate on
+                it. That is a first-class mode, not a degraded one: a hub app may
+                want the date for a greeting and have no bar at all, and the card
+                then drops the age line, the eligibility wording and the refusal
+                handoff rather than rendering "You must be 0+".
+    submit_url  (String, REQUIRED)  — the app endpoint the DOB POSTs to. The
+                app owns the authoritative recompute + DOB persistence; the modal
+                only shows the response.
+    state       (String, optional)  — a PASSIVE jurisdiction label for the copy
+                (e.g. "CA"). Server-detected upstream; the modal never detects
+                geography and never offers an editable state field (a spoofable
+                client state must not be able to lower the bar). Blank => the
+                jurisdiction clause is dropped.
+    title       (String, optional)  — modal title. Default "Your birthday"
+                (it was "Verify your age" under the old _age_verify name).
+    intro       (String, optional)  — the lead sentence after the age line.
+    fine_print  (String, optional)  — the app's legal / jurisdiction copy (e.g.
+                its per-state age table). The engine ships only a neutral,
+                policy-free default; the app passes its real copy here.
+    modal_store (String, optional)  — Alpine store backing close(). Default "modals".
+    age_gate_modal_id (String, optional) — the id opened when the app’s verdict is
+                UNDER age. Default "age-gate". Pass nil to keep the old
+                inline-refusal behaviour (the refusal then falls back to the
+                error line), which exists only so a host mid-adoption is not
+                forced to register a second modal on the same deploy.
+    demo        (Boolean, optional) — style-guide preview: resolve locally, no POST.
+    demo_underage (Boolean, optional) — style-guide preview ONLY: make the local
+                resolve take the REFUSED branch, so the guide can show the
+                handoff without a backend. Ignored unless demo.
+
+  Requires window.birthdayModal — render studio/_birthday_assets once at
+  layout level (the factory can’t ship inside this template; a cloned script
+  never runs). Single root element (modal-host template mount rule).
+%>
+<%
+  # min_age is OPTIONAL now. Absent (or 0) means this app asks for a birthday and
+  # does not gate on it — McRitchie Studio wants the date for a greeting, not for
+  # eligibility. Present means the app validates, and the shape of that validation
+  # is the APP's: turf-monster's varies by jurisdiction, which is exactly why the
+  # engine takes a resolved number and a passive label rather than a rule.
+  min_age     = local_assigns[:min_age]
+  validates   = min_age.to_i.positive?
+  submit_url  = local_assigns.fetch(:submit_url)
+  state       = local_assigns[:state].to_s.strip
+  title       = local_assigns.fetch(:title, "Your birthday")
+  intro       = local_assigns.fetch(:intro,
+                  validates ? "Enter your date of birth to confirm you're eligible — we only ask once."
+                            : "Enter your date of birth — we only ask once.")
+  fine_print  = local_assigns.fetch(:fine_print,
+                  validates ? "We use your date of birth only to confirm eligibility."
+                            : "We use your date of birth only to know when to wish you a happy birthday.")
+  modal_store = local_assigns.fetch(:modal_store, "modals")
+  demo        = local_assigns.fetch(:demo, false)
+  demo_underage     = local_assigns.fetch(:demo_underage, false)
+  age_gate_modal_id = local_assigns.fetch(:age_gate_modal_id, "age-gate")
+%>
+<div x-data="birthdayModal({ minAge: <%= min_age.to_i %>, state: '<%= j state %>', url: '<%= j submit_url %>', store: '<%= j modal_store %>', demo: <%= demo ? 'true' : 'false' %>, demoUnderage: <%= demo_underage ? 'true' : 'false' %>, gateId: '<%= j age_gate_modal_id.to_s %>' })">
+  <%= render layout: "studio/modals/blocks/shell", locals: { title: title, modal_store: modal_store } do %>
+    <%# The age line only exists when the app HAS a bar. A card that says
+        "You must be 0+" is what an unconditional line produces for a host that
+        just wants the date. %>
+    <p class="text-sm text-muted mb-4">
+      <% if validates %>
+        You must be <span class="text-heading font-semibold"><%= min_age %>+</span><%= state.present? ? " in #{state}" : "" %>.
+      <% end %>
+      <%= intro %>
+    </p>
+
+    <%# Month / Day / Year — the engine's one DOB field, shared with the profile
+        page's birthday row. It lived here first and turf-monster forked a second
+        copy; extracting it is what stops the two drifting. %>
+    <div class="mb-4">
+      <%= render "studio/fields/date_of_birth" %>
+    </div>
+
+    <%# NO inline too-young hint. It used to live here, and turning the card red
+        while disabling its own button is the dead end this rename removed — the
+        refusal is now its own card (blocks/_age_gate) with somewhere to go.
+
+        This line stays for genuine ERRORS: an invalid date, a network failure.
+        A refusal is not an error, and showing them in the same red paragraph is
+        what let the dead end hide. %>
+    <template x-if="error">
+      <p class="text-red-400 text-sm mb-3" x-text="error"></p>
+    </template>
+
+    <%# Disabled ONLY for an incomplete date or an in-flight submit. It used to be
+        disabled for an under-age date too, which is precisely the dead end: the
+        one state where the card had nothing to press. An under-age date now
+        submits like any other and the app’s verdict opens the age-gate card. %>
+    <button type="button" @click="submit()"
+            class="btn btn-primary btn-lg w-full"
+            :disabled="!complete || submitting">
+      <span x-show="!submitting">Confirm &amp; Continue</span>
+      <span x-show="submitting" class="inline-flex items-center justify-center gap-2" style="display: none;">
+        <span class="cta-spinner" aria-hidden="true"></span>
+        Verifying…
+      </span>
+    </button>
+
+    <p class="text-[11px] text-muted text-center mt-3 leading-snug"><%= fine_print %></p>
+  <% end %>
+</div>

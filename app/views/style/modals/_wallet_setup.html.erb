@@ -1,0 +1,112 @@
+<%#
+  Living style guide specimen — the onboarding chain's LAST step, "Set up your
+  wallet" (chain step 3 of 3).
+
+  This documents an APP-SPECIFIC flow. The engine deliberately does NOT own it:
+  turf-monster's app/views/modals/_wallet_setup.html.erb is ~576 lines of
+  extension-presence polling, a hosted 90-second walkthrough video, a Detailed
+  Guide route that resolves at render time, and a managed-wallet fallback for
+  grandfathered web2 accounts. None of that is shareable — it is one app's
+  answer to "how do we get this person a wallet".
+
+  What IS shared, and all this specimen composes, is the CHROME:
+    studio/modals/blocks/shell               — title row + close
+    studio/modals/blocks/progress_pill       — the 3-of-3 chain position
+    studio/modals/blocks/wallet_brand_sprite — inline brand marks, no per-app PNG
+  plus the house wallet-row idiom (brand tile, the wallet's own name, status on
+  the right, chevron) and pulse-cta, so a wallet reads identically here, in the
+  connect picker, and on the web3 step-up card.
+
+  ONE card, ONE id, a `detected` TOGGLE for the two ends of the real progression
+  (install -> waiting -> Installed -> connect). Deliberately not two specimens
+  sharing a modal id: that shape is what left the two web3-step-up cards unable
+  to tell each other apart in the glow, fixed in the same pass that added this.
+
+  WHO SEES IT — the half worth remembering. This card and the web3 step-up card
+  are OPPOSITE populations and no user can ever meet both. WalletSetupPolicy
+  exits at its own step 1 for an account that already holds a wallet; the step-up
+  card is only ever shown to accounts that DO hold one. "Get a wallet" vs "prove
+  the wallet you have".
+
+  Self-contained: no install detection, no video embed, no real routes. The
+  walkthrough is represented as a still placeholder rather than an <iframe>,
+  because the video is the app's asset and an embed here would reach off-host.
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div x-data="{
+       get props() { var c = Alpine.store('dsModals').current(); return (c && c.props) || {}; },
+       get detected() { return !!this.props.detected; }
+     }"
+     class="relative">
+  <%= render "studio/modals/blocks/wallet_brand_sprite" %>
+
+  <%= render layout: "studio/modals/blocks/shell",
+        locals: { title: "Set up your wallet", modal_store: "dsModals" } do %>
+
+    <%# Chain position — the HOST's, not this page's. It is the only one of the
+        three onboarding steps that fills the pill, which is why the pill is here
+        even though the card sits in the Web3 section beside the wallet cards. %>
+    <div class="mb-3">
+      <%= render "studio/modals/blocks/progress_pill", current: 3, total: 3 %>
+    </div>
+
+    <p class="text-sm text-body text-center mb-4">
+      This app runs on the Solana public blockchain; you will need a wallet to
+      enter contests and collect winnings.
+    </p>
+
+    <%# THE wallet row — the house idiom, glowing because it is the one thing to
+        press. Same shape the connect picker and the step-up card use. The right
+        side is the only part that moves: INSTALL before the extension exists,
+        an Installed badge once it answers. %>
+    <button type="button" @click="$store.dsModals.close()"
+            style="--pulse-cta-color: var(--color-primary); --pulse-cta-strength: 0.4; --pulse-cta-scale: 1.02"
+            class="pulse-cta w-full flex items-center gap-3 p-3 rounded-xl bg-surface-alt border border-strong hover:bg-surface transition text-left">
+      <span class="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+        <svg class="w-9 h-9" aria-hidden="true"><use href="#se-wallet-phantom"></use></svg>
+      </span>
+      <span class="font-semibold text-heading">Phantom</span>
+      <span class="ml-auto flex items-center gap-2">
+        <span x-show="!detected" class="text-xs text-muted uppercase tracking-wide">Install</span>
+        <span x-show="detected" class="badge border-primary text-primary">Installed</span>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-muted">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+        </svg>
+      </span>
+    </button>
+
+    <%# The teaching half. A brand-new player does not know what a wallet IS, so
+        the card carries its own explainer rather than sending them away to find
+        one. Represented, not embedded — see the header. %>
+    <div class="mt-4 pt-4 border-t border-strong">
+      <h4 class="text-heading font-bold text-sm mb-1">New to Solana &#129300;</h4>
+      <p class="text-sm text-body mb-3">Set up your wallet in <strong>90 seconds</strong>.</p>
+
+      <div class="rounded-lg border border-subtle bg-inset aspect-video flex flex-col items-center justify-center gap-1">
+        <span class="text-2xl leading-none" aria-hidden="true">&#9654;&#65039;</span>
+        <span class="text-2xs text-muted">walkthrough &mdash; the app supplies the video</span>
+      </div>
+
+      <button type="button" @click="$store.dsModals.close()"
+              class="btn btn-primary btn-lg w-full mt-3 flex items-center justify-center gap-2">
+        Detailed Guide
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+        </svg>
+      </button>
+    </div>
+
+    <%# Dismissible by design, and the fine print says what dismissing costs. The
+        chain is skippable; the entry gate is not, and the card is honest that
+        the two are different things. %>
+    <button type="button" @click="$store.dsModals.close()"
+            class="block mx-auto mt-4 text-sm text-secondary hover:text-heading transition">
+      Maybe later
+    </button>
+    <p class="mt-2 text-center text-2xs text-muted">
+      Rather pay by card? Link a wallet first &mdash; an entry token needs
+      somewhere to land.
+    </p>
+  <% end %>
+</div>

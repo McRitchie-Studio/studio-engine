@@ -478,7 +478,32 @@
 # The badge specs read the badge's TEXT tone and the square specs its background
 # wash — two different reds, and the first draft of this file asserted the wrong
 # one against the badge, which is the sort of thing a lane catches about itself.
-total_specs: 83
+# 2026-08-25: 88 -> 90. Two more in e2e/birthday_gate.spec.js for the age-gate
+# COUNTDOWN — its month-clamping (Jan 31 + 1 month is Feb 28, not Mar 3) and that
+# the clock actually ticks. Both were RED on the first implementation and neither
+# is visible to a markup test: an overflowed month and a frozen clock each render
+# a plausible-looking number.
+#
+# 2026-08-24: 83 -> 88. e2e/birthday_gate.spec.js adds 5 for the birthday card's
+# refusal HANDOFF — the path where an under-age date opens the age-gate card
+# instead of turning the birthday card red and disabling its own submit button.
+# It is in this lane because the server's bytes are identical either way: both
+# cards render and every String assertion in test/views passes in both worlds.
+# What only a browser sees is birthdayModal's submit() deciding the refusal is
+# not an error and swapping the store.
+# 2026-08-26: 90 -> 92. Two more in e2e/birthday_gate.spec.js for the age gate's
+# RETURN TRIP — the back link handing the entered date back to the birthday card,
+# and that the restored date is still RE-JUDGED on submit. Neither is visible to a
+# markup test: three empty <select>s render identically whether the values come
+# back, because they are chosen after mount. Both were verified RED against the
+# shipped defect (back() swapping with an empty props bag) and against the factory
+# not seeding from what it is handed, with the lab server killed between runs.
+#
+# The second spec is the one that keeps the convenience honest: a restored date
+# must still be REFUSED on resubmit. "The card came back filled in" and "the card
+# came back filled in and now accepts what it just refused" are the same screen.
+
+total_specs: 92
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -490,7 +515,7 @@ total_specs: 83
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 83
+executed: 92
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

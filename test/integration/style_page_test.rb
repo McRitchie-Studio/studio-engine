@@ -373,11 +373,15 @@ class StylePageTest < ActiveSupport::TestCase
     end
   end
 
-  # --- 6c. Web3 Contest + Contest entry & eligibility flows -------------------
+  # --- 6c. Web3 + Contest entry & eligibility flows ---------------------------
 
-  # The Modals sub-sections rename ("Web3" -> "Web3 Contest", "Eligibility &
-  # entry" -> "Contest entry & eligibility") and reorder (entry sits DIRECTLY
-  # under Web3 Contest).
+  # The Modals sub-section names and their ORDER: entry sits DIRECTLY under Web3.
+  #
+  # That heading has been renamed twice. It was "Web3", became "Web3 Contest" in
+  # 0.27, and went back to "Web3" on 2026-08-25 — the section stopped being only
+  # about contest entry once Setup Wallet and the Sign Wallet pair moved into it,
+  # and the longer name was describing a subset of its own cards. What has held
+  # across both renames is the ORDER, which is what this asserts.
   def modals_subheadings(html)
     modals_start = html.index('id="modals"')
     tricks_start = html.index('id="tricks"')
@@ -387,29 +391,30 @@ class StylePageTest < ActiveSupport::TestCase
     slice.scan(%r{text-xl font-bold text-heading">([^<]+)</h3>}).flatten
   end
 
-  test "the Modals sub-sections rename Web3 Contest + Contest entry, in the right order" do
+  test "the Modals sub-sections carry the right names, in the right order" do
     headings = modals_subheadings(render_index)
 
-    web3     = headings.index("Web3 Contest")
+    web3     = headings.index("Web3")
     entry    = headings.index("Contest entry &amp; eligibility")
     leveling = headings.index("Profile Leveling")
 
-    refute_nil web3,  "the Web3 section is renamed to Web3 Contest"
-    refute_nil entry, "the section is renamed to Contest entry & eligibility"
+    refute_nil web3,  "the wallet + on-chain section is named Web3"
+    refute_nil entry, "the section is named Contest entry & eligibility"
     refute_nil leveling, "Profile Leveling still present"
 
-    refute_includes headings, "Web3", "the bare 'Web3' heading is gone (renamed to Web3 Contest)"
+    refute_includes headings, "Web3 Contest",
+      "the section covers more than contest entry now (Setup Wallet, the Sign Wallet pair)"
     refute_includes headings, "Eligibility &amp; entry", "the old heading is gone"
 
-    assert_operator leveling, :<, web3, "Web3 Contest follows Profile Leveling"
+    assert_operator leveling, :<, web3, "Web3 follows Profile Leveling"
     assert_equal web3 + 1, entry,
-      "Contest entry & eligibility sits DIRECTLY under Web3 Contest (no section between)"
+      "Contest entry & eligibility sits DIRECTLY under Web3 (no section between)"
   end
 
-  test "the Web3 Contest walk + Contest entry flow wire every specimen Open affordance" do
+  test "the Web3 walk + Contest entry flow wire every specimen Open affordance" do
     html = render_index
 
-    # Web3 Contest walk: Connect Wallet -> Processing -> On-chain success/error.
+    # Web3 walk: Connect Wallet -> Processing -> On-chain success/error.
     assert_includes html, "$store.dsModals.open('wallet-connect')"
     assert_includes html, "$store.dsModals.open('onchain-tx', { state: 'processing'"
     assert_includes html, "$store.dsModals.open('onchain-tx', { state: 'success'"
@@ -902,4 +907,728 @@ class StylePageTest < ActiveSupport::TestCase
     assert_includes html, ".pulse-cta",
       "the pulse specimen surfaces the .pulse-cta class name"
   end
+  # --- 11. sections group by SUBJECT, not by moment ---------------------------
+  #
+  # The Onboarding section folded into Profile on 2026-08-24. It grouped cards by
+  # WHEN they are shown ("just after signup"), which put the birthday card in one
+  # section and the picture cards in another despite both being about who the
+  # account is. Grouping by subject also let the wallet step move to the wallet
+  # cards, where it belongs.
+
+  # Nokogiri, not string matching: "does this label appear on the page" cannot
+  # tell WHICH section it appears in, and the section is the whole point here.
+  def section_html(heading)
+    doc = Nokogiri::HTML(render_index)
+    h3  = doc.css("h3").find { |n| n.text.strip == heading }
+    assert h3, "no section heading #{heading.inspect} on the page"
+    h3.ancestors("section").first.to_html
+  end
+
+  # The specimen cards a section renders, in page order. Read off the open-button
+  # aria-label, which is the one place a card's own name appears verbatim — the
+  # visible header is uppercased by CSS and the reference prose mentions other
+  # cards by name.
+  def section_cards(heading)
+    section_html(heading).scan(/aria-label="Open the (.+?) modal"/).flatten
+  end
+
+  PROFILE_ORDER = [
+    "First name", "Birthday", "Age gate",
+    "Image upload", "Crop photo", "Saving card",
+    # The email-change handoff reads LAST because it is the only Profile card
+    # that changes nothing when it is shown: the change is held until a link in
+    # the person's CURRENT inbox is clicked.
+    "Email change pending"
+  ].freeze
+
+  WEB3_ORDER = [
+    "Connect wallet", "Setup Wallet",
+    "Sign Wallet", "Sign Wallet (no remembered brand)",
+    "Processing on-chain tx", "On-chain success", "On-chain error",
+    # Co-sign refused sits WITH the other failure deliberately: On-chain error is
+    # the chain saying no, this is the SERVER saying no. Reading either alone
+    # leaves you unaware the other exists.
+    "Co-sign refused",
+    # The three FUNDING cards run together, because they are one question asked
+    # three ways: deposit an address, top up with a rail, or see every rail. A
+    # reader comparing them has to have them adjacent.
+    "Wallet deposit", "Top up wallet", "Add funds hub",
+    "Buy entry token", "Coinbase ramp (preflight)",
+    "Entry confirmed",
+    # The two reconciliation cards close the section, after the happy path they
+    # interrupt: Network guard is asked BEFORE a request is signed, Wallet
+    # changed AFTER the extension moves underneath a live session. Both read
+    # as noise anywhere earlier, because neither makes sense until you know what
+    # a normal wallet run looks like.
+    "Network guard", "Wallet changed"
+  ].freeze
+
+  # Rails.root is the DUMMY app in this suite, not the engine — a source read
+  # rooted there silently looks in test/dummy and raises ENOENT. Engine files
+  # resolve through Studio::Engine.root.
+  WALLET_SETUP_SPECIMEN =
+    Studio::Engine.root.join("app/views/style/modals/_wallet_setup.html.erb").freeze
+
+  test "the Onboarding section is gone, folded into Profile" do
+    doc = Nokogiri::HTML(render_index)
+    headings = doc.css("h3").map { |n| n.text.strip }
+    assert_not_includes headings, "Onboarding",
+      "Onboarding grouped by MOMENT; its cards moved to the sections that own their subject"
+  end
+
+  test "the Profile section carries who-the-account-is, in order" do
+    assert_equal PROFILE_ORDER, section_cards("Profile"),
+      "Profile runs name -> birthday -> the refusal -> picture; the birthday pair must stay adjacent"
+  end
+
+  test "the Web3 section runs get-a-wallet then spend-from-it, in order" do
+    assert_equal WEB3_ORDER, section_cards("Web3"),
+      "the wallet cards run in the order a player meets them"
+  end
+
+  test "wallet setup sits with the wallet cards, not with the signup chain" do
+    # It moved out of Onboarding on 2026-08-24: it is about GETTING a wallet, so
+    # it belongs beside the card that asks a player to PROVE one.
+    assert_not_includes section_cards("Profile"), "Setup Wallet"
+    cards = section_cards("Web3")
+    assert_operator cards.index("Setup Wallet"), :<, cards.index("Sign Wallet"),
+      "get-a-wallet reads before prove-your-wallet"
+  end
+
+  test "the wallet setup specimen composes engine chrome rather than copying it" do
+    # The Tier-2 contract: an app-specific flow may live here, but only if it is
+    # built from engine blocks. A specimen that hand-rolls its own chrome is a
+    # second copy of the shell/pill/brand marks, which is what this catches.
+    source = WALLET_SETUP_SPECIMEN.read
+    # Match the QUOTED path, not the bare one. The bare form also matches this
+    # file's own header comment, which lists all three blocks by name — so the
+    # test passed with every render call DELETED. Proved by mutation while
+    # control-checking batch 3; the quotes are what tie the assertion to a real
+    # render rather than to prose about one.
+    %w[shell progress_pill wallet_brand_sprite].each do |block|
+      assert_includes source, %("studio/modals/blocks/#{block}"),
+        "the specimen must compose the engine's #{block} block, not re-draw it"
+    end
+  end
+
+  test "the wallet setup specimen renders and is registered on the guide's host" do
+    html = render_index
+    assert_includes html, "$store.dsModals.current().id === 'wallet-setup'",
+      "the specimen needs a registration on the page-scoped host or the card opens blank"
+    assert_includes html, "Set up your wallet", "the wallet setup card renders its title"
+  end
+
+  # --- 12. the birthday / age-gate split --------------------------------------
+
+  test "the birthday card is ONE card with a validation toggle" do
+    # It was two specimens ("Birthday" and "Birthday (underage)") until
+    # 2026-08-25, which read as two components while the second was the first
+    # with a prop flipped. The toggle is the honest shape.
+    cards = section_cards("Profile")
+    assert_includes cards, "Birthday"
+    assert_not_includes cards, "Birthday (underage)",
+      "the refused branch is a TOGGLE on the birthday card, not a second specimen"
+
+    html = render_index
+    assert_includes html, "$store.dsModals.open('birthday', { validates: opts.validates })",
+      "the card opens through its own age-validation toggle"
+    assert_includes html, "Age validation",
+      "the toggle is labelled for the RULE, not for this app's feature flag"
+  end
+
+  # The e2e lane drives the LAB, whose two modes are separate registrations with
+  # baked-in locals — so it cannot see this. The specimen picks its mode from a
+  # PROP, and the age gate's back() forwards only the three DOB parts, so
+  # `validates` is absent on every return trip and the default is load-bearing:
+  # read `undefined` as "no bar" and the return trip from the gate lands on the
+  # card with no age line, where the same under-age date is accepted. That
+  # shipped once (caught in review 2026-08-25); this is the guard. It survived
+  # back() starting to carry the date (2026-08-26) precisely because that change
+  # forwards three named keys rather than the whole props bag.
+  test "the birthday specimen treats an absent validates prop as VALIDATING" do
+    source = Studio::Engine.root.join("app/views/style/modals/_birthday.html.erb").read
+
+    assert_includes source, "this.props.validates !== false",
+      "absent validates must mean validating — a bare truthiness test sends the " \
+      "gate's empty-props return trip to the no-bar card"
+    refute_match(/x-if="props\.validates"/, source,
+      "the branches must read the shared getter, not the raw prop, or the default " \
+      "lives in two places and they will disagree")
+  end
+
+  # --- the ported specimens (batch 2 of the /admin/modals migration) ----------
+  #
+  # Each of these replaced a card that existed ONLY in turf-monster's own gallery,
+  # which is deprecated and cannot be deleted until every state it shows has a
+  # home here. A missing registration is the failure that matters: the card opens
+  # a blank shell, which looks like a styling bug rather than a missing partial.
+
+  PORTED_SPECIMENS = {
+    "cosign-rejected"      => "Co-sign refused",
+    "unsubscribe-confirm"  => "Leave the newsletter?",
+    "unsubscribe-goodbye"  => "See you later",
+    "quest-success"        => "Quest success (off-page)"
+  }.freeze
+
+  # Registered ids, read off the <template x-if> ELEMENTS.
+  #
+  # NOT a substring search for "current().id === '<id>'": ds_glow builds the glow
+  # expression from that exact text, so every carded modal contains it whether or
+  # not it is registered. The first version of this test asserted the substring,
+  # passed with a registration deliberately deleted, and would have shipped a card
+  # that opens a blank shell. Third time this shape of trap has bitten in this
+  # file — assert the ELEMENT, not the string.
+  def registered_modal_ids(html = render_index)
+    Nokogiri::HTML(html).css("template[x-if]").filter_map { |t|
+      t["x-if"][/\A\$store\.dsModals\.current\(\)\.id === '([a-z0-9-]+)'\z/, 1]
+    }
+  end
+
+  # The full <template> a specimen is registered in, nesting-aware.
+  #
+  # A non-greedy /id === '...'.*?<\/template>/ stops at the FIRST closing tag,
+  # which for any specimen containing its own <template x-if> is an INNER one —
+  # so the captured block silently excludes the half of the card the test was
+  # written to check. That is how the top-up fork's second face read as missing
+  # from a page rendering it correctly. Count depth instead.
+  def specimen_block(modal_id, html = render_index)
+    at = html.index("id === '#{modal_id}'")
+    return nil unless at
+
+    # Walk back to the <template that OPENS this registration. Counting from the
+    # id instead starts at depth 0 mid-tag, so the first closing tag seen is the
+    # inner one and the block ends before the half the test cares about.
+    start = html.rindex("<template", at)
+    return nil unless start
+
+    depth = 0
+    pos   = start
+    while (m = html.match(/<\/?template\b/, pos))
+      depth += m[0].start_with?("</") ? -1 : 1
+      pos = m.end(0)
+      if depth.zero?
+        close = html.index(">", pos)
+        return html[start..close]
+      end
+    end
+    nil
+  end
+
+  test "every ported specimen is both carded AND registered on the host" do
+    html  = render_index
+    cards = html.scan(/aria-label="Open the (.+?) modal"/).flatten
+    ids   = registered_modal_ids(html)
+
+    PORTED_SPECIMENS.each do |modal_id, label|
+      assert_includes cards, label, "no specimen card for #{modal_id}"
+      assert_includes ids, modal_id,
+        "#{modal_id} has a card but NO host registration — it opens a blank shell " \
+        "(registered: #{ids.inspect})"
+    end
+  end
+
+  test "the unsubscribe pair is registered together, because one swaps to the other" do
+    # The confirm card swaps to the goodbye beat. A handoff to an unregistered id
+    # renders nothing, and an empty modal reads as a styling bug — the same defect
+    # class the birthday/age-gate pair carries a guard for.
+    html = render_index
+    assert_includes html, "$store.dsModals.swap('unsubscribe-goodbye')",
+      "the confirm card must hand off to the goodbye beat"
+    assert_includes registered_modal_ids(html), "unsubscribe-goodbye",
+      "the card it hands off to must be REGISTERED — a glow expression mentioning " \
+      "the id is not a registration"
+  end
+
+  test "the ported specimens compose engine chrome rather than copying it" do
+    # The Tier-2 contract. Each of these four already rendered card_header in
+    # turf-monster, so a specimen that hand-rolls its own header is a SECOND copy
+    # of chrome the app already borrows — which is what style/modals/_wallet_deposit
+    # is, and what this batch was written not to add.
+    root = Studio::Engine.root.join("app/views/style/modals")
+    %w[_cosign_rejected _unsubscribe_confirm _unsubscribe_goodbye _quest_success].each do |f|
+      source = root.join("#{f}.html.erb").read
+      # The trailing quote+comma matters: a bare path is a PREFIX of any longer
+      # name, so the old form passed against a hand-rolled "…/card_header_custom"
+      # — a second copy of the chrome, which is the one thing this refuses.
+      assert_includes source, %(render "studio/modals/blocks/card_header",),
+        "#{f} must compose the engine's card_header, not re-draw it"
+    end
+    # quest-success also borrows the leveling seeds bar, which is the engine's.
+    assert_includes root.join("_quest_success.html.erb").read,
+      %(render "studio/modals/blocks/seeds_bar",),
+      "the quest celebration's bar is an engine :leveling primitive, not a copy"
+  end
+
+  test "the contest-entry section still resumes from the birthday card" do
+    # Moving the CARD must not break the demo walk: confirming still advances to
+    # Entry tokens through the page-level 'age-verified' hook, which the rename
+    # deliberately left alone because consuming apps already listen on it.
+    html = render_index
+    assert_includes html, "@age-verified.window=",
+      "the page-level age-verified wiring is what carries the entry walk"
+    assert_includes html, "$store.dsModals.open('entry-tokens', { step: 'picker' })",
+      "confirming the birthday card must still advance to the Entry tokens picker"
+  end
+
+  # --- 13. one modal id, two cards: the glow must tell them apart --------------
+
+  test "both web3 step-up specimens carry a glow discriminator" do
+    # The pair opens the SAME modal id. Before this discriminator existed only
+    # the first card passed a glow_when, so opening the SECOND card lit the
+    # FIRST — the precise bug a glow helper exists to prevent. ds_glow gained a
+    # provider: presence check because the brand is a free-form string with no
+    # fixed value for step:/state: to match.
+    #
+    # ASSERT ON THE FULL CONJUNCT, never the bare expression. "!$store…provider"
+    # is a SUBSTRING of "!!$store…provider", so a naive assert_includes for the
+    # no-brand form matches the remembered card's expression and passes even when
+    # the no-brand card has no glow at all. That is precisely how this test first
+    # went green against a deliberately broken page. The "&& " prefix is what
+    # makes the two forms mutually exclusive.
+    html = render_index
+    present = "&& !!$store.dsModals.current().props.provider"
+    absent  = "&& !$store.dsModals.current().props.provider"
+    refute absent.include?(present) || present.include?(absent),
+      "the two glow forms must not be substrings of one another, or neither assertion below bites"
+
+    assert_includes html, present,
+      "the remembered-brand card must glow only when a provider is present"
+    assert_includes html, absent,
+      "the no-brand card must glow only when a provider is absent"
+  end
+
+  test "the two step-up thumbnails are visually distinguishable" do
+    # They used to differ by ONE border-dashed class on a 20px row, which no
+    # reviewer can see — and these two are the likeliest pair on the page to be
+    # mistaken for duplicates, because they share a modal id AND a title.
+    section = section_html("Web3")
+    assert_includes section, "border border-dashed",
+      "the no-brand thumbnail keeps its dashed empty slot"
+    assert_includes section, %(<span class="w-4 h-4 rounded shrink-0" style="background: var(--color-primary)"></span>),
+      "the remembered thumbnail needs a filled brand tile — a dashed border alone is not a visible difference"
+  end
+
+
+  # --- 14. batch 3: the modals that had a card on NEITHER page -----------------
+  #
+  # Batches 1 and 2 ported cards that at least existed in turf-monster's own
+  # gallery. These six existed only in the running app: no card here, no card
+  # there. A state with no card anywhere is a state nobody reviews, which is how
+  # the age-gate timer leak survived a full cycle.
+
+  BATCH3_SPECIMENS = {
+    "email-change-pending" => "Email change pending",
+    "newsletter-email"     => "Newsletter email",
+    "network-guard"        => "Network guard",
+    "wallet-changed"       => "Wallet changed",
+    "it-begins"            => "It Begins",
+    "rate-limit-general"   => "Rate limited (soft)"
+  }.freeze
+
+  test "every batch-3 specimen is both carded AND registered on the host" do
+    html  = render_index
+    cards = html.scan(/aria-label="Open the (.+?) modal"/).flatten
+    ids   = registered_modal_ids(html)
+
+    BATCH3_SPECIMENS.each do |modal_id, label|
+      assert_includes cards, label, "no specimen card for #{modal_id}"
+      assert_includes ids, modal_id,
+        "#{modal_id} has a card but NO host registration — it opens a blank shell " \
+        "(registered: #{ids.inspect})"
+    end
+  end
+
+  BATCH3_SOURCES = Studio::Engine.root.join("app/views/style/modals").freeze
+
+  test "the batch-3 specimens compose engine chrome rather than copying it" do
+    # The Tier-2 contract, same as batch 2. Five of the six are card_header
+    # compositions. It Begins is the exception ON PURPOSE: it hand-rolls its
+    # heading because the block it borrows is the DRAINING CTA, which is the only
+    # part of that card worth a specimen.
+    # Assert the CLOSING quote too. A bare path is a PREFIX of any longer name,
+    # so "studio/modals/blocks/card_header" matches a hand-rolled
+    # "…/card_header_custom" — a second copy of the chrome, which is the one
+    # thing this test exists to refuse. Control-checking this batch caught the
+    # weak form passing against exactly that mutant.
+    %w[_email_change_pending _newsletter_email _network_guard
+       _rate_limit_general _wallet_changed].each do |f|
+      assert_includes BATCH3_SOURCES.join("#{f}.html.erb").read,
+        %(render "studio/modals/blocks/card_header",),
+        "#{f} must compose the engine's card_header, not re-draw it"
+    end
+
+    assert_includes BATCH3_SOURCES.join("_it_begins.html.erb").read,
+      %(render "studio/modals/blocks/cta_redirect",),
+      "It Begins exists to demo the engine's draining CTA — without that block it " \
+      "is a plain announcement and has no reason to be here"
+  end
+
+  test "no batch-3 x-data is truncated by an inner double quote" do
+    # An inner double quote CLOSES the attribute, and Alpine then mounts a silent
+    # no-op: the card renders, looks fine, and does nothing. Nothing raises.
+    #
+    # The read is deliberately naive — /x-data="(.*?)"/ stops at the FIRST double
+    # quote — because that is exactly what the browser does. A well-formed
+    # attribute therefore ends at the object literal's closing brace; a truncated
+    # one ends mid-expression. Asserting the brace is what makes a truncation
+    # visible instead of silently shortening the captured string.
+    %w[_email_change_pending _newsletter_email _network_guard
+       _rate_limit_general _wallet_changed].each do |f|
+      source = BATCH3_SOURCES.join("#{f}.html.erb").read
+      body   = source[/x-data="(.*?)"/m, 1]
+      assert body, "#{f} declares no x-data — this guard has nothing to check"
+      assert body.strip.end_with?("}"),
+        "#{f}'s x-data is cut short at a double quote — Alpine will mount a silent " \
+        "no-op (captured tail: #{body.strip[-40..].inspect})"
+    end
+  end
+
+  # RENDERED, not grepped — and it took a review to notice why the grep was worse
+  # than merely weak. `modal_store` is consumed in exactly one place: the anchor's
+  # @click else-branch, reached only when the destination is NULL. The It Begins
+  # specimen passed a TRUTHY href ("'#modals'"), so that branch was unreachable and
+  # the old source-text assertion guarded dead code — it would have gone on passing
+  # with the store wired to anything at all.
+  #
+  # Asserted PAGE-WIDE rather than on one specimen's subtree: "no drain on this
+  # guide ends as a dead spinner" is the property worth holding, and it cannot be
+  # quietly reintroduced by the next card that copies this one.
+  test "no drain specimen redirects — a truthy destination ends as a dead spinner" do
+    html  = render_index
+    doc   = Nokogiri::HTML.fragment(html)
+    cards = doc.css("[x-data]").select { |el| el["x-data"].to_s.include?("_redirectTimer") }
+
+    refute_empty cards, "the guide must render at least one cta_redirect specimen"
+
+    # THE DESTINATION IS READ OFF THE TIMER, not off the anchor. x-data survives HTML
+    # parsing intact; the anchor's @click does NOT — it is a multi-line handler, and
+    # the parser splits it into pseudo-attributes named `if`, `return`, `var`, `go`
+    # and `else`. Reading `self.go(<dest>)` also asks the more honest question, since
+    # the timer firing is the exact mechanism of the defect.
+    destinations = cards.map do |card|
+      card["x-data"].to_s[/self\.go\(([^)]*)\)/, 1].to_s.strip
+    end
+
+    refute_empty destinations.compact_blank, "each drain specimen must call go() on a timer"
+
+    destinations.each do |dest|
+      refute_match(/\A'#/, dest,
+        "a same-document fragment destination (#{dest}) is TRUTHY, so the timer takes " \
+        "the redirect path and sets redirecting = true — and because the browser never " \
+        "leaves the document, nothing resets it. The card ends as a permanently dead " \
+        "spinner: label and drain bar hidden, anchor pointer-events-none and " \
+        "aria-disabled=true. Use the block's null-destination gallery mode instead.")
+    end
+
+    # The store is only reachable on the null-destination path, and it can only be
+    # asserted on the RENDERED page: see the @click note above. This is a render-tier
+    # fact — the partial was invoked with these locals and produced this wiring — not
+    # a grep of the ERB source, which is what this test used to be and why it guarded
+    # dead code.
+    # Asserted as an ABSENCE, deliberately. The positive form (`assert_includes html,
+    # "$store.dsModals.close()"`) passes for the wrong reason: other specimens on this
+    # page render that same string, so it stays green even when THIS card is wired to
+    # the wrong store. Proven — mutating It Begins to modal_store "modals" left the
+    # positive assertion passing. The host store never belonging on this guide is the
+    # property that actually bites.
+    assert_includes html, "$store.dsModals.close()",
+      "the guide must wire at least one drain through its page-scoped store"
+    refute_includes html, "$store.modals.close()",
+      "no specimen may close through the HOST store — $store.modals does not exist on " \
+      "this guide, so close() would throw inside the timer where nothing surfaces it"
+  end
+
+  test "the network guard keeps Continue inert until the box is ticked" do
+    # The card's entire reason to exist. A request signed against the wrong
+    # network looks identical to a correct one until it is irreversible, so the
+    # acknowledgement has to be explicit rather than implied by the click.
+    source = BATCH3_SOURCES.join("_network_guard.html.erb").read
+    assert_includes source, %(:disabled="!checked"),
+      "Continue must be inert until the acknowledgement is ticked"
+    assert_includes source, %(x-model="checked"),
+      "the tick has to bind to the same flag Continue reads"
+  end
+
+  test "the soft rate limit clears its interval in a destroy() METHOD" do
+    # Alpine 3 dispatches no "destroy" DOM event, so @destroy="stop()" never
+    # fires and a 1 Hz interval outlives every close. That shipped once, on
+    # blocks/_age_gate, and was caught in review rather than by a test — so this
+    # card carries the guard the age gate now also carries.
+    source = BATCH3_SOURCES.join("_rate_limit_general.html.erb").read
+    assert_includes source, "destroy() { this.stop(); }",
+      "cleanup must be a destroy() method on the x-data — the idiom Alpine invokes"
+    assert_not_includes source, "@destroy=",
+      "an @destroy listener never fires in Alpine 3; the timer would survive the close"
+  end
+
+  test "the wallet-changed card shows BOTH addresses" do
+    # Recognising your own address is the only way to tell a deliberate account
+    # switch from an accident, and it is the one check the app cannot make for
+    # the person. One address alone answers nothing.
+    source = BATCH3_SOURCES.join("_wallet_changed.html.erb").read
+    assert_includes source, %(x-text="short(props.currentAddress)),
+      "the session's address must be printed"
+    assert_includes source, %(x-text="short(props.newAddress)),
+      "the extension's new address must be printed beside it"
+  end
+
+
+  # --- 15. the funding chrome primitives -------------------------------------
+
+  FUNDING_CHROME_SPECIMENS = {
+    "ds-rail-row" => "Rail row",
+    "ds-close-x"  => "Close ×"
+  }.freeze
+
+  test "both funding chrome specimens are carded AND registered" do
+    html  = render_index
+    cards = html.scan(/aria-label="Open the (.+?) modal"/).flatten
+    ids   = registered_modal_ids(html)
+
+    FUNDING_CHROME_SPECIMENS.each do |modal_id, label|
+      assert_includes cards, label, "no specimen card for #{modal_id}"
+      assert_includes ids, modal_id,
+        "#{modal_id} has a card but NO host registration — it opens a blank shell " \
+        "(registered: #{ids.inspect})"
+    end
+  end
+
+  test "the rail-row specimen ranks exactly one rail" do
+    # The arrangement IS the demo. Three equally-weighted rails would show the
+    # primitive while teaching the opposite of what it is for — a hub that asks
+    # the person to compare payment processors. Read the rendered specimen, not
+    # its source: the source could pass `emphasis: :primary` three times and this
+    # would still be the assertion that noticed.
+    # SCOPED TO THE SPECIMEN'S OWN TEMPLATE. Page-wide counts answer a different
+    # question: `border border-strong hover:border-primary` is a generic Tailwind
+    # combination and seven of them render elsewhere on this page, so a page-wide
+    # neutral count would sit at 7 whether this specimen drew two rails or none.
+    block = specimen_block("ds-rail-row")
+    assert block, "the rail-row specimen did not render"
+
+    assert_equal 1, block.scan("border-2 border-primary hover:bg-surface").size,
+      "exactly one rail may carry the primary emphasis"
+    assert_equal 2, block.scan("border border-strong hover:border-primary").size,
+      "two rails must render neutral"
+    assert_equal 1, block.scan("border border-subtle opacity-60").size,
+      "and one must show the announced-but-not-wired shape"
+  end
+
+  test "the guide's funding chrome closes the PAGE-SCOPED store" do
+    # Both specimens render the engine's close_x, whose default store is the real
+    # host (`modals`) — which this page does not run. Left at the default the mark
+    # renders, looks right, and throws inside a click handler where nothing
+    # surfaces it. Assert on the SPECIMEN SOURCES: the page carries other cards
+    # that legitimately mention $store.modals, so a page-wide count would answer
+    # a different question.
+    root = Studio::Engine.root.join("app/views/style/modals")
+    %w[_ds_rail_row _ds_close_x].each do |f|
+      source = root.join("#{f}.html.erb").read
+      assert_includes source, %(modal_store: "dsModals"),
+        "#{f} must point the close mark at the page-scoped store"
+    end
+  end
+
+  test "the funding chrome specimens compose the primitives rather than redrawing them" do
+    # The Tier-2 contract, and the one most at risk here: these two specimens
+    # exist BECAUSE the markup was being copied, so a specimen that hand-rolls it
+    # would be the eleventh copy sitting in the cabinet meant to stop them.
+    root = Studio::Engine.root.join("app/views/style/modals")
+
+    rail = root.join("_ds_rail_row.html.erb").read
+    assert_includes rail, %(render "studio/modals/blocks/rail_row"),
+      "the rail specimen must render the engine block"
+    assert_equal 4, rail.scan(%(render "studio/modals/blocks/rail_row")).size,
+      "four rails: one primary, two neutral, one :soon — the ranking needs " \
+      "something to rank, and the third shape needs somewhere to be seen"
+    assert_not_includes rail, "w-full flex items-center gap-4 p-4 rounded-xl",
+      "the specimen must not carry its own copy of the row's class string"
+
+    close = root.join("_ds_close_x.html.erb").read
+    assert_includes close, %(render "studio/modals/blocks/close_x"),
+      "the close specimen must render the engine block"
+    assert_not_includes close, "absolute top-0 right-0 -mt-2 -mr-2",
+      "nor its own copy of the mark"
+  end
+
+
+  # --- 16. the funding modals the primitives were extracted for --------------
+
+  FUNDING_MODAL_SPECIMENS = {
+    "ds-wallet-topup" => "Top up wallet",
+    "ds-onramp-hub"   => "Add funds hub"
+  }.freeze
+
+  test "both funding modal specimens are carded AND registered" do
+    html  = render_index
+    cards = html.scan(/aria-label="Open the (.+?) modal"/).flatten
+    ids   = registered_modal_ids(html)
+
+    FUNDING_MODAL_SPECIMENS.each do |modal_id, label|
+      assert_includes cards, label, "no specimen card for #{modal_id}"
+      assert_includes ids, modal_id,
+        "#{modal_id} has a card but NO host registration — it opens a blank shell"
+    end
+  end
+
+  test "the funding specimens are built from the primitives, not from copies" do
+    # This is the whole reason the primitives were extracted first. A specimen
+    # that hand-rolled a rail would be the eleventh copy, sitting in the cabinet
+    # meant to stop them — and it would look completely fine.
+    root = Studio::Engine.root.join("app/views/style/modals")
+
+    %w[_ds_wallet_topup _ds_onramp_hub].each do |f|
+      source = root.join("#{f}.html.erb").read
+      assert_includes source, %(render "studio/modals/blocks/rail_row"),
+        "#{f} must render the engine's rail"
+      assert_includes source, %(render "studio/modals/blocks/close_x"),
+        "#{f} must render the engine's close mark"
+      assert_not_includes source, "w-full flex items-center gap-4 p-4 rounded-xl",
+        "#{f} must not carry its own copy of the rail's class string"
+      assert_not_includes source, "absolute top-0 right-0 -mt-2 -mr-2",
+        "#{f} must not carry its own copy of the close mark"
+    end
+  end
+
+  test "the hub ranks exactly one of its six rails" do
+    # Six is where ranking starts to matter: a hub of equal rails answers "which
+    # do I press" by asking the person to compare payment processors. Scoped to
+    # the specimen's own template — the page renders other rails elsewhere.
+    block = specimen_block("ds-onramp-hub")
+    assert block, "the hub specimen did not render"
+
+    assert_equal 1, block.scan("border-2 border-primary hover:bg-surface").size,
+      "exactly one rail leads"
+    assert_equal 3, block.scan("border border-strong hover:border-primary").size,
+      "three rails defer to it"
+    assert_equal 2, block.scan("border border-subtle opacity-60").size,
+      "and two are announced but not wired"
+  end
+
+  test "the top-up card carries its safety fork on ONE card" do
+    # The fork is a safety one: a web2 viewer with the USDC kill-switch on cannot
+    # pay an entry with USDC, so the primary rail becomes the token instead. Two
+    # cards would read as two products; the point is a player never sees both.
+    block = specimen_block("ds-wallet-topup")
+    assert block, "the top-up specimen did not render"
+
+    # ASSERT THE GATING, NOT THE PRESENCE. Both faces sit inside <template>s, so
+    # both strings are in the DOM no matter what the conditions say — a presence
+    # check stays green with the fork welded open, welded shut, or deleted. This
+    # was proved by mutation: three separate breakages all passed the first
+    # version of this test. So read each face out of ITS OWN template.
+    default  = block[/<template x-if="!tokenFallback">.*?<\/template>/m]
+    fallback = block[/<template x-if="tokenFallback">.*?<\/template>/m]
+
+    assert default,  "the default face must be gated on the kill-switch being OFF"
+    assert fallback, "the fallback face must be gated on it being ON"
+
+    assert_includes default, "Buy USDC with Coinbase"
+    assert_not_includes default, "Buy Entry Tokens",
+      "the two faces must be mutually exclusive — a player never sees both"
+
+    assert_includes fallback, "Buy Entry Tokens"
+    assert_not_includes fallback, "Buy USDC with Coinbase",
+      "pitching USDC to the audience that cannot spend it is the bug this fork exists to avoid"
+
+    # ...and the card offers the toggle that walks between them. Assert the
+    # rendered CHECKBOX, not the string "opts.tokenFallback" — that also appears
+    # in the card's open_expr, so a bare match survives deleting the toggle and
+    # leaves the second face in the DOM and unreachable: a card nobody reviews.
+    assert_includes render_index, %(<input type="checkbox" x-model="opts.tokenFallback"),
+      "the specimen card needs the toggle that reaches the second face"
+  end
+
+
+  # --- 17. the last three: the catalogue closes at 33 of 33 ------------------
+
+  LAST_SPECIMENS = {
+    "ds-newsletter-success" => "Subscribed! (standalone)",
+    "ds-buy-entry-token"    => "Buy entry token",
+    "ds-cdp-ramp"           => "Coinbase ramp (preflight)"
+  }.freeze
+
+  test "the last three specimens are carded AND registered" do
+    html  = render_index
+    cards = html.scan(/aria-label="Open the (.+?) modal"/).flatten
+    ids   = registered_modal_ids(html)
+
+    LAST_SPECIMENS.each do |modal_id, label|
+      assert_includes cards, label, "no specimen card for #{modal_id}"
+      assert_includes ids, modal_id,
+        "#{modal_id} has a card but NO host registration — it opens a blank shell"
+    end
+  end
+
+  test "the standalone Subscribed card walks BOTH of its forks" do
+    # Two forks, neither visible in the markup, which is why this card exists
+    # apart from the in-place leveling beat. Read each branch out of ITS OWN
+    # template: both live inside <template> elements, so both are in the DOM
+    # whatever the conditions say and a presence check proves nothing — the same
+    # trap that let three assertions pass against a broken fork on the top-up
+    # card.
+    block = specimen_block("ds-newsletter-success")
+    assert block, "the standalone Subscribed specimen did not render"
+
+    quest = block[/<template x-if="questOpen">.*?<\/template>/m]
+    other = block[/<template x-if="!questOpen">.*?<\/template>/m]
+    assert quest, "the open-quest CTA must be gated on the quest being open"
+    assert other, "the browse-contests CTA must be gated on it being closed"
+
+    assert_includes quest, "Next Quest"
+    assert_not_includes quest, "Check Out Contests",
+      "showing both hides the fork that decides where the person goes next"
+    assert_includes other, "Check Out Contests"
+    assert_not_includes other, "Next Quest"
+
+    # The seeds bar is FIRST-JOIN only. A re-subscribe earns nothing, and a flat
+    # "0 seeds" would read as a bug about the person's own account.
+    assert_includes block, %(x-if="firstJoin"),
+      "the seeds bar must be gated on a first-ever join"
+
+    # ...and the card offers both toggles. Asserted as the rendered checkboxes:
+    # the bare model strings also appear in the card's open_expr, so a string
+    # match survives deleting the toggles and leaves both forks unreachable.
+    %w[firstJoin questOpen].each do |opt|
+      assert_includes render_index, %(<input type="checkbox" x-model="opts.#{opt}"),
+        "the card needs the #{opt} toggle to reach that fork"
+    end
+  end
+
+  test "the cdp-ramp card admits it shows one state of thirteen" do
+    # A cabinet that shows one state of a thirteen-state machine WITHOUT saying
+    # so teaches a reader that the machine is simpler than it is. The partial
+    # coverage is a decision (operator, 2026-08-26: minimal migration is fine
+    # here), and a decision has to be legible to be reviewable.
+    section = section_html("Web3")
+
+    assert_includes section, "THIRTEEN states",
+      "the reference must name the real size of the machine"
+    assert_includes section, "BY DECISION",
+      "and say the gap is a decision rather than an oversight"
+  end
+
+  test "the last three compose engine chrome rather than copies" do
+    root = Studio::Engine.root.join("app/views/style/modals")
+
+    # buy-entry-token is a rail picker; cdp-ramp is a centred card. Both borrow.
+    %w[_ds_buy_entry_token _ds_cdp_ramp].each do |f|
+      source = root.join("#{f}.html.erb").read
+      assert_includes source, %(render "studio/modals/blocks/close_x"),
+        "#{f} must render the engine's close mark"
+      assert_not_includes source, "absolute top-0 right-0 -mt-2 -mr-2",
+        "#{f} must not carry its own copy of it"
+    end
+
+    buy = root.join("_ds_buy_entry_token.html.erb").read
+    assert_equal 2, buy.scan(%(render "studio/modals/blocks/rail_row")).size,
+      "two rails, one ranked above the other"
+
+    news = root.join("_ds_newsletter_success.html.erb").read
+    assert_includes news, %(render "studio/modals/blocks/card_header"),
+      "the celebration borrows the engine's header"
+    assert_includes news, %(render "studio/modals/blocks/seeds_bar"),
+      "and the engine's :leveling seeds bar — the bar is the engine's, the numbers are the app's"
+  end
+
 end

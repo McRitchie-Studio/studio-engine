@@ -35,6 +35,8 @@
                            on the left and a launch arrow on the
                            right. The "canonical" tx link.
 
+    slot_position:         :below_cta (default) or :above_cta — where the block
+                           renders. See the note on the slot itself.
     cta_label:             primary CTA button text.
     cta_href_key:          Alpine expression for the button's href.
                            Mutually exclusive with cta_event.
@@ -70,6 +72,7 @@
   fire_confetti = !!local_assigns[:confetti]
   large_title   = !!local_assigns[:large_title]
   use_drain     = has_redirect && !!local_assigns[:cta_drain]
+  slot_position = local_assigns.fetch(:slot_position, :below_cta).to_sym
 
   data_attr = "{
     _remaining: #{redirect_secs},
@@ -182,6 +185,18 @@
     </p>
   <% end %>
 
+  <%# The block, when the caller wants it ABOVE the button.
+      WHY THE POSITION IS A CHOICE. Below the CTA is right for an afterthought —
+      a badge, a stat that ticks. It is wrong for anything the person is meant to
+      READ before deciding, because the button is where a celebration card ends:
+      put a countdown under it and it is furniture behind the exit. turf's entry
+      card has always run its kickoff timer and seeds bar above the button for
+      that reason, and this is what lets the engine's card do the same instead of
+      the app forking one to keep the order. %>
+  <% if block_given? && slot_position == :above_cta %>
+    <div class="mb-4"><%= yield %></div>
+  <% end %>
+
   <%# Primary CTA — three flavors:
       1. cta_drain + auto_redirect: countdown drains over the button
       2. cta_href_key: anchor
@@ -219,10 +234,10 @@
     </button>
   <% end %>
 
-  <%# Optional inline block — appended below the CTA so callers can
-      slot in product-specific celebration UI (seeds bar, badges,
-      stat increments) without forking the partial. %>
-  <% if block_given? %>
+  <%# ...or below it, which stays the DEFAULT: every existing caller renders here
+      and none of them asked to move. A partial can only yield once, so exactly
+      one of these two branches runs. %>
+  <% if block_given? && slot_position != :above_cta %>
     <div class="mt-3"><%= yield %></div>
   <% end %>
 </div>

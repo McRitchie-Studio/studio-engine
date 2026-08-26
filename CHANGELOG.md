@@ -4,6 +4,51 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Breaking
+
+- **The age-gate DOB modal is renamed, and the refusal moved to its own card.**
+  A host that renders these paths from the released gem must update them:
+
+  | Was | Is now |
+  |-----|--------|
+  | `studio/modals/blocks/_age_verify` | `studio/modals/blocks/_birthday` |
+  | `studio/_age_verify_assets` | `studio/_birthday_assets` |
+  | `window.ageVerifyModal` | `window.birthdayModal` |
+
+  Nothing in `mcritchie-studio`, `turf-monster`, `mcritchie-industries` or `rolio`
+  rendered the old paths at the time of this change (each app that shows an age
+  gate ships its own card and shares only `studio/fields/_date_of_birth`), so the
+  rename lands with no consumer edit — but the old paths are GONE, not aliased, so
+  a future adopter reaching for `blocks/age_verify` needs this table.
+
+  **`age-verified` is deliberately unchanged.** The success event and
+  `session.ageVerified` are what consuming apps already listen on, so the rename
+  stopped short of them and no host wiring moves.
+
+- **`min_age` is now OPTIONAL on the birthday card** (was REQUIRED). Absent — or
+  `0` — means the app asks for a birthday and does not gate on it: the card drops
+  the age line, the eligibility wording and the refusal handoff. Existing callers
+  that pass a number are unaffected. There is still NO engine default, because 18
+  is itself a policy value.
+
+- **An under-age date now SUBMITS.** It used to disable the card's own submit
+  button and turn the card red — the one screen state with nothing to press. The
+  factory routes on the RESPONSE instead: `body.underage === true`, or HTTP 403,
+  opens the age-gate card; anything else non-verified stays on the error line. An
+  app adopting this must make its verify endpoint answer "too young" distinctly
+  from "bad request", because a client that blocks submission never had to.
+
+### Added
+
+- **`studio/modals/blocks/_age_gate` — the refusal card.** Where the birthday card
+  hands off when the date is under the app's bar. Headed "Easy, Young'un" under a
+  teddy bear rather than a red X, because a person who will be welcome later is
+  not an error state. Carries a LIVE COUNTDOWN to the day they qualify, built from
+  the date the birthday card passes across the store, plus the two ways out: a
+  primary CTA to watch instead (app-supplied `watch_url`, dropped entirely when
+  absent rather than rendered dead) and a back link that returns to the birthday
+  card. Displays `min_age` / `state`; computes no eligibility of its own.
+
 ### Added
 
 - **A Geo row in the shared admin dropdown, with signage when it is off.** Every
@@ -187,6 +232,31 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   should drop that.
 
 ### Fixed
+
+- **The age gate's back link now returns the date the person already entered.**
+  `blocks/_age_gate`'s "Update your Birthday" swapped back to `blocks/_birthday`
+  with an EMPTY props object, discarding the `dobYear`/`dobMonth`/`dobDay` parts
+  the birthday factory had just handed across the store — and the factory started
+  its three fields at `""` and never read them anyway. So the correction path came
+  back BLANK: a mistyped year cost all three picks, on a card whose own header
+  comment promised "a correction, not a restart".
+
+  Both sides of the seam moved. `back()` forwards the three date parts — and only
+  those three, deliberately: `minAge`, `state` and `message` describe the refusal,
+  and `validates` is load-bearing by its ABSENCE (the style guide specimen reads an
+  absent prop as validating, and a forwarded stale one would let the refusal pick
+  the next card's mode). `window.birthdayModal` gained an `init` that re-picks the
+  three selects from the props of the modal entry it mounted in, clamping a day
+  that the restored month cannot hold.
+
+  **The gate is not weakened.** Restoring the date restores the DATE and never the
+  verdict: the card comes back submittable and the app's endpoint re-decides on the
+  next submit exactly as it did on the first. `e2e/birthday_gate.spec.js` asserts a
+  restored under-age date is refused again.
+
+  **No consumer action.** A host that renders `blocks/_age_gate` and
+  `studio/_birthday_assets` gets this by upgrading; nothing in the call signature
+  changed and no host wiring moves.
 
 - **The Geo signpost now reaches every app whose admin chrome the engine owns.**
   The row added last release went into `components/_admin_dropdown` alone, on the

@@ -1,0 +1,41 @@
+<%#
+  Living style guide specimen — the Coinbase ramp, BUY PREFLIGHT only.
+
+  DELIBERATELY PARTIAL, and saying so is the point. turf's modals/_cdp_ramp is a
+  TWO-FLOW step machine — buy and cash-out — across thirteen states: preflight,
+  opening, waiting, awaiting-cdp, send, settling and the rest. This cards ONE of
+  them: the buy preflight, which is the state both funding cards hand off to and
+  therefore the only one a player reaches without already being mid-flow.
+
+  The other twelve are uncarded BY DECISION (operator, 2026-08-26: minimal
+  migration is fine here). That is a different thing from an oversight, and the
+  reference blurb on this card says so, because a cabinet that shows one state of
+  a thirteen-state machine without admitting it teaches a reader that the machine
+  is simpler than it is. /tasks/port-cdp-ramp-specimen holds the full state map
+  if the decision reverses.
+
+  APP-SPECIFIC, engine chrome: blocks/_close_x plus the centred title this whole
+  funding family uses.
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div class="relative">
+  <%= render "studio/modals/blocks/close_x", modal_store: "dsModals" %>
+
+  <div class="text-center pt-1 mb-3">
+    <h3 class="text-heading font-bold text-lg leading-tight">Buy USDC with Coinbase</h3>
+  </div>
+
+  <p class="text-xs text-body mb-4 text-center">
+    You&rsquo;ll finish the purchase in a Coinbase tab. We&rsquo;ll update here
+    automatically once the USDC lands in your wallet.
+  </p>
+
+  <button type="button" @click="$store.dsModals.close()"
+          class="btn btn-primary btn-lg w-full">Continue to Coinbase</button>
+
+  <button type="button" @click="$store.dsModals.close()"
+          class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+    Not now
+  </button>
+</div>

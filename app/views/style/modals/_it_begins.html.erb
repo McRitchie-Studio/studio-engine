@@ -1,0 +1,46 @@
+<%#
+  Living style guide specimen — the moment a contest locks.
+
+  APP-SPECIFIC, engine chrome only. What fires it is turf's: a contest's lock
+  countdown reaching zero (contests/_timestamp_countdown). The engine owns no
+  contests and no lock. It lends `blocks/_cta_redirect` — the DRAINING button,
+  which is the whole reason this card is worth a specimen.
+
+  WHY THE DRAIN MATTERS, and why a reviewer should watch it rather than read it:
+  this card interrupts someone mid-page at a moment they did not choose. A
+  dismissible modal would leave them staring at a stale board; a hard redirect
+  would yank the page out from under them. The drain is the middle — it announces
+  what is about to happen and gives them the length of the bar to opt out. That
+  behaviour is a TIMER, and a timer is not visible in markup.
+
+  Shortened to 4 seconds here (production runs 8) so the drain can be watched
+  twice without waiting. In the app the destination rides in on props.lobbyUrl,
+  set by whoever opened it.
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div class="text-center">
+  <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/15 text-3xl">
+    &#127967;&#65039;
+  </div>
+  <h2 class="text-2xl font-extrabold text-heading">It Begins</h2>
+  <p class="mt-2 text-sm text-secondary">
+    Entries are locked &mdash; the contest is underway. Good luck.
+  </p>
+  <div class="mt-5">
+    <%# NULL destination, which is the block's documented gallery mode (see
+        blocks/_cta_redirect's header): the drain plays, the timer fires a no-op,
+        and a click falls through to closing the modal — so the specimen stays
+        alive to be opened again.
+        A truthy href here is NOT a harmless demo destination. It takes the
+        REDIRECT path, which sets `redirecting = true` and never resets it; and
+        because "#modals" is a same-document fragment, no reload ever clears the
+        component. The card ends as a permanently dead spinner: label and drain
+        bar hidden, anchor pointer-events-none and aria-disabled. %>
+    <%= render "studio/modals/blocks/cta_redirect",
+          href_key:         "null",
+          label_html:       "Enter the Lobby",
+          duration_seconds: 4,
+          modal_store:      "dsModals" %>
+  </div>
+</div>

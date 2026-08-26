@@ -150,6 +150,11 @@ class E2eLabController < ActionController::Base
   # the script runs or not.
   def hold_button = render(:hold_button)
 
+  # The birthday / age-gate handoff. No locals to prepare: the lab page sets up
+  # the two cards' locals itself and both run in demo mode, because the dummy has
+  # no /age/verify and inventing one would put the spec on a fiction.
+  def birthday_gate = render(:birthday_gate)
+
   # The geo manager, rendered as a host renders it: the engine's own template plus
   # the badge a host puts in its navbar.
   #

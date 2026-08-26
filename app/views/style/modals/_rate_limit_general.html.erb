@@ -1,0 +1,61 @@
+<%#
+  Living style guide specimen — the soft rate-limit wait.
+
+  APP-SPECIFIC, engine chrome only (`blocks/_card_header`). The engine throttles
+  nothing; turf's authedFetch 429 interceptor opens this when a general-tier cap
+  trips (hammering "Mint USDC", say).
+
+  THE TONE IS THE DESIGN. This is a SOFT cap on someone who did nothing wrong —
+  they clicked too fast. So the card is dismissible, the copy is "Easy there"
+  rather than an error, and it AUTO-CLOSES when the wait elapses instead of
+  making them acknowledge a penalty. A hard-looking card here would punish
+  enthusiasm.
+
+  The countdown is seeded from the 429's own Retry-After, so the number is the
+  server's, not a guess.
+
+  TWO THINGS THIS CARD ALREADY GETS RIGHT, worth preserving if it is ever
+  rewritten — both were learned the hard way on blocks/_age_gate this week:
+  it clears its interval in a destroy() METHOD (Alpine 3 dispatches no "destroy"
+  DOM event, so an @destroy listener never fires and the timer outlives every
+  close), and it counts whole seconds rather than dividing milliseconds.
+
+  Single root; x-data is single-quoted throughout.
+%>
+<div x-data="{
+       secondsLeft: 0,
+       _timer: null,
+       get props() { var c = $store.dsModals.current(); return (c && c.props) || {} },
+       get waitDisplay() {
+         var s = this.secondsLeft || 0;
+         return s > 90 ? (Math.ceil(s / 60) + ' min') : (s + 's');
+       },
+       init() {
+         this.secondsLeft = this.props.secondsLeft || 20;
+         var self = this;
+         this._timer = setInterval(function () {
+           self.secondsLeft = self.secondsLeft - 1;
+           if (self.secondsLeft <= 0) {
+             self.secondsLeft = 0;
+             self.stop();
+             $store.dsModals.close();
+           }
+         }, 1000);
+       },
+       stop() { if (this._timer) { clearInterval(this._timer); this._timer = null; } },
+       destroy() { this.stop(); }
+     }">
+  <%= render "studio/modals/blocks/card_header",
+        icon_emoji: "✋",
+        title: "Easy there" do %>
+    <p class="text-sm text-body">
+      <span x-text="props.message || 'You are going a bit fast.'"></span>
+      <span class="block mt-1">
+        Try again in <span class="text-heading font-semibold" x-text="waitDisplay"></span>.
+      </span>
+    </p>
+  <% end %>
+
+  <button type="button" @click="$store.dsModals.close()"
+          class="block mx-auto mt-1 text-sm text-secondary hover:text-heading transition">Dismiss</button>
+</div>
