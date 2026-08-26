@@ -28,10 +28,17 @@
     Entries are locked &mdash; the contest is underway. Good luck.
   </p>
   <div class="mt-5">
-    <%# A demo destination: the guide's own anchor, so the drain completes and
-        navigates somewhere harmless rather than 404ing at the end of the bar. %>
+    <%# NULL destination, which is the block's documented gallery mode (see
+        blocks/_cta_redirect's header): the drain plays, the timer fires a no-op,
+        and a click falls through to closing the modal — so the specimen stays
+        alive to be opened again.
+        A truthy href here is NOT a harmless demo destination. It takes the
+        REDIRECT path, which sets `redirecting = true` and never resets it; and
+        because "#modals" is a same-document fragment, no reload ever clears the
+        component. The card ends as a permanently dead spinner: label and drain
+        bar hidden, anchor pointer-events-none and aria-disabled. %>
     <%= render "studio/modals/blocks/cta_redirect",
-          href_key:         "'#modals'",
+          href_key:         "null",
           label_html:       "Enter the Lobby",
           duration_seconds: 4,
           modal_store:      "dsModals" %>

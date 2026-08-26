@@ -1245,14 +1245,59 @@ class StylePageTest < ActiveSupport::TestCase
     end
   end
 
-  test "It Begins drives the guide's store, not the app's" do
-    # cta_redirect defaults to $store.modals — the REAL host, which the style
-    # guide does not run. Left at the default the drain completes and then calls
-    # close() on an undefined store, throwing inside the timer where nothing
-    # surfaces it.
-    assert_includes BATCH3_SOURCES.join("_it_begins.html.erb").read,
-      %(modal_store:      "dsModals"),
-      "the specimen must point the drain at the page-scoped store"
+  # RENDERED, not grepped — and it took a review to notice why the grep was worse
+  # than merely weak. `modal_store` is consumed in exactly one place: the anchor's
+  # @click else-branch, reached only when the destination is NULL. The It Begins
+  # specimen passed a TRUTHY href ("'#modals'"), so that branch was unreachable and
+  # the old source-text assertion guarded dead code — it would have gone on passing
+  # with the store wired to anything at all.
+  #
+  # Asserted PAGE-WIDE rather than on one specimen's subtree: "no drain on this
+  # guide ends as a dead spinner" is the property worth holding, and it cannot be
+  # quietly reintroduced by the next card that copies this one.
+  test "no drain specimen redirects — a truthy destination ends as a dead spinner" do
+    html  = render_index
+    doc   = Nokogiri::HTML.fragment(html)
+    cards = doc.css("[x-data]").select { |el| el["x-data"].to_s.include?("_redirectTimer") }
+
+    refute_empty cards, "the guide must render at least one cta_redirect specimen"
+
+    # THE DESTINATION IS READ OFF THE TIMER, not off the anchor. x-data survives HTML
+    # parsing intact; the anchor's @click does NOT — it is a multi-line handler, and
+    # the parser splits it into pseudo-attributes named `if`, `return`, `var`, `go`
+    # and `else`. Reading `self.go(<dest>)` also asks the more honest question, since
+    # the timer firing is the exact mechanism of the defect.
+    destinations = cards.map do |card|
+      card["x-data"].to_s[/self\.go\(([^)]*)\)/, 1].to_s.strip
+    end
+
+    refute_empty destinations.compact_blank, "each drain specimen must call go() on a timer"
+
+    destinations.each do |dest|
+      refute_match(/\A'#/, dest,
+        "a same-document fragment destination (#{dest}) is TRUTHY, so the timer takes " \
+        "the redirect path and sets redirecting = true — and because the browser never " \
+        "leaves the document, nothing resets it. The card ends as a permanently dead " \
+        "spinner: label and drain bar hidden, anchor pointer-events-none and " \
+        "aria-disabled=true. Use the block's null-destination gallery mode instead.")
+    end
+
+    # The store is only reachable on the null-destination path, and it can only be
+    # asserted on the RENDERED page: see the @click note above. This is a render-tier
+    # fact — the partial was invoked with these locals and produced this wiring — not
+    # a grep of the ERB source, which is what this test used to be and why it guarded
+    # dead code.
+    # Asserted as an ABSENCE, deliberately. The positive form (`assert_includes html,
+    # "$store.dsModals.close()"`) passes for the wrong reason: other specimens on this
+    # page render that same string, so it stays green even when THIS card is wired to
+    # the wrong store. Proven — mutating It Begins to modal_store "modals" left the
+    # positive assertion passing. The host store never belonging on this guide is the
+    # property that actually bites.
+    assert_includes html, "$store.dsModals.close()",
+      "the guide must wire at least one drain through its page-scoped store"
+    refute_includes html, "$store.modals.close()",
+      "no specimen may close through the HOST store — $store.modals does not exist on " \
+      "this guide, so close() would throw inside the timer where nothing surfaces it"
   end
 
   test "the network guard keeps Continue inert until the box is ticked" do
