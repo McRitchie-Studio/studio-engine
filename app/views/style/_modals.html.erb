@@ -376,6 +376,13 @@
         <template x-if="$store.dsModals.current().id === 'network-guard'">
           <div><%= render "style/modals/network_guard" %></div>
         </template>
+        <%# --- funding chrome primitives (extract-funding-modal-chrome) --- %>
+        <template x-if="$store.dsModals.current().id === 'ds-rail-row'">
+          <div><%= render "style/modals/ds_rail_row" %></div>
+        </template>
+        <template x-if="$store.dsModals.current().id === 'ds-close-x'">
+          <div><%= render "style/modals/ds_close_x" %></div>
+        </template>
         <template x-if="$store.dsModals.current().id === 'rate-limit-general'">
           <div><%= render "style/modals/rate_limit_general" %></div>
         </template>
@@ -1540,6 +1547,43 @@
           <span class="block h-1.5 w-28 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
           <%# a dismiss link, not a button — the soft cap has no penalty to accept %>
           <span class="block h-1.5 w-12 mx-auto rounded" style="background: var(--color-text); opacity: .3"></span>
+        </div>
+      <% end %>
+
+      <%# rail-row — the funding picker's option row. Exactly ONE primary. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Rail row",
+            reference: %(the funding rail row (studio/modals/blocks/_rail_row) — the option row a funding hub is built from, ported out of turf-monster where the SAME markup appeared TEN times across modals/_onramp_hub, _buy_entry_token and _wallet_topup. The specimen shows three: one :primary and two :neutral, which is the arrangement a real hub uses. The emphasis is a RANKING, not decoration — a hub of equally-weighted rails asks the person to compare payment processors, which is not a question they can answer. It reads louder in three places at once (doubled border, filled hover, coloured chevron) because one alone is invisible on a 56px row, which is why it is ONE `emphasis:` local rather than three classes a callsite could half-apply. Brand colour rides in as `icon_bg`, so a rail wears a processor's mark with no asset shipped; the emoji tile passes icon_class: "text-xl", because the default bold-white treatment renders an emoji as a fuzzy white blob. Open with $store.dsModals.open('ds-rail-row')),
+            open_expr: "$store.dsModals.open('ds-rail-row')",
+            glow_when: ds_glow.call("ds-rail-row") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
+          <%# the primary rail, then two neutrals — the ranking IS the thumbnail %>
+          <span class="flex items-center gap-1.5 rounded-md p-1.5" style="border: 2px solid var(--color-primary)">
+            <span class="block h-4 w-4 rounded" style="background: var(--color-cta)"></span>
+            <span class="block h-1.5 flex-1 rounded" style="background: var(--color-text); opacity: .3"></span>
+          </span>
+          <span class="flex items-center gap-1.5 rounded-md p-1.5 border border-subtle">
+            <span class="block h-4 w-4 rounded" style="background: var(--color-text); opacity: .25"></span>
+            <span class="block h-1.5 flex-1 rounded" style="background: var(--color-text); opacity: .18"></span>
+          </span>
+          <span class="flex items-center gap-1.5 rounded-md p-1.5 border border-subtle">
+            <span class="block h-4 w-4 rounded" style="background: var(--color-text); opacity: .25"></span>
+            <span class="block h-1.5 flex-1 rounded" style="background: var(--color-text); opacity: .18"></span>
+          </span>
+        </div>
+      <% end %>
+
+      <%# close-x — the mark, and the one class it depends on. %>
+      <%= render layout: "style/modal_specimen", locals: {
+            label:     "Close ×",
+            reference: %(the centred-title card's close mark (studio/modals/blocks/_close_x) — ported out of turf-monster where this markup appeared BYTE-IDENTICAL in eight files (modals/_wallet_deposit, _wallet_topup, _cdp_ramp, _onramp_hub, _buy_entry_token, and three under modals/auth/). It exists ALONGSIDE blocks/_shell rather than inside it: the shell puts its title on the left with the close beside it, while this family centres the title and positions the mark above it, so retrofitting the shell would move eight titles — a visual change wearing a refactor's clothes. THE PARENT MUST BE `relative`: the button is absolute, so it anchors to the nearest positioned ancestor, and without that class it climbs to the modal host's backdrop and lands in the page corner. Nothing errors and nothing in the markup reads as wrong, which is why the specimen says so out loud. Open with $store.dsModals.open('ds-close-x')),
+            open_expr: "$store.dsModals.open('ds-close-x')",
+            glow_when: ds_glow.call("ds-close-x") } do %>
+        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2 relative">
+          <span class="absolute top-1 right-2 text-secondary leading-none">&times;</span>
+          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
+          <span class="block h-1.5 w-28 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
+          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
         </div>
       <% end %>
     </div>
