@@ -1,0 +1,71 @@
+<%#
+  Living style guide specimen — the Add Funds hub, every rail at once.
+
+  APP-SPECIFIC flow, engine chrome throughout (blocks/_close_x + six
+  blocks/_rail_row). This is the card the rail primitive was extracted FOR: turf
+  draws these six by hand today, which is six chances for the seventh to drift.
+
+  WHAT TO LOOK AT IS THE RANKING, and this is where it earns its keep. Six rails
+  is enough that "which one do I press" becomes a real question, and a hub where
+  every rail carries equal weight answers it by asking the person to compare
+  payment processors — which is not a question anyone can answer about their own
+  life. Exactly one rail is :primary. The other five defer to it.
+
+  AND THE THIRD SHAPE. PayPal and Venmo are announced before they are wired, so
+  they are :soon — not disabled buttons but plain <div>s, with a badge where the
+  chevron would be. A dimmed chevron would still promise somewhere to go.
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div class="relative">
+  <%= render "studio/modals/blocks/close_x", modal_store: "dsModals" %>
+
+  <div class="text-center pt-1 mb-3">
+    <h3 class="text-heading font-bold text-lg leading-tight">Add Funds</h3>
+  </div>
+
+  <div class="space-y-3">
+    <%= render "studio/modals/blocks/rail_row",
+          emphasis: :primary, on_click: "$store.dsModals.close()",
+          icon_label: "C", icon_bg: "#0052FF",
+          title: "Coinbase", subtitle: "Buy USDC with a card or bank",
+          data: { ds_rail: "coinbase" } %>
+
+    <%= render "studio/modals/blocks/rail_row",
+          on_click: "$store.dsModals.close()",
+          icon_label: "CF", icon_bg: "#14B8A6",
+          title: "Coinflow · $19", subtitle: "Buy 1 entry token with a card",
+          data: { ds_rail: "coinflow" } %>
+
+    <%= render "studio/modals/blocks/rail_row",
+          on_click: "$store.dsModals.close()",
+          icon_label: "A", icon_bg: "#6D28D9",
+          title: "Aeropay · $19", subtitle: "Buy 1 entry token from your bank",
+          data: { ds_rail: "aeropay" } %>
+
+    <%= render "studio/modals/blocks/rail_row",
+          state: :soon,
+          icon_label: "P", icon_bg: "#003087",
+          title: "PayPal", subtitle: "Pay with your PayPal balance",
+          data: { ds_rail: "paypal" } %>
+
+    <%= render "studio/modals/blocks/rail_row",
+          state: :soon,
+          icon_label: "V", icon_bg: "#008CFF",
+          title: "Venmo", subtitle: "Pay from your Venmo balance",
+          data: { ds_rail: "venmo" } %>
+
+    <%= render "studio/modals/blocks/rail_row",
+          on_click: "$store.dsModals.close()",
+          icon_label: "S", icon_bg: "#635BFF",
+          title: "Card · $19", subtitle: "Buy one entry token with a card",
+          data: { ds_rail: "stripe" } %>
+  </div>
+
+  <%# Back, not close: the hub is always reached FROM somewhere, and landing a
+      player on nothing is not the same as returning them. %>
+  <button type="button" @click="$store.dsModals.swap('ds-wallet-topup', {})"
+          class="block mx-auto mt-4 text-sm text-secondary hover:text-heading transition">
+    &larr; Back
+  </button>
+</div>
