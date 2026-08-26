@@ -23,6 +23,23 @@
 
   Locals (all optional; sensible props.* / static defaults):
     modal_store      — Alpine store name backing props/close. Default "modals".
+    props_expr       — Alpine expression yielding the PROPS OBJECT. Default reads
+                       $store.<modal_store>.current().props, which is the shape
+                       the engine's own host uses. A consumer whose store is a
+                       DIRECT-FIELD object with no .current() — turf-monster's
+                       $store.solanaModal is one — passes that store itself here.
+                       Without it every props.* default below resolves to {} and
+                       the card renders complete with none of its numbers.
+    above_seeds      — partial path rendered INSIDE the card, above the seeds bar
+                       (e.g. a contest kickoff countdown). Named locals rather
+                       than a second block: _success_card's yield is already
+                       spent on the leveling enrichment, and blocks/_card_header
+                       documents the Rails hazard where a partial's block_given?
+                       reads TRUE off a layout yield with no block passed.
+    above_seeds_locals — locals for it. Default {}.
+    slot_position    — passed through to _success_card. Default :above_cta here,
+                       because a celebration's button is where the card ENDS:
+                       anything under it is furniture behind the exit.
     title_key        — Alpine expr for the headline. Default "props.title || 'Good Luck'".
     subtitle         — static sub-headline. Default "Entry Confirmed".
     subtitle_key     — Alpine expr for the sub-headline (priority over subtitle).
@@ -37,6 +54,11 @@
 %>
 <%
   modal_store      = local_assigns.fetch(:modal_store, "modals")
+  props_expr       = local_assigns.fetch(:props_expr,
+                       "(function () { var c = $store.#{modal_store}.current(); return (c && c.props) || {}; })()")
+  above_seeds        = local_assigns[:above_seeds]
+  above_seeds_locals = local_assigns.fetch(:above_seeds_locals, {})
+  slot_position      = local_assigns.fetch(:slot_position, :above_cta)
   title_key        = local_assigns.fetch(:title_key, "props.title || 'Good Luck'")
   subtitle         = local_assigns.fetch(:subtitle, "Entry Confirmed")
   subtitle_key     = local_assigns[:subtitle_key]
@@ -59,7 +81,8 @@
     cta_href_key:          lobby_url_key,
     cta_drain:             true,
     auto_redirect_url_key: lobby_url_key,
-    confetti:              true
+    confetti:              true,
+    slot_position:         slot_position
   }
   if subtitle_key
     sc_locals[:message_key] = subtitle_key
@@ -70,8 +93,15 @@
 <%# props getter + clusterParam live on the root scope so _success_card's nested
     Alpine expressions (props.txSignature, props.lobbyUrl, clusterParam) resolve up
     the scope chain. clusterParam feeds _success_card's branded tx-link URL. %>
-<div x-data="{ get props() { var c = $store.<%= modal_store %>.current(); return (c && c.props) || {}; }, clusterParam: '<%= cluster_param %>' }">
+<div x-data="{ get props() { return <%= props_expr %>; }, clusterParam: '<%= cluster_param %>' }">
   <%= render "studio/modals/blocks/success_card", sc_locals do %>
+    <%# The app's own enrichment, above the seeds bar. turf puts its kickoff
+        countdown here — "when does it start" reads before the celebratory seeds
+        animation, not after it. %>
+    <% if above_seeds.present? %>
+      <%= render above_seeds, **above_seeds_locals %>
+    <% end %>
+
     <% if Studio.feature?(:leveling) %>
       <%# Leveling enrichment — mounts only when this entry awarded seeds. %>
       <template x-if="(<%= seeds_earned_key %>) > 0">

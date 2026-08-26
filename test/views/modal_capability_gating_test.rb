@@ -60,6 +60,28 @@ class ModalCapabilityGatingTest < ActiveSupport::TestCase
 
   # --- 1. wallet brand icons ship inline, engine-owned -----------------------
 
+  # A wallet with no brand still gets a MARK, not a hole. The three brand marks
+  # are official rasters; this one cannot be, because "brand unknown" has no
+  # official artwork to be faithful to — so it is paths, and it takes
+  # currentColor, which is what lets a caller tint it to whatever it stands in
+  # for. Asserted separately from the brand marks above because its CONTRACT is
+  # the opposite of theirs: they must not be hand-drawn, and this one must be.
+  test "the sprite ships a neutral fallback mark, drawn in paths and tintable" do
+    html = render_index
+
+    assert_includes html, %(id="se-wallet-default"),
+      "a wallet whose brand we do not recognise still needs a mark to render"
+    default_symbol = html[/<symbol id="se-wallet-default".*?<\/symbol>/m]
+    assert default_symbol, "the fallback mark must be an inline <symbol> like the brands"
+
+    assert_includes default_symbol, "currentColor",
+      "the fallback must inherit its colour, so one mark serves every surface"
+    assert_includes default_symbol, "<path",
+      "the fallback is drawn, not embedded — it has no official raster to carry"
+    assert_not_includes default_symbol, "base64",
+      "a raster fallback would need a second asset for every size it is shown at"
+  end
+
   test "the wallet picker ships engine-owned inline brand marks, not app PNGs" do
     html = render_index
 
