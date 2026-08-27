@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    studio-engine (0.62.5)
+    studio-engine (0.62.6)
       aws-sdk-s3 (~> 1.218)
       faker (>= 2.0, < 4.0)
       geocoder (>= 1.8, < 2.0)
