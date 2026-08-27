@@ -323,6 +323,42 @@ against this (unknown keys and gutted registries fall back to the built-in
 `'pop'`), but your other custom keys are lost unless the late script merges
 into the existing object instead of assigning over it.
 
+`window.StudioModals.CARD_WIDTHS` is the **card-width registry**, and it works
+exactly like the animation one: define it **before** the host renders and your
+entries merge over the engine defaults. Keys are modal ids, values are the
+Tailwind `max-w-*` class that card should use. `DEFAULT_CARD_WIDTH` (default
+`max-w-sm`) covers every id you don't name:
+
+```html
+<script>
+  window.StudioModals = window.StudioModals || {};
+  window.StudioModals.CARD_WIDTHS = { 'wallet-setup': 'max-w-md' };
+</script>
+```
+
+By modal **id** rather than by prop on purpose: a card opened from several
+places would have to carry the prop at every opener, and one miss renders the
+same card at two widths depending on how the user got there. The width is
+resolved inside `cardClasses()`, so the card element carries no static
+`max-w-*` — don't add one, or the winner is left to stylesheet source order.
+
+**App-wide registrations — `app/views/modals/_host_extras.html.erb`.** The
+block above registers modals per *call site*. An app that renders the host from
+more than one layout (a live one and, say, an `/admin` preview harness) would
+have to repeat every registration in each. Define this optional partial instead
+and the host renders it inside the card on **every** render path:
+
+```erb
+<%# app/views/modals/_host_extras.html.erb %>
+<template x-if="$store.modals.current().id === 'cosign-rejected'">
+  <%= render "modals/cosign_rejected" %>
+</template>
+```
+
+It's a convention, not a local — an app that ships no such file renders nothing
+and needs no call-site change. Use it for modals that belong to the *app*; keep
+page-specific ones in the block where their call site can see them.
+
 `window.StudioModals.holdAtLeast(ms)` returns a thenable that resolves no
 sooner than `ms` after creation — stamp it when a processing view becomes
 visible so fast operations don't flash the spinner.

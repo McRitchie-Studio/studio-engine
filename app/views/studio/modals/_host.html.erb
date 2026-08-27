@@ -13,6 +13,20 @@
   for pages that drive a modal host WITHOUT rendering this partial —
   e.g. the living style guide's page-scoped dsModals host. The two are
   byte-identical; keep them in sync if you retune a curve or duration.
+
+  THREE CONSUMER EXTENSION POINTS, so an app never has to fork this file
+  to change an animation, a width, or register an app-wide modal:
+
+    window.ModalAnimations         per-modal enter/exit animation, merged
+                                   over the engine defaults (see below)
+    window.StudioModals.CARD_WIDTHS  per-modal card width by modal id,
+                                   merged the same way; DEFAULT_CARD_WIDTH
+                                   covers every id it does not name
+    app/views/modals/_host_extras  OPTIONAL app partial, rendered inside
+                                   the card on every render path through
+                                   this host — for a modal that belongs to
+                                   the app rather than to one call site
+
   Consumer integration example and API reference: the "Modal host"
   section of the gem README.
 %>
@@ -195,6 +209,32 @@
       enter: Object.assign({}, animDefaults.enter, animOverrides.enter || {}),
       exit:  Object.assign({}, animDefaults.exit,  animOverrides.exit  || {})
     };
+
+    // Per-modal CARD WIDTH — the second consumer extension point, deliberately
+    // shaped like the animation one above so a consumer learns the pattern once.
+    // Define window.StudioModals.CARD_WIDTHS BEFORE this script runs, keyed by
+    // modal id, and app entries merge OVER the engine defaults (empty: the
+    // engine ships no per-id width, only the default below).
+    //
+    //   window.StudioModals = window.StudioModals || {};
+    //   window.StudioModals.CARD_WIDTHS = { 'wallet-setup': 'max-w-md' };
+    //
+    // BY MODAL ID, NOT BY PROP, and that is the whole reason this is a registry.
+    // A card opened from several places would have to carry the prop at every
+    // opener, and ONE miss renders the same card at two widths depending on how
+    // the user got there. The originating case is turf-monster's wallet-setup,
+    // opened from three (the board's entry gate, the onboarding chain driver,
+    // and the post-Connect reopen).
+    //
+    // Resolved in cardClasses(), NEVER written as a static class on the card
+    // element: exactly one max-w-* may land on that div, and a static class
+    // alongside a bound one leaves the winner to stylesheet source order, which
+    // is not something this file gets to decide.
+    window.StudioModals = window.StudioModals || {};
+    var widthOverrides = window.StudioModals.CARD_WIDTHS || {};
+    window.StudioModals.CARD_WIDTHS = Object.assign({}, widthOverrides);
+    window.StudioModals.DEFAULT_CARD_WIDTH =
+      window.StudioModals.DEFAULT_CARD_WIDTH || 'max-w-sm';
     // Late-binding guard: read window.ModalAnimations at CALL time, and
     // never return undefined. A consumer script that loads after this one
     // (e.g. an importmap module) may REPLACE the merged registry object
@@ -204,6 +244,17 @@
     function modalAnim(channel, key) {
       var table = (window.ModalAnimations && window.ModalAnimations[channel]) || {};
       return table[key] || table.pop || animDefaults[channel].pop;
+    }
+
+    // Same late-binding guard as modalAnim, for the same reason and with one
+    // extra: a width that fails to resolve does not throw, it renders a
+    // FULL-BLEED card. A silent failure gets a literal floor, not a chance.
+    var DEFAULT_CARD_WIDTH = 'max-w-sm';
+    function modalCardWidth(id) {
+      var sm = window.StudioModals || {};
+      return (sm.CARD_WIDTHS && sm.CARD_WIDTHS[id]) ||
+             sm.DEFAULT_CARD_WIDTH ||
+             DEFAULT_CARD_WIDTH;
     }
 
     // Where focus returns when the last modal closes. A module-level closure, NOT a
@@ -624,6 +675,10 @@
           var c = this.current();
           if (!c) return {};
           var o = {};
+          // The card element carries no static max-w-*; this is the only
+          // one it ever gets. Set FIRST so the animation keys below, which
+          // never collide with a max-w-* name, read as additions to it.
+          o[modalCardWidth(c.id)] = true;
           if (!c._settled && !c._swappingIn && !c._swappingOut && !c._closing) {
             o[modalAnim('enter', c.props && c.props.enterAnim).cls] = true;
           }
@@ -744,12 +799,32 @@
         a dead end, since escape and click-outside are gated off. 100dvh, not 100vh:
         mobile browsers shrink the visual viewport when the URL bar is showing, and
         vh ignores that. %>
-    <div class="bg-surface rounded-xl border border-subtle shadow-2xl p-6 max-w-sm w-full max-h-[85dvh] overflow-y-auto"
+    <%# No max-w-* here — cardClasses() supplies exactly one, per modal id, from
+        the CARD_WIDTHS registry above. max-h/overflow are unrelated and stay. %>
+    <div class="bg-surface rounded-xl border border-subtle shadow-2xl p-6 w-full max-h-[85dvh] overflow-y-auto"
          :class="$store.modals.cardClasses()">
       <%# Consumer-provided content registrations. Each block typically
           contains a <template x-if="$store.modals.current().id === 'X'">
           render "modals/X" </template>. %>
       <%= yield if block_given? %>
+
+      <%# APP-WIDE modal registrations — the second seam. The block above is
+          per-CALLSITE: an app rendering this host from two layouts (a live one
+          and, say, an /admin preview harness) must repeat every registration in
+          both. A modal that belongs to the APP rather than to the page defines
+          app/views/modals/_host_extras.html.erb instead and is registered ONCE,
+          for every render path through this partial.
+
+          Convention, not a local, on purpose: a local would have to be passed at
+          each call site, which is the duplication this exists to remove. An app
+          that ships no such partial renders nothing and changes nothing.
+
+          It sits INSIDE the card, beside the block, because each registration is
+          a <template x-if> keyed on $store.modals.current().id — the outer
+          template x-if above is what guarantees current() is non-null here. %>
+      <% if lookup_context.exists?("host_extras", ["modals"], true) %>
+        <%= render "modals/host_extras" %>
+      <% end %>
     </div>
   </div>
 </template>

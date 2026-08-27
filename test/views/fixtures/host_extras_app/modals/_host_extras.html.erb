@@ -1,0 +1,9 @@
+<%# Fixture for ModalHostTest — stands in for a consuming app's app/views/
+    modals/_host_extras.html.erb. Lives under its OWN view-path root rather than
+    the shared test/views/fixtures one so no other test can see it: the host
+    renders this partial on a CONVENTION (does modals/host_extras exist?), so a
+    file dropped in a shared fixture root would silently flip the "absent by
+    default" case for every sibling that mounts that root. %>
+<template x-if="$store.modals.current().id === 'fixture-extra'">
+  <div>APP-EXTRAS-MARKER</div>
+</template>
