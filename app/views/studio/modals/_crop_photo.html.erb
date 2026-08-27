@@ -30,7 +30,7 @@
   <h3 class="text-heading font-bold text-lg text-center mb-4">Crop Photo</h3>
 
   <template x-if="error">
-    <p class="text-red-400 text-sm mb-3 text-center" x-text="error"></p>
+    <p role="alert" class="text-red-400 text-sm mb-3 text-center" x-text="error"></p>
   </template>
 
   <input type="file" x-ref="filePicker" @change="onFilePicked($event)" accept="image/*" class="hidden">

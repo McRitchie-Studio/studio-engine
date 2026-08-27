@@ -112,7 +112,7 @@
         A refusal is not an error, and showing them in the same red paragraph is
         what let the dead end hide. %>
     <template x-if="error">
-      <p class="text-red-400 text-sm mb-3" x-text="error"></p>
+      <p role="alert" class="text-red-400 text-sm mb-3" x-text="error"></p>
     </template>
 
     <%# Disabled ONLY for an incomplete date or an in-flight submit. It used to be
