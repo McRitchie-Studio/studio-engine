@@ -100,6 +100,38 @@ class LayerScaleContractTest < ActiveSupport::TestCase
            "a banner tooltip must clear the banner it hangs off"
   end
 
+  # THE LIFT DEPENDS ON A WORKING SCROLL LOCK, and this gem's was inert wherever
+  # its own link sidebar shipped. Measured on a consumer, 2026-08-27: with a
+  # modal open a real wheel gesture scrolled the page 600px → 1000px and the
+  # sticky header slid away with it.
+  #
+  # `body { overflow: hidden }` locks the viewport only while it PROPAGATES to
+  # it, and it propagates only while `html` is `overflow: visible`. The link
+  # sidebar sets `html { overflow-x: clip }` — right on its own terms — which
+  # ends the propagation and turns BODY into a scroll container pinned at
+  # scrollTop 0. Every position:sticky child of body then has a scrollport that
+  # never moves.
+  #
+  # Every place this gem writes the lock has to write it the same way, or a
+  # consumer picks the broken one by rendering a different host.
+  test "every scroll lock in the gem locks html, not body" do
+    {
+      "app/views/studio/modals/_host.html.erb" => "the default modal host",
+      "app/views/studio/modals/_scoped_host.html.erb" => "the scoped modal host",
+      "app/assets/tailwind/studio_engine/engine-motion.css" => "the motion layer",
+    }.each do |file, what|
+      css = File.read(File.join(ROOT, file)).gsub(%r{/\*.*?\*/}m, " ")
+
+      assert_match(/html:has\(body\.modal-open\)\s*\{[^}]*overflow:\s*hidden/, css,
+                   "#{what} must lock html — on body the lock stops propagating the " \
+                   "moment anything sets overflow on html, and this gem's own link " \
+                   "sidebar does exactly that")
+      refute_match(/(?<!:has\()body\.modal-open\s*\{[^}]*overflow:\s*hidden/, css,
+                   "#{what} still locks body, which makes it a scroll container that " \
+                   "never scrolls and strands every sticky child of it")
+    end
+  end
+
   test "no engine layer paints at a bare blocking number" do
     offenders = PAINTING_FILES.flat_map do |path|
       code = code_of(path)

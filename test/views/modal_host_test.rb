@@ -151,10 +151,24 @@ class ModalHostTest < Minitest::Test
     assert_includes html, "@media (prefers-reduced-motion: reduce)"
   end
 
-  def test_legacy_scroll_lock_and_drain_keyframe_survive
+  # This used to assert the literal `body.modal-open { overflow: hidden; }`,
+  # which pinned a lock that had stopped working. `body { overflow: hidden }`
+  # locks the viewport only while it PROPAGATES to it, and it propagates only
+  # while `html` is `overflow: visible` — and this gem's own link-sidebar sets
+  # `html { overflow-x: clip }`. Measured on a consumer, 2026-08-27: a real wheel
+  # gesture scrolled the page 600px → 1000px with a modal open, and the sticky
+  # header slid away with it. So the assertion is REPLACED by its corrected
+  # form, not loosened: lock html, and put body back to visible so it is not a
+  # second scroll container stranding every sticky child of it.
+  def test_scroll_lock_and_drain_keyframe_survive
     html = render_host
 
-    assert_includes html, "body.modal-open { overflow: hidden; }"
+    assert_match(/html:has\(body\.modal-open\)\s*\{[^}]*overflow:\s*hidden/, html,
+                 "the lock must be on html — on body it stops propagating the moment " \
+                 "anything sets overflow on html, and the link sidebar does")
+    assert_match(/body\.modal-open\s*\{[^}]*overflow:\s*visible/, html,
+                 "body must go back to visible or it stays a scroll container that " \
+                 "never scrolls")
     assert_includes html, "@keyframes studio-modal-drain"
   end
 
