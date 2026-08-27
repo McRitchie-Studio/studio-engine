@@ -28,6 +28,91 @@
   their local copies for this import.
 */
 
+/* -- Layer scale ------------------------------------------------------------
+   The ONE stacking order every Studio app shares. Read the ORDER, not the
+   number: the tier is the contract, the integer is an implementation detail.
+
+   BELOW 100 is page furniture that never blocks another layer, and those tiers
+   line up with Tailwind's own z-10..z-50 — `z-20` and var(--z-raised) are the
+   same rung, so either spelling is fine down here.
+
+   AT 100 AND UP every tier is chrome that can COVER other chrome, and that is
+   where a raw integer stops being readable. The defect this scale was built
+   from: a docked bottom bar at inline `z-index:9999` painting over a modal
+   backdrop at `z-[120]`, with 9,798 unclaimed values between them and no
+   ladder anywhere that said which should win. Three layers were tied at 130
+   and two at 10000, each tie resolved by source order rather than by anyone's
+   decision.
+
+   Consumers override a TIER in their own :root (loaded after this file) — the
+   same seam --studio-toast-z has always had. Override the tier, never the call
+   site: a bespoke number at a call site is how the ladder rotted the first time.
+*/
+:root {
+  --z-behind:       -1;  /* decoration painted behind its own box */
+  --z-base:          0;  /* fixed page backgrounds and their scrims */
+  --z-content:      10;  /* raised content inside a card */
+  --z-raised:       20;  /* hover lifts, in-page click catchers */
+  --z-sticky:       30;  /* in-page sticky headers, bars pinned under the nav */
+  --z-panel:        40;  /* in-page side panels */
+  --z-dropdown:     50;  /* menus and anchored popovers */
+
+  --z-docked:      100;  /* docked bottom bar — must never cover a modal */
+  --z-nav:         110;  /* the pinned navbar */
+  --z-drawer:      150;  /* full-cover drawers (link sidebar, gear sidebar) */
+  --z-modal:       200;  /* modal backdrop + card — THE app blocker */
+  --z-lightbox:    210;  /* a lightbox opened from inside a modal */
+  --z-alert:       300;  /* transient overlays that must not be missed */
+  --z-toast-blur:  399;  /* the frosted halo behind the toasts */
+  --z-toast:       400;  /* toasts */
+  --z-banner:      500;  /* environment / DEV MODE — reachable mid-modal */
+  --z-tooltip:     600;  /* tooltips on the banner, so they clear it */
+}
+
+/* The environment / impersonation bars stay in NORMAL FLOW at rest
+   (banners/_stack records why: pinning them in the RESTING state needs one
+   pinned sibling to measure the other, and the measured version visibly
+   jumped). Flow costs them a stacking level, so the modal backdrop dims the DEV
+   MODE and Email buttons exactly when a QA session needs them.
+
+   So both the level AND the pin are scoped to `body.modal-open` — set by every
+   modal host in this repo and by the consumer forks of it, and the one state
+   where each is free:
+
+     · the LEVEL is free because that class also locks body scroll
+       (engine-motion.css), so the bars can never scroll up behind the pinned
+       navbar while they outrank it;
+     · the PIN is free because a frozen page cannot jump. The measurement
+       problem banners/_stack records is a RESTING-state problem — two pinned
+       siblings of unknown height must lay out adjacently, so one has to measure
+       the other. Here they deliberately OVERLAP: the navbar is dimmed under a
+       backdrop and is not the reader's business.
+
+   With no modal open the bars are unpositioned, exactly as before.
+
+   sticky, NOT fixed, and the difference is load-bearing. A LEVEL ALONE IS NOT
+   THE FIX: the first cut used `position: relative`, which escapes z-index:auto
+   and reads correctly at the top of a page — and leaves the bars exactly where
+   they were for a reader who has scrolled, which is every reader who did
+   anything before opening a modal. Measured on a consumer board at scrollY 900
+   with the modal open: relative put the stack at top -900, off screen; sticky
+   put it at top 0. `fixed` also pins, but pulls the stack out of flow and the
+   page jumps up by its height — sticky keeps the space reserved, so applying it
+   on open shifts nothing (document height identical before and after, measured).
+
+   THE ONE REQUIREMENT ON THE CONSUMER: render the bars as a SIBLING of the
+   navbar, before it — not inside <header>. A pinned header carrying a z-index
+   is a stacking context, and a descendant's z-index is clamped inside it, so a
+   bar nested in the header composites at the HEADER's level no matter what it
+   asks for. --nav-bottom already reports the header's live bottom edge for
+   anything that needs to sit under chrome stacked above it. */
+body.modal-open .studio-bar-stack,
+body.modal-open .studio-app-banner {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-banner, 500);
+}
+
 /* -- Surfaces -------------------------------------------------------------- */
 
 @utility card {
@@ -193,12 +278,16 @@
 
 /* -- Link sidebar (out-of-the-box navigation) ------------------------------
    Paired with components/_link_sidebar + _link_sidebar_trigger and the
-   Studio.sidebar_sections config. The layer sits above the sticky header
-   (z-50) and the modal host. Inert without the panel in the DOM, so apps
-   that declare no sections are unaffected. */
+   Studio.sidebar_sections config. A full-cover drawer, so it takes the shared
+   --z-drawer tier: above the navbar and any docked bottom bar, BELOW the modal
+   host. It used to be a bare 10000, which put it over every modal and tied it
+   exactly with turf-monster's gear sidebar — two unrelated drawers on one
+   number, resolved by source order. A modal opened FROM a drawer is the newer
+   task and should win. Inert without the panel in the DOM, so apps that declare
+   no sections are unaffected. */
 
 @utility studio-link-sidebar-layer {
-  z-index: 10000;
+  z-index: var(--z-drawer, 150);
 }
 
 /* Alpine's pre-init cloak. Engine partials (sidebar panels, dropdowns, the
@@ -282,4 +371,119 @@
   ::view-transition-new(*) {
     animation: none !important;
   }
+}
+
+/* === THE NAVBAR COLLAPSE BAND TABLE =====================================
+   LAYER 2 OF THE PRIMITIVE, and it lives here rather than in
+   layouts/_navbar.html.erb for one reason: every engine-consuming app imports
+   this stylesheet, but only some render that partial. Three of six FORK the
+   navbar (turf-monster, mcritchie-studio, moms-app), and while the table sat
+   inline each fork had to hand-write its own — which is exactly how four
+   independent copies of this collapse came to exist.
+
+   The primitive is three layers, each on a channel that reaches further than
+   the last:
+
+     1. MECHANISM  layouts/studio/_head   @property --nav-p + navCollapse()
+                                          — every app renders it
+     2. SIZES      this file              the .nav-shell band table
+                                          — every app imports it
+     3. MARKUP     layouts/_navbar        the header itself
+                                          — only apps that do not fork
+
+   So adopting the collapse in a hand-written header is: put `nav-shell` and
+   x-data="navCollapse()" on it, and override only the endpoints that differ
+   from the defaults below.
+
+   LAYERED ON PURPOSE. These are DEFAULTS, so a consuming app has to be able to
+   beat them, and unlayered CSS beats every layered rule regardless of
+   specificity — shipping them bare would make the engine's numbers
+   unoverridable by the apps they exist to serve. Inside @layer utilities the
+   engine's import comes FIRST in a consumer's application.css, so the
+   consumer's own `@layer utilities` block wins on source order at equal
+   specificity, which is the whole "override only what differs" promise.
+   `.nav-shell .nav-logo` still outranks a bare `.w-12` on specificity, so an
+   app that DOES put a size utility on its logo has to mean it. */
+@layer utilities {
+    .nav-title { display: flex; gap: 0.25em; align-items: baseline; }
+
+    /* THE COLLAPSE BAND TABLE. Each band is the two ENDPOINTS of its collapse
+       written once, not two rule sets that have to be kept in step — the old
+       shape, where a base rule and an `.is-scrolled` override each carried half
+       the answer and `transition: font-size` guessed the middle.
+
+       --nav-ramp is the scroll distance the collapse is spread over, and it is
+       3x that band's collapse TOTAL (mobile: 8px of logo + 32px of padding =
+       40px, ramp 120px; desktop: 16px + 32px = 48px, ramp 144px). That ratio is
+       what puts the peak content speed near 1.5x rather than 2x — see the
+       navCollapse comment in layouts/studio/_head. Retune one and retune the
+       other, or the easing stops matching the geometry.
+
+       Endpoints below are UNCHANGED from the threshold build. This is the same
+       navbar; only the path between the ends is new.
+
+       EVERY var() CARRIES A FALLBACK OF 0, and it is inert where @property works.
+       navCollapse only WRITES --nav-p when progress changes, so on an unscrolled
+       page it is never written at all and the registration is doing 100% of the work
+       on first paint. In a browser that ignores @property, an unregistered custom
+       property is the guaranteed-invalid token and every calc() here goes
+       invalid-at-computed-value-time — measured: padding-block 0 and the logo at its
+       intrinsic size. `var(--nav-p, 0)` degrades to "always expanded" instead, which
+       is the pre-collapse navbar rather than a broken one. It costs nothing where
+       @property is honoured, which is why it is written unconditionally. (Not a NEW
+       exposure: the built Tailwind v4 already ships 59 @property registrations, so
+       that browser band is unsupported engine-wide.) */
+    .nav-shell {
+      --nav-ramp: 144px;
+      /* How far the collapse may travel in ONE animation frame, as header
+         height. Position-linked progress alone puts the WHOLE collapse in a
+         single frame on a flick — measured 39px in turf-monster, the full
+         178 -> 139. navCollapse() converts this to --nav-p units off
+         --nav-ramp's 3x relation to the collapse total, so one number covers
+         every band. */
+      --nav-max-step: 5px;
+      --nav-pad: calc(1.5rem - 1rem * var(--nav-p, 0));                 /* py-6 -> py-2 */
+      --nav-logo-size: calc(3rem - 1rem * var(--nav-p, 0));             /* 48px -> 32px */
+      --nav-title-size: calc(1.875rem - 0.625rem * var(--nav-p, 0));    /* 3xl  -> xl   */
+      --nav-title-lead-size: var(--nav-title-size);                  /* one line here */
+      /* THE LINE BOX, and the reason this variable exists at all. `text-3xl` and
+         `text-xl` are FONT-SIZE AND LINE-HEIGHT PAIRS (1.875rem/2.25rem and
+         1.25rem/1.75rem). Carrying only the font-size across dropped the
+         line-height to whatever the h1 inherited, and the header grew 9px at every
+         width >= 768px — expanded 84px -> 93px, measured. Collapsed was unaffected
+         because the 32px logo, not the title, sets the row height there, which is
+         exactly why a one-endpoint check would have missed this. Mobile was clean
+         only because its band already declared line-height: 1.15 explicitly.
+         Interpolate the PAIR or the endpoints move. */
+      --nav-title-lead: calc(2.25rem - 0.5rem * var(--nav-p, 0));       /* 36px -> 28px */
+    }
+    .nav-row { padding-block: var(--nav-pad); }
+    .nav-shell .nav-logo { width: var(--nav-logo-size); height: var(--nav-logo-size); }
+    .nav-shell .nav-title { font-size: var(--nav-title-size); line-height: var(--nav-title-lead); }
+    .nav-shell .nav-title span:last-child { font-size: var(--nav-title-lead-size); }
+
+    @media (max-width: 767px) {
+      .nav-title { flex-direction: column; gap: 0; }
+      .nav-title span:first-child { margin-bottom: -4px; }
+      .nav-logo-link { gap: 0.5rem !important; }
+      .nav-shell {
+        --nav-ramp: 120px;
+        --nav-logo-size: calc(3rem - 0.5rem * var(--nav-p, 0));         /* 48px -> 40px   */
+        --nav-title-size: calc(1.25rem - 0.25rem * var(--nav-p, 0));    /* 20px -> 16px   */
+        --nav-title-lead-size: calc(1.5rem - 0.35rem * var(--nav-p, 0));/* 24px -> 18.4px */
+        /* Mobile stacks the two words, so its line box is a RATIO, not the desktop
+           pair. Declared here rather than as a `line-height` on .nav-title, because
+           `.nav-shell .nav-title` outranks a bare `.nav-title` on specificity no
+           matter which comes later in the sheet — one declaration site, like every
+           other endpoint in this table. */
+        --nav-title-lead: 1.15;
+      }
+    }
+    @media (max-width: 399px) {
+      .nav-logo-link { gap: 0.25rem !important; }
+      .nav-shell {
+        --nav-title-size: calc(1.1rem - 0.2rem * var(--nav-p, 0));      /* 17.6px -> 14.4px */
+        --nav-title-lead-size: calc(1.3rem - 0.3rem * var(--nav-p, 0)); /* 20.8px -> 16px   */
+      }
+    }
 }

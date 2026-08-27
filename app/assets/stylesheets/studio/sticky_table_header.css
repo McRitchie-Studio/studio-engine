@@ -25,7 +25,10 @@
   display: none;
   overflow: hidden;
   pointer-events: none;
-  z-index: 45;
+  /* --z-sticky: it fakes a sticky <thead>, so a side panel or a menu opened over
+     the table still covers it. The old bare 45 sat between the panel and dropdown
+     tiers for no recorded reason. */
+  z-index: var(--z-sticky, 30);
 }
 
 .sticky-table-header-clone table {

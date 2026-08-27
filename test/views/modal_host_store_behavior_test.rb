@@ -108,6 +108,11 @@ class ModalHostStoreBehaviorTest < Minitest::Test
     // over the defaults, not replace them.
     globalThis.ModalAnimations = { enter: { wobble: { cls: 'custom-wobble', ms: 90 } } };
 
+    // The SAME pre-registration contract for per-modal card widths: an app
+    // defines its table before the host script and the host must merge it,
+    // leaving every unnamed id on the engine default.
+    globalThis.StudioModals = { CARD_WIDTHS: { 'wide-card': 'max-w-md' } };
+
     // ==== the host's <script>, verbatim, follows ====
   JS
 
@@ -197,6 +202,42 @@ class ModalHostStoreBehaviorTest < Minitest::Test
       assert(store.cardClasses()['modal-card-unmount'] === true, 'gutted registry falls back to pop on exit');
       await sleep(320);
       assert(store.stack.length === 0, 'fallback close still splices');
+
+      // 10. Consumer width table survives the merge, and the engine default
+      // is populated for every id the app did NOT name.
+      assert(globalThis.StudioModals.CARD_WIDTHS['wide-card'] === 'max-w-md',
+             'consumer CARD_WIDTHS entry must survive the merge');
+      assert(globalThis.StudioModals.DEFAULT_CARD_WIDTH === 'max-w-sm',
+             'engine default width must be max-w-sm');
+
+      // 11. A registered id resolves to ITS width through cardClasses().
+      store.open('wide-card');
+      assert(store.cardClasses()['max-w-md'] === true, 'registered id resolves to its own width');
+      assert(!store.cardClasses()['max-w-sm'], 'the default must not also land on a registered id');
+      store.closeAll();
+
+      // 12. An unregistered id falls to the default.
+      store.open('some-other-card');
+      assert(store.cardClasses()['max-w-sm'] === true, 'unregistered id falls back to the default width');
+      store.closeAll();
+
+      // 13. EXACTLY ONE max-w-* is ever emitted. Two would leave the winner to
+      // stylesheet source order, which the host does not get to decide — and a
+      // truthy plus a falsey key still ships both classes through Alpine.
+      store.open('wide-card', { enterAnim: 'shake' });
+      const widthKeys = Object.keys(store.cardClasses()).filter((k) => k.indexOf('max-w-') === 0);
+      assert(widthKeys.length === 1,
+             'exactly one max-w-* key, got ' + JSON.stringify(widthKeys));
+      store.closeAll();
+
+      // 14. Late FULL replacement of window.StudioModals (the same importmap
+      // case as scenario 9). A width that fails to resolve renders a FULL-BLEED
+      // card rather than throwing, so the floor is a literal, not a lookup.
+      globalThis.StudioModals = {};
+      store.open('after-replacement');
+      assert(store.cardClasses()['max-w-sm'] === true,
+             'a gutted StudioModals must still yield the literal default width');
+      store.closeAll();
 
       console.log('ALL-MODAL-STORE-SCENARIOS-PASS');
     })().catch((e) => { console.error('FAIL: ' + (e && e.stack || e)); process.exit(1); });

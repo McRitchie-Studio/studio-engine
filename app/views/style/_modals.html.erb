@@ -116,6 +116,15 @@
         return { connecting: false, error: null, statusText: 'Connect Wallet',
                  walletAvailable: false, isMobile: false, connect: function () {} };
       };
+      // Connect stub for the promoted wallet picker (studio/modals/_wallet_connect,
+      // configured by style/modals/_wallet_connect). Performs NO connect: it
+      // resolves success after a beat so the picker's connecting state is
+      // visible and its onConnected hook can continue the demo walk.
+      window.dsWalletConnectDemo = window.dsWalletConnectDemo || function () {
+        return new Promise(function (resolve) {
+          setTimeout(function () { resolve({ success: true }); }, 1100);
+        });
+      };
       window.walletProvider = window.walletProvider || {
         available: function () { return [{ name: 'Phantom' }, { name: 'Solflare' }]; },
         isMobile: function () { return false; },
@@ -306,7 +315,7 @@
       gated on props.dismissible (never @click.outside, so a hold modal can't
       close itself on the button release). %>
   <template x-if="$store.dsModals.current()">
-    <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop-mount"
+    <div class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 modal-backdrop-mount"
          :class="$store.dsModals.current()?._closing && 'modal-backdrop-unmount'"
          style="background: rgba(0,0,0,0.6)"
          role="dialog" aria-modal="true"

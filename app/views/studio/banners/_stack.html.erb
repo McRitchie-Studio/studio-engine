@@ -78,9 +78,17 @@
   any_bar = show_environment || show_impersonation
 %>
 <% if any_bar %>
-  <%# Normal flow, deliberately. No sticky, no z-index, no measured offset: the
-      navbar is the only pinned chrome, so the bars simply take their own height
-      above it. Not sticky also keeps the paint order right — the pinned navbar
-      is positioned, so it draws over these bars as they scroll up behind it. %>
+  <%# Normal flow, deliberately. No sticky, no measured offset: the navbar is the
+      only pinned chrome, so the bars simply take their own height above it. Not
+      sticky also keeps the paint order right — the pinned navbar is positioned,
+      so it draws over these bars as they scroll up behind it.
+
+      ONE exception, and it is scoped to the state that makes it free:
+      `body.modal-open .studio-bar-stack` in engine.css lifts the stack to
+      --z-banner, above the modal backdrop, so DEV MODE and the email chip stay
+      lit and clickable while a modal is up. It cannot cost the paint order
+      above, because the same class locks body scroll — the bars never move
+      relative to the navbar while the lift is on. Flow is still the resting
+      state; nothing here is positioned until a modal opens. %>
   <div class="studio-bar-stack w-full" data-studio-bar-stack><%= bars %></div>
 <% end %>

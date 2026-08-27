@@ -16,14 +16,65 @@ class ModalHostTest < Minitest::Test
     html = render_host_with_block
 
     assert_includes html, "REGISTERED-MODAL-MARKER"
-    # The registration must land inside the card div (after its opening tag)
-    # and before the template closes.
-    card_index = html.index("cardClasses()\"")
-    marker_index = html.index("REGISTERED-MODAL-MARKER")
-    close_index = html.rindex("</template>")
-    refute_nil card_index
-    assert_operator card_index, :<, marker_index
-    assert_operator marker_index, :<, close_index
+    # STRENGTHENED 2026-08-27 (open-modal-host-seams). This previously asserted
+    # the marker sat between the card's opening tag and the LAST </template>.
+    # A marker moved just outside the card still satisfies both offsets, so the
+    # check passed on the exact regression it exists to catch — proved by
+    # mutation while adding the extras seam below. Walk the element instead.
+    inner = card_inner_html(html)
+
+    refute_nil inner, "could not walk the card element"
+    assert_includes inner, "REGISTERED-MODAL-MARKER"
+  end
+
+  # --- app-registered extras (the convention seam) -----------------------
+
+  def test_extras_partial_is_absent_when_the_app_defines_none
+    # The engine itself ships no modals/_host_extras, so the default render must
+    # emit nothing for it. Asserted on the MARKER, not on the partial name: the
+    # host's own doc comment mentions host_extras, so a name-substring check
+    # would pass with the render deleted AND with it firing.
+    refute_includes render_host, "APP-EXTRAS-MARKER"
+  end
+
+  def test_extras_partial_renders_inside_the_card_when_the_app_defines_one
+    html = render_host_with_extras
+
+    assert_includes html, "APP-EXTRAS-MARKER"
+    # Same containment contract as a block registration: the extras must land
+    # INSIDE the card, because each one is a template x-if reading
+    # $store.modals.current().id and only the outer x-if guarantees a non-nil
+    # current(). Sitting outside the card would throw on every page load.
+    inner = card_inner_html(html)
+
+    refute_nil inner, "could not walk the card element"
+    assert_includes inner, "APP-EXTRAS-MARKER"
+  end
+
+  # --- per-modal card width (the registry seam) --------------------------
+
+  def test_card_element_carries_no_static_width_class
+    # EXACTLY ONE max-w-* may land on the card, and cardClasses() is the one
+    # that supplies it. A static class alongside the bound one leaves the winner
+    # to stylesheet source order, which this partial does not get to decide.
+    # Windowed to the card ELEMENT rather than the document: max-w-* appears in
+    # the doc comment and in the registry example, so a whole-file check is
+    # green no matter what the element says.
+    card = render_host[/<div class="bg-surface rounded-xl[^"]*"/]
+
+    assert card, "could not locate the modal card element — did its classes move?"
+    refute_includes card, "max-w-",
+                    "the width belongs to cardClasses(), not to a static class"
+  end
+
+  def test_card_width_registry_is_a_merge_not_a_replacement
+    # Source-level contract only — that the merge RESOLVES correctly is executed
+    # under node in modal_host_store_behavior_test.rb, which a string assertion
+    # here cannot stand in for.
+    html = render_host
+
+    assert_includes html, "window.StudioModals.CARD_WIDTHS = Object.assign({}, widthOverrides);"
+    assert_includes html, "window.StudioModals.DEFAULT_CARD_WIDTH ||"
   end
 
   def test_renders_without_a_block
@@ -151,10 +202,24 @@ class ModalHostTest < Minitest::Test
     assert_includes html, "@media (prefers-reduced-motion: reduce)"
   end
 
-  def test_legacy_scroll_lock_and_drain_keyframe_survive
+  # This used to assert the literal `body.modal-open { overflow: hidden; }`,
+  # which pinned a lock that had stopped working. `body { overflow: hidden }`
+  # locks the viewport only while it PROPAGATES to it, and it propagates only
+  # while `html` is `overflow: visible` — and this gem's own link-sidebar sets
+  # `html { overflow-x: clip }`. Measured on a consumer, 2026-08-27: a real wheel
+  # gesture scrolled the page 600px → 1000px with a modal open, and the sticky
+  # header slid away with it. So the assertion is REPLACED by its corrected
+  # form, not loosened: lock html, and put body back to visible so it is not a
+  # second scroll container stranding every sticky child of it.
+  def test_scroll_lock_and_drain_keyframe_survive
     html = render_host
 
-    assert_includes html, "body.modal-open { overflow: hidden; }"
+    assert_match(/html:has\(body\.modal-open\)\s*\{[^}]*overflow:\s*hidden/, html,
+                 "the lock must be on html — on body it stops propagating the moment " \
+                 "anything sets overflow on html, and the link sidebar does")
+    assert_match(/body\.modal-open\s*\{[^}]*overflow:\s*visible/, html,
+                 "body must go back to visible or it stays a scroll container that " \
+                 "never scrolls")
     assert_includes html, "@keyframes studio-modal-drain"
   end
 
@@ -230,8 +295,46 @@ class ModalHostTest < Minitest::Test
     ERB
   end
 
+  # Renders with a SECOND view-path root that supplies modals/_host_extras,
+  # standing in for a consuming app that defines one.
+  def render_host_with_extras
+    ActionView::Base.with_empty_template_cache
+                    .with_view_paths(["app/views", "test/views/fixtures/host_extras_app"])
+                    .render(partial: "studio/modals/host")
+  end
+
   def view
     ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+  end
+
+  # The card element's INNER html, by walking div depth from its opening tag to
+  # its matching close. A substring-offset check cannot do this job: content
+  # moved just OUTSIDE the card still lies between the card's opening tag and
+  # the template's final </template>. ERB comments are gone by render time, so
+  # the only div tags here are real ones.
+  def card_inner_html(html)
+    open_at = html.index(/<div class="bg-surface rounded-xl[^"]*"/)
+    return nil unless open_at
+
+    cursor = html.index(">", open_at)
+    return nil unless cursor
+
+    cursor += 1
+    depth = 1
+    scan = cursor
+    while depth.positive?
+      m = html.match(%r{<(/?)div\b[^>]*?(/?)>}, scan)
+      return nil unless m
+
+      scan = m.end(0)
+      if m[1] == "/"
+        depth -= 1
+        return html[cursor...m.begin(0)] if depth.zero?
+      elsif m[2] != "/"
+        depth += 1
+      end
+    end
+    nil
   end
 
   # Counts elements sitting directly inside the fragment by walking tag

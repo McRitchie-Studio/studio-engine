@@ -1,0 +1,18 @@
+<%#
+  The style guide's pre-connect slot for studio/modals/_wallet_connect — the
+  legal-age attestation, sitting exactly where turf-monster puts its own.
+
+  A PARTIAL rather than a block because the picker takes its slot as a named
+  local: `block_given?` reads TRUE inside any compiled Rails partial, so a
+  block-shaped slot yields the captured page body into the card whenever no
+  block is passed. See the picker's header.
+
+  It binds to ageAttested / ageError / needsAttestation, which reach this scope
+  through the picker's extra_data fragment — this renders INSIDE the picker's
+  root, so those members are in scope.
+%>
+<template x-if="needsAttestation">
+  <div class="mb-3">
+    <%= render "studio/modals/shared/age_attestation" %>
+  </div>
+</template>

@@ -4,6 +4,58 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The navbar collapse primitive is broadcastable, rate-limited, and cheap per
+  frame.** Three defects in the primitive as first landed, none of which a
+  consuming app should inherit:
+
+  **The band table shipped from the wrong file.** The `.nav-shell` `--nav-*`
+  sizes were inline in `layouts/_navbar.html.erb`, so only an app rendering that
+  partial got them — and **three of six apps fork the navbar**
+  (`turf-monster`, `mcritchie-studio`, `moms-app`), each left to hand-write its
+  own. That is precisely how four independent copies of this collapse came to
+  exist. They now ship from `engine.css`, which every engine-consuming app
+  imports, inside `@layer utilities` so a consumer's own layer still wins on
+  source order. The primitive is now three layers, each on a channel reaching
+  further than the last: **mechanism** in `layouts/studio/_head` (every app
+  renders it) → **sizes** in `engine.css` (every app imports it) → **markup** in
+  `layouts/_navbar` (only apps that do not fork). Adopting the collapse in a
+  hand-written header is `nav-shell` + `x-data="navCollapse()"` plus overrides
+  for only the endpoints that differ.
+
+  **A flick collapsed the header in one frame.** Progress is a pure function of
+  scroll position, so a scrollY jump of 90px moved the header's whole range with
+  it. Measured in `turf-monster` at 390×844 — 8px/frame walked 3.9px of header,
+  24px/frame 14.1px, a momentum flick **39.0px, the entire 178 → 139 collapse**.
+  Found on a phone, by a person, with every tier here green. `navCollapse` now
+  clamps the per-frame step: `maxStep = 3 × --nav-max-step ÷ --nav-ramp`,
+  derived from the ramp's documented 3× relation to the collapse total, so one
+  number (`5px`) covers every band. **A slow scroll never reaches the clamp**, so
+  the deliberate case is not approximated — it is the same arithmetic. The snap
+  paths (short-page guard, `prefers-reduced-motion`) bypass it, because each is a
+  decision rather than motion. An unfinished clamp schedules its own frame; once
+  the finger lifts nothing else will, and the collapse would otherwise freeze
+  where the clamp left it.
+
+  **The geometry publisher had become per-frame.** The `--nav-h` / `--nav-bottom`
+  `ResizeObserver` called `publish()` directly rather than through its own rAF
+  coalescer. That was fine while the header only resized during a 300ms
+  transition; the collapse made it resize every scroll frame, each one forcing
+  layout and then writing two **inherited** custom properties on
+  `documentElement`. Measured at 6× CPU throttle: frames over 20ms were **13/24
+  through the ramp vs 0/24 past it** (median 26ms vs 8ms), and ablating the
+  observer alone gave 0/24 and median 13ms — it cost ~2.6× the reflow it was
+  reacting to. It now routes through `schedule()`, both reads are hoisted above
+  both writes (a read after a write to `documentElement` forces a fresh layout),
+  and an unchanged value skips its write entirely.
+
+  `nav_offset_contract_test` was rebound rather than relaxed: it now captures the
+  local each source is read into and requires *that* local to be the one written,
+  so the source-swap mutation it was written for still dies, and it gained a
+  guard on the read-before-write order.
+
+
 ### Breaking
 
 - **The age-gate DOB modal is renamed, and the refusal moved to its own card.**
@@ -72,6 +124,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   primary CTA to watch instead (app-supplied `watch_url`, dropped entirely when
   absent rather than rendered dead) and a back link that returns to the birthday
   card. Displays `min_age` / `state`; computes no eligibility of its own.
+
+- **`studio/modals/_wallet_connect` — the Connect Wallet picker, engine-owned.**
+  The reown-style wallet chooser existed three times before this — turf-monster's
+  226 lines, mcritchie-studio's 107 and the style guide's 176 — sharing no code.
+  It is one partial now, and `style/modals/_wallet_connect` CONFIGURES it rather
+  than porting it, so the specimen and production cannot drift again. Locals:
+  `store` (default `"modals"`), `connect_fn` (default `"solanaConnectAndVerify"`),
+  `title`, `extra_data` (extra x-data members as a brace-less JS fragment), plus a
+  BLOCK for the pre-connect slot. App behaviour arrives as optional hook METHODS
+  defined in `extra_data`, each called only if it exists: `onInit`, `canPick`,
+  `verifyArgs`, `onConnected(result)`, `onDeepLink`, `onBack`. Carries the mobile
+  Phantom single-row fix (one Phantom row in every state) and a `role="alert"` on
+  the connect error that both app copies lacked.
+
+  **NO SHIPPING CONSUMER RENDERS IT YET.** Both apps still ship their own copy and
+  adopt this one after it releases, so the green consumer CI here says they still
+  compile — it says nothing about this partial.
 
 ### Fixed
 

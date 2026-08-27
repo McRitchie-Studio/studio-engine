@@ -1,176 +1,82 @@
 <%#
-  "Connect Wallet" picker — design-system port of turf-monster's
-  modals/_wallet_connect, wired to the living style guide's page-scoped host
-  ($store.dsModals). Faithful reown-style picker: detected wallets on top
-  (click to connect), featured-but-missing wallets below (install links), a
-  mobile deep-link row, and the legal-age attestation for guests.
+  "Connect Wallet" specimen for the living style guide.
 
-  Self-contained: window.walletProvider (a page stub) supplies the detected
-  wallet list; pick() runs a brief connecting state then closes (no real
-  connect). Opened via open('wallet-connect', {...}) or swap()ed to from auth.
+  As of the wallet-picker promotion this is a THIN CONFIGURATION of the real
+  engine partial (studio/modals/_wallet_connect) rather than a parallel port of
+  it. That is the point: the card on /admin/style now demonstrates the SAME code
+  the apps render, so a drift between the specimen and production is no longer
+  possible. Before this, the picker existed three times — turf-monster's,
+  mcritchie-studio's, and this one — and only this one was ever looked at.
 
-  Brand icons ship inline from the engine (studio/modals/blocks/_wallet_brand_sprite,
-  rendered once below): brandIcon(name) resolves a known wallet to its <symbol>
-  id, and an unknown wallet falls back to a letter tile. No per-app PNG files.
+  What the configuration supplies, all of it demo scaffolding:
+    store       — the guide's page-scoped host ($store.dsModals), not the app
+                  host, so the specimen never collides with a consuming app's
+                  own shared modal host.
+    connect_fn  — dsWalletConnectDemo, the stub defined with the other guide
+                  credential stubs in style/_modals. It performs NO real
+                  connect; it resolves success after a beat so the picker's
+                  connecting state is visible.
+    extra_data  — the demo's own attestation state plus the hooks: onConnected
+                  continues the walk into the on-chain-tx card, onDeepLink
+                  treats the mobile row as a Phantom pick, onBack slides back
+                  to the auth card when the picker was swapped in from it.
 
-  Single root: the outer <div> is the host's required root.
+  The slot below is the app slot — here it holds the legal-age attestation,
+  exactly where turf-monster puts its own. It is a named local naming a partial,
+  not a block: a block-shaped slot leaks the captured page body into the card
+  (a compiled Rails partial's block_given? is always true).
 %>
-<div x-data="{
-       get props() { var c = Alpine.store('dsModals').current(); return (c && c.props) || {}; },
-       wallets: [],
-       installs: [
-         { name: 'Phantom',  url: 'https://phantom.app/download' },
-         { name: 'Solflare', url: 'https://solflare.com/download' },
-         { name: 'Backpack', url: 'https://backpack.app/downloads' }
-       ],
-       connecting: false,
-       picking: '',
-       error: '',
-       ageAttested: false,
-       ageError: false,
-       get needsAttestation() { return !this.props.linkMode; },
-       attested() {
-         if (!this.needsAttestation) return true;
-         if (this.ageAttested) return true;
-         this.ageError = true;
-         return false;
-       },
-       init() {
-         this.ageAttested = this.props.ageAttested === true;
-         this.refresh();
-       },
-       refresh() {
-         this.wallets = (window.walletProvider && window.walletProvider.available && window.walletProvider.available()) || [];
-       },
-       brandIcon(name) {
-         var n = ('' + name).toLowerCase();
-         return ['phantom', 'solflare', 'backpack'].indexOf(n) >= 0 ? n : null;
-       },
-       get isMobile() { return !!(window.walletProvider && window.walletProvider.isMobile && window.walletProvider.isMobile()); },
-       hasWallet(name) {
-         var n = ('' + name).toLowerCase();
-         return (this.wallets || []).some(function(w) { return w.name && w.name.toLowerCase() === n; });
-       },
-       get missingInstalls() {
-         var self = this;
-         return this.installs.filter(function(i) { return !self.hasWallet(i.name); });
-       },
-       pick(name) {
-         if (this.connecting) return;
-         if (!this.attested()) return;
-         this.connecting = true; this.picking = name; this.error = '';
-         var self = this;
-         // DEMO walk continuity: a picked wallet runs a brief connecting state,
-         // then swaps to the on-chain tx modal in its processing state, which
-         // auto-resolves to on-chain success (demoResolve). So the glow follows
-         // Connect Wallet -> Processing -> On-chain success. (No real connect.)
-         setTimeout(function () {
-           self.connecting = false; self.picking = '';
-           Alpine.store('dsModals').swap('onchain-tx', {
-             state: 'processing', demoResolve: true, demoError: false,
-             title: 'Confirming on-chain',
-             message: 'Waiting for the wallet signature…'
-           });
-         }, 1100);
-       },
-       deepLink() {
-         if (!this.attested()) return;
-         this.pick('Phantom');
-       },
-       back() {
-         if (this.connecting) return;
-         if (this.props.backTo === 'auth') {
-           Alpine.store('dsModals').swap('auth',
-             { step: 'credentials', submitting: null, formError: '' },
-             { direction: 'back' });
-         } else {
-           Alpine.store('dsModals').close();
-         }
-       }
-     }"
-     class="relative">
-
-  <%# Engine-owned brand-icon sprite — one copy; the <use> refs below paint it. %>
-  <%= render "studio/modals/blocks/wallet_brand_sprite" %>
-
-  <div class="relative mb-4">
-    <h3 class="text-heading font-bold text-lg text-center pt-1">Connect Wallet</h3>
-    <button @click="$store.dsModals.close()"
-            class="absolute top-0 right-0 -mr-1 text-secondary hover:text-heading text-xl leading-none"
-            aria-label="Close">&times;</button>
-  </div>
-
-  <template x-if="needsAttestation">
-    <div class="mb-3">
-      <%= render "studio/modals/shared/age_attestation" %>
-    </div>
-  </template>
-
-  <div class="space-y-2">
-    <%# Detected wallets — click to connect. %>
-    <template x-for="w in wallets" :key="w.name">
-      <button type="button" @click="pick(w.name)" :disabled="connecting"
-              class="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-alt border border-strong hover:bg-surface transition text-left disabled:opacity-60 disabled:cursor-wait">
-        <template x-if="brandIcon(w.name)">
-          <span class="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
-            <svg class="w-9 h-9" aria-hidden="true"><use :href="'#se-wallet-' + brandIcon(w.name)"></use></svg>
-          </span>
-        </template>
-        <template x-if="!brandIcon(w.name)">
-          <span class="w-9 h-9 rounded-lg bg-inset flex items-center justify-center text-sm font-bold text-heading shrink-0" x-text="w.name.slice(0,1)"></span>
-        </template>
-        <span class="font-semibold text-heading" x-text="w.name"></span>
-        <span class="ml-auto flex items-center gap-2">
-          <span x-show="picking === w.name" class="inline-flex items-center gap-1.5 text-xs text-secondary"><span class="spinner" aria-hidden="true"></span>Connecting…</span>
-          <span x-show="picking !== w.name" class="badge border-primary text-primary">Installed</span>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-muted">
-            <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-          </svg>
-        </span>
-      </button>
-    </template>
-
-    <%# Featured wallets that aren't installed — open the install page. %>
-    <template x-for="i in missingInstalls" :key="i.name">
-      <a :href="i.url" target="_blank" rel="noopener noreferrer"
-         class="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-alt border border-strong hover:bg-surface transition no-underline">
-        <template x-if="brandIcon(i.name)">
-          <span class="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
-            <svg class="w-9 h-9" aria-hidden="true"><use :href="'#se-wallet-' + brandIcon(i.name)"></use></svg>
-          </span>
-        </template>
-        <template x-if="!brandIcon(i.name)">
-          <span class="w-9 h-9 rounded-lg bg-inset flex items-center justify-center text-sm font-bold text-muted shrink-0" x-text="i.name.slice(0,1)"></span>
-        </template>
-        <span class="font-semibold text-heading" x-text="i.name"></span>
-        <span class="ml-auto flex items-center gap-2">
-          <span class="text-xs text-muted uppercase tracking-wide">Install</span>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 text-muted">
-            <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-          </svg>
-        </span>
-      </a>
-    </template>
-
-    <%# Mobile (no extension) — deep-link into the Phantom app. %>
-    <button x-show="isMobile" type="button" @click="deepLink()"
-            class="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-alt border border-strong hover:bg-surface transition text-left">
-      <span class="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
-        <svg class="w-9 h-9" aria-hidden="true"><use href="#se-wallet-phantom"></use></svg>
-      </span>
-      <span class="font-semibold text-heading">Open in Phantom app</span>
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="ml-auto w-4 h-4 text-muted">
-        <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-      </svg>
-    </button>
-  </div>
-
-  <template x-if="error">
-    <p role="alert" class="text-red-400 text-sm mt-3 text-center" x-text="error"></p>
-  </template>
-
-  <button type="button" @click="back()" :disabled="connecting"
-          class="mt-4 w-full text-center text-sm text-secondary hover:text-heading disabled:opacity-50">
-    &larr; Back
-  </button>
-</div>
+<%
+  # The heredoc MUST live inside one Ruby chunk like this. Written inline in the
+  # render tag below it does NOT compile: ERB closes a tag at the first close
+  # marker it sees, so the heredoc body becomes template TEXT and extra_data
+  # arrives empty — the picker still renders, minus every hook, which is a
+  # working-looking page that passes a markup assertion.
+  #
+  # And note what this comment may NOT contain: the close marker itself, in any
+  # form, even inside a Ruby comment. ERB scans the raw text, not the Ruby. The
+  # first draft of this very comment spelled the marker out and closed the tag
+  # from inside itself.
+  demo_hooks = <<~JS
+    ageAttested: false,
+    ageError: false,
+    get needsAttestation() { return !this.props.linkMode; },
+    canPick() {
+      if (!this.needsAttestation) return true;
+      if (this.ageAttested) return true;
+      this.ageError = true;
+      return false;
+    },
+    onInit() { this.ageAttested = this.props.ageAttested === true; },
+    // DEMO walk continuity: the picked wallet resolves, then the card swaps to
+    // the on-chain tx modal in its processing state, which auto-resolves to
+    // on-chain success. So the guide's active-card glow follows
+    // Connect Wallet -> Processing -> On-chain success.
+    onConnected() {
+      this.connecting = false;
+      this.picking = '';
+      Alpine.store('dsModals').swap('onchain-tx', {
+        state: 'processing', demoResolve: true, demoError: false,
+        title: 'Confirming on-chain',
+        message: 'Waiting for the wallet signature\u2026'
+      });
+    },
+    // No app to deep-link into from the guide — treat the mobile Phantom row
+    // as picking Phantom so the card still walks somewhere.
+    onDeepLink() { this.pick('Phantom'); },
+    onBack() {
+      if (this.props.backTo === 'auth') {
+        Alpine.store('dsModals').swap('auth',
+          { step: 'credentials', submitting: null, formError: '' },
+          { direction: 'back' });
+      } else {
+        Alpine.store('dsModals').close();
+      }
+    }
+  JS
+%>
+<%= render "studio/modals/wallet_connect",
+      store: "dsModals",
+      connect_fn: "dsWalletConnectDemo",
+      slot: "style/modals/wallet_connect_slot",
+      extra_data: demo_hooks %>

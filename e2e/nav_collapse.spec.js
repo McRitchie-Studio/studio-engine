@@ -135,3 +135,64 @@ test("the collapse endpoints are unchanged at every band boundary", async ({ pag
 
   expect(errors, `page errors: ${errors.join(", ")}`).toHaveLength(0);
 });
+
+// AND IT MUST NOT ARRIVE ALL AT ONCE.
+//
+// The sibling above proves the collapse stops when the scroll stops. It says
+// nothing about how fast it gets there, and it cannot: it walks a constant
+// 8px/frame, which is the slow deliberate case that was never broken.
+//
+// Progress is a pure function of scroll position, so if scrollY moves 90px
+// between two frames the header moves its WHOLE range in that frame. Measured
+// in turf-monster at 390x844 before the clamp — 8px/frame walked 3.9px of
+// header, 24px/frame 14.1px, a momentum flick 39.0px, which is the entire
+// 178 -> 139 collapse. It was found on a phone, by a person, after every tier
+// here was green.
+//
+// So this walks a FLICK, and asserts the per-frame cap the clamp promises.
+test("a flick collapses at the capped rate, not all in one frame", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/lab/bar_stack");
+  await expectStickyChromeIsLive(page, expect);
+
+  const walk = async (steps) =>
+    page.evaluate(async (steps) => {
+      const header = document.querySelector("header");
+      const h = () => Math.round(header.getBoundingClientRect().height * 10) / 10;
+      window.scrollTo(0, 0);
+      await new Promise((r) => setTimeout(r, 300));
+      const seen = [h()];
+      for (const s of steps) {
+        window.scrollBy(0, s);
+        await new Promise((r) => requestAnimationFrame(r));
+        seen.push(h());
+      }
+      // Let the clamp finish catching up once the "finger" is off.
+      for (let i = 0; i < 24; i++) {
+        await new Promise((r) => requestAnimationFrame(r));
+        seen.push(h());
+      }
+      let worst = 0;
+      for (let i = 1; i < seen.length; i++) worst = Math.max(worst, Math.abs(seen[i] - seen[i - 1]));
+      return { worst, first: seen[0], last: seen[seen.length - 1] };
+    }, steps);
+
+  // A momentum flick: the profile that used to move the whole range in one frame.
+  const flick = await walk([90, 78, 66, 55, 45, 36, 28, 21, 15, 10, 6, 3]);
+
+  // IT STILL COLLAPSES. Without this, a navbar that ignored scroll entirely
+  // would satisfy the cap trivially.
+  expect(flick.last).toBeLessThan(flick.first - 20);
+
+  // AND NEVER FASTER THAN THE CAP. --nav-max-step is 5px; allow a pixel of
+  // rounding on top rather than pinning the exact constant from another file.
+  expect(
+    flick.worst,
+    `a flick moved the header ${flick.worst}px in one frame (${flick.first} -> ${flick.last})`
+  ).toBeLessThanOrEqual(6);
+
+  expect(errors).toEqual([]);
+});
