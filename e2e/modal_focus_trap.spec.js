@@ -125,6 +125,11 @@ test.describe("modal host focus contract", () => {
     await page.locator('[data-test="open-birthday-underage"]').click();
     await expect(dialog(page)).toBeVisible();
 
+    // Tab onto a control INSIDE the card the swap is about to unmount. Without this
+    // the focused node is the BACKDROP, which a swap does NOT unmount, so focus stays
+    // inside by accident and every assertion below passes against a released trap.
+    await page.keyboard.press("Tab");
+
     // Swap the top entry the way the app does. current() stays truthy across
     // this, which is precisely why x-init does not re-run.
     await page.evaluate(() => window.Alpine.store("labModals").swap("age-gate"));

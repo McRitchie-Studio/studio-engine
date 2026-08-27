@@ -137,8 +137,19 @@ test.describe("global modal host focus contract", () => {
     await page.locator('[data-test="open-first"]').click();
     await expect(dialog(page)).toBeVisible();
 
+    // Tab onto a control INSIDE the card the swap is about to unmount. Without this
+    // the focused node is the BACKDROP, which a swap does NOT unmount, so focus stays
+    // inside by accident and this test passes against a released trap.
+    await page.keyboard.press("Tab");
+
     await page.evaluate(() => window.Alpine.store("modals").swap("lab-second", { title: "Second card" }));
-    await expect(dialog(page)).toBeVisible();
+    // AND WAIT FOR THE SWAP TO LAND. THIS host's replace is ASYNCHRONOUS: phase 2 runs
+    // on a CLOSE_ANIM_MS (220ms) timer, so awaiting the evaluate returns long before the
+    // content template re-mounts. Without this wait the assertions below grade the OLD
+    // card, which is still mounted and still holding focus, and the test passes with the
+    // phase-2 refocus removed. The scoped host splices synchronously, which is why its
+    // twin needs no wait. Verified both ways by mutation.
+    await expect(page.locator('[data-test="second-a"]')).toBeVisible();
 
     await staysTrapped(page, 3, "a swap");
   });
