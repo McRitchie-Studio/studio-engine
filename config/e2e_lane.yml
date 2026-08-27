@@ -503,7 +503,7 @@
 # must still be REFUSED on resubmit. "The card came back filled in" and "the card
 # came back filled in and now accepts what it just refused" are the same screen.
 
-total_specs: 92
+total_specs: 93
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -515,7 +515,7 @@ total_specs: 92
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-executed: 92
+executed: 93
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
