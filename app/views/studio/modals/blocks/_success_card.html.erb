@@ -78,6 +78,7 @@
     _remaining: #{redirect_secs},
     _total: #{redirect_secs},
     _redirectTimer: null,
+    _confettiTimer: null,
     startCountdown(url) {
       if (!url) return;
       var self = this;
@@ -92,9 +93,16 @@
       }, 1000);
     },
     fireConfetti() {
-      setTimeout(function() {
+      var self = this;
+      if (self._confettiTimer) clearTimeout(self._confettiTimer);
+      self._confettiTimer = setTimeout(function() {
+        self._confettiTimer = null;
         try { if (window.fireSuccessConfetti) window.fireSuccessConfetti(); } catch (_) {}
       }, 100);
+    },
+    destroy() {
+      if (this._redirectTimer) { clearInterval(this._redirectTimer); this._redirectTimer = null; }
+      if (this._confettiTimer) { clearTimeout(this._confettiTimer); this._confettiTimer = null; }
     }
   }".gsub(/\s+/, ' ').html_safe
 
