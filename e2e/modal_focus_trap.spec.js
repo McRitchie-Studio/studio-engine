@@ -69,7 +69,15 @@ test.describe("modal host focus contract", () => {
   });
 
   test("a tall card scrolls instead of clipping its own actions away", async ({ page }) => {
-    await page.setViewportSize({ width: 420, height: 380 });
+    // 300, not the 380 this test used to run at. MEASURED on the lab card: at 420x380
+    // its max-height resolves to 323px and its content is 288px, so the card FITS and
+    // never scrolls — the two original assertions (overflow-y is auto, height is under
+    // the viewport) are exactly what a SHORT card looks like, so this test was green
+    // against the case it exists to exclude. At 420x300 the max-height resolves to
+    // 255px against the same 288px of content: scrollHeight 288 > clientHeight 253, a
+    // 35px overflow, which is the condition being asserted. The third assertion below
+    // is what makes that reproduction mandatory rather than incidental.
+    await page.setViewportSize({ width: 420, height: 300 });
     await page.locator('[data-test="open-birthday-underage"]').click();
     await expect(dialog(page)).toBeVisible();
 
@@ -79,12 +87,24 @@ test.describe("modal host focus contract", () => {
       const style = getComputedStyle(el);
       return {
         scrollable: style.overflowY === "auto" || style.overflowY === "scroll",
-        withinViewport: el.getBoundingClientRect().height <= window.innerHeight
+        withinViewport: el.getBoundingClientRect().height <= window.innerHeight,
+        actuallyOverflows: el.scrollHeight > el.clientHeight
       };
     });
 
     expect(fits.scrollable, "a card taller than the viewport must scroll").toBe(true);
     expect(fits.withinViewport, "and must not exceed the viewport, or its actions are unreachable").toBe(true);
+    // WITHOUT THIS the test is green on a card that never scrolls at all. `overflow-y:
+    // auto` plus a height under the viewport is exactly what a SHORT card looks like,
+    // so the two assertions above are satisfied by the case they were written to
+    // exclude. scrollHeight > clientHeight is the only one of the three that says the
+    // content is genuinely taller than the box holding it — i.e. that the clipping
+    // this test is about was actually reproduced at this viewport.
+    expect(
+      fits.actuallyOverflows,
+      "the card did not overflow at 420x300, so the two assertions above proved nothing " +
+        "about clipping — shrink the viewport or lengthen the card"
+    ).toBe(true);
   });
 
   // THE REPRODUCING TIER, and the reason this file needed a fourth test.
@@ -130,5 +150,135 @@ test.describe("modal host focus contract", () => {
       });
       expect(inside, `focus escaped the dialog on Shift+Tab #${i + 1} after a swap`).toBe(true);
     }
+  });
+  // THE THREE SEAMS A SWAP DOES NOT COVER.
+  //
+  // The swap test above closed the seam it was written for, and its own reasoning
+  // named the mechanism exactly: the trap holds only while the OUTER template
+  // re-mounts, because that is what re-runs x-init -> captureFocus. A swap keeps
+  // current() truthy, so it needed an explicit refocus(). So does EVERY other way
+  // the top entry can change without the outer template re-mounting — and there
+  // are three, all measured in Chromium:
+  //
+  //   1. a PLAIN STACKED PUSH   — open() with no replace onto a NON-EMPTY stack
+  //   2. close() DOWN TO a modal underneath
+  //   3. closeAllDismissible() with a NON-DISMISSIBLE card underneath
+  //
+  // The host's own comment claimed the first was safe ("a fresh push takes
+  // current() falsy -> truthy, so the outer template mounts"). True only when the
+  // stack was EMPTY, and silently false for a stacked push.
+  //
+  // EVERY ONE OF THESE USES Shift+Tab, and that is not a stylistic choice. Chrome
+  // parks the sequential-focus-navigation starting point where the removed node
+  // was, so FORWARD Tab lands back inside by accident and passes against a
+  // released trap. Backward walks the other way and leaves. A forward-only version
+  // of these tests would be green on the broken build.
+
+  // Assert focus is inside the dialog, then walk BACKWARD and assert it stays.
+  const staysTrapped = async (page, presses, label) => {
+    await expect
+      .poll(() => page.evaluate(() => {
+        const d = document.querySelector('[role="dialog"]');
+        return !!(d && d.contains(document.activeElement));
+      }), { message: `focus fell out of the dialog after ${label} — the trap released` })
+      .toBe(true);
+
+    for (let i = 0; i < presses; i++) {
+      await page.keyboard.press("Shift+Tab");
+      const where = await page.evaluate(() => {
+        const d = document.querySelector('[role="dialog"]');
+        return {
+          inside: !!(d && d.contains(document.activeElement)),
+          landedOn: document.activeElement?.getAttribute("data-test") || document.activeElement?.tagName
+        };
+      });
+      expect(
+        where.inside,
+        `focus escaped the dialog on Shift+Tab #${i + 1} after ${label} — landed on ${where.landedOn}`
+      ).toBe(true);
+    }
+  };
+
+  test("the trap survives a PLAIN STACKED PUSH onto a non-empty stack", async ({ page }) => {
+    await page.locator('[data-test="open-birthday-underage"]').click();
+    await expect(dialog(page)).toBeVisible();
+    // Tab once first, so focus is on a control INSIDE the card that the push will
+    // unmount. Landing the push on the backdrop itself would not reproduce it.
+    await page.keyboard.press("Tab");
+
+    // A second card pushed on top — no replace. Measured on the broken build:
+    // activeElement BODY, then Shift+Tab x3 walked onto three background buttons
+    // behind a still-open dialog.
+    await page.evaluate(() => window.Alpine.store("labModals").open("age-gate", {
+      minAge: 21, state: "CA", dobYear: new Date().getFullYear() - 16, dobMonth: 6, dobDay: 15
+    }));
+    await expect(dialog(page)).toBeVisible();
+
+    await staysTrapped(page, 3, "a stacked push");
+  });
+
+  test("the trap survives close() DOWN TO a modal underneath", async ({ page }) => {
+    await page.locator('[data-test="open-birthday-underage"]').click();
+    await expect(dialog(page)).toBeVisible();
+    await page.evaluate(() => window.Alpine.store("labModals").open("age-gate", {
+      minAge: 21, state: "CA", dobYear: new Date().getFullYear() - 16, dobMonth: 6, dobDay: 15
+    }));
+    await expect(dialog(page)).toBeVisible();
+    // Tab onto a control INSIDE the card being closed. Without this the focused node
+    // is the BACKDROP, which close() does not unmount (the outer template survives a
+    // pop down to a non-empty stack) — so focus stays inside by accident and the test
+    // passes against a released trap. Verified by mutation on the sibling spec.
+    await page.keyboard.press("Tab");
+
+    // Close the TOP one. releaseFocus() is correctly gated on an empty stack, but
+    // nothing called refocus() for the entry left underneath, so focus sat on
+    // <body> with that dialog still open.
+    await page.evaluate(() => window.Alpine.store("labModals").close());
+    await expect(dialog(page)).toBeVisible();
+    // The card underneath must still be up — if the stack emptied, this test would
+    // be asserting the trap on a dialog that is not there.
+    await expect
+      .poll(() => page.evaluate(() => window.Alpine.store("labModals").stack.length))
+      .toBe(1);
+
+    await staysTrapped(page, 3, "closing down to the modal underneath");
+  });
+
+  test("the trap survives closeAllDismissible() over a non-dismissible card", async ({ page }) => {
+    // The non-dismissible card goes on FIRST so it is the survivor: the filter keeps
+    // dismissible: false entries and drops everything above it.
+    await page.evaluate(() => window.Alpine.store("labModals").open("age-gate", {
+      dismissible: false,
+      minAge: 21, state: "CA", dobYear: new Date().getFullYear() - 16, dobMonth: 6, dobDay: 15
+    }));
+    await expect(dialog(page)).toBeVisible();
+    await page.evaluate(() => window.Alpine.store("labModals").open("birthday-underage", {}));
+    await expect(dialog(page)).toBeVisible();
+    await page.keyboard.press("Tab");
+
+    await page.evaluate(() => window.Alpine.store("labModals").closeAllDismissible());
+    // Exactly the non-dismissible one survives. This is the precondition the whole
+    // test rests on: with an empty stack there is no trap to assert.
+    await expect
+      .poll(() => page.evaluate(() => window.Alpine.store("labModals").stack.length))
+      .toBe(1);
+    await expect(dialog(page)).toBeVisible();
+
+    await staysTrapped(page, 3, "closeAllDismissible over a non-dismissible card");
+  });
+
+  // The whitespace-only title. `title: '   '` is a truthy string, so it passed
+  // through dialogLabel's fallback chain and the accessible-name computation then
+  // trimmed it to empty — announcing a bare "dialog", the outcome that chain
+  // exists to prevent. The empty-string rungs are covered at the unit tier
+  // (test/lib/modal_dialog_label_test.rb); this is the browser's own verdict on
+  // the computed name.
+  test("a whitespace-only title still announces a real name", async ({ page }) => {
+    await page.evaluate(() => window.Alpine.store("labModals").open("birthday-underage", { title: "   " }));
+    await expect(dialog(page)).toBeVisible();
+
+    const name = await dialog(page).getAttribute("aria-label");
+    expect(name, "a whitespace-only title must fall through to the id").toBeTruthy();
+    expect(name.trim().length, `aria-label was ${JSON.stringify(name)}`).toBeGreaterThan(0);
   });
 });

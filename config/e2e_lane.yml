@@ -504,7 +504,7 @@
 # must still be REFUSED on resubmit. "The card came back filled in" and "the card
 # came back filled in and now accepts what it just refused" are the same screen.
 #
-# 2026-08-26: 92 -> 96. e2e/modal_focus_trap.spec.js, four specs on the modal
+# 2026-08-26: +4 (the merged counter landed at 97). e2e/modal_focus_trap.spec.js, on the modal
 # host's FOCUS contract. They are in this lane for the same reason the birthday
 # handoff above is: every assertion is about document.activeElement — where focus
 # actually IS — and the server's bytes are identical whether focus works or not. A
@@ -512,12 +512,56 @@
 # and stay green while a keyboard user sits focused behind the overlay, which is
 # exactly the measured defect.
 #
-# This number is 96, not the 94 this branch carried before it was merged up: the
-# age-gate lane change above (90 -> 92) landed on `accepted` while this branch was
-# in review, so the two additions STACK. Both sides had computed against a
-# 90-baseline that had already moved. The counter is re-derived on the MERGED tree
-# below, never incremented and never resolved by taking one side.
-total_specs: 97
+# This number is 96, not the 94 that branch carried before it was merged up: the
+# age-gate lane change above (90 -> 92) landed on `accepted` while it was in review,
+# so the two additions STACK. Both sides had computed against a 90-baseline that had
+# already moved. The counter is re-derived on the MERGED tree, never incremented and
+# never resolved by taking one side.
+#
+# THE PROSE ABOVE WAS WRONG WHERE IT COUNTED, and the correction is worth keeping
+# rather than quietly overwriting. When 92 -> 96 landed, the counter was re-derived
+# correctly (97 on the merged tree, `--list` -> 97 tests in 13 files, a full lane run
+# -> 97 passed / 0 skips / 0 @devnet) but the JUSTIFYING PROSE was never re-derived
+# with it: it said "four specs", "92 -> 96", and computed "executed = 96 - 0 - 0 = 96".
+# The spec file held FIVE tests, and the number in force was 97. An audit trail that
+# contradicts the number it justifies is worse than no audit trail — a reader who
+# checks the arithmetic finds it wrong and cannot tell which half to trust. The
+# earlier entry now says 96 as the FILE's contribution and this line carries the
+# merged total, which is what each was always measuring.
+#
+# 2026-08-27: 97 -> 107, and a FOURTEENTH file. Two halves:
+#
+#   +4 in e2e/modal_focus_trap.spec.js — the trap held on open and on swap; these
+#      cover the three OTHER ways the top entry changes without the outer template
+#      re-mounting (a plain stacked push, close() down to a modal underneath,
+#      closeAllDismissible() over a non-dismissible card) plus the whitespace-only
+#      dialog name.
+#
+#   +6 in e2e/modal_host_focus_trap.spec.js, a NEW file on a NEW lab page
+#      (/lab/modal_host). This is the one worth reading twice: every focus spec in
+#      this lane drove `studio/modals/scoped_host` through /lab/birthday_gate, and
+#      the GLOBAL host — `studio/modals/_host`, the `$store.modals` singleton every
+#      consumer app mounts once in its layout — is a SEPARATE ~800-line partial with
+#      its own copy of the focus trap. Nothing here ever loaded it. Half the modal
+#      system had zero browser coverage while this lane reported green on "the modal
+#      host's focus contract". Both hosts are now graded independently.
+#
+# EVERY SEAM SPEC PRESSES SHIFT+TAB, not Tab. Chrome parks the sequential-focus
+# navigation starting point where the removed node was, so FORWARD tabbing lands back
+# inside by accident and is green against a released trap — the same reason the
+# original Tab-forward spec stayed green through the swap defect. A forward-only
+# version of these would prove nothing.
+#
+# AND EACH CLOSE-DOWN SPEC TABS BEFORE IT CLOSES. Found by mutation, not by reading:
+# with focus left on the BACKDROP (which close() does not unmount when it pops down to
+# a non-empty stack) the spec stays green against the refocus removed. It has to be
+# holding a control INSIDE the card being closed to reproduce.
+#
+# Re-derived on THIS tree, three ways, never by arithmetic:
+#   npx playwright test --list                                             -> 107 tests, 14 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 107
+total_specs: 107
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -529,14 +573,13 @@ total_specs: 97
 # DOUBLES this number. That is the correct behaviour — the lane really would be
 # running twice the tests — and the reason it is called out is that the failure reads
 # as "5 more than the contract" rather than "you added a browser".
-# Re-derived on the MERGED tree (this branch + `accepted` carrying the age-gate
-# specs), never by arithmetic and never by taking a side of the merge conflict:
-#   npx playwright test --list                                    -> 96 tests, 13 files
-#   npx playwright test --list --grep "@devnet"                   -> 0
-#   npx playwright test --list --grep-invert "@devnet" --project=chromium -> 96
-# executed = total - devnet - allowed_skips = 96 - 0 - 0 = 96, so executed ==
+# Re-derived on THIS tree, never by arithmetic and never by taking a side of a merge:
+#   npx playwright test --list                                             -> 107 tests, 14 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 107
+# executed = total - devnet - allowed_skips = 107 - 0 - 0 = 107, so executed ==
 # total_specs and test/lib/e2e_lane_contract_test.rb's equality assertion holds.
-executed: 97
+executed: 107
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

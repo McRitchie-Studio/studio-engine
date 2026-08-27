@@ -1,0 +1,70 @@
+<%# `x-data` (bare) opens an Alpine scope for this page. Without it Alpine never
+    walks these @click bindings and the buttons are inert — silently: the page
+    renders, the store exists, and every click does nothing. /lab/birthday_gate
+    carries the same bare x-data for the same reason. %>
+<main class="max-w-3xl mx-auto px-4 py-10" x-data>
+  <%# THE GLOBAL MODAL HOST, in a browser — the half of the modal system that had
+      no browser coverage at all.
+
+      /lab/birthday_gate drives `studio/modals/scoped_host` (a per-page store).
+      The GLOBAL host — studio/modals/_host, the `$store.modals` singleton every
+      consumer app mounts once in its layout — is a SEPARATE 800-line partial with
+      its own copy of the focus trap, its own open/close/closeAllDismissible, and
+      its own swap/advance animation machinery. Nothing in e2e/ ever loaded it, so
+      every focus assertion in this lane graded the scoped host and the global one
+      shipped on the strength of the two files looking similar.
+
+      They are not the same file, and the seams this page exists for are exactly
+      where they drifted: the scoped host said "only on a REPLACE" and the global
+      host said the same thing, and both were wrong in the same way — but nothing
+      would have caught it if only one had been fixed.
+
+      THE LAB RULE (see E2eLabController): a lab page sets up a partial's LOCALS
+      and nothing else. This page registers two ordinary content templates and
+      three buttons; every modal behaviour under test belongs to the engine
+      partial rendered by name below. %>
+  <h1 class="text-2xl font-bold mb-6">Modal host (global store)</h1>
+
+  <%# Background-page controls. They exist to be TABBED ONTO when the trap
+      releases: a focus leak shows up as one of these becoming activeElement while
+      a dialog is still open, which is a far sharper signal than "focus is not
+      inside the dialog". %>
+  <div class="flex flex-wrap gap-3 mb-6">
+    <button type="button" data-test="open-first"
+            class="btn btn-primary"
+            @click="$store.modals.open('lab-first', { title: 'First card' })">
+      Open first
+    </button>
+
+    <button type="button" data-test="open-second"
+            class="btn btn-outline"
+            @click="$store.modals.open('lab-second', { title: 'Second card' })">
+      Open second
+    </button>
+
+    <button type="button" data-test="background-control" class="btn btn-outline">
+      Background control
+    </button>
+  </div>
+
+  <%= render "studio/modals/host" do %>
+    <template x-if="$store.modals.current().id === 'lab-first'">
+      <div class="p-6">
+        <h2 class="text-lg font-bold mb-3" x-text="$store.modals.current().props.title"></h2>
+        <%# TWO controls, not one: the trap's cycleFocus wraps between them, so a
+            card with a single control cannot tell a working wrap from a released
+            trap that happens to land back on the only focusable node. %>
+        <button type="button" data-test="first-a" class="btn btn-primary">First A</button>
+        <button type="button" data-test="first-b" class="btn btn-outline">First B</button>
+      </div>
+    </template>
+
+    <template x-if="$store.modals.current().id === 'lab-second'">
+      <div class="p-6">
+        <h2 class="text-lg font-bold mb-3" x-text="$store.modals.current().props.title"></h2>
+        <button type="button" data-test="second-a" class="btn btn-primary">Second A</button>
+        <button type="button" data-test="second-b" class="btn btn-outline">Second B</button>
+      </div>
+    </template>
+  <% end %>
+</main>
