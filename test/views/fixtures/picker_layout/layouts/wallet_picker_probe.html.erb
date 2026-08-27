@@ -1,7 +1,8 @@
 <%# Test-only layout for WalletConnectPickerTest. Lives under a TEST view-path
     root, never app/views — a layout in the gem's app/views ships to every
-    consumer. Populates view_flow[:layout] with a marker so a partial that
-    yields to the layout flow (the leak this picker shipped once) is visible to
-    an assertion. %>
-LAYOUT-BODY-MARKER
+    consumer. It RENDERS THE PICKER, the way an app does (the host lives in the
+    layout), so the picker renders during the LAYOUT pass, when view_flow[:layout]
+    already holds the page body. From the TEMPLATE that flow is still empty and
+    nothing can leak — which is how the first version of this probe went inert. %>
+<div id="probe-host"><%= render "studio/modals/wallet_connect" %></div>
 <%= yield %>

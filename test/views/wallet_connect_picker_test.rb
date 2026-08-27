@@ -132,9 +132,9 @@ class WalletConnectPickerTest < Minitest::Test
     # app actually does.
     html = render_picker_through_layout
 
-    assert_includes html, "LAYOUT-BODY-MARKER",
+    assert_includes html, "LEAKABLE-PAGE-BODY",
                     "the harness must actually populate the layout flow, or this proves nothing"
-    refute_includes root_inner_html(html), "LAYOUT-BODY-MARKER",
+    refute_includes root_inner_html(html), "LEAKABLE-PAGE-BODY",
                     "the page body leaked into the wallet card"
   end
 
@@ -207,14 +207,14 @@ class WalletConnectPickerTest < Minitest::Test
     view.render(partial: "studio/modals/wallet_connect", locals: locals)
   end
 
-  # Renders the picker the way an APP does: inside a layout, so view_flow[:layout]
-  # is populated. A direct partial render cannot reproduce the leak.
+  # The picker renders FROM THE LAYOUT here, the way an app renders it, so
+  # view_flow[:layout] already holds this page body. Rendered from the TEMPLATE
+  # the flow is still empty and the leak cannot appear — the arrangement this
+  # probe shipped with first, which is why it passed with the bug restored.
   def render_picker_through_layout
     v = ActionView::Base.with_empty_template_cache
                         .with_view_paths(["app/views", "test/views/fixtures/picker_layout"])
-    v.render(inline: <<~ERB, layout: "layouts/wallet_picker_probe")
-      <%= render "studio/modals/wallet_connect" %>
-    ERB
+    v.render(inline: %(<div>LEAKABLE-PAGE-BODY</div>), layout: "layouts/wallet_picker_probe")
   end
 
   # The x-data ATTRIBUTE only. Windowing matters: this partial's own doc comment
