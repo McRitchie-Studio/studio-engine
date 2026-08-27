@@ -32,9 +32,34 @@
 %>
 <style>
   /* Scroll lock applied by $store.modals._sync() when the stack is non-empty.
-     Combined with the fixed backdrop on the host below, this keeps the
-     page beneath any modal from scrolling on wheel / touch / spacebar. */
-  body.modal-open { overflow: hidden; }
+     Combined with the fixed backdrop on the host below, this keeps the page
+     beneath any modal from scrolling on wheel / touch / spacebar — a claim that
+     was FALSE wherever this gem's link sidebar shipped, until the rule below
+     moved off body. */
+  /* THE SCROLL LOCK GOES ON THE ELEMENT THAT ACTUALLY SCROLLS.
+     Measured on a consumer, 2026-08-27, before this change: with a modal open a
+     real wheel gesture still scrolled the page (600px → 1000px) and the sticky
+     header unpinned and slid away with it. The lock had been inert there for as
+     long as the link sidebar had shipped.
+
+     `body { overflow: hidden }` locks the viewport only when it PROPAGATES to
+     it, and body's overflow propagates only while `html` is `overflow: visible`.
+     This gem's own link-sidebar partial sets `html { overflow-x: clip }` so the
+     off-canvas panel never flashes a scrollbar — correct on its own terms, clip
+     creates no scroll container — but it ends the propagation. The lock then
+     stopped locking the viewport and started making BODY a scroll container
+     instead: one holding scrollTop 0 forever while the viewport scrolled past
+     it. Every `position: sticky` child of body then has a scrollport that never
+     moves, which is why the header unpinned and why the modal-open banner lift
+     had nothing to pin against.
+
+     So lock `html`, and put body back to `visible` so it is not a second scroll
+     container. An app that sets no overflow on html is unaffected — locking html
+     is correct there too; it was simply never the only thing that worked.
+
+     :has() is the trigger because the class lands on body, not html. */
+  html:has(body.modal-open) { overflow: hidden; }
+  body.modal-open { overflow: visible; }
 
   /* Drain-bar keyframe used by studio/modals/blocks/_success_card when
      cta_drain is set — the CTA button hosts a translucent overlay that
@@ -767,7 +792,7 @@
       tabindex="-1" makes the backdrop programmatically focusable without adding it
       to the tab order. The name comes from props (ariaLabel, else title, else the
       modal id) so a screen reader never announces a bare unnamed dialog. %>
-  <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop-mount"
+  <div class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 modal-backdrop-mount"
        :class="$store.modals.current()?._closing && 'modal-backdrop-unmount'"
        style="background:rgba(0,0,0,0.6)"
        role="dialog"

@@ -132,7 +132,7 @@
        a second transform property would silently replace the first. */
     left: 50%;
     width: min(42rem, calc(100% - 2rem));
-    z-index: 30;
+    z-index: var(--z-sticky, 30);
     background: var(--color-surface);
     border: 1px solid var(--color-border-subtle);
     border-radius: 0.75rem;
