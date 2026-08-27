@@ -31,6 +31,7 @@ module Studio
       dark_base   = colors[:dark] || "#1A1535"
       primary     = colors[:primary] || "#8E82FE"
       border_rgb  = ColorScale.lighten(dark_base, 0.30)
+      danger      = colors[:danger] || "#EF4444"
 
       {
         "--color-page"           => dark_base,
@@ -58,7 +59,22 @@ module Studio
         "--color-cta-hover"      => ColorScale.darken(primary, 0.30),
         "--color-success"        => colors[:success] || "#4BAF50",
         "--color-warning"        => colors[:warning] || "#FF7C47",
-        "--color-danger"         => colors[:danger] || "#EF4444",
+        "--color-danger"         => danger,
+        # THE DANGER *INK*, which is not the danger *colour*. --color-danger is a
+        # brand fill (button backgrounds, borders) and is free to be vivid;
+        # --color-danger-ink is the same red used as TEXT, where it must clear
+        # WCAG AA 4.5:1 on every surface it can land on.
+        #
+        # No STATIC red clears AA on BOTH themes — measured: text-red-300 is
+        # 1.92:1 light / 5.81 dark, text-red-400 2.77 / 4.03, #EF4444 3.76 / 2.96,
+        # text-red-600 4.77 / 2.34. So it is DERIVED per theme by the same bounded
+        # search that already produces --color-text-secondary and --color-text-muted.
+        #
+        # start: 0.0 is deliberate — the search tries the operator's actual danger
+        # colour FIRST and blends only as far as AA demands, so a theme whose red
+        # already passes keeps its exact brand hex.
+        "--color-danger-ink"     => contrast_ink(danger, direction: :lighten, start: 0.0, target: 4.5,
+                                                 against: dark_surfaces(dark_base)),
         "--color-accent"         => colors[:accent] || "#F72585"
       }
     end
@@ -116,6 +132,7 @@ module Studio
     def light_mode_vars
       light_base = colors[:light] || "#f8fafc"
       primary    = colors[:primary] || "#8E82FE"
+      danger     = colors[:danger] || "#EF4444"
 
       {
         "--color-page"           => light_base,
@@ -138,7 +155,22 @@ module Studio
         "--color-cta-hover"      => ColorScale.darken(primary, 0.30),
         "--color-success"        => colors[:success] || "#4BAF50",
         "--color-warning"        => colors[:warning] || "#FF7C47",
-        "--color-danger"         => colors[:danger] || "#EF4444",
+        "--color-danger"         => danger,
+        # THE DANGER *INK*, which is not the danger *colour*. --color-danger is a
+        # brand fill (button backgrounds, borders) and is free to be vivid;
+        # --color-danger-ink is the same red used as TEXT, where it must clear
+        # WCAG AA 4.5:1 on every surface it can land on.
+        #
+        # No STATIC red clears AA on BOTH themes — measured: text-red-300 is
+        # 1.92:1 light / 5.81 dark, text-red-400 2.77 / 4.03, #EF4444 3.76 / 2.96,
+        # text-red-600 4.77 / 2.34. So it is DERIVED per theme by the same bounded
+        # search that already produces --color-text-secondary and --color-text-muted.
+        #
+        # start: 0.0 is deliberate — the search tries the operator's actual danger
+        # colour FIRST and blends only as far as AA demands, so a theme whose red
+        # already passes keeps its exact brand hex.
+        "--color-danger-ink"     => contrast_ink(danger, direction: :darken, start: 0.0, target: 4.5,
+                                                 against: light_surfaces(light_base)),
         "--color-accent"         => colors[:accent] || "#F72585"
       }
     end
