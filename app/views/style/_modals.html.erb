@@ -566,7 +566,7 @@
 
   <%# 1. AUTH suite %>
   <%# ===================================================================== %>
-  <section class="space-y-5">
+  <section id="modals-auth" class="space-y-5">
     <div class="space-y-1">
       <h3 class="text-xl font-bold text-heading">Auth</h3>
       <p class="text-muted text-sm">
@@ -650,7 +650,7 @@
       owns: the person's name, their birthday, their picture. Grouping by
       subject rather than by moment also stops the guide claiming a chain it
       cannot show, now that the wallet step lives with the wallet cards. %>
-  <section class="space-y-5">
+  <section id="modals-profile" class="space-y-5">
     <div class="space-y-1">
       <h3 class="text-xl font-bold text-heading">Profile</h3>
       <p class="text-muted text-sm">
@@ -838,7 +838,7 @@
       "Quest N of N" counter — the with/without fork is gone. The two "updated"
       cards open the same modal id straight at the celebrate state (props.celebrate),
       exactly like the Auth cards open a given step. %>
-  <section class="space-y-5">
+  <section id="modals-profile-leveling" class="space-y-5">
     <div class="space-y-1">
       <div class="flex flex-wrap items-center gap-3">
         <h3 class="text-xl font-bold text-heading">Profile Leveling</h3>
@@ -1046,7 +1046,7 @@
   <%# 2. WEB3 — the wallet + on-chain modals, in the order a player meets them. %>
   <%# Gated by :web3; off = disabled-but-present-yet-openable. %>
   <%# ===================================================================== %>
-  <section class="space-y-5">
+  <section id="modals-web3" class="space-y-5">
     <div class="space-y-1">
       <div class="flex flex-wrap items-center gap-3">
         <h3 class="text-xl font-bold text-heading">Web3</h3>
@@ -1447,7 +1447,7 @@
   <%# 3. CONTEST ENTRY & ELIGIBILITY — moved directly under Web3. The %>
   <%# walked entry flow (glow follows), plus the honest web2/web3 map. %>
   <%# ===================================================================== %>
-  <section class="space-y-5">
+  <section id="modals-contest-entry" class="space-y-5">
     <div class="space-y-1">
       <div class="flex flex-wrap items-center gap-3">
         <h3 class="text-xl font-bold text-heading">Contest entry &amp; eligibility</h3>
@@ -1597,7 +1597,7 @@
   <%# ===================================================================== %>
   <%# 5. SYSTEM AND STATUS (reusable card blocks) %>
   <%# ===================================================================== %>
-  <section class="space-y-5">
+  <section id="modals-system-status" class="space-y-5">
     <div class="space-y-1">
       <h3 class="text-xl font-bold text-heading">System &amp; status</h3>
       <p class="text-muted text-sm">
@@ -1713,7 +1713,7 @@
   <%# ===================================================================== %>
   <%# 6. TEMPLATES (copy-from archetypes) %>
   <%# ===================================================================== %>
-  <section class="space-y-5">
+  <section id="modals-templates" class="space-y-5">
     <div class="space-y-1">
       <h3 class="text-xl font-bold text-heading">Templates</h3>
       <p class="text-muted text-sm">
@@ -1747,7 +1747,7 @@
   <%# ===================================================================== %>
   <%# 7. REWARDS / leveling (gated by Studio.feature?(:leveling)) %>
   <%# ===================================================================== %>
-  <section class="space-y-5">
+  <section id="modals-rewards" class="space-y-5">
     <div class="space-y-1">
       <div class="flex flex-wrap items-center gap-3">
         <h3 class="text-xl font-bold text-heading">Rewards</h3>
