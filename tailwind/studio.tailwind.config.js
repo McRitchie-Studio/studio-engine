@@ -92,6 +92,11 @@ module.exports = {
         body:      'var(--color-text-body)',
         secondary: 'var(--color-text-secondary)',
         muted:     'var(--color-text-muted)',
+        // The danger RED as TEXT. Separate from the `danger` brand fill on
+        // purpose: a fill can be vivid, but text must clear WCAG AA 4.5:1 on
+        // every surface, and no static red does that on BOTH themes. The token
+        // is derived per theme by ThemeResolver#contrast_ink.
+        'danger-ink': 'var(--color-danger-ink)',
       },
       borderColor: {
         subtle: 'var(--color-border)',
