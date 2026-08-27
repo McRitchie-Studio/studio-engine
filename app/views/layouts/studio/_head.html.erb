@@ -244,6 +244,161 @@
   })();
 </script>
 
+<style>
+  /* studio-engine: --nav-p, the sticky header's COLLAPSE PROGRESS, 0 (expanded)
+     to 1 (collapsed). Third of the header properties published from this file,
+     and the only one that is an INPUT to the header rather than a measurement
+     of it — --nav-h and --nav-bottom above say how big it is, this says how far
+     through its collapse it has got.
+
+     REGISTERED, not merely declared. Untyped, `calc(3rem - 1rem * var(--nav-p))`
+     is invalid at computed-value time on a page that has never scrolled and
+     every collapsing dimension drops to its unstyled default; the <number> type
+     is what makes the arithmetic legal and the initial value real. Registration
+     also makes it INTERPOLABLE, which is how /navbar's Scrolled toggle animates
+     the whole collapse by transitioning one property. */
+  @property --nav-p {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 0;
+  }
+</style>
+<script>
+  // studio-engine: navCollapse — the scroll-linked navbar collapse.
+  //
+  // Publishes --nav-p on the <header> once per animation frame from
+  // window.scrollY. The navbar's own stylesheet derives every collapsing
+  // dimension from it with calc(), so the header moves only in a frame the
+  // finger moved it, and stops the instant the finger does.
+  //
+  // It replaces `@scroll.window="scrolled = scrolled ? (scrollY > 5) : (scrollY
+  // > 60)"` plus `transition-all duration-300`. That pair let the FINGER set a
+  // step and an ease curve own everything after it. Measured in turf-monster at
+  // 390x844 before the change: the header ran 178px -> 139px and 34 of those
+  // 39px of document reflow landed AFTER the scroll had stopped, over 232ms, at
+  // up to 3px per frame of content nobody asked to move -- plus a 1px REVERSE
+  // lurch in the frame the class flipped, where a discrete text-3xl -> text-xl
+  // swap collided with the stylesheet's own `transition: font-size`.
+  //
+  // ADOPTING IT: put `nav-shell` and `x-data="navCollapse()"` on the header,
+  // give each breakpoint band a `--nav-ramp`, and write the collapsing
+  // dimensions as calc()s off --nav-p. This file ships NO sizing opinion, so an
+  // app whose navbar collapses to different endpoints than the engine's adopts
+  // the mechanism without touching its markup.
+  //
+  // Four details are load-bearing:
+  //
+  //   passive + rAF — the listener never blocks the compositor and coalesces a
+  //   burst of scroll events (iOS momentum fires far above 60Hz) into one write
+  //   per frame. The write lands on the HEADER, not :root: an inherited custom
+  //   property written on :root dirties style for the whole document every
+  //   frame, and it would leak the live page's scroll progress into the preview
+  //   headers on /navbar.
+  //
+  //   the smoothstep — collapsing a sticky, IN-FLOW header pulls the page up,
+  //   so during the collapse content moves by the scroll AND by the shrink:
+  //   faster than the finger, always. That is inherent; reclaiming the vertical
+  //   space is the point. What is tunable is the shape of the burst. --nav-ramp
+  //   is sized at 3x the band's collapse total and the ramp is smoothstepped,
+  //   whose slope is zero at both ends, so content speed LEAVES 1x, peaks near
+  //   1.5x mid-ramp, and returns to 1x with no velocity step. A linear ramp
+  //   equal to the collapse hits 2x and steps straight back to 1x.
+  //
+  //   the short-page guard — collapsing shortens the document by the collapse
+  //   total. On a page with barely more than that to scroll, the collapse
+  //   deletes the very scroll room that triggered it, the browser clamps
+  //   scrollY to 0, and the navbar flaps open and shut forever. roomExpanded
+  //   adds back the shrink ALREADY applied, so the measurement cannot chase
+  //   itself as it collapses.
+  //
+  //   reduced motion — scroll-linked motion has no clock left to slow down, but
+  //   resizing type under a moving finger is itself the motion some readers are
+  //   asking us to drop. Under the query --nav-p snaps 0/1 on the old
+  //   60/5 hysteresis instead of interpolating.
+  window.navCollapse = function () {
+    return {
+      scrolled: false,
+      p: 0,
+      _ramp: 144,
+      _reduce: null,
+      _onScroll: null,
+      _onResize: null,
+      _onReduce: null,
+      init: function () {
+        var self = this;
+        var el = this.$el;
+        var queued = false;
+
+        this._reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+        function readRamp() {
+          var raw = parseFloat(getComputedStyle(el).getPropertyValue('--nav-ramp'));
+          self._ramp = raw > 0 ? raw : 144;
+        }
+
+        function apply() {
+          queued = false;
+          var ramp = self._ramp;
+          // Clamped: rubber-band overscroll reports a NEGATIVE scrollY, and a
+          // negative progress inflates the navbar past its expanded size.
+          var y = Math.max(0, window.scrollY);
+
+          // The height the document WOULD have with the navbar expanded. The
+          // add-back is the whole trick — see the guard note above.
+          var roomExpanded = document.documentElement.scrollHeight
+                             - window.innerHeight
+                             + ramp * self.p;
+
+          var p;
+          if (roomExpanded < ramp + 24) {
+            p = 0;
+          } else if (self._reduce.matches) {
+            p = (self.p > 0 ? y > 5 : y > 60) ? 1 : 0;
+          } else {
+            var t = Math.min(1, y / ramp);
+            p = t * t * (3 - 2 * t);
+          }
+
+          if (p !== self.p) {
+            self.p = p;
+            el.style.setProperty('--nav-p', p.toFixed(4));
+          }
+
+          // The shadow is the one thing still on a clock, and it may stay
+          // there: box-shadow paints, it never reflows, so it cannot move
+          // content. Hysteresis keeps it from strobing at the boundary.
+          var lit = self.scrolled ? y > 5 : y > 60;
+          if (lit !== self.scrolled) self.scrolled = lit;
+        }
+
+        this._onScroll = function () {
+          if (queued) return;
+          queued = true;
+          requestAnimationFrame(apply);
+        };
+        this._onResize = function () { readRamp(); self._onScroll(); };
+        this._onReduce = apply;
+
+        readRamp();
+        apply();
+
+        window.addEventListener('scroll', this._onScroll, { passive: true });
+        window.addEventListener('resize', this._onResize, { passive: true });
+        if (this._reduce.addEventListener) this._reduce.addEventListener('change', this._onReduce);
+      },
+      destroy: function () {
+        // A Turbo visit tears the header down and builds a new one; without
+        // this every visit would stack another listener on window.
+        if (this._onScroll) window.removeEventListener('scroll', this._onScroll);
+        if (this._onResize) window.removeEventListener('resize', this._onResize);
+        if (this._reduce && this._reduce.removeEventListener && this._onReduce) {
+          this._reduce.removeEventListener('change', this._onReduce);
+        }
+      }
+    };
+  };
+</script>
+
 <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
 <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
 <% if Studio.sticky_table_headers %>

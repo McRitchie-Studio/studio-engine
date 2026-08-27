@@ -561,7 +561,35 @@
 #   npx playwright test --list                                             -> 107 tests, 14 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 107
-total_specs: 107
+# 2026-08-27: 107 -> 109. TWO in e2e/nav_collapse.spec.js (a new 15th file) for the
+# navbar collapse primitive lifted into layouts/studio/_head. Same lane, same reason as
+# its neighbours: --nav-p is written by a scroll listener and read by calc()s, and the
+# server's bytes are identical whether the ramp works or not.
+#
+# THE SECOND SPEC IS THE ONE THIS FILE SHOULD ARGUE FOR. The first proves the PATH
+# between the collapse's two ends is smooth; it says nothing about WHERE the ends are,
+# and that gap shipped a real regression. Lifting the band table carried each Tailwind
+# size across as a font-size and dropped the LINE-HEIGHT half of the pair (`text-3xl` is
+# 1.875rem/2.25rem, not 1.875rem), so the header grew 9px at every width >= 768px —
+# expanded 84 -> 93 — while every wiring assertion, the smoothness spec AND both
+# consumer lanes stayed green. A human measuring two builds side by side is what caught
+# it. The new spec pins both endpoints at all seven band boundaries; the collapsed end
+# was UNAFFECTED by that defect (the 32px logo sets the row height there, not the
+# title), which is why one endpoint would not have been enough.
+#
+# THIS COUNTER WAS A MERGE CONFLICT THREE TIMES OVER, and the arithmetic is the least
+# interesting part. This branch computed 93, then 98, then 99, each correct against an
+# `accepted` that had already moved again — 97, then 107 as PRs #222 and #223 landed
+# mid-review. Every one of those was resolved the same way and it is the only way that
+# works: take accepted's file WHOLESALE, then RE-DERIVE with the lister on the merged
+# tree. Never arithmetic, never a side of the conflict. A single hand-maintained integer
+# under parallel work will keep doing this; the discipline is what makes it survivable.
+#
+# Re-derived on THIS merged tree, three ways:
+#   npx playwright test --list                                             -> 109 tests, 15 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 109
+total_specs: 109
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -579,7 +607,10 @@ total_specs: 107
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 107
 # executed = total - devnet - allowed_skips = 107 - 0 - 0 = 107, so executed ==
 # total_specs and test/lib/e2e_lane_contract_test.rb's equality assertion holds.
-executed: 107
+# Re-derived on THIS merged tree alongside total_specs above:
+# executed = total - devnet - allowed_skips = 109 - 0 - 0 = 109, so executed ==
+# total_specs and test/lib/e2e_lane_contract_test.rb's equality assertion holds.
+executed: 109
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
