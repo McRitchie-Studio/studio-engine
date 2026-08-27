@@ -83,11 +83,87 @@
     // load; this registration lives in a PAGE BODY, so it was absent during that
     // one init. Without the guard, a Turbo Drive visit to this page leaves the
     // store undefined and every x-data on it throws.
+    var _returnFocusTo = null;
+    // The backdrop node, kept in the same closure and for the same proxy reason.
+    var _backdropEl = null;
+
     function registerScopedStore() {
       if (Alpine.store(STORE_NAME)) return;
 
       Alpine.store(STORE_NAME, {
         stack: [],
+
+        // FOCUS — the same contract as the shared host (studio/modals/_host).
+        // Both hosts render [role=dialog]; a fix in only one of them leaves every
+        // page that brings its own store still trapping keyboard users behind an
+        // overlay, which is the "engine-wide" half of this defect.
+        //
+        // The return target is held in the closure below, NOT on the store: an
+        // Alpine store is a reactive Proxy, so a DOM node assigned to it reads back
+        // as a proxy and every identity check against it (===, contains) is false.
+        captureFocus: function(el) {
+          _returnFocusTo = document.activeElement;
+          _backdropEl = el;
+          if (el && el.focus) el.focus();
+        },
+
+        // RE-FOCUS AFTER A REPLACE, without re-capturing the return target. See
+        // the long note in _host.html.erb: captureFocus runs from x-init on the
+        // backdrop, and a replace keeps current() truthy, so the outer template
+        // never re-mounts and x-init never re-runs. The inner content DOES
+        // re-mount and unmounts the focused control, activeElement falls back to
+        // the document body, and the tab handler bound on the backdrop stops seeing
+        // the key. (Written out rather than as a literal tag: this comment ships
+        // inside the rendered script, and studio/emails asserts the page emits no
+        // body element of its own — a tag in prose trips it.)
+        // _returnFocusTo is untouched on purpose — re-capturing would overwrite
+        // the opener with a node inside the dialog.
+        refocus: function() {
+          var run = function() {
+            if (_backdropEl && _backdropEl.focus && document.contains(_backdropEl)) {
+              _backdropEl.focus();
+            }
+          };
+          if (window.Alpine && window.Alpine.nextTick) window.Alpine.nextTick(run);
+          else setTimeout(run, 0);
+        },
+
+        releaseFocus: function() {
+          var target = _returnFocusTo;
+          _returnFocusTo = null;
+          _backdropEl = null;
+          if (target && target.focus && document.contains(target)) target.focus();
+        },
+
+        focusables: function(el) {
+          if (!el) return [];
+          var sel = 'a[href], button:not([disabled]), input:not([disabled]), ' +
+                    'select:not([disabled]), textarea:not([disabled]), [tabindex]';
+          return Array.prototype.slice.call(el.querySelectorAll(sel)).filter(function(n) {
+            return n.tabIndex >= 0 && n.offsetParent !== null;
+          });
+        },
+
+        cycleFocus: function(el, event) {
+          var items = this.focusables(el);
+          if (items.length === 0) { if (el && el.focus) el.focus(); return; }
+
+          var idx = items.indexOf(document.activeElement);
+          var next;
+          if (event && event.shiftKey) {
+            next = idx <= 0 ? items[items.length - 1] : items[idx - 1];
+          } else {
+            next = (idx === -1 || idx === items.length - 1) ? items[0] : items[idx + 1];
+          }
+          next.focus();
+        },
+
+        dialogLabel: function() {
+          var entry = this.current();
+          if (!entry) return 'Dialog';
+          var p = entry.props || {};
+          return p.ariaLabel || p.title || String(entry.id).replace(/[-_]/g, ' ');
+        },
 
         // open(id, props, opts) — opts.replace swaps the top entry in place
         // (what submitFormWithProgress does to turn crop-photo into saving).
@@ -96,12 +172,17 @@
           opts  = opts  || {};
           var entry = { id: id, props: props };
 
+          var replaced = false;
           if (opts.replace && this.stack.length > 0) {
             this.stack.splice(this.stack.length - 1, 1, entry);
+            replaced = true;
           } else {
             this.stack.push(entry);
           }
           this._sync();
+          // Only on a REPLACE. A fresh push takes current() falsy -> truthy, so the
+          // outer template mounts and x-init calls captureFocus for us.
+          if (replaced) this.refocus();
         },
 
         swap: function(id, props, opts) {
@@ -121,10 +202,17 @@
             var index = self.stack.indexOf(entry);
             if (index !== -1) self.stack.splice(index, 1);
             self._sync();
+            // Only when the LAST modal leaves — a stacked flow unmounts one dialog
+            // and mounts the next, and restoring in between yanks focus out of a
+            // flow the user is still inside.
+            if (self.stack.length === 0) self.releaseFocus();
           }, CLOSE_ANIM_MS);
         },
 
         closeAll: function() {
+          // Teardown path (Turbo/bfcache): drop the target rather than restoring
+          // into a document that is about to be replaced.
+          _returnFocusTo = null;
           this.stack = [];
           this._sync();
         },
@@ -201,9 +289,13 @@
        style="background:rgba(0,0,0,0.6)"
        role="dialog"
        aria-modal="true"
+       tabindex="-1"
+       x-init="$store.<%= scoped_store %>.captureFocus($el)"
+       :aria-label="$store.<%= scoped_store %>.dialogLabel()"
+       @keydown.tab.prevent="$store.<%= scoped_store %>.cycleFocus($el, $event)"
        @keydown.escape.window="$store.<%= scoped_store %>.current() && $store.<%= scoped_store %>.current().props.dismissible !== false && $store.<%= scoped_store %>.close()"
        @click.self="$store.<%= scoped_store %>.current() && $store.<%= scoped_store %>.current().props.dismissible !== false && $store.<%= scoped_store %>.close()">
-    <div class="<%= card_class %>" :class="$store.<%= scoped_store %>.cardClasses()">
+    <div class="<%= card_class %> max-h-[85dvh] overflow-y-auto" :class="$store.<%= scoped_store %>.cardClasses()">
       <%# Consumer-provided registrations — one <template x-if> per modal id. %>
       <%= yield if block_given? %>
     </div>

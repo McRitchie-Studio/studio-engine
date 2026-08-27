@@ -206,6 +206,15 @@
       return table[key] || table.pop || animDefaults[channel].pop;
     }
 
+    // Where focus returns when the last modal closes. A module-level closure, NOT a
+    // store property — see captureFocus below for why a DOM node must never live on
+    // a reactive store.
+    var _returnFocusTo = null;
+    // The backdrop node, kept in the SAME closure and for the same reason: a DOM
+    // node on a reactive store reads back as a proxy and every identity check
+    // against it is false forever. refocus() needs this node after a swap.
+    var _backdropEl = null;
+
     // === Alpine.store('modals') — the stack ============================
     //
     // Idempotent registration (return early if already registered) so
@@ -238,6 +247,111 @@
         // SWAP_IN_MS must match the modal-card-swap-in animation duration in
         // the inline style block above; we clear the flag after that so a
         // fresh open() doesn't re-trigger the slide.
+        // === focus management ==============================================
+        //
+        // THE RETURN TARGET LIVES IN A CLOSURE, NOT ON THE STORE. Alpine.store()
+        // wraps its object in a reactive Proxy, so a DOM node assigned to a store
+        // property reads back as a PROXY of that node. Calling .focus() through the
+        // proxy happens to work, but any identity check against it (=== , contains(),
+        // Set membership) is false forever — the exact defect that made the wallet
+        // watcher discard every account-change event it ever received. Focus code is
+        // full of identity checks, so the node is kept out of the reactive object
+        // entirely.
+        captureFocus: function(el) {
+          _returnFocusTo = document.activeElement;
+          _backdropEl = el;
+          // Focus the backdrop itself rather than the first control: landing on a
+          // button means a stray Enter fires it, and a destructive card should not
+          // be one keystroke from confirming.
+          if (el && el.focus) el.focus();
+        },
+
+        // RE-FOCUS THE BACKDROP AFTER THE TOP ENTRY CHANGES, without re-capturing
+        // the return target.
+        //
+        // THE DEFECT THIS CLOSES. captureFocus runs from x-init on the backdrop,
+        // and that backdrop lives inside <template x-if="current()">. swap() is
+        // open(id, props, { replace: true }) and advance() only patches props, so
+        // current() stays truthy and the OUTER template never re-mounts —
+        // captureFocus never runs again. The INNER content template DOES re-mount
+        // and unmounts whatever was focused; document.activeElement falls back to
+        // the document body, which is not a descendant of the backdrop, so the handler
+        // bound there stops seeing the key and native tabbing resumes. Measured
+        // in a browser: open -> swap -> Shift+Tab x3 walked out to the page behind.
+        //
+        // _returnFocusTo IS DELIBERATELY NOT TOUCHED. Re-capturing here would
+        // overwrite the opener with a node inside the dialog, so closing would
+        // return focus into a card that no longer exists.
+        //
+        // Deferred a tick: the re-mount that unfocuses the old node happens during
+        // Alpine's update, so focusing before it lands would be undone immediately.
+        refocus: function() {
+          var run = function() {
+            if (_backdropEl && _backdropEl.focus && document.contains(_backdropEl)) {
+              _backdropEl.focus();
+            }
+          };
+          if (window.Alpine && window.Alpine.nextTick) window.Alpine.nextTick(run);
+          else setTimeout(run, 0);
+        },
+
+        releaseFocus: function() {
+          var target = _returnFocusTo;
+          _returnFocusTo = null;
+          _backdropEl = null;
+          // Only restore if the element is still in the document — a Turbo visit can
+          // replace the page under an open modal, and focusing a detached node
+          // silently moves focus to <body>, which is worse than leaving it alone.
+          if (target && target.focus && document.contains(target)) target.focus();
+        },
+
+        // Every tabbable node inside the dialog, in document order. Deliberately
+        // recomputed per keypress: modal content is Alpine-rendered and a card can
+        // add or remove controls (a spinner replacing a button) while open, so a
+        // list captured at mount goes stale.
+        focusables: function(el) {
+          if (!el) return [];
+          var sel = 'a[href], button:not([disabled]), input:not([disabled]), ' +
+                    'select:not([disabled]), textarea:not([disabled]), [tabindex]';
+          return Array.prototype.slice.call(el.querySelectorAll(sel)).filter(function(n) {
+            return n.tabIndex >= 0 && n.offsetParent !== null;
+          });
+        },
+
+        // Tab is intercepted (.prevent on the binding) and re-dispatched here.
+        //
+        // THAT ONLY HOLDS WHILE FOCUS IS INSIDE THE BACKDROP, which is a real
+        // condition and not a formality. The binding lives ON the backdrop, so it
+        // sees the key only when activeElement is a descendant. If a re-mount
+        // drops focus to the document body — which is what a swap() or advance()
+        // does to the inner content template — this handler never fires, .prevent
+        // never runs, and native tabbing resumes straight out of the dialog. That
+        // is why refocus() exists and why both phase-2 seams call it. An earlier
+        // version of this comment claimed focus could never leave while open; it
+        // could, and it did.
+        cycleFocus: function(el, event) {
+          var items = this.focusables(el);
+          if (items.length === 0) { if (el && el.focus) el.focus(); return; }
+
+          var idx = items.indexOf(document.activeElement);
+          var next;
+          if (event && event.shiftKey) {
+            next = idx <= 0 ? items[items.length - 1] : items[idx - 1];
+          } else {
+            next = (idx === -1 || idx === items.length - 1) ? items[0] : items[idx + 1];
+          }
+          next.focus();
+        },
+
+        // A dialog with no accessible name announces as just "dialog". Props first
+        // so a card can name itself; the id is the honest fallback.
+        dialogLabel: function() {
+          var entry = this.current();
+          if (!entry) return 'Dialog';
+          var p = entry.props || {};
+          return p.ariaLabel || p.title || String(entry.id).replace(/[-_]/g, ' ');
+        },
+
         open: function(id, props, opts) {
           props = props || {};
           opts  = opts  || {};
@@ -271,6 +385,9 @@
                 var newEntry = { id: id, props: props, _swappingIn: true, _swapDir: dir };
                 self.stack[idx] = newEntry;
                 self._sync();
+                // The content template just re-mounted; put focus back on the
+                // backdrop or the trap releases. See refocus().
+                self.refocus();
                 // Phase 3: clear the swap-in flag + direction after the
                 // slide finishes so a future close() runs the unmount
                 // keyframe cleanly. _settled latches so the host's
@@ -340,6 +457,9 @@
             if (propsPatch) Object.assign(cur.props, propsPatch);
             cur._swappingOut = false;
             cur._swappingIn = true;
+            // Same re-mount, same release. advance() patches props in place, so
+            // the outer template never re-runs x-init either.
+            self.refocus();
             setTimeout(function() {
               cur._swappingIn = false;
               cur._swapDir = null;
@@ -367,9 +487,17 @@
               self.stack.splice(idx, 1);
               self._sync();
             }
+            // Hand focus back only when the LAST modal leaves. A stacked flow
+            // (open → swap → close) unmounts one dialog and mounts the next, and
+            // restoring to the background page in between would yank focus out of
+            // a flow the user is still inside.
+            if (self.stack.length === 0) self.releaseFocus();
           }, modalAnim('exit', entry.props && entry.props.exitAnim).ms);
         },
         closeAll: function() {
+          // Turbo/bfcache teardown: the page is going away, so drop the return
+          // target rather than restoring into a document about to be replaced.
+          _returnFocusTo = null;
           // No animation — used by Turbo before-cache + bfcache cleanup
           // where the user is navigating away and we just need the DOM
           // clean immediately.
@@ -532,11 +660,24 @@
       dismissible: false on its props (e.g. processing an on-chain tx
       where an accidental click would orphan a signed but un-confirmed
       transaction). Defaults to dismissible. %>
+  <%# FOCUS AND NAME. Measured on a real page before this: document.activeElement
+      after opening a modal was still the BACKGROUND page's textarea, so a keyboard
+      user sat focused behind an overlay. On the non-dismissible cards that is a
+      genuine trap — escape and click-outside are deliberately gated off there, so
+      there was no way out at all.
+
+      tabindex="-1" makes the backdrop programmatically focusable without adding it
+      to the tab order. The name comes from props (ariaLabel, else title, else the
+      modal id) so a screen reader never announces a bare unnamed dialog. %>
   <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop-mount"
        :class="$store.modals.current()?._closing && 'modal-backdrop-unmount'"
        style="background:rgba(0,0,0,0.6)"
        role="dialog"
        aria-modal="true"
+       tabindex="-1"
+       x-init="$store.modals.captureFocus($el)"
+       :aria-label="$store.modals.dialogLabel()"
+       @keydown.tab.prevent="$store.modals.cycleFocus($el, $event)"
        @keydown.escape.window="$store.modals.current() && $store.modals.current().props.dismissible !== false && $store.modals.close()"
        @click.self="$store.modals.current() && $store.modals.current().props.dismissible !== false && $store.modals.close()">
     <%# Card animation is class-driven (cardClasses() in the store) so it
@@ -554,7 +695,13 @@
         slide finishes, which reads as a flash mid-transition. _settled
         stays true for the rest of the entry's lifetime so a stale Alpine
         re-evaluation can't retrigger the bounce. %>
-    <div class="bg-surface rounded-xl border border-subtle shadow-2xl p-6 max-w-sm w-full"
+    <%# max-h + overflow-y so a card taller than the viewport SCROLLS instead of
+        clipping its own actions off-screen. Without it the confirm button on a long
+        card is unreachable at small heights — and on a non-dismissible card that is
+        a dead end, since escape and click-outside are gated off. 100dvh, not 100vh:
+        mobile browsers shrink the visual viewport when the URL bar is showing, and
+        vh ignores that. %>
+    <div class="bg-surface rounded-xl border border-subtle shadow-2xl p-6 max-w-sm w-full max-h-[85dvh] overflow-y-auto"
          :class="$store.modals.cardClasses()">
       <%# Consumer-provided content registrations. Each block typically
           contains a <template x-if="$store.modals.current().id === 'X'">
