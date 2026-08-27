@@ -211,9 +211,18 @@
       3. cta_event: button dispatching event %>
   <% if local_assigns[:cta_label] %>
     <% if use_drain && local_assigns[:cta_href_key] %>
+      <%# The DRAIN branches carry the same .btn skin as every other CTA in this
+          family (_cta_redirect, _onchain_success, and this file's own non-drain
+          branches two blocks below). They were hand-rolled once and were the
+          only two non-.btn buttons in the engine's modal blocks: px-4 py-2.5
+          text-sm rounded-lg against the class's px-8 py-3 text-base rounded-xl,
+          no shadow, no hover, and no branded focus-visible ring — 40px tall
+          where the class gives 48px, under the 44px mobile touch target, on a
+          consumer's primary conversion CTA. btn-primary already sets the CTA
+          background, so the inline style that used to sit here is gone. The
+          absolutely-positioned drain overlay is unchanged. %>
       <a :href="<%= cta_href_key %>"
-         class="relative overflow-hidden block w-full px-4 py-2.5 rounded-lg font-bold text-sm text-white text-center transition no-underline"
-         style="background: var(--color-cta);">
+         class="btn btn-primary btn-lg w-full relative overflow-hidden no-underline">
         <div class="absolute inset-0 pointer-events-none origin-left"
              style="background: rgba(255,255,255,0.18);"
              :style="{ animation: 'studio-modal-drain ' + _total + 's linear forwards' }"></div>
@@ -221,8 +230,7 @@
       </a>
     <% elsif use_drain && local_assigns[:cta_event] %>
       <button @click="$dispatch('<%= cta_event %>')"
-              class="relative overflow-hidden block w-full px-4 py-2.5 rounded-lg font-bold text-sm text-white text-center transition no-underline"
-              style="background: var(--color-cta);">
+              class="btn btn-primary btn-lg w-full relative overflow-hidden no-underline">
         <div class="absolute inset-0 pointer-events-none origin-left"
              style="background: rgba(255,255,255,0.18);"
              :style="{ animation: 'studio-modal-drain ' + _total + 's linear forwards' }"></div>
