@@ -78,10 +78,21 @@
   tile_style    = icon_bg.present? ? "background-color:#{icon_bg}" : nil
   tile_bg_class = icon_bg.present? ? nil : "bg-primary"
 %>
-<%= content_tag(soon ? :div : :button, type: (soon ? nil : "button"),
-      "@click": on_click,
-      class: "w-full flex items-center gap-4 p-4 rounded-xl #{border_class} bg-inset#{soon ? '' : ' transition text-left'}",
-      data: data_attrs.presence) do %>
+<%# LITERAL ERB, NOT content_tag, and the reason is on_click. content_tag escapes
+    every attribute value it is given, which is right for content and wrong for
+    CODE: an Alpine handler came out as f(&#39;a&#39;) instead of f('a'). A browser
+    unescapes the attribute before Alpine ever reads it, so the handler still
+    fired — which is exactly why it shipped — but every consumer test that reads
+    the MARKUP broke, and a primitive that mangles the expression it was handed is
+    lying about what it renders. Escaping stays correct for data-* and for the
+    title and subtitle below, which ARE content; they go through <%%= %> as usual. %>
+<% if soon %>
+  <div<%= tag.attributes(data: data_attrs) if data_attrs.present? %>
+       class="w-full flex items-center gap-4 p-4 rounded-xl <%= border_class %> bg-inset">
+<% else %>
+  <button type="button" @click="<%= raw on_click %>"<%= tag.attributes(data: data_attrs) if data_attrs.present? %>
+          class="w-full flex items-center gap-4 p-4 rounded-xl <%= border_class %> bg-inset transition text-left">
+<% end %>
   <span class="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center <%= icon_class %> <%= tile_bg_class %>"
         style="<%= tile_style %>"><%= icon_label %></span>
   <span class="flex-1 min-w-0">
@@ -106,4 +117,4 @@
       <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
     </svg>
   <% end %>
-<% end %>
+<% if soon %></div><% else %></button><% end %>

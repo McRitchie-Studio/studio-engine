@@ -175,6 +175,36 @@ class FundingChromeBlocksTest < Minitest::Test
     refute_includes render_rail(subtitle: nil), "text-xs text-secondary"
   end
 
+  # --- the handler is CODE, not content ---------------------------------------
+
+  def test_a_quoted_alpine_expression_survives_unescaped
+    # THE REGRESSION THIS FILE MISSED. The first cut built the element with
+    # content_tag, which escapes every attribute value — right for content, wrong
+    # for code. An Alpine handler came out as f(&#39;a&#39;) instead of f('a').
+    #
+    # A BROWSER STILL FIRED IT, which is why it shipped: the HTML parser
+    # unescapes the attribute before Alpine ever calls getAttribute. What broke
+    # was everything that reads the MARKUP — eight assertions across three
+    # turf-monster suites, each asserting the raw handler string, and each of
+    # them right to.
+    html = render_rail(on_click: "tmCoinflowBuyOne('single')")
+
+    assert_includes html, %(@click="tmCoinflowBuyOne('single')"),
+      "the handler must reach the attribute exactly as the caller wrote it"
+    refute_includes html, "&#39;",
+      "a primitive that mangles the expression it was handed is lying about what it renders"
+  end
+
+  def test_content_locals_are_still_escaped
+    # The other half of the same contract: title and subtitle are CONTENT, and a
+    # caller passing a quote or a bracket must not be able to reshape the markup.
+    html = render_rail(title: %(Coinflow "fast" <b>), subtitle: "a & b")
+
+    assert_includes html, "&quot;fast&quot;"
+    assert_includes html, "&lt;b&gt;"
+    assert_includes html, "a &amp; b"
+  end
+
   def test_data_attributes_reach_the_button
     # The app's own test hooks (turf uses data-onramp-rail / data-buy-rail /
     # data-topup-rail). Underscores become dashes, which is the Rails convention
