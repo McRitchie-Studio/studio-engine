@@ -112,7 +112,10 @@
         // backdrop, and a replace keeps current() truthy, so the outer template
         // never re-mounts and x-init never re-runs. The inner content DOES
         // re-mount and unmounts the focused control, activeElement falls back to
-        // <body>, and the tab handler bound on the backdrop stops seeing the key.
+        // the document body, and the tab handler bound on the backdrop stops seeing
+        // the key. (Written out rather than as a literal tag: this comment ships
+        // inside the rendered script, and studio/emails asserts the page emits no
+        // body element of its own — a tag in prose trips it.)
         // _returnFocusTo is untouched on purpose — re-capturing would overwrite
         // the opener with a node inside the dialog.
         refocus: function() {

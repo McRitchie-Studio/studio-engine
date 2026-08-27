@@ -275,7 +275,7 @@
         // current() stays truthy and the OUTER template never re-mounts —
         // captureFocus never runs again. The INNER content template DOES re-mount
         // and unmounts whatever was focused; document.activeElement falls back to
-        // <body>, which is not a descendant of the backdrop, so the tab handler
+        // the document body, which is not a descendant of the backdrop, so the handler
         // bound there stops seeing the key and native tabbing resumes. Measured
         // in a browser: open -> swap -> Shift+Tab x3 walked out to the page behind.
         //
@@ -323,7 +323,7 @@
         // THAT ONLY HOLDS WHILE FOCUS IS INSIDE THE BACKDROP, which is a real
         // condition and not a formality. The binding lives ON the backdrop, so it
         // sees the key only when activeElement is a descendant. If a re-mount
-        // drops focus to <body> — which is exactly what a swap() or advance()
+        // drops focus to the document body — which is what a swap() or advance()
         // does to the inner content template — this handler never fires, .prevent
         // never runs, and native tabbing resumes straight out of the dialog. That
         // is why refocus() exists and why both phase-2 seams call it. An earlier
