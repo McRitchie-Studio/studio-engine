@@ -78,8 +78,22 @@
   tile_style    = icon_bg.present? ? "background-color:#{icon_bg}" : nil
   tile_bg_class = icon_bg.present? ? nil : "bg-primary"
 %>
+<%# on_click is marked html_safe because it is CODE, not content. content_tag
+    escapes through ERB::Util.unwrapped_html_escape, which no-ops on an html_safe
+    String, so the handler reaches the attribute exactly as the caller wrote it:
+    f('a'), not the entity-escaped form. A browser recovered from the escaped
+    version and Alpine fired either way, so this was invisible on screen; what it
+    broke was every consumer test that reads the markup.
+
+    IT IS STILL SAFE FOR DOUBLE QUOTES. content_tag quote-escapes an attribute
+    VALUE regardless of html_safe, so a double-quoted expression is entity-encoded
+    and still works. An earlier attempt emitted the handler through raw in literal
+    ERB instead, which had no such protection: it broke out of the attribute and
+    silently narrowed the contract to single quotes only.
+
+    Everything else here stays escaped, because everything else is content. %>
 <%= content_tag(soon ? :div : :button, type: (soon ? nil : "button"),
-      "@click": on_click,
+      "@click": on_click&.html_safe,
       class: "w-full flex items-center gap-4 p-4 rounded-xl #{border_class} bg-inset#{soon ? '' : ' transition text-left'}",
       data: data_attrs.presence) do %>
   <span class="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center <%= icon_class %> <%= tile_bg_class %>"
