@@ -86,8 +86,9 @@
   # its way into the x-data attribute and every single quote becomes &#39; —
   # which still PARSES (the browser decodes entities in an attribute), so the
   # page works and only the source reads wrong. That is exactly the failure a
-  # markup assertion cannot see, and it is why the same seam in
-  # style/_modal_specimen carries the same html_safe with the same note.
+  # markup assertion cannot see. On style/_modal_specimen: see the header. It
+  # marks open_expr and glow_when safe but leaves card_data ESCAPED, so the two
+  # seams DIVERGE — deliberately, and not because one of them has a typo.
   slot        = local_assigns[:slot].presence
   slot_locals = local_assigns.fetch(:slot_locals, {})
   extra_data  = local_assigns.fetch(:extra_data, "").to_s.strip
