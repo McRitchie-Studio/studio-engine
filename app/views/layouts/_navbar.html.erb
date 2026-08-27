@@ -64,82 +64,14 @@
        mirror the col's clamps: the item is flex-shrink-0, so without them a
        long nowrap username sizes the column past a narrow viewport. */
     .user-nav-fit { max-width: 14rem; }
-    .nav-title { display: flex; gap: 0.25em; align-items: baseline; }
-
-    /* THE COLLAPSE BAND TABLE. Each band is the two ENDPOINTS of its collapse
-       written once, not two rule sets that have to be kept in step — the old
-       shape, where a base rule and an `.is-scrolled` override each carried half
-       the answer and `transition: font-size` guessed the middle.
-
-       --nav-ramp is the scroll distance the collapse is spread over, and it is
-       3x that band's collapse TOTAL (mobile: 8px of logo + 32px of padding =
-       40px, ramp 120px; desktop: 16px + 32px = 48px, ramp 144px). That ratio is
-       what puts the peak content speed near 1.5x rather than 2x — see the
-       navCollapse comment in layouts/studio/_head. Retune one and retune the
-       other, or the easing stops matching the geometry.
-
-       Endpoints below are UNCHANGED from the threshold build. This is the same
-       navbar; only the path between the ends is new.
-
-       EVERY var() CARRIES A FALLBACK OF 0, and it is inert where @property works.
-       navCollapse only WRITES --nav-p when progress changes, so on an unscrolled
-       page it is never written at all and the registration is doing 100% of the work
-       on first paint. In a browser that ignores @property, an unregistered custom
-       property is the guaranteed-invalid token and every calc() here goes
-       invalid-at-computed-value-time — measured: padding-block 0 and the logo at its
-       intrinsic size. `var(--nav-p, 0)` degrades to "always expanded" instead, which
-       is the pre-collapse navbar rather than a broken one. It costs nothing where
-       @property is honoured, which is why it is written unconditionally. (Not a NEW
-       exposure: the built Tailwind v4 already ships 59 @property registrations, so
-       that browser band is unsupported engine-wide.) */
-    .nav-shell {
-      --nav-ramp: 144px;
-      --nav-pad: calc(1.5rem - 1rem * var(--nav-p, 0));                 /* py-6 -> py-2 */
-      --nav-logo-size: calc(3rem - 1rem * var(--nav-p, 0));             /* 48px -> 32px */
-      --nav-title-size: calc(1.875rem - 0.625rem * var(--nav-p, 0));    /* 3xl  -> xl   */
-      --nav-title-lead-size: var(--nav-title-size);                  /* one line here */
-      /* THE LINE BOX, and the reason this variable exists at all. `text-3xl` and
-         `text-xl` are FONT-SIZE AND LINE-HEIGHT PAIRS (1.875rem/2.25rem and
-         1.25rem/1.75rem). Carrying only the font-size across dropped the
-         line-height to whatever the h1 inherited, and the header grew 9px at every
-         width >= 768px — expanded 84px -> 93px, measured. Collapsed was unaffected
-         because the 32px logo, not the title, sets the row height there, which is
-         exactly why a one-endpoint check would have missed this. Mobile was clean
-         only because its band already declared line-height: 1.15 explicitly.
-         Interpolate the PAIR or the endpoints move. */
-      --nav-title-lead: calc(2.25rem - 0.5rem * var(--nav-p, 0));       /* 36px -> 28px */
-    }
-    .nav-row { padding-block: var(--nav-pad); }
-    .nav-shell .nav-logo { width: var(--nav-logo-size); height: var(--nav-logo-size); }
-    .nav-shell .nav-title { font-size: var(--nav-title-size); line-height: var(--nav-title-lead); }
-    .nav-shell .nav-title span:last-child { font-size: var(--nav-title-lead-size); }
-
     @media (min-width: 400px) { .user-nav-col { width: 15rem; } .user-nav-fit { max-width: 15rem; } }
     @media (min-width: 768px) { .user-nav-col { width: 20rem; } .user-nav-fit { max-width: 20rem; } }
-    @media (max-width: 767px) {
-      .nav-title { flex-direction: column; gap: 0; }
-      .nav-title span:first-child { margin-bottom: -4px; }
-      .nav-logo-link { gap: 0.5rem !important; }
-      .nav-shell {
-        --nav-ramp: 120px;
-        --nav-logo-size: calc(3rem - 0.5rem * var(--nav-p, 0));         /* 48px -> 40px   */
-        --nav-title-size: calc(1.25rem - 0.25rem * var(--nav-p, 0));    /* 20px -> 16px   */
-        --nav-title-lead-size: calc(1.5rem - 0.35rem * var(--nav-p, 0));/* 24px -> 18.4px */
-        /* Mobile stacks the two words, so its line box is a RATIO, not the desktop
-           pair. Declared here rather than as a `line-height` on .nav-title, because
-           `.nav-shell .nav-title` outranks a bare `.nav-title` on specificity no
-           matter which comes later in the sheet — one declaration site, like every
-           other endpoint in this table. */
-        --nav-title-lead: 1.15;
-      }
-    }
-    @media (max-width: 399px) {
-      .nav-logo-link { gap: 0.25rem !important; }
-      .nav-shell {
-        --nav-title-size: calc(1.1rem - 0.2rem * var(--nav-p, 0));      /* 17.6px -> 14.4px */
-        --nav-title-lead-size: calc(1.3rem - 0.3rem * var(--nav-p, 0)); /* 20.8px -> 16px   */
-      }
-    }
+    /* The COLLAPSE band table used to live here, which meant only an app
+       rendering THIS partial got it. Three of six apps fork the navbar, so each
+       was left to hand-write its own — the way four independent copies happened
+       in the first place. It ships from engine.css now (every consuming app
+       imports it), so a forking app adopts the collapse with `nav-shell` +
+       x-data="navCollapse()" and overrides only the endpoints that differ. */
   </style>
   <div class="nav-row flex items-center">
     <%# Left side: logo + nav %>

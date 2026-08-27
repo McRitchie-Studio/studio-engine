@@ -202,15 +202,33 @@
     var ro = null;
     var current = null;
     var queued = false;
+    var lastH = null;
+    var lastBottom = null;
     function publish(header) {
       var style = document.documentElement.style;
-      style.setProperty('--nav-h', header.offsetHeight + 'px');
+      // SKIP THE NO-OP WRITE. --nav-h and --nav-bottom are INHERITED custom
+      // properties on documentElement, so every write invalidates style for the
+      // whole document. Most republishes carry the same number — a scroll with
+      // the header already pinned, a resize that missed this element — and
+      // those cost nothing now.
+      // BOTH READS BEFORE EITHER WRITE. Writing a custom property on
+      // documentElement invalidates style, so a read taken after one write
+      // forces a fresh layout — the thrash this whole change exists to remove.
+      var h = header.offsetHeight;
       // Scroll-dependent where --nav-h is not: chrome above the header scrolls
       // away while an overlay is open (nothing here locks body scroll), so this
       // is republished on scroll. Clamped at 0 — once the sticky header is
       // pinned at top:0 the two values converge, which is why a consumer whose
       // header already starts at the viewport top sees no change at all.
-      style.setProperty('--nav-bottom', Math.max(0, header.getBoundingClientRect().bottom) + 'px');
+      var bottom = Math.max(0, header.getBoundingClientRect().bottom);
+      if (h !== lastH) {
+        lastH = h;
+        style.setProperty('--nav-h', h + 'px');
+      }
+      if (bottom !== lastBottom) {
+        lastBottom = bottom;
+        style.setProperty('--nav-bottom', bottom + 'px');
+      }
     }
     function schedule() {
       if (queued || !current) return;
@@ -231,7 +249,18 @@
       }
       current = header;
       if (ro) ro.disconnect();
-      ro = new ResizeObserver(function () { publish(header); });
+      // THROUGH schedule(), NOT STRAIGHT TO publish(). This callback used to
+      // call publish() directly, which was fine while the header only resized
+      // during a 300ms transition. navCollapse made it resize on EVERY scroll
+      // frame, and each direct publish forced layout and then wrote two
+      // inherited custom properties on documentElement. Measured in
+      // turf-monster at 6x CPU throttle: frames over 20ms were 13/24 THROUGH
+      // the collapse ramp versus 0/24 past it, median 26ms versus 8ms.
+      // Ablating this observer alone took it to 0/24 and median 13ms — it cost
+      // about 2.6x the reflow it was reacting to. schedule() already coalesces
+      // to one publish per frame and is what the scroll and resize listeners
+      // use; the ResizeObserver was the one path that bypassed it.
+      ro = new ResizeObserver(schedule);
       ro.observe(header);
       publish(header);
     }
@@ -320,6 +349,7 @@
       scrolled: false,
       p: 0,
       _ramp: 144,
+      _maxPx: 5,
       _reduce: null,
       _onScroll: null,
       _onResize: null,
@@ -332,8 +362,11 @@
         this._reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
 
         function readRamp() {
-          var raw = parseFloat(getComputedStyle(el).getPropertyValue('--nav-ramp'));
+          var style = getComputedStyle(el);
+          var raw = parseFloat(style.getPropertyValue('--nav-ramp'));
           self._ramp = raw > 0 ? raw : 144;
+          var step = parseFloat(style.getPropertyValue('--nav-max-step'));
+          self._maxPx = step > 0 ? step : 5;
         }
 
         function apply() {
@@ -349,19 +382,77 @@
                              - window.innerHeight
                              + ramp * self.p;
 
-          var p;
+          // WHERE THE COLLAPSE WANTS TO BE, from scroll position alone.
+          var target;
+          var snap = false;
           if (roomExpanded < ramp + 24) {
-            p = 0;
+            target = 0;
+            snap = true;
           } else if (self._reduce.matches) {
-            p = (self.p > 0 ? y > 5 : y > 60) ? 1 : 0;
+            target = (self.p > 0 ? y > 5 : y > 60) ? 1 : 0;
+            snap = true;
           } else {
             var t = Math.min(1, y / ramp);
-            p = t * t * (3 - 2 * t);
+            target = t * t * (3 - 2 * t);
+          }
+
+          // THE RATE LIMIT — how far the collapse may travel in ONE frame.
+          //
+          // Position-linked progress fixed motion that OUTLIVED the gesture. It
+          // also guaranteed the opposite defect: if scrollY moves 90px between
+          // two frames, so does the header's whole range. Measured in
+          // turf-monster at 390x844, worst single-frame header height change by
+          // scroll profile —
+          //
+          //     8px/frame (slow, deliberate)   3.9px
+          //    24px/frame (normal swipe)      14.1px
+          //    momentum flick                 39.0px   <- the ENTIRE collapse
+          //    hard flick                     39.0px
+          //
+          // 39px is the full 178 -> 139. It was found on a phone: slow
+          // scrolling looked right, a flick jumped. The measurements behind the
+          // original primitive all walked a constant 8px/frame, which is
+          // exactly the case that already worked.
+          //
+          // So the TARGET stays position-linked and the STEP is clamped. What
+          // makes this safe is that a slow scroll never REACHES the clamp —
+          // under --nav-max-step of header travel per frame the branch below
+          // returns `target` untouched, so the slow feel is not approximated,
+          // it is the same arithmetic.
+          //
+          // maxStep is derived, not tuned per band: engine.css sizes --nav-ramp
+          // at 3x the band's collapse total, so a cap of MAX px/frame is
+          // 3*MAX/ramp in --nav-p units. Mobile (ramp 120) gives 4.9px/frame,
+          // desktop (ramp 144) 5.0px. Retune --nav-ramp without keeping that 3x
+          // relation and this cap silently drifts with it.
+          var p;
+          if (snap) {
+            // A guard refusal and a reduced-motion state are DECISIONS, not
+            // motion; ramping them would animate the very thing each exists to
+            // avoid.
+            p = target;
+          } else {
+            var maxStep = (3 * self._maxPx) / ramp;
+            var delta = target - self.p;
+            p = Math.abs(delta) <= maxStep
+              ? target
+              : self.p + (delta > 0 ? maxStep : -maxStep);
           }
 
           if (p !== self.p) {
             self.p = p;
             el.style.setProperty('--nav-p', p.toFixed(4));
+          }
+
+          // KEEP FRAMES COMING WHILE CATCHING UP. Nothing else will schedule
+          // one: the finger is off, so no more scroll events arrive, and
+          // without this the collapse freezes wherever the clamp left it. It
+          // converges LINEARLY and lands exactly — about 4 frames (~67ms) from
+          // a hard flick — rather than crawling asymptotically the way the
+          // 300ms ease this replaced did.
+          if (!snap && p !== target) {
+            queued = true;
+            requestAnimationFrame(apply);
           }
 
           // The shadow is the one thing still on a clock, and it may stay

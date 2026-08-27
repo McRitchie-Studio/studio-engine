@@ -118,7 +118,7 @@ class NavCollapseContractTest < Minitest::Test
                  "room must add back the shrink ALREADY applied, or the measurement chases itself as it collapses")
 
     # And the guard has to actually refuse, not merely compute.
-    assert_match(/roomExpanded\s*<[\s\S]{0,80}?\bp\s*=\s*0/, html,
+    assert_match(/roomExpanded\s*<[\s\S]{0,120}?\btarget\s*=\s*0/, html,
                  "under the threshold the guard must pin progress at 0")
   end
 
@@ -134,7 +134,7 @@ class NavCollapseContractTest < Minitest::Test
 
     branch = html[/_reduce\.matches\s*\)\s*\{([\s\S]{0,240}?)\}/, 1].to_s
     refute_empty branch, "could not find the reduced-motion branch"
-    assert_match(/\bp\s*=\s*\([\s\S]*?\)\s*\?\s*1\s*:\s*0/, branch,
+    assert_match(/\btarget\s*=\s*\([\s\S]*?\)\s*\?\s*1\s*:\s*0/, branch,
                  "reduced motion must snap progress to 0 or 1, never interpolate")
   end
 
@@ -191,10 +191,23 @@ class NavCollapseContractTest < Minitest::Test
                  "satisfied by the comment that explains it")
 
     # Each band is the two ENDPOINTS of its collapse, expressed once.
+    css = engine_css
     %w[--nav-pad --nav-logo-size --nav-title-size --nav-title-lead-size --nav-title-lead].each do |hook|
-      assert_match(/#{Regexp.escape(hook)}:\s*(calc\([^;]*var\(--nav-p[,)]|var\(--nav-title-size\)|[\d.]+;)/, nav,
-                   "#{hook} must derive from --nav-p")
+      assert_match(/#{Regexp.escape(hook)}:\s*(calc\([^;]*var\(--nav-p[,)]|var\(--nav-title-size\)|[\d.]+;)/, css,
+                   "#{hook} must derive from --nav-p, in engine.css where every consumer gets it")
     end
+
+    # THE MOVE ITSELF, pinned. Putting the table back inline would satisfy every
+    # assertion above if they still read the partial — and would silently strip
+    # the defaults from the three apps that fork the navbar.
+    refute_match(/--nav-ramp:\s*\d+px/, nav,
+                 "the band table must not return to the navbar partial — a forking app never sees it there")
+
+    # LAYERED, so a consumer can still beat it. Unlayered CSS outranks every
+    # layered rule regardless of specificity, which would make the engine's
+    # defaults unoverridable by the apps they exist to serve.
+    assert_match(/@layer utilities \{[\s\S]*?\.nav-shell \{/, css,
+                 "the defaults must ship inside @layer utilities or a consumer cannot override them")
 
     # EVERY var(--nav-p) CARRIES A FALLBACK. navCollapse writes the property only when
     # progress CHANGES, so on an unscrolled page it is never written and @property's
@@ -204,14 +217,15 @@ class NavCollapseContractTest < Minitest::Test
     # padding-block 0 with the logo at its intrinsic size. `var(--nav-p, 0)` degrades to
     # the pre-collapse navbar instead. Inert where @property works, so it costs nothing —
     # which is exactly why it must not be quietly dropped.
-    bare = nav.scan(/var\(--nav-p\)/)
+    bare = engine_css.scan(/var\(--nav-p\)/)
 
     assert_empty bare,
                  "#{bare.length} var(--nav-p) site(s) carry no fallback; write var(--nav-p, 0) so a " \
                  "browser without @property renders an expanded navbar rather than a broken one"
-    assert_operator nav.scan(/var\(--nav-p,\s*0\)/).length, :>=, 5,
+    assert_operator css.scan(/var\(--nav-p,\s*0\)/).length, :>=, 5,
                     "the band table lost its --nav-p sites entirely"
-    assert_match(/--nav-ramp:\s*\d+px/, nav, "each band must declare its own ramp width")
+    assert_match(/--nav-ramp:\s*\d+px/, css, "each band must declare its own ramp width")
+    assert_match(/--nav-max-step:\s*\d+px/, css, "the per-frame cap ships beside the ramp it derives from")
 
     refute_match(/\.is-scrolled\s+\.nav-(title|logo)/, nav,
                  "the .is-scrolled size overrides are replaced by --nav-p interpolation")
@@ -221,10 +235,95 @@ class NavCollapseContractTest < Minitest::Test
                  "font-size transitions produced the 1px reverse twitch at the threshold")
   end
 
+  # === THE RATE LIMIT ===================================================
+  #
+  # Position-linked progress fixed motion that OUTLIVED the gesture. It also
+  # guaranteed the opposite defect: scrollY can move 90px between two frames,
+  # and so then does the header's whole range. Measured in turf-monster at
+  # 390x844 before this clamp — 8px/frame walked 3.9px of header per frame, a
+  # momentum flick walked 39.0px, which is the ENTIRE collapse in one frame. It
+  # was found on a phone: slow scrolling read as smooth, a flick jumped.
+
+  def test_the_collapse_clamps_how_far_it_travels_in_one_frame
+    html = render_head
+
+    assert_match(/--nav-max-step:\s*\d+px/, engine_css,
+                 "the per-frame cap must be a CSS var so it is tunable beside --nav-ramp")
+    assert_match(/getPropertyValue\(\s*['"]--nav-max-step['"]\s*\)/, html,
+                 "navCollapse must read the cap from CSS, not hardcode it")
+
+    # DERIVED, NOT TUNED PER BAND. engine.css sizes --nav-ramp at 3x the band's
+    # collapse total, so a cap of N px/frame is 3*N/ramp in --nav-p units. A
+    # hardcoded step would be right on one breakpoint and wrong on the other.
+    assert_match(/maxStep\s*=\s*\(\s*3\s*\*\s*self\._maxPx\s*\)\s*\/\s*ramp/, html,
+                 "the step must derive from --nav-ramp's 3x relation to the collapse total")
+
+    # Within one step take the target exactly — no crawl; beyond it advance by
+    # exactly one step.
+    assert_match(/Math\.abs\(delta\)\s*<=\s*maxStep/, html,
+                 "inside one step the target must be taken exactly, or it converges asymptotically")
+    assert_match(/self\.p\s*\+\s*\(\s*delta\s*>\s*0\s*\?\s*maxStep\s*:\s*-maxStep\s*\)/, html,
+                 "beyond one step it must advance by exactly one step")
+  end
+
+  def test_a_clamped_frame_keeps_scheduling_until_it_lands
+    html = render_head
+
+    # THE MUTATION THIS KILLS: keeping the clamp and dropping the follow-up
+    # frame. Every assertion above still passes, and the collapse FREEZES
+    # wherever the clamp left it the moment the finger lifts — because nothing
+    # else schedules a frame once scroll events stop arriving.
+    assert_match(/if\s*\(\s*!snap\s*&&\s*p\s*!==\s*target\s*\)\s*\{[\s\S]{0,160}?requestAnimationFrame\(\s*apply\s*\)/, html,
+                 "an unfinished clamp must schedule its own next frame — no scroll event will")
+  end
+
+  def test_the_snap_paths_bypass_the_limiter
+    html = render_head
+
+    # A short-page refusal and a reduced-motion state are DECISIONS, not motion.
+    # Ramping them would animate the very thing each exists to avoid: the guard
+    # would ease the navbar open on a page that must not collapse, and reduced
+    # motion would get the interpolation it asked us to drop.
+    assert_match(/snap\s*=\s*true/, html, "the guard and reduced-motion must mark themselves as snaps")
+    assert_match(/if\s*\(\s*snap\s*\)\s*\{[\s\S]{0,240}?p\s*=\s*target;/, html,
+                 "a snap must take the target directly, skipping the clamp")
+  end
+
+  # === THE PUBLISHER'S PER-FRAME COST ====================================
+
+  def test_the_geometry_publisher_coalesces_and_skips_no_ops
+    html = render_head
+
+    # The ResizeObserver used to call publish() DIRECTLY. That was fine while
+    # the header only resized during a 300ms transition; navCollapse made it
+    # resize on EVERY scroll frame. Measured in turf-monster at 6x CPU throttle:
+    # frames over 20ms were 13/24 through the ramp vs 0/24 past it, median 26ms
+    # vs 8ms — and ablating this observer alone took it to 0/24 and median 13ms.
+    assert_match(/new ResizeObserver\(\s*schedule\s*\)/, html,
+                 "the ResizeObserver must go through schedule(), the rAF coalescer the other listeners use")
+    refute_match(/new ResizeObserver\(\s*function\s*\([^)]*\)\s*\{\s*publish\(/, html,
+                 "publishing straight from the observer bypasses the coalescer once per resize")
+
+    # And a republish carrying the same number must cost nothing: these are
+    # INHERITED custom properties on documentElement, so every write invalidates
+    # style for the whole document.
+    assert_match(/if\s*\(\s*h\s*!==\s*lastH\s*\)/, html, "--nav-h must skip the unchanged write")
+    assert_match(/if\s*\(\s*bottom\s*!==\s*lastBottom\s*\)/, html, "--nav-bottom must skip the unchanged write")
+  end
+
   private
 
   def navbar_source
     File.read(File.expand_path("../../app/views/layouts/_navbar.html.erb", __dir__))
+  end
+
+  # LAYER 2 OF THE PRIMITIVE. The band table moved here from the navbar
+  # partial's inline <style>: every engine-consuming app imports this
+  # stylesheet, but only some render that partial, and three of six FORK the
+  # navbar. While the table sat inline each fork hand-wrote its own — which is
+  # how four independent copies of this collapse came to exist.
+  def engine_css
+    File.read(File.expand_path("../../app/assets/tailwind/studio_engine/engine.css", __dir__))
   end
 
   # navbar_source WITH ITS ERB COMMENTS REMOVED.
