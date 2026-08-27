@@ -301,7 +301,7 @@
           _backdropEl = null;
           // Only restore if the element is still in the document — a Turbo visit can
           // replace the page under an open modal, and focusing a detached node
-          // silently moves focus to <body>, which is worse than leaving it alone.
+          // silently moves focus to the document body, which is worse than leaving it alone.
           if (target && target.focus && document.contains(target)) target.focus();
         },
 
@@ -349,13 +349,25 @@
           var entry = this.current();
           if (!entry) return 'Dialog';
           var p = entry.props || {};
-          return p.ariaLabel || p.title || String(entry.id).replace(/[-_]/g, ' ');
+          // TRIMMED, not merely truthy. `title: '   '` is a truthy string, so it used to
+          // pass straight through — and the accessible-name computation then trims it to
+          // empty and announces a bare "dialog", the exact outcome this fallback chain
+          // exists to prevent. An empty string already fell through (it is falsy); a
+          // whitespace-only one did not, which is the more likely typo of the two.
+          var named = function(v) {
+            return (typeof v === 'string' && v.trim() !== '') ? v : null;
+          };
+          return named(p.ariaLabel) || named(p.title) || String(entry.id).replace(/[-_]/g, ' ');
         },
 
         open: function(id, props, opts) {
           props = props || {};
           opts  = opts  || {};
           var self = this;
+          // Set by any branch that re-mounts the INNER content template without
+          // re-mounting the OUTER one — see the push branch below. The replace
+          // branch returns early and calls refocus() from its own phase 2.
+          var remounted = false;
 
           if (opts.replace && this.stack.length > 0) {
             var current = this.current();
@@ -404,10 +416,25 @@
             }
             // Already mid-close — just hot-swap so we don't double up timers.
             this.stack[this.stack.length - 1] = { id: id, props: props };
+            remounted = true;
           } else {
+            // A push onto a NON-EMPTY stack is the third re-mount seam, and the one
+            // the trap missed longest. current() stays truthy, so the OUTER template
+            // never re-mounts and x-init never re-runs captureFocus — while the INNER
+            // content template DOES re-mount and unmounts whatever was focused.
+            // Focus lands on the document body, which is not a descendant of the backdrop, so the
+            // @keydown.tab handler bound there stops firing and native tabbing resumes.
+            // MEASURED on /lab/birthday_gate: open a card, Tab once, push a second
+            // card, then Shift+Tab three times and you walk onto three BACKGROUND-PAGE
+            // buttons behind a still-open dialog.
+            //
+            // Only the FIRST push is safe: current() goes falsy -> truthy, the outer
+            // template mounts, and x-init captures for us.
+            remounted = this.stack.length > 0;
             this.stack.push({ id: id, props: props });
           }
           this._sync();
+          if (remounted) this.refocus();
         },
         // Sugar — `swap('foo', props)` ≡ `open('foo', props, { replace: true })`.
         // Pass opts through so callers can request a back-direction slide
@@ -491,7 +518,14 @@
             // (open → swap → close) unmounts one dialog and mounts the next, and
             // restoring to the background page in between would yank focus out of
             // a flow the user is still inside.
+            //
+            // BUT NOT RESTORING IS NOT THE SAME AS DOING NOTHING. Closing down to an
+            // underlying modal re-mounts the inner template, so focus falls to the document body
+            // with the dialog still open — the trap is off while the user is still
+            // inside it. releaseFocus() was correctly gated on an empty stack; the
+            // missing half was the else. MEASURED on both hosts.
             if (self.stack.length === 0) self.releaseFocus();
+            else self.refocus();
           }, modalAnim('exit', entry.props && entry.props.exitAnim).ms);
         },
         closeAll: function() {
@@ -517,6 +551,15 @@
             return modal.props && modal.props.dismissible === false;
           });
           this._sync();
+          // Same re-mount, same release: a surviving non-dismissible card is still on
+          // screen, and the cards dropped from under it took focus with them. MEASURED:
+          // activeElement the document body behind a still-open non-dismissible dialog.
+          //
+          // Nothing is done when the stack empties. That is deliberate and different
+          // from close(): this runs on the Turbo/bfcache teardown path, where the page
+          // is going away and closeAll() already declines to restore into a document
+          // about to be replaced.
+          if (this.stack.length > 0) this.refocus();
         },
         // isOpen(id) — is a card with this id ON THE STACK, in any
         // lifecycle state? A card mid-close still counts: close() flips
