@@ -123,6 +123,20 @@ class LayerScaleContractTest < ActiveSupport::TestCase
     assert_match(/body\.modal-open\s+\.studio-app-banner/, css,
                  "engine.css lost the app-banner half of the modal-open lift")
 
+    # A LEVEL ALONE IS NOT THE FIX. The first cut of this rule used `position:
+    # relative`, which escapes z-index:auto and looks right at the top of a page
+    # — and leaves the bars off screen for a reader who has scrolled, which is
+    # every reader who did anything before opening a modal. Measured on a
+    # consumer board at scrollY 900: relative put the stack at top -900, sticky
+    # at top 0. `fixed` also pins but pulls it out of flow, and the page jumps
+    # up by the bars' height.
+    rule = css[/body\.modal-open\s+\.studio-bar-stack.*?\{(.*?)\}/m]
+    assert_match(/position:\s*sticky/, rule.to_s,
+                 "a scrolled reader never sees a bar that only got a z-index — pin it")
+    assert_match(/top:\s*0/, rule.to_s, "sticky without a top offset never pins")
+    refute_match(/position:\s*fixed/, rule.to_s,
+                 "fixed pulls the bars out of flow and the page jumps by their height")
+
     # code_of, not File.read: both files NAME the hook in a comment explaining
     # what it is for, so a bare substring match stays green through a rename —
     # measured, on the first draft of this test.
