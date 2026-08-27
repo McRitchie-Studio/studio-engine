@@ -7,6 +7,7 @@ require_relative "../dummy/config/environment"
 
 require "minitest/autorun"
 require "action_view"
+require "nokogiri"
 
 # The promoted Connect Wallet picker (studio/modals/_wallet_connect) and the
 # style-guide specimen that now CONFIGURES it rather than copying it.
@@ -86,7 +87,12 @@ class WalletConnectPickerTest < Minitest::Test
   def test_single_root_element
     # The host mounts this inside a template x-if, and Alpine requires exactly
     # one root. A second top-level node is dropped silently.
-    assert_equal 1, top_level_element_count(render_picker.strip)
+    html = render_picker.strip
+
+    assert_equal 1, top_level_element_count(html)
+    # ...and the counter can actually SEE a second root. Without this the
+    # assertion above passed on a two-root document.
+    assert_equal 2, top_level_element_count("#{html}\n<div>second root</div>")
   end
 
   def test_the_block_slot_renders_inside_the_root
@@ -206,19 +212,10 @@ class WalletConnectPickerTest < Minitest::Test
     nil
   end
 
+  # Nokogiri, not a hand-rolled tag scanner. The scanner this replaced read the
+  # row's VOID <img> (no trailing slash, no close tag) as an OPEN element, so its
+  # depth never returned to 0 and it answered 1 for ANY number of roots.
   def top_level_element_count(fragment)
-    depth = 0
-    count = 0
-    fragment.scan(%r{<(/?)([a-zA-Z][a-zA-Z0-9-]*)[^>]*?(/?)>}) do |closing, _tag, self_closing|
-      if closing == "/"
-        depth -= 1
-      elsif self_closing == "/"
-        count += 1 if depth.zero?
-      else
-        count += 1 if depth.zero?
-        depth += 1
-      end
-    end
-    count
+    Nokogiri::HTML.fragment(fragment).element_children.length
   end
 end
