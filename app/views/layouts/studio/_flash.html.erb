@@ -12,10 +12,13 @@
 
 <style>
   /* Z-indexes are CSS-var-driven so consumer apps can override without
-     !important. The defaults (60 / 55) sit just above typical sticky-nav
-     baselines (50). Apps with higher navbars set --studio-toast-z and
-     --studio-toast-blur-z in :root. */
-  #toast-container { z-index: var(--studio-toast-z, 60); }
+     !important. The per-app names stay — they are the published seam — but the
+     DEFAULT now comes from the shared layer scale in engine.css rather than a
+     bare 60/55 that sat below every app navbar. A toast is the one thing that
+     must surface over an open modal, so --z-toast is above --z-modal and an app
+     that never overrides gets that for free. Apps that DO override should set
+     the tier (--z-toast) instead, and drop the per-component name. */
+  #toast-container { z-index: var(--studio-toast-z, var(--z-toast, 400)); }
   .toast-shadow-all {
     box-shadow: 0 0 30px rgba(0,0,0,0.4), 0 0 10px rgba(0,0,0,0.2);
   }
@@ -62,7 +65,7 @@
     mask-image: radial-gradient(ellipse 70% 80% at 50% 0%, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0) 100%);
     -webkit-mask-image: radial-gradient(ellipse 70% 80% at 50% 0%, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0) 100%);
     pointer-events: none;
-    z-index: var(--studio-toast-blur-z, 55);
+    z-index: var(--studio-toast-blur-z, var(--z-toast-blur, 399));
     transition: opacity 0.5s ease;
     background: rgba(255, 255, 255, 0.15);
   }

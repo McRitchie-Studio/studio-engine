@@ -28,6 +28,72 @@
   their local copies for this import.
 */
 
+/* -- Layer scale ------------------------------------------------------------
+   The ONE stacking order every Studio app shares. Read the ORDER, not the
+   number: the tier is the contract, the integer is an implementation detail.
+
+   BELOW 100 is page furniture that never blocks another layer, and those tiers
+   line up with Tailwind's own z-10..z-50 — `z-20` and var(--z-raised) are the
+   same rung, so either spelling is fine down here.
+
+   AT 100 AND UP every tier is chrome that can COVER other chrome, and that is
+   where a raw integer stops being readable. The defect this scale was built
+   from: a docked bottom bar at inline `z-index:9999` painting over a modal
+   backdrop at `z-[120]`, with 9,798 unclaimed values between them and no
+   ladder anywhere that said which should win. Three layers were tied at 130
+   and two at 10000, each tie resolved by source order rather than by anyone's
+   decision.
+
+   Consumers override a TIER in their own :root (loaded after this file) — the
+   same seam --studio-toast-z has always had. Override the tier, never the call
+   site: a bespoke number at a call site is how the ladder rotted the first time.
+*/
+:root {
+  --z-behind:       -1;  /* decoration painted behind its own box */
+  --z-base:          0;  /* fixed page backgrounds and their scrims */
+  --z-content:      10;  /* raised content inside a card */
+  --z-raised:       20;  /* hover lifts, in-page click catchers */
+  --z-sticky:       30;  /* in-page sticky headers, bars pinned under the nav */
+  --z-panel:        40;  /* in-page side panels */
+  --z-dropdown:     50;  /* menus and anchored popovers */
+
+  --z-docked:      100;  /* docked bottom bar — must never cover a modal */
+  --z-nav:         110;  /* the pinned navbar */
+  --z-drawer:      150;  /* full-cover drawers (link sidebar, gear sidebar) */
+  --z-modal:       200;  /* modal backdrop + card — THE app blocker */
+  --z-lightbox:    210;  /* a lightbox opened from inside a modal */
+  --z-alert:       300;  /* transient overlays that must not be missed */
+  --z-toast-blur:  399;  /* the frosted halo behind the toasts */
+  --z-toast:       400;  /* toasts */
+  --z-banner:      500;  /* environment / DEV MODE — reachable mid-modal */
+  --z-tooltip:     600;  /* tooltips on the banner, so they clear it */
+}
+
+/* The environment / impersonation bars stay in NORMAL FLOW (banners/_stack
+   records why: pinning them needs one sibling to measure the other, and the
+   measured version visibly jumped). Flow costs them a stacking level, so the
+   modal backdrop dims the DEV MODE and Email buttons exactly when a QA session
+   needs them.
+
+   So the lift is scoped to `body.modal-open` — set by every modal host in this
+   repo and by the consumer forks of it. That is the one state where raising the
+   bars cannot cost anything: the same class locks body scroll
+   (engine-motion.css), so the bars cannot scroll up behind the pinned navbar
+   while they outrank it. With no modal open they are unpositioned, exactly as
+   before.
+
+   THE ONE REQUIREMENT ON THE CONSUMER: render the bars as a SIBLING of the
+   navbar, before it — not inside <header>. A pinned header carrying a z-index
+   is a stacking context, and a descendant's z-index is clamped inside it, so a
+   bar nested in the header composites at the HEADER's level no matter what it
+   asks for. --nav-bottom already reports the header's live bottom edge for
+   anything that needs to sit under chrome stacked above it. */
+body.modal-open .studio-bar-stack,
+body.modal-open .studio-app-banner {
+  position: relative;
+  z-index: var(--z-banner, 500);
+}
+
 /* -- Surfaces -------------------------------------------------------------- */
 
 @utility card {
@@ -193,12 +259,16 @@
 
 /* -- Link sidebar (out-of-the-box navigation) ------------------------------
    Paired with components/_link_sidebar + _link_sidebar_trigger and the
-   Studio.sidebar_sections config. The layer sits above the sticky header
-   (z-50) and the modal host. Inert without the panel in the DOM, so apps
-   that declare no sections are unaffected. */
+   Studio.sidebar_sections config. A full-cover drawer, so it takes the shared
+   --z-drawer tier: above the navbar and any docked bottom bar, BELOW the modal
+   host. It used to be a bare 10000, which put it over every modal and tied it
+   exactly with turf-monster's gear sidebar — two unrelated drawers on one
+   number, resolved by source order. A modal opened FROM a drawer is the newer
+   task and should win. Inert without the panel in the DOM, so apps that declare
+   no sections are unaffected. */
 
 @utility studio-link-sidebar-layer {
-  z-index: 10000;
+  z-index: var(--z-drawer, 150);
 }
 
 /* Alpine's pre-init cloak. Engine partials (sidebar panels, dropdowns, the

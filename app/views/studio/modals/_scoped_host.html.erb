@@ -313,7 +313,7 @@
 </script>
 
 <template x-if="$store.<%= scoped_store %>.current()">
-  <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop-mount"
+  <div class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 modal-backdrop-mount"
        :class="$store.<%= scoped_store %>.current()?._closing && 'modal-backdrop-unmount'"
        style="background:rgba(0,0,0,0.6)"
        role="dialog"

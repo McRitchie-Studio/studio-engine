@@ -712,7 +712,7 @@
       tabindex="-1" makes the backdrop programmatically focusable without adding it
       to the tab order. The name comes from props (ariaLabel, else title, else the
       modal id) so a screen reader never announces a bare unnamed dialog. %>
-  <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 modal-backdrop-mount"
+  <div class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 modal-backdrop-mount"
        :class="$store.modals.current()?._closing && 'modal-backdrop-unmount'"
        style="background:rgba(0,0,0,0.6)"
        role="dialog"
