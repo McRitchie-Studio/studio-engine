@@ -40,26 +40,63 @@ class NavOffsetContractTest < Minitest::Test
   # --nav-h consumer in the engine breaks — and the suite was green. Each regex
   # below therefore spans the property name AND the expression feeding it, so the
   # two cannot be exchanged without going red.
+  # THE SOURCES ARE NOW ONE HOP AWAY, AND THE BINDING IS STILL ASSERTED.
+  #
+  # publish() used to write each property straight from its expression, and this
+  # test matched property-and-expression in one regex. Both values are now READ
+  # INTO LOCALS FIRST and written after, for two reasons the publisher's own
+  # comment records: a write to an inherited custom property on documentElement
+  # invalidates style, so a read taken after one write forces a fresh layout;
+  # and each write is now skipped when the value has not changed.
+  #
+  # Rather than relax to "offsetHeight appears somewhere" — the exact
+  # vocabulary-not-wiring mistake this file was blocked for — each assertion
+  # below CAPTURES the local a source is read into and requires THAT local to be
+  # the one written. Shannon's swap mutation still dies here: exchange the two
+  # sources and the captured names cross, so both matches fail.
   def test_head_publishes_the_bottom_edge_from_the_headers_rect
     html = render_head
 
     # The height keeps its old meaning — consumers size off it and must not shift.
-    assert_match(/setProperty\(\s*'--nav-h'\s*,\s*\w+\.offsetHeight/, html,
-                 "--nav-h must be fed by the header's HEIGHT, not by its rect")
+    h_local = html[/var\s+(\w+)\s*=\s*\w+\.offsetHeight\s*;/, 1]
+    refute_nil h_local, "--nav-h's source must still be the header's offsetHeight"
+    assert_match(/setProperty\(\s*'--nav-h'\s*,\s*#{Regexp.escape(h_local)}\s*\+/, html,
+                 "--nav-h must be written from the local read out of offsetHeight, not from anything else")
 
     # The offset is a DIFFERENT measurement and must come from the rect, clamped.
     # Feeding it from offsetHeight would reintroduce the bug under a new name.
-    assert_match(
-      /setProperty\(\s*'--nav-bottom'\s*,\s*Math\.max\(\s*0\s*,\s*\w+\.getBoundingClientRect\(\)\.bottom/,
-      html,
-      "--nav-bottom must be fed by the header's clamped rect BOTTOM, not by its height"
-    )
+    b_local = html[/var\s+(\w+)\s*=\s*Math\.max\(\s*0\s*,\s*\w+\.getBoundingClientRect\(\)\.bottom\s*\)\s*;/, 1]
+    refute_nil b_local, "--nav-bottom's source must still be the clamped rect bottom"
+    assert_match(/setProperty\(\s*'--nav-bottom'\s*,\s*#{Regexp.escape(b_local)}\s*\+/, html,
+                 "--nav-bottom must be written from the local read out of the clamped rect bottom")
+
+    refute_equal h_local, b_local, "the two measurements must not collapse into one local"
 
     # And neither may be fed by the other's source, in any spelling.
     refute_match(/setProperty\(\s*'--nav-h'\s*,[^;]*getBoundingClientRect/, html,
                  "feeding --nav-h from the rect breaks every consumer that sizes off it")
     refute_match(/setProperty\(\s*'--nav-bottom'\s*,[^;]*offsetHeight/, html,
                  "feeding --nav-bottom from the height IS the banner-overlap bug")
+  end
+
+  # THE ANTI-THRASH ORDER, which is the point of hoisting the reads at all.
+  #
+  # THE MUTATION THIS KILLS: moving either read back below the first write.
+  # Every assertion above still passes — same sources, same locals, same
+  # properties — and the second read forces a layout against a style tree the
+  # first write just dirtied, which is the per-frame cost this change removed.
+  def test_head_reads_both_measurements_before_writing_either
+    html = render_head
+    body = html[/function publish\(header\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    refute_empty body, "could not isolate publish()"
+
+    last_read  = [body.index("offsetHeight"), body.index("getBoundingClientRect")].compact.max
+    first_write = body.index("setProperty")
+    refute_nil last_read
+    refute_nil first_write
+    assert last_read < first_write,
+           "both geometry reads must precede both writes — a read after a write to " \
+           "documentElement forces a fresh layout, which is the thrash this removed"
   end
 
   def test_head_republishes_the_bottom_edge_on_scroll
