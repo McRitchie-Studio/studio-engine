@@ -238,6 +238,31 @@ the block:
 <% end %>
 ```
 
+**Connect Wallet — `studio/modals/wallet_connect`.** The reown-style wallet
+picker, engine-owned so the apps stop each keeping a copy. Register it like any
+other modal and configure it with locals:
+
+```erb
+<template x-if="$store.modals.current().id === 'wallet-connect'">
+  <%= render "studio/modals/wallet_connect" %>
+</template>
+```
+
+Locals: `store` (default `"modals"`), `connect_fn` (the window function that
+connects AND verifies, default `"solanaConnectAndVerify"`), `title`, `slot` /
+`slot_locals` (a partial rendered before the wallet rows — an app's legal-age
+attestation goes here), and `extra_data` (a JS fragment merged into the
+component's `x-data`).
+
+App behaviour arrives as optional **hook methods** defined in `extra_data`, each
+called only when present: `onInit`, `canPick` (falsy aborts a pick or a deep
+link), `verifyArgs` (merged into the connect options), `onConnected(result)`,
+`onDeepLink`, `onBack`. An app that needs none passes no `extra_data`.
+
+The slot is a **named local, not a block** — `block_given?` is always true inside
+a compiled Rails partial, so a block-shaped slot yields the captured page body
+into the card whenever no block is passed.
+
 **Page-scoped hosts — `studio/modals/scoped_host`.** When a page must bring its
 own modals (because not every consuming app renders a shared host, and the ones
 that do register their own modal set), render a second host on its own Alpine

@@ -21,8 +21,10 @@
                   treats the mobile row as a Phantom pick, onBack slides back
                   to the auth card when the picker was swapped in from it.
 
-  The block below is the app slot — here it holds the legal-age attestation,
-  exactly where turf-monster puts its own.
+  The slot below is the app slot — here it holds the legal-age attestation,
+  exactly where turf-monster puts its own. It is a named local naming a partial,
+  not a block: a block-shaped slot leaks the captured page body into the card
+  (a compiled Rails partial's block_given? is always true).
 %>
 <%
   # The heredoc MUST live inside one Ruby chunk like this. Written inline in the
@@ -73,13 +75,8 @@
     }
   JS
 %>
-<%= render layout: "studio/modals/wallet_connect", locals: { store: "dsModals", connect_fn: "dsWalletConnectDemo", extra_data: demo_hooks } do %>
-  <%# App slot — the legal-age attestation, exactly where turf-monster puts its
-      own. It binds to ageAttested and ageError, which arrive through the hooks
-      fragment above and so share the same x-data scope. %>
-  <template x-if="needsAttestation">
-    <div class="mb-3">
-      <%= render "studio/modals/shared/age_attestation" %>
-    </div>
-  </template>
-<% end %>
+<%= render "studio/modals/wallet_connect",
+      store: "dsModals",
+      connect_fn: "dsWalletConnectDemo",
+      slot: "style/modals/wallet_connect_slot",
+      extra_data: demo_hooks %>

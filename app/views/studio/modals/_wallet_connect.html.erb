@@ -24,10 +24,33 @@
     extra_data  — EXTRA x-data members for this component, as a JS fragment with
                   NO surrounding braces, merged after the built-ins. This is how
                   an app adds its own state (and the hooks below) without forking
-                  the picker. Same convention as style/_modal_specimen's
-                  card_data. Default "".
-  Block: optional markup slotted between the heading and the wallet rows — the
-  place for an app's legal-age attestation or any other pre-connect consent.
+                  the picker. Default "".
+
+                  SHAPED LIKE style/_modal_specimen's card_data but NOT handled
+                  the same way, and the difference is deliberate. That file marks
+                  open_expr and glow_when html_safe and leaves card_data escaped
+                  (:42-44), so its fragment reaches the attribute as entities.
+                  Both work — a browser decodes entities inside an attribute —
+                  but only one is readable in View Source, and a reader comparing
+                  the two seams deserves to be told they diverge rather than left
+                  to assume a typo. If they are ever reconciled, reconcile them
+                  in one pass; do not quietly copy this decision back.
+    slot        — OPTIONAL partial path rendered between the heading and the
+                  wallet rows: the place for an app's legal-age attestation or
+                  any other pre-connect consent. It renders INSIDE this
+                  component's root, so it can bind straight to the members
+                  extra_data contributes.
+    slot_locals — locals for that partial. Default {}.
+
+  A NAMED LOCAL AND NOT A BLOCK, and this is load-bearing. `block_given?` is
+  ALWAYS TRUE inside a compiled Rails partial — PartialRenderer hands the
+  template a block either way — so a bare `yield if block_given?` falls through
+  to view_flow[:layout] and prints THE WHOLE CAPTURED PAGE BODY inside the card.
+  Both consuming apps mount the modal host in application.html.erb, which is
+  exactly when that flow is populated, and the hub's planned adoption is a bare
+  render with no block. Caught in review of this partial's own first version.
+  blocks/_card_header documents the same hazard and blocks/_entry_confirmed made
+  the same choice (above_seeds) for the same reason.
 
   HOOKS — optional methods an app defines in extra_data. Each is called only if
   it exists, so an app that needs none passes no extra_data at all. They are
@@ -43,7 +66,11 @@
                          the app's verify endpoint needs)
     onConnected(result)  what to do on success; DEFAULT navigates to
                          props.returnUrl || result.redirect || '/'. Override it
-                         for a demo or an in-page continuation.
+                         for a demo or an in-page continuation — and note the
+                         override OWNS the reset: pick() leaves `connecting` and
+                         `picking` set, because the default navigates away and
+                         never comes back. An override that stays on the page
+                         must clear both or the rows stay disabled.
     onDeepLink()         REPLACES the Phantom deep-link action. Use it to stash
                          state that must survive the round trip out of the
                          browser, or to do something else entirely. The default
@@ -61,7 +88,9 @@
   # page works and only the source reads wrong. That is exactly the failure a
   # markup assertion cannot see, and it is why the same seam in
   # style/_modal_specimen carries the same html_safe with the same note.
-  extra_data = local_assigns.fetch(:extra_data, "").to_s.strip
+  slot        = local_assigns[:slot].presence
+  slot_locals = local_assigns.fetch(:slot_locals, {})
+  extra_data  = local_assigns.fetch(:extra_data, "").to_s.strip
   # Built here and marked safe ONCE, rather than interpolated at the call site.
   # Two traps sit on this line, both of which render a working-looking page:
   #   1. Marking extra_data safe is NOT enough. Interpolating a SafeBuffer into
@@ -156,6 +185,11 @@
          }
        },
        deepLink() {
+         // Same connecting guard as pick(). Without it a tap during an in-flight
+         // SIWS verify fires the deep link and walks the user out of the browser
+         // mid-signature. The app copies this was promoted from had the same
+         // hole; sharing the partial is the moment to close it for everyone.
+         if (this.connecting) return;
          if (!this.allowed()) return;
          if (typeof this.onDeepLink === 'function') { this.onDeepLink(); return; }
          if (typeof startPhantomDeepLink === 'function') {
@@ -189,9 +223,12 @@
   </div>
 
   <%# App slot — consent, legal copy, anything that must be answered before a
-      wallet is picked. The app's own x-data members (and canPick) come in
-      through extra_data, so the block can bind straight to them. %>
-  <%= yield if block_given? %>
+      wallet is picked. Rendered from a NAMED LOCAL, never a block: see the
+      header. The app's own x-data members (and canPick) arrive through
+      extra_data, so the slot partial can bind straight to them. %>
+  <% if slot %>
+    <%= render slot, **slot_locals %>
+  <% end %>
 
   <div class="space-y-2">
     <%# Detected wallets — INSTALLED, click to connect %>
@@ -210,7 +247,7 @@
         </template>
         <template x-if="!w.icon && brandIcon(w.name)">
           <span class="w-9 h-9 rounded-lg overflow-hidden flex items-center justify-center shrink-0">
-            <svg class="w-9 h-9" aria-hidden="true"><use :href="'#se-wallet-' + brandIcon(w.name)"></use></svg>
+            <svg class="w-9 h-9 shrink-0" aria-hidden="true"><use :href="'#se-wallet-' + brandIcon(w.name)"></use></svg>
           </span>
         </template>
         <template x-if="!w.icon && !brandIcon(w.name)">
@@ -234,7 +271,7 @@
         installed opens it, app absent falls through to Phantom's install page. %>
     <button x-show="showPhantomDeepLink" x-cloak type="button" @click="deepLink()"
             class="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-alt border border-strong hover:bg-surface transition text-left">
-      <svg class="w-9 h-9" aria-hidden="true"><use href="#se-wallet-phantom"></use></svg>
+      <svg class="w-9 h-9 shrink-0" aria-hidden="true"><use href="#se-wallet-phantom"></use></svg>
       <span class="font-semibold text-heading">Phantom</span>
       <span class="ml-auto flex items-center gap-2">
         <span class="text-xs text-muted uppercase tracking-wide">Open app</span>
@@ -248,7 +285,7 @@
     <template x-for="i in missingInstalls" :key="i.name">
       <a :href="i.url" target="_blank" rel="noopener noreferrer"
          class="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-alt border border-strong hover:bg-surface transition no-underline">
-        <svg class="w-9 h-9" aria-hidden="true"><use :href="'#se-wallet-' + brandIcon(i.name)"></use></svg>
+        <svg class="w-9 h-9 shrink-0" aria-hidden="true"><use :href="'#se-wallet-' + brandIcon(i.name)"></use></svg>
         <span class="font-semibold text-heading" x-text="i.name"></span>
         <span class="ml-auto flex items-center gap-2">
           <span class="text-xs text-muted uppercase tracking-wide">Install</span>

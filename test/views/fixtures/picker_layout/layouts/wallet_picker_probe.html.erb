@@ -1,0 +1,7 @@
+<%# Test-only layout for WalletConnectPickerTest. Lives under a TEST view-path
+    root, never app/views — a layout in the gem's app/views ships to every
+    consumer. Populates view_flow[:layout] with a marker so a partial that
+    yields to the layout flow (the leak this picker shipped once) is visible to
+    an assertion. %>
+LAYOUT-BODY-MARKER
+<%= yield %>

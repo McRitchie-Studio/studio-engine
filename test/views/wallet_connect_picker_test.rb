@@ -95,13 +95,47 @@ class WalletConnectPickerTest < Minitest::Test
     assert_equal 2, top_level_element_count("#{html}\n<div>second root</div>")
   end
 
-  def test_the_block_slot_renders_inside_the_root
-    html = render_picker_with_slot
+  def test_the_named_slot_renders_inside_the_root
+    html = render_picker(slot: "studio/modals/shared/age_attestation")
 
-    assert_includes html, "SLOT-MARKER"
     # It must sit inside the component root or it cannot see the x-data scope
-    # that extra_data contributes to — which is the entire point of the slot.
-    assert_includes root_inner_html(html), "SLOT-MARKER"
+    # extra_data contributes to — which is the entire point of the slot.
+    assert_includes root_inner_html(html), "data-age-attestation"
+  end
+
+  def test_the_slot_takes_its_own_locals
+    html = render_picker(slot: "studio/modals/shared/age_attestation",
+                         slot_locals: { x_model: "probeModel" })
+
+    assert_includes root_inner_html(html), %(x-model="probeModel")
+  end
+
+  def test_no_slot_renders_nothing_in_its_place
+    refute_includes render_picker, "data-age-attestation"
+  end
+
+  # --- the slot must NOT be a block (the leak this partial shipped once) ------
+
+  def test_rendering_without_a_slot_through_a_layout_leaks_nothing
+    # THE BLOCKER THIS PINS, found in review. The first version took the slot as
+    # a BLOCK and guarded it with `yield if block_given?`. `block_given?` is
+    # ALWAYS TRUE inside a compiled Rails partial — PartialRenderer hands the
+    # template a block either way — so with no caller block the yield fell
+    # through to view_flow[:layout] and printed THE ENTIRE CAPTURED PAGE BODY
+    # inside the wallet card. Both apps mount the modal host in
+    # application.html.erb, which is precisely when that flow is populated, and
+    # the hub's planned adoption is a bare render with no slot.
+    #
+    # THIS IS THE ONLY TIER THAT SEES IT. Every other test here renders the
+    # partial DIRECTLY, and a direct render has no layout flow to leak — the one
+    # path that stays clean. So this one renders through a layout, the way an
+    # app actually does.
+    html = render_picker_through_layout
+
+    assert_includes html, "LAYOUT-BODY-MARKER",
+                    "the harness must actually populate the layout flow, or this proves nothing"
+    refute_includes root_inner_html(html), "LAYOUT-BODY-MARKER",
+                    "the page body leaked into the wallet card"
   end
 
   def test_the_brand_sprite_definition_rides_inside_the_root
@@ -173,8 +207,14 @@ class WalletConnectPickerTest < Minitest::Test
     view.render(partial: "studio/modals/wallet_connect", locals: locals)
   end
 
-  def render_picker_with_slot
-    view.render(layout: "studio/modals/wallet_connect", locals: {}) { "<i>SLOT-MARKER</i>".html_safe }
+  # Renders the picker the way an APP does: inside a layout, so view_flow[:layout]
+  # is populated. A direct partial render cannot reproduce the leak.
+  def render_picker_through_layout
+    v = ActionView::Base.with_empty_template_cache
+                        .with_view_paths(["app/views", "test/views/fixtures/picker_layout"])
+    v.render(inline: <<~ERB, layout: "layouts/wallet_picker_probe")
+      <%= render "studio/modals/wallet_connect" %>
+    ERB
   end
 
   # The x-data ATTRIBUTE only. Windowing matters: this partial's own doc comment
