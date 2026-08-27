@@ -125,6 +125,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   absent rather than rendered dead) and a back link that returns to the birthday
   card. Displays `min_age` / `state`; computes no eligibility of its own.
 
+- **`studio/modals/_wallet_connect` — the Connect Wallet picker, engine-owned.**
+  The reown-style wallet chooser existed three times before this — turf-monster's
+  226 lines, mcritchie-studio's 107 and the style guide's 176 — sharing no code.
+  It is one partial now, and `style/modals/_wallet_connect` CONFIGURES it rather
+  than porting it, so the specimen and production cannot drift again. Locals:
+  `store` (default `"modals"`), `connect_fn` (default `"solanaConnectAndVerify"`),
+  `title`, `extra_data` (extra x-data members as a brace-less JS fragment), plus a
+  BLOCK for the pre-connect slot. App behaviour arrives as optional hook METHODS
+  defined in `extra_data`, each called only if it exists: `onInit`, `canPick`,
+  `verifyArgs`, `onConnected(result)`, `onDeepLink`, `onBack`. Carries the mobile
+  Phantom single-row fix (one Phantom row in every state) and a `role="alert"` on
+  the connect error that both app copies lacked.
+
+  **NO SHIPPING CONSUMER RENDERS IT YET.** Both apps still ship their own copy and
+  adopt this one after it releases, so the green consumer CI here says they still
+  compile — it says nothing about this partial.
+
 ### Fixed
 
 - **The engine navbar's collapse tracks the finger instead of a clock.**

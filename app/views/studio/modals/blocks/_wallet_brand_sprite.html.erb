@@ -27,6 +27,12 @@
   currentColor, so a caller can tint it to whatever it is standing in for. Use it
   whenever a brand is absent or unrecognised, instead of hiding the avatar and
   giving the surface two different shapes.
+
+  ONE CALLER DELIBERATELY DOES NOT: studio/modals/_wallet_connect paints a LETTER
+  TILE for a detected wallet whose brand it does not know, not se-wallet-default.
+  A detected wallet always has a name (it registered through Wallet Standard to
+  get there), and its initial identifies it where a generic mark would not. The
+  default mark remains right for a slot with no name to fall back on.
 %>
 <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"
      style="position:absolute;width:0;height:0;overflow:hidden" data-wallet-brand-sprite>
