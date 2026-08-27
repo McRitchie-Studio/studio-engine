@@ -164,7 +164,7 @@
         <span x-text="props.submitting === 'google' ? 'Waiting for Google…' : 'Google'"></span>
       </button>
       <template x-if="props.googleError">
-        <p class="text-red-400 text-xs -mt-2 mb-3" x-text="props.googleError"></p>
+        <p role="alert" class="text-red-400 text-xs -mt-2 mb-3" x-text="props.googleError"></p>
       </template>
 
       <%# 2. Solana — progresses to the Connect Wallet picker modal. Gated on
@@ -200,7 +200,7 @@
                 disabled_expr: "!!props.submitting" %>
         </div>
         <template x-if="props.formError">
-          <p class="text-red-400 text-xs mb-3" x-text="props.formError"></p>
+          <p role="alert" class="text-red-400 text-xs mb-3" x-text="props.formError"></p>
         </template>
         <button type="submit" :disabled="!!props.submitting"
                 class="btn btn-neutral btn-lg w-full gap-2 disabled:cursor-wait">

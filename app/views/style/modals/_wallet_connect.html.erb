@@ -166,7 +166,7 @@
   </div>
 
   <template x-if="error">
-    <p class="text-red-400 text-sm mt-3 text-center" x-text="error"></p>
+    <p role="alert" class="text-red-400 text-sm mt-3 text-center" x-text="error"></p>
   </template>
 
   <button type="button" @click="back()" :disabled="connecting"

@@ -131,7 +131,7 @@
         <% end %>
 
         <template x-if="error">
-          <p class="text-red-400 text-sm mb-3" x-text="error"></p>
+          <p role="alert" class="text-red-400 text-sm mb-3" x-text="error"></p>
         </template>
 
         <form @submit.prevent="save()" class="space-y-4">
