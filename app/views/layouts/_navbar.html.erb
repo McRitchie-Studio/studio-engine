@@ -79,37 +79,65 @@
        other, or the easing stops matching the geometry.
 
        Endpoints below are UNCHANGED from the threshold build. This is the same
-       navbar; only the path between the ends is new. */
+       navbar; only the path between the ends is new.
+
+       EVERY var() CARRIES A FALLBACK OF 0, and it is inert where @property works.
+       navCollapse only WRITES --nav-p when progress changes, so on an unscrolled
+       page it is never written at all and the registration is doing 100% of the work
+       on first paint. In a browser that ignores @property, an unregistered custom
+       property is the guaranteed-invalid token and every calc() here goes
+       invalid-at-computed-value-time — measured: padding-block 0 and the logo at its
+       intrinsic size. `var(--nav-p, 0)` degrades to "always expanded" instead, which
+       is the pre-collapse navbar rather than a broken one. It costs nothing where
+       @property is honoured, which is why it is written unconditionally. (Not a NEW
+       exposure: the built Tailwind v4 already ships 59 @property registrations, so
+       that browser band is unsupported engine-wide.) */
     .nav-shell {
       --nav-ramp: 144px;
-      --nav-pad: calc(1.5rem - 1rem * var(--nav-p));                 /* py-6 -> py-2 */
-      --nav-logo-size: calc(3rem - 1rem * var(--nav-p));             /* 48px -> 32px */
-      --nav-title-size: calc(1.875rem - 0.625rem * var(--nav-p));    /* 3xl  -> xl   */
+      --nav-pad: calc(1.5rem - 1rem * var(--nav-p, 0));                 /* py-6 -> py-2 */
+      --nav-logo-size: calc(3rem - 1rem * var(--nav-p, 0));             /* 48px -> 32px */
+      --nav-title-size: calc(1.875rem - 0.625rem * var(--nav-p, 0));    /* 3xl  -> xl   */
       --nav-title-lead-size: var(--nav-title-size);                  /* one line here */
+      /* THE LINE BOX, and the reason this variable exists at all. `text-3xl` and
+         `text-xl` are FONT-SIZE AND LINE-HEIGHT PAIRS (1.875rem/2.25rem and
+         1.25rem/1.75rem). Carrying only the font-size across dropped the
+         line-height to whatever the h1 inherited, and the header grew 9px at every
+         width >= 768px — expanded 84px -> 93px, measured. Collapsed was unaffected
+         because the 32px logo, not the title, sets the row height there, which is
+         exactly why a one-endpoint check would have missed this. Mobile was clean
+         only because its band already declared line-height: 1.15 explicitly.
+         Interpolate the PAIR or the endpoints move. */
+      --nav-title-lead: calc(2.25rem - 0.5rem * var(--nav-p, 0));       /* 36px -> 28px */
     }
     .nav-row { padding-block: var(--nav-pad); }
     .nav-shell .nav-logo { width: var(--nav-logo-size); height: var(--nav-logo-size); }
-    .nav-shell .nav-title { font-size: var(--nav-title-size); }
+    .nav-shell .nav-title { font-size: var(--nav-title-size); line-height: var(--nav-title-lead); }
     .nav-shell .nav-title span:last-child { font-size: var(--nav-title-lead-size); }
 
     @media (min-width: 400px) { .user-nav-col { width: 15rem; } .user-nav-fit { max-width: 15rem; } }
     @media (min-width: 768px) { .user-nav-col { width: 20rem; } .user-nav-fit { max-width: 20rem; } }
     @media (max-width: 767px) {
-      .nav-title { flex-direction: column; gap: 0; line-height: 1.15; }
+      .nav-title { flex-direction: column; gap: 0; }
       .nav-title span:first-child { margin-bottom: -4px; }
       .nav-logo-link { gap: 0.5rem !important; }
       .nav-shell {
         --nav-ramp: 120px;
-        --nav-logo-size: calc(3rem - 0.5rem * var(--nav-p));         /* 48px -> 40px   */
-        --nav-title-size: calc(1.25rem - 0.25rem * var(--nav-p));    /* 20px -> 16px   */
-        --nav-title-lead-size: calc(1.5rem - 0.35rem * var(--nav-p));/* 24px -> 18.4px */
+        --nav-logo-size: calc(3rem - 0.5rem * var(--nav-p, 0));         /* 48px -> 40px   */
+        --nav-title-size: calc(1.25rem - 0.25rem * var(--nav-p, 0));    /* 20px -> 16px   */
+        --nav-title-lead-size: calc(1.5rem - 0.35rem * var(--nav-p, 0));/* 24px -> 18.4px */
+        /* Mobile stacks the two words, so its line box is a RATIO, not the desktop
+           pair. Declared here rather than as a `line-height` on .nav-title, because
+           `.nav-shell .nav-title` outranks a bare `.nav-title` on specificity no
+           matter which comes later in the sheet — one declaration site, like every
+           other endpoint in this table. */
+        --nav-title-lead: 1.15;
       }
     }
     @media (max-width: 399px) {
       .nav-logo-link { gap: 0.25rem !important; }
       .nav-shell {
-        --nav-title-size: calc(1.1rem - 0.2rem * var(--nav-p));      /* 17.6px -> 14.4px */
-        --nav-title-lead-size: calc(1.3rem - 0.3rem * var(--nav-p)); /* 20.8px -> 16px   */
+        --nav-title-size: calc(1.1rem - 0.2rem * var(--nav-p, 0));      /* 17.6px -> 14.4px */
+        --nav-title-lead-size: calc(1.3rem - 0.3rem * var(--nav-p, 0)); /* 20.8px -> 16px   */
       }
     }
   </style>

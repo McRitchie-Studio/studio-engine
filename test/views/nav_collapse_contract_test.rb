@@ -164,8 +164,18 @@ class NavCollapseContractTest < Minitest::Test
 
     assert_includes nav, 'x-data="navCollapse()"',
                     "the header must own the scroll-linked collapse component"
-    assert_includes nav, "nav-shell", "the header is the --nav-p scope root"
-    assert_includes nav, "nav-row", "the collapsing row needs its own hook"
+    # ANCHORED ON THE ATTRIBUTE, not the bare name. `navbar_source` is File.read of
+    # raw ERB, so the file's OWN COMMENTS count as source: with a bare
+    # `assert_includes nav, "nav-shell"`, deleting nav-shell from the header's class
+    # left this green, satisfied by the comment above the header that explains what
+    # nav-shell is. Same for nav-row (satisfied by the comment AND by the surviving
+    # `.nav-row {` rule text) and for transition-shadow. Three assertions, none of
+    # them biting, all found by mutation in review.
+    assert_match(/<header\b[\s\S]{0,600}?class="nav-shell/, navbar_markup,
+                 "the header element does not CARRY nav-shell, so it is not the --nav-p scope " \
+                 "root and every calc() below it resolves against nothing")
+    assert_match(/<div class="nav-row /, navbar_markup,
+                 "the collapsing row does not carry nav-row, so its padding never interpolates")
 
     # The step and the clock, both gone. transition-shadow may stay: box-shadow
     # paints, it never reflows, so it cannot move content under the reader.
@@ -175,14 +185,32 @@ class NavCollapseContractTest < Minitest::Test
                  "row padding must interpolate off --nav-p, not swap on a boolean")
     refute_match(/transition-all duration-300/, nav,
                  "no collapsing dimension may sit on a clock")
-    assert_includes nav, "transition-shadow",
-                    "the shadow may still fade on a clock — it paints and never reflows"
+    assert_match(/class="nav-shell[\s\S]{0,400}?transition-shadow/, navbar_markup,
+                 "the shadow may still fade on a clock — it paints and never reflows — but it " \
+                 "has to be ON THE HEADER to do so; the bare-name version of this assertion was " \
+                 "satisfied by the comment that explains it")
 
     # Each band is the two ENDPOINTS of its collapse, expressed once.
-    %w[--nav-pad --nav-logo-size --nav-title-size --nav-title-lead-size].each do |hook|
-      assert_match(/#{Regexp.escape(hook)}:\s*(calc\([^;]*var\(--nav-p\)|var\(--nav-title-size\))/, nav,
+    %w[--nav-pad --nav-logo-size --nav-title-size --nav-title-lead-size --nav-title-lead].each do |hook|
+      assert_match(/#{Regexp.escape(hook)}:\s*(calc\([^;]*var\(--nav-p[,)]|var\(--nav-title-size\)|[\d.]+;)/, nav,
                    "#{hook} must derive from --nav-p")
     end
+
+    # EVERY var(--nav-p) CARRIES A FALLBACK. navCollapse writes the property only when
+    # progress CHANGES, so on an unscrolled page it is never written and @property's
+    # `initial: 0` is doing all of the work on first paint. In a browser that ignores
+    # @property, an unregistered custom property is the guaranteed-invalid token, every
+    # calc() here goes invalid-at-computed-value-time, and the measured result is
+    # padding-block 0 with the logo at its intrinsic size. `var(--nav-p, 0)` degrades to
+    # the pre-collapse navbar instead. Inert where @property works, so it costs nothing —
+    # which is exactly why it must not be quietly dropped.
+    bare = nav.scan(/var\(--nav-p\)/)
+
+    assert_empty bare,
+                 "#{bare.length} var(--nav-p) site(s) carry no fallback; write var(--nav-p, 0) so a " \
+                 "browser without @property renders an expanded navbar rather than a broken one"
+    assert_operator nav.scan(/var\(--nav-p,\s*0\)/).length, :>=, 5,
+                    "the band table lost its --nav-p sites entirely"
     assert_match(/--nav-ramp:\s*\d+px/, nav, "each band must declare its own ramp width")
 
     refute_match(/\.is-scrolled\s+\.nav-(title|logo)/, nav,
@@ -197,6 +225,24 @@ class NavCollapseContractTest < Minitest::Test
 
   def navbar_source
     File.read(File.expand_path("../../app/views/layouts/_navbar.html.erb", __dir__))
+  end
+
+  # navbar_source WITH ITS ERB COMMENTS REMOVED.
+  #
+  # The file explains every hook it carries, in prose, right above the element that
+  # carries it — which is good writing and a terrible thing to grep. `assert_includes
+  # nav, "nav-shell"` was satisfied by the comment ABOUT nav-shell, so deleting the
+  # class from the header left it green. Review caught all three by mutation.
+  #
+  # Comments are stripped rather than assertions being made cleverer, because the
+  # clever version keeps losing: `<header[^>]*class=` fails on this file too, since
+  # the header tag CONTAINS an ERB comment full of `>` characters — and after those
+  # are stripped it STILL fails, because the surviving `<%= ... %>` output tag on the
+  # same element ends in `>`. The matchers below are therefore bounded lazy spans
+  # (`[\s\S]{0,600}?`) rather than negated character classes: wide enough to cross an
+  # ERB tag, narrow enough that they cannot wander into the next element.
+  def navbar_markup
+    navbar_source.gsub(/<%#.*?%>/m, "")
   end
 
   def render_head

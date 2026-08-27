@@ -52,8 +52,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `x-data="navCollapse()"` on its header, giving each breakpoint band a
   `--nav-ramp`, and writing its collapsing dimensions as `calc()`s off
   `--nav-p`. An app whose navbar collapses to different endpoints than this
-  gem's — `mcritchie-studio` goes `w-8 → w-5`, not `w-12 → w-8` — adopts the
-  mechanism without touching its markup.
+  gem's — `mcritchie-studio` goes `w-8 → w-5`, not `w-12 → w-8` — can adopt the
+  mechanism without changing its endpoints.
+
+  **NO SHIPPING CONSUMER EXERCISES THIS YET, and the adoptions are follow-ons.**
+  `turf-monster` overrides `layouts/_navbar.html.erb` AND redefines
+  `window.navCollapse` in `shared/_alpine_factories.html.erb`, rendered after the
+  engine head, so the engine's copy is shadowed. `mcritchie-studio` never renders
+  `layouts/navbar` at all — its inline header still carries `@scroll.window` and
+  `transition-all duration-300`. Said plainly because it also means the green
+  consumer CI on this change is **not evidence about this code path**: both apps
+  compile and pass against a primitive neither of them runs.
 
 - **`studio/modals/blocks/_age_gate` — the refusal card.** Where the birthday card
   hands off when the date is under the app's bar. Headed "Easy, Young'un" under a
