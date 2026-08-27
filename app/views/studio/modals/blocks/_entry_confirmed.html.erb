@@ -51,6 +51,13 @@
     seeds_total_key  — Alpine expr: new seeds total. Default "props.seedsTotal".
     seeds_per_level  — Integer seeds per level. Default 100.
     free_entry_label — reward copy on a level-up. Default "Free Entry Earned 🎟️".
+    secondary_label  — optional secondary action label under the CTA (e.g.
+                       "Dismiss"). Forwarded to _success_card, which renders a
+                       button dispatching secondary_event.
+    secondary_event  — window event name for that button. BOTH are required or
+                       NEITHER renders, matching how _success_card and _error_card
+                       already gate the pair — a label with no event is a button
+                       that does nothing.
 %>
 <%
   modal_store      = local_assigns.fetch(:modal_store, "modals")
@@ -70,6 +77,8 @@
   seeds_total_key  = local_assigns.fetch(:seeds_total_key, "props.seedsTotal")
   seeds_per_level  = local_assigns.fetch(:seeds_per_level, 100)
   free_entry_label = local_assigns.fetch(:free_entry_label, "Free Entry Earned 🎟️")
+  secondary_label  = local_assigns[:secondary_label]
+  secondary_event  = local_assigns[:secondary_event]
 
   sc_locals = {
     large_title:           true,
@@ -88,6 +97,17 @@
     sc_locals[:message_key] = subtitle_key
   else
     sc_locals[:message] = subtitle
+  end
+
+  # BOTH OR NEITHER, deliberately. sc_locals was a FIXED hash, so a consumer
+  # adopting this card in place of its own fork lost any secondary action it had
+  # SILENTLY — there was no error, the button simply stopped existing. That is
+  # what blocked turf-monster's entry-confirmed defork: its card ends in a
+  # "Dismiss" link, and the call site sits inside a <template x-if>, which takes
+  # ONE root, so the button cannot be kept outside the block either.
+  if secondary_label.present? && secondary_event.present?
+    sc_locals[:secondary_label] = secondary_label
+    sc_locals[:secondary_event] = secondary_event
   end
 %>
 <%# props getter + clusterParam live on the root scope so _success_card's nested
