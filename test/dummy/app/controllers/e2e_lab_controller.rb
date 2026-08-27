@@ -155,6 +155,12 @@ class E2eLabController < ActionController::Base
   # no /age/verify and inventing one would put the spec on a fiction.
   def birthday_gate = render(:birthday_gate)
 
+  # The GLOBAL modal host (`$store.modals`), which no other lab page mounts —
+  # /lab/birthday_gate drives the SCOPED host instead. Two separate partials with
+  # two separate copies of the focus trap; this page is what lets a browser grade
+  # the global one.
+  def modal_host = render(:modal_host)
+
   # The geo manager, rendered as a host renders it: the engine's own template plus
   # the badge a host puts in its navbar.
   #

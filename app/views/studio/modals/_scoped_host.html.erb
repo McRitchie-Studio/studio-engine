@@ -162,7 +162,15 @@
           var entry = this.current();
           if (!entry) return 'Dialog';
           var p = entry.props || {};
-          return p.ariaLabel || p.title || String(entry.id).replace(/[-_]/g, ' ');
+          // TRIMMED, not merely truthy. `title: '   '` is a truthy string, so it used to
+          // pass straight through — and the accessible-name computation then trims it to
+          // empty and announces a bare "dialog", the exact outcome this fallback chain
+          // exists to prevent. An empty string already fell through (it is falsy); a
+          // whitespace-only one did not, which is the more likely typo of the two.
+          var named = function(v) {
+            return (typeof v === 'string' && v.trim() !== '') ? v : null;
+          };
+          return named(p.ariaLabel) || named(p.title) || String(entry.id).replace(/[-_]/g, ' ');
         },
 
         // open(id, props, opts) — opts.replace swaps the top entry in place
@@ -172,17 +180,26 @@
           opts  = opts  || {};
           var entry = { id: id, props: props };
 
-          var replaced = false;
+          // Did this call re-mount the INNER content template without re-mounting the
+          // OUTER one? That is the whole question the focus trap turns on.
+          var remounted = false;
           if (opts.replace && this.stack.length > 0) {
             this.stack.splice(this.stack.length - 1, 1, entry);
-            replaced = true;
+            remounted = true;
           } else {
+            // THE COMMENT THIS REPLACES SAID "only on a REPLACE", on the premise that a
+            // fresh push takes current() falsy -> truthy so the outer template mounts and
+            // x-init captures for us. That is TRUE only when the stack was EMPTY, and
+            // silently false for a stacked push: current() was already truthy, so the
+            // outer template does not re-mount, x-init never re-runs, and the inner
+            // template unmounts whatever was focused. Focus lands on the document body — not a
+            // descendant of the backdrop — so the @keydown.tab handler bound there stops
+            // firing and native tabbing walks straight onto the page behind.
+            remounted = this.stack.length > 0;
             this.stack.push(entry);
           }
           this._sync();
-          // Only on a REPLACE. A fresh push takes current() falsy -> truthy, so the
-          // outer template mounts and x-init calls captureFocus for us.
-          if (replaced) this.refocus();
+          if (remounted) this.refocus();
         },
 
         swap: function(id, props, opts) {
@@ -205,7 +222,13 @@
             // Only when the LAST modal leaves — a stacked flow unmounts one dialog
             // and mounts the next, and restoring in between yanks focus out of a
             // flow the user is still inside.
+            //
+            // NOT RESTORING IS NOT THE SAME AS DOING NOTHING. Closing down TO an
+            // underlying modal re-mounts the inner template, so focus falls to the document body
+            // with that dialog still open — the trap is off while the user is still
+            // inside it. The gate was right; the else was missing.
             if (self.stack.length === 0) self.releaseFocus();
+            else self.refocus();
           }, CLOSE_ANIM_MS);
         },
 
@@ -224,6 +247,12 @@
             return entry.props && entry.props.dismissible === false;
           });
           this._sync();
+          // Same re-mount, same release: a surviving non-dismissible card is still on
+          // screen and the cards dropped from under it took focus with them. Nothing is
+          // done when the stack empties — deliberately unlike close(): this is the
+          // Turbo/bfcache teardown path, where closeAll() already declines to restore
+          // into a document about to be replaced.
+          if (this.stack.length > 0) this.refocus();
         },
 
         // isOpen(id) — on the stack in ANY lifecycle state, including a card
