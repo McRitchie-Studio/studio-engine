@@ -40,6 +40,30 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **`--nav-p` and `navCollapse()` — the navbar collapse becomes a primitive.**
+  `layouts/studio/_head` now publishes a third header property beside `--nav-h`
+  and `--nav-bottom`. The first two are measurements OF the header; `--nav-p` is
+  an input TO it: collapse progress, `0` expanded to `1` collapsed, written on
+  the `<header>` once per animation frame from `window.scrollY`, and registered
+  with `@property` as a `<number>` so it is legal inside `calc()`, real before
+  the first scroll, and interpolable.
+
+  **It ships no sizing opinion.** A host adopts it by putting `nav-shell` and
+  `x-data="navCollapse()"` on its header, giving each breakpoint band a
+  `--nav-ramp`, and writing its collapsing dimensions as `calc()`s off
+  `--nav-p`. An app whose navbar collapses to different endpoints than this
+  gem's — `mcritchie-studio` goes `w-8 → w-5`, not `w-12 → w-8` — can adopt the
+  mechanism without changing its endpoints.
+
+  **NO SHIPPING CONSUMER EXERCISES THIS YET, and the adoptions are follow-ons.**
+  `turf-monster` overrides `layouts/_navbar.html.erb` AND redefines
+  `window.navCollapse` in `shared/_alpine_factories.html.erb`, rendered after the
+  engine head, so the engine's copy is shadowed. `mcritchie-studio` never renders
+  `layouts/navbar` at all — its inline header still carries `@scroll.window` and
+  `transition-all duration-300`. Said plainly because it also means the green
+  consumer CI on this change is **not evidence about this code path**: both apps
+  compile and pass against a primitive neither of them runs.
+
 - **`studio/modals/blocks/_age_gate` — the refusal card.** Where the birthday card
   hands off when the date is under the app's bar. Headed "Easy, Young'un" under a
   teddy bear rather than a red X, because a person who will be welcome later is
@@ -48,6 +72,45 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   primary CTA to watch instead (app-supplied `watch_url`, dropped entirely when
   absent rather than rendered dead) and a back link that returns to the birthday
   card. Displays `min_age` / `state`; computes no eligibility of its own.
+
+### Fixed
+
+- **The engine navbar's collapse tracks the finger instead of a clock.**
+  `layouts/_navbar` flipped `scrolled` at `scrollY > 60` and fed that step into
+  `transition-all duration-300` on padding, logo `width`/`height` and two font
+  sizes. The finger set the step; an ease curve owned everything after it.
+  Measured in `turf-monster` at 390×844 on the same code before the change: the
+  header ran 178px → 139px and **34 of those 39px of document reflow landed
+  AFTER the scroll had stopped, over 232ms**, at up to 3px per frame — plus a
+  1px REVERSE lurch in the frame the class flipped, where a discrete
+  `text-3xl → text-xl` swap collided with the stylesheet's own
+  `transition: font-size`.
+
+  Every collapsing dimension is now a `calc()` off `--nav-p`, and nothing on the
+  path carries a time-based transition. **Both endpoints are unchanged at every
+  breakpoint** — this is the same navbar, re-plumbed, so a consumer sees no
+  visual difference at rest.
+
+  Content still accelerates *during* the collapse: a sticky header is in flow,
+  so shrinking it adds to the scroll and content necessarily outruns the finger.
+  That is the point of a collapse, not a defect. What is tunable is the shape,
+  and `--nav-ramp` is 3× the band's collapse total with a smoothstep ease, whose
+  slope is zero at both ends — so the burst leaves 1×, peaks near 1.5×, and
+  returns to 1× with no velocity step. A linear ramp equal to the collapse hits
+  2× and steps straight back.
+
+  Also included: a passive, rAF-coalesced listener that writes to the header
+  rather than `:root` (keeping each frame's style recalc inside the navbar
+  subtree); a short-page guard, because collapsing shortens the document and on
+  a barely-scrollable page that deletes the very scroll room that triggered it,
+  clamps `scrollY` to 0, and flaps forever; and a `prefers-reduced-motion`
+  branch that snaps `--nav-p` to `0`/`1`, since resizing type under a moving
+  finger is itself motion worth dropping.
+
+  `/navbar`'s Scrolled toggle drops **twelve `!important` rules** that restated
+  every collapsed value — it sets `--nav-p: 0|1` and transitions the registered
+  property, so the preview exercises the shipped `calc()`s instead of a parallel
+  copy of them.
 
 ### Added
 
