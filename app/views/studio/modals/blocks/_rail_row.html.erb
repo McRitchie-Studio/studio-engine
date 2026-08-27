@@ -78,21 +78,24 @@
   tile_style    = icon_bg.present? ? "background-color:#{icon_bg}" : nil
   tile_bg_class = icon_bg.present? ? nil : "bg-primary"
 %>
-<%# LITERAL ERB, NOT content_tag, and the reason is on_click. content_tag escapes
-    every attribute value it is given, which is right for content and wrong for
-    CODE: an Alpine handler came out as f(&#39;a&#39;) instead of f('a'). A browser
-    unescapes the attribute before Alpine ever reads it, so the handler still
-    fired — which is exactly why it shipped — but every consumer test that reads
-    the MARKUP broke, and a primitive that mangles the expression it was handed is
-    lying about what it renders. Escaping stays correct for data-* and for the
-    title and subtitle below, which ARE content; they go through <%%= %> as usual. %>
-<% if soon %>
-  <div<%= tag.attributes(data: data_attrs) if data_attrs.present? %>
-       class="w-full flex items-center gap-4 p-4 rounded-xl <%= border_class %> bg-inset">
-<% else %>
-  <button type="button" @click="<%= raw on_click %>"<%= tag.attributes(data: data_attrs) if data_attrs.present? %>
-          class="w-full flex items-center gap-4 p-4 rounded-xl <%= border_class %> bg-inset transition text-left">
-<% end %>
+<%# on_click is marked html_safe because it is CODE, not content. content_tag
+    escapes through ERB::Util.unwrapped_html_escape, which no-ops on an html_safe
+    String, so the handler reaches the attribute exactly as the caller wrote it:
+    f('a'), not the entity-escaped form. A browser recovered from the escaped
+    version and Alpine fired either way, so this was invisible on screen; what it
+    broke was every consumer test that reads the markup.
+
+    IT IS STILL SAFE FOR DOUBLE QUOTES. content_tag quote-escapes an attribute
+    VALUE regardless of html_safe, so a double-quoted expression is entity-encoded
+    and still works. An earlier attempt emitted the handler through raw in literal
+    ERB instead, which had no such protection: it broke out of the attribute and
+    silently narrowed the contract to single quotes only.
+
+    Everything else here stays escaped, because everything else is content. %>
+<%= content_tag(soon ? :div : :button, type: (soon ? nil : "button"),
+      "@click": on_click&.html_safe,
+      class: "w-full flex items-center gap-4 p-4 rounded-xl #{border_class} bg-inset#{soon ? '' : ' transition text-left'}",
+      data: data_attrs.presence) do %>
   <span class="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center <%= icon_class %> <%= tile_bg_class %>"
         style="<%= tile_style %>"><%= icon_label %></span>
   <span class="flex-1 min-w-0">
@@ -117,4 +120,4 @@
       <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
     </svg>
   <% end %>
-<% if soon %></div><% else %></button><% end %>
+<% end %>

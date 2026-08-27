@@ -177,6 +177,61 @@ class FundingChromeBlocksTest < Minitest::Test
 
   # --- the handler is CODE, not content ---------------------------------------
 
+  # --- the DOM, not a substring ----------------------------------------------
+  #
+  # EVERY ASSERTION IN THIS FILE USED TO BE assert_includes, and that blind spot
+  # let two defects through in a row: the escaped handler in #200, and then a
+  # rewrite of the fix that emitted a malformed element and leaked template text
+  # into every rail. Both render a string that CONTAINS the substring being
+  # asserted. Parse the markup instead — element name, resolvable hook, sibling
+  # count — because those are the properties a substring cannot see.
+
+  def test_a_soon_rail_with_data_is_a_well_formed_element
+    # The regression this exists for: an attribute helper that strips its leading
+    # space produced <divdata-ds-rail="paypal">. HTML5's tag-name state accepts
+    # = and " into the NAME, so the element was called divdata-ds-rail="paypal",
+    # the hook resolved to nothing, and </div> matched nothing — the element
+    # never closed and swallowed every rail after it.
+    frag = fragment(render_rail(state: :soon, data: { ds_rail: "paypal" }))
+
+    assert_equal "div", frag.element_children.first&.name
+    assert_equal 1, frag.css("[data-ds-rail=paypal]").size, "the hook must resolve"
+    assert_equal 1, frag.element_children.size, "and the rail must be a single root"
+  end
+
+  def test_adjacent_soon_rails_stay_siblings
+    # The onramp hub renders PayPal and Venmo back to back. An unclosed element
+    # nests the second inside the first and takes its hook with it.
+    frag = fragment(render_rail(state: :soon, data: { ds_rail: "paypal" }) +
+                    render_rail(state: :soon, data: { ds_rail: "venmo" }))
+
+    assert_equal 2, frag.element_children.size, "two rails, two roots"
+    assert_equal 2, frag.css("[data-ds-rail]").size, "two rails, two hooks"
+  end
+
+  def test_the_rail_emits_no_stray_template_text
+    # An ERB comment terminates at the FIRST %>, so a comment whose body contains
+    # one spills the remainder into the template as visible text — at the top of
+    # every rail, in both branches, six times over on the onramp hub specimen.
+    stray = fragment(render_rail(on_click: "noop()"))
+              .children.select { |n| n.text? && n.text.strip != "" }
+
+    assert_empty stray.map { |n| n.text.strip },
+      "a rail must render markup only"
+  end
+
+  def test_a_double_quoted_expression_still_works
+    # html_safe stops content_tag ENTITY-escaping the handler, but content_tag
+    # still quote-escapes an attribute VALUE — so a double-quoted expression is
+    # encoded and the browser hands Alpine the original. An earlier fix emitted
+    # the handler through `raw` in literal ERB, which had no such protection: it
+    # broke out of the attribute and narrowed the contract to single quotes.
+    el = fragment(render_rail(on_click: %(f("a")))).element_children.first
+
+    assert_equal %(f("a")), el["@click"],
+      "the handler must survive the round trip, whichever quotes the caller used"
+  end
+
   def test_a_quoted_alpine_expression_survives_unescaped
     # THE REGRESSION THIS FILE MISSED. The first cut built the element with
     # content_tag, which escapes every attribute value — right for content, wrong
@@ -230,6 +285,10 @@ class FundingChromeBlocksTest < Minitest::Test
 
   # Only on_click and title are required by the partial; everything else is
   # optional, so the defaults here keep each test naming ONLY what it is about.
+  def fragment(html)
+    Nokogiri::HTML5.fragment(html)
+  end
+
   def render_rail(**locals)
     view.render(partial: "studio/modals/blocks/rail_row",
                 locals: { on_click: "noop()", title: "A rail" }.merge(locals))
