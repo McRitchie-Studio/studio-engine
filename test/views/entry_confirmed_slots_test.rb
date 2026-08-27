@@ -92,6 +92,44 @@ class EntryConfirmedSlotsTest < ActiveSupport::TestCase
     assert_operator html.index("Contest Lobby"), :<, html.index("max-w-[200px]")
   end
 
+  # ---- the secondary action ------------------------------------------------
+  #
+  # sc_locals was a FIXED hash, so a consumer adopting this card in place of its
+  # own fork lost any secondary action it had SILENTLY — no error, the button
+  # simply stopped existing. That is what blocked turf-monster's entry-confirmed
+  # defork: its card ends in a "Dismiss" link, and its call site sits inside a
+  # <template x-if>, which takes ONE root, so the button cannot be kept outside
+  # the block either.
+
+  def test_a_secondary_action_reaches_the_card
+    html = render_card(secondary_label: "Dismiss", secondary_event: "tm-modal-close")
+
+    assert_includes html, "Dismiss", "the secondary label never reached the rendered card"
+    assert_includes html, "tm-modal-close", "the secondary event never reached the rendered card"
+  end
+
+  # BOTH OR NEITHER, matching how _success_card and _error_card already gate the
+  # pair. A label with no event is a button that does nothing, which is worse
+  # than no button — it looks like an affordance and silently is not one.
+  def test_a_label_without_an_event_renders_no_button
+    html = render_card(secondary_label: "Dismiss")
+
+    refute_includes html, "Dismiss", "a secondary label with no event rendered a dead button"
+  end
+
+  def test_an_event_without_a_label_renders_no_button
+    html = render_card(secondary_event: "tm-modal-close")
+
+    refute_includes html, "tm-modal-close", "a secondary event with no label rendered a nameless button"
+  end
+
+  # The default must not change for the callers that never asked for one.
+  def test_no_secondary_action_renders_by_default
+    html = render_card
+
+    refute_includes html, "Dismiss"
+  end
+
   private
 
   # A host renders these through ApplicationController, which has every engine
