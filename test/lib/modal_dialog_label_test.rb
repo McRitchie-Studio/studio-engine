@@ -51,4 +51,30 @@ class ModalDialogLabelTest < ActiveSupport::TestCase
   test "no open modal still yields a name rather than undefined" do
     assert_equal "Dialog", label_for(nil)
   end
+
+  # THE EMPTY-STRING RUNGS, which are the whole reason this is a CHAIN rather than
+  # a pair of ifs. A truthiness test treats "" as absent and falls through; a
+  # presence test ("ariaLabel" in props) does not, and would pin the dialog's
+  # accessible name to the empty string — announced by a screen reader as an
+  # unnamed dialog, which is worse than the humanised id it was meant to improve
+  # on. Requested by the reviewer, and neither rung was covered before.
+
+  test "an empty ariaLabel falls through to the title" do
+    assert_equal "Confirm entry",
+                 label_for({ id: "enter", props: { ariaLabel: "", title: "Confirm entry" } }),
+                 "an empty ariaLabel was treated as a NAME — the dialog announces as unnamed"
+  end
+
+  test "an empty title falls through to the humanised id" do
+    assert_equal "wallet changed",
+                 label_for({ id: "wallet-changed", props: { title: "" } }),
+                 "an empty title was treated as a name, so the last rung never ran"
+  end
+
+  # Both empty together must still reach the id — the chain has to survive more
+  # than one blank rung, which is the case a two-step fallback quietly fails.
+  test "an empty ariaLabel AND an empty title still reach the id" do
+    assert_equal "age gate",
+                 label_for({ id: "age-gate", props: { ariaLabel: "", title: "" } })
+  end
 end

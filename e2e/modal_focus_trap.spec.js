@@ -86,4 +86,49 @@ test.describe("modal host focus contract", () => {
     expect(fits.scrollable, "a card taller than the viewport must scroll").toBe(true);
     expect(fits.withinViewport, "and must not exceed the viewport, or its actions are unreachable").toBe(true);
   });
+
+  // THE REPRODUCING TIER, and the reason this file needed a fourth test.
+  //
+  // The trap held on OPEN and released on SWAP. captureFocus runs from x-init on
+  // the backdrop, and a swap keeps current() truthy, so the outer template never
+  // re-mounts and x-init never re-runs. The INNER content template does re-mount
+  // and unmounts whatever was focused; activeElement falls back to <body>, which
+  // is not inside the backdrop, so the tab handler bound there stops firing and
+  // native tabbing resumes.
+  //
+  // WHY THE EXISTING TAB TEST STAYED GREEN THROUGH IT — worth stating, because it
+  // passed for the wrong reason rather than by luck. It presses Tab FORWARD only,
+  // and Chrome parks the sequential-focus-navigation starting point where the
+  // removed node was, so forward Tab happens to land back inside. SHIFT+Tab walks
+  // the other way and leaves. The reproducing shape is: open -> swap -> Shift+Tab.
+  test("the trap SURVIVES a swap — Shift+Tab after swapping stays in the dialog", async ({ page }) => {
+    await page.locator('[data-test="open-birthday-underage"]').click();
+    await expect(dialog(page)).toBeVisible();
+
+    // Swap the top entry the way the app does. current() stays truthy across
+    // this, which is precisely why x-init does not re-run.
+    await page.evaluate(() => window.Alpine.store("labModals").swap("age-gate"));
+    await expect(dialog(page)).toBeVisible();
+
+    // The focused node must be back inside the dialog before any key is pressed.
+    // If this is <body>, the handler below is not bound to anything reachable and
+    // every assertion after it is meaningless.
+    await expect
+      .poll(() => page.evaluate(() => {
+        const d = document.querySelector('[role="dialog"]');
+        return !!(d && d.contains(document.activeElement));
+      }), { message: "focus fell out of the dialog on swap — the trap released" })
+      .toBe(true);
+
+    // BACKWARD, three presses. Measured on the broken build, this walked
+    // navlink -> opener -> the background page composer.
+    for (let i = 0; i < 3; i++) {
+      await page.keyboard.press("Shift+Tab");
+      const inside = await page.evaluate(() => {
+        const d = document.querySelector('[role="dialog"]');
+        return !!(d && d.contains(document.activeElement));
+      });
+      expect(inside, `focus escaped the dialog on Shift+Tab #${i + 1} after a swap`).toBe(true);
+    }
+  });
 });

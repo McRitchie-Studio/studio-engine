@@ -517,7 +517,7 @@
 # in review, so the two additions STACK. Both sides had computed against a
 # 90-baseline that had already moved. The counter is re-derived on the MERGED tree
 # below, never incremented and never resolved by taking one side.
-total_specs: 96
+total_specs: 97
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -536,7 +536,7 @@ total_specs: 96
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium -> 96
 # executed = total - devnet - allowed_skips = 96 - 0 - 0 = 96, so executed ==
 # total_specs and test/lib/e2e_lane_contract_test.rb's equality assertion holds.
-executed: 96
+executed: 97
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

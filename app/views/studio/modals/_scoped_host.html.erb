@@ -84,6 +84,8 @@
     // one init. Without the guard, a Turbo Drive visit to this page leaves the
     // store undefined and every x-data on it throws.
     var _returnFocusTo = null;
+    // The backdrop node, kept in the same closure and for the same proxy reason.
+    var _backdropEl = null;
 
     function registerScopedStore() {
       if (Alpine.store(STORE_NAME)) return;
@@ -101,12 +103,32 @@
         // as a proxy and every identity check against it (===, contains) is false.
         captureFocus: function(el) {
           _returnFocusTo = document.activeElement;
+          _backdropEl = el;
           if (el && el.focus) el.focus();
+        },
+
+        // RE-FOCUS AFTER A REPLACE, without re-capturing the return target. See
+        // the long note in _host.html.erb: captureFocus runs from x-init on the
+        // backdrop, and a replace keeps current() truthy, so the outer template
+        // never re-mounts and x-init never re-runs. The inner content DOES
+        // re-mount and unmounts the focused control, activeElement falls back to
+        // <body>, and the tab handler bound on the backdrop stops seeing the key.
+        // _returnFocusTo is untouched on purpose — re-capturing would overwrite
+        // the opener with a node inside the dialog.
+        refocus: function() {
+          var run = function() {
+            if (_backdropEl && _backdropEl.focus && document.contains(_backdropEl)) {
+              _backdropEl.focus();
+            }
+          };
+          if (window.Alpine && window.Alpine.nextTick) window.Alpine.nextTick(run);
+          else setTimeout(run, 0);
         },
 
         releaseFocus: function() {
           var target = _returnFocusTo;
           _returnFocusTo = null;
+          _backdropEl = null;
           if (target && target.focus && document.contains(target)) target.focus();
         },
 
@@ -147,12 +169,17 @@
           opts  = opts  || {};
           var entry = { id: id, props: props };
 
+          var replaced = false;
           if (opts.replace && this.stack.length > 0) {
             this.stack.splice(this.stack.length - 1, 1, entry);
+            replaced = true;
           } else {
             this.stack.push(entry);
           }
           this._sync();
+          // Only on a REPLACE. A fresh push takes current() falsy -> truthy, so the
+          // outer template mounts and x-init calls captureFocus for us.
+          if (replaced) this.refocus();
         },
 
         swap: function(id, props, opts) {
