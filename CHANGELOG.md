@@ -163,7 +163,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   directly beneath its own toast so no tier can settle between them. The property
   is also asserted where the defect lives, in `e2e/toast_over_banner.spec.js`: a
   hit test and a real mouse click at the Dismiss button, at desktop and phone
-  widths, at scroll-top and at an offset. One trap is recorded there — at 390px
+  widths, at scroll-top and at an offset. And once more on the artifact a
+  consumer is actually served — `test/integration/layer_scale_build_test.rb`
+  runs the real Tailwind binary over the engine's entry point and reads the
+  tiers out of the COMPILED bundle, where `@import` resolution, layer ordering
+  and a shadowing `:root` are all in play and a source read sees none of them. One trap is recorded there — at 390px
   the point under that button is the banner's Email link, so on the broken build a
   click *navigated* and the toast count on the new page was zero; asserting the
   count alone passes over the bug.
