@@ -1,0 +1,79 @@
+<%# The toast / banner collision lab page.
+
+    THREE engine partials on one page, because the defect only exists where all
+    three are. studio/banners/stack renders the environment bar; the modal host
+    is what puts `modal-open` on body and so LIFTS that bar to a pinned
+    var(--z-banner) at top 0; layouts/studio/flash puts a toast at top 0 as well.
+    Any two of the three and the page cannot exhibit anything at all.
+
+    Every one of them is rendered BY NAME. Nothing here reimplements a toast, a
+    banner or a modal — the page only supplies the two controls that put it into
+    the state under test, and both are ordinary Alpine bindings onto engine
+    behaviour that already exists.
+
+    THE TOAST DELIBERATELY CARRIES A BUTTON. The manager in _flash gives any
+    toast with buttons a duration of 0, so it never auto-dismisses. That is what
+    makes Dismiss the toast's ONLY exit, and it is the whole difference between
+    "a banner covers a toast for four seconds" and "the toast is stuck on this
+    page for the rest of the session".
+
+    THE CONTROLS ARE PINNED TO THE BOTTOM, which is not decoration. They have to
+    be reachable at a SCROLL OFFSET, because a stacking defect between two pinned
+    layers can read correctly at the top of a document and be wrong for every
+    reader who scrolled first. A control in normal flow would be scrolled off,
+    and Playwright would scroll the page back to reach it — quietly undoing the
+    offset the spec came to measure. Pinned, they are clickable at any scroll
+    position without moving it. They also sit clear of the toast's own fixed box
+    at the top of the viewport, so a toast never covers the control that raises
+    the next one.
+
+    The tall filler is what gives the page somewhere to scroll TO.
+
+    THE MODAL HOST RENDERS INSIDE THE x-data SCOPE, not after it, and that is
+    load-bearing rather than tidy. Its backdrop lives behind a bare `template
+    x-if` reading a `$store` magic, and outside a component scope Alpine leaves
+    that template alone: measured here, the store DID take the entry and body DID
+    get `modal-open`, while no dialog element was ever created. A page that
+    mounted the host as a sibling would report a modal it never rendered, and the
+    hit test below would be measuring an empty viewport. The same reason
+    /lab/modal_host wraps its own. `main` carries no transform, filter, opacity
+    or z-index, so it creates no stacking context and the backdrop still
+    composites at var(--z-modal) against the page. %>
+<%= render "studio/banners/stack" %>
+<%= render "layouts/navbar" %>
+<%= render "layouts/studio/flash" %>
+
+<main class="p-8" x-data>
+  <h1 class="text-2xl font-bold mb-6">Toast over banner</h1>
+  <p data-test="lab-body">toast over banner lab</p>
+
+  <div class="flex flex-wrap gap-3"
+       style="position: fixed; left: 1rem; bottom: 1rem;">
+    <button type="button" data-test="raise-toast" class="btn btn-outline"
+            @click="window.dispatchEvent(new CustomEvent('toast', { detail: {
+              type: 'notice',
+              title: 'Saved',
+              message: 'This toast carries a button, so it never auto-dismisses.',
+              buttons: [{ label: 'Undo', style: 'primary' }]
+            } }))">
+      Raise toast
+    </button>
+
+    <button type="button" data-test="open-modal" class="btn btn-primary"
+            @click="$store.modals.open('lab-card', { title: 'Lab card' })">
+      Open modal
+    </button>
+  </div>
+
+  <div style="height: 4000px"></div>
+
+  <%= render "studio/modals/host" do %>
+    <template x-if="$store.modals.current().id === 'lab-card'">
+      <div class="p-6">
+        <h2 class="text-lg font-bold mb-3" x-text="$store.modals.current().props.title"></h2>
+        <button type="button" data-test="card-control" class="btn btn-primary">Card control</button>
+      </div>
+    </template>
+  <% end %>
+</main>
+

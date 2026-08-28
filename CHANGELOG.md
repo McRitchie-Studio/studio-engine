@@ -119,6 +119,60 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   guard on the read-before-write order.
 
 
+### Fixed
+
+- **A toast with buttons could not be dismissed while a modal was open.** The
+  layer scale put `--z-banner` (500) above `--z-toast` (400), and `body.modal-open`
+  lifts the environment bar stack to that tier at `position: sticky; top: 0`.
+  `#toast-container` is fixed at top 0 with `1rem` of padding, so the two land on
+  the same pixels: measured in a browser, the bars own y0-47 while the toast's
+  Dismiss button runs y28-40 — an 8-14px overlap at every viewport tested.
+  `elementFromPoint` at that button returned the **banner**, and a real click left
+  the toast on the page. Because the toast manager gives any toast carrying
+  buttons `duration: 0`, that X was the toast's **only** exit: it was stuck for
+  the rest of the session.
+
+  **The tiers are reordered** — `--z-banner` 400, `--z-toast-blur` 499, `--z-toast`
+  500 — and that is a semantic decision rather than a nudge around the geometry: a
+  toast is transient and demands interaction, a banner is persistent chrome that
+  will still be there afterwards. `--z-banner` still clears `--z-modal` (200), so
+  the property the lift exists for — DEV MODE and the email chip stay lit and
+  clickable over a modal — is unchanged and now has its own spec.
+
+  **One measured cost.** A banner button's tooltip is a descendant of the bar
+  stack, and the modal-open lift makes that stack a stacking context, so the
+  tooltip composites at `--z-banner` rather than at its own `--z-tooltip` (600).
+  At 1440x900 the tooltip and the toast card never meet; at 390x844 they overlap
+  by 260x45px, so a banner tooltip opened with both a modal and a toast up is
+  drawn under the toast. Hover/focus-only, purely visual, and recorded beside the
+  scale.
+
+  **Consumers that redefine these tokens in their own `:root` after the engine
+  import still win**, as they always have, so an app carrying a local copy of the
+  scale keeps the old order (and the bug) until it drops the copy.
+
+  Two literals moved with the tiers: `#toast-container` and `.toast-page-blur` in
+  `layouts/studio/_flash` carry `var(--studio-toast-z, var(--z-toast, …))`
+  fallbacks, and a fallback that disagreed with the scale would hand the bug to
+  any app rendering the partial without the engine sheet.
+
+  **The existing test could not have caught this and still cannot on its own.**
+  `layer_scale_contract_test` asserted `--z-toast > --z-modal`, which was true the
+  entire time the toast was unusable — both tiers cleared the modal, which says
+  nothing about which of *them* wins. It now names the banner, and pins the halo
+  directly beneath its own toast so no tier can settle between them. The property
+  is also asserted where the defect lives, in `e2e/toast_over_banner.spec.js`: a
+  hit test and a real mouse click at the Dismiss button, at desktop and phone
+  widths, at scroll-top and at an offset. And once more on the artifact a
+  consumer is actually served — `test/integration/layer_scale_build_test.rb`
+  runs the real Tailwind binary over the engine's entry point and reads the
+  tiers out of the COMPILED bundle, where `@import` resolution, layer ordering
+  and a shadowing `:root` are all in play and a source read sees none of them. One trap is recorded there — at 390px
+  the point under that button is the banner's Email link, so on the broken build a
+  click *navigated* and the toast count on the new page was zero; asserting the
+  count alone passes over the bug.
+
+
 ### Breaking
 
 - **The age-gate DOB modal is renamed, and the refusal moved to its own card.**

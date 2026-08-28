@@ -17,8 +17,18 @@
      bare 60/55 that sat below every app navbar. A toast is the one thing that
      must surface over an open modal, so --z-toast is above --z-modal and an app
      that never overrides gets that for free. Apps that DO override should set
-     the tier (--z-toast) instead, and drop the per-component name. */
-  #toast-container { z-index: var(--studio-toast-z, var(--z-toast, 400)); }
+     the tier (--z-toast) instead, and drop the per-component name.
+
+     ABOVE THE BANNER TOO, and the fallbacks below have to say so. A toast and
+     the environment bars share the top of the viewport, and with a modal open
+     engine.css lifts those bars to --z-banner at top 0 — which used to sit at
+     500, over the toast's 400, so the toast's Dismiss button was covered and a
+     click landed on the banner. A toast carrying buttons is given duration 0 by
+     the manager below, so that button is its only exit: covered, the toast was
+     stuck forever. The tiers were reordered (engine.css carries the argument);
+     these literals are what an app gets when the engine sheet is absent, so
+     they must carry the SAME order or that app keeps the bug. */
+  #toast-container { z-index: var(--studio-toast-z, var(--z-toast, 500)); }
   .toast-shadow-all {
     box-shadow: 0 0 30px rgba(0,0,0,0.4), 0 0 10px rgba(0,0,0,0.2);
   }
@@ -65,7 +75,7 @@
     mask-image: radial-gradient(ellipse 70% 80% at 50% 0%, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0) 100%);
     -webkit-mask-image: radial-gradient(ellipse 70% 80% at 50% 0%, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 40%, rgba(0,0,0,0) 100%);
     pointer-events: none;
-    z-index: var(--studio-toast-blur-z, var(--z-toast-blur, 399));
+    z-index: var(--studio-toast-blur-z, var(--z-toast-blur, 499));
     transition: opacity 0.5s ease;
     background: rgba(255, 255, 255, 0.15);
   }
