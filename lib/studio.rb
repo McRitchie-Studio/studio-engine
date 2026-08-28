@@ -56,6 +56,41 @@ module Studio
   mattr_accessor :after_newsletter_change, default: ->(_user, subscribed:, first_join:) {}
   mattr_accessor :sso_logo,            default: nil
   mattr_accessor :wallet_address_method, default: nil
+
+  # The statement a wallet signs, and the line the human reads inside Phantom.
+  # Deliberately DERIVED rather than configured: "Sign in to Turf Monster" was
+  # turf-monster's literal before the mobile deep link was promoted, and
+  # app_name reproduces it byte for byte, so nothing that was already signed
+  # changed. Safe to vary because the server does NOT verify this text — see
+  # Solana::SessionAuth#verify_solana_signature!, which checks the nonce, the
+  # host, and the OPSEC-005 User-ID binding, and nothing else about the message.
+  # Both the deep-link partial and the callback view read THIS, so they cannot
+  # drift; the callback rebuilds the signed message to post for verification, so
+  # a drift between them would fail every mobile sign-in.
+  mattr_accessor :wallet_sign_in_statement_builder,
+                 default: -> { "Sign in to #{Studio.app_name}" }
+
+  def self.wallet_sign_in_statement
+    wallet_sign_in_statement_builder.call
+  end
+
+  # The Phantom callback's on-page debug sink. DEFAULTS TO OFF, and the default
+  # is the point: that sink printed the dapp x25519 SECRET KEY to the page and
+  # the console on every mobile sign-in. A capability that leaks a signing key
+  # must be opted INTO, never defaulted on and switched off per environment.
+  #
+  # Rails.env.production? is the wrong predicate here and that is why this is a
+  # lambda rather than an env check: a Heroku QA dyno runs RAILS_ENV=production,
+  # so an env test would take QA's debugging away. turf-monster restores exactly
+  # what it had with:
+  #
+  #     config.wallet_debug_sink = -> { !AppFlags.live_production? }
+  #
+  # The callback treats an absent sink as "debug off" and stays null-safe, so
+  # turning this off can never break sign-in.
+  mattr_accessor :wallet_debug_sink, default: -> { false }
+
+  def self.wallet_debug_sink? = wallet_debug_sink.call
   mattr_accessor :theme_logos,         default: []
   mattr_accessor :sticky_table_headers, default: false
 
@@ -782,13 +817,18 @@ module Studio
              constraints: { token: %r{[^/]+} }
       end
 
-      # Solana / Phantom wallet sign-in (nonce challenge + signature verify).
-      # The browser posts to these literal paths from the shared Connect-Wallet
-      # flow; app-specific surfaces (mobile deep-link callback, account-linking,
-      # OAuth popup) stay in the consuming app's routes.
+      # Solana / Phantom wallet sign-in (nonce challenge + signature verify),
+      # plus the MOBILE deep-link callback Phantom redirects back to. The
+      # callback used to be listed here as app-specific and is not any more —
+      # it was promoted with the deep link itself, because the hub had no
+      # mobile wallet path at all and copying 400 lines of SIWS protocol per
+      # app is how the picker came to exist three times. Account-linking and
+      # the OAuth popup DO stay app-side.
       if Studio.draw_auth_routes && Studio.auth_method?(:wallet)
         get  "auth/solana/nonce",  to: "solana_sessions#nonce",  as: :solana_nonce
         post "auth/solana/verify", to: "solana_sessions#verify", as: :solana_verify
+        get  "auth/phantom/callback", to: "solana_sessions#phantom_callback",
+             as: :phantom_callback
       end
 
       # The shared profile page. ON by default — unlike /admin/emails and the

@@ -141,16 +141,31 @@
          var n = ('' + name).toLowerCase();
          return ['phantom', 'solflare', 'backpack'].indexOf(n) !== -1 ? n : null;
        },
+       // Is there anywhere for a mobile Phantom row to GO? A consumer that does
+       // not render studio/solana/phantom_deeplink has no startPhantomDeepLink,
+       // and every branch below turns on this answer.
+       //
+       // WHY IT IS CHECKED AT ALL: without it, adopting this picker replaced an
+       // app's dead-end install row with a dead BUTTON — the install row
+       // suppressed, the deep-link row painted, and its tap a no-op. Found
+       // before the hub adopted, which had no mobile wallet path whatsoever.
+       // An absent capability must not default to the permissive branch.
+       get canDeepLink() {
+         return typeof startPhantomDeepLink === 'function';
+       },
        // A phone has no extension to install, and Phantom's own row on mobile
        // is the deep link below — so drop Phantom here rather than paint a
        // SECOND Phantom row pointing at a desktop download page the user
-       // cannot act on. Solflare and Backpack keep their install rows: there is
-       // no deep link for them, so the download page is still their only path.
+       // cannot act on. ONLY when a deep link can replace it: with no deep
+       // link the install row is the only Phantom path there is, dead end on
+       // iOS or not, and removing it leaves the user nothing. Solflare and
+       // Backpack keep their install rows either way — there is no deep link
+       // for them, so the download page is still their only path.
        get missingInstalls() {
          var self = this;
          return this.installs.filter(function(i) {
            if (self.hasWallet(i.name)) return false;
-           if (self.isMobile && i.name === 'Phantom') return false;
+           if (self.isMobile && self.canDeepLink && i.name === 'Phantom') return false;
            return true;
          });
        },
@@ -158,7 +173,7 @@
        // means the detected row above already offers a working connect, so a
        // deep link would only offer to leave Phantom to open Phantom.
        get showPhantomDeepLink() {
-         return this.isMobile && !this.hasWallet('Phantom');
+         return this.isMobile && !this.hasWallet('Phantom') && this.canDeepLink;
        },
        async pick(name) {
          if (this.connecting) return;

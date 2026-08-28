@@ -1,0 +1,21 @@
+<%#
+  tweetnacl, for the Phantom mobile deep link. Both halves of that flow need
+  window.nacl: the deep link generates an x25519 keypair so Phantom can encrypt
+  its reply, and the callback opens that box with the stashed secret.
+
+  IDEMPOTENT ON PURPOSE. turf-monster already loads tweetnacl from its own
+  layout, so this must not load a second copy there; the guard means a consumer
+  that already supplies nacl keeps its own and one that does not (the hub, which
+  had no mobile wallet path at all) gets it here.
+
+  Pinned to an exact version rather than a range: this is signing-path crypto,
+  and a range lets a CDN swap it under a running app. The same reasoning is
+  written out beside turf-monster's web3.js pin.
+
+  Render before studio/solana/phantom_deeplink and in the callback view.
+%>
+<script>
+  if (typeof window.nacl === 'undefined') {
+    document.write('<script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl-fast.min.js" integrity="sha384-bxLBoUt3rJHA0lE3rMEJRLbjMOOJ1CQGeaVoRVpUBH+sIbVaJUnECvIpIU/ZOEsl" crossorigin="anonymous"><\/script>');
+  }
+</script>

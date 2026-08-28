@@ -156,11 +156,12 @@ class WalletConnectPickerTest < Minitest::Test
   def test_mobile_collapses_phantom_to_a_single_row
     xd = x_data(render_picker)
 
-    # The install list suppresses Phantom on mobile...
-    assert_includes xd, "if (self.isMobile && i.name === 'Phantom') return false;"
-    # ...and the deep-link row is the one that appears, only when Phantom is
-    # NOT already injected (inside Phantom's own browser the detected row wins).
-    assert_includes xd, "return this.isMobile && !this.hasWallet('Phantom');"
+    # The install list suppresses Phantom on mobile — but only when a deep link
+    # can replace the row (see test_the_mobile_collapse_requires_a_deep_link).
+    assert_includes xd, "if (self.isMobile && self.canDeepLink && i.name === 'Phantom') return false;"
+    # ...and the deep-link row appears only when Phantom is NOT already injected
+    # (inside Phantom's own browser the detected row wins).
+    assert_includes xd, "return this.isMobile && !this.hasWallet('Phantom') && this.canDeepLink;"
   end
 
   def test_the_deep_link_row_uses_the_engine_sprite_not_an_app_png
@@ -182,6 +183,22 @@ class WalletConnectPickerTest < Minitest::Test
 
     assert err, "the connect-error paragraph must render"
     assert_includes err, %(role="alert")
+  end
+
+  # --- the mobile branch is gated on a deep link existing -----------------
+
+  def test_the_mobile_collapse_requires_a_deep_link
+    # WHY THIS GATE EXISTS. Without it, adopting this picker replaced an app's
+    # dead-end Phantom INSTALL row with a dead BUTTON: install suppressed,
+    # deep-link row painted, tap a no-op. Found before the hub adopted — it has
+    # no startPhantomDeepLink at all. An absent capability must not default to
+    # the permissive branch.
+    xd = x_data(render_picker)
+
+    assert_includes xd, "typeof startPhantomDeepLink === 'function'"
+    # Both branches consult it, not just the row.
+    assert_includes xd, "self.isMobile && self.canDeepLink && i.name === 'Phantom'"
+    assert_includes xd, "!this.hasWallet('Phantom') && this.canDeepLink"
   end
 
   # --- the guide specimen now CONFIGURES this partial --------------------
