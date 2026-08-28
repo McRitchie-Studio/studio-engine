@@ -192,6 +192,8 @@ class E2eLabController < ActionController::Base
   # subject; the stamps are what prove it ran.
   def at_time = render(:at_time)
 
+  def phantom_deeplink = render(:phantom_deeplink)
+
   # The email manager's two preview frames — the ARTWORK box and the IN THE EMAIL
   # box — rendered side by side exactly as /admin/emails/:key renders them.
   #
