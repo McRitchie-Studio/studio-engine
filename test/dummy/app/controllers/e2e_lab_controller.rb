@@ -161,6 +161,23 @@ class E2eLabController < ActionController::Base
   # the global one.
   def modal_host = render(:modal_host)
 
+  # THE TOAST / BANNER COLLISION — three engine partials that only misbehave
+  # together.
+  #
+  # studio/banners/stack, layouts/studio/flash and studio/modals/host each work
+  # perfectly alone, and every existing tier proved exactly that. The defect
+  # lives in the seam: opening a modal puts `modal-open` on body, which lifts the
+  # bar stack to a pinned var(--z-banner) at top 0 — over the same pixels
+  # #toast-container's fixed top-0 padding puts the toast's Dismiss button on.
+  # Neither the markup nor the token values show it; only a hit test does.
+  #
+  # No locals to prepare. The environment banner renders because
+  # Studio.show_environment_banner? is true outside production, the toast is
+  # raised by an event the page dispatches, and the modal is opened through the
+  # engine's own store — so the page under test is assembled entirely out of
+  # engine behaviour, exactly as a consumer's layout assembles it.
+  def toast_over_banner = render(:toast_over_banner)
+
   # The geo manager, rendered as a host renders it: the engine's own template plus
   # the badge a host puts in its navbar.
   #

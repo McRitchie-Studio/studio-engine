@@ -589,7 +589,12 @@
 #   npx playwright test --list                                             -> 113 tests, 16 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 113
-total_specs: 115
+#
+# Re-derived again on THIS tree for e2e/toast_over_banner.spec.js (FOUR tests in one
+# new file: the hit test at desktop, at a scroll offset and at phone width, plus the
+# banner-over-backdrop property the same change could have cost):
+#   npx playwright test --list  -> 119 tests, 18 files
+total_specs: 119
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -615,7 +620,11 @@ total_specs: 115
 # Moved 112 -> 113 for the third phantom_deeplink test, the one that CALLS the
 # deep link rather than checking it is defined — the coverage two shipped
 # blockers slipped through.
-executed: 115
+# Re-derived on THIS tree alongside total_specs above, with the lister:
+# executed = total - devnet - allowed_skips = 119 - 0 - 0 = 119, so executed ==
+# total_specs and the equality assertion holds. Moved 115 -> 119 for the four
+# toast_over_banner specs.
+executed: 119
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

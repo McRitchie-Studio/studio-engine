@@ -47,6 +47,7 @@ Rails.application.routes.draw do
   get "lab/email_banner_editor", to: "e2e_lab#email_banner_editor"
   get "lab/birthday_gate", to: "e2e_lab#birthday_gate"
   get "lab/modal_host", to: "e2e_lab#modal_host"
+  get "lab/toast_over_banner", to: "e2e_lab#toast_over_banner"
   get "lab/profile", to: "e2e_lab#profile"
   get "lab/profile_edit", to: "e2e_lab#profile_edit"
   get "lab/hold_button", to: "e2e_lab#hold_button"

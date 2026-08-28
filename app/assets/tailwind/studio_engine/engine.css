@@ -63,11 +63,50 @@
   --z-modal:       200;  /* modal backdrop + card — THE app blocker */
   --z-lightbox:    210;  /* a lightbox opened from inside a modal */
   --z-alert:       300;  /* transient overlays that must not be missed */
-  --z-toast-blur:  399;  /* the frosted halo behind the toasts */
-  --z-toast:       400;  /* toasts */
-  --z-banner:      500;  /* environment / DEV MODE — reachable mid-modal */
+  --z-banner:      400;  /* environment / DEV MODE — reachable mid-modal */
+  --z-toast-blur:  499;  /* the frosted halo behind the toasts */
+  --z-toast:       500;  /* toasts — ABOVE the banner; see below */
   --z-tooltip:     600;  /* tooltips on the banner, so they clear it */
 }
+
+/* WHY THE TOAST OUTRANKS THE BANNER, and why it did not used to.
+
+   The first cut of this scale put --z-banner (500) over --z-toast (400) on the
+   reasoning that the environment bars must stay reachable mid-modal. They must
+   — but so must a toast, and the two claims collided the moment BOTH were true
+   at once, because they occupy the same corner of the viewport.
+
+   THE DEFECT, MEASURED on mcritchie-studio at 1440x900 and 390x844, dark and
+   light, scrollY 0 and 900. #toast-container is fixed at top 0 with 1rem of
+   padding, so a toast card sits at roughly y16-92. With a modal open, the rule
+   below lifts the bar stack to sticky top 0 at --z-banner, so it owns y0-47 —
+   overlapping the toast's top edge, which is where the Dismiss button lives.
+   `document.elementFromPoint` at that button returned the BANNER div, and a
+   real click left the toast count at 1. With no modal open it returned the
+   button's own SVG and the count dropped to 0.
+
+   That is not a cosmetic overlap. A toast carrying action buttons is given
+   `duration: 0` by the toast manager (layouts/studio/_flash), so it never
+   auto-dismisses — the Dismiss button is its ONLY exit, and under a lifted
+   banner the toast is stuck on the page for the rest of the session.
+
+   SO THE ORDER IS A SEMANTIC DECISION, not a workaround for the geometry: a
+   TOAST IS TRANSIENT AND DEMANDS INTERACTION; a BANNER IS PERSISTENT CHROME
+   that will still be there afterwards. The thing asking to be dealt with wins.
+   Two alternatives were considered and rejected — lowering the modal-open lift
+   below the toast (narrower blast radius, but leaves the scale saying something
+   nobody believes) and offsetting #toast-container while modal-open (treats the
+   symptom; the toast goes back under the banner the day either one grows).
+
+   WHAT THIS COSTS, MEASURED RATHER THAN ASSUMED. --z-tooltip (600) still clears
+   both tiers, but a banner button's tooltip is a DESCENDANT of the bar stack —
+   and while a modal is open the rule below gives that stack a z-index, which
+   makes it a stacking context and clamps every descendant inside it. So the
+   tooltip now composites at --z-banner rather than at 600. At 1440x900 the two
+   never meet (tooltip x1083-1343, toast card x496-944); at 390x844 they overlap
+   by 260x45px, so a banner tooltip opened with a modal AND a toast up is drawn
+   under the toast card. It is hover/focus-only, purely visual (the tooltip is
+   pointer-events:none), and it is the accepted cost of this ordering. */
 
 /* The environment / impersonation bars stay in NORMAL FLOW at rest
    (banners/_stack records why: pinning them in the RESTING state needs one
@@ -110,7 +149,7 @@ body.modal-open .studio-bar-stack,
 body.modal-open .studio-app-banner {
   position: sticky;
   top: 0;
-  z-index: var(--z-banner, 500);
+  z-index: var(--z-banner, 400);
 }
 
 /* -- Surfaces -------------------------------------------------------------- */
