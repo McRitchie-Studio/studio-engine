@@ -48,7 +48,25 @@ test("a consumer positions off the pinned stack with max(), and a hidden layer d
     await new Promise((r) => setTimeout(r, 250));
     const hidden = { top: getComputedStyle(probe).top, pinApps: g("--pin-apps-bottom") };
 
-    return { shown, hidden };
+    // THE THIRD WAY A LAYER GOES AWAY, and the one display:none does not cover.
+    // A removed node cannot be measured at 0 by anything, so unless the
+    // publisher CLEARS what departed, its last value stands forever and the
+    // consumer sits at the height of a strip that is gone. Review measured a
+    // removed 300px strip holding the property at 300px against a real stack
+    // bottom of 160px.
+    //
+    // The event order matters and this spec had it wrong: real Turbo fires
+    // turbo:before-stream-render and THEN patches the DOM. So the removal
+    // happens first here, and the event follows it.
+    strip.style.display = "";
+    document.dispatchEvent(new CustomEvent("turbo:before-stream-render"));
+    await new Promise((r) => setTimeout(r, 250));
+    strip.remove();
+    document.dispatchEvent(new CustomEvent("turbo:before-stream-render"));
+    await new Promise((r) => setTimeout(r, 250));
+    const removed = { top: getComputedStyle(probe).top, pinApps: g("--pin-apps-bottom") };
+
+    return { shown, hidden, removed };
   });
 
   // THE HEADER'S TWO NAMES AGREE. --nav-bottom is the legacy name a live
@@ -64,6 +82,11 @@ test("a consumer positions off the pinned stack with max(), and a hidden layer d
   // consumer is unmoved — no stacking order was ever declared.
   expect(result.hidden.pinApps).toBe("0px");
   expect(result.hidden.top).toBe(result.shown.top);
+
+  // REMOVED LAYER CLEARS. The property must be gone, not stuck at its last
+  // value, and the consumer must sit back on the header alone.
+  expect(result.removed.pinApps).toBe("");
+  expect(result.removed.top).toBe(result.shown.navBottom);
 
   expect(errors).toEqual([]);
 });

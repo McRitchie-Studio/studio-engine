@@ -200,150 +200,122 @@
   (function () {
     if (!window.ResizeObserver) return;
     var ro = null;
-    var current = null;
     var queued = false;
-    var lastH = null;
-    var lastBottom = null;
-    function publish(header) {
+    var pins = [];
+    // The names this publisher has written, so a DEPARTED layer can be cleared.
+    var published = {};
+
+    // ONE MEASUREMENT PER ELEMENT PER FRAME, and every read before every write.
+    //
+    // publish() and publishPin() each kept reads-before-writes INTERNALLY, and
+    // that was not enough: the frame ran publish(current) — which WRITES two
+    // inherited custom properties on documentElement — and then the pin loop,
+    // whose first act is a getBoundingClientRect(). A read after a write to the
+    // root forces a fresh layout, so the thrash this file removed came straight
+    // back one function boundary over. Measured by review at 6x CPU throttle
+    // over 175 frames, pin loop on vs off: frames past 20ms 62 vs 42, median
+    // 17.7 vs 14.9ms, p90 34.2 vs 26.0ms; at 10x, 84/180 vs 4/180.
+    //
+    // The header was also measured TWICE — once as `current`, once as pin
+    // `nav` — for values proven identical across 40 frames. It is a pin like
+    // any other now; the only thing special about it is that it ALSO writes the
+    // legacy --nav-h / --nav-bottom that studio/_sidebar_panel and
+    // turf-monster's scroll-margin-top already read.
+    function readPin(pin) {
+      return {
+        pin: pin,
+        h: pin.el.offsetHeight,
+        bottom: Math.max(0, pin.el.getBoundingClientRect().bottom)
+      };
+    }
+    function writeReading(r) {
       var style = document.documentElement.style;
-      // SKIP THE NO-OP WRITE. --nav-h and --nav-bottom are INHERITED custom
-      // properties on documentElement, so every write invalidates style for the
-      // whole document. Most republishes carry the same number — a scroll with
-      // the header already pinned, a resize that missed this element — and
-      // those cost nothing now.
-      // BOTH READS BEFORE EITHER WRITE. Writing a custom property on
-      // documentElement invalidates style, so a read taken after one write
-      // forces a fresh layout — the thrash this whole change exists to remove.
-      var h = header.offsetHeight;
-      // Scroll-dependent where --nav-h is not: chrome above the header scrolls
-      // away while an overlay is open (nothing here locks body scroll), so this
-      // is republished on scroll. Clamped at 0 — once the sticky header is
-      // pinned at top:0 the two values converge, which is why a consumer whose
-      // header already starts at the viewport top sees no change at all.
-      var bottom = Math.max(0, header.getBoundingClientRect().bottom);
-      if (h !== lastH) {
-        lastH = h;
-        style.setProperty('--nav-h', h + 'px');
+      var pin = r.pin;
+      if (r.h !== pin.lastH) {
+        pin.lastH = r.h;
+        style.setProperty('--pin-' + pin.name + '-h', r.h + 'px');
+        if (pin.legacy) style.setProperty('--nav-h', r.h + 'px');
       }
-      if (bottom !== lastBottom) {
-        lastBottom = bottom;
-        style.setProperty('--nav-bottom', bottom + 'px');
+      if (r.bottom !== pin.lastBottom) {
+        pin.lastBottom = r.bottom;
+        style.setProperty('--pin-' + pin.name + '-bottom', r.bottom + 'px');
+        if (pin.legacy) style.setProperty('--nav-bottom', r.bottom + 'px');
       }
     }
-    // === THE PINNED STACK =================================================
-    //
-    // Any element carrying data-pin="<name>" publishes --pin-<name>-h and
-    // --pin-<name>-bottom, so a consumer can position off it in PURE CSS:
-    //
-    //     top: max(var(--pin-nav-bottom, 0px), var(--pin-apps-bottom, 0px));
-    //
-    // WHY max() AND NOT A DECLARED ORDER. A hidden layer measures 0 and simply
-    // drops out of the max, so nothing has to say which layer sits above which
-    // — and reordering a partial cannot break the arithmetic. The alternative,
-    // an explicit stacking order, is one more thing to keep in step with the
-    // markup.
-    //
-    // WHAT THIS EXISTS TO DELETE. mcritchie-studio's /deployments currently
-    // re-derives this three separate times: the app strip positions itself with
-    // :style="{ top: offset + 'px' }", the lane headers compute laneTop as
-    // "site header height + strip height" in Alpine behind their OWN
-    // ResizeObserver on the pinned header element, and --nav-bottom already
-    // answers the first half and goes unused there. (The header's
-    // view-transition class is deliberately NOT spelled here: this comment
-    // renders into the page, and mcritchie-studio's BarStackAdoptionTest counts
-    // that class name in the response body to catch a DUPLICATE pinned header —
-    // a duplicate view-transition-name silently disables every transition on the
-    // page. Naming it in prose reads as a second one.) Same shape as the four
-    // copies of the
-    // navbar collapse, one layer up.
-    var pins = [];
-    function publishPin(pin) {
-      var style = document.documentElement.style;
-      // Both reads before either write, for the reason publish() records.
-      var h = pin.el.offsetHeight;
-      var bottom = Math.max(0, pin.el.getBoundingClientRect().bottom);
-      if (h !== pin.lastH) {
-        pin.lastH = h;
-        style.setProperty('--pin-' + pin.name + '-h', h + 'px');
-      }
-      if (bottom !== pin.lastBottom) {
-        pin.lastBottom = bottom;
-        style.setProperty('--pin-' + pin.name + '-bottom', bottom + 'px');
-      }
+    function publishAll() {
+      var readings = [];
+      var i;
+      for (i = 0; i < pins.length; i++) readings.push(readPin(pins[i]));
+      for (i = 0; i < readings.length; i++) writeReading(readings[i]);
     }
     function schedule() {
-      if (queued || (!current && !pins.length)) return;
+      if (queued || !pins.length) return;
       queued = true;
-      window.requestAnimationFrame(function () {
-        queued = false;
-        if (current) publish(current);
-        for (var i = 0; i < pins.length; i++) publishPin(pins[i]);
-      });
+      window.requestAnimationFrame(function () { queued = false; publishAll(); });
     }
-    // RE-SCANNED, NEVER CAPTURED ONCE. A node registered at init and then
-    // replaced stops resizing, and the observer goes quiet against a detached
-    // element while the live one is never watched — mcritchie-studio's board
-    // documents exactly that bug against its own hand-rolled version, where a
-    // Turbo Stream broadcast swaps the app strip out from under it. So this
-    // runs on every attach AND after a stream render, and it rebuilds from the
-    // document rather than trusting what it held.
+    // ONE construction site. Two of them let attach() replace the observer that
+    // registerPins() had already put the pins on, silently dropping every live
+    // observation — caught by test_pins_share_one_observer_and_one_frame, which
+    // counts them for exactly that reason.
+    function ensureObserver() {
+      if (!ro) ro = new ResizeObserver(schedule);
+      return ro;
+    }
     function registerPins() {
-      // No construction here: the observer is built once, in attach(). A pin
-      // registered before there is one simply waits for the next attach, which
-      // is a frame away at most.
-      if (!ro) return;
+      ensureObserver();
       pins = [];
+      var seen = {};
+      var header = document.querySelector('header');
       var nodes = document.querySelectorAll('[data-pin]');
       for (var i = 0; i < nodes.length; i++) {
         var name = nodes[i].getAttribute('data-pin');
-        // An unnamed pin would write `--pin--h`, which is a valid property name
-        // and a silent nonsense one. Skip it rather than publish it.
+        // An unnamed pin would write `--pin--h`, a valid property name and a
+        // silent nonsense one. Skip it rather than publish it.
         if (!name) continue;
-        pins.push({ el: nodes[i], name: name, lastH: null, lastBottom: null });
+        seen[name] = true;
+        pins.push({
+          el: nodes[i],
+          name: name,
+          // The header keeps publishing --nav-h / --nav-bottom, from the SAME
+          // measurement, so it is never measured twice.
+          legacy: nodes[i] === header,
+          lastH: null,
+          lastBottom: null
+        });
         ro.observe(nodes[i]);
       }
-      for (var j = 0; j < pins.length; j++) publishPin(pins[j]);
-    }
-    function attach() {
-      var header = document.querySelector('header');
-      if (!header) {
-        // A page with no <header> — a bare error page, a print view. RELEASE the
-        // old node instead of returning: the scroll listener outlives the visit,
-        // and publishing from a DETACHED element yields an all-zero rect, which
-        // would drive --nav-h to 0px. Before this listener existed nothing ran
-        // after detach, so --nav-h simply kept its last value; keep that promise.
-        if (ro) ro.disconnect();
-        current = null;
-        // A page can carry pinned chrome without a <header> — a bare error
-        // page still has none, but a print view or a headerless layout may.
-        // The observer is KEPT (not nulled) so the pins have one to ride; it
-        // was disconnected above, and registerPins re-observes what is live.
-        registerPins();
-        return;
+      // CLEAR WHAT LEFT. A layer goes away three ways: display:none and x-show
+      // both keep the node, so it measures 0 and drops out of a consumer's
+      // max() on its own. REMOVAL does not — nothing is left to measure, the
+      // last published value stands forever, and a consumer sits at the height
+      // of a strip that is gone. Review measured a removed 300px strip holding
+      // --pin-apps-bottom at 300px against a real stack bottom of 160px: a
+      // permanent 140px error, and a direct contradiction of this primitive's
+      // headline promise.
+      for (var name2 in published) {
+        if (published.hasOwnProperty(name2) && !seen[name2]) {
+          document.documentElement.style.removeProperty('--pin-' + name2 + '-h');
+          document.documentElement.style.removeProperty('--pin-' + name2 + '-bottom');
+        }
       }
-      current = header;
+      published = seen;
+      publishAll();
+    }
+    // ATTACH IS NOW JUST A RE-SCAN. The header used to be tracked separately as
+    // `current`, with its own observe and its own publish; it is a pin named
+    // "nav" like any other, so registerPins() covers it. What survives is the
+    // release promise: a page with no pinned chrome at all disconnects the
+    // observer rather than leaving it on detached nodes, and the properties keep
+    // their last value rather than being driven to 0 by an all-zero rect.
+    //
+    // A page that never has a <header> is served too — the observer is built by
+    // ensureObserver() from registerPins(), not from a has-header branch. It was
+    // only reachable from that branch before, so pins on a headerless layout were
+    // permanently dead.
+    function attach() {
       if (ro) ro.disconnect();
-      // THROUGH schedule(), NOT STRAIGHT TO publish(). This callback used to
-      // call publish() directly, which was fine while the header only resized
-      // during a 300ms transition. navCollapse made it resize on EVERY scroll
-      // frame, and each direct publish forced layout and then wrote two
-      // inherited custom properties on documentElement. Measured in
-      // turf-monster at 6x CPU throttle: frames over 20ms were 13/24 THROUGH
-      // the collapse ramp versus 0/24 past it, median 26ms versus 8ms.
-      // Ablating this observer alone took it to 0/24 and median 13ms — it cost
-      // about 2.6x the reflow it was reacting to. schedule() already coalesces
-      // to one publish per frame and is what the scroll and resize listeners
-      // use; the ResizeObserver was the one path that bypassed it.
-      ro = new ResizeObserver(schedule);
-      ro.observe(header);
-      // AFTER the observer is built and the header is on it — registerPins
-      // adds the pinned layers to this SAME observer. Called before it, the
-      // construction below would have replaced the observer that was already
-      // watching them and silently dropped every pin. (Caught by
-      // test_pins_share_one_observer_and_one_frame, which counts the
-      // construction sites for exactly this reason.)
       registerPins();
-      publish(header);
+      if (!pins.length && ro) { ro.disconnect(); ro = null; }
     }
     document.addEventListener('DOMContentLoaded', attach);
     document.addEventListener('turbo:load', attach);
@@ -354,7 +326,7 @@
       window.requestAnimationFrame(registerPins);
     });
     // Registered ONCE at script eval, not inside attach(), so a Turbo nav
-    // re-points `current` instead of stacking another listener per visit.
+    // re-scans instead of stacking another listener per visit.
     window.addEventListener('scroll', schedule, { passive: true });
     window.addEventListener('resize', schedule, { passive: true });
   })();

@@ -16,9 +16,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   the navbar collapse, one layer up.
 
   Any element carrying `data-pin="<name>"` now publishes `--pin-<name>-h` and
-  `--pin-<name>-bottom`, through the same rAF coalescer, the same
-  reads-before-writes order and the same no-op-write skip the header already
-  uses, from **one shared `ResizeObserver`**. A consumer composes layers in pure
+  `--pin-<name>-bottom`, from **one shared `ResizeObserver`**, through the same
+  rAF coalescer and the same no-op-write skip the header already uses — and one
+  measurement pass for the whole frame, every read taken before any write.
+
+  That last part was wrong in the first cut of this change and review caught it:
+  the frame published the header (writing two inherited properties on
+  `documentElement`) and *then* read the pins, so the reads-before-writes order
+  held inside each function and broke across them. Measured at 6× CPU throttle
+  over 175 frames, pin loop on vs off: frames past 20ms **62 vs 42**, p90 **34.2
+  vs 26.0ms**; at 10×, **84/180 vs 4/180**. The header is now a pin like any
+  other — measured once, writing `--nav-h` / `--nav-bottom` from that same
+  reading rather than a second one. A consumer composes layers in pure
   CSS:
 
   ```css
@@ -28,6 +37,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   **`max()` rather than a declared stacking order.** A hidden layer measures 0
   and drops out, so nothing has to say which layer sits above which, and
   reordering a partial cannot break the arithmetic.
+
+  **A departed layer has its properties removed.** `display:none` and `x-show`
+  keep the node, so it measures 0 and drops out of a consumer's `max()` on its
+  own; a REMOVED node cannot be measured by anything, and its last value would
+  stand forever — review measured a removed 300px strip holding the property at
+  300px against a real stack bottom of 160px. The registry remembers what it
+  published and clears whatever is no longer in the document.
 
   The registry is **rebuilt from the document**, on attach and after
   `turbo:before-stream-render` — a Turbo Stream replaces nodes without a
