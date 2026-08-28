@@ -66,11 +66,30 @@ class SuccessCardDrainCtaTest < ActiveSupport::TestCase
     assert_includes html, "origin-left"
   end
 
-  def test_the_non_drain_branches_are_untouched
-    # Scope guard: this change is about the DRAIN branches only.
+  def test_the_non_drain_branches_also_carry_btn_lg
+    # UPDATED from a scope guard that asserted "btn btn-primary w-full". That
+    # guard was right when the drain branches were the only ones being resized —
+    # it stopped that change leaking. It became WRONG the moment the non-drain
+    # branches were sized too, and an un-updated scope guard is how a follow-up
+    # gets reverted by its own test suite. The family is now one height.
     html = render_card(cta_href_key: "props.lobbyUrl", cta_drain: false)
 
-    assert_includes html, "btn btn-primary w-full"
+    assert_includes html, "btn btn-primary btn-lg w-full"
+    refute_includes html, "studio-modal-drain"
+  end
+
+  def test_the_non_drain_button_branch_also_carries_btn_lg
+    # The OTHER half of this change, and it had NO test: reverting the
+    # cta_event branch alone left every test in this repo green, because
+    # render_card's base hash pins cta_drain: true, so nothing ever rendered
+    # the non-drain button. Asserted on the button ELEMENT, per this file's
+    # header — a document-wide match is also satisfied by a sibling branch.
+    html = render_card(cta_event: "ds-modal-close", cta_drain: false)
+
+    el = html[/<button\b[^>]*@click="\$dispatch\('ds-modal-close'\)"[^>]*>/m]
+
+    assert el, "the non-drain button CTA must render"
+    assert_includes class_list(el), "btn-lg", "non-drain button is missing .btn-lg"
     refute_includes html, "studio-modal-drain"
   end
 
