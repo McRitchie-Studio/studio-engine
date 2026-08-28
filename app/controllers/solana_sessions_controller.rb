@@ -22,6 +22,15 @@ class SolanaSessionsController < ApplicationController
     render json: { nonce: session[:solana_nonce] }
   end
 
+  # Where Phantom redirects back to after a mobile signIn. The page itself does
+  # the work — decrypt Phantom's reply with the keypair the deep link stashed in
+  # localStorage, rebuild the signed message, and POST it to #verify — so this
+  # action only renders it. It must stay UNAUTHENTICATED: the whole point is
+  # that nobody is signed in yet.
+  def phantom_callback
+    render :phantom_callback
+  end
+
   def verify
     pubkey_b58 = verify_solana_signature!(
       message:       params[:message],
