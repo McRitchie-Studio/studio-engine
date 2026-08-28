@@ -188,18 +188,6 @@ class NavOffsetContractTest < Minitest::Test
   # Any element carrying data-pin="<name>" now publishes --pin-<name>-h and
   # --pin-<name>-bottom, so a consumer composes layers in pure CSS.
 
-  # === THE PINNED STACK ==================================================
-  #
-  # --nav-h and --nav-bottom answer for ONE element. Everything else that pins
-  # has been re-deriving the same geometry by hand: on mcritchie-studio's
-  # /deployments the app strip positions itself with `:style="{ top: offset +
-  # 'px' }"`, and the lane headers compute "site header height + strip height"
-  # in Alpine behind their OWN ResizeObserver on .vt-pinned-header — while
-  # --nav-bottom, which already answers the first half, goes unused there.
-  #
-  # Any element carrying data-pin="<name>" now publishes --pin-<name>-h and
-  # --pin-<name>-bottom, so a consumer composes layers in pure CSS.
-
   def test_head_publishes_geometry_for_every_data_pin_element
     html = render_head
 
@@ -291,6 +279,33 @@ class NavOffsetContractTest < Minitest::Test
 
     assert_match(/<header[^>]*\sdata-pin="nav"/, navbar,
                  "the engine navbar must carry data-pin=\"nav\", or no consumer gets --pin-nav-* for free")
+  end
+
+  # THE HOST-OWNED HEADER — the back-compat promise, asserted where it actually
+  # breaks.
+  #
+  # THIS IS THE HOLE THAT SHIPPED. The registry is built from [data-pin], and
+  # --nav-h / --nav-bottom are written from the legacy pin's reading — so a
+  # header that does not carry the attribute publishes NEITHER. Every test in
+  # this file passed anyway, because the ENGINE's own navbar carries data-pin;
+  # the broken path exists only in a consumer that owns its header, which is
+  # both live consumers (turf-monster layouts/_navbar, mcritchie-studio
+  # layouts/application). Review measured --nav-h unset, the gear drawer 82px
+  # out of place and the contest board 114px, on apps that would have taken it
+  # on their next bundle update with no floor bump.
+  def test_a_header_without_data_pin_still_publishes_the_legacy_properties
+    html = render_head
+    reg = html[/function registerPins\(\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    refute_empty reg, "could not isolate registerPins()"
+
+    # It must NOTICE that the header was absent from the scan...
+    assert_match(/headerPinned/, reg,
+                 "registerPins must track whether the header was among the data-pin nodes")
+    # ...and adopt it anyway, as the legacy pin.
+    assert_match(/if\s*\(\s*header\s*&&\s*!headerPinned\s*\)\s*\{[\s\S]{0,400}?legacy:\s*true/, reg,
+                 "a header that does not carry data-pin must still be adopted, or --nav-h never publishes")
+    assert_match(/if\s*\(\s*header\s*&&\s*!headerPinned\s*\)\s*\{[\s\S]{0,400}?observe\(\s*header\s*\)/, reg,
+                 "and must be observed, or it publishes once and never tracks the collapse")
   end
 
   private

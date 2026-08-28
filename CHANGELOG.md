@@ -38,6 +38,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   and drops out, so nothing has to say which layer sits above which, and
   reordering a partial cannot break the arithmetic.
 
+  **A host-owned header still publishes the legacy pair.** The registry is built
+  from `[data-pin]`, so a header that does not carry the attribute would never be
+  measured and `--nav-h` / `--nav-bottom` would never publish — and **both live
+  consumers own their header** (`turf-monster` `layouts/_navbar`,
+  `mcritchie-studio` `layouts/application`), neither carrying `data-pin`. Review
+  measured the gear drawer **82px** out of place and the contest board **114px**,
+  with neither tracking the collapse; both apps pin a two-segment `~>` under 1.0,
+  so it would have landed on their next bundle update with no floor bump. The
+  header is adopted as the legacy pin whether or not it asks to be.
+
   **A departed layer has its properties removed.** `display:none` and `x-show`
   keep the node, so it measures 0 and drops out of a consumer's `max()` on its
   own; a REMOVED node cannot be measured by anything, and its last value would

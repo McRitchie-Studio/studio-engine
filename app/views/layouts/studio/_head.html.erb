@@ -266,6 +266,7 @@
       pins = [];
       var seen = {};
       var header = document.querySelector('header');
+      var headerPinned = false;
       var nodes = document.querySelectorAll('[data-pin]');
       for (var i = 0; i < nodes.length; i++) {
         var name = nodes[i].getAttribute('data-pin');
@@ -273,6 +274,7 @@
         // silent nonsense one. Skip it rather than publish it.
         if (!name) continue;
         seen[name] = true;
+        if (nodes[i] === header) headerPinned = true;
         pins.push({
           el: nodes[i],
           name: name,
@@ -298,6 +300,39 @@
           document.documentElement.style.removeProperty('--pin-' + name2 + '-bottom');
         }
       }
+      // THE HOST-OWNED HEADER, and the back-compat promise that depends on it.
+      //
+      // The registry is built from [data-pin], so a header that does not carry
+      // the attribute is not in it — and --nav-h / --nav-bottom, which are
+      // written from the legacy pin's reading, would never publish at all.
+      // THIS ENGINE'S navbar carries data-pin, so every test here and the whole
+      // e2e lab publish fine; the broken path exists only in a consumer that
+      // owns its header, which is BOTH live consumers:
+      //
+      //   turf-monster      layouts/_navbar.html.erb      (data-navbar-root)
+      //   mcritchie-studio  layouts/application.html.erb  (inline)
+      //
+      // Review measured it against turf's real header and its real sidebar
+      // declaration: --nav-h and --nav-bottom unset, the gear drawer 82px out
+      // of place, the contest board 114px, and neither tracking the collapse.
+      // Both apps pin a two-segment ~> under 1.0, so it would have landed on
+      // their next bundle update with no floor bump to warn anyone.
+      //
+      // So the header is adopted as a pin even when it does not ask to be. It
+      // still publishes --pin-nav-* under that name, which is what an app gets
+      // for free the moment it wants the general contract.
+      if (header && !headerPinned) {
+        pins.push({
+          el: header,
+          name: 'nav',
+          legacy: true,
+          lastH: null,
+          lastBottom: null
+        });
+        seen.nav = true;
+        ensureObserver().observe(header);
+      }
+
       published = seen;
       publishAll();
     }

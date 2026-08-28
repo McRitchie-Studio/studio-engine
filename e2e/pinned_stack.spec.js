@@ -90,3 +90,57 @@ test("a consumer positions off the pinned stack with max(), and a hidden layer d
 
   expect(errors).toEqual([]);
 });
+
+// THE HOST-OWNED HEADER, IN A BROWSER — the regression that shipped.
+//
+// A consumer that owns its header does not carry data-pin on it, and both live
+// consumers are exactly that (turf-monster layouts/_navbar, mcritchie-studio
+// layouts/application). Built from [data-pin] alone, such a header is never
+// measured, so --nav-h and --nav-bottom never publish — and studio/_sidebar_panel
+// positions off --nav-bottom while turf's contest board takes its
+// scroll-margin-top from --nav-h. Review measured the drawer 82px out of place
+// and the board 114px, with neither tracking the collapse any more.
+//
+// The engine's own navbar DOES carry data-pin, which is why every unit test and
+// this lab published fine over the broken build. So this strips the attribute to
+// stand in for a host-owned header, and asserts the legacy pair survives it.
+test("a header with no data-pin still publishes --nav-h and --nav-bottom", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/lab/bar_stack");
+  await expectStickyChromeIsLive(page, expect);
+
+  const result = await page.evaluate(async () => {
+    const g = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+    const header = document.querySelector("header");
+
+    // Stand in for a consumer that owns its header: no data-pin anywhere.
+    header.removeAttribute("data-pin");
+    document.documentElement.style.removeProperty("--nav-h");
+    document.documentElement.style.removeProperty("--nav-bottom");
+    document.dispatchEvent(new CustomEvent("turbo:before-stream-render"));
+    await new Promise((r) => setTimeout(r, 250));
+    const atRest = { navH: g("--nav-h"), navBottom: g("--nav-bottom") };
+
+    // AND IT MUST KEEP TRACKING. Publishing once and going quiet would satisfy
+    // a value check while the drawer drifted through every collapse.
+    for (let i = 0; i < 20; i++) {
+      window.scrollBy(0, 8);
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    await new Promise((r) => setTimeout(r, 250));
+    const collapsed = { navH: g("--nav-h"), navBottom: g("--nav-bottom") };
+    return { atRest, collapsed };
+  });
+
+  expect(result.atRest.navH, "--nav-h must publish for a header that carries no data-pin").not.toBe("");
+  expect(result.atRest.navBottom, "--nav-bottom must publish for a header that carries no data-pin").not.toBe("");
+  expect(
+    result.collapsed.navH,
+    `--nav-h must follow the collapse (${result.atRest.navH} -> ${result.collapsed.navH})`
+  ).not.toBe(result.atRest.navH);
+
+  expect(errors).toEqual([]);
+});
