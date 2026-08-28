@@ -32,6 +32,46 @@ test.describe("phantom deep link", () => {
     expect(errors).toEqual([]);
   });
 
+  test("CALLING it reaches the Phantom universal link", async ({ page }) => {
+    // THE TEST THAT WOULD HAVE CAUGHT BOTH SHIPPED BLOCKERS, and the reason the
+    // previous version did not: it asserted `typeof startPhantomDeepLink` and
+    // never INVOKED it. A free variable resolves at CALL time, so an encoder
+    // referencing an undefined constant parses perfectly and defines the entry
+    // point — 11 view tests and a `typeof` check all green on a deep link that
+    // throws the moment a user taps Connect. Parse-time mutations cannot reach
+    // this class either. Only calling it can.
+    const errors = watchPageErrors(page);
+    await blockOffsiteRequests(page);
+
+    // nacl is the one dependency the lane cannot load (blockOffsiteRequests
+    // empties the CDN), so stub the two members the flow touches. Everything
+    // else — the base58 encoder, the SIWS assembly, the localStorage handoff —
+    // is the real shipped program.
+    await page.addInitScript(() => {
+      window.nacl = { box: { keyPair: () => ({ publicKey: new Uint8Array(32).fill(7), secretKey: new Uint8Array(64).fill(9) }) } };
+    });
+    await page.route("**/auth/solana/nonce", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ nonce: "abc123" }) }));
+
+    await page.goto("/lab/phantom_deeplink?deeplink=1");
+
+    // Capture the NAVIGATION rather than stubbing window.location — Chromium
+    // refuses to redefine location.href, and watching the request is closer to
+    // what actually happens anyway.
+    const navigation = page.waitForRequest(
+      (r) => r.url().startsWith("https://phantom.app/ul/v1/signIn"),
+      { timeout: 15000 },
+    );
+    await page.evaluate(() => window.startPhantomDeepLink(false, null));
+    const target = (await navigation).url();
+
+    expect(target).toContain("https://phantom.app/ul/v1/signIn");
+    // base58 of the stubbed 32-byte key — proves the INLINED encoder ran and
+    // produced output, which is exactly what the missing constant prevented.
+    expect(target).toMatch(/dapp_encryption_public_key=[1-9A-HJ-NP-Za-km-z]{20,}/);
+    expect(errors).toEqual([]);
+  });
+
   test("a page without the partial defines nothing", async ({ page }) => {
     await blockOffsiteRequests(page);
     await page.goto("/lab/phantom_deeplink");

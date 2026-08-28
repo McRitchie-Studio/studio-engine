@@ -92,8 +92,45 @@ class PhantomDeeplinkTest < ActiveSupport::TestCase
   def test_the_assets_partial_does_not_clobber_an_existing_nacl
     # turf-monster already loads tweetnacl from its own layout. Loading a second
     # copy there would be a silent duplicate; the guard is what makes this
-    # partial safe to render in both apps.
-    assert_includes render_assets, "typeof window.nacl === 'undefined'"
+    # partial safe to render in both apps. Asserted as the PROPERTY (it returns
+    # early when nacl is present, and it de-duplicates its own tag) rather than
+    # as a literal expression — the first version of this test pinned the exact
+    # string and failed when the guard was rewritten to fix an unrelated bug.
+    html = render_assets
+
+    assert_match(/typeof window\.nacl !== 'undefined'\)\s*return/, html)
+    assert_includes html, "data-studio-nacl"
+  end
+
+  def test_the_assets_partial_does_not_use_document_write
+    # document.write under a turbo Drive visit runs at readyState 'complete',
+    # which implicitly calls document.open() and BLANKS THE PAGE — on exactly
+    # the consumer this partial exists for.
+    # CODE ONLY. The partial's own comment explains why document.write is wrong,
+    # so it contains the string — a whole-file assertion fails on the very
+    # documentation that keeps the fix from being undone. Strip comments first.
+    refute_includes code_of(render_assets), "document.write"
+  end
+
+  def test_the_tweetnacl_pin_carries_a_well_formed_sri
+    # WHAT THIS CAN AND CANNOT CATCH, stated plainly because I got it wrong.
+    # The first version of this partial carried a HAND-WRITTEN integrity hash
+    # that matched nothing. The browser refuses such a script, window.nacl stays
+    # undefined, and every mobile sign-in fails before any other code runs — and
+    # no test here saw it, because the lane blocks offsite requests so the SRI is
+    # never exercised.
+    #
+    # This asserts only the SHAPE (sha384, 64 base64 chars). A wrong-but-well-
+    # formed hash still passes. THE ONLY REAL PROTECTION IS DERIVING IT:
+    #
+    #   curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A
+    #
+    # Never hand-write one, and never copy the first sha384 you find in a
+    # neighbouring layout — that file pins several scripts.
+    sri = render_assets[/integrity\s*=\s*'([^']+)'/, 1]
+
+    assert sri, "the tweetnacl tag must carry an integrity attribute"
+    assert_match(%r{\Asha384-[A-Za-z0-9+/]{64}\z}, sri, "not a well-formed sha384 SRI: #{sri}")
   end
 
   # --- the debug sink, which leaks a signing key -------------------------
@@ -126,6 +163,13 @@ class PhantomDeeplinkTest < ActiveSupport::TestCase
   end
 
   private
+
+  # JS with its // and /* */ comments removed. Comments EXPLAIN the hazards
+  # using the very tokens being banned, so scanning them makes documenting a
+  # fix impossible — the same reasoning as mcritchie-studio's markup_of.
+  def code_of(html)
+    html.gsub(%r{/\*.*?\*/}m, " ").gsub(%r{//[^\n]*}, " ")
+  end
 
   def view
     ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])

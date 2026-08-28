@@ -54,6 +54,17 @@
     // The callback view already carries its own codec for the same reason; this
     // matches it, so the partial has exactly one dependency (nacl) and it is a
     // guarded one.
+    // THE CONSTANT THE ENCODER READS. It was left behind when the function body
+    // was inlined: base58.js declares it at module scope, so it is unreachable
+    // from a classic script, and encodeBase58 referenced a free variable that
+    // resolved to nothing AT CALL TIME. Every mobile sign-in threw
+    // "B58_ALPHABET is not defined" on the first keypair encode.
+    //
+    // Invisible to eleven passing view tests and to a browser spec that checked
+    // `typeof startPhantomDeepLink` without ever CALLING it. A parse-time
+    // mutation cannot reach this class either — the program parses fine.
+    const B58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
     function encodeBase58(bytes) {
       const digits = [0];
       for (let i = 0; i < bytes.length; i++) {
@@ -76,7 +87,18 @@
     // Flow: generate keypair → fetch nonce → build SIWS input → redirect to Phantom signIn
 
     function startPhantomDeepLink(linkMode, currentUserId) {
-      var cluster = document.body.dataset.solanaCluster || 'devnet';
+      // The consumer declares its cluster on <body data-solana-cluster="...">.
+  // turf-monster does; an app that does NOT silently signs against devnet while
+  // its wallet is on mainnet, which reads to the user as a rejected signature
+  // and to the log as nothing. Warn loudly rather than guess quietly — the
+  // default stays devnet so behaviour is unchanged for anyone already relying
+  // on it.
+  var cluster = document.body.dataset.solanaCluster;
+  if (!cluster) {
+    console.warn('[StudioSolana] no data-solana-cluster on <body>; defaulting to devnet. ' +
+                 'Set it on the body tag to sign against the cluster you mean.');
+    cluster = 'devnet';
+  }
       var callbackUrl = window.location.origin + '/auth/phantom/callback';
 
       // Generate x25519 keypair for decrypting Phantom's response

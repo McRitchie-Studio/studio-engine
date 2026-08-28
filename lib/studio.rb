@@ -64,6 +64,11 @@ module Studio
   # changed. Safe to vary because the server does NOT verify this text — see
   # Solana::SessionAuth#verify_solana_signature!, which checks the nonce, the
   # host, and the OPSEC-005 User-ID binding, and nothing else about the message.
+  # UNVERIFIED IS NOT UNCONSTRAINED. Solana::AuthVerifier reads the nonce with a
+  # FIRST-MATCH /Nonce: (\w+)/ and the statement is interpolated ABOVE the real
+  # nonce line, so a statement containing "Nonce: something" would be read as the
+  # nonce and fail every verify. Not an attack surface (this is app config, never
+  # user input) but a real constraint on what may be put here.
   # Both the deep-link partial and the callback view read THIS, so they cannot
   # drift; the callback rebuilds the signed message to post for verification, so
   # a drift between them would fail every mobile sign-in.
