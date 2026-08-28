@@ -17,6 +17,15 @@ require "minitest/autorun"
 class NavbarAdoptionDocsTest < Minitest::Test
   ENGINE_CSS = "app/assets/tailwind/studio_engine/engine.css"
   NAVBAR     = "app/views/layouts/_navbar.html.erb"
+  HEAD_ERB   = "app/views/layouts/studio/_head.html.erb"
+
+  # ONLY THE DOCUMENTATION COUNTS. `nav-logo-link` is also a real class on
+  # _navbar's own markup, so asserting it against the whole FILE passes even when
+  # the doc comment drops it — shown by mutation, not by reading: deleting the
+  # hook from the prose left this suite green. Assert against the comment blocks.
+  def docs_in(path)
+    File.read(path).scan(%r{/\*.*?\*/}m).join("\n")
+  end
 
   def test_the_opt_in_sentence_is_not_severed
     # The splice symptom, pinned literally: this sentence must remain contiguous.
@@ -24,6 +33,12 @@ class NavbarAdoptionDocsTest < Minitest::Test
     # every other check in this repo.
     assert_includes File.read(ENGINE_CSS),
                     "override only the endpoints that differ\n   from the defaults below."
+
+    # BOTH splice sites, not one. The same edit severed _head's sentence too,
+    # and pinning only engine.css left that half free to regress — shown by
+    # mutation: re-severing this sentence failed nothing in the whole repo.
+    assert_includes File.read(HEAD_ERB),
+                    "on the header,\n  // give each breakpoint band a `--nav-ramp`,"
   end
 
   def test_every_site_stating_the_opt_in_also_states_the_real_cost
@@ -31,7 +46,7 @@ class NavbarAdoptionDocsTest < Minitest::Test
     # it is the file a forking app actually opens. A site that promises the
     # opt-in without the caveat is how an adoption ships half-done.
     [ENGINE_CSS, NAVBAR].each do |path|
-      body = File.read(path)
+      body = docs_in(path)
       next unless body.include?("navCollapse()")
 
       assert_match(/OPT.?IN|opt IN/i, body,
@@ -45,7 +60,7 @@ class NavbarAdoptionDocsTest < Minitest::Test
     # The one that matters most and was missed twice: the h1's size swap is
     # DISCRETE, which is the exact reverse lurch the primitive exists to delete.
     # A fork that keeps it reproduces the bug it is adopting to fix.
-    assert_match(/DISCRETE/, File.read(ENGINE_CSS))
-    assert_match(/DISCRETE/, File.read(NAVBAR))
+    assert_match(/DISCRETE/, docs_in(ENGINE_CSS))
+    assert_match(/DISCRETE/, docs_in(NAVBAR))
   end
 end
