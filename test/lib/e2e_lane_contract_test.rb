@@ -245,6 +245,10 @@ class E2eLaneContractTest < Minitest::Test
 
     {
       "bar_stack.html.erb" => ["studio/banners/stack", "layouts/navbar"],
+      "toast_over_banner.html.erb" => [
+        "studio/banners/stack", "layouts/navbar", "layouts/studio/flash",
+        "studio/modals/host"
+      ],
       "at_time.html.erb" => ["studio/at_time_script"],
       # THE SAVE CONTROLS ARE NO LONGER NAMED ON THE READ PAGE, and the reason is
       # the change itself: they used to be a bar fixed across the bottom of the

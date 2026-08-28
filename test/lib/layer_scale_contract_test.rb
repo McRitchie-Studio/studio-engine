@@ -32,7 +32,7 @@ class LayerScaleContractTest < ActiveSupport::TestCase
   ORDER = %w[
     --z-behind --z-base --z-content --z-raised --z-sticky --z-panel --z-dropdown
     --z-docked --z-nav --z-drawer --z-modal --z-lightbox --z-alert
-    --z-toast-blur --z-toast --z-banner --z-tooltip
+    --z-banner --z-toast-blur --z-toast --z-tooltip
   ].freeze
 
   ENGINE_CSS = File.join(ROOT, "app/assets/tailwind/studio_engine/engine.css")
@@ -98,6 +98,43 @@ class LayerScaleContractTest < ActiveSupport::TestCase
     end
     assert tokens.fetch("--z-tooltip") > tokens.fetch("--z-banner"),
            "a banner tooltip must clear the banner it hangs off"
+  end
+
+  # THE THIRD DEFECT, AND THE ONE THE TEST ABOVE COULD NOT SEE.
+  #
+  # "Above the modal" was the whole question the first time, so that is all the
+  # assertion above asks — and it stayed GREEN for the entire time the toast was
+  # unusable, because --z-toast > --z-modal was true the whole way through. Both
+  # tiers clearing the modal says nothing about which of THEM wins, and they land
+  # on the same pixels: #toast-container is fixed at top 0 with 1rem of padding
+  # (layouts/studio/_flash), and `body.modal-open` lifts the bar stack to sticky
+  # top 0 at --z-banner, so on a 1440x900 viewport the bars own y0-47 and the
+  # toast card starts at y16 — with its Dismiss button in the overlap.
+  #
+  # MEASURED on mcritchie-studio, dark and light, 1440x900 and 390x844, scrollY 0
+  # and 900: with a modal open, elementFromPoint at the Dismiss button returned
+  # the BANNER div and a real click left the toast count at 1; with no modal it
+  # returned the button's SVG and the count dropped to 0. A toast carrying
+  # buttons gets `duration: 0`, so that button is its ONLY exit — the toast was
+  # stuck on the page permanently.
+  #
+  # The order is the fix and it is a semantic one: a toast is transient and
+  # demands interaction, a banner is persistent chrome. e2e/toast_over_banner
+  # asserts the same property where the defect actually lives — on a real click.
+  test "a toast outranks the environment banner it shares the corner with" do
+    %w[--z-toast --z-toast-blur].each do |above|
+      assert tokens.fetch(above) > tokens.fetch("--z-banner"),
+             "#{above} (#{tokens.fetch(above)}) must sit above --z-banner " \
+             "(#{tokens.fetch("--z-banner")}). With a modal open the bar stack is " \
+             "lifted to --z-banner at top 0, over the same pixels the toast's " \
+             "Dismiss button occupies — and a toast with buttons never auto-" \
+             "dismisses, so covering that button strands the toast forever."
+    end
+
+    assert_equal 1, tokens.fetch("--z-toast") - tokens.fetch("--z-toast-blur"),
+                 "the frosted halo must sit DIRECTLY under its own toast. Any tier " \
+                 "that fits between them paints inside the toast's own visual unit " \
+                 "— the banner did exactly that in the first draft of this fix."
   end
 
   # THE LIFT DEPENDS ON A WORKING SCROLL LOCK, and this gem's was inert wherever
