@@ -4,6 +4,69 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`data-pin` — the pinned stack publishes itself.** `--nav-h` / `--nav-bottom`
+  answer for one element. Everything else that pins has been re-deriving the
+  same geometry by hand: on `mcritchie-studio`'s `/deployments` the app strip
+  positions itself with `:style="{ top: offset + 'px' }"`, and the lane headers
+  compute *"site header height + strip height"* in Alpine behind **their own**
+  `ResizeObserver` on `.vt-pinned-header` — while `--nav-bottom`, which already
+  answers the first half, goes unused there. Same shape as the four copies of
+  the navbar collapse, one layer up.
+
+  Any element carrying `data-pin="<name>"` now publishes `--pin-<name>-h` and
+  `--pin-<name>-bottom`, from **one shared `ResizeObserver`**, through the same
+  rAF coalescer and the same no-op-write skip the header already uses — and one
+  measurement pass for the whole frame, every read taken before any write.
+
+  That last part was wrong in the first cut of this change and review caught it:
+  the frame published the header (writing two inherited properties on
+  `documentElement`) and *then* read the pins, so the reads-before-writes order
+  held inside each function and broke across them. Measured at 6× CPU throttle
+  over 175 frames, pin loop on vs off: frames past 20ms **62 vs 42**, p90 **34.2
+  vs 26.0ms**; at 10×, **84/180 vs 4/180**. The header is now a pin like any
+  other — measured once, writing `--nav-h` / `--nav-bottom` from that same
+  reading rather than a second one. A consumer composes layers in pure
+  CSS:
+
+  ```css
+  top: max(var(--pin-nav-bottom, 0px), var(--pin-apps-bottom, 0px));
+  ```
+
+  **`max()` rather than a declared stacking order.** A hidden layer measures 0
+  and drops out, so nothing has to say which layer sits above which, and
+  reordering a partial cannot break the arithmetic.
+
+  **A host-owned header still publishes the legacy pair.** The registry is built
+  from `[data-pin]`, so a header that does not carry the attribute would never be
+  measured and `--nav-h` / `--nav-bottom` would never publish — and **both live
+  consumers own their header** (`turf-monster` `layouts/_navbar`,
+  `mcritchie-studio` `layouts/application`), neither carrying `data-pin`. Review
+  measured the gear drawer **82px** out of place and the contest board **114px**,
+  with neither tracking the collapse; both apps pin a two-segment `~>` under 1.0,
+  so it would have landed on their next bundle update with no floor bump. The
+  header is adopted as the legacy pin whether or not it asks to be.
+
+  **A departed layer has its properties removed.** `display:none` and `x-show`
+  keep the node, so it measures 0 and drops out of a consumer's `max()` on its
+  own; a REMOVED node cannot be measured by anything, and its last value would
+  stand forever — review measured a removed 300px strip holding the property at
+  300px against a real stack bottom of 160px. The registry remembers what it
+  published and clears whatever is no longer in the document.
+
+  The registry is **rebuilt from the document**, on attach and after
+  `turbo:before-stream-render` — a Turbo Stream replaces nodes without a
+  `turbo:load`, which is precisely the stale-node bug the board documents
+  against its own version.
+
+  `layouts/_navbar` carries `data-pin="nav"`, so every consuming app gets
+  `--pin-nav-bottom` for free. **`--nav-h` and `--nav-bottom` keep publishing
+  unchanged** — `studio/_sidebar_panel` and turf-monster's `scroll-margin-top`
+  read them, and `nav_offset_contract_test` still pins both to their exact
+  sources. This is additive.
+
+
 ### Changed
 
 - **The navbar collapse primitive is broadcastable, rate-limited, and cheap per

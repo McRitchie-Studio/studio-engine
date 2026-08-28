@@ -301,14 +301,19 @@ class NavCollapseContractTest < Minitest::Test
     # vs 8ms — and ablating this observer alone took it to 0/24 and median 13ms.
     assert_match(/new ResizeObserver\(\s*schedule\s*\)/, html,
                  "the ResizeObserver must go through schedule(), the rAF coalescer the other listeners use")
-    refute_match(/new ResizeObserver\(\s*function\s*\([^)]*\)\s*\{\s*publish\(/, html,
+    refute_match(/new ResizeObserver\(\s*function\s*\([^)]*\)\s*\{\s*publish/, html,
                  "publishing straight from the observer bypasses the coalescer once per resize")
 
     # And a republish carrying the same number must cost nothing: these are
     # INHERITED custom properties on documentElement, so every write invalidates
     # style for the whole document.
-    assert_match(/if\s*\(\s*h\s*!==\s*lastH\s*\)/, html, "--nav-h must skip the unchanged write")
-    assert_match(/if\s*\(\s*bottom\s*!==\s*lastBottom\s*\)/, html, "--nav-bottom must skip the unchanged write")
+    # The header is a pin now, so its skip lives on the pin's own last values —
+    # one measurement per element per frame, written from that reading. The
+    # full sourcing contract is in nav_offset_contract_test; this file only
+    # cares that the unchanged write is still skipped, because that is the part
+    # the collapse's per-frame cost depends on.
+    assert_match(/if\s*\(\s*r\.h\s*!==\s*pin\.lastH\s*\)/, html, "an unchanged height must skip its write")
+    assert_match(/if\s*\(\s*r\.bottom\s*!==\s*pin\.lastBottom\s*\)/, html, "an unchanged bottom must skip its write")
   end
 
   private
