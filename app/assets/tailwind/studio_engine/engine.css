@@ -395,6 +395,28 @@ body.modal-open .studio-app-banner {
    x-data="navCollapse()" on it, and override only the endpoints that differ
    from the defaults below.
 
+   ADOPTING IT IN A FORK COSTS MORE THAN THE OPT-IN, corrected 2026-08-28 after
+   checking against a real forked header. Two attributes is what it takes to opt
+   IN; it is not the job. mcritchie-studio's inlined header needs, at minimum:
+
+     REMOVE the bindings that fight the primitive —
+       :class="scrolled ? 'py-2' : 'py-6'"        on the row
+       x-bind:class="scrolled ? 'w-5 h-5' : …"    on the logo
+       x-bind:class="scrolled ? 'text-base' : …"  on the h1, which is a DISCRETE
+         swap and therefore the exact 1px reverse lurch this primitive exists to
+         remove — a fork that keeps it reproduces the bug it is adopting to fix
+       transition-all duration-300                in three places
+     ADD the hooks the band table actually keys on —
+       nav-row, nav-logo, nav-title, nav-logo-link
+       (nav-logo-link is MOBILE-ONLY: omit it and a desktop check still passes,
+        which is how an adoption ships half-done)
+     WRAP the h1's bare text node in a span so there is an element to size.
+
+   That is roughly fourteen edits across five elements. The SIZING LAYER does
+   reach every app — that is the win this block delivers and it is unaffected.
+   Only the cost sentence was wrong, and an understated cost is how an adoption
+   gets started and abandoned half-done.
+
    LAYERED ON PURPOSE. These are DEFAULTS, so a consuming app has to be able to
    beat them, and unlayered CSS beats every layered rule regardless of
    specificity — shipping them bare would make the engine's numbers
