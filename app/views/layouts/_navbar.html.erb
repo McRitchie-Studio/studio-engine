@@ -46,7 +46,11 @@
     so it cannot move content under the reader.
     Preview keeps nav-shell (the calc()s have to resolve) but no x-data — the
     /navbar review page drives --nav-p from its own Scrolled toggle. %>
-<header <%= 'x-data="navCollapse()"'.html_safe unless is_preview %>
+<%# data-pin names this header as a layer of the pinned stack, so
+    layouts/studio/_head publishes --pin-nav-h and --pin-nav-bottom for it and
+    anything below can position off it in pure CSS. The legacy --nav-h /
+    --nav-bottom keep publishing unchanged; this is additive. %>
+<header data-pin="nav" <%= 'x-data="navCollapse()"'.html_safe unless is_preview %>
         <%# top-0, a STATIC value, and never a custom property. Any bars render as
             this header's sibling in normal flow (studio/banners/_stack), so they
             already occupy their own height above it and there is nothing to
