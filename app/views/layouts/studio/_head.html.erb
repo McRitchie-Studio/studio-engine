@@ -541,9 +541,10 @@
           // KEEP FRAMES COMING WHILE CATCHING UP. Nothing else will schedule
           // one: the finger is off, so no more scroll events arrive, and
           // without this the collapse freezes wherever the clamp left it. It
-          // converges LINEARLY and lands exactly — about 4 frames (~67ms) from
-          // a hard flick — rather than crawling asymptotically the way the
-          // 300ms ease this replaced did.
+          // converges LINEARLY and lands exactly — about 8 frames (~133ms) at
+          // the mobile --nav-ramp of 120, and about 10 (~167ms) at the default
+          // 144, from a hard flick — rather than crawling asymptotically the
+          // way the 300ms ease this replaced did.
           if (!snap && p !== target) {
             queued = true;
             requestAnimationFrame(apply);
