@@ -74,8 +74,17 @@
        rendering THIS partial got it. Three of six apps fork the navbar, so each
        was left to hand-write its own — the way four independent copies happened
        in the first place. It ships from engine.css now (every consuming app
-       imports it), so a forking app adopts the collapse with `nav-shell` +
-       x-data="navCollapse()" and overrides only the endpoints that differ. */
+       imports it), so a forking app OPTS IN with `nav-shell` +
+       x-data="navCollapse()" and overrides only the endpoints that differ.
+
+       THE OPT-IN IS NOT THE WHOLE JOB — this is the partial a forker actually
+       reads, so the caveat belongs here too rather than only beside the band
+       table. A hand-written header must also REMOVE the bindings that fight the
+       primitive (a :class size swap on the row, x-bind:class on the logo AND on
+       the title, transition-all alongside) and ADD the hooks the table keys on
+       (nav-row, nav-logo, nav-title, and the mobile-only nav-logo-link). The
+       title swap matters most: it is DISCRETE, which is the 1px reverse lurch
+       the primitive exists to delete. Full accounting in engine.css. */
   </style>
   <div class="nav-row flex items-center">
     <%# Left side: logo + nav %>

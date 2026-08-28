@@ -403,11 +403,7 @@
   // lurch in the frame the class flipped, where a discrete text-3xl -> text-xl
   // swap collided with the stylesheet's own `transition: font-size`.
   //
-  // ADOPTING IT: put `nav-shell` and `x-data="navCollapse()"` on the header —
-  // that is the OPT-IN, not the whole job. A fork that sizes itself with its own
-  // Alpine bindings (:class on the row, x-bind:class on the logo, transition-all
-  // alongside) must remove them too, or they fight the primitive. See the fuller
-  // accounting in engine.css beside the band table.
+  // ADOPTING IT: put `nav-shell` and `x-data="navCollapse()"` on the header,
   // give each breakpoint band a `--nav-ramp`, and write the collapsing
   // dimensions as calc()s off --nav-p. This file ships NO sizing opinion, so an
   // app whose navbar collapses to different endpoints than the engine's adopts
