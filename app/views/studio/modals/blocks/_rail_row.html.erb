@@ -9,6 +9,22 @@
   why that is a named local rather than a class passthrough — a passthrough would
   have let the eleventh copy drift on day one, which is how ten happened.
 
+  THE /admin/style SPECIMENS SHOW STRUCTURE, NOT CONTENT. If you are adopting
+  this primitive to replace existing markup, take every VALUE — icon_label,
+  icon_bg, title, subtitle, badge, data hooks — from the markup you are
+  REPLACING, and use the specimen only to learn which locals exist and how
+  they compose. A specimen is a demo: the engine is entitled to pick any
+  plausible value for it, and those values are not your app's.
+
+  The incident that earned this paragraph: an adopter built a new callsite from
+  style/modals/_ds_wallet_topup and carried its icon across. The specimen passes
+  U+1F39F ADMISSION TICKETS; the markup being replaced had always drawn U+1F3AB
+  TICKET. A different glyph in a different colour landed on the primary rail of
+  the web2 kill-switch face of Top Up Wallet — the single call to action shown to
+  the audience that cannot pay with USDC. Nothing raised, CI was 6/6 green, and
+  no assertion anywhere pinned the glyph. It was caught only by rendering the
+  modal before and after and diffing the markup.
+
   THE EMPHASIS IS A RANKING, not decoration. A hub full of equally-weighted rails
   asks the person to compare payment processors, which is not a question they can
   answer. Exactly one rail should be :primary — the one the app wants taken —

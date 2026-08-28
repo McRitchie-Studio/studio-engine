@@ -586,10 +586,10 @@
 # under parallel work will keep doing this; the discipline is what makes it survivable.
 #
 # Re-derived on THIS merged tree, three ways:
-#   npx playwright test --list                                             -> 109 tests, 15 files
+#   npx playwright test --list                                             -> 113 tests, 16 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
-#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 109
-total_specs: 110
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 113
+total_specs: 113
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -607,10 +607,15 @@ total_specs: 110
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 107
 # executed = total - devnet - allowed_skips = 107 - 0 - 0 = 107, so executed ==
 # total_specs and test/lib/e2e_lane_contract_test.rb's equality assertion holds.
-# Re-derived on THIS merged tree alongside total_specs above:
-# executed = total - devnet - allowed_skips = 109 - 0 - 0 = 109, so executed ==
+# Re-derived on THIS tree alongside total_specs above, with the lister and not by
+# arithmetic — e2e/phantom_deeplink.spec.js added TWO tests in ONE file, and the
+# contract counts TESTS:
+# executed = total - devnet - allowed_skips = 113 - 0 - 0 = 113, so executed ==
 # total_specs and test/lib/e2e_lane_contract_test.rb's equality assertion holds.
-executed: 110
+# Moved 112 -> 113 for the third phantom_deeplink test, the one that CALLS the
+# deep link rather than checking it is defined — the coverage two shipped
+# blockers slipped through.
+executed: 113
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

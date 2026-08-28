@@ -1,0 +1,33 @@
+<%# Lab page for the Phantom mobile deep link and the picker gate that depends
+    on it.
+
+    TWO STATES ON ONE PAGE, chosen by ?deeplink=1, because the property under
+    test is a DIFFERENCE: the engine's wallet picker must collapse its mobile
+    Phantom rows only when startPhantomDeepLink actually exists. A page that
+    could only render one state could not observe that at all.
+
+    Nothing here reimplements either side. The deep link's browser program lives
+    in studio/solana/_phantom_deeplink and the gate lives in the picker's
+    x-data; a lab page that hand-rolled either would grade itself.
+
+    tweetnacl is deliberately NOT loaded: blockOffsiteRequests empties the CDN in
+    this lane, and none of the assertions need it. Defining the function does not
+    require nacl — only calling it does — and the assertions here are about the
+    script having parsed and the gate having flipped. %>
+<% render_deeplink = params[:deeplink] == "1" %>
+
+<div data-test="deeplink-state" data-deeplink="<%= render_deeplink %>"></div>
+
+<% if render_deeplink %>
+  <%= render "studio/solana/phantom_deeplink" %>
+<% end %>
+
+<%# The picker, mounted on its own page-scoped store so it needs no app host. %>
+<%= render "studio/modals/scoped_host", store: "labModals" do %>
+  <template x-if="$store.labModals.current()?.id === 'wallet-connect'">
+    <%= render "studio/modals/wallet_connect", store: "labModals" %>
+  </template>
+<% end %>
+
+<button type="button" data-test="open-picker"
+        x-data @click="$store.labModals.open('wallet-connect', {})">Open picker</button>
