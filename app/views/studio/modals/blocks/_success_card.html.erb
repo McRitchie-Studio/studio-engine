@@ -236,10 +236,15 @@
              :style="{ animation: 'studio-modal-drain ' + _total + 's linear forwards' }"></div>
         <span class="relative z-10"><%= cta_label %></span>
       </button>
+    <%# btn-lg, matching the drain branches above and every sibling in this family
+        (_onchain_success, _cta_redirect). Without it these two rendered 40px
+        while the drain branch rendered 48 — the same card, two heights, decided
+        by whether an auto-redirect happened to be configured. 40px is also under
+        the 44px mobile touch-target guideline. %>
     <% elsif local_assigns[:cta_href_key] %>
-      <a :href="<%= cta_href_key %>" class="btn btn-primary w-full"><%= cta_label %></a>
+      <a :href="<%= cta_href_key %>" class="btn btn-primary btn-lg w-full"><%= cta_label %></a>
     <% elsif local_assigns[:cta_event] %>
-      <button @click="$dispatch('<%= cta_event %>')" class="btn btn-primary w-full"><%= cta_label %></button>
+      <button @click="$dispatch('<%= cta_event %>')" class="btn btn-primary btn-lg w-full"><%= cta_label %></button>
     <% end %>
   <% end %>
 

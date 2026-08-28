@@ -66,11 +66,15 @@ class SuccessCardDrainCtaTest < ActiveSupport::TestCase
     assert_includes html, "origin-left"
   end
 
-  def test_the_non_drain_branches_are_untouched
-    # Scope guard: this change is about the DRAIN branches only.
+  def test_the_non_drain_branches_also_carry_btn_lg
+    # UPDATED from a scope guard that asserted "btn btn-primary w-full". That
+    # guard was right when the drain branches were the only ones being resized —
+    # it stopped that change leaking. It became WRONG the moment the non-drain
+    # branches were sized too, and an un-updated scope guard is how a follow-up
+    # gets reverted by its own test suite. The family is now one height.
     html = render_card(cta_href_key: "props.lobbyUrl", cta_drain: false)
 
-    assert_includes html, "btn btn-primary w-full"
+    assert_includes html, "btn btn-primary btn-lg w-full"
     refute_includes html, "studio-modal-drain"
   end
 
