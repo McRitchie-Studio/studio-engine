@@ -247,8 +247,14 @@
     // re-derives this three separate times: the app strip positions itself with
     // :style="{ top: offset + 'px' }", the lane headers compute laneTop as
     // "site header height + strip height" in Alpine behind their OWN
-    // ResizeObserver on .vt-pinned-header, and --nav-bottom already answers the
-    // first half and goes unused there. Same shape as the four copies of the
+    // ResizeObserver on the pinned header element, and --nav-bottom already
+    // answers the first half and goes unused there. (The header's
+    // view-transition class is deliberately NOT spelled here: this comment
+    // renders into the page, and mcritchie-studio's BarStackAdoptionTest counts
+    // that class name in the response body to catch a DUPLICATE pinned header —
+    // a duplicate view-transition-name silently disables every transition on the
+    // page. Naming it in prose reads as a second one.) Same shape as the four
+    // copies of the
     // navbar collapse, one layer up.
     var pins = [];
     function publishPin(pin) {
