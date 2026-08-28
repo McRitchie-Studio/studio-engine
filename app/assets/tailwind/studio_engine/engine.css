@@ -393,6 +393,20 @@ body.modal-open .studio-app-banner {
 
    So adopting the collapse in a hand-written header is: put `nav-shell` and
    x-data="navCollapse()" on it, and override only the endpoints that differ
+
+   WHAT "ADOPTING" ACTUALLY COSTS A FORK, corrected 2026-08-28 after checking
+   against a real one. Two attributes is what it takes to OPT IN; it is not
+   what it takes to finish. mcritchie-studio's inlined header sizes itself with
+   Alpine bindings that FIGHT the primitive rather than defer to it —
+   :class="scrolled ? 'py-2' : 'py-6'" on the row, x-bind:class on the logo,
+   transition-all duration-300 in three places, and an h1 whose bare text node
+   has no element to size. Each has to come out, and the h1 needs a span, so
+   the real adoption is closer to nine edits than two.
+
+   The SIZING LAYER genuinely does reach every app — that is the win this block
+   delivers and it is unaffected. Only the sentence describing the cost was
+   wrong, and an understated cost is how an adoption gets started and abandoned
+   half-done.
    from the defaults below.
 
    LAYERED ON PURPOSE. These are DEFAULTS, so a consuming app has to be able to

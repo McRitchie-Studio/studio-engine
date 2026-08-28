@@ -403,7 +403,11 @@
   // lurch in the frame the class flipped, where a discrete text-3xl -> text-xl
   // swap collided with the stylesheet's own `transition: font-size`.
   //
-  // ADOPTING IT: put `nav-shell` and `x-data="navCollapse()"` on the header,
+  // ADOPTING IT: put `nav-shell` and `x-data="navCollapse()"` on the header —
+  // that is the OPT-IN, not the whole job. A fork that sizes itself with its own
+  // Alpine bindings (:class on the row, x-bind:class on the logo, transition-all
+  // alongside) must remove them too, or they fight the primitive. See the fuller
+  // accounting in engine.css beside the band table.
   // give each breakpoint band a `--nav-ramp`, and write the collapsing
   // dimensions as calc()s off --nav-p. This file ships NO sizing opinion, so an
   // app whose navbar collapses to different endpoints than the engine's adopts
@@ -541,7 +545,8 @@
           // KEEP FRAMES COMING WHILE CATCHING UP. Nothing else will schedule
           // one: the finger is off, so no more scroll events arrive, and
           // without this the collapse freezes wherever the clamp left it. It
-          // converges LINEARLY and lands exactly — about 4 frames (~67ms) from
+          // converges LINEARLY and lands exactly — about 8 frames (~133ms) at
+          // the default --nav-ramp of 120, and about 10 (~167ms) at 144, from
           // a hard flick — rather than crawling asymptotically the way the
           // 300ms ease this replaced did.
           if (!snap && p !== target) {
