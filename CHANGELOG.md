@@ -4,6 +4,43 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`data-pin` — the pinned stack publishes itself.** `--nav-h` / `--nav-bottom`
+  answer for one element. Everything else that pins has been re-deriving the
+  same geometry by hand: on `mcritchie-studio`'s `/deployments` the app strip
+  positions itself with `:style="{ top: offset + 'px' }"`, and the lane headers
+  compute *"site header height + strip height"* in Alpine behind **their own**
+  `ResizeObserver` on `.vt-pinned-header` — while `--nav-bottom`, which already
+  answers the first half, goes unused there. Same shape as the four copies of
+  the navbar collapse, one layer up.
+
+  Any element carrying `data-pin="<name>"` now publishes `--pin-<name>-h` and
+  `--pin-<name>-bottom`, through the same rAF coalescer, the same
+  reads-before-writes order and the same no-op-write skip the header already
+  uses, from **one shared `ResizeObserver`**. A consumer composes layers in pure
+  CSS:
+
+  ```css
+  top: max(var(--pin-nav-bottom, 0px), var(--pin-apps-bottom, 0px));
+  ```
+
+  **`max()` rather than a declared stacking order.** A hidden layer measures 0
+  and drops out, so nothing has to say which layer sits above which, and
+  reordering a partial cannot break the arithmetic.
+
+  The registry is **rebuilt from the document**, on attach and after
+  `turbo:before-stream-render` — a Turbo Stream replaces nodes without a
+  `turbo:load`, which is precisely the stale-node bug the board documents
+  against its own version.
+
+  `layouts/_navbar` carries `data-pin="nav"`, so every consuming app gets
+  `--pin-nav-bottom` for free. **`--nav-h` and `--nav-bottom` keep publishing
+  unchanged** — `studio/_sidebar_panel` and turf-monster's `scroll-margin-top`
+  read them, and `nav_offset_contract_test` still pins both to their exact
+  sources. This is additive.
+
+
 ### Changed
 
 - **The navbar collapse primitive is broadcastable, rate-limited, and cheap per

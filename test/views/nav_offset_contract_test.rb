@@ -160,6 +160,77 @@ class NavOffsetContractTest < Minitest::Test
                     "offsetting a fixed panel by the header HEIGHT is the banner-overlap bug"
   end
 
+  # === THE PINNED STACK ==================================================
+  #
+  # --nav-h and --nav-bottom answer for ONE element. Everything else that pins
+  # has been re-deriving the same geometry by hand: on mcritchie-studio's
+  # /deployments the app strip positions itself with `:style="{ top: offset +
+  # 'px' }"`, and the lane headers compute "site header height + strip height"
+  # in Alpine behind their OWN ResizeObserver on .vt-pinned-header — while
+  # --nav-bottom, which already answers the first half, goes unused there.
+  #
+  # Any element carrying data-pin="<name>" now publishes --pin-<name>-h and
+  # --pin-<name>-bottom, so a consumer composes layers in pure CSS.
+
+  def test_head_publishes_geometry_for_every_data_pin_element
+    html = render_head
+
+    assert_match(/querySelectorAll\(\s*['"]\[data-pin\]['"]\s*\)/, html,
+                 "the publisher must find pinned layers by data-pin")
+    assert_match(/setProperty\(\s*['"]--pin-['"]\s*\+\s*\w+\.name\s*\+\s*['"]-h['"]/, html,
+                 "each pin publishes its own height under its own name")
+    assert_match(/setProperty\(\s*['"]--pin-['"]\s*\+\s*\w+\.name\s*\+\s*['"]-bottom['"]/, html,
+                 "each pin publishes its own bottom edge under its own name")
+
+    # Same sourcing discipline as the header's pair: height from offsetHeight,
+    # bottom from the CLAMPED rect. A hidden layer must measure 0 so it drops
+    # out of a consumer's max() — that is what removes the need for a declared
+    # stacking order, and an unclamped rect bottom could go negative and win.
+    pin = html[/function publishPin\(pin\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    refute_empty pin, "could not isolate publishPin()"
+    assert_match(/=\s*pin\.el\.offsetHeight/, pin, "pin height comes from offsetHeight")
+    assert_match(/Math\.max\(\s*0\s*,\s*pin\.el\.getBoundingClientRect\(\)\.bottom\s*\)/, pin,
+                 "pin bottom comes from the CLAMPED rect bottom, so a hidden layer measures 0")
+
+    # Both reads before either write, and no-op writes skipped — the same two
+    # properties of publish(), for the same reasons.
+    last_read = [pin.index("offsetHeight"), pin.index("getBoundingClientRect")].compact.max
+    first_write = pin.index("setProperty")
+    assert last_read < first_write,
+           "a pin's reads must precede its writes, or the second forces a fresh layout"
+    assert_match(/if\s*\(\s*h\s*!==\s*pin\.lastH\s*\)/, pin, "an unchanged height must skip its write")
+    assert_match(/if\s*\(\s*bottom\s*!==\s*pin\.lastBottom\s*\)/, pin, "an unchanged bottom must skip its write")
+  end
+
+  def test_pins_share_one_observer_and_one_frame
+    html = render_head
+
+    # N pinned layers must not mean N observers or N frames. schedule() already
+    # coalesces; the pins ride it.
+    assert_equal 1, html.scan(/new ResizeObserver\(/).length,
+                 "every pinned layer shares the one observer"
+    sched = html[/function schedule\(\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    assert_match(/publishPin\(/, sched, "pins must publish inside the coalesced frame, not on their own")
+  end
+
+  def test_pins_are_rescanned_rather_than_captured_once
+    html = render_head
+
+    # THE MUTATION THIS KILLS: registering pins once at init. The board's own
+    # hand-rolled version documents this exact bug — a Turbo Stream swaps the
+    # app strip, the observer keeps watching a detached node, and the live one
+    # is never measured. Rebuilding from the document is what makes that
+    # unreachable, so the rebuild has to be reachable from a stream render.
+    assert_match(/addEventListener\(\s*['"]turbo:before-stream-render['"][\s\S]{0,160}?registerPins/, html,
+                 "a Turbo Stream replaces nodes without a turbo:load; pins must re-register after one")
+    reg = html[/function registerPins\(\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    refute_empty reg, "could not isolate registerPins()"
+    assert_match(/pins\s*=\s*\[\]/, reg,
+                 "registerPins must REBUILD the list, not append to a stale one")
+    assert_match(/if\s*\(!name\)\s*continue/, reg,
+                 "an unnamed data-pin would publish `--pin--h`, a valid property and a silent nonsense one")
+  end
+
   private
 
   def render_head
