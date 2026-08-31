@@ -79,7 +79,7 @@ class ScriptCommentLeakTest < ActiveSupport::TestCase
   # Kinds that mean the walker could not read a span reliably. They are reported
   # as findings on purpose: an unreadable span is a blind spot, and a blind spot
   # that reports green is the whole failure this file exists to end.
-  UNREADABLE = %i[unterminated_erb unterminated_block].freeze
+  UNREADABLE = %i[unterminated_erb unterminated_block unterminated_literal].freeze
 
   def self.view_root = Pathname.new(File.expand_path("../../app/views", __dir__))
 
@@ -127,10 +127,10 @@ class ScriptCommentLeakTest < ActiveSupport::TestCase
   #
   # The states that matter are the ones that can HIDE a comment opener — a string
   # ("https://example.com" is not a comment), a template literal, a regex. ERB
-  # tags are opaque in CODE and STRING position, because an ERB tag's quotes and
-  # slashes are Ruby, not JavaScript, and letting them steer this walk is how a
-  # walker loses its place for the rest of a file. Inside a COMMENT they are the
-  # thing being hunted, so there they are left exactly as written.
+  # tags are opaque in CODE position, because an ERB tag's quotes and slashes are
+  # Ruby, not JavaScript, and letting them steer this walk is how a walker loses
+  # its place for the rest of a file. Inside a COMMENT they are the thing being
+  # hunted, so there they are left exactly as written.
   def js_comments(js)
     found = []
     tail = +""
@@ -163,7 +163,9 @@ class ScriptCommentLeakTest < ActiveSupport::TestCase
           index = stop + 2
         end
       elsif QUOTES.include?(js[index])
-        index = skip_literal(js, index)
+        stop, closed = skip_literal(js, index)
+        found << [:unterminated_literal, js[index, 120], index] unless closed
+        index = stop
         tail = push_tail(tail, "x")
       elsif js[index] == "/" && regex_may_start?(tail)
         index = skip_regex(js, index)
@@ -177,8 +179,22 @@ class ScriptCommentLeakTest < ActiveSupport::TestCase
     found
   end
 
-  # Past a string or template literal. An ERB tag inside one is skipped whole so
-  # its own quotes cannot close the literal early.
+  # Past a string or template literal, and whether it CLOSED.
+  #
+  # A quoted string resyncs at its own line end, so the worst a broken one costs
+  # is the rest of that line. A template literal has no line end to resync on: one
+  # that never closes swallows every comment after it for the rest of the block,
+  # and reports a clean file. That is the exact shape of "a scan that read
+  # nothing", so it is returned as unreadable rather than absorbed.
+  #
+  # ERB tags are NOT skipped here, and that is a measured choice rather than an
+  # oversight. Skipping them changed nothing: the walker returned the identical
+  # 4_011 comments with and without across studio-engine, mcritchie-studio and
+  # turf-monster on 2026-08-31, and zero literals ran away in any of them. No
+  # fixture kills the branch either, because reaching it needs an ERB tag holding
+  # an odd number of one quote character, which is not valid Ruby. A branch no
+  # test can kill is a branch the next author deletes without knowing what it
+  # guarded, so the runaway REPORT carries that risk instead.
   def skip_literal(js, start)
     quote = js[start]
     index = start + 1
@@ -187,21 +203,16 @@ class ScriptCommentLeakTest < ActiveSupport::TestCase
     while index < length
       if js[index] == "\\"
         index += 2
-      elsif js[index, 2] == ERB_OPEN
-        stop = js.index(ERB_CLOSE, index + 2)
-        return length if stop.nil?
-
-        index = stop + 2
       elsif js[index] == quote
-        return index + 1
+        return [index + 1, true]
       elsif js[index] == "\n" && quote != "`"
-        return index # a quote that never closed on its line: resync, do not eat the file
+        return [index, true] # resynced at the line end, which bounds the damage
       else
         index += 1
       end
     end
 
-    length
+    [length, false]
   end
 
   # Past a regex literal. A `/` inside a character class does not close it. If no
@@ -341,23 +352,17 @@ class ScriptCommentLeakTest < ActiveSupport::TestCase
                  "prose is how this scan would cry wolf on working code"
   end
 
-  # This one is DEFENCE, not observed need, and saying so is the honest framing.
-  # Running the walker with and without the ERB skip inside string literals over
-  # studio-engine, mcritchie-studio and turf-monster on 2026-08-31 returned the
-  # identical 4_011 comments — no view in the ecosystem needs it TODAY. It stays
-  # because the shape below is the one that costs everything when it does arrive:
-  # a template literal has no end of line to resync on, so an ERB tag that closes
-  # it early swallows every comment after it, silently, for the rest of the block.
-  test "an ERB tag inside a string literal does not steer the walk" do
-    js = <<~'JS'
-      var hint = `<%= raw("press ` to open") %>`;
-      // the real comment
-    JS
+  test "a literal that never closes is reported, not read past" do
+    kinds = js_comments("var t = `never closed;\nvar u = 1; // unreachable\n")
+            .map { |kind, _body, _offset| kind }
 
-    assert_equal [" the real comment"], js_comments(js).map { |_kind, body, _offset| body },
-                 "the backtick inside that ERB tag is RUBY. Letting it close the JavaScript " \
-                 "template literal leaves the walker inside a literal that never ends, and " \
-                 "every comment after it goes unread while the scan reports a clean file"
+    assert_includes kinds, :unterminated_literal,
+                    "a template literal with no closing backtick swallows every comment after " \
+                    "it — there is no line end to resync on. Absorbing that in silence is a scan " \
+                    "that read nothing while reporting a clean file"
+    refute_includes kinds, :line,
+                    "the comment IS swallowed, which is the point. What must not happen is the " \
+                    "walker losing it without saying so"
   end
 
   test "an unterminated ERB open inside a script is reported, not skipped past" do
