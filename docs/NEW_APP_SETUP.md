@@ -382,8 +382,12 @@ Rails.application.routes.draw do
 end
 ```
 
-`Studio.routes(self)` draws `POST /magic_link` (request a link) when
-`Studio.auth_methods` includes `:magic_link`, and `GET`/`POST /l/:token` (the
+`Studio.routes(self)` draws each auth group from your own declaration, so the
+groups are independent: `POST /magic_link` (request a link) when
+`Studio.auth_methods` includes `:magic_link`, the Solana trio
+(`/auth/solana/nonce`, `/auth/solana/verify`, `/auth/phantom/callback`) only when
+it includes `:wallet` — a web2 app keeps magic-link and draws no Solana route —
+and `GET`/`POST /l/:token` (the
 scanner-safe confirm page and the consume that burns the token) whenever
 `Studio.draw_link_routes` is on. **A magic link needs the `studio_links`
 table**, which section 5's `bin/rails studio_engine:install:migrations` already
@@ -837,9 +841,23 @@ require Rails.root.join("app/services/solana/keypair")
 
 ### Solana Routes
 
+Solana is the **web3 bolt-on**, not part of the base template: `:wallet` is not
+in the `Studio.auth_methods` default, so a web2 app draws no `/auth/solana/*`
+routes and needs nothing from this section. Turning it on takes **both** knobs —
+`auth_methods` draws the routes, `features` renders the button, and an app that
+sets only the first gets endpoints its own auth modal never offers:
+
 ```ruby
-# If you only need basic wallet auth, add :wallet to Studio.auth_methods and let
-# Studio.routes draw /auth/solana/nonce + /auth/solana/verify.
+# config/initializers/studio.rb
+Studio.configure do |config|
+  config.auth_methods = %i[magic_link google wallet]  # draws the Solana routes
+  config.features     = %i[web3]                      # renders the wallet button
+end
+```
+
+```ruby
+# With :wallet declared, Studio.routes draws /auth/solana/nonce,
+# /auth/solana/verify and /auth/phantom/callback for you.
 #
 # Add app-specific routes that can conflict with OmniAuth wildcards BEFORE
 # Studio.routes.
