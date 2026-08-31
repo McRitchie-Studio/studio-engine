@@ -559,8 +559,16 @@ class StylePageTest < ActiveSupport::TestCase
   test "the auth modal gates each credential method + terms via props" do
     html = render_index
     assert_includes html, "methodOn('google')", "Google is gated"
-    assert_includes html, "methodOn('wallet')", "Solana wallet is gated"
     assert_includes html, "methodOn('magicLink')", "magic link is gated"
+    # Wallet is NOT asserted here any more, and the omission is the point. The
+    # wallet button is contributed by the web3 layer through the auth modal's
+    # credential slot, and this engine ships no such layer, so on this page there
+    # is no wallet CTA to gate. A `methodOn('wallet')` substring assertion still
+    # PASSES here — the "or" divider's expression contains that exact call — so
+    # keeping it would have looked like coverage while pinning nothing. The slot
+    # itself is covered both ways in test/views/auth_credential_slot_test.rb.
+    assert_includes html, "methodOn('magicLink') && (methodOn('google') || methodOn('wallet'))",
+      "the or-divider still tracks whichever credential methods are live"
     assert_includes html, "termsOn()", "the age-attestation terms block is gated"
     assert_includes html, "_methodDefaults", "method defaults come from Studio.auth_method?"
   end

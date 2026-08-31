@@ -5,7 +5,9 @@
   app (including McRitchie Studio) without an auth backend.
 
   Steps (opened at any step via open('auth', { step, ... })):
-    credentials       — Google + Solana + email magic-link request
+    credentials       — Google + email magic-link, plus any credential a bolt-on
+                        layer contributes through the slot described below
+                        (solana-studio contributes Solana)
     magic-link-sent   — "check your inbox" after the email request
     magic-link-resent — success confirmation after a resend (directional slide)
     redirect          — countdown auto-redirect (drain CTA demo)
@@ -14,13 +16,42 @@
   dropped (that is contest-entry-specific), and every credential CTA runs behind
   a page stub — window.postMagicLink resolves { success: true } so the magic-link
   step machine advances for real; Google briefly shows its waiting state then
-  resets; Solana swaps to the wallet-connect picker (a real ported specimen).
-  No real auth happens — the demo shows the real UI.
+  resets; the contributed Solana button swaps to the wallet-connect picker (a
+  real ported specimen). No real auth happens — the demo shows the real UI.
 
   CRITICAL: rendered inside <template x-if="id==='auth'"> — Alpine requires a
   SINGLE root, so everything lives inside the outer <div>. The x-data is a
   double-quoted attribute: keep it free of double-quotes and backticks.
 %>
+<%#
+  THE CREDENTIAL SLOT. Google and magic-link are implemented by this engine, so
+  they render below directly. Wallet is not: it belongs to the web3 bolt-on, and
+  a base-template app (a newsletter, a hub) must not carry markup it can never
+  render. So the wallet button is CONTRIBUTED, by whichever layer implements it,
+  as a partial at a fixed path that this file merely looks for.
+
+  Two questions, and both must answer yes:
+
+    configured   Studio.auth_method?(:wallet) AND Studio.feature?(:web3) - does
+                 this app WANT wallet sign-in. Unchanged; this is the split
+                 lib/studio.rb already documents.
+    implemented  does a layer on the view path actually ship the button. Today
+                 that is the solana-studio gem.
+
+  Checking both is what makes the seam fail safe. Configured but not implemented
+  renders no button instead of raising a missing-partial error in front of a
+  user; implemented but not configured renders no button either, which is how
+  McRitchie Studio bundles the gem for its Ruby signing primitives and still
+  shows a web2 sign-in modal.
+
+  The result feeds the JS defaults below rather than gating the render on its
+  own, so ONE value drives the button, the "or" divider, and the style guide's
+  method toggles. A divider that appears for an absent button is the bug this
+  avoids.
+%>
+<% wallet_credential = "solana_studio/auth/wallet_credential" %>
+<% wallet_available  = Studio.auth_method?(:wallet) && Studio.feature?(:web3) &&
+                       lookup_context.exists?("wallet_credential", ["solana_studio/auth"], true) %>
 <div x-data="{
        email: '',
        ageAttested: false,
@@ -38,9 +69,11 @@
        },
        // Method configuration — which credential methods render. props.methods
        // overrides per-key; unset keys fall back to the app's Studio.auth_method?
-       // (wallet also needs the web3 capability). props.terms gates the age
-       // attestation. This standardizes the engine auth modal as method-configurable.
-       _methodDefaults: { magicLink: <%= Studio.auth_method?(:magic_link) %>, google: <%= Studio.auth_method?(:google) %>, wallet: <%= Studio.auth_method?(:wallet) && Studio.feature?(:web3) %> },
+       // (wallet additionally needs the web3 capability AND a layer shipping the
+       // credential partial — see the credential-slot note above the x-data).
+       // props.terms gates the age attestation. This standardizes the engine
+       // auth modal as method-configurable.
+       _methodDefaults: { magicLink: <%= Studio.auth_method?(:magic_link) %>, google: <%= Studio.auth_method?(:google) %>, wallet: <%= wallet_available %> },
        _termsDefault: true,
        methodOn(m) {
          var v = this.props.methods;
@@ -67,10 +100,6 @@
            var pp = self.props;
            if (pp) pp.submitting = null;
          }, 1200);
-       },
-       openWalletHub() {
-         if (!this.attested()) return;
-         Alpine.store('dsModals').swap('wallet-connect', { backTo: 'auth', ageAttested: true });
        },
        async submitMagicLink() {
          if (!this.attested()) return;
@@ -167,21 +196,14 @@
         <p role="alert" class="text-red-400 text-xs -mt-2 mb-3" x-text="props.googleError"></p>
       </template>
 
-      <%# 2. Solana — progresses to the Connect Wallet picker modal. Gated on
-          methodOn('wallet') (default OFF where web3 is off, e.g. McRitchie Studio). %>
-      <button @click="openWalletHub()" x-show="methodOn('wallet')" :disabled="!!props.submitting"
-              class="btn btn-neutral btn-lg w-full gap-3 mb-3 disabled:cursor-wait">
-        <svg width="18" height="14" viewBox="0 0 397 311" fill="none" x-show="props.submitting !== 'wallet'" aria-hidden="true">
-          <defs><linearGradient id="auth-solana-grad" x1="361" y1="-9" x2="153" y2="389" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#00FFA3"/><stop offset="1" stop-color="#DC1FFF"/>
-          </linearGradient></defs>
-          <path d="M65 234c2-2 6-4 9-4h317c6 0 9 7 5 11l-63 63c-2 2-6 4-9 4H6c-6 0-9-7-5-11l64-63z" fill="url(#auth-solana-grad)"/>
-          <path d="M65 4c2-2 6-4 9-4h317c6 0 9 7 5 11l-63 63c-2 2-6 4-9 4H6c-6 0-9-7-5-11L65 4z" fill="url(#auth-solana-grad)"/>
-          <path d="M333 119c-2-2-6-4-9-4H7c-6 0-9 7-5 11l63 63c2 2 6 4 9 4h317c6 0 9-7 5-11l-63-63z" fill="url(#auth-solana-grad)"/>
-        </svg>
-        <span x-show="props.submitting === 'wallet'" class="spinner" aria-hidden="true"></span>
-        <span x-text="props.submitting === 'wallet' ? 'Connecting…' : 'Solana'"></span>
-      </button>
+      <%# 2. Wallet — CONTRIBUTED, not written here. See the credential-slot note
+          at the top of this file. The partial owns the button, its brand mark and
+          its click handler; this engine owns only the decision to look for it.
+          An app with no web3 layer on its view path renders nothing at all here,
+          which is the whole point: the base template ships no wallet markup. %>
+      <% if wallet_available %>
+        <%= render wallet_credential, modal_store: "dsModals" %>
+      <% end %>
 
       <%# "or" divider — only when magic-link AND a social method are both on. %>
       <div class="relative my-4" x-show="methodOn('magicLink') && (methodOn('google') || methodOn('wallet'))">
