@@ -326,7 +326,7 @@ class ScriptCommentLeakTest < ActiveSupport::TestCase
       // a plain line
       /* a block
          over two lines */
-      var re = /["']\/\//g;
+      var slashes = /\/\//g;
       var tpl = `inline // not a comment`;
       var div = total / count / 2;
     JS
@@ -341,16 +341,23 @@ class ScriptCommentLeakTest < ActiveSupport::TestCase
                  "prose is how this scan would cry wolf on working code"
   end
 
-  test "an ERB tag inside a string does not steer the walk" do
+  # This one is DEFENCE, not observed need, and saying so is the honest framing.
+  # Running the walker with and without the ERB skip inside string literals over
+  # studio-engine, mcritchie-studio and turf-monster on 2026-08-31 returned the
+  # identical 4_011 comments — no view in the ecosystem needs it TODAY. It stays
+  # because the shape below is the one that costs everything when it does arrive:
+  # a template literal has no end of line to resync on, so an ERB tag that closes
+  # it early swallows every comment after it, silently, for the rest of the block.
+  test "an ERB tag inside a string literal does not steer the walk" do
     js = <<~'JS'
-      var path = "<%= studio.root_path %>";
-      var alt = '<%= t("a // b") %>';
+      var hint = `<%= raw("press ` to open") %>`;
       // the real comment
     JS
 
     assert_equal [" the real comment"], js_comments(js).map { |_kind, body, _offset| body },
-                 "an ERB tag's own quotes and slashes are Ruby. Letting them close a JavaScript " \
-                 "string loses the walker's place for the rest of the block"
+                 "the backtick inside that ERB tag is RUBY. Letting it close the JavaScript " \
+                 "template literal leaves the walker inside a literal that never ends, and " \
+                 "every comment after it goes unread while the scan reports a clean file"
   end
 
   test "an unterminated ERB open inside a script is reported, not skipped past" do
@@ -380,13 +387,19 @@ class ScriptCommentLeakTest < ActiveSupport::TestCase
 
       assert_includes found.join, "_leak_line.html.erb",
                       "a line comment quoting an ERB tag is the shape this guard exists for"
-      assert_includes found.join, "_leak_block.html.erb",
-                      "a block comment quoting a close sequence is the same defect, and the ERB " \
-                      "guard is blind to it because no ERB comment is involved"
+      assert_includes found.join, "_leak_close_only.html.erb",
+                      "a block comment quoting only a CLOSE sequence is the same defect, and the " \
+                      "ERB guard is blind to it because no ERB comment is involved"
+      assert_includes found.join, "_leak_open_only.html.erb",
+                      "a body carrying only an OPEN is the worst of them: ERB starts a tag there " \
+                      "and swallows JavaScript up to the next close sequence in the file"
       assert_includes found.join, "_leak_escaped.html.erb",
                       "the escape form renders a raw tag into every consuming app's page. It is " \
                       "refused with the rest: describe the tag in words"
-      assert_equal 3, found.size,
+      assert_includes found.join, "_leak_unreadable.html.erb",
+                      "a span the walker cannot read must be reported, not passed over. Silence " \
+                      "there is the green-that-means-nothing this guard exists to end"
+      assert_equal 5, found.size,
                    "an ordinary script was flagged. The next step would be an allowlist, and an " \
                    "allowlisted guard is how a rule stops guarding. Got: #{found.inspect}"
     end
@@ -405,13 +418,22 @@ class ScriptCommentLeakTest < ActiveSupport::TestCase
     Dir.mktmpdir do |dir|
       FileUtils.mkdir_p(File.join(dir, "probe"))
 
-      # The three leak shapes.
+      # The leak shapes, separated by WHICH sequence the body carries. A probe that
+      # happens to carry both still passes a rule that checks for only one of them,
+      # and that is how a half-disabled rule reads as green.
       File.write(File.join(dir, "probe/_leak_line.html.erb"),
                  "<script>\n  // renders below the <%= yield %> call\n  var a = 1;\n</script>\n")
-      File.write(File.join(dir, "probe/_leak_block.html.erb"),
+      File.write(File.join(dir, "probe/_leak_close_only.html.erb"),
                  "<script>\n  /* the tag ends at its %> and the rest runs */\n  var b = 2;\n</script>\n")
+      File.write(File.join(dir, "probe/_leak_open_only.html.erb"),
+                 "<script>\n  /* never write <% in one of these */\n  var c = 3;\n</script>\n")
       File.write(File.join(dir, "probe/_leak_escaped.html.erb"),
                  "<script>\n  // see <%%= render \"studio/modals/host\" %> below\n</script>\n")
+      # A span the walker cannot read is a blind spot, and a blind spot that reports
+      # green is the failure this whole file exists to end. This body carries NO ERB
+      # sequence, so only the unreadable-span rule catches it.
+      File.write(File.join(dir, "probe/_leak_unreadable.html.erb"),
+                 "<script>\n  /* a block comment that never closes\n  var d = 4;\n</script>\n")
 
       # Prose about the hazard, which must stay legal.
       File.write(File.join(dir, "probe/_ok_words.html.erb"),
