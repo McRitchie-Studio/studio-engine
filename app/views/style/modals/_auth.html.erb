@@ -69,8 +69,10 @@
        },
        // Method configuration — which credential methods render. props.methods
        // overrides per-key; unset keys fall back to the app's Studio.auth_method?
-       // (wallet also needs the web3 capability). props.terms gates the age
-       // attestation. This standardizes the engine auth modal as method-configurable.
+       // (wallet additionally needs the web3 capability AND a layer shipping the
+       // credential partial — see the credential-slot note above the x-data).
+       // props.terms gates the age attestation. This standardizes the engine
+       // auth modal as method-configurable.
        _methodDefaults: { magicLink: <%= Studio.auth_method?(:magic_link) %>, google: <%= Studio.auth_method?(:google) %>, wallet: <%= wallet_available %> },
        _termsDefault: true,
        methodOn(m) {
