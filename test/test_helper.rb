@@ -82,10 +82,12 @@ module Studio
   mattr_accessor :geo_ip_api_key, default: nil
   mattr_accessor :geo_lookup_timeout, default: 3
   mattr_accessor :geo_cache_ttl, default: 24.hours
-  # Mirrors lib/studio.rb. Studio::OauthIdentity gates the orphan guard on this,
-  # so the unit suite needs it defined; the tests that depend on a specific value
-  # set it explicitly and restore it in teardown.
-  mattr_accessor :auth_methods,         default: %i[magic_link google wallet]
+  # Mirrors lib/studio.rb, which deliberately EXCLUDES :wallet — the base template
+  # is web2 and web3 is an opt-in bolt-on. Studio::OauthIdentity gates the orphan
+  # guard on this, so the unit suite needs it defined; the tests that depend on a
+  # specific value (a wallet app included) set it explicitly and restore it in
+  # teardown.
+  mattr_accessor :auth_methods,         default: %i[magic_link google]
 
   # READ from lib/studio.rb rather than restated. This mirror block is
   # hand-maintained, and a restated number here would be a second definition of

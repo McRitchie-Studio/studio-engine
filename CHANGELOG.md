@@ -107,6 +107,54 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Changed
 
+- **The base template is web2: `:wallet` has left the `auth_methods` default.**
+  `Studio.auth_methods` defaulted to `%i[magic_link google wallet]` while
+  `Studio.features` defaulted to `[]`. Those two defaults disagree, and the
+  disagreement was load-bearing: the auth modal renders its wallet button from
+  `auth_method?(:wallet) && feature?(:web3)`, so a stock app rendered **no**
+  wallet button — while `Studio.routes` draws the Solana trio from
+  `auth_method?(:wallet)` alone, so the same stock app published
+  `GET /auth/solana/nonce`, `POST /auth/solana/verify` and
+  `GET /auth/phantom/callback`. All three `skip_before_action
+  :require_authentication`, and `#verify` lands in `User.from_solana_wallet`,
+  which `validate_user_contract!` never requires a host to implement. A brand-new
+  newsletter app inherited three public endpoints into an unvalidated contract.
+
+  studio-engine + McRitchie Studio is the base template for **every** app, web2
+  and web3 alike; solana-studio + Turf Monster is the web3 bolt-on. Most apps are
+  web2, so the default now says so: `%i[magic_link google]`. `README.md` and
+  `docs/NEW_APP_SETUP.md` have always printed that exact line as the new-app
+  configuration — the code simply disagreed with the docs it shipped.
+
+  **No current consumer changes behaviour**, because all three declare
+  `auth_methods` explicitly: McRitchie Studio (`magic_link google wallet`),
+  Turf Monster (`magic_link google wallet`, and `draw_auth_routes = false`
+  besides, so the engine draws neither group for it), mcritchie-industries
+  (`magic_link`). A wallet app opts in to both knobs — `auth_methods` including
+  `:wallet` **and** `features` including `:web3`, the second being what makes the
+  button appear.
+
+- **The auth route gate is pinned, and the gate choice is written down.**
+  Nothing tested which auth routes `Studio.routes` draws, on an engine whose
+  route changes break consumers at **boot** rather than at test time.
+  `test/integration/auth_route_gating_test.rb` draws the real host route table
+  under each consumer's configuration and reads the drawn routes back, so a
+  comment naming `auth/solana/nonce` cannot satisfy it.
+
+  The gate stays `draw_auth_routes && auth_method?(:wallet)` — **not** `&&
+  feature?(:web3)`, even though the modal uses both. `auth_methods` says which
+  CREDENTIALS an app accepts and these three paths are the credential exchange
+  itself; `features` gates product surfaces. `phantom_callback` is the mobile
+  deep-link RETURN url, so an app that declared `:wallet` and forgot `:web3`
+  would dead-end the handshake inside the user's wallet app with no server-side
+  trace — a worse failure than an endpoint that draws while the UI hides its
+  button. That decision is now a test with its rationale attached, so adding the
+  feature check flips a red assertion instead of silently unpublishing a live
+  consumer's routes. `Studio.draw_auth_routes`' comment likewise now records that
+  it is the OUTER switch, not the only gate: each group carries its own
+  `auth_methods` sub-gate, which is how a web2 app keeps magic-link while drawing
+  no `/auth/solana/*`.
+
 - **The navbar collapse primitive is broadcastable, rate-limited, and cheap per
   frame.** Three defects in the primitive as first landed, none of which a
   consuming app should inherit:

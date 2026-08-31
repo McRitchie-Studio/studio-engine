@@ -119,7 +119,23 @@ module Studio
   # display order. Both McRitchie Studio + Turf Monster are passwordless; legacy
   # email+password is opt-in via :password (which also re-arms the User#authenticate
   # contract check — see validate_user_contract!).
-  mattr_accessor :auth_methods, default: %i[magic_link google wallet]
+  #
+  # :wallet is deliberately NOT in the default. This engine plus McRitchie Studio
+  # is the BASE template for every app, web2 and web3 alike; solana-studio plus
+  # Turf Monster is the web3 bolt-on. Most apps are web2, so standing up Solana
+  # infrastructure to build a newsletter app is the wrong default.
+  #
+  # Membership here is also what DRAWS the Solana sign-in routes (see the wallet
+  # block in Studio.routes), so a default carrying :wallet published three public,
+  # unauthenticated /auth/solana/* endpoints on apps that ship no wallet at all —
+  # and #verify lands in User.from_solana_wallet, which validate_user_contract!
+  # does not require a host to implement. README.md and docs/NEW_APP_SETUP.md have
+  # always shown `%i[magic_link google]` as the new-app line; the code now agrees
+  # with the docs it ships. A wallet app opts in to BOTH knobs:
+  #
+  #   config.auth_methods = %i[magic_link google wallet]
+  #   config.features     = %i[web3]
+  mattr_accessor :auth_methods, default: %i[magic_link google]
 
   # ---- Capability features --------------------------------------------------
   # Coarse app-level capability switches an app opts into. Distinct from
@@ -230,10 +246,18 @@ module Studio
           "boot until the line is gone."
   end
 
-  # Whether Studio.routes draws the magic_link + solana wallet routes. An app that
-  # already defines its own auth routes (e.g. turf-monster, which has battle-tested
-  # magic_link/solana routes + extras) sets this false to avoid duplicate route
-  # NAMES at boot, keeping its own routes intact. New consumers leave it true.
+  # Whether Studio.routes draws the magic_link + solana wallet routes AT ALL. An
+  # app that already defines its own auth routes (e.g. turf-monster, which has
+  # battle-tested magic_link/solana routes + extras) sets this false to avoid
+  # duplicate route NAMES at boot, keeping its own routes intact. New consumers
+  # leave it true.
+  #
+  # This is the OUTER switch, and it is all-or-nothing by design: false means the
+  # host draws every auth route itself. It is NOT the only gate. Each group also
+  # carries its own auth_methods sub-gate, so a true app still draws only the
+  # methods it declares — magic_link needs auth_method?(:magic_link), the Solana
+  # trio needs auth_method?(:wallet). A web2 app therefore keeps magic-link while
+  # drawing no /auth/solana/* routes, without touching this flag.
   mattr_accessor :draw_auth_routes, default: true
 
   # Whether Studio.routes draws the unified /l/<token> link routes
@@ -829,6 +853,21 @@ module Studio
       # mobile wallet path at all and copying 400 lines of SIWS protocol per
       # app is how the picker came to exist three times. Account-linking and
       # the OAuth popup DO stay app-side.
+      #
+      # The gate is auth_methods, NOT auth_methods && feature?(:web3), even though
+      # the auth modal computes its wallet button from both
+      # (app/views/style/modals/_auth.html.erb). Deliberate: auth_methods says
+      # which CREDENTIALS this app accepts, features gates PRODUCT SURFACES, and
+      # these three paths are the credential exchange itself. phantom_callback is
+      # the mobile deep-link RETURN url — a wallet app that declared :wallet but
+      # forgot :web3 would dead-end the handshake inside the user's wallet app
+      # with no server-side trace, which is a worse failure than an endpoint that
+      # draws while the UI hides its button. Keying on the app's own declaration
+      # also keeps the two knobs independent, so an app may offer wallet SIGN-IN
+      # without shipping on-chain product surfaces.
+      #
+      # What stops a plain web2 app from publishing these is that :wallet is no
+      # longer in the auth_methods default — see that accessor above.
       if Studio.draw_auth_routes && Studio.auth_method?(:wallet)
         get  "auth/solana/nonce",  to: "solana_sessions#nonce",  as: :solana_nonce
         post "auth/solana/verify", to: "solana_sessions#verify", as: :solana_verify
