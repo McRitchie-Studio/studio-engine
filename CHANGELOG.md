@@ -6,6 +6,44 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **A green comment-leak scan used to mean "not looked at".**
+  `test/views/erb_comment_leak_test.rb` guards the ERB comment form in
+  `app/views/**/*.erb`. It never looked inside `<script>`, and that is where this
+  gem keeps its browser programs — `studio/modals/_host`,
+  `studio/solana/_phantom_deeplink`, `layouts/studio/_head` and the modal blocks
+  between them hold **1_239 JavaScript comments, 73_913 bytes of comment body**,
+  none of it read by any guard. A review of a diff made almost entirely of those
+  comments came back green, and the reviewer's note was the honest reading of it:
+  *"don't read that green as clearance."*
+
+  `test/views/script_comment_leak_test.rb` reads them. The rule is the one the ERB
+  guard applies — no ERB open or close sequence inside a comment body — and the
+  mechanism it defends against is worse than the ERB one. A tag quoted inside an
+  ERB comment is inert, because the comment swallows it. A tag quoted inside a
+  **JavaScript** comment is not inside anything ERB knows about, so ERB opens a tag
+  right there and **runs** it: a complete tag evaluates at render, and an
+  incomplete one swallows every byte up to the next close sequence in the file,
+  deleting working JavaScript with no syntax error to show for it. Wrapping the
+  line in an HTML comment does not help — ERB runs inside those too. Describing the
+  tag in words stays legal, exactly as it is for ERB comments.
+
+  **Finding a comment is the hard half, and the first cut of this got it wrong.**
+  Anchoring `<script>` blocks on raw source let an ERB comment's *prose mention* of
+  a script tag open the block: `studio/_board_assets.html.erb` reported 19_512
+  bytes of markup as JavaScript and never saw its real program on its own terms.
+  Blocks are now anchored on a copy with ERB tags and HTML comments blanked out,
+  length preserved so offsets and line numbers still land. Inside a block the
+  walker tracks the states that can hide a comment opener — a string
+  (`"https://…"` is not a comment), a template literal, a regex (`/\/\//`) — and a
+  literal or comment that never closes is REPORTED rather than absorbed, because a
+  walker that quietly lost its place is the same green as a clean file. The
+  assertions check the input as well as the verdict: how many blocks, comments and
+  bytes the scan actually reached, and that every block it opened matches a real
+  closing tag.
+
+  Zero findings across the engine at `origin/accepted`, so this lands green with no
+  allowlist.
+
 - **`data-pin` — the pinned stack publishes itself.** `--nav-h` / `--nav-bottom`
   answer for one element. Everything else that pins has been re-deriving the
   same geometry by hand: on `mcritchie-studio`'s `/deployments` the app strip

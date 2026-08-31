@@ -53,6 +53,15 @@ require "fileutils"
 # follows almost every comment in the tree, which is the measurement that killed the
 # broad widening twice. Catching it needs an allowlist, and an allowlisted guard is
 # how a rule stops guarding.
+#
+# AND IT GUARDS ONE COMMENT FORM, NOT ONE FILE — worth saying here, because a green
+# run of this file has been read as clearance for a whole view. The JavaScript
+# comments inside these same views' <script> blocks are a separate surface: 1_239 of
+# them holding 73_913 bytes, measured across the engine on 2026-08-31, that nothing
+# above ever looked at. Their mechanism is worse, too. A tag quoted inside an ERB
+# comment is inert, because the comment swallows it; a tag quoted inside a JavaScript
+# comment is not inside anything ERB knows about, so ERB opens it there and RUNS it.
+# test/views/script_comment_leak_test.rb is the guard for that surface.
 class ErbCommentLeakTest < ActiveSupport::TestCase
   COMMENT = /<%#(.*?)%>/m
   ERB_OPEN = "<%"
