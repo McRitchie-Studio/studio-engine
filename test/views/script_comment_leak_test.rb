@@ -102,9 +102,12 @@ class ScriptCommentLeakTest < ActiveSupport::TestCase
 
   # [[inner_begin, inner_end], ...] as offsets into the ORIGINAL source.
   #
-  # Anchoring on the masked copy is the point. Nine views name a script tag in
-  # prose inside an ERB or HTML comment, and on raw source the first of those
-  # opens a block that runs until the real program's closing tag.
+  # Anchoring on the masked copy is the point. Views name a script tag in PROSE —
+  # inside an ERB comment, an HTML comment, a Ruby string, a JS comment — and on
+  # raw source the first such mention opens a block that runs to the real
+  # program's closing tag. Measured, not hypothetical: studio/_board_assets
+  # anchored on its line-3 ERB comment and handed 19_512 bytes of markup to the
+  # JavaScript walker; masked, it anchors on line 22 and hands over 18_321.
   def script_blocks(src)
     masked = mask_non_markup(src)
     blocks = []
