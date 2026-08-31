@@ -238,6 +238,43 @@ the block:
 <% end %>
 ```
 
+#### The auth modal's credential slot
+
+Sign-in is a BASE concern — every app does it, and most apps are web2 — so the
+auth modal (`style/modals/_auth`) lives here and is never forked. **Which
+credentials it offers is not a base concern.** Google and magic-link are
+implemented by this engine and render directly. Anything else is CONTRIBUTED by
+the layer that implements it, as a partial this file merely looks for:
+
+    solana_studio/auth/_wallet_credential     (shipped by the solana-studio gem)
+
+A host bundling that gem gets the Solana button with no registration call. A host
+without it renders nothing there — **a web2 app carries no wallet markup at
+all**, rather than shipping a button hidden by a flag.
+
+The engine requires two independent yeses before it renders the slot:
+
+| Question | Answered by |
+|---|---|
+| Does the app *want* wallet sign-in? | `Studio.auth_method?(:wallet) && Studio.feature?(:web3)` |
+| Does a layer *implement* it? | the partial resolving on the view path |
+
+Checking both is what makes the seam fail safe, and it is not belt-and-braces:
+an app that declares `:wallet` and forgets the gem renders no button instead of
+raising `Missing partial` in front of someone signing in (measured — dropping
+the existence check turns that case into a 500). The other direction matters
+too: McRitchie Studio bundles solana-studio for its Ruby signing primitives
+while shipping web3 off, so the partial is present and the button is correctly
+absent.
+
+One value drives the button, the "or" divider and the style guide's method
+toggles, so a divider can never appear above a button that is not there.
+
+A contributed partial renders inside the modal's own Alpine scope and may use
+`methodOn(...)`, `attested()` and `props.submitting`. It receives one local,
+`modal_store` — the engine's real host is `"modals"`, the living style guide's
+page-scoped host is `"dsModals"`.
+
 **Connect Wallet — `studio/modals/wallet_connect`.** The reown-style wallet
 picker, engine-owned so the apps stop each keeping a copy. Register it like any
 other modal and configure it with locals:

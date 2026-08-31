@@ -6,6 +6,28 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **The auth modal grew a CREDENTIAL SLOT, and the Solana button moved out of
+  this gem.** Architectural split, decided 2026-08-31: studio-engine plus
+  McRitchie Studio is the base template for EVERY app, web2 and web3 alike;
+  solana-studio plus Turf Monster is the web3 bolt-on. Most apps are web2, and
+  standing up web3 infrastructure to build a newsletter app is wrong. Sign-in is
+  a base concern, so `style/modals/_auth` stays here and is never forked —
+  copying it into the gem would fork a surface both apps sign in through, which
+  is how the wallet picker reached three drifting copies before it was promoted.
+  But the **wallet button** is not a base concern, so it now ships from
+  `solana-studio` at `solana_studio/auth/_wallet_credential`, and this modal
+  renders whatever resolves at that path. Bundling the gem IS the registration;
+  an app without it carries no wallet markup at all rather than markup hidden
+  behind a flag. The gate keeps both halves it already had
+  (`Studio.auth_method?(:wallet) && Studio.feature?(:web3)`) AND adds the
+  existence check, which is what makes it fail safe: an app that declares
+  `:wallet` and forgets the gem now renders no button instead of raising
+  `Missing partial` in front of a user — measured, by deleting the check and
+  watching three tests turn into that exact error. One value feeds the button,
+  the "or" divider and the style guide's toggles, so the divider can never float
+  above an absent button. Documented under "Modal host" in the README.
+
+
 - **A green comment-leak scan used to mean "not looked at".**
   `test/views/erb_comment_leak_test.rb` guards the ERB comment form in
   `app/views/**/*.erb`. It never looked inside `<script>`, and that is where this
