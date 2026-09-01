@@ -85,16 +85,27 @@ class ModalErrorLinesAnnounceTest < ActiveSupport::TestCase
   # pattern that stops matching after a restyle, makes the assertion above pass
   # forever over an empty list — which is precisely the "green but blind" failure
   # this file exists to prevent, one level up.
+  #
+  # THE FLOOR MOVED 10 -> 8, AND ONLY FOR THIS REASON. The wallet_connect and
+  # web3_step_up partials contributed one error line each and left this engine
+  # for solana-studio with the two-template split — the engine ships no wallet UI
+  # any more. Re-derived on this tree with the pattern above, not adjusted to fit
+  # a red run. Lowering it for any OTHER reason is the failure this test names:
+  # if the count drops again, find the line that stopped matching.
+  #
+  # Both moved partials still carry role="alert" in the gem, but solana-studio
+  # ships NO equivalent guard, so those two lines are now unpinned in their new
+  # home. Porting this test to the gem is filed as follow-up work.
   def test_the_guard_reads_the_error_lines_it_claims_to
     views = modal_views
     assert_operator views.length, :>=, 10,
                     "only #{views.length} modal view(s) under #{MODAL_DIR} — this guard covers nothing"
 
     found = views.sum { |path| error_paragraphs(File.read(path)).length }
-    assert_operator found, :>=, 10,
-                    "the error-line pattern matched only #{found} paragraph(s); it matched 10 when " \
-                    "written. A restyle away from text-red-* would leave this guard passing over " \
-                    "nothing — re-point the pattern rather than deleting the test."
+    assert_operator found, :>=, 8,
+                    "the error-line pattern matched only #{found} paragraph(s); it matched 8 when " \
+                    "last re-derived. A restyle away from text-red-* would leave this guard passing " \
+                    "over nothing — re-point the pattern rather than deleting the test."
   end
 
   # The reusable error CARD is a different mechanism and is pinned separately: its

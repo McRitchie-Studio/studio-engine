@@ -238,30 +238,28 @@ the block:
 <% end %>
 ```
 
-**Connect Wallet — `studio/modals/wallet_connect`.** The reown-style wallet
-picker, engine-owned so the apps stop each keeping a copy. Register it like any
-other modal and configure it with locals:
+**Wallet modals moved to `solana-studio`.** The Connect Wallet picker, the Web3
+step-up card and the Phantom deep link used to ship here as
+`studio/modals/wallet_connect`, `studio/modals/web3_step_up` and
+`studio/solana/phantom_deeplink`. They now live in the **solana-studio** gem as
+`solana_studio/modals/wallet_connect`, `solana_studio/modals/web3_step_up` and
+`solana_studio/phantom_deeplink`; render them from those paths and read that
+gem's README for their locals and hooks.
 
-```erb
-<template x-if="$store.modals.current().id === 'wallet-connect'">
-  <%= render "studio/modals/wallet_connect" %>
-</template>
-```
+This is the two-template split: **BASE** is studio-engine + mcritchie-studio,
+**WEB3 ADD** is solana-studio + turf-monster. The engine has no business
+shipping wallet UI — as the call was made, *"the real op sec vector is managing
+sessions safely. Anything wallet based should be in the app."*
 
-Locals: `store` (default `"modals"`), `connect_fn` (the window function that
-connects AND verifies, default `"solanaConnectAndVerify"`), `title`, `slot` /
-`slot_locals` (a partial rendered before the wallet rows — an app's legal-age
-attestation goes here), and `extra_data` (a JS fragment merged into the
-component's `x-data`).
+What the engine **keeps** is the SESSION half of Solana sign-in:
+`SolanaSessionsController`, `Solana::SessionAuth`, the `/auth/solana/nonce` and
+`/auth/solana/verify` routes, the `solana_sessions/phantom_callback` view, and
+`Studio.wallet_sign_in_statement` — the single source for the signed statement,
+which the gem's deep link reads so the two cannot drift.
 
-App behaviour arrives as optional **hook methods** defined in `extra_data`, each
-called only when present: `onInit`, `canPick` (falsy aborts a pick or a deep
-link), `verifyArgs` (merged into the connect options), `onConnected(result)`,
-`onDeepLink`, `onBack`. An app that needs none passes no `extra_data`.
-
-The slot is a **named local, not a block** — `block_given?` is always true inside
-a compiled Rails partial, so a block-shaped slot yields the captured page body
-into the card whenever no block is passed.
+It also keeps two blocks the gem renders **by name** across the gem boundary:
+`studio/modals/blocks/wallet_brand_sprite` and `studio/modals/blocks/card_header`.
+Renaming either is a cross-repo change.
 
 **Page-scoped hosts — `studio/modals/scoped_host`.** When a page must bring its
 own modals (because not every consuming app renders a shared host, and the ones
