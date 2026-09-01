@@ -11,9 +11,34 @@ require "test_helper"
 # email, which is a property of that app's DATA, not of the code. The engine
 # ships to apps whose data it has never seen, so it has to ask.
 class OauthIdentityTest < Minitest::Test
+  # RESTORE WHAT WE FOUND, never a literal. This teardown used to re-assign
+  # `%i[magic_link google wallet]` — a copy of the engine default that went stale
+  # the moment the web2/base split dropped :wallet from it (lib/studio.rb). The
+  # damage was not one red test, it was TWO leaks at once:
+  #
+  #   * INTO the file — teardown runs AFTER each test, so the test Minitest
+  #     happened to order FIRST saw the real default and every later test saw a
+  #     :wallet the engine no longer ships. Any test here that leaned on the
+  #     default passed or failed BY SEED.
+  #   * OUT of the file — the last teardown left :wallet enabled process-wide for
+  #     whatever ran next, so the suite lied to unrelated files about the fleet's
+  #     shape.
+  #
+  # Capturing the live values in setup fixes both and cannot go stale again: the
+  # next change to the default is restored correctly without touching this file.
+  # Same idiom the engine already uses in AuthRouteGatingTest and
+  # EngineLoginPasswordlessTest.
+  #
+  # This does NOT make the tests below default-agnostic on its own — a test whose
+  # subject is an auth method has to STATE that premise itself. They now do.
+  def setup
+    @original_auth_methods = Studio.auth_methods
+    @original_wallet_address_method = Studio.wallet_address_method
+  end
+
   def teardown
-    Studio.auth_methods = %i[magic_link google wallet]
-    Studio.wallet_address_method = nil
+    Studio.auth_methods = @original_auth_methods
+    Studio.wallet_address_method = @original_wallet_address_method
   end
 
   def user(**attrs)
@@ -57,6 +82,7 @@ class OauthIdentityTest < Minitest::Test
   end
 
   def test_an_email_keeps_the_account_reachable_when_magic_link_is_offered
+    Studio.auth_methods = %i[magic_link google]
     subject = user(provider: "google_oauth2", uid: "1", email: "pat@example.com")
 
     refute Studio::OauthIdentity.unlink_orphans_account?(subject)
@@ -76,7 +102,13 @@ class OauthIdentityTest < Minitest::Test
       "an email is only a way back in if the app actually offers magic-link sign-in"
   end
 
+  # STATES ITS OWN PREMISE — "when the app OFFERS wallet sign-in". :wallet is not
+  # in the engine default (the base template is web2; a wallet app opts in, as
+  # turf-monster does in config/initializers/studio.rb), so a test about wallets
+  # has to turn wallets on. It previously inherited one from the stale teardown,
+  # which made it pass or fail by seed.
   def test_a_wallet_keeps_the_account_reachable
+    Studio.auth_methods = %i[magic_link google wallet]
     Studio.wallet_address_method = :solana_address
     subject = user(provider: "google_oauth2", uid: "1", solana_address: "7ZDJp7FU")
 
@@ -95,7 +127,17 @@ class OauthIdentityTest < Minitest::Test
   # So an unconfigured app is treated as having no wallet sign-in. The cost is an
   # occasional refusal the operator fixes by configuring the column; the cost of
   # the other direction is someone locked out.
+  #
+  # THE PREMISE IS LOAD-BEARING FOR A REASON THE ASSERTION HIDES.
+  # remaining_sign_ins short-circuits on `methods.include?(:wallet)` BEFORE it
+  # ever calls wallet_present? (lib/studio/oauth_identity.rb:48), so with :wallet
+  # absent this test passes WITHOUT EXECUTING the guard it exists to pin.
+  # Verified by mutation: restoring the convention fallback
+  # (`configured = :solana_address if configured.blank?`) left this test green
+  # when it ran first, and killed it only once :wallet was offered. Offering
+  # wallet sign-in is what makes the assertion bite.
   def test_an_unconfigured_wallet_column_is_not_guessed
+    Studio.auth_methods = %i[magic_link google wallet]
     Studio.wallet_address_method = nil
     subject = user(provider: "google_oauth2", uid: "1", solana_address: "7ZDJp7FU")
 
@@ -170,6 +212,15 @@ class OauthIdentityTest < Minitest::Test
     end
   end
 
+  # WAS INERT — defined below `private`, where Minitest#runnable_methods (which
+  # reads PUBLIC instance methods) never saw it. The file reported 15 runnable
+  # tests against 16 defined, and this one had never executed a single time.
+  # A private `def test_*` does not error and does not skip; it is simply absent,
+  # so the suite stays green whether the behaviour works or not.
+  def test_a_bare_model_orphans_rather_than_raising
+    assert Studio::OauthIdentity.unlink_orphans_account?(Struct.new(:name).new("Pat"))
+  end
+
   private
 
   # Stands up the ::User constant Studio.user_supports_password? reads — a host
@@ -181,9 +232,5 @@ class OauthIdentityTest < Minitest::Test
     yield
   ensure
     Object.send(:remove_const, :User) if Object.const_defined?(:User)
-  end
-
-  def test_a_bare_model_orphans_rather_than_raising
-    assert Studio::OauthIdentity.unlink_orphans_account?(Struct.new(:name).new("Pat"))
   end
 end
