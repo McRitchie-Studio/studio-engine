@@ -78,10 +78,14 @@ module Studio
 
       # Immediate child folder names under `base` for this scope, derived from
       # the paths documents actually claim — there is no folder table.
+      #
+      # unscope(:order) is load-bearing: callers hand in display-ordered scopes,
+      # and Postgres refuses SELECT DISTINCT with an ORDER BY column outside the
+      # select list (SQLite tolerates it, so only a real consumer sees the 500).
       def folders_under(base = "")
         base   = normalize_path(base)
         prefix = base.empty? ? "" : "#{base}/"
-        distinct.pluck(:path).filter_map { |path|
+        unscope(:order).distinct.pluck(:path).filter_map { |path|
           next if path == base || !path.start_with?(prefix)
 
           path.delete_prefix(prefix).split("/").first

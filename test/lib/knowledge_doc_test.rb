@@ -105,6 +105,12 @@ class KnowledgeDocTest < ActiveSupport::TestCase
     assert_equal %w[aging statements],     Doc.all.folders_under("financials")
     assert_equal %w[2026-08 2026-09],      Doc.all.folders_under("financials/aging")
     assert_equal [],                       Doc.all.folders_under("equipment")
+
+    # The browser hands in a display-ordered scope. Postgres refuses
+    # SELECT DISTINCT + foreign ORDER BY (SQLite does not, so this line alone
+    # cannot fail here for the PG reason — the unscope(:order) inside
+    # folders_under is what keeps the real consumer standing).
+    assert_equal %w[equipment financials], Doc.order(created_at: :desc).folders_under
   end
 
   test "in_folder is exact and under is subtree" do
