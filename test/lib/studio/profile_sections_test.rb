@@ -18,6 +18,22 @@ require "stringio"
 #      symbolized, admin rows gated — because this registry deliberately copies
 #      that shape and a divergence would be a surprise.
 class ProfileSectionsTest < Minitest::Test
+  # RESTORE WHAT WE FOUND. The one test below that flips Studio.auth_methods used
+  # to `ensure` its way back to the literal `%i[magic_link google wallet]` — a
+  # stale copy of an engine default that no longer carries :wallet since the
+  # web2/base split. That did not just fail to restore: it ENABLED wallet sign-in
+  # process-wide for every file ordered after this one, which is how a sibling
+  # suite's wallet test passed on some seeds and failed on others. Measured: the
+  # process ended on `[:magic_link, :google, :wallet]` against a real default of
+  # `[:magic_link, :google]`.
+  def setup
+    @original_auth_methods = Studio.auth_methods
+  end
+
+  def teardown
+    Studio.auth_methods = @original_auth_methods
+  end
+
   # View doubles. `current_user` is what the requires-gate reads; a bare view
   # (no current_user, no admin?) stands in for a render with nobody signed in.
   # Shaped like a consumer that has every standard column, so the defaults all
@@ -297,8 +313,6 @@ class ProfileSectionsTest < Minitest::Test
 
     Studio.auth_methods = %i[magic_link google]
     assert_includes Studio::ProfileSections.resolve(nil, view).map { |s| s[:key] }, :google
-  ensure
-    Studio.auth_methods = %i[magic_link google wallet]
   end
 
   # The requires-gate, exercised on the row most likely to be absent: the Google
