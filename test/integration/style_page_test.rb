@@ -159,8 +159,26 @@ class StylePageTest < ActiveSupport::TestCase
   # Theme is the landing section; the section order the nav pills follow.
   SECTION_ANCHORS = %w[theme modals tricks tasks].freeze
 
+  # solana-studio's app/views. The guide's THREE web3 specimens (Connect wallet
+  # and the two Sign Wallet cards) render from that gem since the two-template
+  # split moved the wallet UI out of this engine — BASE is studio-engine +
+  # mcritchie-studio, WEB3 ADD is solana-studio + turf-monster.
+  #
+  # WITHOUT THIS PATH the page under test is a BASE app's page: style/_modals
+  # gates those registrations on the partial RESOLVING, so they would be absent
+  # and several assertions below would quietly describe a page no consumer of
+  # this suite's dummy app actually sees. The dummy REQUIRES solana-studio
+  # (test/dummy/config/application.rb), so this is the faithful render.
+  #
+  # The BASE-app rendering is not lost — test/views/style_web3_specimens_test.rb
+  # asserts it directly, including that /admin/style survives with no gem.
+  GEM_VIEWS = File.join(
+    Gem::Specification.find_by_name("solana-studio").gem_dir, "app/views"
+  ).freeze
+
   def render_index
-    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    view = ActionView::Base.with_empty_template_cache
+                           .with_view_paths(["app/views", GEM_VIEWS])
     # A host renders this page through ApplicationController, which has EVERY
     # engine helper mixed in (the engine sets no isolate_namespace, so its
     # app/helpers join the host's helper path). This bare view has none, so give

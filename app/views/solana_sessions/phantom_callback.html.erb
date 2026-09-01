@@ -313,11 +313,12 @@
       dbg('Verify result', JSON.stringify(result));
       if (result.success) {
         cleanup();
-        // Guarded, matching studio/modals/_wallet_connect two files over. An app
-        // that does not define this hook would otherwise throw HERE — after a
-        // successful verify, with the session already set — so the user is
-        // signed in and the page dies before redirecting. The engine cannot
-        // require a hook it does not ship.
+        // Guarded, matching solana-studio's wallet_connect picker (the partial
+        // that used to sit two files over, before the two-template split moved
+        // the wallet UI to the gem). An app that does not define this hook would
+        // otherwise throw HERE — after a successful verify, with the session
+        // already set — so the user is signed in and the page dies before
+        // redirecting. The engine cannot require a hook it does not ship.
         if (typeof window.handleSolanaVerifySuccess === 'function') window.handleSolanaVerifySuccess(result);
         dbg('OK', 'Login success! Redirecting...');
         window.location.href = result.redirect || '/';

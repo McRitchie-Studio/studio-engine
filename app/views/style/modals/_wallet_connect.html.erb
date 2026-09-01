@@ -1,12 +1,18 @@
 <%#
   "Connect Wallet" specimen for the living style guide.
 
-  As of the wallet-picker promotion this is a THIN CONFIGURATION of the real
-  engine partial (studio/modals/_wallet_connect) rather than a parallel port of
-  it. That is the point: the card on /admin/style now demonstrates the SAME code
-  the apps render, so a drift between the specimen and production is no longer
+  This is a THIN CONFIGURATION of the real picker rather than a parallel port of
+  it. That is the point: the card on /admin/style demonstrates the SAME code the
+  apps render, so a drift between the specimen and production is no longer
   possible. Before this, the picker existed three times — turf-monster's,
   mcritchie-studio's, and this one — and only this one was ever looked at.
+
+  THE PARTIAL IS NO LONGER THIS ENGINE'S. It moved to solana-studio
+  (solana_studio/modals/_wallet_connect) with the two-template split: BASE is
+  studio-engine + mcritchie-studio, WEB3 ADD is solana-studio + turf-monster.
+  The engine keeps the session half and ships no wallet UI. Nothing renders this
+  file unless the gem resolved — style/_modals.html.erb gates the registration
+  on web3_gem — so an app with no solana-studio never reaches this render.
 
   What the configuration supplies, all of it demo scaffolding:
     store       — the guide's page-scoped host ($store.dsModals), not the app
@@ -75,7 +81,7 @@
     }
   JS
 %>
-<%= render "studio/modals/wallet_connect",
+<%= render "solana_studio/modals/wallet_connect",
       store: "dsModals",
       connect_fn: "dsWalletConnectDemo",
       slot: "style/modals/wallet_connect_slot",

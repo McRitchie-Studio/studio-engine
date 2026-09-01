@@ -18,9 +18,10 @@
      app-supplied-policy age-gate DOB primitive, gated by Studio.feature?(:age_gate),
      plus the app-specific entry-tokens purchase flow documented via engine chrome),
      Profile (crop / upload, opened
-     through studio/cropper_assets), Web3 (wallet-connect with engine-owned inline
-     brand icons / on-chain-tx / deposit / the generic entry-confirmed celebration,
-     gated by Studio.feature?(:web3) — disabled-but-present-yet-openable when off),
+     through studio/cropper_assets), Web3 (wallet-connect and web3-step-up now
+     rendered from the solana-studio gem / on-chain-tx / deposit / the generic
+     entry-confirmed celebration, gated by Studio.feature?(:web3) —
+     disabled-but-present-yet-openable when off),
      System and status (the reusable card blocks), Templates (the copy-from
      archetypes), and Rewards (level-up + the entry-confirmed seeds bar + the
      Free Entry Earned reward, gated by :leveling).
@@ -32,6 +33,25 @@
   web3_on     = Studio.feature?(:web3)
   leveling_on = Studio.feature?(:leveling)
   age_gate_on = Studio.feature?(:age_gate)
+
+  # THE WEB3 SPECIMENS NOW COME FROM A GEM THIS ENGINE DOES NOT DEPEND ON.
+  # wallet_connect and web3_step_up used to live in app/views/studio/modals and
+  # were rendered here unconditionally. The two-template split moved them to
+  # solana-studio: BASE is studio-engine + mcritchie-studio, WEB3 ADD is
+  # solana-studio + turf-monster. The engine keeps the SESSION half (the
+  # /auth/solana routes, Solana::SessionAuth, the phantom callback) and ships no
+  # wallet UI at all.
+  #
+  # So resolution is a RUNTIME question here, not a build-time one. Three of the
+  # six apps mounting this engine (acquisition-studio, mcritchie-industries,
+  # moms-app) bundle no solana-studio, and an unconditional render would turn
+  # their /admin/style into a missing-template 500. The gem is a development and
+  # test dependency of this engine precisely so the guide can show the REAL
+  # cards; where it is absent the specimens stay listed but unopenable.
+  #
+  # Same three-term lookup_context.exists? the modal host uses for host_extras
+  # (studio/modals/_host.html.erb): name, prefixes, partial.
+  web3_gem = lookup_context.exists?("wallet_connect", ["solana_studio/modals"], true)
 
   # Auth method-toggle defaults — mirror the app's Studio.auth_method? config;
   # Solana Wallet also needs the web3 capability, so it defaults OFF on an app
@@ -432,17 +452,21 @@
         <template x-if="$store.dsModals.current().id === 'cosign-rejected'">
           <div><%= render "style/modals/cosign_rejected" %></div>
         </template>
-        <template x-if="$store.dsModals.current().id === 'wallet-connect'">
-          <div><%= render "style/modals/wallet_connect" %></div>
-        </template>
-        <%# web3-step-up — the REAL shared partial, not a style-guide specimen.
-            The other Web3 cards here render style/modals/* demos while each app
-            keeps its own live modal; this one renders studio/modals/* — the
-            same file a host renders in production — so what is reviewed here IS
-            the shipped card. modal_store mounts it on this page's own host. %>
-        <template x-if="$store.dsModals.current().id === 'web3-step-up'">
-          <div><%= render "studio/modals/web3_step_up", modal_store: "dsModals" %></div>
-        </template>
+        <%# Both web3 sign-in cards render from SOLANA-STUDIO, and both are the
+            REAL shipped partials rather than style-guide forks — the same files
+            turf-monster renders in production, so what is reviewed here IS the
+            card that ships. They left this engine with the two-template split.
+            Registered only when the gem resolves (see web3_gem above): an app
+            that bundles no solana-studio still lists these specimens, it just
+            cannot open them. %>
+        <% if web3_gem %>
+          <template x-if="$store.dsModals.current().id === 'wallet-connect'">
+            <div><%= render "style/modals/wallet_connect" %></div>
+          </template>
+          <template x-if="$store.dsModals.current().id === 'web3-step-up'">
+            <div><%= render "solana_studio/modals/web3_step_up", modal_store: "dsModals" %></div>
+          </template>
+        <% end %>
         <template x-if="$store.dsModals.current().id === 'onchain-tx'">
           <div><%= render "style/modals/onchain_tx" %></div>
         </template>
@@ -1116,7 +1140,7 @@
       <%# 1. Connect wallet — the walk's entry; picking a wallet swaps to Processing. %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Connect wallet",
-            reference: %(the Web3 "Connect wallet" picker (studio-engine style/modals/_wallet_connect) — the walk's entry: picking a wallet runs a brief connecting state then swaps to the on-chain Processing modal. Open with $store.dsModals.open('wallet-connect')),
+            reference: %(the Web3 "Connect wallet" picker (solana-studio solana_studio/modals/_wallet_connect, configured by style/modals/_wallet_connect) — the walk's entry: picking a wallet runs a brief connecting state then swaps to the on-chain Processing modal. Open with $store.dsModals.open('wallet-connect')),
             open_expr: "$store.dsModals.open('wallet-connect')",
             glow_when: ds_glow.call("wallet-connect"),
             disabled: !web3_on, openable: true } do %>
@@ -1182,7 +1206,7 @@
           wallet, so no user can ever meet both. %>
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Sign Wallet",
-            reference: %(the Web3 "Sign Wallet" card (studio/modals/_web3_step_up — the REAL shared partial, not a specimen copy) — shown to an account that holds a self-custody wallet but authenticated this session with a web2 credential. One wallet row, glowing, because it is the only thing to press. Open with $store.dsModals.open('web3-step-up', { provider: 'phantom', providerLabel: 'Phantom', walletHint: '7xKp…JZ2Q' })),
+            reference: %(the Web3 "Sign Wallet" card (solana-studio solana_studio/modals/_web3_step_up — the REAL shared partial, not a specimen copy) — shown to an account that holds a self-custody wallet but authenticated this session with a web2 credential. One wallet row, glowing, because it is the only thing to press. Open with $store.dsModals.open('web3-step-up', { provider: 'phantom', providerLabel: 'Phantom', walletHint: '7xKp…JZ2Q' })),
             open_expr: "$store.dsModals.open('web3-step-up', { provider: 'phantom', providerLabel: 'Phantom', walletHint: '7xKp…JZ2Q' })",
             glow_when: ds_glow.call("web3-step-up", provider: true),
             disabled: !web3_on, openable: true } do %>
@@ -1205,7 +1229,7 @@
 
       <%= render layout: "style/modal_specimen", locals: {
             label:     "Sign Wallet (no remembered brand)",
-            reference: %(the Web3 "Sign Wallet" card with NO remembered brand (studio/modals/_web3_step_up) — every wallet linked before a host recorded brands lands here, so it is a live population and not a defensive branch. The row falls back to the picker rather than dead-ending. Open with $store.dsModals.open('web3-step-up', {})),
+            reference: %(the Web3 "Sign Wallet" card with NO remembered brand (solana-studio solana_studio/modals/_web3_step_up) — every wallet linked before a host recorded brands lands here, so it is a live population and not a defensive branch. The row falls back to the picker rather than dead-ending. Open with $store.dsModals.open('web3-step-up', {})),
             open_expr: "$store.dsModals.open('web3-step-up', {})",
             glow_when: ds_glow.call("web3-step-up", provider: false),
             disabled: !web3_on, openable: true } do %>

@@ -594,7 +594,20 @@
 # new file: the hit test at desktop, at a scroll offset and at phone width, plus the
 # banner-over-backdrop property the same change could have cost):
 #   npx playwright test --list  -> 119 tests, 18 files
-total_specs: 119
+#
+# Re-derived again, DOWNWARD, when e2e/phantom_deeplink.spec.js (THREE tests in one
+# file) left this repo with the two-template split: the partial it drove,
+# studio/solana/_phantom_deeplink, now lives in solana-studio, and so does the
+# /lab/phantom_deeplink fixture it browsed. A spec cannot stay behind its subject.
+# Counted with the lister on THIS tree, not by subtracting 3 from the line above:
+#   npx playwright test --list  -> 116 tests, 17 files
+#
+# NOTE: solana-studio's own lane does NOT yet carry a replacement. Those three
+# specs proved the deep link's INLINED base58 program parses and runs in a real
+# browser — the one property a markup assertion cannot reach. Porting them into
+# the gem's lane is filed as follow-up work; until it lands that coverage exists
+# in neither repo.
+total_specs: 116
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -624,7 +637,13 @@ total_specs: 119
 # executed = total - devnet - allowed_skips = 119 - 0 - 0 = 119, so executed ==
 # total_specs and the equality assertion holds. Moved 115 -> 119 for the four
 # toast_over_banner specs.
-executed: 119
+# Re-derived again on THIS tree with the lister when the three phantom_deeplink
+# specs left for solana-studio:
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 116
+# executed = total - devnet - allowed_skips = 116 - 0 - 0 = 116, so executed ==
+# total_specs and the equality assertion holds.
+executed: 116
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
