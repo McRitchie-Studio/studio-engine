@@ -42,7 +42,6 @@ Rails.application.routes.draw do
   get "up", to: "e2e_lab#up"
   get "lab/bar_stack", to: "e2e_lab#bar_stack"
   get "lab/at_time", to: "e2e_lab#at_time"
-  get "lab/phantom_deeplink", to: "e2e_lab#phantom_deeplink"
   get "lab/email_banner_frames", to: "e2e_lab#email_banner_frames"
   get "lab/email_banner_editor", to: "e2e_lab#email_banner_editor"
   get "lab/birthday_gate", to: "e2e_lab#birthday_gate"

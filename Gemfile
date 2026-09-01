@@ -30,3 +30,28 @@ group :development, :test do
   # test fixture. Not a runtime dependency — consuming apps bring their own server.
   gem "puma", ">= 6.0"
 end
+
+# solana-studio backs the style guide's THREE web3 specimens (Connect wallet and
+# the two Sign Wallet cards). Those partials used to live here, in
+# app/views/studio/modals; the two-template split moved them to the gem —
+# BASE is studio-engine + mcritchie-studio, WEB3 ADD is solana-studio +
+# turf-monster — because, as the call was made, "the real op sec vector is
+# managing sessions safely. Anything wallet based should be in the app."
+#
+# DEVELOPMENT AND TEST ONLY, and deliberately NOT a gemspec runtime dependency.
+# Declaring it there would push a Solana stack onto every BASE consumer
+# (acquisition-studio, mcritchie-industries, moms-app mount this engine and
+# bundle no solana-studio), which is precisely the coupling the split removed.
+# It is here so the DUMMY app can resolve the gem's partials and the style guide
+# renders the real shipped cards rather than a fork of them.
+#
+# There is no dependency cycle: solana-studio's GEMSPEC declares only ed25519.
+# It lists studio-engine in its own Gemfile, dev-only, which Bundler never reads
+# when solana-studio is consumed as a gem.
+#
+# The style guide self-gates on the partial RESOLVING (style/_modals.html.erb),
+# so an app without this gem renders /admin/style with the web3 cards badged
+# rather than raising a missing-template error.
+group :development, :test do
+  gem "solana-studio", ">= 0.5.3"
+end

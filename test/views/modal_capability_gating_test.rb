@@ -25,12 +25,32 @@ require "action_view"
 #   5. The new modal ids register in the overlay and stay openable when a
 #      capability is off (disabled-but-present preview), never hidden.
 class ModalCapabilityGatingTest < ActiveSupport::TestCase
+  # solana-studio's app/views. The Connect Wallet picker asserted below is the
+  # GEM's partial since the two-template split moved the wallet UI out of this
+  # engine — BASE is studio-engine + mcritchie-studio, WEB3 ADD is solana-studio
+  # + turf-monster. style/_modals gates its registration on the partial
+  # RESOLVING, so without this path the picker is simply absent and the brand-mark
+  # assertions below describe a page that never rendered one.
+  #
+  # The dummy app REQUIRES solana-studio (test/dummy/config/application.rb), so
+  # this is the faithful render. The absent-gem rendering is asserted directly in
+  # test/views/style_web3_specimens_test.rb instead.
+  #
+  # NOTE the sprite ids asserted here (se-wallet-*) come from THIS engine —
+  # studio/modals/blocks/_wallet_brand_sprite, which the gem's picker renders by
+  # name across the gem boundary. That cross-repo contract is pinned in
+  # style_web3_specimens_test.
+  GEM_VIEWS = File.join(
+    Gem::Specification.find_by_name("solana-studio").gem_dir, "app/views"
+  ).freeze
+
   def render_index
     # A host renders these views through ApplicationController, which has EVERY
     # engine helper mixed in (no isolate_namespace). A bare test view has none, so
     # give it the whole set rather than the one module today's specimens happen to
     # call — otherwise the next helper-backed specimen breaks all five harnesses.
-    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    view = ActionView::Base.with_empty_template_cache
+                           .with_view_paths(["app/views", GEM_VIEWS])
     view.extend(Studio::Engine.helpers)
     view.render(template: "style/index")
   end

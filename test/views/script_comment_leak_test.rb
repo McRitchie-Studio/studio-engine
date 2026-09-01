@@ -16,7 +16,7 @@ require "fileutils"
 # THE SURFACE THIS ADDS. test/views/erb_comment_leak_test.rb guards the ERB
 # comment form in these same files. It does not look inside <script> blocks, and
 # that is where the engine keeps its browser programs: studio/modals/_host,
-# studio/solana/_phantom_deeplink, layouts/studio/_head and the modal blocks all
+# solana_sessions/phantom_callback, layouts/studio/_head and the modal blocks all
 # ship substantial JavaScript with substantial comments. Measured at
 # origin/accepted on 2026-08-31, those blocks hold 1_239 comments and 73_913
 # bytes of comment body that NO guard read. A green run of the ERB guard on a

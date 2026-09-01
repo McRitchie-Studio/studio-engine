@@ -14,6 +14,26 @@ require "action_mailer/railtie"
 # which auto-registers the engine's app/* paths as a railtie of this app.
 require "studio"
 
+# THE WEB3 HALF, WHICH THIS ENGINE NO LONGER SHIPS. wallet_connect and
+# web3_step_up used to live in app/views/studio/modals; the two-template split
+# moved them to solana-studio (BASE is studio-engine + mcritchie-studio, WEB3
+# ADD is solana-studio + turf-monster) because, as the call was made, "the real
+# op sec vector is managing sessions safely. Anything wallet based should be in
+# the app."
+#
+# It is required HERE, and only here, so the style guide can render the REAL
+# shipped cards instead of a fork of them — SolanaStudio::Engine registers the
+# gem's app/views, which is what makes `render "solana_studio/modals/..."`
+# resolve. Development and test only (see the Gemfile); it is NOT a gemspec
+# runtime dependency, because three of the apps mounting this engine
+# (acquisition-studio, mcritchie-industries, moms-app) bundle no solana-studio
+# and must never be made to. The style guide self-gates on the partial resolving
+# for exactly that reason.
+#
+# Requiring it after `require "rails"` above is load-bearing: lib/solana_studio.rb
+# only pulls in its Rails half when Rails::Engine is already defined.
+require "solana_studio"
+
 module Dummy
   class Application < Rails::Application
     # Pin the app root to test/dummy. Without a config.ru marker, Rails' root
