@@ -1,0 +1,10 @@
+<%# Per-agent access chips — who may know this document, at which depth.
+    Renders the map the document actually carries (any agent slug), so a chip
+    never lies about roster membership. Locals: doc:. %>
+<% if doc.access.blank? %>
+  <span class="knowledge-chip knowledge-chip-none">no agents</span>
+<% else %>
+  <% doc.access.sort.each do |agent, level| %>
+    <span class="knowledge-chip knowledge-chip-<%= level %>"><%= agent %> · <%= level %></span>
+  <% end %>
+<% end %>

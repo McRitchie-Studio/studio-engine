@@ -1,0 +1,115 @@
+<%# The knowledge-layer browser. Locals:
+      view:       "folders" | "flat"
+      folder:     current folder path ("" = root; folder view only)
+      entity:     entity filter or nil
+      status:     status filter or nil
+      entities:   all entity slugs (for the filter row)
+      folders:    immediate child folder names (folder view)
+      docs:       the documents to list
+      inbox_size: count of inbox docs in the current scope
+
+    Styling note: gem-specific looks live in the scoped <style> below because a
+    host's Tailwind build may not scan this gem's views (same reasoning as the
+    geo grid). Layout leans on utilities every host already ships. %>
+<style>
+  .knowledge-chip { display: inline-block; padding: 0 .5rem; border-radius: 9999px;
+    font-size: .7rem; line-height: 1.4rem; border: 1px solid transparent; white-space: nowrap; }
+  .knowledge-chip-full  { background: rgb(16 185 129 / .12); border-color: rgb(16 185 129 / .4); color: rgb(5 150 105); }
+  .knowledge-chip-aware { background: rgb(245 158 11 / .12); border-color: rgb(245 158 11 / .4); color: rgb(180 83 9); }
+  .knowledge-chip-none  { background: rgb(148 163 184 / .12); border-color: rgb(148 163 184 / .4); color: rgb(100 116 139); }
+  .knowledge-status { font-size: .7rem; padding: 0 .45rem; border-radius: .25rem; border: 1px solid rgb(148 163 184 / .5); }
+  .knowledge-status-inbox      { border-color: rgb(245 158 11 / .6); color: rgb(180 83 9); }
+  .knowledge-status-superseded { text-decoration: line-through; opacity: .6; }
+  .knowledge-folder { display: inline-flex; align-items: center; gap: .4rem; padding: .35rem .75rem;
+    border: 1px solid rgb(148 163 184 / .4); border-radius: .5rem; }
+</style>
+
+<% unless Studio::S3.configured? %>
+  <div id="knowledge-storage-warning" class="mb-4 p-3 border rounded" style="border-color: rgb(239 68 68 / .5); color: rgb(220 38 38);">
+    Object storage is not configured — set <code>Studio.s3_bucket_prefix</code> in
+    <code>config/initializers/studio.rb</code>. Uploads will refuse rather than
+    silently drop files.
+  </div>
+<% end %>
+
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+  <h1 class="text-xl font-semibold">
+    Knowledge
+    <% if inbox_size.to_i.positive? %>
+      <%= link_to "#{inbox_size} in inbox",
+                  admin_knowledge_path(view: "flat", entity: entity, status: "inbox"),
+                  id: "knowledge-inbox-badge", class: "knowledge-status knowledge-status-inbox ml-2 align-middle" %>
+    <% end %>
+  </h1>
+  <div id="knowledge-view-toggle" class="flex items-center gap-2 text-sm">
+    <%= link_to "Folders", admin_knowledge_path(view: "folders", entity: entity, status: status),
+                class: view == "folders" ? "font-semibold underline" : "" %>
+    <span aria-hidden="true">·</span>
+    <%= link_to "Show all", admin_knowledge_path(view: "flat", entity: entity, status: status),
+                class: view == "flat" ? "font-semibold underline" : "" %>
+  </div>
+</div>
+
+<% if entities.length > 1 || entity %>
+  <div id="knowledge-entity-filter" class="flex flex-wrap items-center gap-2 mb-3 text-sm">
+    <%= link_to "All entities", admin_knowledge_path(view: view),
+                class: entity ? "" : "font-semibold underline" %>
+    <% entities.each do |candidate| %>
+      <%= link_to candidate, admin_knowledge_path(view: view, entity: candidate),
+                  class: candidate == entity ? "font-semibold underline" : "" %>
+    <% end %>
+  </div>
+<% end %>
+
+<% if view == "folders" %>
+  <nav id="knowledge-breadcrumbs" class="text-sm mb-3">
+    <%= link_to "root", admin_knowledge_path(view: "folders", entity: entity, status: status) %>
+    <% segments = folder.blank? ? [] : folder.split("/") %>
+    <% segments.each_with_index do |segment, index| %>
+      <span aria-hidden="true">/</span>
+      <%= link_to segment,
+                  admin_knowledge_path(view: "folders", entity: entity, status: status,
+                                       folder: segments[0..index].join("/")) %>
+    <% end %>
+  </nav>
+
+  <% if folders.any? %>
+    <div class="flex flex-wrap gap-2 mb-4">
+      <% folders.each do |name| %>
+        <%= link_to admin_knowledge_path(view: "folders", entity: entity, status: status,
+                                         folder: [folder.presence, name].compact.join("/")),
+                    id: "knowledge-folder-#{name.parameterize}", class: "knowledge-folder" do %>
+          <span aria-hidden="true">📁</span> <%= name %>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>
+
+<% if docs.any? %>
+  <div class="overflow-x-auto">
+    <table id="knowledge-docs" class="w-full text-sm">
+      <thead>
+        <tr class="text-left border-b">
+          <th class="py-2 pr-3">Document</th>
+          <% if view == "flat" %><th class="py-2 pr-3">Folder</th><% end %>
+          <th class="py-2 pr-3">Category</th>
+          <th class="py-2 pr-3">As of</th>
+          <th class="py-2 pr-3">Status</th>
+          <th class="py-2 pr-3">Access</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% docs.each do |doc| %>
+          <%= render "studio/knowledge_docs/doc_row", doc: doc, view: view %>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <p id="knowledge-empty" class="text-sm opacity-70 mb-4">
+    <%= view == "folders" && folder.present? ? "This folder holds no documents." : "No documents yet — upload the first one below." %>
+  </p>
+<% end %>
+
+<%= render "studio/knowledge_docs/upload_form", entity: entity, folder: folder %>

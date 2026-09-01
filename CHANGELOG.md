@@ -6,6 +6,30 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **Knowledge layer primitive** — `Studio::KnowledgeDoc` + `/admin/knowledge`:
+  an S3-backed document store for an entity's business knowledge, built for the
+  McRitchie Industries acquisition agents (Samson/Dawn) but app-agnostic.
+  One row per document: entity, implicit folder `path` (the S3 key mirrors it,
+  so the bucket stays human-browsable), category, `document_date` (the as-of
+  date, distinct from upload time), `inbox → filed → superseded` lifecycle, and
+  a per-agent access map with three levels — `full` (reads the facts), `aware`
+  (knows the document exists and gets the safe `summary` + boundary line, not
+  the contents), `none` (does not see the row). "Aware" exists because an agent
+  with a hole in its context confabulates or stonewalls; one with an awareness
+  entry has something true to say and a boundary to hold.
+  The browser renders folder and flat ("show all") views with breadcrumbs,
+  entity/status filters, an inbox badge, per-agent access chips, and an intake
+  form whose uploads land as `inbox` for triage; downloads are 15-minute
+  presigned GETs. Storage goes through `Studio::S3` and **fails loudly** on an
+  unconfigured app (`NotConfigured` raised, plus a red banner on the browser) —
+  never a silent drop. Routes are opt-in (`Studio.draw_knowledge_routes`,
+  default off); `Studio.knowledge_agents` names the agent roster the intake UI
+  offers selects for. Ships the reference migration
+  `create_studio_knowledge_docs` — consumers run
+  `bin/rails studio_engine:install:migrations && bin/rails db:migrate`.
+  Deferred to a later cut, recorded on the task: coverage view against a
+  diligence tracker, recurring-series tracking, per-folder access defaults.
+
 - **A green comment-leak scan used to mean "not looked at".**
   `test/views/erb_comment_leak_test.rb` guards the ERB comment form in
   `app/views/**/*.erb`. It never looked inside `<script>`, and that is where this
