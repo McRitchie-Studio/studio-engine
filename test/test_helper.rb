@@ -56,6 +56,9 @@ module Studio
   # mirror has to carry the real default rather than a convenient one.
   mattr_accessor :profile_sections,     default: nil
   mattr_accessor :draw_profile_routes,  default: true
+  # Mirrors the knowledge-layer accessors in lib/studio.rb.
+  mattr_accessor :draw_knowledge_routes, default: false
+  mattr_accessor :knowledge_agents,      default: []
   # Mirrors the geo accessors in lib/studio.rb. Studio::GeoHelper and
   # Studio::Geo::Lookup read them, so the unit suite needs them defined; tests
   # that depend on a specific value set it explicitly and restore it.

@@ -1,0 +1,48 @@
+<%# Intake form — uploads land as status "inbox" for triage; classification is
+    the second step (the show page / the knowledge-intake SOP), so this form
+    asks only for what the uploader knows at drop time. Locals: entity:, folder:
+    (both may be blank; they pre-fill from where the browser stands). %>
+<div id="knowledge-upload" class="mt-6 p-4 border rounded">
+  <h2 class="font-semibold mb-3">Add a document</h2>
+  <%= form_with url: admin_knowledge_path, method: :post, multipart: true, local: true do |form| %>
+    <div class="grid gap-3 md:grid-cols-2">
+      <label class="block text-sm">
+        <span class="block mb-1">File</span>
+        <%= form.file_field "knowledge_doc[file]", required: true, class: "block w-full text-sm" %>
+      </label>
+      <label class="block text-sm">
+        <span class="block mb-1">Title <span class="opacity-60">(blank = from filename)</span></span>
+        <%= form.text_field "knowledge_doc[title]", class: "block w-full border rounded px-2 py-1" %>
+      </label>
+      <label class="block text-sm">
+        <span class="block mb-1">Entity</span>
+        <%= form.text_field "knowledge_doc[entity]", value: entity, required: true,
+                            placeholder: "commercial-welding-llc", class: "block w-full border rounded px-2 py-1" %>
+      </label>
+      <label class="block text-sm">
+        <span class="block mb-1">Folder</span>
+        <%= form.text_field "knowledge_doc[path]", value: folder,
+                            placeholder: "financials/aging-inventory/2026-08", class: "block w-full border rounded px-2 py-1" %>
+      </label>
+      <label class="block text-sm">
+        <span class="block mb-1">Document date <span class="opacity-60">(the as-of date, not today)</span></span>
+        <%= form.date_field "knowledge_doc[document_date]", class: "block w-full border rounded px-2 py-1" %>
+      </label>
+      <label class="block text-sm">
+        <span class="block mb-1">Source <span class="opacity-60">(who/where it came from)</span></span>
+        <%= form.text_field "knowledge_doc[source_note]", class: "block w-full border rounded px-2 py-1" %>
+      </label>
+      <% Array(Studio.knowledge_agents).each do |agent| %>
+        <label class="block text-sm" id="knowledge-access-<%= agent %>">
+          <span class="block mb-1">Access — <%= agent %></span>
+          <%= form.select "knowledge_doc[access][#{agent}]",
+                          [["none (default)", ""], ["aware — knows it exists", "aware"], ["full — reads the facts", "full"]],
+                          {}, class: "block w-full border rounded px-2 py-1" %>
+        </label>
+      <% end %>
+    </div>
+    <div class="mt-3">
+      <%= form.submit "Upload to inbox", class: "px-3 py-1.5 border rounded font-medium" %>
+    </div>
+  <% end %>
+</div>
