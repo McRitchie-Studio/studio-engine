@@ -1,0 +1,6 @@
+<%# /admin/knowledge — bare content wrapper; the browser partial is the
+    primitive (renderable + testable on its own, like studio/board/_board). %>
+<%= render "studio/knowledge_docs/browser",
+           view: @view, folder: @folder, entity: @entity, status: @status,
+           entities: @entities, folders: @folders, docs: @docs,
+           inbox_size: @inbox_size %>

@@ -554,6 +554,14 @@ module Studio
   # A trailing slash is added if you leave it off.
   mattr_accessor :s3_key_prefix, default: nil
 
+  # Knowledge layer — the S3-backed document store + /admin/knowledge browser
+  # (Studio::KnowledgeDoc). Routes are opt-in like every route surface.
+  # knowledge_agents is the roster of agent slugs the intake UI offers
+  # per-agent access selects for (e.g. %w[samson dawn] on Industries); the
+  # access map itself accepts any agent slug regardless.
+  mattr_accessor :draw_knowledge_routes, default: false
+  mattr_accessor :knowledge_agents,      default: []
+
   class S3ConfigError < StandardError; end
 
   # Whether to validate the host app's User model at boot. See docs/USER_CONTRACT.md.
@@ -844,6 +852,19 @@ module Studio
              constraints: { token: %r{[^/]+} }
         post "l/:token", to: "studio/links#consume", as: :link_consume,
              constraints: { token: %r{[^/]+} }
+      end
+
+      # Knowledge layer — /admin/knowledge (Studio::KnowledgeDoc): folder/flat
+      # document browser, upload-to-inbox intake, per-agent access map, and
+      # 15-minute presigned downloads. Opt-in (default off) like every route
+      # surface, so no app grows an admin page it never asked for.
+      if Studio.draw_knowledge_routes
+        get   "admin/knowledge",     to: "studio/knowledge_docs#index", as: :admin_knowledge
+        post  "admin/knowledge",     to: "studio/knowledge_docs#create"
+        get   "admin/knowledge/:id", to: "studio/knowledge_docs#show",  as: :admin_knowledge_doc
+        patch "admin/knowledge/:id", to: "studio/knowledge_docs#update"
+        get   "admin/knowledge/:id/download", to: "studio/knowledge_docs#download",
+              as: :admin_knowledge_doc_download
       end
 
       # Solana / Phantom wallet sign-in (nonce challenge + signature verify),
