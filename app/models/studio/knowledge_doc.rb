@@ -93,8 +93,13 @@ module Studio
       end
 
       # "/a//b/" -> "a/b". Nil-safe; the empty string is the root folder.
+      # Dot segments are dropped ("a/../b" -> "a/b"): harmless server-side, but
+      # the S3 key mirrors the path and a ".." reads as traversal to every
+      # scanner and human who ever greps the bucket.
       def normalize_path(value)
-        value.to_s.strip.squeeze("/").delete_prefix("/").delete_suffix("/")
+        value.to_s.strip.squeeze("/").split("/")
+             .reject { |segment| segment.empty? || segment == "." || segment == ".." }
+             .join("/")
       end
 
       def default_title(file)
@@ -105,8 +110,11 @@ module Studio
 
     # --- access ---------------------------------------------------------------
 
+    # The queried agent is normalized the same way written keys are, so a
+    # capitalized Studio.knowledge_agents roster entry reads its real level
+    # instead of silently defaulting to "none".
     def access_for(agent)
-      level = access.is_a?(Hash) ? access[agent.to_s] : nil
+      level = access.is_a?(Hash) ? access[agent.to_s.strip.downcase] : nil
       ACCESS_LEVELS.include?(level) ? level : "none"
     end
 
@@ -133,9 +141,13 @@ module Studio
       content_type = file.respond_to?(:content_type) ? file.content_type : nil
       body = file.respond_to?(:read) ? file.read : file.to_s
 
+      # The random suffix is load-bearing: the timestamp is second-granularity,
+      # so two same-named uploads in one second would otherwise write the same
+      # key — the second S3 PUT overwrites the first object BEFORE the unique
+      # index rejects the second row (found in PR #251 review, twice over).
       key = [
         "knowledge", entity, path.presence,
-        "#{Time.current.strftime('%Y%m%d%H%M%S')}-#{self.class.sanitize_filename(filename)}"
+        "#{Time.current.strftime('%Y%m%d%H%M%S')}-#{SecureRandom.hex(4)}-#{self.class.sanitize_filename(filename)}"
       ].compact.join("/")
 
       Studio::S3.upload(key: key, body: body, content_type: content_type)

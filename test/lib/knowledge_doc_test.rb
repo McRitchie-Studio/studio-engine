@@ -68,6 +68,13 @@ class KnowledgeDocTest < ActiveSupport::TestCase
     assert_equal %w[financials aging], doc.folder_segments
   end
 
+  test "dot segments are dropped from paths — the S3 key mirrors them" do
+    assert_equal "a/b",    Doc.normalize_path("a/../b")
+    assert_equal "a/b",    Doc.normalize_path("a/./b")
+    assert_equal "secret", Doc.normalize_path("../secret")
+    assert_equal "",       Doc.normalize_path("../..")
+  end
+
   test "access map normalizes keys and rejects unknown levels" do
     doc = doc!(access: { "Samson " => "FULL", "dawn" => "aware" })
     assert_equal({ "samson" => "full", "dawn" => "aware" }, doc.access)
@@ -90,6 +97,32 @@ class KnowledgeDocTest < ActiveSupport::TestCase
     refute doc.full_for?(:dawn)
     assert doc.visible_to?(:dawn), "aware means the agent may know it exists"
     refute doc.visible_to?(:steffon)
+  end
+
+  test "access_for normalizes the queried agent like writes normalize keys" do
+    doc = doc!(access: { "samson" => "full" })
+    assert_equal "full", doc.access_for("SAMSON"),
+      "a capitalized Studio.knowledge_agents roster entry must not read none"
+    assert_equal "full", doc.access_for(" Samson ")
+  end
+
+  test "same-second same-name uploads get distinct keys" do
+    Studio.s3_bucket_prefix = "test-bucket"
+    uploaded = []
+    original = Studio::S3.method(:upload)
+    Studio::S3.define_singleton_method(:upload) { |key:, **| uploaded << key; "url" }
+    begin
+      travel_to Time.current do
+        a = Doc.new(title: "a", entity: "welding", path: "deal")
+        b = Doc.new(title: "b", entity: "welding", path: "deal")
+        a.attach!(UploadStub.new("report.pdf", "application/pdf", "x"))
+        b.attach!(UploadStub.new("report.pdf", "application/pdf", "y"))
+      end
+    ensure
+      Studio::S3.define_singleton_method(:upload, original)
+    end
+    assert_equal 2, uploaded.uniq.size,
+      "the second PUT would silently overwrite the first object before the unique index could refuse"
   end
 
   # --- implicit folders ------------------------------------------------------

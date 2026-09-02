@@ -4,6 +4,21 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **Knowledge layer hardening** — the five findings from the 0.67.0 reviews:
+  upload keys carry a random suffix (same-named uploads in the same second no
+  longer overwrite the first object before the unique index can refuse);
+  `normalize_path` drops dot segments (`a/../b` → `a/b` — the S3 key mirrors
+  the path, and a `..` reads as traversal to every scanner); `access_for`
+  normalizes the queried agent the way writes normalize keys (a capitalized
+  `Studio.knowledge_agents` roster entry no longer reads `none`); the inbox
+  badge counts before the status filter (filtering to `filed` no longer zeroes
+  it); chip styles moved to one shared partial (`_chip_styles`); and reference
+  migrations are now written omakase-rubocop-compatible, with the convention
+  noted in the migration header (consumer copies are linted by the consumer's
+  rubocop — measured on the Industries adoption ship).
+
 ### Added
 
 - **Knowledge layer primitive** — `Studio::KnowledgeDoc` + `/admin/knowledge`:
