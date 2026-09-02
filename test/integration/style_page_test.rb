@@ -577,10 +577,19 @@ class StylePageTest < ActiveSupport::TestCase
   test "the auth modal gates each credential method + terms via props" do
     html = render_index
     assert_includes html, "methodOn('google')", "Google is gated"
-    assert_includes html, "methodOn('wallet')", "Solana wallet is gated"
     assert_includes html, "methodOn('magicLink')", "magic link is gated"
     assert_includes html, "termsOn()", "the age-attestation terms block is gated"
     assert_includes html, "_methodDefaults", "method defaults come from Studio.auth_method?"
+
+    # The wallet term is the one that cannot be asked of the whole page. Read the
+    # CTA's OWN x-show; see the helper below for what the bare form was reading.
+    gate = wallet_cta_visibility_gate(html)
+    refute_nil gate,
+      "the wallet CTA must carry an x-show AT ALL — moving the decision into ERB " \
+      "is the exact substitution the bare substring could not see"
+    assert_includes gate, "methodOn('wallet')",
+      "Solana wallet is gated — by methodOn on the CTA itself, not by a term the " \
+      "page happens to contain elsewhere"
   end
 
   # Item 4 — the magic-link-resent step has its own specimen.
@@ -1647,6 +1656,173 @@ class StylePageTest < ActiveSupport::TestCase
       "the celebration borrows the engine's header"
     assert_includes news, %(render "studio/modals/blocks/seeds_bar"),
       "and the engine's :leveling seeds bar — the bar is the engine's, the numbers are the app's"
+  end
+
+  # --- the wallet CTA's own visibility gate ---------------------------------
+  #
+  # WHY THE WALLET TERM GOT ITS OWN HELPER while google, magicLink and termsOn
+  # stay bare substrings above. MEASURED on the rendered page, not reasoned:
+  # `methodOn('wallet')` occurs TWICE, and only one occurrence is the gem's CTA.
+  # The other is ENGINE-owned, three lines below the render call in
+  # style/modals/_auth.html.erb, on the "or" divider:
+  #
+  #   x-show="methodOn('magicLink') && (methodOn('google') || methodOn('wallet'))"
+  #
+  # That divider sits OUTSIDE the wallet_credential_available guard, so it is on
+  # the page whether or not the gem contributed a button. Deleting the CTA's
+  # x-show OUTRIGHT left the old `assert_includes html, "methodOn('wallet')"`
+  # GREEN: it was reading an engine-owned divider while reporting on a gem-owned
+  # gate. The siblings are genuinely fine — google and magicLink each occur twice
+  # too, but every occurrence of each is a real gate, so the weaker question they
+  # ask still has only the right answers available.
+  #
+  # NOT NOKOGIRI, in a file that otherwise reaches for it, and this is the
+  # surprise worth writing down: Nokogiri::HTML's HTML4 parser MANGLES the CTA's
+  # Alpine handler. `@click="… .swap('wallet-connect', { backTo: 'auth' …"` comes
+  # back as an attribute named `backto:`, so a DOM search for the element
+  # carrying the swap call finds NOTHING — a rebind through it would fail
+  # vacuously in the other direction. Nokogiri::HTML5 parses it correctly; the
+  # string window below needs neither.
+  #
+  # The same property is asserted from the gem's side in
+  # test/views/style_web3_specimens_test.rb. This one is the page's copy: it
+  # proves the STYLE GUIDE ships a gated CTA, which is what this file is for.
+
+  # The swap call carrying its literal target id — what identifies the CTA
+  # element, rather than a name that merely implies it.
+  WALLET_CTA_ANCHOR = /\.swap\(\s*'wallet-connect'/
+
+  # The wallet CTA's OWN open tag, windowed out of the AUTH specimen block.
+  #
+  # Windowed to that block first because the anchor occurs TWICE on the full
+  # page — the CTA here, and the wallet-connect specimen's own card further down
+  # (measured: byte 74_792 and byte 239_160). Inside the auth block it occurs
+  # exactly once, so the anchor identifies one element rather than the first of
+  # two.
+  def wallet_cta_element(html = render_index)
+    block = specimen_block("auth", html)
+    return nil unless block
+    return nil unless block.match?(WALLET_CTA_ANCHOR)
+
+    open_tag_containing(block, WALLET_CTA_ANCHOR)
+  end
+
+  # A well-formed HTML OPEN TAG, whole. Attribute names are deliberately loose
+  # (`@click`, `:disabled`, `x-show` are all legal here); values are the three
+  # HTML shapes. This is the shape check the walk below validates its answer
+  # against — an overrun window carries following markup, which cannot match.
+  OPEN_TAG = %r{\A<[A-Za-z][^\s>/]*(?:\s+[^\s=>/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*))?)*\s*/?>\z}
+
+  # The open tag of the element whose ATTRIBUTES contain `anchor`, from its "<"
+  # to the ">" that closes it. Nil ONLY when the anchor is genuinely absent;
+  # every other unhappy path raises, loudly, by name.
+  #
+  # The quote-aware walk is not ceremony: the CTA's @click carries a
+  # single-quoted modal id inside a double-quoted attribute, and a naive
+  # index(">") would truncate the tag one attribute short of the x-show this
+  # exists to read.
+  #
+  # AND IT IS GUARDED, which the first version of this walk (shipped in
+  # style_web3_specimens_test.rb, and corrected there in the same commit) was
+  # not. rindex("<") can land inside an EARLIER attribute VALUE instead of on the
+  # tag's own "<". The walk then starts mid-string with its quote state INVERTED
+  # from the first character, and from there it can run off the end, close on a
+  # ">" that precedes the anchor, or sail past the real ">" and return kilobytes
+  # of following markup while calling it an element — answering this test's
+  # question about some other part of the page.
+  #
+  # No ONE invariant catches every misaligned shape; MEASURED, each of the four
+  # below catches shapes the others miss, so all four are checked:
+  #   · the anchor is present but the walk found no closing ">"  (ran off the end)
+  #   · the ">" it closed on precedes the anchor                 (wrong element)
+  #   · an UNQUOTED "<" appeared before the ">"                  (state inverted)
+  #   · the window is not a single well-formed open tag          (overrun)
+  # test_the_CTA_window_refuses_a_misaligned_start exercises three of the four
+  # against constructed markup; the fourth is the aligned control.
+  def open_tag_containing(source, anchor)
+    source = source.to_s
+    site = source.index(anchor)
+    return nil unless site
+
+    start = source.rindex("<", site)
+    raise "open_tag_containing: misaligned — no \"<\" precedes the anchor" unless start
+
+    element = nil
+    quote = nil
+    cursor = start
+    while (cursor += 1) < source.length
+      char = source[cursor]
+      if quote
+        quote = nil if char == quote
+      elsif ['"', "'"].include?(char)
+        quote = char
+      elsif char == "<"
+        raise "open_tag_containing: misaligned — an unquoted \"<\" appears before " \
+              "the tag closed, so the walk's quote state is inverted"
+      elsif char == ">"
+        element = source[start..cursor]
+        break
+      end
+    end
+
+    raise "open_tag_containing: misaligned — the anchor is present but no tag " \
+          "closed after it (the walk ran off the end)" unless element
+    raise "open_tag_containing: misaligned — the tag closed BEFORE the anchor, " \
+          "so this window is not the element carrying it" unless cursor > site
+    raise "open_tag_containing: misaligned — the window is not a single open " \
+          "tag (#{element.bytesize} bytes), so it overran the element" \
+          unless element.match?(OPEN_TAG)
+
+    element
+  end
+
+  # The x-show EXPRESSION on the wallet CTA, or nil when it carries none.
+  #
+  # Reading the EXPRESSION rather than the whole attribute is deliberate: the
+  # concern is that methodOn still owns visibility, never how the call is spelled
+  # — so a gem tolerating a host that defines no methodOn
+  # (`typeof methodOn === 'function' ? methodOn('wallet') : true`) satisfies it,
+  # while deleting the x-show or moving the decision into ERB does not.
+  def wallet_cta_visibility_gate(html = render_index)
+    wallet_cta_element(html)&.slice(/\sx-show="([^"]*)"/, 1)
+  end
+
+  # The guard above, exercised. Without this its four branches are prose: the
+  # shipped markup happens to carry no "<" in an attribute value before the CTA's
+  # swap call, so nothing on the real page would ever reach them.
+  test "the CTA window refuses a misaligned start instead of overrunning" do
+    # 1. The decoy "<" leaves the walk's quote state inverted from its first
+    #    character, and it runs off the end without ever closing a tag.
+    ran_off = %(<button x-text="a < b" @click="$store.m.swap('wallet-connect')">x</button>) +
+              %(<div>markup an overrun would swallow</div>)
+    assert_includes assert_raises(RuntimeError) {
+      open_tag_containing(ran_off, WALLET_CTA_ANCHOR)
+    }.message, "ran off the end"
+
+    # 2. The decoy carries its own ">", so the walk closes BEFORE the anchor and
+    #    returns a window that does not contain the thing it was asked about.
+    closes_early = %(<button x-html="<b>" @click="$store.m.swap('wallet-connect')">x</button>)
+    assert_includes assert_raises(RuntimeError) {
+      open_tag_containing(closes_early, WALLET_CTA_ANCHOR)
+    }.message, "closed BEFORE the anchor"
+
+    # 3. An odd quote in later TEXT re-flips the inverted state, so the walk
+    #    reaches real markup — the kilobyte overrun, caught before it returns.
+    reflips = %(<button title="a <b" @click="$store.m.swap('wallet-connect')">x</button>) +
+              %(<p>6" pipe</p><div>tail</div>)
+    assert_includes assert_raises(RuntimeError) {
+      open_tag_containing(reflips, WALLET_CTA_ANCHOR)
+    }.message, "unquoted"
+
+    # 4. The control — the same tag WITHOUT a decoy windows to itself EXACTLY, so
+    #    the guard rejects misalignment rather than rejecting the walk.
+    aligned = %(<button x-text="a b" @click="$store.m.swap('wallet-connect')" x-show="methodOn('wallet')">x</button>) +
+              %(<div>markup</div>)
+    assert_equal %(<button x-text="a b" @click="$store.m.swap('wallet-connect')" x-show="methodOn('wallet')">),
+      open_tag_containing(aligned, WALLET_CTA_ANCHOR)
+
+    # A genuinely absent anchor is the ONE nil, and it is not an error.
+    assert_nil open_tag_containing(%(<div>no anchor here</div>), WALLET_CTA_ANCHOR)
   end
 
 end

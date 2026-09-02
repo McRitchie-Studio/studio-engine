@@ -530,8 +530,18 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
   # Why this bites harder, not softer:
   #   · it matches the SWAP CALL carrying its literal target id, which is the
   #     thing that actually opens the panel, not a name that merely implies it;
-  #   · the leading dot requires a store RECEIVER, so prose in a rendered JS or
-  #     HTML comment naming the swap cannot satisfy it;
+  #   · the leading dot requires a RECEIVER, so a bare `swap('wallet-connect')`
+  #     — a definition, or prose naming the method alone — cannot satisfy it.
+  #     It does NOT exclude prose generally, and an earlier draft of this comment
+  #     claimed it did: a rendered comment quoting the whole call WITH its
+  #     receiver ("…calls $store.dsModals.swap('wallet-connect', …)") matches
+  #     this regex exactly as a real call site does. That mattered enough to
+  #     correct because the claim became load-bearing — style_page_test's CTA
+  #     window anchors on this same shape. What actually separates prose from a
+  #     call there is not the regex: it is that the window must resolve to a
+  #     well-formed OPEN TAG carrying the anchor in an attribute, which a comment
+  #     cannot. MEASURED on the rendered page today: two matches, both real
+  #     elements, no prose site;
   #   · it still catches the call behind ANY attribute — @click today, @keydown
   #     or a future x-on tomorrow — which was the original stated intent;
   #   · it needs no definition-exclusion lookahead, because the engine defines
@@ -549,14 +559,29 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
   # single-quoted modal id inside a double-quoted attribute, and a naive
   # index(">") would be one bad attribute away from truncating the tag and
   # silently dropping the very attribute this file is here to read.
+  #
+  # AND IT IS NOW GUARDED. The first version of this walk was not, and nothing
+  # checked that: rindex("<") can land inside an EARLIER attribute VALUE instead
+  # of on the tag's own "<", after which the walk starts mid-string with its
+  # quote state INVERTED and can run off the end, close on a ">" that precedes
+  # the anchor, or sail past the real ">" and hand back kilobytes of following
+  # markup while calling it an element (a constructed case measured 3375 bytes
+  # against a real 284). It fails safe on the markup either partial ships today,
+  # but "today's markup happens to be kind" is not a guard.
+  #
+  # No ONE invariant catches every misaligned shape, so all four are checked and
+  # every one of them RAISES. Nil means one thing only: the anchor is absent.
+  # style_page_test's open_tag_containing is the same contract, exercised there
+  # against constructed misalignment.
   def wallet_cta_element(html)
     html = html.to_s
     site = html.index(/\.swap\(\s*'wallet-connect'/)
     return nil unless site
 
     start = html.rindex("<", site)
-    return nil unless start
+    raise "wallet_cta_element: misaligned — no \"<\" precedes the anchor" unless start
 
+    element = nil
     quote = nil
     cursor = start
     while (cursor += 1) < html.length
@@ -565,12 +590,29 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
         quote = nil if char == quote
       elsif ['"', "'"].include?(char)
         quote = char
+      elsif char == "<"
+        raise "wallet_cta_element: misaligned — an unquoted \"<\" appears before " \
+              "the tag closed, so the walk's quote state is inverted"
       elsif char == ">"
-        return html[start..cursor]
+        element = html[start..cursor]
+        break
       end
     end
-    nil
+
+    raise "wallet_cta_element: misaligned — the anchor is present but no tag " \
+          "closed after it (the walk ran off the end)" unless element
+    raise "wallet_cta_element: misaligned — the tag closed BEFORE the anchor, " \
+          "so this window is not the element carrying it" unless cursor > site
+    raise "wallet_cta_element: misaligned — the window is not a single open tag " \
+          "(#{element.bytesize} bytes), so it overran the element" unless element.match?(OPEN_TAG)
+
+    element
   end
+
+  # A well-formed HTML OPEN TAG, whole. Attribute names are deliberately loose
+  # (`@click`, `:disabled`, `x-show` are all legal here); values are the three
+  # HTML shapes. An overrun window carries following markup, which cannot match.
+  OPEN_TAG = %r{\A<[A-Za-z][^\s>/]*(?:\s+[^\s=>/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*))?)*\s*/?>\z}
 
   # The x-show EXPRESSION on the wallet CTA, or nil when it carries none.
   #
@@ -586,9 +628,19 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
   # document-wide substring assert stays GREEN with the CTA's gate deleted
   # outright — reading an engine-owned divider while claiming to check a
   # gem-owned gate. It is the same failure registration_for and specimen_state
-  # already document, one seam over. style_page_test's bare form is sound where
-  # it lives, asking a weaker question of the whole page; copied to here it
-  # removes the guard while looking like it fixed it.
+  # already document, one seam over.
+  #
+  # AN EARLIER DRAFT OF THIS COMMENT SAID style_page_test's bare form was "sound
+  # where it lives, asking a weaker question of the whole page". That was wrong,
+  # and wrong in the direction that buries findings. For the WALLET term the bare
+  # form was not asking a weaker question — it was asking a DIFFERENT one, and
+  # answering yes about an engine-owned divider. Measured there too: with this
+  # same gate deleted, style_page_test's wallet assertion stayed green. It is
+  # rebound now (StylePageTest#wallet_cta_visibility_gate). Its google and
+  # magicLink siblings ARE sound in the bare form — each of their two occurrences
+  # is a real gate — which is exactly why the wallet term needed naming rather
+  # than a blanket vouch for the neighbouring file. A comment that over-vouches
+  # for a test one seam over is how an inert guard survives review.
   #
   # Reading the EXPRESSION rather than the whole attribute is the actual repair.
   # The concern is that methodOn still owns visibility, never how that call is
