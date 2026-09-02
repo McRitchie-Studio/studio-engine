@@ -182,8 +182,9 @@
         return { connecting: false, error: null, statusText: 'Connect Wallet',
                  walletAvailable: false, isMobile: false, connect: function () {} };
       };
-      // Connect stub for the promoted wallet picker (studio/modals/_wallet_connect,
-      // configured by style/modals/_wallet_connect). Performs NO connect: it
+      // Connect stub for the wallet picker (solana-studio
+      // solana_studio/modals/_wallet_connect, configured by
+      // style/modals/_wallet_connect). Performs NO connect: it
       // resolves success after a beat so the picker's connecting state is
       // visible and its onConnected hook can continue the demo walk.
       window.dsWalletConnectDemo = window.dsWalletConnectDemo || function () {
@@ -1169,9 +1170,9 @@
         (<code class="font-mono text-2xs">studio/modals/blocks/_wallet_brand_sprite</code>),
         so every app inherits them with no per-app icon files.
         The two <strong>Sign Wallet</strong> cards are a different kind of thing
-        from the rest of this section: they render
-        <code class="font-mono text-2xs">studio/modals/_web3_step_up</code> &mdash;
-        the <strong>REAL shared partial a host renders in production</strong>,
+        from the rest of this section: they render solana-studio's
+        <code class="font-mono text-2xs">solana_studio/modals/_web3_step_up</code>
+        &mdash; the <strong>REAL shared partial a host renders in production</strong>,
         not a style-guide copy of it &mdash; so what you review here is the
         shipped card, and it cannot drift from what users see. They also carry the
         <strong>standard web3 auth button</strong>: a wallet row (brand mark, the
