@@ -569,10 +569,22 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
   # against a real 284). It fails safe on the markup either partial ships today,
   # but "today's markup happens to be kind" is not a guard.
   #
-  # No ONE invariant catches every misaligned shape, so all four are checked and
-  # every one of them RAISES. Nil means one thing only: the anchor is absent.
-  # style_page_test's open_tag_containing is the same contract, exercised there
-  # against constructed misalignment.
+  # No ONE invariant catches every misaligned shape, so all FIVE below are checked
+  # and every one of them RAISES. Nil means one thing only: the anchor is absent.
+  #
+  # THIS COPY HAS NO GUARD TEST OF ITS OWN. The previous sentence said the
+  # contract was "exercised there" in style_page_test — a neighbour-vouch, and
+  # this file's own rule against neighbour-vouching sits a few dozen lines above
+  # it. Two things were wrong with the vouch: the count was five, not four, and
+  # the neighbour exercised three of them until PR window-guard-branches-are-prose
+  # added the missing two.
+  #
+  # What is true, stated as a fact about THIS file rather than a borrowed one:
+  # wallet_cta_element is a semantic DUPLICATE of style_page_test's
+  # open_tag_containing — same five invariants, same messages bar the method name
+  # — and only that copy is exercised. Extracting both to one shared helper is the
+  # standing fix; until then a change here must be mirrored there BY HAND, and
+  # this comment is the only thing that says so.
   def wallet_cta_element(html)
     html = html.to_s
     site = html.index(/\.swap\(\s*'wallet-connect'/)
