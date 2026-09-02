@@ -1,12 +1,6 @@
 <%# /admin/knowledge/:id — one document: metadata, access, download, and the
     triage form that files it out of the inbox. %>
-<style>
-  .knowledge-chip { display: inline-block; padding: 0 .5rem; border-radius: 9999px;
-    font-size: .7rem; line-height: 1.4rem; border: 1px solid transparent; white-space: nowrap; }
-  .knowledge-chip-full  { background: rgb(16 185 129 / .12); border-color: rgb(16 185 129 / .4); color: rgb(5 150 105); }
-  .knowledge-chip-aware { background: rgb(245 158 11 / .12); border-color: rgb(245 158 11 / .4); color: rgb(180 83 9); }
-  .knowledge-chip-none  { background: rgb(148 163 184 / .12); border-color: rgb(148 163 184 / .4); color: rgb(100 116 139); }
-</style>
+<%= render "studio/knowledge_docs/chip_styles" %>
 
 <div class="mb-4 text-sm">
   <%= link_to "← Knowledge", admin_knowledge_path(folder: @doc.path.presence) %>
@@ -29,7 +23,7 @@
   <div><dt class="opacity-60">Document date</dt><dd><%= @doc.document_date&.iso8601 || "—" %></dd></div>
   <div><dt class="opacity-60">Uploaded</dt><dd><%= @doc.created_at&.to_date&.iso8601 %> by <%= @doc.uploaded_by.presence || "—" %></dd></div>
   <div><dt class="opacity-60">Source</dt><dd><%= @doc.source_note.presence || "—" %></dd></div>
-  <div><dt class="opacity-60">File</dt><dd><%= @doc.file? ? "#{@doc.mime_type.presence || 'file'} · #{number_to_human_size(@doc.byte_size) if @doc.byte_size}" : "metadata only" %></dd></div>
+  <div><dt class="opacity-60">File</dt><dd><%= @doc.file? ? [ @doc.mime_type.presence || "file", (number_to_human_size(@doc.byte_size) if @doc.byte_size) ].compact.join(" · ") : "metadata only" %></dd></div>
   <div class="md:col-span-2"><dt class="opacity-60">Access</dt><dd><%= render "studio/knowledge_docs/access_chips", doc: @doc %></dd></div>
 </dl>
 

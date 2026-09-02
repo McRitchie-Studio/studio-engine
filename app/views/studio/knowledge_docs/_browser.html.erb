@@ -11,12 +11,8 @@
     Styling note: gem-specific looks live in the scoped <style> below because a
     host's Tailwind build may not scan this gem's views (same reasoning as the
     geo grid). Layout leans on utilities every host already ships. %>
+<%= render "studio/knowledge_docs/chip_styles" %>
 <style>
-  .knowledge-chip { display: inline-block; padding: 0 .5rem; border-radius: 9999px;
-    font-size: .7rem; line-height: 1.4rem; border: 1px solid transparent; white-space: nowrap; }
-  .knowledge-chip-full  { background: rgb(16 185 129 / .12); border-color: rgb(16 185 129 / .4); color: rgb(5 150 105); }
-  .knowledge-chip-aware { background: rgb(245 158 11 / .12); border-color: rgb(245 158 11 / .4); color: rgb(180 83 9); }
-  .knowledge-chip-none  { background: rgb(148 163 184 / .12); border-color: rgb(148 163 184 / .4); color: rgb(100 116 139); }
   .knowledge-status { font-size: .7rem; padding: 0 .45rem; border-radius: .25rem; border: 1px solid rgb(148 163 184 / .5); }
   .knowledge-status-inbox      { border-color: rgb(245 158 11 / .6); color: rgb(180 83 9); }
   .knowledge-status-superseded { text-decoration: line-through; opacity: .6; }

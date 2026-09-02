@@ -25,10 +25,13 @@ module Studio
 
       scope = Studio::KnowledgeDoc.order(created_at: :desc)
       scope = scope.for_entity(@entity) if @entity
-      scope = scope.where(status: @status) if @status
 
-      @entities   = Studio::KnowledgeDoc.distinct.pluck(:entity).sort
+      @entities = Studio::KnowledgeDoc.distinct.pluck(:entity).sort
+      # Counted BEFORE the status filter: the badge answers "what waits for
+      # triage in this entity", and filtering to status=filed must not zero it.
       @inbox_size = scope.inbox.count
+
+      scope = scope.where(status: @status) if @status
 
       if @view == "folders"
         @folders = scope.folders_under(@folder)
