@@ -69,7 +69,7 @@
                           class: "block w-full border rounded px-2 py-1" %>
         </label>
       <% end %>
-      <% expectations = Studio::KnowledgeExpectation.active.for_entity(@doc.entity).order(:path, :title) %>
+      <% expectations = @linkable_expectations || [] %>
       <% if expectations.any? %>
         <label class="block text-sm" id="knowledge-expectation-select">
           <span class="block mb-1">Fulfills expectation</span>

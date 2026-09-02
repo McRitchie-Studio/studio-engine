@@ -865,7 +865,8 @@ module Studio
         # or "coverage" is swallowed as a document id.
         get   "admin/knowledge/coverage", to: "studio/knowledge_docs#coverage",
               as: :admin_knowledge_coverage
-        post  "admin/knowledge/expectations", to: "studio/knowledge_docs#create_expectation"
+        post  "admin/knowledge/expectations", to: "studio/knowledge_docs#create_expectation",
+              as: :admin_knowledge_expectations
         patch "admin/knowledge/expectations/:id", to: "studio/knowledge_docs#update_expectation",
               as: :admin_knowledge_expectation
         get   "admin/knowledge/:id", to: "studio/knowledge_docs#show",  as: :admin_knowledge_doc

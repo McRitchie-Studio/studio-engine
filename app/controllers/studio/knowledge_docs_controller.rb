@@ -43,10 +43,25 @@ module Studio
     end
 
     def show
+      # Guarded like intake!'s MissingTable posture: a consumer that bumped the
+      # gem without installing the expectations migrations keeps its working
+      # doc pages — the link select simply doesn't render.
+      @linkable_expectations =
+        if Studio::KnowledgeExpectation.table_exists?
+          Studio::KnowledgeExpectation.active.for_entity(@doc.entity).order(:path, :title).to_a
+        else
+          []
+        end
     end
 
     # GET /admin/knowledge/coverage — expected vs uploaded, the gap named.
     def coverage
+      unless Studio::KnowledgeExpectation.table_exists?
+        return redirect_to admin_knowledge_path,
+                           alert: "The coverage view needs the studio_knowledge_expectations table — " \
+                                  "run `bin/rails studio_engine:install:migrations && bin/rails db:migrate`."
+      end
+
       @entity = params[:entity].presence
       scope = Studio::KnowledgeExpectation.active.order(:path, :title)
       scope = scope.for_entity(@entity) if @entity

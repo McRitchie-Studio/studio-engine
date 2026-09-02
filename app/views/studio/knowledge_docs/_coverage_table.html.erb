@@ -76,7 +76,7 @@
 
 <div id="coverage-new" class="p-4 border rounded">
   <h2 class="font-semibold mb-3">Expect a document</h2>
-  <%= form_with url: "/admin/knowledge/expectations", method: :post, local: true do |form| %>
+  <%= form_with url: admin_knowledge_expectations_path, method: :post, local: true do |form| %>
     <div class="grid gap-3 md:grid-cols-3">
       <label class="block text-sm">
         <span class="block mb-1">Title</span>

@@ -53,6 +53,7 @@ class KnowledgeCoverageTest < ActiveSupport::TestCase
     end
 
     def admin_knowledge_doc_path(doc) = "/admin/knowledge/#{doc.respond_to?(:id) ? doc.id : doc}"
+    def admin_knowledge_expectations_path = "/admin/knowledge/expectations"
     def protect_against_forgery? = false
   end
 
