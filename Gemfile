@@ -52,6 +52,34 @@ end
 # The style guide self-gates on the partial RESOLVING (style/_modals.html.erb),
 # so an app without this gem renders /admin/style with the web3 cards badged
 # rather than raising a missing-template error.
+#
+# THE CONSTRAINT STAYS OPEN-ENDED, AND THAT IS A DECISION, NOT AN OVERSIGHT.
+# ">= 0.5.3" is a FLOOR: 0.5.2 shipped the credential partial without
+# solana_studio/modals/_wallet_connect, which the web3 capability gate requires,
+# so 0.5.3 is the first version that can draw the button at all. Above it this
+# engine deliberately claims no ceiling. It is the BASE half of the split; the
+# bolt-on is the consumer's choice, and an engine that pinned the bolt-on more
+# tightly than the app bolting it on would be dictating upward. Concretely: a
+# pessimistic "~> 0.5.3" here would be NARROWER than mcritchie-studio's own
+# "~> 0.5", so this dev-only dependency would start constraining a resolution it
+# does not own.
+#
+# WHAT ACTUALLY WENT WRONG, and it was the LOCK, not the constraint. The lock sat
+# on 0.5.3 while both consumers shipped 0.5.7 — four patch releases — and nothing
+# was red, because engine CI installs with `bundler-cache: true` and never
+# resolves fresh. Meanwhile test/views/style_web3_specimens_test.rb exists to
+# prove "the style guide renders the REAL gem cards" and reads them off whatever
+# the LOCK resolved. Behind, that guard certifies a card no consumer receives; it
+# still passes, and only its MEANING has changed. (Measured on this span: the
+# gem's whole app/ tree was byte-identical 0.5.3 -> 0.5.7, so this instance cost
+# nothing — which is precisely why it went four releases unnoticed.)
+#
+# SO THE FIX IS A GATE, NOT A PIN. bin/gem-drift-check fails when this engine's
+# lock TRAILS a consumer's, and consumer-ci.yml runs it — the only lane holding
+# two repos' lockfiles at once. Direction is one-way: engine behind fails, engine
+# ahead or level passes, a consumer bundling no solana-studio is a skip. Keeping
+# up is now enforced rather than remembered, which is what lets the floor stay a
+# floor. Guarded by test/lib/gem_drift_check_test.rb.
 group :development, :test do
   gem "solana-studio", ">= 0.5.3"
 end
