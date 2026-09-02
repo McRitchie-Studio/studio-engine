@@ -1,0 +1,170 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Fails when THIS ENGINE's lock resolves a tracked gem OLDER than a consumer's.
+#
+# WHY THIS EXISTS. studio-engine's Gemfile.lock sat on solana-studio 0.5.3 for
+# four patch releases while both consumers shipped 0.5.7. Nothing was red, and
+# nothing could have been: engine CI installs with `bundler-cache: true`, so it
+# resolves from the lock and never fresh. The drift does not self-correct and it
+# does not surface as flakiness — it simply stays wrong until someone looks.
+#
+# WHAT IT COSTS WHEN IT IS WRONG, which is the reason this is a gate and not a
+# report. test/views/style_web3_specimens_test.rb exists to prove "the style
+# guide renders the REAL gem cards". It reads them off
+# `Gem::Specification.find_by_name("solana-studio").gem_dir` — whatever the LOCK
+# resolved. Behind by four versions, that guard certifies a card no consumer
+# receives. It still passes; what it MEANS has quietly changed. Measured on the
+# 0.5.3 -> 0.5.7 span, the gem's whole `app/` tree was byte-identical, so this
+# instance was harmless — which is exactly the point. Nothing would have said so
+# either way, and the next span is not promised to be kind. /tasks/engine-test-
+# pins-a-spelling was the same hole one release earlier: an engine assertion
+# pinned a spelling the gem was about to change, and nothing resolved fresh to
+# reveal it.
+#
+# DIRECTION IS DELIBERATE — this fails ONLY when the ENGINE TRAILS a consumer.
+# Engine ahead is fine (it is the producer; it may test against an unreleased
+# gem). A consumer that lags is the consumer's business and must never redden an
+# engine PR. Only the defect this file is named for fails.
+#
+# WHERE IT RUNS. Nowhere else can: comparing two repos' resolutions needs both
+# lockfiles on disk, and only consumer-ci.yml has that (it checks the engine out
+# at `studio/` and each consumer beside it). test/lib/consumer_ci_shard_contract
+# _test.rb already records that constraint for its own cross-repo contract.
+#
+# Stdlib only — it runs before/without a bundle, on either checkout's Ruby.
+#
+# Usage:
+#   bin/gem-drift-check <engine-lock> <label>=<consumer-lock> [<label>=<lock> ...]
+#
+# Exit 0 aligned (or engine ahead); 1 engine behind; 64 usage; 65 unreadable.
+
+require "rubygems"
+
+# The gems whose resolution this engine must not trail its consumers on.
+#
+# SCOPED ON PURPOSE, and short on purpose. The engine's dev lock differs from
+# every consumer's on dozens of gems (Rails lines, drivers, test tooling) and
+# SHOULD — a shared-everything comparison would be noise with a gate attached.
+# A gem earns a row here by being one the engine RENDERS OR ASSERTS ON as its
+# consumers receive it. solana-studio is that: the style guide renders its real
+# partials and the suite certifies them.
+TRACKED = %w[solana-studio].freeze
+
+# A resolved spec line in the GEM/PATH `specs:` block sits at EXACTLY four
+# spaces. Two is a DEPENDENCIES entry (the constraint, not the resolution) and
+# six is a sub-dependency of the gem above it — matching either would report a
+# range or a neighbour as "the resolved version".
+def resolved_version(lock_path, gem_name)
+  begin
+    body = File.read(lock_path)
+  rescue SystemCallError => e
+    warn "gem-drift-check: cannot read #{lock_path} (#{e.class})"
+    exit 65
+  end
+
+  # PROVE THE INPUT before trusting a miss. A lock whose format moved, or a file
+  # that is not a lock at all, yields zero matches for EVERY gem — and a bare
+  # `return nil` would read that as "the consumer does not bundle it" and skip,
+  # quietly, forever. A readable lock has resolved specs; one with none is a
+  # broken read, not an answer.
+  unless body.match?(/^ {4}\S+ \([^)]+\)$/)
+    warn "gem-drift-check: #{lock_path} contains no resolved spec lines at all — " \
+         "it is not a Gemfile.lock, or the lock format changed and this parse is blind."
+    exit 65
+  end
+
+  found = body.scan(/^ {4}#{Regexp.escape(gem_name)} \(([^)]+)\)$/).flatten
+  return nil if found.empty?
+
+  # More than one resolution for one name in one lock is not a version question
+  # — it is a malformed or hand-edited lock, and picking either answer would be
+  # a guess presented as a measurement.
+  unless found.uniq.length == 1
+    warn "gem-drift-check: #{lock_path} resolves #{gem_name} to #{found.uniq.join(', ')} " \
+         "— a lock cannot hold two resolutions for one gem; fix the lock."
+    exit 65
+  end
+
+  Gem::Version.new(found.first)
+rescue ArgumentError
+  warn "gem-drift-check: #{lock_path} resolves #{gem_name} to an unparseable version"
+  exit 65
+end
+
+engine_lock, *consumers = ARGV
+if engine_lock.nil? || consumers.empty?
+  warn "usage: bin/gem-drift-check <engine-lock> <label>=<consumer-lock> [...]"
+  exit 64
+end
+
+behind = []
+checked = 0
+
+TRACKED.each do |gem_name|
+  engine_version = resolved_version(engine_lock, gem_name)
+
+  # The engine dropping a tracked gem is a REAL finding, not a quiet pass: this
+  # list would then be guarding nothing while still reporting success.
+  if engine_version.nil?
+    warn "gem-drift-check: #{engine_lock} resolves no #{gem_name} at all. Either the " \
+         "dependency was removed (retire the TRACKED row in this script) or the lock " \
+         "is stale (run `bundle lock`)."
+    exit 1
+  end
+
+  consumers.each do |pair|
+    label, path = pair.split("=", 2)
+    if path.nil? || path.empty?
+      warn "usage: consumers are <label>=<path>, got #{pair.inspect}"
+      exit 64
+    end
+
+    consumer_version = resolved_version(path, gem_name)
+
+    # A consumer that bundles no solana-studio is the base half of the split
+    # working as designed (mcritchie-industries, acquisition-studio). Nothing to
+    # compare, and nothing wrong.
+    if consumer_version.nil?
+      puts "· #{label} bundles no #{gem_name} — nothing to compare"
+      next
+    end
+
+    checked += 1
+    if engine_version < consumer_version
+      behind << [gem_name, label, engine_version, consumer_version]
+      puts "✗ #{gem_name}: engine #{engine_version} TRAILS #{label} #{consumer_version}"
+    else
+      marker = engine_version == consumer_version ? "=" : ">"
+      puts "✓ #{gem_name}: engine #{engine_version} #{marker} #{label} #{consumer_version}"
+    end
+  end
+end
+
+# An all-skip run is LEGITIMATE here and must not fail: mcritchie-industries and
+# the other BASE-half consumers bundle no solana-studio by design, and the lane
+# runs this check per consumer. The anti-vacuous property is not "something was
+# compared" — it is "every lock we read was really read", which resolved_version
+# proves per file before it is allowed to answer nil.
+
+unless behind.empty?
+  warn ""
+  warn "The engine's lock TRAILS its own consumers:"
+  behind.each do |gem_name, label, engine_version, consumer_version|
+    warn "  #{gem_name}: this engine #{engine_version}, #{label} #{consumer_version}"
+  end
+  warn ""
+  warn "Fix it in the ENGINE, in one command, then commit the lock:"
+  behind.map(&:first).uniq.each { |g| warn "  bundle update #{g}" }
+  warn ""
+  warn "Why this is a gate: engine CI installs with bundler-cache: true, so it never"
+  warn "resolves fresh. Left alone this stays wrong silently, and the style-guide"
+  warn "specimens go on certifying a gem card no consumer receives."
+  exit 1
+end
+
+if checked.zero?
+  puts "gem-drift-check: no tracked gem is bundled by these consumers — nothing to compare."
+else
+  puts "gem-drift-check: #{checked} comparison(s), engine level or ahead on all tracked gems."
+end

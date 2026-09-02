@@ -575,11 +575,38 @@ class StylePageTest < ActiveSupport::TestCase
   # Item 2 (gating) — the ported auth modal actually GATES each method + terms on
   # props, so the toggles configure a live open.
   test "the auth modal gates each credential method + terms via props" do
-    html = render_index
-    assert_includes html, "methodOn('google')", "Google is gated"
-    assert_includes html, "methodOn('wallet')", "Solana wallet is gated"
-    assert_includes html, "methodOn('magicLink')", "magic link is gated"
-    assert_includes html, "termsOn()", "the age-attestation terms block is gated"
+    html  = render_index
+    block = specimen_block("auth", html)
+    refute_nil block, "the auth specimen must be registered before anything below means anything"
+
+    # Each credential's OWN control carries its OWN methodOn gate. Read that
+    # element's x-show; CREDENTIAL_CONTROLS records what the bare substrings this
+    # replaced were actually reading.
+    CREDENTIAL_CONTROLS.each do |method, anchor|
+      gate = credential_visibility_gate(block, anchor)
+      refute_nil gate,
+        "the #{method} control must carry an x-show AT ALL — moving the decision " \
+        "into ERB is the substitution a page-wide substring cannot see"
+      assert_includes gate, "methodOn('#{method}')",
+        "#{method} is gated by methodOn ON ITS OWN CONTROL, not by a term the page " \
+        "happens to contain elsewhere"
+    end
+
+    # Terms has no unique anchor in its wrapper's open tag (the checkbox that
+    # identifies it sits INSIDE), so this asserts the x-show ATTRIBUTE SET rather
+    # than one element. Weaker than the three above — it would not notice the gate
+    # moving to a different element — and still strictly stronger than the bare
+    # substring it replaces: MEASURED, `termsOn()` renders three times and two are
+    # the modal's own x-data (`termsOn() { … }` and `if (!this.termsOn())`),
+    # neither of which is an x-show.
+    assert_includes x_show_expressions(block), "termsOn()",
+      "the age-attestation terms block is gated by an x-show, not merely named in " \
+      "the modal's script"
+
+    # The defaults MECHANISM, not a gate — and the one bare substring here that
+    # asks the right question. MEASURED: `_methodDefaults` renders twice, both
+    # inside the x-data (its definition, and methodOn's read of it). There is no
+    # element to bind to, and its presence IS the claim.
     assert_includes html, "_methodDefaults", "method defaults come from Studio.auth_method?"
   end
 
@@ -1647,6 +1674,197 @@ class StylePageTest < ActiveSupport::TestCase
       "the celebration borrows the engine's header"
     assert_includes news, %(render "studio/modals/blocks/seeds_bar"),
       "and the engine's :leveling seeds bar — the bar is the engine's, the numbers are the app's"
+  end
+
+  # --- each credential control's own visibility gate ------------------------
+  #
+  # WHY THESE ARE NOT `assert_includes html, "methodOn('<method>')"`, which is
+  # what this test used to do for all three. MEASURED on the rendered page, not
+  # reasoned: ONE engine-owned element satisfies ALL THREE substrings at once. It
+  # is the "or" divider in style/modals/_auth.html.erb, and it sits OUTSIDE every
+  # credential's guard, so it renders unconditionally:
+  #
+  #   x-show="methodOn('magicLink') && (methodOn('google') || methodOn('wallet'))"
+  #
+  # So each old assertion could be satisfied with that credential's OWN gate
+  # deleted. Proved by deleting each in turn and re-running this test:
+  #   the gem's wallet CTA x-show deleted   -> stayed GREEN
+  #   the Google button's x-show deleted    -> stayed GREEN
+  #   the magic-link form's x-show deleted  -> stayed GREEN
+  #
+  # The finding that opened this task named only the wallet term and recorded the
+  # other two as fine — "they occur twice in ways that still bite". They do occur
+  # twice, and the second occurrence of each is that same divider, so all three
+  # were inert together. Repeating that judgement instead of re-running it is
+  # precisely how the first one survived review: measure the neighbours before
+  # vouching for them.
+  #
+  # NOT NOKOGIRI, in a file that otherwise reaches for it, and this is the
+  # surprise worth recording: Nokogiri::HTML's HTML4 parser MANGLES the wallet
+  # CTA's Alpine handler. `@click="… .swap('wallet-connect', { backTo: 'auth' …"`
+  # comes back as an attribute named `backto:`, so a DOM search for the element
+  # carrying the swap call finds NOTHING — a rebind through it would fail
+  # vacuously in the other direction. Nokogiri::HTML5 parses it correctly; the
+  # string window below needs neither.
+  #
+  # The wallet half is asserted from the gem's side too, in
+  # test/views/style_web3_specimens_test.rb. This file owns the PAGE's copy: it
+  # proves the style guide ships gated controls, which is what it is for.
+
+  # Each credential's control, and the anchor that identifies it.
+  #
+  # ANCHORS ARE THE HANDLER BINDING, never the bare handler name. The modal's own
+  # x-data DEFINES `loginGoogle() {` and `async submitMagicLink() {` a hundred
+  # lines above the buttons, so a bare-name anchor windows the x-data element
+  # instead. MEASURED, not reasoned: that is a 4_283-byte `<div x-data="{ … }">`
+  # open tag carrying NO x-show, so the gate reads nil and refute_nil fires. The
+  # wrong element answers loudly rather than silently — but it is still the wrong
+  # element. With the binding, each anchor occurs exactly
+  # ONCE in the auth block (measured). The wallet anchor needs no such exclusion
+  # — the engine defines no wallet handler — but it does need the block window:
+  # `.swap('wallet-connect'` occurs twice on the full page (the CTA at byte
+  # 74_792, the wallet-connect specimen's own card at 239_160) and once inside
+  # the auth block.
+  CREDENTIAL_CONTROLS = {
+    "google"    => /@click="loginGoogle\(\)"/,
+    "magicLink" => /@submit\.prevent="submitMagicLink\(\)"/,
+    "wallet"    => /\.swap\(\s*'wallet-connect'/
+  }.freeze
+
+  # Named separately because the window guard's own test exercises it directly.
+  WALLET_CTA_ANCHOR = CREDENTIAL_CONTROLS.fetch("wallet")
+
+  # A well-formed HTML OPEN TAG, whole. Attribute names are deliberately loose
+  # (`@click`, `:disabled`, `x-show` are all legal here); values are the three
+  # HTML shapes. This is the shape check the walk below validates its answer
+  # against — an overrun window carries following markup, which cannot match.
+  OPEN_TAG = %r{\A<[A-Za-z][^\s>/]*(?:\s+[^\s=>/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*))?)*\s*/?>\z}
+
+  # The open tag of the element whose ATTRIBUTES contain `anchor`, from its "<"
+  # to the ">" that closes it. Nil ONLY when the anchor is genuinely absent;
+  # every other unhappy path raises, loudly, by name.
+  #
+  # The quote-aware walk is not ceremony: the CTA's @click carries a
+  # single-quoted modal id inside a double-quoted attribute, and a naive
+  # index(">") would truncate the tag one attribute short of the x-show this
+  # exists to read.
+  #
+  # AND IT IS GUARDED, which the first version of this walk (shipped in
+  # style_web3_specimens_test.rb, and corrected there in the same commit) was
+  # not. rindex("<") can land inside an EARLIER attribute VALUE instead of on the
+  # tag's own "<". The walk then starts mid-string with its quote state INVERTED
+  # from the first character, and from there it can run off the end, close on a
+  # ">" that precedes the anchor, or sail past the real ">" and return kilobytes
+  # of following markup while calling it an element — answering this test's
+  # question about some other part of the page.
+  #
+  # No ONE invariant catches every misaligned shape; MEASURED, each of the four
+  # below catches shapes the others miss, so all four are checked:
+  #   · the anchor is present but the walk found no closing ">"  (ran off the end)
+  #   · the ">" it closed on precedes the anchor                 (wrong element)
+  #   · an UNQUOTED "<" appeared before the ">"                  (state inverted)
+  #   · the window is not a single well-formed open tag          (overrun)
+  # test_the_CTA_window_refuses_a_misaligned_start exercises three of the four
+  # against constructed markup; the fourth is the aligned control.
+  def open_tag_containing(source, anchor)
+    source = source.to_s
+    site = source.index(anchor)
+    return nil unless site
+
+    start = source.rindex("<", site)
+    raise "open_tag_containing: misaligned — no \"<\" precedes the anchor" unless start
+
+    element = nil
+    quote = nil
+    cursor = start
+    while (cursor += 1) < source.length
+      char = source[cursor]
+      if quote
+        quote = nil if char == quote
+      elsif ['"', "'"].include?(char)
+        quote = char
+      elsif char == "<"
+        raise "open_tag_containing: misaligned — an unquoted \"<\" appears before " \
+              "the tag closed, so the walk's quote state is inverted"
+      elsif char == ">"
+        element = source[start..cursor]
+        break
+      end
+    end
+
+    raise "open_tag_containing: misaligned — the anchor is present but no tag " \
+          "closed after it (the walk ran off the end)" unless element
+    raise "open_tag_containing: misaligned — the tag closed BEFORE the anchor, " \
+          "so this window is not the element carrying it" unless cursor > site
+    raise "open_tag_containing: misaligned — the window is not a single open " \
+          "tag (#{element.bytesize} bytes), so it overran the element" \
+          unless element.match?(OPEN_TAG)
+
+    element
+  end
+
+  # The x-show EXPRESSION on the control `anchor` identifies, or nil when that
+  # control carries none.
+  #
+  # Reading the EXPRESSION rather than the whole attribute is deliberate: the
+  # concern is that methodOn still owns visibility, never how the call is spelled
+  # — so a gem tolerating a host that defines no methodOn
+  # (`typeof methodOn === 'function' ? methodOn('wallet') : true`) satisfies it,
+  # while deleting the x-show or moving the decision into ERB does not.
+  def credential_visibility_gate(block, anchor)
+    open_tag_containing(block, anchor)&.slice(/\sx-show="([^"]*)"/, 1)
+  end
+
+  # Every x-show EXPRESSION in the block, as written. Requiring the ` x-show="`
+  # wrapper is what defeats the decoy this replaced: MEASURED, `termsOn()`'s
+  # other two renders are bare x-data text, and deleting the real x-show turns
+  # the assertion above RED.
+  #
+  # It is a STRING scan, not a parse, so it cannot tell an attribute from text
+  # shaped like one — a `<script>` body or an HTML comment carrying a literal
+  # ` x-show="termsOn()"` WOULD satisfy it. Sound on this block, not sound by
+  # construction: MEASURED, all 19 matches here are real attributes, and the
+  # auth block contains no `<script` and no `<!--`.
+  def x_show_expressions(block)
+    block.to_s.scan(/\sx-show="([^"]*)"/).flatten
+  end
+
+  # The guard above, exercised. Without this its four branches are prose: the
+  # shipped markup happens to carry no "<" in an attribute value before the CTA's
+  # swap call, so nothing on the real page would ever reach them.
+  test "the CTA window refuses a misaligned start instead of overrunning" do
+    # 1. The decoy "<" leaves the walk's quote state inverted from its first
+    #    character, and it runs off the end without ever closing a tag.
+    ran_off = %(<button x-text="a < b" @click="$store.m.swap('wallet-connect')">x</button>) +
+              %(<div>markup an overrun would swallow</div>)
+    assert_includes assert_raises(RuntimeError) {
+      open_tag_containing(ran_off, WALLET_CTA_ANCHOR)
+    }.message, "ran off the end"
+
+    # 2. The decoy carries its own ">", so the walk closes BEFORE the anchor and
+    #    returns a window that does not contain the thing it was asked about.
+    closes_early = %(<button x-html="<b>" @click="$store.m.swap('wallet-connect')">x</button>)
+    assert_includes assert_raises(RuntimeError) {
+      open_tag_containing(closes_early, WALLET_CTA_ANCHOR)
+    }.message, "closed BEFORE the anchor"
+
+    # 3. An odd quote in later TEXT re-flips the inverted state, so the walk
+    #    reaches real markup — the kilobyte overrun, caught before it returns.
+    reflips = %(<button title="a <b" @click="$store.m.swap('wallet-connect')">x</button>) +
+              %(<p>6" pipe</p><div>tail</div>)
+    assert_includes assert_raises(RuntimeError) {
+      open_tag_containing(reflips, WALLET_CTA_ANCHOR)
+    }.message, "unquoted"
+
+    # 4. The control — the same tag WITHOUT a decoy windows to itself EXACTLY, so
+    #    the guard rejects misalignment rather than rejecting the walk.
+    aligned = %(<button x-text="a b" @click="$store.m.swap('wallet-connect')" x-show="methodOn('wallet')">x</button>) +
+              %(<div>markup</div>)
+    assert_equal %(<button x-text="a b" @click="$store.m.swap('wallet-connect')" x-show="methodOn('wallet')">),
+      open_tag_containing(aligned, WALLET_CTA_ANCHOR)
+
+    # A genuinely absent anchor is the ONE nil, and it is not an error.
+    assert_nil open_tag_containing(%(<div>no anchor here</div>), WALLET_CTA_ANCHOR)
   end
 
 end
