@@ -322,7 +322,12 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
                      "the wallet button must stay wired where the gem resolves " \
                      "(features=#{features.inspect}) — it is the gem's contributed partial now, " \
                      "but it must still reach the picker"
-        assert_includes auth, %(x-show="methodOn('wallet')"),
+        gate = wallet_cta_visibility_gate(auth)
+        refute_nil gate,
+                   "the wallet CTA must carry an x-show AT ALL — a server-rendered " \
+                   "conditional in its place is the exact substitution this guards " \
+                   "(features=#{features.inspect})"
+        assert_includes gate, "methodOn('wallet')",
                         "the Ruby gate must not replace the Alpine one — methodOn still owns " \
                         "whether a gem app SHOWS the button (features=#{features.inspect})"
       end
@@ -534,6 +539,64 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
   # Mutation-proved both directions in the PR body.
   def wallet_cta_call_sites(html)
     html.to_s.scan(/\.swap\(\s*'wallet-connect'/)
+  end
+
+  # The wallet CTA's OWN element — its open tag, from "<" to the ">" that closes
+  # it. Anchored on the swap call above, because that is what identifies this
+  # element as the CTA rather than the button next to it.
+  #
+  # The quote-aware walk is not ceremony: the CTA's @click carries a
+  # single-quoted modal id inside a double-quoted attribute, and a naive
+  # index(">") would be one bad attribute away from truncating the tag and
+  # silently dropping the very attribute this file is here to read.
+  def wallet_cta_element(html)
+    html = html.to_s
+    site = html.index(/\.swap\(\s*'wallet-connect'/)
+    return nil unless site
+
+    start = html.rindex("<", site)
+    return nil unless start
+
+    quote = nil
+    cursor = start
+    while (cursor += 1) < html.length
+      char = html[cursor]
+      if quote
+        quote = nil if char == quote
+      elsif ['"', "'"].include?(char)
+        quote = char
+      elsif char == ">"
+        return html[start..cursor]
+      end
+    end
+    nil
+  end
+
+  # The x-show EXPRESSION on the wallet CTA, or nil when it carries none.
+  #
+  # WHY THIS IS NOT `assert_includes auth, "methodOn('wallet')"`, which is what
+  # style_page_test:580 does and what this assertion was first rebound to.
+  # MEASURED on the rendered auth modal: `methodOn('wallet')` occurs TWICE, and
+  # only one occurrence is the gem's. The other is ENGINE-owned, three lines
+  # below the render call, on the "or" divider:
+  #
+  #   x-show="methodOn('magicLink') && (methodOn('google') || methodOn('wallet'))"
+  #
+  # That divider renders whether or not the gem's button does, so a
+  # document-wide substring assert stays GREEN with the CTA's gate deleted
+  # outright — reading an engine-owned divider while claiming to check a
+  # gem-owned gate. It is the same failure registration_for and specimen_state
+  # already document, one seam over. style_page_test's bare form is sound where
+  # it lives, asking a weaker question of the whole page; copied to here it
+  # removes the guard while looking like it fixed it.
+  #
+  # Reading the EXPRESSION rather than the whole attribute is the actual repair.
+  # The concern is that methodOn still owns visibility, never how that call is
+  # spelled — so the gem tolerating a host that defines no methodOn
+  # (`typeof methodOn === 'function' ? methodOn('wallet') : true`) satisfies it,
+  # while removing the x-show or moving the decision into ERB does not.
+  def wallet_cta_visibility_gate(html)
+    wallet_cta_element(html)&.slice(/\sx-show="([^"]*)"/, 1)
   end
 
   # The x-data STATE a specimen card is seeded with.
