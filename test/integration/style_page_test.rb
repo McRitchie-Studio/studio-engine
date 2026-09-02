@@ -575,21 +575,39 @@ class StylePageTest < ActiveSupport::TestCase
   # Item 2 (gating) — the ported auth modal actually GATES each method + terms on
   # props, so the toggles configure a live open.
   test "the auth modal gates each credential method + terms via props" do
-    html = render_index
-    assert_includes html, "methodOn('google')", "Google is gated"
-    assert_includes html, "methodOn('magicLink')", "magic link is gated"
-    assert_includes html, "termsOn()", "the age-attestation terms block is gated"
-    assert_includes html, "_methodDefaults", "method defaults come from Studio.auth_method?"
+    html  = render_index
+    block = specimen_block("auth", html)
+    refute_nil block, "the auth specimen must be registered before anything below means anything"
 
-    # The wallet term is the one that cannot be asked of the whole page. Read the
-    # CTA's OWN x-show; see the helper below for what the bare form was reading.
-    gate = wallet_cta_visibility_gate(html)
-    refute_nil gate,
-      "the wallet CTA must carry an x-show AT ALL — moving the decision into ERB " \
-      "is the exact substitution the bare substring could not see"
-    assert_includes gate, "methodOn('wallet')",
-      "Solana wallet is gated — by methodOn on the CTA itself, not by a term the " \
-      "page happens to contain elsewhere"
+    # Each credential's OWN control carries its OWN methodOn gate. Read that
+    # element's x-show; CREDENTIAL_CONTROLS records what the bare substrings this
+    # replaced were actually reading.
+    CREDENTIAL_CONTROLS.each do |method, anchor|
+      gate = credential_visibility_gate(block, anchor)
+      refute_nil gate,
+        "the #{method} control must carry an x-show AT ALL — moving the decision " \
+        "into ERB is the substitution a page-wide substring cannot see"
+      assert_includes gate, "methodOn('#{method}')",
+        "#{method} is gated by methodOn ON ITS OWN CONTROL, not by a term the page " \
+        "happens to contain elsewhere"
+    end
+
+    # Terms has no unique anchor in its wrapper's open tag (the checkbox that
+    # identifies it sits INSIDE), so this asserts the x-show ATTRIBUTE SET rather
+    # than one element. Weaker than the three above — it would not notice the gate
+    # moving to a different element — and still strictly stronger than the bare
+    # substring it replaces: MEASURED, `termsOn()` renders three times and two are
+    # the modal's own x-data (`termsOn() { … }` and `if (!this.termsOn())`),
+    # neither of which is an x-show.
+    assert_includes x_show_expressions(block), "termsOn()",
+      "the age-attestation terms block is gated by an x-show, not merely named in " \
+      "the modal's script"
+
+    # The defaults MECHANISM, not a gate — and the one bare substring here that
+    # asks the right question. MEASURED: `_methodDefaults` renders twice, both
+    # inside the x-data (its definition, and methodOn's read of it). There is no
+    # element to bind to, and its presence IS the claim.
+    assert_includes html, "_methodDefaults", "method defaults come from Studio.auth_method?"
   end
 
   # Item 4 — the magic-link-resent step has its own specimen.
@@ -1658,54 +1676,60 @@ class StylePageTest < ActiveSupport::TestCase
       "and the engine's :leveling seeds bar — the bar is the engine's, the numbers are the app's"
   end
 
-  # --- the wallet CTA's own visibility gate ---------------------------------
+  # --- each credential control's own visibility gate ------------------------
   #
-  # WHY THE WALLET TERM GOT ITS OWN HELPER while google, magicLink and termsOn
-  # stay bare substrings above. MEASURED on the rendered page, not reasoned:
-  # `methodOn('wallet')` occurs TWICE, and only one occurrence is the gem's CTA.
-  # The other is ENGINE-owned, three lines below the render call in
-  # style/modals/_auth.html.erb, on the "or" divider:
+  # WHY THESE ARE NOT `assert_includes html, "methodOn('<method>')"`, which is
+  # what this test used to do for all three. MEASURED on the rendered page, not
+  # reasoned: ONE engine-owned element satisfies ALL THREE substrings at once. It
+  # is the "or" divider in style/modals/_auth.html.erb, and it sits OUTSIDE every
+  # credential's guard, so it renders unconditionally:
   #
   #   x-show="methodOn('magicLink') && (methodOn('google') || methodOn('wallet'))"
   #
-  # That divider sits OUTSIDE the wallet_credential_available guard, so it is on
-  # the page whether or not the gem contributed a button. Deleting the CTA's
-  # x-show OUTRIGHT left the old `assert_includes html, "methodOn('wallet')"`
-  # GREEN: it was reading an engine-owned divider while reporting on a gem-owned
-  # gate. The siblings are genuinely fine — google and magicLink each occur twice
-  # too, but every occurrence of each is a real gate, so the weaker question they
-  # ask still has only the right answers available.
+  # So each old assertion could be satisfied with that credential's OWN gate
+  # deleted. Proved by deleting each in turn and re-running this test:
+  #   the gem's wallet CTA x-show deleted   -> stayed GREEN
+  #   the Google button's x-show deleted    -> stayed GREEN
+  #   the magic-link form's x-show deleted  -> stayed GREEN
+  #
+  # The finding that opened this task named only the wallet term and recorded the
+  # other two as fine — "they occur twice in ways that still bite". They do occur
+  # twice, and the second occurrence of each is that same divider, so all three
+  # were inert together. Repeating that judgement instead of re-running it is
+  # precisely how the first one survived review: measure the neighbours before
+  # vouching for them.
   #
   # NOT NOKOGIRI, in a file that otherwise reaches for it, and this is the
-  # surprise worth writing down: Nokogiri::HTML's HTML4 parser MANGLES the CTA's
-  # Alpine handler. `@click="… .swap('wallet-connect', { backTo: 'auth' …"` comes
-  # back as an attribute named `backto:`, so a DOM search for the element
+  # surprise worth recording: Nokogiri::HTML's HTML4 parser MANGLES the wallet
+  # CTA's Alpine handler. `@click="… .swap('wallet-connect', { backTo: 'auth' …"`
+  # comes back as an attribute named `backto:`, so a DOM search for the element
   # carrying the swap call finds NOTHING — a rebind through it would fail
   # vacuously in the other direction. Nokogiri::HTML5 parses it correctly; the
   # string window below needs neither.
   #
-  # The same property is asserted from the gem's side in
-  # test/views/style_web3_specimens_test.rb. This one is the page's copy: it
-  # proves the STYLE GUIDE ships a gated CTA, which is what this file is for.
+  # The wallet half is asserted from the gem's side too, in
+  # test/views/style_web3_specimens_test.rb. This file owns the PAGE's copy: it
+  # proves the style guide ships gated controls, which is what it is for.
 
-  # The swap call carrying its literal target id — what identifies the CTA
-  # element, rather than a name that merely implies it.
-  WALLET_CTA_ANCHOR = /\.swap\(\s*'wallet-connect'/
-
-  # The wallet CTA's OWN open tag, windowed out of the AUTH specimen block.
+  # Each credential's control, and the anchor that identifies it.
   #
-  # Windowed to that block first because the anchor occurs TWICE on the full
-  # page — the CTA here, and the wallet-connect specimen's own card further down
-  # (measured: byte 74_792 and byte 239_160). Inside the auth block it occurs
-  # exactly once, so the anchor identifies one element rather than the first of
-  # two.
-  def wallet_cta_element(html = render_index)
-    block = specimen_block("auth", html)
-    return nil unless block
-    return nil unless block.match?(WALLET_CTA_ANCHOR)
+  # ANCHORS ARE THE HANDLER BINDING, never the bare handler name. The modal's own
+  # x-data DEFINES `loginGoogle() {` and `async submitMagicLink() {` a hundred
+  # lines above the buttons, so a bare-name anchor would window the SCRIPT's
+  # element and read ITS x-show. With the binding, each anchor occurs exactly
+  # ONCE in the auth block (measured). The wallet anchor needs no such exclusion
+  # — the engine defines no wallet handler — but it does need the block window:
+  # `.swap('wallet-connect'` occurs twice on the full page (the CTA at byte
+  # 74_792, the wallet-connect specimen's own card at 239_160) and once inside
+  # the auth block.
+  CREDENTIAL_CONTROLS = {
+    "google"    => /@click="loginGoogle\(\)"/,
+    "magicLink" => /@submit\.prevent="submitMagicLink\(\)"/,
+    "wallet"    => /\.swap\(\s*'wallet-connect'/
+  }.freeze
 
-    open_tag_containing(block, WALLET_CTA_ANCHOR)
-  end
+  # Named separately because the window guard's own test exercises it directly.
+  WALLET_CTA_ANCHOR = CREDENTIAL_CONTROLS.fetch("wallet")
 
   # A well-formed HTML OPEN TAG, whole. Attribute names are deliberately loose
   # (`@click`, `:disabled`, `x-show` are all legal here); values are the three
@@ -1776,15 +1800,22 @@ class StylePageTest < ActiveSupport::TestCase
     element
   end
 
-  # The x-show EXPRESSION on the wallet CTA, or nil when it carries none.
+  # The x-show EXPRESSION on the control `anchor` identifies, or nil when that
+  # control carries none.
   #
   # Reading the EXPRESSION rather than the whole attribute is deliberate: the
   # concern is that methodOn still owns visibility, never how the call is spelled
   # — so a gem tolerating a host that defines no methodOn
   # (`typeof methodOn === 'function' ? methodOn('wallet') : true`) satisfies it,
   # while deleting the x-show or moving the decision into ERB does not.
-  def wallet_cta_visibility_gate(html = render_index)
-    wallet_cta_element(html)&.slice(/\sx-show="([^"]*)"/, 1)
+  def credential_visibility_gate(block, anchor)
+    open_tag_containing(block, anchor)&.slice(/\sx-show="([^"]*)"/, 1)
+  end
+
+  # Every x-show EXPRESSION in the block, as written. Reads ATTRIBUTES only, so
+  # script text or prose naming the same call cannot satisfy a membership test.
+  def x_show_expressions(block)
+    block.to_s.scan(/\sx-show="([^"]*)"/).flatten
   end
 
   # The guard above, exercised. Without this its four branches are prose: the

@@ -636,11 +636,22 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
   # form was not asking a weaker question — it was asking a DIFFERENT one, and
   # answering yes about an engine-owned divider. Measured there too: with this
   # same gate deleted, style_page_test's wallet assertion stayed green. It is
-  # rebound now (StylePageTest#wallet_cta_visibility_gate). Its google and
-  # magicLink siblings ARE sound in the bare form — each of their two occurrences
-  # is a real gate — which is exactly why the wallet term needed naming rather
-  # than a blanket vouch for the neighbouring file. A comment that over-vouches
-  # for a test one seam over is how an inert guard survives review.
+  # rebound now (StylePageTest#credential_visibility_gate).
+  #
+  # AND THE SECOND HALF OF THAT SENTENCE WAS WRONG TOO, which is the sharper
+  # lesson. The finding recorded google and magicLink as "fine — they occur twice
+  # in ways that still bite", and this comment repeated it. MEASURED instead of
+  # repeated: the SECOND occurrence of each is that same "or" divider,
+  # `methodOn('magicLink') && (methodOn('google') || methodOn('wallet'))`, which
+  # carries ALL THREE terms on ONE unconditional element. Deleting the Google
+  # button's own x-show, and separately the magic-link form's, each left the old
+  # assertion GREEN. All three were inert together, and so was `termsOn()` (three
+  # renders, two of them the modal's own x-data). Every one of them is rebound
+  # now.
+  #
+  # A comment that over-vouches for a test one seam over is how an inert guard
+  # survives review — and vouching for its NEIGHBOURS without re-running them is
+  # how three more survive alongside it.
   #
   # Reading the EXPRESSION rather than the whole attribute is the actual repair.
   # The concern is that methodOn still owns visibility, never how that call is
