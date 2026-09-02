@@ -76,9 +76,35 @@
   # Auth method-toggle defaults — mirror the app's Studio.auth_method? config;
   # Solana Wallet also needs the web3 capability, so it defaults OFF on an app
   # (like McRitchie Studio) that ships web3 off.
+  #
+  # web3_gem is the THIRD term, and it answers a question neither of the other
+  # two asks. auth_methods declares which CREDENTIALS an app accepts; features
+  # gates PRODUCT SURFACES — lib/studio.rb spells that split out where it
+  # deliberately does NOT gate the /auth/solana routes on :web3. Both are
+  # POLICY. Whether the wallet picker can RENDER AT ALL is template resolution,
+  # and the Solana button does nothing except swap to that picker. A trigger
+  # must carry at least the gate its target's REGISTRATION carries (see
+  # web3_gem above, which wraps the wallet-connect registration) or it opens an
+  # empty panel — the same failure the three specimen cards had, through a
+  # different door.
   ml_default = Studio.auth_method?(:magic_link)
   g_default  = Studio.auth_method?(:google)
-  w_default  = Studio.auth_method?(:wallet) && web3_on
+  w_default  = Studio.auth_method?(:wallet) && web3_on && web3_gem
+
+  # The Sign in card's toggles. Solana Wallet is DROPPED where the gem is
+  # absent, because that checkbox is the door this page actually opens:
+  # methodOn('wallet') reads props.methods.wallet — the toggle's own boolean —
+  # BEFORE it ever falls back to the defaults above, so a ticked box overrides
+  # w_default outright. Leaving it offered would keep the empty panel one click
+  # away in EVERY base-app configuration, including the stock auth_methods
+  # default that declares no :wallet at all. A control that cannot do its one
+  # job is worse than an absent one; the section prose says why it is gone.
+  auth_toggles = [
+    { model: "opts.magicLink", label: "Magic Link" },
+    { model: "opts.google",    label: "Google" }
+  ]
+  auth_toggles << { model: "opts.wallet", label: "Solana Wallet" } if web3_gem
+  auth_toggles << { model: "opts.terms", label: "Terms" }
 
   # Active-card glow-match expression builder: yields an Alpine boolean that is
   # true when $store.dsModals.current() is THIS specimen's modal. It discriminates
@@ -365,8 +391,12 @@
            :class="$store.dsModals.cardClasses()">
 
         <%# --- Auth suite --- %>
+        <%# web3_gem is passed, not recomputed: this file owns the lookup (see
+            above) and the auth modal's Solana button needs the SAME answer,
+            because that button's only job is to swap to the wallet-connect
+            registration gated on it a few lines down. One lookup, two readers. %>
         <template x-if="$store.dsModals.current().id === 'auth'">
-          <div><%= render "style/modals/auth" %></div>
+          <div><%= render "style/modals/auth", web3_gem: web3_gem %></div>
         </template>
 
         <%# --- Onboarding step (its card now lives in Profile) --- %>
@@ -629,6 +659,11 @@
         magic-link-sent &rarr; magic-link-resent</code>. Toggle the methods below a
         card, then open it to watch them gate the modal. The live card
         <strong>glows</strong>, and the glow follows the step machine as you advance.
+        <% unless web3_gem %>
+          <strong>Solana sign-in needs solana-studio, which this app does not
+          bundle</strong>, so that button and its toggle are absent here &mdash;
+          nothing registers the wallet picker the button opens.
+        <% end %>
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -639,12 +674,7 @@
             card_data: "opts: { magicLink: #{ml_default}, google: #{g_default}, wallet: #{w_default}, terms: true }",
             open_expr: "$store.dsModals.open('auth', { step: 'credentials', picksRequired: 6, methods: { magicLink: opts.magicLink, google: opts.google, wallet: opts.wallet }, terms: opts.terms })",
             glow_when: ds_glow.call("auth", step: "credentials"),
-            toggles: [
-              { model: "opts.magicLink", label: "Magic Link" },
-              { model: "opts.google",    label: "Google" },
-              { model: "opts.wallet",    label: "Solana Wallet" },
-              { model: "opts.terms",     label: "Terms" }
-            ] } do %>
+            toggles: auth_toggles } do %>
         <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2 text-center">
           <span class="block h-2 w-16 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
           <span class="block h-6 w-full rounded border" style="border-color: var(--color-border-strong)"></span>

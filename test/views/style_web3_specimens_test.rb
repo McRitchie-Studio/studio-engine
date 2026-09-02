@@ -253,6 +253,126 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
     end
   end
 
+  # --- [component] the AUTH modal's Solana button — the OTHER door --------
+
+  # Everything below is the same defect as the four tests above, reached through
+  # a different partial. style/modals/_auth's Solana button does one thing:
+  # swap('wallet-connect') — the id whose registration style/_modals gates on
+  # web3_gem. Gating a registration and not its trigger is what produced the
+  # empty specimen cards; the auth button was the remaining instance.
+  #
+  # WHY features WAS NEVER THE GATE HERE. The button's Alpine gate,
+  # methodOn('wallet'), reads props.methods.wallet BEFORE it consults any
+  # server default — and that value is the Sign in card's own checkbox. So the
+  # button was one tick away in EVERY base-app configuration, including under
+  # the stock auth_methods (%i[magic_link google]), which declares no :wallet at
+  # all. A gate the operator can flip is not a gate, which is why the fix is in
+  # Ruby and the tests below run the auth_methods axis as well as the features
+  # one. lib/studio.rb states the same split where it declines to gate the
+  # /auth/solana routes on :web3: auth_methods is CREDENTIALS, features is
+  # PRODUCT SURFACES, and neither one answers whether a template resolves.
+
+  def test_the_auth_modal_carries_no_wallet_trigger_in_a_base_app
+    [[], %i[web3]].each do |features|
+      [%i[magic_link google wallet], %i[magic_link google]].each do |methods|
+        with_auth(features, methods) do
+          where = "features=#{features.inspect}, auth_methods=#{methods.inspect}"
+          auth = modal_registration(render_index(base_app_view), "auth")
+
+          refute_nil auth, "the auth modal must stay REGISTERED in a base app (#{where}) — " \
+                           "it is engine-owned, and only its wallet button needed the gem"
+          assert_empty wallet_hub_call_sites(auth),
+                       "the auth modal must carry no openWalletHub CALL SITE where the gem is " \
+                       "absent (#{where}) — nothing registers wallet-connect, so the swap opens " \
+                       "an empty panel"
+          # The control, in the same window: gating the wallet button must not
+          # inert the modal it lives in. Magic link is the credential a base app
+          # actually ships, and it has to survive.
+          assert_includes auth, "submitMagicLink()",
+                          "the auth modal must keep its other credentials (#{where})"
+        end
+      end
+    end
+  end
+
+  def test_an_app_that_bundles_the_gem_keeps_the_wallet_trigger
+    # The over-gate control. A fix that hid the button everywhere would pass
+    # every base-app assertion above and silently delete Solana sign-in from
+    # turf-monster's style guide. In BOTH capability states, because with :web3
+    # off the button is still RENDERED — methodOn('wallet') decides visibility at
+    # runtime, and that is the layer the Ruby gate must not usurp.
+    [[], %i[web3]].each do |features|
+      with_auth(features, %i[magic_link google wallet]) do
+        auth = modal_registration(render_index(full_view), "auth")
+
+        refute_empty wallet_hub_call_sites(auth),
+                     "the wallet button must stay wired where the gem resolves " \
+                     "(features=#{features.inspect})"
+        assert_includes auth, %(x-show="methodOn('wallet')"),
+                        "the Ruby gate must not replace the Alpine one — methodOn still owns " \
+                        "whether a gem app SHOWS the button (features=#{features.inspect})"
+      end
+    end
+  end
+
+  def test_the_sign_in_card_offers_no_wallet_toggle_in_a_base_app
+    # The door itself. This checkbox writes props.methods.wallet, which
+    # methodOn reads in preference to every server default — so while it was
+    # offered, a base app was one tick from the empty panel no matter how the
+    # app was configured. The three other toggles are the control: the wallet
+    # entry had to go without taking the toggle row with it.
+    [[], %i[web3]].each do |features|
+      with_auth(features, %i[magic_link google wallet]) do
+        where = "features=#{features.inspect}"
+        base = specimen_card(render_index(base_app_view), "Sign in")
+        gem_app = specimen_card(render_index(full_view), "Sign in")
+
+        refute_nil base, "the Sign in specimen must render in a base app (#{where})"
+        refute_includes base, ">Solana Wallet</span>",
+                        "a base app must not offer a Solana Wallet toggle (#{where}) — ticking " \
+                        "it overrides the server default and summons a button that opens nothing"
+        ["Magic Link", "Google", "Terms"].each do |kept|
+          assert_includes base, ">#{kept}</span>",
+                          "gating the wallet toggle must leave the #{kept} toggle alone (#{where})"
+        end
+        assert_includes gem_app, ">Solana Wallet</span>",
+                        "an app that bundles the gem keeps the toggle (#{where})"
+      end
+    end
+  end
+
+  def test_the_sign_in_card_seeds_wallet_off_in_a_base_app
+    # The seeded value, which outlives the toggle's removal: open_expr still
+    # passes methods: { wallet: opts.wallet }, so opts.wallet must EXIST and be
+    # false. Dropping the key instead would make it undefined, and methodOn
+    # falls back to _methodDefaults.wallet for a non-boolean — which is true in
+    # exactly the configuration this test's second row runs.
+    with_auth(%i[web3], %i[magic_link google wallet]) do
+      base = specimen_state(render_index(base_app_view), "Sign in")
+      gem_app = specimen_state(render_index(full_view), "Sign in")
+
+      refute_nil base, "the Sign in specimen must seed its toggle state in a base app"
+      assert_includes base, "wallet: false",
+                      "a base app must seed the wallet method OFF even with :web3 on — this is " \
+                      "the state the sibling specimen-card bug proved is the dangerous one"
+      assert_includes gem_app, "wallet: true",
+                      "an app with the gem and :web3 on still defaults the toggle ON"
+    end
+  end
+
+  def test_a_base_app_is_told_why_solana_sign_in_is_missing
+    # The operator-facing half, as for the specimen cards: a method that quietly
+    # vanishes from a reference page is indistinguishable from one the design
+    # system never had. Deliberately NOT the same sentence as the web3 section's
+    # notice — sharing a string would let either test pass on the other's markup.
+    with_auth(%i[web3], %i[magic_link google wallet]) do
+      assert_includes render_index(base_app_view), "Solana sign-in needs solana-studio",
+                      "a base app's auth section must say why the Solana button is absent"
+      refute_includes render_index(full_view), "Solana sign-in needs solana-studio",
+                      "an app that bundles the gem must not be told it lacks it"
+    end
+  end
+
   # --- the cross-boundary contract, which is easy to break by accident ----
 
   def test_the_engine_keeps_the_blocks_the_gem_renders_by_name
@@ -287,8 +407,81 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
   # not the modal was registered — so a substring assertion for it is true even
   # in a BASE app where nothing registered anything, and the absent-gem test
   # passed for the wrong reason until this was tightened.
+  REGISTRATION_PREFIX = %(<template x-if="$store.dsModals.current().id === ).freeze
+
   def registration_for(id)
-    %(<template x-if="$store.dsModals.current().id === '#{id}'">)
+    %(#{REGISTRATION_PREFIX}'#{id}'">)
+  end
+
+  # ONE modal's REGISTERED block, windowed: from its <template x-if> wrapper to
+  # the next modal's. Every registration on the page opens with the same prefix,
+  # so the next occurrence of it is this block's end.
+  #
+  # Measured, so the claim is about the code and not the intent: the auth block
+  # is 2.3% of the rendered guide, and openWalletHub / submitMagicLink are
+  # auth-EXCLUSIVE strings today — a document-wide assertion on them would bite
+  # too. So this window is DEFENSIVE, not load-bearing, and saying otherwise
+  # would be the overclaim specimen_card was written to stop. It earns its place
+  # by scope: the guide gains modals constantly, and the day another one grows a
+  # wallet trigger or a second sign-in surface, the document-wide version starts
+  # answering a question this test never asked. specimen_state below is where
+  # windowing IS load-bearing, with the decoy named.
+  def modal_registration(html, id)
+    start = html.index(registration_for(id))
+    return nil unless start
+
+    nxt = html.index(REGISTRATION_PREFIX, start + REGISTRATION_PREFIX.length)
+    nxt ? html[start...nxt] : html[start..]
+  end
+
+  # openWalletHub CALL SITES in a window — its DEFINITION excluded.
+  #
+  # The bare name cannot be the assertion. x-data still defines
+  # `openWalletHub() {` in a base app (removing it means ERB inside a
+  # double-quoted Alpine attribute, which this partial's header warns off), so a
+  # refute on the name would be red on correct markup. Matching the name NOT
+  # followed by a brace separates the two, and it catches a call site behind any
+  # attribute — @click today, @keydown or a future x-on tomorrow — rather than
+  # pinning the one handler string the bug happened to use.
+  def wallet_hub_call_sites(html)
+    html.to_s.scan(/openWalletHub\(\)(?!\s*\{)/)
+  end
+
+  # The x-data STATE a specimen card is seeded with.
+  #
+  # This lives on style/_modal_specimen's glow WRAPPER, outside the <article>
+  # specimen_card windows, so it needs its own window rather than a second use
+  # of that one. Anchored on the nearest wrapper before the label: every
+  # specimen opens its x-data with the same copiedRef key.
+  #
+  # Here the windowing is genuinely LOAD-BEARING, and the decoy is measured. A
+  # base app's page carries TWO "wallet: true" substrings before this fix and
+  # ONE after it, because the auth partial's own _methodDefaults renders
+  # `wallet: <the capability>` into its x-data. So a document-wide assertion
+  # would be reading the MODAL's default when it meant to read the CARD's
+  # toggle seed — passing, on the wrong string, in exactly the base-app-with-
+  # web3-on case that matters most.
+  def specimen_state(html, label)
+    idx = html.index(">#{label}</span>")
+    return nil unless idx
+
+    start = html.rindex(%(x-data="{ copiedRef: false), idx)
+    return nil unless start
+
+    close = html.index(%("), start + %(x-data=").length)
+    close ? html[start...close] : nil
+  end
+
+  # with_features, plus the auth_methods axis. Both are global config an app
+  # sets in its initializer, and this file's subject depends on BOTH: the
+  # capability decides whether the wallet method defaults on, auth_methods
+  # decides whether it is offered at all, and neither answers the gem question.
+  def with_auth(features, auth_methods)
+    original = Studio.auth_methods
+    Studio.auth_methods = auth_methods
+    with_features(features) { yield }
+  ensure
+    Studio.auth_methods = original
   end
 
   # ONE specimen card's <article> element, windowed.
