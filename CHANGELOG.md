@@ -4,6 +4,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **Knowledge coverage view** — `/admin/knowledge/coverage` +
+  `Studio::KnowledgeExpectation`: the "what SHOULD exist" half of the
+  knowledge layer. Expectations carry an entity, folder, provenance
+  (`source_note`, e.g. "diligence tracker item 14"), and a cadence — `once`
+  (an LOI) or `monthly` (aging inventory), where each calendar month from
+  `start_on` is a slot and the view names missing months outright
+  (`2026-09 MISSING`). Documents fulfill expectations by an EXPLICIT
+  `expectation_id` set at triage (the show page grows a "fulfills expectation"
+  select; a fuzzy name-match would silently merge lookalikes, an id never
+  does), and superseded documents never fill a slot. Ships two reference
+  migrations (`create_studio_knowledge_expectations`,
+  `add_expectation_to_studio_knowledge_docs`); routes ride the existing
+  `Studio.draw_knowledge_routes` opt-in. Built for the Commercial Welding
+  65-item diligence tracker; app-agnostic like the rest of the layer.
+
 ### Changed
 
 - **The auth modal's Solana button moved to solana-studio, behind a CREDENTIAL

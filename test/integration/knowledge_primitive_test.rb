@@ -48,6 +48,12 @@ class KnowledgePrimitiveTest < ActiveSupport::TestCase
 
     def admin_knowledge_doc_path(doc) = "/admin/knowledge/#{doc.respond_to?(:id) ? doc.id : doc}"
     def admin_knowledge_doc_download_path(doc) = "/admin/knowledge/#{doc.id}/download"
+
+    def admin_knowledge_coverage_path(**opts)
+      query = opts.compact.map { |k, v| "#{k}=#{v}" }.join("&")
+      query.empty? ? "/admin/knowledge/coverage" : "/admin/knowledge/coverage?#{query}"
+    end
+
     def protect_against_forgery? = false
   end
 

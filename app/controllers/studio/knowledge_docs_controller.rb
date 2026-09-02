@@ -45,6 +45,32 @@ module Studio
     def show
     end
 
+    # GET /admin/knowledge/coverage — expected vs uploaded, the gap named.
+    def coverage
+      @entity = params[:entity].presence
+      scope = Studio::KnowledgeExpectation.active.order(:path, :title)
+      scope = scope.for_entity(@entity) if @entity
+      @expectations = scope.to_a
+      @entities = Studio::KnowledgeExpectation.distinct.pluck(:entity).sort
+    end
+
+    def create_expectation
+      expectation = Studio::KnowledgeExpectation.create!(expectation_params)
+      redirect_to admin_knowledge_coverage_path(entity: expectation.entity),
+                  notice: "Expecting: #{expectation.title}."
+    rescue ActiveRecord::RecordInvalid => e
+      redirect_to admin_knowledge_coverage_path, alert: e.message
+    end
+
+    def update_expectation
+      expectation = Studio::KnowledgeExpectation.find(params[:id])
+      expectation.update!(expectation_params)
+      redirect_to admin_knowledge_coverage_path(entity: expectation.entity),
+                  notice: "#{expectation.title} updated."
+    rescue ActiveRecord::RecordInvalid => e
+      redirect_to admin_knowledge_coverage_path, alert: e.message
+    end
+
     def create
       file = params.dig(:knowledge_doc, :file)
       doc  = Studio::KnowledgeDoc.intake!(
@@ -73,6 +99,12 @@ module Studio
 
     private
 
+    def expectation_params
+      params.require(:knowledge_expectation)
+            .permit(:entity, :title, :path, :category, :cadence, :start_on,
+                    :source_note, :active)
+    end
+
     def set_doc
       @doc = Studio::KnowledgeDoc.find(params[:id])
     end
@@ -80,7 +112,8 @@ module Studio
     def doc_params
       permitted = params.require(:knowledge_doc)
                         .permit(:title, :entity, :path, :category, :summary,
-                                :document_date, :source_note, :status, access: {})
+                                :document_date, :source_note, :status,
+                                :expectation_id, access: {})
       # The access map arrives as {"samson" => "full", ...}; drop blanks so an
       # untouched select doesn't write a "none" the map means by absence anyway.
       if permitted[:access]

@@ -861,6 +861,13 @@ module Studio
       if Studio.draw_knowledge_routes
         get   "admin/knowledge",     to: "studio/knowledge_docs#index", as: :admin_knowledge
         post  "admin/knowledge",     to: "studio/knowledge_docs#create"
+        # Coverage (expected vs uploaded) — MUST precede the :id route below,
+        # or "coverage" is swallowed as a document id.
+        get   "admin/knowledge/coverage", to: "studio/knowledge_docs#coverage",
+              as: :admin_knowledge_coverage
+        post  "admin/knowledge/expectations", to: "studio/knowledge_docs#create_expectation"
+        patch "admin/knowledge/expectations/:id", to: "studio/knowledge_docs#update_expectation",
+              as: :admin_knowledge_expectation
         get   "admin/knowledge/:id", to: "studio/knowledge_docs#show",  as: :admin_knowledge_doc
         patch "admin/knowledge/:id", to: "studio/knowledge_docs#update"
         get   "admin/knowledge/:id/download", to: "studio/knowledge_docs#download",
