@@ -1715,8 +1715,11 @@ class StylePageTest < ActiveSupport::TestCase
   #
   # ANCHORS ARE THE HANDLER BINDING, never the bare handler name. The modal's own
   # x-data DEFINES `loginGoogle() {` and `async submitMagicLink() {` a hundred
-  # lines above the buttons, so a bare-name anchor would window the SCRIPT's
-  # element and read ITS x-show. With the binding, each anchor occurs exactly
+  # lines above the buttons, so a bare-name anchor windows the x-data element
+  # instead. MEASURED, not reasoned: that is a 4_283-byte `<div x-data="{ … }">`
+  # open tag carrying NO x-show, so the gate reads nil and refute_nil fires. The
+  # wrong element answers loudly rather than silently — but it is still the wrong
+  # element. With the binding, each anchor occurs exactly
   # ONCE in the auth block (measured). The wallet anchor needs no such exclusion
   # — the engine defines no wallet handler — but it does need the block window:
   # `.swap('wallet-connect'` occurs twice on the full page (the CTA at byte
@@ -1812,8 +1815,16 @@ class StylePageTest < ActiveSupport::TestCase
     open_tag_containing(block, anchor)&.slice(/\sx-show="([^"]*)"/, 1)
   end
 
-  # Every x-show EXPRESSION in the block, as written. Reads ATTRIBUTES only, so
-  # script text or prose naming the same call cannot satisfy a membership test.
+  # Every x-show EXPRESSION in the block, as written. Requiring the ` x-show="`
+  # wrapper is what defeats the decoy this replaced: MEASURED, `termsOn()`'s
+  # other two renders are bare x-data text, and deleting the real x-show turns
+  # the assertion above RED.
+  #
+  # It is a STRING scan, not a parse, so it cannot tell an attribute from text
+  # shaped like one — a `<script>` body or an HTML comment carrying a literal
+  # ` x-show="termsOn()"` WOULD satisfy it. Sound on this block, not sound by
+  # construction: MEASURED, all 19 matches here are real attributes, and the
+  # auth block contains no `<script` and no `<!--`.
   def x_show_expressions(block)
     block.to_s.scan(/\sx-show="([^"]*)"/).flatten
   end
