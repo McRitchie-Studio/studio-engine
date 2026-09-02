@@ -3,6 +3,11 @@
 # (`bin/rails studio_engine:install:migrations && bin/rails db:migrate`) so the
 # table is created in the app's database. Do not hand-copy — a hand copy
 # collides with the installed copy on `class CreateStudioKnowledgeDocs`.
+#
+# STYLE NOTE: reference migrations are written omakase-rubocop-compatible
+# (spaces inside array brackets) because the installed copy is linted by the
+# CONSUMER's rubocop, not this gem's — an engine-styled copy fails the
+# consumer's cert untouched (measured on the Industries adoption ship).
 class CreateStudioKnowledgeDocs < ActiveRecord::Migration[7.2]
   def change
     create_table :studio_knowledge_docs do |t|
@@ -41,8 +46,8 @@ class CreateStudioKnowledgeDocs < ActiveRecord::Migration[7.2]
       t.timestamps
     end
 
-    add_index :studio_knowledge_docs, [:entity, :status]
-    add_index :studio_knowledge_docs, [:entity, :path]
+    add_index :studio_knowledge_docs, [ :entity, :status ]
+    add_index :studio_knowledge_docs, [ :entity, :path ]
     add_index :studio_knowledge_docs, :s3_key, unique: true
     add_index :studio_knowledge_docs, :superseded_by_id
   end

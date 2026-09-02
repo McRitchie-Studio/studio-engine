@@ -95,6 +95,15 @@ class KnowledgePrimitiveTest < ActiveSupport::TestCase
     assert_includes html, "knowledge-status-filed"
   end
 
+  test "chip styles come from the shared partial, defined exactly once" do
+    doc = doc!(title: "LOI", access: { "samson" => "full" })
+    html = render_browser(docs: [doc])
+
+    assert_equal 1, html.scan("border-radius: 9999px").size,
+      "the chip style block must render once — a second copy means the shared partial split again"
+    assert_includes html, "knowledge-chip-full", "chips still render against the shared definition"
+  end
+
   test "a doc with no access map says so instead of rendering nothing" do
     doc = doc!(title: "Untriaged")
     html = view.render(partial: "studio/knowledge_docs/access_chips", locals: { doc: doc })
