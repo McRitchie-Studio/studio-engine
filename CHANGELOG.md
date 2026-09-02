@@ -4,6 +4,34 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The auth modal's Solana button moved to solana-studio, behind a CREDENTIAL
+  SLOT.** `style/modals/_auth` no longer draws the button; it renders whatever
+  resolves at `solana_studio/auth/wallet_credential` and nothing when that path
+  is empty, so bundling the gem IS the registration and a web2 app carries no
+  wallet markup at all. This completes the two-template split begun in 0.67.0,
+  which moved the four web3 MODALS to the gem and left the sign-in button as the
+  last web3 markup in the base engine. The gem half has shipped since
+  solana-studio **0.5.2** — until now this engine referenced that partial
+  nowhere, so the gem shipped a button no host rendered.
+  **Supersedes the stranded PR #245**, whose consumer lane was red only because
+  it opened before solana-studio 0.5.2 published.
+
+  **What did NOT change, deliberately:** `_methodDefaults.wallet` is still
+  `Studio.auth_method?(:wallet) && Studio.feature?(:web3)`. The Ruby gate
+  answers "is it implemented" (is the picker registered, does the credential
+  partial resolve) and gates the RENDER; Alpine's `methodOn('wallet')` still
+  answers "should it show" and gates VISIBILITY, which keeps the style guide's
+  method toggles working. Folding policy into the Ruby gate would delete the
+  button from the DOM on a web3-off app that bundles the gem, and the "or"
+  divider — which reads `methodOn('wallet')` too — would then float above a
+  button that is not there.
+
+  Hosts need no change: the engine's auth modal is a style-guide specimen
+  reached through `/admin/style`, and an app that bundles solana-studio 0.5.2 or
+  later sees the same button in the same place.
+
 ### Fixed
 
 - **Knowledge layer hardening** — the five findings from the 0.67.0 reviews:

@@ -56,6 +56,18 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
     view
   end
 
+  # The auth modal ALONE, with the local style/_modals passes it.
+  #
+  # Everything else in this file goes through render_index, because it is asking
+  # about the GUIDE. The two tests below ask about the credential slot's Ruby
+  # gate, whose two terms — is the picker registered, does a layer ship the
+  # credential — the real gem always answers together. Only a direct render can
+  # separate them, and one of those splits is a state solana-studio actually
+  # shipped rather than a contrivance.
+  def render_auth(paths, web3_gem:)
+    build_view(paths).render(partial: "style/modals/auth", locals: { web3_gem: web3_gem })
+  end
+
   def with_features(features)
     original = Studio.features
     Studio.features = features
@@ -281,10 +293,11 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
 
           refute_nil auth, "the auth modal must stay REGISTERED in a base app (#{where}) — " \
                            "it is engine-owned, and only its wallet button needed the gem"
-          assert_empty wallet_hub_call_sites(auth),
-                       "the auth modal must carry no openWalletHub CALL SITE where the gem is " \
-                       "absent (#{where}) — nothing registers wallet-connect, so the swap opens " \
-                       "an empty panel"
+          assert_empty wallet_cta_call_sites(auth),
+                       "the auth modal must open no wallet picker where the gem is absent " \
+                       "(#{where}) — nothing registers wallet-connect, so the swap opens an " \
+                       "empty panel. The button is CONTRIBUTED now, so a base app resolves no " \
+                       "partial at solana_studio/auth/wallet_credential and draws nothing"
           # The control, in the same window: gating the wallet button must not
           # inert the modal it lives in. Magic link is the credential a base app
           # actually ships, and it has to survive.
@@ -305,13 +318,73 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
       with_auth(features, %i[magic_link google wallet]) do
         auth = modal_registration(render_index(full_view), "auth")
 
-        refute_empty wallet_hub_call_sites(auth),
+        refute_empty wallet_cta_call_sites(auth),
                      "the wallet button must stay wired where the gem resolves " \
-                     "(features=#{features.inspect})"
+                     "(features=#{features.inspect}) — it is the gem's contributed partial now, " \
+                     "but it must still reach the picker"
         assert_includes auth, %(x-show="methodOn('wallet')"),
                         "the Ruby gate must not replace the Alpine one — methodOn still owns " \
                         "whether a gem app SHOWS the button (features=#{features.inspect})"
       end
+    end
+  end
+
+  def test_a_layer_with_the_credential_but_no_picker_draws_no_cta
+    # NOT a contrivance: solana-studio 0.5.2 shipped exactly this pair —
+    # auth/_wallet_credential and no modals/_wallet_connect. The credential
+    # resolves, so the existence term alone answers yes, and the button it would
+    # draw swaps to an id nothing registered. That is the empty panel again, one
+    # layer up from where it was fixed. web3_gem is the term that refuses it,
+    # which is the whole reason it is still in the gate after the move.
+    with_auth(%i[web3], %i[magic_link google wallet]) do
+      auth = render_auth([ENGINE_VIEWS, GEM_VIEWS], web3_gem: false)
+
+      assert_empty wallet_cta_call_sites(auth),
+                   "a layer shipping the credential without a registered picker must draw no " \
+                   "wallet CTA — the swap would open an empty panel"
+      # The control, in the same render: refusing the wallet CTA must not inert
+      # the modal around it. Magic link is what a base app actually ships.
+      assert_includes auth, "submitMagicLink()",
+                      "refusing the wallet CTA must not inert the modal it lives in"
+    end
+  end
+
+  def test_the_wallet_cta_is_the_gems_partial_and_not_an_engine_fork
+    # THE MOVE, pinned by provenance. A brand mark is namespaced by whoever owns
+    # it: the gem's gradient id is solana-studio-auth-grad, and the copy this
+    # engine carried until adopt-wallet-credential-slot was auth-solana-grad.
+    # Asserting the gem's id appears AND the engine's is gone anywhere on the
+    # guide is what makes a re-added engine copy fail here, instead of quietly
+    # becoming a second source of the same button — which is how the wallet
+    # picker reached three drifting copies before it was promoted.
+    with_auth(%i[web3], %i[magic_link google wallet]) do
+      auth = render_auth([ENGINE_VIEWS, GEM_VIEWS], web3_gem: true)
+
+      assert_includes auth, "solana-studio-auth-grad",
+                      "the wallet CTA must be the gem's contributed partial"
+      refute_includes render_index(full_view), "auth-solana-grad",
+                      "this engine must ship no Solana button markup of its own"
+    end
+  end
+
+  def test_a_registered_picker_with_no_credential_renders_nothing_rather_than_raising
+    # The OTHER direction of the same gate, and the one that fails LOUDLY if the
+    # existence term is dropped. A host whose picker is registered but whose
+    # layer ships no credential partial must get NO BUTTON, not
+    # ActionView::MissingTemplate in front of someone trying to sign in.
+    # Measured: without the exists? term this render raises instead of returning.
+    with_auth(%i[web3], %i[magic_link google wallet]) do
+      auth = nil
+
+      # Mutating the exists? term out of the gate turns this line into
+      # ActionView::MissingTemplate, which is the 500 the term exists to prevent.
+      assert_nothing_raised do
+        auth = render_auth([ENGINE_VIEWS], web3_gem: true)
+      end
+      assert_empty wallet_cta_call_sites(auth),
+                   "no credential layer means no wallet CTA"
+      assert_includes auth, "submitMagicLink()",
+                      "the rest of the modal must survive a missing credential layer"
     end
   end
 
@@ -434,17 +507,33 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
     nxt ? html[start...nxt] : html[start..]
   end
 
-  # openWalletHub CALL SITES in a window — its DEFINITION excluded.
+  # WALLET CTA CALL SITES in a window — anything that opens the picker.
   #
-  # The bare name cannot be the assertion. x-data still defines
-  # `openWalletHub() {` in a base app (removing it means ERB inside a
-  # double-quoted Alpine attribute, which this partial's header warns off), so a
-  # refute on the name would be red on correct markup. Matching the name NOT
-  # followed by a brace separates the two, and it catches a call site behind any
-  # attribute — @click today, @keydown or a future x-on tomorrow — rather than
-  # pinning the one handler string the bug happened to use.
-  def wallet_hub_call_sites(html)
-    html.to_s.scan(/openWalletHub\(\)(?!\s*\{)/)
+  # REBOUND, and deliberately TIGHTER than what it replaces. This used to scan
+  # for `openWalletHub()` not followed by a brace: an engine-owned FUNCTION
+  # NAME, plus a dance to exclude its own definition. adopt-wallet-credential-
+  # slot moved the button into solana-studio, which inlines the swap instead, so
+  # that name no longer exists in this engine at all and the old regex would be
+  # green on a base app for the wrong reason — it cannot find a string nobody
+  # writes any more, whatever the markup does.
+  #
+  # The old helper's own comment said it meant to catch a call site "rather than
+  # pinning the one handler string the bug happened to use". Pinning
+  # openWalletHub was exactly that. This asks the question the tests are named
+  # for instead: does anything here OPEN THE PICKER.
+  #
+  # Why this bites harder, not softer:
+  #   · it matches the SWAP CALL carrying its literal target id, which is the
+  #     thing that actually opens the panel, not a name that merely implies it;
+  #   · the leading dot requires a store RECEIVER, so prose in a rendered JS or
+  #     HTML comment naming the swap cannot satisfy it;
+  #   · it still catches the call behind ANY attribute — @click today, @keydown
+  #     or a future x-on tomorrow — which was the original stated intent;
+  #   · it needs no definition-exclusion lookahead, because the engine defines
+  #     no wallet handler to exclude.
+  # Mutation-proved both directions in the PR body.
+  def wallet_cta_call_sites(html)
+    html.to_s.scan(/\.swap\(\s*'wallet-connect'/)
   end
 
   # The x-data STATE a specimen card is seeded with.

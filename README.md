@@ -257,6 +257,54 @@ What the engine **keeps** is the SESSION half of Solana sign-in:
 `Studio.wallet_sign_in_statement` — the single source for the signed statement,
 which the gem's deep link reads so the two cannot drift.
 
+#### The auth modal's credential slot
+
+The **sign-in modal itself stays here** and is never forked: every app in the
+ecosystem signs people in, and most of them are web2. What varies is *which
+credentials it offers*. Google and magic-link are implemented by this engine and
+render directly. The wallet button is implemented by the web3 layer, so it is
+**contributed** — `style/modals/_auth` looks for a partial at one fixed path and
+renders whatever it finds:
+
+    solana_studio/auth/_wallet_credential     (shipped by the solana-studio gem)
+
+Bundling the gem **is** the registration. There is no registry call and no
+config flag; an app without that layer renders nothing there, so a web2 app
+carries no wallet markup at all rather than markup hidden behind a flag. This is
+the same optional-partial convention as `modals/_host_extras` above, and it uses
+the same three-term `lookup_context.exists?`.
+
+Copying the auth modal into the gem was rejected deliberately: it would fork a
+surface both apps sign in through, and the two copies would drift — which is how
+the wallet picker reached three copies before it was promoted.
+
+**Two layers answer two different questions, and they are not merged:**
+
+| Question | Answered by | Where it is decided |
+|---|---|---|
+| Is it **implemented**? | the picker is registered, **and** the credential partial resolves | Ruby, in `style/modals/_auth` — gates the render |
+| Should it **show**? | `methodOn('wallet')`, falling back to `Studio.auth_method?(:wallet) && Studio.feature?(:web3)` | Alpine, inside the contributed partial — gates visibility |
+
+Both terms of the Ruby gate are load-bearing, and they fail differently. Without
+the **registration** term a layer that ships the credential but not the picker
+draws a button that opens an empty panel — not hypothetical, solana-studio 0.5.2
+shipped exactly that pair. Without the **existence** term an app whose picker
+resolves but whose credential does not raises `Missing partial` in front of
+someone signing in, instead of quietly rendering no button.
+
+Policy stays **out** of the Ruby gate on purpose. Folding
+`auth_method?(:wallet)` and `feature?(:web3)` into the render would delete the
+button from the DOM on a web3-off app that bundles the gem — and the "or"
+divider reads `methodOn('wallet')` too, so ticking Solana Wallet on the style
+guide's Sign in card would then float a divider above a button that is not
+there.
+
+A contributed partial renders inside the modal's own Alpine scope, so it may use
+`methodOn(...)`, `attested()` (the legal-age gate — call it, or wallet becomes
+the one credential that skips attestation) and `props.submitting`. It receives
+one local, `modal_store`: the engine's real host is `"modals"`, the living style
+guide's page-scoped host is `"dsModals"`.
+
 It also keeps two blocks the gem renders **by name** across the gem boundary:
 `studio/modals/blocks/wallet_brand_sprite` and `studio/modals/blocks/card_header`.
 Renaming either is a cross-repo change.
