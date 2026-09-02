@@ -18,26 +18,69 @@
   No real auth happens — the demo shows the real UI.
 
   LOCALS:
-    web3_gem (Boolean, required) — does solana-studio resolve. style/_modals
-    owns the lookup and registers wallet-connect behind the same flag; the
-    Solana button below is rendered only when it is true, because a button that
-    swaps to an unregistered id opens an empty panel. Fetched without a default
-    on purpose: a caller that forgets it should fail loudly here rather than
+    web3_gem (Boolean, required) — does solana-studio resolve, meaning is the
+    wallet-connect picker on the view path. style/_modals owns the lookup and
+    registers wallet-connect behind the same flag. Fetched without a default on
+    purpose: a caller that forgets it should fail loudly here rather than
     silently drop Solana sign-in from an app that has the gem.
 
-  NOT gated on web3_gem, deliberately: _methodDefaults.wallet below. It is the
-  fallback methodOn uses when an opener passes no methods hash, and on a base
-  app nothing reaches it — the Sign in card always passes explicit booleans, and
-  the only opener that omits them is the wallet picker's back button, which
-  needs the gem to exist at all. Adding the term there would read like a third
-  gate while changing no rendered outcome and no behaviour, and a gate that
-  cannot be shown to bite is decoration. The trigger below is the real gate.
+  THE CREDENTIAL SLOT. Google and magic-link are implemented by this engine, so
+  they render below directly. Wallet is not: it belongs to the web3 bolt-on, and
+  a base-template app — a newsletter, a hub — must not carry markup it can never
+  render. So the wallet button is CONTRIBUTED by whichever layer implements it,
+  as a partial this file merely looks for:
+
+    solana_studio/auth/wallet_credential
+
+  Bundling the gem IS the registration. An app without that layer renders
+  nothing here and carries no wallet markup at all, rather than shipping a
+  button hidden behind a flag.
+
+  TWO LAYERS ANSWER TWO DIFFERENT QUESTIONS, and they are deliberately NOT
+  merged into one:
+
+    Ruby, below      IS IT IMPLEMENTED. Is the picker this button swaps to
+                     registered (web3_gem), and does a layer actually ship the
+                     credential partial. This gates the RENDER.
+    Alpine, in the   SHOULD IT SHOW. methodOn('wallet'), which reads
+    contributed      props.methods first so the Sign in card's toggle overrides
+    partial          the server default outright. This gates VISIBILITY.
+
+  KEEPING POLICY OUT OF THE RUBY GATE IS LOAD-BEARING, and it is why
+  auth_method?(:wallet) and feature?(:web3) are NOT terms in the render gate.
+  Fold them in and the button leaves the DOM on a web3-off app that bundles the
+  gem — and then ticking Solana Wallet on the Sign in card turns the divider
+  below on above a button that is not there, because the divider reads
+  methodOn('wallet') too. Measured: that is the exact failure this slot was
+  meant to remove, reintroduced one layer up.
+
+  NOT gated on the slot, deliberately: _methodDefaults.wallet below. It stays
+  the app's own policy answer and is unchanged by the move. It is the fallback
+  methodOn uses when an opener passes no methods hash, and on a base app nothing
+  reaches it — the Sign in card always passes explicit booleans, and the only
+  opener that omits them is the wallet picker's back button, which needs the gem
+  to exist at all.
 
   CRITICAL: rendered inside <template x-if="id==='auth'"> — Alpine requires a
   SINGLE root, so everything lives inside the outer <div>. The x-data is a
   double-quoted attribute: keep it free of double-quotes and backticks.
 %>
 <% web3_gem = local_assigns.fetch(:web3_gem) %>
+<%# BOTH terms are load-bearing, and they fail differently.
+
+    web3_gem  is the picker this button swaps to actually REGISTERED. A layer
+      that ships the credential partial without the picker draws a button that
+      opens an empty panel — not hypothetical: solana-studio 0.5.2 shipped
+      exactly that pair, the credential without wallet_connect.
+    exists?   does a layer ship the button AT ALL. Without it, an app whose
+      picker resolves but whose credential does not raises Missing partial in
+      front of someone signing in, instead of rendering no button.
+
+    Same three-term lookup_context.exists? the modal host uses for host_extras
+    (studio/modals/_host.html.erb): name, prefixes, partial. %>
+<% wallet_credential = "solana_studio/auth/wallet_credential" %>
+<% wallet_credential_available = web3_gem &&
+                                 lookup_context.exists?("wallet_credential", ["solana_studio/auth"], true) %>
 <div x-data="{
        email: '',
        ageAttested: false,
@@ -84,10 +127,6 @@
            var pp = self.props;
            if (pp) pp.submitting = null;
          }, 1200);
-       },
-       openWalletHub() {
-         if (!this.attested()) return;
-         Alpine.store('dsModals').swap('wallet-connect', { backTo: 'auth', ageAttested: true });
        },
        async submitMagicLink() {
          if (!this.attested()) return;
@@ -184,35 +223,19 @@
         <p role="alert" class="text-red-400 text-xs -mt-2 mb-3" x-text="props.googleError"></p>
       </template>
 
-      <%# 2. Solana — progresses to the Connect Wallet picker modal. TWO gates,
-          asking two different questions, and only one of them is Alpine's:
+      <%# 2. Wallet — CONTRIBUTED, not written here. See the credential-slot note
+          at the top of this file. The partial owns the button, its brand mark
+          and its click handler; this engine owns only the decision to look for
+          it. An app with no web3 layer on its view path renders nothing at all
+          here, which is the whole point: the base template ships no wallet
+          markup.
 
-            x-show methodOn('wallet')  POLICY — does this app offer wallet as a
-              credential, and has the specimen card's toggle turned it on. Reads
-              props.methods.wallet first, so the card's checkbox overrides the
-              server default outright.
-            Ruby web3_gem             CAPABILITY — does solana-studio resolve, so
-              that something actually REGISTERED the wallet-connect id this button
-              swaps to. style/_modals wraps that registration in the same gate.
-
-          The policy gate cannot stand in for the capability one: a base app can
-          answer yes to the first and no to the second, and then the button opens
-          an empty panel. It has to be the RUBY gate because the toggle can flip
-          every Alpine term, and a control the operator can tick is not a gate. %>
-      <% if web3_gem %>
-        <button @click="openWalletHub()" x-show="methodOn('wallet')" :disabled="!!props.submitting"
-                class="btn btn-neutral btn-lg w-full gap-3 mb-3 disabled:cursor-wait">
-          <svg width="18" height="14" viewBox="0 0 397 311" fill="none" x-show="props.submitting !== 'wallet'" aria-hidden="true">
-            <defs><linearGradient id="auth-solana-grad" x1="361" y1="-9" x2="153" y2="389" gradientUnits="userSpaceOnUse">
-              <stop offset="0" stop-color="#00FFA3"/><stop offset="1" stop-color="#DC1FFF"/>
-            </linearGradient></defs>
-            <path d="M65 234c2-2 6-4 9-4h317c6 0 9 7 5 11l-63 63c-2 2-6 4-9 4H6c-6 0-9-7-5-11l64-63z" fill="url(#auth-solana-grad)"/>
-            <path d="M65 4c2-2 6-4 9-4h317c6 0 9 7 5 11l-63 63c-2 2-6 4-9 4H6c-6 0-9-7-5-11L65 4z" fill="url(#auth-solana-grad)"/>
-            <path d="M333 119c-2-2-6-4-9-4H7c-6 0-9 7-5 11l63 63c2 2 6 4 9 4h317c6 0 9-7 5-11l-63-63z" fill="url(#auth-solana-grad)"/>
-          </svg>
-          <span x-show="props.submitting === 'wallet'" class="spinner" aria-hidden="true"></span>
-          <span x-text="props.submitting === 'wallet' ? 'Connecting…' : 'Solana'"></span>
-        </button>
+          Visibility is still Alpine's. The contributed partial carries
+          x-show methodOn('wallet'), so the Sign in card's toggle drives it
+          exactly as it drove the button that used to live here, and the divider
+          below can never float above a button the DOM is missing. %>
+      <% if wallet_credential_available %>
+        <%= render wallet_credential, modal_store: "dsModals" %>
       <% end %>
 
       <%# "or" divider — only when magic-link AND a social method are both on. %>
