@@ -1758,14 +1758,23 @@ class StylePageTest < ActiveSupport::TestCase
   # of following markup while calling it an element — answering this test's
   # question about some other part of the page.
   #
-  # No ONE invariant catches every misaligned shape; MEASURED, each of the four
-  # below catches shapes the others miss, so all four are checked:
+  # No ONE invariant catches every misaligned shape; MEASURED, each of the FIVE
+  # below catches shapes the others miss, so all five are checked:
+  #   · no "<" precedes the anchor at all                        (unwindowable)
+  #   · an UNQUOTED "<" appeared before the ">"                  (state inverted)
   #   · the anchor is present but the walk found no closing ">"  (ran off the end)
   #   · the ">" it closed on precedes the anchor                 (wrong element)
-  #   · an UNQUOTED "<" appeared before the ">"                  (state inverted)
   #   · the window is not a single well-formed open tag          (overrun)
-  # test_the_CTA_window_refuses_a_misaligned_start exercises three of the four
-  # against constructed markup; the fourth is the aligned control.
+  # test_the_CTA_window_refuses_a_misaligned_start raises ALL FIVE against
+  # constructed markup, and separately asserts the aligned control windows to
+  # itself exactly.
+  #
+  # The list said FOUR and the count was always five; the guard test exercised
+  # three and the comment called the aligned control "the fourth", conflating a
+  # CASE with an INVARIANT. The control exercises invariant five's SUCCESS path
+  # and cannot redden it. Two branches were prose for the whole of that time —
+  # proved by deleting each raise alone and watching every shipped case come back
+  # byte-identical.
   def open_tag_containing(source, anchor)
     source = source.to_s
     site = source.index(anchor)
@@ -1812,6 +1821,29 @@ class StylePageTest < ActiveSupport::TestCase
   # (`typeof methodOn === 'function' ? methodOn('wallet') : true`) satisfies it,
   # while deleting the x-show or moving the decision into ERB does not.
   def credential_visibility_gate(block, anchor)
+    # EVERY invariant in open_tag_containing can be satisfied by the WRONG element.
+    # `site = source.index(anchor)` takes the FIRST match and no invariant asks
+    # whether that match is a LIVE control. A decoy earlier in the block — inside an
+    # HTML comment, a <script> string, or an attribute value holding well-formed
+    # markup — yields a window that passes all five and hands back its x-show, while
+    # the real control below carries none. That is a FALSE GREEN: the assertion
+    # reports the gate is wired when it is not.
+    #
+    # Carl reproduced it five ways on PR #266 (attribute value, HTML comment, script
+    # string, self-closing). NOT reachable on today's markup — the auth block holds
+    # no `<script` and no `<!--`, and each anchor occurs exactly once — which is
+    # precisely why this is worth pinning: "each anchor occurs exactly ONCE
+    # (measured)" was a comment, and a comment cannot notice when it stops being
+    # true. Counting here turns that measurement into a check.
+    occurrences = block.to_s.scan(anchor).size
+    if occurrences > 1
+      raise "credential_visibility_gate: the anchor #{anchor.inspect} matches " \
+            "#{occurrences} times in this block, so `index` cannot be trusted to have " \
+            "found the LIVE control. A decoy (script string, HTML comment, attribute " \
+            "value) would window to itself and report a gate the real control does not " \
+            "carry. Narrow the anchor or the block."
+    end
+
     open_tag_containing(block, anchor)&.slice(/\sx-show="([^"]*)"/, 1)
   end
 
@@ -1829,9 +1861,20 @@ class StylePageTest < ActiveSupport::TestCase
     block.to_s.scan(/\sx-show="([^"]*)"/).flatten
   end
 
-  # The guard above, exercised. Without this its four branches are prose: the
-  # shipped markup happens to carry no "<" in an attribute value before the CTA's
-  # swap call, so nothing on the real page would ever reach them.
+  # The guard above, exercised. Without this its FIVE branches are prose, and
+  # nothing on the real page would reach them.
+  #
+  # The reason is not the one this comment used to give. It claimed "the shipped
+  # markup happens to carry no '<' in an attribute value before the CTA's swap
+  # call". MEASURED FALSE by Carl reviewing PR #266: one does — inside a
+  # double-quoted x-data, ahead of all three credential anchors.
+  #
+  # The walk is safe for a different reason, and this one is structural rather
+  # than a property of today's markup: `start = source.rindex("<", site)` takes
+  # the NEAREST "<" before the anchor, which is the anchor's own tag's "<". An
+  # earlier "<" anywhere in the block cannot be selected while a closer one
+  # exists. So the guard holds on markup that the old sentence said would be
+  # dangerous — the conclusion was right, the stated fact was not.
   test "the CTA window refuses a misaligned start instead of overrunning" do
     # 1. The decoy "<" leaves the walk's quote state inverted from its first
     #    character, and it runs off the end without ever closing a tag.
@@ -1863,8 +1906,66 @@ class StylePageTest < ActiveSupport::TestCase
     assert_equal %(<button x-text="a b" @click="$store.m.swap('wallet-connect')" x-show="methodOn('wallet')">),
       open_tag_containing(aligned, WALLET_CTA_ANCHOR)
 
+    # 5. INVARIANT 4 — the OPEN_TAG overrun check. The walk starts at a bare "<"
+    #    that is TEXT, not a tag, and closes on a later ">" that is also text, so
+    #    it returns a window that is well-formed to every earlier invariant: a "<"
+    #    precedes the anchor, no unquoted "<" follows, a tag "closed", and it closed
+    #    AFTER the anchor. Only the shape check catches it.
+    #
+    #    This branch shipped with NO raising test. Proved by deleting only this
+    #    raise and re-running the four cases above: all four came back
+    #    BYTE-IDENTICAL. A guard nothing can redden is prose.
+    text_not_a_tag = %(<p>a < b and $store.m.swap('wallet-connect') is here > done</p>)
+    assert_includes assert_raises(RuntimeError) {
+      open_tag_containing(text_not_a_tag, WALLET_CTA_ANCHOR)
+    }.message, "not a single open tag"
+
+    # 6. INVARIANT 5 — no "<" precedes the anchor at all, so there is no window to
+    #    walk. Distinct from the ONE legitimate nil below: there the anchor is
+    #    ABSENT and nil is the answer; here the anchor is PRESENT and unwindowable,
+    #    which is a misalignment and must raise rather than answer.
+    no_tag_at_all = %($store.m.swap('wallet-connect'))
+    assert_includes assert_raises(RuntimeError) {
+      open_tag_containing(no_tag_at_all, WALLET_CTA_ANCHOR)
+    }.message, %(no "<" precedes the anchor)
+
     # A genuinely absent anchor is the ONE nil, and it is not an error.
     assert_nil open_tag_containing(%(<div>no anchor here</div>), WALLET_CTA_ANCHOR)
+  end
+
+  # THE FALSE GREEN ALL FIVE INVARIANTS ALLOW. open_tag_containing validates the
+  # SHAPE of the window it built; nothing asks whether the anchor it indexed is a
+  # LIVE control. A decoy earlier in the block windows to itself, satisfies every
+  # invariant, and hands back ITS x-show — so the assertion passes while the real
+  # control carries no gate at all.
+  #
+  # This is the failure this whole lineage keeps producing: a check that reports
+  # success about something other than the thing it names.
+  test "a decoy carrying the anchor cannot answer for the real control" do
+    # The decoy lives in a <script> string and carries a gate. The REAL button
+    # below carries NO x-show — so a green here would be entirely false.
+    decoyed = <<~HTML
+      <script>const tpl = `<span data-x="$store.m.swap('wallet-connect')" x-show="methodOn('wallet')">`;</script>
+      <button @click="$store.m.swap('wallet-connect')">Connect</button>
+    HTML
+
+    error = assert_raises(RuntimeError) do
+      credential_visibility_gate(decoyed, WALLET_CTA_ANCHOR)
+    end
+    assert_includes error.message, "matches 2 times",
+                    "the guard must refuse on COUNT, before `index` picks a winner"
+
+    # Proof the refusal is worth having: without the count check, the decoy answers
+    # and the real control's MISSING gate reads as present.
+    assert_equal %(methodOn('wallet')),
+                 open_tag_containing(decoyed, WALLET_CTA_ANCHOR).slice(/\sx-show="([^"]*)"/, 1),
+                 "this is the false green the count check exists to prevent — the window " \
+                 "resolves to the SCRIPT STRING and reports a gate the button does not carry"
+
+    # And the guard must not fire on the honest single-anchor case.
+    honest = %(<button @click="$store.m.swap('wallet-connect')" x-show="methodOn('wallet')">Connect</button>)
+    assert_equal %(methodOn('wallet')), credential_visibility_gate(honest, WALLET_CTA_ANCHOR),
+                 "one anchor, one control — the count check must be invisible here"
   end
 
 end
