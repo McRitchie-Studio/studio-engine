@@ -43,6 +43,8 @@
     <span aria-hidden="true">·</span>
     <%= link_to "Show all", admin_knowledge_path(view: "flat", entity: entity, status: status),
                 class: view == "flat" ? "font-semibold underline" : "" %>
+    <span aria-hidden="true">·</span>
+    <%= link_to "Coverage", admin_knowledge_coverage_path(entity: entity), id: "knowledge-coverage-link" %>
   </div>
 </div>
 
