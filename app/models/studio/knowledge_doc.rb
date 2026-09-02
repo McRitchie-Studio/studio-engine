@@ -35,6 +35,12 @@ module Studio
     ACCESS_LEVELS = %w[full aware none].freeze
     STATUSES      = %w[inbox filed superseded].freeze
 
+    # The expectation this document fulfills (coverage view) — optional, set at
+    # triage. Guarded: consumers that installed the docs table before the
+    # expectations migration existed simply have no column yet.
+    belongs_to :expectation, class_name: "Studio::KnowledgeExpectation",
+                             optional: true, inverse_of: :docs
+
     validates :title,  presence: true
     validates :entity, presence: true
     validates :status, inclusion: { in: STATUSES }
