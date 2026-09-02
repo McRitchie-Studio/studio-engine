@@ -279,6 +279,27 @@ jobs:
           grep -q '^gem "studio-engine", path: "../studio"$' Gemfile
           bundle install --jobs 4 --retry 2
 
+      # THE ONLY PLACE THIS CAN BE CHECKED. Comparing what this engine resolves
+      # against what a consumer resolves needs BOTH lockfiles on disk, and only
+      # this lane has them — the engine at `studio/`, the consumer beside it.
+      # test/lib/consumer_ci_shard_contract_test.rb records the same constraint
+      # for its own cross-repo contract: a test in this repo cannot read another
+      # repo's tree at test time.
+      #
+      # It fails ONLY when the ENGINE TRAILS the consumer. A consumer that lags
+      # is the consumer's business and never reddens an engine PR; a consumer
+      # that bundles no tracked gem (the BASE half — mcritchie_industries) is a
+      # skip, not a failure. Direction, rationale and remedy: studio/bin/gem-
+      # drift-check, guarded by test/lib/gem_drift_check_test.rb.
+      #
+      # Runs once per matrix entry, so the four hub shards each repeat it. That
+      # is sub-second and stdlib-only; skipping three of them would need a shard
+      # condition that could itself go stale.
+      - name: Check this engine does not trail ${{ matrix.consumer }}
+        run: |
+          ruby studio/bin/gem-drift-check studio/Gemfile.lock \
+            "${{ matrix.consumer }}=${{ matrix.consumer }}/Gemfile.lock"
+
       - name: Generate test-only Solana admin key
         if: ${{ matrix.needs_solana_admin_key }}
         working-directory: ${{ matrix.consumer }}
