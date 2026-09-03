@@ -1,3 +1,9 @@
+# The QA signal lives in EnvironmentBanner (pure Ruby, unit-tested). Required
+# EXPLICITLY rather than leaned on: s3.rb is loadable on its own — the unit suite
+# requires it directly without lib/studio.rb — so an implicit dependency here
+# resolves in the app and raises NoMethodError in a test.
+require_relative "environment_banner"
+
 module Studio
   module S3
     class Error < StandardError; end
@@ -100,7 +106,23 @@ module Studio
 
       private
 
+      # WHICH BUCKET HALF THIS APP OWNS. Rails.env alone cannot answer it: no QA app
+      # sets RAILS_ENV, so every QA app boots as `production` exactly like real
+      # production. QA_ENV is the signal that separates them, and it is the one
+      # config/storage.yml (Active Storage), Studio::EnvironmentBanner and
+      # turf-monster's AppFlags already read — so consulting it here makes BOTH S3
+      # writers agree instead of resolving different buckets from the same process.
+      #
+      # Before this, a QA app holding the DEV key was handed the PRODUCTION bucket:
+      # every write took an IAM AccessDenied (uncaught — the knowledge_docs
+      # controller rescues only NotConfigured/MissingTable), and a LIST returned
+      # production's confidential objects to a review environment.
+      #
+      # `Studio.qa_environment?` delegates to EnvironmentBanner.truthy?, so
+      # `QA_ENV=false` correctly reads as production rather than as mere presence.
       def environment
+        return "dev" if EnvironmentBanner.qa_environment?
+
         defined?(Rails) && Rails.env.production? ? "production" : "dev"
       end
     end
