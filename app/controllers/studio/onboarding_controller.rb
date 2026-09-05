@@ -42,17 +42,35 @@ module Studio
       end
 
       rescue_and_log(target: current_user) do
-        # update_columns, not update!: this runs seconds after signup, on an
-        # account that may be mid-onboarding, and a validation failure elsewhere
-        # on the record (a grandfathered reserved username, say) must not block a
-        # first name. It also steps around any host before_save that DERIVES
-        # first_name FROM name — turf's set_name_parts does exactly that, and
-        # writing through it would discard the value we were just handed.
-        attrs = { first_name: value }
+        # update_columns, not update!, for THREE reasons — all still true:
+        #
+        #   1. This runs seconds after signup, on an account that may be
+        #      mid-onboarding, and a validation failure elsewhere on the record
+        #      (a grandfathered reserved username, say) must not block a name.
+        #   2. It steps around any host before_save that DERIVES first_name FROM
+        #      name — set_name_parts does exactly that — which would discard the
+        #      value we were just handed.
+        #   3. THE SLUG. Sluggable's `before_save :set_slug` is UNGATED, and
+        #      mcritchie-studio's User#name_slug is built from `name`. A full
+        #      save right after this writes `name` would therefore re-point the
+        #      slug the account answers on — a URL change, on a column carrying
+        #      a unique index, for every signup. That is the constraint this
+        #      endpoint has always been protecting; it is not a shortcut.
+        #
+        # WHAT SKIPPING CALLBACKS USED TO COST. Because set_name_parts never
+        # ran, `first_name` got the WHOLE typed value: someone answering "Ada
+        # Lovelace" landed first_name="Ada Lovelace", last_name NULL — and it
+        # never self-healed, because set_name_parts is gated on `name_changed?`
+        # and no later save sees a name change. So the derivation comes to the
+        # writer instead: Studio::NameParts is the same rule the callback runs.
+        attrs = name_columns(value)
         attrs[:name] = value if current_user.name.blank?
         current_user.update_columns(attrs)
 
-        render json: { ok: true, first_name: value, next: remaining_steps }
+        # The STORED first name, not the typed string — they differ for exactly
+        # the case above, and a response that disagreed with the row would be
+        # the same bug wearing a different hat.
+        render json: { ok: true, first_name: attrs[:first_name], next: remaining_steps }
       end
     end
 
@@ -67,6 +85,19 @@ module Studio
     end
 
     private
+
+    # The name halves to write, derived exactly as the host's set_name_parts
+    # would derive them from the same string.
+    #
+    # `last_name` is dropped for a host that has no such column —
+    # mcritchie-industries' users table is eight columns wide and update_columns
+    # on an absent column raises. Same respond_to? guard /profile already
+    # carries for the same reason.
+    def name_columns(value)
+      parts = Studio::NameParts.from(value)
+      parts.delete(:last_name) unless current_user.respond_to?(:last_name)
+      parts
+    end
 
     # What is left AFTER this write. The host's resolver decides; the engine's
     # default is "nothing further", which is the right answer for an app whose
