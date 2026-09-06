@@ -42,6 +42,13 @@ require "action_dispatch/testing/integration"
 # proves the constraint is live in this harness rather than asserted from
 # reading, which is what makes the guard next to it mean something.
 #
+# IT ALSO CARRIES THE LENGTH CAP, for the same reason: the cap and the split are
+# one decision. The endpoint bounds a WHOLE typed answer
+# (Studio::FULL_NAME_MAX_LENGTH) and then splits it, so what a cap does to the
+# surname is only visible in the row the split leaves behind. Bounding the answer
+# with the PER-FIELD cap instead stored 40 characters of a 41-character name and
+# called it a success — see the cap section below.
+#
 # The pure derivation is unit-tested in test/lib/studio/name_parts_test.rb.
 # The endpoints, routes and the shared outstanding? rule are covered by
 # test/integration/onboarding_endpoints_test.rb. A host with NO last_name column
@@ -189,6 +196,106 @@ class OnboardingNamePartsTest < ActionDispatch::IntegrationTest
 
     assert_equal "Ada", @user.reload.first_name
     assert_equal "Lovelace", @user.last_name
+  end
+
+  # --- THE LENGTH CAP, which used to mangle the surname it stored -------------
+
+  # The regression. `MAX_FIRST_NAME` (the PER-FIELD cap, 40) was applied to the
+  # WHOLE typed answer, so a 41-character name stored 40 of it and handed the
+  # account back its own surname misspelled — "Montgomery-Smyth". `name` is
+  # first in the display-name chain, so that spelling was what every surface
+  # showed.
+  test "a full name past the per-field cap lands intact" do
+    value = "Bartholomew Fitzwilliam Montgomery-Smythe"
+
+    # THE CONTROL. This fixture is only a regression while it drives PAST the
+    # cap that used to cut it; a shorter name would round-trip under the defect
+    # too and the test would prove nothing.
+    assert_operator value.length, :>, Studio::FIRST_NAME_MAX_LENGTH,
+                    "the fixture must exceed the per-field cap or it tests nothing"
+    assert_operator value.length, :<=, Studio::FULL_NAME_MAX_LENGTH,
+                    "a real full name must fit the whole-answer cap"
+
+    answer value
+
+    assert_response :success
+    @user.reload
+
+    assert_equal value, @user.name
+    assert_equal "Bartholomew", @user.first_name
+    assert_equal "Montgomery-Smythe", @user.last_name,
+                 "the surname is stored as typed, not one character short of it"
+  end
+
+  # WHY THE WHOLE-ANSWER CAP IS THE NUMBER IT IS. It is first(40) + a space +
+  # last(40), so the longest answer this endpoint accepts still splits into two
+  # halves that each fit the PER-FIELD cap — onboarding cannot hand /profile a
+  # name /profile would silently shorten on the next save.
+  test "an answer at the whole-answer cap splits into halves the profile page could save" do
+    first = "A" * Studio::FIRST_NAME_MAX_LENGTH
+    last  = "B" * Studio::FIRST_NAME_MAX_LENGTH
+    value = "#{first} #{last}"
+
+    assert_equal Studio::FULL_NAME_MAX_LENGTH, value.length,
+                 "the cap is first + space + last — if that stops being true, so does this guard"
+
+    answer value
+
+    assert_response :success
+    @user.reload
+
+    assert_equal value, @user.name
+    assert_equal first, @user.first_name
+    assert_equal last,  @user.last_name
+  end
+
+  # REFUSED, NOT TRUNCATED — the product decision. Storing a shortened version
+  # of a name and reporting success is what produced "Montgomery-Smyth";
+  # raising the number alone would only move that cliff one character further
+  # out. Isolated to the WHOLE-answer rule: both halves here fit the per-field
+  # cap, so only the total is over.
+  test "an answer past the whole-answer cap is refused and writes nothing" do
+    value = "#{'A' * Studio::FIRST_NAME_MAX_LENGTH} M #{'B' * Studio::FIRST_NAME_MAX_LENGTH}"
+
+    assert_operator value.length, :>, Studio::FULL_NAME_MAX_LENGTH
+    value.split(" ").each do |word|
+      assert_operator word.length, :<=, Studio::FIRST_NAME_MAX_LENGTH,
+                      "this case must trip the WHOLE-answer rule alone"
+    end
+
+    answer value
+
+    assert_response :unprocessable_entity
+    refute body["ok"]
+    assert_includes body["error"], Studio::FULL_NAME_MAX_LENGTH.to_s,
+                    "the refusal must name the limit it applied"
+
+    @user.reload
+    assert_nil @user.name
+    assert_nil @user.first_name
+    assert_nil @user.last_name
+  end
+
+  # The SECOND rule, and it is independent rather than redundant: a single long
+  # word fits the whole-answer cap and would still land a `first_name` past the
+  # per-field cap — the drift the two constants exist to prevent. Isolated the
+  # other way: the total here is well under the whole-answer cap.
+  test "a single word past the per-field cap is refused and writes nothing" do
+    value = "#{'X' * (Studio::FIRST_NAME_MAX_LENGTH + 1)} Y"
+
+    assert_operator value.length, :<=, Studio::FULL_NAME_MAX_LENGTH,
+                    "this case must trip the PER-FIELD rule alone"
+
+    answer value
+
+    assert_response :unprocessable_entity
+    refute body["ok"]
+    assert_includes body["error"], Studio::FIRST_NAME_MAX_LENGTH.to_s,
+                    "the refusal must name the limit it applied"
+
+    @user.reload
+    assert_nil @user.name
+    assert_nil @user.first_name
   end
 
   # --- the slug, which is why this is not a plain save ------------------------
