@@ -15,7 +15,10 @@
     heading     — (default "What should we call you?")
     subtext     — the one-line why (default speaks about emails)
     placeholder — (default "Alex")
-    max_length  — (default 40; the server stays the real bound)
+    max_length  — (default Studio::FULL_NAME_MAX_LENGTH; the server stays the
+                  real bound, and it REFUSES past that rather than truncating,
+                  so a host raising this makes the endpoint answer 422 rather
+                  than store a name nobody typed)
     progress    — [current, total] to render the segmented pill, or nil for none
     modal_store — Alpine store name (default "modals"; the living style guide
                   mounts its own page-scoped host and passes "dsModals")
@@ -41,7 +44,7 @@
   subtext     = local_assigns.fetch(:subtext,
                   "Just your first name — we use it to address you in emails.")
   placeholder = local_assigns.fetch(:placeholder, "Alex")
-  max_length  = local_assigns.fetch(:max_length, 40)
+  max_length  = local_assigns.fetch(:max_length, Studio::FULL_NAME_MAX_LENGTH)
   progress    = local_assigns.fetch(:progress, nil)
   modal_store = local_assigns.fetch(:modal_store, "modals")
   done_event  = local_assigns.fetch(:done_event, "onboarding-step-done")

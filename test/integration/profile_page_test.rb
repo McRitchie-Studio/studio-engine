@@ -167,6 +167,49 @@ class ProfilePageTest < ActiveSupport::TestCase
       "a view reaching into a controller for a constant couples them for no reason"
   end
 
+  # THE SECOND CAP, and why it has to be a second constant.
+  #
+  # The same 40 measured TWO different things: one FIELD here (/profile caps
+  # each input with it, and the form renders it as maxlength) and a WHOLE typed
+  # answer at the onboarding step, where the string is a first name PLUS a
+  # surname. Neither call site looked wrong on its own, and the whole-answer
+  # reading cut "Bartholomew Fitzwilliam Montgomery-Smythe" to
+  # "…Montgomery-Smyth" — an account handed back its own surname, misspelled.
+  #
+  # The repair was to give the second question its own name, so the borrow
+  # cannot be rewritten by accident. This asserts the two stay two: collapsing
+  # them in EITHER direction is what would silently re-scope /profile's
+  # per-field contract while looking like an onboarding fix.
+  test "the whole-answer cap is its own constant, not the per-field one" do
+    ensure_application_controller!
+
+    assert_operator Studio::FULL_NAME_MAX_LENGTH, :>, Studio::FIRST_NAME_MAX_LENGTH,
+      "a whole answer carries a first name AND a surname — one field's cap cannot measure it"
+    assert_equal (Studio::FIRST_NAME_MAX_LENGTH * 2) + 1, Studio::FULL_NAME_MAX_LENGTH,
+      "first + a space + last: the longest answer whose halves BOTH still fit the per-field cap"
+
+    assert_equal Studio::FULL_NAME_MAX_LENGTH, Studio::OnboardingController::MAX_FULL_NAME
+    assert_equal Studio::FIRST_NAME_MAX_LENGTH, Studio::ProfilesController::MAX_FIRST_NAME
+
+    # Each form must bound what it actually collects, and say which in its own
+    # markup. The onboarding input carried a bare literal, which is how a third
+    # copy of the per-field number ended up on the one field that receives a
+    # whole name.
+    profile_form = File.read(File.expand_path(
+      "../../app/views/studio/profiles/_name_fields.html.erb", __dir__
+    ))
+    onboarding_form = File.read(File.expand_path(
+      "../../app/views/studio/modals/onboarding/_first_name.html.erb", __dir__
+    ))
+
+    refute_includes profile_form, "Studio::FULL_NAME_MAX_LENGTH",
+      "the profile inputs are one field each — the whole-answer cap does not belong here"
+    assert_includes onboarding_form, "Studio::FULL_NAME_MAX_LENGTH",
+      "the onboarding input collects a whole answer and must bound it with that cap"
+    refute_match(/local_assigns\.fetch\(:max_length,\s*\d/, onboarding_form,
+      "the input's default maxlength must be the constant, not a literal copy of it")
+  end
+
   # The page reads the current user on every row. Losing the guard would make
   # /profile a public page that raises NoMethodError on nil rather than
   # redirecting a signed-out visitor to login.

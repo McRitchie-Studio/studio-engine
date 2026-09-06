@@ -16,17 +16,23 @@ require "action_dispatch/testing/integration"
 # THIS IS A REAL FLEET SHAPE, not a hypothetical. The engine's standard-columns
 # migration (db/migrate/20260813220000) adds `first_name` and deliberately does
 # NOT add `last_name` — making that column universal is a separate coordinated
-# change (roll-out-last-name-column). So mcritchie-industries, moms-app and
-# acquisition-studio all run this endpoint against a table with no last_name
-# today, and app/views/studio/profiles/_name_fields.html.erb already gates on
-# exactly that.
+# change (roll-out-last-name-column). mcritchie-industries, moms-app and
+# acquisition-studio all carry a users table with no `last_name` today, and
+# app/views/studio/profiles/_name_fields.html.erb already gates on exactly that.
 #
-# WHY IT NEEDS ITS OWN FILE. The fix for the name-splitting bug writes a SECOND
-# column, and `update_columns` on a column that does not exist raises inside
-# rescue_and_log — which RE-RAISES, so it is a 500 plus an ErrorLog row, not a
-# graceful no-op. Without the respond_to? guard in
-# Studio::OnboardingController#name_columns, the fix would have turned a
-# mis-split row into a hard signup failure across three apps. Two shapes of
+# WHAT THOSE THREE APPS DO NOT DO IS MOUNT THIS ENDPOINT. Corrected 2026-09-06:
+# `Studio.draw_onboarding_routes` defaults to FALSE (lib/studio.rb), and only
+# mcritchie-studio and turf-monster set it true — both of which HAVE
+# `last_name`. So no app in the fleet is one column away from a 500 here right
+# now. The guard is a standing one for the next host that opts in before it
+# runs the column, not a live save; the earlier wording overstated it.
+#
+# WHY IT STILL NEEDS ITS OWN FILE. The fix for the name-splitting bug writes a
+# SECOND column, and `update_columns` on a column that does not exist raises
+# inside rescue_and_log — which RE-RAISES, so it is a 500 plus an ErrorLog row,
+# not a graceful no-op. Without the respond_to? guard in
+# Studio::OnboardingController#name_columns, a thin host opting in would take a
+# hard signup failure on every two-word answer. Two shapes of
 # `users` cannot coexist in one process, and bin/release-check runs each test
 # FILE in its own process, so the second shape gets its own file — the same
 # argument test/integration/profile_thin_host_test.rb makes.

@@ -55,6 +55,57 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **Onboarding no longer truncates a surname to fit a first name's cap.**
+  `Studio::OnboardingController#first_name` measured the WHOLE typed answer with
+  `Studio::FIRST_NAME_MAX_LENGTH` — the PER-FIELD cap, 40. The field asks for a
+  name and people type a full one, so "Bartholomew Fitzwilliam
+  Montgomery-Smythe" (41 characters) stored 40 of them and handed the account
+  back its own surname misspelled, **"Montgomery-Smyth"**, on every surface
+  `name` feeds.
+
+  **ONE CONSTANT WAS ANSWERING TWO QUESTIONS**, which is why neither call site
+  looked wrong. `/profile` applies the same number PER FIELD (`normalized_name`,
+  once to each of its two inputs); onboarding applied it to first name PLUS
+  surname in one string. The fix NAMES the second question rather than
+  re-scoping the first: **`Studio::FULL_NAME_MAX_LENGTH`**, the whole-answer
+  cap, `(FIRST_NAME_MAX_LENGTH * 2) + 1` = **81**. It is DERIVED, not picked —
+  first(40) + a space + last(40) is the longest answer whose two halves BOTH
+  still fit the per-field cap, so onboarding can never accept a name `/profile`
+  would silently shorten on the next save, which is the drift the shared
+  constant existed to prevent. `FIRST_NAME_MAX_LENGTH` keeps its value and its
+  meaning, and `test/integration/profile_name_field_caps_test.rb` now proves
+  that by sending BOTH fields over-long in one request and reading two 40s back
+  — a single-field assertion cannot tell "per field" from "per whole name".
+
+  **PAST THE CAP IT REFUSES INSTEAD OF TRUNCATING** (422 + `{ error: … }`,
+  rendered inline by the modal). `.first(cap)` on a name is not a cap but a
+  rewrite: it accepted the answer, stored something nobody typed, and reported
+  success — and raising the number alone would only move that cliff one
+  character further out. Two independent rules, because the whole answer becomes
+  `name` while each half becomes its own column: the answer must fit the
+  whole-answer cap, and each derived half must fit the per-field cap (a single
+  60-character word passes the first and would still land a `first_name`
+  `/profile` shortens). The onboarding input's `maxlength` default was a LITERAL
+  `40` — a third copy of the per-field number, on the one field that receives a
+  whole name — and now reads `FULL_NAME_MAX_LENGTH`, so the browser bound and
+  the server bound cannot drift.
+
+  **NEITHER CAP IS A COLUMN CEILING.** Measured 2026-09-06 across all six
+  consumer databases (mcritchie-studio, turf-monster, mcritchie-industries;
+  production and QA): `name`, `first_name` and `last_name` are unbounded
+  `character varying` — `character_maximum_length` NULL, no CHECK constraint, no
+  model length validation. Raising the bound cannot trade a silent truncation
+  for a raised error at any value, so this is a product decision start to
+  finish.
+
+  **NO DATA REPAIR SHIPS.** Re-measured for THIS defect on the same six
+  databases: **zero rows** carry a `name`, `first_name` or `last_name` at or
+  over 40 characters, and the longest `name` in the fleet is 27 (control:
+  5 / 6 / 46 / 15 / 4 / 4 users scanned, `max(length(name))` non-null in every
+  one). Nothing was truncated in production, so there is nothing to repair — and
+  a row whose halves disagree with its `name` because of a `/profile` edit must
+  never be auto-repaired anyway.
+
 - **Onboarding no longer stores a two-word answer as the whole first name.**
   `Studio::OnboardingController#first_name` writes with `update_columns`, which
   skips callbacks — so the host's `before_save :set_name_parts` never ran and
@@ -72,10 +123,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `test/integration/onboarding_name_parts_test.rb` carries that as a live
   control (`update!` moves `pat-pat@example.com` → `ada-lovelace-pat@…`), not as
   a claim. `last_name` is written only where the column exists: the engine's own
-  standard-columns migration does not carry it, so mcritchie-industries,
-  moms-app and acquisition-studio would otherwise have taken a
-  `MissingAttributeError` 500 on every hyphen-free two-word answer
-  (`test/integration/onboarding_thin_host_test.rb`).
+  standard-columns migration does not carry it, so a host that opts into these
+  routes before it runs that column would otherwise take a
+  `MissingAttributeError` 500 on every two-word answer
+  (`test/integration/onboarding_thin_host_test.rb`). **Corrected 2026-09-06:**
+  an earlier version of this entry named mcritchie-industries, moms-app and
+  acquisition-studio as apps that would have taken that 500. They carry no
+  `last_name`, but they do not mount these endpoints at all —
+  `Studio.draw_onboarding_routes` defaults to false and only mcritchie-studio
+  and turf-monster set it true, and both of those HAVE the column. The guard is
+  a standing one for the next host to opt in, not a live save.
   NO DATA REPAIR SHIPS: measured 2026-09-05 across both production databases
   (mcritchie-studio 5 users, turf-monster 43) and both QA ones, **zero rows**
   carry a space in `first_name`. Repairing rows whose halves merely disagree

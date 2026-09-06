@@ -91,6 +91,20 @@ class OnboardingFirstNameTest < ActiveSupport::TestCase
     assert_not_includes html, "$store.modals."
   end
 
+  # THE BROWSER BOUND MUST BE THE SERVER BOUND. This default was a LITERAL 40 —
+  # a third copy of the PER-FIELD cap, sitting on the one input that receives a
+  # whole name. It is why "Bartholomew Fitzwilliam Montgomery-Smythe" could not
+  # be typed here in the first place, and why nothing went red when the endpoint
+  # measured the same answer with the same wrong number.
+  test "the input's maxlength defaults to the whole-answer cap, not the per-field one" do
+    assert_equal Studio::FULL_NAME_MAX_LENGTH.to_s, doc.at_css("input")["maxlength"]
+
+    # THE CONTROL. The assertion above is only meaningful while the two caps are
+    # different numbers; if they were ever collapsed it would pass on either.
+    refute_equal Studio::FIRST_NAME_MAX_LENGTH, Studio::FULL_NAME_MAX_LENGTH,
+                 "a whole answer and one field are two questions and two constants"
+  end
+
   test "copy and field bounds are host-overridable" do
     html = render_first_name(heading: "Your name?", subtext: "For your receipts.",
                              placeholder: "Sam", max_length: 12)
