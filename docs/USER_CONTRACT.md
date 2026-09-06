@@ -37,10 +37,34 @@ The engine accesses these via `try:` or only inside config procs you write. They
 |------|---------|-------|
 | `#name` | `set_app_session` (via `try(:name)`) | If present, populates `session[:sso_name]`. |
 | `#provider` | `set_app_session` | OAuth provider string (e.g. `"google"`). |
+| `#first_name` (+ writer) | `Studio::OnboardingController`, `Studio::ProfilesController`, `Studio.first_name_outstanding?` | The name ask is SKIPPED entirely on a host without the column, rather than raising — `mcritchie-industries` ran that way for weeks. Install it with the engine's standard-columns migration. |
+| `#last_name` (+ writer) | `Studio::OnboardingController`, `Studio::ProfilesController` | Written ONLY where the column exists. The standard-columns migration deliberately does NOT add it (making it universal is a separate fleet change), so `mcritchie-industries`, `moms-app` and `acquisition-studio` run without it today and get a first-name-only profile row. |
 | `#uid` | `set_app_session` | OAuth provider UID. |
 | `#wallet_address` or `#solana_address` | `Studio.user_wallet_address`, `set_app_session`, `SessionContext#address` | For wallet-auth apps. Override with `Studio.wallet_address_method = :your_method` if the app uses another helper. |
 | `#role=` | `configure_sso_user` proc in host app | Only required if the host's `Studio.configure_sso_user` proc sets `user.role = ...`. |
 | `#balance_cents=` | `configure_sso_user` proc | Same — only if the host proc uses it. |
+
+### Deriving the name halves
+
+Every consumer derives `first_name`/`last_name` from `name` in a `before_save`:
+
+```ruby
+before_save :set_name_parts, if: -> { name_changed? }
+```
+
+Two things about that are the host's problem, and the engine now helps with both.
+
+1. **A callback-free writer owes the same derivation.** `Studio::OnboardingController`
+   writes with `update_columns` on purpose — `Sluggable`'s `before_save :set_slug`
+   is UNGATED, so a full save right after a `name` write re-points the slug the
+   account answers on. Any writer in that position should derive with
+   **`Studio::NameParts.from(name)`** (`lib/studio/name_parts.rb`) rather than
+   retyping the split, so every door leaves the row split the same way. A host's
+   own `set_name_parts` may delegate to it too.
+2. **`last_name` is OMITTED, not nil, for a one-word name.** That is what leaves a
+   surname already on file standing when someone answers a first-name prompt with
+   one word. A hash that nulled it would disagree with the callback in the
+   opposite direction.
 
 ## Recommended attributes (DB columns)
 
@@ -51,6 +75,7 @@ The engine doesn't care about DB shape directly, but in practice every consumer 
 - `provider:string`, `uid:string` (OmniAuth)
 - `role:string` or `role:integer` (for `admin?`)
 - `slug:string` (for `Sluggable`-friendly URLs)
+- `first_name:string` (and `last_name:string` where the app wants the surname) — the standard-columns migration installs `first_name`
 
 ## Example minimal compliant model
 

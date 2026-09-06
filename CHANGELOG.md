@@ -55,6 +55,34 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **Onboarding no longer stores a two-word answer as the whole first name.**
+  `Studio::OnboardingController#first_name` writes with `update_columns`, which
+  skips callbacks — so the host's `before_save :set_name_parts` never ran and
+  someone answering "Ada Lovelace" landed `first_name = "Ada Lovelace"`,
+  `last_name` NULL. It never self-healed either: `set_name_parts` is gated on
+  `name_changed?`, and no later save sees a name change. The derivation now
+  comes to the writer instead — a new pure primitive, **`Studio::NameParts.from`**
+  (`lib/studio/name_parts.rb`), carrying the same rule the host callback runs,
+  including the deliberate OMISSION of `last_name` for a one-word name so a
+  surname already on file survives a first-name prompt.
+  **`update_columns` STAYS**, and the fix does not touch it: `Sluggable`'s
+  `before_save :set_slug` is UNGATED and mcritchie-studio's `User#name_slug` is
+  built from `name`, so a full save here would re-point the slug the account
+  answers on — on a uniquely-indexed column, at every signup.
+  `test/integration/onboarding_name_parts_test.rb` carries that as a live
+  control (`update!` moves `pat-pat@example.com` → `ada-lovelace-pat@…`), not as
+  a claim. `last_name` is written only where the column exists: the engine's own
+  standard-columns migration does not carry it, so mcritchie-industries,
+  moms-app and acquisition-studio would otherwise have taken a
+  `MissingAttributeError` 500 on every hyphen-free two-word answer
+  (`test/integration/onboarding_thin_host_test.rb`).
+  NO DATA REPAIR SHIPS: measured 2026-09-05 across both production databases
+  (mcritchie-studio 5 users, turf-monster 43) and both QA ones, **zero rows**
+  carry a space in `first_name`. Repairing rows whose halves merely disagree
+  with `name` would be data loss — `/profile` writes those columns directly —
+  and a fossil repair belongs to the consuming app that owns its `users` table,
+  not to the gem.
+
 - **Knowledge layer hardening** — the five findings from the 0.67.0 reviews:
   upload keys carry a random suffix (same-named uploads in the same second no
   longer overwrite the first object before the unique index can refuse);
