@@ -407,16 +407,45 @@ module Studio
   # later session may ask again. That is the whole reason this is not a column.
   FIRST_NAME_SKIP_SESSION_KEY = :onboarding_skipped_first_name
 
-  # How long a first name may be. ONE constant because users.first_name is
-  # written from TWO surfaces — the onboarding step (seconds after signup) and
-  # /profile (any time after) — and rendered by a third, the profile form's
-  # maxlength. Two independently-correct caps that disagreed would let onboarding
-  # accept a name /profile then refused to save, a bug with no obvious owner.
+  # How long ONE name field may be — users.first_name, and users.last_name where
+  # a host carries it. PER FIELD, which is the only thing this number has ever
+  # measured: /profile caps each of the two inputs with it, and the profile
+  # form's maxlength renders it. Two independently-correct caps that disagreed
+  # would let one surface accept a name another then refused to save, a bug with
+  # no obvious owner.
   #
   # Keeping it here rather than on either controller also keeps the VIEW off a
   # controller constant: the form needs the number, and a view reaching into
   # Studio::ProfilesController to get it would couple the two for no reason.
   FIRST_NAME_MAX_LENGTH = 40
+
+  # How long a WHOLE typed answer may be — one string holding a full name, which
+  # the onboarding step stores as users.name and SPLITS into the two halves
+  # above (Studio::NameParts).
+  #
+  # A SECOND CONSTANT BECAUSE THIS IS A SECOND QUESTION. Onboarding asked the
+  # per-field number for a whole-answer bound, and the two readings were both
+  # defensible at their own call site: "Bartholomew Fitzwilliam
+  # Montgomery-Smythe" is 41 characters, so it stored 40 and handed the account
+  # back its own surname misspelled — "Montgomery-Smyth". Nothing was wrong in
+  # either controller alone; the number was answering two questions with one
+  # value. Giving the whole-answer bound its own name makes that borrow
+  # unwriteable rather than merely discouraged.
+  #
+  # DERIVED, NOT PICKED. It is the longest answer whose two halves BOTH still
+  # fit the per-field cap — first(40) + a space + last(40) — so onboarding can
+  # never accept a name /profile would later shorten, which is the drift
+  # FIRST_NAME_MAX_LENGTH exists to prevent. Raising the per-field cap moves
+  # this one with it, by construction.
+  #
+  # NOT BOUNDED BY THE COLUMN. Measured 2026-09-06 across all six consumer
+  # databases (mcritchie-studio, turf-monster and mcritchie-industries, prod and
+  # QA): every one of `name`, `first_name` and `last_name` is an unbounded
+  # `character varying` — character_maximum_length NULL, no CHECK constraint, no
+  # model length validation. So this cap is a product decision start to finish,
+  # not a column ceiling, and raising it cannot trade a truncation for a
+  # PG::StringDataRightTruncation.
+  FULL_NAME_MAX_LENGTH = (FIRST_NAME_MAX_LENGTH * 2) + 1
 
   # The shared rule for "does this account still owe us a first name?" — the one
   # piece of onboarding logic every app agrees on. Hosts compose it into their own
