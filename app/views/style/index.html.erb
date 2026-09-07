@@ -3,12 +3,20 @@
      application.html.erb, inheriting that app's navbar and theme, so every
      specimen restyles per app and in dark or light automatically.
 
-     Four sections, reached by the sticky section nav below and rendered as
-     sibling partials: Theme is the landing section (the color foundation - it
+     Four ENGINE sections, reached by the sticky section nav below and rendered
+     as sibling partials: Theme is the landing section (the color foundation - it
      owns the role tokens/swatches, the folded-in /admin/theme editor, and the
      live preview), then Modals (the shared host + engine card blocks), Tricks
      (the button/surface/motion/effect/leveling primitives, framed as a board of
      copy-paste-for-an-agent snippets), and Tasks (the shared board primitive).
+
+     A FIFTH section is the host app's own, and appears only on an app that asks
+     for it: define app/views/style/host/_modals.html.erb in the consuming app
+     and the guide grows a section (and a nav pill) for that app's own modals,
+     between Modals and Tricks. The gem still renders the section chrome; the app
+     supplies the specimens. Full contract, including which modal store a host
+     specimen drives and why it is not the one the Modals section uses:
+     app/views/style/_host.html.erb.
 
      Specimens use ONLY the engine's own classes (engine.css component layer plus
      engine-motion.css motion/effect/leveling layer), so a consumer that bundles
@@ -16,9 +24,27 @@
      CSS is NOT inlined here - the consumer's Tailwind build provides it. Page
      chrome uses the engine's own .card / .label-upper / theme tokens. %>
 <%
+  # THE HOST SECTION SEAM. A consuming app grows its OWN modal specimens onto
+  # this page by defining app/views/style/host/_modals.html.erb. Found by the
+  # same three-term lookup_context.exists?(name, prefixes, partial) the modal
+  # host uses for modals/_host_extras (studio/modals/_host.html.erb) - one
+  # convention in this codebase, not two.
+  #
+  # Resolved ONCE, here, because two places need the same answer: the sticky
+  # section nav below and the render further down. An app that ships no such
+  # partial gets no pill, no heading and no container - the page is what it was.
+  # The section chrome and the consumer contract live in style/_host.html.erb.
+  host_modals = lookup_context.exists?("modals", ["style/host"], true)
+
   sections = [
     ["theme",  "Theme"],
-    ["modals", "Modals"],
+    ["modals", "Modals"]
+  ]
+  # Adjacent to Modals, not appended: this page groups by SUBJECT, and a host's
+  # own modals are the same subject as the engine's. Labelled with the app's own
+  # name, so the pill says whose section it is.
+  sections << ["host-modals", Studio.app_name] if host_modals
+  sections += [
     ["tricks", "Tricks"],
     ["tasks",  "Tasks"]
   ]
@@ -54,6 +80,9 @@
   <div class="space-y-16 pt-10">
     <%= render "style/theme" %>
     <%= render "style/modals" %>
+    <% if host_modals %>
+      <%= render "style/host" %>
+    <% end %>
     <%= render "style/tricks" %>
     <%= render "style/tasks" %>
   </div>
