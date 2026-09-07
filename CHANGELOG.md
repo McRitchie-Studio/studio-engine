@@ -47,6 +47,15 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   roughly half the ported demos drove that proxy, and none of them reference it
   now (asserted).
 
+  **Both sections are graded in a browser**, because neither is observable from
+  the response bytes: `e2e/style_modal_simulators.spec.js` (7 specs) drives a new
+  `/lab/style_modals` lab page, which mounts the shared modal host exactly as a
+  consumer layout does — without it `window.ModalAnimations` is undefined, the
+  build produces no controls, and "the controls match the registry" would be
+  vacuously true at `0 == 0`. Each spec was verified RED against its own defect
+  reintroduced, with the lab server restarted between runs. The lane contract
+  moves 116 → 123 (`config/e2e_lane.yml`), re-derived with the lister.
+
 ### Changed
 
 - **`Gemfile.lock` resolves solana-studio 0.5.7, and a gate now keeps it there.** The lock had sat on **0.5.3 for four patch releases** while BOTH consumers shipped 0.5.7 (turf-monster `~> 0.5.3`, mcritchie-studio `~> 0.5`). Nothing was red and nothing could have been: engine CI installs with `bundler-cache: true`, so it resolves from the lock and never fresh — the drift does not self-correct and never surfaces as flakiness. It matters because `test/views/style_web3_specimens_test.rb` exists to prove "the style guide renders the REAL gem cards" and reads them off whatever the LOCK resolved; four versions behind, that guard certifies a card no consumer receives. It still passes — only its MEANING changes. MEASURED on this span, the gem's whole `app/` tree was byte-identical 0.5.3 → 0.5.7 (only `CHANGELOG.md`, `README.md` and `version.rb` differ), so this instance cost nothing, which is exactly why it went four releases unnoticed.

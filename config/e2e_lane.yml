@@ -607,7 +607,41 @@
 # browser — the one property a markup assertion cannot reach. Porting them into
 # the gem's lane is filed as follow-up work; until it lands that coverage exists
 # in neither repo.
-total_specs: 116
+#
+# 116 -> 123: e2e/style_modal_simulators.spec.js, and the new /lab/style_modals
+# page under it. The style guide grew two sections ported out of turf-monster's
+# /admin/modals — an enter/leave animation simulator and the modal-stack demos —
+# and both are BUILT BY SCRIPT rather than rendered. The simulator's control
+# containers ship EMPTY on purpose, and the Ruby tier
+# (test/views/style_guide_modal_simulator_test.rb) asserts that emptiness
+# DELIBERATELY, because it is proving the controls are not hard-coded. That makes
+# the server-side tier structurally incapable of noticing that no control was ever
+# generated: four empty divs are what "working" and "the script threw" both look
+# like in the response bytes.
+#
+# THE SHARPEST OF THE SEVEN is the late-binding one. The guide's page-scoped store
+# carried its own hard-coded COPY of the animation table while the controls were
+# generated from window.ModalAnimations, so a newly registered key grew a button
+# that the store then resolved back to 'pop' — the control said "shake" and the
+# card popped. The class the store writes at open() time never appears in the
+# response bytes, so no String assertion can reach it. The spec registers a key
+# whose class name exists in no stylesheet and no template, which leaves the
+# registry as the only path by which it can land on the card.
+#
+# Each of the seven was verified RED against its own defect reintroduced, with the
+# lab server RESTARTED between runs (a reused RAILS_ENV=test server caches
+# templates and reports the previous mutation's result — the hazard this file
+# already records for profile_chrome):
+#
+#   store reads a stale local table  -> 1 red   controls built from a literal -> 2 red
+#   processing card is dismissible   -> 1 red   holdAtLeast floor removed     -> 1 red
+#   second card swaps, not pushes    -> 1 red   timed demo swaps, not advances-> 1 red
+#   generated control wired to a no-op -> 1 red
+#
+# The last one was run because the first six left "a generated control opens the
+# demo card" untouched, and a spec no mutation can redden is the one this file's
+# own history says to delete rather than keep.
+total_specs: 123
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -643,7 +677,14 @@ total_specs: 116
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 116
 # executed = total - devnet - allowed_skips = 116 - 0 - 0 = 116, so executed ==
 # total_specs and the equality assertion holds.
-executed: 116
+# Re-derived once more on THIS tree with the lister when the style-guide modal
+# simulators landed — 7 tests in ONE new file, and the contract counts TESTS:
+#   npx playwright test --list                                             -> 123 tests, 18 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 123
+# executed = total - devnet - allowed_skips = 123 - 0 - 0 = 123, so executed ==
+# total_specs and the equality assertion holds.
+executed: 123
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
