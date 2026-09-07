@@ -14,26 +14,35 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 // So this file never reads source. It clicks the real submit button on an empty
 // field and reads the text the user is left looking at.
 
-// THE MOUNT PROBE, and why the specs are not allowed to skip it. An unmounted
-// component shows no error either — which is the same observation as "the copy is
-// wrong" if all we did was read the alert. Alpine stamps _x_dataStack on a root it
-// has successfully initialised, so this distinguishes "the card is alive and said
-// X" from "the card is dead and said nothing".
+// THE MOUNT PROBE, and why the specs are not allowed to go without it. A DEAD card
+// shows no error either, so "the alert never appeared" is the same observation as
+// "the copy is wrong" unless something separates them first.
+//
+// IT ASSERTS THE EVALUATED DATA, NOT THE PRESENCE OF _x_dataStack, and that
+// distinction was measured rather than assumed. Alpine stamps _x_dataStack on the
+// root even when the x-data expression THROWS, so the obvious probe passes happily
+// over a component that never evaluated — checked by deleting the escaping and
+// watching the stack-only version stay green while the card was plainly dead.
+// Reading a method OFF the evaluated object is the check that actually separates
+// them: a SyntaxError leaves nothing for `save` to be.
 async function expectCardIsLive(page, card) {
   await page
     .waitForFunction(
       (selector) => {
         const root = document.querySelector(`${selector} [x-data]`);
-        return Boolean(root && root._x_dataStack);
+        if (!root || !root._x_dataStack) return false;
+
+        const data = root._x_dataStack[0] || {};
+        return typeof data.save === "function";
       },
       card,
       { timeout: 10_000 }
     )
     .catch(() => {
       throw new Error(
-        `${card} never initialised. Alpine did not evaluate its x-data — the usual ` +
+        `${card} never evaluated its x-data — save() is not on the component. The usual ` +
           "cause is an unescaped quote in an interpolated local, which closes the " +
-          "attribute and mounts the component as a silent no-op."
+          "attribute and mounts the card as a silent no-op that still renders markup."
       );
     });
 }
