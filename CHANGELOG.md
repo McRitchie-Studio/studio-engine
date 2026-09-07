@@ -6,6 +6,43 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **A `required` mode on the shared first-name card.**
+  `studio/modals/onboarding/_first_name` grows one local. `required: true`
+  renders the card with BOTH skip affordances gone — the "Skip for now" button
+  is not emitted at all, and the × merely CLOSES and is labelled `Close` — and
+  swaps the sub-copy to the audience being gated. Default `false`, so the
+  post-auth chain card McRitchie Studio renders today does not move.
+
+  **IT IS FOR A HOST THAT GATES SOMETHING ON THE NAME.** turf-monster's entry
+  gate opens this card as the first validation of hold-to-confirm, and that gate
+  reads the stored COLUMN — so a recorded skip buys the user nothing and the
+  Skip link is a door painted on a wall, promising a way past a wall that does
+  not move.
+
+  **IT IS DELIBERATELY NOT A TRAP.** Closing stays reachable, because abandoning
+  the flow and slipping past the gate are two different things: the × still
+  dismisses the card, it just stops calling `skip()` and stops claiming it did.
+  A `required` that also removed the × would satisfy every "hides the skip"
+  reading and be a worse card, so the two are asserted as a PAIR.
+
+  **RESOLVED SERVER-SIDE, not through an Alpine `x-show`** — the source this was
+  ported from hides its skip button reactively, which leaves a button that must
+  not exist sitting in the DOM and clickable for as long as Alpine has not
+  mounted, and there for good if it never does. `required` is known at render
+  time, so the button is simply never emitted.
+
+  The default render is asserted **byte-for-byte identical** to `required:
+  false`, which is what pins the existing consumer. Mutation-checked 5/5:
+  flipping the default, un-hiding the skip button, making the × always skip,
+  freezing the label, and freezing the sub-copy each turn the suite red on a
+  different test.
+
+  This was the LAST mode turf-monster's own 240-line `modals/_onboarding` had
+  that the gem did not, so that copy can be deleted next release. A host wanting
+  both modes mounts two `<template x-if>` ids rather than branching one at
+  runtime — which is how the two cards already differ in copy, not just in
+  affordances.
+
 - **Knowledge coverage view** — `/admin/knowledge/coverage` +
   `Studio::KnowledgeExpectation`: the "what SHOULD exist" half of the
   knowledge layer. Expectations carry an entity, folder, provenance

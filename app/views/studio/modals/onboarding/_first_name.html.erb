@@ -12,8 +12,18 @@
   Locals (all optional, defaults via local_assigns.fetch):
     submit_path — POST target for the name (default "/onboarding/first_name")
     skip_path   — POST target for the skip  (default "/onboarding/skip_first_name")
+    required    — hide the SKIP affordances (default false, which keeps today's
+                  skippable card). The × then merely CLOSES and is labelled
+                  Close, and the "Skip for now" button is not rendered. For a
+                  host that GATES something on the name: offering to skip would
+                  promise a way past a wall that does not move. Closing stays
+                  available — a required step abandons the flow, it never traps
+                  the user in it.
     heading     — (default "What should we call you?")
-    subtext     — the one-line why (default speaks about emails)
+    subtext     — the one-line why (default speaks about emails; the DEFAULT
+                  follows `required`, because a card that cannot be skipped is
+                  talking to a different audience — a host that passes its own
+                  subtext still wins)
     placeholder — (default "Alex")
     max_length  — (default Studio::FULL_NAME_MAX_LENGTH; the server stays the
                   real bound, and it REFUSES past that rather than truncating,
@@ -40,15 +50,27 @@
 <%
   submit_path = local_assigns.fetch(:submit_path, "/onboarding/first_name")
   skip_path   = local_assigns.fetch(:skip_path, "/onboarding/skip_first_name")
+  required    = local_assigns.fetch(:required, false)
   heading     = local_assigns.fetch(:heading, "What should we call you?")
-  subtext     = local_assigns.fetch(:subtext,
-                  "Just your first name — we use it to address you in emails.")
+  default_subtext = if required
+                      "One last thing — just your first name, so we can address you in emails."
+                    else
+                      "Just your first name — we use it to address you in emails."
+                    end
+  subtext     = local_assigns.fetch(:subtext, default_subtext)
   placeholder = local_assigns.fetch(:placeholder, "Alex")
   max_length  = local_assigns.fetch(:max_length, Studio::FULL_NAME_MAX_LENGTH)
   progress    = local_assigns.fetch(:progress, nil)
   modal_store = local_assigns.fetch(:modal_store, "modals")
   done_event  = local_assigns.fetch(:done_event, "onboarding-step-done")
   field_id    = local_assigns.fetch(:id, "onboarding-first-name")
+  # The × mirrors the skip affordance it sits beside: it SKIPS while the step is
+  # skippable, and merely CLOSES once it is required. Resolved here rather than in
+  # an Alpine expression because `required` is known at render time — and a skip
+  # button hidden with x-show is still in the DOM, and still clickable, for as
+  # long as Alpine has not mounted.
+  dismiss_action = required ? "$store.#{modal_store}.close()" : "skip()"
+  dismiss_label  = required ? "Close" : "Skip"
 %>
 <div x-data="{
        get props() { var c = $store.<%= modal_store %>.current(); return (c && c.props) || {}; },
@@ -101,10 +123,15 @@
     <h3 class="text-heading font-bold text-lg leading-tight text-center pt-1"><%= heading %></h3>
     <%# The × SKIPS rather than merely closing: this lands seconds after signup,
         and a close that silently abandons the chain is how a host ends up with a
-        step nobody can answer again. %>
-    <button @click="skip()"
+        step nobody can answer again.
+
+        When the host passes required: true it merely CLOSES, and says so. That
+        step is gating something the host will not let through without a name, so
+        recording a skip would promise a way past a wall that does not move.
+        Closing still works — it abandons the flow rather than slipping past it. %>
+    <button @click="<%= dismiss_action %>"
             class="absolute top-0 right-0 -mr-2 text-secondary hover:text-heading text-xl leading-none"
-            aria-label="Skip">&times;</button>
+            aria-label="<%= dismiss_label %>">&times;</button>
   </div>
   <% if progress %>
     <%= render "studio/modals/blocks/progress_pill", current: progress.first, total: progress.last %>
@@ -134,8 +161,13 @@
     </button>
   </form>
 
-  <button type="button" @click="skip()" :disabled="submitting"
-          class="mt-3 w-full text-center text-sm text-secondary hover:text-heading disabled:opacity-50">
-    Skip for now
-  </button>
+  <%# Gone entirely when required — see the × above for why offering it there
+      would promise a way past a wall that does not move. Omitted rather than
+      hidden, for the same reason the × is resolved server-side. %>
+  <% unless required %>
+    <button type="button" @click="skip()" :disabled="submitting"
+            class="mt-3 w-full text-center text-sm text-secondary hover:text-heading disabled:opacity-50">
+      Skip for now
+    </button>
+  <% end %>
 </div>

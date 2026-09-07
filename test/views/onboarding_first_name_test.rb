@@ -160,4 +160,66 @@ class OnboardingFirstNameTest < ActiveSupport::TestCase
     assert_includes html, "X-CSRF-Token"
     assert_includes html, "application/json"
   end
+
+  # --- required: the gated mode -----------------------------------------------
+  #
+  # A host that GATES something on the name (turf's entry gate opens this card as
+  # the first validation of hold-to-confirm) needs the skip affordances GONE: the
+  # gate reads the stored column, so a recorded skip buys the user nothing and the
+  # button is a door painted on a wall.
+  #
+  # What it must NOT become is a trap. Closing stays reachable — that abandons the
+  # flow, which is a different thing from slipping past the gate. The two tests
+  # below are a pair on purpose; a `required` that also removed the × would pass
+  # the first one and be a worse card.
+
+  test "required hides BOTH skip affordances" do
+    html = render_first_name(required: true)
+    assert_not_includes html, "Skip for now", "the skip button must not render at all"
+    # Scanned for `@click="skip()"`, never bare "skip()": the x-data still DEFINES
+    # async skip(), so a substring assertion would fail on the definition and pass
+    # on nothing.
+    assert_equal 0, html.scan(%(@click="skip()")).size,
+                 "neither the × nor a button may call skip() at a gate"
+    assert_not_includes html, %(aria-label="Skip")
+
+    # THE CONTROL. Every assertion above also passes on a partial that lost the
+    # skip path entirely, so pin what the UNGATED card still has.
+    default = render_first_name
+    assert_includes default, "Skip for now"
+    assert_equal 2, default.scan(%(@click="skip()")).size
+  end
+
+  test "required leaves closing reachable, and relabels the × to match" do
+    html = render_first_name(required: true)
+    assert_includes html, %(@click="$store.modals.close()"),
+                    "required hides the skip, it does not trap the user"
+    assert_includes html, %(aria-label="Close"),
+                    "the label must follow what the button now does"
+  end
+
+  test "the required × closes the HOST's store, not a hard-coded one" do
+    html = render_first_name(required: true, modal_store: "dsModals")
+    assert_includes html, %(@click="$store.dsModals.close()")
+    assert_not_includes html, "$store.modals."
+  end
+
+  test "the default render is byte-for-byte the skippable card" do
+    # McRitchie Studio renders this card today. Adding a second mode must not move
+    # the first one, so the default is pinned to the skippable branch rather than
+    # merely asserted to contain a Skip link.
+    assert_equal render_first_name(required: false), render_first_name
+  end
+
+  test "the sub-copy follows required, and a host still outranks both" do
+    assert_includes render_first_name, "we use it to address you in emails"
+
+    gated = render_first_name(required: true)
+    assert_includes gated, "One last thing"
+    assert_not_includes gated, "we use it to address you in emails",
+                        "the chain and the gate are reading to different audiences"
+
+    assert_includes render_first_name(required: true, subtext: "For your receipts."),
+                    "For your receipts."
+  end
 end
