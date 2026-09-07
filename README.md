@@ -305,6 +305,18 @@ the one credential that skips attestation) and `props.submitting`. It receives
 one local, `modal_store`: the engine's real host is `"modals"`, the living style
 guide's page-scoped host is `"dsModals"`.
 
+**Name a store like a JavaScript identifier.** Partials splice this local in as a
+bare name — `$store.<name>.current()` — rather than as a string, so a value
+carrying a quote, a dot or a space is not a mangled store name: it is a
+SyntaxError in the whole `x-data`, and Alpine mounts a component that renders
+every element and does nothing. Escaping is not the repair (an escaped identifier
+is a different SyntaxError); a name that matches `/\A[A-Za-z_$][A-Za-z0-9_$]*\z/`
+is. `studio/modals/onboarding/_first_name` enforces exactly that and raises
+`ArgumentError` on anything else — the first partial to do so, not yet the fleet.
+Note the shape decides the repair, not the name of the local: `blocks/_birthday`
+and `blocks/_leveling_activity` pass `modal_store` in *string* position and
+correctly `escape_javascript` it instead.
+
 It also keeps two blocks the gem renders **by name** across the gem boundary:
 `studio/modals/blocks/wallet_brand_sprite` and `studio/modals/blocks/card_header`.
 Renaming either is a cross-repo change.

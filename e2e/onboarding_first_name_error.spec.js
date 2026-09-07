@@ -113,3 +113,170 @@ test("a host's apostrophe reaches the screen instead of killing the card", async
   expect(text).toBe("We'll need your first name before you continue.");
   expect(errors).toEqual([]);
 });
+
+// --- THE REST OF THE x-data's LOCALS ----------------------------------------
+//
+// empty_error above is the local that TAUGHT this file the hazard. It was never the
+// only one inside that attribute: submit_path, skip_path and done_event each sit in
+// a JS single-quoted literal exactly as it does, and modal_store sits in IDENTIFIER
+// position — the same silent brick, a different repair.
+//
+// EACH SPEC DRIVES ONE LOCAL, and that is the point rather than tidiness. The three
+// string locals are three separate interpolations on three separate lines, so a
+// repair applied to one is silent about the other two; a single card carrying all
+// three hostile values would go green the moment ANY of them was fixed.
+//
+// AND EACH ONE ASSERTS THE CARD WORKED, not that the markup looks right. The value
+// has to arrive at a fetch, or at a dispatched event, or at the named store —
+// somewhere on the far side of the JS parser. That is the only assertion a dead
+// card cannot pass, and a dead card is what this whole file exists to catch.
+
+// The HOST's half, played by the spec.
+//
+// A store is not a local, so the lab page may not set one up — its rule is locals
+// and nothing else. Installing it here is also what lets these specs assert WHICH
+// store the card reached, which is the entire question modal_store asks.
+async function installStores(page, names) {
+  await page.evaluate((storeNames) => {
+    window.__closedStores = [];
+    storeNames.forEach((name) => {
+      window.Alpine.store(name, {
+        current() {
+          return { props: { marker: name } };
+        },
+        close() {
+          window.__closedStores.push(name);
+        }
+      });
+    });
+  }, names);
+}
+
+// Answer the card's POST the way both endpoints are contracted to, and record the
+// URL it actually requested.
+//
+// THAT URL IS THE PROOF. It can only carry the host's path if the JS literal parsed,
+// the value round-tripped through the escaping, and the component reached its fetch.
+// No source-level assertion reaches that far, and no dead card produces it.
+//
+// Registered AFTER blockOffsiteRequests (the beforeEach), because Playwright matches
+// route handlers in reverse registration order — the `**/*` catch-all would
+// otherwise answer these first.
+async function capturePosts(page) {
+  const requested = [];
+
+  await page.route("**/lab/echo*", async (route) => {
+    requested.push(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, next: [] })
+    });
+  });
+
+  return requested;
+}
+
+test("a hostile submit_path reaches the server as the host wrote it", async ({ page }) => {
+  const errors = watchPageErrors(page);
+  const card = '[data-test="hostile-submit-card"]';
+
+  await installStores(page, ["modals"]);
+  const requested = await capturePosts(page);
+  await expectCardIsLive(page, card);
+
+  await page.locator(`${card} input[type="text"]`).fill("Sam");
+  await page.locator(`${card} button[type="submit"]`).click();
+
+  await expect.poll(() => requested.length).toBe(1);
+  expect(decodeURIComponent(requested[0])).toContain(`first=it's a "quote"`);
+
+  // AND IT FINISHED. The save's whole far side — the ok response, finish(), the
+  // dispatch, the close — runs only if the component evaluated.
+  await expect.poll(() => page.evaluate(() => window.__closedStores)).toEqual(["modals"]);
+  expect(errors).toEqual([]);
+});
+
+test("a hostile skip_path reaches the server as the host wrote it", async ({ page }) => {
+  const errors = watchPageErrors(page);
+  const card = '[data-test="hostile-skip-card"]';
+
+  await installStores(page, ["modals"]);
+  const requested = await capturePosts(page);
+  await expectCardIsLive(page, card);
+
+  await page.locator(`${card} button:has-text("Skip for now")`).click();
+
+  await expect.poll(() => requested.length).toBe(1);
+  expect(decodeURIComponent(requested[0])).toContain(`skip=it's a "quote"`);
+  await expect.poll(() => page.evaluate(() => window.__closedStores)).toEqual(["modals"]);
+  expect(errors).toEqual([]);
+});
+
+test("a hostile done_event is the event the host actually receives", async ({ page }) => {
+  const errors = watchPageErrors(page);
+  const card = '[data-test="hostile-event-card"]';
+  const eventName = `it's a "done"\\event`;
+
+  await installStores(page, ["modals"]);
+  await capturePosts(page);
+  await expectCardIsLive(page, card);
+
+  // Listen for the name the HOST passed. A card that lost a character of it — or
+  // that never mounted — dispatches something else, or nothing, and this stays null.
+  await page.evaluate((name) => {
+    window.__doneDetail = null;
+    window.addEventListener(name, (event) => {
+      window.__doneDetail = event.detail;
+    });
+  }, eventName);
+
+  await page.locator(`${card} button:has-text("Skip for now")`).click();
+
+  await expect.poll(() => page.evaluate(() => window.__doneDetail)).toEqual({ next: [], saved: false });
+  expect(errors).toEqual([]);
+});
+
+test("a host's own store name is reached at BOTH of the x-data's splices", async ({ page }) => {
+  // modal_store is spliced in as a bare NAME, so a hostile value never reaches a
+  // browser — the partial refuses it at render, and the view test owns that half.
+  // What only a browser can show is this half: that a host's identifier arrives
+  // VERBATIM and the card really talks to THAT store. Escaping it would have made
+  // both assertions below fail on a card that still rendered perfectly.
+  const errors = watchPageErrors(page);
+  const card = '[data-test="custom-store-card"]';
+
+  await installStores(page, ["labModals"]);
+  await capturePosts(page);
+  await expectCardIsLive(page, card);
+
+  // Site one: the props getter, `$store.<name>.current()`.
+  const props = await page.evaluate((selector) => {
+    const root = document.querySelector(`${selector} [x-data]`);
+    return root._x_dataStack[0].props;
+  }, card);
+  expect(props).toEqual({ marker: "labModals" });
+
+  // Site two: finish()'s `$store.<name>.close()`.
+  await page.locator(`${card} button:has-text("Skip for now")`).click();
+  await expect.poll(() => page.evaluate(() => window.__closedStores)).toEqual(["labModals"]);
+
+  expect(errors).toEqual([]);
+});
+
+test("the required card's × closes the host's store, through the third splice", async ({ page }) => {
+  // THE SITE THAT IS EASY TO MISS. dismiss_action is assembled in RUBY —
+  // "$store.#{modal_store}.close()" — and emitted into @click, which evaluates JS
+  // like x-data does. It is a third splice of the same local, in a second attribute,
+  // and it is covered because the guard validates the SOURCE rather than each splice.
+  const errors = watchPageErrors(page);
+  const card = '[data-test="custom-store-required-card"]';
+
+  await installStores(page, ["labModals"]);
+  await expectCardIsLive(page, card);
+
+  await page.locator(`${card} button[aria-label="Close"]`).click();
+
+  await expect.poll(() => page.evaluate(() => window.__closedStores)).toEqual(["labModals"]);
+  expect(errors).toEqual([]);
+});
