@@ -1,0 +1,46 @@
+<%# THE FIRST-NAME STEP'S EMPTY-FIELD ERROR, in a browser.
+
+    WHY THIS PAGE EXISTS AND A RENDER TEST DOES NOT COVER IT. The error copy is a
+    JS string INSIDE the x-data. A view test can assert the sentence is present in
+    that attribute; it cannot assert a user ever SEES it, and it stays green when
+    the attribute is syntactically broken - which is exactly how this component
+    fails. A stray quote closes the attribute early, Alpine mounts a silent no-op,
+    and every element a string assertion looks for is still in the markup. Only a
+    browser can tell those two pages apart.
+
+    THE LAB RULE: this page sets up the partial's LOCALS and nothing else. The
+    three modes ARE three sets of locals, so all three are the engine partial
+    rendered by name.
+
+    THE THIRD CARD CARRIES AN APOSTROPHE ON PURPOSE. empty_error is the first
+    host-supplied PROSE to land inside the x-data, and prose is where the quote
+    that kills the component comes from. If the escaping is ever dropped, that
+    card mounts dead and shows no error at all.
+
+    RENDERED STANDALONE, not inside a modal host, and that is deliberate: the
+    empty path never reaches the store. save() returns before it reads props or
+    calls finish(), so a host would add a click to open each card and would grade
+    the host - which lab/modal_host already does.
+%>
+<main class="max-w-3xl mx-auto px-4 py-10 space-y-12" x-data>
+  <h1 class="text-2xl font-bold mb-2">First-name step — empty-field error</h1>
+
+  <section data-test="default-card">
+    <h2 class="text-lg font-bold mb-3">Default — the skippable card</h2>
+    <%= render "studio/modals/onboarding/first_name",
+               id: "lab-default-first-name" %>
+  </section>
+
+  <section data-test="required-card">
+    <h2 class="text-lg font-bold mb-3">required: true — the gated card</h2>
+    <%= render "studio/modals/onboarding/first_name",
+               id: "lab-required-first-name", required: true %>
+  </section>
+
+  <section data-test="custom-card">
+    <h2 class="text-lg font-bold mb-3">A host's own copy, apostrophe and all</h2>
+    <%= render "studio/modals/onboarding/first_name",
+               id: "lab-custom-first-name", required: true,
+               empty_error: "We'll need your first name before you continue." %>
+  </section>
+</main>
