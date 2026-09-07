@@ -32,6 +32,13 @@ module Studio
       primary     = colors[:primary] || "#8E82FE"
       border_rgb  = ColorScale.lighten(dark_base, 0.30)
       danger      = colors[:danger] || "#EF4444"
+      surfaces    = dark_surfaces(dark_base)
+
+      secondary_ink = contrast_ink(dark_base, direction: :lighten, start: 0.70, target: 4.5, against: surfaces)
+      muted_ink     = ladder_clamp(
+        contrast_ink(dark_base, direction: :lighten, start: 0.55, target: 4.5, against: surfaces),
+        secondary_ink, direction: :lighten
+      )
 
       {
         "--color-page"           => dark_base,
@@ -48,10 +55,15 @@ module Studio
         # until the ink clears its target on every emitted dark surface
         # (clamped at pure white for pathological bases). Note the blend
         # DESATURATES toward gray; only strongly-tinted bases keep a cast.
-        "--color-text-secondary" => contrast_ink(dark_base, direction: :lighten, start: 0.70, target: 4.5,
-                                                 against: dark_surfaces(dark_base)),
-        "--color-text-muted"     => contrast_ink(dark_base, direction: :lighten, start: 0.55, target: 3.0,
-                                                 against: dark_surfaces(dark_base)),
+        "--color-text-secondary" => secondary_ink,
+        # MUTED IS NORMAL-SIZE TEXT, so its target is AA 4.5:1 — not 3.0.
+        # 3.0 is WCAG's LARGE-text allowance (>=18.66px, or 14px bold) and this
+        # ink does not land on large text: the engine's own `.label-upper`
+        # utility is `text-xs text-muted` (12px), and consumers render it at
+        # 11px. Measured on the default theme before this change: muted was
+        # #9896A4 at 3.84:1 on --color-surface (dark) and #818283 at 3.46:1 on
+        # --color-surface-alt (light) — both below AA, in BOTH themes.
+        "--color-text-muted"     => muted_ink,
         "--color-border"         => ColorScale.with_opacity(border_rgb, 0.2),
         "--color-border-strong"  => ColorScale.with_opacity(border_rgb, 0.4),
         "--color-shadow"         => "transparent",
@@ -95,6 +107,31 @@ module Studio
         ColorScale.darken(light_base, 0.08) ]
     end
 
+    # Keep the ink ladder monotonic: muted is the QUIETEST text ink and must
+    # never come out louder than secondary.
+    #
+    # This became reachable the moment muted's target rose to 4.5 and the two
+    # inks started sharing one threshold. They are found by the same stepped
+    # search from DIFFERENT starts (muted 0.40/0.55, secondary 0.55/0.70), so
+    # their grids are offset and the one that starts lower can overshoot PAST
+    # the one that starts higher. Measured on the default light base #f8fafc:
+    # the true minimum blend clearing 4.5 is 0.59, secondary lands exactly
+    # there, and muted — stepping 0.40, 0.42, ... — skips 0.59 and lands on
+    # 0.60, i.e. DARKER than secondary. The ladder inverted while every
+    # contrast assertion stayed green, because nothing compared the two.
+    #
+    # Ordering is a design decision, so make it structurally rather than let a
+    # 0.02 grid decide it. `direction` says which way "louder" runs: lightened
+    # ink on a dark base is louder as luminance RISES; darkened ink on a light
+    # base is louder as luminance FALLS.
+    def ladder_clamp(muted, secondary, direction:)
+      muted_l     = ColorScale.relative_luminance(muted)
+      secondary_l = ColorScale.relative_luminance(secondary)
+      louder = direction == :lighten ? muted_l > secondary_l : muted_l < secondary_l
+
+      louder ? secondary : muted
+    end
+
     # Bounded, clamped search: raise the blend amount from `start` until the
     # ink clears `target` contrast against every background in `against`.
     # Clamps at 1.0 (pure white/black), so a pathological base degrades to the
@@ -133,6 +170,13 @@ module Studio
       light_base = colors[:light] || "#f8fafc"
       primary    = colors[:primary] || "#8E82FE"
       danger     = colors[:danger] || "#EF4444"
+      surfaces   = light_surfaces(light_base)
+
+      secondary_ink = contrast_ink(light_base, direction: :darken, start: 0.55, target: 4.5, against: surfaces)
+      muted_ink     = ladder_clamp(
+        contrast_ink(light_base, direction: :darken, start: 0.40, target: 4.5, against: surfaces),
+        secondary_ink, direction: :darken
+      )
 
       {
         "--color-page"           => light_base,
@@ -144,10 +188,9 @@ module Studio
         # Same bounded search as dark mode: the old fixed grays measured as
         # low as 2.05:1 (muted on --color-inset) — below the very defect this
         # derivation exists to prevent. Ink darkens away from the light base.
-        "--color-text-secondary" => contrast_ink(light_base, direction: :darken, start: 0.55, target: 4.5,
-                                                 against: light_surfaces(light_base)),
-        "--color-text-muted"     => contrast_ink(light_base, direction: :darken, start: 0.40, target: 3.0,
-                                                 against: light_surfaces(light_base)),
+        "--color-text-secondary" => secondary_ink,
+        # See the dark-mode note: muted is normal-size text and owes AA 4.5:1.
+        "--color-text-muted"     => muted_ink,
         "--color-border"         => ColorScale.darken(light_base, 0.08),
         "--color-border-strong"  => ColorScale.darken(light_base, 0.15),
         "--color-shadow"         => "rgba(0,0,0,0.05)",
