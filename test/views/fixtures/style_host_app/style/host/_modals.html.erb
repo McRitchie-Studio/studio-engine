@@ -1,0 +1,19 @@
+<%#  Fixture for StyleHostSectionTest - stands in for a consuming app's
+     app/views/style/host/_modals.html.erb.
+
+     Lives under its OWN view-path root, not the shared test/views/fixtures one,
+     for the same reason the modal host's host_extras fixture does: the guide
+     finds this partial by CONVENTION, so a file in a root other tests mount
+     would silently flip the absent-by-default case for every one of them - and
+     the absent case is half of what this seam promises.
+
+     Shaped like a real host specimen rather than a bare marker: a card with a
+     trigger that drives the app's REAL store, which is the contract the section
+     documents. %>
+<div class="card p-4">
+  <p class="label-upper">HOST-SECTION-MARKER</p>
+  <button type="button" class="btn btn-primary btn-sm"
+          @click="$store.modals.open('fixture-host-modal', { step: 'one' })">
+    Open fixture modal
+  </button>
+</div>

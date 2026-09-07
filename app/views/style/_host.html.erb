@@ -1,0 +1,105 @@
+<%#  The HOST section of the living style guide (admin/style).
+
+     THE ONE SEAM a consuming app has for growing its own specimens onto this
+     page. Every other section on this page is the gem's. This one is the app's,
+     and the gem still dictates its structure: the section element, the anchor,
+     the heading, the intro line, and the nav pill above are all rendered HERE,
+     from the engine. The app supplies content only.
+
+     "Host" means the CONSUMING APP, the same sense it carries in the modal
+     host's own seam (modals/_host_extras). It does NOT mean the modal-host
+     shell, which is studio/modals/_host - a different file and a different
+     meaning of the word.
+
+
+     THE CONTRACT - what a consuming app writes
+     ------------------------------------------
+     Define ONE partial in the app:
+
+         app/views/style/host/_modals.html.erb
+
+     That is the whole registration. There is no initializer, no locals, no
+     list to append to, and nothing to render from the app's own layout. The
+     guide finds the partial by CONVENTION, exactly the way the modal host
+     finds modals/_host_extras:
+
+         lookup_context.exists?("modals", ["style/host"], true)
+
+     - the same three-term form: name, prefixes, partial. That call lives in
+     style/index.html.erb, which owns it because the sticky section nav needs
+     the same answer the render does. An app that ships no such partial gets no
+     pill, no heading, no container, and no bytes: the guide is unchanged.
+
+     WHY THIS PATH. A directory (style/host/) rather than a flat name in the
+     gem's own style/ prefix, because the gem already ships style/_modals,
+     style/_theme, style/_tricks and style/_tasks - an app file dropped beside
+     them shadows a section by name, and the failure is silent. Nothing of the
+     gem's lives under style/host/, so an app cannot collide with the engine
+     there. Naming the partial for the SECTION it contributes (modals) rather
+     than for the seam leaves room for a later style/host/_tricks without
+     renaming what is already shipped.
+
+
+     WHAT THE PARTIAL MAY ASSUME
+     ---------------------------
+     - It renders INSIDE this section element, already anchored, spaced and
+       headed. So it supplies cards and prose only: no section tag of its own,
+       no h2, no scroll-margin, no nav entry.
+     - The engine component layer (engine.css) and motion layer
+       (engine-motion.css) are loaded, so card, btn, badge, label-upper, the
+       role tokens and the motion/effect primitives all style for real.
+     - Alpine is running and this section carries an x-data scope, so a
+       specimen can use x-on / at-click bindings directly. A plain onclick
+       calling Alpine.store works too.
+     - The app's layout has ALREADY mounted the shared modal host on
+       Alpine.store("modals"), because this page renders inside that layout.
+
+
+     WHICH STORE IT DRIVES - read this before writing a trigger
+     ----------------------------------------------------------
+     Drive the app's REAL store:
+
+         $store.modals.open(id, props)
+
+     NOT dsModals. dsModals is the page-scoped host that the gem's own Modals
+     section above stands up, and copying it here is the one wrong turn this
+     seam invites.
+
+     The gem's section needs dsModals for a reason that does NOT apply to an
+     app's own modals. Its specimens are the ENGINE's ids, and an app's layout
+     host registers only that app's ids under an unconditional template x-if on
+     the current modal. Pushing a NOVEL id onto the app's store would open that
+     host onto a card it has no registration for, painting an EMPTY panel behind
+     the specimen. So the gem's section owns a private store and registers all
+     of its specimen content itself.
+
+     An app's own modal ids are already registered in that app's layout host.
+     Push one onto $store.modals and the real host renders the real card - the
+     production card, in production chrome, with production behaviour. There is
+     nothing to mirror, no second registration list to keep in sync, and no
+     iframe. Turf Monster's /admin/modals gallery has driven the real store from
+     a plain button this way since it was built; this seam is that same move,
+     given a home on the guide.
+
+     A reader who assumes dsModals will build a mirror instead: a second copy of
+     every card, free to drift from the one the app actually ships, which is the
+     opposite of what a living style guide is for. %>
+<section id="host-modals" class="space-y-8" x-data="{}"
+         style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
+  <div class="space-y-1">
+    <h2 class="text-2xl font-bold text-heading"><%= Studio.app_name %></h2>
+    <p class="text-muted text-sm max-w-2xl">
+      This app&rsquo;s own modals, contributed by
+      <code class="font-mono text-2xs bg-inset px-1.5 py-0.5 rounded">app/views/style/host/_modals.html.erb</code>.
+      Every section above belongs to the engine and is inherited; everything
+      here belongs to <%= Studio.app_name %> and ships with it. These specimens
+      drive the app&rsquo;s <strong>real</strong>
+      <code class="font-mono text-2xs bg-inset px-1.5 py-0.5 rounded">$store.modals</code>
+      host, so the card that opens here is the card that opens in production.
+    </p>
+  </div>
+
+  <%# The app's content. Reached only when it resolves - style/index.html.erb
+      owns that guard, because the section nav needs the same answer. %>
+  <%= render "style/host/modals" %>
+</section>
