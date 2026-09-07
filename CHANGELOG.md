@@ -63,6 +63,39 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   test, while forcing the typed mode on, un-guarding the refocus, and treating
   an empty pool as present each hit a placeholder test.
 
+- **The living style guide grows a HOST SECTION seam.** `/admin/style` rendered
+  four hard-coded engine sections (Theme, Modals, Tricks, Tasks) with no way for
+  a consuming app to contribute one of its own. An app now defines
+  **`app/views/style/host/_modals.html.erb`** and the guide grows a fifth
+  section for that app's own modals, between Modals and Tricks, plus its pill in
+  the sticky section nav. Found by the same three-term
+  `lookup_context.exists?("modals", ["style/host"], true)` the modal host uses
+  for `modals/_host_extras` — one convention in this codebase, not two — so
+  defining the file IS the registration: no initializer, no locals, no list to
+  append to.
+
+  **The gem keeps dictating the structure.** `style/_host.html.erb` renders the
+  section element, the `#host-modals` anchor, the heading (`Studio.app_name`),
+  the intro line and the Alpine scope; the app supplies specimens only. An app
+  that ships no such partial gets **nothing** — no pill, no heading, no
+  container — and that is asserted as a whole-document comparison rather than a
+  handful of refutes: the page an app WITH a section gets, minus that section
+  and its pill, must equal the page a base app gets. Five of the six apps
+  mounting this engine will ship no host section, and their page is unchanged.
+
+  **A host specimen drives `$store.modals`, not `dsModals`, and the distinction
+  is the whole point.** The guide's own Modals section needs a page-scoped store
+  because its specimens are the ENGINE's ids, which an app's layout host has no
+  registration for — pushing one there paints an empty card behind the specimen.
+  An app's own ids ARE registered in its layout host, so a host section opens
+  the **real** production card with no mirror, no second registration list and
+  no iframe. The doc comment on `style/_host.html.erb` is the consumer contract
+  and says so outright, because a reader who assumes `dsModals` builds that
+  mirror instead — a second copy of every card, free to drift from the one the
+  app ships, which is the opposite of what a living style guide is for.
+
+  **The seam ships no host section itself.** The first consumer is
+  turf-monster's own `style/host/_modals`, which lands as its own task.
 - **A `required` mode on the shared first-name card.**
   `studio/modals/onboarding/_first_name` grows one local. `required: true`
   renders the card with BOTH skip affordances gone — the "Skip for now" button

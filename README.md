@@ -449,6 +449,48 @@ than assuming drop-in equivalence:
   the replacement lands after the 220ms slide-out (previously an immediate
   top-of-stack assignment).
 
+### Style guide — your app's own section
+
+`/admin/style` is the engine's living style guide, and every section on it is
+the engine's: Theme, Modals, Tricks, Tasks. An app grows a **fifth section, its
+own**, by defining one partial:
+
+```erb
+<%# app/views/style/host/_modals.html.erb %>
+<div class="card p-4 space-y-3">
+  <p class="label-upper">Wallet setup</p>
+  <button type="button" class="btn btn-primary btn-sm"
+          @click="$store.modals.open('wallet-setup', { returnUrl: window.location.href })">
+    Open
+  </button>
+</div>
+```
+
+That is the whole registration — the same optional-partial convention as
+`modals/_host_extras`, resolved by the same three-term `lookup_context.exists?`.
+An app that ships no such file gets no section, no heading, and no nav pill; its
+page is byte-for-byte what it was.
+
+**The gem keeps dictating the structure.** It renders the section element, the
+`#host-modals` anchor, the heading (your `Studio.app_name`), the intro line, and
+the sticky nav pill, and it places the section between Modals and Tricks. Your
+partial supplies specimens only — no `<section>`, no `<h2>`, nothing to register
+in a nav.
+
+**Drive `$store.modals`, not `dsModals`.** The guide's own Modals section stands
+up a page-scoped store because its specimens are the *engine's* ids, and pushing
+an id your layout host has never registered opens that host onto an empty card.
+Your own ids are already registered there, so
+`$store.modals.open(id, props)` renders the **real** card, in production chrome,
+with production behavior. There is nothing to mirror and no second registration
+list to keep in sync — building one is the mistake this note exists to prevent.
+This assumes your layout mounts the shared host. Not every consuming app does
+(see "Page-scoped hosts" above); where none is mounted `$store.modals` is
+undefined, so mount `studio/modals/host` before writing a trigger.
+
+Full contract, including what the partial may assume: the doc comment at the top
+of `app/views/style/_host.html.erb`.
+
 ### User nav slots
 
 `components/_user_nav.html.erb` renders the right-side navbar user section.
