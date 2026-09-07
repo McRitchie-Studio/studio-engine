@@ -641,6 +641,12 @@
 # The last one was run because the first six left "a generated control opens the
 # demo card" untouched, and a spec no mutation can redden is the one this file's
 # own history says to delete rather than keep.
+#
+# 2026-09-07: 123 -> 126, and a NINETEENTH file. e2e/onboarding_first_name_error.spec.js
+# adds THREE tests in ONE new file — the first-name card's empty-field error in each of
+# its three modes (skippable, gated, host-supplied copy). The contract counts TESTS, not
+# files. Re-derived on THIS tree with the lister, never by arithmetic:
+#   npx playwright test --list  -> 126 tests in 19 files
 total_specs: 126
 
 # What the lane MUST execute — asserted against the runner's own report, so no
@@ -683,6 +689,13 @@ total_specs: 126
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 123
 # executed = total - devnet - allowed_skips = 123 - 0 - 0 = 123, so executed ==
+# total_specs and the equality assertion holds.
+# Re-derived once more on THIS tree with the lister when the first-name empty-field
+# error specs landed — 3 tests in ONE new file:
+#   npx playwright test --list                                             -> 126 tests, 19 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 126
+# executed = total - devnet - allowed_skips = 126 - 0 - 0 = 126, so executed ==
 # total_specs and the equality assertion holds.
 executed: 126
 
