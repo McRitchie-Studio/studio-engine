@@ -415,7 +415,7 @@ body.modal-open .studio-app-banner {
 /* === THE NAVBAR COLLAPSE BAND TABLE =====================================
    LAYER 2 OF THE PRIMITIVE, and it lives here rather than in
    layouts/_navbar.html.erb for one reason: every engine-consuming app imports
-   this stylesheet, but only some render that partial. Three of six FORK the
+   this stylesheet, but only some render that partial. Three of five FORK the
    navbar (turf-monster, mcritchie-studio, moms-app), and while the table sat
    inline each fork had to hand-write its own — which is exactly how four
    independent copies of this collapse came to exist.

@@ -44,8 +44,9 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
   end
 
   # A BASE app: this engine's own views and nothing else. This is not a
-  # contrivance — acquisition-studio, mcritchie-industries and moms-app all
-  # mount studio-engine and bundle no solana-studio.
+  # contrivance — mcritchie-studio, acquisition-studio, mcritchie-industries and
+  # moms-app all mount studio-engine and bundle no solana-studio. That is four
+  # of the five consumers; turf-monster is the only one that bundles the gem.
   def base_app_view
     build_view([ENGINE_VIEWS])
   end

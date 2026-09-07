@@ -4,6 +4,49 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **The app census in these comments was short by the most important app.** Ten
+  sites said this engine is mounted by SIX apps and that THREE of them bundle no
+  `solana-studio`. Measured 2026-09-07 by grepping every app `Gemfile` in the
+  ecosystem for `gem "studio-engine"`: **five** apps mount it —
+  `mcritchie-studio`, `turf-monster`, `acquisition-studio`,
+  `mcritchie-industries`, `moms-app` — and **four** of those bundle no
+  `solana-studio`. `turf-monster` is the only one that does.
+
+  **The omission was the HUB.** Every roster of BASE consumers named
+  `acquisition-studio`, `mcritchie-industries` and `moms-app` and left out
+  `mcritchie-studio` — the app a developer reading those comments is most likely
+  to be sitting in, and one whose `/admin/style` is exactly what the
+  missing-template gate protects. The error ran in the direction that
+  UNDERSTATES the risk the comments exist to explain.
+
+  **Two near misses are what make a naive count wrong.** `chain-ops` bundles
+  `solana-studio` and NOT this engine, so it is not in this set at all;
+  `acquisition-studio` is a retired prototype whose `Gemfile` still pins the
+  engine, so it is. `rolio` bundles neither and is not a consumer.
+
+  **Corrected at every site, because a partial correction is a contradiction:**
+  `app/views/style/_modals.html.erb`, `test/dummy/config/application.rb`,
+  `Gemfile`, `test/views/style_web3_specimens_test.rb`,
+  `test/views/style_host_section_test.rb` (both sites),
+  `app/views/layouts/_navbar.html.erb`,
+  `app/assets/tailwind/studio_engine/engine.css`,
+  `test/views/nav_collapse_contract_test.rb`, `test/lib/vendored_alpine_test.rb`,
+  `test/lib/vendored_montserrat_test.rb`, and two earlier Unreleased entries
+  below. The navbar-fork claim rides the same denominator — three of FIVE fork
+  it, not three of six, and the named three are unchanged — and the
+  Sprockets/propshaft split is two of five rather than "exactly half the fleet",
+  a phrase that encoded an even total no census supports.
+
+  **What was already right, and stays.** The five-consumer roster in
+  `lib/studio.rb`'s `draw_profile_routes` note (each checked 2026-08-14) named
+  the correct five all along; this change brings the rest of the repo to it. The
+  "all six consumer DATABASES" figures elsewhere in this file are three apps
+  times two environments, not an app count.
+
+  Comment and prose only. No behaviour changes.
+
 ### Added
 
 - **The first-name card now says WHICH path finished it, and can type its
@@ -80,7 +123,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   that ships no such partial gets **nothing** — no pill, no heading, no
   container — and that is asserted as a whole-document comparison rather than a
   handful of refutes: the page an app WITH a section gets, minus that section
-  and its pill, must equal the page a base app gets. Five of the six apps
+  and its pill, must equal the page a base app gets. Four of the five apps
   mounting this engine will ship no host section, and their page is unchanged.
 
   **A host specimen drives `$store.modals`, not `dsModals`, and the distinction
@@ -512,7 +555,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
   **The band table shipped from the wrong file.** The `.nav-shell` `--nav-*`
   sizes were inline in `layouts/_navbar.html.erb`, so only an app rendering that
-  partial got them — and **three of six apps fork the navbar**
+  partial got them — and **three of five apps fork the navbar**
   (`turf-monster`, `mcritchie-studio`, `moms-app`), each left to hand-write its
   own. That is precisely how four independent copies of this collapse came to
   exist. They now ship from `engine.css`, which every engine-consuming app
