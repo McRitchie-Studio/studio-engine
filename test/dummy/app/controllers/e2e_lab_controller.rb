@@ -354,6 +354,16 @@ class E2eLabController < ActionController::Base
     render(:profile_edit)
   end
 
+  # THE STYLE GUIDE'S MODALS SECTION — the page-scoped host plus the two
+  # simulator sections whose controls are GENERATED rather than rendered.
+  #
+  # No locals to prepare: style/_modals resolves its own web3 / leveling gates and
+  # takes no arguments, which is exactly how style/index renders it. The browser
+  # programs under test — the registry-driven control build and the dsModals stack
+  # demos — are inline scripts in that engine partial, so the response bytes are
+  # identical whether either one runs.
+  def style_modals = render(:style_modals)
+
   # Liveness. Playwright's webServer polls this before the first spec, so it must
   # not depend on anything a lab page needs.
   def up = render(plain: "ok")

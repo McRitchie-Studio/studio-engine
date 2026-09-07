@@ -39,6 +39,42 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
   **The seam ships no host section itself.** The first consumer is
   turf-monster's own `style/host/_modals`, which lands as its own task.
+- **A `required` mode on the shared first-name card.**
+  `studio/modals/onboarding/_first_name` grows one local. `required: true`
+  renders the card with BOTH skip affordances gone — the "Skip for now" button
+  is not emitted at all, and the × merely CLOSES and is labelled `Close` — and
+  swaps the sub-copy to the audience being gated. Default `false`, so the
+  post-auth chain card McRitchie Studio renders today does not move.
+
+  **IT IS FOR A HOST THAT GATES SOMETHING ON THE NAME.** turf-monster's entry
+  gate opens this card as the first validation of hold-to-confirm, and that gate
+  reads the stored COLUMN — so a recorded skip buys the user nothing and the
+  Skip link is a door painted on a wall, promising a way past a wall that does
+  not move.
+
+  **IT IS DELIBERATELY NOT A TRAP.** Closing stays reachable, because abandoning
+  the flow and slipping past the gate are two different things: the × still
+  dismisses the card, it just stops calling `skip()` and stops claiming it did.
+  A `required` that also removed the × would satisfy every "hides the skip"
+  reading and be a worse card, so the two are asserted as a PAIR.
+
+  **RESOLVED SERVER-SIDE, not through an Alpine `x-show`** — the source this was
+  ported from hides its skip button reactively, which leaves a button that must
+  not exist sitting in the DOM and clickable for as long as Alpine has not
+  mounted, and there for good if it never does. `required` is known at render
+  time, so the button is simply never emitted.
+
+  The default render is asserted **byte-for-byte identical** to `required:
+  false`, which is what pins the existing consumer. Mutation-checked 5/5:
+  flipping the default, un-hiding the skip button, making the × always skip,
+  freezing the label, and freezing the sub-copy each turn the suite red on a
+  different test.
+
+  This was the LAST mode turf-monster's own 240-line `modals/_onboarding` had
+  that the gem did not, so that copy can be deleted next release. A host wanting
+  both modes mounts two `<template x-if>` ids rather than branching one at
+  runtime — which is how the two cards already differ in copy, not just in
+  affordances.
 
 - **Knowledge coverage view** — `/admin/knowledge/coverage` +
   `Studio::KnowledgeExpectation`: the "what SHOULD exist" half of the
@@ -54,6 +90,41 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `add_expectation_to_studio_knowledge_docs`); routes ride the existing
   `Studio.draw_knowledge_routes` opt-in. Built for the Commercial Welding
   65-item diligence tracker; app-agnostic like the rest of the layer.
+
+- **The style guide grows the two modal simulators that review ENGINE
+  behaviour** — `#modals-motion-registry` ("Enter & leave animations") and
+  `#modals-stack-mechanics` ("Stack behaviour") in `style/_modals`. Both are
+  ported from turf-monster's `/admin/modals` gallery, which is being deleted:
+  the rest of that page was consumer showroom, but these two exercised engine
+  mechanics — the `window.ModalAnimations` registry, and the modal stack's
+  dismissibility / `holdAtLeast` / LIFO rules — and would have gone with it.
+
+  The motion section BUILDS ITS CONTROLS FROM THE LIVE REGISTRY at load
+  (a button and a dropdown option per registered key, per channel), so
+  registering a new animation surfaces it on the guide with no edit to the
+  page. That is the property the section exists for, and
+  `test/views/style_guide_modal_simulator_test.rb` pins it from both sides:
+  the containers must ship EMPTY, and the build must enumerate
+  `window.ModalAnimations` rather than a local literal.
+
+  The stack demos drive `$store.dsModals` and the guide's own `onchain-tx`
+  specimen directly. **One demo did not come across: "error with recovery."**
+  turf's `setRecovery(label, fn, { phantom })` is a method on that app's
+  legacy compatibility proxy and renders a recovery button on ITS `_onchain_tx`
+  card; the engine specimen's error state is `blocks/_card_header` plus a plain
+  Close, with no recovery affordance. Porting it would have meant designing a
+  new block into a shipped partial, so it was dropped rather than shimmed —
+  roughly half the ported demos drove that proxy, and none of them reference it
+  now (asserted).
+
+  **Both sections are graded in a browser**, because neither is observable from
+  the response bytes: `e2e/style_modal_simulators.spec.js` (7 specs) drives a new
+  `/lab/style_modals` lab page, which mounts the shared modal host exactly as a
+  consumer layout does — without it `window.ModalAnimations` is undefined, the
+  build produces no controls, and "the controls match the registry" would be
+  vacuously true at `0 == 0`. Each spec was verified RED against its own defect
+  reintroduced, with the lab server restarted between runs. The lane contract
+  moves 116 → 123 (`config/e2e_lane.yml`), re-derived with the lister.
 
 ### Changed
 
@@ -88,6 +159,22 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   later sees the same button in the same place.
 
 ### Fixed
+
+- **The style guide's page-scoped modal store now resolves animations through
+  the LIVE registry, so the guide can no longer disagree with itself.**
+  `style/_modals`' `dsModals` carried a hard-coded COPY of the animation table
+  while the new simulator builds its controls from `window.ModalAnimations`.
+  The two agreed today, which is exactly why this was invisible — but a
+  consumer registering a key would have grown a control from the registry that
+  the store then resolved back to `pop`: the button said "shake", the card
+  popped, and nothing reported the gap. Its `modalAnim` now reads
+  `window.ModalAnimations` at CALL time with the same late-binding guard the
+  shared host uses (unknown keys and a gutted registry still fall back to
+  `pop`, so a miss can never throw on `.ms` and strand a modal open); the local
+  table remains only as the fallback for a guide rendered without the host.
+  MEASURED in a browser both ways: registering a new key at runtime surfaces a
+  control AND plays it, and with this fix reverted the same key surfaces a
+  control that plays `modal-card-mount`.
 
 - **Onboarding no longer truncates a surname to fit a first name's cap.**
   `Studio::OnboardingController#first_name` measured the WHOLE typed answer with

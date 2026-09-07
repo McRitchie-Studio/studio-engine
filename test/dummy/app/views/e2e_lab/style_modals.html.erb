@@ -1,0 +1,34 @@
+<%# The living style guide's MODALS section, in a browser.
+
+    WHY THIS PAGE EXISTS. style/_modals carries the guide's page-scoped modal
+    host and, since the simulator port, two sections whose entire content is
+    BUILT BY SCRIPT: the enter/leave controls are generated from the live
+    window.ModalAnimations registry at load, and the stack demos drive
+    $store.dsModals through timers and advance(). None of that is observable in
+    the response bytes — the containers ship EMPTY on purpose, so a String tier
+    asserting "the container is there" passes on a page where the script never
+    ran and the operator sees four empty boxes.
+
+    WHY THE SHARED HOST IS RENDERED TOO, AND WHY THAT IS NOT SCENERY.
+    window.ModalAnimations — the registry the simulator enumerates — is published
+    by studio/modals/_host, which every consumer mounts ONCE AT LAYOUT LEVEL.
+    /admin/style is always reached through such a layout, so the guide has never
+    published that registry itself and does not here either. Without this render
+    the registry is UNDEFINED on the lab page, the build falls back to an empty
+    table, and the section paints zero controls — over which "the controls match
+    the registry" would be vacuously true at 0 == 0. Mounting both hosts is also
+    the honest reproduction of the real page: the guide uses a page-scoped store
+    PRECISELY BECAUSE the app already owns $store.modals (see style/_modals).
+
+    THE LAB RULE (see E2eLabController): a lab page sets up a partial's LOCALS
+    and nothing else. Neither partial here takes any — style/_modals resolves its
+    own web3 / leveling gates, and the host is given an EMPTY block because it
+    guards its extension point with `yield if block_given?`, which a partial
+    rendered inside a layout answers true for whether or not one was passed. %>
+<main class="max-w-5xl mx-auto px-4 py-10" x-data>
+  <h1 class="text-2xl font-bold mb-6">Style guide — modals</h1>
+
+  <%= render "studio/modals/host" do %><% end %>
+
+  <%= render "style/modals" %>
+</main>
