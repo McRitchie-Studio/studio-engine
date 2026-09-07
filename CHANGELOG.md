@@ -6,6 +6,53 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **The first-name card now says WHICH path finished it, and can type its
+  placeholder.** Two adoption hooks on
+  `studio/modals/onboarding/_first_name`, so turf-monster can retire its own
+  240-line copy.
+
+  **THE OUTCOME (the blocker).** `finish()` is called by the save AND the skip,
+  and it dispatched the same detail either way — so a host could hear that the
+  step was done and could not hear whether a name had landed. Its `done_event`
+  detail now carries `{ next: [...], saved: true|false }`. turf's entry gate
+  resumes a contest entry the gate interrupted when the name saves; fired after
+  a SKIP that same signal resumes an entry that still has no name.
+
+  It is an extra detail key rather than an opt-in second event because
+  McRitchie Studio's listener wants BOTH paths (it retires the "ask" marker
+  whether the user answered or skipped), so the event that always fires has to
+  be the one carrying the answer — and an opt-in event would leave this one
+  ambiguous for every host that did not pass it, including the next one to add
+  a gate. `next` keeps its key and the event keeps its name, so the existing
+  listener does not move. The flag is written `!!saved`, so an unreported path
+  reports FALSE: a card claiming `saved: true` for a skip would be worse than
+  the ambiguity it replaced.
+
+  **THE TYPED PLACEHOLDER (optional, OFF by default).** A new
+  `placeholder_names:` local takes an array of first names and types one of
+  them into the placeholder a character at a time, so the card demonstrates the
+  answer instead of describing it. Absent or empty, NONE of it is emitted and
+  the static `placeholder` is used exactly as before — the local exists so
+  turf's adoption does not silently delete a flourish it has today, and it
+  comes out in one piece if the operator would rather drop it.
+
+  It carries the three things that make it bearable rather than a nuisance:
+  typing stops the moment the user types and NEVER restarts (a focus counts
+  only when it follows a blur, because the field is focused on mount);
+  `prefers-reduced-motion` gets the whole example statically, with no timer;
+  and there is a 420ms pre-roll so a short name does not finish underneath the
+  modal's own mount spring. The pool travels as an escaped `data-` attribute
+  rather than interpolated into the `x-data`, which is what keeps a name with
+  an apostrophe — or the JSON's own double quotes — from killing the component.
+
+  The default card is asserted **byte-for-byte against the 0.70.0 render**,
+  with the four outcome lines rewound and every other byte required to match;
+  a fifth change has to be added to that list deliberately. Mutation-checked
+  6/6, and the two halves redden disjoint tests: reporting `true` on the skip,
+  dropping `saved` from the detail, and renaming `next` each hit an outcome
+  test, while forcing the typed mode on, un-guarding the refocus, and treating
+  an empty pool as present each hit a placeholder test.
+
 - **A `required` mode on the shared first-name card.**
   `studio/modals/onboarding/_first_name` grows one local. `required: true`
   renders the card with BOTH skip affordances gone — the "Skip for now" button
