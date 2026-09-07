@@ -38,6 +38,8 @@ class StyleGuideModalAnchorsTest < ActiveSupport::TestCase
     modals-system-status
     modals-templates
     modals-rewards
+    modals-motion-registry
+    modals-stack-mechanics
   ].freeze
 
   def source = File.read(GUIDE)
@@ -79,6 +81,29 @@ class StyleGuideModalAnchorsTest < ActiveSupport::TestCase
 
   # THE PROPERTY THE TASK EXISTS FOR: ids must not track heading text. Proven
   # structurally — no anchor may be a slug of the heading inside its own section.
+  #
+  # !! THIS GUARD IS CURRENTLY INERT — DO NOT TRUST A GREEN RUN OF IT. !!
+  #
+  # Nokogiri cannot nest these subsections. The guide is ERB, and the overlay's
+  # <template x-if> swallows every tag that follows it, so parsing the WHOLE file
+  # yields exactly ONE <section> (the outer id="modals") for a file that has ten.
+  # Every doc.at_css("section#...") below therefore returns nil, the `next if
+  # section.nil?` skips all of them, and `coupled` is empty no matter what the
+  # ids say. Measured 2026-09-06 while porting the simulator sections.
+  #
+  # WORSE, THE PROPERTY IT CLAIMS IS ALREADY VIOLATED. Slicing each section out
+  # first and parsing it alone (the technique in
+  # test/views/style_guide_modal_simulator_test.rb#section_dom) shows 7 of the 8
+  # published anchors ARE slugs of their own heading: modals-auth, modals-
+  # profile, modals-profile-leveling, modals-web3, modals-system-status,
+  # modals-templates and modals-rewards. Only modals-contest-entry was not.
+  #
+  # SO THIS IS NOT A ONE-LINE FIX, which is why it was left standing rather than
+  # quietly repaired. Making the guard read the sections would red the suite, and
+  # the remedy is to RENAME seven ids a consumer may anchor on — a deliberate,
+  # release-noted, consumer-breaking change that needs its own task. The two
+  # anchors added by the simulator port (modals-motion-registry, modals-stack-
+  # mechanics) name their subject and are NOT coupled, so the debt is not growing.
   def test_ids_do_not_track_heading_text
     doc = Nokogiri::HTML.fragment(source)
     coupled = []

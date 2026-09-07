@@ -211,7 +211,20 @@
         // slide uses the modal-card-swap-* classes regardless of these keys.
         var CLOSE_ANIM_MS = 220;
         var SWAP_IN_MS    = 220;
-        var Anim = {
+
+        // THE LIVE REGISTRY IS window.ModalAnimations, NOT THIS TABLE. This is a
+        // fallback only, for the case where the guide renders without the shared
+        // host (studio/modals/_host) that publishes the registry — both consumer
+        // layouts mount it, so in practice the lookup below always finds it.
+        //
+        // It used to be a hard-coded local copy, and that made the Enter/Leave
+        // simulator below a LIAR: the simulator builds its controls from the live
+        // registry, so a newly registered animation grew a button here while the
+        // store silently resolved the unknown key back to 'pop'. The control said
+        // "shake", the card popped, and nothing reported the gap. Reading the
+        // registry at CALL time is what makes a registered animation actually
+        // playable on this page.
+        var ANIM_FALLBACK = {
           enter: {
             pop:   { cls: 'modal-card-mount',    ms: 320 },
             shake: { cls: 'modal-card-shake-in', ms: 600 },
@@ -222,9 +235,13 @@
             slide: { cls: 'modal-card-swap-out', ms: 220 }
           }
         };
+        // Same late-binding guard, and for the same reason, as the host's own
+        // modalAnim: never return undefined. A miss would throw on .ms in close()
+        // and strand the modal open, so an unknown key falls back to 'pop'.
         function modalAnim(channel, key) {
-          var table = Anim[channel] || {};
-          return table[key] || table.pop;
+          var table = (window.ModalAnimations && window.ModalAnimations[channel]) ||
+                      ANIM_FALLBACK[channel];
+          return table[key] || table.pop || ANIM_FALLBACK[channel].pop;
         }
 
         Alpine.store('dsModals', {
@@ -1913,5 +1930,356 @@
       <% end %>
     </div>
   </section>
+
+  <%# ===================================================================== %>
+  <%# 8. MOTION REGISTRY (the enter / leave animation simulator) %>
+  <%# ===================================================================== %>
+  <section id="modals-motion-registry" class="space-y-5">
+    <div class="space-y-1">
+      <h3 class="text-xl font-bold text-heading">Enter &amp; leave animations</h3>
+      <p class="text-muted text-sm">
+        The per-modal entrance/exit registry &mdash;
+        <code class="font-mono text-2xs">window.ModalAnimations</code>, published by
+        <code class="font-mono text-2xs">studio/modals/_host</code>. Any modal opens with
+        <code class="font-mono text-2xs">open(id, { enterAnim, exitAnim })</code>; omit either
+        and it uses <code class="font-mono text-2xs">pop</code>. Every control below is
+        <strong class="text-heading font-semibold">generated from the live registry</strong>,
+        so registering a new animation surfaces it here with no edit to this page. Demo card:
+        <code class="font-mono text-2xs">email-change-pending</code>.
+      </p>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2">
+      <%# One control per registered ENTER key, built by the script below. %>
+      <div class="card p-5 space-y-3">
+        <h4 class="text-heading font-semibold text-sm">
+          Enter <span class="text-muted text-xs font-normal">&mdash; watch it arrive</span>
+        </h4>
+        <p class="text-secondary text-xs">
+          Opens the demo card with that entrance. Dismiss with Escape, click-outside, or Close.
+        </p>
+        <div id="modal-anim-enter-buttons" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <%# One control per registered EXIT key: opens with a plain entrance, then
+          auto-closes a beat later so the exit keyframe is what you watch. %>
+      <div class="card p-5 space-y-3">
+        <h4 class="text-heading font-semibold text-sm">
+          Leave <span class="text-muted text-xs font-normal">&mdash; watch it dismiss</span>
+        </h4>
+        <p class="text-secondary text-xs">
+          Opens with a plain entrance, then closes itself so the exit keyframe is the star.
+        </p>
+        <div id="modal-anim-exit-buttons" class="flex flex-wrap gap-2"></div>
+      </div>
+
+      <%# The full matrix: any entrance crossed with any exit. %>
+      <div class="card p-5 space-y-3 sm:col-span-2">
+        <h4 class="text-heading font-semibold text-sm">Combine</h4>
+        <p class="text-secondary text-xs">Pick any entrance and exit, then run the round trip.</p>
+        <div class="flex flex-wrap items-end gap-3">
+          <label class="text-xs text-secondary">Enter
+            <select id="modal-anim-enter-select"
+                    class="block mt-1 text-sm bg-inset border border-subtle rounded px-2 py-1 text-heading"></select>
+          </label>
+          <label class="text-xs text-secondary">Leave
+            <select id="modal-anim-exit-select"
+                    class="block mt-1 text-sm bg-inset border border-subtle rounded px-2 py-1 text-heading"></select>
+          </label>
+          <button type="button" class="btn btn-primary btn-sm"
+                  onclick="dsModalDemos.animOpenSelected()">Open</button>
+          <button type="button" class="btn btn-outline btn-sm"
+                  onclick="dsModalDemos.animRoundTripSelected()">Open, then auto-close</button>
+          <button type="button" class="btn btn-outline btn-sm"
+                  @click="$store.dsModals.close()">Close</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <%# ===================================================================== %>
+  <%# 9. STACK MECHANICS (dismissibility, hold-at-least, LIFO stacking) %>
+  <%# ===================================================================== %>
+  <section id="modals-stack-mechanics" class="space-y-5">
+    <div class="space-y-1">
+      <h3 class="text-xl font-bold text-heading">Stack behaviour</h3>
+      <p class="text-muted text-sm">
+        The engine modal-stack mechanics, poked at directly on
+        <code class="font-mono text-2xs">$store.dsModals</code>: the on-chain TX card states,
+        dismissibility, the minimum-visible-duration floor, and LIFO stacking.
+      </p>
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2">
+      <%# The three states of style/modals/_onchain_tx. The two static buttons open
+          the card AT a state; the two timed buttons drive the transition through
+          the store's advance(), which is the in-flow step primitive. %>
+      <div class="card p-5 space-y-3">
+        <h4 class="text-heading font-semibold text-sm">On-chain TX states</h4>
+        <p class="text-secondary text-xs">
+          Engine <code class="font-mono text-2xs">blocks/_card_header</code> and
+          <code class="font-mono text-2xs">blocks/_onchain_success</code>. The timed pair
+          transitions a live card with
+          <code class="font-mono text-2xs">advance()</code>.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" class="btn btn-outline btn-sm"
+                  onclick="dsModalDemos.processing()">Processing</button>
+          <button type="button" class="btn btn-outline btn-sm"
+                  onclick="dsModalDemos.success()">Success</button>
+          <button type="button" class="btn btn-outline btn-sm"
+                  onclick="dsModalDemos.error()">Error</button>
+          <button type="button" class="btn btn-primary btn-sm"
+                  onclick="dsModalDemos.processThenSuccess()">Processing to success (3s)</button>
+          <button type="button" class="btn btn-primary btn-sm"
+                  onclick="dsModalDemos.processThenError()">Processing to error (3s)</button>
+        </div>
+      </div>
+
+      <%# dismissible: false is what a pending transaction sets so a stray Escape
+          cannot orphan an in-flight signature. %>
+      <div class="card p-5 space-y-3">
+        <h4 class="text-heading font-semibold text-sm">Dismissibility</h4>
+        <p class="text-secondary text-xs">
+          A processing card passes <code class="font-mono text-2xs">dismissible: false</code>, so
+          Escape and click-outside are both suppressed until it resolves.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" class="btn btn-outline btn-sm"
+                  onclick="dsModalDemos.processing()">Try Escape (locked)</button>
+          <button type="button" class="btn btn-outline btn-sm"
+                  onclick="dsModalDemos.dismissible()">Dismissible processing</button>
+        </div>
+      </div>
+
+      <%# The anti-flicker floor from studio/modals/_load_convention. %>
+      <div class="card p-5 space-y-3">
+        <h4 class="text-heading font-semibold text-sm">Hold at least</h4>
+        <p class="text-secondary text-xs">
+          <code class="font-mono text-2xs">StudioModals.holdAtLeast(ms)</code> keeps a fast
+          operation from flashing the spinner. Run both and watch the difference.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" class="btn btn-primary btn-sm"
+                  onclick="dsModalDemos.fastWithHold()">Fast op, hold 1500ms</button>
+          <button type="button" class="btn btn-outline btn-sm"
+                  onclick="dsModalDemos.fastNoHold()">Fast op, no hold (flashes)</button>
+        </div>
+      </div>
+
+      <%# LIFO: open pushes, close pops back to what was underneath. %>
+      <div class="card p-5 space-y-3">
+        <h4 class="text-heading font-semibold text-sm">Stacking</h4>
+        <p class="text-secondary text-xs">
+          LIFO &mdash; a second <code class="font-mono text-2xs">open()</code> pushes the first
+          card behind it, and <code class="font-mono text-2xs">close()</code> pops back to it.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" class="btn btn-primary btn-sm"
+                  onclick="dsModalDemos.stackTwo()">Open two</button>
+          <button type="button" class="btn btn-outline btn-sm"
+                  @click="$store.dsModals.closeAll()">closeAll()</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <%# ---- Demo drivers for the two sections above -------------------------
+      Deliberately NOT an Alpine component: these are multi-step sequences with
+      timers, and an x-data scope would be cloned per specimen card. One global
+      namespace, defined after the markup it drives so the control containers
+      exist when the registry build runs.
+
+      THE STORE IS dsModals. turf-monster's version of this page drove roughly
+      half of these through its legacy solana-modal compatibility proxy, a store
+      this engine does not ship; every demo here goes through the page-scoped
+      store and the onchain-tx specimen directly instead. The exact spelling of
+      that legacy store name is deliberately absent from this file, because
+      style_guide_modal_simulator_test scans the source for it. %>
+  <script>
+    window.dsModalDemos = (function () {
+      var SAMPLE_TX = '5xTrDemoSignature1234567890abcXYZ';
+
+      function store() { return Alpine.store('dsModals'); }
+
+      // Open the onchain-tx specimen. The defaults mirror a real pending
+      // transaction, INCLUDING dismissible: false — the demos that want an
+      // escapable card override it explicitly.
+      function openTx(props) {
+        store().open('onchain-tx', Object.assign({
+          state: 'processing',
+          title: 'Submitting entry',
+          message: 'Awaiting wallet signature',
+          dismissible: false
+        }, props || {}));
+      }
+
+      // In-flow state change on the card that is already open. advance() patches
+      // props WITHOUT replacing the stack entry, so the specimen's x-data scope
+      // survives the transition. Guarded to a still-open onchain-tx card: a timer
+      // that fires after the user closed it must do nothing rather than patch
+      // whatever card happens to be on top now.
+      function advanceTx(patch) {
+        var cur = store().current();
+        if (!cur || cur.id !== 'onchain-tx' || cur._closing) return;
+        store().advance(patch);
+      }
+
+      var SUCCESS = {
+        state: 'success',
+        txSignature: SAMPLE_TX,
+        successTitle: 'Entry confirmed',
+        successSubtitle: 'Your entry is confirmed on-chain.',
+        ctaLabel: 'View wallet',
+        ctaHref: null,
+        dismissible: true
+      };
+      var FAILURE = {
+        state: 'error',
+        title: 'Submission failed',
+        errorMessage: 'Transaction simulation failed: insufficient SOL for rent.',
+        dismissible: true
+      };
+
+      // === Enter / leave simulator =====================================
+      // The demo vehicle is the always-registered email-change-pending card, so
+      // only the motion varies between runs.
+      var ANIM_DEMO_ID    = 'email-change-pending';
+      var ANIM_DEMO_PROPS = { currentEmail: 'you@example.com', newEmail: 'new@example.com' };
+
+      function animOpen(enterAnim, exitAnim) {
+        store().open(ANIM_DEMO_ID, Object.assign({}, ANIM_DEMO_PROPS, {
+          enterAnim: enterAnim, exitAnim: exitAnim
+        }));
+      }
+
+      // Open, let the entrance settle, then close so the chosen EXIT keyframe is
+      // what you watch. The hold is the entrance's own registry duration plus a
+      // beat, read from the live registry rather than assumed.
+      function animRoundTrip(enterAnim, exitAnim) {
+        animOpen(enterAnim, exitAnim);
+        var reg = window.ModalAnimations || { enter: {}, exit: {} };
+        var enterMs = ((reg.enter[enterAnim] || {}).ms) || 320;
+        setTimeout(function () { store().close(); }, enterMs + 700);
+      }
+
+      function el(id) { return document.getElementById(id); }
+
+      // Build the quick buttons and the dropdown options FROM THE LIVE REGISTRY.
+      // This is the property the section exists to demonstrate: a newly
+      // registered animation key grows a control here with no edit to this file.
+      // Idempotent — it clears each container first, so re-running on a Turbo
+      // visit cannot double the controls.
+      function buildAnimControls() {
+        var reg = window.ModalAnimations || { enter: {}, exit: {} };
+
+        var label = function (key) {
+          return key.charAt(0).toUpperCase() + key.slice(1) + (key === 'pop' ? ' (default)' : '');
+        };
+        var addOption = function (sel, key) {
+          if (!sel) return;
+          var o = document.createElement('option');
+          o.value = key;
+          o.textContent = label(key);
+          if (key === 'pop') o.selected = true;
+          sel.appendChild(o);
+        };
+        var addButton = function (container, key, onClick, suffix) {
+          if (!container) return;
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'btn btn-outline btn-sm';
+          b.textContent = label(key) + (suffix || '');
+          b.onclick = onClick;
+          container.appendChild(b);
+        };
+
+        var enterBtns = el('modal-anim-enter-buttons');
+        var exitBtns  = el('modal-anim-exit-buttons');
+        var enterSel  = el('modal-anim-enter-select');
+        var exitSel   = el('modal-anim-exit-select');
+
+        [enterBtns, exitBtns, enterSel, exitSel].forEach(function (node) {
+          if (node) node.innerHTML = '';
+        });
+
+        Object.keys(reg.enter || {}).forEach(function (key) {
+          addButton(enterBtns, key, function () { animOpen(key, 'pop'); }, ' ↗');
+          addOption(enterSel, key);
+        });
+        Object.keys(reg.exit || {}).forEach(function (key) {
+          addButton(exitBtns, key, function () { animRoundTrip('pop', key); });
+          addOption(exitSel, key);
+        });
+      }
+
+      // WHEN TO BUILD. window.ModalAnimations is published by the shared host's
+      // inline script, which a host layout may render AFTER this one — so the
+      // build waits for the rest of the body either way:
+      //   full load   — DOMContentLoaded, the host script has run by then;
+      //   Turbo visit — DOMContentLoaded already fired and never fires again, so
+      //                 fall through to a macrotask, which runs after the body
+      //                 swap finishes inserting its scripts.
+      // turbo:load covers the remaining visits; the build is idempotent, so the
+      // overlap between these paths is redundant work and nothing worse.
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', buildAnimControls);
+      } else {
+        setTimeout(buildAnimControls, 0);
+      }
+      if (!window.__dsAnimControlsBound) {
+        window.__dsAnimControlsBound = true;
+        document.addEventListener('turbo:load', buildAnimControls);
+      }
+
+      return {
+        // Stack behaviour
+        processing: function () { openTx({}); },
+        success:    function () { openTx(SUCCESS); },
+        error:      function () { openTx(FAILURE); },
+        processThenSuccess: function () {
+          openTx({ message: 'Awaiting RPC confirmation' });
+          setTimeout(function () { advanceTx(SUCCESS); }, 3000);
+        },
+        processThenError: function () {
+          openTx({ message: 'Awaiting RPC confirmation' });
+          setTimeout(function () { advanceTx(FAILURE); }, 3000);
+        },
+        dismissible: function () {
+          openTx({
+            dismissible: true,
+            title: 'Dismissible processing',
+            message: 'Escape and click-outside both close this one.'
+          });
+        },
+        fastWithHold: function () {
+          openTx({ title: 'Fast operation', message: 'Holding the spinner for at least 1500ms' });
+          window.StudioModals.holdAtLeast(1500).then(function () { advanceTx(SUCCESS); });
+        },
+        fastNoHold: function () {
+          openTx({ title: 'Fast operation', message: 'No hold, so this flashes past' });
+          setTimeout(function () { advanceTx(SUCCESS); }, 50);
+        },
+        stackTwo: function () {
+          openTx({
+            dismissible: true,
+            title: 'Bottom of the stack',
+            message: 'A second card is about to push in front of this one.'
+          });
+          setTimeout(function () {
+            store().open(ANIM_DEMO_ID, ANIM_DEMO_PROPS);
+          }, 700);
+        },
+
+        // Enter / leave simulator
+        animOpenSelected: function () {
+          animOpen(el('modal-anim-enter-select').value, el('modal-anim-exit-select').value);
+        },
+        animRoundTripSelected: function () {
+          animRoundTrip(el('modal-anim-enter-select').value, el('modal-anim-exit-select').value);
+        }
+      };
+    })();
+  </script>
 
 </section>
