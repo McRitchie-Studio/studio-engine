@@ -58,6 +58,41 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `Studio.draw_knowledge_routes` opt-in. Built for the Commercial Welding
   65-item diligence tracker; app-agnostic like the rest of the layer.
 
+- **The style guide grows the two modal simulators that review ENGINE
+  behaviour** — `#modals-motion-registry` ("Enter & leave animations") and
+  `#modals-stack-mechanics` ("Stack behaviour") in `style/_modals`. Both are
+  ported from turf-monster's `/admin/modals` gallery, which is being deleted:
+  the rest of that page was consumer showroom, but these two exercised engine
+  mechanics — the `window.ModalAnimations` registry, and the modal stack's
+  dismissibility / `holdAtLeast` / LIFO rules — and would have gone with it.
+
+  The motion section BUILDS ITS CONTROLS FROM THE LIVE REGISTRY at load
+  (a button and a dropdown option per registered key, per channel), so
+  registering a new animation surfaces it on the guide with no edit to the
+  page. That is the property the section exists for, and
+  `test/views/style_guide_modal_simulator_test.rb` pins it from both sides:
+  the containers must ship EMPTY, and the build must enumerate
+  `window.ModalAnimations` rather than a local literal.
+
+  The stack demos drive `$store.dsModals` and the guide's own `onchain-tx`
+  specimen directly. **One demo did not come across: "error with recovery."**
+  turf's `setRecovery(label, fn, { phantom })` is a method on that app's
+  legacy compatibility proxy and renders a recovery button on ITS `_onchain_tx`
+  card; the engine specimen's error state is `blocks/_card_header` plus a plain
+  Close, with no recovery affordance. Porting it would have meant designing a
+  new block into a shipped partial, so it was dropped rather than shimmed —
+  roughly half the ported demos drove that proxy, and none of them reference it
+  now (asserted).
+
+  **Both sections are graded in a browser**, because neither is observable from
+  the response bytes: `e2e/style_modal_simulators.spec.js` (7 specs) drives a new
+  `/lab/style_modals` lab page, which mounts the shared modal host exactly as a
+  consumer layout does — without it `window.ModalAnimations` is undefined, the
+  build produces no controls, and "the controls match the registry" would be
+  vacuously true at `0 == 0`. Each spec was verified RED against its own defect
+  reintroduced, with the lab server restarted between runs. The lane contract
+  moves 116 → 123 (`config/e2e_lane.yml`), re-derived with the lister.
+
 ### Changed
 
 - **`Gemfile.lock` resolves solana-studio 0.5.7, and a gate now keeps it there.** The lock had sat on **0.5.3 for four patch releases** while BOTH consumers shipped 0.5.7 (turf-monster `~> 0.5.3`, mcritchie-studio `~> 0.5`). Nothing was red and nothing could have been: engine CI installs with `bundler-cache: true`, so it resolves from the lock and never fresh — the drift does not self-correct and never surfaces as flakiness. It matters because `test/views/style_web3_specimens_test.rb` exists to prove "the style guide renders the REAL gem cards" and reads them off whatever the LOCK resolved; four versions behind, that guard certifies a card no consumer receives. It still passes — only its MEANING changes. MEASURED on this span, the gem's whole `app/` tree was byte-identical 0.5.3 → 0.5.7 (only `CHANGELOG.md`, `README.md` and `version.rb` differ), so this instance cost nothing, which is exactly why it went four releases unnoticed.
@@ -91,6 +126,22 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   later sees the same button in the same place.
 
 ### Fixed
+
+- **The style guide's page-scoped modal store now resolves animations through
+  the LIVE registry, so the guide can no longer disagree with itself.**
+  `style/_modals`' `dsModals` carried a hard-coded COPY of the animation table
+  while the new simulator builds its controls from `window.ModalAnimations`.
+  The two agreed today, which is exactly why this was invisible — but a
+  consumer registering a key would have grown a control from the registry that
+  the store then resolved back to `pop`: the button said "shake", the card
+  popped, and nothing reported the gap. Its `modalAnim` now reads
+  `window.ModalAnimations` at CALL time with the same late-binding guard the
+  shared host uses (unknown keys and a gutted registry still fall back to
+  `pop`, so a miss can never throw on `.ms` and strand a modal open); the local
+  table remains only as the fallback for a guide rendered without the host.
+  MEASURED in a browser both ways: registering a new key at runtime surfaces a
+  control AND plays it, and with this fix reverted the same key surfaces a
+  control that plays `modal-card-mount`.
 
 - **Onboarding no longer truncates a surname to fit a first name's cap.**
   `Studio::OnboardingController#first_name` measured the WHOLE typed answer with
