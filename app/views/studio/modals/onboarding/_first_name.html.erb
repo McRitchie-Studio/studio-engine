@@ -25,6 +25,18 @@
                   talking to a different audience — a host that passes its own
                   subtext still wins)
     placeholder — (default "Alex")
+    placeholder_names — OPTIONAL, and OFF unless passed: an array of first names,
+                  one of which is TYPED into the placeholder a character at a
+                  time, so the card demonstrates the answer instead of
+                  describing it. Absent (or empty) NONE of it is emitted and the
+                  static `placeholder` above is used exactly as before. Passed,
+                  `placeholder` goes unused: the field carries no static
+                  placeholder, because a value Alpine blanks a moment after
+                  paint reads as a flicker rather than a hint. Honours
+                  prefers-reduced-motion by showing the whole example
+                  statically, with no timer. The typing stops FOR GOOD the
+                  moment the user types — it never restarts, not even when they
+                  leave the field and come back.
     max_length  — (default Studio::FULL_NAME_MAX_LENGTH; the server stays the
                   real bound, and it REFUSES past that rather than truncating,
                   so a host raising this makes the endpoint answer 422 rather
@@ -32,9 +44,24 @@
     progress    — [current, total] to render the segmented pill, or nil for none
     modal_store — Alpine store name (default "modals"; the living style guide
                   mounts its own page-scoped host and passes "dsModals")
-    done_event  — window event dispatched with { next: [...] } when this step is
-                  finished, saved or skipped (default "onboarding-step-done").
+    done_event  — window event dispatched when this step is finished, saved or
+                  skipped (default "onboarding-step-done"). Its detail carries
+                  `{ next: [...], saved: true|false }` — see THE OUTCOME below.
                   The HOST decides what happens next; this partial never knows.
+
+  THE OUTCOME RIDES THE DETAIL, NOT A SECOND EVENT. `saved` says which path
+  finished the step, because to a host the two are not interchangeable:
+  turf-monster's entry gate resumes a contest entry the gate interrupted once
+  the name lands, and resuming after a SKIP resumes an entry that still has no
+  name. It is an extra detail key rather than an opt-in `saved_event` local for
+  two reasons. McRitchie Studio's listener wants BOTH paths — it retires the
+  "ask" marker whether the user answered or skipped — so the event that always
+  fires has to be the one carrying the answer, and a second event would leave
+  this one ambiguous for every host that did not opt in, including the next one
+  to add a gate. `next` keeps its key and its meaning, so an existing listener
+  does not move. And the flag is written `!!saved`: an unreported path reports
+  FALSE, because a card that claimed `saved: true` for a skip would be worse
+  than the ambiguity it replaced.
 
   CONTRACT WITH THE SERVER. Both endpoints answer JSON `{ ok: true, next: [...] }`
   — `next` being whatever steps the host says remain. A non-ok response must carry
@@ -59,6 +86,12 @@
                     end
   subtext     = local_assigns.fetch(:subtext, default_subtext)
   placeholder = local_assigns.fetch(:placeholder, "Alex")
+  # OFF unless a host passes a non-empty array. Normalised to nil so that an
+  # empty list behaves exactly like an absent local rather than emitting the
+  # whole typing machine for a pool it can never sample from.
+  placeholder_names = local_assigns.fetch(:placeholder_names, nil)
+  placeholder_names = nil if placeholder_names.nil? || placeholder_names.empty?
+  typed_placeholder = !placeholder_names.nil?
   max_length  = local_assigns.fetch(:max_length, Studio::FULL_NAME_MAX_LENGTH)
   progress    = local_assigns.fetch(:progress, nil)
   modal_store = local_assigns.fetch(:modal_store, "modals")
@@ -77,6 +110,68 @@
        firstName: '',
        submitting: false,
        error: '',
+<% if typed_placeholder %>
+       // --- the typed placeholder (opt-in: placeholder_names) ---------------
+       // Types ONE sampled name into the field's PLACEHOLDER, character by
+       // character. The field itself stays genuinely empty — nothing is ever
+       // submitted that the user did not type.
+       //
+       // NO fake caret. A blinking block after the text is the obvious way to
+       // sell a typewriter and it is wrong here: the field is focused on mount,
+       // so the browser is already drawing a real caret at position 0, and a
+       // second one two characters away reads as a rendering bug.
+       placeholderText: '',
+       _phPhrase: '',
+       _phTimer: null,
+       _phDelay: null,
+       _phBlurred: false,
+       startPlaceholder(names) {
+         if (!names || !names.length) return;
+         this._phPhrase = names[Math.floor(Math.random() * names.length)];
+         // Reduced motion: show the whole example, statically, no timer. The
+         // hint is the point; the animation is decoration.
+         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+           this.placeholderText = this._phPhrase;
+           return;
+         }
+         var self = this, i = 0;
+         this.placeholderText = '';
+         // WAIT FOR THE CARD TO LAND. The modal mounts with a 320ms spring and
+         // x-init fires at the START of it, so typing that begins immediately
+         // runs entirely underneath the entrance. A SHORT name is the common
+         // case and the worst one: a two-letter name finishes before the card
+         // has finished appearing, so the field simply arrives with a name
+         // already in it and the effect is invisible.
+         this._phDelay = setTimeout(function () {
+           self._phDelay = null;
+           self._phTimer = setInterval(function () {
+             i += 1;
+             self.placeholderText = self._phPhrase.slice(0, i);
+             if (i >= self._phPhrase.length) self.stopPlaceholder();
+           }, 110);
+         }, 420);
+       },
+       // Stop the timer, leaving whatever is on screen. Also kills the pre-roll,
+       // or dismissing DURING the delay lets the animation start after the user
+       // has already begun typing.
+       stopPlaceholder() {
+         if (this._phTimer) { clearInterval(this._phTimer); this._phTimer = null; }
+         if (this._phDelay) { clearTimeout(this._phDelay); this._phDelay = null; }
+       },
+       // The user is writing their own name — get out of the way. Clearing
+       // rather than completing is deliberate: a half-typed name frozen under
+       // their cursor looks broken. Nothing restarts it afterwards.
+       dismissPlaceholder() {
+         this.stopPlaceholder();
+         this.placeholderText = '';
+       },
+       // The mount focus is NOT engagement. This card focuses the field the
+       // moment it mounts, so treating ANY focus as the user choosing the field
+       // would kill the animation before it drew a character. Only a focus that
+       // FOLLOWS a blur is the user deliberately coming back.
+       markPlaceholderBlurred() { this._phBlurred = true; },
+       refocusPlaceholder() { if (this._phBlurred) this.dismissPlaceholder(); },
+<% end %>
        async save() {
          if (this.submitting) return;
          var value = (this.firstName || '').trim();
@@ -88,14 +183,14 @@
            this.error = (data && data.error) || 'Could not save that — try again.';
            return;
          }
-         this.finish(data.next || []);
+         this.finish(data.next || [], true);
        },
        async skip() {
          if (this.submitting) return;
          this.submitting = true; this.error = '';
          var data = await this.post('<%= skip_path %>', {});
          this.submitting = false;
-         this.finish((data && data.next) || []);
+         this.finish((data && data.next) || [], false);
        },
        async post(url, body) {
          var meta = document.querySelector('meta[name=csrf-token]');
@@ -112,11 +207,18 @@
            return await res.json();
          } catch (e) { return null; }
        },
-       finish(next) {
-         window.dispatchEvent(new CustomEvent('<%= done_event %>', { detail: { next: next } }));
+       finish(next, saved) {
+<% if typed_placeholder %>
+         this.stopPlaceholder();
+<% end %>
+         window.dispatchEvent(new CustomEvent('<%= done_event %>', { detail: { next: next, saved: !!saved } }));
          $store.<%= modal_store %>.close();
        }
      }"
+<% if typed_placeholder %>
+     data-placeholder-names="<%= placeholder_names.to_json %>"
+     x-init="startPlaceholder(JSON.parse($el.dataset.placeholderNames || '[]'))"
+<% end %>
      class="relative">
 
   <div class="relative mb-3 -mt-2">
@@ -144,9 +246,22 @@
       <%# Focused on open. The HTML autofocus attribute is not enough for a modal
           mounted from a <template x-if> after the document parsed, so Alpine does
           it; preventScroll keeps the mount animation from being yanked. %>
+      <%# The placeholder is STATIC unless the host passed placeholder_names, in
+          which case it is bound and typed. The three extra handlers are the
+          difference between a hint and a nuisance: real typing dismisses it, a
+          blur is recorded, and a focus AFTER that blur — the user deliberately
+          returning — dismisses it too. A bare focus must not, because the
+          x-init on this input fires one immediately. %>
       <input id="<%= field_id %>" type="text" x-model="firstName"
              maxlength="<%= max_length %>" autocomplete="given-name" enterkeyhint="done"
+<% if typed_placeholder %>
+             :placeholder="placeholderText"
+             @input="dismissPlaceholder()"
+             @blur="markPlaceholderBlurred()"
+             @focus="refocusPlaceholder()"
+<% else %>
              placeholder="<%= placeholder %>"
+<% end %>
              :disabled="submitting"
              x-init="$nextTick(() => $el.focus({ preventScroll: true }))"
              class="input-field">
