@@ -278,7 +278,17 @@ class E2eLaneContractTest < Minitest::Test
         "studio/cropper_assets", "studio/profiles/editable_identity",
         "studio/profiles/birthday_fields", "studio/profiles/name_fields",
         "studio/profiles/form_script"
-      ]
+      ],
+      # THE SHARED HOST IS NAMED HERE FOR A REASON THAT IS EASY TO DELETE BY
+      # ACCIDENT. window.ModalAnimations — the registry the guide's simulator
+      # enumerates to BUILD its controls — is published by studio/modals/_host,
+      # which consumers mount at LAYOUT level and which /admin/style therefore
+      # never renders itself. Drop that render from the lab page and the registry
+      # is undefined, the build produces zero controls, and the spec's
+      # "controls == registry" assertion passes at 0 == 0 over a section that
+      # painted nothing. The spec guards its own side with a `> 0`; this names
+      # the render that has to exist for it.
+      "style_modals.html.erb" => ["studio/modals/host", "style/modals"]
     }.each do |page, partials|
       source = File.read(File.join(lab, page))
 
