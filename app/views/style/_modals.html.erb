@@ -766,7 +766,7 @@
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%= render layout: "style/modal_specimen", locals: {
             label:     "First name",
-            reference: %(the shared onboarding first-name step (studio-engine studio/modals/onboarding/_first_name) — open with $store.dsModals.open('onboarding-first-name'). Posts to submit_path/skip_path (defaults /onboarding/first_name and /onboarding/skip_first_name) and dispatches its done_event with the steps the SERVER says remain),
+            reference: %(the shared onboarding first-name step (studio-engine studio/modals/onboarding/_first_name) — open with $store.dsModals.open('onboarding-first-name'). Posts to submit_path/skip_path (defaults /onboarding/first_name and /onboarding/skip_first_name) and dispatches its done_event with the steps the SERVER says remain. A host that GATES on the name passes required: true, which drops BOTH skip affordances and leaves the × merely closing — this specimen shows the default, skippable card),
             open_expr: "$store.dsModals.open('onboarding-first-name')",
             glow_when: ds_glow.call("onboarding-first-name")
           } do %>
