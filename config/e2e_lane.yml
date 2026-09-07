@@ -647,7 +647,16 @@
 # its three modes (skippable, gated, host-supplied copy). The contract counts TESTS, not
 # files. Re-derived on THIS tree with the lister, never by arithmetic:
 #   npx playwright test --list  -> 126 tests in 19 files
-total_specs: 126
+#
+# 2026-09-07: 126 -> 131, in the SAME file and with NO new file. The first-name
+# card's OTHER interpolated locals — submit_path, skip_path, done_event in JS
+# string position, modal_store in identifier position — get one spec each, plus one
+# for modal_store's third splice (the Ruby-built @click on the ×). One spec per
+# local is the point rather than tidiness: they are separate interpolations on
+# separate lines, so a card carrying all of them would go green the moment ANY one
+# was repaired. Re-derived on THIS tree with the lister, never by arithmetic:
+#   npx playwright test --list  -> 131 tests in 19 files
+total_specs: 131
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -697,7 +706,14 @@ total_specs: 126
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 126
 # executed = total - devnet - allowed_skips = 126 - 0 - 0 = 126, so executed ==
 # total_specs and the equality assertion holds.
-executed: 126
+# Re-derived once more on THIS tree with the lister when the first-name card's
+# remaining interpolated locals got their five specs — same file, no new file:
+#   npx playwright test --list                                             -> 131 tests, 19 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 131
+# executed = total - devnet - allowed_skips = 131 - 0 - 0 = 131, so executed ==
+# total_specs and the equality assertion holds.
+executed: 131
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

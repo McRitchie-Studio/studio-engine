@@ -491,4 +491,208 @@ class OnboardingFirstNameTest < ActiveSupport::TestCase
     assert_not_includes gated, "Skip for now"
     assert_includes gated, %(:placeholder="placeholderText")
   end
+
+  # --- THE REST OF THE x-data's LOCALS: one hazard, two different fixes -------
+  #
+  # empty_error above is the local that TAUGHT this file the hazard; it is not the
+  # only local inside the x-data. Four more are interpolated into that same
+  # double-quoted attribute, and they split into two shapes that must NOT be
+  # repaired the same way:
+  #
+  #   STRING position — submit_path, skip_path, done_event — each sits inside a JS
+  #     SINGLE-quoted literal, exactly as empty_error does. A bare ' closes the
+  #     literal, the whole expression becomes a SyntaxError, and Alpine mounts a
+  #     silent no-op that still renders every element. Fix: escape_javascript, in
+  #     the interpolated form, because escape_javascript(SafeBuffer) is html_safe?
+  #     and would skip ERB's own attribute escaping on the way out.
+  #
+  #   IDENTIFIER position — modal_store — is spliced in as a bare NAME:
+  #     `$store.<name>.current()`. The stray quote kills the same card, but
+  #     escaping is the WRONG repair — `$store.a\'b.current()` is not a rescued
+  #     identifier, it is a different SyntaxError reached a longer way. Fix: refuse
+  #     a value that is not an identifier.
+  #
+  # NO KNOWN TRIGGER TODAY. All four defaults are host constants — two paths, an
+  # event name, a store name — and none carries a character either repair touches,
+  # so the shipped card is byte-for-byte unmoved (the golden pin above says so).
+  # The guard exists because the failure is SILENT, and because empty_error
+  # established that host-supplied PROSE belongs in this attribute: the next local
+  # to carry an apostrophe will look like an ordinary change to whoever writes it.
+
+  # Every character that can end a JS single-quoted literal, or the double-quoted
+  # attribute wrapped around it, in one value.
+  HOSTILE_VALUE = %q(a'b"c\\d</script>e)
+
+  # Pull the JS single-quoted literal sitting between `before` and `after` out of
+  # the x-data the way a PARSER would: a literal ends at the first UNESCAPED ',
+  # and a backslash escapes whatever follows it.
+  #
+  # PINNING BOTH SIDES is what makes this a real check rather than a substring
+  # match. Drop the escaping and the value's own apostrophe ends the literal early,
+  # so the text after it is no longer the argument list the partial wrote and this
+  # returns nil — the test then reads "that call is not in the component", which is
+  # exactly what a browser would find.
+  JS_LITERAL = /'((?:[^'\\]|\\.)*)'/
+
+  def js_literal_between(x_data, before, after)
+    m = x_data.match(/#{Regexp.escape(before)}#{JS_LITERAL}#{Regexp.escape(after)}/m)
+    m && m[1]
+  end
+
+  # Undo the JS escaping, so each test can assert the host's value ARRIVED rather
+  # than assert it was escaped by the same function the partial calls — which would
+  # pass on any two matching mistakes.
+  def js_unescape(literal)
+    literal.gsub(/\\(u[0-9a-fA-F]{4}|.)/m) do
+      c = Regexp.last_match(1)
+      case c
+      when "n" then "\n"
+      when "r" then "\r"
+      when "t" then "\t"
+      when /\Au/ then [c[1..].to_i(16)].pack("U")
+      else c
+      end
+    end
+  end
+
+  def x_data_of(html)
+    Nokogiri::HTML::DocumentFragment.parse(html).at_css("[x-data]")["x-data"]
+  end
+
+  # The attribute half, read from the RAW markup and never from Nokogiri: an HTML
+  # parser terminates a double-quoted value at the first unescaped ", so the
+  # decoded string can never contain one and would pass on the very input this
+  # catches.
+  def assert_attribute_survives(html, local)
+    raw = html[/<div x-data="(.*?)"\s*\n\s*class=/m, 1]
+    assert raw.present?, "could not locate the x-data attribute — did the root element change?"
+    assert_not_includes raw, %("),
+                        "a double quote from #{local} closes x-data and kills the component"
+  end
+
+  test "submit_path arrives as a COMPLETE JS literal, hostile value and all" do
+    html = render_first_name(submit_path: HOSTILE_VALUE)
+
+    literal = js_literal_between(x_data_of(html), "this.post(", ", { first_name: value })")
+    assert literal, "the save's post() call is no longer parseable — the literal ended early"
+    assert_equal HOSTILE_VALUE, js_unescape(literal),
+                 "the path must arrive WHOLE: escaped, not truncated and not stripped"
+
+    assert_attribute_survives(html, "submit_path")
+  end
+
+  test "skip_path arrives as a COMPLETE JS literal, hostile value and all" do
+    # Asserted separately from submit_path on purpose. They are two interpolations
+    # on two lines, and a repair applied to one is silent about the other.
+    html = render_first_name(skip_path: HOSTILE_VALUE)
+
+    literal = js_literal_between(x_data_of(html), "this.post(", ", {})")
+    assert literal, "the skip's post() call is no longer parseable — the literal ended early"
+    assert_equal HOSTILE_VALUE, js_unescape(literal),
+                 "the path must arrive WHOLE: escaped, not truncated and not stripped"
+
+    assert_attribute_survives(html, "skip_path")
+  end
+
+  test "done_event arrives as a COMPLETE JS literal, hostile value and all" do
+    html = render_first_name(done_event: HOSTILE_VALUE)
+
+    literal = js_literal_between(x_data_of(html), "new CustomEvent(", ", { detail:")
+    assert literal, "the done event's dispatch is no longer parseable — the literal ended early"
+    assert_equal HOSTILE_VALUE, js_unescape(literal),
+                 "the event name must arrive WHOLE: escaped, not truncated and not stripped"
+
+    assert_attribute_survives(html, "done_event")
+  end
+
+  # ActionView wraps whatever a template raises, so unwrap to the error the partial
+  # actually raised.
+  def refusal_for(**locals)
+    render_first_name(**locals)
+    nil
+  rescue StandardError => e
+    e = e.cause while e.cause
+    e
+  end
+
+  test "modal_store is REFUSED when it is not an identifier — never escaped into one" do
+    # THE TRAP. This local is spliced in as a bare NAME, not a string, so the repair
+    # that rescues the three above BREAKS this one: escape_javascript turns `a'b`
+    # into `a\'b`, and `$store.a\'b.current()` is a different SyntaxError — the same
+    # dead card, reached a longer way. This test is what separates the two repairs:
+    # under escaping every value below renders happily and nothing raises.
+    #
+    # It refuses LOUDLY rather than falling back to the default store. A silent
+    # fallback is the worse of the two repairs: the card would mount, look perfect,
+    # and talk to a store that is not the host's — which is the SILENT-brick class
+    # this whole change exists to leave.
+    ["modals'x", %(modals"x), "modals.foo", "modals-x", "2modals", "mo dals", "",
+     "modals; alert(1)", "modals</script>"].each do |bad|
+      err = refusal_for(modal_store: bad)
+      assert_instance_of ArgumentError, err,
+                         "#{bad.inspect} is not a JS identifier and must be refused at render"
+      assert_includes err.message, "modal_store",
+                      "the refusal has to name the local a host would have to fix"
+    end
+  end
+
+  test "a valid store name is spliced in VERBATIM, at BOTH of its sites" do
+    # The other half. An identifier must arrive UNTOUCHED, and it lands twice —
+    # the props getter and finish()'s close() — so a repair applied to one line
+    # leaves the card half-wired.
+    x_data = x_data_of(render_first_name(modal_store: "ds_Modals$2"))
+
+    assert_includes x_data, "$store.ds_Modals$2.current()"
+    assert_includes x_data, "$store.ds_Modals$2.close()"
+    assert_not_includes x_data, "$store.modals",
+                        "a host that named its store may not be silently returned the default"
+  end
+
+  test "the required card's × closes the host's store through the same validation" do
+    # The THIRD site, and the one that is easy to miss: dismiss_action is built in
+    # Ruby ("$store.#{modal_store}.close()") and emitted into @click, which is a
+    # JS-evaluating attribute like x-data. One validation covers all three because
+    # it guards the SOURCE rather than each splice.
+    html = render_first_name(required: true, modal_store: "ds_Modals$2")
+    assert_includes html, "$store.ds_Modals$2.close()"
+
+    assert_instance_of ArgumentError, refusal_for(required: true, modal_store: "modals'x")
+  end
+
+  test "an html_safe local cannot smuggle a raw double quote past ERB" do
+    # THE WRAPPER IS LOAD-BEARING, and this is the only test that can prove it.
+    #
+    # escape_javascript(SafeBuffer) answers TRUE to html_safe?, so ERB SKIPS its own
+    # attribute-escaping half and the \" that escape_javascript produced arrives in
+    # the markup as a RAW " — which closes the double-quoted x-data and mounts the
+    # silent no-op. escape_javascript("#{value}") is not html_safe, because the
+    # interpolation strips the marking, so BOTH escapers run.
+    #
+    # Every other test in this section passes either way: a plain String local gets
+    # the same bytes from both forms, and a host only reaches this by handing over a
+    # SafeBuffer — a helper's return value, or a literal marked .html_safe. That is
+    # exactly how it would be reached by accident.
+    { submit_path: "/x?q=", skip_path: "/y?q=", done_event: "ev-" }.each do |local, prefix|
+      html = render_first_name(local => %(#{prefix}a"b).html_safe)
+      raw = html[/<div x-data="(.*?)"\s*\n\s*class=/m, 1]
+
+      assert raw.present?, "could not locate the x-data attribute"
+      assert_not_includes raw, %("),
+                          "an html_safe #{local} reached the attribute with ERB's escaping " \
+                          "skipped — wrap the value in \"\#{}\" before escape_javascript"
+    end
+  end
+
+  test "a store name the engine has never heard of is still admitted" do
+    # THE DECISION, written down: a PATTERN, not an allowlist. An allowlist would be
+    # the engine enumerating its own CONSUMERS — `modals` and the style guide's
+    # `dsModals` today — and the next app to mount a page-scoped host would be
+    # refused by the gem until a release admitted it. That is backwards for a shared
+    # primitive: a satellite would be blocked by its own dependency over a name.
+    #
+    # The real contract is narrower and stateless. The value is spliced into
+    # `$store.<name>`, so it must be a JS identifier — and WHICH identifier is none
+    # of the engine's business.
+    assert_includes render_first_name(modal_store: "turfModals"), "$store.turfModals"
+  end
 end

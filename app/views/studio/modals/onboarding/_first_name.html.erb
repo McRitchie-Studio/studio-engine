@@ -10,8 +10,11 @@
   This partial owns ONE step; the host owns the sequence.
 
   Locals (all optional, defaults via local_assigns.fetch):
-    submit_path — POST target for the name (default "/onboarding/first_name")
-    skip_path   — POST target for the skip  (default "/onboarding/skip_first_name")
+    submit_path — POST target for the name (default "/onboarding/first_name").
+                  Interpolated into the x-data, so it is JS-escaped on the way in
+                  — see THE TWO SHAPES below.
+    skip_path   — POST target for the skip  (default "/onboarding/skip_first_name").
+                  JS-escaped, same as submit_path.
     required    — hide the SKIP affordances (default false, which keeps today's
                   skippable card). The × then merely CLOSES and is labelled
                   Close, and the "Skip for now" button is not rendered. For a
@@ -48,9 +51,13 @@
                   than store a name nobody typed)
     progress    — [current, total] to render the segmented pill, or nil for none
     modal_store — Alpine store name (default "modals"; the living style guide
-                  mounts its own page-scoped host and passes "dsModals")
+                  mounts its own page-scoped host and passes "dsModals"). It lands
+                  in IDENTIFIER position, not string position, so it is VALIDATED
+                  rather than escaped and a value that is not a JS identifier
+                  raises ArgumentError at render — see THE TWO SHAPES below.
     done_event  — window event dispatched when this step is finished, saved or
-                  skipped (default "onboarding-step-done"). Its detail carries
+                  skipped (default "onboarding-step-done"). JS-escaped, same as
+                  submit_path. Its detail carries
                   `{ next: [...], saved: true|false }` — see THE OUTCOME below.
                   The HOST decides what happens next; this partial never knows.
 
@@ -78,6 +85,38 @@
   DOUBLE-QUOTED attribute — a single " anywhere inside it (a code comment
   included) closes it early and the whole component mounts as a silent no-op that
   still renders markup. Keep every inner string SINGLE-quoted.
+
+  THE TWO SHAPES — read this before adding a local to the x-data. Five locals are
+  interpolated into that attribute and they do NOT take the same repair. Getting
+  this wrong does not raise; it mounts a card that renders every element and does
+  nothing, which is why it is written down here rather than left to be noticed.
+
+    STRING position — empty_error, submit_path, skip_path, done_event — each sits
+      inside a JS SINGLE-quoted literal. A bare apostrophe closes the literal, the
+      expression becomes a SyntaxError, and the card is that silent no-op. Repair:
+      escape_javascript, in the INTERPOLATED form. The wrapper is load-bearing:
+      escape_javascript(SafeBuffer) answers true to html_safe, so ERB would skip
+      its own attribute-escaping half and a raw double quote could still close the
+      attribute. Wrapping the value in a plain interpolation first strips the safe
+      marking, so both escapers run.
+
+    IDENTIFIER position — modal_store — is spliced in as a bare NAME, at three
+      sites: the props getter, finish's close, and the Ruby-built dismiss_action
+      emitted into the x's click handler. Escaping is the WRONG repair here: an
+      escaped identifier is a different SyntaxError and the same dead card.
+      Repair: refuse a value that is not a JS identifier, which the Ruby block
+      below does once, at the source, so all three sites are covered.
+
+  A PATTERN, NOT AN ALLOWLIST, and the reason is worth keeping: an allowlist would
+  be this engine enumerating its own consumers, so the next app to mount a
+  page-scoped host would be refused by its own dependency until a gem release
+  admitted the name. The contract is narrower and stateless — it is spliced into
+  member-access position, so it must be an identifier, and which one is the host's
+  business.
+
+  NOTE THE SAME LOCAL TAKES THE OTHER REPAIR ELSEWHERE. blocks/_birthday and
+  blocks/_leveling_activity pass modal_store in STRING position and escape it,
+  correctly. The shape decides the repair, never the name of the local.
 %>
 <%
   submit_path = local_assigns.fetch(:submit_path, "/onboarding/first_name")
@@ -125,7 +164,58 @@
   max_length  = local_assigns.fetch(:max_length, Studio::FULL_NAME_MAX_LENGTH)
   progress    = local_assigns.fetch(:progress, nil)
   modal_store = local_assigns.fetch(:modal_store, "modals")
+  # VALIDATED, NOT ESCAPED — and that distinction is the whole point of this local.
+  # Every other value inside the x-data is a JS STRING and is repaired by escaping.
+  # This one is spliced in as a bare NAME (`$store.<name>.current()`), so the same
+  # repair breaks it: escape_javascript turns `a'b` into `a\'b`, and
+  # `$store.a\'b.current()` is not a rescued identifier, it is a different
+  # SyntaxError — the same silently dead card, reached a longer way.
+  #
+  # A PATTERN RATHER THAN AN ALLOWLIST, deliberately. An allowlist would be this
+  # engine enumerating its own CONSUMERS — "modals" and the style guide's
+  # "dsModals" today — so the next app to mount a page-scoped host would be refused
+  # by its own dependency until a gem release admitted the name. That is backwards
+  # for a shared primitive. The real contract is narrower and stateless: this is
+  # spliced into member-access position, so it must be a JS identifier, and WHICH
+  # identifier is none of the engine's business.
+  #
+  # ASCII IdentifierName, which is what member access after a dot accepts. It
+  # admits every store name a host would plausibly write and rejects every
+  # character that could leave identifier position — quote, apostrophe, backslash,
+  # dot, space, semicolon, angle bracket.
+  #
+  # IT RAISES RATHER THAN FALLING BACK TO THE DEFAULT. A silent fallback is the
+  # worse of the two repairs: the card would mount, look perfect, and talk to a
+  # store that is not the host's — which is the SILENT-brick failure class this
+  # guard exists to leave behind. A host sees this the first time it renders.
+  unless modal_store.to_s.match?(/\A[A-Za-z_$][A-Za-z0-9_$]*\z/)
+    raise ArgumentError,
+          "modal_store must be a JS identifier (it is spliced into $store.<name>); " \
+          "got #{modal_store.inspect}. Escaping it would not help — an escaped " \
+          "identifier is a different SyntaxError, and the card would mount dead."
+  end
   done_event  = local_assigns.fetch(:done_event, "onboarding-step-done")
+  # THE SAME HAZARD empty_error_js CARRIES, on the three remaining locals that land
+  # inside a JS SINGLE-quoted literal in the x-data below. A bare apostrophe in any
+  # of them closes its literal, the whole expression becomes a SyntaxError, and
+  # Alpine mounts the component as a SILENT NO-OP that still renders every element
+  # — perfect-looking markup, dead card.
+  #
+  # THE INTERPOLATED FORM IS LOAD-BEARING, not a style choice:
+  # escape_javascript(SafeBuffer).html_safe? is TRUE, so ERB would skip its own
+  # attribute-escaping half and a raw double quote could still close the
+  # double-quoted x-data. Wrapping in "#{}" first strips the html_safe marking, so
+  # both escapers run: escape_javascript for the JS literal, ERB for the attribute.
+  #
+  # INERT ON EVERY DEFAULT. Two paths, an event name and a store name carry no
+  # character either escaper touches, so the shipped card is byte-for-byte what it
+  # was — the golden-fixture pin in the view test says so. This is latent cover: no
+  # host supplies these as prose today, but empty_error established that prose does
+  # belong in this attribute, and the next local to carry an apostrophe will look
+  # like an ordinary change to whoever writes it.
+  submit_path_js = escape_javascript("#{submit_path}")
+  skip_path_js   = escape_javascript("#{skip_path}")
+  done_event_js  = escape_javascript("#{done_event}")
   field_id    = local_assigns.fetch(:id, "onboarding-first-name")
   # The × mirrors the skip affordance it sits beside: it SKIPS while the step is
   # skippable, and merely CLOSES once it is required. Resolved here rather than in
@@ -207,7 +297,7 @@
          var value = (this.firstName || '').trim();
          if (!value) { this.error = '<%= empty_error_js %>'; return; }
          this.submitting = true; this.error = '';
-         var data = await this.post('<%= submit_path %>', { first_name: value });
+         var data = await this.post('<%= submit_path_js %>', { first_name: value });
          this.submitting = false;
          if (!data || !data.ok) {
            this.error = (data && data.error) || 'Could not save that — try again.';
@@ -218,7 +308,7 @@
        async skip() {
          if (this.submitting) return;
          this.submitting = true; this.error = '';
-         var data = await this.post('<%= skip_path %>', {});
+         var data = await this.post('<%= skip_path_js %>', {});
          this.submitting = false;
          this.finish((data && data.next) || [], false);
        },
@@ -241,7 +331,7 @@
 <% if typed_placeholder %>
          this.stopPlaceholder();
 <% end %>
-         window.dispatchEvent(new CustomEvent('<%= done_event %>', { detail: { next: next, saved: !!saved } }));
+         window.dispatchEvent(new CustomEvent('<%= done_event_js %>', { detail: { next: next, saved: !!saved } }));
          $store.<%= modal_store %>.close();
        }
      }"
