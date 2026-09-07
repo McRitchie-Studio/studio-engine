@@ -24,6 +24,11 @@
                   follows `required`, because a card that cannot be skipped is
                   talking to a different audience — a host that passes its own
                   subtext still wins)
+    empty_error — the inline error shown when the field is submitted EMPTY. Like
+                  subtext, its default follows `required`: a card that renders no
+                  skip must not answer an empty field by offering one. Rendered
+                  INSIDE the x-data, so it is escaped for a JS single-quoted
+                  string on the way in — see CRITICAL below.
     placeholder — (default "Alex")
     placeholder_names — OPTIONAL, and OFF unless passed: an array of first names,
                   one of which is TYPED into the placeholder a character at a
@@ -85,6 +90,31 @@
                       "Just your first name — we use it to address you in emails."
                     end
   subtext     = local_assigns.fetch(:subtext, default_subtext)
+  # The inline error for an EMPTY field, resolved here for the same reason
+  # default_subtext is: `required` is known at render time, and a card that
+  # renders no skip button must not answer an empty field by offering one. It was
+  # a hard-coded literal until now, which is why a gated card told the user to
+  # skip for now and pointed at a button that is not on the page.
+  default_empty_error = if required
+                          "Enter your first name to continue."
+                        else
+                          "Enter your first name, or skip for now."
+                        end
+  empty_error = local_assigns.fetch(:empty_error, default_empty_error)
+  # ESCAPED FOR THE x-data, which is the hazard this local introduces: it is the
+  # first HOST-SUPPLIED PROSE to go inside that attribute, and prose has
+  # apostrophes. Interpolated raw, an error reading "We'll need a name" would
+  # close the JS single-quoted string, make the whole expression a SyntaxError,
+  # and mount the component as a SILENT NO-OP that still renders every element
+  # below. escape_javascript covers the apostrophe, the double quote, the
+  # backslash and the newline; the interpolation around it first strips any
+  # html_safe marking, because a safe string would skip ERB's own attribute
+  # escaping and could smuggle a raw double quote in — the exact failure the
+  # CRITICAL note above describes.
+  #
+  # INERT ON BOTH DEFAULTS. Neither default string contains a character either
+  # escaper touches, so the shipped card is byte-for-byte what it was.
+  empty_error_js = escape_javascript("#{empty_error}")
   placeholder = local_assigns.fetch(:placeholder, "Alex")
   # OFF unless a host passes a non-empty array. Normalised to nil so that an
   # empty list behaves exactly like an absent local rather than emitting the
@@ -175,7 +205,7 @@
        async save() {
          if (this.submitting) return;
          var value = (this.firstName || '').trim();
-         if (!value) { this.error = 'Enter your first name, or skip for now.'; return; }
+         if (!value) { this.error = '<%= empty_error_js %>'; return; }
          this.submitting = true; this.error = '';
          var data = await this.post('<%= submit_path %>', { first_name: value });
          this.submitting = false;

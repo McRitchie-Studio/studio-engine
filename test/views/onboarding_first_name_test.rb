@@ -242,6 +242,92 @@ class OnboardingFirstNameTest < ActiveSupport::TestCase
                     "For your receipts."
   end
 
+  # --- empty_error: the inline validation copy --------------------------------
+  #
+  # THE DEFECT. The empty-field error was a hard-coded literal inside the x-data,
+  # so a GATED card — which renders no skip affordance at all — told the user to
+  # "skip for now" and pointed at a button that is not on the page.
+  #
+  # NOT A REGRESSION, and it must not be filed as one. turf-monster's own card
+  # carried the identical unconditional line while ALREADY supporting required, so
+  # adopting this partial moved nothing a user could see. The string was simply
+  # never parameterised, in any released version — which is also why no consumer
+  # can be overriding it today, and why adding the local can break none of them.
+  #
+  # Resolved at RENDER time from `required`, exactly as default_subtext is, so a
+  # host that passes nothing still gets copy that matches the card in front of it.
+
+  test "the empty-field error follows required, and a host still outranks both" do
+    assert_includes render_first_name, "Enter your first name, or skip for now.",
+                    "the skippable card keeps today's wording"
+
+    gated = render_first_name(required: true)
+    assert_includes gated, "Enter your first name to continue."
+    assert_not_includes gated, "Enter your first name, or skip for now.",
+                        "a gated card renders no skip, so its error may not offer one"
+
+    assert_includes render_first_name(empty_error: "Your name, please."),
+                    "Your name, please."
+    assert_includes render_first_name(required: true, empty_error: "Your name, please."),
+                    "Your name, please."
+  end
+
+  test "a gated card offers no skip ANYWHERE, copy included" do
+    # The property each of the four string sites was missing a piece of, asserted
+    # once over the whole card instead of site by site.
+    #
+    # Scanned for the human OFFER, never for bare "skip": the x-data still DEFINES
+    # async skip() in both modes and the skip ENDPOINT is still configured, so a
+    # bare substring would fail on plumbing the user never sees.
+    gated = render_first_name(required: true).downcase
+    assert_equal 0, gated.scan("skip for now").size,
+                 "the gate offers no way past the wall — not as a button, not as copy"
+
+    # THE CONTROL. Every assertion above also passes on a card that lost the skip
+    # path entirely, so pin what the SKIPPABLE card still says — and it says it
+    # twice, which is the whole point: the button and the error line are two sites.
+    default = render_first_name.downcase
+    assert_equal 2, default.scan("skip for now").size,
+                 "the skippable card offers it twice — the button, and the empty-field error"
+  end
+
+  test "a host's apostrophe is escaped INTO the x-data, not through it" do
+    # empty_error is the first HOST-SUPPLIED PROSE to land inside the x-data, and
+    # prose has apostrophes. It is interpolated into a JS SINGLE-quoted literal, so
+    # a bare ' closes that literal, the whole expression is a SyntaxError, and
+    # Alpine mounts the component as a SILENT NO-OP that still renders markup —
+    # every string assertion above would stay green over a dead card.
+    #
+    # Read the DECODED attribute: that is the source text the browser hands Alpine.
+    html = render_first_name(empty_error: %(We'll need your first name.))
+    x_data = Nokogiri::HTML::DocumentFragment.parse(html).at_css("[x-data]")["x-data"]
+
+    assert_includes x_data, %(We\\'ll need your first name.),
+                    "the apostrophe must reach Alpine escaped"
+    assert_not_includes x_data, %(We'll),
+                        "a bare apostrophe closes the JS string and kills the component"
+  end
+
+  test "a host's double quote cannot close the x-data attribute" do
+    # The same guard the default card carries, aimed at the one local that now
+    # carries free text. Read the RAW markup, NEVER Nokogiri's parsed attribute: an
+    # HTML parser terminates a double-quoted value at the first unescaped `"`, so
+    # the parsed string can never contain one and the assertion would pass on the
+    # exact input it exists to catch.
+    html = render_first_name(empty_error: %(Type the name on your ID, e.g. "Sam".))
+    x_data = html[/<div x-data="(.*?)"\s*\n\s*class=/m, 1]
+
+    assert x_data.present?, "could not locate the x-data attribute"
+    assert_not_includes x_data, %("),
+                        "a double quote inside x-data kills the component in the browser"
+
+    # And it must still ARRIVE — escaped, not dropped. A fix that merely STRIPPED
+    # the quote would satisfy the guard above and silently rewrite a host's copy.
+    decoded = Nokogiri::HTML::DocumentFragment.parse(html).at_css("[x-data]")["x-data"]
+    assert_includes decoded, %(e.g. \\"Sam\\".),
+                    "the quote reaches Alpine escaped, not removed"
+  end
+
   # --- the OUTCOME: which path finished the step ------------------------------
   #
   # THE BLOCKER this partial had for turf-monster. `finish` is called by BOTH the
