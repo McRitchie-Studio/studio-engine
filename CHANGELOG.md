@@ -8,8 +8,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 - **The first-name card now says WHICH path finished it, and can type its
   placeholder.** Two adoption hooks on
-  `studio/modals/onboarding/_first_name`, so turf-monster can retire its own
-  240-line copy.
+  `studio/modals/onboarding/_first_name`, aimed at turf-monster's own 240-line
+  copy of it.
+
+  **WHAT THIS DOES NOT DO.** It unblocks that adoption; it does not complete it,
+  and the copy cannot simply be deleted on this release. `required` is still
+  resolved at RENDER time, while turf drives it as a runtime prop from ONE
+  registered modal id — the post-auth chain opens that id skippable, the entry
+  gate opens the SAME id with `required: true` — so adopting still costs two
+  registered ids (pass a distinct `id:` to keep the field's DOM id unique) or a
+  runtime mode here. And the host still writes the bridge: this card touches no
+  session store and emits no `first-name-saved`, so turf's resume needs a
+  listener that does both when `saved` is true.
 
   **THE OUTCOME (the blocker).** `finish()` is called by the save AND the skip,
   and it dispatched the same detail either way — so a host could hear that the
