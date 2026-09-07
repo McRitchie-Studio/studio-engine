@@ -484,6 +484,9 @@ Your own ids are already registered there, so
 `$store.modals.open(id, props)` renders the **real** card, in production chrome,
 with production behavior. There is nothing to mirror and no second registration
 list to keep in sync — building one is the mistake this note exists to prevent.
+This assumes your layout mounts the shared host. Not every consuming app does
+(see "Page-scoped hosts" above); where none is mounted `$store.modals` is
+undefined, so mount `studio/modals/host` before writing a trigger.
 
 Full contract, including what the partial may assume: the doc comment at the top
 of `app/views/style/_host.html.erb`.

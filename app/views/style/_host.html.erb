@@ -51,8 +51,14 @@
      - Alpine is running and this section carries an x-data scope, so a
        specimen can use x-on / at-click bindings directly. A plain onclick
        calling Alpine.store works too.
-     - The app's layout has ALREADY mounted the shared modal host on
-       Alpine.store("modals"), because this page renders inside that layout.
+     - NOT that a shared modal host exists. Only an app whose layout renders
+       studio/modals/host has Alpine.store("modals") at all: mcritchie-studio
+       and turf-monster mount it; acquisition-studio, mcritchie-industries and
+       moms-app render none (the same split README's "Page-scoped hosts" and
+       studio/emails/index.html.erb already name). On an app with no shared
+       host $store.modals is UNDEFINED and a trigger throws on click, so mount
+       studio/modals/host in the layout first - or give the page its own host
+       with studio/modals/scoped_host and drive that instead.
 
 
      WHICH STORE IT DRIVES - read this before writing a trigger
