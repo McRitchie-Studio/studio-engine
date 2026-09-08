@@ -34,9 +34,19 @@
   <% if id.present? %>id="<%= id %>"<% end %>
   x-cloak
   x-show="<%= open %>"
-  <%= %(#{outside_action.present? ? "@click.outside=\"#{outside_action}\"" : ""}).html_safe %>
-  <%= %(#{escape_action.present? ? "@keydown.escape.window=\"#{escape_action}\"" : ""}).html_safe %>
-  <%= %(#{close_action.present? ? "@turbo:before-cache.window=\"#{close_action}\"" : ""}).html_safe %>
+  <%# THE THREE DISMISSAL HANDLERS, EMITTED BY tag.attributes. Each was built as
+      %(@name="#{action}").html_safe — the attribute's OWN quotes assembled in Ruby
+      and then marked safe, which is the one shape ERB's escaping can never reach. A
+      double quote in any of the three actions closed the attribute and everything
+      after it became markup on the panel's root element.
+
+      The actions stay html_safe: they are Alpine EXPRESSIONS the host wrote (see the
+      @click at the close button below, and `open` above). tag_option's
+      gsub('"', "&quot;") runs on the finished value whether or not it is marked, so
+      the expression reaches Alpine unchanged and cannot end the attribute. %>
+  <%= tag.attributes("@click.outside": outside_action.html_safe) if outside_action.present? %>
+  <%= tag.attributes("@keydown.escape.window": escape_action.html_safe) if escape_action.present? %>
+  <%= tag.attributes("@turbo:before-cache.window": close_action.html_safe) if close_action.present? %>
   x-transition:enter="transition ease-out duration-300"
   x-transition:enter-start="translate-x-full"
   x-transition:enter-end="translate-x-0"

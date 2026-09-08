@@ -41,8 +41,27 @@
   # JS sides of the convention agree on the same floor.
   min_duration = local_assigns[:min_duration] || 1400
   resolve_expr = local_assigns[:resolve_expr]
+
+  # THE AUTO-RESOLVE PAIR, ENCODED RATHER THAN ASSEMBLED. This line used to build
+  # ` x-data="{}" x-init="…"` as one html_safe String, quotes and all, so ERB had
+  # nothing left to escape: a double quote in EITHER local — min_duration as much as
+  # resolve_expr, since min_duration is interpolated raw and only its GUARD calls
+  # .to_i — closed the attribute and turned the remainder into markup.
+  #
+  # tag.attributes writes the quotes instead. The x-init value stays html_safe
+  # because it is CODE the caller handed us, and tag_option's unconditional
+  # gsub('"', "&quot;") still fires on an html_safe value, so the JS arrives intact
+  # and the attribute cannot end early. safe_join supplies the separating space
+  # without a second hand-marked String.
+  resolve_attrs =
+    if resolve_expr
+      safe_join([" ", tag.attributes(
+        "x-data": "{}",
+        "x-init": "window.StudioModals.holdAtLeast(#{min_duration}).then(() => { #{resolve_expr} })".html_safe
+      )])
+    end
 %>
-<div class="text-center py-6"<%= " x-data=\"{}\" x-init=\"window.StudioModals.holdAtLeast(#{min_duration}).then(() => { #{resolve_expr} })\"".html_safe if resolve_expr %>>
+<div class="text-center py-6"<%= resolve_attrs %>>
   <div class="mx-auto <%= spinner_class %> rounded-full border-<%= color %>/30 border-t-<%= color %> animate-spin mb-5"></div>
   <% if local_assigns[:title_key] %>
     <p class="text-base font-bold text-heading mb-1" x-text="<%= title_key %>"></p>
