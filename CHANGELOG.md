@@ -185,6 +185,61 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Changed
 
+- **The pinned stack composes itself, and publishes in the frame the change
+  happened.** `data-pin` layers now also publish `--pin-stack-bottom` (the bottom
+  of the whole stack) and `--pin-<name>-top` (the bottom of everything above that
+  layer), and the publisher writes them from inside its ResizeObserver callback
+  rather than deferring to `requestAnimationFrame`.
+
+  **THE DEFECT.** A frame runs `rAF -> style/layout -> ResizeObserver -> paint`,
+  so a write made in the frame callback lands at the top of the NEXT frame. Every
+  frame in which a pinned layer appeared or disappeared therefore painted with the
+  previous frame's number. Measured in isolation by toggling a layer's `display`
+  and sampling what the changing frame paints: rAF-deferred wrong on 8/8 changing
+  frames, synchronous wrong on 0/8. On mcritchie-studio's production
+  `/deployments` it showed as the board's swim-lane headers slamming 99px and back
+  on a page nobody was touching — parked at a fixed scroll offset with document
+  height, row position and nav height all constant, the header's `top` went
+  152 -> 53 -> 152 -> 53px in 240ms behind two Turbo broadcasts.
+
+  **AND CONSUMERS NO LONGER COMPOSE THE STACK.** `top: max(var(--pin-nav-bottom),
+  var(--pin-apps-bottom))` fails twice: it does not scale, because a fourth layer
+  means editing every consumer that ever wanted to sit under the stack; and it is
+  not sound, because a `max()` over two custom properties is only meaningful if
+  they were written in the same frame. `--pin-stack-bottom` is one value that
+  cannot disagree with itself. A layer that is ITSELF in the stack reads
+  `--pin-<name>-top` instead, which excludes its own edge — positioning off the
+  stack bottom would make it chase itself down the page. Stacking order is
+  document order, with `data-pin-order` overriding it for a layer whose DOM
+  position does not match where it sits on screen.
+
+  **THE REGISTRY IS DERIVED PER PUBLISH, never cached.** A Turbo Stream replaces a
+  pinned layer's node without a `turbo:load`, and a held reference then points at
+  the DETACHED predecessor, whose rect is all zeros — indistinguishable from a
+  layer that is legitimately hidden. Re-querying makes the stale reference
+  impossible rather than merely unlikely.
+
+  **THE COST, re-measured**, because the rule this reverses was itself justified by
+  a measurement (turf-monster, 6x CPU throttle, frames over 20ms 13/24 through the
+  collapse ramp vs 0/24 once the observer was coalesced). What was expensive there
+  was read-write thrash, not the observer: the publisher now takes one read pass
+  and one write pass per invocation, and in an RO callback layout is already clean,
+  so those reads force nothing. On the engine lab at the same 6x throttle, ~700
+  frames of ramp each way — `RO through rAF` median 8.3ms / p90 10.0ms / 0 frames
+  over 20ms; `RO synchronous` median 8.4-8.5ms / p90 11.0ms / 3-6 frames over 20ms;
+  ZERO frames over 32ms on either, so neither drops one.
+
+  **BACK-COMPAT.** `--nav-h`, `--nav-bottom` and `--pin-<name>-h` /
+  `--pin-<name>-bottom` publish exactly as before, from the same measurements, so
+  the 26 consumers across turf-monster, rolio and mcritchie-studio need no change
+  and no floor bump. A structural change (a Turbo patch, a fresh document, a layer
+  joining or leaving) now forces a full write, because the unchanged-write skip is
+  only safe while nothing else touches these properties — the lab caught
+  `--nav-h` staying empty through a re-scan on exactly the host-owned-header path
+  both live consumers use. The lane contract moves 131 -> 132
+  (`config/e2e_lane.yml`), re-derived with the lister.
+
+
 - **`Gemfile.lock` resolves solana-studio 0.5.7, and a gate now keeps it there.** The lock had sat on **0.5.3 for four patch releases** while BOTH consumers shipped 0.5.7 (turf-monster `~> 0.5.3`, mcritchie-studio `~> 0.5`). Nothing was red and nothing could have been: engine CI installs with `bundler-cache: true`, so it resolves from the lock and never fresh — the drift does not self-correct and never surfaces as flakiness. It matters because `test/views/style_web3_specimens_test.rb` exists to prove "the style guide renders the REAL gem cards" and reads them off whatever the LOCK resolved; four versions behind, that guard certifies a card no consumer receives. It still passes — only its MEANING changes. MEASURED on this span, the gem's whole `app/` tree was byte-identical 0.5.3 → 0.5.7 (only `CHANGELOG.md`, `README.md` and `version.rb` differ), so this instance cost nothing, which is exactly why it went four releases unnoticed.
 - **The constraint stays `>= 0.5.3`, deliberately.** 0.5.3 is a real FLOOR (0.5.2 shipped the credential partial without `solana_studio/modals/_wallet_connect`, which the web3 capability gate requires). Above it this engine claims no ceiling: it is the BASE half of the base/bolt-on split, and a pessimistic `~> 0.5.3` here would be NARROWER than mcritchie-studio's own `~> 0.5` — a dev-only dependency constraining a resolution it does not own. The defect was the LOCK, not the pin, so the fix is a gate rather than a tighter pin.
 - **`bin/gem-drift-check`** — fails when this engine's lock resolves a tracked gem OLDER than a consumer's, wired into `consumer-ci.yml` after the consumer bundle install. That lane is the only place two repos' lockfiles exist at once (engine at `studio/`, consumer beside it); `test/lib/consumer_ci_shard_contract_test.rb` records the same constraint for its own cross-repo contract. Direction is ONE-WAY on purpose: engine behind FAILS, engine level or ahead passes (the engine is the producer and may test an unreleased gem), and a consumer bundling no tracked gem is a SKIP, not a failure — `mcritchie_industries` is the base half working as designed. Stdlib-only, and it names its one-command remedy (`bundle update solana-studio`) in the failure.
