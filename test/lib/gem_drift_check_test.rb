@@ -84,9 +84,34 @@ class GemDriftCheckTest < Minitest::Test
     out, err, code = run_check(lock(solana: "0.5.3"), { "turf_monster" => lock(solana: "0.5.7") })
 
     assert_equal 1, code, "engine behind a consumer must FAIL — this is the whole gate"
-    assert_includes out, "engine 0.5.3 TRAILS turf_monster 0.5.7"
+    assert_includes out, "engine 0.5.3 is behind the released 0.5.7"
+    assert_includes out, "seen in turf_monster's lock"
     assert_includes err, "bundle update solana-studio",
       "a gate that fails without naming its one-command remedy costs the next reader the finding"
+  end
+
+  def test_the_failure_names_the_released_gem_as_the_target_not_the_consumer
+    # WORDING IS LOAD-BEARING HERE. The gate compares two lockfiles because those
+    # are the only facts on disk — it is stdlib-only and makes no network call,
+    # a property its header defends on purpose. But that mechanism is not the
+    # invariant: the engine's obligation is to resolve the latest RELEASED
+    # solana-studio, and turf_monster is only the messenger that makes a newer
+    # release visible. A message phrased as "the engine trails its own
+    # consumers" sends the reader to the wrong model, and from there to the
+    # wrong fix — chasing a consumer instead of the registry.
+    out, err, code = run_check(lock(solana: "0.5.3"), { "turf_monster" => lock(solana: "0.5.7") })
+    assert_equal 1, code
+
+    combined = out + err
+    assert_includes combined, "RELEASED",
+      "the message must name the released gem as the thing being trailed"
+    assert_includes combined, "messenger",
+      "the message must say the consumer is the messenger, not the target"
+    assert_includes combined, "https://rubygems.org/gems/solana-studio",
+      "the message must point at the registry — the only place the real latest can be confirmed"
+
+    refute_match(/TRAILS its own consumers/, combined,
+      "the old framing named the consumer as the target and must not come back")
   end
 
   def test_the_engine_level_with_its_consumers_passes
@@ -109,7 +134,10 @@ class GemDriftCheckTest < Minitest::Test
       { "mcritchie_industries" => lock(solana: nil), "turf_monster" => lock(solana: "0.5.7") }
     )
     assert_equal 1, code
-    assert_includes err, "turf_monster 0.5.7"
+    # The failing consumer must still be NAMED — it is the messenger, and a
+    # reader who cannot see which lock carried the evidence cannot check it.
+    assert_includes err, "0.5.7 is released"
+    assert_includes err, "observed in turf_monster's lock"
   end
 
   # --- the parse, against its own decoys ------------------------------------

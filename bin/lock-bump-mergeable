@@ -1,0 +1,226 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Decides whether ONE Dependabot pull request may merge itself with no human.
+#
+# WHY THIS EXISTS. studio-engine's Gemfile.lock trails the released
+# solana-studio, repeatedly and measurably: five times on 2026-09-07 alone,
+# lagging v0.5.7 by 3h, v0.6.0 by 2h20m, v0.6.1 by 14h15m and v0.7.0 by 1h10m.
+# The decisive datum is the last one — the 0.6.1 fix landed at 15:59 and v0.7.0
+# was tagged at 16:35, so the lock went stale 36 MINUTES after being committed.
+# bin/gem-drift-check reddens EVERY open engine PR while that is true, so the
+# cost falls on PR authors who never touched the line.
+#
+# WHY IT IS SCOPED THIS TIGHTLY. Dependabot is already installed in
+# mcritchie-studio and turf-monster, where it has opened 22 PRs since 2026-08-14
+# with ZERO merged. Dropping an unscoped config into this repo buys a 23rd. Two
+# properties make solana-studio the exception, and both are why auto-merge is
+# defensible here and nowhere else yet:
+#
+#   GATED      — bin/gem-drift-check already fails the build on this exact
+#                drift, so unlike a third-party bump it cannot rot quietly.
+#   FIRST-PARTY— we author and release the gem, and consumer-ci.yml runs three
+#                consumers' full suites against it before any of this is asked.
+#
+# The graveyard next door is third-party MAJOR bumps that legitimately need a
+# human to read a changelog. Nothing here touches those.
+#
+# WHY IT IS A SCRIPT AND NOT A WORKFLOW `if:`. These four conditions are the
+# whole safety argument, and a condition living in a YAML expression can only be
+# tested by reading it — a test that asserts a string is present is not the same
+# claim as "this rejects a multi-file PR". Here every condition is executed, and
+# test/lib/lock_bump_mergeable_test.rb kills a mutation to any one of them.
+#
+# WHAT HAPPENS ON A GENUINELY BREAKING BUMP — the designed degradation, and the
+# floor this must never drop below. A breaking bump satisfies conditions 1-3
+# exactly and fails 4 (CI is red). This exits 1, the workflow does nothing, and
+# the PR SITS OPEN AND RED. bin/gem-drift-check goes on reddening other engine
+# PRs, so a human is pulled in within one PR cycle — which is precisely today's
+# behaviour. This feature can be slower than a human, never quieter.
+#
+# ALL FOUR CONDITIONS ARE ANDed. Each is reported separately rather than
+# short-circuiting, so a refusal names every reason it refused and a reader is
+# never left re-running the gate to discover the second problem.
+#
+# Stdlib only, and no network: it is handed facts and returns a verdict. The
+# workflow owns every API read, so this file can be certified on a laptop with
+# no token, no checkout of anything, and no GitHub at all.
+#
+# Usage:
+#   bin/lock-bump-mergeable < payload.json
+#
+# The payload is a JSON object with FOUR required keys — a missing key is a
+# broken caller and exits 64, never an empty value that quietly satisfies a
+# condition:
+#
+#   author  String  the PR author's login, e.g. "dependabot[bot]"
+#   files   Array   every path the PR changes
+#   diff    String  the PR's unified diff
+#   checks  Array   [{ "name":.., "status":.., "conclusion":.. }, ..]
+#
+# Exit 0 merge it; 1 refused (the reasons are on stderr); 64 malformed input.
+
+require "json"
+
+# The gem this repo automates, and the ONLY one. Kept in step with the TRACKED
+# list in bin/gem-drift-check and with the `allow` block in
+# .github/dependabot.yml — three files, one scope, on purpose.
+GEM_NAME = "solana-studio"
+
+# The resolved-spec form as it appears in a Gemfile.lock and therefore in a
+# diff: the gem name followed by a space and an open paren. Matching the bare
+# name would also match a DEPENDENCIES constraint line or a sub-dependency.
+LINE_MARKER = "#{GEM_NAME} ("
+
+# A check that ran and did not fail. SKIPPED is included deliberately: it is how
+# a path-filtered lane reports itself, and the e2e lane is path-filtered on
+# purpose (docs/E2E_LANE.md). Treating it as red would make this gate inert
+# while looking strict — refusing every PR for a reason no reader would find.
+GREEN_CONCLUSIONS = %w[SUCCESS SKIPPED NEUTRAL].freeze
+
+# How many off-scope diff lines to quote in a refusal before summarising the
+# rest as a count. A wholesale `bundle update` (or a PR that is not a lock bump
+# at all) can put hundreds of lines here, and quoting them all buries the other
+# refusal reasons in the workflow log.
+SAMPLE_LINES = 5
+
+def bail_usage(message)
+  warn "lock-bump-mergeable: #{message}"
+  exit 64
+end
+
+raw = $stdin.read
+begin
+  payload = JSON.parse(raw)
+rescue JSON::ParserError => e
+  bail_usage "stdin is not valid JSON (#{e.class}). " \
+             "The workflow builds this payload; a parse failure means the API read broke."
+end
+
+bail_usage "payload must be a JSON object, got #{payload.class}" unless payload.is_a?(Hash)
+
+# PROVE THE INPUT before trusting any answer derived from it. A missing key
+# defaulted to nil/[] would satisfy the very conditions it fails to describe:
+# absent `files` reads as "no disallowed files", absent `checks` as "nothing
+# failed". Both are vacuous passes, and both are the shape of defect this
+# codebase finds most often.
+%w[author files diff checks].each do |key|
+  bail_usage "payload is missing the #{key.inspect} key — a missing key is a broken " \
+             "caller, not an empty value" unless payload.key?(key)
+end
+
+author = payload["author"]
+files  = payload["files"]
+diff   = payload["diff"]
+checks = payload["checks"]
+
+bail_usage "author must be a String, got #{author.class}" unless author.is_a?(String)
+bail_usage "files must be an Array, got #{files.class}"    unless files.is_a?(Array)
+bail_usage "diff must be a String, got #{diff.class}"      unless diff.is_a?(String)
+bail_usage "checks must be an Array, got #{checks.class}"  unless checks.is_a?(Array)
+
+refusals = []
+
+# --- Condition 1: the author is EXACTLY the bot -------------------------------
+#
+# Exact, never a substring: a substring test would accept an
+# attacker-registered `not-dependabot[bot]`. A human PR that happens to touch
+# only the lock is a person doing something deliberate, and auto-merging it
+# would merge unreviewed human code — a strictly larger blast radius than the
+# drift this removes.
+unless author == "dependabot[bot]"
+  refusals << "author is #{author.inspect}, not \"dependabot[bot]\" — only the bot's own " \
+              "lock bumps auto-merge; a human PR is reviewed like any other"
+end
+
+# --- Condition 2: the changed file set is EXACTLY [Gemfile.lock] --------------
+#
+# Equality, not inclusion. "Gemfile.lock is among the changed files" is true of
+# a PR that also rewrites lib/, and an EMPTY list satisfies every subset-style
+# phrasing while describing a failed API read.
+unless files == ["Gemfile.lock"]
+  refusals << "changed files are #{files.inspect}, not exactly [\"Gemfile.lock\"] — a PR that " \
+              "touches anything else is not a lock bump (an empty list means the file read failed)"
+end
+
+# --- Condition 3: every changed LINE is the solana-studio resolution ----------
+#
+# The file set can be exactly [Gemfile.lock] while the CONTENT is a wholesale
+# `bundle update`. Scan the diff's changed lines and require every one of them
+# to be the tracked gem's resolved spec.
+#
+# The `+++ `/`--- ` FILE HEADERS start with + and - and are not changed content.
+# Counting them would refuse every real PR — the gate would be permanently
+# inert while presenting as strict, which is worse than being absent.
+changed_lines = diff.lines.map(&:chomp).reject do |line|
+  line.start_with?("+++ ", "--- ")
+end.select do |line|
+  line.start_with?("+", "-")
+end
+
+if changed_lines.empty?
+  refusals << "the diff contains no changed lines at all — that is a failed read of the diff, " \
+              "not an approval to merge"
+else
+  off_scope = changed_lines.reject { |line| line.include?(LINE_MARKER) }
+  unless off_scope.empty?
+    # BOUNDED, and the COUNT is always stated. Measured against real PR #285 on
+    # 2026-09-07: an unbounded dump ran to ~90 lines and pushed the OTHER
+    # refusal reasons — including the red-CI one — far below the fold of the
+    # workflow log. A refusal that hides its own siblings is a refusal the
+    # reader acts on incompletely. The sample proves the finding; the count
+    # keeps the truncation honest, so nothing is silently dropped.
+    sample = off_scope.first(SAMPLE_LINES).map { |l| l.strip[0, 80] }
+    more = off_scope.length - sample.length
+    refusals << "the diff changes #{off_scope.length} line(s) other than #{GEM_NAME}'s " \
+                "resolution#{" (first #{SAMPLE_LINES} shown)" if more.positive?}: " \
+                "#{sample.inspect}#{" … and #{more} more" if more.positive?} — only the " \
+                "#{LINE_MARKER}..) line may move"
+  end
+end
+
+# --- Condition 4: CI is green -------------------------------------------------
+#
+# This is the condition carrying the safety argument. A BREAKING bump is
+# otherwise indistinguishable from a safe one — same author, same single file,
+# same single line — and the consumer suites are the only thing that can tell
+# them apart. Everything below therefore fails CLOSED.
+if checks.empty?
+  # The most dangerous vacuous pass available here: "nothing failed" is true of
+  # a board with no checks, INCLUDING an API read that returned nothing and a
+  # PR in the first seconds of its life before any lane registers.
+  refusals << "the check list is empty — an empty board is a failed read or a PR whose lanes " \
+              "have not registered yet, never a green CI"
+else
+  unfinished = checks.reject { |c| c["status"] == "COMPLETED" }
+  unless unfinished.empty?
+    refusals << "these checks have not finished: #{unfinished.map { |c| c['name'] }.inspect} — " \
+                "pending is not success, and merging now would merge before the consumer suites " \
+                "that would SEE a breaking bump have run"
+  end
+
+  failed = checks.select do |c|
+    c["status"] == "COMPLETED" && !GREEN_CONCLUSIONS.include?(c["conclusion"])
+  end
+  unless failed.empty?
+    refusals << "these checks are not green: " \
+                "#{failed.map { |c| "#{c['name']} (#{c['conclusion']})" }.inspect} — this is what " \
+                "a genuinely breaking bump looks like; leave the PR open and red for a human"
+  end
+end
+
+# --- the verdict ---------------------------------------------------------------
+
+unless refusals.empty?
+  warn "lock-bump-mergeable: REFUSED — this PR does not auto-merge."
+  refusals.each { |r| warn "  · #{r}" }
+  warn ""
+  warn "This is the designed degradation, not a malfunction. The PR stays open, " \
+       "bin/gem-drift-check goes on reddening other engine PRs until the lock moves, " \
+       "and a human is pulled in within one PR cycle — exactly today's behaviour."
+  exit 1
+end
+
+puts "lock-bump-mergeable: APPROVED — dependabot[bot], Gemfile.lock only, " \
+     "#{GEM_NAME} line only, #{checks.length} check(s) green."
+exit 0
