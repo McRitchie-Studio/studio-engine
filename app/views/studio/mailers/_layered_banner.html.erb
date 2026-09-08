@@ -66,7 +66,25 @@
 <table role="presentation" width="<%= banner.width %>" cellpadding="0" cellspacing="0" border="0"
        style="width:<%= banner.width %>px;border-collapse:collapse;">
   <tr>
-    <td <%= %(background="#{banner.background_url}").html_safe if banner.background_url.present? %>
+    <%# THE BACKGROUND ATTRIBUTE, EMITTED BY tag.attributes. It was assembled as a
+        Ruby string carrying its OWN quotes and then marked html_safe, which is the
+        one shape ERB's attribute escaping can never reach.
+
+        MEASURED on the unrepaired template, not reasoned about: a double quote in
+        background_url closed the attribute, and the browser read the remainder of
+        the tag as markup. The td came back carrying attributes named `quote"`,
+        `\`, `<` and `script`, and LOST bgcolor, width, height, valign and style
+        outright. That is worse than an injected attribute — the cell loses the
+        fallback colour and both dimensions the whole banner is laid out from, so
+        the failure is a wrecked email, not just a tainted one.
+
+        The URL is CONTENT, not code, so it is passed UNMARKED and takes the full
+        escaping a content attribute is owed. That also closes the latent half: a
+        bare ampersand in a signed-URL query string used to reach the client as the
+        start of an entity. Contrast the Alpine handlers elsewhere in this engine,
+        which stay html_safe precisely because they are expressions the host wrote
+        on purpose. The rule follows what the value IS, not which file it is in. %>
+    <td <%= tag.attributes(background: banner.background_url) if banner.background_url.present? %>
         bgcolor="<%= Studio.theme_primary %>"
         width="<%= banner.width %>" height="<%= banner.height %>" valign="middle"
         style="width:<%= banner.width %>px;height:<%= banner.height %>px;<%= "background-image:url(#{banner.background_url});background-size:cover;background-position:center;background-repeat:no-repeat;" if banner.background_url.present? %>">
@@ -97,7 +115,24 @@
                     contrast case the scrim exists for, in the one client that
                     cannot be spot-checked. Every other client honours the rgba
                     declaration and overrides the flat attribute. %>
-                <%= %(bgcolor="#{banner.scrim_solid_hex}").html_safe if banner.scrim_opacity.positive? %>
+                <%# SAME SHAPE AS THE background ABOVE, AND — stated honestly — NOT
+                    THE SAME LIVE DEFECT. This one was assembled with its own quotes
+                    and marked html_safe too, but the value cannot currently carry a
+                    quote to exploit it: scrim_solid_hex formats three integers the
+                    model has already clamped to 0-255, so it returns a hash sign
+                    and six hex digits for EVERY input. Checked by rendering rather
+                    than by reading, which is the only way that claim is worth
+                    anything: a scrim of `0.5" onload="alert(1)` still came back as
+                    the hex #4C4860, with all five of this cell's attributes intact.
+
+                    It is converted anyway because the SHAPE is the hazard. Safety
+                    here rests on an implementation detail one refactor away from
+                    changing — a scrim that ever learned to accept a named colour
+                    would reopen it silently — and leaving a hand-assembled
+                    attribute beside a repaired one is how the wrong pattern gets
+                    copied next. Same encoder, same reasoning, zero byte movement
+                    for a hex triplet. %>
+                <%= tag.attributes(bgcolor: banner.scrim_solid_hex) if banner.scrim_opacity.positive? %>
                 style="height:<%= banner.height %>px;padding:0 <%= side_padding %>px;<%= "background-color:rgba(24,16,64,#{banner.scrim_opacity});" if banner.scrim_opacity.positive? %>">
               <% if preview || banner.header.present? %>
                 <p<%= hook.call("header") %> style="margin:0 0 <%= gap_after_header %>px;font-family:Montserrat,'Segoe UI',Helvetica,Arial,sans-serif;font-size:<%= header_size %>px;line-height:<%= header_line %>px;font-weight:700;color:#ffffff;">

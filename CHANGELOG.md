@@ -6,6 +6,44 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **The email banner assembled two attributes INCLUDING THEIR OWN QUOTES in Ruby,
+  so ERB escaping never ran on them.** `_layered_banner.html.erb` wrote
+  `background="..."` and `bgcolor="..."` as Ruby strings and marked them
+  `html_safe` — the one shape ERB's attribute escaping can never reach. Both now
+  go through `tag.attributes`. This is the EMAIL half of the family PR #303 closed
+  in the modal/Alpine partials.
+
+  **THE RULE IS THE OPPOSITE OF #303'S, and that is the whole point.** There the
+  locals are Alpine EXPRESSIONS: they stay `html_safe` so a handler reaches the
+  browser byte-identical. A background URL and a colour are CONTENT, so they take
+  the FULL escaping a content attribute is owed — the treatment #303 gave the four
+  input constraints. Mark by what the value IS, not by which file it lives in.
+
+  **MEASURED, and worse than the sibling seams.** A double quote in
+  `background_url` did not merely inject an attribute, it ATE the rest of the tag:
+  the cell came back carrying `background`, `quote"`, a lone backslash, `<` and
+  `script`, having LOST `bgcolor`, `width`, `height`, `valign` and `style`
+  outright — five attributes gone from one quote. The failure is
+  a structurally wrecked email — no fallback colour, no dimensions, no
+  background-image CSS — not merely a tainted one.
+
+  **`bgcolor` WAS CLASSIFIED AND CLEARED BEFORE BEING TOUCHED**, because #303's
+  warning was that two of its six candidate sites were already safe.
+  `scrim_solid_hex` formats three integers the model has already clamped to 0-255,
+  so it returns a hash and six hex digits for every input — proven by rendering a
+  hostile scrim, not by reading the method. It is repaired anyway, and the reason
+  is measured: simulating the plausible refactor (the method learning to pass a
+  named colour through) injects an `onload` into every email with the attribute
+  hand-assembled, and merely renders a wrong colour with `tag.attributes` on it.
+
+  **NOTHING MOVED FOR REAL INPUT.** Seven banner shapes rendered before and after,
+  in both email and preview mode, are byte-identical. The one input whose bytes
+  change is a signed CDN URL, whose `&` now ships as `&amp;` — a correction, since
+  the CSS twin and the VML `src` on the SAME element already escaped it and the
+  hand-assembled `background` was the odd one out shipping a bare `&`. Verified in
+  a real browser: the client decodes the attribute, requests the URL with its
+  signature intact, and paints the banner.
+
 - **The Rails guard sweep's non-vacuity check tested a COPY of the scanner, so
   the scanner could go blind and the suite stayed green.**
   `rails_guard_sweep_test.rb` is a source scan, and a scan is only trustworthy
