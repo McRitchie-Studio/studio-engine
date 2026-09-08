@@ -656,7 +656,18 @@
 # separate lines, so a card carrying all of them would go green the moment ANY one
 # was repaired. Re-derived on THIS tree with the lister, never by arithmetic:
 #   npx playwright test --list  -> 131 tests in 19 files
-total_specs: 131
+#
+# 2026-09-07: 131 -> 132, in the SAME file and with NO new file. One spec for the
+# pinned stack's SAME-FRAME property — that a layer appearing or disappearing moves
+# the stack in the frame it happened, not the next one. It earns its place because
+# it is the only tier that CAN hold that property: the unit tier pins the publisher's
+# shape, but "the number is right when it is read" is a fact about when a browser
+# runs work inside a frame. Demonstrated by mutation — deferring the publish back to
+# requestAnimationFrame turns this spec red at 8/8 changing frames while both older
+# pinned-stack specs stay green, which is exactly how the defect shipped.
+# Re-derived on THIS tree with the lister, never by arithmetic:
+#   npx playwright test --list  -> 132 tests in 19 files
+total_specs: 132
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -713,7 +724,14 @@ total_specs: 131
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 131
 # executed = total - devnet - allowed_skips = 131 - 0 - 0 = 131, so executed ==
 # total_specs and the equality assertion holds.
-executed: 131
+# Re-derived once more on THIS tree with the lister when the pinned stack's
+# same-frame spec landed — same file, no new file:
+#   npx playwright test --list                                             -> 132 tests, 19 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 132
+# executed = total - devnet - allowed_skips = 132 - 0 - 0 = 132, so executed ==
+# total_specs and the equality assertion holds.
+executed: 132
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
