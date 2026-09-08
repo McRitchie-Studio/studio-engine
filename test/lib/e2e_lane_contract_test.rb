@@ -288,7 +288,13 @@ class E2eLaneContractTest < Minitest::Test
       # "controls == registry" assertion passes at 0 == 0 over a section that
       # painted nothing. The spec guards its own side with a `> 0`; this names
       # the render that has to exist for it.
-      "style_modals.html.erb" => ["studio/modals/host", "style/modals"]
+      "style_modals.html.erb" => ["studio/modals/host", "style/modals"],
+      # The empty-field error is a JS string INSIDE the partial's x-data, so the
+      # partial IS the browser program under test. Naming it here is what stops
+      # that spec from quietly becoming a test of three hand-written cards — and
+      # the page renders it three times, once per mode, because the modes are
+      # locals and locals are all a lab page is allowed to set up.
+      "onboarding_first_name.html.erb" => ["studio/modals/onboarding/first_name"]
     }.each do |page, partials|
       source = File.read(File.join(lab, page))
 
