@@ -23,8 +23,10 @@ require_relative "../../../lib/studio/s3"
 # the production branch; this one must NOT, because the absence of that accessor IS
 # the condition under test. bin/release-check runs each test file in its own process
 # (`ruby -Itest <file>`), so the sibling that installs the accessor cannot reach
-# this one — and requiring test_helper above is what pulls action_view in, which is
-# what defines the bare constant. The fixture is the real dependency graph rather
+# this one — and requiring test_helper above is what loads studio/js_literal, whose
+# `extend ActionView::Helpers::JavaScriptHelper` autoloads the helpers tree and with
+# it rails-html-sanitizer, which is what defines the bare constant. A bare
+# `require "action_view"` does NOT. The fixture is the real dependency graph rather
 # than a hand-written double of it.
 class S3NamespaceOnlyRailsTest < Minitest::Test
   def setup
