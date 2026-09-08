@@ -8,8 +8,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 - **The app census in these comments was short by the most important app.** Ten
   sites said this engine is mounted by SIX apps and that THREE of them bundle no
-  `solana-studio`. Measured 2026-09-07 by grepping every app `Gemfile` in the
-  ecosystem for `gem "studio-engine"`: **five** apps mount it —
+  `solana-studio`. Measured 2026-09-07 by the criterion that reproduces it — a
+  checkout whose own `config/routes.rb` calls `Studio.routes(self)`. A Gemfile
+  grep returns seven instead, catching `solana-studio`'s dev-group pin and the
+  `mcritchie-studio-ai-builder-cache` clone of the hub. **Five** apps mount it —
   `mcritchie-studio`, `turf-monster`, `acquisition-studio`,
   `mcritchie-industries`, `moms-app` — and **four** of those bundle no
   `solana-studio`. `turf-monster` is the only one that does.

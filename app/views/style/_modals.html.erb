@@ -52,12 +52,17 @@
   # cards; where it is absent the specimens stay listed but unopenable.
   #
   # THE EXCEPTION IS THE DURABLE HALF; the count rots the day an app is born.
-  # Derived 2026-09-07 by grepping every app Gemfile in the ecosystem for
-  # `gem "studio-engine"`, and it agrees with the five that lib/studio.rb's
-  # draw_profile_routes note enumerates by name. This line used to read "three of
-  # the six" and to omit the HUB — mcritchie-studio, the app a reader of this
-  # comment is most likely to be sitting in, and one that bundles no
-  # solana-studio. Two near misses are what make a naive count wrong:
+  # Derived 2026-09-07 — and the CRITERION is recorded, not just the count,
+  # because the obvious grep does not reproduce it. The five are the checkouts
+  # whose own config/routes.rb calls `Studio.routes(self)`, the same five
+  # lib/studio.rb's draw_profile_routes note names. Grepping Gemfiles for
+  # `gem "studio-engine"` returns SEVEN: it also catches solana-studio, which
+  # pins the engine in `group :development, :test` for its dummy and draws no
+  # routes, and mcritchie-studio-ai-builder-cache, which is the HUB checked out
+  # twice (same Heroku remote; HEAD c7d5d326 is a commit inside
+  # mcritchie-studio) and would double-count it. This line used to read "three
+  # of the six" and to omit the HUB — the app a reader is likeliest to be
+  # sitting in, and one that bundles no solana-studio. Two further near misses:
   # chain-ops bundles solana-studio WITHOUT this engine, so it is not in this
   # set at all; acquisition-studio is a retired prototype whose Gemfile still
   # pins the engine, so it is.
