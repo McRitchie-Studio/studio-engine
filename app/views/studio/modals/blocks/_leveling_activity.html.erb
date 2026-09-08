@@ -138,10 +138,23 @@
           <% if input %>
             <input type="<%= input_type %>" x-model="value" class="input-field w-full"
                    placeholder="<%= placeholder %>"
-                   <%= "minlength=\"#{min_length}\"".html_safe if min_length.to_i.positive? %>
-                   <%= "maxlength=\"#{max_length}\"".html_safe if max_length.present? %>
-                   <%= "pattern=\"#{pattern}\"".html_safe if pattern.present? %>
-                   <%= "title=\"#{pattern_title}\"".html_safe if pattern_title.present? %>
+                   <%# FOUR CONSTRAINT ATTRIBUTES, ENCODED AND — unlike the Alpine
+                       handlers in this file — DELIBERATELY NOT html_safe. Each was
+                       assembled as `attr="#{value}"`.html_safe, which handed ERB a
+                       String it must not touch, so a double quote in any of the four
+                       closed the attribute and the rest became markup. minlength
+                       looks numeric and is not: only the GUARD calls .to_i, the
+                       interpolation splices the local raw.
+
+                       These are CONTENT, not code — a length, a regex, a tooltip
+                       sentence — so they take the full escaping a content attribute
+                       is owed and the parser decodes it back. That also repairs a
+                       second latent bug the marking carried: a bare & in a title or
+                       pattern used to reach the browser as the start of an entity. %>
+                   <%= tag.attributes(minlength: min_length) if min_length.to_i.positive? %>
+                   <%= tag.attributes(maxlength: max_length) if max_length.present? %>
+                   <%= tag.attributes(pattern: pattern) if pattern.present? %>
+                   <%= tag.attributes(title: pattern_title) if pattern_title.present? %>
                    autofocus>
           <% end %>
           <% if consent_label.present? %>
@@ -180,7 +193,12 @@
       </div>
 
       <% if next_label.present? && next_open.present? %>
-        <button type="button" @click="<%= next_open %>" class="btn btn-primary btn-lg w-full">
+        <%# next_open is html_safe (:102) because it is a developer-authored Alpine
+            EXPRESSION — so ERB steps aside here and a double quote in it used to
+            close the @click attribute outright. tag.attributes writes the quotes and
+            entity-encodes any of its own that appear in the value, leaving the
+            expression otherwise byte-identical. %>
+        <button type="button" <%= tag.attributes("@click": next_open) %> class="btn btn-primary btn-lg w-full">
           <%= next_label %>
         </button>
       <% end %>

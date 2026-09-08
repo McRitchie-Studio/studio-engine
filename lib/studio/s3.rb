@@ -128,10 +128,18 @@ module Studio
         # before any Rails APPLICATION does — defines a namespace-only `module
         # Rails` with no singleton methods on it. Against that, a bare
         # `defined?(Rails)` reads TRUE and the very next call dies with
-        # NoMethodError: undefined method `env` for module Rails. lib/studio.rb
-        # already spells the guard this way in three places; this was the
-        # straggler, and it turned an unrelated green suite red the first time a
-        # unit test pulled action_view in.
+        # NoMethodError: undefined method `env` for module Rails. It turned an
+        # unrelated green suite red the first time a unit test pulled action_view
+        # in.
+        #
+        # THIS WAS NOT THE LAST ONE, though it was described that way when it
+        # landed. Three sites still carried the bare form afterwards — both
+        # keyword defaults in lib/studio/mail_transport.rb and the developer-desk
+        # route guard in lib/studio.rb — and the claim that the sweep was finished
+        # is how they survived a second review. The whole tree is swept now, and
+        # test/lib/studio/rails_guard_sweep_test.rb is what keeps it that way; do
+        # not restate completeness here, because a comment cannot notice the next
+        # straggler and that test can.
         defined?(Rails) && Rails.respond_to?(:env) && Rails.env&.production? ? "production" : "dev"
       end
     end

@@ -6,6 +6,111 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **A quote in a host local can no longer close an Alpine attribute and turn the
+  rest of the element into markup.** Four partials built an attribute — its OWN
+  QUOTES included — as a Ruby String and marked it `html_safe`, which is the one
+  shape ERB's attribute escaping can never reach: the marking tells ERB to stand
+  down, so a double quote in the local ended the attribute and the HTML parser read
+  the remainder as new attributes. Measured, not reasoned: one hostile
+  `auto_redirect_seconds` turned the success card's root into an element carrying
+  attributes named `quote"`, `\`, `<` and `script`, with its `class` swallowed
+  whole. This is strictly worse than the JS-string-literal class fixed in
+  *Host-supplied locals can no longer brick an Alpine component* below, which at
+  least stayed inside its attribute.
+
+  **THE REPAIR IS NOT ESCAPING.** These locals are Alpine EXPRESSIONS by contract —
+  the caller is handing the engine JS on purpose — so `escape_javascript` would
+  break the feature it was protecting. The partials stop writing the quotes and let
+  ActionView write them: `tag.attributes("x-init": expr.html_safe)`. `tag_option`
+  runs `gsub('"', "&quot;")` on the finished value UNCONDITIONALLY, on the line
+  AFTER the escape branch it skips for a marked String, so the expression keeps its
+  apostrophes, angle brackets and backslashes byte-for-byte and still cannot end the
+  attribute. `blocks/_rail_row:112` already did exactly this and was the worked
+  example.
+
+  **WHAT MOVED — twelve splices in four files.** `blocks/_success_card` (the
+  Ruby-built `x-data` countdown object, and the `x-init` call list that splices
+  `auto_redirect_url_key`), `blocks/_processing_card` (one assembled `x-data`/`x-init`
+  pair carrying TWO locals — `resolve_expr` and `min_duration`, which only LOOKS
+  numeric because just its guard calls `.to_i`), `blocks/_leveling_activity` (the
+  Next Quest `@click`, plus `minlength` / `maxlength` / `pattern` / `title` on the
+  form input), and `components/_sidebar_panel` (`@click.outside`,
+  `@keydown.escape.window` and `@turbo:before-cache.window` on the root of the shell
+  every link menu hangs from). No default or in-repo value contains a character tag
+  encoding touches, so every shipped page renders byte-for-byte what it did — a
+  render-level test asserts that directly.
+
+  **THE MARKING NOW FOLLOWS WHAT THE VALUE IS.** Code stays `html_safe` and reaches
+  the browser unchanged; CONTENT does not. The four input constraint attributes are
+  a length, a regex and a tooltip, so they take the full escaping a content
+  attribute is owed — which also closes a second latent bug the marking carried, a
+  bare `&` in a `title` or `pattern` reaching the browser as the start of an entity.
+
+  **TWO OF THE SIX SITES ON THE ORIGINAL LIST WERE ALREADY SAFE and were left
+  alone.** `blocks/_rail_row:112` routes its handler through `content_tag`, and
+  `board/_card_shell:54` escapes both halves of its arbitrary-attribute passthrough
+  through ERB. Both were re-verified by rendering them with a hostile value, not by
+  reading them. Filing a fix for either would have bought a guard that can never
+  bite.
+
+  **HOW THE GUARDS ASSERT.** `test/views/assembled_attribute_locals_test.rb` reads
+  every seam through Nokogiri's HTML5 parser — the algorithm a browser runs — and
+  asserts on the DECODED attribute value, never on the template's output bytes,
+  because ERB entity-escapes an unmarked value too and a raw-markup structural
+  assertion therefore cannot fail. (HTML5 rather than HTML4 on purpose: HTML4
+  silently drops an `@click`, so every Alpine assertion made through it reads nil on
+  a correct page.) Each seam makes two claims — the element carries exactly the
+  attributes a benign value gives it, and the browser recovers the whole expression
+  — plus a non-vacuity control that fails if the partial ever stops splicing the
+  local at all. All twelve were mutated back to their assembled form ONE AT A TIME
+  and each was killed by its own test; the shared `_processing_card` call was also
+  mutated per-local. `test/lib/studio/attribute_encoding_contract_test.rb` pins the
+  ActionView property the whole repair stands on, so a future Rails moving that
+  `gsub` reports itself as one dependency change rather than twelve partial bugs.
+
+  **STILL OPEN, and named rather than quietly folded in:**
+  `studio/mailers/_layered_banner:69,100` assemble `background=` and `bgcolor=` the
+  same way. Same shape, different family — email attributes, no Alpine, no JS — so
+  they are left for their own ticket rather than widened into this one.
+
+- **The Rails guard sweep really is finished now, and a test says so instead of a
+  comment.** Fixing `Studio::S3` left THREE sites still guarding a Rails method
+  call on a bare `defined?(Rails)`: both keyword defaults in
+  `Studio::MailTransport.configure!` (`rails_env:` reading `Rails.env`, `logger:`
+  reading `Rails.logger`) and the developer-desk route guard in
+  `Studio.routes`. All three now ask `Rails.respond_to?` first.
+
+  **THE MAIL TRANSPORT ONE WAS ARMED, not theoretical.** `lib/studio.rb` requires
+  `studio/js_literal` (line 11) — whose first line is `require "action_view"`,
+  which is what defines the namespace-only `module Rails` — BEFORE it requires
+  `studio/mail_transport` (line 25). Measured at this branch's head, a bare
+  `Studio::MailTransport.configure!(env: {}, action_mailer: mailer)` died with
+  `NoMethodError: undefined method 'env' for module Rails`. No shipped app can
+  reach it (every host configures mail from an initializer, where `Rails.env`
+  exists, and all four in-repo callers pass `rails_env:` explicitly) — the cost
+  lands on the next gem unit test that omits the kwarg, which is the same
+  half-hour the `Studio::S3` fix already paid once.
+
+  **THE TWO DEFAULTS ARE SEPARATE STRAGGLERS**, and the first hid the second: Ruby
+  evaluates only the defaults a caller omitted, and `rails_env:` is declared above
+  `logger:`, so a bare call raised out of `Rails.env` and never reached
+  `Rails.logger`. `test/lib/studio/mail_transport_namespace_only_rails_test.rb`
+  supplies one argument and omits the other in each test, so each guard is pinned
+  independently rather than behind its neighbour.
+
+  **THE ROUTE GUARD IS PINNED BY A SCAN, deliberately.** `Studio.routes` only
+  loads inside a real Rails application, where `Rails.env` exists — so the
+  condition under test cannot be constructed where the file loads, and no
+  behavioural test can reach it. `test/lib/studio/rails_guard_sweep_test.rb` is
+  the tree-wide net instead, and it asserts both that it really read the files and
+  that its predicate still flags the original shape, so it cannot pass for free.
+
+  **The completeness claim itself was the other half of the bug.** `lib/studio/s3.rb`
+  and this changelog both said that fix "was the straggler" — while one of the
+  remaining three sat in `lib/studio.rb`, the very file the comment cited as
+  already clean. Both claims are corrected, and the comment now points at the test
+  rather than restating that the sweep is done.
+
 - **The app census in these comments was short by the most important app.** Ten
   sites said this engine is mounted by SIX apps and that THREE of them bundle no
   `solana-studio`. Measured 2026-09-07 by the criterion that reproduces it — a
@@ -363,7 +468,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   singleton methods, so that guard reads true and the next call raises
   `NoMethodError: undefined method 'env' for module Rails`. It now asks
   `Rails.respond_to?(:env)`, which is the form `lib/studio.rb` already uses in three
-  places; this was the straggler. No shipped app can reach it — every host boots a
+  places. **This entry originally called it "the straggler"; that was wrong** —
+  three more sites carried the bare form, swept in *The Rails guard sweep really is
+  finished now* above. No shipped app can reach it — every host boots a
   real application — but the engine's own pure-Ruby unit lane can, and it did:
   adding one `require` for a file that needs `action_view` turned an untouched
   `email_catalog_test` red with two errors about email uploads.

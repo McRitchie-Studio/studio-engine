@@ -32,6 +32,20 @@
     attrs:         Hash of extra root attributes ({ "x-data" => "…", "data-foo" => 1 }),
                    values are HTML-escaped — the rebase seam for a card that carries
                    its own Alpine/data-* on the root.
+
+                   NOT A CANDIDATE FOR THE ASSEMBLED-ATTRIBUTE SWEEP: nothing here is
+                   marked html_safe, so ERB escapes both halves. A double quote in a
+                   VALUE becomes &quot; and the parser decodes it back — the value half
+                   cannot break out. Verified 2026-09-08 by rendering, not reading.
+
+                   THE NAME HALF IS A DIFFERENT QUESTION, and entity decoding is not
+                   what answers it. html_escape does not touch a SPACE, and a space
+                   ENDS an attribute name: a name of `data-y=1 x-init` renders as
+                   `data-y=1 x-init="…"` and the parser builds a real SECOND attribute
+                   — measured, an injected x-init Alpine will run. What makes this seam
+                   safe today is that nothing passes attrs: at all — zero call sites in
+                   studio-engine, turf-monster and mcritchie-studio. Its first caller
+                   owes an allow-list on the NAME before this emits it.
 %>
 <%
   id            = local_assigns.fetch(:id)
