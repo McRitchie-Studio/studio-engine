@@ -75,11 +75,29 @@ end
 # nothing — which is precisely why it went four releases unnoticed.)
 #
 # SO THE FIX IS A GATE, NOT A PIN. bin/gem-drift-check fails when this engine's
-# lock TRAILS a consumer's, and consumer-ci.yml runs it — the only lane holding
-# two repos' lockfiles at once. Direction is one-way: engine behind fails, engine
-# ahead or level passes, a consumer bundling no solana-studio is a skip. Keeping
-# up is now enforced rather than remembered, which is what lets the floor stay a
-# floor. Guarded by test/lib/gem_drift_check_test.rb.
+# lock resolves an OLDER solana-studio than a consumer's, and consumer-ci.yml
+# runs it — the only lane holding two repos' lockfiles at once. Direction is
+# one-way: engine behind fails, engine ahead or level passes, a consumer
+# bundling no solana-studio is a skip. Guarded by
+# test/lib/gem_drift_check_test.rb.
+#
+# READ THE CONSUMER AS A MESSENGER, not as the target. The invariant is that
+# this engine resolves the LATEST RELEASED solana-studio. A consumer's lock is
+# compared only because it is the one newer-release fact on disk — the gate is
+# stdlib-only and makes no network call, deliberately, so it cannot ask the
+# registry directly. A consumer being ahead is EVIDENCE of a release this engine
+# missed, never itself the thing to catch up to.
+#
+# AND THE GATE ALONE WAS NOT ENOUGH. Enforcement only reddens; a human still had
+# to do the bump. Measured 2026-09-07: that human was late five times in ONE DAY
+# — by 3h, 2h20m, 14h15m and 1h10m — and the worst case was not the longest but
+# the fastest, a lock that went stale 36 minutes after the previous fix was
+# committed. While it is stale EVERY open engine PR is red, over a line no PR
+# author owns. So .github/dependabot.yml now opens the bump PR daily (scoped to
+# solana-studio ALONE, so this repo never inherits the third-party graveyard),
+# and .github/workflows/engine-lock-automerge.yml merges it when — and only
+# when — all four of bin/lock-bump-mergeable's conditions hold. A breaking bump
+# still stops, stays open and red, and still waits for a human.
 group :development, :test do
   gem "solana-studio", ">= 0.5.3"
 end

@@ -322,6 +322,12 @@ class ThemeResolverInkContrastTest < Minitest::Test
   # derivation with a green suite), and a grayscale sweep of the sane domain
   # for each mode. The theme editor accepts arbitrary hexes, so this is an
   # operator-reachable input space, not a hypothetical one.
+  # WCAG 2.x AA. 4.5:1 is the NORMAL-text threshold; the 3:1 allowance applies
+  # only to LARGE text (>=18.66px, or 14px bold). Every ink here lands on
+  # normal-size text — the engine's own `.label-upper` is `text-xs text-muted`
+  # (12px) — so 4.5 is the number for all of them, muted included.
+  AA_NORMAL = 4.5
+
   FLEET_DARK = %w[#1A1535 #0D1A63 #0f172a #10101f].freeze
   COUNTEREXAMPLES = %w[#374151 #1e3a8a #312e81 #134e4a].freeze
   # Above ~#555555 even pure white cannot reach 4.5:1 on the lifted surface —
@@ -337,15 +343,41 @@ class ThemeResolverInkContrastTest < Minitest::Test
       backgrounds = vars.values_at("--color-page", "--color-surface", "--color-surface-alt", "--color-inset")
 
       backgrounds.each do |bg|
-        assert_operator contrast(vars["--color-text-muted"], bg), :>=, 3.0,
-          "muted must clear 3:1 on #{bg} for base #{base}"
-        assert_operator contrast(vars["--color-text-secondary"], bg), :>=, 4.5,
-          "secondary must clear 4.5:1 on #{bg} for base #{base}"
+        assert_operator contrast(vars["--color-text-muted"], bg), :>=, AA_NORMAL,
+          "muted must clear #{AA_NORMAL}:1 on #{bg} for base #{base}"
+        assert_operator contrast(vars["--color-text-secondary"], bg), :>=, AA_NORMAL,
+          "secondary must clear #{AA_NORMAL}:1 on #{bg} for base #{base}"
       end
 
       assert_operator luminance(vars["--color-text-muted"]), :<=, luminance(vars["--color-text-secondary"]),
         "the ink ladder must stay monotonic (muted <= secondary) for base #{base}"
     end
+  end
+
+  # THE REGRESSION, pinned at the two exact pairs that were measured failing.
+  #
+  # Both ratios are COMPUTED from the resolver's own emitted values — no hex is
+  # written down here, so the guard survives a palette change and still fails
+  # for the right reason. (A guard asserting `muted == "#818283"` would have
+  # passed happily the whole time the token was wrong.)
+  #
+  # Measured on the default theme before the fix:
+  #   light  muted #818283 on --color-surface-alt #F1F3F4 -> 3.46:1
+  #   dark   muted #9896A4 on --color-surface     #3C3853 -> 3.84:1
+  # Both were derived against target 3.0 — WCAG's LARGE-text allowance — while
+  # the ink is used on 11-12px normal text, which owes 4.5:1.
+  def test_muted_ink_clears_aa_on_the_surfaces_it_was_measured_failing
+    light = Studio::ThemeResolver.new({}).light_mode_vars
+    light_ratio = contrast(light["--color-text-muted"], light["--color-surface-alt"])
+    assert_operator light_ratio, :>=, AA_NORMAL,
+      "light muted #{light["--color-text-muted"]} on surface-alt " \
+      "#{light["--color-surface-alt"]} measured #{light_ratio.round(2)}:1, owes #{AA_NORMAL}:1"
+
+    dark = Studio::ThemeResolver.new({}).dark_mode_vars
+    dark_ratio = contrast(dark["--color-text-muted"], dark["--color-surface"])
+    assert_operator dark_ratio, :>=, AA_NORMAL,
+      "dark muted #{dark["--color-text-muted"]} on surface " \
+      "#{dark["--color-surface"]} measured #{dark_ratio.round(2)}:1, owes #{AA_NORMAL}:1"
   end
 
   def test_pathological_dark_base_clamps_to_best_achievable_ink
@@ -361,11 +393,18 @@ class ThemeResolverInkContrastTest < Minitest::Test
       backgrounds = vars.values_at("--color-page", "--color-surface", "--color-surface-alt", "--color-inset")
 
       backgrounds.each do |bg|
-        assert_operator contrast(vars["--color-text-muted"], bg), :>=, 3.0,
-          "muted must clear 3:1 on #{bg} for base #{base}"
-        assert_operator contrast(vars["--color-text-secondary"], bg), :>=, 4.5,
-          "secondary must clear 4.5:1 on #{bg} for base #{base}"
+        assert_operator contrast(vars["--color-text-muted"], bg), :>=, AA_NORMAL,
+          "muted must clear #{AA_NORMAL}:1 on #{bg} for base #{base}"
+        assert_operator contrast(vars["--color-text-secondary"], bg), :>=, AA_NORMAL,
+          "secondary must clear #{AA_NORMAL}:1 on #{bg} for base #{base}"
       end
+
+      # The dark test has always asserted this; light never did, and that gap
+      # is where the inversion this task fixed could land unseen. On a LIGHT
+      # base the inks DARKEN away from the base, so louder = lower luminance
+      # and the comparison flips: muted must stay the LIGHTER of the two.
+      assert_operator luminance(vars["--color-text-muted"]), :>=, luminance(vars["--color-text-secondary"]),
+        "the ink ladder must stay monotonic (muted no darker than secondary) for base #{base}"
     end
   end
 

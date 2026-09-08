@@ -217,6 +217,45 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **The style guide's two "Sign Wallet" thumbnails no longer crown themselves
+  with a padlock the card stopped drawing, and the guide's lock no longer trails
+  the release that removed it.** solana-studio 0.6.1 replaced the step-up card's
+  padlock with the remembered wallet's own brand mark, falling back to a neutral
+  billfold where no brand is remembered. Both hand-drawn thumbnails in
+  `style/_modals` went on drawing the padlock, so the first thing a designer
+  reads advertised a glyph the design system had retired.
+
+  **THE THUMBNAILS WERE HALF OF IT.** The opened specimen renders the REAL
+  shared partial, but it does so through whatever `Gemfile.lock` resolves — so
+  it is only ever as current as the lock, and the lock sat on 0.6.0 while
+  turf-monster shipped 0.6.1. The guide's opened card was still drawing the
+  padlock too, which `bin/gem-drift-check` had already been failing on
+  (`engine 0.6.0 TRAILS turf-monster 0.6.1`). Correcting the sketches alone
+  would have put a brand mark on the thumbnail and a padlock in the card it
+  opens — moving the contradiction onto one screen rather than removing it. So
+  the lock had to move too, and it has: `accepted` carried the engine to
+  solana-studio 0.7.0 while this change sat in review, which is past the 0.6.1
+  that removed the padlock. This change no longer moves the lock itself — it
+  defers to the line `accepted` already holds — so the sketch and the card it
+  opens agree without it.
+
+  The sketches follow the card: a centered brand tile where a wallet is
+  remembered, the card's own billfold outline in an inset square where none is.
+  They stay SKETCHES rather than real brand marks for a mechanical reason worth
+  recording — every `se-wallet` symbol on the guide is defined inside a
+  `template x-if`, whose content is inert until Alpine clones it, so a `use`
+  placed outside one resolves to nothing and paints an empty box.
+
+  Guarded by `test/views/step_up_specimen_thumbnails_test.rb`, which slices each
+  thumbnail by a `data-test` hook before asserting. That slicing is the point:
+  the rendered guide already carried 17 `se-wallet-` hits from the picker and
+  the card's own CTA, so a page-wide assertion for the mark could not fail, and
+  a page-wide assertion against the padlock could not pass — the drag-board
+  specimen's prose legitimately contains one. The padlock is pinned in BOTH the
+  codepoint and the HTML-entity form. MEASURED: five mutants, five killed —
+  the padlock restored in either form, either header mark removed, and the lock
+  reverted to 0.6.0 each reddens the assertion that owns it.
+
 - **The style guide's page-scoped modal store now resolves animations through
   the LIVE registry, so the guide can no longer disagree with itself.**
   `style/_modals`' `dsModals` carried a hard-coded COPY of the animation table

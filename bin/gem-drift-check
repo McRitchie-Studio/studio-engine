@@ -133,7 +133,13 @@ TRACKED.each do |gem_name|
     checked += 1
     if engine_version < consumer_version
       behind << [gem_name, label, engine_version, consumer_version]
-      puts "✗ #{gem_name}: engine #{engine_version} TRAILS #{label} #{consumer_version}"
+      # WORDED AS THE REAL INVARIANT. The engine's obligation is to resolve the
+      # LATEST RELEASED gem — not to match any particular consumer. The consumer
+      # is read here only because its lock is the one newer-release fact on
+      # disk; saying the engine "trails turf_monster" sends the reader to the
+      # wrong model and, worse, to the wrong fix.
+      puts "✗ #{gem_name}: engine #{engine_version} is behind the released " \
+           "#{consumer_version} (seen in #{label}'s lock)"
     else
       marker = engine_version == consumer_version ? "=" : ">"
       puts "✓ #{gem_name}: engine #{engine_version} #{marker} #{label} #{consumer_version}"
@@ -149,10 +155,20 @@ end
 
 unless behind.empty?
   warn ""
-  warn "The engine's lock TRAILS its own consumers:"
+  warn "The engine's lock trails the latest RELEASED version of a gem it tracks:"
   behind.each do |gem_name, label, engine_version, consumer_version|
-    warn "  #{gem_name}: this engine #{engine_version}, #{label} #{consumer_version}"
+    warn "  #{gem_name}: this engine resolves #{engine_version}; #{consumer_version} is released"
+    warn "    (observed in #{label}'s lock — the messenger, not the target)"
   end
+  warn ""
+  warn "READ THE CONSUMER AS A MESSENGER. The invariant is that this engine resolves the"
+  warn "LATEST RELEASED gem, NOT that it matches any particular consumer. A consumer's"
+  warn "lock is compared here only because it is the one newer-release fact on disk: this"
+  warn "gate is stdlib-only and makes no network call, deliberately (see the header), so"
+  warn "it cannot ask the registry what the latest version actually is. A consumer being"
+  warn "ahead is therefore EVIDENCE of a release this engine missed — never itself the"
+  warn "thing to catch up to. The real latest is on the registry:"
+  behind.map(&:first).uniq.each { |g| warn "  https://rubygems.org/gems/#{g}/versions" }
   warn ""
   warn "Fix it in the ENGINE, in one command, then commit the lock:"
   behind.map(&:first).uniq.each { |g| warn "  bundle update #{g}" }

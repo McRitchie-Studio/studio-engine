@@ -11,7 +11,14 @@
 
     The asset tags at the end of that partial are the HOST's job. The dummy does
     them in E2eLabController::AssetDelivery, pointing at the engine's real
-    app/assets files that e2e/boot.rb copies into public/e2e. %>
+    app/assets files that e2e/boot.rb copies into public/e2e.
+
+    THE LAB IS DARK-ONLY, and a spec cannot opt out of it from the page. The class
+    below is hard-coded, and the head's theme script only ever ADDS `dark` - it
+    never removes it - so setting localStorage to 'light' changes nothing here.
+    Anything grading the LIGHT palette has to strip the class itself after load.
+    Recorded because the head partial's theme store, named above, reads as though
+    the toggle works on these pages; it does not. %>
 <!DOCTYPE html>
 <html lang="en" class="dark">
   <head>
