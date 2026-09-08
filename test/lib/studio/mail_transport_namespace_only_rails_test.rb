@@ -17,8 +17,10 @@ require_relative "../../../lib/studio/mail_transport"
 # `NoMethodError: undefined method 'env' for module Rails`.
 #
 # WHY THIS FILE COULD NOT EXIST BEFORE, and why it does now. test_helper requires
-# lib/studio/js_literal, whose first line is `require "action_view"` — so merely
-# loading the unit suite is what conjures the bare constant. lib/studio.rb loads
+# lib/studio/js_literal, whose line 66 `extend ActionView::Helpers::JavaScriptHelper`
+# autoloads the helpers tree and with it rails-html-sanitizer — so merely loading the
+# unit suite is what conjures the bare constant. NOT its line-1 `require
+# "action_view"`, which alone leaves `Rails` UNDEFINED. lib/studio.rb loads
 # js_literal (line 11) BEFORE mail_transport (line 25), so a real host arms the
 # same condition in the same order.
 #
@@ -45,8 +47,9 @@ class MailTransportNamespaceOnlyRailsTest < Minitest::Test
   # tests below would pass while testing nothing.
   def test_the_fixture_really_is_a_rails_constant_without_env_or_logger
     assert defined?(Rails),
-           "action_view should have defined a bare `module Rails`; without it the " \
-           "assertions below are inert"
+           "loading action_view's HELPERS tree should have defined a bare " \
+           "`module Rails` — a bare `require \"action_view\"` does not; without it " \
+           "the assertions below are inert"
     refute Rails.respond_to?(:env),
            "this file must NOT stub Rails.env — the missing accessor is the " \
            "condition under test, and a sibling's stub leaking in would hide the bug"

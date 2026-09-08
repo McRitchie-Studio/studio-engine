@@ -23,8 +23,10 @@ require_relative "../../../lib/studio/s3"
 # the production branch; this one must NOT, because the absence of that accessor IS
 # the condition under test. bin/release-check runs each test file in its own process
 # (`ruby -Itest <file>`), so the sibling that installs the accessor cannot reach
-# this one — and requiring test_helper above is what pulls action_view in, which is
-# what defines the bare constant. The fixture is the real dependency graph rather
+# this one — and requiring test_helper above is what loads studio/js_literal, whose
+# `extend ActionView::Helpers::JavaScriptHelper` autoloads the helpers tree and with
+# it rails-html-sanitizer, which is what defines the bare constant. A bare
+# `require "action_view"` does NOT. The fixture is the real dependency graph rather
 # than a hand-written double of it.
 class S3NamespaceOnlyRailsTest < Minitest::Test
   def setup
@@ -44,8 +46,9 @@ class S3NamespaceOnlyRailsTest < Minitest::Test
   # that cannot fire is the failure mode this whole file exists to catch elsewhere.
   def test_the_fixture_really_is_a_rails_constant_without_an_env
     assert defined?(Rails),
-           "action_view should have defined a bare `module Rails`; without it the " \
-           "assertions below are inert"
+           "loading action_view's HELPERS tree should have defined a bare " \
+           "`module Rails` — a bare `require \"action_view\"` does not; without it " \
+           "the assertions below are inert"
     refute Rails.respond_to?(:env),
            "this file must NOT stub Rails.env — the missing accessor is the condition " \
            "under test, and a sibling's stub leaking in would hide the bug"

@@ -6,6 +6,84 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **The email banner assembled two attributes INCLUDING THEIR OWN QUOTES in Ruby,
+  so ERB escaping never ran on them.** `_layered_banner.html.erb` wrote
+  `background="..."` and `bgcolor="..."` as Ruby strings and marked them
+  `html_safe` — the one shape ERB's attribute escaping can never reach. Both now
+  go through `tag.attributes`. This is the EMAIL half of the family PR #303 closed
+  in the modal/Alpine partials.
+
+  **THE RULE IS THE OPPOSITE OF #303'S, and that is the whole point.** There the
+  locals are Alpine EXPRESSIONS: they stay `html_safe` so a handler reaches the
+  browser byte-identical. A background URL and a colour are CONTENT, so they take
+  the FULL escaping a content attribute is owed — the treatment #303 gave the four
+  input constraints. Mark by what the value IS, not by which file it lives in.
+
+  **MEASURED, and worse than the sibling seams.** A double quote in
+  `background_url` did not merely inject an attribute, it ATE the rest of the tag:
+  the cell came back carrying `background`, `quote"`, a lone backslash, `<` and
+  `script`, having LOST `bgcolor`, `width`, `height`, `valign` and `style`
+  outright — five attributes gone from one quote. The failure is
+  a structurally wrecked email — no fallback colour, no dimensions, no
+  background-image CSS — not merely a tainted one.
+
+  **`bgcolor` WAS CLASSIFIED AND CLEARED BEFORE BEING TOUCHED**, because #303's
+  warning was that two of its six candidate sites were already safe.
+  `scrim_solid_hex` formats three integers the model has already clamped to 0-255,
+  so it returns a hash and six hex digits for every input — proven by rendering a
+  hostile scrim, not by reading the method. It is repaired anyway, and the reason
+  is measured: simulating the plausible refactor (the method learning to pass a
+  named colour through) injects an `onload` into every email with the attribute
+  hand-assembled, and merely renders a wrong colour with `tag.attributes` on it.
+
+  **NOTHING MOVED FOR REAL INPUT.** Seven banner shapes rendered before and after,
+  in both email and preview mode, are byte-identical. The one input whose bytes
+  change is a signed CDN URL, whose `&` now ships as `&amp;` — a correction, since
+  the CSS twin and the VML `src` on the SAME element already escaped it and the
+  hand-assembled `background` was the odd one out shipping a bare `&`. Verified in
+  a real browser: the client decodes the attribute, requests the URL with its
+  signature intact, and paints the banner.
+
+- **The Rails guard sweep's non-vacuity check tested a COPY of the scanner, so
+  the scanner could go blind and the suite stayed green.**
+  `rails_guard_sweep_test.rb` is a source scan, and a scan is only trustworthy
+  with a control proving its predicate can still say NO. That control re-typed
+  the rule as string operations on a sample instead of calling the scan's own
+  path: the predicate existed twice, at line 78 and line 101. Measured — typing
+  one typo into line 78 ALONE (`\bRails\.` → `\bRailz\.`), which blinds the net so
+  it can never flag anything no matter what `lib/` contains, left all three tests
+  passing, 0 failures. The floor was being measured against a duplicate
+  implementation, so it certified the copy and never the instrument.
+
+  **THE REPAIR IS ONE DEFINITION, NOT A BETTER COPY.** The rule now lives in a
+  single `offending_line?`, and both the scan and every control call it. The same
+  mutation now reddens `test_the_predicate_still_flags_the_shape_that_was_fixed`
+  by name — while the scan itself still passes, which is precisely the "passes for
+  free" the control exists to catch.
+
+  **THE CONTROLS ARE SPLIT ONE PER CLAUSE**, because `offending_line?` decides on
+  four (comment exemption, mentions `defined?(Rails)`, not already asking
+  `Rails.respond_to?`, and calls a method on the constant) and one combined
+  assertion would go red without saying which clause went inert — the same
+  blindness as the copy, one level in. Each of the four now reddens its own named
+  test. The scan also asserts its EXIT-BLINDNESS FLOOR inside the test that trusts
+  the result — the three named files were swept, and more than 1,000 lines were
+  read — because a scan whose loop never runs reports zero offenders and passes
+  having proved nothing. Six mutations, applied one at a time, each verified red.
+
+  **TWO CLAIMS IN THE ENTRIES BELOW WERE FALSE, and are corrected in this same
+  change.** *The Rails guard sweep really is finished now* said a bare
+  `require "action_view"` is what defines the namespace-only `module Rails`. It is
+  not — measured, that require leaves `Rails` UNDEFINED and never loads
+  rails-html-sanitizer. What defines it is naming a constant under
+  `ActionView::Helpers`, which autoloads the helpers tree; in `studio/js_literal`
+  that is line 66's `extend ActionView::Helpers::JavaScriptHelper`. The same loose
+  sentence had propagated into three test files and is corrected there too. And
+  *`Studio::S3` no longer mistakes a Rails NAMESPACE* said `lib/studio.rb` used the
+  repaired form "in three places" — the sweep in this same unreleased block made it
+  FOUR, so a false completeness claim was shipping one sentence above the entry
+  announcing a fix for exactly that.
+
 - **A quote in a host local can no longer close an Alpine attribute and turn the
   rest of the element into markup.** Four partials built an attribute — its OWN
   QUOTES included — as a Ruby String and marked it `html_safe`, which is the one
@@ -81,9 +159,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `Studio.routes`. All three now ask `Rails.respond_to?` first.
 
   **THE MAIL TRANSPORT ONE WAS ARMED, not theoretical.** `lib/studio.rb` requires
-  `studio/js_literal` (line 11) — whose first line is `require "action_view"`,
-  which is what defines the namespace-only `module Rails` — BEFORE it requires
-  `studio/mail_transport` (line 25). Measured at this branch's head, a bare
+  `studio/js_literal` (line 11) BEFORE it requires `studio/mail_transport`
+  (line 25), and loading `js_literal` is what puts the namespace-only `module
+  Rails` in memory. **Not its `require "action_view"`** — measured, that require
+  alone leaves `Rails` UNDEFINED and never loads the sanitizer at all. It is line
+  66, `extend ActionView::Helpers::JavaScriptHelper`: naming anything under
+  `ActionView::Helpers` autoloads the helpers tree, which requires
+  rails-html-sanitizer, and that gem is what ships `module Rails` — with
+  `Rails.methods(false) == []`, no singleton methods at all. The distinction is
+  not pedantry: a file that requires `action_view` and never reaches into
+  `Helpers` does not arm this trap. Measured at this branch's head, a bare
   `Studio::MailTransport.configure!(env: {}, action_mailer: mailer)` died with
   `NoMethodError: undefined method 'env' for module Rails`. No shipped app can
   reach it (every host configures mail from an initializer, where `Rails.env`
@@ -467,10 +552,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   long before any application does — ships a namespace-only `module Rails` with no
   singleton methods, so that guard reads true and the next call raises
   `NoMethodError: undefined method 'env' for module Rails`. It now asks
-  `Rails.respond_to?(:env)`, which is the form `lib/studio.rb` already uses in three
-  places. **This entry originally called it "the straggler"; that was wrong** —
-  three more sites carried the bare form, swept in *The Rails guard sweep really is
-  finished now* above. No shipped app can reach it — every host boots a
+  `Rails.respond_to?(:env)`, which is the form `lib/studio.rb` now uses in FOUR
+  places: the three it already carried (lines 701, 707 and 742) plus the route
+  guard at line 859. **This entry originally called it "the straggler"; that was
+  wrong** — three more sites carried the bare form, line 859 among them, and all
+  three are swept in *The Rails guard sweep really is finished now* above, in this
+  same unreleased block. No shipped app can reach it — every host boots a
   real application — but the engine's own pure-Ruby unit lane can, and it did:
   adding one `require` for a file that needs `action_view` turned an untouched
   `email_catalog_test` red with two errors about email uploads.

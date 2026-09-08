@@ -169,7 +169,14 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
   # the section's disabled-but-openable preview contract in a BASE app. They are
   # the control: they prove the fix below gated the gem-backed cards
   # SPECIFICALLY, and did not simply turn the web3 section inert.
-  ENGINE_OWNED_CARDS = ["Setup Wallet", "Processing on-chain tx"].freeze
+  #
+  # DOWN TO ONE CARD as of 2026-09-08, and that is worth stating rather than
+  # quietly editing: "Setup Wallet" was the other member until its specimen was
+  # retired (it mirrored a card turf owns, and turf now cards the real one in its
+  # own host section). A one-member control still discriminates — an inert
+  # section would fail it — but it no longer has a second card to corroborate,
+  # so a future engine-owned web3 specimen belongs in this list.
+  ENGINE_OWNED_CARDS = ["Processing on-chain tx"].freeze
 
   def test_the_gem_backed_specimens_are_not_triggers_in_a_base_app
     # THE DEFECT THIS PREVENTS. web3_gem gated the REGISTRATION and nothing else,

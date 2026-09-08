@@ -987,25 +987,20 @@ class StylePageTest < ActiveSupport::TestCase
   ].freeze
 
   WEB3_ORDER = [
-    "Connect wallet", "Setup Wallet",
+    "Connect wallet",
     "Sign Wallet", "Sign Wallet (no remembered brand)",
     "Processing on-chain tx", "On-chain success", "On-chain error",
-    # Co-sign refused sits WITH the other failure deliberately: On-chain error is
-    # the chain saying no, this is the SERVER saying no. Reading either alone
-    # leaves you unaware the other exists.
-    "Co-sign refused",
     # The three FUNDING cards run together, because they are one question asked
     # three ways: deposit an address, top up with a rail, or see every rail. A
     # reader comparing them has to have them adjacent.
     "Wallet deposit", "Top up wallet", "Add funds hub",
-    "Buy entry token", "Coinbase ramp (preflight)",
     "Entry confirmed",
     # The two reconciliation cards close the section, after the happy path they
     # interrupt: Network guard is asked BEFORE a request is signed, Wallet
     # changed AFTER the extension moves underneath a live session. Both read
     # as noise anywhere earlier, because neither makes sense until you know what
     # a normal wallet run looks like.
-    "Network guard", "Wallet changed"
+    "Network guard"
   ].freeze
 
   # Rails.root is the DUMMY app in this suite, not the engine — a source read
@@ -1031,37 +1026,8 @@ class StylePageTest < ActiveSupport::TestCase
       "the wallet cards run in the order a player meets them"
   end
 
-  test "wallet setup sits with the wallet cards, not with the signup chain" do
-    # It moved out of Onboarding on 2026-08-24: it is about GETTING a wallet, so
-    # it belongs beside the card that asks a player to PROVE one.
-    assert_not_includes section_cards("Profile"), "Setup Wallet"
-    cards = section_cards("Web3")
-    assert_operator cards.index("Setup Wallet"), :<, cards.index("Sign Wallet"),
-      "get-a-wallet reads before prove-your-wallet"
-  end
 
-  test "the wallet setup specimen composes engine chrome rather than copying it" do
-    # The Tier-2 contract: an app-specific flow may live here, but only if it is
-    # built from engine blocks. A specimen that hand-rolls its own chrome is a
-    # second copy of the shell/pill/brand marks, which is what this catches.
-    source = WALLET_SETUP_SPECIMEN.read
-    # Match the QUOTED path, not the bare one. The bare form also matches this
-    # file's own header comment, which lists all three blocks by name — so the
-    # test passed with every render call DELETED. Proved by mutation while
-    # control-checking batch 3; the quotes are what tie the assertion to a real
-    # render rather than to prose about one.
-    %w[shell progress_pill wallet_brand_sprite].each do |block|
-      assert_includes source, %("studio/modals/blocks/#{block}"),
-        "the specimen must compose the engine's #{block} block, not re-draw it"
-    end
-  end
 
-  test "the wallet setup specimen renders and is registered on the guide's host" do
-    html = render_index
-    assert_includes html, "$store.dsModals.current().id === 'wallet-setup'",
-      "the specimen needs a registration on the page-scoped host or the card opens blank"
-    assert_includes html, "Set up your wallet", "the wallet setup card renders its title"
-  end
 
   # --- 12. the birthday / age-gate split --------------------------------------
 
@@ -1109,7 +1075,6 @@ class StylePageTest < ActiveSupport::TestCase
   # a blank shell, which looks like a styling bug rather than a missing partial.
 
   PORTED_SPECIMENS = {
-    "cosign-rejected"      => "Co-sign refused",
     "unsubscribe-confirm"  => "Leave the newsletter?",
     "unsubscribe-goodbye"  => "See you later",
     "quest-success"        => "Quest success (off-page)"
@@ -1190,7 +1155,7 @@ class StylePageTest < ActiveSupport::TestCase
     # of chrome the app already borrows — which is what style/modals/_wallet_deposit
     # is, and what this batch was written not to add.
     root = Studio::Engine.root.join("app/views/style/modals")
-    %w[_cosign_rejected _unsubscribe_confirm _unsubscribe_goodbye _quest_success].each do |f|
+    %w[_unsubscribe_confirm _unsubscribe_goodbye _quest_success].each do |f|
       source = root.join("#{f}.html.erb").read
       # The trailing quote+comma matters: a bare path is a PREFIX of any longer
       # name, so the old form passed against a hand-rolled "…/card_header_custom"
@@ -1265,7 +1230,6 @@ class StylePageTest < ActiveSupport::TestCase
     "email-change-pending" => "Email change pending",
     "newsletter-email"     => "Newsletter email",
     "network-guard"        => "Network guard",
-    "wallet-changed"       => "Wallet changed",
     "it-begins"            => "It Begins",
     "rate-limit-general"   => "Rate limited (soft)"
   }.freeze
@@ -1296,7 +1260,7 @@ class StylePageTest < ActiveSupport::TestCase
     # thing this test exists to refuse. Control-checking this batch caught the
     # weak form passing against exactly that mutant.
     %w[_email_change_pending _newsletter_email _network_guard
-       _rate_limit_general _wallet_changed].each do |f|
+       _rate_limit_general].each do |f|
       assert_includes BATCH3_SOURCES.join("#{f}.html.erb").read,
         %(render "studio/modals/blocks/card_header",),
         "#{f} must compose the engine's card_header, not re-draw it"
@@ -1318,7 +1282,7 @@ class StylePageTest < ActiveSupport::TestCase
     # one ends mid-expression. Asserting the brace is what makes a truncation
     # visible instead of silently shortening the captured string.
     %w[_email_change_pending _newsletter_email _network_guard
-       _rate_limit_general _wallet_changed].each do |f|
+       _rate_limit_general].each do |f|
       source = BATCH3_SOURCES.join("#{f}.html.erb").read
       body   = source[/x-data="(.*?)"/m, 1]
       assert body, "#{f} declares no x-data — this guard has nothing to check"
@@ -1406,16 +1370,6 @@ class StylePageTest < ActiveSupport::TestCase
       "an @destroy listener never fires in Alpine 3; the timer would survive the close"
   end
 
-  test "the wallet-changed card shows BOTH addresses" do
-    # Recognising your own address is the only way to tell a deliberate account
-    # switch from an accident, and it is the one check the app cannot make for
-    # the person. One address alone answers nothing.
-    source = BATCH3_SOURCES.join("_wallet_changed.html.erb").read
-    assert_includes source, %(x-text="short(props.currentAddress)),
-      "the session's address must be printed"
-    assert_includes source, %(x-text="short(props.newAddress)),
-      "the extension's new address must be printed beside it"
-  end
 
 
   # --- 15. the funding chrome primitives -------------------------------------
@@ -1588,9 +1542,7 @@ class StylePageTest < ActiveSupport::TestCase
   # --- 17. the last three: the catalogue closes at 33 of 33 ------------------
 
   LAST_SPECIMENS = {
-    "ds-newsletter-success" => "Subscribed! (standalone)",
-    "ds-buy-entry-token"    => "Buy entry token",
-    "ds-cdp-ramp"           => "Coinbase ramp (preflight)"
+    "ds-newsletter-success" => "Subscribed! (standalone)"
   }.freeze
 
   test "the last three specimens are carded AND registered" do
@@ -1640,34 +1592,15 @@ class StylePageTest < ActiveSupport::TestCase
     end
   end
 
-  test "the cdp-ramp card admits it shows one state of thirteen" do
-    # A cabinet that shows one state of a thirteen-state machine WITHOUT saying
-    # so teaches a reader that the machine is simpler than it is. The partial
-    # coverage is a decision (operator, 2026-08-26: minimal migration is fine
-    # here), and a decision has to be legible to be reviewable.
-    section = section_html("Web3")
-
-    assert_includes section, "THIRTEEN states",
-      "the reference must name the real size of the machine"
-    assert_includes section, "BY DECISION",
-      "and say the gap is a decision rather than an oversight"
-  end
 
   test "the last three compose engine chrome rather than copies" do
     root = Studio::Engine.root.join("app/views/style/modals")
 
-    # buy-entry-token is a rail picker; cdp-ramp is a centred card. Both borrow.
-    %w[_ds_buy_entry_token _ds_cdp_ramp].each do |f|
-      source = root.join("#{f}.html.erb").read
-      assert_includes source, %(render "studio/modals/blocks/close_x"),
-        "#{f} must render the engine's close mark"
-      assert_not_includes source, "absolute top-0 right-0 -mt-2 -mr-2",
-        "#{f} must not carry its own copy of it"
-    end
-
-    buy = root.join("_ds_buy_entry_token.html.erb").read
-    assert_equal 2, buy.scan(%(render "studio/modals/blocks/rail_row")).size,
-      "two rails, one ranked above the other"
+    # WAS THREE. buy-entry-token and cdp-ramp were retired from the guide on
+    # 2026-09-08 — they mirrored cards turf owns, and turf now cards the real
+    # ones in its own host section. What they asserted (that a specimen borrows
+    # blocks/_close_x rather than hand-rolling the mark) still holds for every
+    # specimen that remains, and is covered per-card where those live.
 
     news = root.join("_ds_newsletter_success.html.erb").read
     assert_includes news, %(render "studio/modals/blocks/card_header"),

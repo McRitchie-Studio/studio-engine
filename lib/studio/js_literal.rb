@@ -56,6 +56,26 @@ module Studio
   # the worked examples; test/lib/studio/attribute_encoding_contract_test.rb pins the
   # ActionView behaviour the whole thing rests on.
   #
+  # THE MARKING IS A JUDGEMENT ABOUT THE VALUE, NOT ABOUT THE FILE, and it is the
+  # half of that repair most easily got backwards. `tag.attributes` takes both kinds
+  # and does the right thing with each:
+  #
+  #   EXPRESSION (an Alpine handler, a JS number, a store path) — pass it MARKED.
+  #     Only the double quotes move, so the code the caller deliberately handed the
+  #     engine still parses. Escaping it would be corruption of the same kind the
+  #     script-body note above describes.
+  #   CONTENT (a URL, a colour, a length, a regex, a tooltip sentence) — pass it
+  #     UNMARKED and let it take the full escaping a content attribute is owed. The
+  #     parser hands the value back decoded, and a bare `&` stops reaching the client
+  #     as the start of an entity.
+  #
+  # Both repairs live in this engine and neither is the default: the four input
+  # constraints in modals/blocks/_leveling_activity are the content case beside the
+  # handlers in the same file, and studio/mailers/_layered_banner is the content case
+  # in an EMAIL, where the consumer is a mail client rather than a browser and the
+  # margin for a malformed attribute is smaller. Choosing by which file a value sits
+  # in, rather than by what the value is, gets one of those two wrong every time.
+  #
   # AND IT IS THE WRONG REPAIR FOR IDENTIFIER POSITION. A local spliced in as a bare
   # NAME — `$store.<%= modal_store %>.close()` — must be VALIDATED, never escaped:
   # escape_javascript also escapes `$`, so a legitimate store name like `dsModals$2`
