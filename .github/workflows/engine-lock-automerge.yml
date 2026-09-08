@@ -75,6 +75,12 @@ jobs:
   auto-merge:
     name: Auto-merge a green solana-studio lock bump
     runs-on: ubuntu-latest
+    # A wall-clock bound, per test/lib/ci_job_timeout_test.rb: without one this
+    # job inherits GitHub's six-hour default, where a hang never fails and an
+    # incomplete run cannot be re-run. This lane makes three API reads and at
+    # most one merge, so ten minutes is many times its real cost while still
+    # turning "hangs forever" into "fails".
+    timeout-minutes: 10
     # A cheap pre-filter ONLY — it can make this lane run less, never merge
     # more. Every safety condition lives in bin/lock-bump-mergeable. Runs from
     # a failed CI are deliberately NOT filtered out here, so a refusal leaves a
@@ -150,9 +156,16 @@ jobs:
         if: steps.pr.outputs.found == 'true'
         run: |
           set -uo pipefail
-          # The exit code IS the verdict, so do not let `set -e` end the job on a
-          # refusal: a refused PR is a normal, expected outcome and must leave a
-          # green run with a readable log, not a red one that reads as breakage.
+          # `set +e` IS REQUIRED, and is not redundant with the line above.
+          # Actions runs every `run:` step as `bash -e {0}`, so -e is already ON
+          # before this script starts and `set -uo pipefail` does not clear it.
+          # Left alone, a REFUSAL (exit 1) would abort the step at the ruby call:
+          # `verdict` would never be assigned, the case below would never run,
+          # and every breaking bump would show up as a RED workflow — reading as
+          # "the automation is broken" when it is in fact working exactly as
+          # designed. The exit code is the verdict here, so it must be captured,
+          # not obeyed.
+          set +e
           ruby bin/lock-bump-mergeable < /tmp/payload.json
           verdict=$?
           set -e
