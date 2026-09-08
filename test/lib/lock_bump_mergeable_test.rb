@@ -160,6 +160,30 @@ class LockBumpMergeableTest < Minitest::Test
     assert_includes err, "nokogiri"
   end
 
+  def test_a_large_off_scope_diff_is_summarised_without_hiding_the_other_reasons
+    # MEASURED against real PR #285 on 2026-09-07: quoting every off-scope line
+    # ran to ~90 lines and pushed the other refusal reasons — including the
+    # red-CI one — below the fold of the workflow log. A refusal that buries its
+    # own siblings gets acted on incompletely.
+    noisy = (1..40).map { |i| "+  a prose line number #{i}" }.join("\n")
+    diff = "diff --git a/Gemfile.lock b/Gemfile.lock\n--- a/Gemfile.lock\n+++ b/Gemfile.lock\n#{noisy}\n"
+    _out, err, code = decide(mergeable("diff" => diff, "checks" => [
+      { "name" => "Consumer CI", "status" => "COMPLETED", "conclusion" => "FAILURE" }
+    ]))
+
+    assert_equal 1, code
+    assert_includes err, "40 line(s)", "the COUNT must be stated so truncation hides nothing"
+    assert_includes err, "and 35 more", "the summary must say how many it did not quote"
+
+    # The bound is only worth having if the LATER reasons survive it.
+    assert_includes err, "Consumer CI",
+      "the red-CI reason must still be readable after a large off-scope diff — " \
+      "burying it is the defect this bound exists to prevent"
+
+    refute_includes err, "a prose line number 40",
+      "an unbounded dump is what pushed the other reasons out of view"
+  end
+
   def test_a_lock_diff_that_changes_nothing_is_refused
     # No changed lines means nothing was measured. Merging on it would be a pass
     # over an empty set.

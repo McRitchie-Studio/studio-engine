@@ -78,6 +78,12 @@ LINE_MARKER = "#{GEM_NAME} ("
 # while looking strict — refusing every PR for a reason no reader would find.
 GREEN_CONCLUSIONS = %w[SUCCESS SKIPPED NEUTRAL].freeze
 
+# How many off-scope diff lines to quote in a refusal before summarising the
+# rest as a count. A wholesale `bundle update` (or a PR that is not a lock bump
+# at all) can put hundreds of lines here, and quoting them all buries the other
+# refusal reasons in the workflow log.
+SAMPLE_LINES = 5
+
 def bail_usage(message)
   warn "lock-bump-mergeable: #{message}"
   exit 64
@@ -158,8 +164,18 @@ if changed_lines.empty?
 else
   off_scope = changed_lines.reject { |line| line.include?(LINE_MARKER) }
   unless off_scope.empty?
-    refusals << "the diff changes lines other than #{GEM_NAME}'s resolution: " \
-                "#{off_scope.map(&:strip).inspect} — only the #{LINE_MARKER}..) line may move"
+    # BOUNDED, and the COUNT is always stated. Measured against real PR #285 on
+    # 2026-09-07: an unbounded dump ran to ~90 lines and pushed the OTHER
+    # refusal reasons — including the red-CI one — far below the fold of the
+    # workflow log. A refusal that hides its own siblings is a refusal the
+    # reader acts on incompletely. The sample proves the finding; the count
+    # keeps the truncation honest, so nothing is silently dropped.
+    sample = off_scope.first(SAMPLE_LINES).map { |l| l.strip[0, 80] }
+    more = off_scope.length - sample.length
+    refusals << "the diff changes #{off_scope.length} line(s) other than #{GEM_NAME}'s " \
+                "resolution#{" (first #{SAMPLE_LINES} shown)" if more.positive?}: " \
+                "#{sample.inspect}#{" … and #{more} more" if more.positive?} — only the " \
+                "#{LINE_MARKER}..) line may move"
   end
 end
 
