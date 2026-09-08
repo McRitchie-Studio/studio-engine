@@ -6,6 +6,44 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **The Rails guard sweep really is finished now, and a test says so instead of a
+  comment.** Fixing `Studio::S3` left THREE sites still guarding a Rails method
+  call on a bare `defined?(Rails)`: both keyword defaults in
+  `Studio::MailTransport.configure!` (`rails_env:` reading `Rails.env`, `logger:`
+  reading `Rails.logger`) and the developer-desk route guard in
+  `Studio.routes`. All three now ask `Rails.respond_to?` first.
+
+  **THE MAIL TRANSPORT ONE WAS ARMED, not theoretical.** `lib/studio.rb` requires
+  `studio/js_literal` (line 11) — whose first line is `require "action_view"`,
+  which is what defines the namespace-only `module Rails` — BEFORE it requires
+  `studio/mail_transport` (line 25). Measured at this branch's head, a bare
+  `Studio::MailTransport.configure!(env: {}, action_mailer: mailer)` died with
+  `NoMethodError: undefined method 'env' for module Rails`. No shipped app can
+  reach it (every host configures mail from an initializer, where `Rails.env`
+  exists, and all four in-repo callers pass `rails_env:` explicitly) — the cost
+  lands on the next gem unit test that omits the kwarg, which is the same
+  half-hour the `Studio::S3` fix already paid once.
+
+  **THE TWO DEFAULTS ARE SEPARATE STRAGGLERS**, and the first hid the second: Ruby
+  evaluates only the defaults a caller omitted, and `rails_env:` is declared above
+  `logger:`, so a bare call raised out of `Rails.env` and never reached
+  `Rails.logger`. `test/lib/studio/mail_transport_namespace_only_rails_test.rb`
+  supplies one argument and omits the other in each test, so each guard is pinned
+  independently rather than behind its neighbour.
+
+  **THE ROUTE GUARD IS PINNED BY A SCAN, deliberately.** `Studio.routes` only
+  loads inside a real Rails application, where `Rails.env` exists — so the
+  condition under test cannot be constructed where the file loads, and no
+  behavioural test can reach it. `test/lib/studio/rails_guard_sweep_test.rb` is
+  the tree-wide net instead, and it asserts both that it really read the files and
+  that its predicate still flags the original shape, so it cannot pass for free.
+
+  **The completeness claim itself was the other half of the bug.** `lib/studio/s3.rb`
+  and this changelog both said that fix "was the straggler" — while one of the
+  remaining three sat in `lib/studio.rb`, the very file the comment cited as
+  already clean. Both claims are corrected, and the comment now points at the test
+  rather than restating that the sweep is done.
+
 - **The app census in these comments was short by the most important app.** Ten
   sites said this engine is mounted by SIX apps and that THREE of them bundle no
   `solana-studio`. Measured 2026-09-07 by the criterion that reproduces it — a
@@ -363,7 +401,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   singleton methods, so that guard reads true and the next call raises
   `NoMethodError: undefined method 'env' for module Rails`. It now asks
   `Rails.respond_to?(:env)`, which is the form `lib/studio.rb` already uses in three
-  places; this was the straggler. No shipped app can reach it — every host boots a
+  places. **This entry originally called it "the straggler"; that was wrong** —
+  three more sites carried the bare form, swept in *The Rails guard sweep really is
+  finished now* above. No shipped app can reach it — every host boots a
   real application — but the engine's own pure-Ruby unit lane can, and it did:
   adding one `require` for a file that needs `action_view` turned an untouched
   `email_catalog_test` red with two errors about email uploads.
