@@ -106,6 +106,19 @@
     }
   }".gsub(/\s+/, ' ').html_safe
 
+  # THE TWO EVENT NAMES, ESCAPED FOR THE @click THEY ARE SPLICED INTO. Each sits in
+  # a JS single-quoted literal inside a double-quoted attribute, so an apostrophe in
+  # either closes the literal and the handler becomes a SyntaxError — a CTA that
+  # renders exactly right and does nothing when clicked. This is the engine's
+  # most-rendered block, so it is also the widest reach that failure has.
+  #
+  # ESCAPED, NOT VALIDATED: an event name is a STRING argument to $dispatch and any
+  # character is legal in one. Contrast cta_href_key / props_expr below, which are
+  # Alpine EXPRESSIONS by contract and must not be touched. Studio::JsLiteral
+  # carries why the interpolated form is load-bearing.
+  cta_event_js       = Studio::JsLiteral.in_attribute(local_assigns[:cta_event])
+  secondary_event_js = Studio::JsLiteral.in_attribute(local_assigns[:secondary_event])
+
   init_calls = []
   init_calls << "fireConfetti()" if fire_confetti
   init_calls << "startCountdown(#{local_assigns[:auto_redirect_url_key]})" if has_redirect
@@ -229,7 +242,7 @@
         <span class="relative z-10"><%= cta_label %></span>
       </a>
     <% elsif use_drain && local_assigns[:cta_event] %>
-      <button @click="$dispatch('<%= cta_event %>')"
+      <button @click="$dispatch('<%= cta_event_js %>')"
               class="btn btn-primary btn-lg w-full relative overflow-hidden no-underline">
         <div class="absolute inset-0 pointer-events-none origin-left"
              style="background: rgba(255,255,255,0.18);"
@@ -246,12 +259,12 @@
     <% elsif local_assigns[:cta_href_key] %>
       <a :href="<%= cta_href_key %>" class="btn btn-primary btn-lg w-full"><%= cta_label %></a>
     <% elsif local_assigns[:cta_event] %>
-      <button @click="$dispatch('<%= cta_event %>')" class="btn btn-primary btn-lg w-full"><%= cta_label %></button>
+      <button @click="$dispatch('<%= cta_event_js %>')" class="btn btn-primary btn-lg w-full"><%= cta_label %></button>
     <% end %>
   <% end %>
 
   <% if local_assigns[:secondary_label] && local_assigns[:secondary_event] %>
-    <button @click="$dispatch('<%= secondary_event %>')"
+    <button @click="$dispatch('<%= secondary_event_js %>')"
             class="block mx-auto mt-3 text-xs text-secondary hover:text-heading underline underline-offset-2">
       <%= secondary_label %>
     </button>

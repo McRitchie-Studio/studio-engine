@@ -24,6 +24,15 @@
 <%
   icon_emoji = local_assigns[:icon_emoji] || "⏳"   # ⏳
   cta_label  = local_assigns[:cta_label]  || 'Refresh'
+  # THE TWO EVENT NAMES ARE THE ONLY LOCALS HERE THAT LAND INSIDE JS. Both sit in a
+  # single-quoted literal inside a double-quoted @click, so an apostrophe in either
+  # closes the literal, the handler becomes a SyntaxError, and the button renders
+  # perfectly and does NOTHING when clicked — no error, no log, nothing a markup
+  # assertion can see. Escaped, not validated: an event name is a STRING to
+  # $dispatch, and any character is legal in one. Studio::JsLiteral says why the
+  # interpolated form is load-bearing.
+  cta_event_js       = Studio::JsLiteral.in_attribute(local_assigns[:cta_event])
+  secondary_event_js = Studio::JsLiteral.in_attribute(local_assigns[:secondary_event])
 %>
 <%# role="alert" on the CARD, not on its message: the message is server-rendered
     static text, so it never "changes" for a live region to notice. The modal host
@@ -42,11 +51,11 @@
   <% if local_assigns[:cta_reload] %>
     <button @click="window.location.reload()" class="btn btn-outline btn-sm"><%= cta_label %></button>
   <% elsif local_assigns[:cta_event] %>
-    <button @click="$dispatch('<%= cta_event %>')" class="btn btn-outline btn-sm"><%= cta_label %></button>
+    <button @click="$dispatch('<%= cta_event_js %>')" class="btn btn-outline btn-sm"><%= cta_label %></button>
   <% end %>
 
   <% if local_assigns[:secondary_label] && local_assigns[:secondary_event] %>
-    <button @click="$dispatch('<%= secondary_event %>')"
+    <button @click="$dispatch('<%= secondary_event_js %>')"
             class="block mx-auto mt-3 text-xs text-secondary hover:text-heading underline underline-offset-2">
       <%= secondary_label %>
     </button>

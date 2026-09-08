@@ -26,6 +26,9 @@ require_relative "../lib/studio/oauth_identity"
 require_relative "../lib/studio/name_parts"
 require_relative "../lib/studio/theme_resolver"
 require_relative "../lib/studio/ui_primitives"
+# Needs action_view for escape_javascript, which is a plain gem require rather
+# than a Rails app — the engine dependency this helper avoids is studio/engine.
+require_relative "../lib/studio/js_literal"
 require_relative "../lib/studio/email"
 require_relative "../lib/studio/email_smoke"
 require_relative "../lib/studio/redis"
