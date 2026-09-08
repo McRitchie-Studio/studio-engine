@@ -1167,9 +1167,9 @@
           listed for reference but <strong>cannot be opened here</strong>. Nothing
           registers them, so a trigger would open an empty panel.
         <% end %>
-        The cards run in the order a player meets them &mdash; <strong>get a wallet,
-        prove it, spend from it</strong>: Connect wallet &rarr; Setup Wallet &rarr;
-        the two Sign Wallet states &rarr; Processing &rarr; success or error &rarr;
+        The cards run in the order a player meets them &mdash; <strong>connect a
+        wallet, prove it, spend from it</strong>: Connect wallet &rarr; the two
+        Sign Wallet states &rarr; Processing &rarr; success or error &rarr;
         top-up &rarr; Entry confirmed. Inside that, <strong>Connect Wallet &rarr;
         Processing on-chain transaction &rarr; On-chain success</strong> is a
         <strong>walked flow</strong> and the live card <strong>glows</strong>,
@@ -1192,14 +1192,7 @@
         <strong>standard web3 auth button</strong>: a wallet row (brand mark, the
         wallet&rsquo;s own name, Installed badge, chevron) rather than a filled
         CTA, glowing via <code class="font-mono text-2xs">pulse-cta</code> because
-        it is the one thing to press. Do not confuse them with <strong>Setup
-        Wallet</strong>, immediately before them: that one asks an account to
-        <strong>get</strong> a wallet, these ask an account to
-        <strong>prove</strong> the one it already has &mdash; opposite populations
-        (<code class="font-mono text-2xs">WalletSetupPolicy</code> exits at its own
-        step 1 for an account that holds a wallet), so no user ever meets both.
-        They sit next to each other anyway, because the pair is easiest to keep
-        straight when you can read them side by side.
+        it is the one thing to press.
       </p>
     </div>
     <%# ONE ordered run, read left to right as a player meets it: get a wallet,
