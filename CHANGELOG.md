@@ -272,6 +272,45 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **A host's apostrophe no longer kills the card it was passed to — now across the
+  blocks, not just the first-name step.** The same defect
+  `onboarding/_first_name` fixed one release ago turns out to be an engine-wide
+  idiom: a host-supplied local interpolated into a JS string literal inside a
+  JS-evaluating attribute. Repaired at eleven more splices.
+
+  **WHY IT IS WORTH A CHANGELOG LINE WHEN NOTHING VISIBLE CHANGES.** The failure
+  mode is silent. A bare apostrophe closes the JS literal, the whole expression
+  becomes a SyntaxError, and Alpine mounts the component as a NO-OP that still
+  renders every element — a card that looks perfect and whose buttons do nothing.
+  There is no error on screen, nothing in the server log, and no markup assertion
+  that can see it. Every value in every consumer resolves to a source literal or a
+  frozen constant today, so this is latent cover rather than a live fix; it is
+  worth doing because the next local to carry prose will look like an ordinary
+  change to whoever writes it.
+
+  **WHAT MOVED.** `blocks/_success_card` (`cta_event` at both CTA branches,
+  `secondary_event`), `blocks/_error_card` (`cta_event`, `secondary_event`),
+  `blocks/_entry_confirmed` and `blocks/_solana_tx_link` (`cluster_param`),
+  `modals/_crop_photo` (`store`), `studio/emails/show` (the two upload filenames
+  and the success sentence), and `profiles/_birthday_fields` (the date value).
+  No default or in-repo value contains a character either escaper touches, so
+  every shipped card renders byte-for-byte what it did.
+
+  **THE MECHANISM NOW HAS ONE HOME AND ONE GUARD.** `Studio::JsLiteral.in_attribute`
+  replaces the four inline copies in `_first_name`. TWO escapers have to run — one
+  for the JS literal, one for the HTML attribute — and the second only runs on a
+  value ERB still believes is unsafe, which is why the value is interpolated before
+  it is escaped. That subtlety was re-derived at every call site and had no test
+  anywhere; deleting it used to leave the suite green.
+
+  **NOT A FIX FOR IDENTIFIER POSITION, deliberately.** A local spliced in as a bare
+  NAME — `$store.<name>.close()` — must be VALIDATED, never escaped, because
+  `escape_javascript` also escapes `$` and mangles a legal store name. That fleet
+  (about 36 splices across 19 partials) and a third class found alongside it —
+  Ruby-ASSEMBLED JS emitted into an attribute, some of it already `html_safe` — are
+  scoped OUT of this change and carry their own tickets. The SHAPE of the splice
+  decides the repair, never the name of the local.
+
 - **The style guide's two "Sign Wallet" thumbnails no longer crown themselves
   with a padlock the card stopped drawing, and the guide's lock no longer trails
   the release that removed it.** solana-studio 0.6.1 replaced the step-up card's
