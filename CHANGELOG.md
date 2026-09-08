@@ -311,6 +311,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   scoped OUT of this change and carry their own tickets. The SHAPE of the splice
   decides the repair, never the name of the local.
 
+- **`Studio::S3` no longer mistakes a Rails NAMESPACE for a Rails application.**
+  `environment` guarded on `defined?(Rails)` and then called `Rails.env`.
+  rails-html-sanitizer — a transitive dependency of `action_view`, which arrives
+  long before any application does — ships a namespace-only `module Rails` with no
+  singleton methods, so that guard reads true and the next call raises
+  `NoMethodError: undefined method 'env' for module Rails`. It now asks
+  `Rails.respond_to?(:env)`, which is the form `lib/studio.rb` already uses in three
+  places; this was the straggler. No shipped app can reach it — every host boots a
+  real application — but the engine's own pure-Ruby unit lane can, and it did:
+  adding one `require` for a file that needs `action_view` turned an untouched
+  `email_catalog_test` red with two errors about email uploads.
+
 - **The style guide's two "Sign Wallet" thumbnails no longer crown themselves
   with a padlock the card stopped drawing, and the guide's lock no longer trails
   the release that removed it.** solana-studio 0.6.1 replaced the step-up card's

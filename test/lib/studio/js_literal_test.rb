@@ -2,16 +2,6 @@
 
 require "test_helper"
 
-# REQUIRED HERE RATHER THAN FROM test_helper, and the reason is worth keeping.
-# lib/studio/js_literal.rb needs action_view for escape_javascript, and action_view
-# pulls in rails-html-sanitizer, which defines a NAMESPACE-ONLY `module Rails` — a
-# Rails constant with no `.env` on it. This helper's whole point is a pure-Ruby lane
-# with no Rails app, and several files in it guard on a bare `defined?(Rails)`; that
-# guard reads TRUE against the namespace and then dies on `Rails.env`. Requiring it
-# from test_helper turned test/lib/studio/email_catalog_test.rb red for exactly that
-# reason. Only this file needs the constant, so only this file loads it.
-require_relative "../../../lib/studio/js_literal"
-
 # [unit] Studio::JsLiteral — the string-position repair for a host value spliced
 # into a JS-evaluating HTML attribute (lib/studio/js_literal.rb).
 #
