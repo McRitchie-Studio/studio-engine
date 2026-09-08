@@ -144,3 +144,126 @@ test("a header with no data-pin still publishes --nav-h and --nav-bottom", async
 
   expect(errors).toEqual([]);
 });
+
+// ============================================================================
+// THE SAME-FRAME PROPERTY — the defect this primitive was rebuilt for.
+//
+// WHAT SHIPPED, measured on mcritchie-studio's production /deployments on
+// 2026-09-07. The publisher was WOKEN by its ResizeObserver and then DEFERRED
+// the write to requestAnimationFrame. A frame runs
+//
+//     rAF callbacks -> style/layout -> ResizeObserver callbacks -> paint
+//
+// so a write made in rAF lands at the top of the NEXT frame: the frame in which
+// a layer actually appeared or disappeared painted with the PREVIOUS frame's
+// number, every time. On the live board that showed as the deploy lane headers
+// slamming 99px and back on a page nobody was touching — two Turbo broadcasts of
+// the applications row produced four jumps in 240ms with scrollY, document
+// height and nav height all constant.
+//
+// WHY THIS CANNOT BE A UNIT CHECK. nav_offset_contract_test pins the SHAPE — the
+// observer callback publishes outright and defers to nothing. It cannot say the
+// number is RIGHT WHEN IT IS READ, because that is a fact about when a browser
+// runs work inside a frame. Only a browser can answer it.
+//
+// HOW IT IS MEASURED. A ResizeObserver created LAST runs after every observer
+// registered before it, including the publisher's own — and RO callbacks are the
+// last point in a frame at which anything is observable before paint. So what a
+// consumer's box reads there IS what the frame paints. Sampling in rAF instead
+// would read the NEXT frame and report the bug as fixed.
+test("a layer appearing or disappearing moves the stack in the SAME frame", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/lab/bar_stack");
+  await expectStickyChromeIsLive(page, expect);
+
+  const result = await page.evaluate(async () => {
+    const strip = document.createElement("div");
+    strip.setAttribute("data-pin", "apps");
+    // TALLER THAN THE HEADER, on purpose. A layer that never becomes the lowest
+    // edge cannot move --pin-stack-bottom at all, and the test would pass
+    // against a publisher that had stopped composing entirely.
+    strip.style.cssText = "position:fixed;left:0;right:0;top:0;height:600px";
+    document.body.appendChild(strip);
+    document.dispatchEvent(new CustomEvent("turbo:before-stream-render"));
+    await new Promise((r) => setTimeout(r, 250));
+
+    // THE CONSUMER. One CSS expression over ONE published value — no max(), no
+    // layer named. This is the whole point of the primitive.
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:fixed;left:0;height:4px;top:var(--pin-stack-bottom,0px)";
+    document.body.appendChild(probe);
+    await new Promise((r) => setTimeout(r, 100));
+
+    const navBottom = document.querySelector("header").getBoundingClientRect().bottom;
+    const samples = [];
+
+    // THE INSTRUMENT. Created last, so it runs after the publisher's observer in
+    // the same frame; what it reads is what this frame paints.
+    const spy = new ResizeObserver(() => {
+      const shown = getComputedStyle(strip).display !== "none";
+      samples.push({
+        truth: Math.round(shown ? 600 : navBottom),
+        painted: Math.round(probe.getBoundingClientRect().top),
+      });
+    });
+    spy.observe(strip);
+    await new Promise((r) => setTimeout(r, 100));
+    samples.length = 0;
+
+    for (let i = 0; i < 8; i++) {
+      strip.style.display = i % 2 === 0 ? "none" : "block";
+      await new Promise((r) => setTimeout(r, 120));
+    }
+    spy.disconnect();
+
+    // While the strip is up it is the lowest edge, so it owns the stack bottom;
+    // --pin-apps-top must still exclude it and sit on the header alone.
+    strip.style.display = "block";
+    await new Promise((r) => setTimeout(r, 150));
+    const root = getComputedStyle(document.documentElement);
+    const composed = {
+      stack: root.getPropertyValue("--pin-stack-bottom").trim(),
+      appsTop: root.getPropertyValue("--pin-apps-top").trim(),
+      navBottom: root.getPropertyValue("--pin-nav-bottom").trim(),
+    };
+
+    strip.remove();
+    document.dispatchEvent(new CustomEvent("turbo:before-stream-render"));
+    await new Promise((r) => setTimeout(r, 250));
+    const afterRemoval = {
+      stack: getComputedStyle(document.documentElement).getPropertyValue("--pin-stack-bottom").trim(),
+      probeTop: Math.round(probe.getBoundingClientRect().top),
+      navBottom: Math.round(navBottom),
+    };
+
+    return { samples, composed, afterRemoval };
+  });
+
+  // THE ASSERTION. Not "it settles eventually" — every changing frame paints the
+  // right number. Against the rAF-deferred publisher this was wrong on 8/8.
+  expect(result.samples.length).toBeGreaterThan(4);
+  const wrong = result.samples.filter((s) => s.painted !== s.truth);
+  expect(
+    wrong,
+    `every frame in which a layer changed must paint the new stack bottom; ` +
+      `${wrong.length}/${result.samples.length} painted the previous frame's`
+  ).toEqual([]);
+
+  // A LAYER DOES NOT STACK ON ITSELF. --pin-stack-bottom includes the strip's own
+  // edge; --pin-apps-top is the bottom of everything ABOVE it, which here is the
+  // header alone. Collapse the two and a layer positioned off its own top chases
+  // itself down the page on every publish.
+  expect(result.composed.stack).toBe("600px");
+  expect(result.composed.appsTop).toBe(result.composed.navBottom);
+  expect(result.composed.appsTop).not.toBe(result.composed.stack);
+
+  // AND A REMOVED LAYER LEAVES THE STACK. Nothing is left to measure, so without
+  // an explicit clear the consumer sits at the height of a strip that is gone.
+  expect(result.afterRemoval.stack).toBe(`${result.afterRemoval.navBottom}px`);
+  expect(result.afterRemoval.probeTop).toBe(result.afterRemoval.navBottom);
+
+  expect(errors).toEqual([]);
+});
