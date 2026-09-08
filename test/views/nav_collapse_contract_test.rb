@@ -294,26 +294,65 @@ class NavCollapseContractTest < Minitest::Test
   def test_the_geometry_publisher_coalesces_and_skips_no_ops
     html = render_head
 
-    # The ResizeObserver used to call publish() DIRECTLY. That was fine while
-    # the header only resized during a 300ms transition; navCollapse made it
-    # resize on EVERY scroll frame. Measured in turf-monster at 6x CPU throttle:
-    # frames over 20ms were 13/24 through the ramp vs 0/24 past it, median 26ms
-    # vs 8ms — and ablating this observer alone took it to 0/24 and median 13ms.
-    assert_match(/new ResizeObserver\(\s*schedule\s*\)/, html,
-                 "the ResizeObserver must go through schedule(), the rAF coalescer the other listeners use")
-    refute_match(/new ResizeObserver\(\s*function\s*\([^)]*\)\s*\{\s*publish/, html,
-                 "publishing straight from the observer bypasses the coalescer once per resize")
+    # THIS ASSERTION USED TO REQUIRE THE DEFECT, and the reversal is measured
+    # rather than preferred — so the numbers are here, on both sides.
+    #
+    # It read: `new ResizeObserver(schedule)` — the observer must go through the
+    # rAF coalescer. That was written against a real cost. The observer used to
+    # call publish() DIRECTLY, once per entry, each doing read-then-write; when
+    # navCollapse made the header resize on EVERY scroll frame that thrashed, and
+    # routing it through the frame callback fixed it. Measured in turf-monster at
+    # 6x CPU throttle: frames over 20ms 13/24 through the ramp vs 0/24 past it,
+    # median 26ms vs 8ms.
+    #
+    # But a frame runs rAF -> layout -> ResizeObserver -> paint, so a write made
+    # in the frame callback lands at the top of the NEXT frame. Coalescing bought
+    # the cost back and paid for it in CORRECTNESS: every frame in which a pinned
+    # layer appeared or disappeared painted with the previous frame's number. On
+    # mcritchie-studio's /deployments that was the lane headers slamming 99px and
+    # back on a page nobody was touching.
+    #
+    # THE COST THAT JUSTIFIED THE RULE IS GONE, because what was expensive was
+    # read-write thrash, not the observer. The publisher now takes ONE read pass
+    # and ONE write pass per invocation (nav_offset_contract_test pins that), and
+    # in an RO callback layout is already clean, so those reads force nothing.
+    # Re-measured on the engine lab at the same 6x throttle, ~700 frames of ramp
+    # each way, two runs of the new shape against one of the old:
+    #
+    #     RO through rAF (old)     median 8.3ms   p90 10.0ms   >20ms 0/714
+    #     RO synchronous (new)     median 8.5ms   p90 11.0ms   >20ms 6/701
+    #     RO synchronous (new)     median 8.4ms   p90 11.0ms   >20ms 3/702
+    #
+    # 0.1-0.2ms of median and 3-6 frames in 700 — and ZERO frames over 32ms on
+    # either shape, so neither drops one. That is the price of the correctness,
+    # and it is two orders of magnitude off the rate that justified the old rule.
+    assert_match(/new ResizeObserver\(\s*onResize\s*\)/, html,
+                 "the observer must publish synchronously — a write deferred to rAF paints the " \
+                 "changing frame with the previous frame's number")
+    refute_match(/new ResizeObserver\(\s*schedule\s*\)/, html,
+                 "routing the observer through the frame callback IS the one-frame lag")
 
-    # And a republish carrying the same number must cost nothing: these are
-    # INHERITED custom properties on documentElement, so every write invalidates
-    # style for the whole document.
-    # The header is a pin now, so its skip lives on the pin's own last values —
-    # one measurement per element per frame, written from that reading. The
-    # full sourcing contract is in nav_offset_contract_test; this file only
-    # cares that the unchanged write is still skipped, because that is the part
-    # the collapse's per-frame cost depends on.
-    assert_match(/if\s*\(\s*r\.h\s*!==\s*pin\.lastH\s*\)/, html, "an unchanged height must skip its write")
-    assert_match(/if\s*\(\s*r\.bottom\s*!==\s*pin\.lastBottom\s*\)/, html, "an unchanged bottom must skip its write")
+    # WHAT ACTUALLY CARRIES THE COST, and what must therefore stay asserted: the
+    # collapse resizes the header on every scroll frame, and a republish carrying
+    # the same number must cost nothing. These are INHERITED custom properties on
+    # documentElement, so every write invalidates style for the whole document,
+    # and the publisher touches four of them per layer.
+    #
+    # The header is a pin like any other, so its skip lives on the per-name last
+    # values. The full sourcing contract is in nav_offset_contract_test; this file
+    # only cares that the unchanged write is still skipped, because that is the
+    # part the collapse's per-frame cost depends on.
+    assert_match(/if\s*\(force \|\| p\.h !== prev\.h\)/, html, "an unchanged height must skip its write")
+    assert_match(/if\s*\(force \|\| p\.bottom !== prev\.bottom\)/, html, "an unchanged bottom must skip its write")
+
+    # AND THE SCROLL PATH MUST STILL COALESCE. A scroll changes a sticky header's
+    # bottom EDGE without changing its SIZE, so the observer never fires there and
+    # rAF is the right clock — iOS momentum fires scroll far above 60Hz, and that
+    # burst must still collapse to one write per frame.
+    assert_match(/function schedule\(\)\s*\{[\s\S]{0,200}?requestAnimationFrame/, html,
+                 "the scroll path must still coalesce a burst into one write per frame")
+    assert_match(/addEventListener\(\s*'scroll'\s*,\s*schedule\s*,\s*\{\s*passive:\s*true\s*\}/, html,
+                 "and must stay passive, so it never blocks the compositor")
   end
 
   private

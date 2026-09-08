@@ -1,0 +1,112 @@
+<%# THE FIRST-NAME STEP'S EMPTY-FIELD ERROR, in a browser.
+
+    WHY THIS PAGE EXISTS AND A RENDER TEST DOES NOT COVER IT. The error copy is a
+    JS string INSIDE the x-data. A view test can assert the sentence is present in
+    that attribute; it cannot assert a user ever SEES it, and it stays green when
+    the attribute is syntactically broken - which is exactly how this component
+    fails. A stray quote closes the attribute early, Alpine mounts a silent no-op,
+    and every element a string assertion looks for is still in the markup. Only a
+    browser can tell those two pages apart.
+
+    THE LAB RULE: this page sets up the partial's LOCALS and nothing else. The
+    three modes ARE three sets of locals, so all three are the engine partial
+    rendered by name.
+
+    THE THIRD CARD CARRIES AN APOSTROPHE ON PURPOSE. empty_error is the first
+    host-supplied PROSE to land inside the x-data, and prose is where the quote
+    that kills the component comes from. If the escaping is ever dropped, that
+    card mounts dead and shows no error at all.
+
+    CARDS FOUR THROUGH EIGHT ARE THE REST OF THAT x-data'S LOCALS. empty_error was
+    never the only one interpolated into the attribute - submit_path, skip_path and
+    done_event land inside JS single-quoted literals exactly as it does, and
+    modal_store lands in IDENTIFIER position, which is the same silent brick with a
+    different repair. Each card feeds ONE of them a value that would close its
+    literal, so a repair applied to one line cannot cover for a line it missed.
+
+    THESE CARDS REACH THE STORE, and the three above do not. The empty path returns
+    before finish() runs; a submit or a skip that SUCCEEDS calls close() on the
+    host's store. So the specs install that store themselves - a store is not a
+    local, it is what a host mounts around the card, and installing it in the spec
+    is also what lets the spec assert WHICH store the card reached.
+
+    RENDERED STANDALONE, not inside a modal host, and that is deliberate: the
+    empty path never reaches the store. save() returns before it reads props or
+    calls finish(), so a host would add a click to open each card and would grade
+    the host - which lab/modal_host already does.
+%>
+<main class="max-w-3xl mx-auto px-4 py-10 space-y-12" x-data>
+  <h1 class="text-2xl font-bold mb-2">First-name step — the interpolated locals</h1>
+
+  <section data-test="default-card">
+    <h2 class="text-lg font-bold mb-3">Default — the skippable card</h2>
+    <%= render "studio/modals/onboarding/first_name",
+               id: "lab-default-first-name" %>
+  </section>
+
+  <section data-test="required-card">
+    <h2 class="text-lg font-bold mb-3">required: true — the gated card</h2>
+    <%= render "studio/modals/onboarding/first_name",
+               id: "lab-required-first-name", required: true %>
+  </section>
+
+  <section data-test="custom-card">
+    <h2 class="text-lg font-bold mb-3">A host's own copy, apostrophe and all</h2>
+    <%= render "studio/modals/onboarding/first_name",
+               id: "lab-custom-first-name", required: true,
+               empty_error: "We'll need your first name before you continue." %>
+  </section>
+  <%# submit_path, skip_path and done_event each sit inside a JS single-quoted
+      literal in the x-data. Each card below carries the apostrophe and the double
+      quote that end one, in exactly one of the three, so a spec that goes green
+      names the local that survived. The paths point at the lab echo the spec
+      fulfils, because a card that cannot complete its POST never reaches the
+      finish() these specs read. %>
+  <section data-test="hostile-submit-card">
+    <h2 class="text-lg font-bold mb-3">submit_path carrying a quote</h2>
+    <%= render "studio/modals/onboarding/first_name",
+               id: "lab-hostile-submit-first-name",
+               submit_path: %q(/lab/echo?first=it's a "quote") %>
+  </section>
+
+  <section data-test="hostile-skip-card">
+    <h2 class="text-lg font-bold mb-3">skip_path carrying a quote</h2>
+    <%= render "studio/modals/onboarding/first_name",
+               id: "lab-hostile-skip-first-name",
+               skip_path: %q(/lab/echo?skip=it's a "quote") %>
+  </section>
+
+  <%# The event NAME is the hostile value here; the skip path is the lab echo only
+      so the skip can complete and dispatch it. A backslash rides along because it
+      is the third character escape_javascript answers for and no URL parser is in
+      the way of an event name. %>
+  <section data-test="hostile-event-card">
+    <h2 class="text-lg font-bold mb-3">done_event carrying a quote</h2>
+    <%= render "studio/modals/onboarding/first_name",
+               id: "lab-hostile-event-first-name",
+               skip_path: "/lab/echo?event-card=1",
+               done_event: %q(it's a "done"\event) %>
+  </section>
+
+  <%# modal_store is the ODD ONE OUT and these two cards are why it gets its own
+      pair. It is spliced in as a bare NAME, so a hostile value never reaches a
+      browser at all - the partial refuses it at render, which the view test owns.
+      What a browser can prove is the other half: that a host's own identifier is
+      spliced VERBATIM and the card really talks to THAT store, at every site.
+      Skippable reaches the props getter and finish()'s close; required reaches the
+      third site, the Ruby-built @click on the x. %>
+  <section data-test="custom-store-card">
+    <h2 class="text-lg font-bold mb-3">modal_store: a host's own store</h2>
+    <%= render "studio/modals/onboarding/first_name",
+               id: "lab-custom-store-first-name",
+               skip_path: "/lab/echo?store-card=1",
+               modal_store: "labModals" %>
+  </section>
+
+  <section data-test="custom-store-required-card">
+    <h2 class="text-lg font-bold mb-3">modal_store: the required card's ×</h2>
+    <%= render "studio/modals/onboarding/first_name",
+               id: "lab-custom-store-required-first-name",
+               required: true, modal_store: "labModals" %>
+  </section>
+</main>

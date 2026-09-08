@@ -364,6 +364,12 @@ class E2eLabController < ActionController::Base
   # identical whether either one runs.
   def style_modals = render(:style_modals)
 
+  # THE FIRST-NAME STEP'S EMPTY-FIELD ERROR, in three modes.
+  #
+  # No locals to prepare here: the modes ARE the locals, and the lab rule says the
+  # page sets those up. This action exists only to render the view.
+  def onboarding_first_name = render(:onboarding_first_name)
+
   # Liveness. Playwright's webServer polls this before the first spec, so it must
   # not depend on anything a lab page needs.
   def up = render(plain: "ok")

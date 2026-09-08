@@ -45,6 +45,17 @@ module Studio
     def first_name
       value = params[:first_name].to_s.strip.gsub(/\s+/, " ")
 
+      # THE SAME SENTENCE AS THE CARD'S EMPTY-FIELD ERROR, and deliberately NOT
+      # parameterised the way that one now is. `required` is a RENDER-TIME local of
+      # studio/modals/onboarding/_first_name; the server is never told which mode
+      # the card was drawn in, so this branch has no `required` to follow, and
+      # rewording it unconditionally would move McRitchie Studio's copy to say
+      # something only turf's gate needs.
+      #
+      # It is also UNREACHABLE FROM THE CARD: save() returns on a blank value
+      # before it posts, so what arrives here is a direct POST or a host driving
+      # these endpoints with its own form. If that ever becomes a mode-sensitive
+      # surface, the caller says which mode it is in — this string does not guess.
       if value.blank?
         return refuse("Enter your first name, or skip for now.")
       end

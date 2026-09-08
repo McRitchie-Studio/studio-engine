@@ -456,11 +456,23 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
 
   def test_the_engine_keeps_the_blocks_the_gem_renders_by_name
     # solana-studio's partials render THESE, from this engine, by string name
-    # across the gem boundary:
+    # across the gem boundary (re-derived from the resolved gem 2026-09-07 at
+    # solana-studio 0.6.1, and re-checked at 0.7.0, which is what this engine
+    # locks — 0.7.0 changes _web3_step_up's failure reporting, not its header,
+    # so all three edges below hold unchanged at both versions):
     #
-    #   solana_studio/modals/_wallet_connect  -> studio/modals/blocks/wallet_brand_sprite
-    #   solana_studio/modals/_web3_step_up    -> studio/modals/blocks/wallet_brand_sprite
-    #                                         -> studio/modals/blocks/card_header
+    #   solana_studio/modals/_wallet_connect    -> studio/modals/blocks/wallet_brand_sprite
+    #   solana_studio/modals/_web3_step_up      -> studio/modals/blocks/wallet_brand_sprite
+    #   solana_studio/modals/_network_mismatch  -> studio/modals/blocks/card_header
+    #
+    # THE card_header ROW MOVED, and the old note had it on the wrong partial.
+    # It read `_web3_step_up -> card_header`, which 0.6.1 severed: the step-up
+    # card now heads itself with a wallet BRAND MARK, and card_header has no slot
+    # for one (it takes an emoji, a spinner, or one of two fixed icons). Left
+    # uncorrected the note was worse than merely stale — it named the only edge
+    # holding up the card_header half of this assertion as an edge that no longer
+    # exists, so the next reader could reasonably conclude the block had no gem
+    # consumer left and delete it. _network_mismatch is what keeps it alive.
     #
     # Nothing in THIS repo's own render graph would notice if they were renamed
     # or removed — the wallet UI that used to render them left. The failure would
