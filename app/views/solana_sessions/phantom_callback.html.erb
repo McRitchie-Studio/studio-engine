@@ -137,6 +137,68 @@
     dbg('  ' + key, truncate(val, 40));
   });
 
+  // === THE REDIRECT TRANSPORT'S RETURN LEG ==============================
+  //
+  // TRIED FIRST, AND EVERYTHING BELOW IS LEFT EXACTLY AS IT WAS. The legacy
+  // block that follows handles ONE step — Phantom's signIn — with keys named
+  // phantom_dl_*, and it is what production mobile sign-in runs on TODAY. It is
+  // not touched, moved, or reworded here: a consumer that has not yet adopted
+  // the new transport must behave identically after this change, and the only
+  // honest way to promise that is to leave its code alone.
+  //
+  // GUARDED THE WAY THIS CODEBASE GUARDS EVERY OPTIONAL CAPABILITY: a host that
+  // does not load solana_studio/wallet_ops.js + wallet_journal.js has no
+  // SolanaStudio.walletOps, so this branch never runs and the legacy path is
+  // the whole program. An absent capability must not default to the permissive
+  // branch — the same rule the wallet picker's canDeepLink learned.
+  //
+  // WHY THE PENDING-JOURNAL CHECK IS PART OF THE GUARD, not just the globals:
+  // a host may load the new scripts while a signIn started under the OLD keys
+  // is still in flight — a user mid-round-trip across a deploy. Requiring an
+  // actual wallet_dl journal means that user finishes on the path they started,
+  // rather than being handed to a resumer with nothing to resume.
+  //
+  // WHAT THIS BRANCH DOES NOT DO: decrypt, verify, or know what the user was
+  // trying to accomplish. walletOps owns the step machine and the registered
+  // intent owns the outcome. This is a seam, and keeping it a seam is what lets
+  // the same callback serve sign-in and a contest entry without learning either.
+  var studio = window.SolanaStudio;
+  var hasResumer = !!(studio && studio.walletOps && typeof studio.walletOps.resume === 'function' &&
+                      studio.walletJournal && typeof studio.walletJournal.peek === 'function');
+
+  if (hasResumer && studio.walletJournal.peek()) {
+    dbg('Transport', 'wallet_dl journal present — resuming through walletOps');
+
+    studio.walletOps.resume(params, {
+      navigate: function(url) { window.location.href = url; }
+    }).then(function(result) {
+      // SUSPENDED means resume already navigated to the next hop; this document
+      // is on its way out and must not also redirect, or the two race.
+      if (result && result.suspended) {
+        dbg('Transport', 'advanced to the next hop');
+        return;
+      }
+      if (result && result.done) {
+        dbg('Transport', 'intent complete');
+        // The registered intent owns where to land — it knows what the user was
+        // doing. Falling back to '/' rather than guessing a wallet-specific
+        // destination, which this file has no business knowing.
+        window.location.href = (result.value && result.value.redirect) || '/';
+        return;
+      }
+      // No pending request is a STATE, not a failure: a stale bookmark, a second
+      // tab, a reload after the journal was consumed. peek() said otherwise a
+      // moment ago, so this is a race, and the honest answer is to start over.
+      showError('No pending wallet request. Redirecting to login...');
+    }, function(err) {
+      // A user rejection arrives here with .rejected set — the wallet's own
+      // words, already mapped. Anything else is a genuine fault.
+      dbg('Transport ERROR', (err && err.message) || String(err));
+      showError((err && err.message) || 'Wallet request failed');
+    });
+    return;
+  }
+
   // Check for Phantom error
   if (params.get('errorCode')) {
     dbg('ERROR', 'errorCode=' + params.get('errorCode'));
