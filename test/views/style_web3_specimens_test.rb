@@ -455,8 +455,10 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
 
   def test_the_engine_keeps_the_blocks_the_gem_renders_by_name
     # solana-studio's partials render THESE, from this engine, by string name
-    # across the gem boundary (re-derived from the resolved gem 2026-09-07, at
-    # solana-studio 0.6.1):
+    # across the gem boundary (re-derived from the resolved gem 2026-09-07 at
+    # solana-studio 0.6.1, and re-checked at 0.7.0, which is what this engine
+    # locks — 0.7.0 changes _web3_step_up's failure reporting, not its header,
+    # so all three edges below hold unchanged at both versions):
     #
     #   solana_studio/modals/_wallet_connect    -> studio/modals/blocks/wallet_brand_sprite
     #   solana_studio/modals/_web3_step_up      -> studio/modals/blocks/wallet_brand_sprite

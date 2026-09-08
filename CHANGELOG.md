@@ -232,8 +232,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   padlock too, which `bin/gem-drift-check` had already been failing on
   (`engine 0.6.0 TRAILS turf-monster 0.6.1`). Correcting the sketches alone
   would have put a brand mark on the thumbnail and a padlock in the card it
-  opens — moving the contradiction onto one screen rather than removing it. The
-  lock is bumped in the same change, which is the whole fix.
+  opens — moving the contradiction onto one screen rather than removing it. So
+  the lock had to move too, and it has: `accepted` carried the engine to
+  solana-studio 0.7.0 while this change sat in review, which is past the 0.6.1
+  that removed the padlock. This change no longer moves the lock itself — it
+  defers to the line `accepted` already holds — so the sketch and the card it
+  opens agree without it.
 
   The sketches follow the card: a centered brand tile where a wallet is
   remembered, the card's own billfold outline in an inset square where none is.
