@@ -856,7 +856,7 @@ module Studio
       # Developer-desk tools. Drawn outside production, and each controller
       # re-checks Studio.local_tool_enabled? per request (loopback only) — the
       # route being absent is the outer gate, not the only one.
-      unless defined?(Rails) && Rails.env.production?
+      unless defined?(Rails) && Rails.respond_to?(:env) && Rails.env.production?
         get "_studio/local_emails", to: "studio/local_emails#index", as: :studio_local_emails
         get "_studio/local_review", to: "studio/local_reviews#show",  as: :studio_local_review
       end

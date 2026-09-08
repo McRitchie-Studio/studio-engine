@@ -6,9 +6,9 @@ module Studio
 
     class << self
       def configure!(env: ENV,
-                     rails_env: defined?(Rails) ? Rails.env : "development",
+                     rails_env: defined?(Rails) && Rails.respond_to?(:env) ? Rails.env : "development",
                      action_mailer: defined?(ActionMailer) ? ActionMailer::Base : nil,
-                     logger: defined?(Rails) ? Rails.logger : nil,
+                     logger: defined?(Rails) && Rails.respond_to?(:logger) ? Rails.logger : nil,
                      mailer_from: defined?(Studio) && Studio.respond_to?(:mailer_from) ? Studio.mailer_from : nil,
                      resend_loader: method(:load_resend!),
                      resend_configurer: method(:configure_resend!))
