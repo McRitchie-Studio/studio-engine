@@ -42,6 +42,18 @@
 # within one PR cycle. That is today's behaviour, and it is the floor this lane
 # may never drop below.
 #
+# WHEN THIS LANE ACTUALLY STARTS WORKING — it is NOT when this PR merges into
+# `accepted`. GitHub reads BOTH halves of this feature from the DEFAULT BRANCH
+# only: a `workflow_run` workflow triggers solely from the default branch's copy
+# of the file, and Dependabot reads `.github/dependabot.yml` from the default
+# branch too (which is exactly why `target-branch: accepted` has to be stated —
+# the config is read on `main` and the PRs are opened against `accepted`).
+#
+# So nothing here fires until this change has travelled the full ladder,
+# accepted -> release -> main. Between merge and ship it is dormant, not broken.
+# Do not debug it in that window, and do not conclude it works because the PR
+# went green — no part of it has executed yet at that point.
+#
 # OPERATOR PREREQUISITE, and this lane is INERT until it is met. consumer-ci.yml
 # mints a GitHub App token from MCRITCHIE_AGENT_APP_ID and
 # MCRITCHIE_AGENT_PRIVATE_KEY to check out the private consumer repos. A
