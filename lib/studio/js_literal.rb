@@ -43,6 +43,19 @@ module Studio
   # safe). The name says `in_attribute` so that the next person reaching for this in
   # a <script> has to stop and notice the difference.
   #
+  # AND IT IS THE WRONG REPAIR FOR AN ATTRIBUTE THE PARTIAL ASSEMBLES ITSELF —
+  # `<%= "x-init=\"#{expr}\"".html_safe %>`, where the attribute's OWN QUOTES are
+  # built in Ruby. Nothing here helps: escaping the value would break the Alpine
+  # EXPRESSION the caller deliberately handed the engine, and the marking has already
+  # told ERB to stand down, so a double quote closes the ATTRIBUTE and the remainder
+  # is parsed as MARKUP. The repair is to stop writing the quotes and let ActionView
+  # write them — `tag.attributes("x-init": expr.html_safe)` — because tag_option
+  # quote-escapes the finished value UNCONDITIONALLY, outside the escape branch it
+  # skips for a marked String. The expression survives byte-for-byte and cannot end
+  # the attribute. modals/blocks/_rail_row:112 and components/_sidebar_panel carry
+  # the worked examples; test/lib/studio/attribute_encoding_contract_test.rb pins the
+  # ActionView behaviour the whole thing rests on.
+  #
   # AND IT IS THE WRONG REPAIR FOR IDENTIFIER POSITION. A local spliced in as a bare
   # NAME — `$store.<%= modal_store %>.close()` — must be VALIDATED, never escaped:
   # escape_javascript also escapes `$`, so a legitimate store name like `dsModals$2`

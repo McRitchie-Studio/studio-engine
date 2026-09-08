@@ -32,6 +32,15 @@
     attrs:         Hash of extra root attributes ({ "x-data" => "…", "data-foo" => 1 }),
                    values are HTML-escaped — the rebase seam for a card that carries
                    its own Alpine/data-* on the root.
+
+                   NOT A CANDIDATE FOR THE ASSEMBLED-ATTRIBUTE SWEEP, and it has been
+                   listed as one. Both halves of the passthrough below go through ERB
+                   with nothing marked html_safe, so a double quote in a VALUE becomes
+                   &quot; and the parser decodes it back, and a hostile NAME cannot
+                   open a second attribute because entity decoding does not happen in
+                   attribute-name position. Re-verified 2026-09-08 by rendering it
+                   with a hostile value, not by reading it. Converting it would buy a
+                   guard that can never bite.
 %>
 <%
   id            = local_assigns.fetch(:id)

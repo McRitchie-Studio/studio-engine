@@ -122,9 +122,26 @@
   init_calls = []
   init_calls << "fireConfetti()" if fire_confetti
   init_calls << "startCountdown(#{local_assigns[:auto_redirect_url_key]})" if has_redirect
+  init_expr = init_calls.join("; ").html_safe
 %>
-<div x-data="<%= data_attr %>"
-     <%= "x-init=\"#{init_calls.join('; ')}\"".html_safe if init_calls.any? %>
+<%# BOTH ALPINE ATTRIBUTES ARE EMITTED BY tag.attributes, NOT ASSEMBLED BY HAND.
+    Each carries Ruby-built JS that splices a host local — redirect_secs into the
+    x-data object, auto_redirect_url_key into startCountdown() — and both blobs are
+    html_safe, because they are CODE and the caller is owed the JS it wrote.
+
+    THAT MARKING USED TO BE THE HOLE. html_safe tells ERB to step aside, so a double
+    quote in either local closed the ATTRIBUTE and everything after it became markup:
+    x-data="{ _remaining: it's a " quote" …  — measured, not reasoned.
+
+    tag.attributes closes it without touching the JS. ActionView's tag_option runs
+    gsub('"', "&quot;") on the finished value UNCONDITIONALLY, outside the escape
+    branch it skips for an html_safe string (actionview tag_helper.rb, the line after
+    the escape ternary), so the attribute cannot be closed early and the HTML parser
+    decodes the entity back before Alpine ever sees it. Every other character reaches
+    the attribute byte-for-byte as it does today. blocks/_rail_row:112 is the same
+    move on a whole tag and its comment carries the rest of the reasoning. %>
+<div <%= tag.attributes("x-data": data_attr) %>
+     <%= tag.attributes("x-init": init_expr) if init_calls.any? %>
      class="text-center py-6">
 
   <%# Icon — emoji takes priority over the default circular green check %>
