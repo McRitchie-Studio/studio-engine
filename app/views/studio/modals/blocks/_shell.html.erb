@@ -13,7 +13,9 @@
 <%
   shell_title       = local_assigns[:title]
   shell_dismissible = local_assigns.fetch(:dismissible, true)
-  modal_store       = local_assigns.fetch(:modal_store, "modals")
+  # IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier.
+  modal_store       = Studio::JsIdentifier.validate!(
+                      local_assigns.fetch(:modal_store, "modals"), local: :modal_store)
 %>
 <div>
   <% if shell_title || shell_dismissible %>

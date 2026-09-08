@@ -80,6 +80,13 @@
   fine_print  = local_assigns.fetch(:fine_print,
                   validates ? "We use your date of birth only to confirm eligibility."
                             : "We use your date of birth only to know when to wish you a happy birthday.")
+  # NOT VALIDATED HERE, deliberately. This partial never splices the store name into
+  # identifier position: it reaches birthdayModal as a JS STRING (escaped below) and
+  # the factory looks it up with Alpine.store(name), where any character is legal.
+  # The identifier contract is owed by blocks/_shell, which this card renders one
+  # line further down and which validates it — so a hostile value still raises,
+  # once, at the site that actually splices it. A second guard here would be a
+  # redundant one: it would survive being deleted.
   modal_store = local_assigns.fetch(:modal_store, "modals")
   demo        = local_assigns.fetch(:demo, false)
   demo_underage     = local_assigns.fetch(:demo_underage, false)

@@ -12,7 +12,9 @@
     modal_store — Alpine store name backing close(). Default "modals".
 %>
 <%
-  modal_store = local_assigns.fetch(:modal_store, "modals")
+  # IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier.
+  modal_store = Studio::JsIdentifier.validate!(
+                local_assigns.fetch(:modal_store, "modals"), local: :modal_store)
 %>
 <button @click="resendMagicLink()" :disabled="props.submitting === 'magic-link' || (props.resendCooldown || 0) > 0"
         class="block mx-auto text-sm text-primary hover:text-primary-300 underline underline-offset-2 disabled:opacity-50 disabled:no-underline">

@@ -6,6 +6,52 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **A store name that is not a JS identifier half-worked, silently, in seventeen
+  partials — it now raises.** `$store.<%= modal_store %>.close()` splices the local
+  in as a bare NAME, so `modal_store: "my store"` emitted
+  `$store.my store.close()`: a SyntaxError that Alpine mounts as a no-op which still
+  renders every element. `Studio::JsIdentifier.validate!` is the new shared contract
+  (`/\A[A-Za-z_$][A-Za-z0-9_$]*\z/`), called once per partial at the fetch.
+
+  **THIS IS A BEHAVIOUR TIGHTENING, NOT A REPAIR, and it is breaking.** A host that
+  passed a non-identifier store name got a working page with a dead button; it now
+  gets an `ArgumentError` at render. That is the right trade — loud beats silent —
+  but it is a 500 where there was a 200. **Blast radius is zero, measured:** every
+  explicit store name in mcritchie-studio, turf-monster, rolio and this engine is
+  `modals`, `dsModals`, `emailModals` or `profileModals`, and no consumer app passes
+  one at all. **Rollback is one file:** make `validate!` return its argument instead
+  of raising and every partial is back to the old leniency, with no call site to
+  revisit.
+
+  **ESCAPING IS THE WRONG REPAIR HERE, which is why this is a second module rather
+  than a second method on `Studio::JsLiteral`.** `escape_javascript` also escapes
+  `$`, so the legal name `dsModals$2` comes back as `dsModals\$2` and
+  `$store.dsModals\$2.close()` is a different SyntaxError — the same dead card on a
+  value that was never hostile. A pattern rather than an allowlist, deliberately: an
+  allowlist would be a shared gem enumerating its own consumers, and the next app to
+  mount a page-scoped host would be refused by its own dependency.
+
+  **MEASURED, AND TWO OF THE LISTED SITES WERE LEFT ALONE.** Nineteen partials fetch
+  a store-name local. Counted on the tree: 36 splices of a store name in identifier
+  position — 32 in ERB, 4 assembled in Ruby — across 17 files. Rendering a hostile
+  value through all nineteen (rather than reading them) showed 17 emitting at least
+  one DEAD splice, one already refusing, and one unaffected. Seventeen now carry the
+  guard: 16 new, plus `modals/onboarding/_first_name` moved onto the shared one.
+  `modals/_crop_photo` is the unaffected one — its name is a JS string argument
+  resolved with `$store[name]`, a lookup where a space is as legal as a letter, and
+  it was already escaped, so demanding an identifier would break a host for nothing.
+  `blocks/_birthday` has no splice of its own — it hands the name to `Alpine.store()`
+  and forwards it to `blocks/_shell`, which validates — so a second guard there would
+  have been one that survives deletion.
+
+  **NOTHING MOVED FOR A LEGAL NAME.** All nineteen partials rendered before and
+  after, against the default, `dsModals` and `ds_Modals$2`, are byte-identical
+  (186,310 bytes each): a value matching the pattern carries no character ERB
+  escapes, and the validator returns a plain String so ERB's escaping stays armed
+  for the day the pattern widens. `modals/onboarding/_first_name` carried this
+  regex inline as the worked example and now calls the shared one — same pattern,
+  same error, same message.
+
 - **The email banner assembled two attributes INCLUDING THEIR OWN QUOTES in Ruby,
   so ERB escaping never ran on them.** `_layered_banner.html.erb` wrote
   `background="..."` and `bgcolor="..."` as Ruby strings and marked them

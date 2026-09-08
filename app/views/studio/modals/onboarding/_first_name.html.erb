@@ -104,8 +104,8 @@
       sites: the props getter, finish's close, and the Ruby-built dismiss_action
       emitted into the x's click handler. Escaping is the WRONG repair here: an
       escaped identifier is a different SyntaxError and the same dead card.
-      Repair: refuse a value that is not a JS identifier, which the Ruby block
-      below does once, at the source, so all three sites are covered.
+      Repair: refuse a value that is not a JS identifier, which one call to
+      Studio::JsIdentifier.validate! does at the source, covering all three sites.
 
   A PATTERN, NOT AN ALLOWLIST, and the reason is worth keeping: an allowlist would
   be this engine enumerating its own consumers, so the next app to mount a
@@ -116,7 +116,9 @@
 
   NOTE THE SAME LOCAL TAKES THE OTHER REPAIR ELSEWHERE. blocks/_birthday and
   blocks/_leveling_activity pass modal_store in STRING position and escape it,
-  correctly. The shape decides the repair, never the name of the local.
+  correctly. The shape decides the repair, never the name of the local. And where
+  a store name reaches ONLY a string — blocks/_birthday hands it to Alpine.store(),
+  a lookup by string — no identifier is owed and none is demanded.
 %>
 <%
   submit_path = local_assigns.fetch(:submit_path, "/onboarding/first_name")
@@ -163,37 +165,21 @@
   typed_placeholder = !placeholder_names.nil?
   max_length  = local_assigns.fetch(:max_length, Studio::FULL_NAME_MAX_LENGTH)
   progress    = local_assigns.fetch(:progress, nil)
-  modal_store = local_assigns.fetch(:modal_store, "modals")
   # VALIDATED, NOT ESCAPED — and that distinction is the whole point of this local.
   # Every other value inside the x-data is a JS STRING and is repaired by escaping.
   # This one is spliced in as a bare NAME (`$store.<name>.current()`), so the same
-  # repair breaks it: escape_javascript turns `a'b` into `a\'b`, and
-  # `$store.a\'b.current()` is not a rescued identifier, it is a different
-  # SyntaxError — the same silently dead card, reached a longer way.
+  # repair breaks it: escape_javascript backslash-escapes the apostrophe, and an
+  # escaped apostrophe is not a rescued identifier — it is a different SyntaxError,
+  # the same silently dead card reached a longer way.
   #
-  # A PATTERN RATHER THAN AN ALLOWLIST, deliberately. An allowlist would be this
-  # engine enumerating its own CONSUMERS — "modals" and the style guide's
-  # "dsModals" today — so the next app to mount a page-scoped host would be refused
-  # by its own dependency until a gem release admitted the name. That is backwards
-  # for a shared primitive. The real contract is narrower and stateless: this is
-  # spliced into member-access position, so it must be a JS identifier, and WHICH
-  # identifier is none of the engine's business.
-  #
-  # ASCII IdentifierName, which is what member access after a dot accepts. It
-  # admits every store name a host would plausibly write and rejects every
-  # character that could leave identifier position — quote, apostrophe, backslash,
-  # dot, space, semicolon, angle bracket.
-  #
-  # IT RAISES RATHER THAN FALLING BACK TO THE DEFAULT. A silent fallback is the
-  # worse of the two repairs: the card would mount, look perfect, and talk to a
-  # store that is not the host's — which is the SILENT-brick failure class this
-  # guard exists to leave behind. A host sees this the first time it renders.
-  unless modal_store.to_s.match?(/\A[A-Za-z_$][A-Za-z0-9_$]*\z/)
-    raise ArgumentError,
-          "modal_store must be a JS identifier (it is spliced into $store.<name>); " \
-          "got #{modal_store.inspect}. Escaping it would not help — an escaped " \
-          "identifier is a different SyntaxError, and the card would mount dead."
-  end
+  # THE REGEX AND THE ARGUMENT USED TO LIVE HERE, INLINE. This card was the first
+  # site to need them, so it carried the worked example; the engine has sixteen more
+  # splices of a store name in identifier position, and the contract now lives in ONE
+  # place. Studio::JsIdentifier holds the pattern, why it is a pattern and not an
+  # allowlist, and why it raises rather than falling back to the default. Behaviour
+  # here is unchanged: same pattern, same ArgumentError, same message.
+  modal_store = Studio::JsIdentifier.validate!(
+                  local_assigns.fetch(:modal_store, "modals"), local: :modal_store)
   done_event  = local_assigns.fetch(:done_event, "onboarding-step-done")
   # THE SAME HAZARD empty_error_js CARRIES, on the three remaining locals that land
   # inside a JS SINGLE-quoted literal in the x-data below. A bare apostrophe in any
