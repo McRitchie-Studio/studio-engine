@@ -37,9 +37,16 @@
   m = user.birth_month
   d = user.birth_day
   value = (y.present? && m.present? && d.present?) ? format("%04d-%02d-%02d", y, m, d) : nil
+  # ESCAPED FOR THE x-data BELOW. format() cannot produce a quote today, so this is
+  # latent cover rather than a live fix — but the local is read off a USER record,
+  # and the guard has to sit on the splice rather than on today's formatter. Bare,
+  # an apostrophe would close the JS literal and studioBirthdayFields would never
+  # evaluate, leaving three selects that render and never save. The <input value="">
+  # copy below needs no such treatment: ERB already escapes it, and it is not JS.
+  value_js = Studio::JsLiteral.in_attribute(value)
 %>
 
-<div x-data="studioBirthdayFields('<%= value %>')">
+<div x-data="studioBirthdayFields('<%= value_js %>')">
   <%# --- the JS-less path ------------------------------------------------- %>
   <template x-if="!alpine">
     <input type="date" name="profile[birthday]" id="profile_birthday"

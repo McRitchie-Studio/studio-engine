@@ -25,10 +25,11 @@ require "studio"
 # shipped cards instead of a fork of them — SolanaStudio::Engine registers the
 # gem's app/views, which is what makes `render "solana_studio/modals/..."`
 # resolve. Development and test only (see the Gemfile); it is NOT a gemspec
-# runtime dependency, because three of the apps mounting this engine
-# (acquisition-studio, mcritchie-industries, moms-app) bundle no solana-studio
-# and must never be made to. The style guide self-gates on the partial resolving
-# for exactly that reason.
+# runtime dependency, because four of the five apps mounting this engine
+# (mcritchie-studio, acquisition-studio, mcritchie-industries, moms-app) bundle
+# no solana-studio and must never be made to — turf-monster is the only one that
+# does. The style guide self-gates on the partial resolving for exactly that
+# reason.
 #
 # Requiring it after `require "rails"` above is load-bearing: lib/solana_studio.rb
 # only pulls in its Rails half when Rails::Engine is already defined.

@@ -71,6 +71,12 @@
   subtitle_key     = local_assigns[:subtitle_key]
   tx_signature_key = local_assigns.fetch(:tx_signature_key, "props.txSignature")
   cluster_param    = local_assigns.fetch(:cluster_param, "")
+  # STRING position — clusterParam is a JS string on the root scope that
+  # _success_card's tx-link concatenates into a URL. An apostrophe closes the
+  # literal and the whole x-data becomes a SyntaxError, which mounts this card and
+  # every nested block as a silent no-op. props_expr one line up is the OPPOSITE
+  # shape (an Alpine expression by contract) and is deliberately left alone.
+  cluster_param_js = Studio::JsLiteral.in_attribute(cluster_param)
   lobby_url_key    = local_assigns.fetch(:lobby_url_key, "props.lobbyUrl")
   cta_label        = local_assigns.fetch(:cta_label, "Continue")
   seeds_earned_key = local_assigns.fetch(:seeds_earned_key, "props.seedsEarned")
@@ -113,7 +119,7 @@
 <%# props getter + clusterParam live on the root scope so _success_card's nested
     Alpine expressions (props.txSignature, props.lobbyUrl, clusterParam) resolve up
     the scope chain. clusterParam feeds _success_card's branded tx-link URL. %>
-<div x-data="{ get props() { return <%= props_expr %>; }, clusterParam: '<%= cluster_param %>' }">
+<div x-data="{ get props() { return <%= props_expr %>; }, clusterParam: '<%= cluster_param_js %>' }">
   <%= render "studio/modals/blocks/success_card", sc_locals do %>
     <%# The app's own enrichment, above the seeds bar. turf puts its kickoff
         countdown here — "when does it start" reads before the celebratory seeds

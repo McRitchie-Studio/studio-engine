@@ -20,7 +20,7 @@ require "minitest/autorun"
 #   * the CDN tag creeping back (the thing being fixed)
 #   * the precompile entry missing — Sprockets hosts (mcritchie-studio, turf-monster)
 #     serve NOTHING without it, while propshaft hosts happily ignore the list, so
-#     this breaks on exactly half the fleet and looks fine on the other half
+#     this breaks two of the five apps in the fleet and looks fine on the other three
 #   * the pin drifting between the file header and the view comment, which would
 #     leave the next upgrader trusting whichever one they happened to read
 class VendoredAlpineTest < Minitest::Test

@@ -94,11 +94,11 @@
     STRING position — empty_error, submit_path, skip_path, done_event — each sits
       inside a JS SINGLE-quoted literal. A bare apostrophe closes the literal, the
       expression becomes a SyntaxError, and the card is that silent no-op. Repair:
-      escape_javascript, in the INTERPOLATED form. The wrapper is load-bearing:
-      escape_javascript(SafeBuffer) answers true to html_safe, so ERB would skip
-      its own attribute-escaping half and a raw double quote could still close the
-      attribute. Wrapping the value in a plain interpolation first strips the safe
-      marking, so both escapers run.
+      Studio::JsLiteral.in_attribute, which is where the mechanism now lives and is
+      tested. Two escapers have to run — one for the JS literal, one for the
+      attribute — and the second only runs on a value ERB still believes is unsafe.
+      This card used to spell that out inline at four sites; the engine has eleven
+      more of them, so it is one method with one guard now.
 
     IDENTIFIER position — modal_store — is spliced in as a bare NAME, at three
       sites: the props getter, finish's close, and the Ruby-built dismiss_action
@@ -145,15 +145,15 @@
   # apostrophes. Interpolated raw, an error reading "We'll need a name" would
   # close the JS single-quoted string, make the whole expression a SyntaxError,
   # and mount the component as a SILENT NO-OP that still renders every element
-  # below. escape_javascript covers the apostrophe, the double quote, the
-  # backslash and the newline; the interpolation around it first strips any
-  # html_safe marking, because a safe string would skip ERB's own attribute
-  # escaping and could smuggle a raw double quote in — the exact failure the
-  # CRITICAL note above describes.
+  # below. Studio::JsLiteral.in_attribute covers the apostrophe, the double quote,
+  # the backslash and the newline, AND hands ERB a value it still believes is
+  # unsafe so the attribute's own escaping runs too — a safe string would skip that
+  # half and could smuggle a raw double quote in, the exact failure the CRITICAL
+  # note above describes.
   #
   # INERT ON BOTH DEFAULTS. Neither default string contains a character either
   # escaper touches, so the shipped card is byte-for-byte what it was.
-  empty_error_js = escape_javascript("#{empty_error}")
+  empty_error_js = Studio::JsLiteral.in_attribute(empty_error)
   placeholder = local_assigns.fetch(:placeholder, "Alex")
   # OFF unless a host passes a non-empty array. Normalised to nil so that an
   # empty list behaves exactly like an absent local rather than emitting the
@@ -201,11 +201,11 @@
   # Alpine mounts the component as a SILENT NO-OP that still renders every element
   # — perfect-looking markup, dead card.
   #
-  # THE INTERPOLATED FORM IS LOAD-BEARING, not a style choice:
-  # escape_javascript(SafeBuffer).html_safe? is TRUE, so ERB would skip its own
-  # attribute-escaping half and a raw double quote could still close the
-  # double-quoted x-data. Wrapping in "#{}" first strips the html_safe marking, so
-  # both escapers run: escape_javascript for the JS literal, ERB for the attribute.
+  # WHY A METHOD RATHER THAN escape_javascript AT EACH SITE: the second escaper is
+  # conditional. ERB skips a value that answers true to html_safe, and
+  # escape_javascript preserves its argument's marking, so the naive call silently
+  # loses the attribute half. Studio::JsLiteral.in_attribute owns that, and owns the
+  # single test that fails when it is removed.
   #
   # INERT ON EVERY DEFAULT. Two paths, an event name and a store name carry no
   # character either escaper touches, so the shipped card is byte-for-byte what it
@@ -213,9 +213,9 @@
   # host supplies these as prose today, but empty_error established that prose does
   # belong in this attribute, and the next local to carry an apostrophe will look
   # like an ordinary change to whoever writes it.
-  submit_path_js = escape_javascript("#{submit_path}")
-  skip_path_js   = escape_javascript("#{skip_path}")
-  done_event_js  = escape_javascript("#{done_event}")
+  submit_path_js = Studio::JsLiteral.in_attribute(submit_path)
+  skip_path_js   = Studio::JsLiteral.in_attribute(skip_path)
+  done_event_js  = Studio::JsLiteral.in_attribute(done_event)
   field_id    = local_assigns.fetch(:id, "onboarding-first-name")
   # The × mirrors the skip affordance it sits beside: it SKIPS while the step is
   # skippable, and merely CLOSES once it is required. Resolved here rather than in

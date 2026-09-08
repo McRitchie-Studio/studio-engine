@@ -364,6 +364,15 @@ class E2eLabController < ActionController::Base
   # identical whether either one runs.
   def style_modals = render(:style_modals)
 
+  # HOST-SUPPLIED LOCALS THAT LAND INSIDE A JS STRING LITERAL, across the blocks
+  # that take one — success/error card event names and the tx link's cluster query.
+  #
+  # No locals to prepare here either: the hostile values ARE the locals, and the lab
+  # rule says the page sets those up. The partials render standalone because none of
+  # these paths reaches a store — a $dispatch goes to the window, and the tx link
+  # only resolves an href.
+  def js_attribute_locals = render(:js_attribute_locals)
+
   # THE FIRST-NAME STEP'S EMPTY-FIELD ERROR, in three modes.
   #
   # No locals to prepare here: the modes ARE the locals, and the lab rule says the

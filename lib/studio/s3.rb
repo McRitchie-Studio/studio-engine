@@ -123,7 +123,16 @@ module Studio
       def environment
         return "dev" if EnvironmentBanner.qa_environment?
 
-        defined?(Rails) && Rails.env.production? ? "production" : "dev"
+        # ASKS FOR THE METHOD, NOT THE CONSTANT, and the difference is not
+        # theoretical. rails-html-sanitizer — which arrives with action_view, long
+        # before any Rails APPLICATION does — defines a namespace-only `module
+        # Rails` with no singleton methods on it. Against that, a bare
+        # `defined?(Rails)` reads TRUE and the very next call dies with
+        # NoMethodError: undefined method `env` for module Rails. lib/studio.rb
+        # already spells the guard this way in three places; this was the
+        # straggler, and it turned an unrelated green suite red the first time a
+        # unit test pulled action_view in.
+        defined?(Rails) && Rails.respond_to?(:env) && Rails.env&.production? ? "production" : "dev"
       end
     end
   end

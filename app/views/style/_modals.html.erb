@@ -43,12 +43,29 @@
   # /auth/solana routes, Solana::SessionAuth, the phantom callback) and ships no
   # wallet UI at all.
   #
-  # So resolution is a RUNTIME question here, not a build-time one. Three of the
-  # six apps mounting this engine (acquisition-studio, mcritchie-industries,
-  # moms-app) bundle no solana-studio, and an unconditional render would turn
-  # their /admin/style into a missing-template 500. The gem is a development and
+  # So resolution is a RUNTIME question here, not a build-time one. FOUR of the
+  # five apps mounting this engine (mcritchie-studio, acquisition-studio,
+  # mcritchie-industries, moms-app) bundle no solana-studio — turf-monster is
+  # the only one that does — and an unconditional render would turn their
+  # /admin/style into a missing-template 500. The gem is a development and
   # test dependency of this engine precisely so the guide can show the REAL
   # cards; where it is absent the specimens stay listed but unopenable.
+  #
+  # THE EXCEPTION IS THE DURABLE HALF; the count rots the day an app is born.
+  # Derived 2026-09-07 — and the CRITERION is recorded, not just the count,
+  # because the obvious grep does not reproduce it. The five are the checkouts
+  # whose own config/routes.rb calls `Studio.routes(self)`, the same five
+  # lib/studio.rb's draw_profile_routes note names. Grepping Gemfiles for
+  # `gem "studio-engine"` returns SEVEN: it also catches solana-studio, which
+  # pins the engine in `group :development, :test` for its dummy and draws no
+  # routes, and mcritchie-studio-ai-builder-cache, which is the HUB checked out
+  # twice (same Heroku remote; HEAD c7d5d326 is a commit inside
+  # mcritchie-studio) and would double-count it. This line used to read "three
+  # of the six" and to omit the HUB — the app a reader is likeliest to be
+  # sitting in, and one that bundles no solana-studio. Two further near misses:
+  # chain-ops bundles solana-studio WITHOUT this engine, so it is not in this
+  # set at all; acquisition-studio is a retired prototype whose Gemfile still
+  # pins the engine, so it is.
   #
   # Same three-term lookup_context.exists? the modal host uses for host_extras
   # (studio/modals/_host.html.erb): name, prefixes, partial.

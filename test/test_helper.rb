@@ -26,6 +26,11 @@ require_relative "../lib/studio/oauth_identity"
 require_relative "../lib/studio/name_parts"
 require_relative "../lib/studio/theme_resolver"
 require_relative "../lib/studio/ui_primitives"
+# Studio::JsLiteral is referenced by engine PARTIALS, and test/views/*.rb render
+# those partials through this helper — so it has to resolve here, not just in the
+# dummy app. It requires action_view, which is why lib/studio/s3.rb had to stop
+# guarding on a bare `defined?(Rails)`: see the note in s3_qa_environment_test.rb.
+require_relative "../lib/studio/js_literal"
 require_relative "../lib/studio/email"
 require_relative "../lib/studio/email_smoke"
 require_relative "../lib/studio/redis"

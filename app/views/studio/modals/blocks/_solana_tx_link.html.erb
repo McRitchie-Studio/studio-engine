@@ -17,10 +17,15 @@
 <%
   tx_signature_key = local_assigns.fetch(:tx_signature_key)
   cluster_param    = local_assigns.fetch(:cluster_param, "")
+  # STRING position, inside the :href expression below. tx_signature_key beside it
+  # is an Alpine EXPRESSION by contract and is spliced in bare; this one is a
+  # literal suffix, so an apostrophe would close it and turn the whole :href
+  # binding into a SyntaxError — the link then renders with no href at all.
+  cluster_param_js = Studio::JsLiteral.in_attribute(cluster_param)
 %>
 <template x-if="(<%= tx_signature_key %>)">
   <div class="text-center mb-3 -mt-1">
-    <a :href="'https://explorer.solana.com/tx/' + (<%= tx_signature_key %>) + '<%= cluster_param %>'"
+    <a :href="'https://explorer.solana.com/tx/' + (<%= tx_signature_key %>) + '<%= cluster_param_js %>'"
        target="_blank" rel="noopener"
        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-subtle hover:border-primary/50 transition group no-underline"
        style="background: rgb(var(--color-primary-500-rgb) / 0.06);">

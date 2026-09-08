@@ -40,8 +40,9 @@ end
 #
 # DEVELOPMENT AND TEST ONLY, and deliberately NOT a gemspec runtime dependency.
 # Declaring it there would push a Solana stack onto every BASE consumer
-# (acquisition-studio, mcritchie-industries, moms-app mount this engine and
-# bundle no solana-studio), which is precisely the coupling the split removed.
+# (mcritchie-studio, acquisition-studio, mcritchie-industries and moms-app all
+# mount this engine and bundle no solana-studio — four of the five consumers,
+# the hub included), which is precisely the coupling the split removed.
 # It is here so the DUMMY app can resolve the gem's partials and the style guide
 # renders the real shipped cards rather than a fork of them.
 #

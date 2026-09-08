@@ -25,8 +25,8 @@ require "nokogiri"
 #   reach it; a pill with no section scrolls nowhere.
 #
 #   ABSENT — an app that supplies nothing gets NOTHING. Not an empty container,
-#   not a bare heading, not a dangling pill. Six apps mount this engine and only
-#   one will ship a host section soon; the other five must see the page they see
+#   not a bare heading, not a dangling pill. Five apps mount this engine and only
+#   one will ship a host section soon; the other four must see the page they see
 #   today. That is asserted here as a whole-document comparison rather than a
 #   handful of refutes, because "renders nothing" is a claim about the WHOLE
 #   page and a refute only ever covers the string somebody thought to name.
@@ -156,8 +156,10 @@ class StyleHostSectionTest < ActiveSupport::TestCase
   end
 
   # A BASE app: this engine's views and nothing else. Not a contrivance —
-  # acquisition-studio, mcritchie-industries and moms-app all mount this engine
-  # and none of them will ship a host section.
+  # measured 2026-09-07, NONE of the five apps mounting this engine
+  # (mcritchie-studio, turf-monster, acquisition-studio, mcritchie-industries,
+  # moms-app) defines app/views/style/host/_modals.html.erb, so this is the page
+  # every one of them renders today.
   def base_html
     pages[:base]
   end

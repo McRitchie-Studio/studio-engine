@@ -4,6 +4,51 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **The app census in these comments was short by the most important app.** Ten
+  sites said this engine is mounted by SIX apps and that THREE of them bundle no
+  `solana-studio`. Measured 2026-09-07 by the criterion that reproduces it — a
+  checkout whose own `config/routes.rb` calls `Studio.routes(self)`. A Gemfile
+  grep returns seven instead, catching `solana-studio`'s dev-group pin and the
+  `mcritchie-studio-ai-builder-cache` clone of the hub. **Five** apps mount it —
+  `mcritchie-studio`, `turf-monster`, `acquisition-studio`,
+  `mcritchie-industries`, `moms-app` — and **four** of those bundle no
+  `solana-studio`. `turf-monster` is the only one that does.
+
+  **The omission was the HUB.** Every roster of BASE consumers named
+  `acquisition-studio`, `mcritchie-industries` and `moms-app` and left out
+  `mcritchie-studio` — the app a developer reading those comments is most likely
+  to be sitting in, and one whose `/admin/style` is exactly what the
+  missing-template gate protects. The error ran in the direction that
+  UNDERSTATES the risk the comments exist to explain.
+
+  **Two near misses are what make a naive count wrong.** `chain-ops` bundles
+  `solana-studio` and NOT this engine, so it is not in this set at all;
+  `acquisition-studio` is a retired prototype whose `Gemfile` still pins the
+  engine, so it is. `rolio` bundles neither and is not a consumer.
+
+  **Corrected at every site, because a partial correction is a contradiction:**
+  `app/views/style/_modals.html.erb`, `test/dummy/config/application.rb`,
+  `Gemfile`, `test/views/style_web3_specimens_test.rb`,
+  `test/views/style_host_section_test.rb` (both sites),
+  `app/views/layouts/_navbar.html.erb`,
+  `app/assets/tailwind/studio_engine/engine.css`,
+  `test/views/nav_collapse_contract_test.rb`, `test/lib/vendored_alpine_test.rb`,
+  `test/lib/vendored_montserrat_test.rb`, and two earlier Unreleased entries
+  below. The navbar-fork claim rides the same denominator — three of FIVE fork
+  it, not three of six, and the named three are unchanged — and the
+  Sprockets/propshaft split is two of five rather than "exactly half the fleet",
+  a phrase that encoded an even total no census supports.
+
+  **What was already right, and stays.** The five-consumer roster in
+  `lib/studio.rb`'s `draw_profile_routes` note (each checked 2026-08-14) named
+  the correct five all along; this change brings the rest of the repo to it. The
+  "all six consumer DATABASES" figures elsewhere in this file are three apps
+  times two environments, not an app count.
+
+  Comment and prose only. No behaviour changes.
+
 ### Added
 
 - **The first-name card now says WHICH path finished it, and can type its
@@ -80,7 +125,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   that ships no such partial gets **nothing** — no pill, no heading, no
   container — and that is asserted as a whole-document comparison rather than a
   handful of refutes: the page an app WITH a section gets, minus that section
-  and its pill, must equal the page a base app gets. Five of the six apps
+  and its pill, must equal the page a base app gets. Four of the five apps
   mounting this engine will ship no host section, and their page is unchanged.
 
   **A host specimen drives `$store.modals`, not `dsModals`, and the distinction
@@ -271,6 +316,57 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   later sees the same button in the same place.
 
 ### Fixed
+
+- **A host's apostrophe no longer kills the card it was passed to — now across the
+  blocks, not just the first-name step.** The same defect
+  `onboarding/_first_name` fixed one release ago turns out to be an engine-wide
+  idiom: a host-supplied local interpolated into a JS string literal inside a
+  JS-evaluating attribute. Repaired at eleven more splices.
+
+  **WHY IT IS WORTH A CHANGELOG LINE WHEN NOTHING VISIBLE CHANGES.** The failure
+  mode is silent. A bare apostrophe closes the JS literal, the whole expression
+  becomes a SyntaxError, and Alpine mounts the component as a NO-OP that still
+  renders every element — a card that looks perfect and whose buttons do nothing.
+  There is no error on screen, nothing in the server log, and no markup assertion
+  that can see it. Every value in every consumer resolves to a source literal or a
+  frozen constant today, so this is latent cover rather than a live fix; it is
+  worth doing because the next local to carry prose will look like an ordinary
+  change to whoever writes it.
+
+  **WHAT MOVED.** `blocks/_success_card` (`cta_event` at both CTA branches,
+  `secondary_event`), `blocks/_error_card` (`cta_event`, `secondary_event`),
+  `blocks/_entry_confirmed` and `blocks/_solana_tx_link` (`cluster_param`),
+  `modals/_crop_photo` (`store`), `studio/emails/show` (the two upload filenames
+  and the success sentence), and `profiles/_birthday_fields` (the date value).
+  No default or in-repo value contains a character either escaper touches, so
+  every shipped card renders byte-for-byte what it did.
+
+  **THE MECHANISM NOW HAS ONE HOME AND ONE GUARD.** `Studio::JsLiteral.in_attribute`
+  replaces the four inline copies in `_first_name`. TWO escapers have to run — one
+  for the JS literal, one for the HTML attribute — and the second only runs on a
+  value ERB still believes is unsafe, which is why the value is interpolated before
+  it is escaped. That subtlety was re-derived at every call site and had no test
+  anywhere; deleting it used to leave the suite green.
+
+  **NOT A FIX FOR IDENTIFIER POSITION, deliberately.** A local spliced in as a bare
+  NAME — `$store.<name>.close()` — must be VALIDATED, never escaped, because
+  `escape_javascript` also escapes `$` and mangles a legal store name. That fleet
+  (about 36 splices across 19 partials) and a third class found alongside it —
+  Ruby-ASSEMBLED JS emitted into an attribute, some of it already `html_safe` — are
+  scoped OUT of this change and carry their own tickets. The SHAPE of the splice
+  decides the repair, never the name of the local.
+
+- **`Studio::S3` no longer mistakes a Rails NAMESPACE for a Rails application.**
+  `environment` guarded on `defined?(Rails)` and then called `Rails.env`.
+  rails-html-sanitizer — a transitive dependency of `action_view`, which arrives
+  long before any application does — ships a namespace-only `module Rails` with no
+  singleton methods, so that guard reads true and the next call raises
+  `NoMethodError: undefined method 'env' for module Rails`. It now asks
+  `Rails.respond_to?(:env)`, which is the form `lib/studio.rb` already uses in three
+  places; this was the straggler. No shipped app can reach it — every host boots a
+  real application — but the engine's own pure-Ruby unit lane can, and it did:
+  adding one `require` for a file that needs `action_view` turned an untouched
+  `email_catalog_test` red with two errors about email uploads.
 
 - **The style guide's two "Sign Wallet" thumbnails no longer crown themselves
   with a padlock the card stopped drawing, and the guide's lock no longer trails
@@ -606,7 +702,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
   **The band table shipped from the wrong file.** The `.nav-shell` `--nav-*`
   sizes were inline in `layouts/_navbar.html.erb`, so only an app rendering that
-  partial got them — and **three of six apps fork the navbar**
+  partial got them — and **three of five apps fork the navbar**
   (`turf-monster`, `mcritchie-studio`, `moms-app`), each left to hand-write its
   own. That is precisely how four independent copies of this collapse came to
   exist. They now ship from `engine.css`, which every engine-consuming app

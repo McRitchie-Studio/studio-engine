@@ -21,9 +21,13 @@ require_relative "../../../lib/studio/s3"
 # QA LIST 61 objects out of the production bucket — an app whose safety profile is
 # `auth-gated-confidential-deal-data`.
 #
-# RAILS IS NOT DEFINED in the engine's unit env, so the production branch is
-# unreachable without a stub. bin/release-check runs each test file in its own
-# process (`ruby -Itest <file>`), so defining Rails here cannot leak into a sibling.
+# RAILS CARRIES NO `env` in the engine's unit env, so the production branch is
+# unreachable without the stub below. It is NOT true that the constant is absent —
+# rails-html-sanitizer ships a namespace-only `module Rails`, and anything that
+# reaches action_view defines it. That is exactly why Studio::S3#environment asks
+# `Rails.respond_to?(:env)` rather than `defined?(Rails)`; see the test at the foot
+# of this file. bin/release-check runs each test file in its own process
+# (`ruby -Itest <file>`), so the accessor added here cannot leak into a sibling.
 module Rails
   class << self
     attr_accessor :env
