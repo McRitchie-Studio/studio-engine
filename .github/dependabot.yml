@@ -1,0 +1,46 @@
+# target-branch pins every version-update PR to `accepted`, the first rung of
+# the accepted -> release -> main ladder. Without it Dependabot targets the
+# default branch (main); merging there puts a commit on main that `release`
+# lacks, and the next `bin/release ship` fails closed on the divergence.
+# Set it on EVERY entry — target-branch is per-entry, not global.
+#
+# Caveat: Dependabot SECURITY updates always target the default branch and
+# cannot be retargeted. Retarget those to `accepted` by hand before merging.
+#
+# ---------------------------------------------------------------------------
+# SCOPED TO solana-studio ALONE, and that scope is the whole justification.
+#
+# Dependabot is already installed in mcritchie-studio and turf-monster, where it
+# has opened 22 PRs since 2026-08-14 with ZERO merged (10 open in the flagship,
+# 9 open + 3 closed in turf-monster). An unscoped config here buys a 23rd
+# unmerged PR and teaches everyone to ignore this repo's Dependabot too.
+#
+# solana-studio is the exception because two things are true of it and of
+# nothing else in this lock:
+#
+#   GATED       bin/gem-drift-check fails the build while this engine's lock
+#               trails the released gem, so the drift cannot rot quietly the way
+#               a third-party bump can. It reddens EVERY open engine PR, which
+#               puts the cost on authors who never touched the line. Measured
+#               2026-09-07: the lock trailed five times in one day, once going
+#               stale 36 minutes after the previous fix was committed.
+#   FIRST-PARTY we author and release it, and consumer-ci.yml runs three
+#               consumers' full suites against it before any merge is proposed.
+#
+# The `allow` block is what keeps those two properties true of everything this
+# config opens. Widening it re-imports the third-party graveyard — major bumps
+# that legitimately need a human to read a changelog — and the case for
+# auto-merge does not extend to them.
+#
+# open-pull-requests-limit is 3, not 10: one gem on a daily schedule should
+# never need more, and a number larger than the problem is how a queue starts.
+version: 2
+updates:
+- package-ecosystem: bundler
+  directory: "/"
+  target-branch: accepted
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 3
+  allow:
+  - dependency-name: solana-studio

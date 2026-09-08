@@ -1,0 +1,187 @@
+# Auto-merges Dependabot's solana-studio Gemfile.lock bumps — and nothing else.
+#
+# WHY THIS LANE EXISTS. This engine's lock trails the RELEASED solana-studio
+# over and over: five times on 2026-09-07 alone (v0.5.7 by 3h, v0.6.0 by 2h20m,
+# v0.6.1 by 14h15m, v0.7.0 by 1h10m). The decisive one — the 0.6.1 fix landed
+# 15:59 and v0.7.0 was tagged 16:35, so the lock went stale 36 minutes after
+# being committed. While it is stale, bin/gem-drift-check reddens EVERY open
+# engine PR, over a line no PR author owns.
+#
+# THE DECISION IS NOT IN THIS FILE, on purpose. bin/lock-bump-mergeable owns all
+# four conditions, and test/lib/lock_bump_mergeable_test.rb executes each of
+# them against fixtures. A condition written as a workflow expression could only
+# ever be tested by reading it, and "the string is present" is not the claim
+# that matters. This file is plumbing: it gathers facts, hands them over, and
+# obeys the verdict.
+#
+# WHY workflow_run AND NOT pull_request. A `pull_request` run raised by
+# Dependabot gets a READ-ONLY GITHUB_TOKEN and the Dependabot secret store — it
+# cannot merge anything. A `workflow_run` lane runs in the context of the
+# default branch with the repository's own token, which is the supported way to
+# hold merge permission over a bot's PR. It also means this lane never runs
+# code from the PR: it reads facts through the API and never checks the branch
+# out.
+#
+# WHY IT MERGES DIRECTLY RATHER THAN ENABLING AUTO-MERGE. `allow_auto_merge` is
+# FALSE on this repository (measured 2026-09-07), so `gh pr merge --auto` would
+# fail. That is fine here: this lane only runs after a CI board has settled and
+# it re-reads that board itself, so there is nothing left to wait for. If
+# auto-merge is ever enabled, this still works unchanged.
+#
+# --merge, NEVER squash or rebase. Both rewrite history, and the
+# accepted -> release -> main ladder walks `git rev-list` ancestry to decide
+# what is already shipped. A rewritten commit is a commit the ladder cannot
+# find, and `bin/release ship` fails closed on the divergence. This is a
+# correctness constraint, not a style preference; it is asserted in
+# test/lib/lock_bump_mergeable_test.rb.
+#
+# ON A GENUINELY BREAKING BUMP nothing happens here. The gate exits 1, this
+# workflow stays green and does NOT touch the PR — no close, no branch
+# deletion, no comment. The PR sits open and red, bin/gem-drift-check keeps
+# reddening other engine PRs until the lock moves, and a human is pulled in
+# within one PR cycle. That is today's behaviour, and it is the floor this lane
+# may never drop below.
+#
+# OPERATOR PREREQUISITE, and this lane is INERT until it is met. consumer-ci.yml
+# mints a GitHub App token from MCRITCHIE_AGENT_APP_ID and
+# MCRITCHIE_AGENT_PRIVATE_KEY to check out the private consumer repos. A
+# Dependabot-raised `pull_request` run reads from the separate DEPENDABOT secret
+# store, so unless both are mirrored there (Settings -> Secrets and variables ->
+# Dependabot) every Dependabot PR's consumer lanes fail closed on a missing
+# token — which is indistinguishable, from here, from a breaking bump. Nothing
+# unsafe happens; the lane simply never merges anything and the drift stays
+# manual.
+
+name: Engine Lock Auto-merge
+
+on:
+  workflow_run:
+    # BOTH lanes, because "CI is green" means both. Whichever finishes last
+    # raises the run that finds a fully settled board; the earlier one refuses
+    # on "these checks have not finished" and logs why.
+    workflows: [Engine CI, Consumer CI]
+    types: [completed]
+
+# Never let two completions race into a double merge of the same PR.
+concurrency:
+  group: engine-lock-automerge-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Auto-merge a green solana-studio lock bump
+    runs-on: ubuntu-latest
+    # A cheap pre-filter ONLY — it can make this lane run less, never merge
+    # more. Every safety condition lives in bin/lock-bump-mergeable. Runs from
+    # a failed CI are deliberately NOT filtered out here, so a refusal leaves a
+    # readable log rather than no run at all.
+    if: github.event.workflow_run.event == 'pull_request'
+
+    steps:
+      # This lane never checks the PR out. It needs exactly two things from this
+      # repository — the gate and its scope — so it takes a shallow, sparse
+      # checkout of the DEFAULT branch. The PR's own tree is never executed.
+      - name: Checkout the gate (default branch, never the PR)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: bin/lock-bump-mergeable
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve the pull request for this commit
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          # Resolve by commit rather than trusting workflow_run.pull_requests,
+          # which is empty for some event shapes and would silently skip.
+          number="$(gh api "repos/${{ github.repository }}/commits/${SHA}/pulls" \
+                      --jq '[.[] | select(.state == "open")][0].number // empty')"
+          if [ -z "$number" ]; then
+            echo "No open PR for ${SHA} — nothing to consider."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Considering PR #${number} at ${SHA}."
+            echo "found=true"          >> "$GITHUB_OUTPUT"
+            echo "number=${number}"    >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Gather the facts the gate decides on
+        id: facts
+        if: steps.pr.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          gh pr diff "$PR" > /tmp/pr.diff
+
+          gh pr view "$PR" --json author,files,statusCheckRollup > /tmp/pr.json
+
+          # Normalise the two rollup shapes into one. A CheckRun carries
+          # status+conclusion; a legacy StatusContext carries only `state`, and
+          # a PENDING one must NOT normalise to COMPLETED or the gate would read
+          # an unfinished lane as a finished one.
+          jq '[.statusCheckRollup[]
+               | if .__typename == "CheckRun"
+                 then { name: .name, status: .status, conclusion: .conclusion }
+                 else { name: .context,
+                        status: (if .state == "PENDING" then "IN_PROGRESS" else "COMPLETED" end),
+                        conclusion: .state }
+                 end]' /tmp/pr.json > /tmp/checks.json
+
+          jq -n \
+            --arg    author "$(jq -r '.author.login' /tmp/pr.json)" \
+            --argjson files "$(jq '[.files[].path]' /tmp/pr.json)" \
+            --rawfile diff  /tmp/pr.diff \
+            --argjson checks "$(cat /tmp/checks.json)" \
+            '{author: $author, files: $files, diff: $diff, checks: $checks}' \
+            > /tmp/payload.json
+
+          echo "Payload built for PR #${PR}."
+
+      - name: Gate — may this PR merge itself?
+        id: gate
+        if: steps.pr.outputs.found == 'true'
+        run: |
+          set -uo pipefail
+          # The exit code IS the verdict, so do not let `set -e` end the job on a
+          # refusal: a refused PR is a normal, expected outcome and must leave a
+          # green run with a readable log, not a red one that reads as breakage.
+          ruby bin/lock-bump-mergeable < /tmp/payload.json
+          verdict=$?
+          set -e
+
+          case "$verdict" in
+            0)
+              echo "mergeable=true" >> "$GITHUB_OUTPUT"
+              ;;
+            1)
+              echo "mergeable=false" >> "$GITHUB_OUTPUT"
+              echo "Refused. Leaving the PR open and untouched — see the reasons above."
+              ;;
+            *)
+              # 64 (or anything unexpected) means the GATE broke, not that the PR
+              # was judged. That must be loud: a silently broken gate is a gate
+              # that stops protecting anything while the board stays green.
+              echo "::error::lock-bump-mergeable exited ${verdict} — the gate itself failed."
+              exit 1
+              ;;
+          esac
+
+      # --merge is load-bearing. Squashing or rebasing rewrites history and
+      # breaks the git rev-list ancestry the release ladder depends on.
+      - name: Merge the lock bump
+        if: steps.gate.outputs.mergeable == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          gh pr merge --merge "$PR" --repo "${{ github.repository }}"
+          echo "Merged PR #${PR} into accepted."
