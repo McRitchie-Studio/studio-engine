@@ -45,8 +45,9 @@ class MailTransportNamespaceOnlyRailsTest < Minitest::Test
   # tests below would pass while testing nothing.
   def test_the_fixture_really_is_a_rails_constant_without_env_or_logger
     assert defined?(Rails),
-           "action_view should have defined a bare `module Rails`; without it the " \
-           "assertions below are inert"
+           "loading action_view's HELPERS tree should have defined a bare " \
+           "`module Rails` — a bare `require \"action_view\"` does not; without it " \
+           "the assertions below are inert"
     refute Rails.respond_to?(:env),
            "this file must NOT stub Rails.env — the missing accessor is the " \
            "condition under test, and a sibling's stub leaking in would hide the bug"
