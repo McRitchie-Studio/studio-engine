@@ -47,6 +47,7 @@ Rails.application.routes.draw do
   get "lab/birthday_gate", to: "e2e_lab#birthday_gate"
   get "lab/modal_host", to: "e2e_lab#modal_host"
   get "lab/onboarding_first_name", to: "e2e_lab#onboarding_first_name"
+  get "lab/js_attribute_locals", to: "e2e_lab#js_attribute_locals"
   get "lab/toast_over_banner", to: "e2e_lab#toast_over_banner"
   get "lab/profile", to: "e2e_lab#profile"
   get "lab/profile_edit", to: "e2e_lab#profile_edit"
