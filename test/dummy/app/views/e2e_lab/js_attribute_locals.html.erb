@@ -1,0 +1,86 @@
+<%# HOST-SUPPLIED LOCALS THAT LAND INSIDE A JS STRING, in a browser.
+
+    WHY A BROWSER AND NOT THE RENDER TEST BESIDE IT. test/views/js_attribute_locals_test.rb
+    asserts these attributes are structurally intact in the response bytes. That is
+    a strong claim and it is still not the one that matters: an attribute can be
+    well-formed and the component can still be dead, and an attribute can look
+    broken to a regex and mount fine. What the user actually has is a button that
+    fires, or a button that does nothing. Only a browser separates those.
+
+    THE FAILURE THESE CARDS EXIST TO CATCH IS SILENT. A bare apostrophe in one of
+    these locals closes its JS literal, the handler or the x-data becomes a
+    SyntaxError, and Alpine mounts a no-op that still renders every element. The
+    card looks perfect and the click goes nowhere - no error on screen, no server
+    log, and every markup assertion still green.
+
+    THE LAB RULE: this page sets up the partials' LOCALS and nothing else. Every
+    card below is an engine partial rendered BY NAME.
+
+    ONE HOSTILE LOCAL PER CARD, deliberately. cta_event and secondary_event are two
+    interpolations on two different lines, so a repair applied to one is silent
+    about the other; a single card carrying both would go green the moment either
+    was fixed. The same reasoning the first-name lab page records.
+
+    THE VALUE CARRIES BOTH QUOTES AND A BACKSLASH. The apostrophe is what closes
+    the JS literal; the double quote is what closes the HTML attribute once ERB has
+    been persuaded to skip its own escaping; the backslash is what would swallow
+    the escape of whatever follows it if the order were wrong. A card that mounts
+    and fires with all three in the value has been through both escapers.
+%>
+<main class="max-w-3xl mx-auto px-4 py-10 space-y-12" x-data>
+  <h1 class="text-2xl font-bold mb-2">JS-string locals — the hostile values</h1>
+
+  <section data-test="success-cta">
+    <h2 class="text-lg font-bold mb-3">_success_card — a hostile cta_event</h2>
+    <%= render "studio/modals/blocks/success_card",
+               title: "Entry confirmed",
+               cta_label: "Continue",
+               cta_event: %q{it's a "cta"\event} %>
+  </section>
+
+  <section data-test="success-secondary">
+    <h2 class="text-lg font-bold mb-3">_success_card — a hostile secondary_event</h2>
+    <%= render "studio/modals/blocks/success_card",
+               title: "Entry confirmed",
+               secondary_label: "Maybe later",
+               secondary_event: %q{it's a "secondary"\event} %>
+  </section>
+
+  <section data-test="error-cta">
+    <h2 class="text-lg font-bold mb-3">_error_card — a hostile cta_event</h2>
+    <%= render "studio/modals/blocks/error_card",
+               title: "Still processing",
+               cta_label: "Retry",
+               cta_event: %q{it's an "error"\event} %>
+  </section>
+
+  <section data-test="error-secondary">
+    <h2 class="text-lg font-bold mb-3">_error_card — a hostile secondary_event</h2>
+    <%= render "studio/modals/blocks/error_card",
+               title: "Still processing",
+               secondary_label: "Close",
+               secondary_event: %q{it's an "error secondary"\event} %>
+  </section>
+
+  <%# THE TX LINK'S cluster_param is not an event name - it is a literal SUFFIX
+      concatenated into a :href expression, so what proves it survived is the
+      resolved URL rather than a dispatch. tx_signature_key beside it is an Alpine
+      EXPRESSION by contract and is spliced in bare, which is why it is written as
+      a quoted JS literal here rather than as a plain string local. %>
+  <section data-test="tx-link">
+    <h2 class="text-lg font-bold mb-3">_solana_tx_link — a hostile cluster_param</h2>
+    <%= render "studio/modals/blocks/solana_tx_link",
+               tx_signature_key: "'5xSigNature'",
+               cluster_param: %q{?cluster=it's a "devnet"} %>
+  </section>
+
+  <%# THE CONTROL. Same partial, an ORDINARY event name, so a spec that went green
+      because NOTHING on the page dispatches anything has something to fail against. %>
+  <section data-test="ordinary-cta">
+    <h2 class="text-lg font-bold mb-3">_success_card — an ordinary cta_event</h2>
+    <%= render "studio/modals/blocks/success_card",
+               title: "Entry confirmed",
+               cta_label: "Continue",
+               cta_event: "lab-ordinary-cta" %>
+  </section>
+</main>

@@ -667,7 +667,19 @@
 # pinned-stack specs stay green, which is exactly how the defect shipped.
 # Re-derived on THIS tree with the lister, never by arithmetic:
 #   npx playwright test --list  -> 132 tests in 19 files
-total_specs: 132
+#
+# 2026-09-07: 132 -> 138, and a TWENTIETH file. e2e/js_attribute_locals.spec.js adds
+# SIX tests for the engine-wide version of the first-name card's string-position
+# hazard: a host-supplied local inside a JS literal in a JS-evaluating attribute,
+# now on the blocks that also take one. Five drive a hostile value (success card
+# cta_event and secondary_event, error card cta_event and secondary_event, tx link
+# cluster_param) and the sixth is the CONTROL — an ordinary event name, so a page
+# where nothing dispatches at all fails loudly instead of reading as five passes.
+# ONE LOCAL PER SPEC rather than one card carrying all of them: they are separate
+# interpolations on separate lines, so a combined card would go green the moment
+# ANY one was repaired. Re-derived on THIS tree with the lister, never by arithmetic:
+#   npx playwright test --list  -> 138 tests in 20 files
+total_specs: 138
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -731,7 +743,7 @@ total_specs: 132
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 132
 # executed = total - devnet - allowed_skips = 132 - 0 - 0 = 132, so executed ==
 # total_specs and the equality assertion holds.
-executed: 132
+executed: 138
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

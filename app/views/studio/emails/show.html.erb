@@ -197,6 +197,17 @@
 
   <%# ROW TWO — the pictures, and the words that ride on them. %>
   <div class="grid gap-6 md:grid-cols-2 mb-6">
+    <%# THE FILENAMES AND THE LABEL ARE ESCAPED ON THE WAY INTO THIS x-data. All
+        three come off the email REGISTRY entry rather than a form, so nothing
+        reaches them with a quote today — but they are the only values in the
+        attribute that are not authored right here, and bare interpolation of one
+        would close its JS literal and mount the whole upload host as a silent
+        no-op: an image picker that opens, crops, and never saves.
+
+        successMessage previously used the BARE `j` form. That is correct only
+        while the label is a plain String — `j` preserves an html_safe marking, and
+        a safe value would skip ERB's attribute-escaping half and let a raw double
+        quote out of the attribute. Studio::JsLiteral removes that condition. %>
     <section class="card p-4"
       <% if @uploads_available %>
         x-data="imageUploadHost({
@@ -205,10 +216,10 @@
           maxWidth: <%= max_width %>,
           transparent: false,
           allowGifs: true,
-          filename: '<%= @entry.key %>.png',
+          filename: '<%= Studio::JsLiteral.in_attribute(@entry.key) %>.png',
           saving: 'Saving banner…',
           success: 'Banner updated',
-          successMessage: '<%= j @entry.label %> now uses this app\'s own image.',
+          successMessage: '<%= Studio::JsLiteral.in_attribute(@entry.label) %> now uses this app\'s own image.',
           failure: 'Couldn\'t save the banner'
         })"
         @crop-photo-confirmed.window="onCropConfirmed($event.detail)"
@@ -513,7 +524,7 @@
            maxWidth: 600,
            transparent: true,
            allowGifs: false,
-           filename: '<%= @entry.key %>-logo.png',
+           filename: '<%= Studio::JsLiteral.in_attribute(@entry.key) %>-logo.png',
            saving: 'Saving logo…',
            success: 'Logo updated',
            successMessage: 'This email now uses its own logo.',

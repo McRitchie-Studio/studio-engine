@@ -26,7 +26,13 @@
   The living style guide passes store: "dsModals" for its page-scoped host.
 %>
 <% crop_store = local_assigns.fetch(:store, "modals") %>
-<div x-data="cropPhotoModal({ store: '<%= crop_store %>' })">
+<%# STRING position, so it is ESCAPED rather than validated: the store name is
+    handed to cropPhotoModal as a JS string argument, not spliced in as a bare
+    identifier. An apostrophe would close that literal and mount the modal as a
+    silent no-op that still renders every element below. Studio::JsLiteral carries
+    why both escapers have to run. %>
+<% crop_store_js = Studio::JsLiteral.in_attribute(crop_store) %>
+<div x-data="cropPhotoModal({ store: '<%= crop_store_js %>' })">
   <h3 class="text-heading font-bold text-lg text-center mb-4">Crop Photo</h3>
 
   <template x-if="error">
