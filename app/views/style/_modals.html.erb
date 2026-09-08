@@ -468,14 +468,6 @@
                     resolve_expr: "$store.dsModals.close()" %></div>
         </template>
 
-        <%# wallet-setup — registered here with the other cards this page opens.
-            Its CARD lives in the Web3 section (it is about getting a wallet); the
-            3-of-3 pill it renders is the HOST's onboarding chain position, which
-            is not this page's business. The Onboarding section that used to own
-            it was folded into Profile on 2026-08-24. %>
-        <template x-if="$store.dsModals.current().id === 'wallet-setup'">
-          <div><%= render "style/modals/wallet_setup" %></div>
-        </template>
 
         <%# --- Batch 3: the modals that had no card on EITHER page --- %>
         <template x-if="$store.dsModals.current().id === 'it-begins'">
@@ -504,20 +496,11 @@
         <template x-if="$store.dsModals.current().id === 'ds-onramp-hub'">
           <div><%= render "style/modals/ds_onramp_hub" %></div>
         </template>
-        <template x-if="$store.dsModals.current().id === 'ds-buy-entry-token'">
-          <div><%= render "style/modals/ds_buy_entry_token" %></div>
-        </template>
-        <template x-if="$store.dsModals.current().id === 'ds-cdp-ramp'">
-          <div><%= render "style/modals/ds_cdp_ramp" %></div>
-        </template>
         <template x-if="$store.dsModals.current().id === 'ds-newsletter-success'">
           <div><%= render "style/modals/ds_newsletter_success" %></div>
         </template>
         <template x-if="$store.dsModals.current().id === 'rate-limit-general'">
           <div><%= render "style/modals/rate_limit_general" %></div>
-        </template>
-        <template x-if="$store.dsModals.current().id === 'wallet-changed'">
-          <div><%= render "style/modals/wallet_changed" %></div>
         </template>
 
         <%# --- Newsletter exit + the off-page quest celebration --- %>
@@ -534,9 +517,6 @@
         </template>
 
         <%# --- Web3 --- %>
-        <template x-if="$store.dsModals.current().id === 'cosign-rejected'">
-          <div><%= render "style/modals/cosign_rejected" %></div>
-        </template>
         <%# Both web3 sign-in cards render from SOLANA-STUDIO, and both are the
             REAL shipped partials rather than style-guide forks — the same files
             turf-monster renders in production, so what is reviewed here IS the
@@ -1187,9 +1167,9 @@
           listed for reference but <strong>cannot be opened here</strong>. Nothing
           registers them, so a trigger would open an empty panel.
         <% end %>
-        The cards run in the order a player meets them &mdash; <strong>get a wallet,
-        prove it, spend from it</strong>: Connect wallet &rarr; Setup Wallet &rarr;
-        the two Sign Wallet states &rarr; Processing &rarr; success or error &rarr;
+        The cards run in the order a player meets them &mdash; <strong>connect a
+        wallet, prove it, spend from it</strong>: Connect wallet &rarr; the two
+        Sign Wallet states &rarr; Processing &rarr; success or error &rarr;
         top-up &rarr; Entry confirmed. Inside that, <strong>Connect Wallet &rarr;
         Processing on-chain transaction &rarr; On-chain success</strong> is a
         <strong>walked flow</strong> and the live card <strong>glows</strong>,
@@ -1212,14 +1192,7 @@
         <strong>standard web3 auth button</strong>: a wallet row (brand mark, the
         wallet&rsquo;s own name, Installed badge, chevron) rather than a filled
         CTA, glowing via <code class="font-mono text-2xs">pulse-cta</code> because
-        it is the one thing to press. Do not confuse them with <strong>Setup
-        Wallet</strong>, immediately before them: that one asks an account to
-        <strong>get</strong> a wallet, these ask an account to
-        <strong>prove</strong> the one it already has &mdash; opposite populations
-        (<code class="font-mono text-2xs">WalletSetupPolicy</code> exits at its own
-        step 1 for an account that holds a wallet), so no user ever meets both.
-        They sit next to each other anyway, because the pair is easiest to keep
-        straight when you can read them side by side.
+        it is the one thing to press.
       </p>
     </div>
     <%# ONE ordered run, read left to right as a player meets it: get a wallet,
@@ -1261,30 +1234,6 @@
           section's business.
           ONE card with a "Wallet detected" toggle rather than two cards sharing a
           modal id: the two Sign Wallet cards below are what that shape costs. %>
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Setup Wallet",
-            reference: %(the "Set up your wallet" card (style/modals/_wallet_setup) — how an account with NO wallet gets one, and the host's third onboarding step (it renders a 3-of-3 pill, which is the host's chain position, not this section's). An APP-SPECIFIC flow: the engine owns only the chrome (shell, progress_pill, wallet_brand_sprite) and the house wallet-row idiom, while extension detection, the 90-second walkthrough video, the Detailed Guide route and the managed-wallet fallback stay in the host (turf-monster's own is ~576 lines). Toggle "Wallet detected" to swap the row between INSTALL and Installed. NOTE it is the OPPOSITE population to the two Sign Wallet cards immediately below — WalletSetupPolicy exits at its own step 1 for an account that already holds a wallet, so no user ever meets both. Open with $store.dsModals.open('wallet-setup', { detected: false })),
-            card_data: "opts: { detected: false }",
-            toggles:   [{ model: "opts.detected", label: "Wallet detected" }],
-            open_expr: "$store.dsModals.open('wallet-setup', { detected: opts.detected })",
-            glow_when: ds_glow.call("wallet-setup"),
-            disabled: !web3_on, openable: true } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
-          <span class="block h-2 w-20 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <%# the 3-of-3 pill, filled — the whole reason this card sits here %>
-          <span class="flex gap-1">
-            <span class="flex-1 h-1.5 rounded" style="background: var(--color-cta)"></span>
-            <span class="flex-1 h-1.5 rounded" style="background: var(--color-cta)"></span>
-            <span class="flex-1 h-1.5 rounded" style="background: var(--color-cta)"></span>
-          </span>
-          <span class="flex items-center gap-1.5 h-7 w-full rounded-lg border px-1.5" style="border-color: var(--color-border-strong)">
-            <span class="w-4 h-4 rounded shrink-0" style="background: var(--color-primary)"></span>
-            <span class="block h-1.5 w-8 rounded" style="background: var(--color-text); opacity: .35"></span>
-          </span>
-          <%# the walkthrough placeholder, the card's second half %>
-          <span class="block w-full rounded" style="height: 1.6rem; background: var(--color-text); opacity: .10"></span>
-        </div>
-      <% end %>
 
       <%# SIGN WALLET — the web2-session-on-a-wallet-account card. NOT part of the
           walk above: that walk is one on-chain transaction, this is an AUTH state
@@ -1411,20 +1360,6 @@
           no — refusing to co-sign because the transaction it was handed did not
           match the entry it prepared. They sit together because a reviewer
           reading either alone would not know the other existed. %>
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Co-sign refused",
-            reference: %(the "Transaction not signed" card (style/modals/_cosign_rejected) — turf-monster's modals/_cosign_rejected, opened when POST confirm_onchain_entry answers 422 with code tx_rejected: the server refused to co-sign because the submitted transaction did not match the entry it had prepared. APP-SPECIFIC — the engine owns no entry preparation, no co-signing and no verdict; it lends card_header and nothing else. THE COPY IS DELIBERATELY VAGUE and should stay that way: good actors never see this card (it fires on a tampered or mismatched transaction), so naming WHICH server-side check failed would help an attacker probe the validation. What the copy does commit to is the part the one honest user needs — nothing was submitted, the funds are safe. Open with $store.dsModals.open('cosign-rejected')),
-            open_expr: "$store.dsModals.open('cosign-rejected')",
-            glow_when: ds_glow.call("cosign-rejected"),
-            disabled: !web3_on, openable: true } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <div class="text-2xl leading-none">&#128737;&#65039;</div>
-          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="block h-1.5 w-full rounded" style="background: var(--color-text); opacity: .3"></span>
-          <span class="block h-1.5 w-28 mx-auto rounded" style="background: var(--color-text); opacity: .3"></span>
-          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
-        </div>
-      <% end %>
 
       <%# Wallet deposit — standalone top-up card (not part of the walk). %>
       <%= render layout: "style/modal_specimen", locals: {
@@ -1486,41 +1421,7 @@
         </div>
       <% end %>
 
-      <%# ds-buy-entry-token — reached with a lineup picked and no way to pay. %>
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Buy entry token",
-            reference: %(the entry-token purchase (style/modals/_ds_buy_entry_token) — turf-monster's modals/_buy_entry_token, built from blocks/_close_x and two blocks/_rail_row. Reached when a player has picked a lineup and has no way to pay for it, which is why the copy says the lineup is SAVED: losing their picks is the one thing they are afraid of at that moment. The ranking is a PRODUCT decision rather than a visual one — Coinflow leads and carries the "New" badge because it mints a spendable entry token directly, the shortest path from here to being in the contest, while Stripe swaps into the auth wizard's tokens picker, the older and longer path, and defers. Open with $store.dsModals.open('ds-buy-entry-token')),
-            open_expr: "$store.dsModals.open('ds-buy-entry-token')",
-            glow_when: ds_glow.call("ds-buy-entry-token"),
-            disabled: !web3_on, openable: true } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 space-y-2">
-          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="flex items-center gap-1.5 rounded-md p-1.5" style="border: 2px solid var(--color-primary)">
-            <span class="block h-4 w-4 rounded" style="background: var(--color-cta)"></span>
-            <span class="block h-1.5 flex-1 rounded" style="background: var(--color-text); opacity: .3"></span>
-          </span>
-          <span class="flex items-center gap-1.5 rounded-md p-1.5 border border-subtle">
-            <span class="block h-4 w-4 rounded" style="background: var(--color-text); opacity: .25"></span>
-            <span class="block h-1.5 flex-1 rounded" style="background: var(--color-text); opacity: .18"></span>
-          </span>
-        </div>
-      <% end %>
 
-      <%# ds-cdp-ramp — ONE of thirteen states, and the card says so. %>
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Coinbase ramp (preflight)",
-            reference: %(the Coinbase ramp's BUY PREFLIGHT (style/modals/_ds_cdp_ramp) — turf-monster's modals/_cdp_ramp. DELIBERATELY PARTIAL: that modal is a TWO-FLOW step machine (buy and cash-out) across THIRTEEN states — preflight, opening, waiting, awaiting-cdp, send, settling and the rest — and this cards exactly one of them, the buy preflight, which is the state both funding cards hand off to and therefore the only one a player reaches without already being mid-flow. The other twelve are uncarded BY DECISION (operator, 2026-08-26), which is a different thing from an oversight — a cabinet that shows one state of a thirteen-state machine without admitting it teaches a reader that the machine is simpler than it is. /tasks/port-cdp-ramp-specimen holds the full state map if that decision reverses. Open with $store.dsModals.open('ds-cdp-ramp')),
-            open_expr: "$store.dsModals.open('ds-cdp-ramp')",
-            glow_when: ds_glow.call("ds-cdp-ramp"),
-            disabled: !web3_on, openable: true } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2 relative">
-          <span class="absolute top-1 right-2 text-secondary leading-none">&times;</span>
-          <span class="block h-2 w-28 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <span class="block h-1.5 w-full rounded" style="background: var(--color-text); opacity: .12"></span>
-          <span class="block h-1.5 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .12"></span>
-          <span class="block h-4 w-full rounded" style="background: var(--color-cta)"></span>
-        </div>
-      <% end %>
 
       <%# Entry confirmed — the GENERIC web3 celebration (tx link + heading + drain
           CTA). seedsEarned: 0 so no seeds bar even where leveling is on: this card
@@ -1567,30 +1468,6 @@
         </div>
       <% end %>
 
-      <%# wallet-changed — the extension switched accounts underneath the session.
-          Both addresses are shown because recognising your own is the only way to
-          tell a deliberate switch from an accident. %>
-      <%= render layout: "style/modal_specimen", locals: {
-            label:     "Wallet changed",
-            reference: %(the Web3 "Wallet changed" reconciliation (style/modals/_wallet_changed) — turf-monster's modals/_wallet_changed, fired when the person switches accounts inside their wallet extension while signed in. Composes the engine's blocks/_card_header; the switch itself belongs to turf's wallet store (continueSwitch) and the engine owns no wallet. Nothing is broken — but the session and the extension now disagree about who this is, and every on-chain action from here would use an identity the page is not showing. So it prints BOTH addresses, truncated the Solana way, because recognising your own is the one check the app cannot make for you. Continuing re-derives a session against the new wallet, which is a round trip, so the button carries a busy state rather than looking dead. Open with $store.dsModals.open('wallet-changed', { currentAddress: '…', newAddress: '…' })),
-            open_expr: "$store.dsModals.open('wallet-changed', { currentAddress: '7xKpDemoSignedInWallet9JZ2Q', newAddress: '9mQtDemoSwitchedWalletLd4V' })",
-            glow_when: ds_glow.call("wallet-changed"),
-            disabled: !web3_on, openable: true } do %>
-        <div class="pointer-events-none w-40 rounded-lg bg-surface border border-subtle shadow p-4 text-center space-y-2">
-          <div class="text-2xl leading-none">🔀</div>
-          <span class="block h-2 w-24 mx-auto rounded" style="background: var(--color-text); opacity: .18"></span>
-          <%# the two truncated addresses — the comparison IS the card %>
-          <span class="flex items-center justify-between gap-2">
-            <span class="block h-1.5 w-10 rounded" style="background: var(--color-text); opacity: .18"></span>
-            <span class="block h-1.5 w-12 rounded" style="background: var(--color-text); opacity: .35"></span>
-          </span>
-          <span class="flex items-center justify-between gap-2">
-            <span class="block h-1.5 w-10 rounded" style="background: var(--color-text); opacity: .18"></span>
-            <span class="block h-1.5 w-12 rounded" style="background: var(--color-text); opacity: .35"></span>
-          </span>
-          <span class="block h-5 w-full rounded" style="background: var(--color-cta)"></span>
-        </div>
-      <% end %>
     </div>
   </section>
 
