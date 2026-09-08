@@ -31,7 +31,7 @@ require "action_view"
 #   * the src pointing at bytes the gem does not actually ship
 #   * the precompile entry missing — Sprockets hosts (mcritchie-studio, turf-monster)
 #     serve NOTHING without it while propshaft hosts ignore the list, so it breaks
-#     exactly half the fleet and looks fine on the other half
+#     two of the five apps in the fleet and looks fine on the other three
 #   * the preload losing `crossorigin`, which silently DOUBLES the download
 #   * the 100-900 range outliving the variable file that makes it true
 class VendoredMontserratTest < Minitest::Test

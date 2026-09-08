@@ -363,7 +363,7 @@ class NavCollapseContractTest < Minitest::Test
 
   # LAYER 2 OF THE PRIMITIVE. The band table moved here from the navbar
   # partial's inline <style>: every engine-consuming app imports this
-  # stylesheet, but only some render that partial, and three of six FORK the
+  # stylesheet, but only some render that partial, and three of five FORK the
   # navbar. While the table sat inline each fork hand-wrote its own — which is
   # how four independent copies of this collapse came to exist.
   def engine_css
