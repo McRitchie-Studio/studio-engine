@@ -24,7 +24,11 @@ require_relative "../../../lib/studio/s3"
 # RAILS CARRIES NO `env` in the engine's unit env, so the production branch is
 # unreachable without the stub below. It is NOT true that the constant is absent —
 # rails-html-sanitizer ships a namespace-only `module Rails`, and anything that
-# reaches action_view defines it. That is exactly why Studio::S3#environment asks
+# reaches into `ActionView::Helpers` loads it. Measured, because the looser version
+# of this sentence was wrong: a bare `require "action_view"` leaves `Rails`
+# UNDEFINED and never loads the sanitizer; naming any constant under
+# `ActionView::Helpers` autoloads the helpers tree, which requires
+# rails-html-sanitizer. That is exactly why Studio::S3#environment asks
 # `Rails.respond_to?(:env)` rather than `defined?(Rails)`; see the test at the foot
 # of this file. bin/release-check runs each test file in its own process
 # (`ruby -Itest <file>`), so the accessor added here cannot leak into a sibling.
