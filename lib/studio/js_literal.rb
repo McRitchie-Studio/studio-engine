@@ -80,8 +80,9 @@ module Studio
   # NAME — `$store.<%= modal_store %>.close()` — must be VALIDATED, never escaped:
   # escape_javascript also escapes `$`, so a legitimate store name like `dsModals$2`
   # comes back mangled and the card dies anyway. The SHAPE of the splice decides the
-  # repair, never the name of the local. studio/modals/onboarding/_first_name
-  # carries the worked example of both.
+  # repair, never the name of the local. That repair is Studio::JsIdentifier, this
+  # module's sibling and its opposite; studio/modals/onboarding/_first_name carries
+  # the worked example of both in one partial.
   module JsLiteral
     extend ActionView::Helpers::JavaScriptHelper
 

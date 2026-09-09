@@ -19,7 +19,9 @@
     close_label  — dismiss link text. Default "Close".
 %>
 <%
-  modal_store  = local_assigns.fetch(:modal_store, "modals")
+  # IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier.
+  modal_store  = Studio::JsIdentifier.validate!(
+                 local_assigns.fetch(:modal_store, "modals"), local: :modal_store)
   icon_emoji   = local_assigns.fetch(:icon_emoji, "🎉")
   title_key    = local_assigns.fetch(:title_key, "props.level ? ('Level ' + props.level) : 'Free Entry Earned'")
   subtitle     = local_assigns.fetch(:subtitle, "You leveled up and earned a reward. Keep earning more with each level.")

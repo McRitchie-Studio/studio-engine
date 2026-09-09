@@ -62,7 +62,9 @@
   birthday_modal_id = local_assigns.fetch(:birthday_modal_id, "birthday")
   back_label        = local_assigns.fetch(:back_label, "Update your Birthday")
   title             = local_assigns[:title]
-  modal_store       = local_assigns.fetch(:modal_store, "modals")
+  # IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier.
+  modal_store       = Studio::JsIdentifier.validate!(
+                      local_assigns.fetch(:modal_store, "modals"), local: :modal_store)
 %>
 <div x-data="{
        now: Date.now(),

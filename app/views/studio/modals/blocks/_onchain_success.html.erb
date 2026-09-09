@@ -27,7 +27,9 @@
   cta_label_key    = local_assigns.fetch(:cta_label_key)
   cta_href_key     = local_assigns.fetch(:cta_href_key)
   cluster_param    = local_assigns.fetch(:cluster_param, "")
-  modal_store      = local_assigns.fetch(:modal_store, "modals")
+  # IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier.
+  modal_store      = Studio::JsIdentifier.validate!(
+                     local_assigns.fetch(:modal_store, "modals"), local: :modal_store)
 %>
 <div>
   <%= render "studio/modals/blocks/card_header",

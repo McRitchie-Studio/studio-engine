@@ -46,7 +46,9 @@
   rest of it onto the page as visible text. That shipped once.)
 %>
 <%
-  scoped_store = local_assigns.fetch(:store)
+  # IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier.
+  scoped_store = Studio::JsIdentifier.validate!(
+                 local_assigns.fetch(:store), local: :store)
   card_class   = local_assigns.fetch(:card_class,
                    "bg-surface rounded-xl border border-subtle shadow-2xl p-6 max-w-sm w-full")
 %>

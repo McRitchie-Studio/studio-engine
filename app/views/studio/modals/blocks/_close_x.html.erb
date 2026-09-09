@@ -42,7 +42,9 @@
     label       — aria-label. Default "Close".
 %>
 <%
-  modal_store = local_assigns.fetch(:modal_store, "modals")
+  # IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier.
+  modal_store = Studio::JsIdentifier.validate!(
+                local_assigns.fetch(:modal_store, "modals"), local: :modal_store)
   label       = local_assigns.fetch(:label, "Close")
 %>
 <button type="button" @click="$store.<%= modal_store %>.close()"
