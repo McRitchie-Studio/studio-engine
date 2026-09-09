@@ -10,7 +10,8 @@
                      apps omit this; the /admin/style demo passes an expression
                      (e.g. close) so the specimen self-terminates after min_duration
                      instead of spinning forever. %>
-<% saving_store = local_assigns.fetch(:store, "modals") %>
+<%# IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier. %>
+<% saving_store = Studio::JsIdentifier.validate!(local_assigns.fetch(:store, "modals"), local: :store) %>
 <div>
   <%= render "studio/modals/blocks/processing_card",
         title_key: "$store.#{saving_store}.current()?.props?.title || 'Saving…'",

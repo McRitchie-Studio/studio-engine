@@ -8,7 +8,8 @@
     primary CTA pulling forward; Back as a subtle link, hidden on step 1.
 
     Local: modal_store — Alpine store name backing close(). Default "modals". %>
-<% modal_store = local_assigns.fetch(:modal_store, "modals") %>
+<%# IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier. %>
+<% modal_store = Studio::JsIdentifier.validate!(local_assigns.fetch(:modal_store, "modals"), local: :modal_store) %>
 <div x-data="{ step: 1, total: 3 }">
   <div class="relative mb-3 -mt-2">
     <h3 class="text-heading font-bold text-lg leading-tight text-center pt-1">Wizard Template</h3>

@@ -7,7 +7,8 @@
     icon_color :primary / :success / :warning to card_header.
 
     Local: modal_store — Alpine store name backing close(). Default "modals". %>
-<% modal_store = local_assigns.fetch(:modal_store, "modals") %>
+<%# IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier. %>
+<% modal_store = Studio::JsIdentifier.validate!(local_assigns.fetch(:modal_store, "modals"), local: :modal_store) %>
 <div x-data>
   <%= render "studio/modals/blocks/card_header",
         size: :lg,

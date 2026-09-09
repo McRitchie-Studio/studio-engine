@@ -25,7 +25,9 @@
   href_key         = local_assigns.fetch(:href_key)
   label_html       = local_assigns.fetch(:label_html, "Continue")
   duration_seconds = local_assigns.fetch(:duration_seconds, 5)
-  modal_store      = local_assigns.fetch(:modal_store, "modals")
+  # IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier.
+  modal_store      = Studio::JsIdentifier.validate!(
+                     local_assigns.fetch(:modal_store, "modals"), local: :modal_store)
 %>
 <div x-data="{
        _redirectTimer: null,

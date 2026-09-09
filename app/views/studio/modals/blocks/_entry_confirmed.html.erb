@@ -60,7 +60,9 @@
                        that does nothing.
 %>
 <%
-  modal_store      = local_assigns.fetch(:modal_store, "modals")
+  # IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier.
+  modal_store      = Studio::JsIdentifier.validate!(
+                     local_assigns.fetch(:modal_store, "modals"), local: :modal_store)
   props_expr       = local_assigns.fetch(:props_expr,
                        "(function () { var c = $store.#{modal_store}.current(); return (c && c.props) || {}; })()")
   above_seeds        = local_assigns[:above_seeds]

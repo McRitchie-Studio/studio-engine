@@ -91,7 +91,9 @@
   free_entry_label   = local_assigns.fetch(:free_entry_label, "Free Entry Earned 🎟️")
   seeds_per_level    = local_assigns.fetch(:seeds_per_level, 100)
   leveling           = local_assigns.fetch(:leveling, Studio.feature?(:leveling))
-  modal_store        = local_assigns.fetch(:modal_store, "modals")
+  # IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier.
+  modal_store        = Studio::JsIdentifier.validate!(
+                       local_assigns.fetch(:modal_store, "modals"), local: :modal_store)
   demo               = local_assigns.fetch(:demo, false)
   # consent_label — render a consent checkbox that gates the action (newsletter
   # join). next_label / next_open — an optional "Next Quest" button in the

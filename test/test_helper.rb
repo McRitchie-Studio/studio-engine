@@ -31,6 +31,10 @@ require_relative "../lib/studio/ui_primitives"
 # dummy app. It requires action_view, which is why lib/studio/s3.rb had to stop
 # guarding on a bare `defined?(Rails)`: see the note in s3_qa_environment_test.rb.
 require_relative "../lib/studio/js_literal"
+# Studio::JsIdentifier is its SIBLING and has the same reason to be here: engine
+# partials call it at the top of every store-taking modal, so a partial rendered
+# through this helper cannot resolve without it.
+require_relative "../lib/studio/js_identifier"
 require_relative "../lib/studio/email"
 require_relative "../lib/studio/email_smoke"
 require_relative "../lib/studio/redis"
