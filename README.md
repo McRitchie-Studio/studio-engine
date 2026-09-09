@@ -238,6 +238,30 @@ the block:
 <% end %>
 ```
 
+#### Writing a modal's content partial — two rules the host imposes
+
+Both of these fail SILENTLY. Nothing raises, nothing logs, and the card renders;
+it just does less than it looks like it does.
+
+**1. SINGLE ROOT.** A content partial's outer `<div>` is the host's required
+root. Alpine's `<template x-if>` clones only the FIRST root element of its
+content, so a second top-level sibling — a stray `<span>`, a trailing `<style>`
+block, a comment-turned-node — is dropped on the floor. Bake anything extra
+inside the wrapping `<div>`.
+
+**2. NO DOUBLE QUOTE INSIDE `x-data`.** The attribute is double-quoted, so an
+inner double quote CLOSES it. Alpine then mounts a component whose expression is
+truncated mid-statement: every element still renders and every handler does
+nothing. Single-quote everything inside `x-data`.
+
+These are properties of the HOST, not of any one card, and they apply to every
+consumer partial an app registers — not only to the specimens in this gem. They
+are recorded here because they used to be recorded only in the style guide's
+specimen headers, which made them deletable by a change that removed a specimen:
+retiring the `style/modals/_network_guard` and `_wallet_deposit` mirrors on
+2026-09-09 would otherwise have taken the single-root rule out of both this repo
+and the app that inherited those cards.
+
 **Wallet modals moved to `solana-studio`.** The Connect Wallet picker, the Web3
 step-up card and the Phantom deep link used to ship here as
 `studio/modals/wallet_connect`, `studio/modals/web3_step_up` and

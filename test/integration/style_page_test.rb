@@ -381,9 +381,14 @@ class StylePageTest < ActiveSupport::TestCase
 
   # Every ported modal registers a single-root <template x-if> on its id in the
   # page overlay.
+  #
+  # wallet-deposit LEFT THIS LIST on 2026-09-09 with its specimen (it mirrored a
+  # card turf-monster owns). The list is a sample of ids, not a census, so it
+  # still does its job at ten — but it is the id-by-id form, so anything added
+  # here must be added by hand, and nothing re-derives it.
   test "the overlay registers the ported modal ids" do
     html = render_index
-    %w[auth crop-photo saving wallet-connect onchain-tx wallet-deposit
+    %w[auth crop-photo saving wallet-connect onchain-tx
        template-wizard template-form template-action template-status
        template-success].each do |id|
       assert_includes html, "$store.dsModals.current().id === '#{id}'",
@@ -781,10 +786,17 @@ class StylePageTest < ActiveSupport::TestCase
       "mountCropper sets cropReady on the store entry (picker -> cropper transition)"
   end
 
-  # web3 (wallet-connect, on-chain-tx, wallet-deposit) and leveling (level-up)
-  # render disabled-but-present-yet-openable when the host has the capability
-  # off: greyed + badged, but the trigger keeps its click affordance (a preview
-  # you can still open), never inert.
+  # web3 (wallet-connect, on-chain-tx) and leveling (level-up) render
+  # disabled-but-present-yet-openable when the host has the capability off:
+  # greyed + badged, but the trigger keeps its click affordance (a preview you
+  # can still open), never inert.
+  #
+  # DOWN TO THREE IDS, from four. wallet-deposit was the third web3 member until
+  # 2026-09-09, when its specimen was retired for mirroring a card turf owns.
+  # The control still spans BOTH capabilities — two web3 ids and one leveling id
+  # — which is what makes it a control rather than a single-flag check: a change
+  # that broke only web3, or only leveling, still fails here. Drop to one web3
+  # id and that stops being true, so a replacement belongs in this list.
   test "with :web3 and :leveling OFF the capability modal specimens are disabled-but-present-yet-openable" do
     original = Studio.features
     begin
@@ -792,7 +804,7 @@ class StylePageTest < ActiveSupport::TestCase
       html = render_index
 
       # The ported modal ids stay present with a working Open affordance.
-      %w[wallet-connect onchain-tx wallet-deposit levelup].each do |id|
+      %w[wallet-connect onchain-tx levelup].each do |id|
         assert_includes html, "$store.dsModals.open('#{id}'",
           "the #{id} specimen stays present + openable, not hidden"
       end
@@ -990,24 +1002,33 @@ class StylePageTest < ActiveSupport::TestCase
     "Connect wallet",
     "Sign Wallet", "Sign Wallet (no remembered brand)",
     "Processing on-chain tx", "On-chain success", "On-chain error",
-    # The three FUNDING cards run together, because they are one question asked
-    # three ways: deposit an address, top up with a rail, or see every rail. A
-    # reader comparing them has to have them adjacent.
-    "Wallet deposit", "Top up wallet", "Add funds hub",
-    "Entry confirmed",
-    # The two reconciliation cards close the section, after the happy path they
-    # interrupt: Network guard is asked BEFORE a request is signed, Wallet
-    # changed AFTER the extension moves underneath a live session. Both read
-    # as noise anywhere earlier, because neither makes sense until you know what
-    # a normal wallet run looks like.
-    "Network guard"
+    # The FUNDING cards run together, because they are one question asked more
+    # than one way: top up with a rail, or see every rail. A reader comparing
+    # them has to have them adjacent.
+    #
+    # WAS THREE, DOWN TO TWO on 2026-09-09. "Wallet deposit" led the run — the
+    # deposit-an-address answer — until its specimen was retired for mirroring a
+    # card turf owns. The remaining two still make the comparison this grouping
+    # exists for (one rail vs. every rail); what is gone is the third ANSWER, so
+    # a future funding specimen belongs adjacent to these rather than wherever
+    # it lands.
+    "Top up wallet", "Add funds hub",
+    "Entry confirmed"
+    # THE SECTION NO LONGER CLOSES ON A RECONCILIATION CARD. It closed on two
+    # (Network guard, then Wallet changed), then on one, and on 2026-09-09
+    # Network guard was retired too — turf cards the real one in its own host
+    # section. Both were the after-the-happy-path beats, so the section now ends
+    # on Entry confirmed, which is the happy path's own end. Stated rather than
+    # quietly deleted: the ordering rule was "reconciliation reads last", and a
+    # list with no reconciliation card in it cannot demonstrate that rule.
   ].freeze
 
   # Rails.root is the DUMMY app in this suite, not the engine — a source read
   # rooted there silently looks in test/dummy and raises ENOENT. Engine files
-  # resolve through Studio::Engine.root.
-  WALLET_SETUP_SPECIMEN =
-    Studio::Engine.root.join("app/views/style/modals/_wallet_setup.html.erb").freeze
+  # resolve through Studio::Engine.root. (WALLET_SETUP_SPECIMEN lived here and
+  # pointed at _wallet_setup.html.erb, deleted in batch 1 on 2026-09-08; its
+  # last reader went with it, so the constant is gone too rather than left
+  # naming a path that no longer resolves.)
 
   test "the Onboarding section is gone, folded into Profile" do
     doc = Nokogiri::HTML(render_index)
@@ -1074,10 +1095,15 @@ class StylePageTest < ActiveSupport::TestCase
   # home here. A missing registration is the failure that matters: the card opens
   # a blank shell, which looks like a styling bug rather than a missing partial.
 
+  # DOWN TO ONE MEMBER as of 2026-09-09, and worth stating rather than quietly
+  # editing. This hash held four (cosign-rejected went on 2026-09-08), then
+  # three; unsubscribe-goodbye and quest-success were retired together for
+  # mirroring cards turf-monster owns and now cards itself. A one-member list
+  # still bites — the assertion below is per-id, so it fails for the card that
+  # remains — but it no longer corroborates across a batch, so the next ported
+  # specimen belongs in here rather than in a test of its own.
   PORTED_SPECIMENS = {
-    "unsubscribe-confirm"  => "Leave the newsletter?",
-    "unsubscribe-goodbye"  => "See you later",
-    "quest-success"        => "Quest success (off-page)"
+    "unsubscribe-confirm"  => "Leave the newsletter?"
   }.freeze
 
   # Registered ids, read off the <template x-if> ELEMENTS.
@@ -1137,25 +1163,30 @@ class StylePageTest < ActiveSupport::TestCase
     end
   end
 
-  test "the unsubscribe pair is registered together, because one swaps to the other" do
-    # The confirm card swaps to the goodbye beat. A handoff to an unregistered id
-    # renders nothing, and an empty modal reads as a styling bug — the same defect
-    # class the birthday/age-gate pair carries a guard for.
-    html = render_index
-    assert_includes html, "$store.dsModals.swap('unsubscribe-goodbye')",
-      "the confirm card must hand off to the goodbye beat"
-    assert_includes registered_modal_ids(html), "unsubscribe-goodbye",
-      "the card it hands off to must be REGISTERED — a glow expression mentioning " \
-      "the id is not a registration"
-  end
+  # RETIRED 2026-09-09 — "the unsubscribe pair is registered together, because one
+  # swaps to the other". Its whole subject was the goodbye beat, which is gone
+  # from this guide. Kept as written, it would have DEMANDED that the confirm
+  # card go on swapping to an id nothing registers — asserting the defect rather
+  # than the contract. What it was really guarding — a handoff must not point at an
+  # unregistered id — is now held for EVERY specimen, not just this pair, by
+  # test/views/style_guide_no_dangling_specimens_test.rb, which reads swap()
+  # targets out of the specimen partials as well as open() targets out of the
+  # section. That is a strictly wider guard: this test could only ever have
+  # caught the one handoff somebody remembered to name.
 
   test "the ported specimens compose engine chrome rather than copying it" do
-    # The Tier-2 contract. Each of these four already rendered card_header in
+    # The Tier-2 contract. Each of these already rendered card_header in
     # turf-monster, so a specimen that hand-rolls its own header is a SECOND copy
-    # of chrome the app already borrows — which is what style/modals/_wallet_deposit
-    # is, and what this batch was written not to add.
+    # of chrome the app already borrows. (The example this comment used to name —
+    # style/modals/_wallet_deposit, the one specimen that DID hand-roll it — was
+    # itself retired on 2026-09-09, so the counter-example is now historical
+    # rather than a file a reader can open.)
+    #
+    # ONE FILE LEFT, from four. The list shrank with the batches that retired the
+    # mirrors; the contract is unchanged and is asserted per-file, so it still
+    # fails for the specimen that remains.
     root = Studio::Engine.root.join("app/views/style/modals")
-    %w[_unsubscribe_confirm _unsubscribe_goodbye _quest_success].each do |f|
+    %w[_unsubscribe_confirm].each do |f|
       source = root.join("#{f}.html.erb").read
       # The trailing quote+comma matters: a bare path is a PREFIX of any longer
       # name, so the old form passed against a hand-rolled "…/card_header_custom"
@@ -1163,10 +1194,6 @@ class StylePageTest < ActiveSupport::TestCase
       assert_includes source, %(render "studio/modals/blocks/card_header",),
         "#{f} must compose the engine's card_header, not re-draw it"
     end
-    # quest-success also borrows the leveling seeds bar, which is the engine's.
-    assert_includes root.join("_quest_success.html.erb").read,
-      %(render "studio/modals/blocks/seeds_bar",),
-      "the quest celebration's bar is an engine :leveling primitive, not a copy"
   end
 
   test "the contest-entry section still resumes from the birthday card" do
@@ -1222,14 +1249,18 @@ class StylePageTest < ActiveSupport::TestCase
   # --- 14. batch 3: the modals that had a card on NEITHER page -----------------
   #
   # Batches 1 and 2 ported cards that at least existed in turf-monster's own
-  # gallery. These six existed only in the running app: no card here, no card
-  # there. A state with no card anywhere is a state nobody reviews, which is how
-  # the age-gate timer leak survived a full cycle.
-
+  # gallery. This batch's cards existed only in the running app: no card here, no
+  # card there. A state with no card anywhere is a state nobody reviews, which is
+  # how the age-gate timer leak survived a full cycle.
+  #
+  # SIX, THEN FIVE, NOW FOUR — the count is recorded because it has moved twice
+  # and the header used to state a number the hash no longer held. wallet-changed
+  # left on 2026-09-08 and network-guard on 2026-09-09, both for the same reason:
+  # they mirrored cards turf-monster owns and now cards against its real
+  # partials. Every card still in this hash is one no other guide shows.
   BATCH3_SPECIMENS = {
     "email-change-pending" => "Email change pending",
     "newsletter-email"     => "Newsletter email",
-    "network-guard"        => "Network guard",
     "it-begins"            => "It Begins",
     "rate-limit-general"   => "Rate limited (soft)"
   }.freeze
@@ -1250,17 +1281,19 @@ class StylePageTest < ActiveSupport::TestCase
   BATCH3_SOURCES = Studio::Engine.root.join("app/views/style/modals").freeze
 
   test "the batch-3 specimens compose engine chrome rather than copying it" do
-    # The Tier-2 contract, same as batch 2. Five of the six are card_header
+    # The Tier-2 contract, same as batch 2. All but one are card_header
     # compositions. It Begins is the exception ON PURPOSE: it hand-rolls its
     # heading because the block it borrows is the DRAINING CTA, which is the only
     # part of that card worth a specimen.
+    # THE LIST BELOW IS DOWN TO THREE, from five: _wallet_changed (2026-09-08)
+    # and _network_guard (2026-09-09) were retired with their specimens. Three
+    # files still exercise both halves of the contract, so it discriminates.
     # Assert the CLOSING quote too. A bare path is a PREFIX of any longer name,
     # so "studio/modals/blocks/card_header" matches a hand-rolled
     # "…/card_header_custom" — a second copy of the chrome, which is the one
     # thing this test exists to refuse. Control-checking this batch caught the
     # weak form passing against exactly that mutant.
-    %w[_email_change_pending _newsletter_email _network_guard
-       _rate_limit_general].each do |f|
+    %w[_email_change_pending _newsletter_email _rate_limit_general].each do |f|
       assert_includes BATCH3_SOURCES.join("#{f}.html.erb").read,
         %(render "studio/modals/blocks/card_header",),
         "#{f} must compose the engine's card_header, not re-draw it"
@@ -1281,8 +1314,7 @@ class StylePageTest < ActiveSupport::TestCase
     # attribute therefore ends at the object literal's closing brace; a truncated
     # one ends mid-expression. Asserting the brace is what makes a truncation
     # visible instead of silently shortening the captured string.
-    %w[_email_change_pending _newsletter_email _network_guard
-       _rate_limit_general].each do |f|
+    %w[_email_change_pending _newsletter_email _rate_limit_general].each do |f|
       source = BATCH3_SOURCES.join("#{f}.html.erb").read
       body   = source[/x-data="(.*?)"/m, 1]
       assert body, "#{f} declares no x-data — this guard has nothing to check"
@@ -1347,16 +1379,13 @@ class StylePageTest < ActiveSupport::TestCase
       "this guide, so close() would throw inside the timer where nothing surfaces it"
   end
 
-  test "the network guard keeps Continue inert until the box is ticked" do
-    # The card's entire reason to exist. A request signed against the wrong
-    # network looks identical to a correct one until it is irreversible, so the
-    # acknowledgement has to be explicit rather than implied by the click.
-    source = BATCH3_SOURCES.join("_network_guard.html.erb").read
-    assert_includes source, %(:disabled="!checked"),
-      "Continue must be inert until the acknowledgement is ticked"
-    assert_includes source, %(x-model="checked"),
-      "the tick has to bind to the same flag Continue reads"
-  end
+  # RETIRED 2026-09-09 — "the network guard keeps Continue inert until the box is
+  # ticked". Its subject was style/modals/_network_guard, deleted in this change.
+  # The property it held (an acknowledgement has to be explicit rather than
+  # implied by the click) belongs to the card, and the card is turf-monster's:
+  # turf's own section of this guide cards the real partial, and turf's
+  # style_host_section_test is where a guard on it now has something to read.
+  # Not re-pointed at a file in another repo — this suite cannot see one.
 
   test "the soft rate limit clears its interval in a destroy() METHOD" do
     # Alpine 3 dispatches no "destroy" DOM event, so @destroy="stop()" never
@@ -1539,75 +1568,26 @@ class StylePageTest < ActiveSupport::TestCase
   end
 
 
-  # --- 17. the last three: the catalogue closes at 33 of 33 ------------------
-
-  LAST_SPECIMENS = {
-    "ds-newsletter-success" => "Subscribed! (standalone)"
-  }.freeze
-
-  test "the last three specimens are carded AND registered" do
-    html  = render_index
-    cards = html.scan(/aria-label="Open the (.+?) modal"/).flatten
-    ids   = registered_modal_ids(html)
-
-    LAST_SPECIMENS.each do |modal_id, label|
-      assert_includes cards, label, "no specimen card for #{modal_id}"
-      assert_includes ids, modal_id,
-        "#{modal_id} has a card but NO host registration — it opens a blank shell"
-    end
-  end
-
-  test "the standalone Subscribed card walks BOTH of its forks" do
-    # Two forks, neither visible in the markup, which is why this card exists
-    # apart from the in-place leveling beat. Read each branch out of ITS OWN
-    # template: both live inside <template> elements, so both are in the DOM
-    # whatever the conditions say and a presence check proves nothing — the same
-    # trap that let three assertions pass against a broken fork on the top-up
-    # card.
-    block = specimen_block("ds-newsletter-success")
-    assert block, "the standalone Subscribed specimen did not render"
-
-    quest = block[/<template x-if="questOpen">.*?<\/template>/m]
-    other = block[/<template x-if="!questOpen">.*?<\/template>/m]
-    assert quest, "the open-quest CTA must be gated on the quest being open"
-    assert other, "the browse-contests CTA must be gated on it being closed"
-
-    assert_includes quest, "Next Quest"
-    assert_not_includes quest, "Check Out Contests",
-      "showing both hides the fork that decides where the person goes next"
-    assert_includes other, "Check Out Contests"
-    assert_not_includes other, "Next Quest"
-
-    # The seeds bar is FIRST-JOIN only. A re-subscribe earns nothing, and a flat
-    # "0 seeds" would read as a bug about the person's own account.
-    assert_includes block, %(x-if="firstJoin"),
-      "the seeds bar must be gated on a first-ever join"
-
-    # ...and the card offers both toggles. Asserted as the rendered checkboxes:
-    # the bare model strings also appear in the card's open_expr, so a string
-    # match survives deleting the toggles and leaves both forks unreachable.
-    %w[firstJoin questOpen].each do |opt|
-      assert_includes render_index, %(<input type="checkbox" x-model="opts.#{opt}"),
-        "the card needs the #{opt} toggle to reach that fork"
-    end
-  end
-
-
-  test "the last three compose engine chrome rather than copies" do
-    root = Studio::Engine.root.join("app/views/style/modals")
-
-    # WAS THREE. buy-entry-token and cdp-ramp were retired from the guide on
-    # 2026-09-08 — they mirrored cards turf owns, and turf now cards the real
-    # ones in its own host section. What they asserted (that a specimen borrows
-    # blocks/_close_x rather than hand-rolling the mark) still holds for every
-    # specimen that remains, and is covered per-card where those live.
-
-    news = root.join("_ds_newsletter_success.html.erb").read
-    assert_includes news, %(render "studio/modals/blocks/card_header"),
-      "the celebration borrows the engine's header"
-    assert_includes news, %(render "studio/modals/blocks/seeds_bar"),
-      "and the engine's :leveling seeds bar — the bar is the engine's, the numbers are the app's"
-  end
+  # --- 17. RETIRED — the "last three" batch is empty ------------------------
+  #
+  # This section held LAST_SPECIMENS and three tests, and it is gone rather than
+  # left iterating an empty hash. THREE, THEN ONE, NOW NONE: ds-buy-entry-token
+  # and ds-cdp-ramp were retired on 2026-09-08, ds-newsletter-success on
+  # 2026-09-09, all three for mirroring cards turf-monster owns and now cards
+  # against its real partials. An empty constant is worse than a deleted one —
+  # `LAST_SPECIMENS.each` over `{}` passes forever and reads like coverage.
+  #
+  # What went with it, so a reader knows what is NOT asserted here any more:
+  #   * "the last three specimens are carded AND registered" — the carded/
+  #     registered pairing. Still held for every id on the page, list-free, by
+  #     test/views/style_guide_no_dangling_specimens_test.rb.
+  #   * "the standalone Subscribed card walks BOTH of its forks" — the firstJoin
+  #     and questOpen forks. Those forks belong to turf's modals/_newsletter_success
+  #     and are asserted in turf's style_host_section_test; this suite has no file
+  #     left to read them out of.
+  #   * "the last three compose engine chrome rather than copies" — the Tier-2
+  #     borrow-don't-copy contract, which every remaining specimen is still held
+  #     to by the batch-2 and batch-3 chrome tests above.
 
   # --- each credential control's own visibility gate ------------------------
   #

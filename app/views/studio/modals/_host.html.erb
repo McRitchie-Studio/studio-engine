@@ -28,7 +28,11 @@
                                    the app rather than to one call site
 
   Consumer integration example and API reference: the "Modal host"
-  section of the gem README.
+  section of the gem README — which also carries the two rules this host
+  IMPOSES on the content partials registered in its block: a SINGLE ROOT
+  element (a template x-if clones only the first one; later siblings are
+  dropped) and NO double quote inside x-data (it closes the attribute and
+  Alpine mounts a silent no-op). Both fail without raising.
 %>
 <style>
   /* Scroll lock applied by $store.modals._sync() when the stack is non-empty.
