@@ -28,7 +28,8 @@ git tag --list 'v*' --sort=-v:refname | head -1   # what this repo last tagged
 ```
 
 - **What changed in a release** → `CHANGELOG.md`, which every engine PR updates
-  under `Unreleased` as it goes (the changelog is not gated by `dor-check`).
+  under `Unreleased` as it goes (the changelog is not gated by `dor-check`), and
+  which the release conductor rolls into a version heading afterwards.
 - **What a given consumer resolves** → that app's `Gemfile.lock`, never its
   Gemfile pin.
 - **Why a consumer's floor is where it is** → its Gemfile pin COMMENT, which is
@@ -69,6 +70,9 @@ So the two audiences below are separate. Read the one you are.
 1. Confirm the diff is limited to the intended engine changes.
 2. **Do not touch `lib/studio/version.rb`.** Updating `CHANGELOG.md` under the
    `Unreleased` heading is fine and encouraged — the changelog is *not* gated.
+   Write under `## Unreleased` and nowhere else; the conductor renames that
+   heading to your version at release (see **Rolling `Unreleased` into a version**
+   below).
 3. Run `bin/release-check` (or `bin/release-check --build` for a package sanity
    check).
 4. Open your PR into `accepted` like any other task. You are done; the release
@@ -106,6 +110,30 @@ It narrates the decision, e.g.:
 
 The allocation can also REFUSE (it names what to fix) or decline to allocate at
 all (nothing to publish). Both are reported; neither wants a hand-edit.
+
+#### Rolling `Unreleased` into a version
+
+**`bin/release prepare` does NOT do this, and nothing else does it for you.** It
+commits `lib/studio/version.rb` with its lockfile, publishes and tags — it never
+touches `CHANGELOG.md`. So the last step of a release is yours, by hand, on
+`accepted`:
+
+1. Rename the `## Unreleased` heading to `## <allocated version> — <tag date>`,
+   matching the form already in the file (`## 0.74.3 — 2026-09-08`).
+2. Open a fresh, empty `## Unreleased` above it.
+
+Leave `## Unreleased` empty when a release ships no entries — that is a real and
+legitimate state (0.74.4 was one), not something to paper over with placeholder
+prose that the next builder then has to delete.
+
+**This step was missed for thirty-five consecutive releases.** Between 0.39.0 and
+0.74.x, `## Unreleased` grew to 2,382 lines holding every shipped entry, so the
+heading said "pending" about the entire history of the gem and every reviewer who
+opened the file had to work out per entry which half it was in.
+`test/lib/changelog_structure_test.rb` now fails when `Studio::VERSION` runs more
+than two minor versions ahead of the newest version heading, so the drift is
+caught within three releases instead of thirty-five. Automating the roll inside
+`bin/release prepare` (mcritchie-studio) is the real fix and is not done.
 
 **Why `Gemfile.lock` must ride with the version** — this rule is unchanged and
 still bites. The engine bundles itself as a path gem, so `Gemfile.lock` pins its
