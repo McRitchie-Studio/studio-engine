@@ -41,6 +41,18 @@
   chaining (`current()?.id`): the outer template unmounts one tick AFTER the
   stack empties, so a bare `.id` throws on every close.
 
+  THE CONTENT PARTIALS OBEY THE SAME TWO RULES AS THE SHARED HOST'S, and both
+  fail silently: a SINGLE ROOT element (a template x-if clones only the first
+  one) and NO double quote inside x-data (it closes the attribute and Alpine
+  mounts a component that renders everything and does nothing). Stated in full
+  in the gem README's "Modal host" section.
+
+  AND EVERY ID REGISTERED HERE MUST BE REACHABLE, both ways round. A card that
+  opens an id no template registers shows an EMPTY panel; a template no card
+  opens is a modal nobody can reach. That pairing is the one thing a cabinet of
+  modals cannot check by looking at itself, so the living style guide holds it
+  in a test (test/views/style_guide_no_dangling_specimens_test.rb).
+
   (No inline ERB example here on purpose. An ERB comment ends at its FIRST "%" +
   ">", so an example containing one silently closes the comment and dumps the
   rest of it onto the page as visible text. That shipped once.)

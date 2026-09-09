@@ -1,12 +1,20 @@
 <%#
-  Living style guide specimen — the unsubscribe confirmation, and the handoff to
-  its goodbye beat.
+  Living style guide specimen — the unsubscribe confirmation.
 
   APP-SPECIFIC FLOW, engine chrome only. The real card POSTs the host's
-  newsletter_unsubscribe_path and swaps to the goodbye card on success; the engine
-  owns no newsletter and no endpoint. Here the POST resolves locally so the guide
-  can walk the handoff with no backend — the SWAP is the thing worth reviewing,
-  and you cannot see a handoff by looking at either card alone.
+  newsletter_unsubscribe_path and swaps to the GOODBYE card on success; the engine
+  owns no newsletter and no endpoint. Here the POST resolves locally so the
+  pending state is walkable with no backend, and then the card CLOSES.
+
+  IT USED TO SWAP, and the swap was the point.
+  `$store.dsModals.swap('unsubscribe-goodbye')` was correct only while this
+  guide also carried a goodbye MIRROR; that mirror was retired on 2026-09-09
+  (turf-monster cards the real goodbye beat in its own section of this guide),
+  and a swap to an id no template registers opens an EMPTY panel — the exact
+  failure the cabinet exists to catch, wearing a working card's clothes. Closing
+  is the honest stop: it shows every state this guide still owns and claims no
+  beat it cannot render. Do not restore the swap without restoring a
+  registration for its target.
 
   THE BOTTOM LINK IS THE POINT OF THE CARD. "Close" is the never-mind out, and it
   is deliberately the quiet option while the destructive action wears the primary
@@ -24,10 +32,12 @@
          this.saving = true;
          var s = this;
          // Demo: the real card awaits a POST. Hold briefly so the pending state
-         // is visible rather than skipped, then hand off exactly as it does.
+         // is visible rather than skipped. The real card then swaps to the
+         // goodbye beat; this guide no longer carries that mirror, so it stops
+         // here rather than swapping to an unregistered id (see the header).
          setTimeout(function () {
            s.saving = false;
-           $store.dsModals.swap('unsubscribe-goodbye');
+           $store.dsModals.close();
          }, 450);
        }
      }">
