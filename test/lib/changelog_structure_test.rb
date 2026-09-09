@@ -122,12 +122,18 @@ class ChangelogStructureTest < Minitest::Test
                     "the changelog's newest heading (#{newest_version.join('.')}) is AHEAD of " \
                     "Studio::VERSION (#{Studio::VERSION}) — a version was documented before it shipped"
 
-    drift = (current[0] - newest_version[0]) * 1_000 + (current[1] - newest_version[1])
-    assert_operator drift, :<=, MAX_MINOR_DRIFT,
-                    "Studio::VERSION is #{Studio::VERSION} but the newest changelog heading is " \
-                    "#{newest_version.join('.')} — #{drift} minor versions of entries are still " \
-                    "filed under '#{UNRELEASED}'. Roll them into their release headings " \
-                    "(see docs/RELEASE.md, 'Rolling Unreleased into a version')."
+    # A MAJOR bump has to be rolled at once — 1.0.0 shipping while the newest
+    # heading still reads 0.74.x is the same defect at a louder scale — so a
+    # differing major is refused outright rather than converted into a minor
+    # count that would read as nonsense ("926 minor versions").
+    major_gap = current[0] - newest_version[0]
+    drift = major_gap.zero? ? current[1] - newest_version[1] : nil
+    behind = drift ? "#{drift} minor version(s)" : "a whole major version"
+    assert drift && drift <= MAX_MINOR_DRIFT,
+           "Studio::VERSION is #{Studio::VERSION} but the newest changelog heading is " \
+           "#{newest_version.join('.')} — #{behind} of entries are still filed under " \
+           "'#{UNRELEASED}'. Roll them into their release headings " \
+           "(see docs/RELEASE.md, 'Rolling Unreleased into a version')."
   end
 
   private
