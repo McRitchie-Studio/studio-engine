@@ -12,11 +12,13 @@ require "test_helper"
 #
 #                        dark card #3C3853      light card #ffffff
 #   text-danger-ink      4.50  PASS             5.76  PASS
-#   text-red-400         4.03  FAIL             2.77  FAIL
+#   text-red-400         3.86  FAIL             2.89  FAIL
 #
-# red-400 fails on EVERY light surface the resolver emits (2.21 to 2.77) and on
-# the dark modal card. That is the sentence a user reads when a sign-in link
-# fails to resend.
+# That red-400 is Tailwind v4's oklch(70.4% 0.191 22.216), about #FF6467, which
+# is what these apps compile; the v3 hex #F87171 gives 4.03 / 2.77 and fails the
+# same way. red-400 fails on EVERY light surface the resolver emits (2.31 to
+# 2.89) and on the dark modal card. That is the sentence a user reads when a
+# sign-in link fails to resend.
 #
 # THE ENGINE ALREADY DECIDED THIS. lib/studio/theme_resolver.rb states in its own
 # comment that no STATIC red clears AA on BOTH themes — it quotes red-400 at
@@ -59,7 +61,10 @@ class ResendFooterErrorContrastTest < ActiveSupport::TestCase
 
   # Static Tailwind text colours, so a partial that names one is MEASURED rather
   # than waved through. These are theme-independent by construction — that is the
-  # whole defect. Hexes are Tailwind's own palette.
+  # whole defect. Hexes are Tailwind v3's palette; v4, which the apps compile,
+  # shifts them slightly (red-400 is about #FF6467, not #F87171). That cannot
+  # flip a verdict: against white and #3C3853 no colour of any hue clears AA on
+  # both, since it would need luminance <= 0.183 and >= 0.374 at once.
   STATIC_HEX = {
     "red-300"    => "#FCA5A5", "red-400"  => "#F87171", "red-500"  => "#EF4444",
     "red-600"    => "#DC2626", "rose-300" => "#FDA4AF", "rose-400" => "#FB7185",

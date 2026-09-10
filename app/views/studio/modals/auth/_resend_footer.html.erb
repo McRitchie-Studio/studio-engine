@@ -16,7 +16,9 @@
   text-red-400. Measured through the resolver on turf-monster's real palette
   (primary 4BAF50), on the modal card, which is bg-surface: danger-ink is 4.50
   on the dark card 3C3853 and 5.76 on the light card ffffff, clearing AA on
-  both; text-red-400 was 4.03 and 2.77, failing both. No STATIC red clears AA
+  both; text-red-400 was 3.86 and 2.89, failing both. Those are Tailwind v4's
+  red-400, about FF6467, which is what these apps compile; the v3 hex F87171
+  gives 4.03 and 2.77 and fails the same way. No STATIC red clears AA
   on BOTH themes — theme_resolver.rb carries the measured table and derives
   --color-danger-ink precisely to be the text red. --color-danger is the brand
   FILL and is free to be vivid; it is not this. Guarded, executably, by
