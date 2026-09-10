@@ -11,8 +11,10 @@ require "minitest/autorun"
 # are recorded in the host's own docs rather than in the style guide's specimen
 # headers. That "why" used to be two measurably false sentences (the rules were
 # never specimen-only, and retiring two engine mirrors removed nothing from
-# turf-monster, which states neither rule at all). They were replaced with a
-# reason that is checkable, and this file is where it gets checked.
+# turf-monster, whose own _network_guard and _wallet_deposit state neither rule;
+# turf states both rules elsewhere, just not in those two cards). They were
+# replaced with a reason that is checkable, and this file is where it gets
+# checked.
 #
 # WHY A DOC TEST AT ALL. A README that states a rule is exactly where a grep
 # proves nothing: the prose can be edited into a lie and every behavioural test
