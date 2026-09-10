@@ -4,6 +4,20 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **The auth resend footer's error line failed WCAG AA in both themes; it now
+  uses the danger ink.** `studio/modals/auth/_resend_footer` painted its
+  `role="alert"` paragraph with the static `text-red-400`, which Tailwind v4
+  compiles to about `#FF6467`: 3.86:1 on the dark modal card and 2.89:1 on the
+  light one, both under the 4.5:1 that 12px text needs. It is now
+  `text-danger-ink`, the red `Studio::ThemeResolver` derives per theme to clear
+  4.5:1 on every surface: 4.50:1 dark and 5.76:1 light on the default modal
+  card. The resend spinner stays the engine's `.spinner`, tuned to
+  turf-monster's currentColor ring (`--spinner-track: currentColor;
+  --spinner-color: transparent`), so a host that drops its fork sees no change.
+  Guarded by `test/views/resend_footer_error_contrast_test.rb`.
+
 ### Docs
 
 - **Thirty-five minor versions of shipped entries left `## Unreleased` and moved
