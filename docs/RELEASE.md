@@ -164,7 +164,7 @@ for a gem prepare ALLOCATES, so a SKIP neither rolls this file nor checks it.
 Prepare skips when there are no commits past the last `v*` tag, when nothing has
 ever been published, and when **`lib/studio/version.rb` at `origin/release`
 already leads the last `v*` tag** ("allocated already"). This file feels the
-last case, and four things reach it:
+last case, and three things reach it:
 
 1. **A version set by hand**: committed straight onto `accepted`, as a failed
    `gem push` suggests, or bumped any other way outside prepare. It publishes
@@ -179,19 +179,21 @@ last case, and four things reach it:
 3. **The window inside one sweep** between the version commit and its tag: 13
    to 24 minutes across the eight gem publishes of 2026-09-09/10. Nothing to
    do; the roll is already in the commit.
-4. **A tag push that failed.** It does not stop the sweep; prepare prints
-   `tag v<version> push skipped/failed — push it manually if needed`. Push it
-   (`git -C /Users/alex/projects/studio-engine push origin v<version>`): until
-   the tag reaches `origin`, every sweep run from a clone without it SKIPs this
-   gem as allocated already and rolls nothing. The clone that ran the publish
-   keeps the tag locally, so it alone still allocates. This cause exists only
-   until https://mcritchie.studio/tasks/untagged-gem-publish-strands-work ships.
 
 That window is **not** the state between sweeps. Measured at `origin/release` on
 2026-09-10, studio-engine sat at `0.74.8` with tag `v0.74.8`, and solana-studio
 at `0.10.0` with `v0.10.0`. An earlier reading of "0.74.7 against `v0.74.6`"
 came from inside case 3: the 0.74.7 version commit is stamped 22:09:28 MDT and
 `v0.74.7` was tagged at 22:29:32.
+
+A publish whose **tag push failed** used to be a fourth, and the worst: from a
+clone without the tag, every sweep SKIPped this gem for good. Prepare now
+REFUSES it instead — a version already live on RubyGems whose `v*` tag never
+reached origin — and names the tag to push
+(`git -C /Users/alex/projects/studio-engine push origin v<version>`). The
+failing sweep itself carries on and prints `⚠ tag v<version> did NOT reach
+origin — push it now`
+(https://mcritchie.studio/tasks/untagged-gem-publish-strands-work).
 
 Prepare also rolls nothing when a gem has no `CHANGELOG.md` (it says so and
 allocates anyway), and **Publishing by hand (fallback)** below bypasses prepare,
