@@ -8,6 +8,7 @@ require_relative "../dummy/config/environment"
 require "minitest/autorun"
 require "active_support/test_case"
 require "action_view"
+require "nokogiri"
 
 # [unit] The Phantom MOBILE callback — the half of that flow the engine KEEPS.
 #
@@ -110,6 +111,26 @@ class PhantomCallbackTest < ActiveSupport::TestCase
     # translating this line silently disables the binding — the signature still
     # verifies, it just is not bound to the session any more.
     assert_includes render_callback, %q{'\nUser-ID: ' + storedUserId}
+  end
+
+  # --- the status line, which names the act and not the vendor ----------
+
+  # The one sentence the user reads for the WHOLE return leg: the wallet hands
+  # back, the page decodes, and on a transaction the server cosigns, broadcasts
+  # and confirms. Measured on a QA iPhone at 18 seconds for a contest entry. The
+  # redirect transport serves Phantom, Solflare and Backpack, so a sentence
+  # naming one of them is wrong for the other two. Pinned as the ONE right
+  # answer rather than refuted as the old string: a refutation passes on a blank
+  # line, and a blank line reads as a hang.
+  NEUTRAL_STATUS = "Processing your wallet's response..."
+
+  def test_the_status_line_opens_on_the_wallet_neutral_default
+    status = Nokogiri::HTML.fragment(render_callback).at_css("#phantom-status")
+
+    assert status, "the callback lost its status line — the progress seam writes to #phantom-status"
+    assert_equal NEUTRAL_STATUS, status.text.strip,
+                 "the status line a user reads while the wallet's reply is processed must name the " \
+                 "act, not a wallet brand: the redirect transport serves three of them"
   end
 
   # --- the debug sink, which leaks a signing key -------------------------

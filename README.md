@@ -324,6 +324,14 @@ What the engine **keeps** is the SESSION half of Solana sign-in:
 `Studio.wallet_sign_in_statement` — the single source for the signed statement,
 which the gem's deep link reads so the two cannot drift.
 
+The callback view is also where a redirect-transport transaction waits while
+the server cosigns and confirms, and it does not know what the user was doing.
+The registered intent does, so the intent narrates: from its `complete()` it
+dispatches `studio:wallet-progress` with `{ detail: { text: '…' } }`, and the
+page writes that text into its status line. With nothing pushed the line reads
+"Processing your wallet's response...", which names no wallet brand. On the
+inline transport nothing listens, so the dispatch is a harmless no-op there.
+
 #### The auth modal's credential slot
 
 The **sign-in modal itself stays here** and is never forked: every app in the

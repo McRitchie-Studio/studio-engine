@@ -1,7 +1,14 @@
 <div class="flex flex-col items-center justify-center min-h-[60vh] px-4">
   <div class="text-center">
     <div id="phantom-spinner" class="inline-block w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-    <p id="phantom-status" class="text-secondary text-sm">Processing Phantom response...</p>
+    <%# THE ONE SENTENCE THE USER READS for the whole return leg, and on a
+        transaction that leg includes the server's cosign, broadcast and confirm.
+        It names the act and not a vendor: the redirect transport returns
+        Phantom, Solflare and Backpack users here alike. The id keeps its old name
+        because the script below addresses it by that name. A registered intent
+        replaces this text through the studio:wallet-progress event (see the
+        resume branch below); with nothing pushed it stays, and stays true. %>
+    <p id="phantom-status" class="text-secondary text-sm">Processing your wallet's response...</p>
     <p id="phantom-error" class="text-red-400 text-sm mt-2 hidden"></p>
   </div>
 
@@ -168,6 +175,37 @@
 
   if (hasResumer && studio.walletJournal.peek()) {
     dbg('Transport', 'wallet_dl journal present — resuming through walletOps');
+
+    // THE PROGRESS SEAM — the intent speaks, this page listens.
+    //
+    // THE DEFECT IT CLOSES. The status line used to change only on the legacy
+    // path below, past this branch's return, so a transaction resumed here read
+    // one unchanging sentence while the server cosigned, broadcast and
+    // confirmed: 18 seconds measured on a QA iPhone for a contest entry. That
+    // reads as a hang. The registered intent knows what the server is doing and
+    // has no surface on this document; this page has the surface and, by
+    // design, no idea. So the intent dispatches, from its complete():
+    //
+    //   document.dispatchEvent(new CustomEvent('studio:wallet-progress',
+    //     { detail: { text: 'Cosigning and submitting to Solana...' } }));
+    //
+    // An EVENT, not a function the intent must find, because complete() runs on
+    // both transports: on the inline one there is no listener and the dispatch
+    // is a harmless no-op, so the intent needs no check for which document it
+    // is on. And an event, not an option handed through resume, because
+    // solana-studio's resume calls complete() with ctx, result and state and
+    // nothing else, so there is no bag to carry one in.
+    //
+    // INSTALLED BEFORE resume, never after: resume calls complete() in the same
+    // tick, so a push made before its first await would land on no listener.
+    // textContent, never markup. A push with no text is ignored, because a blank
+    // status line reads as the hang this seam exists to end.
+    document.addEventListener('studio:wallet-progress', function(e) {
+      var text = e && e.detail && e.detail.text;
+      if (typeof text !== 'string' || !text.trim()) { return; }
+      dbg('Progress', text);
+      statusEl.textContent = text;
+    });
 
     studio.walletOps.resume(params, {
       navigate: function(url) { window.location.href = url; }
