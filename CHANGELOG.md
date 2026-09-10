@@ -12,8 +12,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   compiles to about `#FF6467`: 3.86:1 on the dark modal card and 2.89:1 on the
   light one, both under the 4.5:1 that 12px text needs. It is now
   `text-danger-ink`, the red `Studio::ThemeResolver` derives per theme to clear
-  4.5:1 on every surface: 4.50:1 dark and 5.76:1 light on the default modal
-  card. The resend spinner stays the engine's `.spinner`, tuned to
+  4.5:1 on every surface: 4.89:1 dark and 6.49:1 light on the default modal
+  card, with the tint-aware ink change below. The resend spinner stays the engine's `.spinner`, tuned to
   turf-monster's currentColor ring (`--spinner-track: currentColor;
   --spinner-color: transparent`), so a host that drops its fork sees no change.
   Guarded by `test/views/resend_footer_error_contrast_test.rb`.

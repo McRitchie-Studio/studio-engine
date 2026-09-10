@@ -11,8 +11,11 @@ require "test_helper"
 # was ported from, and the one about to render it):
 #
 #                        dark card #3C3853      light card #ffffff
-#   text-danger-ink      4.50  PASS             5.76  PASS
+#   text-danger-ink      4.89  PASS             6.49  PASS
 #   text-red-400         3.86  FAIL             2.89  FAIL
+#
+# (The ink first measured 4.50 / 5.76; it gained contrast when ThemeResolver
+# began counting the danger tint as a surface. See status_ink_contrast_test.rb.)
 #
 # That red-400 is Tailwind v4's oklch(70.4% 0.191 22.216), about #FF6467, which
 # is what these apps compile; the v3 hex #F87171 gives 4.03 / 2.77 and fails the
