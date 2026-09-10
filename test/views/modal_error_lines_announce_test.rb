@@ -86,12 +86,22 @@ class ModalErrorLinesAnnounceTest < ActiveSupport::TestCase
   # forever over an empty list — which is precisely the "green but blind" failure
   # this file exists to prevent, one level up.
   #
-  # THE FLOOR MOVED 10 -> 8, AND ONLY FOR THIS REASON. The wallet_connect and
-  # web3_step_up partials contributed one error line each and left this engine
-  # for solana-studio with the two-template split — the engine ships no wallet UI
-  # any more. Re-derived on this tree with the pattern above, not adjusted to fit
-  # a red run. Lowering it for any OTHER reason is the failure this test names:
-  # if the count drops again, find the line that stopped matching.
+  # THE FLOOR MOVED 10 -> 8 -> 6, AND ONLY FOR THESE REASONS.
+  #
+  # 10 -> 8: the wallet_connect and web3_step_up partials contributed one error
+  # line each and left this engine for solana-studio with the two-template split
+  # — the engine ships no wallet UI any more.
+  #
+  # 8 -> 6 (2026-09-09): style/modals/_auth contributed exactly two, and it was
+  # retired for mirroring turf-monster's sign-in card. ATTRIBUTED BEFORE THE
+  # NUMBER WAS TOUCHED, which is the discipline this comment exists to enforce:
+  # the five partials deleted that day were scanned with the pattern above and
+  # _auth accounts for both lines (the other four carried none), so 8 - 2 = 6 is
+  # arithmetic, not a fit to a red run. The six that remain all still match.
+  #
+  # Lowering this for any OTHER reason is the failure this test names: if the
+  # count drops again, find the line that stopped matching before you touch the
+  # floor. A floor edited to make a run green is the guard deleting itself.
   #
   # Both moved partials still carry role="alert" in the gem, but solana-studio
   # ships NO equivalent guard, so those two lines are now unpinned in their new
@@ -102,8 +112,8 @@ class ModalErrorLinesAnnounceTest < ActiveSupport::TestCase
                     "only #{views.length} modal view(s) under #{MODAL_DIR} — this guard covers nothing"
 
     found = views.sum { |path| error_paragraphs(File.read(path)).length }
-    assert_operator found, :>=, 8,
-                    "the error-line pattern matched only #{found} paragraph(s); it matched 8 when " \
+    assert_operator found, :>=, 6,
+                    "the error-line pattern matched only #{found} paragraph(s); it matched 6 when " \
                     "last re-derived. A restyle away from text-red-* would leave this guard passing " \
                     "over nothing — re-point the pattern rather than deleting the test."
   end

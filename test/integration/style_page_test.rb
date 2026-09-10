@@ -375,20 +375,28 @@ class StylePageTest < ActiveSupport::TestCase
     end
     assert_includes html, "modal-card-mount",
       "cardClasses drives the ported enter animation classes"
-    assert_includes html, "dsSolanaModal",
-      "the on-chain-tx modal reads through the dsSolanaModal proxy"
+    # A SECOND ASSERTION LIVED HERE and was RETIRED 2026-09-09: `assert_includes
+    # html, "dsSolanaModal"`. That proxy existed only so style/modals/_onchain_tx,
+    # a mirror of turf-monster's card, could keep its $store.dsSolanaModal reads;
+    # both are gone. Worth naming rather than deleting silently, because when the
+    # store was removed THIS ASSERTION STILL PASSED — the commit that removed it
+    # left a comment saying so, and a JS `//` comment inside a rendered <script>
+    # IS page content. A substring assertion cannot tell a live store from its
+    # own obituary.
   end
 
   # Every ported modal registers a single-root <template x-if> on its id in the
   # page overlay.
   #
   # wallet-deposit LEFT THIS LIST on 2026-09-09 with its specimen (it mirrored a
-  # card turf-monster owns). The list is a sample of ids, not a census, so it
-  # still does its job at ten — but it is the id-by-id form, so anything added
-  # here must be added by hand, and nothing re-derives it.
+  # card turf-monster owns), and auth + onchain-tx left the same day for the same
+  # reason — every id here now names a card the ENGINE owns, which is the
+  # property that makes the sample worth keeping. The list is a sample of ids,
+  # not a census, so it still does its job at eight; it is the id-by-id form, so
+  # anything added here must be added by hand and nothing re-derives it.
   test "the overlay registers the ported modal ids" do
     html = render_index
-    %w[auth crop-photo saving wallet-connect onchain-tx
+    %w[crop-photo saving wallet-connect
        template-wizard template-form template-action template-status
        template-success].each do |id|
       assert_includes html, "$store.dsModals.current().id === '#{id}'",
@@ -434,38 +442,38 @@ class StylePageTest < ActiveSupport::TestCase
       "Contest entry & eligibility sits DIRECTLY under Web3 (no section between)"
   end
 
-  test "the Web3 walk + Contest entry flow wire every specimen Open affordance" do
+  # WHAT THIS TEST IS FOR, NARROWED 2026-09-09. It used to pin two walks: the
+  # Web3 one and the five-step Contest-entry one. The entry walk was
+  # style/modals/_entry_tokens, a mirror of turf-monster's purchase flow, and it
+  # is gone — asserting its five steps now would demand the mirror back, which is
+  # the trap of editing a test whose SUBJECT died instead of retiring that half.
+  #
+  # The Web3 half survives with a different destination. Picking a wallet used to
+  # swap to onchain-tx (another mirror) and now swaps to ds-stack-demo, the
+  # guide's own vehicle. THE DESTINATION IS THE POINT: a swap to an unregistered
+  # id fails SILENTLY — the overlay stays open and renders an empty card — so
+  # this asserts the target is registered rather than merely named.
+  test "the Web3 walk hands off to a REGISTERED destination" do
     html = render_index
 
-    # Web3 walk: Connect Wallet -> Processing -> On-chain success/error.
     assert_includes html, "$store.dsModals.open('wallet-connect')"
-    assert_includes html, "$store.dsModals.open('onchain-tx', { state: 'processing'"
-    assert_includes html, "$store.dsModals.open('onchain-tx', { state: 'success'"
-    assert_includes html, "$store.dsModals.open('onchain-tx', { state: 'error'"
-    # Picking a wallet continues the walk (swaps to the processing modal).
-    assert_includes html, "Alpine.store('dsModals').swap('onchain-tx'"
+    assert_includes html, "Alpine.store('dsModals').swap('ds-stack-demo'",
+      "picking a wallet continues the walk"
 
-    # Contest entry flow: Entry tokens -> Payment processing -> Minted -> enter -> entered.
-    %w[picker confirming minted entering entered].each do |step|
-      assert_includes html, "$store.dsModals.open('entry-tokens', { step: '#{step}'",
-        "the entry flow wires an Open for the #{step} step"
-    end
+    assert_includes registered_modal_ids(html), "ds-stack-demo",
+      "the walk's destination must be REGISTERED, not just named — an unregistered " \
+      "swap target renders an empty card with nothing raised and nothing logged"
   end
 
-  test "the Processing card success/error toggle flips the resolved on-chain state" do
-    html = render_index
-
-    # The per-card toggle (like the leveling toggle) — a checkbox bound to opts.demoError.
-    assert_includes html, %(x-model="opts.demoError"), "the Processing card carries a demoError toggle"
-    assert_includes html, "Resolve to error", "the toggle is labeled"
-    # The toggle flows into the open() call as demoError.
-    assert_includes html, "demoError: opts.demoError"
-
-    # The on-chain-tx modal branches on demoError: checked -> error, unchecked -> success.
-    assert_includes html, "entry.props.demoError", "the auto-resolve reads the demoError flag"
-    assert_includes html, "advance({ state: 'error'", "checked resolves to the error state"
-    assert_includes html, "advance({ state: 'success'", "unchecked resolves to the success state"
-  end
+  # RETIRED 2026-09-09 — "the Processing card success/error toggle flips the
+  # resolved on-chain state". Every line of it was about style/modals/_onchain_tx
+  # and its demoError toggle: the specimen, the toggle and the auto-resolve are
+  # all gone with the mirror. Nothing here was salvageable, because the SUBJECT
+  # was the deleted card rather than a rule the card happened to demonstrate —
+  # the distinction that decides retire-vs-amend for every test in this batch.
+  # The per-card option-toggle mechanism it also exercised in passing is still
+  # covered by "modal specimens are whole-card clickable and carry option
+  # toggles", which reads a toggle that still exists.
 
   test "the minimum-visible-duration convention ships and the demo load modals honor it" do
     html = render_index
@@ -486,14 +494,18 @@ class StylePageTest < ActiveSupport::TestCase
     assert_includes html, "$store.dsModals.close()",
       "the Saving specimen self-terminates after the floor (retrofit)"
 
-    # The entry-flow load steps use the convention (not a hardcoded timeout).
-    assert_includes html, "window.StudioModals.holdAtLeast(window.StudioModals.MIN_LOAD_MS)",
-      "the entry-tokens load steps hold at least MIN_LOAD_MS"
-    assert_includes html, "autoAdvance('confirming', { step: 'minted' })",
-      "Confirming your purchase advances via the convention"
-    assert_includes html, "Confirming your purchase…"
-    assert_includes html, "Consuming one token on-chain to create your contest entry",
-      "the Contest enter processing step copy is present"
+    # A FOURTH GROUP LIVED HERE, RETIRED 2026-09-09: the entry-flow load steps
+    # (holdAtLeast(MIN_LOAD_MS), autoAdvance('confirming', …) and the two copy
+    # strings). They belonged to style/modals/_entry_tokens, a mirror of
+    # turf-monster's purchase flow, and went with it.
+    #
+    # THE CONVENTION KEEPS TWO INDEPENDENT WITNESSES without them — the
+    # _processing_card retrofit and the Saving specimen, both asserted above, and
+    # both cards the ENGINE owns. That matters more than the count: the group
+    # that left was the only one whose witness was a copy of someone else's card,
+    # so what is left is smaller and none of it can drift.
+    assert_includes html, "dsModalDemos.fastWithHold()",
+      "the stack-mechanics section still demonstrates the floor against a fast op"
   end
 
   test "the Contest entry section states the honest web2/web3 map" do
@@ -504,31 +516,47 @@ class StylePageTest < ActiveSupport::TestCase
     assert_includes html, "mints no token", "web3 funds USDC directly and mints no token"
     assert_includes html, "same on-chain Entry PDA", "both paths converge on the Entry PDA"
     assert_includes html, "web2-only", "the note frames the mint/consume prelude as web2-only"
+
+    # ON-CHAIN ACCURACY, inherited 2026-09-09 from the retired
+    # style/modals/_entry_tokens, whose HEADER COMMENT was the only place these
+    # two facts were written down. Folding them into the rendered box is what
+    # kept them: a comment in a deleted file leaves nothing behind.
+    #
+    # WHY THE ASSERTION IS POSITIVE AND NOT A REFUTE. The version this replaces
+    # was `refute_includes html, "SPL token"`, guarding against framing the token
+    # as a wallet-held SPL token. The rendered prose states the fact by NEGATING
+    # it — "not a fungible SPL token" — so the refute would fail on the correct
+    # copy. A substring refute cannot tell a claim from its denial; assert the
+    # claim you want instead.
+    assert_includes html, "program-owned",
+      "the box says an entry token is a program-owned credit, not a wallet SPL token"
+    assert_includes html, "server-signed",
+      "the box says the mint is server-signed once payment clears, not on the buyer's click"
   end
 
-  # The AUTH suite — the #1 gap. Its bespoke step machine + blocks are present,
-  # and the specimens open the real modal at a step.
-  test "the Auth modal ports the credentials step machine + its blocks" do
-    html = render_index
-    # Opened at the credentials step with picksRequired AND the method config the
-    # specimen toggles feed (methods { magicLink, google, wallet } + terms).
-    assert_includes html, "$store.dsModals.open('auth', { step: 'credentials', picksRequired: 6, methods:",
-      "the Sign in specimen opens the auth modal at the credentials step with method config"
-    assert_includes html, "$store.dsModals.open('auth', { step: 'magic-link-sent'",
-      "a 'magic link sent' variant specimen is wired"
-    # The step machine itself.
-    assert_includes html, "isCredentialsStep",
-      "the auth partial carries the credentials-step guard"
-    %w[magic-link-sent magic-link-resent].each do |step|
-      assert_includes html, "props.step === '#{step}'",
-        "the auth step machine handles the #{step} step"
-    end
-    # The magic-link CTA runs behind the stub, and the age gate is exercised.
-    assert_includes html, "window.postMagicLink",
-      "the magic-link CTA no-ops behind the postMagicLink stub"
-    assert_includes html, "data-age-attestation",
-      "the auth modal renders the legal-age attestation"
-  end
+  # --- the auth suite, and why three tests left this file on 2026-09-09 -------
+  #
+  # RETIRED TOGETHER: "the Auth modal ports the credentials step machine + its
+  # blocks", "the auth modal gates each credential method + terms via props", and
+  # "the Magic link resent step has its own specimen". All three read
+  # style/modals/_auth, which was a MIRROR of turf-monster's sign-in card.
+  #
+  # THE ENGINE SHIPS NO AUTH CARD, and that is the fact these tests were quietly
+  # obscuring. A sign-in modal is a product decision — which methods, whose terms,
+  # whose legal copy — so each app owns one and cards it against the partial that
+  # actually renders in production. turf-monster does exactly that now, on its own
+  # host section, and its round-trip is guarded there
+  # (turf-monster test/integration/style_host_section_test.rb).
+  #
+  # WHAT THE ENGINE STILL OWES IS THE PIECES, and those gained specimens in the
+  # same change: studio/modals/shared/_email_field and
+  # studio/modals/auth/_resend_footer are carded as ds-email-field and
+  # ds-resend-footer. The email field in particular had NO coverage of any kind
+  # once the mirror went — the mirror was its only renderer — which is the
+  # concrete reason to card a fragment rather than delete the section.
+  #
+  # The methodOn/termsOn gating machinery those tests exercised belongs to the
+  # consumer's card and is asserted where that card lives.
 
   # --- 6c. Modals QoL: conversational copy, toggles, whole-card click, glow ----
 
@@ -538,8 +566,8 @@ class StylePageTest < ActiveSupport::TestCase
     html = render_index
     assert_includes html, "Copy an agent-ready reference to this modal",
       "the header Copy affordance is present"
-    assert_includes html, %(the Auth "Sign in" modal (studio-engine style/modals/_auth, step 'credentials')),
-      "the reference names the modal + partial + step as a sentence"
+    assert_includes html, %(the modal family's email input (studio/modals/shared/_email_field)),
+      "the reference names the modal + partial as a sentence"
     assert_includes html, "$refs.ref.textContent",
       "Copy reads the reference text, not a raw snippet"
     # The TITLE itself is the copy control (centered) — the standalone "Copy"
@@ -568,59 +596,18 @@ class StylePageTest < ActiveSupport::TestCase
       "Enter opens the modal (keyboard accessible)"
     assert_includes html, "@keydown.space.prevent",
       "Space opens the modal (keyboard accessible)"
-    %w[opts.magicLink opts.google opts.wallet opts.terms].each do |model|
-      assert_includes html, %(x-model="#{model}"),
-        "the Auth specimen has the #{model} option toggle"
-    end
-    %w[Magic\ Link Google Solana\ Wallet Terms].each do |lbl|
-      assert_includes html, lbl, "the toggle row labels #{lbl}"
-    end
+    # THE TOGGLE SAMPLE MOVED 2026-09-09. It read the Auth specimen's four
+    # (opts.magicLink / google / wallet / terms), which went with
+    # style/modals/_auth — turf-monster's mirror. The birthday card's toggle is
+    # the replacement and is a better witness for what this test is actually
+    # about: it belongs to an ENGINE card (studio/modals/blocks/_birthday), so it
+    # cannot be deleted out from under this assertion by a consumer's decision.
+    assert_includes html, %(x-model="opts.validates"),
+      "a specimen carries an option toggle that configures the modal before it opens"
+    assert_includes html, "Age validation",
+      "the toggle row labels its control"
   end
 
-  # Item 2 (gating) — the ported auth modal actually GATES each method + terms on
-  # props, so the toggles configure a live open.
-  test "the auth modal gates each credential method + terms via props" do
-    html  = render_index
-    block = specimen_block("auth", html)
-    refute_nil block, "the auth specimen must be registered before anything below means anything"
-
-    # Each credential's OWN control carries its OWN methodOn gate. Read that
-    # element's x-show; CREDENTIAL_CONTROLS records what the bare substrings this
-    # replaced were actually reading.
-    CREDENTIAL_CONTROLS.each do |method, anchor|
-      gate = credential_visibility_gate(block, anchor)
-      refute_nil gate,
-        "the #{method} control must carry an x-show AT ALL — moving the decision " \
-        "into ERB is the substitution a page-wide substring cannot see"
-      assert_includes gate, "methodOn('#{method}')",
-        "#{method} is gated by methodOn ON ITS OWN CONTROL, not by a term the page " \
-        "happens to contain elsewhere"
-    end
-
-    # Terms has no unique anchor in its wrapper's open tag (the checkbox that
-    # identifies it sits INSIDE), so this asserts the x-show ATTRIBUTE SET rather
-    # than one element. Weaker than the three above — it would not notice the gate
-    # moving to a different element — and still strictly stronger than the bare
-    # substring it replaces: MEASURED, `termsOn()` renders three times and two are
-    # the modal's own x-data (`termsOn() { … }` and `if (!this.termsOn())`),
-    # neither of which is an x-show.
-    assert_includes x_show_expressions(block), "termsOn()",
-      "the age-attestation terms block is gated by an x-show, not merely named in " \
-      "the modal's script"
-
-    # The defaults MECHANISM, not a gate — and the one bare substring here that
-    # asks the right question. MEASURED: `_methodDefaults` renders twice, both
-    # inside the x-data (its definition, and methodOn's read of it). There is no
-    # element to bind to, and its presence IS the claim.
-    assert_includes html, "_methodDefaults", "method defaults come from Studio.auth_method?"
-  end
-
-  # Item 4 — the magic-link-resent step has its own specimen.
-  test "the Magic link resent step has its own specimen" do
-    html = render_index
-    assert_includes html, "$store.dsModals.open('auth', { step: 'magic-link-resent'",
-      "a magic-link-resent specimen opens that step"
-  end
 
   # Items 5 + 6 — the active-card glow follows the step machine off the store, and
   # Profile lists Image upload BEFORE Crop photo.
@@ -628,8 +615,14 @@ class StylePageTest < ActiveSupport::TestCase
     html = render_index
     assert_includes html, "--studio-team-glow-opacity",
       "cards fade the ported glow via the opacity var"
-    assert_includes html, "$store.dsModals.current().props.step || 'credentials'",
-      "the glow matches the current modal + step reactively"
+    # WAS the auth step machine's discriminator ("props.step || 'credentials'"),
+    # retired 2026-09-09 with style/modals/_auth. ds_glow dropped step:/state:
+    # entirely — both only ever served mirrors — so the sub-state discriminator
+    # that remains and is asserted here is crop-photo's, which reads an ENGINE
+    # card's prop. The property under test is unchanged: one modal id, two cards,
+    # and the glow must tell them apart.
+    assert_includes html, "$store.dsModals.current().props.cropReady",
+      "the glow matches the current modal + sub-state reactively"
     upload_at = html.index("Image upload")
     crop_at   = html.index("Crop photo")
     refute_nil upload_at
@@ -804,7 +797,10 @@ class StylePageTest < ActiveSupport::TestCase
       html = render_index
 
       # The ported modal ids stay present with a working Open affordance.
-      %w[wallet-connect onchain-tx levelup].each do |id|
+      # onchain-tx left this sample on 2026-09-09 with its mirror; wallet-connect
+      # covers the :web3 half and levelup the :leveling half, which is what the
+      # two-capability claim in this test's name actually needs.
+      %w[wallet-connect levelup].each do |id|
         assert_includes html, "$store.dsModals.open('#{id}'",
           "the #{id} specimen stays present + openable, not hidden"
       end
@@ -998,21 +994,26 @@ class StylePageTest < ActiveSupport::TestCase
     "Email change pending"
   ].freeze
 
+  # DOWN TO FOUR from nine, all on 2026-09-09, and the shrink has one cause worth
+  # stating: every card that left was a MIRROR of a turf-monster card, and every
+  # card that stayed is rendered from a gem this engine ships (solana-studio for
+  # the three step-up cards, studio/modals/blocks/_entry_confirmed for the last).
+  #
+  # WHAT WENT: the three on-chain-tx states (Processing / On-chain success /
+  # On-chain error) and the two funding cards (Top up wallet / Add funds hub) —
+  # and before them, in earlier batches, Wallet deposit and the two reconciliation
+  # cards that used to close the section.
+  #
+  # WHAT THE ORDER STILL SAYS at four: get a wallet, then prove it, then spend
+  # from it. Two rules this list used to demonstrate no longer have a witness in
+  # it — "the funding cards run adjacent, because they are one question asked
+  # more than one way" and "reconciliation reads last" — so a future funding or
+  # reconciliation specimen has no neighbour to land beside. Both rules are
+  # recorded here rather than in the deleted lines, which is the only place a
+  # reader would otherwise find them.
   WEB3_ORDER = [
     "Connect wallet",
     "Sign Wallet", "Sign Wallet (no remembered brand)",
-    "Processing on-chain tx", "On-chain success", "On-chain error",
-    # The FUNDING cards run together, because they are one question asked more
-    # than one way: top up with a rail, or see every rail. A reader comparing
-    # them has to have them adjacent.
-    #
-    # WAS THREE, DOWN TO TWO on 2026-09-09. "Wallet deposit" led the run — the
-    # deposit-an-address answer — until its specimen was retired for mirroring a
-    # card turf owns. The remaining two still make the comparison this grouping
-    # exists for (one rail vs. every rail); what is gone is the third ANSWER, so
-    # a future funding specimen belongs adjacent to these rather than wherever
-    # it lands.
-    "Top up wallet", "Add funds hub",
     "Entry confirmed"
     # THE SECTION NO LONGER CLOSES ON A RECONCILIATION CARD. It closed on two
     # (Network guard, then Wallet changed), then on one, and on 2026-09-09
@@ -1197,14 +1198,26 @@ class StylePageTest < ActiveSupport::TestCase
   end
 
   test "the contest-entry section still resumes from the birthday card" do
-    # Moving the CARD must not break the demo walk: confirming still advances to
-    # Entry tokens through the page-level 'age-verified' hook, which the rename
-    # deliberately left alone because consuming apps already listen on it.
+    # Moving the CARD must not break the demo walk: confirming still resumes
+    # through the page-level 'age-verified' hook, which no rename and no deletion
+    # has touched because consuming apps already listen on it.
+    #
+    # THE HOOK IS THE SUBJECT; THE DESTINATION IS NOT. It resumed to the
+    # entry-tokens picker until 2026-09-09, when that mirror was retired — so
+    # this asserts the handler exists AND that whatever it opens is REGISTERED,
+    # rather than pinning one id. Pinning the id is what made this test have to
+    # change; an unregistered target is the failure worth catching, because it
+    # renders an empty card silently.
     html = render_index
-    assert_includes html, "@age-verified.window=",
-      "the page-level age-verified wiring is what carries the entry walk"
-    assert_includes html, "$store.dsModals.open('entry-tokens', { step: 'picker' })",
-      "confirming the birthday card must still advance to the Entry tokens picker"
+    handler = html[/@age-verified\.window="([^"]*)"/, 1]
+    refute_nil handler,
+      "the page-level age-verified wiring is what carries the walk"
+
+    target = handler[/dsModals\.open\('([a-z0-9-]+)'/, 1]
+    refute_nil target, "the age-verified handler must OPEN something"
+    assert_includes registered_modal_ids(html), target,
+      "age-verified resumes to '#{target}', which nothing registers — the walk ends " \
+      "on an empty card"
   end
 
   # --- 13. one modal id, two cards: the glow must tell them apart --------------
@@ -1480,93 +1493,41 @@ class StylePageTest < ActiveSupport::TestCase
   end
 
 
-  # --- 16. the funding modals the primitives were extracted for --------------
-
-  FUNDING_MODAL_SPECIMENS = {
-    "ds-wallet-topup" => "Top up wallet",
-    "ds-onramp-hub"   => "Add funds hub"
-  }.freeze
-
-  test "both funding modal specimens are carded AND registered" do
-    html  = render_index
-    cards = html.scan(/aria-label="Open the (.+?) modal"/).flatten
-    ids   = registered_modal_ids(html)
-
-    FUNDING_MODAL_SPECIMENS.each do |modal_id, label|
-      assert_includes cards, label, "no specimen card for #{modal_id}"
-      assert_includes ids, modal_id,
-        "#{modal_id} has a card but NO host registration — it opens a blank shell"
-    end
-  end
-
-  test "the funding specimens are built from the primitives, not from copies" do
-    # This is the whole reason the primitives were extracted first. A specimen
-    # that hand-rolled a rail would be the eleventh copy, sitting in the cabinet
-    # meant to stop them — and it would look completely fine.
-    root = Studio::Engine.root.join("app/views/style/modals")
-
-    %w[_ds_wallet_topup _ds_onramp_hub].each do |f|
-      source = root.join("#{f}.html.erb").read
-      assert_includes source, %(render "studio/modals/blocks/rail_row"),
-        "#{f} must render the engine's rail"
-      assert_includes source, %(render "studio/modals/blocks/close_x"),
-        "#{f} must render the engine's close mark"
-      assert_not_includes source, "w-full flex items-center gap-4 p-4 rounded-xl",
-        "#{f} must not carry its own copy of the rail's class string"
-      assert_not_includes source, "absolute top-0 right-0 -mt-2 -mr-2",
-        "#{f} must not carry its own copy of the close mark"
-    end
-  end
-
-  test "the hub ranks exactly one of its six rails" do
-    # Six is where ranking starts to matter: a hub of equal rails answers "which
-    # do I press" by asking the person to compare payment processors. Scoped to
-    # the specimen's own template — the page renders other rails elsewhere.
-    block = specimen_block("ds-onramp-hub")
-    assert block, "the hub specimen did not render"
-
-    assert_equal 1, block.scan("border-2 border-primary hover:bg-surface").size,
-      "exactly one rail leads"
-    assert_equal 3, block.scan("border border-strong hover:border-primary").size,
-      "three rails defer to it"
-    assert_equal 2, block.scan("border border-subtle opacity-60").size,
-      "and two are announced but not wired"
-  end
-
-  test "the top-up card carries its safety fork on ONE card" do
-    # The fork is a safety one: a web2 viewer with the USDC kill-switch on cannot
-    # pay an entry with USDC, so the primary rail becomes the token instead. Two
-    # cards would read as two products; the point is a player never sees both.
-    block = specimen_block("ds-wallet-topup")
-    assert block, "the top-up specimen did not render"
-
-    # ASSERT THE GATING, NOT THE PRESENCE. Both faces sit inside <template>s, so
-    # both strings are in the DOM no matter what the conditions say — a presence
-    # check stays green with the fork welded open, welded shut, or deleted. This
-    # was proved by mutation: three separate breakages all passed the first
-    # version of this test. So read each face out of ITS OWN template.
-    default  = block[/<template x-if="!tokenFallback">.*?<\/template>/m]
-    fallback = block[/<template x-if="tokenFallback">.*?<\/template>/m]
-
-    assert default,  "the default face must be gated on the kill-switch being OFF"
-    assert fallback, "the fallback face must be gated on it being ON"
-
-    assert_includes default, "Buy USDC with Coinbase"
-    assert_not_includes default, "Buy Entry Tokens",
-      "the two faces must be mutually exclusive — a player never sees both"
-
-    assert_includes fallback, "Buy Entry Tokens"
-    assert_not_includes fallback, "Buy USDC with Coinbase",
-      "pitching USDC to the audience that cannot spend it is the bug this fork exists to avoid"
-
-    # ...and the card offers the toggle that walks between them. Assert the
-    # rendered CHECKBOX, not the string "opts.tokenFallback" — that also appears
-    # in the card's open_expr, so a bare match survives deleting the toggle and
-    # leaves the second face in the DOM and unreachable: a card nobody reviews.
-    assert_includes render_index, %(<input type="checkbox" x-model="opts.tokenFallback"),
-      "the specimen card needs the toggle that reaches the second face"
-  end
-
+  # --- 16. RETIRED — the funding modals the primitives were extracted for ----
+  #
+  # This section held FUNDING_MODAL_SPECIMENS and four tests, all reading
+  # style/modals/_ds_wallet_topup and _ds_onramp_hub. Both were MIRRORS of
+  # turf-monster's modals/_wallet_topup and modals/_onramp_hub, and both were
+  # retired on 2026-09-09. The constant is deleted rather than emptied, for the
+  # reason section 17 gives: `{}.each` passes forever and reads like coverage.
+  #
+  # THE AWKWARD PART, SAID PLAINLY: blocks/_rail_row and blocks/_close_x were
+  # extracted FOR these two cards, and the cards they were extracted for now live
+  # in another repo. That does not make the blocks orphans — turf renders
+  # rail_row at 3 call sites and close_x at 10, which is more adoption than they
+  # had here — but it does mean the ENGINE no longer contains a full card built
+  # from them. What it contains is the two block demos, _ds_rail_row and
+  # _ds_close_x, and section 15 above still holds those to the borrow-don't-copy
+  # contract.
+  #
+  # What went, so a reader knows what is NOT asserted here any more:
+  #   * "both funding modal specimens are carded AND registered" — the carded/
+  #     registered pairing. Still held for every id on the page, list-free, by
+  #     test/views/style_guide_no_dangling_specimens_test.rb.
+  #   * "the funding specimens are built from the primitives, not from copies" —
+  #     the Tier-2 contract, still asserted for the two block demos in section 15.
+  #   * "the hub ranks exactly one of its six rails" — the ranking rule. Its
+  #     surviving witness is the rail-row specimen's own ranking test in section
+  #     15, which pins one leading rail; the SIX-rail version of the claim has no
+  #     card left in this repo and is asserted in turf's style_host_section_test.
+  #   * "the top-up card carries its safety fork on ONE card" — the web2
+  #     kill-switch fork. That fork is turf's product decision, it is asserted
+  #     against turf's real partial, and this suite has no file left to read it
+  #     out of. Its lesson is worth carrying forward wherever a two-face card is
+  #     tested: both faces sit inside <template>s, so BOTH strings are in the DOM
+  #     regardless of the conditions — assert each face out of ITS OWN template,
+  #     because a presence check stays green with the fork welded open, welded
+  #     shut, or deleted. Three separate breakages passed the first version.
 
   # --- 17. RETIRED — the "last three" batch is empty ------------------------
   #
@@ -1725,6 +1686,25 @@ class StylePageTest < ActiveSupport::TestCase
     element
   end
 
+  # THIS HELPER NOW GUARDS NOTHING BUT ITSELF — read this before trusting it.
+  #
+  # Its production caller, "the auth modal gates each credential method + terms
+  # via props", was retired on 2026-09-09 with style/modals/_auth, the mirror of
+  # turf-monster's sign-in card. What is left below is the helper and its own
+  # self-tests, which pass. That is not coverage of anything this engine ships,
+  # and saying so out loud is the point: the two tests at the bottom of this file
+  # exercise six ways a naive version of this reader goes wrong, and a reader who
+  # mistakes them for a live guard on the auth card is reading a page that does
+  # not exist.
+  #
+  # IT IS KEPT ANYWAY, deliberately, because the TECHNIQUE outlived the card and
+  # nowhere else has it: turf-monster now owns the auth card whose credential
+  # gates need exactly this reader, and its style_host_section_test currently has
+  # no equivalent — measured 2026-09-09. Porting it there is filed as follow-up
+  # work. If that lands and this is still here, delete this section; if the
+  # follow-up is dropped, delete it then too. What it must not do is sit here
+  # quietly looking like it is watching the auth card.
+  #
   # The x-show EXPRESSION on the control `anchor` identifies, or nil when that
   # control carries none.
   #
@@ -1760,19 +1740,12 @@ class StylePageTest < ActiveSupport::TestCase
     open_tag_containing(block, anchor)&.slice(/\sx-show="([^"]*)"/, 1)
   end
 
-  # Every x-show EXPRESSION in the block, as written. Requiring the ` x-show="`
-  # wrapper is what defeats the decoy this replaced: MEASURED, `termsOn()`'s
-  # other two renders are bare x-data text, and deleting the real x-show turns
-  # the assertion above RED.
-  #
-  # It is a STRING scan, not a parse, so it cannot tell an attribute from text
-  # shaped like one — a `<script>` body or an HTML comment carrying a literal
-  # ` x-show="termsOn()"` WOULD satisfy it. Sound on this block, not sound by
-  # construction: MEASURED, all 19 matches here are real attributes, and the
-  # auth block contains no `<script` and no `<!--`.
-  def x_show_expressions(block)
-    block.to_s.scan(/\sx-show="([^"]*)"/).flatten
-  end
+  # x_show_expressions(block) LIVED HERE and was deleted on 2026-09-09 with its
+  # only caller, "the auth modal gates each credential method + terms via props".
+  # It scanned a block for every `x-show="…"` value — the weaker sibling of
+  # credential_visibility_gate below, used where a control had no unique anchor
+  # in its own open tag. Nothing calls it now, and a helper kept for a caller
+  # that may never come back is indistinguishable from coverage.
 
   # The guard above, exercised. Without this its FIVE branches are prose, and
   # nothing on the real page would reach them.

@@ -18,12 +18,14 @@
   and label — from the markup you are REPLACING, and use the specimen only to
   learn which locals exist and how they compose. A specimen is a demo: the
   engine is entitled to pick any plausible value for it, and those values are
-  not your app's. style/modals/_ds_wallet_topup passes modal_store "dsModals",
-  its own page-scoped host; a callsite that copies it closes a store the app
-  does not have, so the mark renders and does nothing.
+  not your app's. The specimen that earned this paragraph passed modal_store
+  "dsModals", its own page-scoped host; a callsite that copies that closes a
+  store the app does not have, so the mark renders and does nothing.
 
   The incident that earned this paragraph: an adopter built a new callsite from
-  style/modals/_ds_wallet_topup and carried its icon across. The specimen passes
+  style/modals/_ds_wallet_topup — a mirror of turf-monster's Top Up Wallet card,
+  retired on 2026-09-09, so do not go looking for the file — and carried its icon
+  across. The specimen passed
   U+1F39F ADMISSION TICKETS; the markup being replaced had always drawn U+1F3AB
   TICKET. A different glyph in a different colour landed on the primary rail of
   the web2 kill-switch face of Top Up Wallet — the single call to action shown to
