@@ -41,11 +41,12 @@
   chaining (`current()?.id`): the outer template unmounts one tick AFTER the
   stack empties, so a bare `.id` throws on every close.
 
-  THE CONTENT PARTIALS OBEY THE SAME TWO RULES AS THE SHARED HOST'S, and both
-  fail silently: a SINGLE ROOT element (a template x-if clones only the first
-  one) and NO double quote inside x-data (it closes the attribute and Alpine
-  mounts a component that renders everything and does nothing). Stated in full
-  in the gem README's "Modal host" section.
+  THE CONTENT PARTIALS OBEY THE SAME TWO RULES AS THE SHARED HOST'S, and they
+  fail DIFFERENTLY: a SINGLE ROOT element (a template x-if clones only the
+  first one, logging nothing) and NO double quote inside x-data (it closes the
+  attribute and Alpine mounts a component that renders everything and does
+  nothing -- but LOGS "Alpine Expression Error" on the way). Stated in full in
+  the gem README's "Modal host" section.
 
   AND EVERY ID REGISTERED HERE MUST BE REACHABLE, both ways round. A card that
   opens an id no template registers shows an EMPTY panel; a template no card

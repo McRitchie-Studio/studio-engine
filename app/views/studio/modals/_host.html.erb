@@ -32,7 +32,11 @@
   IMPOSES on the content partials registered in its block: a SINGLE ROOT
   element (a template x-if clones only the first one; later siblings are
   dropped) and NO double quote inside x-data (it closes the attribute and
-  Alpine mounts a silent no-op). Both fail without raising.
+  Alpine mounts a no-op). NEITHER STOPS THE RENDER, BUT ONLY ONE IS SILENT:
+  the single-root miss logs nothing at all, while the truncated x-data prints
+  "Alpine Expression Error" to the console (and rethrows it async). That
+  warning is the clue rule one never gives you, so check the console before
+  you re-read the markup.
 %>
 <style>
   /* Scroll lock applied by $store.modals._sync() when the stack is non-empty.
