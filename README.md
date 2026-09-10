@@ -268,10 +268,11 @@ the console rather than to the markup. Single-quote everything inside
 
 Interpolated values are the same rule arriving from the server, and Rails
 already guards the ordinary case: `<%= value %>` inside `x-data` renders a
-double quote as `&quot;`, which the parser decodes only AFTER the attribute
-has ended, so the attribute survives. The vector is a value that SKIPS that
-escaping — `raw`, `.html_safe`, or a helper returning a SafeBuffer — which
-puts a bare `"` into the attribute and closes it exactly as a typed one would.
+double quote as `&quot;`, and the HTML tokenizer never reads a character
+reference as the closing quote — it decodes it straight into the value — so
+the attribute survives. The vector is a value that SKIPS that escaping —
+`raw`, `.html_safe`, or a helper returning a SafeBuffer — which puts a bare
+`"` into the attribute and closes it exactly as a typed one would.
 `escape_javascript` (`j`) is NOT the guard here: it escapes for a JavaScript
 string literal (`\"`) and PRESERVES the html_safe flag, so the raw quote still
 reaches the attribute. Let Rails escape it.
