@@ -818,7 +818,7 @@ the allocation read the current version as already past the last tag and skip, s
 the hand number silently wins over the derived one. **`prepare` does not touch
 [`CHANGELOG.md`](./CHANGELOG.md)** — renaming `## Unreleased` to the allocated
 version and opening a fresh empty one is a manual last step, and skipping it is
-how thirty-five releases of entries ended up filed as pending. Details and the
+how thirty-five minor versions of entries ended up filed as pending. Details and the
 exact commands are in [`docs/RELEASE.md`](./docs/RELEASE.md).
 
 **Semver guide** — the release *derives* the bump from its members (a `breaking`
