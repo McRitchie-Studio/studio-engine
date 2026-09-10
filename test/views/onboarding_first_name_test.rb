@@ -30,17 +30,32 @@ class OnboardingFirstNameTest < ActiveSupport::TestCase
     File.join(ENGINE_ROOT, "test/views/fixtures/onboarding_first_name/default_0_70_0.html")
   )
 
-  # Every byte 0.71 moves in that default card — and there may be no others.
-  # Written as (what it says NOW) => (what 0.70.0 said) so the test can rewind
-  # the render and compare the rest. A change that moves the default further has
-  # to be ADDED here deliberately, which is the point: the consumer's listener
-  # lives on the other side of these four lines.
+  # Every byte 0.71 moved in that default card. Written as (what it says NOW) =>
+  # (what 0.70.0 said) so the test can rewind the render and compare the rest.
+  # A change that moves the default further has to be ADDED deliberately — as its
+  # own reasoned group, like SPINNER_DELTAS below — which is the point: the
+  # consumer's listener lives on the other side of these four lines.
   OUTCOME_DELTAS = {
     "finish(next, saved) {" => "finish(next) {",
     "{ detail: { next: next, saved: !!saved } }" => "{ detail: { next: next } }",
     "this.finish(data.next || [], true);" => "this.finish(data.next || []);",
     "this.finish((data && data.next) || [], false);" => "this.finish((data && data.next) || []);"
   }.freeze
+
+  # The in-flight spinner, moved deliberately. 0.70.0 named `cta-spinner`, a HOST
+  # utility defined in turf-monster's application.css and NOWHERE in this engine,
+  # so McRitchie Studio — which renders this card — showed an unstyled empty span
+  # beside "Saving…". It is now the engine's own `.spinner` (engine-motion.css),
+  # tuned to the same currentColor ring turf's utility draws. Guarded engine-wide
+  # by test/views/engine_class_vocabulary_test.rb.
+  SPINNER_DELTAS = {
+    %(<span x-show="submitting" class="spinner" aria-hidden="true" ) +
+      %(style="--spinner-track: currentColor; --spinner-color: transparent; opacity: 0.85"></span>) =>
+      %(<span x-show="submitting" class="cta-spinner" aria-hidden="true"></span>)
+  }.freeze
+
+  # Every line moved since 0.70.0, each group carrying the reason it moved.
+  DEFAULT_CARD_DELTAS = OUTCOME_DELTAS.merge(SPINNER_DELTAS).freeze
 
   def view
     ActionView::Base.with_empty_template_cache.with_view_paths([File.join(ENGINE_ROOT, "app/views")])
@@ -374,12 +389,12 @@ class OnboardingFirstNameTest < ActiveSupport::TestCase
                  "one event carries the outcome; a second one would leave this one ambiguous"
   end
 
-  test "the default card is 0.70.0's, moved ONLY by the outcome key" do
-    # Byte-for-byte against the released card, with the four intended lines
-    # rewound. Anything else that moved shows up as a diff here rather than in a
-    # consumer.
-    restored = OUTCOME_DELTAS.reduce(render_first_name) do |html, (now, before)|
-      assert_includes html, now, "the outcome signal changed shape — update OUTCOME_DELTAS"
+  test "the default card is 0.70.0's, moved ONLY by the listed deltas" do
+    # Byte-for-byte against the released card, with every intended line rewound —
+    # the outcome key and the spinner. Anything else that moved shows up as a diff
+    # here rather than in a consumer.
+    restored = DEFAULT_CARD_DELTAS.reduce(render_first_name) do |html, (now, before)|
+      assert_includes html, now, "a listed delta changed shape — update DEFAULT_CARD_DELTAS"
       html.sub(now, before)
     end
     assert_equal GOLDEN_0_70_0, restored

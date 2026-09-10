@@ -37,11 +37,20 @@ class ModalErrorLinesAnnounceTest < ActiveSupport::TestCase
   ].freeze
   MODAL_DIR = MODAL_DIRS.first
 
-  # An error line, as it actually appears in this tree: a <p> carrying a
-  # `text-red-*` utility. Scoped to <p> on purpose — the same utility appears on
-  # an <svg> stroke in blocks/_card_header.html.erb, which is an ICON and has
-  # nothing to announce.
-  ERROR_PARAGRAPH = /<p\b[^>]*\bclass\s*=\s*"[^"]*\btext-red-\d+\b[^"]*"[^>]*>/m
+  # An error line, as it actually appears in this tree: a <p> carrying a RED text
+  # utility. Scoped to <p> on purpose — the same utility appears on an <svg>
+  # stroke in blocks/_card_header.html.erb, which is an ICON and has nothing to
+  # announce.
+  #
+  # THE ALTERNATION IS THE RE-POINTING THIS FILE ASKS FOR, not a widening. Error
+  # text is migrating off static Tailwind reds onto `text-danger-ink`, the
+  # per-theme red ThemeResolver derives to clear WCAG AA on every surface (no
+  # STATIC red clears AA on BOTH themes — see lib/studio/theme_resolver.rb). The
+  # auth resend footer was the first to move. Matching ONLY `text-red-*` would
+  # have quietly dropped that paragraph out of this guard the moment it was
+  # restyled, which is exactly the failure the floor below exists to catch — and
+  # did catch, on the very commit that moved it.
+  ERROR_PARAGRAPH = /<p\b[^>]*\bclass\s*=\s*"[^"]*\b(?:text-red-\d+|text-danger-ink)\b[^"]*"[^>]*>/m
   ANNOUNCES = /\brole\s*=\s*"alert"|\baria-live\s*=\s*"(?:polite|assertive)"/
 
   # ERB TAGS ARE NEUTRALISED FIRST, and that is not tidiness. An attribute like
@@ -103,6 +112,15 @@ class ModalErrorLinesAnnounceTest < ActiveSupport::TestCase
   # count drops again, find the line that stopped matching before you touch the
   # floor. A floor edited to make a run green is the guard deleting itself.
   #
+  # THE FLOOR HELD AT 6 THROUGH THE INK MIGRATION. When the auth resend footer
+  # moved from text-red-400 to text-danger-ink, this assertion went red — the
+  # restyle took that paragraph out of a text-red-* pattern, exactly the case the
+  # message below names. The fix was to re-point ERROR_PARAGRAPH at the ink as
+  # well, which restores the count. Lowering the floor instead would have retired
+  # a LIVE error line from the announce rule and left this guard covering one
+  # paragraph less, silently. Re-derived on the merged tree: the re-pointed
+  # pattern matches 6, text-red-* alone matches 5.
+  #
   # Both moved partials still carry role="alert" in the gem, but solana-studio
   # ships NO equivalent guard, so those two lines are now unpinned in their new
   # home. Porting this test to the gem is filed as follow-up work.
@@ -114,8 +132,9 @@ class ModalErrorLinesAnnounceTest < ActiveSupport::TestCase
     found = views.sum { |path| error_paragraphs(File.read(path)).length }
     assert_operator found, :>=, 6,
                     "the error-line pattern matched only #{found} paragraph(s); it matched 6 when " \
-                    "last re-derived. A restyle away from text-red-* would leave this guard passing " \
-                    "over nothing — re-point the pattern rather than deleting the test."
+                    "last re-derived. A restyle away from text-red-* and text-danger-ink would leave " \
+                    "this guard passing over nothing — re-point the pattern rather than lowering " \
+                    "the floor or deleting the test."
   end
 
   # The reusable error CARD is a different mechanism and is pinned separately: its

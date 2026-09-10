@@ -191,6 +191,13 @@
    Usage:  <span class="spinner"></span>
            <span class="spinner" style="--spinner-size: 2rem"></span>
            on a colored button:  <span class="spinner" style="--spinner-color: currentColor"></span>
+           the currentColor RING the engine's own CTA blocks use, matching the
+           ring turf-monster's host-only .cta-spinner draws:
+             <span class="spinner" style="--spinner-track: currentColor; --spinner-color: transparent; opacity: 0.85"></span>
+           Mind the mapping, it reads backwards: --spinner-track paints the
+           WHOLE ring and --spinner-color only the leading segment. Untuned on a
+           .btn-primary, the head is --color-cta, the button's own fill, so the
+           spinner shows nothing but its faint track.
    Tune:   --spinner-size / --spinner-thickness / --spinner-track /
            --spinner-color / --spinner-speed
    ========================================================================== */

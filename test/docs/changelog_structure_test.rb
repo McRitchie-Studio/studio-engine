@@ -8,12 +8,17 @@ require "test_helper"
 #
 # WHY IT EXISTS. Between 0.39.0 and 0.74.x, `## Unreleased` grew to 2,382 lines
 # holding thirty-five minor versions' worth of shipped entries, because `bin/release
-# prepare` bumps `lib/studio/version.rb` and its lockfile but never rolls the
+# prepare` bumped `lib/studio/version.rb` and its lockfile but never rolled the
 # Unreleased heading into a version heading, and nothing failed when it didn't.
 # Every reviewer who opened the file then had to decide, per entry, whether it was
 # shipped history or pending work — Carl had to measure it during PR #305 just to
 # rule on a scope question. This guard is the thing that would have gone red in
 # week one.
+#
+# Prepare rolls it now (mcritchie-studio#1344), but only when it ALLOCATES a
+# version: a version set by hand, or a re-run after an abort before the tag,
+# skips the roll (docs/RELEASE.md, 'Rolling Unreleased into a version'). So this
+# guard stays.
 #
 # THE FLOOR MATTERS AS MUCH AS THE RULES. A structure test whose regex stops
 # matching passes having proved nothing, so the parse count is asserted against a
@@ -38,9 +43,12 @@ class ChangelogStructureTest < Minitest::Test
   MIN_MODERN_HEADINGS = 80
 
   # How far `Studio::VERSION` may run ahead of the newest version heading before
-  # the changelog counts as drifting. A release that ships no entry at all is
-  # legitimate (0.74.4 was one), so the tolerance is not zero — but a drift of
-  # thirty-five minor versions is the defect this file exists to catch.
+  # the changelog counts as drifting. It is not zero because this branch can
+  # carry a version whose heading has not reached it: a version set by hand, or
+  # history from before prepare rolled the file. A release that ships no entry
+  # still gets a heading (prepare writes it at ALLOCATE), so an empty bucket is no
+  # reason to drift. A drift of thirty-five minor versions is the defect this file
+  # exists to catch.
   MAX_MINOR_DRIFT = 2
 
   def setup
@@ -132,7 +140,8 @@ class ChangelogStructureTest < Minitest::Test
     assert drift && drift <= MAX_MINOR_DRIFT,
            "Studio::VERSION is #{Studio::VERSION} but the newest changelog heading is " \
            "#{newest_version.join('.')} — #{behind} of entries are still filed under " \
-           "'#{UNRELEASED}'. Roll them into their release headings " \
+           "'#{UNRELEASED}'. Roll them into their release headings; a release " \
+           "that recorded no entry still gets its heading " \
            "(see docs/RELEASE.md, 'Rolling Unreleased into a version')."
   end
 

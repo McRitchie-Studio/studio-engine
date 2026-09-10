@@ -131,7 +131,7 @@
             :disabled="!complete || submitting">
       <span x-show="!submitting">Confirm &amp; Continue</span>
       <span x-show="submitting" class="inline-flex items-center justify-center gap-2" style="display: none;">
-        <span class="cta-spinner" aria-hidden="true"></span>
+        <span class="spinner" aria-hidden="true" style="--spinner-track: currentColor; --spinner-color: transparent; opacity: 0.85"></span>
         Verifying…
       </span>
     </button>

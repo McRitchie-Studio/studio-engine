@@ -168,7 +168,7 @@
           <button type="submit" class="btn btn-primary btn-lg w-full" :disabled="saving || !changed">
             <span x-show="!saving" x-text="changed ? '<%= j cta_label %>' : '<%= j saved_label %>'"><%= cta_label %></span>
             <span x-show="saving" class="inline-flex items-center justify-center gap-2" style="display: none;">
-              <span class="cta-spinner" aria-hidden="true"></span>
+              <span class="spinner" aria-hidden="true" style="--spinner-track: currentColor; --spinner-color: transparent; opacity: 0.85"></span>
               <span x-text="progressLabel || '<%= j saving_label %>'"><%= saving_label %></span>
             </span>
           </button>

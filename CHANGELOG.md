@@ -1,8 +1,22 @@
 # Changelog
 
-The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package and pin the floor each one needs — the pins differ on purpose, and every consumer records why beside its own. Bumping the gem version and updating consumer lockfiles is a release; `bin/release prepare` allocates the version and does both (see [`docs/RELEASE.md`](./docs/RELEASE.md)). `prepare` does NOT roll this file: renaming `## Unreleased` to the allocated version and opening a fresh empty one is a manual conductor step (see [`docs/RELEASE.md`](./docs/RELEASE.md), *Rolling `Unreleased` into a version*), guarded by `test/docs/changelog_structure_test.rb`.
+The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package and pin the floor each one needs — the pins differ on purpose, and every consumer records why beside its own. Bumping the gem version and updating consumer lockfiles is a release; `bin/release prepare` allocates the version and does both (see [`docs/RELEASE.md`](./docs/RELEASE.md)). Write entries under `## Unreleased` and never write a version heading: when `prepare` allocates a version it rolls this file in the same commit, moving everything under `## Unreleased` beneath a new `## <version> — <date>` heading (written even when the bucket is empty) and leaving `## Unreleased` first and empty. It refuses the sweep, with nothing published, when the roll would lie or it cannot read this file; when it skips allocation, nothing rolls. [`docs/RELEASE.md`](./docs/RELEASE.md), *Rolling `Unreleased` into a version*, says when each happens and what to do by hand. `test/docs/changelog_structure_test.rb` guards the shape.
 
 ## Unreleased
+
+### Fixed
+
+- **The auth resend footer's error line failed WCAG AA in both themes; it now
+  uses the danger ink.** `studio/modals/auth/_resend_footer` painted its
+  `role="alert"` paragraph with the static `text-red-400`, which Tailwind v4
+  compiles to about `#FF6467`: 3.86:1 on the dark modal card and 2.89:1 on the
+  light one, both under the 4.5:1 that 12px text needs. It is now
+  `text-danger-ink`, the red `Studio::ThemeResolver` derives per theme to clear
+  4.5:1 on every surface: 4.50:1 dark and 5.76:1 light on the default modal
+  card. The resend spinner stays the engine's `.spinner`, tuned to
+  turf-monster's currentColor ring (`--spinner-track: currentColor;
+  --spinner-color: transparent`), so a host that drops its fork sees no change.
+  Guarded by `test/views/resend_footer_error_contrast_test.rb`.
 
 ### Docs
 
@@ -32,8 +46,29 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   fails loudly rather than passing vacuously, and — the one that would have caught
   this in week one — `Studio::VERSION` no more than two minor versions ahead of the
   newest heading. Against the pre-change file it reports "35 minor versions of
-  entries are still filed under `## Unreleased`". Automating the roll inside
-  `bin/release prepare` (mcritchie-studio) is the real fix and is not done.
+  entries are still filed under `## Unreleased`". ~~Automating the roll inside
+  `bin/release prepare` (mcritchie-studio) is the real fix and is not done.~~ —
+  **superseded after 0.74.8:** mcritchie-studio#1344 made `prepare` roll this
+  file whenever it allocates a version, so "it never touches this file" above
+  describes the tooling as of 0.74.8. See the entry on the automatic roll below.
+
+- **The docs called the `## Unreleased` roll a manual conductor step; `bin/release
+  prepare` does it now, and the docs say exactly when it does not.**
+  mcritchie-studio#1344 made prepare roll this file into the allocated version in
+  the commit that sets `lib/studio/version.rb` and `Gemfile.lock`, and REFUSE the
+  sweep, with nothing published, when the roll would lie. `docs/RELEASE.md`
+  (*Rolling `Unreleased` into a version*), this file's preamble and the README's
+  release paragraph still said the roll was yours, by hand. They now name the
+  three outcomes (ALLOCATE rolls, SKIP rolls nothing, REFUSE aborts), each
+  refusal and its fix, and the reach limit: a SKIP (a version set by hand, or a
+  re-run after an abort before the tag) rolls nothing. They also settle three
+  conventions. An entry-less release still gets its heading; a heading never
+  lands before its version does, because `accepted` lags `release`; and a merge
+  that crosses a roll gets checked, because git can merge a new bullet CLEAN
+  under a version that shipped without it. The manual procedure stays, as the
+  remedy for those cases. No runtime code changed;
+  `test/docs/changelog_structure_test.rb` changed only its comments and its
+  failure message.
 
 ## 0.74.3 — 2026-09-08
 

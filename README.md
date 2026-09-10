@@ -240,35 +240,78 @@ the block:
 
 #### Writing a modal's content partial — two rules the host imposes
 
-Both of these fail SILENTLY. Nothing raises, nothing logs, and the card renders;
-it just does less than it looks like it does.
+Both rules let the card render and then do less than it looks like it does.
+They differ in whether anything reaches the CONSOLE, which is the first thing
+to check when a registered partial misbehaves.
 
-**1. SINGLE ROOT.** A content partial's outer `<div>` is the host's required
-root. Alpine's `<template x-if>` clones only the FIRST root element of its
-content, so a second top-level sibling — a stray `<span>`, a trailing `<style>`
-block, a comment-turned-node — is dropped on the floor. Bake anything extra
-inside the wrapping `<div>`.
+**1. SINGLE ROOT — fails in total silence.** A content partial's outer `<div>`
+is the host's required root. Alpine's `<template x-if>` clones only the FIRST
+root element of its content, so a second top-level sibling — a stray `<span>`,
+a trailing `<style>` block, a comment-turned-node — is dropped on the floor.
+Nothing raises and nothing logs: `x-if` takes `.firstElementChild` and asks no
+questions. (Alpine DOES warn on a multi-root `x-for` template — *"x-for
+templates require a single root element, additional elements will be ignored"*
+— which is exactly why this one catches people out. The modal host is `x-if`,
+and `x-if` ships no such check.) Bake anything extra inside the wrapping
+`<div>`.
 
-**2. NO DOUBLE QUOTE INSIDE `x-data`.** The attribute is double-quoted, so an
-inner double quote CLOSES it. Alpine then mounts a component whose expression is
-truncated mid-statement: every element still renders and every handler does
-nothing. Single-quote everything inside `x-data`.
+**2. NO DOUBLE QUOTE INSIDE `x-data` — this one LOGS.** The attribute is
+double-quoted, so an inner double quote CLOSES it. Alpine then mounts a
+component whose expression is truncated mid-statement: every element still
+renders and every handler does nothing. It is NOT silent. The truncation
+leaves a JavaScript syntax error, Alpine's evaluator catches it, and the
+default handler prints `Alpine Expression Error: …` together with the
+offending expression — a `console.warn`, followed by an async rethrow. That
+warning is the best clue this rule was broken, so send a debugging engineer to
+the console rather than to the markup. Single-quote everything inside
+`x-data`.
+
+Interpolated values are the same rule arriving from the server, and Rails
+already guards the ordinary case: `<%= value %>` inside `x-data` renders a
+double quote as `&quot;`, and the HTML tokenizer never reads a character
+reference as the closing quote — it decodes it straight into the value — so
+the attribute survives. The vector is a value that SKIPS that escaping —
+`raw`, `.html_safe`, or a helper returning a SafeBuffer — which puts a bare
+`"` into the attribute and closes it exactly as a typed one would.
+`escape_javascript` (`j`) is NOT the guard here: it escapes for a JavaScript
+string literal (`\"`) and PRESERVES the html_safe flag, so the raw quote still
+reaches the attribute. Let Rails escape it.
+
+That settles the ATTRIBUTE, not the JavaScript inside it. A value spliced into
+a single-quoted JS string — the shape rule 2 steers you to — has a second way
+out: a `'`. ERB escapes it to `&#39;`, the parser decodes that straight back
+into the value, and the bare `'` ends the string: the same
+`Alpine Expression Error`. Route such a value through
+`Studio::JsLiteral.in_attribute(value)`, which runs both escapers in the order
+that works; `lib/studio/js_literal.rb` carries the full contract, identifier
+position (`Studio::JsIdentifier`) included.
 
 These are properties of the HOST, not of any one card, and they apply to every
-consumer partial an app registers — not only to the specimens in this gem. They
-are recorded here because they used to be recorded only in the style guide's
-specimen headers, which made them deletable by a change that removed a specimen:
-retiring the `style/modals/_network_guard` and `_wallet_deposit` mirrors on
-2026-09-09 would otherwise have taken the single-root rule out of both this repo
-and the app that inherited those cards.
+consumer partial an app registers — not only to the specimens in this gem.
 
-**Wallet modals moved to `solana-studio`.** The Connect Wallet picker, the Web3
-step-up card and the Phantom deep link used to ship here as
-`studio/modals/wallet_connect`, `studio/modals/web3_step_up` and
-`studio/solana/phantom_deeplink`. They now live in the **solana-studio** gem as
-`solana_studio/modals/wallet_connect`, `solana_studio/modals/web3_step_up` and
-`solana_studio/phantom_deeplink`; render them from those paths and read that
-gem's README for their locals and hooks.
+They are recorded HERE because this is the host's CONTRACT, and nothing else
+in the repo is. Plenty of files state one or both rules, but each of them is
+describing ITSELF — a specimen header explaining its own markup, an asset
+partial explaining its own root. Someone writing a NEW partial has no specimen
+to read; they read the host's documentation, so that is where the rules have
+to live.
+
+And a specimen could not carry rule 1 even in principle, which is what settles
+it: the style guide wraps EVERY registration's partial in a `<div>` of its own
+— `<template x-if="…"><div><%= render … %></div></template>` — and that
+wrapper supplies the single root the rule is about. A specimen that broke the
+rule would still render correctly in the guide, so the specimens cannot
+demonstrate the failure they would be documenting. Pinned by
+`test/docs/modal_host_contract_docs_test.rb`.
+
+#### Wallet modals moved to `solana-studio`
+
+The Connect Wallet picker, the Web3 step-up card and the Phantom deep link used
+to ship here as `studio/modals/wallet_connect`, `studio/modals/web3_step_up`
+and `studio/solana/phantom_deeplink`. They now live in the **solana-studio**
+gem as `solana_studio/modals/wallet_connect`, `solana_studio/modals/web3_step_up`
+and `solana_studio/phantom_deeplink`; render them from those paths and read
+that gem's README for their locals and hooks.
 
 This is the two-template split: **BASE** is studio-engine + mcritchie-studio,
 **WEB3 ADD** is solana-studio + turf-monster. The engine has no business
@@ -815,11 +858,14 @@ let it allocate the version — it derives the bump, commits `lib/studio/version
 with its `Gemfile.lock` onto **`origin/release`**, then publishes, tags, and bumps
 each consumer's lock. **Do not set the version by hand.** A hand-set number makes
 the allocation read the current version as already past the last tag and skip, so
-the hand number silently wins over the derived one. **`prepare` does not touch
-[`CHANGELOG.md`](./CHANGELOG.md)** — renaming `## Unreleased` to the allocated
-version and opening a fresh empty one is a manual last step, and skipping it is
-how thirty-five minor versions of entries ended up filed as pending. Details and the
-exact commands are in [`docs/RELEASE.md`](./docs/RELEASE.md).
+the hand number silently wins over the derived one, and the skip rolls no
+changelog. **When it allocates, `prepare` also rolls
+[`CHANGELOG.md`](./CHANGELOG.md)** in the same commit: everything under
+`## Unreleased` moves beneath the new version's heading, written even when the
+bucket is empty, and `## Unreleased` stays first and empty. It refuses the sweep,
+with nothing published, when the roll would lie or it cannot read the file.
+[`docs/RELEASE.md`](./docs/RELEASE.md), *Rolling `Unreleased` into a version*,
+says exactly when it rolls, refuses or skips, and what to do by hand.
 
 **Semver guide** — the release *derives* the bump from its members (a `breaking`
 risk tag → major, a `feature` → minor, otherwise patch), so this is what those

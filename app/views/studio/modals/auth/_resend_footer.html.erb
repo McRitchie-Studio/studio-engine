@@ -10,6 +10,29 @@
 
   Locals:
     modal_store — Alpine store name backing close(). Default "modals".
+
+  ERROR INK, not a static red. The error paragraph is text-danger-ink, the
+  per-theme red Studio::ThemeResolver derives to a 4.5:1 target. It replaced
+  text-red-400. Measured through the resolver on turf-monster's real palette
+  (primary 4BAF50), on the modal card, which is bg-surface: danger-ink is 4.50
+  on the dark card 3C3853 and 5.76 on the light card ffffff, clearing AA on
+  both; text-red-400 was 3.86 and 2.89, failing both. Those are Tailwind v4's
+  red-400, about FF6467, which is what these apps compile; the v3 hex F87171
+  gives 4.03 and 2.77 and fails the same way. No STATIC red clears AA
+  on BOTH themes — theme_resolver.rb carries the measured table and derives
+  --color-danger-ink precisely to be the text red. --color-danger is the brand
+  FILL and is free to be vivid; it is not this. Guarded, executably, by
+  test/views/resend_footer_error_contrast_test.rb.
+
+  SPINNER, tuned rather than re-named. This is the engine's canonical .spinner
+  primitive (engine-motion.css), tuned through its OWN documented custom
+  properties to the currentColor ring turf-monster paints with its host-only
+  .cta-spinner — so the block looks unchanged once turf renders it, and the
+  engine names no class it cannot define. Read the mapping carefully, because
+  it looks backwards: --spinner-track colours the WHOLE ring and
+  --spinner-color colours only the leading segment. A currentColor ring with a
+  transparent gap is therefore track currentColor plus color transparent, NOT
+  the reverse, which would draw a lone quarter-arc instead.
 %>
 <%
   # IDENTIFIER position ($store.<name>) — VALIDATED, never escaped: Studio::JsIdentifier.
@@ -19,9 +42,10 @@
 <button @click="resendMagicLink()" :disabled="props.submitting === 'magic-link' || (props.resendCooldown || 0) > 0"
         class="block mx-auto text-sm text-primary hover:text-primary-300 underline underline-offset-2 disabled:opacity-50 disabled:no-underline">
   <span class="inline-flex items-center justify-center gap-1.5">
-    <span x-show="props.submitting === 'magic-link'" class="spinner" aria-hidden="true"></span>
+    <span x-show="props.submitting === 'magic-link'" class="spinner" aria-hidden="true"
+          style="--spinner-track: currentColor; --spinner-color: transparent; opacity: 0.85"></span>
     <span x-text="props.submitting === 'magic-link' ? 'Resending…' : ((props.resendCooldown || 0) > 0 ? ('Resend available in ' + props.resendCooldown + 's') : 'Resend link')"></span>
   </span>
 </button>
-<p role="alert" x-show="props.resendError" x-cloak class="text-xs text-red-400 mt-3 text-center" x-text="props.resendError"></p>
+<p role="alert" x-show="props.resendError" x-cloak class="text-xs text-danger-ink mt-3 text-center" x-text="props.resendError"></p>
 <button @click="$store.<%= modal_store %>.close()" class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">Close</button>

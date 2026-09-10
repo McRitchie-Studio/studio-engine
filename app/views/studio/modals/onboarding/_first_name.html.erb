@@ -377,7 +377,7 @@
     </template>
     <button type="submit" :disabled="submitting"
             class="btn btn-primary btn-lg w-full gap-2 disabled:cursor-wait">
-      <span x-show="submitting" class="cta-spinner" aria-hidden="true"></span>
+      <span x-show="submitting" class="spinner" aria-hidden="true" style="--spinner-track: currentColor; --spinner-color: transparent; opacity: 0.85"></span>
       <span x-text="submitting ? 'Saving…' : 'Save and continue'"></span>
     </button>
   </form>
