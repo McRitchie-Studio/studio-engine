@@ -82,7 +82,7 @@ class OnboardingFirstNameTest < ActiveSupport::TestCase
 
   test "the x-data attribute contains no double quotes" do
     # A double quote inside the double-quoted x-data closes it early and the
-    # component mounts as a SILENT no-op — the markup still renders, so every
+    # component mounts DEAD — the markup still renders, so every
     # string assertion below would still pass while the modal is dead in a
     # browser. This exact bug has bitten twice in turf (PR #30, then the wallet
     # modal), which is why the port carries the guard with it.
@@ -310,7 +310,7 @@ class OnboardingFirstNameTest < ActiveSupport::TestCase
     # empty_error is the first HOST-SUPPLIED PROSE to land inside the x-data, and
     # prose has apostrophes. It is interpolated into a JS SINGLE-quoted literal, so
     # a bare ' closes that literal, the whole expression is a SyntaxError, and
-    # Alpine mounts the component as a SILENT NO-OP that still renders markup —
+    # Alpine mounts the component DEAD while it still renders markup —
     # every string assertion above would stay green over a dead card.
     #
     # Read the DECODED attribute: that is the source text the browser hands Alpine.
@@ -517,7 +517,7 @@ class OnboardingFirstNameTest < ActiveSupport::TestCase
   #   STRING position — submit_path, skip_path, done_event — each sits inside a JS
   #     SINGLE-quoted literal, exactly as empty_error does. A bare ' closes the
   #     literal, the whole expression becomes a SyntaxError, and Alpine mounts a
-  #     silent no-op that still renders every element. Fix: escape_javascript, in
+  #     dead component that still renders every element. Fix: escape_javascript, in
   #     the interpolated form, because escape_javascript(SafeBuffer) is html_safe?
   #     and would skip ERB's own attribute escaping on the way out.
   #
@@ -680,7 +680,7 @@ class OnboardingFirstNameTest < ActiveSupport::TestCase
     # escape_javascript(SafeBuffer) answers TRUE to html_safe?, so ERB SKIPS its own
     # attribute-escaping half and the \" that escape_javascript produced arrives in
     # the markup as a RAW " — which closes the double-quoted x-data and mounts the
-    # silent no-op. escape_javascript("#{value}") is not html_safe, because the
+    # dead card. escape_javascript("#{value}") is not html_safe, because the
     # interpolation strips the marking, so BOTH escapers run.
     #
     # Every other test in this section passes either way: a plain String local gets

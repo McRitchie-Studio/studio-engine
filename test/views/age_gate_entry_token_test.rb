@@ -323,7 +323,7 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
     x_data = html[/x-data="(\{.*?\})"/m, 1]
     assert x_data.present?, "the x-data attribute did not survive rendering intact"
     refute_includes x_data, %("),
-      "an interpolated double quote closes x-data early and mounts a silent no-op"
+      "an interpolated double quote closes x-data early and mounts a dead card"
   end
 
   test "the style guide walks the handoff, not just the two cards" do

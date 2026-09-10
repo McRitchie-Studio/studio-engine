@@ -507,9 +507,10 @@
 
   <% if @uploads_available %>
     <%# Cropper + the page-scoped modal host, exactly as the index mounts them:
-        scoped_host rather than modals/host, because mcritchie-studio and
-        turf-monster both ship app copies of modals/host that shadow the engine's
-        in this non-isolated engine.
+        scoped_host rather than modals/host, because this page mounts its modals
+        on its OWN store, and because scoped_host's path has never been forked
+        (an app copy of modals/host would shadow the engine's in this
+        non-isolated engine; none ships one today).
 
         Optional chaining on current() is load-bearing: the outer template
         unmounts one tick AFTER the stack empties, so a bare .id throws on every

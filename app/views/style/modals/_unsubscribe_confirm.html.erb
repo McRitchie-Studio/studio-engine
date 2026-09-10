@@ -23,7 +23,8 @@
 
   Single root: the outer <div> is the host's required root, and everything inside
   the double-quoted x-data is single-quoted — an inner double quote closes the
-  attribute and mounts the component as a silent no-op.
+  attribute and mounts the component dead, with an Alpine Expression Error in
+  the browser console as the only signal.
 %>
 <div x-data="{
        saving: false,

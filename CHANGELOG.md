@@ -73,6 +73,25 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Docs
 
+- **The README stops describing a sign-in card the engine no longer ships.**
+  Its "credential slot" section still named `style/modals/_auth` — deleted with
+  the other mirrors in PR #319 — as the renderer of solana-studio's
+  `solana_studio/auth/_wallet_credential`, while `lib/studio.rb` already said the
+  engine ships no auth card. It now says so too, names turf-monster's
+  `app/views/modals/_auth.html.erb` as the authority both cite, and states that
+  the wallet slot currently has NO host: nothing renders it. Whether it should
+  have one is left as an open call. The store-name paragraph now reflects that
+  every store-taking partial validates through `Studio::JsIdentifier`, and
+  `Studio::JsLiteral.in_attribute` is described exactly (it runs
+  `escape_javascript`; ERB does the HTML half).
+- **"Silent no-op" is gone from every file that teaches the modal family.** A
+  quote or apostrophe that breaks an Alpine expression mounts a dead card, but the
+  vendored Alpine logs `Alpine Expression Error` for it. About a dozen comments —
+  shipped partials, specimens, the e2e lab, `JsLiteral` and `JsIdentifier` — said
+  otherwise; `_age_gate`'s also blamed `to_json`, which ERB entity-escapes. Four
+  files also claimed mcritchie-studio and turf-monster fork `studio/modals/_host`;
+  neither has since 2026-08-28. Pinned in `test/docs/modal_host_contract_docs_test.rb`.
+
 - **Thirty-five minor versions of shipped entries left `## Unreleased` and moved
   under the version that actually shipped them.** The block spanned 2,382 lines and every
   entry in it had already been published — `accepted` sat on the `v0.74.4` release
