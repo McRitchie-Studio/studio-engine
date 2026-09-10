@@ -148,8 +148,14 @@ class ModalHostContractDocsTest < Minitest::Test
   # moves with every specimen retirement, and a number in a test is a number
   # that goes stale. What matters is that shipped, non-deletable files state it.
   def test_the_single_root_rule_is_stated_in_shipped_files_not_only_specimens
+    # The vendored Alpine is EXCLUDED. Its own x-for warning ("x-for templates
+    # require a single root element") matches this pattern, and the x-for test
+    # above asserts that string is present, so leaving it in let the scan pass
+    # with every engine file stripped of the rule. It states Alpine's rule, not
+    # the host's.
     shipped = Dir[File.join(ROOT, "app/views/studio/**/*.erb"),
                   File.join(ROOT, "app/assets/javascripts/studio/*.js")]
+              .reject { |f| f == ALPINE }
               .select { |f| File.read(f).match?(/single[-\s]root/i) }
               .map    { |f| f.delete_prefix("#{ROOT}/") }
 
