@@ -12,8 +12,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   compiles to about `#FF6467`: 3.86:1 on the dark modal card and 2.89:1 on the
   light one, both under the 4.5:1 that 12px text needs. It is now
   `text-danger-ink`, the red `Studio::ThemeResolver` derives per theme to clear
-  4.5:1 on every surface: 4.89:1 dark and 6.49:1 light on the default modal
-  card, with the tint-aware ink change below. The resend spinner stays the engine's `.spinner`, tuned to
+  4.5:1 on every surface: 4.50:1 dark and 5.76:1 light on the default modal
+  card. The resend spinner stays the engine's `.spinner`, tuned to
   turf-monster's currentColor ring (`--spinner-track: currentColor;
   --spinner-color: transparent`), so a host that drops its fork sees no change.
   Guarded by `test/views/resend_footer_error_contrast_test.rb`.
@@ -37,7 +37,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
     fix reaches the success and warning badges in `studio/emails/show` and
     the flash panel in `studio/email_images/index`, whose classes sit in Ruby
     strings the guard's scanner cannot read; a raw-source check now covers
-    them.
+    them. The flash panel is now `bg-surface` with a role border, because
+    danger-ink on a danger tint measures 4.10 to 4.18:1, under AA.
   - **For consumers:** turf-monster can delete its `@utility backdrop-overlay`
     (no turf view uses it now) and its `@utility email-reject` plus keyframes.
     Until it does, turf's utilities-layer copy outranks the engine's rule, so
@@ -53,18 +54,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   and `border-danger/30` compile. It deliberately registers no bare
   `text-<role>`: every default role colour fails AA as text on the light
   surfaces (warning #FF7C47 2.04:1, success #4BAF50 2.22:1, danger #EF4444
-  3.01:1). `Studio::ColorScale.blend` composites a translucent fill over a
-  surface. Guarded by `test/lib/status_ink_contrast_test.rb`.
+  3.01:1). The warning and success inks are read inside their own
+  `bg-<role>/10` badge, so `ThemeResolver#status_ink` also counts that tint as
+  a surface; tuned to the bare surfaces alone, the warning ink measured 3.91:1
+  there. `--color-danger-ink` is unchanged. Danger text belongs on a theme
+  surface, never a danger tint, and the vocabulary guard now refuses that
+  combination in engine views. `Studio::ColorScale.blend` composites a
+  translucent fill over a surface. Guarded by
+  `test/lib/status_ink_contrast_test.rb`.
 
 ### Changed
 
-- **Every status ink now also clears AA inside its own 10% tint, so the danger
-  ink moved.** An ink searched against the bare surfaces measured 4.18:1 (danger,
-  dark) and 3.91:1 (warning, dark) on the `bg-<role>/10` badge it is read on.
-  `ThemeResolver#status_ink` now counts that tint as a surface. On the default
-  theme `--color-danger-ink` goes from `#F48484` to `#F58F8F` (dark) and from
-  `#BA3535` to `#AC3131` (light). Both inks gain contrast, and a role colour
-  that already passes keeps its exact hex.
 - **The vocabulary guard's Tailwind build reads only its probe.** Tailwind v4
   auto-detects sources from the working directory, which is this repo, so an
   empty probe compiled to 75 KB. `source(none)` now makes the probe the only

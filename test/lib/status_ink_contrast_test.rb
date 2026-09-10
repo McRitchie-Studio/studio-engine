@@ -4,7 +4,7 @@ require "test_helper"
 require_relative "../support/engine_tailwind_build"
 
 # [unit] Every status ink (danger, warning, success) must clear WCAG AA on every
-# surface AND on its own role's tint, in both themes.
+# surface in both themes, and the warning and success inks on their own tint too.
 #
 # THE DEFECT THIS PINS. Engine views wrote text-warning, text-danger and
 # text-success, and the shared preset registered none of them, so each compiled
@@ -12,26 +12,31 @@ require_relative "../support/engine_tailwind_build"
 # swapped one defect for another: measured on the default theme, the role
 # colours as light-surface text are warning #FF7C47 at 2.04:1, success #4BAF50
 # at 2.22:1 and danger #EF4444 at 3.01:1, all under AA's 4.5:1. So the text form
-# of each role is an INK, derived per theme by ThemeResolver#status_ink, the
-# contract danger-ink already set (test/lib/danger_ink_contrast_test.rb).
+# of each role is an INK derived per theme by ThemeResolver, the contract
+# danger-ink already set (test/lib/danger_ink_contrast_test.rb).
 #
-# THE TINT. These inks are mostly read INSIDE their own tint: the badge
-# `bg-warning/10 text-warning-ink border-warning/30` and the flash panel
-# `bg-danger/10 text-danger-ink`. An ink tuned to the bare surfaces alone
-# measured 3.91:1 (warning, dark) and 4.10:1 (danger, light) there. So the
-# search counts the 10% tint over each surface as a surface too.
+# THE TINT. The warning and success inks are read INSIDE their own tint, in the
+# badge `bg-warning/10 text-warning-ink border-warning/30`. An ink tuned to the
+# bare surfaces alone measured 3.91:1 (warning, dark) there, so their search
+# counts the 10% tint over each surface as a surface too. Danger text is kept
+# OFF its tint instead (ThemeResolver#status_ink says why), so danger-ink is
+# held to the surfaces here and engine_class_vocabulary_test.rb refuses the
+# combination in views.
 #
 # Like its danger sibling, this asserts the PROPERTY on the resolver's own
 # surfaces rather than pinning hexes, which would freeze one palette.
 class StatusInkContrastTest < ActiveSupport::TestCase
-  AA    = 4.5
-  ROLES = %w[danger warning success].freeze
+  AA     = 4.5
+  ROLES  = %w[danger warning success].freeze
+  TINTED = %w[warning success].freeze
 
   def resolver(colors = {}) = Studio::ThemeResolver.new(colors)
 
-  # Every background the ink can sit on in one mode: the surfaces, and the
-  # role's own 10% tint composited over each of them.
-  def backgrounds(role_colour, surfaces)
+  # Every background the ink can sit on in one mode: the surfaces, plus, for a
+  # tinted role, its own 10% tint composited over each of them.
+  def backgrounds(role, role_colour, surfaces)
+    return surfaces unless TINTED.include?(role)
+
     surfaces + surfaces.map { |bg| Studio::ColorScale.blend(role_colour, bg, Studio::ThemeResolver::STATUS_TINT) }
   end
 
@@ -47,7 +52,7 @@ class StatusInkContrastTest < ActiveSupport::TestCase
         ink = vars["--color-#{role}-ink"]
 
         assert ink, "#{mode} emits no --color-#{role}-ink"
-        backgrounds(vars["--color-#{role}"], surfaces).each do |bg|
+        backgrounds(role, vars["--color-#{role}"], surfaces).each do |bg|
           ratio = Studio::ColorScale.contrast_ratio(ink, bg)
 
           assert_operator ratio, :>=, AA, "#{palette.inspect} #{mode} #{role} ink #{ink} on #{bg} is #{ratio.round(2)}:1"
@@ -89,7 +94,7 @@ class StatusInkContrastTest < ActiveSupport::TestCase
     surfaces = res.send(:dark_surfaces, "#1A1535")
     bare = res.send(:contrast_ink, vars["--color-warning"], direction: :lighten, start: 0.0, target: AA,
                                                             against: surfaces)
-    worst = backgrounds(vars["--color-warning"], surfaces).map { |bg| Studio::ColorScale.contrast_ratio(bare, bg) }.min
+    worst = backgrounds("warning", vars["--color-warning"], surfaces).map { |bg| Studio::ColorScale.contrast_ratio(bare, bg) }.min
 
     assert_operator worst, :<, AA, "a bare-surface warning ink now clears its own tint; the tint term proves nothing"
   end
