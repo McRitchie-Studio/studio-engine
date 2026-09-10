@@ -229,7 +229,8 @@ class ModalHostContractDocsTest < Minitest::Test
   # and called it a "silent no-op". It is quiet on the SERVER, but the vendored
   # Alpine logs it (test_vendored_alpine_logs_an_expression_error_through_console_warn).
   #
-  # So the phrase is pinned out of every file that teaches the modal family.
+  # So the phrase is pinned out of the files CENSUS_GLOBS reads. It is NOT yet
+  # pinned out of e2e/, studio/emails or test/, where it still survives.
   # Rule 1 (a multi-root <template x-if>) really IS silent; say "drops every root
   # but the first" for that, so a true sentence cannot trip a pin written for a
   # false one.

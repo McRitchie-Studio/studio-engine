@@ -84,13 +84,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   every store-taking partial validates through `Studio::JsIdentifier`, and
   `Studio::JsLiteral.in_attribute` is described exactly (it runs
   `escape_javascript`; ERB does the HTML half).
-- **"Silent no-op" is gone from every file that teaches the modal family.** A
+- **"Silent no-op" is gone from the modal partials, specimens and escapers.** A
   quote or apostrophe that breaks an Alpine expression mounts a dead card, but the
   vendored Alpine logs `Alpine Expression Error` for it. About a dozen comments —
   shipped partials, specimens, the e2e lab, `JsLiteral` and `JsIdentifier` — said
   otherwise; `_age_gate`'s also blamed `to_json`, which ERB entity-escapes. Four
   files also claimed mcritchie-studio and turf-monster fork `studio/modals/_host`;
-  neither has since 2026-08-28. Pinned in `test/docs/modal_host_contract_docs_test.rb`.
+  neither has since 2026-08-28. Pinned in `test/docs/modal_host_contract_docs_test.rb`,
+  whose census reads `studio/modals`, `style/modals`, the dummy app, the two
+  modules and the README. The phrase still survives outside it, in the two e2e
+  specs, `studio/emails/show` and `test/integration/style_page_test.rb`.
 
 - **Thirty-five minor versions of shipped entries left `## Unreleased` and moved
   under the version that actually shipped them.** The block spanned 2,382 lines and every
