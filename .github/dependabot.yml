@@ -34,6 +34,42 @@
 #
 # open-pull-requests-limit is 3, not 10: one gem on a daily schedule should
 # never need more, and a number larger than the problem is how a queue starts.
+# ---------------------------------------------------------------------------
+# THE COOLDOWN EXEMPTION IS WHAT LETS THIS LANE FIRE AT ALL.
+#
+# GitHub applies a DEFAULT 3-DAY COOLDOWN to version updates even when
+# `cooldown` is never configured. solana-studio ships several times a day, so
+# every candidate version is permanently inside that window: Dependabot
+# discards them all, computes `latest` from what survives, and correctly
+# concludes there is nothing to do. Measured on run 34390789978
+# (2026-09-09T18:43Z), with the lock at 0.9.0 and 0.9.1 published 4h18m
+# earlier:
+#
+#   Checking if solana-studio 0.9.0 needs updating
+#   Filtered out 5 versions due to cooldown
+#   Latest version is 0.6.0
+#   No update needed for solana-studio 0.9.0
+#
+# All four runs since this config landed said the same thing with a different
+# count (2, 2, 4, 5 filtered). The lane was 100% inert, and silently so.
+#
+# `exclude` opts a dependency out of the cooldown. Do NOT reach for
+# `default-days: 0` instead: GitHub documents "The number of cooldown days must
+# be between 1 and 90", so 0 is out of range.
+#
+# A MALFORMED config is not the silent case. GitHub's Dependabot app posts a
+# "Dependabot config file validation" check on every PR that touches this file;
+# it ran on the PR that added this block and said "All changes look good".
+# What IS silent is a config that is VALID and yet semantically inert — the
+# state this whole block exists to fix. It passes that check, every run
+# concludes `success`, and no PR ever opens. Guarded by
+# test/lib/lock_bump_mergeable_test.rb.
+#
+# WHAT THIS DOES NOT BUY. Dependabot's fastest interval is DAILY. The windows
+# this is meant to close were measured at 41 minutes (0.8.0) and 31 minutes
+# (0.9.0), and a human closed both. Even with the cooldown gone this arrives up
+# to 24h late. It is a BACKSTOP, not the mechanism.
+# ---------------------------------------------------------------------------
 version: 2
 updates:
 - package-ecosystem: bundler
@@ -44,3 +80,6 @@ updates:
   open-pull-requests-limit: 3
   allow:
   - dependency-name: solana-studio
+  cooldown:
+    exclude:
+    - solana-studio
