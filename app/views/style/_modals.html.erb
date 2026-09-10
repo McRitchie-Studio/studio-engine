@@ -162,7 +162,7 @@
       modal (Enter/Space work too). The header <strong>Copy</strong> yields an
       agent-ready reference you can paste into a chat; option <strong>toggles</strong>
       configure the modal before you open it; and the card that matches the open
-      modal + step <strong>glows</strong>, following the step machine as it advances.
+      modal <strong>glows</strong>.
     </p>
   </div>
 
@@ -1040,16 +1040,7 @@
         <% end %>
         The cards run in the order a player meets them &mdash; <strong>connect a
         wallet, prove it, spend from it</strong>: Connect wallet &rarr; the two
-        Sign Wallet states &rarr; Processing &rarr; success or error &rarr;
-        top-up &rarr; Entry confirmed. Inside that, <strong>Connect Wallet &rarr;
-        Processing on-chain transaction &rarr; On-chain success</strong> is a
-        <strong>walked flow</strong> and the live card <strong>glows</strong>,
-        following it as it advances (open Connect Wallet and pick a wallet to watch
-        it walk).
-        The <strong>Processing</strong> card is a load modal: its
-        <strong>success/error toggle</strong> chooses whether it resolves to success
-        or the error state, after the <strong>minimum-visible duration</strong>
-        (<code class="font-mono text-2xs">studio/modals/_load_convention</code>). The
+        Sign Wallet states &rarr; Entry confirmed. The
         Connect-wallet picker ships its <strong>Phantom / Solflare / Backpack brand
         marks inline from the engine</strong>
         (<code class="font-mono text-2xs">studio/modals/blocks/_wallet_brand_sprite</code>),
@@ -1255,9 +1246,7 @@
         </p>
         <p>
           Both create the <strong>same on-chain Entry PDA</strong> and resolve to the
-          <strong>same “Entry Confirmed” card</strong>. The walk below demos the web2
-          path end-to-end; web3 skips the mint and joins at
-          <strong>enter&nbsp;&rarr;&nbsp;entered</strong>.
+          <strong>same “Entry Confirmed” card</strong>.
         </p>
       </div>
     </div>
