@@ -170,13 +170,17 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
   # the control: they prove the fix below gated the gem-backed cards
   # SPECIFICALLY, and did not simply turn the web3 section inert.
   #
-  # DOWN TO ONE CARD as of 2026-09-08, and that is worth stating rather than
-  # quietly editing: "Setup Wallet" was the other member until its specimen was
-  # retired (it mirrored a card turf owns, and turf now cards the real one in its
-  # own host section). A one-member control still discriminates — an inert
-  # section would fail it — but it no longer has a second card to corroborate,
-  # so a future engine-owned web3 specimen belongs in this list.
-  ENGINE_OWNED_CARDS = ["Processing on-chain tx"].freeze
+  # STILL ONE CARD, BUT A DIFFERENT ONE — and the substitution is the point.
+  # "Setup Wallet" left on 2026-09-08 and "Processing on-chain tx" on 2026-09-09,
+  # both for mirroring cards turf owns and now cards against its real partials.
+  # The replacement is "Entry confirmed", which renders
+  # studio/modals/blocks/_entry_confirmed: a block THIS ENGINE SHIPS, so unlike
+  # its two predecessors it cannot be retired by a decision made in another repo.
+  #
+  # A one-member control still discriminates — an inert section fails it — but it
+  # has no second card to corroborate, so a future engine-owned web3 specimen
+  # belongs in this list.
+  ENGINE_OWNED_CARDS = ["Entry confirmed"].freeze
 
   def test_the_gem_backed_specimens_are_not_triggers_in_a_base_app
     # THE DEFECT THIS PREVENTS. web3_gem gated the REGISTRATION and nothing else,
@@ -273,189 +277,62 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
     end
   end
 
-  # --- [component] the AUTH modal's Solana button — the OTHER door --------
-
-  # Everything below is the same defect as the four tests above, reached through
-  # a different partial. style/modals/_auth's Solana button does one thing:
-  # swap('wallet-connect') — the id whose registration style/_modals gates on
-  # web3_gem. Gating a registration and not its trigger is what produced the
-  # empty specimen cards; the auth button was the remaining instance.
+  # --- RETIRED 2026-09-09: the AUTH modal's Solana button ------------------
   #
-  # WHY features WAS NEVER THE GATE HERE. The button's Alpine gate,
-  # methodOn('wallet'), reads props.methods.wallet BEFORE it consults any
-  # server default — and that value is the Sign in card's own checkbox. So the
-  # button was one tick away in EVERY base-app configuration, including under
-  # the stock auth_methods (%i[magic_link google]), which declares no :wallet at
-  # all. A gate the operator can flip is not a gate, which is why the fix is in
-  # Ruby and the tests below run the auth_methods axis as well as the features
-  # one. lib/studio.rb states the same split where it declines to gate the
-  # /auth/solana routes on :web3: auth_methods is CREDENTIALS, features is
-  # PRODUCT SURFACES, and neither one answers whether a template resolves.
+  # SEVEN TESTS LIVED HERE and all seven read style/modals/_auth, a MIRROR of
+  # turf-monster's sign-in card. The engine ships no auth card — a sign-in modal
+  # is a product decision (which methods, whose terms, whose legal copy) — so
+  # turf owns one and cards it against its real partial on its own host section.
+  # The mirror is gone and these went with it.
+  #
+  # WHAT THEY WERE GUARDING, AND WHERE IT STILL LIVES. Their subject was one
+  # rule: A TRIGGER MUST CARRY AT LEAST THE GATE ITS TARGET'S REGISTRATION
+  # CARRIES, or it opens an empty panel. The auth modal's Solana button was the
+  # second door onto that defect (it swapped to 'wallet-connect', whose
+  # registration is gated on web3_gem); the three gem-backed specimen cards were
+  # the first. THOSE THREE ARE STILL HERE, in
+  # #test_the_gem_backed_specimens_are_not_triggers_in_a_base_app and
+  # #test_an_app_that_bundles_the_gem_keeps_every_web3_trigger, which run the
+  # same two capability states against the same rule. The rule keeps two
+  # witnesses; it lost the auth-methods AXIS, which only the auth card had.
+  #
+  # The one assertion NOT tied to the mirror was kept and stands alone below:
+  # the engine must ship no Solana button markup of its own. It is a negative
+  # over the WHOLE guide, so it never needed the auth card to be meaningful, and
+  # it is the one that would catch a re-added engine copy of the gem's button —
+  # the failure that let the wallet picker reach three drifting copies.
+  #
+  # Two more things they asserted, recorded because nothing else says them:
+  #   * solana-studio 0.5.2 really shipped auth/_wallet_credential WITHOUT
+  #     modals/_wallet_connect. A layer can ship the credential and no picker, so
+  #     a gate that only asks "does the credential exist?" says yes and draws a
+  #     button that swaps to an unregistered id. web3_gem is the term that
+  #     refuses it. Any future consumer-side auth card needs both terms.
+  #     (turf-monster's style_host_section_test carries this forward for the card
+  #     that now renders.)
+  #   * methodOn('wallet') reads props.methods.wallet — the specimen's own
+  #     checkbox — BEFORE any server default, so a checkbox is not a gate. The
+  #     fix has to be in Ruby. lib/studio.rb states the same split where it
+  #     declines to gate the /auth/solana routes on :web3.
 
-  def test_the_auth_modal_carries_no_wallet_trigger_in_a_base_app
-    [[], %i[web3]].each do |features|
-      [%i[magic_link google wallet], %i[magic_link google]].each do |methods|
-        with_auth(features, methods) do
-          where = "features=#{features.inspect}, auth_methods=#{methods.inspect}"
-          auth = modal_registration(render_index(base_app_view), "auth")
-
-          refute_nil auth, "the auth modal must stay REGISTERED in a base app (#{where}) — " \
-                           "it is engine-owned, and only its wallet button needed the gem"
-          assert_empty wallet_cta_call_sites(auth),
-                       "the auth modal must open no wallet picker where the gem is absent " \
-                       "(#{where}) — nothing registers wallet-connect, so the swap opens an " \
-                       "empty panel. The button is CONTRIBUTED now, so a base app resolves no " \
-                       "partial at solana_studio/auth/wallet_credential and draws nothing"
-          # The control, in the same window: gating the wallet button must not
-          # inert the modal it lives in. Magic link is the credential a base app
-          # actually ships, and it has to survive.
-          assert_includes auth, "submitMagicLink()",
-                          "the auth modal must keep its other credentials (#{where})"
-        end
-      end
-    end
-  end
-
-  def test_an_app_that_bundles_the_gem_keeps_the_wallet_trigger
-    # The over-gate control. A fix that hid the button everywhere would pass
-    # every base-app assertion above and silently delete Solana sign-in from
-    # turf-monster's style guide. In BOTH capability states, because with :web3
-    # off the button is still RENDERED — methodOn('wallet') decides visibility at
-    # runtime, and that is the layer the Ruby gate must not usurp.
-    [[], %i[web3]].each do |features|
-      with_auth(features, %i[magic_link google wallet]) do
-        auth = modal_registration(render_index(full_view), "auth")
-
-        refute_empty wallet_cta_call_sites(auth),
-                     "the wallet button must stay wired where the gem resolves " \
-                     "(features=#{features.inspect}) — it is the gem's contributed partial now, " \
-                     "but it must still reach the picker"
-        gate = wallet_cta_visibility_gate(auth)
-        refute_nil gate,
-                   "the wallet CTA must carry an x-show AT ALL — a server-rendered " \
-                   "conditional in its place is the exact substitution this guards " \
-                   "(features=#{features.inspect})"
-        assert_includes gate, "methodOn('wallet')",
-                        "the Ruby gate must not replace the Alpine one — methodOn still owns " \
-                        "whether a gem app SHOWS the button (features=#{features.inspect})"
-      end
-    end
-  end
-
-  def test_a_layer_with_the_credential_but_no_picker_draws_no_cta
-    # NOT a contrivance: solana-studio 0.5.2 shipped exactly this pair —
-    # auth/_wallet_credential and no modals/_wallet_connect. The credential
-    # resolves, so the existence term alone answers yes, and the button it would
-    # draw swaps to an id nothing registered. That is the empty panel again, one
-    # layer up from where it was fixed. web3_gem is the term that refuses it,
-    # which is the whole reason it is still in the gate after the move.
+  def test_the_engine_ships_no_solana_button_of_its_own
+    # PINNED BY PROVENANCE, which is why this outlived the card it was written
+    # against. A brand mark is namespaced by whoever owns it: the gem's gradient
+    # id is solana-studio-auth-grad, and the copy THIS ENGINE carried until
+    # adopt-wallet-credential-slot was auth-solana-grad. Asserting the engine's
+    # id appears nowhere on the guide is what makes a re-added engine copy fail
+    # here rather than quietly becoming a second source of the same button.
+    #
+    # It reads the FULL view deliberately: with the gem resolved, the gem's own
+    # button IS on the page, so a naive "no Solana gradient anywhere" would fail
+    # on correct output. The two ids are what tell the gem's copy from a fork.
     with_auth(%i[web3], %i[magic_link google wallet]) do
-      auth = render_auth([ENGINE_VIEWS, GEM_VIEWS], web3_gem: false)
+      html = render_index(full_view)
 
-      assert_empty wallet_cta_call_sites(auth),
-                   "a layer shipping the credential without a registered picker must draw no " \
-                   "wallet CTA — the swap would open an empty panel"
-      # The control, in the same render: refusing the wallet CTA must not inert
-      # the modal around it. Magic link is what a base app actually ships.
-      assert_includes auth, "submitMagicLink()",
-                      "refusing the wallet CTA must not inert the modal it lives in"
-    end
-  end
-
-  def test_the_wallet_cta_is_the_gems_partial_and_not_an_engine_fork
-    # THE MOVE, pinned by provenance. A brand mark is namespaced by whoever owns
-    # it: the gem's gradient id is solana-studio-auth-grad, and the copy this
-    # engine carried until adopt-wallet-credential-slot was auth-solana-grad.
-    # Asserting the gem's id appears AND the engine's is gone anywhere on the
-    # guide is what makes a re-added engine copy fail here, instead of quietly
-    # becoming a second source of the same button — which is how the wallet
-    # picker reached three drifting copies before it was promoted.
-    with_auth(%i[web3], %i[magic_link google wallet]) do
-      auth = render_auth([ENGINE_VIEWS, GEM_VIEWS], web3_gem: true)
-
-      assert_includes auth, "solana-studio-auth-grad",
-                      "the wallet CTA must be the gem's contributed partial"
-      refute_includes render_index(full_view), "auth-solana-grad",
-                      "this engine must ship no Solana button markup of its own"
-    end
-  end
-
-  def test_a_registered_picker_with_no_credential_renders_nothing_rather_than_raising
-    # The OTHER direction of the same gate, and the one that fails LOUDLY if the
-    # existence term is dropped. A host whose picker is registered but whose
-    # layer ships no credential partial must get NO BUTTON, not
-    # ActionView::MissingTemplate in front of someone trying to sign in.
-    # Measured: without the exists? term this render raises instead of returning.
-    with_auth(%i[web3], %i[magic_link google wallet]) do
-      auth = nil
-
-      # Mutating the exists? term out of the gate turns this line into
-      # ActionView::MissingTemplate, which is the 500 the term exists to prevent.
-      assert_nothing_raised do
-        auth = render_auth([ENGINE_VIEWS], web3_gem: true)
-      end
-      assert_empty wallet_cta_call_sites(auth),
-                   "no credential layer means no wallet CTA"
-      assert_includes auth, "submitMagicLink()",
-                      "the rest of the modal must survive a missing credential layer"
-    end
-  end
-
-  def test_the_sign_in_card_offers_no_wallet_toggle_in_a_base_app
-    # The door itself. This checkbox writes props.methods.wallet, which
-    # methodOn reads in preference to every server default — so while it was
-    # offered, a base app was one tick from the empty panel no matter how the
-    # app was configured. The three other toggles are the control: the wallet
-    # entry had to go without taking the toggle row with it.
-    [[], %i[web3]].each do |features|
-      with_auth(features, %i[magic_link google wallet]) do
-        where = "features=#{features.inspect}"
-        base = specimen_card(render_index(base_app_view), "Sign in")
-        gem_app = specimen_card(render_index(full_view), "Sign in")
-
-        refute_nil base, "the Sign in specimen must render in a base app (#{where})"
-        refute_includes base, ">Solana Wallet</span>",
-                        "a base app must not offer a Solana Wallet toggle (#{where}) — ticking " \
-                        "it overrides the server default and summons a button that opens nothing"
-        ["Magic Link", "Google", "Terms"].each do |kept|
-          assert_includes base, ">#{kept}</span>",
-                          "gating the wallet toggle must leave the #{kept} toggle alone (#{where})"
-        end
-        assert_includes gem_app, ">Solana Wallet</span>",
-                        "an app that bundles the gem keeps the toggle (#{where})"
-      end
-    end
-  end
-
-  def test_the_sign_in_card_seeds_wallet_off_in_a_base_app
-    # The seeded value, which outlives the toggle's removal: open_expr still
-    # passes methods: { wallet: opts.wallet }, so opts.wallet must EXIST and be
-    # false. Dropping the key instead would make it undefined, and methodOn
-    # falls back to _methodDefaults.wallet for a non-boolean — which is true in
-    # exactly the configuration this test's second row runs.
-    with_auth(%i[web3], %i[magic_link google wallet]) do
-      base = specimen_state(render_index(base_app_view), "Sign in")
-      gem_app = specimen_state(render_index(full_view), "Sign in")
-
-      refute_nil base, "the Sign in specimen must seed its toggle state in a base app"
-      assert_includes base, "wallet: false",
-                      "a base app must seed the wallet method OFF even with :web3 on — this is " \
-                      "the state the sibling specimen-card bug proved is the dangerous one"
-      assert_includes gem_app, "wallet: true",
-                      "an app with the gem and :web3 on still defaults the toggle ON"
-    end
-  end
-
-  def test_a_base_app_is_told_why_solana_sign_in_is_missing
-    # The operator-facing half, as for the specimen cards: a method that quietly
-    # vanishes from a reference page is indistinguishable from one the design
-    # system never had. Deliberately NOT the same sentence as the web3 section's
-    # notice — sharing a string would let either test pass on the other's markup.
-    with_auth(%i[web3], %i[magic_link google wallet]) do
-      assert_includes render_index(base_app_view), "Solana sign-in needs solana-studio",
-                      "a base app's auth section must say why the Solana button is absent"
-      refute_includes render_index(full_view), "Solana sign-in needs solana-studio",
-                      "an app that bundles the gem must not be told it lacks it"
+      refute_includes html, "auth-solana-grad",
+                      "this engine must ship no Solana button markup of its own — the gem " \
+                      "contributes that partial, and a second copy here is how the wallet " \
+                      "picker reached three drifting versions"
     end
   end
 

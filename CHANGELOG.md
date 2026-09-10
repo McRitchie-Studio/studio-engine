@@ -1,8 +1,41 @@
 # Changelog
 
-The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package and pin the floor each one needs — the pins differ on purpose, and every consumer records why beside its own. Bumping the gem version and updating consumer lockfiles is a release; `bin/release prepare` allocates the version and does both (see [`docs/RELEASE.md`](./docs/RELEASE.md)).
+The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package and pin the floor each one needs — the pins differ on purpose, and every consumer records why beside its own. Bumping the gem version and updating consumer lockfiles is a release; `bin/release prepare` allocates the version and does both (see [`docs/RELEASE.md`](./docs/RELEASE.md)). `prepare` does NOT roll this file: renaming `## Unreleased` to the allocated version and opening a fresh empty one is a manual conductor step (see [`docs/RELEASE.md`](./docs/RELEASE.md), *Rolling `Unreleased` into a version*), guarded by `test/docs/changelog_structure_test.rb`.
 
 ## Unreleased
+
+### Docs
+
+- **Thirty-five minor versions of shipped entries left `## Unreleased` and moved
+  under the version that actually shipped them.** The block spanned 2,382 lines and every
+  entry in it had already been published — `accepted` sat on the `v0.74.4` release
+  commit when they were rolled — so the heading said "pending" about the whole history of the gem, and
+  each reviewer who opened the file had to settle per entry which half it was in.
+  85 entries plus three unbulleted prose blocks now sit under 46 version headings
+  from `0.40.0` to `0.74.3`; `## Unreleased` holds only this note.
+
+  **Bookkeeping only — no entry was reworded, added or dropped.** Attribution came
+  from git, never from position in the file: `git blame -w -M` on each entry, the
+  pickaxe (`git log -S`) for its introducing commit, and a scan of `CHANGELOG.md`
+  at all 81 release tags from `v0.39.0` up for the earliest tag whose file already
+  contained the entry's text. All three agreed on 81 of 85; each of the four splits
+  was a false `-M` match on boilerplate — a bare fenced-Ruby opener, a
+  `bin/rails … install:migrations` line — and resolved to the majority of five
+  per-entry probes. Verified as a permutation: 1,991 content lines before, the
+  same 1,991 after, none added, none lost.
+
+  **The cause, and the guard.** `bin/release prepare` commits `version.rb` with its
+  lockfile, publishes and tags — it never touches this file, and nothing failed
+  when the roll was skipped. `test/docs/changelog_structure_test.rb` now asserts the
+  file's SHAPE, never its prose: one leading `## Unreleased`, strictly decreasing
+  versions, no duplicate version, no orphan `###`, a parse floor so a rotted regex
+  fails loudly rather than passing vacuously, and — the one that would have caught
+  this in week one — `Studio::VERSION` no more than two minor versions ahead of the
+  newest heading. Against the pre-change file it reports "35 minor versions of
+  entries are still filed under `## Unreleased`". Automating the roll inside
+  `bin/release prepare` (mcritchie-studio) is the real fix and is not done.
+
+## 0.74.3 — 2026-09-08
 
 ### Fixed
 
@@ -51,6 +84,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   for the day the pattern widens. `modals/onboarding/_first_name` carried this
   regex inline as the worked example and now calls the shared one — same pattern,
   same error, same message.
+
+## 0.74.2 — 2026-09-08
+
+### Fixed
 
 - **The email banner assembled two attributes INCLUDING THEIR OWN QUOTES in Ruby,
   so ERB escaping never ran on them.** `_layered_banner.html.erb` wrote
@@ -129,6 +166,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   repaired form "in three places" — the sweep in this same unreleased block made it
   FOUR, so a false completeness claim was shipping one sentence above the entry
   announcing a fix for exactly that.
+
+## 0.74.1 — 2026-09-08
+
+### Fixed
 
 - **A quote in a host local can no longer close an Alpine attribute and turn the
   rest of the element into markup.** Four partials built an attribute — its OWN
@@ -242,6 +283,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   already clean. Both claims are corrected, and the comment now points at the test
   rather than restating that the sweep is done.
 
+## 0.74.0 — 2026-09-08
+
+### Fixed
+
 - **The app census in these comments was short by the most important app.** Ten
   sites said this engine is mounted by SIX apps and that THREE of them bundle no
   `solana-studio`. Measured 2026-09-07 by the criterion that reproduces it — a
@@ -284,6 +329,164 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   times two environments, not an app count.
 
   Comment and prose only. No behaviour changes.
+
+- **A host's apostrophe no longer kills the card it was passed to — now across the
+  blocks, not just the first-name step.** The same defect
+  `onboarding/_first_name` fixed one release ago turns out to be an engine-wide
+  idiom: a host-supplied local interpolated into a JS string literal inside a
+  JS-evaluating attribute. Repaired at eleven more splices.
+
+  **WHY IT IS WORTH A CHANGELOG LINE WHEN NOTHING VISIBLE CHANGES.** The failure
+  mode is silent. A bare apostrophe closes the JS literal, the whole expression
+  becomes a SyntaxError, and Alpine mounts the component as a NO-OP that still
+  renders every element — a card that looks perfect and whose buttons do nothing.
+  There is no error on screen, nothing in the server log, and no markup assertion
+  that can see it. Every value in every consumer resolves to a source literal or a
+  frozen constant today, so this is latent cover rather than a live fix; it is
+  worth doing because the next local to carry prose will look like an ordinary
+  change to whoever writes it.
+
+  **WHAT MOVED.** `blocks/_success_card` (`cta_event` at both CTA branches,
+  `secondary_event`), `blocks/_error_card` (`cta_event`, `secondary_event`),
+  `blocks/_entry_confirmed` and `blocks/_solana_tx_link` (`cluster_param`),
+  `modals/_crop_photo` (`store`), `studio/emails/show` (the two upload filenames
+  and the success sentence), and `profiles/_birthday_fields` (the date value).
+  No default or in-repo value contains a character either escaper touches, so
+  every shipped card renders byte-for-byte what it did.
+
+  **THE MECHANISM NOW HAS ONE HOME AND ONE GUARD.** `Studio::JsLiteral.in_attribute`
+  replaces the four inline copies in `_first_name`. TWO escapers have to run — one
+  for the JS literal, one for the HTML attribute — and the second only runs on a
+  value ERB still believes is unsafe, which is why the value is interpolated before
+  it is escaped. That subtlety was re-derived at every call site and had no test
+  anywhere; deleting it used to leave the suite green.
+
+  **NOT A FIX FOR IDENTIFIER POSITION, deliberately.** A local spliced in as a bare
+  NAME — `$store.<name>.close()` — must be VALIDATED, never escaped, because
+  `escape_javascript` also escapes `$` and mangles a legal store name. That fleet
+  (about 36 splices across 19 partials) and a third class found alongside it —
+  Ruby-ASSEMBLED JS emitted into an attribute, some of it already `html_safe` — are
+  scoped OUT of this change and carry their own tickets. The SHAPE of the splice
+  decides the repair, never the name of the local.
+
+- **`Studio::S3` no longer mistakes a Rails NAMESPACE for a Rails application.**
+  `environment` guarded on `defined?(Rails)` and then called `Rails.env`.
+  rails-html-sanitizer — a transitive dependency of `action_view`, which arrives
+  long before any application does — ships a namespace-only `module Rails` with no
+  singleton methods, so that guard reads true and the next call raises
+  `NoMethodError: undefined method 'env' for module Rails`. It now asks
+  `Rails.respond_to?(:env)`, which is the form `lib/studio.rb` now uses in FOUR
+  places: the three it already carried (lines 701, 707 and 742) plus the route
+  guard at line 859. **This entry originally called it "the straggler"; that was
+  wrong** — three more sites carried the bare form, line 859 among them, and all
+  three are swept in *The Rails guard sweep really is finished now* above, in this
+  same unreleased block. No shipped app can reach it — every host boots a
+  real application — but the engine's own pure-Ruby unit lane can, and it did:
+  adding one `require` for a file that needs `action_view` turned an untouched
+  `email_catalog_test` red with two errors about email uploads.
+
+## 0.72.3 — 2026-09-07
+
+### Changed
+
+- **The pinned stack composes itself, and publishes in the frame the change
+  happened.** `data-pin` layers now also publish `--pin-stack-bottom` (the bottom
+  of the whole stack) and `--pin-<name>-top` (the bottom of everything above that
+  layer), and the publisher writes them from inside its ResizeObserver callback
+  rather than deferring to `requestAnimationFrame`.
+
+  **THE DEFECT.** A frame runs `rAF -> style/layout -> ResizeObserver -> paint`,
+  so a write made in the frame callback lands at the top of the NEXT frame. Every
+  frame in which a pinned layer appeared or disappeared therefore painted with the
+  previous frame's number. Measured in isolation by toggling a layer's `display`
+  and sampling what the changing frame paints: rAF-deferred wrong on 8/8 changing
+  frames, synchronous wrong on 0/8. On mcritchie-studio's production
+  `/deployments` it showed as the board's swim-lane headers slamming 99px and back
+  on a page nobody was touching — parked at a fixed scroll offset with document
+  height, row position and nav height all constant, the header's `top` went
+  152 -> 53 -> 152 -> 53px in 240ms behind two Turbo broadcasts.
+
+  **AND CONSUMERS NO LONGER COMPOSE THE STACK.** `top: max(var(--pin-nav-bottom),
+  var(--pin-apps-bottom))` fails twice: it does not scale, because a fourth layer
+  means editing every consumer that ever wanted to sit under the stack; and it is
+  not sound, because a `max()` over two custom properties is only meaningful if
+  they were written in the same frame. `--pin-stack-bottom` is one value that
+  cannot disagree with itself. A layer that is ITSELF in the stack reads
+  `--pin-<name>-top` instead, which excludes its own edge — positioning off the
+  stack bottom would make it chase itself down the page. Stacking order is
+  document order, with `data-pin-order` overriding it for a layer whose DOM
+  position does not match where it sits on screen.
+
+  **THE REGISTRY IS DERIVED PER PUBLISH, never cached.** A Turbo Stream replaces a
+  pinned layer's node without a `turbo:load`, and a held reference then points at
+  the DETACHED predecessor, whose rect is all zeros — indistinguishable from a
+  layer that is legitimately hidden. Re-querying makes the stale reference
+  impossible rather than merely unlikely.
+
+  **THE COST, re-measured**, because the rule this reverses was itself justified by
+  a measurement (turf-monster, 6x CPU throttle, frames over 20ms 13/24 through the
+  collapse ramp vs 0/24 once the observer was coalesced). What was expensive there
+  was read-write thrash, not the observer: the publisher now takes one read pass
+  and one write pass per invocation, and in an RO callback layout is already clean,
+  so those reads force nothing. On the engine lab at the same 6x throttle, ~700
+  frames of ramp each way — `RO through rAF` median 8.3ms / p90 10.0ms / 0 frames
+  over 20ms; `RO synchronous` median 8.4-8.5ms / p90 11.0ms / 3-6 frames over 20ms;
+  ZERO frames over 32ms on either, so neither drops one.
+
+  **BACK-COMPAT.** `--nav-h`, `--nav-bottom` and `--pin-<name>-h` /
+  `--pin-<name>-bottom` publish exactly as before, from the same measurements, so
+  the 26 consumers across turf-monster, rolio and mcritchie-studio need no change
+  and no floor bump. A structural change (a Turbo patch, a fresh document, a layer
+  joining or leaving) now forces a full write, because the unchanged-write skip is
+  only safe while nothing else touches these properties — the lab caught
+  `--nav-h` staying empty through a re-scan on exactly the host-owned-header path
+  both live consumers use. The lane contract moves 131 -> 132
+  (`config/e2e_lane.yml`), re-derived with the lister.
+
+## 0.72.2 — 2026-09-07
+
+### Fixed
+
+- **The style guide's two "Sign Wallet" thumbnails no longer crown themselves
+  with a padlock the card stopped drawing, and the guide's lock no longer trails
+  the release that removed it.** solana-studio 0.6.1 replaced the step-up card's
+  padlock with the remembered wallet's own brand mark, falling back to a neutral
+  billfold where no brand is remembered. Both hand-drawn thumbnails in
+  `style/_modals` went on drawing the padlock, so the first thing a designer
+  reads advertised a glyph the design system had retired.
+
+  **THE THUMBNAILS WERE HALF OF IT.** The opened specimen renders the REAL
+  shared partial, but it does so through whatever `Gemfile.lock` resolves — so
+  it is only ever as current as the lock, and the lock sat on 0.6.0 while
+  turf-monster shipped 0.6.1. The guide's opened card was still drawing the
+  padlock too, which `bin/gem-drift-check` had already been failing on
+  (`engine 0.6.0 TRAILS turf-monster 0.6.1`). Correcting the sketches alone
+  would have put a brand mark on the thumbnail and a padlock in the card it
+  opens — moving the contradiction onto one screen rather than removing it. So
+  the lock had to move too, and it has: `accepted` carried the engine to
+  solana-studio 0.7.0 while this change sat in review, which is past the 0.6.1
+  that removed the padlock. This change no longer moves the lock itself — it
+  defers to the line `accepted` already holds — so the sketch and the card it
+  opens agree without it.
+
+  The sketches follow the card: a centered brand tile where a wallet is
+  remembered, the card's own billfold outline in an inset square where none is.
+  They stay SKETCHES rather than real brand marks for a mechanical reason worth
+  recording — every `se-wallet` symbol on the guide is defined inside a
+  `template x-if`, whose content is inert until Alpine clones it, so a `use`
+  placed outside one resolves to nothing and paints an empty box.
+
+  Guarded by `test/views/step_up_specimen_thumbnails_test.rb`, which slices each
+  thumbnail by a `data-test` hook before asserting. That slicing is the point:
+  the rendered guide already carried 17 `se-wallet-` hits from the picker and
+  the card's own CTA, so a page-wide assertion for the mark could not fail, and
+  a page-wide assertion against the padlock could not pass — the drag-board
+  specimen's prose legitimately contains one. The padlock is pinned in BOTH the
+  codepoint and the HTML-entity form. MEASURED: five mutants, five killed —
+  the padlock restored in either form, either header mark removed, and the lock
+  reverted to 0.6.0 each reddens the assertion that owns it.
+
+## 0.72.0 — 2026-09-07
 
 ### Added
 
@@ -344,6 +547,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   test, while forcing the typed mode on, un-guarding the refocus, and treating
   an empty pool as present each hit a placeholder test.
 
+## 0.71.0 — 2026-09-07
+
+### Added
+
 - **The living style guide grows a HOST SECTION seam.** `/admin/style` rendered
   four hard-coded engine sections (Theme, Modals, Tricks, Tasks) with no way for
   a consuming app to contribute one of its own. An app now defines
@@ -377,6 +584,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
   **The seam ships no host section itself.** The first consumer is
   turf-monster's own `style/host/_modals`, which lands as its own task.
+
+## 0.70.0 — 2026-09-06
+
+### Added
+
 - **A `required` mode on the shared first-name card.**
   `studio/modals/onboarding/_first_name` grows one local. `required: true`
   renders the card with BOTH skip affordances gone — the "Skip for now" button
@@ -414,21 +626,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   runtime — which is how the two cards already differ in copy, not just in
   affordances.
 
-- **Knowledge coverage view** — `/admin/knowledge/coverage` +
-  `Studio::KnowledgeExpectation`: the "what SHOULD exist" half of the
-  knowledge layer. Expectations carry an entity, folder, provenance
-  (`source_note`, e.g. "diligence tracker item 14"), and a cadence — `once`
-  (an LOI) or `monthly` (aging inventory), where each calendar month from
-  `start_on` is a slot and the view names missing months outright
-  (`2026-09 MISSING`). Documents fulfill expectations by an EXPLICIT
-  `expectation_id` set at triage (the show page grows a "fulfills expectation"
-  select; a fuzzy name-match would silently merge lookalikes, an id never
-  does), and superseded documents never fill a slot. Ships two reference
-  migrations (`create_studio_knowledge_expectations`,
-  `add_expectation_to_studio_knowledge_docs`); routes ride the existing
-  `Studio.draw_knowledge_routes` opt-in. Built for the Commercial Welding
-  65-item diligence tracker; app-agnostic like the rest of the layer.
-
 - **The style guide grows the two modal simulators that review ENGINE
   behaviour** — `#modals-motion-registry` ("Enter & leave animations") and
   `#modals-stack-mechanics` ("Stack behaviour") in `style/_modals`. Both are
@@ -464,188 +661,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   reintroduced, with the lab server restarted between runs. The lane contract
   moves 116 → 123 (`config/e2e_lane.yml`), re-derived with the lister.
 
-### Changed
-
-- **The pinned stack composes itself, and publishes in the frame the change
-  happened.** `data-pin` layers now also publish `--pin-stack-bottom` (the bottom
-  of the whole stack) and `--pin-<name>-top` (the bottom of everything above that
-  layer), and the publisher writes them from inside its ResizeObserver callback
-  rather than deferring to `requestAnimationFrame`.
-
-  **THE DEFECT.** A frame runs `rAF -> style/layout -> ResizeObserver -> paint`,
-  so a write made in the frame callback lands at the top of the NEXT frame. Every
-  frame in which a pinned layer appeared or disappeared therefore painted with the
-  previous frame's number. Measured in isolation by toggling a layer's `display`
-  and sampling what the changing frame paints: rAF-deferred wrong on 8/8 changing
-  frames, synchronous wrong on 0/8. On mcritchie-studio's production
-  `/deployments` it showed as the board's swim-lane headers slamming 99px and back
-  on a page nobody was touching — parked at a fixed scroll offset with document
-  height, row position and nav height all constant, the header's `top` went
-  152 -> 53 -> 152 -> 53px in 240ms behind two Turbo broadcasts.
-
-  **AND CONSUMERS NO LONGER COMPOSE THE STACK.** `top: max(var(--pin-nav-bottom),
-  var(--pin-apps-bottom))` fails twice: it does not scale, because a fourth layer
-  means editing every consumer that ever wanted to sit under the stack; and it is
-  not sound, because a `max()` over two custom properties is only meaningful if
-  they were written in the same frame. `--pin-stack-bottom` is one value that
-  cannot disagree with itself. A layer that is ITSELF in the stack reads
-  `--pin-<name>-top` instead, which excludes its own edge — positioning off the
-  stack bottom would make it chase itself down the page. Stacking order is
-  document order, with `data-pin-order` overriding it for a layer whose DOM
-  position does not match where it sits on screen.
-
-  **THE REGISTRY IS DERIVED PER PUBLISH, never cached.** A Turbo Stream replaces a
-  pinned layer's node without a `turbo:load`, and a held reference then points at
-  the DETACHED predecessor, whose rect is all zeros — indistinguishable from a
-  layer that is legitimately hidden. Re-querying makes the stale reference
-  impossible rather than merely unlikely.
-
-  **THE COST, re-measured**, because the rule this reverses was itself justified by
-  a measurement (turf-monster, 6x CPU throttle, frames over 20ms 13/24 through the
-  collapse ramp vs 0/24 once the observer was coalesced). What was expensive there
-  was read-write thrash, not the observer: the publisher now takes one read pass
-  and one write pass per invocation, and in an RO callback layout is already clean,
-  so those reads force nothing. On the engine lab at the same 6x throttle, ~700
-  frames of ramp each way — `RO through rAF` median 8.3ms / p90 10.0ms / 0 frames
-  over 20ms; `RO synchronous` median 8.4-8.5ms / p90 11.0ms / 3-6 frames over 20ms;
-  ZERO frames over 32ms on either, so neither drops one.
-
-  **BACK-COMPAT.** `--nav-h`, `--nav-bottom` and `--pin-<name>-h` /
-  `--pin-<name>-bottom` publish exactly as before, from the same measurements, so
-  the 26 consumers across turf-monster, rolio and mcritchie-studio need no change
-  and no floor bump. A structural change (a Turbo patch, a fresh document, a layer
-  joining or leaving) now forces a full write, because the unchanged-write skip is
-  only safe while nothing else touches these properties — the lab caught
-  `--nav-h` staying empty through a re-scan on exactly the host-owned-header path
-  both live consumers use. The lane contract moves 131 -> 132
-  (`config/e2e_lane.yml`), re-derived with the lister.
-
-
-- **`Gemfile.lock` resolves solana-studio 0.5.7, and a gate now keeps it there.** The lock had sat on **0.5.3 for four patch releases** while BOTH consumers shipped 0.5.7 (turf-monster `~> 0.5.3`, mcritchie-studio `~> 0.5`). Nothing was red and nothing could have been: engine CI installs with `bundler-cache: true`, so it resolves from the lock and never fresh — the drift does not self-correct and never surfaces as flakiness. It matters because `test/views/style_web3_specimens_test.rb` exists to prove "the style guide renders the REAL gem cards" and reads them off whatever the LOCK resolved; four versions behind, that guard certifies a card no consumer receives. It still passes — only its MEANING changes. MEASURED on this span, the gem's whole `app/` tree was byte-identical 0.5.3 → 0.5.7 (only `CHANGELOG.md`, `README.md` and `version.rb` differ), so this instance cost nothing, which is exactly why it went four releases unnoticed.
-- **The constraint stays `>= 0.5.3`, deliberately.** 0.5.3 is a real FLOOR (0.5.2 shipped the credential partial without `solana_studio/modals/_wallet_connect`, which the web3 capability gate requires). Above it this engine claims no ceiling: it is the BASE half of the base/bolt-on split, and a pessimistic `~> 0.5.3` here would be NARROWER than mcritchie-studio's own `~> 0.5` — a dev-only dependency constraining a resolution it does not own. The defect was the LOCK, not the pin, so the fix is a gate rather than a tighter pin.
-- **`bin/gem-drift-check`** — fails when this engine's lock resolves a tracked gem OLDER than a consumer's, wired into `consumer-ci.yml` after the consumer bundle install. That lane is the only place two repos' lockfiles exist at once (engine at `studio/`, consumer beside it); `test/lib/consumer_ci_shard_contract_test.rb` records the same constraint for its own cross-repo contract. Direction is ONE-WAY on purpose: engine behind FAILS, engine level or ahead passes (the engine is the producer and may test an unreleased gem), and a consumer bundling no tracked gem is a SKIP, not a failure — `mcritchie_industries` is the base half working as designed. Stdlib-only, and it names its one-command remedy (`bundle update solana-studio`) in the failure.
-
-- **The auth modal's Solana button moved to solana-studio, behind a CREDENTIAL
-  SLOT.** `style/modals/_auth` no longer draws the button; it renders whatever
-  resolves at `solana_studio/auth/wallet_credential` and nothing when that path
-  is empty, so bundling the gem IS the registration and a web2 app carries no
-  wallet markup at all. This completes the two-template split begun in 0.67.0,
-  which moved the four web3 MODALS to the gem and left the sign-in button as the
-  last web3 markup in the base engine. The gem half has shipped since
-  solana-studio **0.5.2** — until now this engine referenced that partial
-  nowhere, so the gem shipped a button no host rendered.
-  **Supersedes the stranded PR #245**, whose consumer lane was red only because
-  it opened before solana-studio 0.5.2 published.
-
-  **What did NOT change, deliberately:** `_methodDefaults.wallet` is still
-  `Studio.auth_method?(:wallet) && Studio.feature?(:web3)`. The Ruby gate
-  answers "is it implemented" (is the picker registered, does the credential
-  partial resolve) and gates the RENDER; Alpine's `methodOn('wallet')` still
-  answers "should it show" and gates VISIBILITY, which keeps the style guide's
-  method toggles working. Folding policy into the Ruby gate would delete the
-  button from the DOM on a web3-off app that bundles the gem, and the "or"
-  divider — which reads `methodOn('wallet')` too — would then float above a
-  button that is not there.
-
-  Hosts need no change: the engine's auth modal is a style-guide specimen
-  reached through `/admin/style`, and an app that bundles solana-studio 0.5.2 or
-  later sees the same button in the same place.
-
 ### Fixed
-
-- **A host's apostrophe no longer kills the card it was passed to — now across the
-  blocks, not just the first-name step.** The same defect
-  `onboarding/_first_name` fixed one release ago turns out to be an engine-wide
-  idiom: a host-supplied local interpolated into a JS string literal inside a
-  JS-evaluating attribute. Repaired at eleven more splices.
-
-  **WHY IT IS WORTH A CHANGELOG LINE WHEN NOTHING VISIBLE CHANGES.** The failure
-  mode is silent. A bare apostrophe closes the JS literal, the whole expression
-  becomes a SyntaxError, and Alpine mounts the component as a NO-OP that still
-  renders every element — a card that looks perfect and whose buttons do nothing.
-  There is no error on screen, nothing in the server log, and no markup assertion
-  that can see it. Every value in every consumer resolves to a source literal or a
-  frozen constant today, so this is latent cover rather than a live fix; it is
-  worth doing because the next local to carry prose will look like an ordinary
-  change to whoever writes it.
-
-  **WHAT MOVED.** `blocks/_success_card` (`cta_event` at both CTA branches,
-  `secondary_event`), `blocks/_error_card` (`cta_event`, `secondary_event`),
-  `blocks/_entry_confirmed` and `blocks/_solana_tx_link` (`cluster_param`),
-  `modals/_crop_photo` (`store`), `studio/emails/show` (the two upload filenames
-  and the success sentence), and `profiles/_birthday_fields` (the date value).
-  No default or in-repo value contains a character either escaper touches, so
-  every shipped card renders byte-for-byte what it did.
-
-  **THE MECHANISM NOW HAS ONE HOME AND ONE GUARD.** `Studio::JsLiteral.in_attribute`
-  replaces the four inline copies in `_first_name`. TWO escapers have to run — one
-  for the JS literal, one for the HTML attribute — and the second only runs on a
-  value ERB still believes is unsafe, which is why the value is interpolated before
-  it is escaped. That subtlety was re-derived at every call site and had no test
-  anywhere; deleting it used to leave the suite green.
-
-  **NOT A FIX FOR IDENTIFIER POSITION, deliberately.** A local spliced in as a bare
-  NAME — `$store.<name>.close()` — must be VALIDATED, never escaped, because
-  `escape_javascript` also escapes `$` and mangles a legal store name. That fleet
-  (about 36 splices across 19 partials) and a third class found alongside it —
-  Ruby-ASSEMBLED JS emitted into an attribute, some of it already `html_safe` — are
-  scoped OUT of this change and carry their own tickets. The SHAPE of the splice
-  decides the repair, never the name of the local.
-
-- **`Studio::S3` no longer mistakes a Rails NAMESPACE for a Rails application.**
-  `environment` guarded on `defined?(Rails)` and then called `Rails.env`.
-  rails-html-sanitizer — a transitive dependency of `action_view`, which arrives
-  long before any application does — ships a namespace-only `module Rails` with no
-  singleton methods, so that guard reads true and the next call raises
-  `NoMethodError: undefined method 'env' for module Rails`. It now asks
-  `Rails.respond_to?(:env)`, which is the form `lib/studio.rb` now uses in FOUR
-  places: the three it already carried (lines 701, 707 and 742) plus the route
-  guard at line 859. **This entry originally called it "the straggler"; that was
-  wrong** — three more sites carried the bare form, line 859 among them, and all
-  three are swept in *The Rails guard sweep really is finished now* above, in this
-  same unreleased block. No shipped app can reach it — every host boots a
-  real application — but the engine's own pure-Ruby unit lane can, and it did:
-  adding one `require` for a file that needs `action_view` turned an untouched
-  `email_catalog_test` red with two errors about email uploads.
-
-- **The style guide's two "Sign Wallet" thumbnails no longer crown themselves
-  with a padlock the card stopped drawing, and the guide's lock no longer trails
-  the release that removed it.** solana-studio 0.6.1 replaced the step-up card's
-  padlock with the remembered wallet's own brand mark, falling back to a neutral
-  billfold where no brand is remembered. Both hand-drawn thumbnails in
-  `style/_modals` went on drawing the padlock, so the first thing a designer
-  reads advertised a glyph the design system had retired.
-
-  **THE THUMBNAILS WERE HALF OF IT.** The opened specimen renders the REAL
-  shared partial, but it does so through whatever `Gemfile.lock` resolves — so
-  it is only ever as current as the lock, and the lock sat on 0.6.0 while
-  turf-monster shipped 0.6.1. The guide's opened card was still drawing the
-  padlock too, which `bin/gem-drift-check` had already been failing on
-  (`engine 0.6.0 TRAILS turf-monster 0.6.1`). Correcting the sketches alone
-  would have put a brand mark on the thumbnail and a padlock in the card it
-  opens — moving the contradiction onto one screen rather than removing it. So
-  the lock had to move too, and it has: `accepted` carried the engine to
-  solana-studio 0.7.0 while this change sat in review, which is past the 0.6.1
-  that removed the padlock. This change no longer moves the lock itself — it
-  defers to the line `accepted` already holds — so the sketch and the card it
-  opens agree without it.
-
-  The sketches follow the card: a centered brand tile where a wallet is
-  remembered, the card's own billfold outline in an inset square where none is.
-  They stay SKETCHES rather than real brand marks for a mechanical reason worth
-  recording — every `se-wallet` symbol on the guide is defined inside a
-  `template x-if`, whose content is inert until Alpine clones it, so a `use`
-  placed outside one resolves to nothing and paints an empty box.
-
-  Guarded by `test/views/step_up_specimen_thumbnails_test.rb`, which slices each
-  thumbnail by a `data-test` hook before asserting. That slicing is the point:
-  the rendered guide already carried 17 `se-wallet-` hits from the picker and
-  the card's own CTA, so a page-wide assertion for the mark could not fail, and
-  a page-wide assertion against the padlock could not pass — the drag-board
-  specimen's prose legitimately contains one. The padlock is pinned in BOTH the
-  codepoint and the HTML-entity form. MEASURED: five mutants, five killed —
-  the padlock restored in either form, either header mark removed, and the lock
-  reverted to 0.6.0 each reddens the assertion that owns it.
 
 - **The style guide's page-scoped modal store now resolves animations through
   the LIVE registry, so the guide can no longer disagree with itself.**
@@ -662,6 +678,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   MEASURED in a browser both ways: registering a new key at runtime surfaces a
   control AND plays it, and with this fix reverted the same key surfaces a
   control that plays `modal-card-mount`.
+
+## 0.69.5 — 2026-09-06
+
+### Fixed
 
 - **Onboarding no longer truncates a surname to fit a first name's cap.**
   `Studio::OnboardingController#first_name` measured the WHOLE typed answer with
@@ -714,6 +734,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   a row whose halves disagree with its `name` because of a `/profile` edit must
   never be auto-repaired anyway.
 
+## 0.69.4 — 2026-09-05
+
+### Fixed
+
 - **Onboarding no longer stores a two-word answer as the whole first name.**
   `Studio::OnboardingController#first_name` writes with `update_columns`, which
   skips callbacks — so the host's `before_save :set_name_parts` never ran and
@@ -748,6 +772,69 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   and a fossil repair belongs to the consuming app that owns its `users` table,
   not to the gem.
 
+## 0.69.1 — 2026-09-02
+
+### Changed
+
+- **`Gemfile.lock` resolves solana-studio 0.5.7, and a gate now keeps it there.** The lock had sat on **0.5.3 for four patch releases** while BOTH consumers shipped 0.5.7 (turf-monster `~> 0.5.3`, mcritchie-studio `~> 0.5`). Nothing was red and nothing could have been: engine CI installs with `bundler-cache: true`, so it resolves from the lock and never fresh — the drift does not self-correct and never surfaces as flakiness. It matters because `test/views/style_web3_specimens_test.rb` exists to prove "the style guide renders the REAL gem cards" and reads them off whatever the LOCK resolved; four versions behind, that guard certifies a card no consumer receives. It still passes — only its MEANING changes. MEASURED on this span, the gem's whole `app/` tree was byte-identical 0.5.3 → 0.5.7 (only `CHANGELOG.md`, `README.md` and `version.rb` differ), so this instance cost nothing, which is exactly why it went four releases unnoticed.
+
+- **The constraint stays `>= 0.5.3`, deliberately.** 0.5.3 is a real FLOOR (0.5.2 shipped the credential partial without `solana_studio/modals/_wallet_connect`, which the web3 capability gate requires). Above it this engine claims no ceiling: it is the BASE half of the base/bolt-on split, and a pessimistic `~> 0.5.3` here would be NARROWER than mcritchie-studio's own `~> 0.5` — a dev-only dependency constraining a resolution it does not own. The defect was the LOCK, not the pin, so the fix is a gate rather than a tighter pin.
+
+- **`bin/gem-drift-check`** — fails when this engine's lock resolves a tracked gem OLDER than a consumer's, wired into `consumer-ci.yml` after the consumer bundle install. That lane is the only place two repos' lockfiles exist at once (engine at `studio/`, consumer beside it); `test/lib/consumer_ci_shard_contract_test.rb` records the same constraint for its own cross-repo contract. Direction is ONE-WAY on purpose: engine behind FAILS, engine level or ahead passes (the engine is the producer and may test an unreleased gem), and a consumer bundling no tracked gem is a SKIP, not a failure — `mcritchie_industries` is the base half working as designed. Stdlib-only, and it names its one-command remedy (`bundle update solana-studio`) in the failure.
+
+## 0.69.0 — 2026-09-02
+
+### Added
+
+- **Knowledge coverage view** — `/admin/knowledge/coverage` +
+  `Studio::KnowledgeExpectation`: the "what SHOULD exist" half of the
+  knowledge layer. Expectations carry an entity, folder, provenance
+  (`source_note`, e.g. "diligence tracker item 14"), and a cadence — `once`
+  (an LOI) or `monthly` (aging inventory), where each calendar month from
+  `start_on` is a slot and the view names missing months outright
+  (`2026-09 MISSING`). Documents fulfill expectations by an EXPLICIT
+  `expectation_id` set at triage (the show page grows a "fulfills expectation"
+  select; a fuzzy name-match would silently merge lookalikes, an id never
+  does), and superseded documents never fill a slot. Ships two reference
+  migrations (`create_studio_knowledge_expectations`,
+  `add_expectation_to_studio_knowledge_docs`); routes ride the existing
+  `Studio.draw_knowledge_routes` opt-in. Built for the Commercial Welding
+  65-item diligence tracker; app-agnostic like the rest of the layer.
+
+## 0.68.0 — 2026-09-01
+
+### Changed
+
+- **The auth modal's Solana button moved to solana-studio, behind a CREDENTIAL
+  SLOT.** `style/modals/_auth` no longer draws the button; it renders whatever
+  resolves at `solana_studio/auth/wallet_credential` and nothing when that path
+  is empty, so bundling the gem IS the registration and a web2 app carries no
+  wallet markup at all. This completes the two-template split begun in 0.67.0,
+  which moved the four web3 MODALS to the gem and left the sign-in button as the
+  last web3 markup in the base engine. The gem half has shipped since
+  solana-studio **0.5.2** — until now this engine referenced that partial
+  nowhere, so the gem shipped a button no host rendered.
+  **Supersedes the stranded PR #245**, whose consumer lane was red only because
+  it opened before solana-studio 0.5.2 published.
+
+  **What did NOT change, deliberately:** `_methodDefaults.wallet` is still
+  `Studio.auth_method?(:wallet) && Studio.feature?(:web3)`. The Ruby gate
+  answers "is it implemented" (is the picker registered, does the credential
+  partial resolve) and gates the RENDER; Alpine's `methodOn('wallet')` still
+  answers "should it show" and gates VISIBILITY, which keeps the style guide's
+  method toggles working. Folding policy into the Ruby gate would delete the
+  button from the DOM on a web3-off app that bundles the gem, and the "or"
+  divider — which reads `methodOn('wallet')` too — would then float above a
+  button that is not there.
+
+  Hosts need no change: the engine's auth modal is a style-guide specimen
+  reached through `/admin/style`, and an app that bundles solana-studio 0.5.2 or
+  later sees the same button in the same place.
+
+## 0.67.2 — 2026-09-01
+
+### Fixed
+
 - **Knowledge layer hardening** — the five findings from the 0.67.0 reviews:
   upload keys carry a random suffix (same-named uploads in the same second no
   longer overwrite the first object before the unique index can refuse);
@@ -760,6 +847,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   migrations are now written omakase-rubocop-compatible, with the convention
   noted in the migration header (consumer copies are linted by the consumer's
   rubocop — measured on the Industries adoption ship).
+
+## 0.67.0 — 2026-09-01
 
 ### Added
 
@@ -786,6 +875,62 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `bin/rails studio_engine:install:migrations && bin/rails db:migrate`.
   Deferred to a later cut, recorded on the task: coverage view against a
   diligence tracker, recurring-series tracking, per-folder access defaults.
+
+## 0.66.0 — 2026-08-31
+
+### Changed
+
+- **The base template is web2: `:wallet` has left the `auth_methods` default.**
+  `Studio.auth_methods` defaulted to `%i[magic_link google wallet]` while
+  `Studio.features` defaulted to `[]`. Those two defaults disagree, and the
+  disagreement was load-bearing: the auth modal renders its wallet button from
+  `auth_method?(:wallet) && feature?(:web3)`, so a stock app rendered **no**
+  wallet button — while `Studio.routes` draws the Solana trio from
+  `auth_method?(:wallet)` alone, so the same stock app published
+  `GET /auth/solana/nonce`, `POST /auth/solana/verify` and
+  `GET /auth/phantom/callback`. All three `skip_before_action
+  :require_authentication`, and `#verify` lands in `User.from_solana_wallet`,
+  which `validate_user_contract!` never requires a host to implement. A brand-new
+  newsletter app inherited three public endpoints into an unvalidated contract.
+
+  studio-engine + McRitchie Studio is the base template for **every** app, web2
+  and web3 alike; solana-studio + Turf Monster is the web3 bolt-on. Most apps are
+  web2, so the default now says so: `%i[magic_link google]`. `README.md` and
+  `docs/NEW_APP_SETUP.md` have always printed that exact line as the new-app
+  configuration — the code simply disagreed with the docs it shipped.
+
+  **No current consumer changes behaviour**, because all three declare
+  `auth_methods` explicitly: McRitchie Studio (`magic_link google wallet`),
+  Turf Monster (`magic_link google wallet`, and `draw_auth_routes = false`
+  besides, so the engine draws neither group for it), mcritchie-industries
+  (`magic_link`). A wallet app opts in to both knobs — `auth_methods` including
+  `:wallet` **and** `features` including `:web3`, the second being what makes the
+  button appear.
+
+- **The auth route gate is pinned, and the gate choice is written down.**
+  Nothing tested which auth routes `Studio.routes` draws, on an engine whose
+  route changes break consumers at **boot** rather than at test time.
+  `test/integration/auth_route_gating_test.rb` draws the real host route table
+  under each consumer's configuration and reads the drawn routes back, so a
+  comment naming `auth/solana/nonce` cannot satisfy it.
+
+  The gate stays `draw_auth_routes && auth_method?(:wallet)` — **not** `&&
+  feature?(:web3)`, even though the modal uses both. `auth_methods` says which
+  CREDENTIALS an app accepts and these three paths are the credential exchange
+  itself; `features` gates product surfaces. `phantom_callback` is the mobile
+  deep-link RETURN url, so an app that declared `:wallet` and forgot `:web3`
+  would dead-end the handshake inside the user's wallet app with no server-side
+  trace — a worse failure than an endpoint that draws while the UI hides its
+  button. That decision is now a test with its rationale attached, so adding the
+  feature check flips a red assertion instead of silently unpublishing a live
+  consumer's routes. `Studio.draw_auth_routes`' comment likewise now records that
+  it is the OUTER switch, not the only gate: each group carries its own
+  `auth_methods` sub-gate, which is how a web2 app keeps magic-link while drawing
+  no `/auth/solana/*`.
+
+## 0.65.3 — 2026-08-31
+
+### Added
 
 - **A green comment-leak scan used to mean "not looked at".**
   `test/views/erb_comment_leak_test.rb` guards the ERB comment form in
@@ -824,6 +969,65 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
   Zero findings across the engine at `origin/accepted`, so this lands green with no
   allowlist.
+
+## 0.65.2 — 2026-08-28
+
+### Fixed
+
+- **A toast with buttons could not be dismissed while a modal was open.** The
+  layer scale put `--z-banner` (500) above `--z-toast` (400), and `body.modal-open`
+  lifts the environment bar stack to that tier at `position: sticky; top: 0`.
+  `#toast-container` is fixed at top 0 with `1rem` of padding, so the two land on
+  the same pixels: measured in a browser, the bars own y0-47 while the toast's
+  Dismiss button runs y28-40 — an 8-14px overlap at every viewport tested.
+  `elementFromPoint` at that button returned the **banner**, and a real click left
+  the toast on the page. Because the toast manager gives any toast carrying
+  buttons `duration: 0`, that X was the toast's **only** exit: it was stuck for
+  the rest of the session.
+
+  **The tiers are reordered** — `--z-banner` 400, `--z-toast-blur` 499, `--z-toast`
+  500 — and that is a semantic decision rather than a nudge around the geometry: a
+  toast is transient and demands interaction, a banner is persistent chrome that
+  will still be there afterwards. `--z-banner` still clears `--z-modal` (200), so
+  the property the lift exists for — DEV MODE and the email chip stay lit and
+  clickable over a modal — is unchanged and now has its own spec.
+
+  **One measured cost.** A banner button's tooltip is a descendant of the bar
+  stack, and the modal-open lift makes that stack a stacking context, so the
+  tooltip composites at `--z-banner` rather than at its own `--z-tooltip` (600).
+  At 1440x900 the tooltip and the toast card never meet; at 390x844 they overlap
+  by 260x45px, so a banner tooltip opened with both a modal and a toast up is
+  drawn under the toast. Hover/focus-only, purely visual, and recorded beside the
+  scale.
+
+  **Consumers that redefine these tokens in their own `:root` after the engine
+  import still win**, as they always have, so an app carrying a local copy of the
+  scale keeps the old order (and the bug) until it drops the copy.
+
+  Two literals moved with the tiers: `#toast-container` and `.toast-page-blur` in
+  `layouts/studio/_flash` carry `var(--studio-toast-z, var(--z-toast, …))`
+  fallbacks, and a fallback that disagreed with the scale would hand the bug to
+  any app rendering the partial without the engine sheet.
+
+  **The existing test could not have caught this and still cannot on its own.**
+  `layer_scale_contract_test` asserted `--z-toast > --z-modal`, which was true the
+  entire time the toast was unusable — both tiers cleared the modal, which says
+  nothing about which of *them* wins. It now names the banner, and pins the halo
+  directly beneath its own toast so no tier can settle between them. The property
+  is also asserted where the defect lives, in `e2e/toast_over_banner.spec.js`: a
+  hit test and a real mouse click at the Dismiss button, at desktop and phone
+  widths, at scroll-top and at an offset. And once more on the artifact a
+  consumer is actually served — `test/integration/layer_scale_build_test.rb`
+  runs the real Tailwind binary over the engine's entry point and reads the
+  tiers out of the COMPILED bundle, where `@import` resolution, layer ordering
+  and a shadowing `:root` are all in play and a source read sees none of them. One trap is recorded there — at 390px
+  the point under that button is the banner's Email link, so on the broken build a
+  click *navigated* and the toast count on the new page was zero; asserting the
+  count alone passes over the bug.
+
+## 0.65.0 — 2026-08-28
+
+### Added
 
 - **`data-pin` — the pinned stack publishes itself.** `--nav-h` / `--nav-bottom`
   answer for one element. Everything else that pins has been re-deriving the
@@ -885,56 +1089,28 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   read them, and `nav_offset_contract_test` still pins both to their exact
   sources. This is additive.
 
+## 0.63.0 — 2026-08-27
+
+### Added
+
+- **`studio/modals/_wallet_connect` — the Connect Wallet picker, engine-owned.**
+  The reown-style wallet chooser existed three times before this — turf-monster's
+  226 lines, mcritchie-studio's 107 and the style guide's 176 — sharing no code.
+  It is one partial now, and `style/modals/_wallet_connect` CONFIGURES it rather
+  than porting it, so the specimen and production cannot drift again. Locals:
+  `store` (default `"modals"`), `connect_fn` (default `"solanaConnectAndVerify"`),
+  `title`, `extra_data` (extra x-data members as a brace-less JS fragment), plus a
+  BLOCK for the pre-connect slot. App behaviour arrives as optional hook METHODS
+  defined in `extra_data`, each called only if it exists: `onInit`, `canPick`,
+  `verifyArgs`, `onConnected(result)`, `onDeepLink`, `onBack`. Carries the mobile
+  Phantom single-row fix (one Phantom row in every state) and a `role="alert"` on
+  the connect error that both app copies lacked.
+
+  **NO SHIPPING CONSUMER RENDERS IT YET.** Both apps still ship their own copy and
+  adopt this one after it releases, so the green consumer CI here says they still
+  compile — it says nothing about this partial.
 
 ### Changed
-
-- **The base template is web2: `:wallet` has left the `auth_methods` default.**
-  `Studio.auth_methods` defaulted to `%i[magic_link google wallet]` while
-  `Studio.features` defaulted to `[]`. Those two defaults disagree, and the
-  disagreement was load-bearing: the auth modal renders its wallet button from
-  `auth_method?(:wallet) && feature?(:web3)`, so a stock app rendered **no**
-  wallet button — while `Studio.routes` draws the Solana trio from
-  `auth_method?(:wallet)` alone, so the same stock app published
-  `GET /auth/solana/nonce`, `POST /auth/solana/verify` and
-  `GET /auth/phantom/callback`. All three `skip_before_action
-  :require_authentication`, and `#verify` lands in `User.from_solana_wallet`,
-  which `validate_user_contract!` never requires a host to implement. A brand-new
-  newsletter app inherited three public endpoints into an unvalidated contract.
-
-  studio-engine + McRitchie Studio is the base template for **every** app, web2
-  and web3 alike; solana-studio + Turf Monster is the web3 bolt-on. Most apps are
-  web2, so the default now says so: `%i[magic_link google]`. `README.md` and
-  `docs/NEW_APP_SETUP.md` have always printed that exact line as the new-app
-  configuration — the code simply disagreed with the docs it shipped.
-
-  **No current consumer changes behaviour**, because all three declare
-  `auth_methods` explicitly: McRitchie Studio (`magic_link google wallet`),
-  Turf Monster (`magic_link google wallet`, and `draw_auth_routes = false`
-  besides, so the engine draws neither group for it), mcritchie-industries
-  (`magic_link`). A wallet app opts in to both knobs — `auth_methods` including
-  `:wallet` **and** `features` including `:web3`, the second being what makes the
-  button appear.
-
-- **The auth route gate is pinned, and the gate choice is written down.**
-  Nothing tested which auth routes `Studio.routes` draws, on an engine whose
-  route changes break consumers at **boot** rather than at test time.
-  `test/integration/auth_route_gating_test.rb` draws the real host route table
-  under each consumer's configuration and reads the drawn routes back, so a
-  comment naming `auth/solana/nonce` cannot satisfy it.
-
-  The gate stays `draw_auth_routes && auth_method?(:wallet)` — **not** `&&
-  feature?(:web3)`, even though the modal uses both. `auth_methods` says which
-  CREDENTIALS an app accepts and these three paths are the credential exchange
-  itself; `features` gates product surfaces. `phantom_callback` is the mobile
-  deep-link RETURN url, so an app that declared `:wallet` and forgot `:web3`
-  would dead-end the handshake inside the user's wallet app with no server-side
-  trace — a worse failure than an endpoint that draws while the UI hides its
-  button. That decision is now a test with its rationale attached, so adding the
-  feature check flips a red assertion instead of silently unpublishing a live
-  consumer's routes. `Studio.draw_auth_routes`' comment likewise now records that
-  it is the OUTER switch, not the only gate: each group carries its own
-  `auth_methods` sub-gate, which is how a web2 app keeps magic-link while drawing
-  no `/auth/solana/*`.
 
 - **The navbar collapse primitive is broadcastable, rate-limited, and cheap per
   frame.** Three defects in the primitive as first landed, none of which a
@@ -985,94 +1161,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   so the source-swap mutation it was written for still dies, and it gained a
   guard on the read-before-write order.
 
-
-### Fixed
-
-- **A toast with buttons could not be dismissed while a modal was open.** The
-  layer scale put `--z-banner` (500) above `--z-toast` (400), and `body.modal-open`
-  lifts the environment bar stack to that tier at `position: sticky; top: 0`.
-  `#toast-container` is fixed at top 0 with `1rem` of padding, so the two land on
-  the same pixels: measured in a browser, the bars own y0-47 while the toast's
-  Dismiss button runs y28-40 — an 8-14px overlap at every viewport tested.
-  `elementFromPoint` at that button returned the **banner**, and a real click left
-  the toast on the page. Because the toast manager gives any toast carrying
-  buttons `duration: 0`, that X was the toast's **only** exit: it was stuck for
-  the rest of the session.
-
-  **The tiers are reordered** — `--z-banner` 400, `--z-toast-blur` 499, `--z-toast`
-  500 — and that is a semantic decision rather than a nudge around the geometry: a
-  toast is transient and demands interaction, a banner is persistent chrome that
-  will still be there afterwards. `--z-banner` still clears `--z-modal` (200), so
-  the property the lift exists for — DEV MODE and the email chip stay lit and
-  clickable over a modal — is unchanged and now has its own spec.
-
-  **One measured cost.** A banner button's tooltip is a descendant of the bar
-  stack, and the modal-open lift makes that stack a stacking context, so the
-  tooltip composites at `--z-banner` rather than at its own `--z-tooltip` (600).
-  At 1440x900 the tooltip and the toast card never meet; at 390x844 they overlap
-  by 260x45px, so a banner tooltip opened with both a modal and a toast up is
-  drawn under the toast. Hover/focus-only, purely visual, and recorded beside the
-  scale.
-
-  **Consumers that redefine these tokens in their own `:root` after the engine
-  import still win**, as they always have, so an app carrying a local copy of the
-  scale keeps the old order (and the bug) until it drops the copy.
-
-  Two literals moved with the tiers: `#toast-container` and `.toast-page-blur` in
-  `layouts/studio/_flash` carry `var(--studio-toast-z, var(--z-toast, …))`
-  fallbacks, and a fallback that disagreed with the scale would hand the bug to
-  any app rendering the partial without the engine sheet.
-
-  **The existing test could not have caught this and still cannot on its own.**
-  `layer_scale_contract_test` asserted `--z-toast > --z-modal`, which was true the
-  entire time the toast was unusable — both tiers cleared the modal, which says
-  nothing about which of *them* wins. It now names the banner, and pins the halo
-  directly beneath its own toast so no tier can settle between them. The property
-  is also asserted where the defect lives, in `e2e/toast_over_banner.spec.js`: a
-  hit test and a real mouse click at the Dismiss button, at desktop and phone
-  widths, at scroll-top and at an offset. And once more on the artifact a
-  consumer is actually served — `test/integration/layer_scale_build_test.rb`
-  runs the real Tailwind binary over the engine's entry point and reads the
-  tiers out of the COMPILED bundle, where `@import` resolution, layer ordering
-  and a shadowing `:root` are all in play and a source read sees none of them. One trap is recorded there — at 390px
-  the point under that button is the banner's Email link, so on the broken build a
-  click *navigated* and the toast count on the new page was zero; asserting the
-  count alone passes over the bug.
-
-
-### Breaking
-
-- **The age-gate DOB modal is renamed, and the refusal moved to its own card.**
-  A host that renders these paths from the released gem must update them:
-
-  | Was | Is now |
-  |-----|--------|
-  | `studio/modals/blocks/_age_verify` | `studio/modals/blocks/_birthday` |
-  | `studio/_age_verify_assets` | `studio/_birthday_assets` |
-  | `window.ageVerifyModal` | `window.birthdayModal` |
-
-  Nothing in `mcritchie-studio`, `turf-monster`, `mcritchie-industries` or `rolio`
-  rendered the old paths at the time of this change (each app that shows an age
-  gate ships its own card and shares only `studio/fields/_date_of_birth`), so the
-  rename lands with no consumer edit — but the old paths are GONE, not aliased, so
-  a future adopter reaching for `blocks/age_verify` needs this table.
-
-  **`age-verified` is deliberately unchanged.** The success event and
-  `session.ageVerified` are what consuming apps already listen on, so the rename
-  stopped short of them and no host wiring moves.
-
-- **`min_age` is now OPTIONAL on the birthday card** (was REQUIRED). Absent — or
-  `0` — means the app asks for a birthday and does not gate on it: the card drops
-  the age line, the eligibility wording and the refusal handoff. Existing callers
-  that pass a number are unaffected. There is still NO engine default, because 18
-  is itself a policy value.
-
-- **An under-age date now SUBMITS.** It used to disable the card's own submit
-  button and turn the card red — the one screen state with nothing to press. The
-  factory routes on the RESPONSE instead: `body.underage === true`, or HTTP 403,
-  opens the age-gate card; anything else non-verified stays on the error line. An
-  app adopting this must make its verify endpoint answer "too young" distinctly
-  from "bad request", because a client that blocks submission never had to.
+## 0.62.6 — 2026-08-27
 
 ### Added
 
@@ -1099,32 +1188,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `transition-all duration-300`. Said plainly because it also means the green
   consumer CI on this change is **not evidence about this code path**: both apps
   compile and pass against a primitive neither of them runs.
-
-- **`studio/modals/blocks/_age_gate` — the refusal card.** Where the birthday card
-  hands off when the date is under the app's bar. Headed "Easy, Young'un" under a
-  teddy bear rather than a red X, because a person who will be welcome later is
-  not an error state. Carries a LIVE COUNTDOWN to the day they qualify, built from
-  the date the birthday card passes across the store, plus the two ways out: a
-  primary CTA to watch instead (app-supplied `watch_url`, dropped entirely when
-  absent rather than rendered dead) and a back link that returns to the birthday
-  card. Displays `min_age` / `state`; computes no eligibility of its own.
-
-- **`studio/modals/_wallet_connect` — the Connect Wallet picker, engine-owned.**
-  The reown-style wallet chooser existed three times before this — turf-monster's
-  226 lines, mcritchie-studio's 107 and the style guide's 176 — sharing no code.
-  It is one partial now, and `style/modals/_wallet_connect` CONFIGURES it rather
-  than porting it, so the specimen and production cannot drift again. Locals:
-  `store` (default `"modals"`), `connect_fn` (default `"solanaConnectAndVerify"`),
-  `title`, `extra_data` (extra x-data members as a brace-less JS fragment), plus a
-  BLOCK for the pre-connect slot. App behaviour arrives as optional hook METHODS
-  defined in `extra_data`, each called only if it exists: `onInit`, `canPick`,
-  `verifyArgs`, `onConnected(result)`, `onDeepLink`, `onBack`. Carries the mobile
-  Phantom single-row fix (one Phantom row in every state) and a `role="alert"` on
-  the connect error that both app copies lacked.
-
-  **NO SHIPPING CONSUMER RENDERS IT YET.** Both apps still ship their own copy and
-  adopt this one after it releases, so the green consumer CI here says they still
-  compile — it says nothing about this partial.
 
 ### Fixed
 
@@ -1165,6 +1228,131 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   property, so the preview exercises the shipped `calc()`s instead of a parallel
   copy of them.
 
+## 0.61.2 — 2026-08-26
+
+### Fixed
+
+- **The age gate's back link now returns the date the person already entered.**
+  `blocks/_age_gate`'s "Update your Birthday" swapped back to `blocks/_birthday`
+  with an EMPTY props object, discarding the `dobYear`/`dobMonth`/`dobDay` parts
+  the birthday factory had just handed across the store — and the factory started
+  its three fields at `""` and never read them anyway. So the correction path came
+  back BLANK: a mistyped year cost all three picks, on a card whose own header
+  comment promised "a correction, not a restart".
+
+  Both sides of the seam moved. `back()` forwards the three date parts — and only
+  those three, deliberately: `minAge`, `state` and `message` describe the refusal,
+  and `validates` is load-bearing by its ABSENCE (the style guide specimen reads an
+  absent prop as validating, and a forwarded stale one would let the refusal pick
+  the next card's mode). `window.birthdayModal` gained an `init` that re-picks the
+  three selects from the props of the modal entry it mounted in, clamping a day
+  that the restored month cannot hold.
+
+  **The gate is not weakened.** Restoring the date restores the DATE and never the
+  verdict: the card comes back submittable and the app's endpoint re-decides on the
+  next submit exactly as it did on the first. `e2e/birthday_gate.spec.js` asserts a
+  restored under-age date is refused again.
+
+  **No consumer action.** A host that renders `blocks/_age_gate` and
+  `studio/_birthday_assets` gets this by upgrading; nothing in the call signature
+  changed and no host wiring moves.
+
+## 0.60.1 — 2026-08-25
+
+### Breaking
+
+- **The age-gate DOB modal is renamed, and the refusal moved to its own card.**
+  A host that renders these paths from the released gem must update them:
+
+  | Was | Is now |
+  |-----|--------|
+  | `studio/modals/blocks/_age_verify` | `studio/modals/blocks/_birthday` |
+  | `studio/_age_verify_assets` | `studio/_birthday_assets` |
+  | `window.ageVerifyModal` | `window.birthdayModal` |
+
+  Nothing in `mcritchie-studio`, `turf-monster`, `mcritchie-industries` or `rolio`
+  rendered the old paths at the time of this change (each app that shows an age
+  gate ships its own card and shares only `studio/fields/_date_of_birth`), so the
+  rename lands with no consumer edit — but the old paths are GONE, not aliased, so
+  a future adopter reaching for `blocks/age_verify` needs this table.
+
+  **`age-verified` is deliberately unchanged.** The success event and
+  `session.ageVerified` are what consuming apps already listen on, so the rename
+  stopped short of them and no host wiring moves.
+
+- **`min_age` is now OPTIONAL on the birthday card** (was REQUIRED). Absent — or
+  `0` — means the app asks for a birthday and does not gate on it: the card drops
+  the age line, the eligibility wording and the refusal handoff. Existing callers
+  that pass a number are unaffected. There is still NO engine default, because 18
+  is itself a policy value.
+
+- **An under-age date now SUBMITS.** It used to disable the card's own submit
+  button and turn the card red — the one screen state with nothing to press. The
+  factory routes on the RESPONSE instead: `body.underage === true`, or HTTP 403,
+  opens the age-gate card; anything else non-verified stays on the error line. An
+  app adopting this must make its verify endpoint answer "too young" distinctly
+  from "bad request", because a client that blocks submission never had to.
+
+### Added
+
+- **`studio/modals/blocks/_age_gate` — the refusal card.** Where the birthday card
+  hands off when the date is under the app's bar. Headed "Easy, Young'un" under a
+  teddy bear rather than a red X, because a person who will be welcome later is
+  not an error state. Carries a LIVE COUNTDOWN to the day they qualify, built from
+  the date the birthday card passes across the store, plus the two ways out: a
+  primary CTA to watch instead (app-supplied `watch_url`, dropped entirely when
+  absent rather than rendered dead) and a back link that returns to the birthday
+  card. Displays `min_age` / `state`; computes no eligibility of its own.
+
+## 0.59.0 — 2026-08-21
+
+### Fixed
+
+- **The Geo signpost now reaches every app whose admin chrome the engine owns.**
+  The row added last release went into `components/_admin_dropdown` alone, on the
+  premise that the shared dropdown reaches every app from one change. It does
+  not, and counted against the apps that actually consume this engine it reached
+  **none of them**. Wherever a host declares an admin-flagged sidebar section,
+  `studio_sidebar_replaces_admin_menu?` SUPPRESSES the dropdown and the link
+  sidebar is the admin menu — that is both `mcritchie-studio` and
+  `mcritchie-industries`. An app that forks its navbar outright renders neither,
+  which is `turf-monster`. Nobody was left on the plain engine navbar to see it,
+  so the app carrying the largest admin surface in the ecosystem was among those
+  guaranteed never to.
+
+  The row moved into its own partial, **`components/_geo_signpost`**, and BOTH
+  engine chromes render it — the dropdown as before, and
+  `components/_link_sidebar` under its own admin-chipped `Geo` heading. Nothing
+  to configure: a host on either chrome gets the signage from the version bump.
+
+  **Exactly one of them, never both.** The sidebar carries the row only where it
+  IS the admin menu (the host declared an admin-flagged section, so the dropdown
+  is suppressed). A host declaring only public sections renders BOTH chromes by
+  design, and there the dropdown keeps the row — fixing a reach gap by showing
+  an admin the same row twice is not a fix.
+
+  **A forked chrome still needs one line**, because the engine cannot reach a
+  fork by rendering. Inside your own admin block:
+
+  ```erb
+  <%= render "components/geo_signpost",
+        variant: :sidebar, close_action: "$store.sidebars.gearOpen = false" %>
+  ```
+
+  `variant:` picks the chrome's row shape (`:dropdown`, the default, or
+  `:sidebar`); `close_action:` is the Alpine expression that closes YOUR panel
+  behind the row — the store flag belongs to the caller, so the partial never
+  hardcodes one. See [`docs/GEO.md`](docs/GEO.md#finding-the-page--the-signpost-in-whichever-chrome-the-app-has).
+
+  Behavior is otherwise unchanged: same three states, same words, same
+  self-gating on `admin?`, and `ENABLE_GEO_BLOCKING` still governs the LINK and
+  never the gate. One test hook was renamed — `data-test="geo-signpost-disabled"`,
+  was `admin-dropdown-geo-disabled` — since the row renders in two chromes now
+  and a name claiming one of them was a lie. Grepped ecosystem-wide first: it
+  appeared in no consumer.
+
+## 0.58.0 — 2026-08-21
+
 ### Added
 
 - **A Geo row in the shared admin dropdown, with signage when it is off.** Every
@@ -1180,6 +1368,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   detects, still blocks, still enforces — a default-off variable that switched
   enforcement would silently stop a live legal blocklist on the next deploy. An
   app that would rather decide in code sets `config.geo_blocking_enabled`.
+
+## 0.57.0 — 2026-08-20
+
+### Added
 
 - **Geo — validation for every app, locking for the apps that need it.**
   Turf Monster's geo stack, lifted into the engine and generalised from
@@ -1236,6 +1428,51 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   exist, and a *resolved foreign* country with no region stays allowed. Opt out
   with `Studio.geo_fail_closed = false`.
 
+## 0.56.3 — 2026-08-19
+
+### Changed
+
+- **Montserrat is vendored into the engine and can no longer re-measure the page.**
+  `layouts/studio/_head` linked the family from `fonts.googleapis.com` with
+  `display=swap`. The stylesheet blocks the load event; the font FILES do not — so
+  every app went interactive in the fallback font and re-measured every glyph when
+  Montserrat landed. That reflow swallowed a synthesized click three times in one CI
+  day (root-caused in `close-board-filter-flake`: `pointerdown` and `pointerup` hit
+  different elements, so the browser fired `click` on their common ancestor), and on a
+  cold cache it moved a filter chip under a real finger. Montserrat was the last
+  third-party asset in the head; Alpine, SortableJS and canvas-confetti were already
+  vendored.
+
+  What ships:
+
+  - **Two woff2 files** — `studio/montserrat-latin.woff2` (35KB) and
+    `studio/montserrat-latin-ext.woff2` (68KB), served through the asset pipeline and
+    precompiled for Sprockets hosts. The `fonts.googleapis.com` and `fonts.gstatic.com`
+    preconnects are gone, and the head reaches no third party at all.
+  - **`font-display: optional`, not `swap`.** This is the fix, not the self-hosting.
+    `swap` has an unbounded swap period, so a late font always reflows wherever it is
+    served from; `optional` has none, so a font that misses the block period is
+    abandoned for that navigation instead of shifting the layout. The cost is named: a
+    first visit on a slow link can render one page in the fallback. A `crossorigin`
+    preload of the latin subset is what keeps that rare.
+  - **One face per subset spanning `100 900`.** Montserrat v31 is a VARIABLE font — the
+    six weights the old link requested all resolved to the same bytes — so every weight
+    the fleet uses renders from real outlines rather than a synthesized fake, and asking
+    for fewer weights would not have saved a byte.
+  - **Only latin and latin-ext.** cyrillic, cyrillic-ext and vietnamese occur zero times
+    in the engine's views, the consumers' views, and their seed and locale data, so they
+    are not shipped. `unicode-range` means a page only downloads the subsets it renders,
+    so keeping latin-ext (for roster names like Modrić and Çalhanoğlu) costs an English
+    page nothing.
+
+  No consumer action is required: the family, the weights, and the Tailwind `sans` stack
+  are unchanged. An app that sets its own `font-display` or preloads Montserrat itself
+  should drop that.
+
+## 0.56.0 — 2026-08-16
+
+### Added
+
 - **The hold-to-confirm button, with its fizz — a new ACTION family in
   `engine-motion.css`.** A press-and-hold CTA for an action a host does not want
   taken by accident, ported from Turf Monster where it confirms a contest entry.
@@ -1283,6 +1520,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   page matches the one it replaced) and two buttons on a page do not fizz in
   lockstep.
 
+## 0.55.0 — 2026-08-16
+
+### Added
+
 - **`.studio-team-glow` rings a host that paints its own background**, and can
   carry **two colors**.
 
@@ -1308,114 +1549,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   transparent border twice the blur radius and its wedges stop at the padding
   box. Without that room the halo ends on a hard line at its own edge.
 
-### Changed
-
-- **Montserrat is vendored into the engine and can no longer re-measure the page.**
-  `layouts/studio/_head` linked the family from `fonts.googleapis.com` with
-  `display=swap`. The stylesheet blocks the load event; the font FILES do not — so
-  every app went interactive in the fallback font and re-measured every glyph when
-  Montserrat landed. That reflow swallowed a synthesized click three times in one CI
-  day (root-caused in `close-board-filter-flake`: `pointerdown` and `pointerup` hit
-  different elements, so the browser fired `click` on their common ancestor), and on a
-  cold cache it moved a filter chip under a real finger. Montserrat was the last
-  third-party asset in the head; Alpine, SortableJS and canvas-confetti were already
-  vendored.
-
-  What ships:
-
-  - **Two woff2 files** — `studio/montserrat-latin.woff2` (35KB) and
-    `studio/montserrat-latin-ext.woff2` (68KB), served through the asset pipeline and
-    precompiled for Sprockets hosts. The `fonts.googleapis.com` and `fonts.gstatic.com`
-    preconnects are gone, and the head reaches no third party at all.
-  - **`font-display: optional`, not `swap`.** This is the fix, not the self-hosting.
-    `swap` has an unbounded swap period, so a late font always reflows wherever it is
-    served from; `optional` has none, so a font that misses the block period is
-    abandoned for that navigation instead of shifting the layout. The cost is named: a
-    first visit on a slow link can render one page in the fallback. A `crossorigin`
-    preload of the latin subset is what keeps that rare.
-  - **One face per subset spanning `100 900`.** Montserrat v31 is a VARIABLE font — the
-    six weights the old link requested all resolved to the same bytes — so every weight
-    the fleet uses renders from real outlines rather than a synthesized fake, and asking
-    for fewer weights would not have saved a byte.
-  - **Only latin and latin-ext.** cyrillic, cyrillic-ext and vietnamese occur zero times
-    in the engine's views, the consumers' views, and their seed and locale data, so they
-    are not shipped. `unicode-range` means a page only downloads the subsets it renders,
-    so keeping latin-ext (for roster names like Modrić and Çalhanoğlu) costs an English
-    page nothing.
-
-  No consumer action is required: the family, the weights, and the Tailwind `sans` stack
-  are unchanged. An app that sets its own `font-display` or preloads Montserrat itself
-  should drop that.
+## 0.54.1 — 2026-08-15
 
 ### Fixed
-
-- **The age gate's back link now returns the date the person already entered.**
-  `blocks/_age_gate`'s "Update your Birthday" swapped back to `blocks/_birthday`
-  with an EMPTY props object, discarding the `dobYear`/`dobMonth`/`dobDay` parts
-  the birthday factory had just handed across the store — and the factory started
-  its three fields at `""` and never read them anyway. So the correction path came
-  back BLANK: a mistyped year cost all three picks, on a card whose own header
-  comment promised "a correction, not a restart".
-
-  Both sides of the seam moved. `back()` forwards the three date parts — and only
-  those three, deliberately: `minAge`, `state` and `message` describe the refusal,
-  and `validates` is load-bearing by its ABSENCE (the style guide specimen reads an
-  absent prop as validating, and a forwarded stale one would let the refusal pick
-  the next card's mode). `window.birthdayModal` gained an `init` that re-picks the
-  three selects from the props of the modal entry it mounted in, clamping a day
-  that the restored month cannot hold.
-
-  **The gate is not weakened.** Restoring the date restores the DATE and never the
-  verdict: the card comes back submittable and the app's endpoint re-decides on the
-  next submit exactly as it did on the first. `e2e/birthday_gate.spec.js` asserts a
-  restored under-age date is refused again.
-
-  **No consumer action.** A host that renders `blocks/_age_gate` and
-  `studio/_birthday_assets` gets this by upgrading; nothing in the call signature
-  changed and no host wiring moves.
-
-- **The Geo signpost now reaches every app whose admin chrome the engine owns.**
-  The row added last release went into `components/_admin_dropdown` alone, on the
-  premise that the shared dropdown reaches every app from one change. It does
-  not, and counted against the apps that actually consume this engine it reached
-  **none of them**. Wherever a host declares an admin-flagged sidebar section,
-  `studio_sidebar_replaces_admin_menu?` SUPPRESSES the dropdown and the link
-  sidebar is the admin menu — that is both `mcritchie-studio` and
-  `mcritchie-industries`. An app that forks its navbar outright renders neither,
-  which is `turf-monster`. Nobody was left on the plain engine navbar to see it,
-  so the app carrying the largest admin surface in the ecosystem was among those
-  guaranteed never to.
-
-  The row moved into its own partial, **`components/_geo_signpost`**, and BOTH
-  engine chromes render it — the dropdown as before, and
-  `components/_link_sidebar` under its own admin-chipped `Geo` heading. Nothing
-  to configure: a host on either chrome gets the signage from the version bump.
-
-  **Exactly one of them, never both.** The sidebar carries the row only where it
-  IS the admin menu (the host declared an admin-flagged section, so the dropdown
-  is suppressed). A host declaring only public sections renders BOTH chromes by
-  design, and there the dropdown keeps the row — fixing a reach gap by showing
-  an admin the same row twice is not a fix.
-
-  **A forked chrome still needs one line**, because the engine cannot reach a
-  fork by rendering. Inside your own admin block:
-
-  ```erb
-  <%= render "components/geo_signpost",
-        variant: :sidebar, close_action: "$store.sidebars.gearOpen = false" %>
-  ```
-
-  `variant:` picks the chrome's row shape (`:dropdown`, the default, or
-  `:sidebar`); `close_action:` is the Alpine expression that closes YOUR panel
-  behind the row — the store flag belongs to the caller, so the partial never
-  hardcodes one. See [`docs/GEO.md`](docs/GEO.md#finding-the-page--the-signpost-in-whichever-chrome-the-app-has).
-
-  Behavior is otherwise unchanged: same three states, same words, same
-  self-gating on `admin?`, and `ENABLE_GEO_BLOCKING` still governs the LINK and
-  never the gate. One test hook was renamed — `data-test="geo-signpost-disabled"`,
-  was `admin-dropdown-geo-disabled` — since the row renders in two chromes now
-  and a name claiming one of them was a lie. Grepped ecosystem-wide first: it
-  appeared in no consumer.
 
 - **`.conic-surface` keeps its wash inside its own box.** The wash was an
   OVERSIZED pseudo (`inset: -50%`) spun by a `transform` keyframe, cut back to
@@ -1449,6 +1585,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   where the selection ring belongs. The specimen, its copyable snippet, and the
   contract comment now all state the same thing. The primitive's geometry is
   unchanged — the consumers tuned against it are untouched.
+
+## 0.54.0 — 2026-08-15
 
 ### Added
 
@@ -1485,6 +1623,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   clearing a day the new month lost, refusing a partial date, and a year list
   that stops at this year.
 
+## 0.53.1 — 2026-08-15
 
 ### Changed
 
@@ -1502,6 +1641,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `position: fixed`, placed from the trigger's rect, so it never relied on that
   wrapper as a containing block.
 
+## 0.53.0 — 2026-08-15
 
 ### Added
 
@@ -1534,7 +1674,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   Fires on both verbs, so a host that only cares about joins ignores the flag.
   The default is inert.
 
-
 ### Fixed
 
 - **The birthday calendar keeps the side it opened on.** `place()` runs on every
@@ -1552,6 +1691,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   should be re-decided at all. The flip spec added with it opens and asserts
   once, so a side that changes **later** was invisible to it.
 
+## 0.52.3 — 2026-08-15
 
 ### Fixed
 
@@ -1575,6 +1715,40 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   fits. The new spec forces the flip, asserts the flip actually happened, and then
   asserts the popover's bottom edge sits against the trigger's top edge.
 
+## 0.52.0 — 2026-08-15
+
+### Added
+
+- **`/profile` gains the Newsletter row.** Lifted from turf-monster's `/account`
+  card, which has run this flow in production, and stripped of everything
+  turf-specific on the way: its 25-seed on-chain welcome bonus, its quest state,
+  its seeds level-up payload. What the engine takes is the part every app needs.
+
+  New routes: `POST /profile/newsletter` (`profile_newsletter_path`) joins,
+  `DELETE` on the same path leaves.
+
+  **TWO TIMESTAMPS, NOT A BOOLEAN.** `joined_email_list_at` and
+  `left_email_list_at`, matching turf, because the pair carries three states a
+  flag cannot: never asked (both nil), subscribed (joined after left, *including
+  a rejoin where both are set*), and unsubscribed. `Studio::Newsletter` holds the
+  rules — `subscribed?`, `ever_joined?`, `needs_email?` — pure and duck-typed
+  like `Studio::OauthIdentity`.
+
+  `ever_joined?` is deliberately a different question from `subscribed?`: leaving
+  stamps a date and never clears the join, so a consumer paying a once-ever
+  welcome bonus cannot have it re-earned by cycling.
+
+  **ASYMMETRIC ON PURPOSE.** Joining is one click; leaving asks for confirmation
+  in a modal. Joining is reversible from the same card, so a confirm step would
+  be friction protecting nothing — a mis-click on leave is silent until the next
+  send that never arrives. An account with **no address on file** (a wallet-only
+  sign-in) is asked for one in a modal rather than allowed to submit and fail;
+  the address is written but **not** marked verified, because typing an address
+  is not the same as holding it.
+
+  Gated on `requires:` like every other row, so a host without the columns gets
+  silence rather than a 500. The columns ship consumer-first under
+  *Roll Out Standard Profile Columns*.
 
 ### Changed
 
@@ -1614,39 +1788,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   The three integer columns are unchanged; the UI joins them for entry and
   `ProfilesController#update` splits them again.
 
+- **The read page mounts a modal host only when a row asks for one.** This is the
+  registry's `modals:` key finally doing the job it was documented for — until
+  the newsletter row, nothing on `/profile` opened a modal and mounting a host
+  would have been furniture for nobody.
 
-### Added
+  `modals:` is now **a partial path rather than a boolean**. A host row that
+  declares modals keeps its partial in the host's own app, so any convention like
+  `"studio/profiles/#{key}_modals"` would resolve to a path that does not exist
+  there. It costs one string and works for everyone.
 
-- **`/profile` gains the Newsletter row.** Lifted from turf-monster's `/account`
-  card, which has run this flow in production, and stripped of everything
-  turf-specific on the way: its 25-seed on-chain welcome bonus, its quest state,
-  its seeds level-up payload. What the engine takes is the part every app needs.
-
-  New routes: `POST /profile/newsletter` (`profile_newsletter_path`) joins,
-  `DELETE` on the same path leaves.
-
-  **TWO TIMESTAMPS, NOT A BOOLEAN.** `joined_email_list_at` and
-  `left_email_list_at`, matching turf, because the pair carries three states a
-  flag cannot: never asked (both nil), subscribed (joined after left, *including
-  a rejoin where both are set*), and unsubscribed. `Studio::Newsletter` holds the
-  rules — `subscribed?`, `ever_joined?`, `needs_email?` — pure and duck-typed
-  like `Studio::OauthIdentity`.
-
-  `ever_joined?` is deliberately a different question from `subscribed?`: leaving
-  stamps a date and never clears the join, so a consumer paying a once-ever
-  welcome bonus cannot have it re-earned by cycling.
-
-  **ASYMMETRIC ON PURPOSE.** Joining is one click; leaving asks for confirmation
-  in a modal. Joining is reversible from the same card, so a confirm step would
-  be friction protecting nothing — a mis-click on leave is silent until the next
-  send that never arrives. An account with **no address on file** (a wallet-only
-  sign-in) is asked for one in a modal rather than allowed to submit and fail;
-  the address is written but **not** marked verified, because typing an address
-  is not the same as holding it.
-
-  Gated on `requires:` like every other row, so a host without the columns gets
-  silence rather than a 500. The columns ship consumer-first under
-  *Roll Out Standard Profile Columns*.
+  The host is **not** the cropper: `/profile` mounts `studio/modals/_scoped_host`
+  and never `studio/cropper_assets`, because the avatar is read-only on that page.
 
 ### Fixed
 
@@ -1668,21 +1821,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   first browser spec — the view suite was green on the `@click` attribute
   throughout.
 
-### Changed
-
-- **The read page mounts a modal host only when a row asks for one.** This is the
-  registry's `modals:` key finally doing the job it was documented for — until
-  the newsletter row, nothing on `/profile` opened a modal and mounting a host
-  would have been furniture for nobody.
-
-  `modals:` is now **a partial path rather than a boolean**. A host row that
-  declares modals keeps its partial in the host's own app, so any convention like
-  `"studio/profiles/#{key}_modals"` would resolve to a path that does not exist
-  there. It costs one string and works for everyone.
-
-  The host is **not** the cropper: `/profile` mounts `studio/modals/_scoped_host`
-  and never `studio/cropper_assets`, because the avatar is read-only on that page.
-
+## 0.50.0 — 2026-08-15
 
 ### Added
 
@@ -1719,19 +1858,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   the intended consequence — the sidebar always has at least the viewer's own
   profile in it — but it is a visible change to a navbar every consumer inherits.
 
-### Fixed
-
-- **`Studio.profile_sections`' `if:` gate no longer fails open on a Symbol.**
-  `if: :some_predicate` — Rails' own `before_action ..., if: :method_name`
-  spelling, and so the most natural thing a host will write — was coerced
-  straight to `true`, because a Symbol does not answer `call`. The gate silently
-  did nothing, with no signal to the host, in the same permissive direction as
-  the bug `if:` was added to fix. Symbols and Strings now name a method on the
-  view; a name the view does not answer drops the row rather than rendering it.
-  Lambdas and plain booleans are unchanged.
-
-### Added
-
 - **`/profile` splits into a read page and an edit page.** `/profile` is now "you
   at a glance" — the identity header, and the rows you look at rather than type
   into. `/profile/edit` (`edit_profile_path`) holds the fields, in ONE form with
@@ -1759,6 +1885,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   non-interactive: it duplicates what is already in the document rather than
   adding a second copy for a screen reader to read out. Honors
   `prefers-reduced-motion`.
+
+## 0.49.0 — 2026-08-15
+
+### Added
 
 - **`/profile` gains the Email field — changeable from any signed-in session.**
   It saves with the rest of the edit form through `PATCH /profile`.
@@ -1790,6 +1920,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   turf-monster's defines one with the SAME signature — so there the call would
   not raise, it would quietly send TURF's copy, banner and `account_url` instead
   of the engine's. The silent case is the dangerous one.
+
+## 0.48.0 — 2026-08-15
+
+### Added
 
 - **`/profile` gains the Google account row.** Shows the linked identity with an
   Unlink control, or a branded Connect button that POSTs to OmniAuth's own
@@ -1984,6 +2118,21 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   mcritchie-industries and acquisition-studio gain a working link where they had
   `href="#"`; every other consumer forks the partial and is untouched.
 
+### Fixed
+
+- **`Studio.profile_sections`' `if:` gate no longer fails open on a Symbol.**
+  `if: :some_predicate` — Rails' own `before_action ..., if: :method_name`
+  spelling, and so the most natural thing a host will write — was coerced
+  straight to `true`, because a Symbol does not answer `call`. The gate silently
+  did nothing, with no signal to the host, in the same permissive direction as
+  the bug `if:` was added to fix. Symbols and Strings now name a method on the
+  view; a name the view does not answer drops the row rather than rendering it.
+  Lambdas and plain booleans are unchanged.
+
+## 0.47.2 — 2026-08-14
+
+### Changed
+
 - **No pre-registered email seeds a logo — `magic_link` was the last one, and it
   seeded the Studio wordmark onto the SIGN-IN email.** `STANDARD`'s `magic_link`
   entry carried `logo: "emails/logo-horizontal.png"`, and
@@ -2033,32 +2182,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   that registers no mark, so the page says so rather than offering a choice that
   changes nothing.
 
-- **`email_change_confirmation` leaves the pre-registered set; `newsletter_subscribed`
-  joins it.** `STANDARD` means "the emails EVERY Studio app sends", and only
-  turf-monster sends an email-change confirmation — which it **already registers
-  itself**, with its own artwork, in `config/initializers/studio_emails.rb`. No
-  host loses a banner, and no host action is required for the removal.
-
-  What DOES break consumers is the ADDITION. Three suites assert against the
-  whole shared catalogue, so a new standard email fails them:
-
-  | Consumer | Assertion | Fix | State |
-  |---|---|---|---|
-  | turf-monster | `EmailRegistrationTest` compares the full key list | McRitchie-Studio/turf-monster#292 | merged |
-  | turf-monster | `AdminEmailsRenderTest` counts `tbody img` exactly | McRitchie-Studio/turf-monster#294 | merged |
-  | mcritchie-studio | `StudioEmailsPageTest` pins the registry list, an `email_change_confirmation` link, and the upload-rejection wording | McRitchie-Studio/mcritchie-studio#813 | merged |
-
-  The second turf fix is the easy one to miss: a layered standard email renders
-  its banner through an `<iframe>` rather than an `<img>`, so an exact image
-  count comes up one short. #292 alone does NOT turn that lane green.
-
-  Consumer CI builds each app against its **default branch**, so all three had to
-  reach `main` before this engine's consumer lanes could go green. All three now
-  have, and the lanes pass. Nothing on this branch ever could have turned them
-  green — a red consumer lane here is a consumer-side fix, not an engine defect.
-
-  The artwork `emails/email-change-confirmation.gif` still ships, so a host that
-  wants the entry can register it.
+## 0.47.0 — 2026-08-13
 
 ### Added
 
@@ -2115,6 +2239,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `wallet-changed`, `cdp/returns/show.html.erb` for `cdp-ramp`), which are the
   exact defect `isLive` exists to prevent. A turf-side follow-up, not part of
   this change.
+
+## 0.46.0 — 2026-08-13
+
+### Added
 
 - **The standard user profile columns — and the engine's first migration against
   a host-owned table.** Every other engine migration creates a `studio_*` table
@@ -2193,6 +2321,46 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
     rather than raising on every signed-in request — so the gem can land there
     before the migration does.
 
+## 0.44.1 — 2026-08-13
+
+### Fixed
+
+- **The newsletter's seed lent every host the McRitchie Studio wordmark.**
+  `STANDARD`'s `newsletter_subscribed` entry seeded
+  `logo: "emails/logo-horizontal.png"`, and `EmailCatalog.register` merges on
+  `logo.presence` — so an omitted `logo:` INHERITS. A host registering that email
+  for any ordinary reason (a relabel, its own preview builder) would have sent its
+  branded newsletter under Studio's mark, and the alt text could not warn anyone:
+  `Studio::Banner` sets it from `Studio.app_name`, so it always agrees with the
+  host and never with the pixels. turf-monster hit the same mechanism on
+  `magic_link`.
+
+  **No consumer was exposed.** No app registers `newsletter_subscribed` or sends
+  it — turf's own `NewsletterMailer` sends its flat `newsletter_welcome` — so this
+  was visible only on the `/admin/emails` preview. It was seeded identically in
+  0.42 and 0.43; nothing changed it recently.
+
+  The seed now carries no logo. **Artwork still rides the gem** — a background is
+  a picture any app can send, and inheriting one is what gives a new app
+  good-looking mail on day one. A wordmark is somebody's identity, and the line is
+  drawn there. An app that wants a mark registers a path IT ships
+  (`register("newsletter_subscribed", logo: "emails/our-mark.png")`) or sets one
+  on /admin/emails. Guards render the mail and resolve every `<img>` back to a
+  file on the engine's own asset load path, comparing the wordmark by its BYTES,
+  so renaming the file and re-seeding it is caught too.
+
+  **`magic_link` is unchanged and still seeds the wordmark.** A host that
+  registers no mark of its own inherits it on the sign-in email. That is an
+  **upgrade trap** rather than a live leak — the apps with no email initializer
+  are pinned before this registry existed, so they inherit nothing today, but the
+  bump that brings one forward would hand it another brand's mark with no code
+  change of its own. Tracked separately, with the design question of whether
+  `STANDARD` should seed a logo at all.
+
+## 0.42.0 — 2026-08-12
+
+### Added
+
 - **`Studio::NewsletterMailer` — a sendable "you're on the list" email.**
   Namespaced under `Studio::` on purpose: a host that defines its own top-level
   `UserMailer` (McRitchie Studio does) SHADOWS the engine's outright, so an
@@ -2245,39 +2413,36 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   host's own users with avatar and initials, degrading to a sample when an app has
   none.
 
+### Changed
+
+- **`email_change_confirmation` leaves the pre-registered set; `newsletter_subscribed`
+  joins it.** `STANDARD` means "the emails EVERY Studio app sends", and only
+  turf-monster sends an email-change confirmation — which it **already registers
+  itself**, with its own artwork, in `config/initializers/studio_emails.rb`. No
+  host loses a banner, and no host action is required for the removal.
+
+  What DOES break consumers is the ADDITION. Three suites assert against the
+  whole shared catalogue, so a new standard email fails them:
+
+  | Consumer | Assertion | Fix | State |
+  |---|---|---|---|
+  | turf-monster | `EmailRegistrationTest` compares the full key list | McRitchie-Studio/turf-monster#292 | merged |
+  | turf-monster | `AdminEmailsRenderTest` counts `tbody img` exactly | McRitchie-Studio/turf-monster#294 | merged |
+  | mcritchie-studio | `StudioEmailsPageTest` pins the registry list, an `email_change_confirmation` link, and the upload-rejection wording | McRitchie-Studio/mcritchie-studio#813 | merged |
+
+  The second turf fix is the easy one to miss: a layered standard email renders
+  its banner through an `<iframe>` rather than an `<img>`, so an exact image
+  count comes up one short. #292 alone does NOT turn that lane green.
+
+  Consumer CI builds each app against its **default branch**, so all three had to
+  reach `main` before this engine's consumer lanes could go green. All three now
+  have, and the lanes pass. Nothing on this branch ever could have turned them
+  green — a red consumer lane here is a consumer-side fix, not an engine defect.
+
+  The artwork `emails/email-change-confirmation.gif` still ships, so a host that
+  wants the entry can register it.
+
 ### Fixed
-
-- **The newsletter's seed lent every host the McRitchie Studio wordmark.**
-  `STANDARD`'s `newsletter_subscribed` entry seeded
-  `logo: "emails/logo-horizontal.png"`, and `EmailCatalog.register` merges on
-  `logo.presence` — so an omitted `logo:` INHERITS. A host registering that email
-  for any ordinary reason (a relabel, its own preview builder) would have sent its
-  branded newsletter under Studio's mark, and the alt text could not warn anyone:
-  `Studio::Banner` sets it from `Studio.app_name`, so it always agrees with the
-  host and never with the pixels. turf-monster hit the same mechanism on
-  `magic_link`.
-
-  **No consumer was exposed.** No app registers `newsletter_subscribed` or sends
-  it — turf's own `NewsletterMailer` sends its flat `newsletter_welcome` — so this
-  was visible only on the `/admin/emails` preview. It was seeded identically in
-  0.42 and 0.43; nothing changed it recently.
-
-  The seed now carries no logo. **Artwork still rides the gem** — a background is
-  a picture any app can send, and inheriting one is what gives a new app
-  good-looking mail on day one. A wordmark is somebody's identity, and the line is
-  drawn there. An app that wants a mark registers a path IT ships
-  (`register("newsletter_subscribed", logo: "emails/our-mark.png")`) or sets one
-  on /admin/emails. Guards render the mail and resolve every `<img>` back to a
-  file on the engine's own asset load path, comparing the wordmark by its BYTES,
-  so renaming the file and re-seeding it is caught too.
-
-  **`magic_link` is unchanged and still seeds the wordmark.** A host that
-  registers no mark of its own inherits it on the sign-in email. That is an
-  **upgrade trap** rather than a live leak — the apps with no email initializer
-  are pinned before this registry existed, so they inherit nothing today, but the
-  bump that brings one forward would hand it another brand's mark with no code
-  change of its own. Tracked separately, with the design question of whether
-  `STANDARD` should seed a logo at all.
 
 - **The manager reported artwork that was not being sent.** A layered-native email
   (no flat `default_asset`) drew an empty box and a "sends without a banner" badge
@@ -2290,6 +2455,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   it at its own delimiter; the rest of the sentence rendered above the banner. The
   existing guard was real and only ran on the index, so it never saw the page that
   shipped it.
+
+## 0.41.0 — 2026-08-12
 
 ### Added
 
@@ -2311,6 +2478,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   unchanged. Chromium-only, with the Intl/timezone blind spot that implies named
   and covered instead by `test/views/at_time_zone_table_test.rb`. Full rationale,
   limits and cost: `docs/E2E_LANE.md`.
+
+## 0.40.0 — 2026-08-12
+
+### Added
 
 - **The "at" time stamp — `at_time_tag` + `studio/at_time_script`.** A shared
   primitive for stamping WHEN something happened, on the READER's clock rather

@@ -1,0 +1,63 @@
+<%#
+  Living style guide specimen — THE STACK-MECHANICS VEHICLE.
+
+  This card exists to be POKED AT, not to be copied. Everything under
+  "Stack behaviour" below the specimen grid — dismissibility, the
+  minimum-visible-duration floor, LIFO stacking, and advance() — needs a card on
+  the stack to demonstrate itself on, and the mechanics are the engine's while
+  the card is incidental.
+
+  IT REPLACED A MIRROR, AND THAT IS THE POINT. Until 2026-09-09 every one of
+  those demos ran on style/modals/_onchain_tx, a copy of turf-monster's
+  on-chain card. Borrowing a consumer's card as a test vehicle is how a copy
+  earns tenure: it drifts from the original, and deleting it takes six unrelated
+  demos down with it. This card is built from engine blocks only
+  (studio/modals/blocks/_card_header), belongs to no app, and answers to nothing
+  but the store — so it can never disagree with a card that ships.
+
+  THREE FACES ON ONE ID, which is exactly what advance() needs. props.state
+  picks the face and the entry is never replaced, so a timed transition patches a
+  LIVE card rather than pushing a new one. Three separate ids could not show that
+  — and the three cards those ids would name (ds-processing, ds-success,
+  ds-error) already have their own specimens in System & status, where they are
+  the subject rather than the vehicle.
+
+  It deliberately does NOT auto-resolve. blocks/_processing_card takes a
+  resolve_expr and self-terminates, which is right for a specimen of that block
+  and wrong here: a card that closes itself cannot demonstrate that Escape is
+  locked.
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div x-data="{ get props() { var c = Alpine.store('dsModals').current(); return (c && c.props) || {}; } }">
+  <template x-if="(props.state || 'processing') === 'processing'">
+    <div>
+      <%= render "studio/modals/blocks/card_header",
+            spinner: true,
+            title_key: "props.title || 'Working…'",
+            subtitle_key: "props.message || 'This card is the stack-mechanics vehicle.'" %>
+    </div>
+  </template>
+
+  <template x-if="props.state === 'success'">
+    <div>
+      <%= render "studio/modals/blocks/card_header",
+            icon_color: "success",
+            title_key: "props.title || 'Done'",
+            subtitle_key: "props.message || 'Resolved in place — the stack entry was never replaced.'" %>
+      <button type="button" @click="$store.dsModals.close()"
+              class="btn btn-primary btn-lg w-full">Close</button>
+    </div>
+  </template>
+
+  <template x-if="props.state === 'error'">
+    <div>
+      <%= render "studio/modals/blocks/card_header",
+            icon: :error,
+            title_key: "props.title || 'That did not work'",
+            subtitle_key: "props.message || 'The error face of the same stack entry.'" %>
+      <button type="button" @click="$store.dsModals.close()"
+              class="btn btn-outline btn-lg w-full">Close</button>
+    </div>
+  </template>
+</div>
