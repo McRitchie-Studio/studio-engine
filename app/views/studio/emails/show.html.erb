@@ -66,16 +66,16 @@
   badge_class, badge_label, badge_note =
     case source
     when :app
-      ["badge bg-success/10 text-success border-success/30", "Uploaded here",
+      ["badge bg-success/10 text-success-ink border-success/30", "Uploaded here",
        "Stored for #{Studio.app_name} — this upload is what ships."]
     when :app_asset
-      ["badge bg-success/10 text-success border-success/30", "#{Studio.app_name}'s artwork",
+      ["badge bg-success/10 text-success-ink border-success/30", "#{Studio.app_name}'s artwork",
        "Committed in this app's own assets. Upload to replace it."]
     when :engine_default
       ["badge bg-inset text-muted border-subtle", "Studio default",
        "Shared artwork that ships with the engine. Upload to make it #{Studio.app_name}'s."]
     else
-      ["badge bg-warning/10 text-warning border-warning/30", "No image",
+      ["badge bg-warning/10 text-warning-ink border-warning/30", "No image",
        "This email sends without a banner."]
     end
 %>
@@ -476,7 +476,7 @@
       </div>
     <% end %>
     <% if @preview_error.present? %>
-      <p class="text-2xs text-danger mt-2 px-1 font-mono break-all"><%= @preview_error %></p>
+      <p class="text-2xs text-danger-ink mt-2 px-1 font-mono break-all"><%= @preview_error %></p>
     <% end %>
   </section>
 

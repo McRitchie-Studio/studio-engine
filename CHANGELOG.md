@@ -17,6 +17,59 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   turf-monster's currentColor ring (`--spinner-track: currentColor;
   --spinner-color: transparent`), so a host that drops its fork sees no change.
   Guarded by `test/views/resend_footer_error_contrast_test.rb`.
+- **The sign-in overlay blurs in every consumer, and the eight engine classes
+  that painted nothing are fixed.** The class vocabulary guard
+  (`test/views/engine_class_vocabulary_test.rb`) listed them as open defects;
+  its allow-list now holds only deliberate JS and test hooks.
+  - `sessions/new`'s SSO overlay used turf-monster's `backdrop-overlay`, so
+    mcritchie-industries showed it with no blur and no scrim. It now carries
+    `backdrop-blur-[2px] backdrop-brightness-70 bg-primary-900/20`, which
+    compiles to turf's `blur(2px) brightness(0.7)` over a 20% primary-900.
+    Guarded by `test/integration/sign_in_overlay_blur_test.rb`, which renders
+    the page and compiles the overlay's classes without the motion layer.
+  - `_email_field`'s `email-reject` shake lived only in turf. The engine's
+    motion layer now owns it under the same name, with byte-compatible
+    keyframes and a reduced-motion variant that keeps the border flash.
+  - `text-danger`, `hover:text-danger`, `text-warning`, `bg-warning/10`,
+    `border-warning/30` and `placeholder-muted` compiled to nothing. The
+    text forms are now `text-danger-ink` and `text-warning-ink`, the fills
+    compile, and `placeholder-muted` is `placeholder:text-muted`. The same
+    fix reaches the success and warning badges in `studio/emails/show` and
+    the flash panel in `studio/email_images/index`, whose classes sit in Ruby
+    strings the guard's scanner cannot read; a raw-source check now covers
+    them. The flash panel is now `bg-surface` with a role border, because
+    danger-ink on a danger tint measures 4.10 to 4.18:1, under AA.
+  - **For consumers:** turf-monster can delete its `@utility backdrop-overlay`
+    (no turf view uses it now) and its `@utility email-reject` plus keyframes.
+    Until it does, turf's utilities-layer copy outranks the engine's rule, so
+    turf keeps its own shake and does not get the reduced-motion variant.
+
+### Added
+
+- **Warning and success inks, and fills for all three status roles.**
+  `Studio::ThemeResolver` now emits `--color-warning-ink` and
+  `--color-success-ink` beside `--color-danger-ink`, and the preset maps them
+  to `text-warning-ink` and `text-success-ink`. It also registers `success`,
+  `warning` and `danger` as background and border colours, so `bg-warning/10`
+  and `border-danger/30` compile. It deliberately registers no bare
+  `text-<role>`: every default role colour fails AA as text on the light
+  surfaces (warning #FF7C47 2.04:1, success #4BAF50 2.22:1, danger #EF4444
+  3.01:1). The warning and success inks are read inside their own
+  `bg-<role>/10` badge, so `ThemeResolver#status_ink` also counts that tint as
+  a surface; tuned to the bare surfaces alone, the warning ink measured 3.91:1
+  there. `--color-danger-ink` is unchanged. Danger text belongs on a theme
+  surface, never a danger tint, and the vocabulary guard now refuses that
+  combination in engine views. `Studio::ColorScale.blend` composites a
+  translucent fill over a surface. Guarded by
+  `test/lib/status_ink_contrast_test.rb`.
+
+### Changed
+
+- **The vocabulary guard's Tailwind build reads only its probe.** Tailwind v4
+  auto-detects sources from the working directory, which is this repo, so an
+  empty probe compiled to 75 KB. `source(none)` now makes the probe the only
+  source. The build recipe moved to `test/support/engine_tailwind_build.rb`,
+  where the overlay test shares it.
 
 ### Docs
 

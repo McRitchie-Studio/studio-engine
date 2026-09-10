@@ -31,6 +31,8 @@ module Studio
       dark_base   = colors[:dark] || "#1A1535"
       primary     = colors[:primary] || "#8E82FE"
       border_rgb  = ColorScale.lighten(dark_base, 0.30)
+      success     = colors[:success] || "#4BAF50"
+      warning     = colors[:warning] || "#FF7C47"
       danger      = colors[:danger] || "#EF4444"
       surfaces    = dark_surfaces(dark_base)
 
@@ -69,8 +71,8 @@ module Studio
         "--color-shadow"         => "transparent",
         "--color-cta"            => primary,
         "--color-cta-hover"      => ColorScale.darken(primary, 0.30),
-        "--color-success"        => colors[:success] || "#4BAF50",
-        "--color-warning"        => colors[:warning] || "#FF7C47",
+        "--color-success"        => success,
+        "--color-warning"        => warning,
         "--color-danger"         => danger,
         # THE DANGER *INK*, which is not the danger *colour*. --color-danger is a
         # brand fill (button backgrounds, borders) and is free to be vivid;
@@ -85,8 +87,17 @@ module Studio
         # start: 0.0 is deliberate — the search tries the operator's actual danger
         # colour FIRST and blends only as far as AA demands, so a theme whose red
         # already passes keeps its exact brand hex.
+        #
+        # The warning and success inks are the same contract for the other two
+        # status roles: their default colours fail AA as text on the light
+        # surfaces too. They are found by #status_ink, which also counts the
+        # role's own tint as a surface, because they are read inside tinted
+        # badges. Danger text is not: it belongs on a theme surface, never on a
+        # danger tint (see #status_ink for why that is a rule, not an accident).
         "--color-danger-ink"     => contrast_ink(danger, direction: :lighten, start: 0.0, target: 4.5,
-                                                 against: dark_surfaces(dark_base)),
+                                                 against: surfaces),
+        "--color-warning-ink"    => status_ink(warning, surfaces, direction: :lighten),
+        "--color-success-ink"    => status_ink(success, surfaces, direction: :lighten),
         "--color-accent"         => colors[:accent] || "#F72585"
       }
     end
@@ -132,6 +143,29 @@ module Studio
       louder ? secondary : muted
     end
 
+    # How strong a status role's tint is where its ink is read on it: the
+    # `bg-<role>/10 text-<role>-ink` badge and flash-panel pattern.
+    STATUS_TINT = 0.10
+
+    # The warning and success inks land on the page surfaces AND on their own
+    # role's tint over each of them (the `bg-warning/10 text-warning-ink`
+    # badge). The tint is darker than a light surface and lighter than a dark
+    # one, so an ink tuned to the bare surfaces alone came out below AA inside
+    # its own badge (default theme: warning 3.91:1 dark, success 4.00:1 dark).
+    # Counting the tints as surfaces closes that.
+    #
+    # --color-danger-ink does NOT go through here, and danger text must not sit
+    # on a danger tint: tuned to bare surfaces it measures 4.10:1 (light) and
+    # 4.18:1 (dark) on its own 10% tint. Consumers already build on that rule (turf-monster's error
+    # contrast guard keeps a control that fails the day danger-ink clears a red
+    # tint), so retuning danger-ink is a sequenced change, not a drive-by one.
+    # test/views/engine_class_vocabulary_test.rb refuses danger-ink on a danger
+    # tint in any engine view.
+    def status_ink(role, surfaces, direction:)
+      tints = surfaces.map { |bg| ColorScale.blend(role, bg, STATUS_TINT) }
+      contrast_ink(role, direction: direction, start: 0.0, target: 4.5, against: surfaces + tints)
+    end
+
     # Bounded, clamped search: raise the blend amount from `start` until the
     # ink clears `target` contrast against every background in `against`.
     # Clamps at 1.0 (pure white/black), so a pathological base degrades to the
@@ -169,6 +203,8 @@ module Studio
     def light_mode_vars
       light_base = colors[:light] || "#f8fafc"
       primary    = colors[:primary] || "#8E82FE"
+      success    = colors[:success] || "#4BAF50"
+      warning    = colors[:warning] || "#FF7C47"
       danger     = colors[:danger] || "#EF4444"
       surfaces   = light_surfaces(light_base)
 
@@ -196,8 +232,8 @@ module Studio
         "--color-shadow"         => "rgba(0,0,0,0.05)",
         "--color-cta"            => primary,
         "--color-cta-hover"      => ColorScale.darken(primary, 0.30),
-        "--color-success"        => colors[:success] || "#4BAF50",
-        "--color-warning"        => colors[:warning] || "#FF7C47",
+        "--color-success"        => success,
+        "--color-warning"        => warning,
         "--color-danger"         => danger,
         # THE DANGER *INK*, which is not the danger *colour*. --color-danger is a
         # brand fill (button backgrounds, borders) and is free to be vivid;
@@ -212,8 +248,13 @@ module Studio
         # start: 0.0 is deliberate — the search tries the operator's actual danger
         # colour FIRST and blends only as far as AA demands, so a theme whose red
         # already passes keeps its exact brand hex.
+        #
+        # The warning and success inks are the same contract for the other two
+        # status roles (see the dark-mode note).
         "--color-danger-ink"     => contrast_ink(danger, direction: :darken, start: 0.0, target: 4.5,
-                                                 against: light_surfaces(light_base)),
+                                                 against: surfaces),
+        "--color-warning-ink"    => status_ink(warning, surfaces, direction: :darken),
+        "--color-success-ink"    => status_ink(success, surfaces, direction: :darken),
         "--color-accent"         => colors[:accent] || "#F72585"
       }
     end
