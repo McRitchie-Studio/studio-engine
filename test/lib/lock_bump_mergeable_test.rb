@@ -325,7 +325,7 @@ class LockBumpMergeableTest < Minitest::Test
                "an unconditional merge step merges every PR the workflow sees, gate or no gate"
   end
 
-  # --- the Dependabot config's three load-bearing properties ---------------------
+  # --- the Dependabot config's load-bearing properties ---------------------------
 
   def test_dependabot_targets_accepted_on_every_entry
     # Without target-branch, Dependabot targets the DEFAULT branch (main).
@@ -364,6 +364,62 @@ class LockBumpMergeableTest < Minitest::Test
     assert_includes body, "per-entry", "the target-branch rationale must travel with the config"
     assert_match(/security updates always target the default branch/i, body,
                  "the un-retargetable security-update caveat must survive")
+  end
+
+  def test_dependabot_exempts_every_allowed_gem_from_the_cooldown
+    # THE LANE'S ON/OFF SWITCH, and it fails SILENTLY when it is wrong.
+    #
+    # GitHub applies a DEFAULT 3-day cooldown to version updates even when
+    # `cooldown` is never configured, so a gem that releases more often than
+    # every three days is permanently inside the window: Dependabot discards
+    # every candidate it could bump to, computes `latest` from what survives,
+    # and reports "No update needed" against a lock that is genuinely stale.
+    # Measured on run 34390789978 (2026-09-09T18:43Z) with the lock at 0.9.0 and
+    # 0.9.1 published 4h18m earlier: "Filtered out 5 versions due to cooldown" /
+    # "Latest version is 0.6.0" / "No update needed for solana-studio 0.9.0".
+    # All four runs since the config landed said the same thing. Conclusion
+    # `success`, PRs opened zero — nothing anywhere goes red.
+    #
+    # THE ASSERTION IS DERIVED FROM `allow`, NOT HARD-CODED, because the
+    # invariant is per-gem: a gem this config is ALLOWED to bump but is not
+    # EXEMPT from the cooldown is a lane that quietly does nothing for it. So
+    # widening `allow` without widening `exclude` reddens here rather than
+    # shipping a second inert entry.
+    config = YAML.safe_load_file(DEPENDABOT, aliases: true)
+
+    config["updates"].each do |entry|
+      allowed  = entry["allow"].to_a.map { |a| a["dependency-name"] }
+      excluded = entry.dig("cooldown", "exclude").to_a
+
+      refute_empty allowed, "an entry that allows nothing cannot bump anything"
+      assert_empty allowed - excluded,
+                   "every allowed gem must be exempt from the cooldown; " \
+                   "#{(allowed - excluded).inspect} would be filtered out as too fresh"
+    end
+  end
+
+  def test_dependabot_never_zeroes_the_cooldown_default_instead_of_excluding
+    # `default-days: 0` is the obvious-looking alternative to `exclude` and it is
+    # a trap. The Dependabot options reference does not confirm 0 is a legal
+    # value, and an INVALID dependabot.yml does not fail this repo's CI or a PR
+    # check — it takes the whole lane down with the error surfaced only on the
+    # repo's own Dependabot page, which is exactly the class of silent failure
+    # the test above exists to catch. `exclude` is documented to opt a
+    # dependency out of the cooldown, so that is what this config uses.
+    config = YAML.safe_load_file(DEPENDABOT, aliases: true)
+
+    config["updates"].each do |entry|
+      cooldown = entry["cooldown"]
+      next if cooldown.nil? # the test above is what requires one to exist
+
+      %w[default-days include-major-days include-minor-days include-patch-days].each do |key|
+        next unless cooldown.key?(key)
+
+        refute_equal 0, cooldown[key],
+                     "#{key}: 0 is not a documented value; an invalid dependabot.yml " \
+                     "kills the lane with the error visible only on the Dependabot page"
+      end
+    end
   end
 
   # --- the degradation path: a breaking bump must land on TODAY's behaviour ------
