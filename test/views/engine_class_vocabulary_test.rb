@@ -1,10 +1,8 @@
 # frozen_string_literal: true
 
 require "test_helper"
-require "tmpdir"
-require "open3"
 require "set"
-require "tailwindcss/ruby"
+require_relative "../support/engine_tailwind_build"
 
 # [unit] An engine view may name only classes the ENGINE can define.
 #
@@ -37,17 +35,21 @@ require "tailwindcss/ruby"
 # bindings are read only for quoted literals that are object KEYS or ternary
 # BRANCHES — a comparison operand (`mode === 'custom'`) is data, not a class.
 #
-# THE ALLOW-LISTS ARE DECISIONS, NOT SKIPS. A token that is legitimately
-# undefined goes on a list, with its reason, so it moves only when someone moves
-# it deliberately. Each list is policed in BOTH directions: an entry whose token
-# is now defined, or no longer used, fails as stale — so the open-defect lists
-# can only shrink, and a fix cannot leave its own entry behind.
+# THE ALLOW-LIST IS A DECISION, NOT A SKIP. The only undefined names allowed are
+# HOOKS: names that carry no CSS by design, each with its reason. The list is
+# policed in BOTH directions: an entry whose token is now defined, or no longer
+# used, fails as stale. It once also held the OPEN DEFECTS this guard found on its
+# first run (two turf-only utilities and six colour classes the preset never
+# registered). Those were fixed, not listed, so there is no longer anywhere to
+# park a host-only class: an engine view either names engine vocabulary or fails.
+#
+# A BLIND SPOT, stated plainly. A class written inside Ruby (`badge_class =
+# "..."`, a ternary in `<%= %>`) never reaches this scanner. The status-role
+# colours, which lived exactly there, have their own raw-source guard below
+# (test_status_role_colours_resolve_wherever_a_view_writes_them).
 class EngineClassVocabularyTest < ActiveSupport::TestCase
   ROOT       = File.expand_path("../..", __dir__)
   VIEWS      = File.join(ROOT, "app/views")
-  PRESET     = File.join(ROOT, "tailwind/studio.tailwind.config.js")
-  ENGINE_CSS = File.join(ROOT, "app/assets/tailwind/studio_engine/engine.css")
-  MOTION_CSS = File.join(ROOT, "app/assets/tailwind/studio_engine/engine-motion.css")
   PLAIN_CSS  = File.join(ROOT, "app/assets/stylesheets/**/*.css")
 
   # Stands in for any ERB tag, so a token it touches is recognisably dynamic.
@@ -72,36 +74,7 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
     "stage-count"          => "board column count pill; styled by the utilities beside it"
   }.freeze
 
-  # ── OPEN DEFECTS: host-only utilities an engine view still names ─────────────
-  # The cta-spinner class of bug, found by this guard on its first run. Each is
-  # defined ONLY in turf-monster, so it paints nothing anywhere else. Listed so
-  # the guard can go green on the fix it was written for without pretending
-  # these are fine. Fixing one means deciding, per name, what the engine should
-  # own — not copying turf's CSS — and then deleting its entry here.
-  KNOWN_HOST_ONLY = {
-    "email-reject"     => "OPEN DEFECT: studio/modals/shared/_email_field; turf @utility email-reject " \
-                          "(application.css:302), a shake + border fade the engine has no equivalent of",
-    "backdrop-overlay" => "OPEN DEFECT: sessions/new; turf @utility backdrop-overlay (application.css:274). " \
-                          "mcritchie-industries renders this engine view and lacks it, so the SSO overlay has " \
-                          "no blur. Expressible in engine terms: backdrop-blur-[2px] backdrop-brightness-[.7] " \
-                          "bg-primary-900/20"
-  }.freeze
-
-  # ── OPEN DEFECTS: theme-role colour utilities the preset never registers ─────
-  # The preset registers `danger-ink` under textColor only, and no `danger` or
-  # `warning` colour at all, so these compile to nothing in every consumer that
-  # does not register them itself (turf registers `warning`; McRitchie Studio,
-  # which renders these admin pages, registers neither).
-  KNOWN_PHANTOM = {
-    "text-danger"       => "OPEN DEFECT: studio/emails/show — use text-danger-ink",
-    "hover:text-danger" => "OPEN DEFECT: components/_avatar_cropper — use hover:text-danger-ink",
-    "text-warning"      => "OPEN DEFECT: schema/index, studio/emails/orphan — no warning text colour exists",
-    "bg-warning/10"     => "OPEN DEFECT: studio/emails/orphan — no warning colour exists",
-    "border-warning/30" => "OPEN DEFECT: studio/emails/orphan — no warning colour exists",
-    "placeholder-muted" => "OPEN DEFECT: error_logs/index, schema/index — muted is a textColor only"
-  }.freeze
-
-  ALLOWED = HOOKS.merge(KNOWN_HOST_ONLY).merge(KNOWN_PHANTOM).freeze
+  ALLOWED = HOOKS
 
   # ── views that depend on the OPT-IN motion layer ───────────────────────────
   # engine-motion.css does NOT auto-bundle (see its header): a consumer adopts it
@@ -181,34 +154,10 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
 
   # ── the vocabulary ─────────────────────────────────────────────────────────
 
-  # Class names a stylesheet defines — escapes decoded (`hover\:x`, `\32 xl`).
-  # A superset by construction (a decimal like `.5rem` reads as a "class"), so it
-  # can only ever over-credit a token, never falsely accuse one.
-  def self.classes_in_css(css)
-    css.gsub(%r{/\*.*?\*/}m, "")
-       .scan(/\.((?:\\[0-9a-fA-F]{1,6}\s?|\\.|[A-Za-z0-9_-])+)/)
-       .flatten
-       .to_set { |raw| raw.gsub(/\\([0-9a-fA-F]{1,6})\s?/) { [::Regexp.last_match(1).hex].pack("U") }.gsub(/\\(.)/, '\1') }
-  end
-
-  def self.compile(tokens, motion:)
-    Dir.mktmpdir("studio-engine-vocab") do |dir|
-      File.write(File.join(dir, "probe.html"), %(<div class="#{tokens.join(' ')}"></div>\n))
-      File.write(File.join(dir, "tailwind.config.js"),
-                 "const studio = require('#{PRESET}')\n" \
-                 "module.exports = { darkMode: 'class', content: ['#{dir}/probe.html'], theme: studio.theme }\n")
-      input = +"@import 'tailwindcss';\n@config '#{dir}/tailwind.config.js';\n@import '#{ENGINE_CSS}';\n"
-      input << "@import '#{MOTION_CSS}';\n" if motion
-      File.write(File.join(dir, "input.css"), input)
-
-      out = File.join(dir, "out.css")
-      _stdout, stderr, status = Open3.capture3(Tailwindcss::Ruby.executable,
-                                               "-i", File.join(dir, "input.css"), "-o", out)
-      raise "tailwind build failed:\n#{stderr}" unless status.success?
-
-      File.read(out)
-    end
-  end
+  # The build recipe lives in test/support/engine_tailwind_build.rb, shared with
+  # the sign-in overlay test so the two cannot drift into different builds.
+  def self.classes_in_css(css) = EngineTailwindBuild.classes_in_css(css)
+  def self.compile(tokens, motion:) = EngineTailwindBuild.compile(tokens, motion: motion)
 
   def self.owned_plain_css
     sheets = Dir.glob(PLAIN_CSS).map { |f| File.read(f) }
@@ -267,10 +216,34 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
                  "delete the entries"
   end
 
-  def test_the_lists_do_not_overlap
-    overlap = [HOOKS, KNOWN_HOST_ONLY, KNOWN_PHANTOM].map(&:keys).combination(2).flat_map { |a, b| a & b }
+  # ── the status-role colours, wherever a view writes them ──────────────────
+  # These were the colour half of the open defects, and most of their uses sat
+  # where the scanner above cannot look: Ruby strings in emails/show's badge
+  # `case` and a ternary in email_images/index's flash. So this reads RAW source.
+  #
+  # The contract (tailwind/studio.tailwind.config.js + ThemeResolver): a status
+  # role is a FILL (bg-/border-<role>, vivid, free) or an INK (text-<role>-ink,
+  # derived per theme to clear AA). A bare text-<role> is the defect: the default
+  # role colours fail AA as text, so the preset deliberately never mints one.
+  STATUS_ROLE = /(?<![\w-])(?:[a-z-]+:)*(?:bg|border|text)-(?:success|warning|danger)(?:-ink)?(?:\/\d+)?(?![\w-])/
 
-    assert_empty overlap, "#{overlap.inspect} are on more than one list — a name has exactly one reason"
+  def self.status_role_tokens
+    view_paths.each_with_object(Hash.new { |h, k| h[k] = Set.new }) do |path, found|
+      File.read(path).gsub(/<%#.*?%>/m, "").scan(STATUS_ROLE) { |t| found[t] << relative(path) }
+    end
+  end
+
+  def test_status_role_colours_resolve_wherever_a_view_writes_them
+    tokens = self.class.status_role_tokens
+    compiled = self.class.classes_in_css(self.class.compile(tokens.keys.sort, motion: false))
+    bare_text = tokens.keys.grep(/(?:\A|:)text-(?:success|warning|danger)(?:\/\d+)?\z/)
+    phantom   = tokens.keys.reject { |t| compiled.include?(t) }
+
+    assert_empty bare_text.to_h { |t| [t, tokens[t].to_a.sort] },
+                 "a bare text-<role> colour is the AA defect the inks exist to fix — use text-<role>-ink"
+    assert_empty phantom.to_h { |t| [t, tokens[t].to_a.sort] },
+                 "these status-role classes compile to nothing, so they paint the inherited colour"
+    assert_operator tokens.length, :>=, 8, "only #{tokens.length} status-role tokens found — the scan went quiet"
   end
 
   # ── the opt-in layer is a declared dependency ─────────────────────────────

@@ -26,6 +26,7 @@
   Action:
     .hold-btn             press-and-hold confirm button       (ported, TM)
     .hold-stack/.fizz-bit the carbonation behind it           (ported, TM)
+    .email-reject         email field rejection shake + fade  (extracted, TM)
 
   Leveling:
     .level-badge(-1..-10) progressive level pill ladder       (ported, TM)
@@ -74,9 +75,9 @@
   - Every tuning knob (duration, size, color, %, delay) is a CSS custom property
     with a sensible themed default, so a caller retunes via `style="--x: ..."`
     or a `:root` override WITHOUT forking the rule.
-  - Namespacing: the two extracted primitives keep their source names
-    (`.studio-border-glow`, `.loading-dots`) so the follow-up de-fork is a pure
-    delete-the-local-copy swap with no view churn; their gem rules are byte-
+  - Namespacing: the extracted primitives keep their source names
+    (`.studio-border-glow`, `.loading-dots`, `.email-reject`) so the follow-up
+    de-fork is a pure delete-the-local-copy swap with no view churn; their gem rules are byte-
     compatible with the app copies, so a transient co-load is a harmless
     duplicate. The reconciled/fresh primitives use fresh generic names
     (`.spinner`, `.sheen`, `.ping`, `.fade-edge`, `.progress-meter`) that no app
@@ -1871,5 +1872,45 @@ body.modal-open { overflow: visible; }
     opacity: 0 !important;
     transition: none !important;
   }
+}
+
+/* =============================================================================
+   13. email-reject — the email field's submit-rejection "no" (extracted, TM)
+   A short horizontal shake plus a danger border that fades back to the resting
+   border .input-field uses (border-strong), so it settles with no flash.
+   studio/modals/shared/_email_field binds it as :class="{ 'email-reject':
+   _rejecting }" when rendered with validator: true; the consumer's
+   emailValidator factory owns the _rejecting STATE, and the engine paints it.
+
+   The name and keyframes are byte-compatible with turf-monster's local
+   @utility, so the two co-load harmlessly until turf deletes its copy. Turf's
+   utilities-layer rule outranks this one until then, so the reduced-motion
+   branch below reaches turf only after that delete.
+
+   Tune:   --email-reject-duration (default 0.55s)
+   ========================================================================== */
+.email-reject {
+  animation: email-reject var(--email-reject-duration, 0.55s) ease-in-out;
+}
+
+@keyframes email-reject {
+  0%   { transform: translateX(0);    border-color: var(--color-danger); }
+  15%  { transform: translateX(-7px); }
+  30%  { transform: translateX(7px);  }
+  45%  { transform: translateX(-5px); }
+  60%  { transform: translateX(4px);  }
+  75%  { transform: translateX(-2px); }
+  100% { transform: translateX(0);    border-color: var(--color-border-strong, inherit); }
+}
+
+/* Reduced motion keeps the signal and drops the shake: the border still flashes
+   danger and fades back, and nothing moves. */
+@keyframes email-reject-fade {
+  0%   { border-color: var(--color-danger); }
+  100% { border-color: var(--color-border-strong, inherit); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .email-reject { animation-name: email-reject-fade; }
 }
 }

@@ -23,7 +23,7 @@
           }
         ">
     <input type="text" name="q" value="<%= params[:q] %>" placeholder="Search errors... (Esc to clear)" autofocus x-ref="input"
-           class="input-field pr-10 py-2.5 text-sm placeholder-muted"
+           class="input-field pr-10 py-2.5 text-sm placeholder:text-muted"
            :readonly="loading" />
     <div x-show="loading" x-cloak class="absolute right-3 top-1/2 -translate-y-1/2">
       <svg class="animate-spin h-4 w-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
