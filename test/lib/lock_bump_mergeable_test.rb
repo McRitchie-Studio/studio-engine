@@ -400,9 +400,9 @@ class LockBumpMergeableTest < Minitest::Test
 
   def test_dependabot_never_zeroes_the_cooldown_default_instead_of_excluding
     # `default-days: 0` is the obvious-looking alternative to `exclude` and it is
-    # a trap. The Dependabot options reference does not confirm 0 is a legal
-    # value, and an INVALID dependabot.yml does not fail this repo's CI or a PR
-    # check — it takes the whole lane down with the error surfaced only on the
+    # a trap. The Dependabot options reference states "The number of cooldown
+    # days must be between 1 and 90", so 0 is out of range, and an INVALID
+    # dependabot.yml does not fail this repo's CI or a PR check — it takes the whole lane down with the error surfaced only on the
     # repo's own Dependabot page, which is exactly the class of silent failure
     # the test above exists to catch. `exclude` is documented to opt a
     # dependency out of the cooldown, so that is what this config uses.
@@ -412,11 +412,11 @@ class LockBumpMergeableTest < Minitest::Test
       cooldown = entry["cooldown"]
       next if cooldown.nil? # the test above is what requires one to exist
 
-      %w[default-days include-major-days include-minor-days include-patch-days].each do |key|
+      %w[default-days semver-major-days semver-minor-days semver-patch-days].each do |key|
         next unless cooldown.key?(key)
 
         refute_equal 0, cooldown[key],
-                     "#{key}: 0 is not a documented value; an invalid dependabot.yml " \
+                     "#{key}: 0 is outside the documented 1-90 range; an invalid dependabot.yml " \
                      "kills the lane with the error visible only on the Dependabot page"
       end
     end

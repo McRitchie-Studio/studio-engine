@@ -54,9 +54,10 @@
 # count (2, 2, 4, 5 filtered). The lane was 100% inert, and silently so.
 #
 # `exclude` opts a dependency out of the cooldown. Do NOT reach for
-# `default-days: 0` instead: the docs do not confirm 0 is a legal value, and an
-# INVALID dependabot.yml takes the whole lane down with the error surfaced only
-# on the repo's Dependabot page — never in CI, never on a PR. Guarded by
+# `default-days: 0` instead: GitHub documents "The number of cooldown days must
+# be between 1 and 90", so 0 is out of range, and an INVALID dependabot.yml
+# takes the whole lane down with the error surfaced only on the repo's
+# Dependabot page — never in CI, never on a PR. Guarded by
 # test/lib/lock_bump_mergeable_test.rb.
 #
 # WHAT THIS DOES NOT BUY. Dependabot's fastest interval is DAILY. The windows
