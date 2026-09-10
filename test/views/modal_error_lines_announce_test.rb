@@ -95,19 +95,31 @@ class ModalErrorLinesAnnounceTest < ActiveSupport::TestCase
   # forever over an empty list — which is precisely the "green but blind" failure
   # this file exists to prevent, one level up.
   #
-  # THE FLOOR HELD AT 8 THROUGH THE INK MIGRATION. When the auth resend footer
-  # moved from text-red-400 to text-danger-ink, this assertion went red at 7 —
-  # working exactly as designed. The fix was to re-point ERROR_PARAGRAPH at the
-  # ink as well, which restored the count to 8. Lowering the floor would have
-  # been the wrong move: it would have retired a live error line from the
-  # announce rule and left this guard covering one paragraph less, silently.
+  # THE FLOOR MOVED 10 -> 8 -> 6, AND ONLY FOR THESE REASONS.
   #
-  # THE FLOOR MOVED 10 -> 8, AND ONLY FOR THIS REASON. The wallet_connect and
-  # web3_step_up partials contributed one error line each and left this engine
-  # for solana-studio with the two-template split — the engine ships no wallet UI
-  # any more. Re-derived on this tree with the pattern above, not adjusted to fit
-  # a red run. Lowering it for any OTHER reason is the failure this test names:
-  # if the count drops again, find the line that stopped matching.
+  # 10 -> 8: the wallet_connect and web3_step_up partials contributed one error
+  # line each and left this engine for solana-studio with the two-template split
+  # — the engine ships no wallet UI any more.
+  #
+  # 8 -> 6 (2026-09-09): style/modals/_auth contributed exactly two, and it was
+  # retired for mirroring turf-monster's sign-in card. ATTRIBUTED BEFORE THE
+  # NUMBER WAS TOUCHED, which is the discipline this comment exists to enforce:
+  # the five partials deleted that day were scanned with the pattern above and
+  # _auth accounts for both lines (the other four carried none), so 8 - 2 = 6 is
+  # arithmetic, not a fit to a red run. The six that remain all still match.
+  #
+  # Lowering this for any OTHER reason is the failure this test names: if the
+  # count drops again, find the line that stopped matching before you touch the
+  # floor. A floor edited to make a run green is the guard deleting itself.
+  #
+  # THE FLOOR HELD AT 6 THROUGH THE INK MIGRATION. When the auth resend footer
+  # moved from text-red-400 to text-danger-ink, this assertion went red — the
+  # restyle took that paragraph out of a text-red-* pattern, exactly the case the
+  # message below names. The fix was to re-point ERROR_PARAGRAPH at the ink as
+  # well, which restores the count. Lowering the floor instead would have retired
+  # a LIVE error line from the announce rule and left this guard covering one
+  # paragraph less, silently. Re-derived on the merged tree: the re-pointed
+  # pattern matches 6, text-red-* alone matches 5.
   #
   # Both moved partials still carry role="alert" in the gem, but solana-studio
   # ships NO equivalent guard, so those two lines are now unpinned in their new
@@ -118,10 +130,11 @@ class ModalErrorLinesAnnounceTest < ActiveSupport::TestCase
                     "only #{views.length} modal view(s) under #{MODAL_DIR} — this guard covers nothing"
 
     found = views.sum { |path| error_paragraphs(File.read(path)).length }
-    assert_operator found, :>=, 8,
-                    "the error-line pattern matched only #{found} paragraph(s); it matched 8 when " \
-                    "last re-derived. A restyle away from text-red-* would leave this guard passing " \
-                    "over nothing — re-point the pattern rather than deleting the test."
+    assert_operator found, :>=, 6,
+                    "the error-line pattern matched only #{found} paragraph(s); it matched 6 when " \
+                    "last re-derived. A restyle away from text-red-* and text-danger-ink would leave " \
+                    "this guard passing over nothing — re-point the pattern rather than lowering " \
+                    "the floor or deleting the test."
   end
 
   # The reusable error CARD is a different mechanism and is pinned separately: its

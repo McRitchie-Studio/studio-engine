@@ -125,24 +125,27 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
     refute_match(/\|\|\s*18/,          factory, "the engine factory must not default the minimum age to 18")
   end
 
-  # --- B. the entry-token DS specimen (app-specific, engine chrome) ----------
-
-  test "the entry-token specimen renders the documented purchase flow" do
-    html = render_index
-    assert_includes html, "$store.dsModals.current().id === 'entry-tokens'",
-      "the overlay registers the entry-tokens modal"
-    assert_includes html, "$store.dsModals.open('entry-tokens'",
-      "the entry-tokens specimen is wired + openable"
-    assert_includes html, "Get Entry Tokens", "the picker header renders"
-    assert_includes html, "1 token = 1 contest entry", "the token mental model is documented"
-    # On-chain accuracy (Jasper): a prepaid on-chain credit, NOT a wallet SPL token.
-    assert_includes html, "prepaid entry credit recorded on-chain",
-      "the doc frames the entry token as a prepaid on-chain credit"
-    refute_includes html, "SPL token",
-      "the doc must not frame the entry token as a wallet-held SPL token"
-    assert_includes html, "app-owned",
-      "the specimen states the packs/rails/mint stay app-owned"
-  end
+  # --- B. RETIRED 2026-09-09 — the entry-token DS specimen -------------------
+  #
+  # "the entry-token specimen renders the documented purchase flow" read
+  # style/modals/_entry_tokens, which mirrored turf-monster's modals/auth/_tokens
+  # — the STRIPE funding face, which had stopped rendering in production
+  # (application_helper#entry_funding_mode takes the else branch under mainnet
+  # flags, and both :cdp and :none take it). It carried the largest measured
+  # drift on the guide, 27 engine-only and 11 turf-only fragments, against a card
+  # no player had seen since the provider changed. Operator call: turf cards the
+  # LIVE face; the mirror was deleted rather than transplanted.
+  #
+  # ONE ASSERTION HERE WAS WORTH MORE THAN THE SPECIMEN and did not go with it —
+  # the on-chain accuracy pair, which said an entry token is a prepaid on-chain
+  # credit and NOT a wallet-held SPL token. That paragraph was folded out of the
+  # deleted partial's header comment into the guide's rendered "Web2 vs web3"
+  # box, where it is now asserted by
+  # StylePageTest#"the Contest entry section states the honest web2/web3 map".
+  # Note the assertion had to CHANGE SHAPE in the move: it was a refute on the
+  # string "SPL token", and the rendered prose states the fact by NEGATING it
+  # ("not a fungible SPL token"), which the refute would have failed. A refute on
+  # a substring cannot tell a claim from its denial.
 
   # --- C. the age-gate specimen is capability-gated on :age_gate -------------
 
@@ -191,7 +194,11 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
     html = render_index
     assert_includes html, "--studio-team-glow-opacity",
       "the specimens carry the active-card glow opacity var"
-    %w[birthday age-gate entry-tokens].each do |id|
+    # entry-tokens left this list on 2026-09-09 with its specimen. The two that
+    # remain are ENGINE primitives (studio/modals/blocks/_birthday and _age_gate),
+    # which is what this test was always really about — the third was an app-flow
+    # mirror that happened to sit beside them.
+    %w[birthday age-gate].each do |id|
       assert_includes html, "$store.dsModals.current() && $store.dsModals.current().id === '#{id}'",
         "the #{id} specimen card must glow when its modal is the current one"
     end
@@ -204,10 +211,24 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
   # 'age-verified' handoff hook and opens the purchase modal. The engine
   # primitive stays flow-agnostic — its real submit posts to the app submit_url.
 
-  test "the style page advances the age-gate demo to the entry-token purchase" do
-    html = render_index
-    assert_match(/@age-verified\.window="[^"]*\$store\.dsModals\.open\('entry-tokens'/, html,
-      "confirming the age-gate demo advances to the entry-tokens purchase modal")
+  # THE HOOK IS THE SUBJECT, NOT ITS DESTINATION — the reason this test had to be
+  # rewritten rather than repointed. It pinned the literal id 'entry-tokens', so
+  # retiring that mirror broke a test whose real claim ("the primitive's handoff
+  # hook is wired, and it lands somewhere real") was untouched. Assert the hook
+  # exists and that whatever it opens is REGISTERED: an unregistered target is
+  # the failure worth catching, because the overlay opens and renders an empty
+  # card with nothing raised and nothing logged.
+  test "the style page advances the age-gate demo to a registered modal" do
+    html    = render_index
+    handler = html[/@age-verified\.window="([^"]*)"/, 1]
+    refute_nil handler, "the page must listen for the primitive's age-verified handoff"
+
+    target = handler[/dsModals\.open\('([a-z0-9-]+)'/, 1]
+    refute_nil target, "the age-verified handler must OPEN something"
+
+    registered = html.scan(/\$store\.dsModals\.current\(\)\.id === '([a-z0-9-]+)'/).flatten
+    assert_includes registered, target,
+      "age-verified advances to '#{target}', which nothing registers"
   end
 
   test "the age-gate engine primitive carries no demo flow/advance logic" do

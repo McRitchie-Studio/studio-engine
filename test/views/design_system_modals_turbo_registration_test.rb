@@ -13,7 +13,8 @@ require "tempfile"
 # [component] Regression guard for the /admin/style page-scoped modal store
 # (dsModals) surviving Turbo Drive navigation.
 #
-# THE BUG (fixed 0.26.1): the dsModals + dsSolanaModal stores were registered
+# THE BUG (fixed 0.26.1): the dsModals store — and, until 2026-09-09, a second
+# dsSolanaModal proxy beside it — was registered
 # ONLY inside a `document.addEventListener('alpine:init', ...)` handler in the
 # page body. Alpine loads via a deferred CDN <script> in the engine head and
 # fires alpine:init exactly ONCE — on the first full-document load. A Turbo Drive
@@ -132,8 +133,11 @@ class DesignSystemModalsTurboRegistrationTest < ActiveSupport::TestCase
     runScript();
     assert(alpineStores['dsModals'],
       'TURBO: dsModals must register immediately when Alpine is already started (no alpine:init)');
-    assert(alpineStores['dsSolanaModal'],
-      'TURBO: dsSolanaModal must register immediately alongside dsModals');
+    // A SECOND STORE WAS ASSERTED HERE, dsSolanaModal, until 2026-09-09. It was a
+    // proxy for style/modals/_onchain_tx — a mirror of turf-monster's card — and
+    // went when that partial did. It never widened this test: both stores were
+    // registered by the same function on the same path, so the second assertion
+    // could only ever fail alongside the first.
     assert((pendingEvents['alpine:init'] || []).length === 0,
       'TURBO: registration must NOT depend on an alpine:init listener when Alpine is already up');
 
@@ -149,8 +153,6 @@ class DesignSystemModalsTurboRegistrationTest < ActiveSupport::TestCase
     fire('alpine:init');
     assert(alpineStores['dsModals'],
       'FIRST-LOAD: dsModals registers when alpine:init fires');
-    assert(alpineStores['dsSolanaModal'],
-      'FIRST-LOAD: dsSolanaModal registers when alpine:init fires');
 
     // Scenario C — idempotent: a second render (another Turbo visit) plus a later
     // alpine:init must keep the ORIGINAL store instance (the in-function guard

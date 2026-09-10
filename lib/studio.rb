@@ -916,8 +916,10 @@ module Studio
       # the OAuth popup DO stay app-side.
       #
       # The gate is auth_methods, NOT auth_methods && feature?(:web3), even though
-      # the auth modal computes its wallet button from both
-      # (app/views/style/modals/_auth.html.erb). Deliberate: auth_methods says
+      # an app's auth modal computes its wallet button from both (turf-monster's
+      # app/views/modals/_auth.html.erb; this engine ships no auth card, and the
+      # style-guide copy that used to be cited here was a mirror of turf's,
+      # retired 2026-09-09). Deliberate: auth_methods says
       # which CREDENTIALS this app accepts, features gates PRODUCT SURFACES, and
       # these three paths are the credential exchange itself. phantom_callback is
       # the mobile deep-link RETURN url — a wallet app that declared :wallet but

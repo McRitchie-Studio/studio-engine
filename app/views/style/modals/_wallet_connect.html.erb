@@ -55,29 +55,43 @@
     },
     onInit() { this.ageAttested = this.props.ageAttested === true; },
     // DEMO walk continuity: the picked wallet resolves, then the card swaps to
-    // the on-chain tx modal in its processing state, which auto-resolves to
-    // on-chain success. So the guide's active-card glow follows
-    // Connect Wallet -> Processing -> On-chain success.
+    // the stack-mechanics vehicle in its processing face, so the walk still ends
+    // somewhere rather than on a closed overlay.
+    //
+    // IT SWAPPED TO 'onchain-tx' UNTIL 2026-09-09, and that id is gone — it named
+    // a mirror of turf-monster's card. A swap to an UNREGISTERED id is the
+    // quietest failure this page has: the store accepts it, the overlay stays
+    // open, every <template x-if> misses, and the card renders EMPTY. Nothing
+    // throws and nothing logs. Keep this target on an id registered in
+    // style/_modals.html.erb.
     onConnected() {
       this.connecting = false;
       this.picking = '';
-      Alpine.store('dsModals').swap('onchain-tx', {
-        state: 'processing', demoResolve: true, demoError: false,
+      Alpine.store('dsModals').swap('ds-stack-demo', {
+        state: 'processing',
         title: 'Confirming on-chain',
         message: 'Waiting for the wallet signature\u2026'
       });
+      setTimeout(function () {
+        var c = Alpine.store('dsModals').current();
+        if (!c || c.id !== 'ds-stack-demo' || c._closing) return;
+        Alpine.store('dsModals').advance({
+          state: 'success', title: 'Wallet connected',
+          message: 'The picker handed off and this card resolved in place.'
+        });
+      }, 1600);
     },
     // No app to deep-link into from the guide — treat the mobile Phantom row
     // as picking Phantom so the card still walks somewhere.
     onDeepLink() { this.pick('Phantom'); },
+    // A REAL APP SWAPS BACK TO ITS OWN SIGN-IN CARD HERE, reading props.backTo
+    // — that is the partial's contract and solana-studio still honours it. This
+    // GUIDE cannot: the engine ships no auth card, and the 'auth' branch that
+    // used to live here pointed at style/modals/_auth, the retired
+    // turf-monster mirror. An unregistered swap target renders an EMPTY card
+    // silently, so the branch was removed rather than left aimed at nothing.
     onBack() {
-      if (this.props.backTo === 'auth') {
-        Alpine.store('dsModals').swap('auth',
-          { step: 'credentials', submitting: null, formError: '' },
-          { direction: 'back' });
-      } else {
-        Alpine.store('dsModals').close();
-      }
+      Alpine.store('dsModals').close();
     }
   JS
 %>

@@ -28,6 +28,14 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 // A String assertion cannot see which keyframe class landed on the card, because
 // the class is written by the store at open() time and never appears in the
 // response bytes.
+// THE VEHICLE ID CHANGED 2026-09-09, and nothing else in this file did. The
+// stack demos drove "onchain-tx" — a style-guide MIRROR of turf-monster's
+// on-chain card — which meant these engine-mechanics specs depended on a copy of
+// a consumer's markup, and retiring that copy broke three of them. They now
+// drive "ds-stack-demo" (style/modals/_ds_stack_demo), a vehicle built from
+// engine blocks that belongs to no app. Same three faces on one id, which is
+// what the advance()-in-place spec below needs; same props.state; same
+// assertions.
 test.describe("style guide modal simulators", () => {
   test.beforeEach(async ({ page }) => {
     watchPageErrors(page);
@@ -163,7 +171,7 @@ test.describe("style guide modal simulators", () => {
   test("holdAtLeast keeps a fast operation on the spinner, then advances", async ({ page }) => {
     await page.evaluate(() => window.dsModalDemos.fastWithHold());
 
-    await expect.poll(() => stack(page)).toEqual([{ id: "onchain-tx", state: "processing" }]);
+    await expect.poll(() => stack(page)).toEqual([{ id: "ds-stack-demo", state: "processing" }]);
 
     // Still processing well after the underlying "work" finished — the floor.
     await page.waitForTimeout(600);
@@ -197,7 +205,7 @@ test.describe("style guide modal simulators", () => {
       .poll(() => page.evaluate(() => Alpine.store("dsModals").current()?.id), {
         message: "close() did not pop back to the card underneath",
       })
-      .toBe("onchain-tx");
+      .toBe("ds-stack-demo");
   });
 
   // The timed demo drives a live card through advance(), which patches props
@@ -211,7 +219,7 @@ test.describe("style guide modal simulators", () => {
   // pass on either, and "in place" would be an unpinned word in the test's name.
   test("the timed demo advances a live card in place", async ({ page }) => {
     await page.evaluate(() => window.dsModalDemos.processThenError());
-    await expect.poll(() => stack(page)).toEqual([{ id: "onchain-tx", state: "processing" }]);
+    await expect.poll(() => stack(page)).toEqual([{ id: "ds-stack-demo", state: "processing" }]);
 
     await page.evaluate(() => {
       Alpine.store("dsModals").current().__labEntryMarker = "same-entry";
@@ -219,7 +227,7 @@ test.describe("style guide modal simulators", () => {
 
     await expect
       .poll(() => stack(page), { timeout: 9000, message: "the processing card never reached the error state" })
-      .toEqual([{ id: "onchain-tx", state: "error" }]);
+      .toEqual([{ id: "ds-stack-demo", state: "error" }]);
 
     expect(
       await page.evaluate(() => Alpine.store("dsModals").current().__labEntryMarker),
