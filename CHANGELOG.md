@@ -1,17 +1,17 @@
 # Changelog
 
-The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package and pin the floor each one needs — the pins differ on purpose, and every consumer records why beside its own. Bumping the gem version and updating consumer lockfiles is a release; `bin/release prepare` allocates the version and does both (see [`docs/RELEASE.md`](./docs/RELEASE.md)). `prepare` does NOT roll this file: renaming `## Unreleased` to the allocated version and opening a fresh empty one is a manual conductor step (see [`docs/RELEASE.md`](./docs/RELEASE.md), *Rolling `Unreleased` into a version*), guarded by `test/lib/changelog_structure_test.rb`.
+The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package and pin the floor each one needs — the pins differ on purpose, and every consumer records why beside its own. Bumping the gem version and updating consumer lockfiles is a release; `bin/release prepare` allocates the version and does both (see [`docs/RELEASE.md`](./docs/RELEASE.md)). `prepare` does NOT roll this file: renaming `## Unreleased` to the allocated version and opening a fresh empty one is a manual conductor step (see [`docs/RELEASE.md`](./docs/RELEASE.md), *Rolling `Unreleased` into a version*), guarded by `test/docs/changelog_structure_test.rb`.
 
 ## Unreleased
 
 ### Docs
 
-- **Thirty-five releases of shipped entries left `## Unreleased` and moved under
-  the version that actually shipped them.** The block spanned 2,382 lines and every
-  entry in it had already been published — `accepted` is the `v0.74.4` release
-  commit — so the heading said "pending" about the whole history of the gem, and
+- **Thirty-five minor versions of shipped entries left `## Unreleased` and moved
+  under the version that actually shipped them.** The block spanned 2,382 lines and every
+  entry in it had already been published — `accepted` sat on the `v0.74.4` release
+  commit when they were rolled — so the heading said "pending" about the whole history of the gem, and
   each reviewer who opened the file had to settle per entry which half it was in.
-  85 entries plus two unbulleted prose blocks now sit under 46 version headings
+  85 entries plus three unbulleted prose blocks now sit under 46 version headings
   from `0.40.0` to `0.74.3`; `## Unreleased` holds only this note.
 
   **Bookkeeping only — no entry was reworded, added or dropped.** Attribution came
@@ -26,7 +26,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
   **The cause, and the guard.** `bin/release prepare` commits `version.rb` with its
   lockfile, publishes and tags — it never touches this file, and nothing failed
-  when the roll was skipped. `test/lib/changelog_structure_test.rb` now asserts the
+  when the roll was skipped. `test/docs/changelog_structure_test.rb` now asserts the
   file's SHAPE, never its prose: one leading `## Unreleased`, strictly decreasing
   versions, no duplicate version, no orphan `###`, a parse floor so a rotted regex
   fails loudly rather than passing vacuously, and — the one that would have caught

@@ -126,13 +126,15 @@ Leave `## Unreleased` empty when a release ships no entries — that is a real a
 legitimate state (0.74.4 was one), not something to paper over with placeholder
 prose that the next builder then has to delete.
 
-**This step was missed for thirty-five consecutive releases.** Between 0.39.0 and
+**This step was missed across thirty-five minor versions.** Between 0.39.0 and
 0.74.x, `## Unreleased` grew to 2,382 lines holding every shipped entry, so the
 heading said "pending" about the entire history of the gem and every reviewer who
 opened the file had to work out per entry which half it was in.
-`test/lib/changelog_structure_test.rb` now fails when `Studio::VERSION` runs more
+`test/docs/changelog_structure_test.rb` now fails when `Studio::VERSION` runs more
 than two minor versions ahead of the newest version heading, so the drift is
-caught within three releases instead of thirty-five. Automating the roll inside
+caught within three minor versions instead of thirty-five. Patch releases do not
+move that number — the comparison is minor-to-minor — so a run of patches can
+still ship between the drift appearing and the guard reporting it. Automating the roll inside
 `bin/release prepare` (mcritchie-studio) is the real fix and is not done.
 
 **Why `Gemfile.lock` must ride with the version** — this rule is unchanged and

@@ -7,7 +7,7 @@ require "test_helper"
 # changelog writing cannot turn it red.
 #
 # WHY IT EXISTS. Between 0.39.0 and 0.74.x, `## Unreleased` grew to 2,382 lines
-# holding thirty-five releases' worth of shipped entries, because `bin/release
+# holding thirty-five minor versions' worth of shipped entries, because `bin/release
 # prepare` bumps `lib/studio/version.rb` and its lockfile but never rolls the
 # Unreleased heading into a version heading, and nothing failed when it didn't.
 # Every reviewer who opened the file then had to decide, per entry, whether it was
@@ -31,16 +31,16 @@ class ChangelogStructureTest < Minitest::Test
   MODERN_HEADING = /\A\#\# (\d+\.\d+\.\d+) — (\d{4}-\d{2}-\d{2})\z/
   LEGACY_HEADING = /\A\#\# v(\d+\.\d+\.\d+) \((?:pre-)?\d{4}-\d{2}-\d{2}\)\z/
 
-  # Parse floors. Both are well below the real counts (115 version headings and
-  # 46 dated 2026-08 or later at the time of writing) and exist only so a regex
-  # that has stopped matching fails LOUDLY instead of vacuously passing.
+  # Parse floors. Both are well below the real counts (115 version headings, 83 of
+  # them in the modern form at the time of writing) and exist only so a regex that
+  # has stopped matching fails LOUDLY instead of vacuously passing.
   MIN_VERSION_HEADINGS = 110
   MIN_MODERN_HEADINGS = 80
 
   # How far `Studio::VERSION` may run ahead of the newest version heading before
   # the changelog counts as drifting. A release that ships no entry at all is
-  # legitimate (0.74.4 was one), so the tolerance is not zero — but thirty-five
-  # of them in a row is the defect this file exists to catch.
+  # legitimate (0.74.4 was one), so the tolerance is not zero — but a drift of
+  # thirty-five minor versions is the defect this file exists to catch.
   MAX_MINOR_DRIFT = 2
 
   def setup
