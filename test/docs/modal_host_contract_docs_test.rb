@@ -158,6 +158,40 @@ class ModalHostContractDocsTest < Minitest::Test
                  "become true and the subsection needs rewriting."
   end
 
+  # ---- 4. the interpolated-quote vector, and the guard that is NOT the guard -
+  #
+  # README.md now tells a partial author that plain `<%= value %>` is what keeps
+  # an interpolated double quote from closing `x-data`, and that
+  # `escape_javascript` (`j`) is NOT that guard because it escapes for a
+  # JavaScript string literal AND preserves the html_safe flag.
+  #
+  # That is the opposite of the obvious guess, and the review of this very task
+  # proposed the obvious guess. A prose claim that a domain expert has already
+  # got backwards once is exactly the claim that needs pinning, so the three
+  # interpolation paths are asserted against ActionView itself.
+  def test_plain_interpolation_escapes_the_quote_but_j_and_raw_do_not
+    require "action_view"
+    helper = Object.new.extend(ActionView::Helpers::JavaScriptHelper)
+    value  = %(say "hi")
+
+    assert_equal "say &quot;hi&quot;", ERB::Util.html_escape(value),
+                 "plain <%= value %> no longer escapes a double quote to &quot;, so the README's " \
+                 "advice to let Rails escape it is wrong"
+
+    assert_equal %(say "hi"), ERB::Util.html_escape(value.html_safe),
+                 "an html_safe value no longer reaches the attribute raw; re-read the README's " \
+                 "raw/.html_safe vector"
+
+    escaped = helper.escape_javascript(value.html_safe)
+    assert_predicate escaped, :html_safe?,
+                     "escape_javascript no longer preserves the html_safe flag, so it may now be " \
+                     "a valid guard for x-data after all — the README says it is not"
+    assert_includes ERB::Util.html_escape(escaped), %("),
+                    "escape_javascript output no longer puts a bare double quote into the " \
+                    "attribute. README.md tells authors j() will NOT save them; if it now does, " \
+                    "that paragraph needs rewriting."
+  end
+
   # ---- the one prose claim worth pinning -----------------------------------
   #
   # PR #311 shipped "both of these fail silently" into README.md, _host and
