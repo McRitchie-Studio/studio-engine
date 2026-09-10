@@ -277,6 +277,15 @@ the attribute survives. The vector is a value that SKIPS that escaping —
 string literal (`\"`) and PRESERVES the html_safe flag, so the raw quote still
 reaches the attribute. Let Rails escape it.
 
+That settles the ATTRIBUTE, not the JavaScript inside it. A value spliced into
+a single-quoted JS string — the shape rule 2 steers you to — has a second way
+out: a `'`. ERB escapes it to `&#39;`, the parser decodes that straight back
+into the value, and the bare `'` ends the string: the same
+`Alpine Expression Error`. Route such a value through
+`Studio::JsLiteral.in_attribute(value)`, which runs both escapers in the order
+that works; `lib/studio/js_literal.rb` carries the full contract, identifier
+position (`Studio::JsIdentifier`) included.
+
 These are properties of the HOST, not of any one card, and they apply to every
 consumer partial an app registers — not only to the specimens in this gem.
 
