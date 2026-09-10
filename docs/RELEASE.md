@@ -164,7 +164,7 @@ for a gem prepare ALLOCATES, so a SKIP neither rolls this file nor checks it.
 Prepare skips when there are no commits past the last `v*` tag, when nothing has
 ever been published, and when **`lib/studio/version.rb` at `origin/release`
 already leads the last `v*` tag** ("allocated already"). This file feels the
-last case, and three things reach it:
+last case, and four things reach it:
 
 1. **A version set by hand**: committed straight onto `accepted`, as a failed
    `gem push` suggests, or bumped any other way outside prepare. It publishes
@@ -179,6 +179,13 @@ last case, and three things reach it:
 3. **The window inside one sweep** between the version commit and its tag: 13
    to 24 minutes across the eight gem publishes of 2026-09-09/10. Nothing to
    do; the roll is already in the commit.
+4. **A tag push that failed.** It does not stop the sweep; prepare prints
+   `tag v<version> push skipped/failed — push it manually if needed`. Push it
+   (`git -C /Users/alex/projects/studio-engine push origin v<version>`): until
+   the tag reaches `origin`, every sweep run from a clone without it SKIPs this
+   gem as allocated already and rolls nothing. The clone that ran the publish
+   keeps the tag locally, so it alone still allocates. This cause exists only
+   until https://mcritchie.studio/tasks/untagged-gem-publish-strands-work ships.
 
 That window is **not** the state between sweeps. Measured at `origin/release` on
 2026-09-10, studio-engine sat at `0.74.8` with tag `v0.74.8`, and solana-studio
