@@ -5,9 +5,10 @@ module Studio
   #     <button @click="$store.<%= modal_store %>.close()">
   #
   # THE SIBLING OF Studio::JsLiteral, AND ITS OPPOSITE. Both exist for the same
-  # silent failure: a host value that makes an Alpine expression a SyntaxError, so
+  # quiet failure: a host value that makes an Alpine expression a SyntaxError, so
   # the component mounts as a NO-OP that still renders every element. Perfect
-  # markup, dead card, nothing raised and nothing logged. The two differ on the
+  # markup, dead card, nothing raised server-side, and only an Alpine Expression
+  # Error in the browser console to say why. The two differ on the
   # only question that matters — WHAT THE VALUE IS:
   #
   #   STRING position  — the value is DATA inside a JS literal. Any character is

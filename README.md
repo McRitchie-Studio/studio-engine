@@ -282,8 +282,9 @@ a single-quoted JS string — the shape rule 2 steers you to — has a second wa
 out: a `'`. ERB escapes it to `&#39;`, the parser decodes that straight back
 into the value, and the bare `'` ends the string: the same
 `Alpine Expression Error`. Route such a value through
-`Studio::JsLiteral.in_attribute(value)`, which runs both escapers in the order
-that works; `lib/studio/js_literal.rb` carries the full contract, identifier
+`Studio::JsLiteral.in_attribute(value)`. It runs `escape_javascript` and
+returns an UNMARKED String, so ERB's `<%= %>` does the HTML half on output —
+both escapers, in the order that works, provided you never `raw` it; `lib/studio/js_literal.rb` carries the full contract, identifier
 position (`Studio::JsIdentifier`) included.
 
 These are properties of the HOST, not of any one card, and they apply to every
@@ -296,8 +297,8 @@ partial explaining its own root. Someone writing a NEW partial has no specimen
 to read; they read the host's documentation, so that is where the rules have
 to live.
 
-And a specimen could not carry rule 1 even in principle, which is what settles
-it: the style guide wraps EVERY registration's partial in a `<div>` of its own
+And a specimen could not DEMONSTRATE rule 1 even in principle — many specimen
+headers state it, but none can show it failing — which is what settles it: the style guide wraps EVERY registration's partial in a `<div>` of its own
 — `<template x-if="…"><div><%= render … %></div></template>` — and that
 wrapper supplies the single root the rule is about. A specimen that broke the
 rule would still render correctly in the guide, so the specimens cannot
@@ -326,51 +327,49 @@ which the gem's deep link reads so the two cannot drift.
 
 #### The auth modal's credential slot
 
-The **sign-in modal itself stays here** and is never forked: every app in the
-ecosystem signs people in, and most of them are web2. What varies is *which
-credentials it offers*. Google and magic-link are implemented by this engine and
-render directly. The wallet button is implemented by the web3 layer, so it is
-**contributed** — `style/modals/_auth` looks for a partial at one fixed path and
-renders whatever it finds:
+**This engine ships no sign-in card.** Each app owns its own and computes its
+credential buttons itself: turf-monster's is `app/views/modals/_auth.html.erb`,
+which is also the authority `lib/studio.rb` cites beside the Solana routes. The
+engine's one auth card was the living style guide's MIRROR of turf's,
+`style/modals/_auth`, and it was retired with the other mirrors on 2026-09-09
+(PR #319). For sign-in the engine now ships fragments, not a card:
+`studio/modals/shared/_email_field` and `studio/modals/auth/_resend_footer`,
+each carded on the style guide.
 
-    solana_studio/auth/_wallet_credential     (shipped by the solana-studio gem)
+**The wallet credential slot has no host today.** solana-studio still ships
+`solana_studio/auth/_wallet_credential`, a Solana button written to be
+*contributed* into a sign-in card rather than copied into one. The retired
+mirror was its only renderer. Neither turf-monster nor mcritchie-studio names
+the path; turf's card draws its wallet button directly. So bundling solana-studio
+no longer puts a wallet button anywhere. Whether the engine should host the slot
+again, or the convention should be retired, is an open call, not a fact this
+README can settle.
 
-Bundling the gem **is** the registration. There is no registry call and no
-config flag; an app without that layer renders nothing there, so a web2 app
-carries no wallet markup at all rather than markup hidden behind a flag. This is
-the same optional-partial convention as `modals/_host_extras` above, and it uses
-the same three-term `lookup_context.exists?`.
-
-Copying the auth modal into the gem was rejected deliberately: it would fork a
-surface both apps sign in through, and the two copies would drift — which is how
-the wallet picker reached three copies before it was promoted.
-
-**Two layers answer two different questions, and they are not merged:**
+**A card that does host it owns the gate.** The retired mirror's rules still
+hold; they simply live in that app's view now. Two layers answer two different
+questions, and they are not merged:
 
 | Question | Answered by | Where it is decided |
 |---|---|---|
-| Is it **implemented**? | the picker is registered, **and** the credential partial resolves | Ruby, in `style/modals/_auth` — gates the render |
+| Is it **implemented**? | the picker is registered, **and** the credential partial resolves (`lookup_context.exists?`, the same three-term check as `modals/_host_extras`) | Ruby, in the hosting card — gates the render |
 | Should it **show**? | `methodOn('wallet')`, falling back to `Studio.auth_method?(:wallet) && Studio.feature?(:web3)` | Alpine, inside the contributed partial — gates visibility |
 
 Both terms of the Ruby gate are load-bearing, and they fail differently. Without
 the **registration** term a layer that ships the credential but not the picker
 draws a button that opens an empty panel — not hypothetical, solana-studio 0.5.2
-shipped exactly that pair. Without the **existence** term an app whose picker
+shipped exactly that pair. Without the **existence** term a card whose picker
 resolves but whose credential does not raises `Missing partial` in front of
-someone signing in, instead of quietly rendering no button.
+someone signing in, instead of quietly rendering no button. Keep policy out of
+the Ruby gate: folding `auth_method?(:wallet)` and `feature?(:web3)` into the
+render deletes the button from the DOM, while an "or" divider that reads
+`methodOn('wallet')` still draws above the gap.
 
-Policy stays **out** of the Ruby gate on purpose. Folding
-`auth_method?(:wallet)` and `feature?(:web3)` into the render would delete the
-button from the DOM on a web3-off app that bundles the gem — and the "or"
-divider reads `methodOn('wallet')` too, so ticking Solana Wallet on the style
-guide's Sign in card would then float a divider above a button that is not
-there.
-
-A contributed partial renders inside the modal's own Alpine scope, so it may use
+The partial renders inside the hosting card's Alpine scope, so it may use
 `methodOn(...)`, `attested()` (the legal-age gate — call it, or wallet becomes
 the one credential that skips attestation) and `props.submitting`. It receives
-one local, `modal_store`: the engine's real host is `"modals"`, the living style
-guide's page-scoped host is `"dsModals"`.
+one local, `modal_store`, the store backing that card's host. solana-studio's
+own header for the partial still describes the engine as its renderer; that is
+the same stale claim, one repo over.
 
 **Name a store like a JavaScript identifier.** Partials splice this local in as a
 bare name — `$store.<name>.current()` — rather than as a string, so a value
@@ -379,10 +378,11 @@ SyntaxError in the whole `x-data`, and Alpine mounts a component that renders
 every element and does nothing. Escaping is not the repair (an escaped identifier
 is a different SyntaxError); a name that matches `/\A[A-Za-z_$][A-Za-z0-9_$]*\z/`
 is. `studio/modals/onboarding/_first_name` enforces exactly that and raises
-`ArgumentError` on anything else — the first partial to do so, not yet the fleet.
-Note the shape decides the repair, not the name of the local: `blocks/_birthday`
-and `blocks/_leveling_activity` pass `modal_store` in *string* position and
-correctly `escape_javascript` it instead.
+`ArgumentError` on anything else, and every store-taking partial now does the
+same through `Studio::JsIdentifier.validate!` — the shell, the blocks and the
+templates alike. Note the shape decides the repair, not the
+name of the local: `blocks/_birthday` passes `modal_store` in *string* position
+(`store: '…'`) and correctly `escape_javascript`s it instead.
 
 It also keeps two blocks the gem renders **by name** across the gem boundary:
 `studio/modals/blocks/wallet_brand_sprite` and `studio/modals/blocks/card_header`.
@@ -409,11 +409,13 @@ default to `"modals"`, so existing call sites are unchanged. The engine's
 
 Two things that will bite you:
 
-- **Render `scoped_host`, not `host`.** This is a non-isolated engine, so an app
-  view at the same path shadows the engine's — and `mcritchie-studio` and
-  `turf-monster` both ship their own `app/views/studio/modals/_host.html.erb`.
-  A page rendering `studio/modals/host` in those apps silently gets the app's
-  fork. `scoped_host` is unforked everywhere.
+- **Render `scoped_host`, not `host`.** `scoped_host` mounts the page's modals
+  on the page's OWN store, which is the point of a page-scoped host; `host` is
+  the app's shared one. The path matters too: this is a non-isolated engine, so
+  an app view at `app/views/studio/modals/_host.html.erb` would shadow the
+  engine's. No consumer ships one today — mcritchie-studio and turf-monster
+  deleted their forks on 2026-08-28 — but nothing stops the next app, and
+  `scoped_host` has never been forked.
 - **Guard registrations with `current()?.id`.** The outer template unmounts one
   tick *after* the stack empties, so a bare `.id` throws on every close.
 

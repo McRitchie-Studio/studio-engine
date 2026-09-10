@@ -5,12 +5,13 @@
 
   Why this exists as a separate partial rather than a local on
   studio/modals/_host: this is a NON-ISOLATED engine, so an app view at the same
-  path SHADOWS the engine's. `mcritchie-studio` and `turf-monster` both ship
-  their own app/views/studio/modals/_host.html.erb — older, simpler copies that
-  know nothing of a store: local. A page rendering "studio/modals/host" in those
-  apps silently gets the fork, and its page-scoped store is never registered.
-  This partial's path is unforked in every app, so it renders the engine's code
-  everywhere. (The living style guide hand-rolled the same thing inline for the
+  path SHADOWS the engine's. mcritchie-studio and turf-monster each carried an
+  app copy of app/views/studio/modals/_host.html.erb — older, simpler copies that
+  knew nothing of a store: local — until both were deleted on 2026-08-28. No consumer
+  forks _host today, but nothing stops the next one, and a page rendering
+  "studio/modals/host" in such an app would silently get the fork with its
+  page-scoped store never registered. This partial's path has never been forked,
+  so it renders the engine's code everywhere. (The living style guide hand-rolled the same thing inline for the
   same reason; it can rebase onto this later.)
 
   Two independent problems it solves at once:

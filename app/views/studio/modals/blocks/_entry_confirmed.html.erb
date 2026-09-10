@@ -76,7 +76,8 @@
   # STRING position — clusterParam is a JS string on the root scope that
   # _success_card's tx-link concatenates into a URL. An apostrophe closes the
   # literal and the whole x-data becomes a SyntaxError, which mounts this card and
-  # every nested block as a silent no-op. props_expr one line up is the OPPOSITE
+  # every nested block dead: all of it renders, and only the browser console says
+  # why (an Alpine Expression Error). props_expr one line up is the OPPOSITE
   # shape (an Alpine expression by contract) and is deliberately left alone.
   cluster_param_js = Studio::JsLiteral.in_attribute(cluster_param)
   lobby_url_key    = local_assigns.fetch(:lobby_url_key, "props.lobbyUrl")

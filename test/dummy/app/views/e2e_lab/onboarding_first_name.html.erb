@@ -4,7 +4,8 @@
     JS string INSIDE the x-data. A view test can assert the sentence is present in
     that attribute; it cannot assert a user ever SEES it, and it stays green when
     the attribute is syntactically broken - which is exactly how this component
-    fails. A stray quote closes the attribute early, Alpine mounts a silent no-op,
+    fails. A stray quote closes the attribute early, Alpine mounts a dead component
+    (only the browser console says so, as an Alpine Expression Error),
     and every element a string assertion looks for is still in the markup. Only a
     browser can tell those two pages apart.
 
