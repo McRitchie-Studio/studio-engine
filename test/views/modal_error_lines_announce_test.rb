@@ -37,11 +37,20 @@ class ModalErrorLinesAnnounceTest < ActiveSupport::TestCase
   ].freeze
   MODAL_DIR = MODAL_DIRS.first
 
-  # An error line, as it actually appears in this tree: a <p> carrying a
-  # `text-red-*` utility. Scoped to <p> on purpose — the same utility appears on
-  # an <svg> stroke in blocks/_card_header.html.erb, which is an ICON and has
-  # nothing to announce.
-  ERROR_PARAGRAPH = /<p\b[^>]*\bclass\s*=\s*"[^"]*\btext-red-\d+\b[^"]*"[^>]*>/m
+  # An error line, as it actually appears in this tree: a <p> carrying a RED text
+  # utility. Scoped to <p> on purpose — the same utility appears on an <svg>
+  # stroke in blocks/_card_header.html.erb, which is an ICON and has nothing to
+  # announce.
+  #
+  # THE ALTERNATION IS THE RE-POINTING THIS FILE ASKS FOR, not a widening. Error
+  # text is migrating off static Tailwind reds onto `text-danger-ink`, the
+  # per-theme red ThemeResolver derives to clear WCAG AA on every surface (no
+  # STATIC red clears AA on BOTH themes — see lib/studio/theme_resolver.rb). The
+  # auth resend footer was the first to move. Matching ONLY `text-red-*` would
+  # have quietly dropped that paragraph out of this guard the moment it was
+  # restyled, which is exactly the failure the floor below exists to catch — and
+  # did catch, on the very commit that moved it.
+  ERROR_PARAGRAPH = /<p\b[^>]*\bclass\s*=\s*"[^"]*\b(?:text-red-\d+|text-danger-ink)\b[^"]*"[^>]*>/m
   ANNOUNCES = /\brole\s*=\s*"alert"|\baria-live\s*=\s*"(?:polite|assertive)"/
 
   # ERB TAGS ARE NEUTRALISED FIRST, and that is not tidiness. An attribute like
@@ -85,6 +94,13 @@ class ModalErrorLinesAnnounceTest < ActiveSupport::TestCase
   # pattern that stops matching after a restyle, makes the assertion above pass
   # forever over an empty list — which is precisely the "green but blind" failure
   # this file exists to prevent, one level up.
+  #
+  # THE FLOOR HELD AT 8 THROUGH THE INK MIGRATION. When the auth resend footer
+  # moved from text-red-400 to text-danger-ink, this assertion went red at 7 —
+  # working exactly as designed. The fix was to re-point ERROR_PARAGRAPH at the
+  # ink as well, which restored the count to 8. Lowering the floor would have
+  # been the wrong move: it would have retired a live error line from the
+  # announce rule and left this guard covering one paragraph less, silently.
   #
   # THE FLOOR MOVED 10 -> 8, AND ONLY FOR THIS REASON. The wallet_connect and
   # web3_step_up partials contributed one error line each and left this engine
