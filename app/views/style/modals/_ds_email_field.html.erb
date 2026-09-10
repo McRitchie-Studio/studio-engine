@@ -1,0 +1,58 @@
+<%#
+  Living style guide specimen — the modal family's email input,
+  studio/modals/shared/_email_field.
+
+  THIS IS A BLOCK DEMO, NOT A CARD. The engine does not own an auth MODAL — the
+  sign-in card is each app's, mounted on that app's own host and reviewed on that
+  app's own section of this guide. What the engine owns is the PIECES that card
+  is built from, and this is the one every app's auth card renders. It had no
+  specimen of its own until 2026-09-09 because style/modals/_auth, a mirror of
+  turf-monster's card, happened to render it — so retiring the mirror is what
+  made the gap visible.
+
+  BOTH FACES ARE SHOWN because `validator` is a real fork, not a flag. Off, the
+  partial is self-contained and the SERVER stays the only boundary; on, it wraps
+  itself in x-data="emailValidator()" and paints a right-edge spinner / check / X
+  that only works if the CONSUMER ships that factory. An app that passes
+  validator: true without the factory gets an Alpine scope error and a dead
+  indicator, so the two are drawn side by side to make the dependency legible.
+  This page ships no emailValidator, which is why the right-hand field's
+  indicator stays blank — that is the demo, not a defect.
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div class="relative">
+  <%= render "studio/modals/blocks/close_x", modal_store: "dsModals" %>
+
+  <div class="text-center pt-1 mb-4">
+    <h3 class="text-heading font-bold text-lg leading-tight">Email field</h3>
+    <p class="text-xs text-muted mt-1">studio/modals/shared/_email_field</p>
+  </div>
+
+  <div class="space-y-4" x-data="{ email: '' }">
+    <div>
+      <p class="text-2xs font-bold text-secondary uppercase tracking-wide mb-1.5">Plain</p>
+      <%= render "studio/modals/shared/email_field",
+            name: nil, x_model: "email", required: true %>
+      <p class="text-2xs text-muted mt-1.5">
+        No dependency beyond the theme. <code class="font-mono">x_model</code>
+        resolves in the ENCLOSING scope, so the value lands on the host component
+        rather than on the field.
+      </p>
+    </div>
+
+    <div>
+      <p class="text-2xs font-bold text-secondary uppercase tracking-wide mb-1.5">With validator</p>
+      <%= render "studio/modals/shared/email_field",
+            name: nil, x_model: "email", required: true, validator: true %>
+      <p class="text-2xs text-muted mt-1.5">
+        Adds <code class="font-mono">x-data="emailValidator()"</code> and the
+        right-edge indicator. <strong>The factory is the consumer&rsquo;s to
+        ship</strong> &mdash; this guide does not, so the indicator stays blank here.
+      </p>
+    </div>
+  </div>
+
+  <button type="button" @click="$store.dsModals.close()"
+          class="btn btn-primary btn-lg w-full mt-5">Done</button>
+</div>

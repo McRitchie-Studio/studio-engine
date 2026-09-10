@@ -1,0 +1,70 @@
+<%#
+  Living style guide specimen — the magic-link resend footer,
+  studio/modals/auth/_resend_footer.
+
+  A BLOCK DEMO, for the same reason as _ds_email_field: the engine owns this
+  fragment, not the auth card that renders it. Both of the auth card's
+  link-sent steps render it, and they are identical — which is the whole reason
+  it was extracted.
+
+  IT NEEDS A HOST, AND THAT IS THE POINT. The footer reads props.submitting,
+  props.resendCooldown and props.resendError, and calls resendMagicLink(), all
+  resolved from the ENCLOSING x-data — never from a store. So the x-data below
+  is a stand-in for the auth card's own component, and it is the contract this
+  specimen documents: drop this partial into a scope that supplies none of those
+  and nothing errors, the link simply never enables and the cooldown never
+  counts. The stub here drives a real 5s cooldown so all three states are
+  reachable: idle, in-flight, counting down.
+
+  THE COOLDOWN IS SHORTENED ON PURPOSE. Production counts 60s; a reviewer will
+  not wait 60s to watch a number tick, and a specimen nobody watches documents
+  nothing. The partial does not own the duration — the host does.
+
+  Single root: the outer <div> is the host's required root.
+%>
+<div class="relative"
+     x-data="{
+       props: { submitting: null, resendCooldown: 0, resendError: '' },
+       _timer: null,
+       resendMagicLink() {
+         if (this.props.submitting || this.props.resendCooldown > 0) return;
+         this.props.resendError = '';
+         this.props.submitting = 'magic-link';
+         setTimeout(() => {
+           this.props.submitting = null;
+           this.props.resendCooldown = 5;
+           this._timer = setInterval(() => {
+             this.props.resendCooldown -= 1;
+             if (this.props.resendCooldown <= 0) clearInterval(this._timer);
+           }, 1000);
+         }, 900);
+       },
+       fail() {
+         this.props.submitting = null;
+         this.props.resendCooldown = 0;
+         this.props.resendError = 'That link could not be sent. Try again in a moment.';
+       },
+       // Alpine calls destroy() when the component leaves the DOM. Without it the
+       // interval outlives the closed card and keeps decrementing a dead object.
+       destroy() { clearInterval(this._timer); }
+     }">
+  <%= render "studio/modals/blocks/close_x", modal_store: "dsModals" %>
+
+  <div class="text-center pt-1 mb-4">
+    <div class="text-2xl leading-none mb-2">📬</div>
+    <h3 class="text-heading font-bold text-lg leading-tight">Check your email</h3>
+    <p class="text-xs text-body mt-1">
+      The footer below is the shared piece &mdash; everything above it belongs to
+      the app&rsquo;s own card.
+    </p>
+  </div>
+
+  <div class="border-t border-subtle pt-4">
+    <%= render "studio/modals/auth/resend_footer", modal_store: "dsModals" %>
+  </div>
+
+  <button type="button" @click="fail()"
+          class="block mx-auto mt-4 text-2xs text-muted hover:text-secondary underline underline-offset-2">
+    Show the error line
+  </button>
+</div>

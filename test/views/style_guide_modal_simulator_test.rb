@@ -128,10 +128,13 @@ class StyleGuideModalSimulatorTest < ActiveSupport::TestCase
   # reference is a dead button: Alpine.store returns undefined and the handler
   # throws where only the console sees it.
   #
-  # Matched case-sensitively and on the bare identifier. The guide legitimately
-  # ships `dsSolanaModal` (capital S), which does NOT contain the lowercase
-  # `solanaModal` this looks for — the distinction is the whole reason this
-  # asserts on the exact spellings rather than a loose substring.
+  # Matched case-sensitively and on the bare identifier. The guide USED TO ship a
+  # `dsSolanaModal` store (capital S), which does NOT contain the lowercase
+  # `solanaModal` this looks for — that near-miss is why this asserts on exact
+  # spellings rather than a loose substring. The store itself was retired on
+  # 2026-09-09 with the onchain-tx mirror it proxied, so the collision is now
+  # hypothetical; the precision stays, because a loose substring would fire on
+  # any future name that merely contains these letters.
   LEGACY_STORE_PATTERNS = [
     /Alpine\.store\(\s*['"]solanaModal['"]\s*\)/,
     /\$store\.solanaModal\b/
@@ -144,7 +147,7 @@ class StyleGuideModalSimulatorTest < ActiveSupport::TestCase
                  "the guide references Alpine.store('solanaModal'), turf-monster's legacy " \
                  "compatibility proxy. This engine registers no such store, so each reference " \
                  "is a button that throws instead of opening a modal. Drive $store.dsModals " \
-                 "and the onchain-tx specimen directly."
+                 "and the guide's own ds-stack-demo vehicle directly."
   end
 
   # The guard above only bites if it is reading the demo code at all. If the
@@ -165,9 +168,17 @@ class StyleGuideModalSimulatorTest < ActiveSupport::TestCase
     assert_match(/Alpine\.store\(['"]dsModals['"]\)/, drivers,
                  "the demo drivers no longer reach $store.dsModals — the page-scoped store the " \
                  "whole guide is built on.")
-    assert_match(/store\(\)\.open\(['"]onchain-tx['"]/, drivers,
-                 "the stack demos no longer open the onchain-tx specimen, which is the card " \
-                 "they were rewritten against when turf's proxy was dropped.")
+    # THE VEHICLE, NOT THE CARD. This pinned 'onchain-tx' until 2026-09-09 —
+    # a mirror of turf-monster's card, which meant six engine mechanics demos
+    # depended on a consumer's markup and this assertion had to change when it
+    # went. It now names style/modals/_ds_stack_demo, which exists only to be
+    # driven here. Read the id from the shared constant the drivers declare, so a
+    # future re-vehicle is one edit in the guide rather than two.
+    assert_match(/var VEHICLE = ['"]ds-stack-demo['"]/, drivers,
+                 "the stack demos no longer declare their vehicle id, so the demos and this " \
+                 "guard can drift apart silently.")
+    assert_match(/store\(\)\.open\(VEHICLE\b/, drivers,
+                 "the stack demos no longer open their vehicle through the page-scoped store.")
   end
 
   private

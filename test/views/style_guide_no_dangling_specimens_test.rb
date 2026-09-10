@@ -39,13 +39,28 @@ class StyleGuideNoDanglingSpecimensTest < Minitest::Test
 
   # Ids the page OPENS from a card's trigger.
   #
-  # TWO FORMS, and missing the second is the trap this method exists to document.
-  # Most cards write the id as a literal. The Templates section writes ONE card in
-  # a loop and interpolates — `"$store.dsModals.open('#{id}')"` — so a literal-only
-  # scan reports all five template ids as registered-but-unreachable, which is
-  # exactly what the first version of this test claimed. They are reachable; the
-  # regex could not see them. So the ids feeding such a loop are collected from
-  # its array literal as well.
+  # THREE FORMS, and every one of them was added because a literal-only scan
+  # called a reachable card unreachable. That is this method's whole subject:
+  # "reachable" is a property of the PAGE, and the page names ids three ways.
+  #
+  #   1. LITERAL — most cards: `$store.dsModals.open('birthday', …)`.
+  #   2. INTERPOLATED — the Templates section writes ONE card in a loop,
+  #      `"$store.dsModals.open('#{id}')"`, so a literal-only scan reported all
+  #      five template ids as registered-but-unreachable. They were reachable;
+  #      the regex could not see them. The ids feeding that loop are collected
+  #      from its array literal instead.
+  #   3. VIA A DECLARED CONSTANT (added 2026-09-09) — the stack-behaviour drivers
+  #      open one vehicle from a dozen places, so they declare it once
+  #      (`var VEHICLE = 'ds-stack-demo';`) and call `store().open(VEHICLE, …)`.
+  #      Same trap as form 2 with a different indirection: the id is in the file,
+  #      it is just not at the call site. Read the declaration.
+  #
+  # WHAT THIS DELIBERATELY DOES NOT DO is treat a swap() target as reachable.
+  # A swap is one card handing off to another MID-FLOW, so it proves the second
+  # card can be reached ONLY IF the first one can — and #test_every_swap_target_
+  # has_a_registration already holds that end. Folding swaps in here would let a
+  # pair of cards that swap to each other, with no trigger into either, satisfy
+  # both tests at once.
   def opened
     body         = strip_erb_comments(@src)
     literal      = body.scan(/dsModals\.open\('([a-z0-9-]+)'/).flatten
@@ -54,7 +69,10 @@ class StyleGuideNoDanglingSpecimensTest < Minitest::Test
                    else
                      []
                    end
-    (literal + interpolated).uniq
+    via_const = body.scan(/var\s+([A-Z_]+)\s*=\s*'([a-z0-9-]+)';/).filter_map { |name, id|
+      id if body.match?(/\.open\(\s*#{Regexp.escape(name)}\b/)
+    }
+    (literal + interpolated + via_const).uniq
   end
 
   # Ids a specimen hands off to MID-FLOW, with swap() rather than open().
@@ -66,10 +84,27 @@ class StyleGuideNoDanglingSpecimensTest < Minitest::Test
   # was retired, style/modals/_unsubscribe_confirm went on swapping to
   # 'unsubscribe-goodbye': every test in this suite stayed green, every card
   # still rendered, and pressing Unsubscribe opened nothing. Read the specimens.
+  # TWO SPELLINGS OF THE SAME CALL, and reading only one left this guard blind
+  # for the whole window it was supposed to be closing. MEASURED 2026-09-09 by
+  # dangling a real swap target and watching this file stay green:
+  #
+  #   $store.dsModals.swap('ds-success')            <- seen by the old regex
+  #   Alpine.store('dsModals').swap('ds-stack-demo')  <- NOT seen
+  #
+  # The second is what a specimen writes from inside a heredoc'd x-data, where
+  # `$store` is not in scope — so the form this missed is the form used by the
+  # partials that hand off MID-FLOW, which is precisely the case this guard
+  # exists for. `dsModals\.swap` cannot match `dsModals').swap`; the store name
+  # and the method are separated by the close of Alpine.store's own call.
+  #
+  # Anchored on the store NAME either way rather than a bare /\.swap\(/, so an
+  # unrelated swap on some other object cannot enter the set.
+  SWAP_CALL = /dsModals(?:'\s*\))?\.swap\(\s*'([a-z0-9-]+)'/
+
   def swapped
     sources = [SECTION] + Dir["#{SPECIMENS}/*.html.erb"].sort
     sources.flat_map { |file|
-      strip_erb_comments(File.read(file)).scan(/dsModals\.swap\('([a-z0-9-]+)'/).flatten
+      strip_erb_comments(File.read(file)).scan(SWAP_CALL).flatten
     }.uniq
   end
 
@@ -120,13 +155,16 @@ class StyleGuideNoDanglingSpecimensTest < Minitest::Test
     # their absence is the POINT of this change, and the pairing checks above
     # would stay green if a pair of them were reinstated together.
     #
-    # TWO BATCHES so far, in ONE list rather than a list per batch: the reason
-    # each id left is identical, and a per-batch list is the list that gets
-    # forgotten by the batch which adds no test. Batch 1 landed 2026-09-08, batch
-    # 2 on 2026-09-09; batch 3 appends here.
+    # THREE BATCHES, in ONE list rather than a list per batch: the reason each id
+    # left is identical, and a per-batch list is the list that gets forgotten by
+    # the batch which adds no test. Batch 1 landed 2026-09-08, batches 2 and 3 on
+    # 2026-09-09. BATCH 3 IS THE LAST — after it the guide holds no mirror of a
+    # consumer's card at all, so an id appended below from here on is a NEW
+    # mistake rather than one more of the same.
     %w[wallet-setup wallet-changed ds-cdp-ramp ds-buy-entry-token cosign-rejected
        quest-success ds-newsletter-success unsubscribe-goodbye wallet-deposit
-       network-guard].each do |id|
+       network-guard
+       auth entry-tokens onchain-tx ds-onramp-hub ds-wallet-topup].each do |id|
       refute_includes registered, id, "#{id} is a turf card; the guide should not mirror it"
       refute_includes opened, id, "#{id} is a turf card; the guide should not card it"
       refute File.exist?("app/views/style/modals/_#{id.tr('-', '_').sub(/\Ads_/, 'ds_')}.html.erb"),
