@@ -815,11 +815,14 @@ let it allocate the version — it derives the bump, commits `lib/studio/version
 with its `Gemfile.lock` onto **`origin/release`**, then publishes, tags, and bumps
 each consumer's lock. **Do not set the version by hand.** A hand-set number makes
 the allocation read the current version as already past the last tag and skip, so
-the hand number silently wins over the derived one. **`prepare` does not touch
-[`CHANGELOG.md`](./CHANGELOG.md)** — renaming `## Unreleased` to the allocated
-version and opening a fresh empty one is a manual last step, and skipping it is
-how thirty-five minor versions of entries ended up filed as pending. Details and the
-exact commands are in [`docs/RELEASE.md`](./docs/RELEASE.md).
+the hand number silently wins over the derived one, and the skip rolls no
+changelog. **When it allocates, `prepare` also rolls
+[`CHANGELOG.md`](./CHANGELOG.md)** in the same commit: everything under
+`## Unreleased` moves beneath the new version's heading, written even when the
+bucket is empty, and `## Unreleased` stays first and empty. It refuses the sweep,
+with nothing published, when the roll would lie or it cannot read the file.
+[`docs/RELEASE.md`](./docs/RELEASE.md), *Rolling `Unreleased` into a version*,
+says exactly when it rolls, refuses or skips, and what to do by hand.
 
 **Semver guide** — the release *derives* the bump from its members (a `breaking`
 risk tag → major, a `feature` → minor, otherwise patch), so this is what those
