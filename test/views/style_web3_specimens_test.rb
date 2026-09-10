@@ -57,18 +57,6 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
     view
   end
 
-  # The auth modal ALONE, with the local style/_modals passes it.
-  #
-  # Everything else in this file goes through render_index, because it is asking
-  # about the GUIDE. The two tests below ask about the credential slot's Ruby
-  # gate, whose two terms — is the picker registered, does a layer ship the
-  # credential — the real gem always answers together. Only a direct render can
-  # separate them, and one of those splits is a state solana-studio actually
-  # shipped rather than a contrivance.
-  def render_auth(paths, web3_gem:)
-    build_view(paths).render(partial: "style/modals/auth", locals: { web3_gem: web3_gem })
-  end
-
   def with_features(features)
     original = Studio.features
     Studio.features = features
@@ -314,6 +302,13 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
   #     checkbox — BEFORE any server default, so a checkbox is not a gate. The
   #     fix has to be in Ruby. lib/studio.rb states the same split where it
   #     declines to gate the /auth/solana routes on :web3.
+  #
+  # Seven private helpers outlived them with no caller left, and went in
+  # delete-engine-dead-gate-readers: render_auth, modal_registration,
+  # specimen_state, and this file's copy of style_page_test's credential-control
+  # reader (wallet_cta_call_sites, wallet_cta_element, OPEN_TAG,
+  # wallet_cta_visibility_gate). That reader lives on in turf-monster's
+  # test/views/auth_submitting_coercion_test.rb, against the card it was for.
 
   def test_the_engine_ships_no_solana_button_of_its_own
     # PINNED BY PROVENANCE, which is why this outlived the card it was written
@@ -386,214 +381,6 @@ class StyleWeb3SpecimensTest < ActiveSupport::TestCase
 
   def registration_for(id)
     %(#{REGISTRATION_PREFIX}'#{id}'">)
-  end
-
-  # ONE modal's REGISTERED block, windowed: from its <template x-if> wrapper to
-  # the next modal's. Every registration on the page opens with the same prefix,
-  # so the next occurrence of it is this block's end.
-  #
-  # Measured, so the claim is about the code and not the intent: the auth block
-  # is 2.3% of the rendered guide, and openWalletHub / submitMagicLink are
-  # auth-EXCLUSIVE strings today — a document-wide assertion on them would bite
-  # too. So this window is DEFENSIVE, not load-bearing, and saying otherwise
-  # would be the overclaim specimen_card was written to stop. It earns its place
-  # by scope: the guide gains modals constantly, and the day another one grows a
-  # wallet trigger or a second sign-in surface, the document-wide version starts
-  # answering a question this test never asked. specimen_state below is where
-  # windowing IS load-bearing, with the decoy named.
-  def modal_registration(html, id)
-    start = html.index(registration_for(id))
-    return nil unless start
-
-    nxt = html.index(REGISTRATION_PREFIX, start + REGISTRATION_PREFIX.length)
-    nxt ? html[start...nxt] : html[start..]
-  end
-
-  # WALLET CTA CALL SITES in a window — anything that opens the picker.
-  #
-  # REBOUND, and deliberately TIGHTER than what it replaces. This used to scan
-  # for `openWalletHub()` not followed by a brace: an engine-owned FUNCTION
-  # NAME, plus a dance to exclude its own definition. adopt-wallet-credential-
-  # slot moved the button into solana-studio, which inlines the swap instead, so
-  # that name no longer exists in this engine at all and the old regex would be
-  # green on a base app for the wrong reason — it cannot find a string nobody
-  # writes any more, whatever the markup does.
-  #
-  # The old helper's own comment said it meant to catch a call site "rather than
-  # pinning the one handler string the bug happened to use". Pinning
-  # openWalletHub was exactly that. This asks the question the tests are named
-  # for instead: does anything here OPEN THE PICKER.
-  #
-  # Why this bites harder, not softer:
-  #   · it matches the SWAP CALL carrying its literal target id, which is the
-  #     thing that actually opens the panel, not a name that merely implies it;
-  #   · the leading dot requires a RECEIVER, so a bare `swap('wallet-connect')`
-  #     — a definition, or prose naming the method alone — cannot satisfy it.
-  #     It does NOT exclude prose generally, and an earlier draft of this comment
-  #     claimed it did: a rendered comment quoting the whole call WITH its
-  #     receiver ("…calls $store.dsModals.swap('wallet-connect', …)") matches
-  #     this regex exactly as a real call site does. That mattered enough to
-  #     correct because the claim became load-bearing — style_page_test's CTA
-  #     window anchors on this same shape. What actually separates prose from a
-  #     call there is not the regex: it is that the window must resolve to a
-  #     well-formed OPEN TAG carrying the anchor in an attribute, which a comment
-  #     cannot. MEASURED on the rendered page today: two matches, both real
-  #     elements, no prose site;
-  #   · it still catches the call behind ANY attribute — @click today, @keydown
-  #     or a future x-on tomorrow — which was the original stated intent;
-  #   · it needs no definition-exclusion lookahead, because the engine defines
-  #     no wallet handler to exclude.
-  # Mutation-proved both directions in the PR body.
-  def wallet_cta_call_sites(html)
-    html.to_s.scan(/\.swap\(\s*'wallet-connect'/)
-  end
-
-  # The wallet CTA's OWN element — its open tag, from "<" to the ">" that closes
-  # it. Anchored on the swap call above, because that is what identifies this
-  # element as the CTA rather than the button next to it.
-  #
-  # The quote-aware walk is not ceremony: the CTA's @click carries a
-  # single-quoted modal id inside a double-quoted attribute, and a naive
-  # index(">") would be one bad attribute away from truncating the tag and
-  # silently dropping the very attribute this file is here to read.
-  #
-  # AND IT IS NOW GUARDED. The first version of this walk was not, and nothing
-  # checked that: rindex("<") can land inside an EARLIER attribute VALUE instead
-  # of on the tag's own "<", after which the walk starts mid-string with its
-  # quote state INVERTED and can run off the end, close on a ">" that precedes
-  # the anchor, or sail past the real ">" and hand back kilobytes of following
-  # markup while calling it an element (a constructed case measured 3375 bytes
-  # against a real 284). It fails safe on the markup either partial ships today,
-  # but "today's markup happens to be kind" is not a guard.
-  #
-  # No ONE invariant catches every misaligned shape, so all FIVE below are checked
-  # and every one of them RAISES. Nil means one thing only: the anchor is absent.
-  #
-  # THIS COPY HAS NO GUARD TEST OF ITS OWN. The previous sentence said the
-  # contract was "exercised there" in style_page_test — a neighbour-vouch, and
-  # this file's own rule against neighbour-vouching sits a few dozen lines above
-  # it. Two things were wrong with the vouch: the count was five, not four, and
-  # the neighbour exercised three of them until PR window-guard-branches-are-prose
-  # added the missing two.
-  #
-  # What is true, stated as a fact about THIS file rather than a borrowed one:
-  # wallet_cta_element is a semantic DUPLICATE of style_page_test's
-  # open_tag_containing — same five invariants, same messages bar the method name
-  # — and only that copy is exercised. Extracting both to one shared helper is the
-  # standing fix; until then a change here must be mirrored there BY HAND, and
-  # this comment is the only thing that says so.
-  def wallet_cta_element(html)
-    html = html.to_s
-    site = html.index(/\.swap\(\s*'wallet-connect'/)
-    return nil unless site
-
-    start = html.rindex("<", site)
-    raise "wallet_cta_element: misaligned — no \"<\" precedes the anchor" unless start
-
-    element = nil
-    quote = nil
-    cursor = start
-    while (cursor += 1) < html.length
-      char = html[cursor]
-      if quote
-        quote = nil if char == quote
-      elsif ['"', "'"].include?(char)
-        quote = char
-      elsif char == "<"
-        raise "wallet_cta_element: misaligned — an unquoted \"<\" appears before " \
-              "the tag closed, so the walk's quote state is inverted"
-      elsif char == ">"
-        element = html[start..cursor]
-        break
-      end
-    end
-
-    raise "wallet_cta_element: misaligned — the anchor is present but no tag " \
-          "closed after it (the walk ran off the end)" unless element
-    raise "wallet_cta_element: misaligned — the tag closed BEFORE the anchor, " \
-          "so this window is not the element carrying it" unless cursor > site
-    raise "wallet_cta_element: misaligned — the window is not a single open tag " \
-          "(#{element.bytesize} bytes), so it overran the element" unless element.match?(OPEN_TAG)
-
-    element
-  end
-
-  # A well-formed HTML OPEN TAG, whole. Attribute names are deliberately loose
-  # (`@click`, `:disabled`, `x-show` are all legal here); values are the three
-  # HTML shapes. An overrun window carries following markup, which cannot match.
-  OPEN_TAG = %r{\A<[A-Za-z][^\s>/]*(?:\s+[^\s=>/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*))?)*\s*/?>\z}
-
-  # The x-show EXPRESSION on the wallet CTA, or nil when it carries none.
-  #
-  # WHY THIS IS NOT `assert_includes auth, "methodOn('wallet')"`, which is what
-  # style_page_test:580 does and what this assertion was first rebound to.
-  # MEASURED on the rendered auth modal: `methodOn('wallet')` occurs TWICE, and
-  # only one occurrence is the gem's. The other is ENGINE-owned, three lines
-  # below the render call, on the "or" divider:
-  #
-  #   x-show="methodOn('magicLink') && (methodOn('google') || methodOn('wallet'))"
-  #
-  # That divider renders whether or not the gem's button does, so a
-  # document-wide substring assert stays GREEN with the CTA's gate deleted
-  # outright — reading an engine-owned divider while claiming to check a
-  # gem-owned gate. It is the same failure registration_for and specimen_state
-  # already document, one seam over.
-  #
-  # AN EARLIER DRAFT OF THIS COMMENT SAID style_page_test's bare form was "sound
-  # where it lives, asking a weaker question of the whole page". That was wrong,
-  # and wrong in the direction that buries findings. For the WALLET term the bare
-  # form was not asking a weaker question — it was asking a DIFFERENT one, and
-  # answering yes about an engine-owned divider. Measured there too: with this
-  # same gate deleted, style_page_test's wallet assertion stayed green. It is
-  # rebound now (StylePageTest#credential_visibility_gate).
-  #
-  # AND THE SECOND HALF OF THAT SENTENCE WAS WRONG TOO, which is the sharper
-  # lesson. The finding recorded google and magicLink as "fine — they occur twice
-  # in ways that still bite", and this comment repeated it. MEASURED instead of
-  # repeated: the SECOND occurrence of each is that same "or" divider,
-  # `methodOn('magicLink') && (methodOn('google') || methodOn('wallet'))`, which
-  # carries ALL THREE terms on ONE unconditional element. Deleting the Google
-  # button's own x-show, and separately the magic-link form's, each left the old
-  # assertion GREEN. All three were inert together, and so was `termsOn()` (three
-  # renders, two of them the modal's own x-data). Every one of them is rebound
-  # now.
-  #
-  # A comment that over-vouches for a test one seam over is how an inert guard
-  # survives review — and vouching for its NEIGHBOURS without re-running them is
-  # how three more survive alongside it.
-  #
-  # Reading the EXPRESSION rather than the whole attribute is the actual repair.
-  # The concern is that methodOn still owns visibility, never how that call is
-  # spelled — so the gem tolerating a host that defines no methodOn
-  # (`typeof methodOn === 'function' ? methodOn('wallet') : true`) satisfies it,
-  # while removing the x-show or moving the decision into ERB does not.
-  def wallet_cta_visibility_gate(html)
-    wallet_cta_element(html)&.slice(/\sx-show="([^"]*)"/, 1)
-  end
-
-  # The x-data STATE a specimen card is seeded with.
-  #
-  # This lives on style/_modal_specimen's glow WRAPPER, outside the <article>
-  # specimen_card windows, so it needs its own window rather than a second use
-  # of that one. Anchored on the nearest wrapper before the label: every
-  # specimen opens its x-data with the same copiedRef key.
-  #
-  # Here the windowing is genuinely LOAD-BEARING, and the decoy is measured. A
-  # base app's page carries TWO "wallet: true" substrings before this fix and
-  # ONE after it, because the auth partial's own _methodDefaults renders
-  # `wallet: <the capability>` into its x-data. So a document-wide assertion
-  # would be reading the MODAL's default when it meant to read the CARD's
-  # toggle seed — passing, on the wrong string, in exactly the base-app-with-
-  # web3-on case that matters most.
-  def specimen_state(html, label)
-    idx = html.index(">#{label}</span>")
-    return nil unless idx
-
-    start = html.rindex(%(x-data="{ copiedRef: false), idx)
-    return nil unless start
-
-    close = html.index(%("), start + %(x-data=").length)
-    close ? html[start...close] : nil
   end
 
   # with_features, plus the auth_methods axis. Both are global config an app
