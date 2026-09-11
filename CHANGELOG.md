@@ -43,6 +43,24 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
     (no turf view uses it now) and its `@utility email-reject` plus keyframes.
     Until it does, turf's utilities-layer copy outranks the engine's rule, so
     turf keeps its own shake and does not get the reduced-motion variant.
+- **The wallet callback page no longer names one vendor, and a host intent can
+  now narrate the wait.** `solana_sessions/phantom_callback` opened on
+  "Processing Phantom response..." and changed that line only on the legacy
+  sign-in path. So a transaction resumed through `walletOps` showed one sentence
+  for the whole cosign, broadcast and confirm leg: 18 seconds measured on a QA
+  iPhone for a contest entry. That sentence was also wrong for Solflare and
+  Backpack, which the redirect transport serves too. The page now opens on
+  "Processing your wallet's response...". Before it resumes, it listens for a
+  `studio:wallet-progress` event and writes `detail.text` into the status line
+  as text. A push with no text is ignored, so the default stays until something
+  real replaces it. The engine still knows nothing of what the user was doing.
+  Guarded by `test/views/phantom_callback_test.rb` and
+  `test/views/phantom_callback_resume_test.rb`.
+  - **For consumers:** no host edit is needed to get the neutral copy. To
+    narrate, dispatch the event from the intent's `complete()`:
+    `document.dispatchEvent(new CustomEvent('studio:wallet-progress', { detail:
+    { text: '…' } }))`. On the inline transport nothing listens, so the same
+    line is a harmless no-op there.
 
 ### Added
 
