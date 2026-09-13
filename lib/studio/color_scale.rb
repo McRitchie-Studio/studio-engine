@@ -85,6 +85,12 @@ module Studio
       (hi + 0.05) / (lo + 0.05)
     end
 
+    # `top` painted at `alpha` over an opaque `bottom`: the colour a browser
+    # composites for a translucent fill like bg-danger/10 on the surface under it.
+    def self.blend(top, bottom, alpha)
+      rgb_to_hex(*hex_to_rgb(top).zip(hex_to_rgb(bottom)).map { |t, b| (t * alpha + b * (1 - alpha)).round })
+    end
+
     def self.with_opacity(hex, opacity)
       r, g, b = hex_to_rgb(hex)
       "rgba(#{r},#{g},#{b},#{opacity})"

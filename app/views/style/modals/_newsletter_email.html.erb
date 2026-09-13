@@ -15,7 +15,8 @@
   path instead of two. Here the callback resolves locally.
 
   Single root, and everything inside the double-quoted x-data is single-quoted —
-  an inner double quote closes the attribute and mounts a silent no-op.
+  an inner double quote closes the attribute and mounts a dead component whose
+  only signal is an Alpine Expression Error in the browser console.
 %>
 <div x-data="{
        email: '',

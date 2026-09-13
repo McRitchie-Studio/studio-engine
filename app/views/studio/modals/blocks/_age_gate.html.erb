@@ -73,10 +73,14 @@
        get minAge() { return <%= min_age.present? ? min_age.to_i : 0 %> || this.props.minAge || null; },
        get stateCode() { return '<%= j state %>' || this.props.state || ''; },
        get headline() {
-         // Single-quoted + j-escaped, NOT to_json: to_json emits DOUBLE quotes,
-         // which close this double-quoted x-data attribute and mount the
-         // component as a silent no-op. The markup still renders, so every
-         // assertion passes while the card is dead in a browser.
+         // Single-quoted + j-escaped. A plain ERB to_json would in fact survive
+         // here: to_json returns an UNMARKED String, so ERB entity-escapes its
+         // quotes and this double-quoted x-data attribute stays whole. The
+         // hazard is a raw or html_safe one, whose bare quote closes the
+         // attribute and mounts the card dead: the markup still renders, every
+         // assertion passes, and the only signal is an Alpine Expression Error
+         // in the browser console. Studio::JsLiteral.in_attribute is the
+         // engine's contract for a value in this position.
          var t = '<%= j title.to_s %>';
          return t ? t : 'Easy, Young’un';
        },

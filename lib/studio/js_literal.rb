@@ -4,7 +4,9 @@ module Studio
   # ONE home for the repair that keeps a host-supplied value from bricking an
   # Alpine component when it is spliced into a JS-evaluating HTML attribute.
   #
-  # THE FAILURE THIS EXISTS FOR is silent, which is the whole reason it is worth a
+  # THE FAILURE THIS EXISTS FOR is quiet — no server error, no failing render
+  # test, only an Alpine Expression Error in the browser console — which is the
+  # whole reason it is worth a
   # module instead of a convention. A local sits inside a JS single-quoted literal
   # in a double-quoted attribute:
   #

@@ -54,6 +54,18 @@ class DangerInkStylesheetTest < ActiveSupport::TestCase
                  "surfaces, which is why this token is derived per theme"
   end
 
+  # The warning and success inks ride the same two blocks.
+  # test/lib/status_ink_contrast_test.rb proves their contrast; this proves they
+  # reach the document the browser receives.
+  def test_both_theme_blocks_declare_every_status_ink
+    dark, light = blocks(css)
+
+    %w[danger warning success].each do |role|
+      assert_match(/--color-#{role}-ink:\s*#[0-9A-Fa-f]{6};/, dark, "the dark theme ships no #{role} ink")
+      assert_match(/--color-#{role}-ink:\s*#[0-9A-Fa-f]{6};/, light, "the light theme ships no #{role} ink")
+    end
+  end
+
   # An operator's own palette must reach the stylesheet too, not just the default.
   def test_an_operator_palette_reaches_the_stylesheet
     dark, light = blocks(css(danger: "#B91C1C", dark: "#0B1020", light: "#ffffff"))

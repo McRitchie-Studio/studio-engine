@@ -32,9 +32,22 @@ class PhantomCallbackResumeTest < ActiveSupport::TestCase
     branch
   end
 
+  # The status line's opening text, read from the view rather than restated, so
+  # the resume tests start from exactly what a real page starts from.
+  def rendered_default_status
+    text = File.read(CALLBACK_PATH)[%r{<p id="phantom-status"[^>]*>(.*?)</p>}m, 1]
+    assert text, "could not find the #phantom-status line in the callback view"
+    text
+  end
+
   # `studio:` nil | :no_journal | :pending
-  # `resume:` what walletOps.resume resolves or rejects with
-  def run_dispatch(studio:, resume: { "pending" => true, "done" => true })
+  # `resume:` what walletOps.resume resolves or rejects with, or :never for a
+  #           server leg still running when the page is read
+  # `push:`   event details the intent dispatches WHILE resume runs. Dispatched
+  #           synchronously inside resume, because that is when the real one
+  #           runs complete(): resume calls it in the same tick, so a listener
+  #           installed after resume would miss every push.
+  def run_dispatch(studio:, resume: { "pending" => true, "done" => true }, push: [])
     studio_js =
       case studio
       when nil then "var SolanaStudioStub = null;"
@@ -42,11 +55,20 @@ class PhantomCallbackResumeTest < ActiveSupport::TestCase
         "var SolanaStudioStub = { walletJournal: { peek: function() { return null; } }, " \
           "walletOps: { resume: function() { calls.push('resume'); return Promise.resolve({}); } } };"
       else
-        settle = resume.is_a?(Hash) && resume["__reject"] ?
-          "Promise.reject(Object.assign(new Error(#{resume['message'].to_json}), { rejected: true }))" :
-          "Promise.resolve(#{resume.to_json})"
+        settle =
+          if resume == :never
+            "new Promise(function() {})"
+          elsif resume.is_a?(Hash) && resume["__reject"]
+            "Promise.reject(Object.assign(new Error(#{resume['message'].to_json}), { rejected: true }))"
+          else
+            "Promise.resolve(#{resume.to_json})"
+          end
+        pushes = push.map do |detail|
+          "document.dispatchEvent(new CustomEvent('studio:wallet-progress', { detail: #{detail.to_json} }));"
+        end.join(" ")
         "var SolanaStudioStub = { walletJournal: { peek: function() { return { v: 1, step: 'connect' }; } }, " \
-          "walletOps: { resume: function(p, o) { calls.push('resume'); navigateFn = o.navigate; return #{settle}; } } };"
+          "walletOps: { resume: function(p, o) { calls.push('resume'); navigateFn = o.navigate; " \
+          "#{pushes} return #{settle}; } } };"
       end
 
     script = <<~JS
@@ -56,6 +78,11 @@ class PhantomCallbackResumeTest < ActiveSupport::TestCase
       function dbg() {}
       function showError(m) { errors.push(m); calls.push('showError'); }
       var params = { get: function() { return null; } };
+      // The status line, seeded with the view's own opening text. innerHTML is a
+      // separate slot on purpose: a push written as markup lands there and leaves
+      // textContent unchanged, so the assertions below catch it.
+      var statusEl = { textContent: #{rendered_default_status.to_json}, innerHTML: '' };
+      global.document = new EventTarget();
       #{studio_js}
       global.window = { SolanaStudio: SolanaStudioStub, location: { href: '' } };
       Object.defineProperty(global.window.location, 'href', {
@@ -72,7 +99,8 @@ class PhantomCallbackResumeTest < ActiveSupport::TestCase
       })();
 
       setTimeout(function () {
-        console.log(JSON.stringify({ calls: calls, errors: errors, branchHandled: branchHandled }));
+        console.log(JSON.stringify({ calls: calls, errors: errors, branchHandled: branchHandled,
+                                     status: statusEl.textContent }));
       }, 10);
     JS
 
@@ -131,6 +159,54 @@ class PhantomCallbackResumeTest < ActiveSupport::TestCase
 
     assert_includes result["errors"], "User rejected the request",
                     "a user rejection must reach the screen as itself, not as a generic failure"
+  end
+
+  # --- the progress seam: the intent speaks, the page listens -------------
+  #
+  # THE DEFECT. The status line changed only on the legacy branch, past this
+  # one's early return, so a redirect-transport transaction read one unchanging
+  # sentence for its whole server leg — 18 seconds measured on a QA iPhone for a
+  # contest entry. The host intent knows what the server is doing; this page has
+  # the only surface left on screen. The page listens for studio:wallet-progress
+  # and the intent dispatches it, so neither learns the other's job.
+
+  NEUTRAL_STATUS = "Processing your wallet's response..."
+
+  test "a progress push from the intent is on screen while the server leg runs" do
+    # resume never settles: the page is read MID-LEG, which is the 18 seconds
+    # the user actually sits through.
+    result = run_dispatch(studio: :pending, resume: :never,
+                          push: [{ "text" => "Cosigning and submitting to Solana..." }])
+
+    assert_equal "Cosigning and submitting to Solana...", result["status"],
+                 "the intent pushed its progress and the status line did not show it"
+    assert_empty result["errors"], "a leg still running is not a failure"
+  end
+
+  test "the latest push is the one on screen" do
+    result = run_dispatch(studio: :pending, resume: :never,
+                          push: [{ "text" => "Cosigning..." }, { "text" => "Confirming on chain..." }])
+
+    assert_equal "Confirming on chain...", result["status"]
+  end
+
+  test "with no push the status line keeps the wallet-neutral default" do
+    # An intent that says nothing, and every host that has not adopted the seam
+    # yet. The page must still tell the truth, and the truth names no vendor.
+    result = run_dispatch(studio: :pending, resume: :never)
+
+    assert_equal NEUTRAL_STATUS, result["status"],
+                 "with nothing pushed, the status line must hold the view's wallet-neutral default"
+  end
+
+  test "an empty or non-text push leaves the default standing" do
+    # A blank status line reads as a hang, which is the defect itself. So a push
+    # with nothing to say, or a detail of the wrong shape, changes nothing.
+    result = run_dispatch(studio: :pending, resume: :never,
+                          push: [{ "text" => "   " }, { "text" => 42 }, {}])
+
+    assert_equal NEUTRAL_STATUS, result["status"],
+                 "a push with no text replaced the default; the user now reads nothing"
   end
 
   test "nothing pending after all is reported rather than silently swallowed" do

@@ -17,8 +17,101 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   turf-monster's currentColor ring (`--spinner-track: currentColor;
   --spinner-color: transparent`), so a host that drops its fork sees no change.
   Guarded by `test/views/resend_footer_error_contrast_test.rb`.
+- **The sign-in overlay blurs in every consumer, and the eight engine classes
+  that painted nothing are fixed.** The class vocabulary guard
+  (`test/views/engine_class_vocabulary_test.rb`) listed them as open defects;
+  its allow-list now holds only deliberate JS and test hooks.
+  - `sessions/new`'s SSO overlay used turf-monster's `backdrop-overlay`, so
+    mcritchie-industries showed it with no blur and no scrim. It now carries
+    `backdrop-blur-[2px] backdrop-brightness-70 bg-primary-900/20`, which
+    compiles to turf's `blur(2px) brightness(0.7)` over a 20% primary-900.
+    Guarded by `test/integration/sign_in_overlay_blur_test.rb`, which renders
+    the page and compiles the overlay's classes without the motion layer.
+  - `_email_field`'s `email-reject` shake lived only in turf. The engine's
+    motion layer now owns it under the same name, with byte-compatible
+    keyframes and a reduced-motion variant that keeps the border flash.
+  - `text-danger`, `hover:text-danger`, `text-warning`, `bg-warning/10`,
+    `border-warning/30` and `placeholder-muted` compiled to nothing. The
+    text forms are now `text-danger-ink` and `text-warning-ink`, the fills
+    compile, and `placeholder-muted` is `placeholder:text-muted`. The same
+    fix reaches the success and warning badges in `studio/emails/show` and
+    the flash panel in `studio/email_images/index`, whose classes sit in Ruby
+    strings the guard's scanner cannot read; a raw-source check now covers
+    them. The flash panel is now `bg-surface` with a role border, because
+    danger-ink on a danger tint measures 4.10 to 4.18:1, under AA.
+  - **For consumers:** turf-monster can delete its `@utility backdrop-overlay`
+    (no turf view uses it now) and its `@utility email-reject` plus keyframes.
+    Until it does, turf's utilities-layer copy outranks the engine's rule, so
+    turf keeps its own shake and does not get the reduced-motion variant.
+- **The wallet callback page no longer names one vendor, and a host intent can
+  now narrate the wait.** `solana_sessions/phantom_callback` opened on
+  "Processing Phantom response..." and changed that line only on the legacy
+  sign-in path. So a transaction resumed through `walletOps` showed one sentence
+  for the whole cosign, broadcast and confirm leg: 18 seconds measured on a QA
+  iPhone for a contest entry. That sentence was also wrong for Solflare and
+  Backpack, which the redirect transport serves too. The page now opens on
+  "Processing your wallet's response...". Before it resumes, it listens for a
+  `studio:wallet-progress` event and writes `detail.text` into the status line
+  as text. A push with no text is ignored, so the default stays until something
+  real replaces it. The engine still knows nothing of what the user was doing.
+  Guarded by `test/views/phantom_callback_test.rb` and
+  `test/views/phantom_callback_resume_test.rb`.
+  - **For consumers:** no host edit is needed to get the neutral copy. To
+    narrate, dispatch the event from the intent's `complete()`:
+    `document.dispatchEvent(new CustomEvent('studio:wallet-progress', { detail:
+    { text: '…' } }))`. On the inline transport nothing listens, so the same
+    line is a harmless no-op there.
+
+### Added
+
+- **Warning and success inks, and fills for all three status roles.**
+  `Studio::ThemeResolver` now emits `--color-warning-ink` and
+  `--color-success-ink` beside `--color-danger-ink`, and the preset maps them
+  to `text-warning-ink` and `text-success-ink`. It also registers `success`,
+  `warning` and `danger` as background and border colours, so `bg-warning/10`
+  and `border-danger/30` compile. It deliberately registers no bare
+  `text-<role>`: every default role colour fails AA as text on the light
+  surfaces (warning #FF7C47 2.04:1, success #4BAF50 2.22:1, danger #EF4444
+  3.01:1). The warning and success inks are read inside their own
+  `bg-<role>/10` badge, so `ThemeResolver#status_ink` also counts that tint as
+  a surface; tuned to the bare surfaces alone, the warning ink measured 3.91:1
+  there. `--color-danger-ink` is unchanged. Danger text belongs on a theme
+  surface, never a danger tint, and the vocabulary guard now refuses that
+  combination in engine views. `Studio::ColorScale.blend` composites a
+  translucent fill over a surface. Guarded by
+  `test/lib/status_ink_contrast_test.rb`.
+
+### Changed
+
+- **The vocabulary guard's Tailwind build reads only its probe.** Tailwind v4
+  auto-detects sources from the working directory, which is this repo, so an
+  empty probe compiled to 75 KB. `source(none)` now makes the probe the only
+  source. The build recipe moved to `test/support/engine_tailwind_build.rb`,
+  where the overlay test shares it.
 
 ### Docs
+
+- **The README stops describing a sign-in card the engine no longer ships.**
+  Its "credential slot" section still named `style/modals/_auth` — deleted with
+  the other mirrors in PR #319 — as the renderer of solana-studio's
+  `solana_studio/auth/_wallet_credential`, while `lib/studio.rb` already said the
+  engine ships no auth card. It now says so too, names turf-monster's
+  `app/views/modals/_auth.html.erb` as the authority both cite, and states that
+  the wallet slot currently has NO host: nothing renders it. Whether it should
+  have one is left as an open call. The store-name paragraph now reflects that
+  every store-taking partial validates through `Studio::JsIdentifier`, and
+  `Studio::JsLiteral.in_attribute` is described exactly (it runs
+  `escape_javascript`; ERB does the HTML half).
+- **"Silent no-op" is gone from the modal partials, specimens and escapers.** A
+  quote or apostrophe that breaks an Alpine expression mounts a dead card, but the
+  vendored Alpine logs `Alpine Expression Error` for it. About a dozen comments —
+  shipped partials, specimens, the e2e lab, `JsLiteral` and `JsIdentifier` — said
+  otherwise; `_age_gate`'s also blamed `to_json`, which ERB entity-escapes. Four
+  files also claimed mcritchie-studio and turf-monster fork `studio/modals/_host`;
+  neither has since 2026-08-28. Pinned in `test/docs/modal_host_contract_docs_test.rb`,
+  whose census reads `studio/modals`, `style/modals`, the dummy app, the two
+  modules and the README. The phrase still survives outside it, in the two e2e
+  specs, `studio/emails/show` and `test/integration/style_page_test.rb`.
 
 - **Thirty-five minor versions of shipped entries left `## Unreleased` and moved
   under the version that actually shipped them.** The block spanned 2,382 lines and every

@@ -15,9 +15,10 @@
      rather than the app's shared `modals` store, so this page works identically
      in an app that renders a shared modal host (mcritchie-studio, turf-monster)
      and one that renders none at all (mcritchie-industries, moms-app). It uses
-     studio/modals/scoped_host, NOT studio/modals/host — the latter is forked by
-     mcritchie-studio and turf-monster, and an app fork shadows the engine's
-     partial in this non-isolated engine. %>
+     studio/modals/scoped_host, NOT studio/modals/host — host is the app's
+     shared store, and in this non-isolated engine an app copy of it would shadow
+     the engine's partial. mcritchie-studio and turf-monster deleted theirs on
+     2026-08-28; scoped_host's path has never been forked. %>
 <% content_for(:title) { "Emails" } %>
 <%
   max_width  = Studio::EmailCatalog::MAX_WIDTH

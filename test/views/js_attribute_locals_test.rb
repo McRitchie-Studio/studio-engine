@@ -33,7 +33,7 @@ require "nokogiri"
 #
 #      repaired   $dispatch('it\'s a \"quote\"')     -> one string, value intact
 #      unrepaired $dispatch('it's a "quote"')        -> literal closes at `it`,
-#                                                       SyntaxError, silent no-op
+#                                                       SyntaxError, dead card
 #
 # So these tests DECODE the attribute the way a browser does and then read the JS
 # string literal the way a JS parser does — honouring backslash escapes and stopping

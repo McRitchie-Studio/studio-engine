@@ -218,4 +218,96 @@ class ModalHostContractDocsTest < Minitest::Test
                       "failure is silent when the console says otherwise."
     end
   end
+
+  # ---- the rest of the census --------------------------------------------
+  #
+  # /tasks/correct-readme-wallet-credential-slot. The three sites above were
+  # corrected together, and the SAME false word survived in about a dozen more:
+  # modal partials, specimens, the two JS-literal modules, the e2e lab. Every one
+  # described a SyntaxError inside an Alpine expression — the double quote that
+  # closes x-data, the apostrophe that closes a JS literal, the bad identifier —
+  # and called it a "silent no-op". It is quiet on the SERVER, but the vendored
+  # Alpine logs it (test_vendored_alpine_logs_an_expression_error_through_console_warn).
+  #
+  # So the phrase is pinned out of the files CENSUS_GLOBS reads. It is NOT yet
+  # pinned out of e2e/, studio/emails or test/, where it still survives.
+  # Rule 1 (a multi-root <template x-if>) really IS silent; say "drops every root
+  # but the first" for that, so a true sentence cannot trip a pin written for a
+  # false one.
+  SILENT_NOOP = /\bsilent(?:ly)?[\s#]+no-?op/i
+  CENSUS_GLOBS = %w[
+    app/views/studio/modals/**/*.erb
+    app/views/style/modals/**/*.erb
+    test/dummy/app/views/**/*.erb
+    lib/studio/js_literal.rb
+    lib/studio/js_identifier.rb
+    README.md
+  ].freeze
+
+  def census_files
+    CENSUS_GLOBS.flat_map { |g| Dir.glob(File.join(ROOT, g)) }.uniq.sort
+  end
+
+  def test_no_modal_doc_calls_an_alpine_syntax_error_a_silent_no_op
+    files = census_files
+    assert_operator files.length, :>=, 60, "the census read only #{files.length} files — a glob went quiet"
+
+    offenders = files.select { |f| File.read(f).match?(SILENT_NOOP) }
+                     .map { |f| f.delete_prefix("#{ROOT}/") }
+    assert_empty offenders,
+                 "#{offenders.inspect} call an Alpine expression SyntaxError a silent no-op. The " \
+                 "vendored Alpine logs 'Alpine Expression Error' for it; say the card mounts dead " \
+                 "and name that console error. (Rule 1's multi-root drop IS silent — phrase it " \
+                 "as dropping every root but the first.)"
+  end
+
+  def test_the_census_pattern_catches_both_spellings_across_a_line_break
+    assert_match SILENT_NOOP, "mounts the component as a SILENT NO-OP"
+    assert_match SILENT_NOOP, "mounts a silent\n  # no-op that still renders"
+    refute_match SILENT_NOOP, "mounts the component dead, logging an Alpine Expression Error"
+  end
+
+  # ---- the sign-in card has one authority --------------------------------
+  #
+  # PR #319 retired style/modals/_auth, the style guide's mirror of turf's sign-in
+  # card and the engine's ONLY auth card. lib/studio.rb was corrected in that PR;
+  # the README went on describing the deleted file as the wallet credential
+  # slot's live renderer — two authorities, one release. Both must now say the
+  # engine ships no sign-in card and name the same app-side authority, and the
+  # README must not describe the retired mirror as deciding anything.
+  TURF_AUTH_CARD = "app/views/modals/_auth.html.erb"
+
+  def test_readme_and_lib_studio_agree_the_engine_ships_no_sign_in_card
+    readme = File.read(README)
+    lib    = File.read(File.join(ROOT, "lib/studio.rb"))
+
+    refute File.exist?(File.join(ROOT, "app/views/style/modals/_auth.html.erb")),
+           "style/modals/_auth is back — re-read the README's credential-slot section before trusting this pin"
+    assert_includes readme, "This engine ships no sign-in card", "README no longer states it"
+    assert_includes lib, "this engine ships no auth card", "lib/studio.rb no longer states it"
+    [readme, lib].zip(%w[README.md lib/studio.rb]).each do |text, label|
+      assert_includes text, TURF_AUTH_CARD, "#{label} no longer names turf's card as the authority"
+    end
+    refute_match(%r{`style/modals/_auth`\s+(?:looks|renders|gates)|Ruby, in `style/modals/_auth`}, readme,
+                 "the README describes the retired style/modals/_auth as a live renderer again")
+  end
+
+  # ---- no consumer forks the shared host ---------------------------------
+  #
+  # README, _scoped_host and both email pages said mcritchie-studio and
+  # turf-monster "both ship" or "fork" their own studio/modals/_host. Neither
+  # has since 2026-08-28. The advice to render scoped_host stands on its own
+  # store; the stated reason was false in four files at once.
+  HOST_FORK_CLAIM = %r{(?:both\s+ship|is\s+forked\s+by|ship\s+their\s+own)[\s\S]{0,140}?modals/_?host}i
+
+  def test_no_doc_claims_the_consumers_fork_the_shared_host
+    files = (Dir.glob(File.join(ROOT, "app/views/**/*.erb")) + [README]).sort
+    assert_operator files.length, :>=, 150, "the host-fork scan read only #{files.length} files"
+    assert_match HOST_FORK_CLAIM, "mcritchie-studio and turf-monster both ship their own app/views/studio/modals/_host.html.erb"
+
+    offenders = files.select { |f| File.read(f).match?(HOST_FORK_CLAIM) }.map { |f| f.delete_prefix("#{ROOT}/") }
+    assert_empty offenders,
+                 "#{offenders.inspect} say a consumer ships or forks studio/modals/_host. None does " \
+                 "(deleted 2026-08-28); re-verify with git cat-file on both repos before writing it again."
+  end
 end

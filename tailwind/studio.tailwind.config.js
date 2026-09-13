@@ -92,15 +92,32 @@ module.exports = {
         body:      'var(--color-text-body)',
         secondary: 'var(--color-text-secondary)',
         muted:     'var(--color-text-muted)',
-        // The danger RED as TEXT. Separate from the `danger` brand fill on
-        // purpose: a fill can be vivid, but text must clear WCAG AA 4.5:1 on
-        // every surface, and no static red does that on BOTH themes. The token
-        // is derived per theme by ThemeResolver#contrast_ink.
-        'danger-ink': 'var(--color-danger-ink)',
+        // The status roles as TEXT. Separate from the success / warning /
+        // danger FILLS below on purpose: a fill can be vivid, but text must
+        // clear WCAG AA 4.5:1 on every surface, and none of the default role
+        // colours does that on BOTH themes (#EF4444, #FF7C47 and #4BAF50 all
+        // fail on the light surfaces). Each ink is derived per theme by
+        // ThemeResolver#contrast_ink. There is deliberately NO text-danger,
+        // text-warning or text-success: a bare role colour as text is the
+        // defect, so it stays uncompilable.
+        'danger-ink':  'var(--color-danger-ink)',
+        'warning-ink': 'var(--color-warning-ink)',
+        'success-ink': 'var(--color-success-ink)',
+      },
+      // The status-role FILLS: badge tints, flash panels, borders. Registered
+      // for backgrounds and borders ONLY (not `colors`), so that registering
+      // them cannot also mint the text utilities the comment above rules out.
+      backgroundColor: {
+        success: 'var(--color-success)',
+        warning: 'var(--color-warning)',
+        danger:  'var(--color-danger)',
       },
       borderColor: {
         subtle: 'var(--color-border)',
         strong: 'var(--color-border-strong)',
+        success: 'var(--color-success)',
+        warning: 'var(--color-warning)',
+        danger:  'var(--color-danger)',
       },
     },
   },

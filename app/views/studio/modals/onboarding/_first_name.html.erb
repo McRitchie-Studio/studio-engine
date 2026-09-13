@@ -83,8 +83,9 @@
   CRITICAL (Alpine): this partial is cloned from a <template x-if> by the modal
   host, so it must have ONE root element, and the x-data below is a
   DOUBLE-QUOTED attribute — a single " anywhere inside it (a code comment
-  included) closes it early and the whole component mounts as a silent no-op that
-  still renders markup. Keep every inner string SINGLE-quoted.
+  included) closes it early and the whole component mounts dead: it still renders
+  markup, and the only signal is an Alpine Expression Error in the browser
+  console. Keep every inner string SINGLE-quoted.
 
   THE TWO SHAPES — read this before adding a local to the x-data. Five locals are
   interpolated into that attribute and they do NOT take the same repair. Getting
@@ -93,7 +94,7 @@
 
     STRING position — empty_error, submit_path, skip_path, done_event — each sits
       inside a JS SINGLE-quoted literal. A bare apostrophe closes the literal, the
-      expression becomes a SyntaxError, and the card is that silent no-op. Repair:
+      expression becomes a SyntaxError, and the card is that dead component. Repair:
       Studio::JsLiteral.in_attribute, which is where the mechanism now lives and is
       tested. Two escapers have to run — one for the JS literal, one for the
       attribute — and the second only runs on a value ERB still believes is unsafe.
@@ -146,8 +147,8 @@
   # first HOST-SUPPLIED PROSE to go inside that attribute, and prose has
   # apostrophes. Interpolated raw, an error reading "We'll need a name" would
   # close the JS single-quoted string, make the whole expression a SyntaxError,
-  # and mount the component as a SILENT NO-OP that still renders every element
-  # below. Studio::JsLiteral.in_attribute covers the apostrophe, the double quote,
+  # and mount the component DEAD: it still renders every element below, and
+  # only the browser console says why (an Alpine Expression Error). Studio::JsLiteral.in_attribute covers the apostrophe, the double quote,
   # the backslash and the newline, AND hands ERB a value it still believes is
   # unsafe so the attribute's own escaping runs too — a safe string would skip that
   # half and could smuggle a raw double quote in, the exact failure the CRITICAL
@@ -184,8 +185,8 @@
   # THE SAME HAZARD empty_error_js CARRIES, on the three remaining locals that land
   # inside a JS SINGLE-quoted literal in the x-data below. A bare apostrophe in any
   # of them closes its literal, the whole expression becomes a SyntaxError, and
-  # Alpine mounts the component as a SILENT NO-OP that still renders every element
-  # — perfect-looking markup, dead card.
+  # Alpine mounts the component DEAD — perfect-looking markup, a card that does
+  # nothing, and an Alpine Expression Error in the console as the only signal.
   #
   # WHY A METHOD RATHER THAN escape_javascript AT EACH SITE: the second escaper is
   # conditional. ERB skips a value that answers true to html_safe, and
