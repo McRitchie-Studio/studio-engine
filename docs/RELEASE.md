@@ -186,6 +186,15 @@ at `0.10.0` with `v0.10.0`. An earlier reading of "0.74.7 against `v0.74.6`"
 came from inside case 3: the 0.74.7 version commit is stamped 22:09:28 MDT and
 `v0.74.7` was tagged at 22:29:32.
 
+A publish whose **tag push failed** used to be a fourth, and the worst: from a
+clone without the tag, every sweep SKIPped this gem for good. Prepare now
+REFUSES it instead — a version already live on RubyGems whose `v*` tag never
+reached origin — and names the tag to push
+(`git -C /Users/alex/projects/studio-engine push origin v<version>`). The
+failing sweep itself carries on and prints `⚠ tag v<version> did NOT reach
+origin — push it now`
+(https://mcritchie.studio/tasks/untagged-gem-publish-strands-work).
+
 Prepare also rolls nothing when a gem has no `CHANGELOG.md` (it says so and
 allocates anyway), and **Publishing by hand (fallback)** below bypasses prepare,
 so it rolls nothing either.
