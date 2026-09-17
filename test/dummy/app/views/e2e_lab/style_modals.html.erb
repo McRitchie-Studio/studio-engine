@@ -22,9 +22,10 @@
 
     THE LAB RULE (see E2eLabController): a lab page sets up a partial's LOCALS
     and nothing else. Neither partial here takes any — style/_modals resolves its
-    own web3 / leveling gates, and the host is given an EMPTY block because it
-    guards its extension point with `yield if block_given?`, which a partial
-    rendered inside a layout answers true for whether or not one was passed. %>
+    own web3 / leveling gates. The host's EMPTY block is a leftover: it guarded
+    against the host's old `yield if block_given?`, which is true in every
+    partial. The host now asks Studio::PartialBlock, so an empty block and no
+    block render the same card. %>
 <main class="max-w-5xl mx-auto px-4 py-10" x-data>
   <h1 class="text-2xl font-bold mb-6">Style guide — modals</h1>
 

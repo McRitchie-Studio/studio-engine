@@ -21,10 +21,16 @@
                     for processing / loading states.
     size:           :md (default) OR :lg (celebration end-state, text-3xl title).
 
-  Block: if given, the block's content replaces the subtitle area. Explicit
-  subtitle locals are checked BEFORE block_given? — a partial's block_given? can
-  read TRUE off the layout yield even with no block passed (see the engine's
-  Rails-partial block_given? note), so lead with the locals.
+  Block: if given, the block's content replaces the subtitle area. The subtitle
+  locals outrank it.
+
+  NEVER TEST THE BLOCK WITH block_given?. In a Rails partial it is always true,
+  and a yield with no caller block returns the LAYOUT's content. This branch
+  used to read `elsif block_given?`, so a header rendered from the layout with
+  no subtitle yielded the whole page body into the modal: every signed-in
+  turf-monster page for a user allowed to rename carried two copies of itself
+  (modal-header-yields-whole-page, 2026-09-16). Studio::PartialBlock
+  (lib/studio/partial_block.rb) tells a real block from that fallback.
 %>
 <%
   icon_color = local_assigns[:icon_color] || 'primary'
@@ -77,7 +83,7 @@
     <p class="<%= sub_cls %>" x-text="<%= subtitle_key %>"></p>
   <% elsif local_assigns[:subtitle] %>
     <p class="<%= sub_cls %>"><%= subtitle %></p>
-  <% elsif block_given? %>
-    <p class="<%= sub_cls %>"><%= yield %></p>
+  <% elsif (caller_block = Studio::PartialBlock.content(self, yield)) %>
+    <p class="<%= sub_cls %>"><%= caller_block %></p>
   <% end %>
 </div>
