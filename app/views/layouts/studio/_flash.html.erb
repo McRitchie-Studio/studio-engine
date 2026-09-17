@@ -54,8 +54,10 @@
   .toast-blur-glow {
     background: rgba(0, 0, 0, 0.06);
   }
+  /* Slash form only: the theme's -rgb vars are space lists, so the legacy
+     comma form is invalid and painted no halo (legacy_rgba_var_guard_test.rb). */
   .dark .toast-blur-glow {
-    background: rgba(var(--color-primary-500-rgb), 0.12);
+    background: rgb(var(--color-primary-500-rgb) / 0.12);
   }
   .toast-wrapper {
     position: relative;

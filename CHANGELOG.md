@@ -4,6 +4,29 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **The toast halo and the success card's explorer link now paint their
+  tints.** Both used the legacy `rgba(var(--color-primary-500-rgb), A)` form.
+  `Studio::ThemeResolver` emits every `-rgb` var as a space-separated list, and
+  that list makes the comma form invalid, so browsers dropped each declaration
+  without an error. `layouts/studio/_flash`'s `.dark .toast-blur-glow` (the
+  `blurShadow: true` halo) painted no halo in dark mode. The Solana explorer
+  link in `blocks/_success_card` (`tx_solana: true`) lost its tinted backing in
+  both themes. Both now use the slash form, `rgb(var(--x-rgb) / A)`.
+  - Measured in headless Chromium on a page built from the engine's
+    consumer-style Tailwind build and the resolver's real theme vars. Before,
+    both elements computed `rgba(0, 0, 0, 0)`. After, the dark halo computed
+    `rgba(142, 130, 254, 0.12)` and the link `rgba(142, 130, 254, 0.06)`.
+  - Guarded by `test/views/legacy_rgba_var_guard_test.rb`. It refuses the
+    legacy form in every code file the gemspec packages, in the
+    `Studio::UiPrimitives` CSS strings, and in a compiled consumer build. It
+    also pins the premise that every `-rgb` triple the engine defines is a
+    space-separated list.
+  - `RUNBOOK.md` gains the symptom and its fix. Its palette entry no longer
+    says a nil or blank primary skips palette generation; on the
+    `studio_theme_css_tag` path, both fall back to a default.
+
 ## 0.74.12 — 2026-09-16
 
 ### Fixed
