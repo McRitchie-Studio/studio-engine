@@ -371,8 +371,9 @@
     }, delay);
   }
 
+  // A stale page knows its stamp is out of date, so it has nothing to tell a peer.
   function announce() {
-    if (!channel || !bound) return;
+    if (!channel || !bound || stale) return;
     try {
       channel.postMessage({ v: MESSAGE_VERSION, type: "announce", tabId: tabId,
         fingerprint: bound.fingerprint, state: bound.state, issuedAt: bound.issuedAt });
@@ -399,7 +400,9 @@
       return;
     }
     if (message.issuedAt === bound.issuedAt) return;
-    if (stale && stale.source === "peer" && inFlight) return;
+    // The same drift, heard again (a peer answering another tab's hello), is not
+    // news: one drift, one warning.
+    if (stale && stale.source === "peer" && (inFlight || (stale.observed && stale.observed.fingerprint === message.fingerprint))) return;
     markStale("peer", { state: message.state, fingerprint: message.fingerprint, issuedAt: message.issuedAt });
   }
 

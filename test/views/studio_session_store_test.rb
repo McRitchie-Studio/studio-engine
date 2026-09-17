@@ -33,6 +33,7 @@ class StudioSessionStoreTest < Minitest::Test
     peer_sign_out_rehydrates_to_signed_out
     peer_sign_in_rehydrates_an_anonymous_page
     peer_drift_without_a_rehydrate_url_stays_stale_and_warns
+    one_drift_warns_once_however_often_it_is_heard
     an_older_peer_never_moves_a_newer_tab
     answers_an_older_announce_with_its_own
     same_millisecond_disagreement_does_not_ping_pong

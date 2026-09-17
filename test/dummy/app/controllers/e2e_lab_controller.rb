@@ -381,5 +381,32 @@ class E2eLabController < ActionController::Base
 
   # Liveness. Playwright's webServer polls this before the first spec, so it must
   # not depend on anything a lab page needs.
+  # The session-drift page (e2e/session_drift.spec.js).
+  #
+  # The browser program under test is studio/_session_stamp, which the ENGINE head in
+  # this lab's layout renders by name: the meta stamp plus studio/session.js. A host
+  # gets the stamp's INPUT from Studio::SessionDrift; the lab supplies that one input
+  # from the query string instead, which is the same relationship every other lab
+  # page has to its partial's locals. Only this action sets it, so every other lab
+  # page keeps a head with no stamp and no store.
+  #
+  # No rehydrateUrl: the lab has no session to rehydrate, so drift is final `stale`.
+  helper_method :studio_session_page_stamp
+
+  def studio_session_page_stamp = @session_stamp
+
+  def session_drift
+    @session_stamp = {
+      v: 1,
+      state: params[:state] == "authenticated" ? "authenticated" : "anonymous",
+      fingerprint: params[:fp].presence || "anonymous",
+      issuedAt: params[:issued].to_i,
+      expiresAt: nil,
+      rehydrateUrl: nil,
+      identities: {}
+    }
+    render(:session_drift)
+  end
+
   def up = render(plain: "ok")
 end

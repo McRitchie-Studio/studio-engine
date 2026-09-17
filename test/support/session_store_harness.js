@@ -301,6 +301,28 @@ scenario("peer_drift_without_a_rehydrate_url_stays_stale_and_warns", async () =>
   assert.deepStrictEqual(a.changed()[0].observed.state, "anonymous");
 });
 
+scenario("one_drift_warns_once_however_often_it_is_heard", async () => {
+  const world = makeWorld();
+  world.server.rehydrateUrl = null;
+  world.server.signIn("u1");
+  const a = makeTab(world, { stamp: world.server.stamp() });
+  await sleep(10);
+  a.clearEvents();
+
+  // A new tab BOOTS (announce + hello) under a newer session. Its hello makes A
+  // answer, and A's older answer makes the new tab repeat itself, so A hears the
+  // same drift more than once.
+  world.server.signOut();
+  const b = makeTab(world, { stamp: world.server.stamp() });
+  const c = makeTab(world, { stamp: world.server.stamp() });
+  await sleep(40);
+
+  assert.strictEqual(a.store.current().state, "stale");
+  assert.strictEqual(a.mismatches().length, 1, "saw " + a.mismatches().length + " warnings for one drift");
+  assert.strictEqual(b.store.current().state, "anonymous");
+  assert.strictEqual(c.store.current().state, "anonymous");
+});
+
 scenario("an_older_peer_never_moves_a_newer_tab", async () => {
   const world = makeWorld();
   const old = world.server.stamp();
