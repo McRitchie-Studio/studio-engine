@@ -121,7 +121,8 @@ class SessionDriftVocabularyTest < Minitest::Test
 
   def test_the_guard_scans_itself
     assert_includes WHOLE_FILES, "test/lib/session_drift_vocabulary_test.rb"
-    refute_match FORBIDDEN, File.read(__FILE__), "this file holds none of the words, reversed list included"
+    assert_empty offending_lines(File.read(__FILE__), File.basename(__FILE__)),
+                 "this file holds none of the words, reversed list included"
   end
 
   def test_every_owned_section_is_found_and_holds_what_it_should
