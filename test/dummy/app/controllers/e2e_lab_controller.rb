@@ -379,8 +379,6 @@ class E2eLabController < ActionController::Base
   # page sets those up. This action exists only to render the view.
   def onboarding_first_name = render(:onboarding_first_name)
 
-  # Liveness. Playwright's webServer polls this before the first spec, so it must
-  # not depend on anything a lab page needs.
   # The session-drift page (e2e/session_drift.spec.js).
   #
   # The browser program under test is studio/_session_stamp, which the ENGINE head in
@@ -417,5 +415,7 @@ class E2eLabController < ActionController::Base
     render(:session_drift)
   end
 
+  # Liveness. Playwright's webServer polls this before the first spec, so it must
+  # not depend on anything a lab page needs.
   def up = render(plain: "ok")
 end

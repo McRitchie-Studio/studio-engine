@@ -5,7 +5,7 @@ require "openssl"
 
 module Studio
   # The session fingerprint: a short, opaque answer to "which signed-in session
-  # rendered this page?" It is stamped on every page (SessionContext#to_stamp)
+  # rendered this page?" It is stamped on every page (Studio::SessionState#to_stamp)
   # and returned by the rehydrate endpoint, so two tabs, or one tab before and
   # after it went to the background, can tell whether they still describe the
   # same session WITHOUT exposing anything that identifies it.
@@ -17,7 +17,7 @@ module Studio
   #     (docs/USER_CONTRACT.md). Studio::ErrorHandling binds it into the cookie
   #     and a host rotates it to log a user out everywhere, so a rotation changes
   #     the fingerprint and a page rendered before it can see it was revoked;
-  #   * the identities the host has bound the session to (SessionContext#to_stamp's
+  #   * the identities the host has bound the session to (Studio::SessionState#to_stamp's
   #     `identities:`). A host can re-bind a session to a different identity
   #     without the account or its token changing. Folding the bindings in means
   #     that re-bind changes the fingerprint too, so every other tab learns about

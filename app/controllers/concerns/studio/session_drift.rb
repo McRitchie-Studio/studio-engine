@@ -26,24 +26,22 @@ module Studio
     extend ActiveSupport::Concern
 
     included do
-      helper_method :studio_session_context, :studio_session_stamp, :studio_session_page_stamp,
+      helper_method :studio_session_state, :studio_session_stamp, :studio_session_page_stamp,
                     :studio_session_identities, :studio_session_rehydrate_url
     end
 
     private
 
-    # The request's SessionContext, built from the viewer alone. The session
-    # state and fingerprint depend on nothing else, so this concern never reaches
-    # for the legacy mode half of SessionContext (see its class comment) or for
-    # a host's override of the accessor that builds it.
-    def studio_session_context
-      @studio_session_context ||= SessionContext.new(user: current_user)
+    # The request's Studio::SessionState, built from the viewer alone: the state
+    # and the fingerprint depend on nothing else.
+    def studio_session_state
+      @studio_session_state ||= Studio::SessionState.new(current_user)
     end
 
     # The stamp for this request. Raises like any other controller code; the
     # rehydrate endpoint relies on that so a failure reaches the error handler.
     def studio_session_stamp
-      studio_session_context.to_stamp(
+      studio_session_state.to_stamp(
         rehydrate_url: studio_session_rehydrate_url,
         expires_at:    studio_session_expires_at,
         identities:    studio_session_identities

@@ -436,6 +436,7 @@ scenario("expiry_marks_stale_then_rehydrates", async () => {
   world.server.signIn("u1");
   world.server.expiresInMs = 25;
   const tab = makeTab(world, { stamp: world.server.stamp() });
+  tab.store.configure({ expiryGraceMs: 0 });
   tab.clearEvents();
   world.server.signOut(); // the cookie lapsed: the next request carries no session
   await sleep(80);
@@ -570,7 +571,7 @@ scenario("holds_expire_and_match_only_their_scope", async () => {
   both.release();
 });
 
-scenario("session_scope_hold_covers_web2_drift", async () => {
+scenario("session_scope_hold_covers_built_in_drift", async () => {
   const world = makeWorld();
   world.server.signIn("u1");
   const a = makeTab(world, { stamp: world.server.stamp() });
@@ -636,6 +637,223 @@ scenario("a_restored_older_snapshot_goes_stale_and_rechecks", async () => {
   assert.strictEqual(states[0], "stale");
   assert.strictEqual(tab.changed()[0].reason, "restored");
   assert.strictEqual(tab.store.current().state, "rehydrated");
+});
+
+scenario("back_to_a_cached_page_keeps_known_drift", async () => {
+  // Default config: no rehydrate route. Tab A reads page 1, then page 2, as u1.
+  const world = makeWorld();
+  world.server.rehydrateUrl = null;
+  world.server.signIn("u1");
+  const page1 = world.server.stamp();
+  const a = makeTab(world, { stamp: page1 });
+  const page2 = world.server.stamp();
+  a.navigate(page2);
+  await sleep(10);
+  a.clearEvents();
+
+  // Tab B signs out. A learns it and warns once.
+  world.server.signOut();
+  makeTab(world, { stamp: world.server.stamp() });
+  await sleep(30);
+  assert.strictEqual(a.store.current().state, "stale");
+  assert.strictEqual(a.mismatches().length, 1);
+
+  // Back in A: Turbo restores its cached page 1 — the SAME session, rendered EARLIER.
+  a.navigate(page1);
+  await sleep(10);
+
+  const snap = a.store.current();
+  assert.strictEqual(snap.state, "stale", "Back must not report the signed-out browser as authenticated");
+  assert.strictEqual(snap.issuedAt, page2.issuedAt, "the newer stamp this tab already holds is kept");
+  assert.strictEqual(a.mismatches().length, 1, "and the drift it already warned about is not warned again");
+});
+
+scenario("back_after_an_expiry_does_not_warn_again", async () => {
+  const world = makeWorld();
+  world.server.rehydrateUrl = null;
+  world.server.signIn("u1");
+  const page1 = world.server.stamp();
+  const a = makeTab(world, { stamp: page1 });
+  a.store.configure({ expiryGraceMs: 0 });
+  world.server.expiresInMs = 20;
+  a.navigate(world.server.stamp());
+  a.clearEvents();
+  await sleep(60);
+  assert.strictEqual(a.store.current().state, "stale");
+  assert.strictEqual(a.mismatches().length, 1);
+
+  a.navigate(page1);
+  a.navigate(page1);
+  await sleep(10);
+  assert.strictEqual(a.store.current().state, "stale");
+  assert.strictEqual(a.mismatches().length, 1, "one expiry, one warning, however often Back is pressed");
+});
+
+scenario("back_to_an_older_page_of_the_same_session_keeps_the_newer_stamp", async () => {
+  const world = makeWorld();
+  world.server.signIn("u1");
+  world.server.expiresInMs = 30;
+  const page1 = world.server.stamp();
+  const a = makeTab(world, { stamp: page1 });
+  a.store.configure({ expiryGraceMs: 0 });
+  world.server.expiresInMs = 60000;
+  const page2 = world.server.stamp();
+  a.navigate(page2);
+  a.clearEvents();
+
+  a.navigate(page1); // Back: page 1's stamp carries the EARLIER expiry
+  await sleep(70);
+
+  assert.strictEqual(a.store.current().expiresAt, page2.expiresAt, "the newer expiry is kept");
+  assert.strictEqual(a.changed().length, 0, "the older page's expiry never fires");
+  assert.strictEqual(a.fetches.length, 0);
+});
+
+scenario("a_fresh_render_of_the_same_session_clears_stale", async () => {
+  // No route. The stamp's expiry passes, so the tab goes stale; then the tab
+  // navigates and the server renders the SAME session again, newer. That render
+  // is proof the session is live, and the tab is current again.
+  const world = makeWorld();
+  world.server.rehydrateUrl = null;
+  world.server.signIn("u1");
+  world.server.expiresInMs = 15;
+  const tab = makeTab(world, { stamp: world.server.stamp() });
+  tab.store.configure({ expiryGraceMs: 0 });
+  await sleep(50);
+  assert.strictEqual(tab.store.current().state, "stale");
+
+  world.server.expiresInMs = null;
+  tab.navigate(world.server.stamp());
+  assert.strictEqual(tab.store.current().state, "authenticated");
+  assert.strictEqual(tab.store.current().reason, "navigation");
+});
+
+scenario("answers_a_hello_with_its_session", async () => {
+  const world = makeWorld();
+  world.server.signIn("u1");
+  makeTab(world, { stamp: world.server.stamp() });
+  const outsider = new world.BroadcastChannel("studio-session");
+  const heard = [];
+  outsider.onmessage = (event) => heard.push(event.data);
+  await sleep(10);
+  heard.length = 0;
+
+  outsider.postMessage({ v: 1, type: "hello", tabId: "outsider" });
+  await sleep(20);
+  assert.deepStrictEqual(heard.map((m) => [m.type, m.fingerprint]), [["announce", "fp-u1"]]);
+  outsider.close();
+});
+
+scenario("a_stale_tab_does_not_announce", async () => {
+  const world = makeWorld();
+  world.server.rehydrateUrl = null;
+  world.server.signIn("u1");
+  const a = makeTab(world, { stamp: world.server.stamp() });
+  await sleep(10);
+  world.server.signOut();
+  const b = makeTab(world, { stamp: world.server.stamp() });
+  await sleep(30);
+  assert.strictEqual(a.store.current().state, "stale");
+
+  const outsider = new world.BroadcastChannel("studio-session");
+  const heard = [];
+  outsider.onmessage = (event) => heard.push(event.data);
+  outsider.postMessage({ v: 1, type: "hello", tabId: "outsider" });
+  await sleep(20);
+  assert.deepStrictEqual(heard.map((m) => m.fingerprint), ["anonymous"],
+    "only the tab with a current stamp answers; the stale one has nothing true to say");
+  assert.strictEqual(b.store.current().state, "anonymous");
+  outsider.close();
+});
+
+scenario("anonymous_stamps_never_arm_expiry", async () => {
+  const world = makeWorld();
+  const tab = makeTab(world, { stamp: world.server.stamp({ expiresAt: Date.now() + 10 }) });
+  tab.store.configure({ expiryGraceMs: 0 });
+  tab.clearEvents();
+  await sleep(40);
+  assert.strictEqual(tab.store.current().state, "anonymous");
+  assert.strictEqual(tab.changed().length, 0);
+  assert.strictEqual(tab.fetches.length, 0, "nothing to expire, nothing to probe");
+});
+
+scenario("expiry_waits_out_its_grace", async () => {
+  const world = makeWorld();
+  world.server.signIn("u1");
+  world.server.expiresInMs = 10;
+  const tab = makeTab(world, { stamp: world.server.stamp() });
+  tab.store.configure({ expiryGraceMs: 80 });
+  tab.clearEvents();
+  world.server.signOut();
+
+  await sleep(40);
+  assert.strictEqual(tab.fetches.length, 0, "at expiresAt the cookie may still be live; probing then would renew it");
+  await sleep(100);
+  assert.strictEqual(tab.store.current().state, "signed_out");
+});
+
+scenario("holds_name_the_built_in_sources", async () => {
+  const world = makeWorld();
+  world.server.signIn("u1");
+  const a = makeTab(world, { stamp: world.server.stamp() });
+  const b = makeTab(world, { stamp: world.server.stamp() });
+  await sleep(10);
+  a.clearEvents();
+
+  const wrong = a.store.expectChange("expiry");
+  const right = a.store.expectChange("peer");
+  world.server.signIn("u2");
+  b.navigate(world.server.stamp());
+  await sleep(30);
+  assert.strictEqual(a.store.current().state, "rehydrated");
+  assert.strictEqual(a.mismatches().length, 0, "a hold on peer covers peer drift");
+  right.release();
+  wrong.release();
+
+  const onlyExpiry = a.store.expectChange("expiry");
+  world.server.signIn("u3");
+  b.navigate(world.server.stamp());
+  await sleep(30);
+  assert.strictEqual(a.mismatches().length, 1, "a hold on expiry does not cover peer drift");
+  onlyExpiry.release();
+});
+
+scenario("hold_timeouts_are_capped", async () => {
+  const world = makeWorld();
+  const tab = makeTab(world, { stamp: world.server.stamp() });
+  tab.store.configure({ maxHoldMs: 20 });
+  const forever = tab.store.expectChange("*", { timeoutMs: Infinity });
+  const huge = tab.store.expectChange("*", { timeoutMs: 1e12 });
+  assert.strictEqual(forever.isActive(), true);
+  await sleep(40);
+  assert.strictEqual(forever.isActive(), false, "Infinity is capped, so a forgotten hold still ends");
+  assert.strictEqual(huge.isActive(), false);
+});
+
+scenario("a_throwing_source_is_contained", async () => {
+  const world = makeWorld();
+  world.server.signIn("u1", { device: "d-1" });
+  const tab = makeTab(world, { stamp: world.server.stamp() });
+  let report = null;
+  let explode = false;
+  tab.store.registerIdentitySource({
+    name: "device",
+    start(r) { report = r; },
+    equals(bound, observed) { if (explode) throw new Error("equals exploded"); return bound === observed; }
+  });
+  report("d-1");
+  tab.clearEvents();
+
+  explode = true;
+  assert.doesNotThrow(() => report("d-2"), "a source's own exception never escapes into its caller");
+  assert.strictEqual(tab.store.current().state, "authenticated", "a source that cannot compare changes nothing");
+
+  // An adoption re-evaluates every source; a throwing one must not strand the swap.
+  world.server.signIn("u2", { device: "d-1" });
+  const snap = await tab.store.refresh();
+  assert.strictEqual(snap.fingerprint, "fp-u2-device=d-1");
+  assert.strictEqual(snap.state, "rehydrated");
+  assert.strictEqual(tab.changed().pop().state, "rehydrated", "the transition was still announced");
 });
 
 scenario("a_failed_rehydrate_on_a_stale_page_is_drift", async () => {

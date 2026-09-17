@@ -15,7 +15,7 @@
 //   rehydrated     the page pulled the server's session in place and is signed in.
 //   signed_out     the page was signed in and the server now reports nobody.
 //
-// WHERE DRIFT COMES FROM. Identity sources. The engine ships three web2 sources
+// WHERE DRIFT COMES FROM. Identity sources. The engine ships three built-in sources
 // (together the "session" scope) and a plug-in interface for everything else:
 //   peer    — other tabs announce their fingerprint on a BroadcastChannel; a
 //             newer, different one makes this page stale.
@@ -31,9 +31,10 @@
 // only, the one a warning listens to), and Alpine.store('studioSession') when
 // Alpine is on the page. It never touches a host's own stores.
 //
-// DORMANT WITHOUT A STAMP. A page with no meta tag (the partial did not render,
-// or rendered nothing) leaves current().state null, fetches nothing and
-// broadcasts nothing, until a Turbo navigation brings a stamp in.
+// DORMANT UNTIL A STAMP. A store that has never seen a meta tag (the partial did
+// not render, or rendered no stamp) leaves current().state null, fetches nothing
+// and broadcasts nothing, until a Turbo navigation brings a stamp in. Once seated
+// it stays seated: a later page without a stamp keeps the binding it has.
 //
 // Written as ES5 with Promises and no framework, like the other engine assets,
 // so every host's asset pipeline accepts it untouched.
@@ -58,7 +59,15 @@
     // How long a tab must be hidden before coming back probes the server.
     revalidateAfterHiddenMs: 30000,
     // How long an expectChange hold lasts when the caller names no timeout.
-    holdTimeoutMs: 60000
+    holdTimeoutMs: 60000,
+    // The longest a hold may last, whatever the caller asks (Infinity included),
+    // so a forgotten hold cannot hide drift for the life of the tab.
+    maxHoldMs: 600000,
+    // How long after expiresAt the expiry source fires. The stamp's expiresAt is
+    // computed before the response commits a sliding session cookie, so AT
+    // expiresAt the cookie can still be live, and probing then would renew the
+    // session it meant to find expired: an idle tab would keep itself signed in.
+    expiryGraceMs: 5000
   };
 
   var tabId = Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -136,19 +145,30 @@
 
   // ---- holds ----------------------------------------------------------------
 
-  function isExpected(scope) {
+  // True when an active hold names any of `scopes` (a string or an array), or "*".
+  function isExpected(scopes) {
+    var wanted = Object.prototype.toString.call(scopes) === "[object Array]" ? scopes : [scopes];
     var now = Date.now();
     holds = holds.filter(function (hold) { return !hold.released && hold.until > now; });
     for (var i = 0; i < holds.length; i++) {
-      if (holds[i].scopes.indexOf("*") !== -1 || holds[i].scopes.indexOf(scope) !== -1) return true;
+      if (holds[i].scopes.indexOf("*") !== -1) return true;
+      for (var j = 0; j < wanted.length; j++) {
+        if (wanted[j] && holds[i].scopes.indexOf(wanted[j]) !== -1) return true;
+      }
     }
     return false;
+  }
+
+  // A built-in source's drift is covered by a hold on "session" or on its own name.
+  function sessionScopes(source) {
+    return [SESSION_SCOPE, source];
   }
 
   function expectChange(scope, options) {
     var scopes = scope == null ? ["*"] : (Object.prototype.toString.call(scope) === "[object Array]" ? scope : [scope]);
     scopes = scopes.map(function (value) { return String(value); });
     var timeout = options && options.timeoutMs > 0 ? options.timeoutMs : config.holdTimeoutMs;
+    timeout = Math.min(timeout, config.maxHoldMs);
     var hold = { scopes: scopes, until: Date.now() + timeout, released: false };
     holds.push(hold);
     return {
@@ -229,12 +249,24 @@
   // undefined means the source cannot tell, which changes nothing. An UNBOUND
   // source (no bound identity) records what it sees but never mismatches: an
   // anonymous page with an identity in view is not a warning.
+  //
+  // A source whose bound() or equals() throws cannot compare, which is the same
+  // as "cannot tell": the error is reported and nothing changes. It must never
+  // escape, because evaluate also runs inside an adoption, between swapping the
+  // stamp and announcing the transition.
   function evaluate(entry) {
     if (!bound || entry.observed === undefined) return null;
     var name = entry.name;
-    var boundValue = boundIdentityFor(entry);
     var had = Object.prototype.hasOwnProperty.call(mismatches, name);
-    var equal = boundValue === null || identitiesEqual(entry, boundValue, entry.observed);
+    var boundValue;
+    var equal;
+    try {
+      boundValue = boundIdentityFor(entry);
+      equal = boundValue === null || identitiesEqual(entry, boundValue, entry.observed);
+    } catch (e) {
+      report(e);
+      return null;
+    }
 
     if (equal) {
       if (!had) return null;
@@ -337,7 +369,7 @@
     transition({
       reason: options.reason,
       source: options.source,
-      expected: !!(options.navigation || options.manual || isExpected(options.scope || SESSION_SCOPE)),
+      expected: !!(options.navigation || options.manual || isExpected(sessionScopes(options.source))),
       drift: drift,
       adopted: fingerprintChanged
     });
@@ -345,7 +377,7 @@
     if (fingerprintChanged) announce();
   }
 
-  // ---- the web2 sources -----------------------------------------------------
+  // ---- the built-in sources -------------------------------------------------
 
   // A session source saw a different truth. With a rehydrate URL the page goes
   // stale and repairs itself; without one, stale is final and IS the drift.
@@ -353,7 +385,7 @@
     if (!bound) return;
     stale = { source: source, observed: observedValue === undefined ? null : observedValue };
     var repairable = !!bound.rehydrateUrl && typeof fetch === "function";
-    transition({ reason: source, source: source, expected: isExpected(SESSION_SCOPE),
+    transition({ reason: source, source: source, expected: isExpected(sessionScopes(source)),
       drift: !repairable, observed: stale.observed });
     if (repairable) rehydrate(source, false);
   }
@@ -362,7 +394,7 @@
     if (expiryTimer !== null) clearTimeout(expiryTimer);
     expiryTimer = null;
     if (!bound || bound.state !== "authenticated" || typeof bound.expiresAt !== "number") return;
-    var delay = Math.max(0, bound.expiresAt - Date.now());
+    var delay = Math.max(0, bound.expiresAt + config.expiryGraceMs - Date.now());
     if (delay > MAX_TIMER_MS) return;
     var armedFor = bound;
     expiryTimer = setTimeout(function () {
@@ -449,7 +481,7 @@
       // A probe that fails on a page with no known drift changes nothing. A page
       // already stale could not confirm what it learned, so that IS drift.
       if (stale) {
-        transition({ reason: "rehydrate_failed", source: source, expected: isExpected(SESSION_SCOPE),
+        transition({ reason: "rehydrate_failed", source: source, expected: isExpected(sessionScopes(source)),
           drift: true, error: String(error && error.message || error) });
       }
       return current();
@@ -484,6 +516,11 @@
       return;
     }
     if (stamp.fingerprint === bound.fingerprint) {
+      // The same session, rendered EARLIER: Back to a page Turbo cached. It holds
+      // nothing this tab does not already know, and it must not undo what the tab
+      // learned since — a stale tab stays stale (Back is not a sign-in), and a
+      // current tab keeps its newer stamp and newer expiry.
+      if (stamp.issuedAt < bound.issuedAt) return;
       bound = stamp;
       stale = null;
       boundState = stamp.state;
@@ -539,6 +576,11 @@
     if (!options) return copy(config);
     if (options.revalidateAfterHiddenMs >= 0) config.revalidateAfterHiddenMs = options.revalidateAfterHiddenMs;
     if (options.holdTimeoutMs > 0) config.holdTimeoutMs = options.holdTimeoutMs;
+    if (options.maxHoldMs > 0) config.maxHoldMs = options.maxHoldMs;
+    if (options.expiryGraceMs >= 0) {
+      config.expiryGraceMs = options.expiryGraceMs;
+      armExpiry();
+    }
     return copy(config);
   }
 

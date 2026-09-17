@@ -119,7 +119,9 @@ Rails.application.routes.draw do
 end
 ```
 
-This draws the enabled auth routes (`/login`, `/signup`, `/logout`, `POST /magic_link` to request a link, `GET`/`POST /l/:token` for the link itself, Solana routes), OAuth callbacks, optional SSO routes, `/error_logs`, and `/admin/theme`. Set `Studio.draw_geo_routes = true` to add the geo manager (`/admin/geo`) and its public probe (`/geo/check`) — off by default because turf-monster owns those helper names until its adoption lands. Set `Studio.draw_session_routes = true` to add the session-drift rehydrate endpoint (`GET /session/state`) — off by default because it inherits the host's filters, which an app should check first ([`docs/SESSION_DRIFT.md`](docs/SESSION_DRIFT.md)). Magic-link emails point at the inert `GET /l/:token` confirmation page; the single-use token is burned only by the CSRF-protected `POST` to `link_consume_path`.
+This draws the enabled auth routes (`/login`, `/signup`, `/logout`, `POST /magic_link` to request a link, `GET`/`POST /l/:token` for the link itself, Solana routes), OAuth callbacks, optional SSO routes, `/error_logs`, and `/admin/theme`. Set `Studio.draw_geo_routes = true` to add the geo manager (`/admin/geo`) and its public probe (`/geo/check`) — off by default because turf-monster owns those helper names until its adoption lands. Magic-link emails point at the inert `GET /l/:token` confirmation page; the single-use token is burned only by the CSRF-protected `POST` to `link_consume_path`.
+
+Set `Studio.draw_session_routes = true` to add the session-drift rehydrate endpoint (`GET /session/state`) — off by default because it inherits the host's filters, which an app should check first ([`docs/SESSION_DRIFT.md`](docs/SESSION_DRIFT.md)).
 
 **Magic links need the `studio_links` table.** Install it with `bin/rails studio_engine:install:migrations && bin/rails db:migrate` (install all of them) before enabling `:magic_link` — never by hand-copying the migration, which collides with the task's own copy on `class CreateStudioLinks`. Without the table, the first sign-in raises `Studio::Link::MissingTable`.
 

@@ -12,8 +12,11 @@ module Studio
   #             that payload refreshes from the same response;
   #   csrf    — a fresh authenticity token. Signing in or out resets the Rails
   #             session, which invalidates every token a stale page holds; the
-  #             store swaps it into the csrf-token meta so the page's next POST
-  #             still works.
+  #             store swaps it into the csrf-token meta. That repairs requests
+  #             that read the meta (Turbo, fetch with X-CSRF-Token). It does NOT
+  #             rewrite the hidden authenticity_token input of a form already on
+  #             the page, so a data-turbo="false" form rendered before the reset
+  #             still posts the old token.
   #
   # ANONYMOUS IS AN ANSWER, NOT A FAILURE. The action skips the host's
   # require_authentication: a signed-out browser gets a 200 describing an

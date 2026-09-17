@@ -25,6 +25,7 @@ require_relative "../lib/studio/profile_image"
 require_relative "../lib/studio/oauth_identity"
 require_relative "../lib/studio/name_parts"
 require_relative "../lib/studio/session_fingerprint"
+require_relative "../lib/studio/session_state"
 require_relative "../lib/studio/theme_resolver"
 require_relative "../lib/studio/ui_primitives"
 # Studio::JsLiteral is referenced by engine PARTIALS, and test/views/*.rb render

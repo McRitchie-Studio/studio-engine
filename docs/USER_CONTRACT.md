@@ -29,14 +29,6 @@ These are the methods/attributes the engine actively calls. Missing one of these
 |------|---------|-------|
 | `User.from_omniauth(auth_hash)` | `OmniauthCallbacksController#create` | Should find-or-create by `(provider, uid)` and return the user. Wrap the find-or-create in `rescue ActiveRecord::RecordNotUnique` to handle concurrent OAuth callbacks for the same user. |
 
-### Methods — only if you enable wallet sign-in
-The validator does not check these, because `:wallet` is an opt-in auth method (not in the `Studio.auth_methods` default). An app that adds it and lacks them fails at the first sign-in instead of at boot.
-
-| Name | Used by | Notes |
-|------|---------|-------|
-| `User.from_solana_wallet(address)` | `SolanaSessionsController#verify` | Return the user whose wallet is `address`, or nil. nil makes the controller build a new user. |
-| `#solana_address=` | `SolanaSessionsController#verify` | Writer the controller calls on that new user (`User.new(solana_address: address)`). |
-
 ## Optional
 
 The engine accesses these via `try:` or only inside config procs you write. They're soft contracts — implement them if your app exposes the concept, ignore them otherwise.
@@ -50,7 +42,6 @@ The engine accesses these via `try:` or only inside config procs you write. They
 | `#uid` | `set_app_session` | OAuth provider UID. |
 | `#session_token` (+ `#update_column`) | `set_app_session`, `verify_session_token`, `Studio::SessionFingerprint` | OPSEC-045's rotating per-user token (a string column). `set_app_session` binds it into the cookie, backfilling a blank one; `verify_session_token` signs out a cookie that no longer matches; the session fingerprint includes it, so a rotation is visible to every open page ([`SESSION_DRIFT.md`](SESSION_DRIFT.md)). Without the column, sessions cannot be revoked server-side and the fingerprint is per account only. |
 | `#regenerate_session_token!` | `Studio::ProfilesController` (email change) | Rotates `session_token` so every other session is signed out; the controller re-binds the current one. Skipped when absent. |
-| `#phantom_wallet?` | `SessionContext#phantom_linked?` | Boolean: the account holds a self-custody wallet. Part of the legacy `mode` payload (`SessionContext#to_h`); reads false when absent. |
 | `#wallet_address` or `#solana_address` | `Studio.user_wallet_address`, `set_app_session`, `SessionContext#address` | For wallet-auth apps. Override with `Studio.wallet_address_method = :your_method` if the app uses another helper. |
 | `#role=` | `configure_sso_user` proc in host app | Only required if the host's `Studio.configure_sso_user` proc sets `user.role = ...`. |
 | `#balance_cents=` | `configure_sso_user` proc | Same — only if the host proc uses it. |

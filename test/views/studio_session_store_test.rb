@@ -47,10 +47,21 @@ class StudioSessionStoreTest < Minitest::Test
     a_source_can_supply_its_own_bound_and_equality
     expect_change_suppresses_the_mismatch_warning
     holds_expire_and_match_only_their_scope
-    session_scope_hold_covers_web2_drift
+    session_scope_hold_covers_built_in_drift
     manual_refresh_waits_for_a_probe_already_in_flight
     navigation_adopts_a_new_session_without_a_warning
     a_restored_older_snapshot_goes_stale_and_rechecks
+    back_to_a_cached_page_keeps_known_drift
+    back_after_an_expiry_does_not_warn_again
+    back_to_an_older_page_of_the_same_session_keeps_the_newer_stamp
+    a_fresh_render_of_the_same_session_clears_stale
+    answers_a_hello_with_its_session
+    a_stale_tab_does_not_announce
+    anonymous_stamps_never_arm_expiry
+    expiry_waits_out_its_grace
+    holds_name_the_built_in_sources
+    hold_timeouts_are_capped
+    a_throwing_source_is_contained
     a_failed_rehydrate_on_a_stale_page_is_drift
     register_refuses_bad_reserved_and_duplicate_names
     subscribers_receive_transitions_and_can_leave
