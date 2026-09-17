@@ -88,6 +88,16 @@ class SessionFingerprintTest < Minitest::Test
                  "no separator trick lets two different bindings share a fingerprint"
   end
 
+  def test_the_id_and_token_are_encoded_as_strings_never_as_objects
+    # A decorated or double user can hand back objects whose JSON encoding walks
+    # (and can recurse through) their internals. The material must never ask.
+    hostile = Object.new
+    def hostile.to_json(*) = raise("encoded an object instead of its string")
+    def hostile.to_s = "42"
+
+    assert_equal fingerprint(Account.new(42, "tok")), fingerprint(Account.new(hostile, "tok"))
+  end
+
   def test_the_explicit_secret_setting_is_used_when_no_secret_is_passed
     user = Account.new(42, "tok-1")
     Studio.session_fingerprint_secret = SECRET

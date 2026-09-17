@@ -66,10 +66,14 @@ module Studio
     # arbitrary text, and no separator is safe against arbitrary text. A host
     # with no session_token column still gets a per-account fingerprint; it simply
     # cannot express "revoked" through it.
+    #
+    # Every part is a String (or nil) before it is encoded. Handing JSON an
+    # arbitrary object would route it through ActiveSupport's as_json, which walks
+    # instance variables — a test double or a decorated user could recurse there.
     def material(user, bindings = [])
       id = user.respond_to?(:id) ? user.id : user
       token = user.respond_to?(:session_token) ? user.session_token : nil
-      JSON.generate(["studio-session", id, token, bindings])
+      JSON.generate(["studio-session", id&.to_s, token&.to_s, bindings])
     end
 
     # Sorted pairs, so the same bindings produce the same fingerprint whatever
