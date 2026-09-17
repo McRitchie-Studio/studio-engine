@@ -24,6 +24,7 @@ require_relative "../lib/studio/profile_sections"
 require_relative "../lib/studio/profile_image"
 require_relative "../lib/studio/oauth_identity"
 require_relative "../lib/studio/name_parts"
+require_relative "../lib/studio/session_fingerprint"
 require_relative "../lib/studio/theme_resolver"
 require_relative "../lib/studio/ui_primitives"
 # Studio::JsLiteral is referenced by engine PARTIALS, and test/views/*.rb render
@@ -70,6 +71,10 @@ module Studio
   # mirror has to carry the real default rather than a convenient one.
   mattr_accessor :profile_sections,     default: nil
   mattr_accessor :draw_profile_routes,  default: true
+  # Mirrors the session-drift accessors in lib/studio.rb. The pure-Ruby
+  # SessionContext and Studio::SessionFingerprint suites read them.
+  mattr_accessor :draw_session_routes,        default: false
+  mattr_accessor :session_fingerprint_secret, default: nil
   # Mirrors the knowledge-layer accessors in lib/studio.rb.
   mattr_accessor :draw_knowledge_routes, default: false
   mattr_accessor :knowledge_agents,      default: []

@@ -22,6 +22,7 @@ require "studio/s3"
 require "studio/image_cache"
 require "studio/link_token"
 require "studio/link_resolution"
+require "studio/session_fingerprint"
 require "studio/email"
 require "studio/email_smoke"
 require "studio/mail_transport"
@@ -269,6 +270,33 @@ module Studio
   # Default true; an app wanting its own /l handling sets this false and draws
   # its own routes (it can still reuse Studio::Link + Studio::LinkConsumption).
   mattr_accessor :draw_link_routes, default: true
+
+  # Draw the session-drift rehydrate endpoint, GET /session/state
+  # (Studio::SessionStatesController, helper studio_session_state_path). See
+  # docs/SESSION_DRIFT.md.
+  #
+  # OFF by default, and not because of a name collision (no consumer owns the
+  # path or the helper, checked 2026-09-16). The endpoint is a JSON GET that
+  # inherits the HOST's ApplicationController filters, and the browser store calls
+  # it whenever a tab returns from the background or learns another tab changed
+  # the session. A host must look at its own filters before that traffic starts:
+  # one that redirects every request to an onboarding page would answer the store
+  # with HTML. turf-monster already runs its own copy of this loop
+  # (/account/session_state), so drawing it there by default would double the
+  # requests. Each app's adoption turns it on:
+  #
+  #   config.draw_session_routes = true
+  #
+  # With it off, every page still carries the stamp and the store still detects
+  # drift (another tab, expiry). It cannot repair a page in place, so it stays
+  # `stale` and the host decides what to do.
+  mattr_accessor :draw_session_routes, default: false
+
+  # The key Studio::SessionFingerprint signs with. nil (the default) derives one
+  # from the app's secret_key_base via Rails.application.key_generator, which
+  # every process of the app agrees on. Set it only to share fingerprints across
+  # two apps on one origin or to pin a value in a test.
+  mattr_accessor :session_fingerprint_secret, default: nil
 
   # Draw the shared transactional-email page at /admin/emails
   # (Studio::EmailsController). OFF by default because the path AND its helper
@@ -885,6 +913,14 @@ module Studio
              constraints: { token: %r{[^/]+} }
         post "l/:token", to: "studio/links#consume", as: :link_consume,
              constraints: { token: %r{[^/]+} }
+      end
+
+      # The session-drift rehydrate endpoint (Studio::SessionStatesController).
+      # OPT-IN — see Studio.draw_session_routes. JSON only: the browser store is
+      # its one caller, and an HTML answer would only ever be a mistake.
+      if Studio.draw_session_routes
+        get "session/state", to: "studio/session_states#show", as: :studio_session_state,
+            defaults: { format: :json }
       end
 
       # Knowledge layer — /admin/knowledge (Studio::KnowledgeDoc): folder/flat

@@ -14,6 +14,10 @@ Studio.draw_onboarding_routes = true
 # names until its adoption lands — see Studio.draw_geo_routes.
 Studio.draw_geo_routes = true
 
+# Opt in to the session-drift rehydrate endpoint (GET /session/state), as a
+# consuming app does. OFF by default — see Studio.draw_session_routes.
+Studio.draw_session_routes = true
+
 Rails.application.routes.draw do
   # Draw the engine's shared route table the same way every consuming app does
   # (Studio.routes(self), not `mount`). The boot test asserts the named path
@@ -59,4 +63,9 @@ Rails.application.routes.draw do
   get "lab/geo", to: "geo_lab#open"
   get "lab/geo_locked", to: "geo_lab#locked"
   post "lab/sign_in", to: "geo_lab_sessions#create"
+
+  # A host app's ordinary page + sign-in/out, for the session-drift suite.
+  get "lab/session", to: "session_lab#show"
+  post "lab/session/sign_in", to: "session_lab#sign_in"
+  post "lab/session/sign_out", to: "session_lab#sign_out"
 end

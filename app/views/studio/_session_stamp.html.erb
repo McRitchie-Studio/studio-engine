@@ -1,0 +1,25 @@
+<%# The session-drift stamp (docs/SESSION_DRIFT.md), rendered by
+    layouts/studio/_head on every page.
+
+    It emits two things: a meta tag named studio-session carrying the stamp as
+    JSON, and the browser store that reads it (studio/session.js, which publishes
+    window.StudioSession). The store is NOT deferred: it has to register its
+    alpine:init listener before the deferred Alpine script runs.
+
+    A META TAG, NOT A JSON SCRIPT TAG, AND THAT IS LOAD-BEARING. Turbo merges the
+    head on every navigation. Script elements are copied in and never removed, so
+    a JSON script tag would pile up one copy per visit and the first copy, the
+    stale one, is the one a lookup by selector returns. Meta tags are replaced, so
+    the head always holds exactly the stamp of the page on screen.
+
+    GUARDED ON THE HELPER. studio_session_page_stamp comes from
+    Studio::SessionDrift, which Studio::ErrorHandling includes. A head rendered
+    anywhere else (the e2e lab, a bare view in a unit test, a host controller that
+    does not include the concern) emits nothing here, byte-identical to the head
+    before this partial existed. A nil stamp (a production failure, logged to
+    ErrorLog) likewise emits nothing, and the page renders as it always did. %>
+<% studio_session_stamp_value = respond_to?(:studio_session_page_stamp) ? studio_session_page_stamp : nil %>
+<% if studio_session_stamp_value %>
+<%= tag.meta(name: "studio-session", content: studio_session_stamp_value.to_json) %>
+<%= javascript_include_tag "studio/session", "data-turbo-track": "reload" %>
+<% end %>

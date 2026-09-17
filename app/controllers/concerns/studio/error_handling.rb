@@ -2,6 +2,11 @@ module Studio
   module ErrorHandling
     extend ActiveSupport::Concern
 
+    # The session-drift stamp every page carries (docs/SESSION_DRIFT.md). Pulled
+    # in here so every consumer has it without wiring anything; it adds helper
+    # methods only.
+    include Studio::SessionDrift
+
     included do
       # ORDER IS LOAD-BEARING — ActiveSupport::Rescuable resolves handlers with
       # `reverse_each`, so the LAST matching rescue_from registered wins. The
@@ -160,9 +165,11 @@ module Studio
       @wallet_context ||= SessionContext.new(user: current_user, onchain_session: onchain_session?)
     end
 
-    # Payload serialised into #session-context for Alpine.store('session').
-    # Baseline = identity only (SessionContext stays RPC-free). Apps override to
-    # merge on-chain balances/tokens they already preloaded for the request.
+    # The host's page payload (SessionContext#to_h), which a host serialises into
+    # its own page for its own client store. Baseline = identity only
+    # (SessionContext stays RPC-free). Apps override to merge values they already
+    # preloaded for the request. The rehydrate endpoint
+    # (Studio::SessionStatesController) returns it as `context`.
     def client_session_payload
       wallet_context.to_h
     end
