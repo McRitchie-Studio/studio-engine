@@ -379,6 +379,42 @@ class E2eLabController < ActionController::Base
   # page sets those up. This action exists only to render the view.
   def onboarding_first_name = render(:onboarding_first_name)
 
+  # The session-drift page (e2e/session_drift.spec.js).
+  #
+  # The browser program under test is studio/_session_stamp, which the ENGINE head in
+  # this lab's layout renders by name: the meta stamp plus studio/session.js. A host
+  # gets the stamp's INPUT from Studio::SessionDrift; the lab supplies that one input
+  # from the query string instead, which is the same relationship every other lab
+  # page has to its partial's locals. Only this action sets it, so every other lab
+  # page keeps a head with no stamp and no store.
+  #
+  # No rehydrateUrl: the lab has no session to rehydrate, so drift is final `stale`.
+  #
+  # NOT a helper_method. The stamp partial renders the store for any view that
+  # responds to studio_session_page_stamp, and a helper_method would answer on
+  # EVERY lab page — loading the store into twenty unrelated specs. So only this
+  # action's view gains the method.
+  module SessionStampInput
+    def studio_session_page_stamp = controller.instance_variable_get(:@session_stamp)
+  end
+
+  def view_context
+    super.tap { |view| view.extend(SessionStampInput) if @session_stamp }
+  end
+
+  def session_drift
+    @session_stamp = {
+      v: 1,
+      state: params[:state] == "authenticated" ? "authenticated" : "anonymous",
+      fingerprint: params[:fp].presence || "anonymous",
+      issuedAt: params[:issued].to_i,
+      expiresAt: nil,
+      rehydrateUrl: nil,
+      identities: {}
+    }
+    render(:session_drift)
+  end
+
   # Liveness. Playwright's webServer polls this before the first spec, so it must
   # not depend on anything a lab page needs.
   def up = render(plain: "ok")

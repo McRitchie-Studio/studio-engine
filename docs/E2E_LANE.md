@@ -270,6 +270,32 @@ as its background; a blocked BADGE gets `rgb(248 113 113)` as its text. The firs
 draft of the spec asserted the wash against the badge's colour and failed against a
 page that was working correctly — the lane catching a defect in itself.
 
+## Session drift: what a stub bus cannot vouch for
+
+`e2e/session_drift.spec.js` drives `/lab/session_drift`, whose subject lives in
+the HEAD: the engine's `layouts/studio/_head` renders `studio/_session_stamp`, which
+emits the meta stamp and loads `studio/session.js`. The lab controller supplies
+the stamp's input from the query string (a host supplies it from
+`Studio::SessionDrift`); only that action sets it, so every other lab page keeps a
+head with no stamp and no store.
+
+The store's transitions are already executed under node
+(`test/views/studio_session_store_test.rb`), one vm context per tab. That harness
+stubs `BroadcastChannel` and `document`, which are exactly the two things this lane
+exists to check: that a real head delivers a store that runs before deferred Alpine,
+and that two real tabs of one browser hear each other. Two specs, each verified RED
+against its own defect reintroduced (server restarted between runs):
+
+| Mutation | Red |
+|---|---|
+| the head stops rendering `studio/session_stamp` | 2 |
+| `session:mismatch` is never dispatched | 1 |
+| the Alpine bridge is never installed | 1 |
+
+The lab has no rehydrate endpoint, so drift there is final `stale`. Rehydration,
+revocation and expiry are covered by the node harness and by
+`test/integration/session_drift_test.rb`, not here.
+
 ## What the lane's OWN Tailwind build cannot see
 
 `e2e/tailwind_input.css` carries `@source "../app/views"`, so the lane compiles

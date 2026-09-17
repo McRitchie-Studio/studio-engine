@@ -679,7 +679,20 @@
 # interpolations on separate lines, so a combined card would go green the moment
 # ANY one was repaired. Re-derived on THIS tree with the lister, never by arithmetic:
 #   npx playwright test --list  -> 138 tests in 20 files
-total_specs: 138
+#
+# 2026-09-16: 138 -> 140, and a TWENTY-FIRST file. e2e/session_drift.spec.js adds TWO
+# tests for the session-drift store (docs/SESSION_DRIFT.md). Its transitions are
+# executed under node by test/views/studio_session_store_test.rb, but that harness
+# stubs the two things only a browser holds: that the ENGINE HEAD delivers a store
+# that runs (and runs before deferred Alpine), and that two real tabs hear each other
+# over BroadcastChannel. Each spec was verified RED against its own defect
+# reintroduced, the lab server restarted between runs:
+#   head stops rendering studio/session_stamp  -> 2 red
+#   session:mismatch never dispatched          -> 1 red
+#   Alpine bridge never installed              -> 1 red
+# Re-derived on THIS tree with the lister, never by arithmetic:
+#   npx playwright test --list  -> 140 tests in 21 files
+total_specs: 140
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -743,7 +756,14 @@ total_specs: 138
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 132
 # executed = total - devnet - allowed_skips = 132 - 0 - 0 = 132, so executed ==
 # total_specs and the equality assertion holds.
-executed: 138
+# Re-derived once more on THIS tree with the lister when the session-drift specs
+# landed — 2 tests in ONE new file:
+#   npx playwright test --list                                             -> 140 tests, 21 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 140
+# executed = total - devnet - allowed_skips = 140 - 0 - 0 = 140, so executed ==
+# total_specs and the equality assertion holds.
+executed: 140
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
