@@ -10,6 +10,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <%= csrf_meta_tags %>
 <%= csp_meta_tag %>
+<%# The session-drift stamp + browser store. Renders nothing unless the controller
+    includes Studio::ErrorHandling. See studio/_session_stamp. %>
+<%= render "studio/session_stamp" %>
 <%= render "layouts/studio/smooth_load" %>
 <link rel="icon" type="image/png" href="/favicon.png">
 

@@ -4,6 +4,81 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **Session drift: every page now knows when the browser's session changed
+  underneath it.** Another tab signs in or out, the session expires, or the
+  server revokes it; the page notices, repairs itself in place when the host
+  allows, and tells a deliberate switch from an accidental one. Generic by
+  design: it knows sessions, accounts and fingerprints, and an app or companion
+  gem binds anything else to the session through an identity-source plug-in.
+  Contract: [`docs/SESSION_DRIFT.md`](./docs/SESSION_DRIFT.md).
+  - **The stamp, on every page, with no wiring.** `layouts/studio/_head` renders
+    `studio/_session_stamp`: `<meta name="studio-session">` carrying the
+    session's state, fingerprint, issue and expiry times, rehydrate URL and bound
+    identities, plus the store script. It renders only for a controller that
+    includes `Studio::ErrorHandling` (every consumer's `ApplicationController`);
+    any other head is byte-identical to before.
+  - **`Studio::SessionState`**: `STATES` (anonymous, authenticated, stale,
+    changed, rehydrated, signed_out), `SERVER_STATES`, `#state`, `#anonymous?`,
+    `#authenticated?`, `#fingerprint` and `#to_stamp`, built from the viewer
+    alone. `SessionContext` exposes the same by delegation; its constructor and
+    `#to_h` are unchanged.
+  - **`Studio::SessionFingerprint`**: an HMAC of the user's id, `session_token`
+    and bound identities, keyed from `secret_key_base`. Rotating the token or
+    re-binding an identity changes it; it never carries either readably.
+  - **`Studio::SessionDrift`**, included by `Studio::ErrorHandling`: helpers
+    `studio_session_stamp`, `studio_session_page_stamp` (logs to `ErrorLog` and
+    omits the stamp in production rather than failing a page),
+    `studio_session_state`, `studio_session_rehydrate_url`, and the host hook
+    `studio_session_identities`.
+  - **`GET /session/state`** (`Studio::SessionStatesController`), OFF by default:
+    `config.draw_session_routes = true`. Returns the stamp, the host's
+    `client_session_payload` and a fresh CSRF token. Anonymous gets a 200; a host
+    filter's 401 reads as revoked.
+  - **`window.StudioSession`** (`studio/session.js`, precompiled): `current`,
+    `subscribe`, `refresh`, `expectChange(scope)`, `registerIdentitySource`,
+    `observed`, `configure`; `session:changed` and `session:mismatch` events on
+    `document`; `Alpine.store('studioSession')`. Ships built-in sources for other
+    tabs (BroadcastChannel `studio-session`), expiry (after a grace, so probing
+    never renews a sliding session), and a server probe on returning to a hidden
+    tab or a bfcache restore. Back to a cached page of the same session keeps
+    what the tab already learned. Holds are capped at 10 minutes. It never
+    touches a host's own stores.
+  - Tested by executing the store under node, one vm context per tab, every
+    scenario asserted by name (`test/views/studio_session_store_test.rb`); two
+    browser-lane specs for real delivery and real cross-tab messaging
+    (`e2e/session_drift.spec.js`, lane contract 138 -> 140); a dummy-app
+    integration suite (`test/integration/session_drift_test.rb`); unit suites for
+    the state, the context delegation and the fingerprint; and a vocabulary guard
+    over the primitive's code, docs, tests and this entry
+    (`test/lib/session_drift_vocabulary_test.rb`).
+- **`docs/USER_CONTRACT.md` documents two methods the engine already called
+  without listing:** `#session_token` and `#regenerate_session_token!`.
+
+### Fixed
+
+- **The toast halo and the success card's explorer link now paint their
+  tints.** Both used the legacy `rgba(var(--color-primary-500-rgb), A)` form.
+  `Studio::ThemeResolver` emits every `-rgb` var as a space-separated list, and
+  that list makes the comma form invalid, so browsers dropped each declaration
+  without an error. `layouts/studio/_flash`'s `.dark .toast-blur-glow` (the
+  `blurShadow: true` halo) painted no halo in dark mode. The Solana explorer
+  link in `blocks/_success_card` (`tx_solana: true`) lost its tinted backing in
+  both themes. Both now use the slash form, `rgb(var(--x-rgb) / A)`.
+  - Measured in headless Chromium on a page built from the engine's
+    consumer-style Tailwind build and the resolver's real theme vars. Before,
+    both elements computed `rgba(0, 0, 0, 0)`. After, the dark halo computed
+    `rgba(142, 130, 254, 0.12)` and the link `rgba(142, 130, 254, 0.06)`.
+  - Guarded by `test/views/legacy_rgba_var_guard_test.rb`. It refuses the
+    legacy form in every code file the gemspec packages, in the
+    `Studio::UiPrimitives` CSS strings, and in a compiled consumer build. It
+    also pins the premise that every `-rgb` triple the engine defines is a
+    space-separated list.
+  - `RUNBOOK.md` gains the symptom and its fix. Its palette entry no longer
+    says a nil or blank primary skips palette generation; on the
+    `studio_theme_css_tag` path, both fall back to a default.
+
 ## 0.74.12 — 2026-09-16
 
 ### Fixed

@@ -23,6 +23,38 @@ class SessionContext
 
   attr_reader :user
 
+  # ---- Session state (docs/SESSION_DRIFT.md) --------------------------------
+  # The generic session-state primitive, delegated to Studio::SessionState, which
+  # reads the viewer and nothing else. This block only exposes it here; the
+  # legacy payload below (#to_h) is unchanged and carries none of it.
+  STATES        = Studio::SessionState::STATES
+  SERVER_STATES = Studio::SessionState::SERVER_STATES
+
+  def session_state
+    @session_state ||= Studio::SessionState.new(user)
+  end
+
+  def state
+    session_state.state
+  end
+
+  def anonymous?
+    session_state.anonymous?
+  end
+
+  def authenticated?
+    session_state.authenticated?
+  end
+
+  def fingerprint(identities = {})
+    session_state.fingerprint(identities)
+  end
+
+  def to_stamp(**options)
+    session_state.to_stamp(**options)
+  end
+  # ---- end session state ----------------------------------------------------
+
   def initialize(user:, onchain_session:)
     @user = user
     @onchain_session = onchain_session
