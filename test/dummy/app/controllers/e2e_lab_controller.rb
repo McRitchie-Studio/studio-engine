@@ -391,9 +391,18 @@ class E2eLabController < ActionController::Base
   # page keeps a head with no stamp and no store.
   #
   # No rehydrateUrl: the lab has no session to rehydrate, so drift is final `stale`.
-  helper_method :studio_session_page_stamp
+  #
+  # NOT a helper_method. The stamp partial renders the store for any view that
+  # responds to studio_session_page_stamp, and a helper_method would answer on
+  # EVERY lab page — loading the store into twenty unrelated specs. So only this
+  # action's view gains the method.
+  module SessionStampInput
+    def studio_session_page_stamp = controller.instance_variable_get(:@session_stamp)
+  end
 
-  def studio_session_page_stamp = @session_stamp
+  def view_context
+    super.tap { |view| view.extend(SessionStampInput) if @session_stamp }
+  end
 
   def session_drift
     @session_stamp = {

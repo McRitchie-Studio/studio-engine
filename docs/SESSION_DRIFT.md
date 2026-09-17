@@ -56,7 +56,10 @@ tags are replaced.
 
 A head rendered anywhere else (a controller without `Studio::ErrorHandling`, the
 e2e lab, a bare view in a unit test) emits no stamp and no store, byte-identical
-to the head before this primitive existed.
+to the head before this primitive existed. When the stamp itself fails in
+production, the meta tag is omitted but the script still loads (dormant): the
+script is Turbo-tracked, and Turbo fully reloads between pages whose tracked
+scripts differ.
 
 ### The fingerprint
 

@@ -152,10 +152,13 @@ class StudioSessionStoreTest < Minitest::Test
     assert_equal JSON.parse(stamp.to_json), JSON.parse(CGI.unescapeHTML(content))
   end
 
-  def test_a_nil_stamp_renders_nothing
+  # A failed stamp omits the meta but keeps the script: Turbo reloads the page
+  # when two pages' tracked scripts differ, so dropping it would turn a logged
+  # stamp failure into a full reload on the next click.
+  def test_a_nil_stamp_omits_the_meta_and_keeps_the_dormant_store
     html = render_head { |view| view.define_singleton_method(:studio_session_page_stamp) { nil } }
     refute_includes html, "studio-session"
-    refute_includes html, "studio/session"
+    assert_includes html, "studio/session"
   end
 
   private

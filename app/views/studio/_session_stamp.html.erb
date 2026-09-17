@@ -16,10 +16,17 @@
     Studio::SessionDrift, which Studio::ErrorHandling includes. A head rendered
     anywhere else (the e2e lab, a bare view in a unit test, a host controller that
     does not include the concern) emits nothing here, byte-identical to the head
-    before this partial existed. A nil stamp (a production failure, logged to
-    ErrorLog) likewise emits nothing, and the page renders as it always did. %>
-<% studio_session_stamp_value = respond_to?(:studio_session_page_stamp) ? studio_session_page_stamp : nil %>
+    before this partial existed.
+
+    THE SCRIPT DOES NOT DEPEND ON THE STAMP. A nil stamp (a production failure,
+    logged to ErrorLog) omits the meta tag and still loads the store, which then
+    stays dormant. The script is Turbo-tracked like every engine asset, and Turbo
+    fully reloads when two pages' tracked scripts differ, so a page whose stamp
+    failed must not also drop the script and turn the next click into a reload. %>
+<% if respond_to?(:studio_session_page_stamp) %>
+<% studio_session_stamp_value = studio_session_page_stamp %>
 <% if studio_session_stamp_value %>
 <%= tag.meta(name: "studio-session", content: studio_session_stamp_value.to_json) %>
+<% end %>
 <%= javascript_include_tag "studio/session", "data-turbo-track": "reload" %>
 <% end %>
