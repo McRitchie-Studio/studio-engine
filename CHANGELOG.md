@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.74.12 — 2026-09-16
+
 ### Fixed
 
 - **A modal partial rendered from a layout no longer re-emits the whole page
