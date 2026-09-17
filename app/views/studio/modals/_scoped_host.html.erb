@@ -364,8 +364,11 @@
        @keydown.escape.window="$store.<%= scoped_store %>.current() && $store.<%= scoped_store %>.current().props.dismissible !== false && $store.<%= scoped_store %>.close()"
        @click.self="$store.<%= scoped_store %>.current() && $store.<%= scoped_store %>.current().props.dismissible !== false && $store.<%= scoped_store %>.close()">
     <div class="<%= card_class %> max-h-[85dvh] overflow-y-auto" :class="$store.<%= scoped_store %>.cardClasses()">
-      <%# Consumer-provided registrations — one <template x-if> per modal id. %>
-      <%= yield if block_given? %>
+      <%# Consumer-provided registrations — one <template x-if> per modal id.
+          Not `yield if block_given?`: a partial's block_given? is always true,
+          and a caller-less yield returns the layout's whole page body. See
+          Studio::PartialBlock. %>
+      <%= Studio::PartialBlock.content(self, yield) %>
     </div>
   </div>
 </template>

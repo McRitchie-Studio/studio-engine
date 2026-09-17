@@ -4,6 +4,30 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **A modal partial rendered from a layout no longer re-emits the whole page
+  body.** In a Rails partial `block_given?` is always true, and a `yield` with
+  no caller block returns the layout's content: the entire rendered page once
+  the layout is rendering. Four partials tested their block that way.
+  turf-monster hit it live: its layout-rendered username modal reaches
+  `blocks/_card_header` with a nil subtitle, so every signed-in page for a user
+  allowed to rename carried a second copy of its own body inside a
+  `<template>`. Measured on turf-monster's `/`, `/contests` and `/account`
+  against 0.74.11: two copies of the page body before, one after.
+  - New `Studio::PartialBlock.content(view, yielded)` returns a caller's block
+    content, or nil when there is none. It treats a blank yield, or a yield
+    equal to `content_for(:layout)`, as no block.
+  - `blocks/_card_header` (the subtitle slot), `blocks/_success_card` (both
+    slot positions), `_host` and `_scoped_host` (the registration seam) now
+    ask it instead of `block_given?`.
+  - The block contract is unchanged. A caller passing a non-blank block
+    renders as before, so no consumer edits a call site. A no-block render
+    outside a layout now omits the empty subtitle paragraph or slot wrapper it
+    used to leave.
+  - Guarded by `test/views/partial_block_layout_yield_test.rb`, which renders
+    each partial through a real layout and counts the page body.
+
 ## 0.74.11 — 2026-09-13
 
 ## 0.74.10 — 2026-09-13
