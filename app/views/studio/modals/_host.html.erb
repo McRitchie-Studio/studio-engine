@@ -838,8 +838,13 @@
          :class="$store.modals.cardClasses()">
       <%# Consumer-provided content registrations. Each block typically
           contains a <template x-if="$store.modals.current().id === 'X'">
-          render "modals/X" </template>. %>
-      <%= yield if block_given? %>
+          render "modals/X" </template>.
+          NOT `yield if block_given?`. In a partial block_given? is always true,
+          and a caller-less yield returns the layout's content, so a host
+          rendered from a layout with no block (an app whose modals all live in
+          _host_extras) put the whole page body inside the card. See
+          Studio::PartialBlock. %>
+      <%= Studio::PartialBlock.content(self, yield) %>
 
       <%# APP-WIDE modal registrations — the second seam. The block above is
           per-CALLSITE: an app rendering this host from two layouts (a live one

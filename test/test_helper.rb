@@ -35,6 +35,10 @@ require_relative "../lib/studio/js_literal"
 # partials call it at the top of every store-taking modal, so a partial rendered
 # through this helper cannot resolve without it.
 require_relative "../lib/studio/js_identifier"
+# Studio::PartialBlock is called by the slot-taking modal partials (_host,
+# _scoped_host, blocks/_card_header, blocks/_success_card), so a partial rendered
+# through this helper needs it for the same reason as its two siblings above.
+require_relative "../lib/studio/partial_block"
 require_relative "../lib/studio/email"
 require_relative "../lib/studio/email_smoke"
 require_relative "../lib/studio/redis"

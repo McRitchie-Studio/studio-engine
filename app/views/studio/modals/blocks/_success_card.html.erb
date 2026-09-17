@@ -73,6 +73,11 @@
   large_title   = !!local_assigns[:large_title]
   use_drain     = has_redirect && !!local_assigns[:cta_drain]
   slot_position = local_assigns.fetch(:slot_position, :below_cta).to_sym
+  # The caller's block, captured ONCE, or nil when there is none. Never
+  # block_given?: in a partial it is always true, and a caller-less yield
+  # returns the layout's content, so a card rendered from a layout with no
+  # block re-emitted the whole page body under its CTA. See Studio::PartialBlock.
+  caller_block  = Studio::PartialBlock.content(self, yield)
 
   data_attr = "{
     _remaining: #{redirect_secs},
@@ -231,8 +236,8 @@
       card has always run its kickoff timer and seeds bar above the button for
       that reason, and this is what lets the engine's card do the same instead of
       the app forking one to keep the order. %>
-  <% if block_given? && slot_position == :above_cta %>
-    <div class="mb-4"><%= yield %></div>
+  <% if caller_block && slot_position == :above_cta %>
+    <div class="mb-4"><%= caller_block %></div>
   <% end %>
 
   <%# Primary CTA — three flavors:
@@ -288,9 +293,9 @@
   <% end %>
 
   <%# ...or below it, which stays the DEFAULT: every existing caller renders here
-      and none of them asked to move. A partial can only yield once, so exactly
-      one of these two branches runs. %>
-  <% if block_given? && slot_position != :above_cta %>
-    <div class="mt-3"><%= yield %></div>
+      and none of them asked to move. The block is captured once at the top, and
+      exactly one of these two branches renders it. %>
+  <% if caller_block && slot_position != :above_cta %>
+    <div class="mt-3"><%= caller_block %></div>
   <% end %>
 </div>

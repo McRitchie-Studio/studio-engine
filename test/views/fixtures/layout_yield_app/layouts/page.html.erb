@@ -1,0 +1,6 @@
+<%# A consumer-shaped layout for test/views/partial_block_layout_yield_test.rb.
+    It yields the page body, THEN renders the test's probe ERB — the position a
+    modal host holds in every consumer layout, where the layout's content (the
+    whole page body) is what a caller-less `yield` in a partial falls back to. %>
+<main><%= yield %></main>
+<%= render inline: probe %>
