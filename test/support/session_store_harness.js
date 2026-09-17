@@ -666,6 +666,13 @@ scenario("back_to_a_cached_page_keeps_known_drift", async () => {
   assert.strictEqual(snap.state, "stale", "Back must not report the signed-out browser as authenticated");
   assert.strictEqual(snap.issuedAt, page2.issuedAt, "the newer stamp this tab already holds is kept");
   assert.strictEqual(a.mismatches().length, 1, "and the drift it already warned about is not warned again");
+
+  // Forward in A: Turbo restores its cached page 2, whose stamp is the one A is
+  // bound to (the same issuedAt). No newer, so it must not clear the drift either.
+  a.navigate(page2);
+  await sleep(10);
+  assert.strictEqual(a.store.current().state, "stale", "Forward must not report the signed-out browser as authenticated");
+  assert.strictEqual(a.mismatches().length, 1, "and Forward does not warn again either");
 });
 
 scenario("back_after_an_expiry_does_not_warn_again", async () => {

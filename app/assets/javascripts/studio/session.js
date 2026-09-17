@@ -516,11 +516,13 @@
       return;
     }
     if (stamp.fingerprint === bound.fingerprint) {
-      // The same session, rendered EARLIER: Back to a page Turbo cached. It holds
-      // nothing this tab does not already know, and it must not undo what the tab
-      // learned since — a stale tab stays stale (Back is not a sign-in), and a
-      // current tab keeps its newer stamp and newer expiry.
-      if (stamp.issuedAt < bound.issuedAt) return;
+      // The same session, rendered NO LATER than the stamp this tab holds: Back or
+      // Forward to a page Turbo cached. It holds nothing this tab does not already
+      // know, and it must not undo what the tab learned since — a stale tab stays
+      // stale (Back is not a sign-in), and a current tab keeps its newer stamp and
+      // newer expiry. EQUAL counts: Forward restores the very page the tab went
+      // stale on, and two renders never share a millisecond.
+      if (stamp.issuedAt <= bound.issuedAt) return;
       bound = stamp;
       stale = null;
       boundState = stamp.state;
