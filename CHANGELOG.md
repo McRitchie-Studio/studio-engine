@@ -4,6 +4,21 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **A host's own sidebar panel can be closed again.** `components/_sidebar_panel`
+  is shared, and it stamps `data-link-sidebar-close` on every panel's close
+  button; `components/_link_sidebar`'s click bridge claimed that attribute
+  anywhere on the page, in the capture phase, with `stopImmediatePropagation`.
+  So on any panel other than the link sidebar the × never reached its own
+  handler: the button did nothing, silently, and the link sidebar closed
+  instead. The bridge is now scoped to the two panels it renders
+  (`#studio-link-sidebar`, `#studio-link-sidebar-mobile`); its own close button,
+  trigger and outside-click are unchanged. Consumers that worked around this with
+  a close button of their own can drop it. Held by
+  `e2e/sidebar_panel_close.spec.js` (a host panel beside the link sidebar) and
+  `test/views/link_sidebar_test.rb`.
+
 ## 0.76.0 — 2026-09-17
 
 ## 0.75.0 — 2026-09-17

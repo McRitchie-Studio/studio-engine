@@ -692,7 +692,7 @@
 #   Alpine bridge never installed              -> 1 red
 # Re-derived on THIS tree with the lister, never by arithmetic:
 #   npx playwright test --list  -> 140 tests in 21 files
-total_specs: 140
+total_specs: 142
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -763,7 +763,7 @@ total_specs: 140
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 140
 # executed = total - devnet - allowed_skips = 140 - 0 - 0 = 140, so executed ==
 # total_specs and the equality assertion holds.
-executed: 140
+executed: 142
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

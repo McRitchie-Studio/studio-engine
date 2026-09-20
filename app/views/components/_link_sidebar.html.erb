@@ -28,6 +28,10 @@
   // page is closed. The document-level capture handlers make the trigger
   // work even for clicks that land before Alpine initializes.
   (function () {
+    // The panels this component renders — the scope for every handler below that
+    // claims a click. Declared once so the selector cannot drift from the ids.
+    var LINK_SIDEBAR_PANELS = '#studio-link-sidebar, #studio-link-sidebar-mobile';
+
     function ensureLinkSidebarStore() {
       if (!window.Alpine) return null;
 
@@ -54,8 +58,18 @@
     }
 
     function handleLinkSidebarClick(event) {
+      // SCOPED TO THIS COMPONENT'S OWN PANELS, and that scope is the whole of it.
+      // components/_sidebar_panel is SHARED: every panel built on it stamps its close
+      // button data-link-sidebar-close, so an unscoped match here claimed the close
+      // click of EVERY other panel on the page — stopImmediatePropagation in the
+      // capture phase, before that panel's own @click could run — and closed this
+      // sidebar instead. The other panel's × then did nothing at all: no error, no
+      // console line. Measured 2026-09-18 on the hub's /deployments summary sidebars,
+      // where the click never reached a document-level listener and the panel stayed
+      // open (mcritchie-studio worked around it with a close button of its own).
+      // The two ids are the panels this file renders, below.
       var closeTrigger = event.target.closest('[data-link-sidebar-close]');
-      if (closeTrigger) {
+      if (closeTrigger && closeTrigger.closest(LINK_SIDEBAR_PANELS)) {
         event.preventDefault();
         event.stopPropagation();
         event.stopImmediatePropagation();
@@ -77,7 +91,7 @@
 
       var sidebars = ensureLinkSidebarStore();
       if (!sidebars || !sidebars.linkTreeOpen) return;
-      if (event.target.closest('#studio-link-sidebar, #studio-link-sidebar-mobile')) return;
+      if (event.target.closest(LINK_SIDEBAR_PANELS)) return;
 
       closeLinkSidebar();
     }

@@ -1,0 +1,38 @@
+<%# TWO SIDEBARS ON ONE PAGE — the shape that broke.
+
+    components/_sidebar_panel is shared: the link sidebar renders through it, and so
+    does any host panel. Every panel it renders stamps its close button
+    data-link-sidebar-close, and the link sidebar's own click bridge claims that
+    attribute in the CAPTURE phase. Unscoped, it claimed the HOST panel's × too —
+    stopImmediatePropagation before that panel's own @click could run — so the ×
+    silently did nothing and this sidebar closed instead.
+
+    Neither panel is hand-rolled here: both are the engine's own partial, and the
+    bridge under test lives inside components/_link_sidebar. The page only supplies
+    locals and the Alpine scope a host supplies — `hostOpen` is this page standing in
+    for a host's own open/closed state. %>
+<main class="p-8" x-data="{ hostOpen: false }">
+  <p data-test="lab-body">sidebar panels lab</p>
+
+  <button type="button"
+          class="rounded border border-subtle px-3 py-2 text-sm"
+          data-test="open-host-panel"
+          @click="hostOpen = true">Open host panel</button>
+
+  <%= render "components/link_sidebar_trigger" %>
+  <%= render "components/link_sidebar" %>
+
+  <% host_body = capture do %>
+    <div class="flex-1 overflow-y-auto p-4">
+      <p data-test="host-panel-body">a host's own panel</p>
+    </div>
+  <% end %>
+  <%= render "components/sidebar_panel",
+        id: "lab-host-panel",
+        title: "Host Panel",
+        open: "hostOpen",
+        close_action: "hostOpen = false",
+        escape_action: "hostOpen = false",
+        display_class: "flex",
+        body_html: host_body %>
+</main>
