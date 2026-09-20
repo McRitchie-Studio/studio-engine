@@ -692,7 +692,20 @@
 #   Alpine bridge never installed              -> 1 red
 # Re-derived on THIS tree with the lister, never by arithmetic:
 #   npx playwright test --list  -> 140 tests in 21 files
-total_specs: 140
+#
+# 2026-09-19: 140 -> 142, and a TWENTY-SECOND file. e2e/sidebar_panel_close.spec.js
+# adds TWO tests for the link sidebar's click bridge. components/_sidebar_panel is
+# SHARED and stamps data-link-sidebar-close on every panel's close button, and the
+# bridge claimed that attribute anywhere on the page, in the capture phase, with
+# stopImmediatePropagation — so any OTHER panel's close button was dead, silently.
+# Both panels render byte-identically either way: the defect is entirely in which
+# listener runs first, which only a browser can see. Verified RED against the defect
+# reintroduced (the unscoped `if (closeTrigger)`), the lab server restarted between
+# runs:
+#   bridge unscoped -> 1 red (the host panel stays open), 1 green (its own close)
+# Re-derived on THIS tree with the lister, never by arithmetic:
+#   npx playwright test --list  -> 142 tests in 22 files
+total_specs: 142
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -763,7 +776,14 @@ total_specs: 140
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 140
 # executed = total - devnet - allowed_skips = 140 - 0 - 0 = 140, so executed ==
 # total_specs and the equality assertion holds.
-executed: 140
+# Re-derived once more on THIS tree with the lister when the sidebar-panel close specs
+# landed — 2 tests in ONE new file:
+#   npx playwright test --list                                             -> 142 tests, 22 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 142
+# executed = total - devnet - allowed_skips = 142 - 0 - 0 = 142, so executed ==
+# total_specs and the equality assertion holds.
+executed: 142
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

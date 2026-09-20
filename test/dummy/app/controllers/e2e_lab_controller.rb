@@ -417,5 +417,10 @@ class E2eLabController < ActionController::Base
 
   # Liveness. Playwright's webServer polls this before the first spec, so it must
   # not depend on anything a lab page needs.
+  # TWO SIDEBARS ON ONE PAGE — the link sidebar beside a host's own panel, both built
+  # on the shared components/_sidebar_panel. The only page where the link sidebar's
+  # click bridge can be caught claiming a close button it did not render.
+  def sidebar_panels = render(:sidebar_panels)
+
   def up = render(plain: "ok")
 end

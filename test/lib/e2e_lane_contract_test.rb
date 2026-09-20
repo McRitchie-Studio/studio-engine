@@ -294,7 +294,13 @@ class E2eLaneContractTest < Minitest::Test
       # that spec from quietly becoming a test of three hand-written cards — and
       # the page renders it three times, once per mode, because the modes are
       # locals and locals are all a lab page is allowed to set up.
-      "onboarding_first_name.html.erb" => ["studio/modals/onboarding/first_name"]
+      "onboarding_first_name.html.erb" => ["studio/modals/onboarding/first_name"],
+      # BOTH panels come from the engine, and that is the whole point of the page: the
+      # bug was the link sidebar's bridge claiming a close button rendered by the SHARED
+      # panel partial. A lab page that hand-rolled either side would prove nothing.
+      "sidebar_panels.html.erb" => [
+        "components/link_sidebar_trigger", "components/link_sidebar", "components/sidebar_panel"
+      ]
     }.each do |page, partials|
       source = File.read(File.join(lab, page))
 
