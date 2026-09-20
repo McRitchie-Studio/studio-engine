@@ -169,6 +169,36 @@ class LinkSidebarTest < Minitest::Test
     assert_equal "$store.sidebars.linkTreeOpen = false", row["@click"]
   end
 
+  # THE BRIDGE CLAIMS ONLY THE CLOSE BUTTONS IT RENDERED.
+  #
+  # components/_sidebar_panel is SHARED and stamps `data-link-sidebar-close` on every
+  # panel's close button. This component's bridge claims that attribute on the DOCUMENT,
+  # in the capture phase, with stopImmediatePropagation — so an unscoped match swallowed
+  # the close click of every OTHER panel on the page and closed this sidebar instead.
+  # The host panel's × then did nothing at all, with no error anywhere (measured
+  # 2026-09-18 on the hub's /deployments sidebars).
+  #
+  # The browser half — that the host panel's × now works and this sidebar's still does —
+  # is e2e/sidebar_panel_close.spec.js; only a browser can see which listener ran first.
+  # What this tier can see is the SCOPE, and that it is written once rather than spelled
+  # out per handler, so the selector cannot drift from the ids the panels are given.
+  def test_the_store_bridge_claims_only_its_own_panels_close_buttons
+    html = render_sidebar(sections: SECTIONS, admin: true)
+
+    assert_includes html, "var LINK_SIDEBAR_PANELS = '#studio-link-sidebar, #studio-link-sidebar-mobile';"
+    assert_includes html, "closeTrigger.closest(LINK_SIDEBAR_PANELS)",
+                          "the close handler must be scoped to this component's own panels"
+    refute_match(/if \(closeTrigger\) \{/, html,
+                 "an unscoped close branch claims every shared panel's close button")
+    # The ids it scopes to are the panels this file renders — asserted together so the
+    # scope cannot outlive the markup.
+    doc = Nokogiri::HTML5.fragment(html)
+    %w[studio-link-sidebar studio-link-sidebar-mobile].each do |id|
+      refute_nil doc.at_css("##{id} [data-link-sidebar-close]"),
+                 "##{id} must render the close button the bridge claims"
+    end
+  end
+
   private
 
   def render_sidebar(sections:, admin:, logged_in: true, geo_flag: nil, geo_routes: false)

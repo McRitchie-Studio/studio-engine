@@ -77,8 +77,16 @@ class SessionDriftVocabularyTest < Minitest::Test
     ["README.md", "- **Session drift**:", "See [`docs/SESSION_DRIFT.md`](docs/SESSION_DRIFT.md).", "StudioSession"],
     ["README.md", "Set `Studio.draw_session_routes = true`", "([`docs/SESSION_DRIFT.md`](docs/SESSION_DRIFT.md)).", "session/state"],
     ["docs/E2E_LANE.md", "## Session drift: what a stub bus cannot vouch for", "not here.", "session_drift.spec.js"],
-    ["config/e2e_lane.yml", "# 2026-09-16: 138 -> 140", "total_specs: 140", "session_drift.spec.js"],
-    ["config/e2e_lane.yml", "# Re-derived once more on THIS tree with the lister when the session-drift specs", "executed: 140", "140 tests"],
+    # CLOSED ON THE BLOCK'S OWN FROZEN LAST LINE, not on the scalar beneath it. The
+    # scalars are DESIGNED to move — every spec added to the lane rewrites them — so a
+    # closing marker spelling one out ("total_specs: 140") turns an unrelated spec into
+    # a RuntimeError here, naming neither the lane nor session drift. Measured
+    # 2026-09-19, when the sidebar-panel close specs took the lane to 142. The lines
+    # below are each block's own historical record of what the lister said at the time,
+    # so they never change, and `section` takes the FIRST close after the opening — this
+    # block's own.
+    ["config/e2e_lane.yml", "# 2026-09-16: 138 -> 140", "-> 140 tests in 21 files", "session_drift.spec.js"],
+    ["config/e2e_lane.yml", "# Re-derived once more on THIS tree with the lister when the session-drift specs", "# total_specs and the equality assertion holds.", "140 tests"],
     ["test/test_helper.rb", "# Mirrors the session-drift accessors", "mattr_accessor :session_fingerprint_secret, default: nil", "draw_session_routes"],
     ["test/dummy/config/routes.rb", "# Opt in to the session-drift rehydrate endpoint", "Studio.draw_session_routes = true", "session/state"],
     ["test/dummy/config/routes.rb", "# A host app's ordinary page + sign-in/out", %(post "lab/session/sign_out"), "session_lab"],

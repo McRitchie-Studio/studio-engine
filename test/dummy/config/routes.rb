@@ -59,6 +59,7 @@ Rails.application.routes.draw do
   get "lab/geo_settings", to: "e2e_lab#geo_settings"
   get "lab/style_modals", to: "e2e_lab#style_modals"
   get "lab/session_drift", to: "e2e_lab#session_drift"
+  get "lab/sidebar_panels", to: "e2e_lab#sidebar_panels"
 
   # A host app's own pages, one open and one geo-LOCKED, for the geo suite.
   get "lab/geo", to: "geo_lab#open"
