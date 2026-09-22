@@ -83,8 +83,21 @@ class EnginePinFloorDocsTest < Minitest::Test
     body.scan(PIN).flatten.map { |v| [relative_path, Gem::Version.new(v)] }
   end
 
+  # THE FLOOR LIVES HERE, not in one caller. An `assert_empty`-shaped test passes
+  # on an empty set, so every consumer of this scan must inherit its proof, not
+  # just the one that happened to carry it. Measured in review 2026-09-22: with
+  # the floor only on the >= test, breaking PIN left
+  # `test_no_instructional_pin_claims_a_floor_that_does_not_exist_yet` GREEN at
+  # 3 assertions — a completely dead selector, reported as a pass.
   def all_pins
-    INSTRUCTIONAL_DOCS.flat_map { |doc| pins_in(doc) }
+    pins = INSTRUCTIONAL_DOCS.flat_map { |doc| pins_in(doc) }
+
+    assert_operator pins.length, :>=, INSTRUCTIONAL_DOCS.length,
+                    "matched only #{pins.length} studio-engine pin(s) across #{INSTRUCTIONAL_DOCS.inspect}. " \
+                    "Each of those files carries exactly one, so the PIN selector has stopped matching and " \
+                    "every scan built on it asserts NOTHING. Fix the scan; do not lower this floor."
+
+    pins
   end
 
   # ── THE ASSERTIONS ──────────────────────────────────────────────────────────
@@ -113,12 +126,7 @@ class EnginePinFloorDocsTest < Minitest::Test
 
   def test_every_instructional_pin_sits_at_or_above_the_log_cap_floor
     floor = cap_floor
-    pins  = all_pins
-
-    assert_operator pins.length, :>=, 3,
-                    "matched only #{pins.length} studio-engine pin(s) across #{INSTRUCTIONAL_DOCS.inspect}. " \
-                    "Each of those files carries one, so the PIN selector has stopped matching and this test " \
-                    "asserts NOTHING. Fix the scan; do not lower this floor."
+    pins  = all_pins   # carries the selector floor; see all_pins
 
     stale = pins.reject { |(_doc, version)| version >= floor }
 
