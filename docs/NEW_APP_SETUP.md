@@ -26,10 +26,14 @@ Use the first port in the range as the primary callback-ready server. Reserve th
 
 ```ruby
 # Studio engine. A two-segment `~>` admits every 0.x below 1.0, so this is a
-# FLOOR, not what resolves — read Gemfile.lock for that. 0.33 is the floor a NEW
-# app actually needs: `studio.logger` began capping local log files there, and
-# an app below it grows dev/test logs to Rails' 100 MB default, silently.
-gem "studio-engine", "~> 0.33"
+# FLOOR, not what resolves — read Gemfile.lock for that. TWO floors matter and
+# the higher one wins. Local log capping starts at 0.33 (`studio.logger`); an
+# app locked below it grows dev/test logs to Rails' 100 MB default, silently.
+# But this document also instructs APIs that landed later — `Studio::GeoDetection`
+# in 0.57.0 — so 0.57 is the floor an app built from these pages needs.
+# Re-derive it from CHANGELOG.md whenever you add an instruction here: a lock
+# below it raises NameError at boot while the pin itself still looks satisfied.
+gem "studio-engine", "~> 0.57"
 
 # CSS
 gem "tailwindcss-rails", "~> 4.5"
