@@ -25,8 +25,11 @@ Use the first port in the range as the primary callback-ready server. Reserve th
 ## 2. Gemfile
 
 ```ruby
-# Studio engine
-gem "studio-engine", "~> 0.6"
+# Studio engine. A two-segment `~>` admits every 0.x below 1.0, so this is a
+# FLOOR, not what resolves — read Gemfile.lock for that. 0.33 is the floor a NEW
+# app actually needs: `studio.logger` began capping local log files there, and
+# an app below it grows dev/test logs to Rails' 100 MB default, silently.
+gem "studio-engine", "~> 0.33"
 
 # CSS
 gem "tailwindcss-rails", "~> 4.5"
