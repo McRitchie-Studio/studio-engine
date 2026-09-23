@@ -187,12 +187,11 @@
           body[this.moveParam.resource] = {};
           body[this.moveParam.resource][this.moveParam.attr] = newZone;
 
-          return this.request(url, "PATCH", body).then(function (resp) {
-            if (!resp.ok) {
-              return resp.json().catch(function () { return {}; }).then(function (err) {
-                throw new Error(err.error || ("Failed (" + resp.status + ")"));
-              });
-            }
+          // request() rejects on a refusal (and reads the server's message), so this
+          // `then` runs only on a real success and the `catch` below is the ONE
+          // failure path. It used to unwrap the 4xx itself; that check now lives at
+          // the seam, where saveOrder gets it too.
+          return this.request(url, "PATCH", body).then(function () {
             self.setCardZone(card, newZone);
             self.toast("Moved to " + self.label(newZone), "success");
             self.emit("board-moved", id, fromKey, newZone);
@@ -208,6 +207,23 @@
 
         // Save the destination column's order. Reads the ordered id list and POSTs
         // it under the neutral payload key (`slugs` | `ids`) plus the advisory zone.
+        //
+        // A REFUSAL IS SHOWN, NOT SWALLOWED. Through 0.76.2 this was a bare
+        // `.catch(){}` on a `fetch` that resolves on 4xx: two layers of silence over
+        // a server that had already written the operator its reason ("That order does
+        // not match this week's games — reload and try again"). The board renumbered
+        // the cards as though the save had landed. request() now rejects on a refusal
+        // and the catch below toasts what the server said.
+        //
+        // NO AUTO-REVERT, deliberately. Unlike a single-card move there is no one
+        // card to snap back — the whole column re-ranked, and SortableJS hands us the
+        // drop with the pre-drop order already gone. Every reorder endpoint's refusal
+        // tells the operator to RELOAD, which restores the stored truth exactly; the
+        // board's job is to make sure that instruction is read.
+        //
+        // RETURNS A PROMISE (resolving true/false, never rejecting) so a caller can
+        // wait for the save to land. It resolves rather than rejects so the
+        // fire-and-forget call in handleSortEnd cannot raise an unhandled rejection.
         saveOrder: function (toZone) {
           var self = this;
           var ids = Array.prototype.slice
@@ -216,12 +232,15 @@
           var zone = this.zoneKey(toZone);
           this.emit("board-reordered", null, zone, zone, { ids: ids, zone: zone });
           this.hook(this.onDropHook, { ids: ids, zone: zone });
-          if (this.demo || !this.reorderUrl) return;
+          if (this.demo || !this.reorderUrl) return Promise.resolve(true);
           var payload = {};
           payload[this.reorderPayload] = ids;
           payload.zone = zone;
-          this.request(this.reorderUrl, "POST", payload).catch(function () {
-            // Order save failed — positions are stale but the board stays functional.
+          return this.request(this.reorderUrl, "POST", payload).then(function () {
+            return true;
+          }).catch(function (e) {
+            self.toast((e && e.message) || "Order save failed — reload and try again.", "error");
+            return false;
           });
         },
 
@@ -377,6 +396,22 @@
         },
 
         // --- helpers -------------------------------------------------------
+        // The board's ONE HTTP seam, and it REJECTS ON A SERVER REFUSAL. That is
+        // the semantics every caller in this factory already assumed by writing
+        // `.catch(…)`, and it is the semantics NEITHER underlying fetcher has:
+        //
+        //   * `window.fetch` RESOLVES on 4xx/5xx. A 422 is an ordinary resolution,
+        //     so a bare `.catch()` sees network-level failure and nothing else.
+        //     That is how saveOrder discarded an operator-readable 422 in silence
+        //     on all five boards that ride this factory.
+        //   * `window.authedFetch` (the turf-monster fetcher this picks up when the
+        //     host defines it) returns the response for anything that is not a 401
+        //     — so a 422 resolves there too — and resolves to NULL on an expired
+        //     session or a rate-limited tier, which `resp.ok` cannot be read from.
+        //
+        // Normalising both HERE is the point: a caller can no longer re-introduce
+        // the silence by forgetting a check. To ignore a refusal it must now say so
+        // out loud, in its own `.catch`.
         request: function (url, method, body) {
           var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || "";
           var fetcher = window.authedFetch || window.fetch;
@@ -384,6 +419,18 @@
             method: method,
             headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf, "Accept": "application/json" },
             body: JSON.stringify(body || {})
+          }).then(function (resp) {
+            // authedFetch's null — the session went away under the board. Name it,
+            // rather than throwing a TypeError off resp.ok on the next line.
+            if (!resp) throw new Error("Session expired — please sign in again.");
+            if (resp.ok) return resp;
+            // Prefer the SERVER'S OWN words. Every board endpoint this factory talks
+            // to renders `{ error: "…" }` beside its 4xx — Studio::Board::Reorderable
+            // here in the engine, and the hand-rolled siblings in the apps — and that
+            // text is written to be read by an operator.
+            return resp.json().catch(function () { return {}; }).then(function (err) {
+              throw new Error(err.error || ("Failed (" + resp.status + ")"));
+            });
           });
         },
 

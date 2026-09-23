@@ -59,7 +59,13 @@
     card_partial:     (req) partial rendered per card (e.g. "tasks/task_card").
     card_as:          local the record binds to in card_partial. Default :card.
     card_locals:      per-card extra locals — a Proc ->(record){ Hash } or a Hash.
-    reorder_url:      POST endpoint the drag-reorder saves the new order to.
+    reorder_url:      POST endpoint the drag-reorder saves the new order to. It is
+                      expected to answer a refusal with a 4xx carrying
+                      { error: "…" } (Studio::Board::Reorderable already does);
+                      the factory TOASTS that sentence. A refused reorder is NOT
+                      reverted — the whole column moved and the pre-drop order is
+                      gone by then — so write that message as the instruction the
+                      operator should follow, e.g. "… reload and try again".
     reorder_payload:  :slugs | :ids — the key the ordered id list POSTs under.
                       Default :slugs.
     move_url:         PATCH template for a cross-column move, ":id" → the card's id
@@ -78,8 +84,10 @@
     empty_selector:   the empty-state selector (revert anchor + count toggle).
                       Default ".kanban-empty"; nil for a board with no empty state.
     live_channel:     Turbo Stream channel for live updates (nil = static board).
-    optimistic:       revert + red-ring flash a failed move. Default true.
+    optimistic:       revert + red-ring flash a failed MOVE. Default true. It does
+                      not govern reorders, which never revert (see reorder_url).
     toasts:           show the toast host (false = window.alert on error). Default true.
+                      Either way a refused move or save reaches the operator.
     empty_label:      empty-zone text. Default "Drop here".
     header_slot:      raw HTML rendered above the columns (pass html_safe content).
     above_board_slot: raw HTML rendered between the header and the columns.

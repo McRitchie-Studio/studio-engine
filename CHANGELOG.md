@@ -4,6 +4,53 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **A board drag that the server refuses now tells you.** The board primitive's
+  drag-reorder POSTed the new order and discarded the answer: `saveOrder` ended in
+  `.catch(function () {})` — an EMPTY handler, on a `fetch` that *resolves* on a
+  4xx and so never reached it. Two layers of silence over one request. The
+  endpoints on the other end had already written the operator a reason (turf-monster's
+  week board answers a drifted card set with *"That order does not match this week's
+  games — reload and try again"*, and `Studio::Board::Reorderable` renders
+  `{ error: … }` beside every 422 it raises) and that sentence was unreachable by
+  construction, while the board's CSS counter renumbered the cards as though the save
+  had landed. A refused save now toasts the server's own words — or `window.alert`s
+  them on a `toasts: false` board — and resolves `false`.
+  - **Fixed at the seam, so all five boards get it.** The check lives in the
+    factory's `request()`, which now REJECTS on a refusal rather than handing back a
+    resolved 4xx. That is the semantics both callers already assumed by writing
+    `.catch(…)`, and it is what neither underlying fetcher provides. Every board
+    riding this factory is covered by the one change: turf-monster's NFL week order,
+    and mcritchie-studio's tasks (the DevOps board itself), depth charts, content and
+    news. No consumer change is needed beyond the gem bump.
+  - **An expired session is no longer a silently lost drag either.** A host that
+    defines `window.authedFetch` (turf-monster does) gets `null` back from it on a
+    401 or a rate-limited 429. `saveOrder` never checked for that, and `applyMove`
+    would have thrown a `TypeError` off `resp.ok`. `request()` now names it:
+    *"Session expired — please sign in again."*
+  - **A refused reorder is not auto-reverted, deliberately.** Unlike a single-card
+    move there is no one card to snap back: the whole column re-ranked, and SortableJS
+    hands the drop over with the pre-drop order already gone. Every reorder endpoint's
+    refusal tells the operator to reload, which restores the stored order exactly; the
+    board's job is to make sure that instruction is read. `optimistic:` governs moves
+    only, and `studio/board/_board` now says so.
+  - **`saveOrder` returns a promise** (resolving `true`/`false`, never rejecting), so
+    a caller can wait for a save to land instead of assuming it did.
+
+### Changed
+
+- **The board factory is now executed under test, not grepped.**
+  `test/views/board_factory_save_behavior_test.rb` extracts
+  `studio/_board_assets`'s `<script>` and runs it under node with stub
+  `window`/`document`/`fetch`, asserting `saveOrder`, `applyMove` and `request` by
+  CALLING them — nine scenarios covering the refusal text, the `null` session, an
+  unparseable error body, the silent success, the `toasts: false` fallback, the
+  unchanged event/hook seam and both move outcomes. The bug above survived every
+  source-substring assertion in `board_primitive_test.rb`, because the broken build
+  contained the word `catch` too; that section now says where behavioral coverage
+  belongs.
+
 ## 0.76.2 — 2026-09-22
 
 ## 0.76.1 — 2026-09-19
