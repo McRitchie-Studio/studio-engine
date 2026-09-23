@@ -126,12 +126,17 @@ class BoardPrimitiveTest < ActiveSupport::TestCase
 
   # --- factory source-presence checks (NOT behavioral) -----------------------
   # HONEST SCOPE: these are SOURCE-SUBSTRING assertions on the factory JS, not
-  # behavioral ones — the engine has no JS/system harness, so the factory is never
-  # executed here. They guard that the load-bearing lines stay present (the
-  # same-zone-never-PATCH guard, the flake-fix init ordering, the event seam); they
-  # do NOT prove runtime behavior. The genuine effect-assertions in this suite are
-  # the Ruby rank math (board_rankable_test) and the rendered-markup contract above.
-  # Promote these to real behavioral coverage when a JS/system-test harness lands.
+  # behavioral ones — the factory is never executed here. They guard that the
+  # load-bearing lines stay present (the same-zone-never-PATCH guard, the flake-fix
+  # init ordering, the event seam); they do NOT prove runtime behavior.
+  #
+  # THE HARNESS HAS LANDED for the factory's SAVE path:
+  # test/views/board_factory_save_behavior_test.rb extracts this same <script> and
+  # runs it under node, so saveOrder/applyMove/request are asserted by calling them.
+  # It exists because this section proved structurally blind to a real defect — a
+  # reorder that discarded the server's 422 in silence kept every assertion below
+  # green, since the broken build contained the word "catch" too. Move a check down
+  # here only when it cannot be executed; prefer growing that file.
   test "the factory keeps the load-bearing guard lines present in source" do
     factory = File.read("app/views/studio/_board_assets.html.erb")
     assert_includes factory, "var moved = fromZone !== toZone",
