@@ -616,6 +616,30 @@ module Studio
   # A trailing slash is added if you leave it off.
   mattr_accessor :s3_key_prefix, default: nil
 
+  # S3-COMPATIBLE STORAGE (Cloudflare R2). All four default nil, and nil means
+  # AWS exactly as before: the SDK's own endpoint, its default credential chain
+  # (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY), and the virtual-hosted
+  # amazonaws.com URL. An app moves to R2 by setting them, typically from ENV:
+  #
+  #   config.s3_endpoint          = ENV["R2_ENDPOINT"]   # https://<account>.r2.cloudflarestorage.com
+  #   config.s3_region            = "auto"               # R2's only region
+  #   config.s3_access_key_id     = ENV["R2_ACCESS_KEY_ID"]
+  #   config.s3_secret_access_key = ENV["R2_SECRET_ACCESS_KEY"]
+  #   config.s3_public_url        = ENV["R2_PUBLIC_URL"] # https://assets.example.com
+  #
+  # Explicit keys exist so an app can hold its R2 pair BESIDE its AWS pair
+  # during a cutover (Active Storage may still mirror to S3) without the two
+  # fighting over the same AWS_* variables.
+  #
+  # s3_public_url is the base public objects are served from — a custom domain
+  # or r2.dev URL attached to THIS environment's bucket. R2's S3 endpoint
+  # serves nothing anonymously, so with an endpoint and no public base there is
+  # no public URL to give, and Studio::S3.url says so rather than inventing one.
+  mattr_accessor :s3_endpoint,          default: nil
+  mattr_accessor :s3_access_key_id,     default: nil
+  mattr_accessor :s3_secret_access_key, default: nil
+  mattr_accessor :s3_public_url,        default: nil
+
   # Knowledge layer — the S3-backed document store + /admin/knowledge browser
   # (Studio::KnowledgeDoc). Routes are opt-in like every route surface.
   # knowledge_agents is the roster of agent slugs the intake UI offers
