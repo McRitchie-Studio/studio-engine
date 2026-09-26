@@ -838,6 +838,24 @@ config.s3_key_prefix    = "mcritchie-industries/"
 logical keys and never see it. Unset (the default) leaves keys byte-identical to
 what every already-shipped app wrote.
 
+### S3-compatible storage (Cloudflare R2)
+
+`Studio::S3` talks to any S3-compatible endpoint. The McRitchie fleet is moving
+to R2 (one account, McRitchie Studio's); an app switches in its initializer:
+
+```ruby
+config.s3_endpoint          = ENV["R2_ENDPOINT"]   # https://<account>.r2.cloudflarestorage.com
+config.s3_region            = "auto"
+config.s3_access_key_id     = ENV["R2_ACCESS_KEY_ID"]
+config.s3_secret_access_key = ENV["R2_SECRET_ACCESS_KEY"]
+config.s3_public_url        = ENV["R2_PUBLIC_URL"] # custom domain on this env's bucket
+```
+
+All four are nil by default, and nil is AWS exactly as before. The keys must be
+set as a pair. R2 serves nothing anonymously from its S3 endpoint, so with an
+endpoint and no `s3_public_url`, `Studio::S3.url` raises `NotConfigured` and
+`upload` writes but returns `nil`; serve private objects with `signed_url`.
+
 An app with **no** bucket configured does not error — `/admin/emails` renders
 read-only, showing the inherited defaults it is genuinely sending and naming the
 one setting that turns uploads on.

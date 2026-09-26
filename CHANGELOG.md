@@ -4,6 +4,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`Studio::S3` runs on Cloudflare R2, or any S3-compatible endpoint.** Four new
+  settings, all nil by default: `s3_endpoint`, `s3_access_key_id` +
+  `s3_secret_access_key` (passed to the client as a pair, so an app can hold its
+  R2 keys beside the `AWS_*` ones during a cutover; half a pair raises), and
+  `s3_public_url`, the base public objects are served from. Unset, every app gets
+  the same client and the same amazonaws.com URLs as before. On an endpoint with
+  no public base, `url` raises `NotConfigured` instead of building a URL R2 would
+  refuse, and `upload` still writes but returns `nil`. Proven live against an R2
+  bucket: upload, download, exists, list, signed URL (200) and delete, with the
+  anonymous endpoint read refused.
+
 ## 0.76.3 — 2026-09-23
 
 ### Fixed
