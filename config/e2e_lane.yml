@@ -717,7 +717,28 @@
 # widths are in an inline <style>; and the document reported
 # scrollWidth 390 / clientWidth 390 the entire time, because a box overflowing its
 # SIBLING's territory never reaches documentElement. Nothing but a real layout can
-# answer it. The ablation runs are recorded in the commit that follows this one.
+# answer it.
+#
+# ABLATED THREE WAYS, one line at a time, each on a committed tree with the lab
+# server restarted between runs. The fix is three parts and they cover three
+# different widths, which is why one ablation was not enough to characterise it:
+#
+#   caps -> bare 14rem/15rem, min-w-0 kept       1 red (containment, at 390px)
+#     The page still does NOT scroll sideways — the min-w-0 chain lets the left
+#     column shrink — so the sideways-scroll spec stays green and only the
+#     containment one fires. Geometry confirmed changed: left column 166 vs 211
+#     at 390px, title 82 vs 107.3.
+#
+#   min-w-0 chain removed, caps kept             1 red (containment, at 320px)
+#     Green at 344px and up: `truncate` carries overflow: hidden, which gives a
+#     span an automatic minimum size of zero and stands in for min-w-0 while
+#     there is room. This ablation is what widened the containment spec from one
+#     width to six — against 390px alone it was green over half a missing fix.
+#
+#   400px band cap -> bare 15rem                 1 red (monotonicity, at 412px)
+#     "the app name is 84px wide at 412px but 107.3px at the narrower 390px".
+#     A wider phone showing less of the name, which is the regression this fix
+#     introduced at its first cut and the reason that spec exists.
 # Re-derived on THIS tree with the lister, never by arithmetic:
 #   npx playwright test --list  -> 147 tests in 23 files
 total_specs: 147

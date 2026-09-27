@@ -92,14 +92,39 @@ test("the collapse tracks the scroll and stops dead when it stops", async ({ pag
 // These numbers are the pre-existing navbar's, measured on origin/accepted. If a
 // change is MEANT to move them, move them here in the same commit — that is a diff
 // a reviewer reads as exactly what it is.
+//
+// MOVED 2026-09-27 (header-fits-a-phone), and by the LAB HOST, not by the navbar.
+// e2e/boot.rb now gives the lab a Navbar Logo and the two-word app_name
+// "McRitchie Industries", because every consuming app has both and the bare
+// dummy had neither — and a header-width defect is invisible against a fixture
+// with no logo and a six-letter name. Attributed by measurement rather than
+// reasoning, one input at a time, all four mobile rows read at 320px:
+//
+//   one-word name, no logo  (the old fixture)   113 / 84 expanded   <- the old table
+//   two-word name, no logo                      117 / 84
+//   two-word name + logo    (what ships now)    125 / 96
+//
+// The 48px logo is taller than a title line, so it raises BOTH bands. The second
+// word raises only the mobile band, where .nav-title stacks into a column. On
+// the mobile rows the 400-767 sub-band reads 124 rather than 117 without the
+// logo, because the title's font steps up above 399px.
+//
+// CONFIRMED NOT THE NAVBAR CHANGE, both directions, both measured:
+//   · new fixture + layouts/_navbar at origin/main  -> still fails, same numbers
+//   · old fixture (one-word name, no logo) + the phone-width fix in place
+//                                                   -> 113/82 and 84/53 exactly,
+//     i.e. the table above this change, restored by reverting only the fixture.
+// The phone-width fix adds min-w-0, `truncate` and two width caps; none of the
+// three touches a height, and the second run is what proves it rather than
+// asserts it.
 const ENDPOINTS = [
-  { width: 320,  expanded: 113, collapsed: 82 },
-  { width: 399,  expanded: 113, collapsed: 82 },
-  { width: 400,  expanded: 113, collapsed: 82 },
-  { width: 767,  expanded: 113, collapsed: 82 },
-  { width: 768,  expanded: 84,  collapsed: 53 },
-  { width: 1024, expanded: 84,  collapsed: 53 },
-  { width: 1440, expanded: 84,  collapsed: 53 }
+  { width: 320,  expanded: 125, collapsed: 86 },
+  { width: 399,  expanded: 125, collapsed: 86 },
+  { width: 400,  expanded: 125, collapsed: 86 },
+  { width: 767,  expanded: 125, collapsed: 86 },
+  { width: 768,  expanded: 96,  collapsed: 53 },
+  { width: 1024, expanded: 96,  collapsed: 53 },
+  { width: 1440, expanded: 96,  collapsed: 53 }
 ];
 
 test("the collapse endpoints are unchanged at every band boundary", async ({ page }) => {

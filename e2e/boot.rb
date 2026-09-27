@@ -161,10 +161,30 @@ require_relative "../test/dummy/config/environment"
 # the LANE's host config, the same relationship E2eLabController::AssetDelivery
 # has to the host asset pipeline.
 #
-# "McRitchie Studio" is not the widest name in the ecosystem (that is
-# "McRitchie Industries"); it is the MEDIAN of the five consumers, so the lane
-# measures an ordinary app rather than an argued-for extreme.
-Studio.app_name = ENV.fetch("E2E_APP_NAME", "McRitchie Industries")
+# WHY THIS NAME. "McRitchie Industries" is one of the TWO apps that render
+# layouts/_navbar rather than a fork of it (the other is "Acquisition Studio");
+# the hub and turf-monster both fork the header, so their names say nothing
+# about this partial. Picking a name from an app that does not render the file
+# would be dressing; this is the file's own widest real consumer.
+#
+# NO ENV OVERRIDE, deliberately. An earlier cut of this read the name from
+# E2E_APP_NAME so the widths could be swept by hand. That is a knob which
+# changes what the lane MEASURES without appearing in any diff, which is the
+# exact shape config/e2e_lane.yml exists to refuse. Sweep by editing this line
+# in a branch you throw away.
+#
+# WHAT THESE TWO LINES MOVE, measured, because they change EVERY spec that
+# reads the header's height — e2e/nav_collapse.spec.js's endpoint table was
+# re-derived in the same commit and carries the same numbers:
+#
+#   one-word name, no logo (the old bare dummy)   mobile 113 / desktop 84 expanded
+#   two-word name, no logo                        mobile 117 (320-399), 124 (400-767)
+#   two-word name + logo  (what ships here)       mobile 125 / desktop 96 expanded
+#
+# The logo raises BOTH bands (it is 48px, taller than a title line); the second
+# word raises only the mobile band, where .nav-title stacks into a column. A
+# one-word, logo-less host is a shape no consumer has ever been in.
+Studio.app_name = "McRitchie Industries"
 Studio.theme_logos = [{ file: "e2e/img/nav-logo.png", title: "Navbar Logo" }]
 
 nav_logo = File.join(PUBLIC_DIR, "img", "nav-logo.png")
