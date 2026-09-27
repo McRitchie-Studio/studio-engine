@@ -141,6 +141,65 @@ end
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../test/dummy/config/environment"
 
+# ---- THE LAB HOST'S OWN IDENTITY ---------------------------------------------
+#
+# A NAVBAR LOGO AND A TWO-WORD APP NAME, because every real consumer has both and
+# the bare dummy has neither. This is not dressing — it is the difference between
+# a lane that can see a header width defect and one that structurally cannot.
+#
+# MEASURED, on this exact page: with Studio's defaults (app_name "Studio", no
+# theme_logos, so logo_for returns nil) the signed-in header at 390px measured
+# scrollWidth 390 / clientWidth 390 and reported ZERO overflowing elements — a
+# perfectly green read over the header this task exists to fix. The left column
+# is `flex-1` (min-width: auto, so it floors at its own min-content) and the
+# right column is flex-shrink-0 at 14rem; with no logo and a 6-letter title the
+# left min-content happened to fit in the 166px the right column left behind.
+# Add the 48px logo and a real word and it does not.
+#
+# Set HERE and not in test/dummy/config — the minitest suites boot that same
+# dummy and several interpolate Studio.app_name into expected strings. This is
+# the LANE's host config, the same relationship E2eLabController::AssetDelivery
+# has to the host asset pipeline.
+#
+# WHY THIS NAME. "McRitchie Industries" is one of the TWO apps that render
+# layouts/_navbar rather than a fork of it (the other is "Acquisition Studio");
+# the hub and turf-monster both fork the header, so their names say nothing
+# about this partial. Picking a name from an app that does not render the file
+# would be dressing; this is the file's own widest real consumer.
+#
+# NO ENV OVERRIDE, deliberately. An earlier cut of this read the name from
+# E2E_APP_NAME so the widths could be swept by hand. That is a knob which
+# changes what the lane MEASURES without appearing in any diff, which is the
+# exact shape config/e2e_lane.yml exists to refuse. Sweep by editing this line
+# in a branch you throw away.
+#
+# WHAT THESE TWO LINES MOVE, measured, because they change EVERY spec that
+# reads the header's height — e2e/nav_collapse.spec.js's endpoint table was
+# re-derived in the same commit and carries the same numbers:
+#
+#   one-word name, no logo (the old bare dummy)   mobile 113 / desktop 84 expanded
+#   two-word name, no logo                        mobile 117 (320-399), 124 (400-767)
+#   two-word name + logo  (what ships here)       mobile 125 / desktop 96 expanded
+#
+# The logo raises BOTH bands (it is 48px, taller than a title line); the second
+# word raises only the mobile band, where .nav-title stacks into a column. A
+# one-word, logo-less host is a shape no consumer has ever been in.
+Studio.app_name = "McRitchie Industries"
+Studio.theme_logos = [{ file: "e2e/img/nav-logo.png", title: "Navbar Logo" }]
+
+nav_logo = File.join(PUBLIC_DIR, "img", "nav-logo.png")
+FileUtils.mkdir_p(File.dirname(nav_logo))
+File.binwrite(nav_logo, Base64.decode64(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk" \
+  "YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+))
+# FAIL LOUD, for the same reason the favicon does: the navbar logo is an <img>
+# whose failed load surfaces to watchPageErrors as a console.error, which would
+# fail whichever spec happened to observe it rather than naming the cause. The
+# CSS sizes it off --nav-logo-size, so the intrinsic pixels are irrelevant — the
+# REQUEST is what has to succeed.
+abort "e2e/boot: nav logo not written at #{nav_logo}" if File.size?(nav_logo).to_i.zero?
+
 # ---- The geo table -----------------------------------------------------------
 #
 # The one lab page that needs a SCHEMA. It runs the REAL migration the gem ships

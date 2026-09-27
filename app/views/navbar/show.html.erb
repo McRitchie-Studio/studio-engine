@@ -41,21 +41,38 @@
     --nav-title-lead-size: calc(1.5rem - 0.35rem * var(--nav-p));
   }
 
+  /* THE USER-COLUMN WIDTH STEPS, re-keyed on the wrapper for the same reason
+     the --nav-p sizes above are: the shipped rules live in media queries, which
+     cannot fire for a CONTAINER at a fixed viewport width.
+
+     PERCENT HERE, vw THERE, AND THEY ARE THE SAME NUMBER. layouts/_navbar caps
+     the two phone bands at min(<rem>, 46vw). A literal 46vw inside a 390px
+     preview box on a 1400px monitor resolves to 644px, which would make the
+     preview show a header no phone has — so the share is expressed against the
+     CONTAINING BLOCK instead, which in this preview is the navbar row, i.e. the
+     simulated device width. Retune the cap in _navbar and retune these, or the
+     preview starts lying about the one dimension it exists to show.
+
+     REMOVED, 2026-09-27: three `.username-cap` rules, at 5/6/7rem. No element
+     in this engine or in any consuming app has ever carried that class —
+     components/_user_nav truncates the name with `truncate` and a min-w-0
+     parent instead. They were dead the day they were written and they read, to
+     the next person sizing this header, like a cap that was already in force.
+     (turf-monster's app/views/admin/navbar.html.erb carries the same three dead
+     rules; that is its own repo's to drop.) */
+
   /* Tiny (< 400px) */
   .navbar-preview.bp-tiny .nav-logo-link { gap: 0.25rem !important; }
-  .navbar-preview.bp-tiny .user-nav-col { width: 14rem !important; }
-  .navbar-preview.bp-tiny .user-nav-fit { max-width: 14rem !important; }
-  .navbar-preview.bp-tiny .username-cap { max-width: 5rem !important; }
+  .navbar-preview.bp-tiny .user-nav-col { width: min(14rem, 46%) !important; }
+  .navbar-preview.bp-tiny .user-nav-fit { max-width: min(14rem, 46%) !important; }
 
   /* Small (400-767px) */
-  .navbar-preview.bp-small .user-nav-col { width: 15rem !important; }
-  .navbar-preview.bp-small .user-nav-fit { max-width: 15rem !important; }
-  .navbar-preview.bp-small .username-cap { max-width: 6rem !important; }
+  .navbar-preview.bp-small .user-nav-col { width: min(15rem, 46%) !important; }
+  .navbar-preview.bp-small .user-nav-fit { max-width: min(15rem, 46%) !important; }
 
-  /* Desktop (768px+) */
+  /* Desktop (768px+) — a bare rem, exactly as the shipped band declares it. */
   .navbar-preview.is-desktop .user-nav-col { width: 20rem !important; }
   .navbar-preview.is-desktop .user-nav-fit { max-width: 20rem !important; }
-  .navbar-preview.is-desktop .username-cap { max-width: 7rem !important; }
 
   /* Scrolled state. The size half of this used to be TWELVE !important rules
      restating every collapsed value; the toggle now just sets --nav-p: 1 on
