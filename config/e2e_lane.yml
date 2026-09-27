@@ -706,7 +706,7 @@
 # Re-derived on THIS tree with the lister, never by arithmetic:
 #   npx playwright test --list  -> 142 tests in 22 files
 #
-# 2026-09-27: 142 -> 146, and a TWENTY-THIRD file. e2e/header_phone_width.spec.js
+# 2026-09-27: 142 -> 147, and a TWENTY-THIRD file. e2e/header_phone_width.spec.js
 # adds FIVE tests for the engine header at phone widths (header-fits-a-phone).
 #
 # WHAT ONLY A BROWSER COULD SEE HERE, since that is this lane's admission price.
