@@ -251,13 +251,17 @@ jobs:
       # Each attempt is bounded on its own (`timeout`), so a HANG is retried
       # rather than waited out; a healthy install takes well under a minute, and
       # the worst case is two bounded attempts inside the step's own 13.
+      # librsvg2-bin: ImageMagick 6 reads SVG only through rsvg-convert, and the
+      # hub's test/lib/workspace_icon_render_test.rb (landed 2026-09-25) renders
+      # an SVG mark. The hub's own ci.yml installs it; without it here every
+      # engine PR fails the mcritchie_studio shard that runs that test.
       - name: Install system packages
         timeout-minutes: 13
         run: |
           for attempt in 1 2; do
             if timeout 120 sudo apt-get update && \
                timeout 240 sudo apt-get install --no-install-recommends -y \
-                 libpq-dev libvips imagemagick postgresql-client; then
+                 libpq-dev libvips imagemagick librsvg2-bin postgresql-client; then
               exit 0
             fi
             echo "::warning::apt attempt $attempt failed or hung; retrying"

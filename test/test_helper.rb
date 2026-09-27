@@ -146,6 +146,11 @@ module Studio
   mattr_accessor :s3_bucket_prefix, default: nil
   mattr_accessor :s3_region,        default: "us-east-2"
   mattr_accessor :s3_key_prefix,    default: nil
+  # S3-compatible endpoint (Cloudflare R2); mirrors lib/studio.rb. nil = AWS.
+  mattr_accessor :s3_endpoint,          default: nil
+  mattr_accessor :s3_access_key_id,     default: nil
+  mattr_accessor :s3_secret_access_key, default: nil
+  mattr_accessor :s3_public_url,        default: nil
 
   def self.configure
     yield self
