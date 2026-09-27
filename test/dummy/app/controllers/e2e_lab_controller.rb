@@ -102,10 +102,14 @@ class E2eLabController < ActionController::Base
 
   layout "e2e_lab"
 
-  helper_method :logged_in?, :root_path, :current_user,
+  helper_method :logged_in?, :root_path, :current_user, :admin?,
                 :geo_country, :geo_state, :geo_blocked?, :geo_override_active?
 
-  def logged_in? = false
+  # Signed in ONLY where a page asked for it (#bar_stack sets @lab_signed_in).
+  # Every other lab action leaves it nil, so they render the signed-out navbar
+  # exactly as before — the profile pages set @user for the profile registry and
+  # must NOT become "logged in" as a side effect of that.
+  def logged_in? = @lab_signed_in.present?
 
   def root_path = "/"
 
@@ -140,7 +144,56 @@ class E2eLabController < ActionController::Base
   # The environment banner gates the stack and Studio.show_environment_banner? is
   # true in every environment except production, so running the lab under
   # RAILS_ENV=test renders a real bar with no stubbing at all.
-  def bar_stack = render(:bar_stack)
+  # THE SIGNED-IN HEADER'S OWN FIXTURE, and the reason it is not LabUser.
+  #
+  # A header's width defect is a defect of the WIDEST ordinary content, and every
+  # signed-out or short-named fixture measures 0px of overflow at every width —
+  # the same trap test/dummy's LabUserWithLongIdentity was written for one page
+  # down. This user carries what a real signed-in visitor carries: a two-word
+  # display name, a level, and a connected wallet, which is what fills the
+  # right-hand column's second row.
+  #
+  # NEITHER VALUE IS EXTREME. "Alexandra Mcritchie" is 19 characters — a first
+  # name and a surname — and the wallet string is the engine's own truncated
+  # form, not a full base58 address.
+  class LabHeaderUser
+    def display_name = "Alexandra Mcritchie"
+    def avatar = @avatar ||= Class.new { def attached? = false }.new
+    def avatar_color = "#6366f1"
+    def avatar_initials = "AM"
+    def level = 7
+    def solana_connected? = true
+    def truncated_solana = "7xKX…gAsU"
+  end
+
+  # ADMIN, because an admin viewer is the one who gets the extra cog in the icon
+  # rail — and an admin is exactly who is looking at a development banner.
+  def admin? = @lab_admin.present?
+
+  def bar_stack
+    # `signed_in` renders the right-hand user column — the half of this header a
+    # signed-out page cannot show at all. `devnet` adds the DEVNET chip to the
+    # environment bar, and `admin` the cog. `balance` is the one local that
+    # swaps the right column from `user-nav-fit` (max-width) to `user-nav-col`
+    # (a hard width), which is the widest shape the partial has.
+    if params[:signed_in].present?
+      @lab_signed_in = true
+      @user = LabHeaderUser.new
+    end
+    @lab_devnet = params[:devnet].present?
+    @lab_admin = params[:admin].present?
+    @lab_balance = params[:balance].present?
+    Studio.sidebar_sections = params[:sidebar].present? ? LAB_SIDEBAR_SECTIONS : []
+    render(:bar_stack)
+  end
+
+  # What a consuming app declares in config/initializers/studio.rb.
+  # mcritchie-industries — one of the two apps that render THIS partial rather
+  # than a fork of it — declares sections, so the trigger is part of the header
+  # under test rather than an optional extra.
+  LAB_SIDEBAR_SECTIONS = [
+    { title: "Site", links: [{ label: "Home", href: "/", emoji: "🏠" }] }
+  ].freeze
 
   # The hold-to-confirm button, both levels.
   #

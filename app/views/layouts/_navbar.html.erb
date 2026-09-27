@@ -62,13 +62,44 @@
         class="nav-shell <%= is_preview ? 'bg-page' : "#{'vt-pinned-header ' if pin_header}sticky top-0 z-50 bg-page transition-shadow duration-300" %>"
         :class="scrolled && 'shadow-lg border-b border-subtle is-scrolled'">
   <style>
-    .user-nav-col { width: 14rem; }
+    /* THE PHONE STEP IS A SHARE OF THE VIEWPORT, NOT A CONSTANT, and that is the
+       whole width fix. 14rem is 224px — 57% of a 390px screen — handed to a
+       flex-shrink-0 column, so the left column was left 166px for a 48px logo,
+       a 4px gap, 32px of padding and whatever the app is called. MEASURED on
+       /lab/bar_stack?signed_in=1 at 390x844, app_name "McRitchie Industries":
+       the title's own box ran to x=175.3 inside a column whose border box ends
+       at x=166, and "Industries" painted ON TOP of the wallet address in the
+       column beside it. documentElement.scrollWidth was 390 against a
+       clientWidth of 390 the entire time — the page did not scroll sideways,
+       so every document-level check of this header was green while the header
+       was visibly broken.
+
+       min() rather than a new breakpoint: the cap still resolves to 14rem on
+       anything at or above ~487px, so this band's desktop-side behaviour is
+       byte-identical and only the phone widths move. 46vw is not a taste
+       value — it is the largest share that still leaves the left column the
+       191px a 48px logo, its gap, its padding and a ten-character word need at
+       360px, the narrowest mainstream Android. Below that the title truncates
+       (see min-w-0 + truncate on the markup) instead of spilling.
+
+       BOTH LINES, and that is not redundancy. .user-nav-col is a hard width
+       (a host passing balance_html reserves the seat) and .user-nav-fit is a
+       cap (no balance, so the column hugs its content). They are two different
+       properties and a fix to one leaves the other exactly as broken. */
+    .user-nav-col { width: min(14rem, 46vw); }
     /* No balance content → no reserved column. The nav hugs its icons and
        name instead of floating in the balance's empty seat. max-width steps
        mirror the col's clamps: the item is flex-shrink-0, so without them a
        long nowrap username sizes the column past a narrow viewport. */
-    .user-nav-fit { max-width: 14rem; }
-    @media (min-width: 400px) { .user-nav-col { width: 15rem; } .user-nav-fit { max-width: 15rem; } }
+    .user-nav-fit { max-width: min(14rem, 46vw); }
+    /* THE SAME SHARE IN THE NEXT BAND UP, and leaving it out was measurably
+       worse than not fixing the first one. With only the base band capped, a
+       412px screen (Pixel-class, and the 400px band's own territory) gave the
+       title 84px while a 390px screen gave it 107 — a WIDER phone showing LESS
+       of the app's name. Monotone or it is not fixed. min(15rem, 46vw) resolves
+       to the plain 15rem at ~522px and up, so everything above this band's
+       phone edge is unchanged. */
+    @media (min-width: 400px) { .user-nav-col { width: min(15rem, 46vw); } .user-nav-fit { max-width: min(15rem, 46vw); } }
     @media (min-width: 768px) { .user-nav-col { width: 20rem; } .user-nav-fit { max-width: 20rem; } }
     /* The COLLAPSE band table used to live here, which meant only an app
        rendering THIS partial got it. Three of five apps fork the navbar, so each
@@ -88,16 +119,27 @@
   </style>
   <div class="nav-row flex items-center">
     <%# Left side: logo + nav %>
-    <div class="flex-1 px-4">
-      <div class="flex items-center gap-6">
-        <%= link_to root_path, class: "nav-logo-link inline-flex items-center gap-3 group" do %>
+    <%# min-w-0 THREE TIMES, on every flex item between the row and the title.
+        A flex item's default min-width is auto, which floors it at its own
+        min-content — so ONE of these left out puts the floor back and the
+        title spills across the gap again. The chain is: row item (.flex-1) ->
+        its inner flex -> the logo link. The <h1> is the fourth link and carries
+        its own min-w-0 below. %>
+    <div class="flex-1 min-w-0 px-4">
+      <div class="flex items-center gap-6 min-w-0">
+        <%= link_to root_path, class: "nav-logo-link inline-flex items-center gap-3 group min-w-0" do %>
           <% if logo_path %>
             <%# No w-*/h-* utility here: .nav-shell .nav-logo sizes it off --nav-p.
                 transition-transform, NOT transition-all — the hover lift still
                 eases, while width/height follow the finger with no clock. %>
             <img src="<%= logo_path %>" alt="<%= Studio.app_name %>" class="nav-logo rounded-full shadow-lg <%= "group-hover:scale-105 transition-transform duration-300" unless is_preview %>">
           <% end %>
-          <h1 class="nav-title font-extrabold text-heading tracking-tight"><span><%= prefix %></span><span class="text-primary"><%= last_word %></span></h1>
+          <%# truncate on the SPANS, not the h1. .nav-title is itself a flex
+              container (a column below 768px, a baseline row above), so the
+              overflow that has to be clipped belongs to each word's own box —
+              `truncate` on the h1 would clip the flex CONTAINER and leave the
+              spans drawing outside it, which is the bug rather than the fix. %>
+          <h1 class="nav-title font-extrabold text-heading tracking-tight min-w-0"><span class="truncate"><%= prefix %></span><span class="text-primary truncate"><%= last_word %></span></h1>
         <% end %>
         <%# Desktop nav — apps should override this partial to add links here %>
         <nav class="hidden md:flex items-center gap-4">

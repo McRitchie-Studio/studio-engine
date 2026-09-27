@@ -705,7 +705,22 @@
 #   bridge unscoped -> 1 red (the host panel stays open), 1 green (its own close)
 # Re-derived on THIS tree with the lister, never by arithmetic:
 #   npx playwright test --list  -> 142 tests in 22 files
-total_specs: 142
+#
+# 2026-09-27: 142 -> 146, and a TWENTY-THIRD file. e2e/header_phone_width.spec.js
+# adds FOUR tests for the engine header at phone widths (header-fits-a-phone).
+#
+# WHAT ONLY A BROWSER COULD SEE HERE, since that is this lane's admission price.
+# The header's right column was a flex-shrink-0 constant of 14rem — 57% of a 390px
+# screen — so the app's own name had no room and, because every flex item defaults
+# to min-width: auto, could not truncate either. It drew ACROSS the gap and on top
+# of the user column beside it. The markup is byte-identical broken or fixed; the
+# widths are in an inline <style>; and the document reported
+# scrollWidth 390 / clientWidth 390 the entire time, because a box overflowing its
+# SIBLING's territory never reaches documentElement. Nothing but a real layout can
+# answer it. The ablation runs are recorded in the commit that follows this one.
+# Re-derived on THIS tree with the lister, never by arithmetic:
+#   npx playwright test --list  -> 146 tests in 23 files
+total_specs: 146
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -783,7 +798,14 @@ total_specs: 142
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 142
 # executed = total - devnet - allowed_skips = 142 - 0 - 0 = 142, so executed ==
 # total_specs and the equality assertion holds.
-executed: 142
+# Re-derived once more on THIS tree with the lister when the phone-width header specs
+# landed (header-fits-a-phone) — 4 tests in ONE new file:
+#   npx playwright test --list                                             -> 146 tests, 23 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 146
+# executed = total - devnet - allowed_skips = 146 - 0 - 0 = 146, so executed ==
+# total_specs and the equality assertion holds.
+executed: 146
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

@@ -42,8 +42,16 @@ class UserNavCollapseRenderTest < ActiveSupport::TestCase
     # The fit column is flex-shrink-0: without media-stepped max-width clamps
     # mirroring .user-nav-col, a long nowrap username sizes it past a narrow
     # viewport (Carl's review catch on PR #70).
-    assert_includes html, ".user-nav-fit { max-width: 14rem; }"
-    assert_match(/min-width: 400px.*\.user-nav-fit \{ max-width: 15rem; \}/, html)
+    #
+    # The two PHONE bands cap by min(<rem>, 46vw) rather than the bare rem they
+    # carried until header-fits-a-phone. A constant 14rem is 57% of a 390px
+    # screen on a column that cannot shrink, which left the app's own name too
+    # little room to sit in — measured, it painted on top of the column beside
+    # it. The rem is still the ceiling; the vw only binds on a phone.
+    assert_includes html, ".user-nav-fit { max-width: min(14rem, 46vw); }"
+    assert_match(/min-width: 400px.*\.user-nav-fit \{ max-width: min\(15rem, 46vw\); \}/, html)
+    # 768px and up is UNCHANGED and must stay a bare rem: min() there would let
+    # a desktop scrollbar's width into a header measurement for no benefit.
     assert_match(/min-width: 768px.*\.user-nav-fit \{ max-width: 20rem; \}/, html)
   end
 

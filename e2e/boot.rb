@@ -141,6 +141,45 @@ end
 ENV["RAILS_ENV"] ||= "test"
 require_relative "../test/dummy/config/environment"
 
+# ---- THE LAB HOST'S OWN IDENTITY ---------------------------------------------
+#
+# A NAVBAR LOGO AND A TWO-WORD APP NAME, because every real consumer has both and
+# the bare dummy has neither. This is not dressing — it is the difference between
+# a lane that can see a header width defect and one that structurally cannot.
+#
+# MEASURED, on this exact page: with Studio's defaults (app_name "Studio", no
+# theme_logos, so logo_for returns nil) the signed-in header at 390px measured
+# scrollWidth 390 / clientWidth 390 and reported ZERO overflowing elements — a
+# perfectly green read over the header this task exists to fix. The left column
+# is `flex-1` (min-width: auto, so it floors at its own min-content) and the
+# right column is flex-shrink-0 at 14rem; with no logo and a 6-letter title the
+# left min-content happened to fit in the 166px the right column left behind.
+# Add the 48px logo and a real word and it does not.
+#
+# Set HERE and not in test/dummy/config — the minitest suites boot that same
+# dummy and several interpolate Studio.app_name into expected strings. This is
+# the LANE's host config, the same relationship E2eLabController::AssetDelivery
+# has to the host asset pipeline.
+#
+# "McRitchie Studio" is not the widest name in the ecosystem (that is
+# "McRitchie Industries"); it is the MEDIAN of the five consumers, so the lane
+# measures an ordinary app rather than an argued-for extreme.
+Studio.app_name = ENV.fetch("E2E_APP_NAME", "McRitchie Industries")
+Studio.theme_logos = [{ file: "e2e/img/nav-logo.png", title: "Navbar Logo" }]
+
+nav_logo = File.join(PUBLIC_DIR, "img", "nav-logo.png")
+FileUtils.mkdir_p(File.dirname(nav_logo))
+File.binwrite(nav_logo, Base64.decode64(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk" \
+  "YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+))
+# FAIL LOUD, for the same reason the favicon does: the navbar logo is an <img>
+# whose failed load surfaces to watchPageErrors as a console.error, which would
+# fail whichever spec happened to observe it rather than naming the cause. The
+# CSS sizes it off --nav-logo-size, so the intrinsic pixels are irrelevant — the
+# REQUEST is what has to succeed.
+abort "e2e/boot: nav logo not written at #{nav_logo}" if File.size?(nav_logo).to_i.zero?
+
 # ---- The geo table -----------------------------------------------------------
 #
 # The one lab page that needs a SCHEMA. It runs the REAL migration the gem ships
