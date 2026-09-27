@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.77.0 — 2026-09-26
+
 ### Added
 
 - **`Studio::S3` runs on Cloudflare R2, or any S3-compatible endpoint.** Four new
