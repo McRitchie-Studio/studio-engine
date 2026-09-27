@@ -15,15 +15,32 @@ module Studio
         opts[:content_type] = content_type if content_type
         opts[:cache_control] = cache_control if cache_control
         client.put_object(**opts)
-        url(key: key)
+        public_url? ? url(key: key) : nil
       end
 
       def download(key:)
         client.get_object(bucket: bucket, key: full_key(key)).body.read
       end
 
+      # The PUBLIC URL of an object. On AWS (no endpoint) it is the bucket's
+      # virtual-hosted amazonaws.com URL, byte-identical to every version before
+      # endpoints existed. On an S3-compatible endpoint it is Studio.s3_public_url
+      # plus the key, and without that base it RAISES: R2's S3 endpoint answers no
+      # anonymous request, so any URL built from it would be a broken image in an
+      # inbox, not an error anyone sees. Private objects want signed_url.
       def url(key:)
+        base = Studio.s3_public_url.to_s
+        return "#{base.chomp("/")}/#{full_key(key)}" unless base.empty?
+        raise NotConfigured, "Studio.s3_public_url not set: #{endpoint} serves no public URL (use signed_url for private objects)" if endpoint
+
         "https://#{bucket}.s3.#{region}.amazonaws.com/#{full_key(key)}"
+      end
+
+      # Whether url can answer. upload asks this so an app with only private
+      # objects (a data room on R2 with no public domain) can still write:
+      # upload returns nil there instead of raising AFTER the object landed.
+      def public_url?
+        endpoint.nil? || !Studio.s3_public_url.to_s.empty?
       end
 
       def signed_url(key:, expires_in: 3600)
@@ -93,11 +110,39 @@ module Studio
         Studio.s3_region
       end
 
+      # The S3-compatible endpoint (R2: https://<account>.r2.cloudflarestorage.com),
+      # or nil for AWS. Blank reads as unset, so an empty ENV var cannot point the
+      # client at "".
+      def endpoint
+        value = Studio.s3_endpoint.to_s
+        value.empty? ? nil : value
+      end
+
       def client
         @client ||= begin
           require "aws-sdk-s3"
-          Aws::S3::Client.new(region: region)
+          Aws::S3::Client.new(**client_options)
         end
+      end
+
+      # Only what is configured is passed, so an unconfigured app builds exactly
+      # the client it always did: region alone, the SDK's default credential chain.
+      # Keys are passed as a PAIR or not at all; half a pair is a configuration
+      # error, and falling back to the default chain would silently write with
+      # whatever AWS_* key the dyno happens to hold.
+      def client_options
+        opts = { region: region }
+        opts[:endpoint] = endpoint if endpoint
+        id = Studio.s3_access_key_id.to_s
+        secret = Studio.s3_secret_access_key.to_s
+        if id.empty? != secret.empty?
+          raise NotConfigured, "Studio.s3_access_key_id and s3_secret_access_key must be set together"
+        end
+        unless id.empty?
+          opts[:access_key_id] = id
+          opts[:secret_access_key] = secret
+        end
+        opts
       end
 
       def reset!
