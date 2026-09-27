@@ -131,7 +131,50 @@ test("the signed-in header does not scroll the page sideways on any phone", asyn
   expect(errors).toEqual([]);
 });
 
-test("the app name stays inside its own column instead of drawing over the user nav", async ({ page }) => {
+test("the app name stays inside its own column on every phone", async ({ page }) => {
+  await blockOffsiteRequests(page);
+
+  // EVERY WIDTH, NOT JUST 390, and that was a measured correction to this spec
+  // rather than caution. Written against PHONE alone it went GREEN under an
+  // ablation that removed the whole min-w-0 chain and kept only the width caps:
+  // at 344px and up the caps alone contain the title (the `truncate` on each
+  // span carries overflow: hidden, which gives it an automatic minimum size of
+  // zero, so it substitutes for min-w-0 while there is room). The chain only
+  // becomes load-bearing at 320px, where the ablation put the title's right
+  // edge 2.3px outside its column — at a width this spec never looked at. Half
+  // the fix was uncovered by a test written for it.
+  for (const width of WIDTHS) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/lab/bar_stack?signed_in=1");
+    await expectStickyChromeIsLive(page, expect);
+
+    const geometry = await readHeaderGeometry(page);
+
+    // THE ASSERTION THAT WOULD HAVE CAUGHT THE ORIGINAL DEFECT. Before the fix
+    // this read titleRight=175.3 against leftColumnRight=166 at 390px while the
+    // document measured a contented 390/390.
+    expect(
+      geometry.titleRight,
+      `at ${width}px the app name's right edge (${geometry.titleRight}) is outside its ` +
+        `own column (ends at ${geometry.leftColumnRight}), so it is drawing across the ` +
+        `gap and over the user column that starts at ${geometry.userColumnLeft}. The ` +
+        `page does not scroll sideways — documentElement reports ` +
+        `${geometry.documentScrollWidth}/${geometry.documentClientWidth} — which is ` +
+        `exactly why a document-level check cannot see this.`
+    ).toBeLessThanOrEqual(geometry.leftColumnRight);
+
+    // The two columns do not overlap. Stated on the boxes rather than on the
+    // text, because this is the property a host inherits no matter what it puts
+    // in either column.
+    expect(
+      geometry.userColumnLeft,
+      `at ${width}px the user column starts at ${geometry.userColumnLeft}, before the ` +
+        `left column ends at ${geometry.leftColumnRight} — the two overlap`
+    ).toBeGreaterThanOrEqual(geometry.leftColumnRight - 1);
+  }
+});
+
+test("the header's left column contains its own contents at 390px", async ({ page }) => {
   await blockOffsiteRequests(page);
 
   await page.setViewportSize(PHONE);
@@ -140,35 +183,16 @@ test("the app name stays inside its own column instead of drawing over the user 
 
   const geometry = await readHeaderGeometry(page);
 
-  // THE ASSERTION THAT WOULD HAVE CAUGHT IT. Before the fix this read
-  // titleRight=175.3 against leftColumnRight=166 while the document measured a
-  // contented 390/390.
-  expect(
-    geometry.titleRight,
-    `the app name's right edge (${geometry.titleRight}) is outside its own column ` +
-      `(ends at ${geometry.leftColumnRight}), so it is drawing across the gap and over ` +
-      `the user column that starts at ${geometry.userColumnLeft}. The page does not ` +
-      `scroll sideways — documentElement reports ${geometry.documentScrollWidth}/` +
-      `${geometry.documentClientWidth} — which is exactly why a document-level check ` +
-      `cannot see this.`
-  ).toBeLessThanOrEqual(geometry.leftColumnRight);
-
-  // And the column itself contains its contents. scrollWidth > clientWidth on a
-  // column is the same defect stated from the other side, and it is the form
-  // that survives a later markup change that renames .nav-title.
+  // The same defect stated from the other side, and the form that survives a
+  // later markup change renaming .nav-title: a column whose scrollWidth exceeds
+  // its width is reporting that its contents do not fit inside it. Held at the
+  // acceptance width only — at 320px the column legitimately clips 2px of a
+  // truncating title, which is the fix working rather than failing.
   expect(
     geometry.leftColumnScrollWidth,
     `the header's left column reports scrollWidth ${geometry.leftColumnScrollWidth} ` +
       `against a width of ${geometry.leftColumnWidth} — its contents do not fit inside it`
   ).toBeLessThanOrEqual(geometry.leftColumnWidth + 1);
-
-  // The two columns do not overlap. Stated on the boxes rather than on the
-  // text, because this is the property a host inherits no matter what it puts
-  // in either column.
-  expect(
-    geometry.userColumnLeft,
-    "the user column starts before the left column ends — the two overlap"
-  ).toBeGreaterThanOrEqual(geometry.leftColumnRight - 1);
 });
 
 test("a wider phone never shows less of the app name", async ({ page }) => {

@@ -707,7 +707,7 @@
 #   npx playwright test --list  -> 142 tests in 22 files
 #
 # 2026-09-27: 142 -> 146, and a TWENTY-THIRD file. e2e/header_phone_width.spec.js
-# adds FOUR tests for the engine header at phone widths (header-fits-a-phone).
+# adds FIVE tests for the engine header at phone widths (header-fits-a-phone).
 #
 # WHAT ONLY A BROWSER COULD SEE HERE, since that is this lane's admission price.
 # The header's right column was a flex-shrink-0 constant of 14rem — 57% of a 390px
@@ -719,8 +719,8 @@
 # SIBLING's territory never reaches documentElement. Nothing but a real layout can
 # answer it. The ablation runs are recorded in the commit that follows this one.
 # Re-derived on THIS tree with the lister, never by arithmetic:
-#   npx playwright test --list  -> 146 tests in 23 files
-total_specs: 146
+#   npx playwright test --list  -> 147 tests in 23 files
+total_specs: 147
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -799,13 +799,13 @@ total_specs: 146
 # executed = total - devnet - allowed_skips = 142 - 0 - 0 = 142, so executed ==
 # total_specs and the equality assertion holds.
 # Re-derived once more on THIS tree with the lister when the phone-width header specs
-# landed (header-fits-a-phone) — 4 tests in ONE new file:
-#   npx playwright test --list                                             -> 146 tests, 23 files
+# landed (header-fits-a-phone) — 5 tests in ONE new file:
+#   npx playwright test --list                                             -> 147 tests, 23 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
-#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 146
-# executed = total - devnet - allowed_skips = 146 - 0 - 0 = 146, so executed ==
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 147
+# executed = total - devnet - allowed_skips = 147 - 0 - 0 = 147, so executed ==
 # total_specs and the equality assertion holds.
-executed: 146
+executed: 147
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
