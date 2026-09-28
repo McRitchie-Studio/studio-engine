@@ -28,9 +28,13 @@
     </p>
 
     <% if (record = Studio::EmailCatalog.record(@key)) %>
-      <div class="rounded-lg overflow-hidden border border-subtle w-56 mt-4">
-        <%= image_tag record.url, class: "w-full h-auto", alt: "Stored artwork for #{@key}" %>
-      </div>
+      <%# EmailCatalog.url, not record.url: it degrades to nil when the stored image
+          cannot be served publicly (R2 with no s3_public_url) instead of 500ing. %>
+      <% if (preview = Studio::EmailCatalog.url(@key)) %>
+        <div class="rounded-lg overflow-hidden border border-subtle w-56 mt-4">
+          <%= image_tag preview, class: "w-full h-auto", alt: "Stored artwork for #{@key}" %>
+        </div>
+      <% end %>
       <p class="font-mono text-2xs text-muted mt-2 break-all"><%= record.s3_key %></p>
     <% end %>
 

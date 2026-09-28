@@ -712,6 +712,13 @@ module Studio
     # caller keeps the behavior it was written against until its app adopts.
     def url(key)
       record(key)&.url
+    rescue Studio::S3::NotConfigured => e
+      # A stored override this app can no longer serve publicly (Studio::S3 on
+      # an S3-compatible endpoint with no s3_public_url). Every caller already
+      # treats nil as "use the default", so degrade to that instead of raising
+      # out of a mailer: this method feeds the magic-link sign-in email.
+      warn_unservable(key, e)
+      nil
     end
 
     # What ACTUALLY SHIPS on this email — the two-layer resolution. Absolute, so
@@ -845,13 +852,31 @@ module Studio
       host ? "#{host}#{path}" : path
     end
 
+    def warn_unservable(key, error)
+      message = "[email_catalog] #{key}: stored image not publicly servable, using default (#{error.message})"
+      defined?(Rails) && Rails.respond_to?(:logger) && Rails.logger ? Rails.logger.warn(message) : warn(message)
+    end
+
     # --- Upload ------------------------------------------------------------
 
     # Whether THIS app can accept an upload. False when the host never set
     # Studio.s3_bucket_prefix — /admin/emails then shows inherited defaults
     # read-only rather than 500ing on the first upload.
     def uploads_available?
-      Studio::S3.configured? && table_ready?
+      uploads_blocked_reason.nil?
+    end
+
+    # Why uploads are off, or nil when they are on:
+    #   :no_storage     the host never set Studio.s3_bucket_prefix (or the table
+    #                   is not migrated yet)
+    #   :no_public_url  storage is an S3-compatible endpoint (Cloudflare R2) with
+    #                   no Studio.s3_public_url, so an uploaded image could be
+    #                   stored but never served to an inbox
+    def uploads_blocked_reason
+      return :no_storage unless Studio::S3.configured? && table_ready?
+      return :no_public_url unless Studio::S3.public_url?
+
+      nil
     end
 
     # Upload bytes to this app's bucket + upsert its ImageCache row (replacing

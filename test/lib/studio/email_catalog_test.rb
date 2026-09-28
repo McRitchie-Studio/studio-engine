@@ -278,6 +278,55 @@ class EmailCatalogTest < Minitest::Test
                  Studio::EmailCatalog.url("magic_link")
   end
 
+  # --- R2 with no public URL: stored, but not servable ----------------------
+  #
+  # REGRESSION GUARD (email-banners-survive-r2). With Studio::S3 on an
+  # S3-compatible endpoint (Cloudflare R2) and no s3_public_url, ImageCache#url
+  # raises NotConfigured. url() feeds the magic-link sign-in email, so a stored
+  # banner used to take sign-in down. It now degrades to nil, which every caller
+  # already reads as "use the default".
+  def test_url_degrades_to_nil_when_the_stored_image_cannot_be_served
+    row = Object.new
+    row.define_singleton_method(:url) { raise Studio::S3::NotConfigured, "no public url" }
+    stub_module(Studio::EmailCatalog, :record) { |_key| row }
+
+    assert_nil Studio::EmailCatalog.url("magic_link")
+  end
+
+  def test_resolved_url_falls_back_to_the_default_when_the_stored_image_cannot_be_served
+    row = Object.new
+    row.define_singleton_method(:url) { raise Studio::S3::NotConfigured, "no public url" }
+    stub_module(Studio::EmailCatalog, :record) { |_key| row }
+    stub_module(Studio::EmailCatalog, :default_url) { |_key| "https://app.example.com/assets/emails/magic-link.gif" }
+
+    assert_equal "https://app.example.com/assets/emails/magic-link.gif", Studio::EmailCatalog.resolved_url("magic_link")
+  end
+
+  def test_other_errors_from_the_stored_image_still_raise
+    row = Object.new
+    row.define_singleton_method(:url) { raise ArgumentError, "a real bug" }
+    stub_module(Studio::EmailCatalog, :record) { |_key| row }
+
+    assert_raises(ArgumentError) { Studio::EmailCatalog.url("magic_link") }
+  end
+
+  def test_uploads_blocked_reason_names_why_uploads_are_off
+    stub_module(Studio::EmailCatalog, :table_ready?) { true }
+
+    stub_module(Studio::S3, :configured?) { false }
+    assert_equal :no_storage, Studio::EmailCatalog.uploads_blocked_reason
+
+    stub_module(Studio::S3, :configured?) { true }
+    stub_module(Studio::S3, :public_url?) { false }
+    assert_equal :no_public_url, Studio::EmailCatalog.uploads_blocked_reason
+    refute Studio::EmailCatalog.uploads_available?,
+      "an image stored with no public URL would break every email that shows it"
+
+    stub_module(Studio::S3, :public_url?) { true }
+    assert_nil Studio::EmailCatalog.uploads_blocked_reason
+    assert Studio::EmailCatalog.uploads_available?
+  end
+
   # --- WHOSE artwork: the bug this file's source() section missed ------------
   #
   # REGRESSION GUARD. source() used to collapse every registered default_asset

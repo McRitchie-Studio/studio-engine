@@ -572,12 +572,13 @@ class EmailsPageTest < ActiveSupport::TestCase
   # Render the page the way the style-guide test does: a bare content wrapper,
   # no host layout. `entries` / `uploads_available` are what the controller
   # assigns.
-  def render_index(uploads_available: true)
+  def render_index(uploads_available: true, uploads_blocked_reason: nil)
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
     # The rows link admin_email_path; a bare ActionView::Base carries no route
     # helpers, so mix the app's in rather than stubbing the URLs away.
     view.singleton_class.include(Rails.application.routes.url_helpers)
-    view.assign(entries: Studio::EmailCatalog.entries, uploads_available: uploads_available)
+    view.assign(entries: Studio::EmailCatalog.entries, uploads_available: uploads_available,
+                uploads_blocked_reason: uploads_blocked_reason)
     view.render(template: "studio/emails/index")
   end
 
@@ -1136,6 +1137,17 @@ class EmailsPageTest < ActiveSupport::TestCase
     assert_includes show, "Studio default", "it still SHOWS what is shipping — that is the honest part"
     refute_includes show, "imageUploadHost(",
       "an Edit button that cannot possibly work must not be offered"
+  end
+
+  # Storage on R2 with no public URL: uploads are off for a DIFFERENT reason, and
+  # the notice must name the setting that actually fixes it, not s3_bucket_prefix
+  # (which is set). An operator told to set the wrong thing sets it and nothing
+  # changes. (email-banners-survive-r2)
+  def test_read_only_notice_names_s3_public_url_when_that_is_what_is_missing
+    index = render_index(uploads_available: false, uploads_blocked_reason: :no_public_url)
+
+    assert_includes index, "s3_public_url"
+    refute_includes index, "s3_bucket_prefix"
   end
 
   # --- the page-scoped host -------------------------------------------------
