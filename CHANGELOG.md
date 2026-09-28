@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.77.4 — 2026-09-28
+
 ### Fixed
 
 - **An email banner stored on R2 with no public URL no longer breaks sign-in.**
