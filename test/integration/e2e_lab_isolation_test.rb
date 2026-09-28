@@ -43,6 +43,18 @@ require "action_dispatch/testing/integration"
 # true of a lab that lost the ability to render one at all — which is exactly what a
 # careless fix (deleting the knob) would produce. So the contaminating request is
 # asserted to ACTUALLY arm the sidebar before its absence afterwards means anything.
+#
+# VERIFIED RED AGAINST THE DEFECT REINTRODUCED — the one line put back in
+# #bar_stack, on a committed tree:
+#
+#   Studio.sidebar_sections = params[:sidebar].present? ? … : []   2-3 red of 3
+#
+# Two runs, two counts, and the spread is itself the finding: minitest randomises
+# test order, and the first bar_stack request REPLACES the declared callable with a
+# bare Array, so which of the three tests notices depends on the seed. The leak test
+# and the global sweep were red in both runs. Nothing about this defect is stable
+# under ordering, in either suite — which is exactly why the lane could stay green
+# over it for as long as it did.
 class E2eLabIsolationTest < ActionDispatch::IntegrationTest
   # The trigger button `components/_link_sidebar_trigger` renders, and the two
   # panels `components/_link_sidebar` renders. Counted through the DOM rather than

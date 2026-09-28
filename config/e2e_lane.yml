@@ -761,18 +761,22 @@
 #
 # MUTATED TWO WAYS, one line at a time, on a committed tree with the lab server
 # restarted between runs — because a spec that passes over correct code has proved
-# nothing until it has been made to fail:
+# nothing until it has been made to fail. Both times exactly ONE of the six header
+# specs went red, and it was this one:
 #
-#   balance_html forced nil in the lab page      1 red (the class assertion)
-#     "the right column rendered user-nav-fit". readHeaderGeometry's selector takes
-#     EITHER column, so without that first assertion the spec would have gone on
-#     measuring the fit path the five tests above already cover and reported
-#     coverage of a path it never saw.
+#   lab page's balance_html forced nil           1 red (the class assertion, 320px)
+#     "at 320px the right column rendered \"user-nav-fit flex-shrink-0 pl-0 pr-4
+#     md:px-4\"". readHeaderGeometry's selector takes EITHER column, so without that
+#     first assertion the spec would have gone on measuring the fit path the five
+#     tests above already cover and reported coverage of a path it never saw.
 #
-#   .user-nav-col width -> a bare 20rem          1 red (containment, 320-390px)
-#     "the app name's right edge (185.9) is outside its own column (ends at 112.4)
-#     once the balance reserves 320px on the right", at 320px. Proves the spec
-#     measures the geometry of the reserved column and not just its class name.
+#   .user-nav-col width -> a bare 20rem          1 red (sideways scroll, 320px)
+#     "at 320px, with a balance in the header, the page scrolls sideways by 32px.
+#     Widest element past the edge: user-nav-col … right 352, width 320,
+#     flexShrink 0". The reserved column is the element past the edge, which is the
+#     point: the five specs above stayed GREEN under this mutation, because none of
+#     them passes balance_html and the max-width column simply shrank. Only the
+#     reserved path can exhibit it.
 # Re-derived on THIS tree with the lister, never by arithmetic:
 #   npx playwright test --list  -> 148 tests in 23 files
 total_specs: 148

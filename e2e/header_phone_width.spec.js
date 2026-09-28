@@ -189,12 +189,19 @@ test("the app name stays inside its own column on every phone", async ({ page })
 // no spec has ever turned it.
 //
 // MEASURED CLEAN, WHICH IS WHY THIS IS A COVERAGE SPEC AND NOT A FIX. Driven by
-// hand across all six widths before this test existed, the hard-width path
-// reported the same containment as the fit path at every one: 0 elements past the
-// viewport, no sideways scroll, and the title inside its own column. So this
-// closes a hole over code that is already right — the thing it stops is a later
-// width change that is verified against the shrinking column and lands on the
-// reserved one.
+// hand across all six widths before this test existed, the two paths were
+// IDENTICAL to a tenth of a pixel — left column right edge, title right edge,
+// title width, user column left and width, --nav-h, all equal at 320/360/375/
+// 390/412/430. So there is no defect here and this claims none.
+//
+// AND THE REASON THEY COINCIDE IS THE REASON THIS SPEC STILL EARNS ITS KEEP.
+// They match because the signed-in user column's CONTENT is wider than the cap at
+// every phone width, so `max-width` is already pinned to the same number the hard
+// `width` reserves — 147.2px at 320, 179.4px at 390. That is a property of this
+// fixture's content, not of the CSS. The two classes are SEPARATE declarations,
+// three media bands each, and only this test reads the `-col` half: mutating
+// `.user-nav-col` to a bare 20rem left all five specs above GREEN and reddened
+// only this one, because none of them passes balance_html.
 //
 // THE FIRST ASSERTION IS THE ONE THAT KEEPS IT HONEST. readHeaderGeometry's
 // selector takes `.user-nav-col, .user-nav-fit`, so if `?balance=1` ever stops
