@@ -751,7 +751,8 @@
 # header specs above all drive the fit path, which can shrink; the reserved one
 # cannot, so the left column absorbs the whole difference. /lab/bar_stack has
 # carried the `?balance=1` knob since the lab page was written and nothing turned
-# it — the partial's own comment calls it "the widest shape the partial has".
+# it — and the lab controller's own comment on that knob (e2e_lab_controller.rb,
+# #bar_stack) calls it "the widest shape the partial has".
 #
 # COVERAGE OVER CORRECT CODE, measured before the test was written: the hard-width
 # path reported the same containment as the fit path at all six widths — 0 elements
