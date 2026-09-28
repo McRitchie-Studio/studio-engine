@@ -35,6 +35,7 @@ The second one is the whole argument for this lane. The guard written to catch
 | Contract | `config/e2e_lane.yml` | How many specs the lane must execute |
 | Runtime gate | `bin/e2e-executed-set-check` | Reads Playwright's own receipt and asserts the executed set |
 | Static guard | `test/lib/e2e_lane_contract_test.rb` | Refuses any edit that could narrow the set |
+| Isolation guard | `test/integration/e2e_lab_isolation_test.rb` | Refuses a lab request that writes a `Studio` process global |
 
 Run it locally:
 
@@ -59,6 +60,36 @@ every spec still passes.
 `test/lib/e2e_lane_contract_test.rb#test_integration_the_lab_pages_render_engine_partials`
 asserts each lab page renders its engine partials by name and carries no `<script>`
 of its own.
+
+**A local, though, not a process global.** "Locals and nothing else" has a second
+half that was learned the expensive way. `E2eLabController#bar_stack` set up the
+link sidebar by assigning `Studio.sidebar_sections` from `?sidebar=1` — and that is
+a `mattr_accessor`, one slot for the whole Puma process, not a local of anything. So
+one request armed the sidebar for every request after it. Measured at `a73edfe`:
+after a single `GET /lab/bar_stack?sidebar=1`, `/lab/toast_over_banner` served 2
+link-sidebar triggers, 2 slide-out panels and `--nav-h: 145px` — against 0, 0 and
+125px before it — on a page that declares no sections.
+
+**The lane could not have told anyone.** Playwright walks `e2e/` in file-name order,
+and `nav_collapse.spec.js` — which visits `/lab/bar_stack` with no `sidebar` param,
+clearing the slot — happens to sort between the contaminator
+(`header_phone_width.spec.js`) and the victim (`toast_over_banner.spec.js`). Run
+those two adjacent with nothing between them and every assertion still passes. The
+lane was clean by alphabet, and `playwright.config.js` carried a comment saying the
+lab pages were stateless.
+
+A host's real relationship to that accessor is one assignment in
+`config/initializers/studio.rb`, so that is the shape the dummy uses now:
+`test/dummy/config/application.rb` declares it ONCE, as the callable form
+[`NEW_APP_SETUP.md`](NEW_APP_SETUP.md) shows, and the callable reads what the
+CURRENT request declared. `Studio::SidebarSections.resolve` stays on the path, so
+the lab still drives the engine's real host seam.
+
+`test/integration/e2e_lab_isolation_test.rb` holds it, and holds more than this one
+accessor: it enumerates every lab GET from the router and every `Studio` accessor
+that has a writer, walks each route bare and with every knob the lane turns, and
+diffs the values either side. A future accessor written per request fails there
+whatever it is called, including one mutated in place.
 
 ## Can it actually see the defects it exists for?
 

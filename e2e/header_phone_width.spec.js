@@ -97,7 +97,11 @@ async function readHeaderGeometry(page) {
       titleWidth: titleBox ? Math.round(titleBox.width * 10) / 10 : null,
       leftColumnRight: leftBox ? Math.round(leftBox.right * 10) / 10 : null,
       userColumnWidth: userColumn ? Math.round(userColumn.getBoundingClientRect().width) : null,
-      userColumnLeft: userColumn ? Math.round(userColumn.getBoundingClientRect().left * 10) / 10 : null
+      userColumnLeft: userColumn ? Math.round(userColumn.getBoundingClientRect().left * 10) / 10 : null,
+      // WHICH of the two right-column shapes rendered. The selector above takes
+      // either, so without this a spec written for the hard-width path would pass
+      // over the max-width one and report coverage it does not have.
+      userColumnClass: userColumn ? (userColumn.getAttribute("class") || "") : null
     };
   });
 }
@@ -172,6 +176,91 @@ test("the app name stays inside its own column on every phone", async ({ page })
         `left column ends at ${geometry.leftColumnRight} — the two overlap`
     ).toBeGreaterThanOrEqual(geometry.leftColumnRight - 1);
   }
+});
+
+// THE WIDEST SHAPE THE PARTIAL HAS, AND NOTHING WAS TURNING IT.
+//
+// layouts/_navbar gives the right-hand column one of two classes, and the choice
+// is the whole geometry: a host that passes `balance_html` gets `.user-nav-col`,
+// a HARD `width: min(14rem, 46vw)` — the seat is reserved whether the balance is
+// wide or narrow — and a host that passes none gets `.user-nav-fit`, the same
+// number as a `max-width`, which shrinks to its contents. Every test above drives
+// the fit path. /lab/bar_stack has carried a `?balance=1` knob the whole time and
+// no spec has ever turned it.
+//
+// MEASURED CLEAN, WHICH IS WHY THIS IS A COVERAGE SPEC AND NOT A FIX. Driven by
+// hand across all six widths before this test existed, the two paths were
+// IDENTICAL to a tenth of a pixel — left column right edge, title right edge,
+// title width, user column left and width, --nav-h, all equal at 320/360/375/
+// 390/412/430. So there is no defect here and this claims none.
+//
+// AND THE REASON THEY COINCIDE IS THE REASON THIS SPEC STILL EARNS ITS KEEP.
+// They match because the signed-in user column's CONTENT is wider than the cap at
+// every phone width, so `max-width` is already pinned to the same number the hard
+// `width` reserves — 147.2px at 320, 179.4px at 390. That is a property of this
+// fixture's content, not of the CSS. The two classes are SEPARATE declarations,
+// three media bands each, and only this test reads the `-col` half: mutating
+// `.user-nav-col` to a bare 20rem left all five specs above GREEN and reddened
+// only this one, because none of them passes balance_html.
+//
+// THE FIRST ASSERTION IS THE ONE THAT KEEPS IT HONEST. readHeaderGeometry's
+// selector takes `.user-nav-col, .user-nav-fit`, so if `?balance=1` ever stops
+// reaching balance_html this spec would go on measuring the fit path and passing
+// — the same shape of vacuous green that a one-word app_name gave the broken
+// header. The class is asserted before the geometry means anything.
+test("the reserved balance column contains the header on every phone", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+
+  const report = [];
+  for (const width of WIDTHS) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/lab/bar_stack?signed_in=1&balance=1");
+    await expectStickyChromeIsLive(page, expect);
+
+    const geometry = await readHeaderGeometry(page);
+    report.push(`${width}px: ${geometry.userColumnClass} w=${geometry.userColumnWidth}`);
+
+    expect(
+      geometry.userColumnClass,
+      `at ${width}px the right column rendered "${geometry.userColumnClass}". ?balance=1 must ` +
+        `reach layouts/_navbar's balance_html, which is what selects .user-nav-col — without ` +
+        `it this spec measures the max-width path the tests above already cover and reports ` +
+        `coverage of the hard-width one it never saw. Series: ${report.join(", ")}`
+    ).toContain("user-nav-col");
+
+    expect(
+      geometry.documentScrollWidth,
+      `at ${width}px, with a balance in the header, the page scrolls sideways by ` +
+        `${geometry.documentScrollWidth - geometry.documentClientWidth}px. Widest element past ` +
+        `the edge: ${JSON.stringify(geometry.pastViewport[0] || null)}`
+    ).toBe(geometry.documentClientWidth);
+
+    expect(
+      geometry.pastViewport,
+      `at ${width}px, with a balance in the header, these elements extend past the viewport: ` +
+        `${JSON.stringify(geometry.pastViewport, null, 2)}`
+    ).toEqual([]);
+
+    // The two containment properties the fit path is held to, restated against the
+    // reserved column. A hard width cannot give, so the left column absorbs the
+    // whole difference — which is exactly why this is the path to hold.
+    expect(
+      geometry.titleRight,
+      `at ${width}px the app name's right edge (${geometry.titleRight}) is outside its own ` +
+        `column (ends at ${geometry.leftColumnRight}) once the balance reserves ` +
+        `${geometry.userColumnWidth}px on the right. The page does not scroll sideways — ` +
+        `documentElement reports ${geometry.documentScrollWidth}/${geometry.documentClientWidth}`
+    ).toBeLessThanOrEqual(geometry.leftColumnRight);
+
+    expect(
+      geometry.userColumnLeft,
+      `at ${width}px the balance column starts at ${geometry.userColumnLeft}, before the left ` +
+        `column ends at ${geometry.leftColumnRight} — the two overlap`
+    ).toBeGreaterThanOrEqual(geometry.leftColumnRight - 1);
+  }
+
+  expect(errors).toEqual([]);
 });
 
 test("the header's left column contains its own contents at 390px", async ({ page }) => {

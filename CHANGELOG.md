@@ -4,6 +4,47 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **The browser lab stopped writing per-request state into the engine's process-wide
+  config.** `E2eLabController#bar_stack` set up the link sidebar by assigning
+  `Studio.sidebar_sections` from `?sidebar=1`, and that accessor is a
+  `mattr_accessor` — one slot for the whole Puma process. So one request armed the
+  sidebar for every request after it: measured at `a73edfe`, after a single
+  `GET /lab/bar_stack?sidebar=1`, `/lab/toast_over_banner` served 2 link-sidebar
+  triggers, 2 slide-out panels and `--nav-h: 145px` against 0, 0 and 125px before it,
+  on a page that declares no sections. **No shipped engine code changed**; the lab is
+  the dummy test app, which is in no gem (`spec.files` has never included `test/`).
+  What changed is what the browser lane measures. The dummy host now declares the
+  accessor once at boot, in the callable form `docs/NEW_APP_SETUP.md` shows, reading
+  what the current request declared through a `before_action` on every lab action —
+  so `?sidebar=1` works on any lab page, carries nowhere, and
+  `Studio::SidebarSections.resolve` stays on the path.
+  - The lane never went red for it. Playwright walks `e2e/` in file-name order and
+    `nav_collapse.spec.js`, which clears the slot, sorts between the contaminator and
+    the victim; run those two adjacent and every assertion still passes. So
+    `playwright.config.js`'s comment claiming the lab pages are stateless was false
+    and was arming whoever next raised `workers` above 1. It now names the incident
+    and the guard instead of asserting itself.
+  - `test/integration/e2e_lab_isolation_test.rb` holds the seam and more than this one
+    accessor: it enumerates every lab GET from the router and every `Studio` accessor
+    that has a writer, walks each route bare and with every knob the lane turns, and
+    diffs the values either side.
+
+### Added
+
+- **The header's reserved balance column has a spec.** `layouts/_navbar` gives the
+  right column a hard `width: min(14rem, 46vw)` when a host passes `balance_html`
+  (`.user-nav-col`) and the same number as a `max-width` when it does not
+  (`.user-nav-fit`). All five phone-width header specs drove the fit path;
+  `/lab/bar_stack` has carried a `?balance=1` knob since it was written and nothing
+  turned it. Measured across 320/360/375/390/412/430, the two paths are identical to
+  a tenth of a pixel — the fit column is already pinned to its cap at every phone
+  width — so this is coverage over correct code, not a fix. It is not redundant:
+  the two classes are separate declarations at three media bands each, and mutating
+  `.user-nav-col` to a bare 20rem left all five existing specs green and reddened
+  only this one.
+
 ## 0.77.1 — 2026-09-27
 
 ### Fixed
