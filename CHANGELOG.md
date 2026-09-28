@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.77.1 — 2026-09-27
+
 ### Fixed
 
 - **The engine header fits a phone.** `.user-nav-col` / `.user-nav-fit` capped their
