@@ -23,6 +23,7 @@ module Studio
     def index
       @entries = Studio::EmailCatalog.entries
       @uploads_available = Studio::EmailCatalog.uploads_available?
+      @uploads_blocked_reason = Studio::EmailCatalog.uploads_blocked_reason
 
       # The list renders every banner and subject AS THEY WOULD ARRIVE, which has
       # no answer until someone is receiving them.
@@ -44,6 +45,7 @@ module Studio
       @subject = Studio::EmailCatalog.preview_subject(@key)
       @preview_error = Studio::EmailCatalog.preview_error(@key)
       @uploads_available = Studio::EmailCatalog.uploads_available?
+      @uploads_blocked_reason = Studio::EmailCatalog.uploads_blocked_reason
 
       # WHO this is previewed as. The banner greets by name, so "what does this
       # email look like" has no answer until someone is receiving it — and the
@@ -241,8 +243,12 @@ module Studio
     def require_uploads
       return if Studio::EmailCatalog.uploads_available?
 
-      redirect_to admin_emails_path, status: :see_other,
-                  alert: "This app has no object storage configured, so email images can't be changed here yet."
+      alert = if Studio::EmailCatalog.uploads_blocked_reason == :no_public_url
+                "This app's storage has no public URL yet, so email images can't be changed here."
+              else
+                "This app has no object storage configured, so email images can't be changed here yet."
+              end
+      redirect_to admin_emails_path, status: :see_other, alert: alert
     end
 
     # Shown INSIDE the preview iframe when the builder is missing or raised.
