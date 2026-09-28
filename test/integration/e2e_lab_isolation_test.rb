@@ -52,21 +52,36 @@ class E2eLabIsolationTest < ActionDispatch::IntegrationTest
   TRIGGER = "[data-link-sidebar-trigger]"
   PANELS = "#studio-link-sidebar, #studio-link-sidebar-mobile"
 
+  # The one link LAB_SIDEBAR_SECTIONS declares, and the only thing on the page
+  # that ONLY that constant can put there.
+  DECLARED_LINK = "#studio-link-sidebar a[href='/']"
+
   def triggers = css_select(TRIGGER).length
 
   def panels = css_select(PANELS).length
+
+  def declared_links = css_select(DECLARED_LINK).length
 
   test "a lab page renders no sidebar after one that asked for it" do
     get "/lab/toast_over_banner"
     assert_response :success
     assert_equal 0, triggers, "the victim page starts clean — it declares no sections"
 
-    get "/lab/bar_stack?signed_in=1&admin=1&sidebar=1"
+    # SIGNED OUT, DELIBERATELY, and the reason is a measurement. `?signed_in=1`
+    # renders two triggers on its own: Studio::SidebarSections.standard prepends
+    # the engine's own "You" section for any signed-in view that has a
+    # profile_path, so a trigger count taken with signed_in=1 would be satisfied
+    # whether or not `?sidebar=1` still does anything. This request's sections can
+    # only come from LAB_SIDEBAR_SECTIONS, and the declared link is asserted
+    # rather than the count, so a lab that had lost the knob fails HERE instead of
+    # greening the leak assertion below.
+    get "/lab/bar_stack?sidebar=1"
     assert_response :success
-    assert_operator triggers, :>, 0,
-                    "?sidebar=1 no longer renders a link sidebar at all, so the assertion " \
-                    "below would pass over a lab that simply cannot exhibit the leak. The " \
-                    "knob has to still work for its absence elsewhere to mean anything."
+    assert_operator declared_links, :>, 0,
+                    "/lab/bar_stack?sidebar=1 no longer renders the host-declared link from " \
+                    "LAB_SIDEBAR_SECTIONS, so the assertion below would pass over a lab that " \
+                    "simply cannot exhibit the leak. The knob has to still work for its " \
+                    "absence elsewhere to mean anything."
 
     get "/lab/toast_over_banner"
     assert_response :success
@@ -84,7 +99,7 @@ class E2eLabIsolationTest < ActionDispatch::IntegrationTest
   test "any lab page can declare a sidebar for its own request" do
     get "/lab/toast_over_banner?sidebar=1"
     assert_response :success
-    assert_operator triggers, :>, 0,
+    assert_operator declared_links, :>, 0,
                     "?sidebar=1 is declared by a before_action on EVERY lab action, so a page " \
                     "other than bar_stack must be able to ask for it"
 

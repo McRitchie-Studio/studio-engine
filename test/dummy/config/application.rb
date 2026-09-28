@@ -77,3 +77,54 @@ module Dummy
     config.assets = assets
   end
 end
+
+# ---- THE DUMMY HOST'S LINK-SIDEBAR DECLARATION -------------------------------
+#
+# What a consuming app puts in config/initializers/studio.rb, in the CALLABLE
+# form docs/NEW_APP_SETUP.md and lib/studio.rb both show for dynamic sections.
+# The dummy has no initializers directory, so its host-wide Studio config lives
+# here.
+#
+# ONE ASSIGNMENT, AT BOOT — and that is the whole point of the shape.
+# `Studio.sidebar_sections` is a `mattr_accessor`: one slot for the entire
+# process. E2eLabController#bar_stack used to assign it PER REQUEST from
+# `?sidebar=1`, which made a process global the home of per-request state. One
+# visit to /lab/bar_stack?sidebar=1 then armed the link sidebar for every request
+# served afterwards; measured on the browser lane at a73edfe,
+# /lab/toast_over_banner rendered 2 trigger buttons and --nav-h 145px after that
+# visit against 0 and 125px before it, and no spec went red — Playwright's
+# file-name ordering happened to put a page that cleared the slot in between.
+# test/integration/e2e_lab_isolation_test.rb holds that seam now.
+#
+# The callable reads the sidebar the CURRENT request declared
+# (E2eLabController#lab_sidebar_sections, set by a before_action on every lab
+# action) and resolves through the engine's real
+# Studio::SidebarSections.resolve, so the lab still drives the host seam a
+# consumer drives — it just reads this request rather than the last one's
+# leftovers. Nothing writes the global after boot, so lab pages are independent
+# of both spec ORDER and, should `workers` ever rise above 1, of concurrent
+# requests landing in one Puma process.
+#
+# HERE AND NOT IN e2e/boot.rb, unlike `Studio.app_name` and
+# `Studio.theme_logos`. Those two are LANE-ONLY on purpose: several minitest
+# suites interpolate the app name into expected strings, so the lane's host
+# identity must not reach them. This one is the opposite — the minitest suite is
+# exactly where the leak is guarded, so the declaration has to load for the
+# dummy too. It changes nothing for any other controller: anything that does not
+# answer `lab_sidebar_sections` resolves to [], which is the engine's documented
+# default, and the suites that pin a specific sidebar
+# (test/integration/sidebar_navbar_render_test.rb) assign the accessor
+# themselves.
+Studio.sidebar_sections = lambda do |view|
+  controller = view.controller if view.respond_to?(:controller)
+  # FAIL TO THE DEFAULT, not to nil. Every other page in this dummy — the two
+  # PagesController landings, the geo and session lab hosts, the engine's own
+  # controllers — has no lab controller behind it and must resolve to the
+  # engine's documented default of NO sections. `Array()` covers the same ground
+  # on the other side: a lab request whose before_action has not run yet reads
+  # nil, and Studio::SidebarSections.resolve should not have to be tolerant of
+  # one.
+  next [] unless controller.respond_to?(:lab_sidebar_sections)
+
+  Array(controller.lab_sidebar_sections)
+end
