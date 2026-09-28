@@ -20,7 +20,7 @@
 #   1. Checks out this engine PR/commit into ./studio
 #   2. Checks out the consumer repo into ./<consumer>, at the LADDER RUNG that
 #      matches the engine ref under test (release↔release, main↔main, a PR
-#      against its own base) — see "Resolve the consumer ref" below
+#      against its own base), pinned to one SHA per run — see "consumer-refs" below
 #   3. Rewrites the consumer's Gemfile `studio-engine` entry to
 #      `path: "../studio"`
 #      (matches the local engine HEAD, not whatever tag the consumer pinned)
@@ -54,8 +54,108 @@ on:
     branches: [main, release]
 
 jobs:
+  # ONE COMMIT PER CONSUMER FOR THE WHOLE RUN.
+  #
+  # Every job below checks its consumer out at the SHA this job resolves, never at a
+  # branch name. A branch moves: a consumer merge landing mid-run once put the four hub
+  # shards on two different commits, and the executed-set gate went red on a union no
+  # single tree held, and `rerun --failed` re-resolved the branch so could not clear it.
+  # A re-run of failed shards now reuses this job's output, so it re-runs the same SHA.
+  consumer-refs:
+    name: Resolve consumer commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      shas: ${{ steps.consumer-ref.outputs.shas }}
+
+    steps:
+      - name: Mint consumer checkout token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.MCRITCHIE_AGENT_APP_ID }}
+          private-key: ${{ secrets.MCRITCHIE_AGENT_PRIVATE_KEY }}
+          owner: McRitchie-Studio
+
+      # THE CONSUMER IS CHECKED OUT AT THE SAME LADDER RUNG AS THE ENGINE REF UNDER
+      # TEST — never at whatever its default branch happens to be.
+      #
+      # A ref-less checkout takes the consumer's DEFAULT branch, which for every
+      # consumer is `main` = the LAST SHIPPED state. This lane then runs that tree's
+      # ENTIRE suite, hub-internal guards included — and some of those guards assert
+      # things about the hub's own CROSS-BRANCH state, which a stale checkout gets
+      # wrong for reasons that have nothing to do with the engine commit on trial.
+      #
+      # THAT PAIRING DEADLOCKED A RELEASE. On 2026-08-21, against engine release tip
+      # 15024aa2 (run 32455620696), two hub guards went red on an engine commit that
+      # broke neither of them:
+      #
+      #   · E2eQuarantineRatchetTest — "Expected 15 to be <= 12". The hub's
+      #     config/e2e_lane.yml carries `quarantined: 15` on `main` and `12` on
+      #     `release`, and the ratchet baselines off `origin/release` INSIDE this
+      #     checkout. So a `main` tree that merely LAGS `release` reads as a ceiling
+      #     RISE. It fires on every candidate that REPAIRS a quarantined spec — which
+      #     is to say on exactly the commits the ratchet exists to encourage.
+      #   · CiTestCommandTest's pin anti-vacuity assert — "Expected [] to not be
+      #     empty". Fixed on the hub's `accepted` by d620526f; absent from `main`.
+      #
+      # Neither red is reachable from the engine side, and the hub's `main` only
+      # advances through `bin/release ship` → which needs the candidate assembled →
+      # which needs the gem published → which needs THIS lane green. A closed loop,
+      # with `studio_engine 0.58.0` sitting unpublished inside it.
+      #
+      # THE RULE IS THE RUNG. Engine `release` is a release candidate and is tested
+      # against the consumer's `release` — they ship together. Engine `main` against
+      # the consumer's `main`. A pull request against the consumer branch matching the
+      # PR's BASE, because the base is the rung the engine change is joining. Anything
+      # off-ladder, or absent from a given consumer, falls back to that consumer's
+      # default branch rather than failing the checkout.
+      - name: Resolve each consumer to the commit every job checks out
+        id: consumer-ref
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          CANDIDATE: ${{ github.base_ref || github.ref_name }}
+          CONSUMER_REPOS: mcritchie-studio turf-monster mcritchie-industries
+        run: |
+          set -euo pipefail
+
+          shas="{}"
+          for CONSUMER_REPO in ${CONSUMER_REPOS}; do
+            # ONLY THE THREE LADDER RUNGS PAIR. An engine PR based on a feature branch
+            # takes the consumer's default branch, exactly as this lane always did, and a
+            # consumer that happens to carry a same-named branch is NOT a pairing.
+            ref=""
+            case "${CANDIDATE}" in
+              main|release|accepted)
+                if gh api "repos/McRitchie-Studio/${CONSUMER_REPO}/branches/${CANDIDATE}" --silent >/dev/null 2>&1; then
+                  ref="${CANDIDATE}"
+                else
+                  echo "::notice::${CONSUMER_REPO} has no '${CANDIDATE}' branch; pairing with its default branch"
+                fi
+                ;;
+              *)
+                echo "::notice::engine ref '${CANDIDATE}' is off-ladder; pairing ${CONSUMER_REPO} with its default branch"
+                ;;
+            esac
+
+            # An empty ref means the consumer's default branch.
+            if [ -z "${ref}" ]; then
+              ref="$(gh api "repos/McRitchie-Studio/${CONSUMER_REPO}" --jq .default_branch)"
+            fi
+            sha="$(gh api "repos/McRitchie-Studio/${CONSUMER_REPO}/commits/${ref}" --jq .sha)"
+            if ! [[ "${sha}" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::could not resolve ${CONSUMER_REPO} '${ref}' to a commit (got '${sha}')"
+              exit 1
+            fi
+            shas="$(jq -cn --argjson m "${shas}" --arg r "${CONSUMER_REPO}" --arg s "${sha}" '$m + {($r): $s}')"
+            echo "engine '${CANDIDATE}' -> ${CONSUMER_REPO} '${ref}' @ ${sha}"
+          done
+
+          echo "shas=${shas}" >> "${GITHUB_OUTPUT}"
+
   consumer-tests:
     name: ${{ matrix.consumer }} suite vs this engine${{ matrix.shard && format('(shard {0}/{1})', matrix.shard, matrix.shards) || '' }}
+    needs: consumer-refs
     strategy:
       fail-fast: false
       matrix:
@@ -159,70 +259,6 @@ jobs:
           private-key: ${{ secrets.MCRITCHIE_AGENT_PRIVATE_KEY }}
           owner: McRitchie-Studio
 
-      # THE CONSUMER IS CHECKED OUT AT THE SAME LADDER RUNG AS THE ENGINE REF UNDER
-      # TEST — never at whatever its default branch happens to be.
-      #
-      # A ref-less checkout takes the consumer's DEFAULT branch, which for every
-      # consumer is `main` = the LAST SHIPPED state. This lane then runs that tree's
-      # ENTIRE suite, hub-internal guards included — and some of those guards assert
-      # things about the hub's own CROSS-BRANCH state, which a stale checkout gets
-      # wrong for reasons that have nothing to do with the engine commit on trial.
-      #
-      # THAT PAIRING DEADLOCKED A RELEASE. On 2026-08-21, against engine release tip
-      # 15024aa2 (run 32455620696), two hub guards went red on an engine commit that
-      # broke neither of them:
-      #
-      #   · E2eQuarantineRatchetTest — "Expected 15 to be <= 12". The hub's
-      #     config/e2e_lane.yml carries `quarantined: 15` on `main` and `12` on
-      #     `release`, and the ratchet baselines off `origin/release` INSIDE this
-      #     checkout. So a `main` tree that merely LAGS `release` reads as a ceiling
-      #     RISE. It fires on every candidate that REPAIRS a quarantined spec — which
-      #     is to say on exactly the commits the ratchet exists to encourage.
-      #   · CiTestCommandTest's pin anti-vacuity assert — "Expected [] to not be
-      #     empty". Fixed on the hub's `accepted` by d620526f; absent from `main`.
-      #
-      # Neither red is reachable from the engine side, and the hub's `main` only
-      # advances through `bin/release ship` → which needs the candidate assembled →
-      # which needs the gem published → which needs THIS lane green. A closed loop,
-      # with `studio_engine 0.58.0` sitting unpublished inside it.
-      #
-      # THE RULE IS THE RUNG. Engine `release` is a release candidate and is tested
-      # against the consumer's `release` — they ship together. Engine `main` against
-      # the consumer's `main`. A pull request against the consumer branch matching the
-      # PR's BASE, because the base is the rung the engine change is joining. Anything
-      # off-ladder, or absent from a given consumer, falls back to that consumer's
-      # default branch rather than failing the checkout.
-      - name: Resolve the consumer ref to pair with this engine ref
-        id: consumer-ref
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          CANDIDATE: ${{ github.base_ref || github.ref_name }}
-          CONSUMER_REPO: ${{ matrix.repo }}
-        run: |
-          set -euo pipefail
-
-          # ONLY THE THREE LADDER RUNGS PAIR. An engine PR based on a feature branch
-          # takes the consumer's default branch, exactly as this lane always did, and a
-          # consumer that happens to carry a same-named branch is NOT a pairing.
-          ref=""
-          case "${CANDIDATE}" in
-            main|release|accepted)
-              if gh api "repos/McRitchie-Studio/${CONSUMER_REPO}/branches/${CANDIDATE}" --silent >/dev/null 2>&1; then
-                ref="${CANDIDATE}"
-              else
-                echo "::notice::${CONSUMER_REPO} has no '${CANDIDATE}' branch; pairing with its default branch"
-              fi
-              ;;
-            *)
-              echo "::notice::engine ref '${CANDIDATE}' is off-ladder; pairing ${CONSUMER_REPO} with its default branch"
-              ;;
-          esac
-
-          # An EMPTY ref is actions/checkout's "use the default branch", which is the
-          # fallback this lane wants: a consumer missing the rung must not fail hard.
-          echo "ref=${ref}" >> "${GITHUB_OUTPUT}"
-          echo "engine '${CANDIDATE}' -> ${CONSUMER_REPO} '${ref:-<default branch>}'"
-
       # fetch-depth: 0 IS LOAD-BEARING — do not "optimize" it back to the default.
       # The hub's e2e quarantine ratchet (test/lib/e2e_quarantine_ratchet_test.rb)
       # reads its baseline from `origin/release` inside THIS checkout; the default
@@ -237,7 +273,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: McRitchie-Studio/${{ matrix.repo }}
-          ref: ${{ steps.consumer-ref.outputs.ref }}
+          ref: ${{ fromJSON(needs.consumer-refs.outputs.shas)[matrix.repo] }}
           path: ${{ matrix.consumer }}
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
@@ -440,7 +476,7 @@ jobs:
     name: mcritchie_studio executed-set
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs: consumer-tests
+    needs: [consumer-refs, consumer-tests]
     if: always()
 
     steps:
@@ -452,47 +488,9 @@ jobs:
           private-key: ${{ secrets.MCRITCHIE_AGENT_PRIVATE_KEY }}
           owner: McRitchie-Studio
 
-      # The gate, its contract and the expected file set all live in the CONSUMER —
-      # and bin/rails-executed-set-check RE-DERIVES the expected file set from THIS
-      # tree. So this checkout has to stand on the same rung the shards ran on, or the
-      # gate audits one branch's receipts against another branch's file list and
-      # reports "drift" that is only ever two branches being two branches.
+      # The gate RE-DERIVES the expected file set from THIS tree, so it checks out the
+      # very commit the shards ran: the one consumer-refs resolved.
       #
-      # Same resolution as the lane above, and byte-identical to it by contract:
-      # test/lib/consumer_ci_ref_pairing_test.rb refuses a workflow whose two resolve
-      # steps have drifted apart. GitHub Actions has no YAML anchors, so a guarded
-      # duplicate is the honest cost.
-      - name: Resolve the consumer ref to pair with this engine ref
-        id: consumer-ref
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          CANDIDATE: ${{ github.base_ref || github.ref_name }}
-          CONSUMER_REPO: mcritchie-studio
-        run: |
-          set -euo pipefail
-
-          # ONLY THE THREE LADDER RUNGS PAIR. An engine PR based on a feature branch
-          # takes the consumer's default branch, exactly as this lane always did, and a
-          # consumer that happens to carry a same-named branch is NOT a pairing.
-          ref=""
-          case "${CANDIDATE}" in
-            main|release|accepted)
-              if gh api "repos/McRitchie-Studio/${CONSUMER_REPO}/branches/${CANDIDATE}" --silent >/dev/null 2>&1; then
-                ref="${CANDIDATE}"
-              else
-                echo "::notice::${CONSUMER_REPO} has no '${CANDIDATE}' branch; pairing with its default branch"
-              fi
-              ;;
-            *)
-              echo "::notice::engine ref '${CANDIDATE}' is off-ladder; pairing ${CONSUMER_REPO} with its default branch"
-              ;;
-          esac
-
-          # An EMPTY ref is actions/checkout's "use the default branch", which is the
-          # fallback this lane wants: a consumer missing the rung must not fail hard.
-          echo "ref=${ref}" >> "${GITHUB_OUTPUT}"
-          echo "engine '${CANDIDATE}' -> ${CONSUMER_REPO} '${ref:-<default branch>}'"
-
       # fetch-depth: 0 IS LOAD-BEARING HERE TOO, for a different reason than the lane
       # above: the step after the receipts download stands this checkout on the commit
       # the SHARDS ran, and that commit is normally an ANCESTOR of the branch tip. A
@@ -501,7 +499,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: McRitchie-Studio/mcritchie-studio
-          ref: ${{ steps.consumer-ref.outputs.ref }}
+          ref: ${{ fromJSON(needs.consumer-refs.outputs.shas)['mcritchie-studio'] }}
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
 
@@ -518,12 +516,11 @@ jobs:
           path: rails-reports
           merge-multiple: true
 
-      # THE RUNG IS NOT ENOUGH — THE COMMIT HAS TO MATCH TOO.
+      # THE RECEIPTS ARE THE LAST WORD ON THE COMMIT.
       #
-      # The resolve step above pins this job to the same LADDER RUNG the shards ran on.
-      # It cannot pin it to the same COMMIT, because a branch name is a moving target and
-      # the two jobs read it minutes apart: the shards resolve `accepted` when the matrix
-      # starts, and this job resolves it again after all four have finished.
+      # consumer-refs now pins this job and the shards to one SHA, so this step is
+      # normally a no-op. It stays as the check that the receipts agree with that SHA.
+      # Before the pin, each job re-read the branch minutes apart.
       #
       # MEASURED, and it deadlocked a release. Run 32495361932: the shards checked out hub
       # `accepted` at 15:02:17 and this job at 15:06:17. Hub PR #979 merged f9a440e5 at
