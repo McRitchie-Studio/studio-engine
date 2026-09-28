@@ -105,6 +105,42 @@ class E2eLabController < ActionController::Base
   helper_method :logged_in?, :root_path, :current_user, :admin?,
                 :geo_country, :geo_state, :geo_blocked?, :geo_override_active?
 
+  # EVERY ACTION DECLARES ITS OWN SIDEBAR, and it is declared as a local of the
+  # REQUEST rather than written into the engine's process-wide config.
+  #
+  # WHAT WENT WRONG WHEN IT WAS NOT. `Studio.sidebar_sections` is a
+  # `mattr_accessor` — ONE slot for the whole process — and #bar_stack used to
+  # assign it from `?sidebar=1` on the way past. So one visit to
+  # /lab/bar_stack?sidebar=1 armed the link sidebar for every request that
+  # followed, whatever that page declared. Measured on this lane at a73edfe:
+  # /lab/toast_over_banner served 2 trigger buttons, 2 slide-out panels and
+  # --nav-h 145px after that visit, against 0/0/125px before it.
+  #
+  # The browser lane never went red for it, which is the part worth remembering:
+  # Playwright walks e2e/ in FILE-NAME order, and nav_collapse.spec.js — which
+  # visits /lab/bar_stack with no `sidebar` param, clearing the slot — happens to
+  # sort between the contaminator and the victim. The lane was clean by
+  # alphabet. Run the two adjacent and every assertion still passes, so its own
+  # green check could not have reported this.
+  #
+  # THE DECLARATION IS A CALLABLE, registered once in test/dummy/config/
+  # application.rb, which is the form docs/NEW_APP_SETUP.md shows consumers
+  # using for dynamic sections. It resolves through the real
+  # Studio::SidebarSections.resolve on every render, so the lab still exercises
+  # the engine's actual host seam — it just reads this request instead of the
+  # last one's leftovers. Nothing here writes a process global, so the lab pages
+  # are genuinely order-independent and thread-independent, which is what
+  # playwright.config.js's `workers` note and
+  # test/integration/e2e_lab_isolation_test.rb now stand on.
+  before_action :declare_lab_sidebar_sections
+
+  # Read by the declared callable through `view.controller`. Public because
+  # `respond_to?` is how that callable tells a lab request from any other
+  # controller's; it is not an action — test/dummy/config/routes.rb draws the
+  # lab's routes one by one, so nothing reaches a controller method that has no
+  # route.
+  attr_reader :lab_sidebar_sections
+
   # Signed in ONLY where a page asked for it (#bar_stack sets @lab_signed_in).
   # Every other lab action leaves it nil, so they render the signed-out navbar
   # exactly as before — the profile pages set @user for the profile registry and
@@ -183,7 +219,6 @@ class E2eLabController < ActionController::Base
     @lab_devnet = params[:devnet].present?
     @lab_admin = params[:admin].present?
     @lab_balance = params[:balance].present?
-    Studio.sidebar_sections = params[:sidebar].present? ? LAB_SIDEBAR_SECTIONS : []
     render(:bar_stack)
   end
 
@@ -194,6 +229,18 @@ class E2eLabController < ActionController::Base
   LAB_SIDEBAR_SECTIONS = [
     { title: "Site", links: [{ label: "Home", href: "/", emoji: "🏠" }] }
   ].freeze
+
+  # `?sidebar=1` on ANY lab page, answered for that request alone. The header
+  # specs drive it on /lab/bar_stack; nothing stops another page asking, and
+  # nothing carries the answer past this request.
+  def declare_lab_sidebar_sections
+    @lab_sidebar_sections = params[:sidebar].present? ? LAB_SIDEBAR_SECTIONS : []
+  end
+  # PRIVATE by name rather than by a trailing `private` section: every public
+  # instance method on a controller is an action_method, and this file's public
+  # surface is deliberately the lab's routed actions plus the helpers it declares
+  # above. A trailing `private` here would swallow #up, which routes.rb draws.
+  private :declare_lab_sidebar_sections
 
   # The hold-to-confirm button, both levels.
   #
