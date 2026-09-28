@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.77.2 — 2026-09-28
+
 ### Fixed
 
 - **The browser lab stopped writing per-request state into the engine's process-wide
