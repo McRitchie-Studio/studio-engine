@@ -65,9 +65,9 @@ class SidebarNavbarRenderTest < ActiveSupport::TestCase
     { title: "Site", links: [{ label: "Home", href: "/", emoji: "🏠" }] }
   ].freeze
 
-  teardown do
-    Studio.sidebar_sections = []
-  end
+  # Restore the host's value (the dummy app's lambda), not a bare [].
+  setup { @prior_sidebar_sections = Studio.sidebar_sections }
+  teardown { Studio.sidebar_sections = @prior_sidebar_sections }
 
   test "navbar mounts trigger and panels when sections are declared" do
     Studio.sidebar_sections = SECTIONS
