@@ -64,10 +64,31 @@ const config = {
   testDir: "./e2e",
   timeout: 30_000,
   retries: 0,
-  // One worker. The lab pages are stateless, so this is not an isolation
-  // requirement — it is a determinism one. The paint spec samples animation
-  // frames, and frame scheduling on a loaded runner is exactly what a
-  // frame-sampling assertion is sensitive to.
+  // One worker, and the reason is DETERMINISM rather than isolation: the paint
+  // spec samples animation frames, and frame scheduling on a loaded runner is
+  // exactly what a frame-sampling assertion is sensitive to.
+  //
+  // THAT SENTENCE WAS FALSE ONCE AND NOTHING NOTICED, which is why it now names
+  // its guard instead of asserting itself. E2eLabController#bar_stack assigned
+  // `Studio.sidebar_sections` — a `mattr_accessor`, one slot for the whole Puma
+  // process — from `?sidebar=1` on the way past. Measured at a73edfe on one
+  // process: after a single /lab/bar_stack?sidebar=1, /lab/toast_over_banner
+  // served 2 link-sidebar triggers, 2 slide-out panels and --nav-h 145px, against
+  // 0/0/125px before it. The lane stayed green purely because Playwright walks
+  // e2e/ in FILE-NAME order and nav_collapse.spec.js, which clears the slot,
+  // sorts between the contaminator and the victim — run those two adjacent and
+  // every assertion still passes. So a comment claiming statelessness was
+  // arming whoever next raised this number, and the lane could not have told
+  // them.
+  //
+  // WHAT HOLDS IT NOW. The lab writes no process global per request — the sidebar
+  // is declared as a local of the request, and test/dummy/config/application.rb
+  // carries the argument. test/integration/e2e_lab_isolation_test.rb drives the
+  // order that broke AND sweeps every lab route the router knows, bare and with
+  // every knob, snapshotting all ~40 of Studio's accessors either side to refuse
+  // the next one written per request whatever it is called. Raising `workers` is a
+  // real option again — but read that file first, because a contaminated page is
+  // invisible from here.
   workers: 1,
   forbidOnly: !!process.env.CI,
   use: {

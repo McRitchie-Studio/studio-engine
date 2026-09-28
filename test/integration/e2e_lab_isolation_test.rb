@@ -56,6 +56,20 @@ class E2eLabIsolationTest < ActionDispatch::IntegrationTest
   # that ONLY that constant can put there.
   DECLARED_LINK = "#studio-link-sidebar a[href='/']"
 
+  # /lab/geo_settings is the one lab page that needs a SCHEMA, and the sweep below
+  # walks every lab route rather than a curated list — so the table has to exist
+  # here for the same reason e2e/boot.rb creates it for the browser lane. The REAL
+  # migration the gem ships, not a hand-written CREATE, matching the pattern
+  # test/integration/geo_gate_test.rb established.
+  def self.ensure_schema!
+    return if ActiveRecord::Base.connection.table_exists?(:studio_geo_settings)
+
+    require_relative "../../db/migrate/20260818120000_create_studio_geo_settings"
+    ActiveRecord::Migration.suppress_messages { CreateStudioGeoSettings.new.migrate(:up) }
+  end
+
+  def setup = self.class.ensure_schema!
+
   def triggers = css_select(TRIGGER).length
 
   def panels = css_select(PANELS).length
@@ -106,5 +120,94 @@ class E2eLabIsolationTest < ActionDispatch::IntegrationTest
     get "/lab/toast_over_banner"
     assert_response :success
     assert_equal 0, triggers, "and the next request is unaffected by that one"
+  end
+
+  # ---- THE GUARD THAT OUTLIVES THIS ONE ACCESSOR -----------------------------
+  #
+  # The two tests above pin `Studio.sidebar_sections`. This one pins the PROPERTY
+  # the incident was an instance of: serving a lab page must not write ANY of the
+  # engine's process-wide config. There are ~40 `mattr_accessor`s on Studio and the
+  # next one to be reached for per request will not be the sidebar.
+  #
+  # BY INSTRUMENTATION, NOT BY READING THE SOURCE. The obvious guard greps the lab
+  # controller and views for `Studio.<attr> =`, and it is the weaker of the two:
+  # it has to strip Ruby and ERB comments out of files that are mostly prose ABOUT
+  # these accessors, it only catches the spellings its regex anticipated, and it
+  # cannot see an in-place mutation (`Studio.auth_methods << :wallet`). Snapshotting
+  # the values and diffing them after the requests catches every spelling, catches
+  # mutation in place, and needs no opinion about comments.
+  #
+  # ENUMERATED FROM THE ROUTER AND FROM Studio ITSELF, both on purpose: a lab
+  # action added next month is swept without anyone remembering to add it here, and
+  # so is an accessor added to lib/studio.rb.
+  #
+  # EVERY PATH TWICE — bare, then with every knob the lane turns. A write can live
+  # inside a branch only a query parameter reaches, which is exactly where this one
+  # lived (`params[:sidebar].present? ? … : …`), so a bare sweep would have walked
+  # straight past it.
+  KNOBS = "signed_in=1&admin=1&devnet=1&sidebar=1&balance=1&subscribed=1" \
+          "&identity=long&birthday=stored&tab=countries&state=authenticated&fp=x&issued=1"
+
+  test "no lab request writes any Studio process global" do
+    paths = lab_paths
+    assert_operator paths.length, :>=, 15,
+                    "only #{paths.length} lab route(s) found — the router enumeration broke and " \
+                    "this test would be sweeping almost nothing"
+
+    before = studio_globals
+
+    paths.each do |path|
+      get path
+      assert_response :success, "GET #{path}"
+      get "#{path}?#{KNOBS}"
+      assert_response :success, "GET #{path}?#{KNOBS}"
+    end
+
+    after = studio_globals
+    changed = before.keys.select { |key| before[key] != after[key] }
+
+    assert_empty changed,
+                 "serving the lab changed Studio.#{changed.join(", Studio.")} — a process-wide " \
+                 "accessor written while handling a request. #{changed.map do |key|
+                   "#{key}: #{before[key]} -> #{after[key]}"
+                 end.join("; ")}. Studio's accessors are `mattr_accessor`s: one slot for the whole " \
+                 "process, shared by every later request and every Playwright worker. Declare the " \
+                 "value as a local of the request instead — test/dummy/config/application.rb shows " \
+                 "the shape, and the two tests above are what happened the last time one of these " \
+                 "was written per request."
+  end
+
+  private
+
+  # Every GET the browser lane can reach on E2eLabController, read off the router
+  # rather than listed, so a new lab action cannot quietly escape the sweep.
+  def lab_paths
+    Rails.application.routes.routes.filter_map do |route|
+      next unless route.defaults[:controller] == "e2e_lab"
+      next unless route.verb.to_s.include?("GET")
+
+      route.path.spec.to_s.sub(/\(\.:format\)\z/, "")
+    end.uniq.sort
+  end
+
+  # Every Studio accessor that has a writer, with its current value rendered as a
+  # string. `inspect` rather than the object: it separates a REASSIGNMENT from an
+  # unchanged value, and it also catches a collection mutated IN PLACE, where the
+  # before and after snapshots would otherwise be the same object and compare equal.
+  def studio_globals
+    Studio.singleton_methods(false)
+          .grep(/\A[a-z_][a-z_0-9]*=\z/)
+          .map { |writer| writer.to_s.chomp("=").to_sym }
+          .select { |reader| Studio.respond_to?(reader) }
+          .to_h do |reader|
+            # A reader that raises is not evidence of a write; record the failure so
+            # the diff stays stable across the two snapshots instead of erroring
+            # this test out on something it is not about.
+            [reader, begin
+              Studio.public_send(reader).inspect
+            rescue StandardError => e
+              "unreadable: #{e.class}"
+            end]
+          end
   end
 end
