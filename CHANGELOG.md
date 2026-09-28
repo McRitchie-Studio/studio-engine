@@ -4,6 +4,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **The engine header fits a phone.** `.user-nav-col` / `.user-nav-fit` capped their
+  two phone bands at a constant `14rem`/`15rem` — 224px is 57% of a 390px screen — on
+  a `flex-shrink-0` column, leaving the left column 166px for a 48px logo, its gap,
+  32px of padding and the app's name. Every flex item defaults to `min-width: auto`,
+  so the name could not truncate either: it drew across the gap and on top of the user
+  column beside it. The bands are now `min(14rem, 46vw)` and `min(15rem, 46vw)`, with
+  `min-w-0` on each flex item between the nav row and the title and `truncate` on the
+  two title spans. `min()` resolves to the plain rem at ~487px and ~522px, so the
+  768px band and every desktop width are unchanged; below ~344px the app name
+  truncates rather than spilling.
+  - **Consumers that render `layouts/_navbar` unforked inherit this on upgrade** —
+    `mcritchie-industries` and `acquisition-studio`. `mcritchie-studio` inlines its own
+    `<header>` and `turf-monster` forks the partial and declares its own
+    `.user-nav-col` widths, so each adopts the change separately.
+
 ## 0.77.0 — 2026-09-26
 
 ### Added

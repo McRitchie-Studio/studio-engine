@@ -705,7 +705,43 @@
 #   bridge unscoped -> 1 red (the host panel stays open), 1 green (its own close)
 # Re-derived on THIS tree with the lister, never by arithmetic:
 #   npx playwright test --list  -> 142 tests in 22 files
-total_specs: 142
+#
+# 2026-09-27: 142 -> 147, and a TWENTY-THIRD file. e2e/header_phone_width.spec.js
+# adds FIVE tests for the engine header at phone widths (header-fits-a-phone).
+#
+# WHAT ONLY A BROWSER COULD SEE HERE, since that is this lane's admission price.
+# The header's right column was a flex-shrink-0 constant of 14rem — 57% of a 390px
+# screen — so the app's own name had no room and, because every flex item defaults
+# to min-width: auto, could not truncate either. It drew ACROSS the gap and on top
+# of the user column beside it. The markup is byte-identical broken or fixed; the
+# widths are in an inline <style>; and the document reported
+# scrollWidth 390 / clientWidth 390 the entire time, because a box overflowing its
+# SIBLING's territory never reaches documentElement. Nothing but a real layout can
+# answer it.
+#
+# ABLATED THREE WAYS, one line at a time, each on a committed tree with the lab
+# server restarted between runs. The fix is three parts and they cover three
+# different widths, which is why one ablation was not enough to characterise it:
+#
+#   caps -> bare 14rem/15rem, min-w-0 kept       1 red (containment, at 390px)
+#     The page still does NOT scroll sideways — the min-w-0 chain lets the left
+#     column shrink — so the sideways-scroll spec stays green and only the
+#     containment one fires. Geometry confirmed changed: left column 166 vs 211
+#     at 390px, title 82 vs 107.3.
+#
+#   min-w-0 chain removed, caps kept             1 red (containment, at 320px)
+#     Green at 344px and up: `truncate` carries overflow: hidden, which gives a
+#     span an automatic minimum size of zero and stands in for min-w-0 while
+#     there is room. This ablation is what widened the containment spec from one
+#     width to six — against 390px alone it was green over half a missing fix.
+#
+#   400px band cap -> bare 15rem                 1 red (monotonicity, at 412px)
+#     "the app name is 84px wide at 412px but 107.3px at the narrower 390px".
+#     A wider phone showing less of the name, which is the regression this fix
+#     introduced at its first cut and the reason that spec exists.
+# Re-derived on THIS tree with the lister, never by arithmetic:
+#   npx playwright test --list  -> 147 tests in 23 files
+total_specs: 147
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -783,7 +819,14 @@ total_specs: 142
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 142
 # executed = total - devnet - allowed_skips = 142 - 0 - 0 = 142, so executed ==
 # total_specs and the equality assertion holds.
-executed: 142
+# Re-derived once more on THIS tree with the lister when the phone-width header specs
+# landed (header-fits-a-phone) — 5 tests in ONE new file:
+#   npx playwright test --list                                             -> 147 tests, 23 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 147
+# executed = total - devnet - allowed_skips = 147 - 0 - 0 = 147, so executed ==
+# total_specs and the equality assertion holds.
+executed: 147
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

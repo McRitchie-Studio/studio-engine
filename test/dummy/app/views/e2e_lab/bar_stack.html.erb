@@ -12,8 +12,9 @@
     and a header offset by a measured custom property look identical. Scrolled,
     the first is nailed to the viewport top and the second tracks a number that a
     ResizeObserver republishes a frame late. %>
-<%= render "studio/banners/stack" %>
-<%= render "layouts/navbar" %>
+<%= render "studio/banners/stack", devnet: @lab_devnet %>
+<% balance_html = @lab_balance ? capture { tag.span("◎ 12.3456 SOL", class: "whitespace-nowrap text-sm font-semibold") } : nil %>
+<%= render "layouts/navbar", balance_html: balance_html, show_logout_link: true %>
 
 <main class="p-8">
   <p data-test="lab-body">bar stack lab</p>
