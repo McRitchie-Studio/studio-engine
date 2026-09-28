@@ -76,14 +76,25 @@
   <% unless @uploads_available %>
     <div class="mb-6 rounded-xl border border-subtle bg-inset px-4 py-3">
       <p class="text-sm font-semibold text-heading">Read-only on this app</p>
-      <p class="text-sm text-body mt-1">
-        <%= Studio.app_name %> has no object storage configured, so the images below
-        can be viewed but not replaced yet. They are the shared defaults that ship
-        with the engine, and they are what this app is sending right now. Set
-        <code class="font-mono text-2xs bg-surface px-1.5 py-0.5 rounded">config.s3_bucket_prefix</code>
-        in <code class="font-mono text-2xs bg-surface px-1.5 py-0.5 rounded">config/initializers/studio.rb</code>
-        to turn on uploads.
-      </p>
+      <% if @uploads_blocked_reason == :no_public_url %>
+        <p class="text-sm text-body mt-1">
+          <%= Studio.app_name %> stores files where they cannot be served to an inbox yet,
+          so the images below can be viewed but not replaced. They are what this app is
+          sending right now. Set
+          <code class="font-mono text-2xs bg-surface px-1.5 py-0.5 rounded">config.s3_public_url</code>
+          in <code class="font-mono text-2xs bg-surface px-1.5 py-0.5 rounded">config/initializers/studio.rb</code>
+          to turn on uploads.
+        </p>
+      <% else %>
+        <p class="text-sm text-body mt-1">
+          <%= Studio.app_name %> has no object storage configured, so the images below
+          can be viewed but not replaced yet. They are the shared defaults that ship
+          with the engine, and they are what this app is sending right now. Set
+          <code class="font-mono text-2xs bg-surface px-1.5 py-0.5 rounded">config.s3_bucket_prefix</code>
+          in <code class="font-mono text-2xs bg-surface px-1.5 py-0.5 rounded">config/initializers/studio.rb</code>
+          to turn on uploads.
+        </p>
+      <% end %>
     </div>
   <% end %>
 

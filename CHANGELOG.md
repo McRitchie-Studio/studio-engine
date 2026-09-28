@@ -4,6 +4,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **An email banner stored on R2 with no public URL no longer breaks sign-in.**
+  With `Studio::S3` on an S3-compatible endpoint (Cloudflare R2) and no
+  `s3_public_url`, a banner upload on `/admin/emails` used to succeed, after which
+  `ImageCache#url` raised `NotConfigured` on every read: the magic-link sign-in
+  email, the newsletter and profile emails, and the orphan page all failed.
+  - `Studio::EmailCatalog.uploads_available?` is now false in that state, and the
+    new `uploads_blocked_reason` (`:no_storage` or `:no_public_url`) lets the page
+    name the setting that fixes it: `s3_public_url`, not `s3_bucket_prefix`.
+  - `EmailCatalog.url` degrades to `nil` when a stored image cannot be served, so
+    `resolved_url` and every host's `url(...) || its_own_asset` fall back to the
+    default banner. Other errors still raise, and `ImageCache#url` stays loud
+    everywhere else.
+  - The orphan page previews through the same safe read.
+  Apps on AWS, or on R2 with `s3_public_url` set, behave exactly as before.
+
 ## 0.77.3 — 2026-09-28
 
 ## 0.77.2 — 2026-09-28
