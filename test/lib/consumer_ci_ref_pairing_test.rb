@@ -47,6 +47,7 @@ require "open3"
 require "tmpdir"
 require "json"
 require "fileutils"
+require "digest"
 
 class ConsumerCiRefPairingTest < Minitest::Test
   ROOT = File.expand_path("../..", __dir__)
@@ -86,22 +87,27 @@ class ConsumerCiRefPairingTest < Minitest::Test
     all_steps.select { |_job, s| s["id"] == "consumer-ref" }
   end
 
+  # The one expression every consumer checkout must read its ref from.
+  RESOLVED_SHAS = "needs.consumer-refs.outputs.shas"
+
   # ==== [unit] the wiring ==============================================================
 
-  def test_unit_every_consumer_checkout_pins_a_ref
+  def test_unit_every_consumer_checkout_pins_the_resolved_sha
     consumer_checkouts = checkout_steps.select { |_job, s| s.dig("with", "repository").to_s.start_with?("McRitchie-Studio/") }
 
     refute_empty consumer_checkouts, "consumer-ci checks out no consumer at all — did the lane move?"
 
-    unpinned = consumer_checkouts.reject { |_job, s| s.dig("with", "ref").to_s.include?("steps.consumer-ref.outputs.ref") }
+    unpinned = consumer_checkouts.reject { |_job, s| s.dig("with", "ref").to_s.include?(RESOLVED_SHAS) }
 
     assert_empty unpinned.map { |job, s| "#{job}: #{s["name"]}" },
-                 "a consumer checkout carries no `ref:` wired to the resolve step, so it takes " \
-                 "that repo's DEFAULT branch. That is the exact shape of the 2026-08-21 deadlock: " \
-                 "the lane ran the hub's last-SHIPPED tree against a release-candidate engine, two " \
-                 "hub-internal guards went red about the hub's own cross-branch state, and the gem " \
-                 "publish those reds gated was the only thing that could have advanced the tree " \
-                 "they complained about. Pair the checkout to the rung; do not silence the guard."
+                 "a consumer checkout does not read its ref from #{RESOLVED_SHAS}. A branch name " \
+                 "(or no ref at all) is re-read by every shard minutes apart, so a consumer merge " \
+                 "mid-run puts the shards on different commits and the executed-set gate goes red."
+
+    consumer_checkouts.map(&:first).uniq.each do |job|
+      assert_includes Array(workflow.dig("jobs", job, "needs")), "consumer-refs",
+                      "#{job} checks a consumer out but does not `needs: consumer-refs`"
+    end
   end
 
   def test_unit_the_engine_checkout_stays_unpinned
@@ -126,54 +132,72 @@ class ConsumerCiRefPairingTest < Minitest::Test
                  "closed without the first and lies without the second."
   end
 
-  def test_unit_both_resolve_steps_are_byte_identical
-    assert_equal 2, resolve_steps.length,
-                 "expected exactly two `consumer-ref` resolve steps — one per job that checks a " \
-                 "consumer out. Found #{resolve_steps.length}: #{resolve_steps.map(&:first).inspect}."
+  def test_unit_one_job_resolves_every_consumer_once
+    assert_equal ["consumer-refs"], resolve_steps.map(&:first),
+                 "exactly one `consumer-ref` resolve step, in the consumer-refs job. A resolve step " \
+                 "per job (or per shard) re-reads a moving branch and splits the run across commits."
 
-    scripts = resolve_steps.map { |_job, s| s["run"] }.uniq
-    assert_equal 1, scripts.length,
-                 "the two resolve steps have DRIFTED apart. GitHub Actions has no YAML anchors, so " \
-                 "the duplicate is deliberate — but a duplicate nobody compares is how the sharded " \
-                 "lane and its executed-set gate end up auditing two different branches against each " \
-                 "other. Keep them byte-identical or give them a shared composite action."
+    step = resolve_steps.first.last
+    assert_equal "${{ github.base_ref || github.ref_name }}", step.dig("env", "CANDIDATE"),
+                 "the resolve step no longer derives the candidate from the PR base (falling back " \
+                 "to the pushed branch). Those two together ARE the rung under test."
+    assert_equal CONSUMER_REPOS.sort, step.dig("env", "CONSUMER_REPOS").split.sort,
+                 "consumer-refs must resolve every consumer the matrix checks out"
 
-    resolve_steps.each do |job, step|
-      assert_equal "${{ github.base_ref || github.ref_name }}", step.dig("env", "CANDIDATE"),
-                   "#{job}'s resolve step no longer derives the candidate from the PR base (falling " \
-                   "back to the pushed branch). Those two together ARE the rung under test."
-    end
+    matrix_repos = workflow.dig("jobs", "consumer-tests", "strategy", "matrix", "include").map { |e| e["repo"] }.uniq
+    assert_equal CONSUMER_REPOS.sort, matrix_repos.sort,
+                 "the matrix and consumer-refs disagree on the consumers; a repo missing from " \
+                 "consumer-refs would check out an empty ref"
+
+    assert_equal "${{ steps.consumer-ref.outputs.shas }}",
+                 workflow.dig("jobs", "consumer-refs", "outputs", "shas"),
+                 "consumer-refs must export the resolved map as its `shas` job output"
   end
 
-  def test_unit_the_gate_job_pairs_with_the_shards_it_audits
-    gate = resolve_steps.find { |job, _s| job == "hub-executed-set" }
-    refute_nil gate, "the executed-set gate no longer resolves a consumer ref"
+  def test_unit_the_gate_job_audits_the_hub_commit_the_shards_ran
+    gate = checkout_steps.find do |job, s|
+      job == "hub-executed-set" && s.dig("with", "repository").to_s.end_with?("mcritchie-studio")
+    end
+    refute_nil gate, "the executed-set gate no longer checks the hub out"
 
-    assert_equal "mcritchie-studio", gate.last.dig("env", "CONSUMER_REPO"),
+    assert_equal "${{ fromJSON(#{RESOLVED_SHAS})['mcritchie-studio'] }}", gate.last.dig("with", "ref"),
                  "bin/rails-executed-set-check RE-DERIVES the expected file set from the tree this " \
-                 "job checks out. Point it at a different repo or rung than the shards ran on and it " \
-                 "reports drift that is only ever two branches being two branches."
+                 "job checks out, so it must be the hub commit the shards ran."
   end
 
   # ==== [integration] the shipped script, executed ======================================
+
+  # The stub reports this as every consumer's default branch, so a default-branch fallback
+  # is distinguishable from a `main` pairing.
+  DEFAULT_BRANCH = "trunk"
+
+  def fake_sha(repo, ref) = Digest::SHA1.hexdigest("#{repo}:#{ref}")
 
   def resolve_script
     @resolve_script ||= resolve_steps.first.last.fetch("run")
   end
 
-  # Runs the REAL `run:` text with a stubbed `gh`, and returns what it wrote to GITHUB_OUTPUT.
-  def resolve(candidate:, consumer_repo:, existing_branches:)
+  # Runs the REAL `run:` text with a stubbed `gh`; returns [status, shas-map].
+  def run_resolver(candidate:, repos:, existing_branches:, unresolvable: [])
     Dir.mktmpdir do |dir|
       stub = File.join(dir, "gh")
       File.write(stub, <<~STUB)
-        #!/bin/sh
-        # $1 = api, $2 = repos/McRitchie-Studio/<repo>/branches/<branch>
-        repo=$(echo "$2" | cut -d/ -f3)
-        branch=$(echo "$2" | cut -d/ -f5-)
-        case " $STUB_BRANCHES " in
-          *" ${repo}:${branch} "*) exit 0 ;;
-          *) exit 1 ;;
-        esac
+        #!/usr/bin/env ruby
+        require "digest"
+        path = ARGV[1].to_s.split("/")
+        repo = path[2]
+        case path[3]
+        when "branches"
+          exit(ENV.fetch("STUB_BRANCHES").split.include?("\#{repo}:\#{path[4..].join("/")}") ? 0 : 1)
+        when "commits"
+          ref = path[4..].join("/")
+          exit 1 if ENV.fetch("STUB_UNRESOLVABLE").split.include?(repo)
+          puts Digest::SHA1.hexdigest("\#{repo}:\#{ref}")
+        when nil
+          puts "#{DEFAULT_BRANCH}"
+        else
+          exit 2
+        end
       STUB
       File.chmod(0o755, stub)
 
@@ -183,19 +207,28 @@ class ConsumerCiRefPairingTest < Minitest::Test
       env = {
         "PATH" => "#{dir}:#{ENV.fetch("PATH")}",
         "CANDIDATE" => candidate,
-        "CONSUMER_REPO" => consumer_repo,
+        "CONSUMER_REPOS" => repos.join(" "),
         "GH_TOKEN" => "stub-token-not-a-real-secret",
         "GITHUB_OUTPUT" => out_file,
-        "STUB_BRANCHES" => existing_branches.map { |b| "#{consumer_repo}:#{b}" }.join(" ")
+        "STUB_BRANCHES" => repos.product(existing_branches).map { |r, b| "#{r}:#{b}" }.join(" "),
+        "STUB_UNRESOLVABLE" => unresolvable.join(" ")
       }
 
       _stdout, stderr, status = Open3.capture3(env, "bash", "-c", resolve_script, unsetenv_others: true)
-      assert status.success?, "the resolve script exited #{status.exitstatus}: #{stderr}"
-
-      line = File.read(out_file).lines.map(&:strip).find { |l| l.start_with?("ref=") }
-      refute_nil line, "the resolve script wrote no `ref=` to GITHUB_OUTPUT"
-      line.delete_prefix("ref=")
+      line = File.read(out_file).lines.map(&:strip).find { |l| l.start_with?("shas=") }
+      [status, line && JSON.parse(line.delete_prefix("shas=")), stderr]
     end
+  end
+
+  # The branch whose commit the resolver pinned for one consumer ("" = default branch).
+  def resolve(candidate:, consumer_repo:, existing_branches:)
+    status, shas, stderr = run_resolver(candidate: candidate, repos: [consumer_repo], existing_branches: existing_branches)
+    assert status.success?, "the resolve script exited #{status.exitstatus}: #{stderr}"
+    refute_nil shas, "the resolve script wrote no `shas=` to GITHUB_OUTPUT"
+
+    sha = shas.fetch(consumer_repo)
+    ([DEFAULT_BRANCH] + LADDER).find { |ref| fake_sha(consumer_repo, ref) == sha }
+                               .then { |ref| ref == DEFAULT_BRANCH ? "" : ref }
   end
 
   def test_integration_every_trigger_context_pairs_with_every_consumer
@@ -213,17 +246,13 @@ class ConsumerCiRefPairingTest < Minitest::Test
   end
 
   def test_integration_a_missing_rung_degrades_to_the_default_branch
-    # THE HARD CONSTRAINT: a consumer that lacks the rung must fall back, never fail the
-    # checkout. A hard failure here takes a whole consumer lane down over a branch that was
-    # simply never created — and it would do it on the release push, the worst possible moment.
+    # A consumer that lacks the rung must fall back to its default branch, never fail the run.
     CONSUMER_REPOS.each do |repo|
       LADDER.each do |rung|
         without = LADDER - [rung]
 
         assert_equal "", resolve(candidate: rung, consumer_repo: repo, existing_branches: without),
-                     "#{repo} without a `#{rung}` branch must fall back to its DEFAULT branch " \
-                     "(empty ref), not pin a ref that does not exist. actions/checkout fails hard " \
-                     "on a missing ref, and this lane must degrade instead."
+                     "#{repo} without a `#{rung}` branch must fall back to its DEFAULT branch."
 
         assert_equal rung, resolve(candidate: rung, consumer_repo: repo, existing_branches: [rung]),
                      "#{repo} WITH a `#{rung}` branch must pair with it."
@@ -232,16 +261,31 @@ class ConsumerCiRefPairingTest < Minitest::Test
   end
 
   def test_integration_an_off_ladder_branch_never_pairs_even_when_it_exists
-    # A consumer may legitimately carry a branch whose NAME matches an engine feature branch —
-    # two agents naming the same task the same thing. That coincidence is not a pairing, and
-    # the lane must not let a stray branch decide which tree a release candidate is tested
-    # against. The allowlist is checked BEFORE the branch lookup for exactly this reason.
+    # A consumer branch whose NAME matches an engine feature branch is a coincidence, not a
+    # pairing. The allowlist is checked BEFORE the branch lookup for exactly this reason.
     stray = "feat/break-consumer-lane-deadlock"
 
     assert_equal "", resolve(candidate: stray, consumer_repo: "mcritchie-studio",
                              existing_branches: LADDER + [stray]),
                  "an off-ladder branch paired just because the consumer happened to have one. " \
                  "Only #{LADDER.join(", ")} may pair; everything else takes the default branch."
+  end
+
+  def test_integration_one_run_emits_a_full_sha_for_every_consumer
+    status, shas, stderr = run_resolver(candidate: "accepted", repos: CONSUMER_REPOS, existing_branches: LADDER)
+    assert status.success?, stderr
+
+    assert_equal CONSUMER_REPOS.to_h { |r| [r, fake_sha(r, "accepted")] }, shas,
+                 "the job output must map every consumer to the full 40-hex SHA of its rung"
+  end
+
+  def test_integration_an_unresolvable_commit_fails_the_run_rather_than_emitting_a_branch
+    # An empty or non-SHA ref would silently turn back into a branch checkout per shard.
+    status, shas, = run_resolver(candidate: "accepted", repos: CONSUMER_REPOS, existing_branches: LADDER,
+                                 unresolvable: ["turf-monster"])
+
+    refute status.success?, "a consumer whose commit cannot be resolved must fail consumer-refs"
+    assert_nil shas, "no partial map may reach GITHUB_OUTPUT"
   end
 
   # ==== the RUNG is not enough — the COMMIT has to match too ===========================

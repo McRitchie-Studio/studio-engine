@@ -142,8 +142,8 @@ class ConsumerCiShardContractTest < Minitest::Test
                  "the gate must carry `if: always()`. On `needs:` alone a red shard SKIPS it, " \
                  "and a skipped required check does not report failure — so the gate goes " \
                  "quiet in exactly the runs where a shrunken lane would show up."
-    assert_equal "consumer-tests", gate["needs"].to_s,
-                 "the gate must `needs: consumer-tests`, or it runs before the receipts exist"
+    assert_includes Array(gate["needs"]), "consumer-tests",
+                    "the gate must `needs: consumer-tests`, or it runs before the receipts exist"
     assert(gate["steps"].any? { |s| s["run"].to_s.include?("rails-executed-set-check") },
            "the gate job no longer runs bin/rails-executed-set-check")
   end
