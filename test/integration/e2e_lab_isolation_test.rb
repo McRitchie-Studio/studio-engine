@@ -138,7 +138,9 @@ class E2eLabIsolationTest < ActionDispatch::IntegrationTest
   #
   # The two tests above pin `Studio.sidebar_sections`. This one pins the PROPERTY
   # the incident was an instance of: serving a lab page must not write ANY of the
-  # engine's process-wide config. There are ~40 `mattr_accessor`s on Studio and the
+  # engine's process-wide config. lib/studio.rb declares 73 `mattr_accessor`s
+  # (counted 2026-09-28; studio_globals below snapshots 74 writable accessors,
+  # the extra being the hand-written magic_link_store writer) and the
   # next one to be reached for per request will not be the sidebar.
   #
   # BY INSTRUMENTATION, NOT BY READING THE SOURCE. The obvious guard greps the lab

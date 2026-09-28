@@ -85,10 +85,10 @@ const config = {
   // is declared as a local of the request, and test/dummy/config/application.rb
   // carries the argument. test/integration/e2e_lab_isolation_test.rb drives the
   // order that broke AND sweeps every lab route the router knows, bare and with
-  // every knob, snapshotting all ~40 of Studio's accessors either side to refuse
-  // the next one written per request whatever it is called. Raising `workers` is a
-  // real option again — but read that file first, because a contaminated page is
-  // invisible from here.
+  // every knob, snapshotting every one of Studio's writable accessors either
+  // side (74 of them on 2026-09-28) to refuse the next one written per request
+  // whatever it is called. Raising `workers` is a real option again — but read
+  // that file first, because a contaminated page is invisible from here.
   workers: 1,
   forbidOnly: !!process.env.CI,
   use: {
