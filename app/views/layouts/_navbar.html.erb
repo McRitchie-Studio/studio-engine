@@ -170,7 +170,7 @@
   <%# Mobile sub-navbar: compact row hidden on desktop — Studio.navbar_links on the left %>
   <div class="flex md:hidden items-center gap-3 px-4 py-1.5 border-t border-subtle bg-surface-alt">
     <% if navbar_links.any? %>
-    <nav aria-label="Main" class="flex items-center gap-3 min-w-0 overflow-x-auto">
+    <nav aria-label="Main" class="flex items-center gap-3 overflow-x-auto">
       <% navbar_links.each do |link| %>
       <%= studio_navbar_link_tag(link, size: "text-xs") %>
       <% end %>
