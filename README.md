@@ -583,6 +583,34 @@ undefined, so mount `studio/modals/host` before writing a trigger.
 Full contract, including what the partial may assume: the doc comment at the top
 of `app/views/style/_host.html.erb`.
 
+### Navigation — `Studio.sidebar_sections` and `Studio.navbar_links`
+
+Two seams, both empty by default, so the navbar is unchanged until an app opts in.
+
+- `sidebar_sections` fills the slide-out link sidebar (the cog trigger in the icon
+  rail). Rules: `lib/studio/sidebar_sections.rb`.
+- `navbar_links` fills the navbar's own link slots: the desktop bar beside the
+  logo and the phone row under it. Rules: `lib/studio/navbar_links.rb`.
+
+```ruby
+Studio.configure do |config|
+  # An Array, or a callable receiving the view (so a badge can read current_user).
+  config.navbar_links = ->(view) {
+    [ { label: "Contests", href: view.contests_path, active: %r{\A/contests} },
+      { label: "Rank", href: "/rank",
+        badge: (view.logged_in? ? "##{view.current_user.rank}" : nil) } ]
+  }
+end
+```
+
+- `label:` and `href:` are required; both are escaped.
+- `active:` is `true`/`false`, a Regexp, or a callable taking `request.path`.
+  Omitted, a link is active when the path equals its href's path. The active
+  link gets `aria-current="page"` and the primary tone.
+- `badge:` is optional short text, such as `"#12"`, shown as a pill in the link.
+- A bad entry raises `Studio::NavbarLinks::InvalidLink` naming its index: at
+  assignment for a static Array, at render for a callable.
+
 ### User nav slots
 
 `components/_user_nav.html.erb` renders the right-side navbar user section.

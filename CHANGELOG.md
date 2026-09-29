@@ -4,6 +4,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`Studio.navbar_links` puts app links in the engine navbar.** An Array, or a
+  callable receiving the view, of `{ label:, href:, active:, badge: }` renders in
+  the desktop bar and the phone row, with `aria-current` on the active link and
+  an optional badge such as `"#12"`. An app that registers nothing renders the
+  same navbar bytes as before. See the README, *Navigation*.
+
 ## 0.77.4 — 2026-09-28
 
 ### Fixed
