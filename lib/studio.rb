@@ -12,6 +12,7 @@ require "studio/js_literal"
 require "studio/js_identifier"
 require "studio/partial_block"
 require "studio/sidebar_sections"
+require "studio/navbar_links"
 require "studio/profile_sections"
 require "studio/profile_image"
 require "studio/oauth_identity"
@@ -173,6 +174,23 @@ module Studio
   #     }
   #   end
   mattr_accessor :sidebar_sections, default: []
+
+  # ---- Navbar links ----
+  # Links for the engine navbar's desktop bar and phone row. The default []
+  # renders nothing, so the navbar stays byte-identical until an app opts in.
+  # An Array, or a callable receiving the view, of
+  # { label:, href:, active: (bool, Regexp or ->(path)), badge: (optional) }.
+  # Rules: lib/studio/navbar_links.rb.
+  #
+  #   config.navbar_links = ->(view) {
+  #     [ { label: "Contests", href: view.contests_path, active: %r{\A/contests} },
+  #       { label: "Rank", href: "/rank", badge: ("#12" if view.logged_in?) } ] }
+  mattr_reader :navbar_links, default: []
+
+  def self.navbar_links=(links)
+    NavbarLinks.validate!(links)
+    @@navbar_links = links
+  end
 
   # ---- The shared profile page (/profile) ----
   # The rows that make up /profile. `nil` — the default — means "the engine's
@@ -875,6 +893,11 @@ module Studio
   # viewers. Rendering gates on `.any?`, so [] keeps the navbar untouched.
   def self.sidebar_sections_for(view)
     SidebarSections.resolve(sidebar_sections, view)
+  end
+
+  # Navbar links resolved for a view context (lib/studio/navbar_links.rb).
+  def self.navbar_links_for(view)
+    NavbarLinks.resolve(navbar_links, view)
   end
 
   # The engine's standard /profile rows. Hosts compose against this rather than
