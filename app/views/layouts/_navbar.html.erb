@@ -26,6 +26,9 @@
     Preview renders skip it too: the /admin/navbar page renders this partial
     repeatedly and the panels carry page-unique ids. %>
 <% sidebar_active = !is_preview && respond_to?(:studio_sidebar?) && studio_sidebar? %>
+<%# Studio.navbar_links: links for the desktop bar and phone row.
+    Empty by default, which renders the same bytes as before. %>
+<% navbar_links = respond_to?(:studio_navbar_links) ? studio_navbar_links : [] %>
 <% if sidebar_active %>
   <% sidebar_trigger_desktop = capture { render "components/link_sidebar_trigger", class_name: "hidden md:inline-flex" } %>
   <% extra_icons_html = safe_join([extra_icons_html, sidebar_trigger_desktop].compact) %>
@@ -141,8 +144,11 @@
               spans drawing outside it, which is the bug rather than the fix. %>
           <h1 class="nav-title font-extrabold text-heading tracking-tight min-w-0"><span class="truncate"><%= prefix %></span><span class="text-primary truncate"><%= last_word %></span></h1>
         <% end %>
-        <%# Desktop nav — apps should override this partial to add links here %>
-        <nav class="hidden md:flex items-center gap-4">
+        <%# Desktop nav — Studio.navbar_links %>
+        <nav class="hidden md:flex items-center gap-4"<%= ' aria-label="Main"'.html_safe if navbar_links.any? %>>
+          <% navbar_links.each do |link| %>
+          <%= studio_navbar_link_tag(link, size: "text-sm") %>
+          <% end %>
         </nav>
       </div>
     </div>
@@ -161,8 +167,15 @@
       <% end %>
     </div>
   </div>
-  <%# Mobile sub-navbar: compact row hidden on desktop — apps should override to add links %>
+  <%# Mobile sub-navbar: compact row hidden on desktop — Studio.navbar_links on the left %>
   <div class="flex md:hidden items-center gap-3 px-4 py-1.5 border-t border-subtle bg-surface-alt">
+    <% if navbar_links.any? %>
+    <nav aria-label="Main" class="flex items-center gap-3 min-w-0 overflow-x-auto">
+      <% navbar_links.each do |link| %>
+      <%= studio_navbar_link_tag(link, size: "text-xs") %>
+      <% end %>
+    </nav>
+    <% end %>
     <span class="ml-auto flex items-center gap-3">
       <%= render "components/link_sidebar_trigger" if sidebar_active %>
       <%= render "components/admin_dropdown" unless sidebar_active && studio_sidebar_replaces_admin_menu? %>
