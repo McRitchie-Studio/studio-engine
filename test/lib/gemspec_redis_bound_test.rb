@@ -8,6 +8,7 @@
 # to load (Cyvasse shipped live chat broken that way). This reads the gemspec
 # itself, so it fails if the ceiling is dropped or widened past 5.x.
 
+require "bundler/setup"
 require "minitest/autorun"
 require "rubygems"
 
