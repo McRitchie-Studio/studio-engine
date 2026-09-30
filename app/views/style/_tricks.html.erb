@@ -90,7 +90,7 @@
             locals: { klass: ".badge", usage: %(<span class="badge">Neutral</span>) } do %>
         <div class="flex flex-wrap items-center justify-center gap-2">
           <span class="badge text-body">Neutral</span>
-          <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">Success</span>
+          <span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">Success</span>
           <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">Warning</span>
           <span class="badge" style="color: var(--color-danger); border-color: var(--color-danger)">Danger</span>
         </div>
@@ -174,7 +174,7 @@
       <%= render layout: "style/specimen",
             locals: { klass: "in a status badge",
                       usage: %(<span class="badge">Shipped ) + erb.call("at_time_tag(release.shipped_at)") + "</span>" } do %>
-        <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">Shipped <%= at_time_tag(42.minutes.ago) %></span>
+        <span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">Shipped <%= at_time_tag(42.minutes.ago) %></span>
       <% end %>
     </div>
   </section>
@@ -442,7 +442,7 @@
       <div class="flex flex-wrap items-center gap-3">
         <h3 class="text-xl font-bold text-heading">Leveling</h3>
         <% if leveling_on %>
-          <span class="badge" style="color: var(--color-success); border-color: var(--color-success)">enabled on this app</span>
+          <span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">enabled on this app</span>
         <% else %>
           <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">disabled on this app</span>
         <% end %>

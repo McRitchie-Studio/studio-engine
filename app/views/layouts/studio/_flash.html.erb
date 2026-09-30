@@ -121,7 +121,7 @@
         </template>
         <template x-if="!toast.image">
           <div class="w-10 h-10 rounded-full flex items-center justify-center bg-inset shrink-0" style="margin-top: 2px;">
-            <svg x-show="toast.type === 'notice'" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" style="color: var(--color-success)" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <svg x-show="toast.type === 'notice'" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" style="color: var(--color-success-ink)" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
             </svg>
             <svg x-show="toast.type !== 'notice'" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" style="color: var(--color-danger)" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">

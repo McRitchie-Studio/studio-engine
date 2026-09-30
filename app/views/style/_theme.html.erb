@@ -189,6 +189,7 @@
         updatePreview() {
           var d = document.documentElement.style;
           d.setProperty('--color-cta', this.colors.primary);
+          d.setProperty('--color-cta-fill', this.colors.primary);
           // btn-success paints --color-success-fill, the server's AA shade of the
           // green; the preview shows the raw pick until a save re-derives it.
           if (this.colors.success) { d.setProperty('--color-success', this.colors.success); d.setProperty('--color-success-fill', this.colors.success); }

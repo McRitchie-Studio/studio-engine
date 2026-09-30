@@ -81,13 +81,13 @@ module Studio
         "--color-border"         => ColorScale.with_opacity(border_rgb, 0.2),
         "--color-border-strong"  => ColorScale.with_opacity(border_rgb, 0.4),
         "--color-shadow"         => "transparent",
-        # The CTA and success FILLS carry a white label (btn-primary,
-        # btn-success, btn-secondary, the navbar level bar), so they are
-        # derived for it; see #cta_fill and #white_label_fill.
-        "--color-cta"            => cta_fill(primary),
+        # --color-cta and --color-success stay the brand colours: apps also
+        # paint them as TEXT on dark surfaces, where a darker shade would lose
+        # contrast. The button FILLS under a white label are separate, derived
+        # vars: see #fill_vars.
+        "--color-cta"            => primary,
         "--color-cta-hover"      => cta_hover(primary),
         "--color-success"        => success,
-        "--color-success-fill"   => white_label_fill(success),
         "--color-warning"        => warning,
         "--color-danger"         => danger,
         # THE DANGER *INK*, which is not the danger *colour*. --color-danger is a
@@ -115,7 +115,7 @@ module Studio
         "--color-warning-ink"    => status_ink(warning, surfaces, direction: :lighten),
         "--color-success-ink"    => status_ink(success, surfaces, direction: :lighten),
         "--color-accent"         => colors[:accent] || "#F72585"
-      }
+      }.merge(fill_vars(primary, success))
     end
 
     # Every dark-mode background a text var can sit on (page, surface,
@@ -189,17 +189,25 @@ module Studio
       contrast_ink(color, direction: :darken, start: 0.0, target: WHITE_LABEL_TARGET, against: ["#ffffff"])
     end
 
-    # --color-cta is the fill of btn-primary under a white label. When the app
-    # CONFIGURED its primary, that colour is the fill as-is: a brand primary is a
-    # design decision the app pairs its label with (mcritchie-industries draws a
-    # navy label on its orange, which a darkened fill would drop to 3.3:1), and
-    # an app that wants another shade sets --color-cta itself (cyvasse does).
-    # The engine's OWN default primary is the engine's to make accessible:
-    # #8E82FE is 3.1:1 under white, so an app that never chose a primary gets
-    # the AA shade of it instead. --color-primary and its palette stay the
-    # default violet either way; only the fill moves.
-    def cta_fill(primary)
-      primary.to_s.casecmp?(DEFAULT_PRIMARY) ? white_label_fill(primary) : primary
+    # The FILLS that carry a white label, the same in both modes (a button's
+    # label is white on either theme):
+    #
+    #   --color-success-fill  btn-success and btn-secondary's default. The
+    #                         success colour's AA shade: the configured green
+    #                         itself when it already passes, darker when not.
+    #   --color-cta-fill      btn-primary, btn-outline's hover and the user
+    #                         nav's level bar. Emitted ONLY while the app leaves
+    #                         its primary at the engine default (#8E82FE, 3.1:1
+    #                         under white), which is the engine's to make
+    #                         accessible. A CONFIGURED primary emits no fill, so
+    #                         those rules fall back to var(--color-cta), the
+    #                         app's own choice: mcritchie-industries pairs a navy
+    #                         label with its orange (a darkened fill would drop it
+    #                         to 3.3:1), and cyvasse sets --color-cta itself.
+    def fill_vars(primary, success)
+      vars = { "--color-success-fill" => white_label_fill(success) }
+      vars["--color-cta-fill"] = white_label_fill(primary) if primary.to_s.casecmp?(DEFAULT_PRIMARY)
+      vars
     end
 
     # The hover fill is always derived, so it is always held to AA under white:
@@ -273,10 +281,9 @@ module Studio
         "--color-border"         => ColorScale.darken(light_base, 0.08),
         "--color-border-strong"  => ColorScale.darken(light_base, 0.15),
         "--color-shadow"         => "rgba(0,0,0,0.05)",
-        "--color-cta"            => cta_fill(primary),
+        "--color-cta"            => primary,
         "--color-cta-hover"      => cta_hover(primary),
         "--color-success"        => success,
-        "--color-success-fill"   => white_label_fill(success),
         "--color-warning"        => warning,
         "--color-danger"         => danger,
         # THE DANGER *INK*, which is not the danger *colour*. --color-danger is a
@@ -300,7 +307,7 @@ module Studio
         "--color-warning-ink"    => status_ink(warning, surfaces, direction: :darken),
         "--color-success-ink"    => status_ink(success, surfaces, direction: :darken),
         "--color-accent"         => colors[:accent] || "#F72585"
-      }
+      }.merge(fill_vars(primary, success))
     end
   end
 end

@@ -17,15 +17,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   partial (mcritchie-studio, turf-monster, cyvasse) are unaffected until they
   drop their copy.
 - **Default button fills clear WCAG AA under their white label.** The default
-  success green is `#367E3A` (5.0:1), was `#4BAF50` (2.78:1). The resolver emits
-  a new `--color-success-fill`, the success colour's AA shade for white text,
-  which `btn-success` and `btn-secondary`'s default now paint; `--color-success`
-  itself is still the configured colour. When an app leaves the primary at the
-  engine default `#8E82FE` (3.1:1), `--color-cta` is its AA shade `#7268CB`;
-  `--color-primary` and its palette stay the default violet. `--color-cta-hover`
-  is held to AA the same way, unchanged wherever `darken(primary, 0.30)` already
-  passes. A configured primary is still the fill as-is: an app pairs its label
-  with it (mcritchie-industries draws navy on orange).
+  success green is `#367E3A` (5.0:1 under white), was `#4BAF50` (2.78:1). The
+  resolver emits two new fill vars, kept apart from the brand colours because
+  `--color-cta` and `--color-success` are also painted as text on dark surfaces:
+  `--color-success-fill`, the success colour's AA shade for a white label, which
+  `btn-success` and `btn-secondary`'s default now paint; and `--color-cta-fill`,
+  emitted only while an app leaves its primary at the engine default `#8E82FE`
+  (3.1:1), which `btn-primary`, `btn-outline`'s hover and the user nav's level
+  bar paint (`#7268CB`). A configured primary emits no cta fill, so those fall
+  back to the app's own `--color-cta` as before. `--color-cta-hover` is held to
+  AA too, unchanged wherever `darken(primary, 0.30)` already passes. Engine views
+  that painted text or icons with the raw `--color-success` now read
+  `--color-success-ink`.
 
 ## 0.78.0 — 2026-09-29
 

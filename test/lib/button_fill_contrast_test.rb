@@ -3,22 +3,26 @@
 require "test_helper"
 
 # [unit] The filled buttons draw a white label (btn-primary, btn-success,
-# btn-secondary's default), so the fills the engine OWNS must clear WCAG AA
-# 4.5:1 under white. The label is 14px bold, which is not WCAG "large" text.
+# btn-secondary's default, btn-outline's hover), so the fills the engine OWNS
+# must clear WCAG AA 4.5:1 under white. The label is 14px bold, which is not
+# WCAG "large" text.
 #
 # THE DEFECT THIS PINS (engine-navbar-phone-polish). The default success green
 # #4BAF50 measured 2.78:1 under white, and the resolver emitted the brand
 # colour itself as every button fill — the default primary #8E82FE at 3.1:1.
 # The text inks were already derived for contrast; the fills were not.
 #
-# THE LINE IT HOLDS. An app's CONFIGURED colours are not the engine's to
-# repaint: a configured primary stays the cta as-is (mcritchie-industries
-# pairs a navy label with its orange), and --color-success stays the
-# configured green. Only defaults and the DERIVED shades — --color-success-fill,
-# --color-cta-hover, and the default primary's cta — are held to AA here.
+# THE LINE IT HOLDS. The fills are SEPARATE vars from the brand colours.
+# --color-cta and --color-success are also painted as text on dark surfaces,
+# where a darker shade would lose contrast, so they stay the colours the app
+# chose; --color-success-fill and --color-cta-fill are what the buttons paint.
+# A CONFIGURED primary gets no cta fill at all: btn-primary falls back to the
+# app's own --color-cta (mcritchie-industries pairs a navy label with its
+# orange; cyvasse sets --color-cta itself).
 class ButtonFillContrastTest < ActiveSupport::TestCase
   AA    = 4.5
   WHITE = "#ffffff"
+  ROOT  = File.expand_path("../..", __dir__)
 
   def ratio(hex) = Studio::ColorScale.contrast_ratio(hex, WHITE)
 
@@ -30,27 +34,29 @@ class ButtonFillContrastTest < ActiveSupport::TestCase
   test "the default success green clears AA under white" do
     assert_equal "#367E3A", Studio::ThemeResolver::DEFAULT_SUCCESS
     assert_operator ratio(Studio::ThemeResolver::DEFAULT_SUCCESS), :>=, AA
-    assert_operator ratio(Studio.theme_success), :>=, AA, "lib/studio.rb's default must match"
+    assert_equal Studio::ThemeResolver::DEFAULT_SUCCESS, Studio.theme_success, "lib/studio.rb's default must match"
   end
 
   test "the default theme's button fills clear AA under white in both modes" do
     modes.each do |mode, vars|
-      %w[--color-cta --color-cta-hover --color-success --color-success-fill].each do |var|
+      %w[--color-cta-fill --color-cta-hover --color-success-fill].each do |var|
         assert_operator ratio(vars.fetch(var)), :>=, AA, "#{mode} #{var} #{vars[var]} is #{ratio(vars[var]).round(2)}:1"
       end
     end
   end
 
-  test "the default primary stays the brand violet; only its fill moves" do
+  test "the default brand colours stay themselves; only the fills move" do
     modes.each do |mode, vars|
-      refute_equal "#8E82FE", vars.fetch("--color-cta"), "#{mode}: 3.1:1 under white is the bug"
+      assert_equal "#8E82FE", vars["--color-cta"], "#{mode}: the cta is still painted as text on dark surfaces"
+      assert_equal "#7268CB", vars["--color-cta-fill"], "#{mode}: #8E82FE is 3.1:1 under white"
+      assert_equal "#367E3A", vars["--color-success"]
+      assert_equal "#367E3A", vars["--color-success-fill"], "an already-passing green is not darkened"
     end
-    assert_equal "#8E82FE", Studio::ThemeResolver.new({}).primary_palette_vars["--color-primary"]
   end
 
   # Every palette the engine's consumers configure today, plus the old default
   # green and pathological light colours. The success fill and the cta hover
-  # are derived, so they must pass for ALL of them.
+  # are derived for every palette, so they must pass for ALL of them.
   PALETTES = [
     { primary: "#2E7D32", success: "#2E7D32" },           # turf-monster
     { primary: "#F68048", warning: "#F5C518" },           # mcritchie-industries
@@ -80,11 +86,12 @@ class ButtonFillContrastTest < ActiveSupport::TestCase
       "hover is unchanged wherever darken(primary, 0.30) already passes"
   end
 
-  test "a configured primary is never repainted, even when it fails under white" do
+  test "a configured primary emits no cta fill, so buttons keep the app's own --color-cta" do
     # mcritchie-industries draws a navy label on #F68048 (6.02:1). A darkened
     # fill would drop that label to 3.3:1, so the configured primary stays.
     modes(primary: "#F68048").each_value do |vars|
       assert_equal "#F68048", vars["--color-cta"]
+      refute vars.key?("--color-cta-fill"), "btn-primary must fall back to var(--color-cta)"
       assert_equal "#AC5A32", vars["--color-cta-hover"], "industries' white hover label stays 4.93:1"
     end
   end
@@ -93,16 +100,33 @@ class ButtonFillContrastTest < ActiveSupport::TestCase
     modes(success: "#4BAF50").each_value do |vars|
       assert_equal "#4BAF50", vars["--color-success"]
       refute_equal "#4BAF50", vars["--color-success-fill"]
+      assert_operator ratio(vars["--color-success-fill"]), :>=, AA
     end
   end
 
   test "the button utilities paint the derived fills" do
-    css = File.read(File.expand_path("../../app/assets/tailwind/studio_engine/engine.css", __dir__))
-    success = css[/@utility btn-success \{.*?\n\}/m]
-    secondary = css[/@utility btn-secondary \{.*?\n\}/m]
+    css = File.read(File.join(ROOT, "app/assets/tailwind/studio_engine/engine.css"))
+    utility = ->(name) { css[/@utility #{name} \{.*?\n\}/m] }
 
-    assert_includes success, "background-color: var(--color-success-fill, var(--color-success));"
-    assert_includes secondary, "var(--btn-secondary-bg, var(--color-success-fill, var(--color-success)))"
-    refute_match(/background-color: var\(--color-success\);/, success)
+    assert_includes utility.("btn-primary"), "background-color: var(--color-cta-fill, var(--color-cta));"
+    assert_includes utility.("btn-outline"), "background-color: var(--color-cta-fill, var(--color-cta));",
+      "btn-outline's hover draws a white label on the cta too"
+    assert_includes utility.("btn-success"), "background-color: var(--color-success-fill, var(--color-success));"
+    assert_includes utility.("btn-secondary"), "var(--btn-secondary-bg, var(--color-success-fill, var(--color-success)))"
+    refute_match(/background-color: var\(--color-(success|cta)\);/, utility.("btn-success") + utility.("btn-primary"))
+  end
+
+  # --color-success is the brand green, and the default is now a DARKER green:
+  # 3.49:1 as text on the default dark page, 2.23:1 on its surface. Text and
+  # icons read --color-success-ink, derived to AA on every surface in both
+  # modes (status_ink_contrast_test.rb).
+  test "no engine view paints text or an icon with the raw success colour" do
+    offenders = Dir.glob("#{ROOT}/app/views/**/*.erb").flat_map do |file|
+      File.readlines(file).each_with_index.filter_map do |line, i|
+        "#{file.delete_prefix("#{ROOT}/")}:#{i + 1}" if line.match?(/(?<![-\w])color: var\(--color-success\)/)
+      end
+    end
+
+    assert_empty offenders, "use var(--color-success-ink) for text: #{offenders.inspect}"
   end
 end
