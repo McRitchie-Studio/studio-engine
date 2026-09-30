@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.81.0 — 2026-09-30
+
 ### Changed
 
 - **Default warning and danger buttons clear WCAG AA under their white label.**
