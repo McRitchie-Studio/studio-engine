@@ -607,7 +607,9 @@ module Studio
   mattr_accessor :theme_primary,  default: "#8E82FE"
   mattr_accessor :theme_dark,     default: "#1A1535"
   mattr_accessor :theme_light,    default: "#f8fafc"
-  mattr_accessor :theme_success,  default: "#4BAF50"
+  # #367E3A: the default green's AA shade under a white label (5.0:1). The old
+  # #4BAF50 measured 2.78:1 on btn-success. Studio::ThemeResolver::DEFAULT_SUCCESS.
+  mattr_accessor :theme_success,  default: "#367E3A"
   mattr_accessor :theme_warning,  default: "#FF7C47"
   mattr_accessor :theme_danger,   default: "#EF4444"
   mattr_accessor :theme_accent,   default: "#F72585"

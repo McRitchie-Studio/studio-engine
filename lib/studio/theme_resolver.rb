@@ -2,6 +2,18 @@ module Studio
   class ThemeResolver
     ROLES = %i[primary dark light success warning danger accent].freeze
 
+    # The engine's default role colours — the resolver's fallbacks, and the
+    # same values lib/studio.rb ships as its theme_* defaults.
+    DEFAULT_PRIMARY = "#8E82FE"
+    # #367E3A, not the #4BAF50 it was until engine-navbar-phone-polish: the old
+    # green measured 2.78:1 under the white label btn-success draws on it. This
+    # is the same hue at 5.0:1 (the shade cyvasse chose for its own success).
+    DEFAULT_SUCCESS = "#367E3A"
+
+    # WCAG AA for normal-size text. Every filled button draws a 14px bold white
+    # label, which is not "large" text, so its fill owes 4.5:1 against white.
+    WHITE_LABEL_TARGET = 4.5
+
     attr_reader :colors
 
     # colors: hash of role => hex string (e.g. { primary: "#8E82FE", dark: "#1A1535", ... })
@@ -29,9 +41,9 @@ module Studio
 
     def dark_mode_vars
       dark_base   = colors[:dark] || "#1A1535"
-      primary     = colors[:primary] || "#8E82FE"
+      primary     = colors[:primary] || DEFAULT_PRIMARY
       border_rgb  = ColorScale.lighten(dark_base, 0.30)
-      success     = colors[:success] || "#4BAF50"
+      success     = colors[:success] || DEFAULT_SUCCESS
       warning     = colors[:warning] || "#FF7C47"
       danger      = colors[:danger] || "#EF4444"
       surfaces    = dark_surfaces(dark_base)
@@ -69,9 +81,13 @@ module Studio
         "--color-border"         => ColorScale.with_opacity(border_rgb, 0.2),
         "--color-border-strong"  => ColorScale.with_opacity(border_rgb, 0.4),
         "--color-shadow"         => "transparent",
-        "--color-cta"            => primary,
-        "--color-cta-hover"      => ColorScale.darken(primary, 0.30),
+        # The CTA and success FILLS carry a white label (btn-primary,
+        # btn-success, btn-secondary, the navbar level bar), so they are
+        # derived for it; see #cta_fill and #white_label_fill.
+        "--color-cta"            => cta_fill(primary),
+        "--color-cta-hover"      => cta_hover(primary),
         "--color-success"        => success,
+        "--color-success-fill"   => white_label_fill(success),
         "--color-warning"        => warning,
         "--color-danger"         => danger,
         # THE DANGER *INK*, which is not the danger *colour*. --color-danger is a
@@ -166,6 +182,33 @@ module Studio
       contrast_ink(role, direction: direction, start: 0.0, target: 4.5, against: surfaces + tints)
     end
 
+    # The darkest-needed shade of `color` that carries a white label at AA: the
+    # colour itself when it already passes, otherwise the same hue darkened in
+    # 0.02 steps until it does. A fill shade, derived the way the text inks are.
+    def white_label_fill(color)
+      contrast_ink(color, direction: :darken, start: 0.0, target: WHITE_LABEL_TARGET, against: ["#ffffff"])
+    end
+
+    # --color-cta is the fill of btn-primary under a white label. When the app
+    # CONFIGURED its primary, that colour is the fill as-is: a brand primary is a
+    # design decision the app pairs its label with (mcritchie-industries draws a
+    # navy label on its orange, which a darkened fill would drop to 3.3:1), and
+    # an app that wants another shade sets --color-cta itself (cyvasse does).
+    # The engine's OWN default primary is the engine's to make accessible:
+    # #8E82FE is 3.1:1 under white, so an app that never chose a primary gets
+    # the AA shade of it instead. --color-primary and its palette stay the
+    # default violet either way; only the fill moves.
+    def cta_fill(primary)
+      primary.to_s.casecmp?(DEFAULT_PRIMARY) ? white_label_fill(primary) : primary
+    end
+
+    # The hover fill is always derived, so it is always held to AA under white:
+    # darken(primary, 0.30) as before when that passes (every consumer palette
+    # today), darker only for a primary so light that 0.30 is not enough.
+    def cta_hover(primary)
+      contrast_ink(primary, direction: :darken, start: 0.30, target: WHITE_LABEL_TARGET, against: ["#ffffff"])
+    end
+
     # Bounded, clamped search: raise the blend amount from `start` until the
     # ink clears `target` contrast against every background in `against`.
     # Clamps at 1.0 (pure white/black), so a pathological base degrades to the
@@ -182,7 +225,7 @@ module Studio
 
     # Generate --color-primary-{50..900} + RGB variants for Tailwind opacity support
     def primary_palette_vars
-      primary = colors[:primary] || "#8E82FE"
+      primary = colors[:primary] || DEFAULT_PRIMARY
       scale = ColorScale.generate(primary)
       vars = {}
 
@@ -202,8 +245,8 @@ module Studio
 
     def light_mode_vars
       light_base = colors[:light] || "#f8fafc"
-      primary    = colors[:primary] || "#8E82FE"
-      success    = colors[:success] || "#4BAF50"
+      primary    = colors[:primary] || DEFAULT_PRIMARY
+      success    = colors[:success] || DEFAULT_SUCCESS
       warning    = colors[:warning] || "#FF7C47"
       danger     = colors[:danger] || "#EF4444"
       surfaces   = light_surfaces(light_base)
@@ -230,9 +273,10 @@ module Studio
         "--color-border"         => ColorScale.darken(light_base, 0.08),
         "--color-border-strong"  => ColorScale.darken(light_base, 0.15),
         "--color-shadow"         => "rgba(0,0,0,0.05)",
-        "--color-cta"            => primary,
-        "--color-cta-hover"      => ColorScale.darken(primary, 0.30),
+        "--color-cta"            => cta_fill(primary),
+        "--color-cta-hover"      => cta_hover(primary),
         "--color-success"        => success,
+        "--color-success-fill"   => white_label_fill(success),
         "--color-warning"        => warning,
         "--color-danger"         => danger,
         # THE DANGER *INK*, which is not the danger *colour*. --color-danger is a
