@@ -115,3 +115,9 @@ Studio::SiteIdentity.seed!(title: "Turf Monster", description: "Skill-based pick
 | `link_preview_image_service` | `nil` (app default) | Active Storage service for the image |
 | `link_preview_fallback_image` | `"/og.png"` | Last image rung; used only if the file exists under `public/` |
 | `draw_link_preview_routes` | `true` | Draw `/admin/link_preview` (`admin_link_preview_path`, `admin_link_preview_image_path`) |
+
+## A page override, worked
+
+The public user page (`/u/:username`, [`PUBLIC_USER_PAGE.md`](PUBLIC_USER_PAGE.md))
+is the template for a per-page preview: `link_preview image: user.avatar, title:
+user.username`. The avatar answers when attached, and the site image when not.

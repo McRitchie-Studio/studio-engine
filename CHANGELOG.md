@@ -6,6 +6,47 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **A public user page at `/u/:username`, and the helpers that link to it.** It
+  shows the user's avatar and username and nothing else (no name, email or
+  wallet), and it is where a click on a username in any Studio app should lead.
+  See [`docs/PUBLIC_USER_PAGE.md`](docs/PUBLIC_USER_PAGE.md).
+  - **Link preview.** The page calls `link_preview image: user.avatar, title:
+    username`, so it unfurls with the avatar when one is set and with the site
+    identity's image when not. The avatar URL is permanent (a public service's own
+    URL, else Rails' storage proxy), never signed and expiring. With
+    `Studio::LinkPreviewBots` included, preview bots get the slim page carrying it.
+  - **Lookup.** Case-insensitive, with an exact spelling first. It reads
+    `username` only, never the email or the slug, so it cannot reveal whether an
+    address has an account. A `User#public_profile_visible?` that answers false
+    hides an account. Every miss gets the same friendly page with a `404` status.
+  - **Public.** The page skips `require_authentication` and renders in the host's
+    own layout.
+  - **Helpers.** `studio_user_profile_path(user)`, `studio_user_profile_url(user)`
+    and `link_to_user_profile(user, text = nil, **html_options, &block)` take a user
+    or a username. They answer `nil` (the link helper renders a plain `<span>`)
+    when the route is not drawn or the user has no username, so any view can call
+    them. The route helper is `studio_public_user_path(username:)`; the rules are
+    `Studio::PublicUser`.
+  - `components/_avatar` gains an `xl` size and an optional `alt:` local. Existing
+    calls render the same.
+  - **Opt-in:** `config.draw_public_user_routes` defaults to `false`, so an app that
+    owns `/u` is not broken. No consumer owns `/u` or the helper name today.
+
+  **Adopting, per app** (this release changes none of them on its own):
+
+  1. **cyvasse, turf-monster** (already have `users.username` with a
+     `lower(username)` index): set `config.draw_public_user_routes = true` in
+     `config/initializers/studio.rb`. Define `User#public_profile_visible?` if some
+     accounts must not have a page (cyvasse's merged accounts, turf-monster's
+     frozen ones). Then point username links at `link_to_user_profile(user)`.
+  2. **mcritchie-studio, mcritchie-industries** (no `username` column): add
+     `users.username` with a unique `lower(username)` index, backfill it
+     (`Studio::UsernameGenerator.generate` drafts one), then do step 1. Do not
+     reuse `slug`: it is keyed on the email.
+  3. For an avatar unfurl on a private bucket, nothing more is needed: the proxy
+     URL serves it. An app with a public-read service gets that service's URL
+     automatically.
+
 - **Site identity and link previews: a core primitive for every app.** Each app
   now has a site identity, `Studio::SiteIdentity`: a title, a description and an
   image. The operator edits all three at `/admin/link_preview`, beside a live card
