@@ -472,17 +472,17 @@ module Studio
   # is loading — taking its entire route set down, not just this page.
   mattr_accessor :draw_geo_routes, default: false
 
-  # ---- Link preview (Studio::LinkPreview, LinkPreviewSetting, LinkPreviewHelper)
+  # ---- Link preview (Studio::LinkPreview, SiteIdentity, LinkPreviewHelper)
   #
-  # What an unfurl shows when someone pastes a link to this app: a DEFAULT image,
-  # title and description the operator sets at /admin/link_preview, which any
-  # page may override (`link_preview image: ..., title: ...`). See
-  # docs/LINK_PREVIEW.md.
+  # What an unfurl shows when someone pastes a link to this app: the SITE
+  # IDENTITY (Studio::SiteIdentity — image, title, description) the operator sets
+  # at /admin/link_preview, which any page may override (`link_preview image:
+  # ..., title: ...`). See docs/LINK_PREVIEW.md.
 
   # Whether layouts/studio/_head emits the og:/twitter: tags.
   #
   #   :auto (default)  emit once this app has INSTALLED the engine's
-  #                    studio_link_preview_settings table — installing the
+  #                    studio_site_identities table — installing the
   #                    migration is the adoption act. An app that emits its own
   #                    og tags today (turf-monster, cyvasse) and has not installed
   #                    it gets no second set.
@@ -504,7 +504,7 @@ module Studio
   #
   #   config.link_preview_image_service = OgImageAttachable::PUBLIC_OG_SERVICE
   #
-  # Read once, when Studio::LinkPreviewSetting loads (has_one_attached's service
+  # Read once, when Studio::SiteIdentity loads (has_one_attached's service
   # is a literal fixed at class load), so set it in the initializer.
   mattr_accessor :link_preview_image_service, default: nil
 
@@ -514,10 +514,15 @@ module Studio
   # trusted as given.
   mattr_accessor :link_preview_fallback_image, default: "/og.png"
 
-  # The last title and description rungs, under the operator's defaults. nil
-  # title means Studio.app_name; nil description means no description tag.
-  mattr_accessor :link_preview_default_title, default: nil
-  mattr_accessor :link_preview_default_description, default: nil
+  # THE SITE IDENTITY'S DRAFTED DEFAULTS — this app's title and description as
+  # written in code, under whatever the operator saves at /admin/link_preview.
+  # The standing convention is that an agent drafts these when it sets an app up
+  # (`bin/rails g studio:site_identity --title "..." --description "..."` writes
+  # them here) and Alex edits them on the page. nil title means Studio.app_name;
+  # nil description means none. Read the resolved answer through
+  # Studio.site_identity, never these directly.
+  mattr_accessor :site_title, default: nil
+  mattr_accessor :site_description, default: nil
 
   # Draw /admin/link_preview from Studio.routes. ON by default: no consumer owns
   # these paths or helper names (admin_link_preview, admin_link_preview_image),
@@ -525,10 +530,25 @@ module Studio
   # mcritchie-industries. The page explains itself when the table is missing.
   mattr_accessor :draw_link_preview_routes, default: true
 
+  # THE APP'S IDENTITY COPY, resolved: { title:, description:, image_url: }.
+  # The operator's saved value (Studio::SiteIdentity, edited at
+  # /admin/link_preview) wins, then the drafted Studio.site_title /
+  # site_description, then Studio.app_name for the title. image_url is the
+  # uploaded image, else the static fallback, else nil — absolute when
+  # `base_url` is given (pass request.base_url) or the image lives on a public
+  # service. Reuse it anywhere the app needs to say what it is: a meta
+  # description, share text, an email footer. Views have `studio_site_identity`.
+  # Never raises; an app without the table answers from the drafted defaults.
+  def self.site_identity(base_url: nil)
+    Studio::SiteIdentity.resolved(base_url: base_url)
+  rescue StandardError
+    { title: site_title.presence || app_name.to_s, description: site_description.presence, image_url: nil }
+  end
+
   # :auto resolves against the table; true/false are taken as given.
   def self.link_preview_tags?
     case link_preview_tags
-    when :auto, "auto", nil then Studio::LinkPreviewSetting.table_ready?
+    when :auto, "auto", nil then Studio::SiteIdentity.table_ready?
     else !!link_preview_tags
     end
   rescue StandardError
@@ -1180,9 +1200,9 @@ module Studio
       # default (Studio.draw_link_preview_routes) because no consumer owns these
       # names; an app can still switch it off from its initializer.
       if Studio.draw_link_preview_routes
-        get    "admin/link_preview",       to: "studio/link_preview_settings#edit",          as: :admin_link_preview
-        patch  "admin/link_preview",       to: "studio/link_preview_settings#update"
-        delete "admin/link_preview/image", to: "studio/link_preview_settings#destroy_image", as: :admin_link_preview_image
+        get    "admin/link_preview",       to: "studio/site_identities#edit",          as: :admin_link_preview
+        patch  "admin/link_preview",       to: "studio/site_identities#update"
+        delete "admin/link_preview/image", to: "studio/site_identities#destroy_image", as: :admin_link_preview_image
       end
       # The living style guide. Canonical at /admin/style (StyleController#index);
       # /admin/design_system redirects here but KEEPS its admin_design_system_path

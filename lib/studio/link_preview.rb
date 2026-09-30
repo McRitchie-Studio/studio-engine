@@ -10,7 +10,7 @@ module Studio
   # hashes out, no request and no database. The pieces that need the world live
   # beside it:
   #
-  #   Studio::LinkPreviewSetting  (model) the operator's default image, title and
+  #   Studio::SiteIdentity  (model) the operator's default image, title and
   #                               description, set at /admin/link_preview
   #   Studio::LinkPreviewHelper   (view helper) the page override
   #                               (`link_preview`) and the tags the head renders

@@ -1,6 +1,8 @@
-<%# /admin/link_preview — the operator's link-preview DEFAULT.
-    What an unfurl (iMessage, Slack, Discord, X...) shows for any page of this
-    app that does not name its own image, title and description. Three parts,
+<%# /admin/link_preview — the operator edits the SITE IDENTITY
+    (Studio::SiteIdentity): the image, title and description an unfurl
+    (iMessage, Slack, Discord, X...) shows for any page of this app that does
+    not name its own, and the copy Studio.site_identity hands any other reader
+    (a meta description, share text, an email footer). Three parts,
     in the order an operator asks: what does a link look like now, what picture
     does it carry, and what words.
 
@@ -11,8 +13,8 @@
 <% content_for(:title) { "Link Preview" } %>
 <%
   setting       = @setting
-  fallback_title = Studio.link_preview_default_title.presence || Studio.app_name.to_s
-  fallback_desc  = Studio.link_preview_default_description.to_s
+  fallback_title = Studio.site_title.presence || Studio.app_name.to_s
+  fallback_desc  = Studio.site_description.to_s
   card_title    = setting.title.presence || fallback_title
   card_desc     = setting.description.presence || fallback_desc
   card_image    = @default_image_url || @static_image_url
@@ -67,10 +69,10 @@
     <div class="card p-6 mb-6" data-link-preview-not-installed>
       <h2 class="text-lg font-bold text-heading mb-2">Not installed yet</h2>
       <p class="text-sm text-body mb-3">
-        This app has not installed the link-preview table, so there is no default to edit and the
+        This app has not installed the site identity table, so there is nothing to edit yet and the
         engine's preview tags are <%= tags_on ? "on, using the static fallback" : "off" %>. Install it with:
       </p>
-      <pre class="bg-inset rounded-lg p-3 text-xs font-mono overflow-x-auto">bin/rails studio_engine:install:migrations &amp;&amp; bin/rails db:migrate</pre>
+      <pre class="bg-inset rounded-lg p-3 text-xs font-mono overflow-x-auto">bin/rails g studio:site_identity &amp;&amp; bin/rails db:migrate</pre>
       <p class="text-xs text-muted mt-3">
         An app that already writes its own og tags sets <span class="font-mono">config.link_preview_tags = false</span>
         first. See docs/LINK_PREVIEW.md in studio-engine.
@@ -125,7 +127,7 @@
         })"
         @crop-photo-confirmed.window="onCropConfirmed($event.detail)"
       <% end %>>
-      <h2 class="text-lg font-bold text-heading mb-2">Default image</h2>
+      <h2 class="text-lg font-bold text-heading mb-2">Image</h2>
       <% if @uploads_available %>
         <p class="text-sm text-muted mb-4">
           Cropped to 1200 × 630, the shape every unfurl uses. It is served from a permanent URL, because
@@ -145,8 +147,8 @@
             (see studio/emails/show for why the pair is load-bearing). %>
         <%= form_with url: admin_link_preview_path, method: :patch,
               html: { multipart: true, id: "link-preview-image-form", "x-ref": "form" } do %>
-          <%= file_field_tag "link_preview_setting[image]", class: "hidden", "x-ref": "fileInput",
-                accept: Studio::LinkPreviewSettingsController::IMAGE_TYPES.join(",") %>
+          <%= file_field_tag "site_identity[image]", class: "hidden", "x-ref": "fileInput",
+                accept: Studio::SiteIdentitiesController::IMAGE_TYPES.join(",") %>
         <% end %>
       <% else %>
         <p class="text-sm text-muted">
@@ -157,22 +159,27 @@
     </div>
 
     <%# -- The words --------------------------------------------------------- %>
-    <%# scope: :link_preview_setting is REQUIRED: a namespaced model's param key
-        is studio_link_preview_setting, which the controller never reads. %>
-    <%= form_with(model: setting, scope: :link_preview_setting, url: admin_link_preview_path,
+    <%# scope: :site_identity is REQUIRED: a namespaced model's param key
+        is studio_site_identity, which the controller never reads. %>
+    <%= form_with(model: setting, scope: :site_identity, url: admin_link_preview_path,
                   method: :patch, local: true) do |f| %>
       <div class="card p-6 mb-6">
-        <h2 class="text-lg font-bold text-heading mb-4">Default title and description</h2>
+        <h2 class="text-lg font-bold text-heading mb-1">Site title and description</h2>
+        <p class="text-sm text-muted mb-4">
+          What <%= Studio.app_name %> is, in its own words. Link previews use them, and so can the rest
+          of the app (<span class="font-mono">Studio.site_identity</span>): a meta description, share
+          text, an email footer.
+        </p>
         <div class="mb-4">
           <%= f.label :title, "Title", class: "block text-sm font-bold text-heading mb-1" %>
           <%= f.text_field :title, class: "input w-full", placeholder: fallback_title,
-                maxlength: Studio::LinkPreviewSetting::TITLE_MAX, data: { link_preview_input: "title" } %>
-          <p class="text-xs text-muted mt-1">Blank uses <%= fallback_title %>.</p>
+                maxlength: Studio::SiteIdentity::TITLE_MAX, data: { link_preview_input: "title" } %>
+          <p class="text-xs text-muted mt-1">Blank uses the drafted default: <%= fallback_title %>.</p>
         </div>
         <div>
           <%= f.label :description, "Description", class: "block text-sm font-bold text-heading mb-1" %>
           <%= f.text_area :description, rows: 3, class: "input w-full", placeholder: fallback_desc.presence,
-                maxlength: Studio::LinkPreviewSetting::DESCRIPTION_MAX, data: { link_preview_input: "description" } %>
+                maxlength: Studio::SiteIdentity::DESCRIPTION_MAX, data: { link_preview_input: "description" } %>
           <p class="text-xs text-muted mt-1">One or two sentences. Unfurls show about two lines.</p>
         </div>
       </div>

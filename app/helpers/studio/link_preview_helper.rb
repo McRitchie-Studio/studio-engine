@@ -35,28 +35,38 @@ module Studio
     # The resolved preview for this page:
     # { title:, description:, image:, image_source:, site_name:, url: }.
     # `image` is absolute (or nil). Never raises: a preview must not 500 a page.
+    #
+    # Rungs, most specific first: the page's `link_preview`, then the page's
+    # own content_for(:title) / content_for(:meta_description) /
+    # content_for(:og_image) (turf-monster's existing keys, honoured so its
+    # pages keep their overrides on adoption), then the site identity.
     def studio_link_preview
       overrides = @studio_link_preview_overrides || {}
-      defaults = studio_link_preview_defaults
-      base_url = studio_link_preview_base_url
+      stored = studio_site_identity_stored
 
       preview = Studio::LinkPreview.resolve(
         site_name: Studio.app_name,
-        titles: [overrides[:title], content_for(:title), defaults[:title], Studio.link_preview_default_title],
+        titles: [overrides[:title], content_for(:title), stored[:title], Studio.site_title],
         descriptions: [overrides[:description], content_for(:meta_description),
-                       defaults[:description], Studio.link_preview_default_description],
-        # content_for(:og_image) is turf-monster's existing page-level key,
-        # honoured so its pages keep their override on adoption.
+                       stored[:description], Studio.site_description],
         page_images: [studio_link_preview_image_location(overrides[:image]), content_for(:og_image)],
-        default_image: defaults[:image_url] || defaults[:image_path],
-        static_image: studio_link_preview_static_image
+        default_image: stored[:image_url] || stored[:image_path],
+        static_image: Studio::SiteIdentity.static_image
       )
 
       preview.merge(
-        image: Studio::LinkPreview.absolute_url(preview[:image], base_url: base_url) || preview[:image],
+        image: Studio::LinkPreview.absolute_url(preview[:image], base_url: studio_request_base_url) || preview[:image],
         site_name: Studio.app_name.to_s,
-        url: studio_link_preview_page_url
+        url: (request.original_url if respond_to?(:request) && request)
       )
+    end
+
+    # The app's IDENTITY COPY — { title:, description:, image_url: } — for any
+    # view that wants the words, not the tags: a meta description, share text,
+    # an email footer. The site-wide answer, ignoring this page's overrides.
+    # Studio.site_identity is the same call outside a view.
+    def studio_site_identity
+      Studio.site_identity(base_url: studio_request_base_url)
     end
 
     # The og:/twitter: tags for this page. layouts/studio/_head renders this
@@ -71,10 +81,10 @@ module Studio
 
     private
 
-    def studio_link_preview_defaults
-      Studio::LinkPreviewSetting.defaults
+    def studio_site_identity_stored
+      Studio::SiteIdentity.stored
     rescue StandardError => e
-      Rails.logger&.warn("[studio.link_preview] defaults unavailable: #{e.class}: #{e.message}")
+      Rails.logger&.warn("[studio.link_preview] site identity unavailable: #{e.class}: #{e.message}")
       {}
     end
 
@@ -82,42 +92,14 @@ module Studio
       return nil if image.nil?
       return image.to_s if image.is_a?(String) || image.is_a?(Symbol)
 
-      location = Studio::LinkPreviewSetting.image_location(image)
+      location = Studio::SiteIdentity.image_location(image)
       location && (location[:url] || location[:path])
     rescue StandardError
       nil
     end
 
-    # The app's own static card (public/og.png by default), used only when the
-    # file is really there — a missing one would be a broken image in every
-    # unfurl. Absolute URLs are trusted as given.
-    def studio_link_preview_static_image
-      path = Studio.link_preview_fallback_image.to_s
-      return nil if path.empty?
-      return path unless path.start_with?("/") && !path.start_with?("//")
-
-      Studio::LinkPreviewHelper.static_file?(path) ? path : nil
-    end
-
-    def studio_link_preview_base_url
+    def studio_request_base_url
       respond_to?(:request) && request ? request.base_url : nil
-    end
-
-    def studio_link_preview_page_url
-      respond_to?(:request) && request ? request.original_url : nil
-    end
-
-    # Whether a root-relative path exists under public/. Memoized per path for
-    # the life of the process: public/ is fixed at deploy.
-    def self.static_file?(path)
-      @static_files ||= Concurrent::Map.new
-      @static_files.compute_if_absent(path) do
-        File.file?(Rails.public_path.join(path.delete_prefix("/")))
-      end
-    end
-
-    def self.reset_static_files!
-      @static_files = nil
     end
   end
 end

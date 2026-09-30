@@ -9,7 +9,7 @@ require "active_record/railtie"
 require "action_controller/railtie"
 require "action_view/railtie"
 require "action_mailer/railtie"
-# Active Storage backs the link-preview DEFAULT image (Studio::LinkPreviewSetting
+# Active Storage backs the link-preview DEFAULT image (Studio::SiteIdentity
 # has_one_attached :image). Every consumer loads it; the dummy loads it so the
 # /admin/link_preview upload is exercised against the real attachment path.
 require "active_storage/engine"

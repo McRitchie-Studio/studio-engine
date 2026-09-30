@@ -86,17 +86,17 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
   # The engine's REAL migration — the one a host installs — rather than a
   # hand-written table that could drift from it.
   def install_link_preview_table!
-    return if ActiveRecord::Base.connection.table_exists?(:studio_link_preview_settings)
+    return if ActiveRecord::Base.connection.table_exists?(:studio_site_identities)
 
-    require_relative "../../db/migrate/20260930120000_create_studio_link_preview_settings"
-    ActiveRecord::Migration.suppress_messages { CreateStudioLinkPreviewSettings.new.migrate(:up) }
-    Studio::LinkPreviewSetting.reset_column_information
+    require_relative "../../db/migrate/20260930120000_create_studio_site_identities"
+    ActiveRecord::Migration.suppress_messages { CreateStudioSiteIdentities.new.migrate(:up) }
+    Studio::SiteIdentity.reset_column_information
   end
 
   def drop_link_preview_table!
-    return unless ActiveRecord::Base.connection.table_exists?(:studio_link_preview_settings)
+    return unless ActiveRecord::Base.connection.table_exists?(:studio_site_identities)
 
-    ActiveRecord::Base.connection.drop_table(:studio_link_preview_settings)
+    ActiveRecord::Base.connection.drop_table(:studio_site_identities)
     ActiveRecord::Base.connection.schema_cache.clear!
   end
 
@@ -105,23 +105,23 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
     @queue_adapter = ActiveJob::Base.queue_adapter
     ActiveJob::Base.queue_adapter = :test
     @config = [Studio.link_preview_tags, Studio.link_preview_fallback_image,
-               Studio.link_preview_default_title, Studio.link_preview_default_description]
+               Studio.site_title, Studio.site_description]
     install_link_preview_table!
-    Studio::LinkPreviewSetting.delete_all
-    Studio::LinkPreviewSetting.bust_cache!
+    Studio::SiteIdentity.delete_all
+    Studio::SiteIdentity.bust_cache!
     User.delete_all
     FileUtils.mkdir_p(STATIC_PNG.dirname)
     File.binwrite(STATIC_PNG, PNG)
-    Studio::LinkPreviewHelper.reset_static_files!
+    Studio::SiteIdentity.reset_static_image!
   end
 
   def teardown
     ActiveJob::Base.queue_adapter = @queue_adapter
     Studio.link_preview_tags, Studio.link_preview_fallback_image,
-      Studio.link_preview_default_title, Studio.link_preview_default_description = @config
-    Studio::LinkPreviewSetting.bust_cache!
+      Studio.site_title, Studio.site_description = @config
+    Studio::SiteIdentity.bust_cache!
     FileUtils.rm_f(STATIC_PNG)
-    Studio::LinkPreviewHelper.reset_static_files!
+    Studio::SiteIdentity.reset_static_image!
   end
 
   # --- helpers ---------------------------------------------------------------
@@ -142,7 +142,7 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
 
   def upload_default_image
     sign_in_admin
-    patch "/admin/link_preview", params: { link_preview_setting: { image: upload } }
+    patch "/admin/link_preview", params: { site_identity: { image: upload } }
     assert_response :see_other
   end
 
@@ -190,7 +190,7 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
 
   test "no static file and no upload means no og image tag rather than a broken one" do
     FileUtils.rm_f(STATIC_PNG)
-    Studio::LinkPreviewHelper.reset_static_files!
+    Studio::SiteIdentity.reset_static_image!
 
     get "/lab/link_preview"
 
@@ -205,7 +205,7 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
     follow_redirect!
     assert_match(/Default link-preview image updated/, flash[:notice].to_s)
 
-    setting = Studio::LinkPreviewSetting.current
+    setting = Studio::SiteIdentity.current
     assert setting.image_attached?
 
     get "/lab/link_preview"
@@ -223,11 +223,11 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
   test "admin sets the default title and description through the page's own fields" do
     sign_in_admin
     get "/admin/link_preview"
-    assert_match(/name="link_preview_setting\[title\]"/, response.body)
-    assert_match(/name="link_preview_setting\[description\]"/, response.body)
-    refute_match(/name="studio_link_preview_setting\[/, response.body, "the namespaced key is read by nobody")
+    assert_match(/name="site_identity\[title\]"/, response.body)
+    assert_match(/name="site_identity\[description\]"/, response.body)
+    refute_match(/name="studio_site_identity\[/, response.body, "the namespaced key is read by nobody")
 
-    patch "/admin/link_preview", params: { link_preview_setting: { title: "Pick'em & win", description: "Skill contests." } }
+    patch "/admin/link_preview", params: { site_identity: { title: "Pick'em & win", description: "Skill contests." } }
     assert_response :see_other
 
     get "/lab/link_preview/override"
@@ -237,12 +237,12 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
 
   test "a text save leaves the uploaded image alone, and removing it falls back to static" do
     upload_default_image
-    patch "/admin/link_preview", params: { link_preview_setting: { title: "New words" } }
-    assert Studio::LinkPreviewSetting.current.image_attached?, "a words-only post must not drop the picture"
+    patch "/admin/link_preview", params: { site_identity: { title: "New words" } }
+    assert Studio::SiteIdentity.current.image_attached?, "a words-only post must not drop the picture"
 
     delete "/admin/link_preview/image"
     assert_response :see_other
-    refute Studio::LinkPreviewSetting.current.image_attached?
+    refute Studio::SiteIdentity.current.image_attached?
 
     get "/lab/link_preview"
     assert_equal "http://www.example.com/og.png", meta("og:image")
@@ -250,12 +250,12 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
 
   test "a non-image upload is refused and nothing is attached" do
     sign_in_admin
-    patch "/admin/link_preview", params: { link_preview_setting: { image: upload("%PDF-1.4", type: "application/pdf", name: "x.pdf") } }
+    patch "/admin/link_preview", params: { site_identity: { image: upload("%PDF-1.4", type: "application/pdf", name: "x.pdf") } }
 
     assert_response :see_other
     follow_redirect!
     assert_match(/PNG, JPG, WebP or GIF/, flash[:alert].to_s)
-    refute Studio::LinkPreviewSetting.current.image_attached?
+    refute Studio::SiteIdentity.current.image_attached?
   end
 
   test "the page is admin only" do
@@ -267,16 +267,16 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
     get "/admin/link_preview"
     assert_redirected_to "/"
 
-    patch "/admin/link_preview", params: { link_preview_setting: { title: "hijack" } }
+    patch "/admin/link_preview", params: { site_identity: { title: "hijack" } }
     assert_redirected_to "/"
-    assert_nil Studio::LinkPreviewSetting.current.title
+    assert_nil Studio::SiteIdentity.current.title
   end
 
   # --- 3. the live card -----------------------------------------------------
 
   test "the admin page draws the card an unfurl draws" do
     upload_default_image
-    patch "/admin/link_preview", params: { link_preview_setting: { title: "Turf Monster", description: "Pick'em." } }
+    patch "/admin/link_preview", params: { site_identity: { title: "Turf Monster", description: "Pick'em." } }
 
     get "/admin/link_preview"
 
@@ -299,7 +299,7 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_match(/data-link-preview-not-installed/, response.body)
-    assert_match(/studio_engine:install:migrations/, response.body)
+    assert_match(/rails g studio:site_identity/, response.body)
   ensure
     install_link_preview_table!
   end
@@ -329,7 +329,7 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
   test "an override image that is an attachment with nothing attached is a blank rung" do
     view = ActionView::Base.empty
     view.extend(Studio::LinkPreviewHelper)
-    unattached = Studio::LinkPreviewSetting.new.image
+    unattached = Studio::SiteIdentity.new.image
 
     view.link_preview(image: unattached)
 
@@ -348,10 +348,54 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
   test "a public service answers its own url and a mirror asks its primary" do
     public_service = Struct.new(:public?).new(true)
     blob = Struct.new(:service, :url).new(public_service, "https://cdn.example.test/og/abc.png")
-    assert_equal({ url: "https://cdn.example.test/og/abc.png" }, Studio::LinkPreviewSetting.image_location(blob))
+    assert_equal({ url: "https://cdn.example.test/og/abc.png" }, Studio::SiteIdentity.image_location(blob))
 
     mirror = Struct.new(:primary, :public?).new(public_service, false)
-    assert Studio::LinkPreviewSetting.public_service?(mirror)
+    assert Studio::SiteIdentity.public_service?(mirror)
+  end
+
+  # --- 4b. the site identity, reused beyond previews -------------------------
+
+  test "Studio.site_identity answers the drafted copy, then the operator's" do
+    Studio.site_title = "Turf Monster"
+    Studio.site_description = "Drafted by an agent."
+
+    identity = Studio.site_identity(base_url: "https://turf.test")
+    assert_equal "Turf Monster", identity[:title]
+    assert_equal "Drafted by an agent.", identity[:description]
+    assert_equal "https://turf.test/og.png", identity[:image_url]
+
+    upload_default_image
+    patch "/admin/link_preview", params: { site_identity: { description: "Edited by Alex." } }
+
+    identity = Studio.site_identity(base_url: "https://turf.test")
+    assert_equal "Turf Monster", identity[:title], "a field the operator left blank keeps the draft"
+    assert_equal "Edited by Alex.", identity[:description], "the operator's edit wins over the draft"
+    assert_match %r{\Ahttps://turf\.test/rails/active_storage/blobs/proxy/}, identity[:image_url]
+
+    get "/lab/link_preview"
+    assert_equal "Edited by Alex.", meta("og:description"), "previews read the same identity"
+  end
+
+  test "Studio.site_identity answers from the drafts before the table exists" do
+    drop_link_preview_table!
+    Studio.site_title = "Cyvasse"
+
+    assert_equal "Cyvasse", Studio.site_identity[:title]
+  ensure
+    install_link_preview_table!
+  end
+
+  test "seed! carries a drafted default in without overwriting an operator edit" do
+    row = Studio::SiteIdentity.seed!(title: "Draft title", description: "Draft description.")
+    assert_equal "Draft title", row.reload.title
+
+    row.update!(title: "Alex's title")
+    Studio::SiteIdentity.seed!(title: "Draft title", description: "A newer draft.")
+
+    row.reload
+    assert_equal "Alex's title", row.title, "a seed never overwrites the operator"
+    assert_equal "Draft description.", row.description, "nor a value an earlier seed already set"
   end
 
   # --- 5. preview bots ------------------------------------------------------
