@@ -4,6 +4,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`Studio.navbar_user_name` and `Studio.sign_in_label` set the navbar's two
+  identity words.** `navbar_user_name` takes a method name (`:player_name`) or a
+  callable `->(user, view)` and replaces `display_name` in the signed-in user
+  nav; a blank answer or a raise falls back to `display_name`, and a raise is
+  reported once rather than 500ing the layout. `sign_in_label` (default
+  `"Log in"`) labels the signed-out button in `layouts/_navbar` and
+  `components/_user_nav`. An app that sets neither renders the same navbar bytes
+  as before. See the README, *Navbar identity*.
+
 ## 0.79.0 — 2026-09-30
 
 ### Changed
