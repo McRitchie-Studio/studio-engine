@@ -131,7 +131,7 @@ module Studio
   mattr_accessor :theme_primary,  default: "#8E82FE"
   mattr_accessor :theme_dark,     default: "#1A1535"
   mattr_accessor :theme_light,    default: "#f8fafc"
-  mattr_accessor :theme_success,  default: "#4BAF50"
+  mattr_accessor :theme_success,  default: "#367E3A"
   mattr_accessor :theme_warning,  default: "#FF7C47"
   mattr_accessor :theme_danger,   default: "#EF4444"
   mattr_accessor :theme_accent,   default: "#F72585"

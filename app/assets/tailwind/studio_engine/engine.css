@@ -230,9 +230,12 @@ body.modal-open .studio-app-banner {
    @utility with unlayered overrides. Defaults resolve to the same white as
    before (a literal #fff — the engine's both-modes guard bars raw
    --color-white references, which only exist in Tailwind's compiled theme). */
+/* The fill is --color-cta-fill when the resolver emits one — only while the
+   app leaves its primary at the engine default, whose own hex is 3.1:1 under
+   white — and otherwise the app's --color-cta, as it always was. */
 @utility btn-primary {
   color: var(--btn-primary-fg, #fff);
-  background-color: var(--color-cta);
+  background-color: var(--color-cta-fill, var(--color-cta));
   &:hover {
     color: var(--btn-primary-fg-hover, var(--btn-primary-fg, #fff));
     background-color: var(--color-cta-hover);
@@ -258,7 +261,7 @@ body.modal-open .studio-app-banner {
   border-color: var(--color-cta);
   &:hover {
     @apply text-white;
-    background-color: var(--color-cta);
+    background-color: var(--color-cta-fill, var(--color-cta));
   }
 }
 

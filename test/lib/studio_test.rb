@@ -15,7 +15,7 @@ class StudioTest < Minitest::Test
     Studio.theme_primary       = "#8E82FE"
     Studio.theme_dark          = "#1A1535"
     Studio.theme_light         = "#f8fafc"
-    Studio.theme_success       = "#4BAF50"
+    Studio.theme_success       = "#367E3A"
     Studio.theme_warning       = "#FF7C47"
     Studio.theme_danger        = "#EF4444"
     Studio.theme_accent        = "#F72585"
@@ -115,7 +115,7 @@ class StudioTest < Minitest::Test
   end
 
   def test_default_theme_success
-    assert_equal "#4BAF50", Studio.theme_success
+    assert_equal "#367E3A", Studio.theme_success
   end
 
   def test_default_theme_warning
@@ -268,7 +268,7 @@ class StudioTest < Minitest::Test
     assert_equal "#8E82FE", config[:primary]
     assert_equal "#1A1535", config[:dark]
     assert_equal "#f8fafc", config[:light]
-    assert_equal "#4BAF50", config[:success]
+    assert_equal "#367E3A", config[:success]
     assert_equal "#FF7C47", config[:warning]
     assert_equal "#EF4444", config[:danger]
     assert_equal "#F72585", config[:accent]
