@@ -204,7 +204,7 @@
         the link's accessible name. %>
     <% account_classes = "group flex items-center gap-2 flex-shrink-0" %>
     <% account_inner = capture do %>
-      <span class="sr-only md:not-sr-only md:max-w-40"><span class="block truncate text-right text-heading font-semibold text-base leading-none transition<%= " group-hover:text-primary" if studio_nav_destination %>" data-nav-name><%= current_user.display_name %></span></span>
+      <span class="sr-only md:not-sr-only md:max-w-40"><span class="block truncate text-right text-heading font-semibold text-base leading-none transition<%= " group-hover:text-primary" if studio_nav_destination %>" data-nav-name><%= Studio.navbar_user_name_for(current_user, self) %></span></span>
       <span class="flex-shrink-0 flex items-center" aria-hidden="true">
         <%= render "components/avatar", user: current_user, size: "nav" %>
       </span>
@@ -219,7 +219,7 @@
     <%# Desktop only, as above: the phone row carries the toggle below md. %>
     <span class="hidden md:flex" data-nav-theme-toggle="desktop"><%= render "components/theme_toggle_morph" %></span>
     <div class="flex items-center gap-3 ml-auto">
-      <%= link_to "Log in", login_path, class: "text-heading hover:text-primary text-sm font-semibold transition" %>
+      <%= link_to Studio.sign_in_label, login_path, class: "text-heading hover:text-primary text-sm font-semibold transition" %>
       <%= link_to "Sign up", signup_path, class: "btn btn-primary btn-sm" %>
     </div>
   <% end %>

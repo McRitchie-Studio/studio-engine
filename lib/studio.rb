@@ -13,6 +13,7 @@ require "studio/js_identifier"
 require "studio/partial_block"
 require "studio/sidebar_sections"
 require "studio/navbar_links"
+require "studio/navbar_identity"
 require "studio/profile_sections"
 require "studio/profile_image"
 require "studio/oauth_identity"
@@ -190,6 +191,33 @@ module Studio
   def self.navbar_links=(links)
     NavbarLinks.validate!(links)
     @@navbar_links = links
+  end
+
+  # ---- Navbar identity ----
+  # The name the signed-in user nav prints, and the signed-out button's label.
+  # Both defaults render the navbar byte-identical to before. The engine has no
+  # I18n catalogue, so the label is plain config rather than a locale key.
+  # Rules: lib/studio/navbar_identity.rb.
+  #
+  #   config.navbar_user_name = :player_name                          # a method on the user
+  #   config.navbar_user_name = ->(user, view) { user.player_name }   # or a callable
+  #   config.sign_in_label    = "Sign in"
+  #
+  # nil means user.display_name. A method or callable that raises, or answers
+  # blank, falls back to display_name; a raise is reported once, never a 500.
+  mattr_reader :navbar_user_name, default: nil
+
+  def self.navbar_user_name=(config)
+    NavbarIdentity.validate_name!(config)
+    NavbarIdentity.reset_reported!
+    @@navbar_user_name = config
+  end
+
+  mattr_reader :sign_in_label, default: NavbarIdentity::DEFAULT_SIGN_IN_LABEL
+
+  def self.sign_in_label=(label)
+    NavbarIdentity.validate_label!(label)
+    @@sign_in_label = label
   end
 
   # ---- The shared profile page (/profile) ----
@@ -900,6 +928,11 @@ module Studio
   # Navbar links resolved for a view context (lib/studio/navbar_links.rb).
   def self.navbar_links_for(view)
     NavbarLinks.resolve(navbar_links, view)
+  end
+
+  # The signed-in user's navbar name for a view (lib/studio/navbar_identity.rb).
+  def self.navbar_user_name_for(user, view = nil)
+    NavbarIdentity.user_name(user, view, config: navbar_user_name)
   end
 
   # The engine's standard /profile rows. Hosts compose against this rather than
