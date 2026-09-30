@@ -68,16 +68,21 @@ class E2eLabIsolationTest < ActionDispatch::IntegrationTest
   # that ONLY that constant can put there.
   DECLARED_LINK = "#studio-link-sidebar a[href='/']"
 
-  # /lab/geo_settings is the one lab page that needs a SCHEMA, and the sweep below
-  # walks every lab route rather than a curated list — so the table has to exist
-  # here for the same reason e2e/boot.rb creates it for the browser lane. The REAL
-  # migration the gem ships, not a hand-written CREATE, matching the pattern
-  # test/integration/geo_gate_test.rb established.
+  # /lab/geo_settings and /lab/site_identity are the lab pages that need a SCHEMA,
+  # and the sweep below walks every lab route rather than a curated list — so their
+  # tables have to exist here for the same reason e2e/boot.rb creates them for the
+  # browser lane. The REAL migrations the gem ships, not hand-written CREATEs,
+  # matching the pattern test/integration/geo_gate_test.rb established.
   def self.ensure_schema!
-    return if ActiveRecord::Base.connection.table_exists?(:studio_geo_settings)
+    connection = ActiveRecord::Base.connection
+    unless connection.table_exists?(:studio_geo_settings)
+      require_relative "../../db/migrate/20260818120000_create_studio_geo_settings"
+      ActiveRecord::Migration.suppress_messages { CreateStudioGeoSettings.new.migrate(:up) }
+    end
+    return if connection.table_exists?(:studio_site_identities)
 
-    require_relative "../../db/migrate/20260818120000_create_studio_geo_settings"
-    ActiveRecord::Migration.suppress_messages { CreateStudioGeoSettings.new.migrate(:up) }
+    require_relative "../../db/migrate/20260930120000_create_studio_site_identities"
+    ActiveRecord::Migration.suppress_messages { CreateStudioSiteIdentities.new.migrate(:up) }
   end
 
   def setup = self.class.ensure_schema!

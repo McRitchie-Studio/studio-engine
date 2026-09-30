@@ -1,0 +1,14 @@
+<%# The link-preview lab layout: the engine's REAL head partial, as every
+    consuming app renders it, plus a body. Nothing link-preview specific is
+    written here — that is the point: an app gets the tags from the head. %>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title><%= content_for(:title) || "Link preview lab" %></title>
+    <%= render "layouts/studio/head" %>
+  </head>
+  <body>
+    <%= yield %>
+  </body>
+</html>

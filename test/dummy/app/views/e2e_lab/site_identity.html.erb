@@ -1,0 +1,7 @@
+<%# The site identity manager's lab page: the engine's own /admin/link_preview
+    template, rendered BY NAME and nothing else, so e2e/site_identity.spec.js
+    drives the page's real script and markup rather than a copy of them. %>
+<main class="p-4">
+  <p data-test="lab-body">site identity lab</p>
+  <%= render template: "studio/site_identities/edit" %>
+</main>
