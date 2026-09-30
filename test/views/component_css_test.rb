@@ -79,7 +79,8 @@ class ComponentCssTest < Minitest::Test
     # the resolver emits --color-cta-fill only for the default primary).
     assert_includes css, "background-color: var(--color-cta-fill, var(--color-cta));"
     assert_includes css, "background-color: var(--color-cta-hover);"
-    assert_includes css, "background-color: var(--color-danger);"
+    assert_includes css, "background-color: var(--color-danger-fill, var(--color-danger));"
+    assert_includes css, "background-color: var(--color-warning-fill, var(--color-warning));"
   end
 
   def test_every_theme_var_referenced_is_emitted_in_both_modes

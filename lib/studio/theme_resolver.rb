@@ -9,6 +9,12 @@ module Studio
     # green measured 2.78:1 under the white label btn-success draws on it. This
     # is the same hue at 5.0:1 (the shade cyvasse chose for its own success).
     DEFAULT_SUCCESS = "#367E3A"
+    # The default warning and danger stay these hexes as ROLE colours (borders,
+    # rings, the -ink derivations start from them). Their button fills are
+    # derived separately, see #fill_vars: #FF7C47 is 2.55:1 and #EF4444 3.76:1
+    # under the white label btn-warning and btn-danger draw.
+    DEFAULT_WARNING = "#FF7C47"
+    DEFAULT_DANGER  = "#EF4444"
 
     # WCAG AA for normal-size text. Every filled button draws a 14px bold white
     # label, which is not "large" text, so its fill owes 4.5:1 against white.
@@ -44,8 +50,8 @@ module Studio
       primary     = colors[:primary] || DEFAULT_PRIMARY
       border_rgb  = ColorScale.lighten(dark_base, 0.30)
       success     = colors[:success] || DEFAULT_SUCCESS
-      warning     = colors[:warning] || "#FF7C47"
-      danger      = colors[:danger] || "#EF4444"
+      warning     = colors[:warning] || DEFAULT_WARNING
+      danger      = colors[:danger] || DEFAULT_DANGER
       surfaces    = dark_surfaces(dark_base)
 
       secondary_ink = contrast_ink(dark_base, direction: :lighten, start: 0.70, target: 4.5, against: surfaces)
@@ -114,7 +120,7 @@ module Studio
         "--color-warning-ink"    => status_ink(warning, surfaces, direction: :lighten),
         "--color-success-ink"    => status_ink(success, surfaces, direction: :lighten),
         "--color-accent"         => colors[:accent] || "#F72585"
-      }.merge(fill_vars(primary, success))
+      }.merge(fill_vars(primary, warning, danger))
     end
 
     # Every dark-mode background a text var can sit on (page, surface,
@@ -197,13 +203,23 @@ module Studio
     # label with its orange (a darkened fill would drop it to 3.3:1), and
     # cyvasse sets --color-cta itself.
     #
+    # --color-warning-fill and --color-danger-fill are the same contract for
+    # btn-warning and btn-danger (engine-button-contrast-admin-cog): emitted
+    # only while the role is at its engine default (#FF7C47 at 2.55:1, #EF4444
+    # at 3.76:1 under white), so a CONFIGURED colour paints as-is through the
+    # var(--color-<role>) fallback — mcritchie-industries' yellow warning is
+    # its own call. The role colour itself is not darkened: it is also a
+    # border, a ring and the start of its -ink search, which text reads.
+    #
     # Success needs no fill var: its DEFAULT is already AA under white
     # (DEFAULT_SUCCESS), and a configured success colour is the app's own —
     # turf-monster's suite pins that a configured #4BAF50 still paints as-is.
-    def fill_vars(primary, _success)
-      return {} unless primary.to_s.casecmp?(DEFAULT_PRIMARY)
-
-      { "--color-cta-fill" => white_label_fill(primary) }
+    def fill_vars(primary, warning, danger)
+      {
+        "--color-cta-fill"     => (white_label_fill(primary) if primary.to_s.casecmp?(DEFAULT_PRIMARY)),
+        "--color-warning-fill" => (white_label_fill(warning) if warning.to_s.casecmp?(DEFAULT_WARNING)),
+        "--color-danger-fill"  => (white_label_fill(danger) if danger.to_s.casecmp?(DEFAULT_DANGER))
+      }.compact
     end
 
     # The hover fill is always derived, so it is always held to AA under white:
@@ -251,8 +267,8 @@ module Studio
       light_base = colors[:light] || "#f8fafc"
       primary    = colors[:primary] || DEFAULT_PRIMARY
       success    = colors[:success] || DEFAULT_SUCCESS
-      warning    = colors[:warning] || "#FF7C47"
-      danger     = colors[:danger] || "#EF4444"
+      warning    = colors[:warning] || DEFAULT_WARNING
+      danger     = colors[:danger] || DEFAULT_DANGER
       surfaces   = light_surfaces(light_base)
 
       secondary_ink = contrast_ink(light_base, direction: :darken, start: 0.55, target: 4.5, against: surfaces)
@@ -303,7 +319,7 @@ module Studio
         "--color-warning-ink"    => status_ink(warning, surfaces, direction: :darken),
         "--color-success-ink"    => status_ink(success, surfaces, direction: :darken),
         "--color-accent"         => colors[:accent] || "#F72585"
-      }.merge(fill_vars(primary, success))
+      }.merge(fill_vars(primary, warning, danger))
     end
   end
 end

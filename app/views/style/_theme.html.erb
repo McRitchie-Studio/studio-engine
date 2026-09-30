@@ -191,8 +191,8 @@
           d.setProperty('--color-cta', this.colors.primary);
           d.setProperty('--color-cta-fill', this.colors.primary);
           if (this.colors.success) d.setProperty('--color-success', this.colors.success);
-          if (this.colors.warning) d.setProperty('--color-warning', this.colors.warning);
-          if (this.colors.danger)  d.setProperty('--color-danger', this.colors.danger);
+          if (this.colors.warning) { d.setProperty('--color-warning', this.colors.warning); d.setProperty('--color-warning-fill', this.colors.warning); }
+          if (this.colors.danger)  { d.setProperty('--color-danger', this.colors.danger);   d.setProperty('--color-danger-fill', this.colors.danger); }
         },
         persist(form, label) {
           if (this.saving) return;

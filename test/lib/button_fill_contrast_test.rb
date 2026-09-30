@@ -112,6 +112,57 @@ class ButtonFillContrastTest < ActiveSupport::TestCase
     refute_match(/background-color: var\(--color-cta\);/, utility.("btn-primary"))
   end
 
+  # engine-button-contrast-admin-cog. btn-warning and btn-danger draw a white
+  # label on the role colour, and the defaults failed AA under it: warning
+  # #FF7C47 at 2.55:1, danger #EF4444 at 3.76:1. Same line as the cta: the
+  # role colour stays (it is also a border and a text colour), and the
+  # resolver emits a derived fill ONLY while the role is at its default.
+  test "the default warning and danger fills clear AA under their white label in both modes" do
+    modes.each do |mode, vars|
+      %w[--color-warning-fill --color-danger-fill].each do |var|
+        assert_operator ratio(vars.fetch(var)), :>=, AA, "#{mode} #{var} #{vars[var]} is #{ratio(vars[var]).round(2)}:1"
+      end
+      assert_equal "#B85933", vars["--color-warning-fill"], "#{mode}: #FF7C47 is 2.55:1 under white"
+      assert_equal "#D73D3D", vars["--color-danger-fill"], "#{mode}: #EF4444 is 3.76:1 under white"
+      assert_equal "#FF7C47", vars["--color-warning"], "#{mode}: the warning role colour itself is unchanged"
+      assert_equal "#EF4444", vars["--color-danger"], "#{mode}: the danger role colour itself is unchanged"
+    end
+  end
+
+  test "the default warning and danger match lib/studio.rb's theme defaults" do
+    assert_equal Studio::ThemeResolver::DEFAULT_WARNING, Studio.theme_warning
+    assert_equal Studio::ThemeResolver::DEFAULT_DANGER, Studio.theme_danger
+  end
+
+  test "a configured warning or danger colour emits no fill and paints as-is" do
+    # mcritchie-industries configures a yellow warning; its label is its own call.
+    modes(warning: "#F5C518", danger: "#B91C1C").each do |mode, vars|
+      assert_equal "#F5C518", vars["--color-warning"], mode
+      assert_equal "#B91C1C", vars["--color-danger"], mode
+      refute vars.key?("--color-warning-fill"), "#{mode}: btn-warning must fall back to var(--color-warning)"
+      refute vars.key?("--color-danger-fill"), "#{mode}: btn-danger must fall back to var(--color-danger)"
+    end
+  end
+
+  # Text keeps reading the -ink variants, derived from the unchanged role
+  # colours; these are the values the engine shipped before the fills.
+  test "the default warning and danger text inks are unchanged" do
+    inks = { dark: %w[#FF966C #F48484], light: %w[#994A2B #BA3535] }
+    modes.each do |mode, vars|
+      assert_equal inks[mode], [vars["--color-warning-ink"], vars["--color-danger-ink"]], mode
+    end
+  end
+
+  test "btn-warning and btn-danger paint the derived fill, falling back to the role" do
+    css = File.read(File.join(ROOT, "app/assets/tailwind/studio_engine/engine.css"))
+    utility = ->(name) { css[/@utility #{name} \{.*?\n\}/m] }
+
+    assert_includes utility.("btn-warning"), "background-color: var(--color-warning-fill, var(--color-warning));"
+    assert_includes utility.("btn-danger"), "background-color: var(--color-danger-fill, var(--color-danger));"
+    assert_includes utility.("btn-warning"), "@apply text-white;", "the label stays white"
+    assert_includes utility.("btn-danger"), "@apply text-white;", "the label stays white"
+  end
+
   # --color-success is the brand green, and the default is now a DARKER green:
   # 3.49:1 as text on the default dark page, 2.23:1 on its surface. Text and
   # icons read --color-success-ink, derived to AA on every surface in both
