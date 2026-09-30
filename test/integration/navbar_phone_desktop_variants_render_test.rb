@@ -106,6 +106,42 @@ class NavbarPhoneDesktopVariantsRenderTest < ActiveSupport::TestCase
     refute_empty header.css("button[title='Admin']")
   end
 
+  # engine-button-contrast-admin-cog: the user nav drew the admin cog at every
+  # width and the phone row drew another, so an admin's phone showed two.
+  test "an admin sees exactly one admin cog on a phone, in the phone row" do
+    header = render_header(NavbarVariantsAdminHostController)
+
+    cogs = visible_cogs(header, :phone)
+
+    assert_equal 1, cogs.size, "two cogs on a phone is the bug"
+    assert cogs.first.ancestors.any? { |el| classes(el).include?("md:hidden") },
+      "the phone's cog is the phone row's"
+  end
+
+  test "an admin sees exactly one admin cog on a desktop, in the user nav" do
+    header = render_header(NavbarVariantsAdminHostController)
+
+    cogs = visible_cogs(header, :desktop)
+
+    assert_equal 1, cogs.size
+    assert cogs.first.ancestors.none? { |el| classes(el).include?("md:hidden") },
+      "the desktop's cog is the user nav's"
+  end
+
+  test "with a sidebar that does not carry the admin menu, still one cog at each width" do
+    Studio.sidebar_sections = [{ title: "Site", links: [{ label: "Home", href: "/", emoji: "🏠" }] }]
+    header = render_header(NavbarVariantsAdminHostController)
+
+    assert_equal 1, visible_cogs(header, :phone).size
+    assert_equal 1, visible_cogs(header, :desktop).size
+  end
+
+  test "a non-admin sees no admin cog at either width" do
+    header = render_header
+
+    assert_empty header.css("button[title='Admin']")
+  end
+
   private
 
   def render_header(controller = NavbarVariantsHostController)
@@ -116,6 +152,10 @@ class NavbarPhoneDesktopVariantsRenderTest < ActiveSupport::TestCase
   end
 
   def classes(el) = el["class"].to_s.split
+
+  def visible_cogs(header, width)
+    header.css("button[title='Admin']").select { |cog| visible?(cog, width) }
+  end
 
   def visible?(node, width)
     [node, *node.ancestors].none? do |el|

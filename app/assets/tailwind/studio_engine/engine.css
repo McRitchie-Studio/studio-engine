@@ -265,17 +265,23 @@ body.modal-open .studio-app-banner {
   }
 }
 
+/* The fill is --color-danger-fill when the resolver emits one (only while the
+   app leaves its danger colour at the engine default, which fails AA under the
+   white label), otherwise the app's own --color-danger. */
 @utility btn-danger {
   @apply text-white;
-  background-color: var(--color-danger);
+  background-color: var(--color-danger-fill, var(--color-danger));
   &:hover {
     filter: brightness(0.9);
   }
 }
 
+/* The fill is --color-warning-fill when the resolver emits one (only while the
+   app leaves its warning colour at the engine default, which fails AA under the
+   white label), otherwise the app's own --color-warning. */
 @utility btn-warning {
   @apply text-white;
-  background-color: var(--color-warning);
+  background-color: var(--color-warning-fill, var(--color-warning));
   &:hover {
     filter: brightness(0.9);
   }
