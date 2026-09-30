@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.81.1 — 2026-09-30
+
 ### Fixed
 
 - **The engine caps `redis` below 6, as ActionCable's redis adapter requires.**
