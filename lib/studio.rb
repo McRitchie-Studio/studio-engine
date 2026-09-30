@@ -3,6 +3,7 @@ require "studio/log_rotation"
 require "studio/ip_locations"
 require "studio/geo"
 require "studio/geo/lookup"
+require "studio/link_preview"
 require "studio/engine"
 require "studio/color_scale"
 require "studio/environment_banner"
@@ -470,6 +471,69 @@ module Studio
   # geo_check_path, and a duplicate route NAME raises while that app's routes.rb
   # is loading — taking its entire route set down, not just this page.
   mattr_accessor :draw_geo_routes, default: false
+
+  # ---- Link preview (Studio::LinkPreview, LinkPreviewSetting, LinkPreviewHelper)
+  #
+  # What an unfurl shows when someone pastes a link to this app: a DEFAULT image,
+  # title and description the operator sets at /admin/link_preview, which any
+  # page may override (`link_preview image: ..., title: ...`). See
+  # docs/LINK_PREVIEW.md.
+
+  # Whether layouts/studio/_head emits the og:/twitter: tags.
+  #
+  #   :auto (default)  emit once this app has INSTALLED the engine's
+  #                    studio_link_preview_settings table — installing the
+  #                    migration is the adoption act. An app that emits its own
+  #                    og tags today (turf-monster, cyvasse) and has not installed
+  #                    it gets no second set.
+  #   true             always emit (the static fallback and the site name still
+  #                    answer with no table).
+  #   false            never emit from the head; the app renders
+  #                    `studio_link_preview_tags` itself, or owns its tags.
+  #
+  # An app that owns its own og tags and installs the engine migrations for any
+  # other reason sets this false until its adoption deletes its own tags.
+  mattr_accessor :link_preview_tags, default: :auto
+
+  # The Active Storage service the DEFAULT image is attached to. nil = the app's
+  # default service. Unfurlers cache the og:image URL and re-fetch it days later,
+  # so the tag must be a PERMANENT URL: a service whose `public?` is true answers
+  # its own public URL; any other service is served through Rails' storage PROXY
+  # route (a permanent URL on this app's own domain, streaming from the private
+  # bucket). An app with a public-read service names it here, e.g. turf-monster:
+  #
+  #   config.link_preview_image_service = OgImageAttachable::PUBLIC_OG_SERVICE
+  #
+  # Read once, when Studio::LinkPreviewSetting loads (has_one_attached's service
+  # is a literal fixed at class load), so set it in the initializer.
+  mattr_accessor :link_preview_image_service, default: nil
+
+  # The last image rung, when neither the page nor the operator supplied one. A
+  # root-relative path is used only when the file exists under public/, so an app
+  # without it emits no og:image rather than a broken one. An absolute URL is
+  # trusted as given.
+  mattr_accessor :link_preview_fallback_image, default: "/og.png"
+
+  # The last title and description rungs, under the operator's defaults. nil
+  # title means Studio.app_name; nil description means no description tag.
+  mattr_accessor :link_preview_default_title, default: nil
+  mattr_accessor :link_preview_default_description, default: nil
+
+  # Draw /admin/link_preview from Studio.routes. ON by default: no consumer owns
+  # these paths or helper names (admin_link_preview, admin_link_preview_image),
+  # checked 2026-09-30 across mcritchie-studio, turf-monster, cyvasse and
+  # mcritchie-industries. The page explains itself when the table is missing.
+  mattr_accessor :draw_link_preview_routes, default: true
+
+  # :auto resolves against the table; true/false are taken as given.
+  def self.link_preview_tags?
+    case link_preview_tags
+    when :auto, "auto", nil then Studio::LinkPreviewSetting.table_ready?
+    else !!link_preview_tags
+    end
+  rescue StandardError
+    false
+  end
 
   # Whether the engine configures Geocoder on boot (provider, HTTPS, timeout, and
   # a Rails.cache-backed IP cache). An app that configures Geocoder itself sets
@@ -1109,6 +1173,16 @@ module Studio
         get   "admin/geo",        to: "studio/geo_settings#edit",            as: :admin_geo
         patch "admin/geo",        to: "studio/geo_settings#update",          as: :admin_geo_update
         post  "admin/geo/toggle", to: "studio/geo_settings#toggle_override", as: :admin_geo_toggle
+      end
+
+      # The link-preview default (/admin/link_preview): the image, title and
+      # description every page unfurls with unless it overrides them. ON by
+      # default (Studio.draw_link_preview_routes) because no consumer owns these
+      # names; an app can still switch it off from its initializer.
+      if Studio.draw_link_preview_routes
+        get    "admin/link_preview",       to: "studio/link_preview_settings#edit",          as: :admin_link_preview
+        patch  "admin/link_preview",       to: "studio/link_preview_settings#update"
+        delete "admin/link_preview/image", to: "studio/link_preview_settings#destroy_image", as: :admin_link_preview_image
       end
       # The living style guide. Canonical at /admin/style (StyleController#index);
       # /admin/design_system redirects here but KEEPS its admin_design_system_path

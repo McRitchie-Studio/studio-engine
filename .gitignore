@@ -14,3 +14,4 @@ node_modules
 
 # Rails writes here when e2e/boot.rb boots the dummy (the theme CSS cache).
 /tmp/
+/test/dummy/tmp/

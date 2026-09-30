@@ -1,0 +1,221 @@
+<%# /admin/link_preview — the operator's link-preview DEFAULT.
+    What an unfurl (iMessage, Slack, Discord, X...) shows for any page of this
+    app that does not name its own image, title and description. Three parts,
+    in the order an operator asks: what does a link look like now, what picture
+    does it carry, and what words.
+
+    A bare content wrapper, like /admin/geo and /admin/emails, so it renders in
+    the host's layout. The crop and saving modals mount on a PAGE-SCOPED host
+    (linkPreviewModals), so the uploader works in an app that renders no shared
+    modal host at all — the /admin/emails pattern. %>
+<% content_for(:title) { "Link Preview" } %>
+<%
+  setting       = @setting
+  fallback_title = Studio.link_preview_default_title.presence || Studio.app_name.to_s
+  fallback_desc  = Studio.link_preview_default_description.to_s
+  card_title    = setting.title.presence || fallback_title
+  card_desc     = setting.description.presence || fallback_desc
+  card_image    = @default_image_url || @static_image_url
+  image_source  =
+    if @default_image_url then "the uploaded default"
+    elsif @static_image_url then "the app's static #{Studio.link_preview_fallback_image}"
+    else nil
+    end
+  tags_on       = Studio.link_preview_tags?
+%>
+<style>
+  /* The unfurl card. Plain CSS rather than utilities, so no host build has to
+     scan this gem for these names. Drawn the way iMessage and Slack draw a
+     large-image card: the picture at 1.91:1, then the domain, title and
+     description underneath. */
+  .lp-card {
+    max-width: 440px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgb(148 163 184 / 0.3);
+    background: rgb(148 163 184 / 0.08);
+  }
+  .lp-card-image {
+    aspect-ratio: 1200 / 630;
+    background: linear-gradient(135deg, var(--color-primary-700), var(--color-primary-900));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .lp-card-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .lp-card-body { padding: 10px 14px 12px; }
+  .lp-card-domain { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.7; }
+  .lp-card-title { font-weight: 700; line-height: 1.3; margin-top: 2px; }
+  .lp-card-desc {
+    font-size: 13px; line-height: 1.4; opacity: 0.8; margin-top: 2px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .lp-card-desc:empty { display: none; }
+</style>
+
+<div class="max-w-3xl mx-auto" data-link-preview-page
+     data-fallback-title="<%= fallback_title %>"
+     data-fallback-description="<%= fallback_desc %>">
+  <h1 class="text-2xl font-extrabold text-heading mb-2">Link Preview</h1>
+  <p class="text-sm text-muted mb-6">
+    What a link to <%= Studio.app_name %> shows when it is pasted into Messages, Slack, Discord or X.
+    Any page can override it with its own picture and words (a contest banner, a profile photo);
+    everything else uses this default.
+  </p>
+
+  <% unless @installed %>
+    <div class="card p-6 mb-6" data-link-preview-not-installed>
+      <h2 class="text-lg font-bold text-heading mb-2">Not installed yet</h2>
+      <p class="text-sm text-body mb-3">
+        This app has not installed the link-preview table, so there is no default to edit and the
+        engine's preview tags are <%= tags_on ? "on, using the static fallback" : "off" %>. Install it with:
+      </p>
+      <pre class="bg-inset rounded-lg p-3 text-xs font-mono overflow-x-auto">bin/rails studio_engine:install:migrations &amp;&amp; bin/rails db:migrate</pre>
+      <p class="text-xs text-muted mt-3">
+        An app that already writes its own og tags sets <span class="font-mono">config.link_preview_tags = false</span>
+        first. See docs/LINK_PREVIEW.md in studio-engine.
+      </p>
+    </div>
+  <% end %>
+
+  <%# -- The card, as an unfurl draws it ------------------------------------ %>
+  <div class="card p-6 mb-6">
+    <h2 class="text-lg font-bold text-heading mb-4">Preview</h2>
+    <div class="lp-card" data-link-preview-card>
+      <div class="lp-card-image">
+        <% if card_image %>
+          <img src="<%= card_image %>" alt="" data-link-preview-card-image>
+        <% else %>
+          <span class="text-xs text-white text-center px-4" data-link-preview-card-no-image>No image — links preview without a picture</span>
+        <% end %>
+      </div>
+      <div class="lp-card-body">
+        <div class="lp-card-domain" data-link-preview-card-domain><%= @domain %></div>
+        <div class="lp-card-title text-heading" data-link-preview-card-title><%= card_title %></div>
+        <div class="lp-card-desc text-body" data-link-preview-card-description><%= card_desc %></div>
+      </div>
+    </div>
+    <p class="text-xs text-muted mt-3">
+      <% if image_source %>
+        The picture is <%= image_source %>.
+      <% else %>
+        No default picture yet. Upload one below, or add <span class="font-mono">public/og.png</span> (1200 × 630).
+      <% end %>
+      <% unless tags_on %>
+        The engine's preview tags are <strong>off</strong> in this app
+        (<span class="font-mono">Studio.link_preview_tags</span>), so pages use the app's own tags.
+      <% end %>
+    </p>
+  </div>
+
+  <% if @installed %>
+    <%# -- The picture -------------------------------------------------------- %>
+    <div class="card p-6 mb-6"
+      <% if @uploads_available %>
+        x-data="imageUploadHost({
+          store: 'linkPreviewModals',
+          aspectRatio: <%= 1200.0 / 630 %>,
+          maxWidth: 1200,
+          transparent: false,
+          filename: 'link-preview.png',
+          saving: 'Saving image…',
+          success: 'Image updated',
+          successMessage: 'Your new link-preview image is live.',
+          failure: 'Couldn\'t save the image'
+        })"
+        @crop-photo-confirmed.window="onCropConfirmed($event.detail)"
+      <% end %>>
+      <h2 class="text-lg font-bold text-heading mb-2">Default image</h2>
+      <% if @uploads_available %>
+        <p class="text-sm text-muted mb-4">
+          Cropped to 1200 × 630, the shape every unfurl uses. It is served from a permanent URL, because
+          apps cache the picture and fetch it again days later.
+        </p>
+        <div class="flex flex-wrap gap-3 items-center">
+          <button type="button" @click="open()" class="btn btn-primary btn-sm" data-link-preview-upload>
+            <%= setting.image_attached? ? "Replace image" : "Upload image" %>
+          </button>
+          <% if setting.persisted? && setting.image_attached? %>
+            <%= button_to "Remove image", admin_link_preview_image_path, method: :delete,
+                  class: "btn btn-outline btn-sm",
+                  form: { data: { turbo_confirm: "Remove the default link-preview image?" } } %>
+          <% end %>
+        </div>
+        <%# The upload host writes the cropped file into THIS input and submits it
+            (see studio/emails/show for why the pair is load-bearing). %>
+        <%= form_with url: admin_link_preview_path, method: :patch,
+              html: { multipart: true, id: "link-preview-image-form", "x-ref": "form" } do %>
+          <%= file_field_tag "link_preview_setting[image]", class: "hidden", "x-ref": "fileInput",
+                accept: Studio::LinkPreviewSettingsController::IMAGE_TYPES.join(",") %>
+        <% end %>
+      <% else %>
+        <p class="text-sm text-muted">
+          Uploading needs Active Storage, which this app does not load. Pages still use the static
+          <span class="font-mono"><%= Studio.link_preview_fallback_image %></span>.
+        </p>
+      <% end %>
+    </div>
+
+    <%# -- The words --------------------------------------------------------- %>
+    <%# scope: :link_preview_setting is REQUIRED: a namespaced model's param key
+        is studio_link_preview_setting, which the controller never reads. %>
+    <%= form_with(model: setting, scope: :link_preview_setting, url: admin_link_preview_path,
+                  method: :patch, local: true) do |f| %>
+      <div class="card p-6 mb-6">
+        <h2 class="text-lg font-bold text-heading mb-4">Default title and description</h2>
+        <div class="mb-4">
+          <%= f.label :title, "Title", class: "block text-sm font-bold text-heading mb-1" %>
+          <%= f.text_field :title, class: "input w-full", placeholder: fallback_title,
+                maxlength: Studio::LinkPreviewSetting::TITLE_MAX, data: { link_preview_input: "title" } %>
+          <p class="text-xs text-muted mt-1">Blank uses <%= fallback_title %>.</p>
+        </div>
+        <div>
+          <%= f.label :description, "Description", class: "block text-sm font-bold text-heading mb-1" %>
+          <%= f.text_area :description, rows: 3, class: "input w-full", placeholder: fallback_desc.presence,
+                maxlength: Studio::LinkPreviewSetting::DESCRIPTION_MAX, data: { link_preview_input: "description" } %>
+          <p class="text-xs text-muted mt-1">One or two sentences. Unfurls show about two lines.</p>
+        </div>
+      </div>
+      <div class="flex justify-end mb-6">
+        <%= f.submit "Save", class: "btn btn-primary" %>
+      </div>
+    <% end %>
+
+    <% if @uploads_available %>
+      <%= render "studio/cropper_assets" %>
+      <%# Optional chaining on current() is load-bearing: the outer template
+          unmounts one tick AFTER the stack empties (see studio/emails/index). %>
+      <%= render "studio/modals/scoped_host", store: "linkPreviewModals" do %>
+        <template x-if="$store.linkPreviewModals.current()?.id === 'crop-photo'">
+          <div><%= render "studio/modals/crop_photo", store: "linkPreviewModals" %></div>
+        </template>
+        <template x-if="$store.linkPreviewModals.current()?.id === 'saving'">
+          <div><%= render "studio/modals/saving", store: "linkPreviewModals" %></div>
+        </template>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>
+
+<script>
+  // LIVE CARD. Typing in the title or description repaints the card before
+  // anything is saved, falling back to what a blank field would really send.
+  (function () {
+    var page = document.querySelector("[data-link-preview-page]");
+    if (!page) return;
+    var fallbacks = {
+      title: page.dataset.fallbackTitle || "",
+      description: page.dataset.fallbackDescription || ""
+    };
+    function paint(input) {
+      var key = input.dataset.linkPreviewInput;
+      var target = page.querySelector("[data-link-preview-card-" + key + "]");
+      if (!target) return;
+      var value = input.value.trim();
+      target.textContent = value || fallbacks[key];
+    }
+    page.querySelectorAll("[data-link-preview-input]").forEach(function (input) {
+      input.addEventListener("input", function () { paint(input); });
+    });
+  })();
+</script>

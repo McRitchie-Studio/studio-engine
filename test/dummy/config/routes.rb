@@ -64,6 +64,11 @@ Rails.application.routes.draw do
   # A host app's own pages, one open and one geo-LOCKED, for the geo suite.
   get "lab/geo", to: "geo_lab#open"
   get "lab/geo_locked", to: "geo_lab#locked"
+
+  # A host app's pages for the link-preview suite: plain, overridden, and heavy.
+  get "lab/link_preview", to: "link_preview_lab#plain"
+  get "lab/link_preview/override", to: "link_preview_lab#override"
+  get "lab/link_preview/heavy", to: "link_preview_lab#heavy"
   post "lab/sign_in", to: "geo_lab_sessions#create"
 
   # A host app's ordinary page + sign-in/out, for the session-drift suite.
