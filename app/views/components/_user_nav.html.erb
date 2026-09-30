@@ -86,8 +86,10 @@
         <div class="flex items-center gap-2 ml-auto self-end">
           <%= studio_nav_slot.call(extra_icons_slot, extra_icons_html) %>
           <%# Skipped when the link sidebar carries the admin menu — two cog
-              glyphs side by side read as a double gear. %>
-          <%= render "components/admin_dropdown" unless respond_to?(:studio_sidebar_replaces_admin_menu?) && studio_sidebar_replaces_admin_menu? %>
+              glyphs side by side read as a double gear. Desktop only, like
+              the theme toggle: below md the navbar's phone row draws the cog,
+              so a second one here put two on an admin's phone. %>
+          <%= render "components/admin_dropdown", display_class: "hidden md:block" unless respond_to?(:studio_sidebar_replaces_admin_menu?) && studio_sidebar_replaces_admin_menu? %>
           <%# Desktop only. Below md the engine navbar's phone row draws the
               theme toggle, so a second one here put two on every phone. The
               signed-out bar has always done it this way (layouts/_navbar). %>
@@ -219,7 +221,7 @@
       <span class="<%= account_classes %>" data-nav-account x-bind:style="$store.devMode && 'background: lightgreen'"><%= account_inner %></span>
     <% end %>
   <% else %>
-    <%= render "components/admin_dropdown" unless respond_to?(:studio_sidebar_replaces_admin_menu?) && studio_sidebar_replaces_admin_menu? %>
+    <%= render "components/admin_dropdown", display_class: "hidden md:block" unless respond_to?(:studio_sidebar_replaces_admin_menu?) && studio_sidebar_replaces_admin_menu? %>
     <%# Desktop only, as above: the phone row carries the toggle below md. %>
     <span class="hidden md:flex" data-nav-theme-toggle="desktop"><%= render "components/theme_toggle_morph" %></span>
     <div class="flex items-center gap-3 ml-auto">
