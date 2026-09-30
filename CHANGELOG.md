@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.82.0 — 2026-09-30
+
 ### Added
 
 - **A public user page at `/u/:username`, and the helpers that link to it.** It
@@ -115,7 +117,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
      resolution, `SiteSetting`'s og fields and the app-local `LinkPreviewBot` (the
      engine concern replaces it; contest pages keep `content_for(:og_image)` or move
      to `link_preview`), and delete `config.link_preview_tags = false`.
-
 
 ## 0.81.1 — 2026-09-30
 
