@@ -81,10 +81,9 @@ module Studio
         "--color-border"         => ColorScale.with_opacity(border_rgb, 0.2),
         "--color-border-strong"  => ColorScale.with_opacity(border_rgb, 0.4),
         "--color-shadow"         => "transparent",
-        # --color-cta and --color-success stay the brand colours: apps also
-        # paint them as TEXT on dark surfaces, where a darker shade would lose
-        # contrast. The button FILLS under a white label are separate, derived
-        # vars: see #fill_vars.
+        # --color-cta stays the brand colour: apps also paint it as TEXT on
+        # dark surfaces, where a darker shade would lose contrast. The button
+        # fill under a white label is a separate, derived var: see #fill_vars.
         "--color-cta"            => primary,
         "--color-cta-hover"      => cta_hover(primary),
         "--color-success"        => success,
@@ -189,25 +188,22 @@ module Studio
       contrast_ink(color, direction: :darken, start: 0.0, target: WHITE_LABEL_TARGET, against: ["#ffffff"])
     end
 
-    # The FILLS that carry a white label, the same in both modes (a button's
-    # label is white on either theme):
+    # --color-cta-fill: the fill btn-primary, btn-outline's hover and the user
+    # nav's level bar paint under a white label (the same in both modes).
+    # Emitted ONLY while the app leaves its primary at the engine default
+    # (#8E82FE, 3.1:1 under white), which is the engine's to make accessible.
+    # A CONFIGURED primary emits no fill, so those rules fall back to
+    # var(--color-cta), the app's own choice: mcritchie-industries pairs a navy
+    # label with its orange (a darkened fill would drop it to 3.3:1), and
+    # cyvasse sets --color-cta itself.
     #
-    #   --color-success-fill  btn-success and btn-secondary's default. The
-    #                         success colour's AA shade: the configured green
-    #                         itself when it already passes, darker when not.
-    #   --color-cta-fill      btn-primary, btn-outline's hover and the user
-    #                         nav's level bar. Emitted ONLY while the app leaves
-    #                         its primary at the engine default (#8E82FE, 3.1:1
-    #                         under white), which is the engine's to make
-    #                         accessible. A CONFIGURED primary emits no fill, so
-    #                         those rules fall back to var(--color-cta), the
-    #                         app's own choice: mcritchie-industries pairs a navy
-    #                         label with its orange (a darkened fill would drop it
-    #                         to 3.3:1), and cyvasse sets --color-cta itself.
-    def fill_vars(primary, success)
-      vars = { "--color-success-fill" => white_label_fill(success) }
-      vars["--color-cta-fill"] = white_label_fill(primary) if primary.to_s.casecmp?(DEFAULT_PRIMARY)
-      vars
+    # Success needs no fill var: its DEFAULT is already AA under white
+    # (DEFAULT_SUCCESS), and a configured success colour is the app's own —
+    # turf-monster's suite pins that a configured #4BAF50 still paints as-is.
+    def fill_vars(primary, _success)
+      return {} unless primary.to_s.casecmp?(DEFAULT_PRIMARY)
+
+      { "--color-cta-fill" => white_label_fill(primary) }
     end
 
     # The hover fill is always derived, so it is always held to AA under white:

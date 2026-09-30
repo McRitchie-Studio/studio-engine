@@ -181,8 +181,8 @@ class ComponentCssTest < Minitest::Test
   def test_secondary_and_neutral_variants_are_token_overridable_with_role_defaults
     secondary = css[/@utility btn-secondary \{.*?\n\}/m]
     refute_nil secondary, "expected an @utility btn-secondary block"
-    assert_includes secondary, "var(--btn-secondary-bg, var(--color-success-fill, var(--color-success)))",
-      "btn-secondary base must be token-overridable, defaulting to the success role's AA fill"
+    assert_includes secondary, "var(--btn-secondary-bg, var(--color-success))",
+      "btn-secondary base must be token-overridable, defaulting to the success role"
     assert_includes secondary, "var(--btn-secondary-bg-hover,",
       "btn-secondary hover fill must be token-overridable"
     assert_includes secondary, "var(--btn-secondary-hover-filter, brightness(0.9))",

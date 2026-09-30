@@ -197,7 +197,7 @@ body.modal-open .studio-app-banner {
 
     --btn-primary-fg              label color    (default: #fff)
     --btn-primary-fg-hover        hover label    (default: same as --btn-primary-fg)
-    --btn-secondary-bg            base fill      (default: var(--color-success-fill))
+    --btn-secondary-bg            base fill      (default: var(--color-success))
     --btn-secondary-bg-hover      hover fill     (default: same as base)
     --btn-secondary-hover-filter  hover filter   (default: brightness(0.9))
     --btn-neutral-bg              base fill      (default: var(--color-surface-alt))
@@ -249,9 +249,9 @@ body.modal-open .studio-app-banner {
    --btn-secondary-* instead of forking the @utility. */
 @utility btn-secondary {
   @apply text-white;
-  background-color: var(--btn-secondary-bg, var(--color-success-fill, var(--color-success)));
+  background-color: var(--btn-secondary-bg, var(--color-success));
   &:hover {
-    background-color: var(--btn-secondary-bg-hover, var(--btn-secondary-bg, var(--color-success-fill, var(--color-success))));
+    background-color: var(--btn-secondary-bg-hover, var(--btn-secondary-bg, var(--color-success)));
     filter: var(--btn-secondary-hover-filter, brightness(0.9));
   }
 }
@@ -281,13 +281,9 @@ body.modal-open .studio-app-banner {
   }
 }
 
-/* The fill is --color-success-fill, the success role's AA shade under a white
-   label (ThemeResolver#white_label_fill): the configured green itself when it
-   already clears 4.5:1, a darker step of it when it does not. The fallback to
-   --color-success covers a page that renders no theme vars. */
 @utility btn-success {
   @apply text-white;
-  background-color: var(--color-success-fill, var(--color-success));
+  background-color: var(--color-success);
   &:hover {
     filter: brightness(0.9);
   }

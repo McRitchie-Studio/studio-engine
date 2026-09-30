@@ -12,13 +12,14 @@ require "test_helper"
 # colour itself as every button fill — the default primary #8E82FE at 3.1:1.
 # The text inks were already derived for contrast; the fills were not.
 #
-# THE LINE IT HOLDS. The fills are SEPARATE vars from the brand colours.
-# --color-cta and --color-success are also painted as text on dark surfaces,
-# where a darker shade would lose contrast, so they stay the colours the app
-# chose; --color-success-fill and --color-cta-fill are what the buttons paint.
-# A CONFIGURED primary gets no cta fill at all: btn-primary falls back to the
-# app's own --color-cta (mcritchie-industries pairs a navy label with its
-# orange; cyvasse sets --color-cta itself).
+# THE LINE IT HOLDS. Only DEFAULTS and the fills the engine derives move; an
+# app's configured colours are its own. The default success green is itself
+# AA. The default primary keeps its violet as --color-cta (apps also paint it
+# as text on dark surfaces) and buttons paint a separate --color-cta-fill. A
+# CONFIGURED primary gets no cta fill: btn-primary falls back to the app's own
+# --color-cta (mcritchie-industries pairs a navy label with its orange; cyvasse
+# sets --color-cta itself). A configured success colour paints as-is
+# (turf-monster's suite pins that for #4BAF50).
 class ButtonFillContrastTest < ActiveSupport::TestCase
   AA    = 4.5
   WHITE = "#ffffff"
@@ -39,7 +40,7 @@ class ButtonFillContrastTest < ActiveSupport::TestCase
 
   test "the default theme's button fills clear AA under white in both modes" do
     modes.each do |mode, vars|
-      %w[--color-cta-fill --color-cta-hover --color-success-fill].each do |var|
+      %w[--color-cta-fill --color-cta-hover --color-success].each do |var|
         assert_operator ratio(vars.fetch(var)), :>=, AA, "#{mode} #{var} #{vars[var]} is #{ratio(vars[var]).round(2)}:1"
       end
     end
@@ -50,13 +51,12 @@ class ButtonFillContrastTest < ActiveSupport::TestCase
       assert_equal "#8E82FE", vars["--color-cta"], "#{mode}: the cta is still painted as text on dark surfaces"
       assert_equal "#7268CB", vars["--color-cta-fill"], "#{mode}: #8E82FE is 3.1:1 under white"
       assert_equal "#367E3A", vars["--color-success"]
-      assert_equal "#367E3A", vars["--color-success-fill"], "an already-passing green is not darkened"
     end
   end
 
   # Every palette the engine's consumers configure today, plus the old default
-  # green and pathological light colours. The success fill and the cta hover
-  # are derived for every palette, so they must pass for ALL of them.
+  # green and pathological light colours. The cta hover is derived for every
+  # palette, so it must pass for ALL of them.
   PALETTES = [
     { primary: "#2E7D32", success: "#2E7D32" },           # turf-monster
     { primary: "#F68048", warning: "#F5C518" },           # mcritchie-industries
@@ -70,7 +70,7 @@ class ButtonFillContrastTest < ActiveSupport::TestCase
   test "derived fills clear AA under white for every palette" do
     PALETTES.each do |palette|
       modes(palette).each do |mode, vars|
-        %w[--color-success-fill --color-cta-hover].each do |var|
+        %w[--color-cta-hover].each do |var|
           assert_operator ratio(vars.fetch(var)), :>=, AA, "#{palette.inspect} #{mode} #{var} #{vars[var]}"
         end
       end
@@ -80,7 +80,6 @@ class ButtonFillContrastTest < ActiveSupport::TestCase
   test "a configured colour that already passes keeps its exact hex" do
     vars = Studio::ThemeResolver.new(primary: "#2E7D32", success: "#2E7D32").light_mode_vars
 
-    assert_equal "#2E7D32", vars["--color-success-fill"], "start 0.0: a passing green is not darkened"
     assert_equal "#2E7D32", vars["--color-cta"]
     assert_equal Studio::ColorScale.darken("#2E7D32", 0.30), vars["--color-cta-hover"],
       "hover is unchanged wherever darken(primary, 0.30) already passes"
@@ -96,11 +95,10 @@ class ButtonFillContrastTest < ActiveSupport::TestCase
     end
   end
 
-  test "a configured success colour is never repainted; its button fill is" do
+  test "a configured success colour paints as-is, even the old failing green" do
     modes(success: "#4BAF50").each_value do |vars|
       assert_equal "#4BAF50", vars["--color-success"]
-      refute_equal "#4BAF50", vars["--color-success-fill"]
-      assert_operator ratio(vars["--color-success-fill"]), :>=, AA
+      refute vars.keys.any? { |k| k.start_with?("--color-success-fill") }, "no derived success fill"
     end
   end
 
@@ -111,9 +109,7 @@ class ButtonFillContrastTest < ActiveSupport::TestCase
     assert_includes utility.("btn-primary"), "background-color: var(--color-cta-fill, var(--color-cta));"
     assert_includes utility.("btn-outline"), "background-color: var(--color-cta-fill, var(--color-cta));",
       "btn-outline's hover draws a white label on the cta too"
-    assert_includes utility.("btn-success"), "background-color: var(--color-success-fill, var(--color-success));"
-    assert_includes utility.("btn-secondary"), "var(--btn-secondary-bg, var(--color-success-fill, var(--color-success)))"
-    refute_match(/background-color: var\(--color-(success|cta)\);/, utility.("btn-success") + utility.("btn-primary"))
+    refute_match(/background-color: var\(--color-cta\);/, utility.("btn-primary"))
   end
 
   # --color-success is the brand green, and the default is now a DARKER green:

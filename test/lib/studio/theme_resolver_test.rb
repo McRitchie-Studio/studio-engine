@@ -49,7 +49,7 @@ class Studio::ThemeResolverTest < Minitest::Test
       --color-text --color-text-body --color-text-secondary --color-text-muted
       --color-border --color-border-strong --color-shadow
       --color-cta --color-cta-hover --color-cta-fill
-      --color-success --color-success-fill --color-warning --color-danger --color-accent
+      --color-success --color-warning --color-danger --color-accent
     ]
     expected_keys.each do |key|
       assert vars.key?(key), "Missing dark mode var: #{key}"
@@ -141,7 +141,7 @@ class Studio::ThemeResolverTest < Minitest::Test
       --color-text --color-text-body --color-text-secondary --color-text-muted
       --color-border --color-border-strong --color-shadow
       --color-cta --color-cta-hover --color-cta-fill
-      --color-success --color-success-fill --color-warning --color-danger --color-accent
+      --color-success --color-warning --color-danger --color-accent
     ]
     expected_keys.each do |key|
       assert vars.key?(key), "Missing light mode var: #{key}"
