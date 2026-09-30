@@ -4,6 +4,24 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **Default warning and danger buttons clear WCAG AA under their white label.**
+  While an app leaves its warning at the engine default `#FF7C47` (2.55:1 under
+  white), the resolver emits `--color-warning-fill` (`#B85933`, 4.65:1); while it
+  leaves danger at `#EF4444` (3.76:1), it emits `--color-danger-fill`
+  (`#D73D3D`, 4.54:1). `btn-warning` and `btn-danger` paint the fill and fall back
+  to `--color-warning` / `--color-danger`, so a configured colour paints as
+  before. The role colours themselves, their borders and rings, and the
+  `--color-warning-ink` / `--color-danger-ink` text inks are unchanged. Labels
+  stay white.
+- **An admin sees one admin cog at every width.** `components/_user_nav` draws its
+  admin menu from `md` up only, as it already did the theme toggle: below `md` the
+  navbar's phone row draws the cog, so an admin's phone showed two.
+  `components/_admin_dropdown` takes an optional `display_class:` for this. Apps
+  that shadow `_user_nav` (mcritchie-studio, turf-monster, cyvasse) are unaffected
+  until they drop their copy.
+
 ## 0.80.0 — 2026-09-30
 
 ### Added
