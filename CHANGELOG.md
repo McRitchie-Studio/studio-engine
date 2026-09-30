@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.79.0 — 2026-09-30
+
 ### Changed
 
 - **The signed-in user nav fits a phone.** `components/_user_nav` draws its theme
