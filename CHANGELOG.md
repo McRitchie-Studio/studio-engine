@@ -37,8 +37,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   1. **cyvasse, turf-monster** (already have `users.username` with a
      `lower(username)` index): set `config.draw_public_user_routes = true` in
      `config/initializers/studio.rb`. Define `User#public_profile_visible?` if some
-     accounts must not have a page (cyvasse's merged accounts, turf-monster's
-     frozen ones). Then point username links at `link_to_user_profile(user)`.
+     accounts must not have a page (cyvasse's merged-away accounts, say). Then
+     point username links at `link_to_user_profile(user)`.
   2. **mcritchie-studio, mcritchie-industries** (no `username` column): add
      `users.username` with a unique `lower(username)` index, backfill it
      (`Studio::UsernameGenerator.generate` drafts one), then do step 1. Do not
