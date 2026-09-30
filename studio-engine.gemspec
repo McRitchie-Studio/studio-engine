@@ -35,7 +35,15 @@ Gem::Specification.new do |spec|
   # Realtime: the redis cable/cache/Sidekiq adapter (Studio::Redis) + Turbo Streams
   # broadcasting (Studio::Broadcastable). `redis` is the dependency whose ABSENCE
   # 500'd a host app's task board — declaring it here makes that impossible to repeat.
-  spec.add_dependency "redis", ">= 4.0.1"
+  #
+  # The `< 6` ceiling is ActionCable's, not ours. Its redis pubsub adapter
+  # (action_cable/subscription_adapter/redis.rb) activates `gem "redis", ">= 4",
+  # "< 6"` on Rails 7.2 through 8.1.3, so a consumer whose lock floats to redis
+  # 6.0.0 fails to load its cable adapter: Cyvasse shipped live chat broken that
+  # way, and mcritchie-studio pinned `redis ~> 5.4` after hitting it. Rails 8.1.4
+  # widens its bound to `< 7`; lift this cap only once every Rails line this gemspec
+  # allows accepts redis 6. test/lib/gemspec_redis_bound_test.rb pins it.
+  spec.add_dependency "redis", ">= 4.0.1", "< 6"
   spec.add_dependency "turbo-rails", ">= 1.0"
   # IP -> location for Studio::Geo. A dependency rather than a host concern
   # because the point of the geo primitive is that EVERY app has the capacity:

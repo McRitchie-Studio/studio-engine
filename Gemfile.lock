@@ -7,7 +7,7 @@ PATH
       geocoder (>= 1.8, < 2.0)
       mini_magick (~> 5.0)
       rails (>= 7.2, < 8.2)
-      redis (>= 4.0.1)
+      redis (>= 4.0.1, < 6)
       resend (~> 1.1)
       solid_queue (>= 1.0, < 2.0)
       tailwindcss-rails (~> 4.5)

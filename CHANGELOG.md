@@ -4,6 +4,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **The engine caps `redis` below 6, as ActionCable's redis adapter requires.**
+  The gemspec declared `redis >= 4.0.1` with no ceiling, so a consumer that did not
+  pin redis itself floated to 6.0.0, and ActionCable's redis pubsub adapter (which
+  activates `redis >= 4, < 6` through Rails 8.1.3) failed to load. The dependency
+  is now `>= 4.0.1, < 6`. Consumers already on redis 5 resolve unchanged.
+
 ## 0.81.0 — 2026-09-30
 
 ### Changed
