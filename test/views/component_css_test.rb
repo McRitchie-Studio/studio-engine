@@ -75,7 +75,9 @@ class ComponentCssTest < Minitest::Test
     assert_includes btn, "&:focus-visible", "btn must keep the hub's focus-visible treatment"
     assert_includes btn, "var(--color-cta)"
 
-    assert_includes css, "background-color: var(--color-cta);"
+    # The cta FILL, falling back to the cta role (engine-navbar-phone-polish:
+    # the resolver emits --color-cta-fill only for the default primary).
+    assert_includes css, "background-color: var(--color-cta-fill, var(--color-cta));"
     assert_includes css, "background-color: var(--color-cta-hover);"
     assert_includes css, "background-color: var(--color-danger);"
   end

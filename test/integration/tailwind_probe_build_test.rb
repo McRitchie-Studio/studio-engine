@@ -29,7 +29,7 @@ class TailwindProbeBuildTest < Minitest::Test
     end
 
     # Theme wiring survives compilation: the CTA role reaches the buttons...
-    assert_includes out_css, "background-color: var(--color-cta)"
+    assert_includes out_css, "background-color: var(--color-cta-fill, var(--color-cta))"
     assert_includes out_css, "background-color: var(--color-cta-hover)"
     # ...including the hub's focus-visible ring...
     assert_includes out_css, "outline: 2px solid color-mix(in srgb, var(--color-cta) 70%, transparent)"

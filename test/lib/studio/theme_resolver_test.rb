@@ -48,7 +48,7 @@ class Studio::ThemeResolverTest < Minitest::Test
       --color-page --color-surface --color-surface-alt --color-inset
       --color-text --color-text-body --color-text-secondary --color-text-muted
       --color-border --color-border-strong --color-shadow
-      --color-cta --color-cta-hover
+      --color-cta --color-cta-hover --color-cta-fill
       --color-success --color-warning --color-danger --color-accent
     ]
     expected_keys.each do |key|
@@ -122,7 +122,7 @@ class Studio::ThemeResolverTest < Minitest::Test
     vars = resolver.dark_mode_vars
     assert_equal "#1A1535", vars["--color-page"]
     assert_equal "#8E82FE", vars["--color-cta"]
-    assert_equal "#4BAF50", vars["--color-success"]
+    assert_equal "#367E3A", vars["--color-success"], "the default green is its AA shade since engine-navbar-phone-polish"
     assert_equal "#FF7C47", vars["--color-warning"]
     assert_equal "#EF4444", vars["--color-danger"]
   end
@@ -140,7 +140,7 @@ class Studio::ThemeResolverTest < Minitest::Test
       --color-page --color-surface --color-surface-alt --color-inset
       --color-text --color-text-body --color-text-secondary --color-text-muted
       --color-border --color-border-strong --color-shadow
-      --color-cta --color-cta-hover
+      --color-cta --color-cta-hover --color-cta-fill
       --color-success --color-warning --color-danger --color-accent
     ]
     expected_keys.each do |key|

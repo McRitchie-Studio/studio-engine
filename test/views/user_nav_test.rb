@@ -96,12 +96,18 @@ class UserNavTest < Minitest::Test
   # /profile is the destination for the four apps that never wrote one, and
   # PLAIN TEXT renders when neither does. Never a dead href.
 
+  # FLIPPED in engine-navbar-phone-polish: these counted TWO /profile links
+  # (the name, then the avatar). The name and avatar are now ONE link — one
+  # tab stop — so the count is 1, and the link carries both.
   def test_username_and_avatar_link_to_profile_when_the_route_exists
     doc = Nokogiri::HTML5.fragment(render_nav)
     hrefs = doc.css("a").map { |a| a["href"] }
 
-    assert_equal 2, hrefs.count("/profile"),
-      "both the username and the avatar link to /profile"
+    assert_equal 1, hrefs.count("/profile"),
+      "the username and the avatar are one link to /profile"
+    link = doc.at_css("a[href='/profile']")
+    assert_includes link.text, "Pat Studio", "the name is inside the link"
+    assert_includes link.to_html, "PS", "the avatar is inside the same link"
   end
 
   def test_no_dead_href_anywhere_when_no_account_route_exists
@@ -118,8 +124,8 @@ class UserNavTest < Minitest::Test
     doc = Nokogiri::HTML5.fragment(render_nav(profile_path: nil))
 
     assert_includes doc.text, "Pat Studio"
-    assert_nil doc.at_css("a.truncate"), "no link when there is no destination"
-    refute_nil doc.at_css("span.truncate"), "the name renders as plain text instead"
+    assert_nil doc.at_css("a"), "no link when there is no destination"
+    refute_nil doc.at_css("span[data-nav-name]"), "the name renders as plain text instead"
   end
 
   def test_the_avatar_still_renders_when_there_is_nowhere_to_link
@@ -132,7 +138,7 @@ class UserNavTest < Minitest::Test
     doc = Nokogiri::HTML5.fragment(render_nav(profile_path: nil, account_path: "/account"))
     hrefs = doc.css("a").map { |a| a["href"] }
 
-    assert_equal 2, hrefs.count("/account")
+    assert_equal 1, hrefs.count("/account")
   end
 
   # THE MIGRATION RULE, and the one most likely to be "simplified" into a
@@ -147,7 +153,7 @@ class UserNavTest < Minitest::Test
     doc = Nokogiri::HTML5.fragment(render_nav(profile_path: "/profile", account_path: "/account"))
     hrefs = doc.css("a").map { |a| a["href"] }
 
-    assert_equal 2, hrefs.count("/account"),
+    assert_equal 1, hrefs.count("/account"),
       "the engine must not repoint an app that already has its own account page"
     refute_includes hrefs, "/profile"
   end
@@ -166,61 +172,126 @@ class UserNavTest < Minitest::Test
   #
   # This suite renders through ActionView only: there is no layout engine
   # here, so it CANNOT assert "the username shows an ellipsis at 400px".
-  # That property was measured directly in Chromium against this partial's
-  # real output plus the hub's compiled Tailwind (viewport 400px, nav given
-  # 328px): with min-w-0 on the inner Div 1 row the nav root could not
-  # shrink below a 364px min-content width, the avatar was pushed to
-  # right=424 (page scrolled horizontally) and the username link measured
-  # scrollWidth 156 == clientWidth 156, so NO ellipsis rendered. With
-  # min-w-0 on the flex-1 column instead, the nav root shrank to 328px,
-  # nothing crossed the viewport, and the link measured scrollWidth 156 >
-  # clientWidth 120 -- the ellipsis rendered.
+  # What IS assertable is the structural precondition, and these tests walk
+  # the DOM rather than string-match classes.
   #
-  # What IS assertable here is the structural precondition that made the
-  # difference, so these two tests guard it: a flex item defaults to
-  # min-width auto, so the min-w-0 escape has to sit on the flex item of
-  # the nav root. Putting it anywhere deeper is a no-op for shrinking, and
-  # that misplacement is exactly the bug these tests exist to catch. They
-  # walk the DOM from the truncating link upward rather than string-matching
-  # the class, so min-w-0 appearing elsewhere in the subtree cannot satisfy
-  # them.
+  # The rule, measured twice. In Chromium at 400px (nav given 328px) the name
+  # ellipsized only with min-w-0 on the left column — the flex item of the nav
+  # root — and not one level deeper, because a flex item defaults to min-width
+  # auto. And after engine-navbar-phone-polish first moved min-w-0 onto the
+  # account link, the browser lane caught a 320px phone with a balance pushing
+  # the avatar 17px past the screen: the icon column would not give. So the
+  # column keeps min-w-0, the account link never shrinks, and the name
+  # truncates inside a max width of its own.
 
-  def test_min_w_0_sits_on_the_nav_roots_flex_item_not_deeper
-    column = username_column(render_nav)
+  def test_min_w_0_sits_on_the_icon_column_the_nav_roots_flex_item
+    root = nav_root(render_nav)
+    column = root.element_children.find { |el| !el.key?("data-nav-account") }
 
     assert_includes column["class"].split, "min-w-0",
-      "the flex item of the nav root must carry min-w-0, or it keeps " \
-      "min-width auto and refuses to shrink, defeating the username truncate"
+      "the icon column must carry min-w-0, or it refuses to shrink and pushes the avatar off a phone"
+    assert_empty column.css("[class~='min-w-0']").map { |el| el["class"] },
+      "min-w-0 below the flex item does not enable shrinking; it belongs on the column"
   end
 
-  def test_no_element_below_the_flex_item_carries_a_stray_min_w_0
-    # Guards the specific regression: min-w-0 on the inner Div 1 row reads
-    # like the fix but does nothing, because that row is a block child of
-    # the column, not a flex item of the nav root.
-    column = username_column(render_nav)
-    strays = column.css("[class~='min-w-0']").map { |el| el["class"] }
+  def test_the_account_link_never_shrinks
+    link = account_item(render_nav)
 
-    assert_empty strays,
-      "min-w-0 below the flex item does not enable shrinking; it belongs on the column"
+    assert_includes link["class"].split, "flex-shrink-0", "the avatar must stay on screen"
+    refute_includes link["class"].split, "min-w-0"
+  end
+
+  def test_the_name_truncates_inside_a_max_width
+    name = account_item(render_nav).at_css("[data-nav-name]")
+
+    assert_includes name["class"].split, "truncate"
+    assert_includes name.parent["class"].split, "md:max-w-40",
+      "the link does not shrink, so the name's box needs a max width to ellipsize in"
+  end
+
+  # --- one account link, avatar only on a phone ---------------------------
+
+  def test_one_account_link_is_one_tab_stop
+    doc = Nokogiri::HTML5.fragment(render_nav)
+    accounts = doc.css("[data-nav-account]")
+
+    assert_equal 1, accounts.size, "one account element"
+    assert_equal "a", accounts.first.name
+    assert_equal 1, doc.css("a[href='/profile']").size, "one link to the account page"
+  end
+
+  def test_phone_shows_the_avatar_only_and_keeps_the_name_for_screen_readers
+    link = account_item(render_nav)
+    name_box = link.at_css("[data-nav-name]").parent
+
+    assert_equal %w[sr-only md:not-sr-only md:max-w-40], name_box["class"].split,
+      "below md the name is screen-reader text; from md up it shows"
+    assert_equal "Pat Studio", name_box.text.strip, "the name is still the link's text"
+
+    avatar = link.css("span").find { |el| el["aria-hidden"] == "true" }
+    refute_nil avatar, "the avatar is decorative inside the link (the name labels it)"
+    assert_includes avatar.to_html, "PS"
+    refute_includes avatar["class"].to_s.split, "hidden", "the avatar shows at every width"
+  end
+
+  # --- one theme toggle on a phone -----------------------------------------
+
+  def test_signed_in_theme_toggle_is_desktop_only
+    doc = Nokogiri::HTML5.fragment(render_nav)
+    wrappers = doc.css("[data-nav-theme-toggle]")
+
+    assert_equal 1, wrappers.size, "one theme toggle in the user nav"
+    assert_equal %w[hidden md:flex], wrappers.first["class"].split,
+      "below md the navbar's phone row draws the toggle; this one must hide"
+    refute_empty wrappers.first.element_children, "the toggle itself renders inside the wrapper"
+  end
+
+  def test_signed_out_theme_toggle_is_desktop_only_too
+    doc = Nokogiri::HTML5.fragment(render_nav(logged_in: false))
+    wrappers = doc.css("[data-nav-theme-toggle]")
+
+    assert_equal 1, wrappers.size
+    assert_equal %w[hidden md:flex], wrappers.first["class"].split
+  end
+
+  # --- what the phone polish must keep --------------------------------------
+
+  def test_the_desktop_sidebar_button_passed_as_extra_icons_html_still_renders
+    # The engine navbar hands its desktop link-sidebar trigger in through
+    # extra_icons_html. cyvasse's fork of this partial dropped it once, which
+    # left desktops no way into the sidebar.
+    html = render_nav(extra_icons_html: %(<button class="hidden md:inline-flex" data-sidebar-trigger>SIDEBAR</button>))
+    button = Nokogiri::HTML5.fragment(html).at_css("[data-sidebar-trigger]")
+
+    refute_nil button
+    assert_nil button.ancestors.find { |el| el["data-nav-account"] }, "icons stay outside the account link"
+  end
+
+  def test_the_admin_menu_still_renders_for_an_admin
+    html = render_nav(admin: true)
+
+    assert_includes html, 'title="Admin"'
+    refute_nil Nokogiri::HTML5.fragment(html).at_css("button[title='Admin']")
   end
 
   private
 
-  # Walks up from the truncating username link to the nav root's direct
-  # child -- the element that is actually a flex item of the nav root.
-  def username_column(html)
-    doc = Nokogiri::HTML5.fragment(html)
-    nav_root = doc.at_css("div.flex.gap-2")
-    refute_nil nav_root, "expected the nav root flex row"
-
-    link = nav_root.at_css("a.truncate")
-    refute_nil link, "expected the truncating username link"
-
-    node = link
-    node = node.parent while node.parent && node.parent != nav_root
-    assert_equal nav_root, node.parent, "expected the link to descend from the nav root"
-    node
+  def nav_root(html)
+    root = Nokogiri::HTML5.fragment(html).at_css("div.flex.gap-2")
+    refute_nil root, "expected the nav root flex row"
+    root
   end
+
+  # The account link (or its plain-text stand-in): a direct child of the nav
+  # root, i.e. actually a flex item of it.
+  def account_item(html)
+    root = nav_root(html)
+    item = root.element_children.find { |el| el.key?("data-nav-account") }
+    refute_nil item, "expected the account link as a direct child of the nav root"
+    item
+  end
+
+  public
 
   # --- off-chain collapse -----------------------------------------------
 
@@ -255,12 +326,13 @@ class UserNavTest < Minitest::Test
   # `profile_path` / `account_path` are passed as nil to model a host that does
   # NOT draw that route — `defined?` is false there, exactly as in a real app
   # whose router never named the helper.
-  def render_nav(logged_in: true, profile_path: "/profile", account_path: nil, **locals)
+  def render_nav(logged_in: true, profile_path: "/profile", account_path: nil, admin: false, **locals)
     view = ActionView::Base.with_empty_template_cache.with_view_paths(
       ["app/views", "test/views/fixtures"]
     )
     user = StubUser.new
     view.define_singleton_method(:logged_in?) { logged_in }
+    view.define_singleton_method(:admin?) { admin } if admin
     view.define_singleton_method(:current_user) { user }
     view.define_singleton_method(:logout_path) { "/logout" }
     view.define_singleton_method(:login_path) { "/login" }
