@@ -49,7 +49,7 @@ class Studio::ThemeResolverTest < Minitest::Test
       --color-text --color-text-body --color-text-secondary --color-text-muted
       --color-border --color-border-strong --color-shadow
       --color-cta --color-cta-hover
-      --color-success --color-warning --color-danger --color-accent
+      --color-success --color-success-fill --color-warning --color-danger --color-accent
     ]
     expected_keys.each do |key|
       assert vars.key?(key), "Missing dark mode var: #{key}"
@@ -61,9 +61,13 @@ class Studio::ThemeResolverTest < Minitest::Test
     assert_equal "#1A1535", vars["--color-page"]
   end
 
-  def test_dark_mode_cta_is_primary
+  # FLIPPED in engine-navbar-phone-polish: the DEFAULT primary #8E82FE is
+  # 3.1:1 under btn-primary's white label, so the cta fill for an app that
+  # never chose a primary is its AA shade. A configured primary is still the
+  # cta as-is (test_turf_monster_green_primary below).
+  def test_dark_mode_cta_is_the_default_primarys_aa_shade
     vars = @resolver.dark_mode_vars
-    assert_equal "#8E82FE", vars["--color-cta"]
+    assert_equal "#7268CB", vars["--color-cta"]
   end
 
   def test_dark_mode_cta_hover_is_darkened_primary
@@ -121,8 +125,8 @@ class Studio::ThemeResolverTest < Minitest::Test
     resolver = Studio::ThemeResolver.new({})
     vars = resolver.dark_mode_vars
     assert_equal "#1A1535", vars["--color-page"]
-    assert_equal "#8E82FE", vars["--color-cta"]
-    assert_equal "#4BAF50", vars["--color-success"]
+    assert_equal "#7268CB", vars["--color-cta"]
+    assert_equal "#367E3A", vars["--color-success"]
     assert_equal "#FF7C47", vars["--color-warning"]
     assert_equal "#EF4444", vars["--color-danger"]
   end
@@ -141,7 +145,7 @@ class Studio::ThemeResolverTest < Minitest::Test
       --color-text --color-text-body --color-text-secondary --color-text-muted
       --color-border --color-border-strong --color-shadow
       --color-cta --color-cta-hover
-      --color-success --color-warning --color-danger --color-accent
+      --color-success --color-success-fill --color-warning --color-danger --color-accent
     ]
     expected_keys.each do |key|
       assert vars.key?(key), "Missing light mode var: #{key}"
@@ -158,9 +162,9 @@ class Studio::ThemeResolverTest < Minitest::Test
     assert_equal "#ffffff", vars["--color-surface"]
   end
 
-  def test_light_mode_cta_is_primary
+  def test_light_mode_cta_is_the_default_primarys_aa_shade
     vars = @resolver.light_mode_vars
-    assert_equal "#8E82FE", vars["--color-cta"]
+    assert_equal "#7268CB", vars["--color-cta"]
   end
 
   def test_light_mode_text_is_dark
@@ -177,7 +181,7 @@ class Studio::ThemeResolverTest < Minitest::Test
     resolver = Studio::ThemeResolver.new({})
     vars = resolver.light_mode_vars
     assert_equal "#f8fafc", vars["--color-page"]
-    assert_equal "#8E82FE", vars["--color-cta"]
+    assert_equal "#7268CB", vars["--color-cta"]
   end
 
   # ── primary_palette_vars ────────────────────────────────────
