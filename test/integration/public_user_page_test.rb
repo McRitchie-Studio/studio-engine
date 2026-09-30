@@ -235,6 +235,16 @@ class PublicUserPageTest < ActionDispatch::IntegrationTest
     assert_no_private_fields(response.body)
   end
 
+  test "the initials circle reads the username, never a host's name-keyed avatar_initials" do
+    User.define_method(:avatar_initials) { name.to_s[0] } # cyvasse's shape: name first
+    User.create!(email: "zed@example.test", name: "Zed Private", username: "otter-9")
+    get "/u/otter-9"
+    assert_match %r{rounded-full[^>]*>\s*O\s*</div>}, response.body
+    refute_match %r{>\s*Z\s*</div>}, response.body, "the name's initial must never appear"
+  ensure
+    User.remove_method(:avatar_initials)
+  end
+
   test "an attached avatar is drawn with the username as its alt text" do
     attach_avatar(@alex)
 
