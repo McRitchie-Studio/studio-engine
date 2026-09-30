@@ -67,9 +67,10 @@ module Studio
     after_commit { self.class.bust_cache! }
 
     class << self
-      # This app's row, or an unsaved one. Never nil.
+      # This app's row, or an unsaved one — or nil when the table is not
+      # installed, because a model with no table cannot even be instantiated.
       def current
-        return new(app_name: Studio.app_name) unless table_ready?
+        return nil unless table_ready?
 
         find_by(app_name: Studio.app_name) || new(app_name: Studio.app_name)
       end

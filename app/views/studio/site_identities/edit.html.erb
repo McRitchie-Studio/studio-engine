@@ -15,8 +15,8 @@
   setting       = @setting
   fallback_title = Studio.site_title.presence || Studio.app_name.to_s
   fallback_desc  = Studio.site_description.to_s
-  card_title    = setting.title.presence || fallback_title
-  card_desc     = setting.description.presence || fallback_desc
+  card_title    = setting&.title.presence || fallback_title
+  card_desc     = setting&.description.presence || fallback_desc
   card_image    = @default_image_url || @static_image_url
   image_source  =
     if @default_image_url then "the uploaded default"

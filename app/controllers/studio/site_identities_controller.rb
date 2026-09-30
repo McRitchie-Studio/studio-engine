@@ -23,7 +23,7 @@ module Studio
 
     def edit
       @installed = Studio::SiteIdentity.table_ready?
-      @setting = Studio::SiteIdentity.current
+      @setting = @installed ? Studio::SiteIdentity.current : nil
       @uploads_available = @installed && @setting.respond_to?(:image)
       @default_image_url = default_image_url
       @static_image_url = static_image_url
@@ -65,7 +65,7 @@ module Studio
       return redirect_to(admin_link_preview_path, alert: not_installed_message, status: :see_other) unless installed?
 
       setting = Studio::SiteIdentity.current
-      if setting.persisted? && setting.image_attached?
+      if setting&.persisted? && setting.image_attached?
         rescue_and_log(target: setting) do
           setting.image.purge
           Studio::SiteIdentity.bust_cache!

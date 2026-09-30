@@ -98,6 +98,7 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
 
     ActiveRecord::Base.connection.drop_table(:studio_site_identities)
     ActiveRecord::Base.connection.schema_cache.clear!
+    Studio::SiteIdentity.reset_column_information
   end
 
   def setup
