@@ -46,10 +46,10 @@ module Studio
 
       preview = Studio::LinkPreview.resolve(
         site_name: Studio.app_name,
-        titles: [overrides[:title], content_for(:title), stored[:title], Studio.site_title],
-        descriptions: [overrides[:description], content_for(:meta_description),
+        titles: [overrides[:title], studio_link_preview_content(:title), stored[:title], Studio.site_title],
+        descriptions: [overrides[:description], studio_link_preview_content(:meta_description),
                        stored[:description], Studio.site_description],
-        page_images: [studio_link_preview_image_location(overrides[:image]), content_for(:og_image)],
+        page_images: [studio_link_preview_image_location(overrides[:image]), studio_link_preview_content(:og_image)],
         default_image: stored[:image_url] || stored[:image_path],
         static_image: Studio::SiteIdentity.static_image
       )
@@ -96,6 +96,14 @@ module Studio
       location && (location[:url] || location[:path])
     rescue StandardError
       nil
+    end
+
+    # content_for holds ESCAPED text in a SafeBuffer, and the resolver's strip
+    # returns a plain String the tag partial escapes again ("Pass &amp;amp; Run").
+    # Hand the resolver the plain text instead.
+    def studio_link_preview_content(key)
+      value = content_for(key)
+      value && CGI.unescapeHTML(value.to_str)
     end
 
     def studio_request_base_url

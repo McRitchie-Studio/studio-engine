@@ -363,6 +363,16 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
     assert_equal :static, view.studio_link_preview[:image_source]
   end
 
+  # content_for stores ESCAPED text in a SafeBuffer; the tags must escape it once.
+  test "a content_for title or image with & or ' reaches the tag escaped once" do
+    html = LinkPreviewLabController.render(inline: <<~ERB, layout: false)
+      <% content_for :title, "Pass & Run's Grades" %><% content_for :og_image, "https://cdn.example.test/c.png?w=1&h=2" %><%= studio_link_preview_tags %>
+    ERB
+
+    assert_equal "Pass & Run's Grades", meta("og:title", html)
+    assert_equal "https://cdn.example.test/c.png?w=1&h=2", meta("og:image", html)
+  end
+
   test "link_preview refuses a key it does not know" do
     view = ActionView::Base.empty
     view.extend(Studio::LinkPreviewHelper)
