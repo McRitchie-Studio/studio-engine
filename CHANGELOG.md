@@ -4,6 +4,29 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The signed-in user nav fits a phone.** `components/_user_nav` draws its theme
+  toggle from `md` up only (the navbar's phone row already has one, so phones
+  showed two), and the name and avatar are now ONE link to the account page, one
+  tab stop, where they were two links to the same place. Below `md` the avatar
+  stands alone and the name is screen-reader text. The desktop sidebar button
+  passed as `extra_icons_html`, the admin menu, the account destination, the
+  second row and the banners are unchanged. From `md` up the name now sits beside
+  the avatar, centred on it, rather than on the top row. Apps that shadow the
+  partial (mcritchie-studio, turf-monster, cyvasse) are unaffected until they
+  drop their copy.
+- **Default button fills clear WCAG AA under their white label.** The default
+  success green is `#367E3A` (5.0:1), was `#4BAF50` (2.78:1). The resolver emits
+  a new `--color-success-fill`, the success colour's AA shade for white text,
+  which `btn-success` and `btn-secondary`'s default now paint; `--color-success`
+  itself is still the configured colour. When an app leaves the primary at the
+  engine default `#8E82FE` (3.1:1), `--color-cta` is its AA shade `#7268CB`;
+  `--color-primary` and its palette stay the default violet. `--color-cta-hover`
+  is held to AA the same way, unchanged wherever `darken(primary, 0.30)` already
+  passes. A configured primary is still the fill as-is: an app pairs its label
+  with it (mcritchie-industries draws navy on orange).
+
 ## 0.78.0 — 2026-09-29
 
 ### Added
