@@ -209,7 +209,7 @@
       </span>
     <% end %>
     <% if studio_nav_destination %>
-      <%= link_to account_inner, studio_nav_destination, class: "#{account_classes} hover:opacity-80 transition", data: { nav_account: true }, "x-bind:style": "$store.devMode && 'background: lightgreen'" %>
+      <%= link_to account_inner, studio_nav_destination, class: "#{account_classes} hover:opacity-80 transition", "data-nav-account": "", "x-bind:style": "$store.devMode && 'background: lightgreen'" %>
     <% else %>
       <span class="<%= account_classes %>" data-nav-account x-bind:style="$store.devMode && 'background: lightgreen'"><%= account_inner %></span>
     <% end %>
