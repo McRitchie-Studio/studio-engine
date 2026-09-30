@@ -40,7 +40,7 @@
      end
    end %>
 
-<%# Where the username and the avatar point — resolved ONCE, used by both.
+<%# Where the account link (the username and the avatar, one link) points.
 
     A HOST'S OWN account_path WINS: an app that already has an account page keeps
     it rather than being repointed at a thinner /profile by a routine dependency
@@ -69,16 +69,14 @@
 
 <div class="flex gap-2">
   <% if logged_in? %>
-    <%# Left column: Div 1 + Div 2 stacked %>
-    <%# min-w-0 belongs HERE, on the flex item of the outer row. A flex item
-        defaults to min-width auto, so without it this column refuses to
-        shrink below its content and the username overflows instead of
-        truncating. Div 1 below is a block child of this column, not a flex
-        item of the outer row, so min-w-0 there has no effect on shrinking.
-        The username link truncates on its own: overflow-hidden gives it an
-        automatic minimum size of zero inside Div 1. %>
-    <div class="flex-1 min-w-0">
-      <%# Div 1 (Bigger): balance + icons + username. %>
+    <%# Left column: Div 1 + Div 2 stacked.
+        flex-1 WITHOUT min-w-0: this column holds the icons, which must never
+        be squeezed, so it keeps min-width auto (its min-content, the icon row)
+        and the account link beside it is what gives way — the name truncates
+        inside the link. The level row's text is absolutely positioned, so it
+        adds nothing to that min-content. %>
+    <div class="flex-1">
+      <%# Div 1 (Bigger): balance + icons. %>
       <div class="flex items-center gap-2 leading-none" :style="'padding: 0 6px;' + ($store.devMode ? 'background: cornflowerblue;' : '')">
         <%= studio_nav_slot.call(balance_slot, balance_html) %>
         <div class="flex items-center gap-2 ml-auto self-end">
@@ -86,14 +84,11 @@
           <%# Skipped when the link sidebar carries the admin menu — two cog
               glyphs side by side read as a double gear. %>
           <%= render "components/admin_dropdown" unless respond_to?(:studio_sidebar_replaces_admin_menu?) && studio_sidebar_replaces_admin_menu? %>
-          <%= render "components/theme_toggle_morph" %>
+          <%# Desktop only. Below md the engine navbar's phone row draws the
+              theme toggle, so a second one here put two on every phone. The
+              signed-out bar has always done it this way (layouts/_navbar). %>
+          <span class="hidden md:flex" data-nav-theme-toggle="desktop"><%= render "components/theme_toggle_morph" %></span>
         </div>
-        <% nav_name_classes = "text-heading font-semibold hover:text-primary transition text-base leading-none truncate text-right" %>
-        <% if studio_nav_destination %>
-          <%= link_to current_user.display_name, studio_nav_destination, class: nav_name_classes %>
-        <% else %>
-          <span class="<%= nav_name_classes %>"><%= current_user.display_name %></span>
-        <% end %>
       </div>
       <% div2_content = studio_nav_slot.call(div2_slot, div2_html) %>
       <% server_level = current_user.respond_to?(:level) && current_user.level.present? ? current_user.level : nil %>
@@ -196,19 +191,32 @@
         </style>
       <% end %>
     </div>
-    <%# Div 3 (Avatar): spans both rows %>
-    <% if studio_nav_destination %>
-      <%= link_to studio_nav_destination, class: "hover:opacity-80 transition flex-shrink-0 flex items-center", "x-bind:style": "$store.devMode && 'background: lightgreen'" do %>
-        <%= render "components/avatar", user: current_user, size: "nav" %>
-      <% end %>
-    <% else %>
-      <span class="flex-shrink-0 flex items-center" x-bind:style="$store.devMode && 'background: lightgreen'">
+    <%# Div 3 (Account): the name and the avatar are ONE link to the account
+        page, one tab stop — they used to be two links to the same place.
+        Below md the name is screen-reader text and the avatar stands alone,
+        so a phone never shows the name truncated to "Guest 55…"; from md up
+        it shows beside the avatar and truncates when the row is tight.
+
+        The link is the nav root's shrinking flex item, so min-w-0 sits on it
+        (a flex item defaults to min-width auto and would refuse to shrink),
+        and again on the name's box, which is the link's own flex item. The
+        avatar is aria-hidden: the name is the link's accessible name. %>
+    <% account_classes = "group flex items-center gap-2 min-w-0 flex-shrink" %>
+    <% account_inner = capture do %>
+      <span class="sr-only md:not-sr-only md:min-w-0"><span class="block truncate text-right text-heading font-semibold text-base leading-none transition<%= " group-hover:text-primary" if studio_nav_destination %>" data-nav-name><%= current_user.display_name %></span></span>
+      <span class="flex-shrink-0 flex items-center" aria-hidden="true">
         <%= render "components/avatar", user: current_user, size: "nav" %>
       </span>
     <% end %>
+    <% if studio_nav_destination %>
+      <%= link_to account_inner, studio_nav_destination, class: "#{account_classes} hover:opacity-80 transition", data: { nav_account: true }, "x-bind:style": "$store.devMode && 'background: lightgreen'" %>
+    <% else %>
+      <span class="<%= account_classes %>" data-nav-account x-bind:style="$store.devMode && 'background: lightgreen'"><%= account_inner %></span>
+    <% end %>
   <% else %>
     <%= render "components/admin_dropdown" unless respond_to?(:studio_sidebar_replaces_admin_menu?) && studio_sidebar_replaces_admin_menu? %>
-    <%= render "components/theme_toggle_morph" %>
+    <%# Desktop only, as above: the phone row carries the toggle below md. %>
+    <span class="hidden md:flex" data-nav-theme-toggle="desktop"><%= render "components/theme_toggle_morph" %></span>
     <div class="flex items-center gap-3 ml-auto">
       <%= link_to "Log in", login_path, class: "text-heading hover:text-primary text-sm font-semibold transition" %>
       <%= link_to "Sign up", signup_path, class: "btn btn-primary btn-sm" %>
