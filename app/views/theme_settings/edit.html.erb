@@ -337,6 +337,13 @@
         document.documentElement.style.setProperty('--color-success', this.colors.success);
         document.documentElement.style.setProperty('--color-warning', this.colors.warning || '#FF7C47');
         document.documentElement.style.setProperty('--color-danger', this.colors.danger || '#EF4444');
+        // btn-warning/btn-danger paint --color-<role>-fill first (the resolver
+        // emits it for the engine defaults), so a typed colour must set it too
+        // or the specimens keep the default fill. Cleared: drop the override.
+        ['warning', 'danger'].forEach((role) => {
+          if (this.colors[role]) document.documentElement.style.setProperty(`--color-${role}-fill`, this.colors[role]);
+          else document.documentElement.style.removeProperty(`--color-${role}-fill`);
+        });
       },
 
       darkPreviewStyle() {

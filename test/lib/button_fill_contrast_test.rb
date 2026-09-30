@@ -176,4 +176,14 @@ class ButtonFillContrastTest < ActiveSupport::TestCase
 
     assert_empty offenders, "use var(--color-success-ink) for text: #{offenders.inspect}"
   end
+
+  # Both live theme editors must set the -fill vars they preview, or a typed
+  # warning/danger colour leaves btn-warning/btn-danger on the default fill.
+  test "both theme editor previews set the warning and danger fill vars" do
+    %w[app/views/style/_theme.html.erb app/views/theme_settings/edit.html.erb].each do |view|
+      source = File.read(File.join(ROOT, view))
+      assert_match(/--color-warning-fill|--color-\$\{role\}-fill/, source, "#{view} previews no warning fill")
+      assert_match(/--color-danger-fill|--color-\$\{role\}-fill/, source, "#{view} previews no danger fill")
+    end
+  end
 end
