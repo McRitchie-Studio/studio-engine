@@ -18,8 +18,8 @@ module Studio
   class SiteIdentitiesController < ApplicationController
     before_action :require_admin
 
-    MAX_IMAGE_BYTES = 8.megabytes
-    IMAGE_TYPES = %w[image/png image/jpeg image/webp image/gif].freeze
+    IMAGE_TYPES = Studio::SiteIdentity::IMAGE_TYPES
+    MAX_IMAGE_BYTES = Studio::SiteIdentity::MAX_IMAGE_BYTES
 
     def edit
       @installed = Studio::SiteIdentity.table_ready?

@@ -39,6 +39,11 @@ module Studio
     TITLE_MAX = 200
     DESCRIPTION_MAX = 500
 
+    # What the image upload accepts. Here rather than on the controller so the
+    # page's file input can name it without reaching into a controller.
+    IMAGE_TYPES = %w[image/png image/jpeg image/webp image/gif].freeze
+    MAX_IMAGE_BYTES = 8 * 1024 * 1024
+
     # The image. `service:` is a LITERAL fixed when this class loads, which is why
     # Studio.link_preview_image_service must be set in the initializer. Guarded
     # so a host without Active Storage still loads the class (and simply has no

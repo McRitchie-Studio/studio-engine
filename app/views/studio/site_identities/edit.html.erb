@@ -149,7 +149,7 @@
         <%= form_with url: admin_link_preview_path, method: :patch,
               html: { multipart: true, id: "link-preview-image-form", "x-ref": "form" } do %>
           <%= file_field_tag "site_identity[image]", class: "hidden", "x-ref": "fileInput",
-                accept: Studio::SiteIdentitiesController::IMAGE_TYPES.join(",") %>
+                accept: Studio::SiteIdentity::IMAGE_TYPES.join(",") %>
         <% end %>
       <% else %>
         <p class="text-sm text-muted">
