@@ -309,6 +309,24 @@ class E2eLabController < ActionController::Base
   # subject; the stamps are what prove it ran.
   def at_time = render(:at_time)
 
+  # The site identity manager (/admin/link_preview), rendered from the engine's
+  # own template with the instance variables its controller sets. A lab page
+  # rather than the real one because that needs an admin session and Active
+  # Storage tables, and neither is what the spec drives: the live card, the
+  # crop modal's wiring, and the layout at phone width.
+  def site_identity
+    @installed = true
+    @setting = Studio::SiteIdentity.new(
+      app_name: Studio.app_name, title: "Saved title",
+      description: "Saved description of what this app is."
+    )
+    @uploads_available = true
+    @default_image_url = "/e2e/img/banner.gif"
+    @static_image_url = nil
+    @domain = "lab.example"
+    render(:site_identity)
+  end
+
 
   # The email manager's two preview frames — the ARTWORK box and the IN THE EMAIL
   # box — rendered side by side exactly as /admin/emails/:key renders them.

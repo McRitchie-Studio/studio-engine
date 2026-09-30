@@ -214,6 +214,9 @@ abort "e2e/boot: nav logo not written at #{nav_logo}" if File.size?(nav_logo).to
 # shared with a minitest run, so the header's rule above still holds: the lab
 # seeds its own state and reaches for nobody else's database.
 require_relative "../db/migrate/20260818120000_create_studio_geo_settings"
+# The site identity page (/lab/site_identity) renders its form from the real
+# model, which needs its real table.
+require_relative "../db/migrate/20260930120000_create_studio_site_identities"
 
 lab_db = File.join(ROOT, "tmp", "e2e-lab.sqlite3")
 FileUtils.mkdir_p(File.dirname(lab_db))
@@ -221,6 +224,7 @@ FileUtils.rm_f(lab_db)
 ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: lab_db)
 ActiveRecord::Migration.suppress_messages do
   CreateStudioGeoSettings.new.migrate(:up)
+  CreateStudioSiteIdentities.new.migrate(:up)
 end
 abort "e2e/boot: geo table missing" unless ActiveRecord::Base.connection.table_exists?(:studio_geo_settings)
 

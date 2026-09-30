@@ -55,7 +55,11 @@
   .lp-card-desc:empty { display: none; }
 </style>
 
-<div class="max-w-3xl mx-auto" data-link-preview-page
+<%# x-data on the root is load-bearing: studio/modals/scoped_host declares no
+    Alpine scope of its own, so without one here the crop modal's store opens
+    and its dialog never appears in a host whose body carries no x-data
+    (e2e/site_identity.spec.js). %>
+<div class="max-w-3xl mx-auto" x-data data-link-preview-page
      data-fallback-title="<%= fallback_title %>"
      data-fallback-description="<%= fallback_desc %>">
   <h1 class="text-2xl font-extrabold text-heading mb-2">Link Preview</h1>
