@@ -21,6 +21,7 @@ require_relative "../lib/studio/geo/lookup"
 require_relative "../lib/studio/environment_banner"
 require_relative "../lib/studio/sidebar_sections"
 require_relative "../lib/studio/navbar_links"
+require_relative "../lib/studio/navbar_identity"
 require_relative "../lib/studio/profile_sections"
 require_relative "../lib/studio/profile_image"
 require_relative "../lib/studio/oauth_identity"
@@ -69,6 +70,9 @@ module Studio
   mattr_accessor :nav_spinner_min_ms,   default: 2500
   mattr_accessor :sidebar_sections,     default: []
   mattr_accessor :navbar_links,         default: []
+  # Mirrors lib/studio.rb (whose writers validate; the mirror does not).
+  mattr_accessor :navbar_user_name,     default: nil
+  mattr_accessor :sign_in_label,        default: Studio::NavbarIdentity::DEFAULT_SIGN_IN_LABEL
   # nil, NOT [] — nil means "the engine's standard profile page". The unit suite
   # asserts that distinction (test/lib/studio/profile_sections_test.rb), so this
   # mirror has to carry the real default rather than a convenient one.
@@ -164,6 +168,10 @@ module Studio
 
   def self.navbar_links_for(view)
     NavbarLinks.resolve(navbar_links, view)
+  end
+
+  def self.navbar_user_name_for(user, view = nil)
+    NavbarIdentity.user_name(user, view, config: navbar_user_name)
   end
 
   # Mirrors lib/studio.rb — Studio::ProfileSections and Studio::OauthIdentity both

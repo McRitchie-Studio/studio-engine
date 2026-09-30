@@ -611,6 +611,36 @@ end
 - A bad entry raises `Studio::NavbarLinks::InvalidLink` naming its index: at
   assignment for a static Array, at render for a callable.
 
+### Navbar identity — `Studio.navbar_user_name` and `Studio.sign_in_label`
+
+Two words the navbar says about the viewer. Both defaults render the navbar
+byte-identical to before, so an app that sets neither sees no change. Rules:
+`lib/studio/navbar_identity.rb`.
+
+```ruby
+Studio.configure do |config|
+  # The signed-in name in components/_user_nav. nil (the default) is display_name.
+  config.navbar_user_name = :player_name                        # a method on the user
+  # config.navbar_user_name = ->(user, view) { user.player_name } # or a callable
+
+  # The signed-out button in layouts/_navbar and components/_user_nav.
+  config.sign_in_label = "Sign in"                              # default "Log in"
+end
+```
+
+- `navbar_user_name` is `nil`, a method name (Symbol or String), or a callable.
+  A two-argument callable gets `(user, view)`; a one-argument callable gets the
+  user alone.
+- The name is always escaped, even when the method or callable returns an
+  `html_safe` string.
+- A method or callable that answers blank falls back to `display_name`. One
+  that raises also falls back, and the error is reported once per process per
+  error class (to `ErrorLog` when the app has it, else the Rails log), so a
+  broken setting never 500s the layout.
+- The engine has no I18n catalogue, so the label is plain config, not a locale
+  key. A blank or non-String label, or a `navbar_user_name` of any other type,
+  raises `Studio::NavbarIdentity::InvalidConfig` at assignment.
+
 ### User nav slots
 
 `components/_user_nav.html.erb` renders the right-side navbar user section.
