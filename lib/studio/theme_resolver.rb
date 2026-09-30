@@ -182,7 +182,7 @@ module Studio
       contrast_ink(role, direction: direction, start: 0.0, target: 4.5, against: surfaces + tints)
     end
 
-    # The darkest-needed shade of `color` that carries a white label at AA: the
+    # The lightest shade of `color` that carries a white label at AA: the
     # colour itself when it already passes, otherwise the same hue darkened in
     # 0.02 steps until it does. A fill shade, derived the way the text inks are.
     def white_label_fill(color)
