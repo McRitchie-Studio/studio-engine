@@ -483,16 +483,17 @@ module Studio
   #
   #   :auto (default)  emit once this app has INSTALLED the engine's
   #                    studio_site_identities table — installing the
-  #                    migration is the adoption act. An app that emits its own
-  #                    og tags today (turf-monster, cyvasse) and has not installed
-  #                    it gets no second set.
+  #                    migration is the adoption act — and no template under
+  #                    app/views writes its own og:title/og:image. An app that
+  #                    emits its own tags (turf-monster, cyvasse) gets no second
+  #                    set, even after `install:migrations` brings the table in.
   #   true             always emit (the static fallback and the site name still
   #                    answer with no table).
   #   false            never emit from the head; the app renders
   #                    `studio_link_preview_tags` itself, or owns its tags.
   #
-  # An app that owns its own og tags and installs the engine migrations for any
-  # other reason sets this false until its adoption deletes its own tags.
+  # An app whose own tags live somewhere the scan cannot see (a helper that
+  # builds them in Ruby) sets this false until its adoption deletes them.
   mattr_accessor :link_preview_tags, default: :auto
 
   # The Active Storage service the DEFAULT image is attached to. nil = the app's
@@ -545,14 +546,34 @@ module Studio
     { title: site_title.presence || app_name.to_s, description: site_description.presence, image_url: nil }
   end
 
-  # :auto resolves against the table; true/false are taken as given.
+  # :auto emits when the table is installed AND no view of this app writes its
+  # own og tags (Studio.link_preview_own_tags_file); true/false are taken as
+  # given.
   def self.link_preview_tags?
     case link_preview_tags
-    when :auto, "auto", nil then Studio::SiteIdentity.table_ready?
+    when :auto, "auto", nil then Studio::SiteIdentity.table_ready? && link_preview_own_tags_file.nil?
     else !!link_preview_tags
     end
   rescue StandardError
     false
+  end
+
+  # The host view that writes its own og tags, or nil — scanned once per process
+  # (app/views is fixed at deploy) and logged once when it keeps :auto off.
+  def self.link_preview_own_tags_file
+    return @link_preview_own_tags_file if defined?(@link_preview_own_tags_file)
+
+    views = defined?(Rails.root) && Rails.root ? Rails.root.join("app/views") : nil
+    found = Studio::LinkPreview.own_tag_file(views)
+    if found && defined?(Rails.logger) && Rails.logger
+      Rails.logger.info("[studio.link_preview] #{found} writes its own og tags, so the engine's head tags " \
+                        "stay off under link_preview_tags = :auto. Set it to true once they are removed.")
+    end
+    @link_preview_own_tags_file = found
+  end
+
+  def self.reset_link_preview_own_tags!
+    remove_instance_variable(:@link_preview_own_tags_file) if defined?(@link_preview_own_tags_file)
   end
 
   # Whether the engine configures Geocoder on boot (provider, HTTPS, timeout, and

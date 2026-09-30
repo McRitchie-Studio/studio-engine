@@ -64,6 +64,30 @@ module Studio
 
     module_function
 
+    # The first view template under `views_root` that writes its own og:title or
+    # og:image, or nil. Studio.link_preview_tags? asks this under :auto, so an
+    # app that still writes its own preview tags (turf-monster's
+    # layouts/_link_preview_meta, cyvasse's layouts/_seo) does not get a second
+    # set the day it installs the engine's migrations — which docs/
+    # NEW_APP_SETUP.md tells every app to do after every upgrade.
+    #
+    # Deliberately BROAD: any mention counts, a comment included. A false
+    # positive only keeps the engine's tags off (an app sets
+    # link_preview_tags = true to override); a false negative would double them.
+    OWN_TAG_PATTERN = /og:(?:title|image)\b/
+    TEMPLATE_GLOB = "**/*.{erb,haml,slim}"
+
+    def own_tag_file(views_root)
+      root = views_root.to_s
+      return nil if root.empty? || !File.directory?(root)
+
+      Dir.glob(File.join(root, TEMPLATE_GLOB)).sort.find do |path|
+        File.read(path, encoding: "UTF-8").scrub.match?(OWN_TAG_PATTERN)
+      rescue SystemCallError
+        false
+      end
+    end
+
     # Is this User-Agent a link-preview fetcher? Blank is never a bot.
     def bot?(user_agent)
       ua = user_agent.to_s

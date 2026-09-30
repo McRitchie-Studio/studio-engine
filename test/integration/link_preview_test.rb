@@ -174,6 +174,32 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
     install_link_preview_table!
   end
 
+  # THE INSTALL:MIGRATIONS HAZARD. docs/NEW_APP_SETUP.md tells every app to
+  # install every engine migration after every upgrade, so turf-monster and
+  # cyvasse WILL get the table before they adopt. A view of their own that writes
+  # og tags keeps :auto off, so they still get no second set.
+  test "an app whose own views write og tags gets no engine tags under auto" do
+    # The scan itself is unit-tested (Studio::LinkPreview.own_tag_file). Here the
+    # finding is planted rather than a file written into the dummy's app/views,
+    # which would trip the reloader and drop the in-memory database.
+    Studio.instance_variable_set(:@link_preview_own_tags_file, "app/views/layouts/_seo.html.erb")
+
+    get "/lab/link_preview"
+    assert_nil meta("og:title")
+
+    Studio.link_preview_tags = true
+    get "/lab/link_preview"
+    assert_equal "Studio", meta("og:title"), "true overrides the scan once the app's own tags are gone"
+  ensure
+    Studio.reset_link_preview_own_tags!
+  end
+
+  test "the dummy host writes no og tags of its own, so auto is on" do
+    Studio.reset_link_preview_own_tags!
+
+    assert_nil Studio.link_preview_own_tags_file
+  end
+
   test "the tags switch is honoured both ways" do
     Studio.link_preview_tags = false
     get "/lab/link_preview"

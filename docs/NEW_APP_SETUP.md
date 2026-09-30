@@ -200,6 +200,15 @@ table you may not use yet, and the one that ALTERS an app-owned table
 (`allow_null_image_cache_owner`) no-ops when that table is absent
 (studio-engine >= 0.30.1).
 
+Give the app its **site identity** (title, description and preview image;
+see [`LINK_PREVIEW.md`](LINK_PREVIEW.md)). Draft the title and description
+yourself; the operator edits them at `/admin/link_preview`:
+
+```bash
+bin/rails g studio:site_identity --title "App Name" --description "One or two sentences."
+bin/rails db:migrate
+```
+
 One limit worth knowing: `install:migrations` skips **by migration name**, so an
 app already holding an older copy of a migration never receives an updated one
 from a later engine release — re-running brings you NEW migrations, not revised

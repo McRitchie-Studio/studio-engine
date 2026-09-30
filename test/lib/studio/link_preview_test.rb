@@ -2,6 +2,8 @@
 
 require "test_helper"
 require_relative "../../../lib/studio/link_preview"
+require "tmpdir"
+require "fileutils"
 
 # [unit] Studio::LinkPreview — the pure half of the link-preview primitive: the
 # preview-bot matcher, the resolution chain (page override, operator default,
@@ -115,6 +117,25 @@ class StudioLinkPreviewTest < Minitest::Test
     assert_equal "https://cdn.test/a.png", LP.absolute_url("//cdn.test/a.png", base_url: "https://app.test")
     assert_equal "https://cdn.test/a.png", LP.absolute_url("https://cdn.test/a.png", base_url: "https://app.test")
     assert_nil LP.absolute_url(" ", base_url: "https://app.test")
+  end
+
+  # --- does the app write its own tags? ------------------------------------
+
+  def test_own_tag_file_finds_an_app_template_that_writes_og_tags
+    Dir.mktmpdir do |root|
+      FileUtils.mkdir_p(File.join(root, "layouts"))
+      File.write(File.join(root, "layouts/application.html.erb"), "<title>x</title>")
+      assert_nil LP.own_tag_file(root), "an app with no og tags of its own"
+
+      seo = File.join(root, "layouts/_seo.html.erb")
+      File.write(seo, %(<meta property="og:title" content="<%= page.title %>">))
+      assert_equal seo, LP.own_tag_file(root), "cyvasse's _seo shape"
+    end
+  end
+
+  def test_own_tag_file_is_nil_for_a_missing_root
+    assert_nil LP.own_tag_file(nil)
+    assert_nil LP.own_tag_file("/nonexistent/app/views")
   end
 
   # --- the slim document ---------------------------------------------------

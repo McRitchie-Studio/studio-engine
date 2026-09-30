@@ -38,6 +38,7 @@ resolved.
 - **Sluggable concern**: `before_save :set_slug` with `to_param` for human-readable URLs
 - **ThemeSetting model**: Per-app DB overrides with fallback to config defaults
 - **Geo**: `Studio::GeoDetection` places every visitor (IP → country + subdivision, session-cached), `Studio::GeoSetting` stores the operator's blocked countries and regions, `require_geo_allowed` locks whichever surfaces an app chooses, and the shared badge + `/admin/geo` manager ship with it. See [`docs/GEO.md`](docs/GEO.md).
+- **Site identity and link previews**: `Studio::SiteIdentity` holds the app's title, description and image, edited at `/admin/link_preview` beside a live unfurl card and read anywhere through `Studio.site_identity`. Every page unfurls with it unless it calls `link_preview image:, title:, description:`, and `Studio::LinkPreviewBots` serves preview fetchers a slim page under iMessage's 1 MiB limit. Adopt with `bin/rails g studio:site_identity`. See [`docs/LINK_PREVIEW.md`](docs/LINK_PREVIEW.md).
 - **Transactional emails**: `Studio::EmailCatalog` — every email an app sends, its type, a live preview, and its banner — plus the shared `/admin/emails` page. Every app inherits the standard emails and their artwork on day one, and can register its own workflows and upload its own banners. See [Transactional emails](#transactional-emails).
 
 ## Configuration

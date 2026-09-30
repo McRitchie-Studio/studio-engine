@@ -105,7 +105,8 @@
       <% end %>
       <% unless tags_on %>
         The engine's preview tags are <strong>off</strong> in this app
-        (<span class="font-mono">Studio.link_preview_tags</span>), so pages use the app's own tags.
+        (<span class="font-mono">Studio.link_preview_tags</span>), so pages use the app's own tags<% if (own = Studio.link_preview_own_tags_file) %>, which
+        <span class="font-mono"><%= own.to_s.delete_prefix("#{Rails.root}/") %></span> writes<% end %>.
       <% end %>
     </p>
   </div>

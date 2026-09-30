@@ -8,8 +8,9 @@
 # which rides the host's active_storage_* tables.
 #
 # INSTALLING THIS TABLE TURNS THE ENGINE'S HEAD TAGS ON under the default
-# Studio.link_preview_tags = :auto. An app that already emits its own og tags
-# sets `config.link_preview_tags = false` before migrating, or deletes its own.
+# Studio.link_preview_tags = :auto — unless a template under the app's
+# app/views writes its own og:title/og:image, in which case :auto stays off
+# until the app deletes them (or sets link_preview_tags = true).
 class CreateStudioSiteIdentities < ActiveRecord::Migration[7.2]
   def change
     create_table :studio_site_identities do |t|

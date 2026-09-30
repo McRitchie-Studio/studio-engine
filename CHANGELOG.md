@@ -4,6 +4,78 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **Site identity and link previews: a core primitive for every app.** Each app
+  now has a site identity, `Studio::SiteIdentity`: a title, a description and an
+  image. The operator edits all three at `/admin/link_preview`, beside a live card
+  drawn the way an unfurl draws it (image, domain, title, description). Every page
+  unfurls with it unless the page overrides it, and a missing override image falls
+  back to the site image. Lifted from turf-monster's `OgHelper`, `SiteSetting` and
+  `OgImageAttachable`. See [`docs/LINK_PREVIEW.md`](docs/LINK_PREVIEW.md).
+  - **Reusable copy.** `Studio.site_identity(base_url:)` (and `studio_site_identity`
+    in a view) returns `{ title:, description:, image_url: }`: the operator's saved
+    value, then the drafted `config.site_title` / `config.site_description`, then
+    `Studio.app_name`. Read it for a meta description, share text or an email footer.
+  - **One page override.** `link_preview image:, title:, description:` from any
+    view. `image:` takes a URL, a path, or an Active Storage attachment, so
+    `link_preview image: user.avatar` works whether or not the user has one.
+    turf-monster's `content_for(:title)`, `content_for(:meta_description)` and
+    `content_for(:og_image)` keys are honoured beneath it.
+  - **Permanent image URLs.** A public service answers its own URL; any other
+    service goes through Rails' storage proxy, never a signed, expiring URL. Name a
+    public service with `config.link_preview_image_service`.
+  - **Preview bots get a slim page.** `include Studio::LinkPreviewBots` serves the
+    known fetchers (iMessage, Facebook, X, Discord, Slack, LinkedIn, WhatsApp,
+    Telegram, Applebot, Skype, Reddit, Embedly) the page's head tags and a one-card
+    body, under Apple LinkPresentation's 1 MiB limit (1,048,000 bytes previews,
+    1,049,000 fails). People and in-app browsers always get the full page.
+  - **Opt-in by installation, and duplicate-safe.** Under the new default
+    `config.link_preview_tags = :auto`, the head emits the tags only once the app
+    has installed the `studio_site_identities` table AND no template under its
+    `app/views` writes its own `og:title` or `og:image` (scanned once per process,
+    logged when it holds the tags off). So turf-monster and cyvasse, which write
+    their own, get no second set even after `studio_engine:install:migrations`
+    brings the table in. Set `true` to override the scan, `false` to keep the head
+    silent. The slim bot page also keeps only the first of any duplicated tag.
+  - **One adoption step.** `bin/rails g studio:site_identity --title "..."
+    --description "..."` copies only this migration (in the form
+    `studio_engine:install:migrations` writes, so that task skips it later), writes
+    the drafted copy into `config/initializers/studio.rb`, and includes
+    `Studio::LinkPreviewBots` in `ApplicationController`. `--own-tags` also sets
+    `config.link_preview_tags = false`. It is idempotent.
+  - **Drafted defaults.** An agent drafts the title and description when setting an
+    app up; the operator edits them on the page, and a saved value wins.
+    `Studio::SiteIdentity.seed!(title:, description:)` carries a draft into the row
+    from `db/seeds.rb` or a release task, filling only blank fields.
+  - `/admin/link_preview` is drawn by default (`config.draw_link_preview_routes`);
+    no consumer owns `admin_link_preview_path` or `admin_link_preview_image_path`.
+    It needs Active Storage for the upload; without it the page still edits the
+    words.
+
+  **Adopting, per app** (each is one short change; this release changes none of
+  them on its own):
+
+  1. **mcritchie-studio, mcritchie-industries** (no og tags of their own):
+     `bin/rails g studio:site_identity --title "..." --description "..."`, then
+     `bin/rails db:migrate`. The tags come from `layouts/studio/head`, which both
+     layouts already render. Optionally add a 1200 × 630 `public/og.png` as the
+     last-resort image. Set the image at `/admin/link_preview`.
+  2. **cyvasse** (writes og tags in `layouts/_seo.html.erb`): run the generator with
+     `--own-tags` and migrate. Then in `_seo`, replace the og:/twitter: tags with
+     `link_preview title: page.title, description: page.description, image: og_image`
+     (keep description, robots, canonical and JSON-LD, which are SEO, not preview),
+     and delete `config.link_preview_tags = false`.
+  3. **turf-monster** (writes og tags through `OgHelper` and
+     `layouts/_link_preview_meta`): run the generator with `--own-tags`, set
+     `config.link_preview_image_service = OgImageAttachable::PUBLIC_OG_SERVICE`, and
+     migrate. Copy `SiteSetting`'s title, description and image into
+     `Studio::SiteIdentity`. Then delete the `_link_preview_meta` renders, `OgHelper`'s
+     resolution, `SiteSetting`'s og fields and the app-local `LinkPreviewBot` (the
+     engine concern replaces it; contest pages keep `content_for(:og_image)` or move
+     to `link_preview`), and delete `config.link_preview_tags = false`.
+
+
 ## 0.81.1 — 2026-09-30
 
 ### Fixed
