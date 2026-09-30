@@ -1,0 +1,26 @@
+<%# locals: (preview:) — the Open Graph + Twitter tags an unfurl reads
+    (iMessage, Slack, Discord, X, WhatsApp...). `preview` is
+    Studio::LinkPreviewHelper#studio_link_preview: the page override, else the
+    operator default from /admin/link_preview, else the static fallback.
+    Lifted from turf-monster's layouts/_link_preview_meta. og:image is absolute
+    and permanent; the tag is omitted rather than emitted empty. %>
+<meta property="og:site_name" content="<%= preview[:site_name] %>">
+<meta property="og:type" content="website">
+<meta property="og:title" content="<%= preview[:title] %>">
+<% if preview[:description] %>
+<meta property="og:description" content="<%= preview[:description] %>">
+<% end %>
+<% if preview[:url] %>
+<meta property="og:url" content="<%= preview[:url] %>">
+<% end %>
+<% if preview[:image] %>
+<meta property="og:image" content="<%= preview[:image] %>">
+<% end %>
+<meta name="twitter:card" content="<%= preview[:image] ? "summary_large_image" : "summary" %>">
+<meta name="twitter:title" content="<%= preview[:title] %>">
+<% if preview[:description] %>
+<meta name="twitter:description" content="<%= preview[:description] %>">
+<% end %>
+<% if preview[:image] %>
+<meta name="twitter:image" content="<%= preview[:image] %>">
+<% end %>

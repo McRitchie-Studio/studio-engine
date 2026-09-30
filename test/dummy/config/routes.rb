@@ -57,6 +57,7 @@ Rails.application.routes.draw do
   get "lab/profile_edit", to: "e2e_lab#profile_edit"
   get "lab/hold_button", to: "e2e_lab#hold_button"
   get "lab/geo_settings", to: "e2e_lab#geo_settings"
+  get "lab/site_identity", to: "e2e_lab#site_identity"
   get "lab/style_modals", to: "e2e_lab#style_modals"
   get "lab/session_drift", to: "e2e_lab#session_drift"
   get "lab/sidebar_panels", to: "e2e_lab#sidebar_panels"
@@ -64,6 +65,11 @@ Rails.application.routes.draw do
   # A host app's own pages, one open and one geo-LOCKED, for the geo suite.
   get "lab/geo", to: "geo_lab#open"
   get "lab/geo_locked", to: "geo_lab#locked"
+
+  # A host app's pages for the link-preview suite: plain, overridden, and heavy.
+  get "lab/link_preview", to: "link_preview_lab#plain"
+  get "lab/link_preview/override", to: "link_preview_lab#override"
+  get "lab/link_preview/heavy", to: "link_preview_lab#heavy"
   post "lab/sign_in", to: "geo_lab_sessions#create"
 
   # A host app's ordinary page + sign-in/out, for the session-drift suite.

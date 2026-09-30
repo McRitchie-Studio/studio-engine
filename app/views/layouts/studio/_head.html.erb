@@ -15,6 +15,12 @@
 <%= render "studio/session_stamp" %>
 <%= render "layouts/studio/smooth_load" %>
 <link rel="icon" type="image/png" href="/favicon.png">
+<%# Link-preview (og:/twitter:) tags: the page's link_preview override, else the
+    operator default from /admin/link_preview, else the static fallback. Gated by
+    Studio.link_preview_tags? — under the default :auto, only once this app has
+    installed the studio_site_identities table, so an app that emits its
+    own tags gets no second set. See docs/LINK_PREVIEW.md. %>
+<%= studio_link_preview_tags if respond_to?(:studio_link_preview_tags) && Studio.link_preview_tags? %>
 
 <%= yield :head %>
 

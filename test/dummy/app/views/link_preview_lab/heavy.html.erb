@@ -1,0 +1,7 @@
+<%# Over Apple LinkPresentation's 1 MiB limit, the way a real page gets there: a
+    large inline script and a large template (turf-monster's contest page was
+    1,224,381 bytes; 512 KB of script and 278 KB of template). %>
+<% link_preview title: "Heavy contest", description: "A page past the iMessage limit" %>
+<p data-lab-page="heavy">heavy</p>
+<script>window.__heavy = "<%= "x" * 800_000 %>";</script>
+<template><%= "y" * 400_000 %></template>

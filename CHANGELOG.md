@@ -4,6 +4,119 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **A public user page at `/u/:username`, and the helpers that link to it.** It
+  shows the user's avatar and username and nothing else (no name, email or
+  wallet), and it is where a click on a username in any Studio app should lead.
+  See [`docs/PUBLIC_USER_PAGE.md`](docs/PUBLIC_USER_PAGE.md).
+  - **Link preview.** The page calls `link_preview image: user.avatar, title:
+    username`, so it unfurls with the avatar when one is set and with the site
+    identity's image when not. The avatar URL is permanent (a public service's own
+    URL, else Rails' storage proxy), never signed and expiring. With
+    `Studio::LinkPreviewBots` included, preview bots get the slim page carrying it.
+  - **Lookup.** Case-insensitive, with an exact spelling first. It reads
+    `username` only, never the email or the slug, so it cannot reveal whether an
+    address has an account. A `User#public_profile_visible?` that answers false
+    hides an account. Every miss gets the same friendly page with a `404` status.
+  - **Public.** The page skips `require_authentication` and renders in the host's
+    own layout.
+  - **Helpers.** `studio_user_profile_path(user)`, `studio_user_profile_url(user)`
+    and `link_to_user_profile(user, text = nil, **html_options, &block)` take a user
+    or a username. They answer `nil` (the link helper renders a plain `<span>`)
+    when the route is not drawn or the user has no username, so any view can call
+    them. The route helper is `studio_public_user_path(username:)`; the rules are
+    `Studio::PublicUser`.
+  - `components/_avatar` gains an `xl` size and an optional `alt:` local. Existing
+    calls render the same.
+  - **Opt-in:** `config.draw_public_user_routes` defaults to `false`, so an app that
+    owns `/u` is not broken. No consumer owns `/u` or the helper name today.
+
+  **Adopting, per app** (this release changes none of them on its own):
+
+  1. **cyvasse, turf-monster** (already have `users.username` with a
+     `lower(username)` index): set `config.draw_public_user_routes = true` in
+     `config/initializers/studio.rb`. Define `User#public_profile_visible?` if some
+     accounts must not have a page (cyvasse's merged-away accounts, say). Then
+     point username links at `link_to_user_profile(user)`.
+  2. **mcritchie-studio, mcritchie-industries** (no `username` column): add
+     `users.username` with a unique `lower(username)` index, backfill it
+     (`Studio::UsernameGenerator.generate` drafts one), then do step 1. Do not
+     reuse `slug`: it is keyed on the email.
+  3. For an avatar unfurl on a private bucket, nothing more is needed: the proxy
+     URL serves it. An app with a public-read service gets that service's URL
+     automatically.
+
+- **Site identity and link previews: a core primitive for every app.** Each app
+  now has a site identity, `Studio::SiteIdentity`: a title, a description and an
+  image. The operator edits all three at `/admin/link_preview`, beside a live card
+  drawn the way an unfurl draws it (image, domain, title, description). Every page
+  unfurls with it unless the page overrides it, and a missing override image falls
+  back to the site image. Lifted from turf-monster's `OgHelper`, `SiteSetting` and
+  `OgImageAttachable`. See [`docs/LINK_PREVIEW.md`](docs/LINK_PREVIEW.md).
+  - **Reusable copy.** `Studio.site_identity(base_url:)` (and `studio_site_identity`
+    in a view) returns `{ title:, description:, image_url: }`: the operator's saved
+    value, then the drafted `config.site_title` / `config.site_description`, then
+    `Studio.app_name`. Read it for a meta description, share text or an email footer.
+  - **One page override.** `link_preview image:, title:, description:` from any
+    view. `image:` takes a URL, a path, or an Active Storage attachment, so
+    `link_preview image: user.avatar` works whether or not the user has one.
+    turf-monster's `content_for(:title)`, `content_for(:meta_description)` and
+    `content_for(:og_image)` keys are honoured beneath it.
+  - **Permanent image URLs.** A public service answers its own URL; any other
+    service goes through Rails' storage proxy, never a signed, expiring URL. Name a
+    public service with `config.link_preview_image_service`.
+  - **Preview bots get a slim page.** `include Studio::LinkPreviewBots` serves the
+    known fetchers (iMessage, Facebook, X, Discord, Slack, LinkedIn, WhatsApp,
+    Telegram, Applebot, Skype, Reddit, Embedly) the page's head tags and a one-card
+    body, under Apple LinkPresentation's 1 MiB limit (1,048,000 bytes previews,
+    1,049,000 fails). People and in-app browsers always get the full page.
+  - **Opt-in by installation, and duplicate-safe.** Under the new default
+    `config.link_preview_tags = :auto`, the head emits the tags only once the app
+    has installed the `studio_site_identities` table AND no template under its
+    `app/views` writes its own `og:title` or `og:image` (scanned once per process,
+    logged when it holds the tags off). So turf-monster and cyvasse, which write
+    their own, get no second set even after `studio_engine:install:migrations`
+    brings the table in. Set `true` to override the scan, `false` to keep the head
+    silent. The slim bot page also keeps only the first of any duplicated tag.
+  - **One adoption step.** `bin/rails g studio:site_identity --title "..."
+    --description "..."` copies only this migration (in the form
+    `studio_engine:install:migrations` writes, so that task skips it later), writes
+    the drafted copy into `config/initializers/studio.rb`, and includes
+    `Studio::LinkPreviewBots` in `ApplicationController`. `--own-tags` also sets
+    `config.link_preview_tags = false`. It is idempotent.
+  - **Drafted defaults.** An agent drafts the title and description when setting an
+    app up; the operator edits them on the page, and a saved value wins.
+    `Studio::SiteIdentity.seed!(title:, description:)` carries a draft into the row
+    from `db/seeds.rb` or a release task, filling only blank fields.
+  - `/admin/link_preview` is drawn by default (`config.draw_link_preview_routes`);
+    no consumer owns `admin_link_preview_path` or `admin_link_preview_image_path`.
+    It needs Active Storage for the upload; without it the page still edits the
+    words.
+
+  **Adopting, per app** (each is one short change; this release changes none of
+  them on its own):
+
+  1. **mcritchie-studio, mcritchie-industries** (no og tags of their own):
+     `bin/rails g studio:site_identity --title "..." --description "..."`, then
+     `bin/rails db:migrate`. The tags come from `layouts/studio/head`, which both
+     layouts already render. Optionally add a 1200 × 630 `public/og.png` as the
+     last-resort image. Set the image at `/admin/link_preview`.
+  2. **cyvasse** (writes og tags in `layouts/_seo.html.erb`): run the generator with
+     `--own-tags` and migrate. Then in `_seo`, replace the og:/twitter: tags with
+     `link_preview title: page.title, description: page.description, image: og_image`
+     (keep description, robots, canonical and JSON-LD, which are SEO, not preview),
+     and delete `config.link_preview_tags = false`.
+  3. **turf-monster** (writes og tags through `OgHelper` and
+     `layouts/_link_preview_meta`): run the generator with `--own-tags`, set
+     `config.link_preview_image_service = OgImageAttachable::PUBLIC_OG_SERVICE`, and
+     migrate. Copy `SiteSetting`'s title, description and image into
+     `Studio::SiteIdentity`. Then delete the `_link_preview_meta` renders, `OgHelper`'s
+     resolution, `SiteSetting`'s og fields and the app-local `LinkPreviewBot` (the
+     engine concern replaces it; contest pages keep `content_for(:og_image)` or move
+     to `link_preview`), and delete `config.link_preview_tags = false`.
+
+
 ## 0.81.1 — 2026-09-30
 
 ### Fixed

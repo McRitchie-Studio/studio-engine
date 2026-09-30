@@ -3,6 +3,7 @@ require "studio/log_rotation"
 require "studio/ip_locations"
 require "studio/geo"
 require "studio/geo/lookup"
+require "studio/link_preview"
 require "studio/engine"
 require "studio/color_scale"
 require "studio/environment_banner"
@@ -19,6 +20,7 @@ require "studio/profile_image"
 require "studio/oauth_identity"
 require "studio/newsletter"
 require "studio/username_generator"
+require "studio/public_user"
 require "studio/name_parts"
 require "studio/s3"
 require "studio/image_cache"
@@ -470,6 +472,125 @@ module Studio
   # geo_check_path, and a duplicate route NAME raises while that app's routes.rb
   # is loading — taking its entire route set down, not just this page.
   mattr_accessor :draw_geo_routes, default: false
+
+  # ---- Link preview (Studio::LinkPreview, SiteIdentity, LinkPreviewHelper)
+  #
+  # What an unfurl shows when someone pastes a link to this app: the SITE
+  # IDENTITY (Studio::SiteIdentity — image, title, description) the operator sets
+  # at /admin/link_preview, which any page may override (`link_preview image:
+  # ..., title: ...`). See docs/LINK_PREVIEW.md.
+
+  # Whether layouts/studio/_head emits the og:/twitter: tags.
+  #
+  #   :auto (default)  emit once this app has INSTALLED the engine's
+  #                    studio_site_identities table — installing the
+  #                    migration is the adoption act — and no template under
+  #                    app/views writes its own og:title/og:image. An app that
+  #                    emits its own tags (turf-monster, cyvasse) gets no second
+  #                    set, even after `install:migrations` brings the table in.
+  #   true             always emit (the static fallback and the site name still
+  #                    answer with no table).
+  #   false            never emit from the head; the app renders
+  #                    `studio_link_preview_tags` itself, or owns its tags.
+  #
+  # An app whose own tags live somewhere the scan cannot see (a helper that
+  # builds them in Ruby) sets this false until its adoption deletes them.
+  mattr_accessor :link_preview_tags, default: :auto
+
+  # The Active Storage service the DEFAULT image is attached to. nil = the app's
+  # default service. Unfurlers cache the og:image URL and re-fetch it days later,
+  # so the tag must be a PERMANENT URL: a service whose `public?` is true answers
+  # its own public URL; any other service is served through Rails' storage PROXY
+  # route (a permanent URL on this app's own domain, streaming from the private
+  # bucket). An app with a public-read service names it here, e.g. turf-monster:
+  #
+  #   config.link_preview_image_service = OgImageAttachable::PUBLIC_OG_SERVICE
+  #
+  # Read once, when Studio::SiteIdentity loads (has_one_attached's service
+  # is a literal fixed at class load), so set it in the initializer.
+  mattr_accessor :link_preview_image_service, default: nil
+
+  # The last image rung, when neither the page nor the operator supplied one. A
+  # root-relative path is used only when the file exists under public/, so an app
+  # without it emits no og:image rather than a broken one. An absolute URL is
+  # trusted as given.
+  mattr_accessor :link_preview_fallback_image, default: "/og.png"
+
+  # THE SITE IDENTITY'S DRAFTED DEFAULTS — this app's title and description as
+  # written in code, under whatever the operator saves at /admin/link_preview.
+  # The standing convention is that an agent drafts these when it sets an app up
+  # (`bin/rails g studio:site_identity --title "..." --description "..."` writes
+  # them here) and Alex edits them on the page. nil title means Studio.app_name;
+  # nil description means none. Read the resolved answer through
+  # Studio.site_identity, never these directly.
+  mattr_accessor :site_title, default: nil
+  mattr_accessor :site_description, default: nil
+
+  # Draw /admin/link_preview from Studio.routes. ON by default: no consumer owns
+  # these paths or helper names (admin_link_preview, admin_link_preview_image),
+  # checked 2026-09-30 across mcritchie-studio, turf-monster, cyvasse and
+  # mcritchie-industries. The page explains itself when the table is missing.
+  mattr_accessor :draw_link_preview_routes, default: true
+
+  # Draw the public user page, GET /u/:username (Studio::PublicUsersController,
+  # route helper studio_public_user_path; link to it with the view helpers
+  # studio_user_profile_path(user) / link_to_user_profile(user)). See
+  # docs/PUBLIC_USER_PAGE.md.
+  #
+  # OFF by default, like every route surface a consumer might already own. No
+  # consumer owns /u or the helper name today (checked 2026-09-30 across
+  # mcritchie-studio, mcritchie-industries, cyvasse and turf-monster), but the
+  # page also needs a `username` column, which the two hub apps do not have yet
+  # (their slug is keyed on the email, so it can never stand in). Each app's
+  # adoption turns it on:
+  #
+  #   config.draw_public_user_routes = true
+  mattr_accessor :draw_public_user_routes, default: false
+
+  # THE APP'S IDENTITY COPY, resolved: { title:, description:, image_url: }.
+  # The operator's saved value (Studio::SiteIdentity, edited at
+  # /admin/link_preview) wins, then the drafted Studio.site_title /
+  # site_description, then Studio.app_name for the title. image_url is the
+  # uploaded image, else the static fallback, else nil — absolute when
+  # `base_url` is given (pass request.base_url) or the image lives on a public
+  # service. Reuse it anywhere the app needs to say what it is: a meta
+  # description, share text, an email footer. Views have `studio_site_identity`.
+  # Never raises; an app without the table answers from the drafted defaults.
+  def self.site_identity(base_url: nil)
+    Studio::SiteIdentity.resolved(base_url: base_url)
+  rescue StandardError
+    { title: site_title.presence || app_name.to_s, description: site_description.presence, image_url: nil }
+  end
+
+  # :auto emits when the table is installed AND no view of this app writes its
+  # own og tags (Studio.link_preview_own_tags_file); true/false are taken as
+  # given.
+  def self.link_preview_tags?
+    case link_preview_tags
+    when :auto, "auto", nil then Studio::SiteIdentity.table_ready? && link_preview_own_tags_file.nil?
+    else !!link_preview_tags
+    end
+  rescue StandardError
+    false
+  end
+
+  # The host view that writes its own og tags, or nil — scanned once per process
+  # (app/views is fixed at deploy) and logged once when it keeps :auto off.
+  def self.link_preview_own_tags_file
+    return @link_preview_own_tags_file if defined?(@link_preview_own_tags_file)
+
+    views = defined?(Rails.root) && Rails.root ? Rails.root.join("app/views") : nil
+    found = Studio::LinkPreview.own_tag_file(views)
+    if found && defined?(Rails.logger) && Rails.logger
+      Rails.logger.info("[studio.link_preview] #{found} writes its own og tags, so the engine's head tags " \
+                        "stay off under link_preview_tags = :auto. Set it to true once they are removed.")
+    end
+    @link_preview_own_tags_file = found
+  end
+
+  def self.reset_link_preview_own_tags!
+    remove_instance_variable(:@link_preview_own_tags_file) if defined?(@link_preview_own_tags_file)
+  end
 
   # Whether the engine configures Geocoder on boot (provider, HTTPS, timeout, and
   # a Rails.cache-backed IP cache). An app that configures Geocoder itself sets
@@ -1110,6 +1231,25 @@ module Studio
         patch "admin/geo",        to: "studio/geo_settings#update",          as: :admin_geo_update
         post  "admin/geo/toggle", to: "studio/geo_settings#toggle_override", as: :admin_geo_toggle
       end
+
+      # The link-preview default (/admin/link_preview): the image, title and
+      # description every page unfurls with unless it overrides them. ON by
+      # default (Studio.draw_link_preview_routes) because no consumer owns these
+      # names; an app can still switch it off from its initializer.
+      if Studio.draw_link_preview_routes
+        get    "admin/link_preview",       to: "studio/site_identities#edit",          as: :admin_link_preview
+        patch  "admin/link_preview",       to: "studio/site_identities#update"
+        delete "admin/link_preview/image", to: "studio/site_identities#destroy_image", as: :admin_link_preview_image
+      end
+      # The public user page (/u/:username): avatar and username only, and the
+      # user's avatar as its link-preview image. OPT-IN — see
+      # Studio.draw_public_user_routes. `format: false` because usernames may
+      # carry a dot, which would otherwise be read as a format extension.
+      if Studio.draw_public_user_routes
+        get "u/:username", to: "studio/public_users#show", as: :studio_public_user,
+            format: false, constraints: { username: %r{[^/]+} }
+      end
+
       # The living style guide. Canonical at /admin/style (StyleController#index);
       # /admin/design_system redirects here but KEEPS its admin_design_system_path
       # helper so a shipped host sidebar link on the old helper still resolves.

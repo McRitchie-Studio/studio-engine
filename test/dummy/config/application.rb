@@ -9,6 +9,10 @@ require "active_record/railtie"
 require "action_controller/railtie"
 require "action_view/railtie"
 require "action_mailer/railtie"
+# Active Storage backs the link-preview DEFAULT image (Studio::SiteIdentity
+# has_one_attached :image). Every consumer loads it; the dummy loads it so the
+# /admin/link_preview upload is exercised against the real attachment path.
+require "active_storage/engine"
 
 # The engine under test. Requiring it defines Studio::Engine < Rails::Engine,
 # which auto-registers the engine's app/* paths as a railtie of this app.
@@ -75,6 +79,16 @@ module Dummy
     assets = ActiveSupport::OrderedOptions.new
     assets.precompile = []
     config.assets = assets
+
+    # Disk services under tmp/, one private (the default) and one PUBLIC, so the
+    # link-preview suite can prove both URL shapes: the proxy path for a private
+    # service and the service's own URL for a public one.
+    storage_root = File.expand_path("../tmp/storage", __dir__)
+    config.active_storage.service_configurations = {
+      "test" => { "service" => "Disk", "root" => storage_root },
+      "test_public" => { "service" => "Disk", "root" => "#{storage_root}-public", "public" => true }
+    }
+    config.active_storage.service = :test
   end
 end
 

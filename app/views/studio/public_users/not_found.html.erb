@@ -1,0 +1,15 @@
+<%# The friendly 404 for /u/:username. Every miss renders this same page
+    (unknown, hidden by the host, or an app with no username column), so it
+    says nothing about why. Served with status 404. %>
+<% content_for(:title, "User not found") %>
+
+<div class="max-w-md mx-auto px-4 py-12" data-public-user-not-found>
+  <div class="card p-8 text-center">
+    <h1 class="text-xl font-bold text-heading mb-2">No one goes by that name here</h1>
+    <p class="text-secondary text-sm mb-6 break-all">
+      We couldn't find a user called <span class="font-semibold text-body"><%= @requested_username %></span>.
+      Check the spelling, or head back home.
+    </p>
+    <%= link_to "Go home", "/", class: "btn btn-primary" %>
+  </div>
+</div>

@@ -780,7 +780,17 @@
 #     reserved path can exhibit it.
 # Re-derived on THIS tree with the lister, never by arithmetic:
 #   npx playwright test --list  -> 148 tests in 23 files
-total_specs: 148
+#
+# 148 -> 152: e2e/site_identity.spec.js (engine-link-preview-primitive). The site
+# identity manager, /admin/link_preview, through /lab/site_identity. Its response
+# bytes are the same whether its program works, so four specs, each RED against its
+# own defect reintroduced:
+#   delete the card's input listener       2 red (title and description repaint)
+#   drop the page root's x-data            1 red (crop modal store opens, dialog never shows)
+#   drop the description's line clamp      1 red (card description runs past two lines)
+# The phone-width spec guards the card's 1200:630 shape and sideways scroll.
+#   npx playwright test --list  -> 152 tests in 24 files
+total_specs: 152
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -873,7 +883,14 @@ total_specs: 148
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 148
 # executed = total - devnet - allowed_skips = 148 - 0 - 0 = 148, so executed ==
 # total_specs and the equality assertion holds.
-executed: 148
+# Re-derived once more on THIS tree with the lister when the site identity specs
+# landed (engine-link-preview-primitive) — 4 tests in ONE new file:
+#   npx playwright test --list                                             -> 152 tests, 24 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 152
+# executed = total - devnet - allowed_skips = 152 - 0 - 0 = 152, so executed ==
+# total_specs and the equality assertion holds.
+executed: 152
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
