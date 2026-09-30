@@ -1,0 +1,28 @@
+<%# /u/:username — the public user page (Studio::PublicUsersController).
+
+    AVATAR AND USERNAME, NOTHING ELSE (operator's call, 2026-09-30). No name,
+    email or wallet, and the image alt is the username for the same reason:
+    _avatar's default alt is display_name, which a host may build from a name.
+
+    The preview is the avatar when one is attached; `link_preview image:` treats
+    an empty attachment as a blank rung, so an account with no picture unfurls
+    with the site identity's image. The avatar URL is the primitive's permanent
+    one (public service URL or the storage proxy), never a signed expiring URL.
+    The description is left to the site identity. %>
+<% username = @public_user.username.to_s %>
+<% content_for(:title, username) %>
+<% link_preview image: @public_user.avatar, title: username %>
+
+<div class="max-w-md mx-auto px-4 py-12" data-public-user="<%= username %>">
+  <div class="card p-8 flex flex-col items-center text-center gap-4">
+    <% if @public_user.avatar.attached? %>
+      <%= render "components/avatar", user: @public_user, size: "xl", alt: username %>
+    <% else %>
+      <%# Drawn from the username alone: a host's avatar_initials / avatar_color may read the name or email (cyvasse's do). %>
+      <% colors = Studio::UserProfile::AVATAR_COLORS %>
+      <div class="w-28 h-28 text-4xl rounded-full flex items-center justify-center font-bold text-white"
+           style="background-color: <%= colors[Digest::MD5.hexdigest(username).hex % colors.size] %>"><%= username[0].upcase %></div>
+    <% end %>
+    <h1 class="text-2xl font-bold text-heading break-all" data-public-user-username><%= username %></h1>
+  </div>
+</div>

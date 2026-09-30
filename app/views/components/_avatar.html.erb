@@ -1,10 +1,12 @@
 <%# Avatar partial — shows attached image or colored initials circle
-    Locals: user (required), size: "sm" | "md" (default) | "lg" %>
+    Locals: user (required), size: "sm" | "nav" | "md" (default) | "lg" | "xl",
+            alt: the image's alt text (default user.display_name) %>
 <% size ||= "md" %>
-<% size_classes = { "sm" => "w-6 h-6 text-xs", "nav" => "w-8 h-8 text-xs", "md" => "w-10 h-10 text-sm", "lg" => "w-14 h-14 text-lg" }[size] %>
+<% alt = local_assigns[:alt].presence || user.display_name %>
+<% size_classes = { "sm" => "w-6 h-6 text-xs", "nav" => "w-8 h-8 text-xs", "md" => "w-10 h-10 text-sm", "lg" => "w-14 h-14 text-lg", "xl" => "w-28 h-28 text-4xl" }[size] %>
 
 <% if user.avatar.attached? %>
-  <%= image_tag user.avatar, class: "#{size_classes.split.first(2).join(' ')} rounded-full object-cover", alt: user.display_name %>
+  <%= image_tag user.avatar, class: "#{size_classes.split.first(2).join(' ')} rounded-full object-cover", alt: alt %>
 <% else %>
   <div class="<%= size_classes %> rounded-full flex items-center justify-center font-bold text-white"
        style="background-color: <%= user.avatar_color %>">

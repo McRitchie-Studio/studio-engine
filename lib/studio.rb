@@ -20,6 +20,7 @@ require "studio/profile_image"
 require "studio/oauth_identity"
 require "studio/newsletter"
 require "studio/username_generator"
+require "studio/public_user"
 require "studio/name_parts"
 require "studio/s3"
 require "studio/image_cache"
@@ -530,6 +531,21 @@ module Studio
   # checked 2026-09-30 across mcritchie-studio, turf-monster, cyvasse and
   # mcritchie-industries. The page explains itself when the table is missing.
   mattr_accessor :draw_link_preview_routes, default: true
+
+  # Draw the public user page, GET /u/:username (Studio::PublicUsersController,
+  # route helper studio_public_user_path; link to it with the view helpers
+  # studio_user_profile_path(user) / link_to_user_profile(user)). See
+  # docs/PUBLIC_USER_PAGE.md.
+  #
+  # OFF by default, like every route surface a consumer might already own. No
+  # consumer owns /u or the helper name today (checked 2026-09-30 across
+  # mcritchie-studio, mcritchie-industries, cyvasse and turf-monster), but the
+  # page also needs a `username` column, which the two hub apps do not have yet
+  # (their slug is keyed on the email, so it can never stand in). Each app's
+  # adoption turns it on:
+  #
+  #   config.draw_public_user_routes = true
+  mattr_accessor :draw_public_user_routes, default: false
 
   # THE APP'S IDENTITY COPY, resolved: { title:, description:, image_url: }.
   # The operator's saved value (Studio::SiteIdentity, edited at
@@ -1225,6 +1241,15 @@ module Studio
         patch  "admin/link_preview",       to: "studio/site_identities#update"
         delete "admin/link_preview/image", to: "studio/site_identities#destroy_image", as: :admin_link_preview_image
       end
+      # The public user page (/u/:username): avatar and username only, and the
+      # user's avatar as its link-preview image. OPT-IN — see
+      # Studio.draw_public_user_routes. `format: false` because usernames may
+      # carry a dot, which would otherwise be read as a format extension.
+      if Studio.draw_public_user_routes
+        get "u/:username", to: "studio/public_users#show", as: :studio_public_user,
+            format: false, constraints: { username: %r{[^/]+} }
+      end
+
       # The living style guide. Canonical at /admin/style (StyleController#index);
       # /admin/design_system redirects here but KEEPS its admin_design_system_path
       # helper so a shipped host sidebar link on the old helper still resolves.
