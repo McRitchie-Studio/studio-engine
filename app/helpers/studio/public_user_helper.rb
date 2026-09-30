@@ -26,12 +26,9 @@ module Studio
       studio_user_profile_location(:url, user, options)
     end
 
-    def link_to_user_profile(user, name = nil, html_options = {}, &block)
-      if block
-        html_options = name || {}
-        name = nil
-      end
-      html_options = (html_options || {}).dup
+    def link_to_user_profile(user, name = nil, html_options = nil, **options, &block)
+      html_options, name = name, nil if name.is_a?(Hash)
+      html_options = (html_options || {}).merge(options)
       path = studio_user_profile_path(user)
 
       content = block ? capture(&block) : (name || studio_user_profile_label(user))
