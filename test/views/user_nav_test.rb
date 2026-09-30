@@ -175,38 +175,38 @@ class UserNavTest < Minitest::Test
   # What IS assertable is the structural precondition, and these tests walk
   # the DOM rather than string-match classes.
   #
-  # The history: until engine-navbar-phone-polish the name sat in the left
-  # column, and measured in Chromium (400px viewport, nav given 328px) the
-  # ellipsis rendered only with min-w-0 on that column — the flex item of the
-  # nav root — and not one level deeper, because a flex item defaults to
-  # min-width auto. The name now lives in the account link, so the same rule
-  # moves with it: the LINK is the nav root's flex item that gives way, and
-  # it must carry min-w-0; the left column (icons, which must never be
-  # squeezed) must not.
+  # The rule, measured twice. In Chromium at 400px (nav given 328px) the name
+  # ellipsized only with min-w-0 on the left column — the flex item of the nav
+  # root — and not one level deeper, because a flex item defaults to min-width
+  # auto. And after engine-navbar-phone-polish first moved min-w-0 onto the
+  # account link, the browser lane caught a 320px phone with a balance pushing
+  # the avatar 17px past the screen: the icon column would not give. So the
+  # column keeps min-w-0, the account link never shrinks, and the name
+  # truncates inside a max width of its own.
 
-  def test_min_w_0_sits_on_the_account_link_the_nav_roots_flex_item
+  def test_min_w_0_sits_on_the_icon_column_the_nav_roots_flex_item
+    root = nav_root(render_nav)
+    column = root.element_children.find { |el| !el.key?("data-nav-account") }
+
+    assert_includes column["class"].split, "min-w-0",
+      "the icon column must carry min-w-0, or it refuses to shrink and pushes the avatar off a phone"
+    assert_empty column.css("[class~='min-w-0']").map { |el| el["class"] },
+      "min-w-0 below the flex item does not enable shrinking; it belongs on the column"
+  end
+
+  def test_the_account_link_never_shrinks
     link = account_item(render_nav)
 
-    assert_includes link["class"].split, "min-w-0",
-      "the account link must carry min-w-0, or it keeps min-width auto and " \
-      "refuses to shrink, defeating the username truncate"
+    assert_includes link["class"].split, "flex-shrink-0", "the avatar must stay on screen"
+    refute_includes link["class"].split, "min-w-0"
   end
 
-  def test_the_icon_column_does_not_shrink_below_its_icons
-    root = nav_root(render_nav)
-    column = root.element_children.find { |el| el != account_item(render_nav) && el.name == "div" }
-
-    refute_nil column, "expected the left icon column"
-    refute_includes column["class"].split, "min-w-0",
-      "min-w-0 here lets the icon column collapse and the icons spill over the name"
-  end
-
-  def test_the_name_truncates_inside_a_shrinkable_box
+  def test_the_name_truncates_inside_a_max_width
     name = account_item(render_nav).at_css("[data-nav-name]")
 
     assert_includes name["class"].split, "truncate"
-    assert_includes name.parent["class"].split, "md:min-w-0",
-      "the name's box is the link's flex item; without min-w-0 it will not shrink"
+    assert_includes name.parent["class"].split, "md:max-w-40",
+      "the link does not shrink, so the name's box needs a max width to ellipsize in"
   end
 
   # --- one account link, avatar only on a phone ---------------------------
@@ -224,7 +224,7 @@ class UserNavTest < Minitest::Test
     link = account_item(render_nav)
     name_box = link.at_css("[data-nav-name]").parent
 
-    assert_equal %w[sr-only md:not-sr-only md:min-w-0], name_box["class"].split,
+    assert_equal %w[sr-only md:not-sr-only md:max-w-40], name_box["class"].split,
       "below md the name is screen-reader text; from md up it shows"
     assert_equal "Pat Studio", name_box.text.strip, "the name is still the link's text"
 

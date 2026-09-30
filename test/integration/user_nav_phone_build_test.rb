@@ -7,7 +7,7 @@ require "tailwindcss/ruby"
 
 # [integration] The user nav's phone behaviour is built from responsive
 # utilities that nothing else in the engine used before engine-navbar-phone-polish
-# (md:not-sr-only in particular). A utility only ships if a consumer's Tailwind
+# (md:not-sr-only and md:max-w-40). A utility only ships if a consumer's Tailwind
 # build emits it, so compile the way a consumer does — the engine's own views as
 # the glob, engine.css imported — and require each one, with its declaration,
 # inside a 768px media block.
@@ -17,14 +17,14 @@ class UserNavPhoneBuildTest < Minitest::Test
 
   RESPONSIVE = {
     "md\\:not-sr-only" => "position: static",
-    "md\\:min-w-0" => "min-width: 0",
+    "md\\:max-w-40" => "max-width:",
     "md\\:flex" => "display: flex"
   }.freeze
 
   def test_the_partial_still_asks_for_the_utilities_this_test_compiles
     classes = File.read(PARTIAL).scan(/class(?:=|: )"([^"]*)"/).flatten.join(" ")
 
-    %w[sr-only md:not-sr-only md:min-w-0 hidden md:flex].each do |utility|
+    %w[sr-only md:not-sr-only md:max-w-40 hidden md:flex].each do |utility|
       assert_match(/(?:^|\s)#{Regexp.escape(utility)}(?:\s|$)/, classes, "#{utility} left the partial")
     end
   end

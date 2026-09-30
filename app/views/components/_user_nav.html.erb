@@ -70,12 +70,12 @@
 <div class="flex gap-2">
   <% if logged_in? %>
     <%# Left column: Div 1 + Div 2 stacked.
-        flex-1 WITHOUT min-w-0: this column holds the icons, which must never
-        be squeezed, so it keeps min-width auto (its min-content, the icon row)
-        and the account link beside it is what gives way — the name truncates
-        inside the link. The level row's text is absolutely positioned, so it
-        adds nothing to that min-content. %>
-    <div class="flex-1">
+        min-w-0 belongs HERE, on the flex item of the nav root: a flex item
+        defaults to min-width auto, and without it this column refuses to
+        shrink below balance + icons. On a 320px phone with a balance the
+        reserved column is 147px, and a column that will not give pushed the
+        avatar 17px past the screen edge (e2e/header_phone_width.spec.js). %>
+    <div class="flex-1 min-w-0">
       <%# Div 1 (Bigger): balance + icons. %>
       <div class="flex items-center gap-2 leading-none" :style="'padding: 0 6px;' + ($store.devMode ? 'background: cornflowerblue;' : '')">
         <%= studio_nav_slot.call(balance_slot, balance_html) %>
@@ -197,13 +197,14 @@
         so a phone never shows the name truncated to "Guest 55…"; from md up
         it shows beside the avatar and truncates when the row is tight.
 
-        The link is the nav root's shrinking flex item, so min-w-0 sits on it
-        (a flex item defaults to min-width auto and would refuse to shrink),
-        and again on the name's box, which is the link's own flex item. The
-        avatar is aria-hidden: the name is the link's accessible name. %>
-    <% account_classes = "group flex items-center gap-2 min-w-0 flex-shrink" %>
+        The link never shrinks (the avatar must stay on screen); the icon
+        column beside it is what gives way. So the name cannot truncate by
+        flex shrinking: from md up its box carries a max width instead, and
+        the name ellipsizes inside it. The avatar is aria-hidden: the name is
+        the link's accessible name. %>
+    <% account_classes = "group flex items-center gap-2 flex-shrink-0" %>
     <% account_inner = capture do %>
-      <span class="sr-only md:not-sr-only md:min-w-0"><span class="block truncate text-right text-heading font-semibold text-base leading-none transition<%= " group-hover:text-primary" if studio_nav_destination %>" data-nav-name><%= current_user.display_name %></span></span>
+      <span class="sr-only md:not-sr-only md:max-w-40"><span class="block truncate text-right text-heading font-semibold text-base leading-none transition<%= " group-hover:text-primary" if studio_nav_destination %>" data-nav-name><%= current_user.display_name %></span></span>
       <span class="flex-shrink-0 flex items-center" aria-hidden="true">
         <%= render "components/avatar", user: current_user, size: "nav" %>
       </span>
