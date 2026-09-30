@@ -183,13 +183,15 @@
     function dsThemeEditor(seed) {
       return {
         colors: Object.assign({ primary: '#000', dark: '#0f172a', light: '#ffffff',
-                                success: '#4BAF50', warning: '#FF7C47', danger: '#EF4444',
+                                success: '#367E3A', warning: '#FF7C47', danger: '#EF4444',
                                 accent: '#6366F1' }, seed || {}),
         saving: false,
         updatePreview() {
           var d = document.documentElement.style;
           d.setProperty('--color-cta', this.colors.primary);
-          if (this.colors.success) d.setProperty('--color-success', this.colors.success);
+          // btn-success paints --color-success-fill, the server's AA shade of the
+          // green; the preview shows the raw pick until a save re-derives it.
+          if (this.colors.success) { d.setProperty('--color-success', this.colors.success); d.setProperty('--color-success-fill', this.colors.success); }
           if (this.colors.warning) d.setProperty('--color-warning', this.colors.warning);
           if (this.colors.danger)  d.setProperty('--color-danger', this.colors.danger);
         },
