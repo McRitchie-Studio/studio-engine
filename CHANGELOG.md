@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.80.0 — 2026-09-30
+
 ### Added
 
 - **`Studio.navbar_user_name` and `Studio.sign_in_label` set the navbar's two
