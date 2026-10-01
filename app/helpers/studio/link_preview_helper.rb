@@ -10,7 +10,7 @@ module Studio
   # reason Studio::GeoHelper gives: every helper module is included into every
   # view, so an unprefixed name would collide with a host's own helper.
   module LinkPreviewHelper
-    OVERRIDE_KEYS = %i[image title description].freeze
+    OVERRIDE_KEYS = %i[image title description image_alt].freeze
 
     # THE PAGE OVERRIDE. Call it from any view (the layout renders later, so it
     # sees the call):
@@ -22,6 +22,8 @@ module Studio
     # attachment/blob (a user's avatar). An image that is nil, blank, or an
     # attachment with nothing attached falls back to the operator's default, so
     # a page can pass `image: user.avatar` without asking whether there is one.
+    # `image_alt:` is the image's text alternative (og:image:alt); without it the
+    # card's title stands in, which is what the picture illustrates.
     # Only the keys passed are set; a second call overrides just its own keys.
     # Returns nil, so `<%= link_preview ... %>` prints nothing either.
     def link_preview(**overrides)
@@ -33,8 +35,14 @@ module Studio
     end
 
     # The resolved preview for this page:
-    # { title:, description:, image:, image_source:, site_name:, url: }.
-    # `image` is absolute (or nil). Never raises: a preview must not 500 a page.
+    # { title:, description:, image:, image_source:, image_width:, image_height:,
+    #   image_alt:, site_name:, url: }.
+    # `image` is absolute (or nil). `image_width`/`image_height` are the
+    # winning image's pixel size when it is KNOWN — an attachment whose blob has
+    # been analyzed, or the static fallback file — and nil otherwise; a URL handed
+    # in as a string is never fetched to measure it. `url` is the page's og:url
+    # (Studio.link_preview_base_url plus the path when the app pins one).
+    # Never raises: a preview must not 500 a page.
     #
     # Rungs, most specific first: the page's `link_preview`, then the page's
     # own content_for(:title) / content_for(:meta_description) /
@@ -43,21 +51,27 @@ module Studio
     def studio_link_preview
       overrides = @studio_link_preview_overrides || {}
       stored = studio_site_identity_stored
+      override_image = studio_link_preview_image_location(overrides[:image])
 
       preview = Studio::LinkPreview.resolve(
         site_name: Studio.app_name,
         titles: [overrides[:title], studio_link_preview_content(:title), stored[:title], Studio.site_title],
         descriptions: [overrides[:description], studio_link_preview_content(:meta_description),
                        stored[:description], Studio.site_description],
-        page_images: [studio_link_preview_image_location(overrides[:image]), studio_link_preview_content(:og_image)],
+        page_images: [override_image, studio_link_preview_content(:og_image)],
         default_image: stored[:image_url] || stored[:image_path],
         static_image: Studio::SiteIdentity.static_image
       )
 
+      width, height = studio_link_preview_image_size(preview[:image_source], overrides[:image], override_image, stored)
+
       preview.merge(
         image: Studio::LinkPreview.absolute_url(preview[:image], base_url: studio_request_base_url) || preview[:image],
+        image_width: width,
+        image_height: height,
+        image_alt: (overrides[:image_alt].to_s.strip.presence || preview[:title] if preview[:image]),
         site_name: Studio.app_name.to_s,
-        url: (request.original_url if respond_to?(:request) && request)
+        url: studio_link_preview_page_url
       )
     end
 
@@ -106,8 +120,42 @@ module Studio
       value && CGI.unescapeHTML(value.to_str)
     end
 
+    # The app's pinned canonical base (Studio.link_preview_base_url), else the
+    # request's. Every preview URL is built on it.
     def studio_request_base_url
-      respond_to?(:request) && request ? request.base_url : nil
+      Studio::LinkPreview.base_url(pinned: Studio.link_preview_base_url,
+                                   request_base_url: (request.base_url if studio_link_preview_request?))
+    end
+
+    def studio_link_preview_page_url
+      return nil unless studio_link_preview_request?
+
+      Studio::LinkPreview.page_url(base_url: Studio.link_preview_base_url,
+                                   request_url: request.original_url, path: request.path)
+    end
+
+    def studio_link_preview_request?
+      respond_to?(:request) && request ? true : false
+    end
+
+    # [width, height] of the image that won, when it is known without a fetch.
+    # The override rung counts only when the page handed in an ATTACHMENT (its
+    # blob's analyzed metadata); a URL string or a content_for(:og_image) is
+    # unmeasured, so its tags are left out rather than guessed.
+    def studio_link_preview_image_size(source, override, override_location, stored)
+      case source
+      when :page
+        return nil if override_location.nil? || override.is_a?(String) || override.is_a?(Symbol)
+
+        Studio::SiteIdentity.image_dimensions(override)
+      when :default
+        width, height = stored[:image_width], stored[:image_height]
+        width && height ? [width, height] : nil
+      when :static
+        Studio::SiteIdentity.static_image_dimensions
+      end
+    rescue StandardError
+      nil
     end
   end
 end
