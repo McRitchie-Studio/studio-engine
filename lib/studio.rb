@@ -573,9 +573,9 @@ module Studio
   # optional; shape and rules: lib/studio/site_footer.rb.
   #
   #   config.site_footer = ->(view) {
-  #     { tagline: "Software & Marketing Solutions",
-  #       address: { street: "3000 Lawrence St", city_line: "Denver, CO 80205",
-  #                  lat: 39.7614786, lng: -104.978957 },
+  #     { tagline: "Everything, by example",
+  #       address: { street: "123 Example St", city_line: "Washington, DC 20024",
+  #                  lat: 38.8894, lng: -77.0352 },
   #       columns: [ [ "Company", [ [ "Home", view.root_path ], [ "Career", nil ] ] ] ],
   #       legal:   [ [ "Privacy Policy", view.privacy_path ] ] }
   #   }
@@ -617,7 +617,7 @@ module Studio
   # default) means no booking: `studio_booking_frame` and `studio_booking_popup`
   # render nothing and no link opens a popup.
   #
-  #   config.booking_url = "https://calendar.google.com/calendar/appointments/schedules/AcZss..."
+  #   config.booking_url = "https://calendar.google.com/calendar/appointments/schedules/EXAMPLE-SCHEDULE-ID"
   mattr_reader :booking_url, default: nil
 
   def self.booking_url=(url)

@@ -12,9 +12,9 @@ facts.
 Studio.configure do |config|
   config.site_footer = ->(view) {
     {
-      tagline: "Software & Marketing Solutions",
-      address: { street: "3000 Lawrence St", city_line: "Denver, CO 80205",
-                 lat: 39.7614786, lng: -104.978957 },
+      tagline: "Everything, by example",
+      address: { street: "123 Example St", city_line: "Washington, DC 20024",
+                 lat: 38.8894, lng: -77.0352 },
       social:  [ [ "LinkedIn", :linkedin, "https://www.linkedin.com/in/someone/" ],
                  [ "Instagram", :instagram, nil ] ],
       columns: [
@@ -27,7 +27,7 @@ Studio.configure do |config|
     }
   }
   config.site_footer_controllers = %w[landing packages]
-  config.booking_url = "https://calendar.google.com/calendar/appointments/schedules/AcZss..."
+  config.booking_url = "https://calendar.google.com/calendar/appointments/schedules/EXAMPLE-SCHEDULE-ID"
   config.draw_booking_routes = true
 end
 ```
@@ -51,7 +51,7 @@ Every key is optional. A missing key removes its part of the footer.
 | Key | What it prints | When absent |
 |-----|----------------|-------------|
 | `name` | The wordmark, the logo's label and the © line | The site identity's title (`Studio.site_identity[:title]`) |
-| `wordmark` | Two parts, the second in the primary colour: `%w[McRitchie Studio]` | `name`, split before its last word |
+| `wordmark` | Two parts, the second in the primary colour: `%w[Example Co]` | `name`, split before its last word |
 | `logo` | An image beside the wordmark: an asset name or a path | The app's "Footer Logo" in `config.theme_logos`, else its navbar logo. `logo: false` shows none |
 | `logo_invert` | `true` inverts a dark mark in light mode | Shown as drawn |
 | `home_path` | Where the logo and wordmark link | `/` |
@@ -74,6 +74,12 @@ Rows may be tuples, as above, or hashes (`{ label:, href: }`, `{ heading:, links
   (`studio_booking_path`), or when it says so:
   `[ "Schedule a call", contact_path, { booking: true } ]`. Its href stays as the
   fallback.
+- **Only some hrefs are linked.** A link, a social URL, `home_path` and
+  `directions_url` may be a relative path or an `http:`, `https:`, `mailto:` or
+  `tel:` URL. Anything else, `javascript:` and `data:` included, is never written
+  into the page: a link or a social icon prints unlinked, `home_path` falls back
+  to `/`, and `directions_url` falls back to the Google Maps default. Each
+  refused value is logged once (`[studio.site_footer] ... is not linked`).
 - **A social profile with a `nil` URL** renders its icon unlinked, with a dashed
   outline. The engine draws `:linkedin`, `:instagram`, `:x`, `:facebook` and
   `:youtube`; any other icon falls back to the label's first letter.
@@ -81,8 +87,8 @@ Rows may be tuples, as above, or hashes (`{ label:, href: }`, `{ heading:, links
 ### The address and the map
 
 ```ruby
-address: { street: "3000 Lawrence St", city_line: "Denver, CO 80205",
-           lat: 39.7614786, lng: -104.978957,
+address: { street: "123 Example St", city_line: "Washington, DC 20024",
+           lat: 38.8894, lng: -77.0352,
            zoom: 15,                               # optional, default 15
            directions_url: "https://maps.app/..." } # optional
 ```
@@ -170,9 +176,15 @@ render nothing and no link opens a popup.
 
 ### The popup
 
-Any `a[data-booking-popup]` opens Google's page in a `<dialog>` without leaving
-the page. The frame inside is requested the first time the dialog opens, and
-kept after that.
+A booking link opens Google's page in a `<dialog>` without leaving the page. The
+frame inside is requested the first time the dialog opens, and kept while that
+page stays up: closing and reopening does not ask Google again.
+
+A Turbo restoration visit (back or forward) is a new page built from a snapshot,
+and it does ask again. The inline frame is restored with its `src`, so the
+browser re-requests Google's page for it. The popup's frame is not: its `src` is
+put back to waiting before the snapshot is taken, so a restored page asks Google
+for the popup only when someone opens it.
 
 - **On a page that already shows the inline frame**, a booking link scrolls to
   that frame, opens its crop and moves focus into it. It does not open a second
@@ -180,6 +192,8 @@ kept after that.
 - **The link's href is the fallback**: with scripts off, on a modified click (new
   tab), or on a page with no dialog, it is an ordinary link.
 - **The page behind does not scroll** while the dialog is open.
+- **It is sized to the visible viewport** (`dvh`, with `vh` as the fallback), so
+  a phone's toolbars do not push the Close button off screen.
 - **Escape closes it, with one limit.** Once focus is inside Google's frame, key
   presses belong to Google (it is another origin), and Escape no longer reaches
   the dialog. Nothing in the page can change that. The Close button and a click
@@ -218,13 +232,43 @@ its own instead; the page and the partial are the same frame.
   error is logged once and the page renders without a footer. In development and
   test it raises.
 
+## Content Security Policy
+
+An app that enforces a policy must allow what these primitives fetch from other
+origins:
+
+| Directive | Source | For |
+|-----------|--------|-----|
+| `frame-src` | `https://calendar.google.com` | The booking frame and the popup |
+| `img-src` | `https://tile.openstreetmap.org` | The map's tiles |
+
+Leaflet itself is same-origin (`script-src 'self'`, `style-src 'self'`), since it
+is served from the app's own assets.
+
+The footer's and the booking primitives' own `<style>` and `<script>` blocks are
+inline and carry no nonce, like the rest of the engine's partials, and Leaflet
+positions its tiles with inline `style` attributes. A policy that forbids inline
+script or style needs `'unsafe-inline'` for them (or hashes), exactly as it does
+for the engine's head partial today.
+
+## Coexisting with an app's own copy
+
+An app that still renders local footer or booking partials (mcritchie-studio,
+until it adopts these) uses the same `data-footer-map` and `data-booking-*`
+attributes. The engine's scripts keep out of its way: their guards are engine
+names (`__studioFooterMapsArmed`, `__studioBookingFramesArmed`,
+`__studioBookingPopupArmed`), and they act only on engine-rendered elements,
+which carry `data-leaflet-js` (the map) or `data-studio-booking` (the frame, its
+wrapper, the dialog and the links). Write a booking link with
+`studio_booking_link`, not by hand, so it carries the marker.
+
 ## Markup hooks
 
 Stable, for tests and for an app's own scripts:
 `footer[data-site-footer]`, `[data-footer-location]`, `[data-footer-map]`,
 `[data-booking-wrap]`, `iframe[data-booking-frame]`, `dialog[data-booking-dialog]`,
 `iframe[data-booking-popup-frame]`, `a[data-booking-popup]`, `[data-booking-close]`,
-`[data-booking-page]`.
+`[data-booking-page]`. The booking elements also carry `data-studio-booking`.
 
 ## Tests
 

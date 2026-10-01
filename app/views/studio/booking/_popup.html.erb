@@ -23,7 +23,7 @@
     reaches the dialog. The Close button and a click on the backdrop always
     work, which is why the button is a solid one. %>
 <%= studio_booking_assets %>
-<dialog class="booking-popup" data-booking-dialog aria-label="<%= label %>">
+<dialog class="booking-popup" data-booking-dialog data-studio-booking aria-label="<%= label %>">
   <form method="dialog" class="booking-popup-bar">
     <span class="booking-popup-title"><%= label %></span>
     <button type="submit" class="booking-popup-close" data-booking-close>Close ✕</button>

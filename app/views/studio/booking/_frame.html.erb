@@ -25,8 +25,8 @@
     WITH SCRIPTS OFF nothing ever assigns the src, so the <noscript> hides the
     empty frame and puts a plain link to Google's booking page in its place. %>
 <%= studio_booking_assets %>
-<div class="booking-frame<%= " booking-frame-cropped" if crop %>" data-booking-wrap>
-  <iframe data-booking-frame
+<div class="booking-frame<%= " booking-frame-cropped" if crop %>" data-booking-wrap data-studio-booking>
+  <iframe data-booking-frame data-studio-booking
           data-src="<%= studio_booking_embed_url %>"
           title="<%= title %>"
           width="100%" frameborder="0"></iframe>
