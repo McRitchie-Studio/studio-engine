@@ -288,8 +288,8 @@ test("the footer lays out as a grid without the host's utilities", async ({ page
 // `minmax(0, 1fr)` tracks broke the address in two at every width; a wrapping
 // flex row kept it whole but gave a wide column a row to itself. Neither shows
 // in the markup: the text and the elements are all there either way. So these
-// specs read the rendered rows, at the five widths the layout has to hold:
-//   320, 390:   the brand, then the link columns two to a row
+// specs read the rendered rows, at the widths the layout has to hold:
+//   320, 360, 390: the brand, then the link columns two to a row
 //   768:        the brand, then every link column in one row
 //   1024, 1280: the brand in that row too
 const rowsOf = (page) =>
@@ -335,6 +335,7 @@ async function expectRows(page, count, expected) {
 test("four link columns: two to a row on a phone, one row from 768px, beside the brand from 1024px", async ({ page }) => {
   await expectRows(page, 4, {
     320: ["brand", "Contact+Company", "Solutions+Legal"],
+    360: ["brand", "Contact+Company", "Solutions+Legal"],
     390: ["brand", "Contact+Company", "Solutions+Legal"],
     768: ["brand", "Contact+Company+Solutions+Legal"],
     1024: ["brand+Contact+Company+Solutions+Legal"],
@@ -345,6 +346,7 @@ test("four link columns: two to a row on a phone, one row from 768px, beside the
 test("three link columns: two to a row on a phone, one row from 768px, beside the brand from 1024px", async ({ page }) => {
   await expectRows(page, 3, {
     320: ["brand", "Contact+Company", "Solutions"],
+    360: ["brand", "Contact+Company", "Solutions"],
     390: ["brand", "Contact+Company", "Solutions"],
     768: ["brand", "Contact+Company+Solutions"],
     1024: ["brand+Contact+Company+Solutions"],
@@ -355,6 +357,7 @@ test("three link columns: two to a row on a phone, one row from 768px, beside th
 test("two link columns: one row under the brand, and beside it from 1024px", async ({ page }) => {
   await expectRows(page, 2, {
     320: ["brand", "Contact+Company"],
+    360: ["brand", "Contact+Company"],
     390: ["brand", "Contact+Company"],
     768: ["brand", "Contact+Company"],
     1024: ["brand+Contact+Company"],

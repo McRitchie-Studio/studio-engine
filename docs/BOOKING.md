@@ -129,8 +129,9 @@ behind it is `frame_height` tall. Six pixels is the margin 0.83.0 used.
 The box is as tall as the month grid or the longest column of appointment slots,
 whichever is taller, at 48px a slot. The month grid was six rows in every month
 measured (two schedules, seven months each, on 2026-10-01), so a short month did
-not move the box. The slot column is not fixed: a day that is partly booked, or partly over, has fewer slots
-than a free one. So **the box's bottom on any one day is not the schedule's
+not move the box. The slot column is not fixed: a day that is partly booked,
+or partly over, has fewer slots than a free one. So **the box's bottom on any
+one day is not the schedule's
 bottom**, and a crop measured from one look at the page cuts off the last slots
 of a fuller day.
 
