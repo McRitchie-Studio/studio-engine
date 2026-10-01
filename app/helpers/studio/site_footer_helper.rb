@@ -2,7 +2,7 @@
 
 module Studio
   # The site footer and the booking primitives, as view helpers. See
-  # docs/SITE_FOOTER.md.
+  # docs/SITE_FOOTER.md and docs/BOOKING.md.
   #
   #   <%= studio_site_footer %>             the footer, where it should show
   #   <%= studio_booking_frame %>           Google's booking page, inline
@@ -40,8 +40,8 @@ module Studio
 
     # Where the footer shows: Studio.site_footer_visible, asked of this view. By
     # default that is every page for a visitor and, for a signed-in viewer, only
-    # the controllers in Studio.site_footer_controllers (plus the engine's booking
-    # page). Always false for an app that declared no footer.
+    # the controllers in Studio.site_footer_controllers (plus the booking page).
+    # Always false for an app that declared no footer.
     def studio_show_site_footer?
       return false if studio_site_footer_facts.nil?
 
@@ -75,12 +75,11 @@ module Studio
     def studio_booking_embed_url = Studio::Booking.embed_url(Studio.booking_url)
 
     # Where a booking link goes when the popup cannot open (scripts off, a
-    # modified click, a page with no dialog): the app's booking page when the
-    # engine draws it, else Google's own page.
+    # modified click, a page with no dialog): the app's booking page
+    # (Studio.booking_path, or the engine's /schedule when drawn), else Google's
+    # own page.
     def studio_booking_fallback_path
-      return studio_booking_path if Studio.draw_booking_routes && respond_to?(:studio_booking_path)
-
-      Studio.booking_url
+      Studio.booking_path_for(self) || Studio.booking_url
     end
 
     # The frame's accessible name.
@@ -99,11 +98,20 @@ module Studio
       studio_site_footer_facts&.dig(:name) || Studio.site_identity[:title]
     end
 
-    # The inline booking frame. `crop: false` shows Google's whole page at rest.
+    # The crop a frame renders with: { offset:, window:, frame_height: }, or nil
+    # for the whole frame at rest. `true` reads Studio.booking_crop; a Hash is a
+    # one-off; false or nil is no crop.
+    def studio_booking_crop(crop = true)
+      Studio::Booking.crop(crop == true ? Studio.booking_crop : crop)
+    end
+
+    # The inline booking frame. `crop:` is true (the default: use
+    # Studio.booking_crop, which is no crop until the app declares one), false
+    # (the whole page at rest) or a Hash for this frame alone.
     def studio_booking_frame(title: nil, crop: true)
       return unless studio_booking?
 
-      render "studio/booking/frame", title: studio_booking_title(title), crop: crop
+      render "studio/booking/frame", title: studio_booking_title(title), crop: studio_booking_crop(crop)
     end
 
     # The booking dialog, once per page however often it is asked for. The

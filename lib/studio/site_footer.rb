@@ -94,6 +94,16 @@ module Studio
       nil
     end
 
+    # True on the app's OWN booking page (Studio.booking_path), which keeps the
+    # footer for a signed-in viewer as the engine's page does. Matched by the
+    # request's path, because the app's controller could be named anything.
+    def booking_page?(view)
+      return false unless Studio.respond_to?(:booking_path) && Studio.booking_path
+      return false unless view.respond_to?(:request) && view.request.respond_to?(:path)
+
+      Studio::Booking.same_path?(view.request.path, Studio.booking_path_for(view))
+    end
+
     def validate!(declared)
       return if declared.nil? || declared.is_a?(Hash) || declared.respond_to?(:call)
 
@@ -106,7 +116,7 @@ module Studio
     #
     #   name:         the site name the engine resolved (the site identity's title)
     #   logo:         the logo the engine resolved (the navbar logo), or nil
-    #   booking_path: the booking page's path when the engine draws it, or nil
+    #   booking_path: the booking page's path (Studio.booking_path_for), or nil
     def resolve(declared, view, name: nil, logo: nil, booking_path: nil)
       raw = declared.respond_to?(:call) ? declared.call(view) : declared
       return nil if raw.nil?
@@ -151,6 +161,8 @@ module Studio
     #   }
     def default_visible?(view, controllers: nil)
       controllers = Studio.site_footer_controllers if controllers.nil? && defined?(Studio.site_footer_controllers)
+      return true if booking_page?(view)
+
       visible?(
         logged_in: view.respond_to?(:logged_in?) && view.logged_in? ? true : false,
         controller_name: view.respond_to?(:controller_name) ? view.controller_name : nil,
@@ -253,7 +265,7 @@ module Studio
 
     # [ label, href ], [ label, href, { booking: true } ] or { label:, href:,
     # booking: }. A nil href is a disabled label; an http(s) href opens in a new
-    # tab; `booking: true`, or an href equal to the engine's booking page, opens
+    # tab; `booking: true`, or an href equal to the booking page's path, opens
     # the booking popup (the href stays as the fallback).
     def link(row, booking_path = nil)
       label, href, options =

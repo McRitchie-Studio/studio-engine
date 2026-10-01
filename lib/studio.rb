@@ -565,7 +565,7 @@ module Studio
   # The public site's footer: brand and social profiles, link columns, an
   # optional Location band with a live map, and a legal line. And the booking
   # primitives: Google Calendar's appointment page inline, in a popup, and on a
-  # page. See docs/SITE_FOOTER.md.
+  # page. See docs/SITE_FOOTER.md and docs/BOOKING.md.
 
   # The footer's facts: a Hash, or a callable receiving the view. nil (the
   # default) means this app has no footer, and `studio_site_footer` renders
@@ -590,7 +590,8 @@ module Studio
   # controller name ("landing") or path ("admin/reports"). A visitor gets the
   # footer on every page; a signed-in viewer gets it only here, because every
   # other signed-in page is a working surface (a board, a queue, an editor) and
-  # stays full height. The engine's own booking page is always included.
+  # stays full height. The booking page (the engine's, or the app's own at
+  # Studio.booking_path) is always included.
   #
   #   config.site_footer_controllers = %w[landing packages contact_submissions]
   mattr_accessor :site_footer_controllers, default: []
@@ -633,6 +634,51 @@ module Studio
   #
   #   config.draw_booking_routes = true
   mattr_accessor :draw_booking_routes, default: false
+
+  # WHERE THE APP'S OWN BOOKING PAGE LIVES, for an app that renders
+  # `studio_booking_frame` in a view of its own instead of drawing the engine's
+  # /schedule: a path ("/schedule"), or a callable receiving the view
+  # (`->(view) { view.schedule_path }`). nil (the default) leaves the engine's
+  # page, when drawn, as the booking page. With it set, the page is treated as
+  # the engine's own is: a footer link to it opens the popup, `studio_booking_link`
+  # falls back to it, and it keeps the footer for a signed-in viewer. It wins
+  # over the engine's page when both are declared.
+  #
+  #   config.booking_path = "/schedule"
+  mattr_reader :booking_path, default: nil
+
+  def self.booking_path=(declared)
+    Booking.validate_path!(declared)
+    declared = declared.strip if declared.is_a?(String)
+    @@booking_path = declared.is_a?(String) && declared.empty? ? nil : declared
+  end
+
+  # The booking page's path for a view: Studio.booking_path, else the engine's
+  # /schedule when it is drawn, else nil.
+  def self.booking_path_for(view)
+    if booking_path
+      path = booking_path.respond_to?(:call) ? booking_path.call(view) : booking_path
+      path = path.to_s.strip
+      return path unless path.empty?
+    end
+
+    draw_booking_routes && view.respond_to?(:studio_booking_path) ? view.studio_booking_path : nil
+  end
+
+  # THE FRAME'S CROP AT REST: nil or false (the default) shows Google's whole
+  # page; a Hash of the schedule's measured box crops the frame to the slot
+  # picker until it is used. The numbers belong to ONE schedule, so there is no
+  # default crop: measure with `bin/booking-crop-measure <booking url>` and paste
+  # what it prints. Keys and derivation: lib/studio/booking.rb.
+  #
+  #   config.booking_crop = { top: 200, bottom: 600, frame_height: 720 }
+  mattr_reader :booking_crop, default: nil
+
+  def self.booking_crop=(declared)
+    Booking.validate_crop!(declared)
+    Booking.crop(declared) # reports a crop that cannot be one, at boot
+    @@booking_crop = declared || nil
+  end
 
   # THE APP'S IDENTITY COPY, resolved: { title:, description:, image_url: }.
   # The operator's saved value (Studio::SiteIdentity, edited at
@@ -1140,9 +1186,8 @@ module Studio
   def self.site_footer_for(view)
     return nil if site_footer.nil?
 
-    booking_path = draw_booking_routes && view.respond_to?(:studio_booking_path) ? view.studio_booking_path : nil
-    SiteFooter.resolve(site_footer, view,
-                       name: site_identity[:title], logo: logo_for("Footer Logo"), booking_path: booking_path)
+    SiteFooter.resolve(site_footer, view, name: site_identity[:title], logo: logo_for("Footer Logo"),
+                                          booking_path: booking_path_for(view))
   end
 
   # Navbar links resolved for a view context (lib/studio/navbar_links.rb).

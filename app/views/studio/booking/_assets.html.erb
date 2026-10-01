@@ -10,11 +10,15 @@
     /* A booking link on this page scrolls here; land below the pinned navbar. */
     scroll-margin-top: calc(var(--nav-bottom, 4rem) + 1rem); }
   .booking-frame iframe { display: block; width: 100%; border: 0; height: 1200px; }
+  /* From 640px up Google lays the month beside the slots. A cropped wrapper
+     carries its own numbers (Studio::Booking.crop_style): how far the frame is
+     pulled up, the window's height, and the frame's full height. A wrapper with
+     no crop carries none, and shows the frame whole at the default height. */
   @media (min-width: 640px) {
-    .booking-frame iframe { height: 732px; }
-    .booking-frame-cropped { height: 414px; transition: height .25s ease; }
-    .booking-frame-cropped iframe { margin-top: -205px; transition: margin-top .25s ease; }
-    .booking-frame-cropped.is-open { height: 732px; }
+    .booking-frame iframe { height: var(--booking-frame-height, 732px); }
+    .booking-frame-cropped { height: var(--booking-crop-window); transition: height .25s ease; }
+    .booking-frame-cropped iframe { margin-top: calc(-1 * var(--booking-crop-offset)); transition: margin-top .25s ease; }
+    .booking-frame-cropped.is-open { height: var(--booking-frame-height, 732px); }
     .booking-frame-cropped.is-open iframe { margin-top: 0; }
   }
   /* Scripts off: the frame never gets its src, so it is hidden and a plain link
