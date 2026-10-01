@@ -82,9 +82,13 @@ module Studio
         return say_status(:skip, "#{CONTROLLER} not found", :yellow) unless File.exist?(path)
         return say_status(:identical, "#{CONTROLLER} (Studio::LinkPreviewBots)", :blue) if File.read(path).include?("Studio::LinkPreviewBots")
 
-        inject_into_class CONTROLLER, "ApplicationController", <<~RUBY
+        # inject_into_class inserts the text as given, right after the class
+        # line, so the body's two-space indent is written here (a bare heredoc
+        # landed at column 0 in cyvasse).
+        inject_into_class CONTROLLER, "ApplicationController", <<~RUBY.gsub(/^(?=.)/, "  ")
           # Preview fetchers (iMessage, Slack, Discord, X...) get a slim page under
-          # Apple's 1 MiB limit. studio-engine docs/LINK_PREVIEW.md.
+          # Apple's 1 MiB limit, and are exempt from allow_browser. studio-engine
+          # docs/LINK_PREVIEW.md.
           include Studio::LinkPreviewBots
         RUBY
       end

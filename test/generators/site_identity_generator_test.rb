@@ -87,6 +87,29 @@ class SiteIdentityGeneratorTest < Rails::Generators::TestCase
     end
   end
 
+  # cyvasse's adoption got the include at column 0. Every line the generator
+  # writes into the class body sits at the body's two-space indent, and the
+  # result is still a class that parses.
+  test "writes the include indented inside the class body" do
+    run_generator
+
+    assert_file "app/controllers/application_controller.rb" do |content|
+      assert_match(/^  include Studio::LinkPreviewBots$/, content)
+      inserted = content.lines.select { |line| line.include?("LinkPreviewBots") || line.include?("Preview fetchers") }
+      assert_operator inserted.size, :>=, 2
+      inserted.each { |line| assert line.start_with?("  "), "unindented: #{line.inspect}" }
+      assert_equal <<~RUBY, content
+        class ApplicationController < ActionController::Base
+          # Preview fetchers (iMessage, Slack, Discord, X...) get a slim page under
+          # Apple's 1 MiB limit, and are exempt from allow_browser. studio-engine
+          # docs/LINK_PREVIEW.md.
+          include Studio::LinkPreviewBots
+          include Studio::ErrorHandling
+        end
+      RUBY
+    end
+  end
+
   test "skip-bots leaves the controller alone" do
     run_generator %w[--skip-bots]
 

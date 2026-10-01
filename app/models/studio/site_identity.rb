@@ -33,7 +33,7 @@ module Studio
 
     # Read on EVERY page render (the head's tags), edited a few times a year. So
     # the stored values are cached, and busted on any write — see .stored.
-    CACHE_KEY_PREFIX = "studio/site_identity/v1"
+    CACHE_KEY_PREFIX = "studio/site_identity/v2" # v2: adds image_width/image_height
     CACHE_TTL = 1.hour
 
     TITLE_MAX = 200
@@ -194,12 +194,45 @@ module Studio
 
       def reset_static_image!
         @static_files = nil
+        @static_dimensions = nil
+      end
+
+      # [width, height] of the static fallback, read from the file's header, or
+      # nil when there is no local file (an absolute URL is never fetched) or its
+      # format is not one Studio::LinkPreview.image_dimensions reads. Memoized
+      # per path like static_image.
+      def static_image_dimensions
+        path = static_image
+        return nil if path.nil? || !path.start_with?("/") || path.start_with?("//")
+
+        @static_dimensions ||= Concurrent::Map.new
+        dims = @static_dimensions.compute_if_absent(path) do
+          Studio::LinkPreview.image_dimensions(Rails.public_path.join(path.delete_prefix("/"))) || false
+        end
+        dims || nil
+      end
+
+      # [width, height] from an attachment's or blob's ANALYZED metadata, or nil
+      # before Active Storage's analyze job has run (or for a non-image).
+      def image_dimensions(attachable)
+        return nil if attachable.nil?
+        return nil if attachable.respond_to?(:attached?) && !attachable.attached?
+
+        blob = attachable.respond_to?(:blob) ? attachable.blob : attachable
+        metadata = blob.respond_to?(:metadata) ? blob.metadata : nil
+        return nil unless metadata.is_a?(Hash)
+
+        width = metadata["width"] || metadata[:width]
+        height = metadata["height"] || metadata[:height]
+        width.is_a?(Integer) && height.is_a?(Integer) && width.positive? && height.positive? ? [width, height] : nil
+      rescue StandardError
+        nil
       end
 
       private
 
       def empty_stored
-        { title: nil, description: nil, image_url: nil, image_path: nil }
+        { title: nil, description: nil, image_url: nil, image_path: nil, image_width: nil, image_height: nil }
       end
 
       def compute_stored
@@ -207,11 +240,14 @@ module Studio
         return empty_stored if row.nil?
 
         location = row.respond_to?(:image) ? image_location(row.image) : nil
+        width, height = (image_dimensions(row.image) if location)
         {
           title: row.title.presence,
           description: row.description.presence,
           image_url: location&.dig(:url),
-          image_path: location&.dig(:path)
+          image_path: location&.dig(:path),
+          image_width: width,
+          image_height: height
         }
       end
     end

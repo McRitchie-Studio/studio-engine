@@ -106,7 +106,7 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
     @queue_adapter = ActiveJob::Base.queue_adapter
     ActiveJob::Base.queue_adapter = :test
     @config = [Studio.link_preview_tags, Studio.link_preview_fallback_image,
-               Studio.site_title, Studio.site_description]
+               Studio.site_title, Studio.site_description, Studio.link_preview_base_url]
     install_link_preview_table!
     Studio::SiteIdentity.delete_all
     Studio::SiteIdentity.bust_cache!
@@ -119,7 +119,7 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
   def teardown
     ActiveJob::Base.queue_adapter = @queue_adapter
     Studio.link_preview_tags, Studio.link_preview_fallback_image,
-      Studio.site_title, Studio.site_description = @config
+      Studio.site_title, Studio.site_description, Studio.link_preview_base_url = @config
     Studio::SiteIdentity.bust_cache!
     FileUtils.rm_f(STATIC_PNG)
     Studio::SiteIdentity.reset_static_image!
@@ -469,5 +469,162 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
     get "/lab/link_preview", headers: { "User-Agent" => "" }
 
     assert_match(/data-lab-page="plain"/, response.body)
+  end
+
+  # --- 6. preview bots through allow_browser :modern -------------------------
+  #
+  # Apple's LinkPresentation sends a Safari 9.0.1 UA; Rails' allow_browser
+  # versions: :modern 406s it, so a Rails 8 app's links never previewed in
+  # iMessage. Including Studio::LinkPreviewBots must exempt the fetcher by
+  # itself, on GET/HEAD only, and nobody else.
+
+  OLD_SAFARI_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/601.2.4 (KHTML, like Gecko) " \
+                  "Version/9.0.1 Safari/601.2.4"
+
+  test "the iMessage fetcher gets the slim page from an allow_browser :modern app" do
+    get "/lab/link_preview_modern/heavy", headers: { "User-Agent" => IMESSAGE_UA }
+
+    assert_response :success
+    assert_equal "slim", response.headers["X-Studio-Link-Preview"]
+    assert_operator response.body.bytesize, :<, 10_000
+    assert_equal "Heavy contest", meta("og:title")
+  end
+
+  test "an old Safari that is not a preview fetcher is still refused with a 406" do
+    get "/lab/link_preview_modern", headers: { "User-Agent" => OLD_SAFARI_UA }
+
+    assert_response :not_acceptable
+    assert_equal "unsupported browser", response.body
+  end
+
+  test "a modern browser still gets the full page from an allow_browser :modern app" do
+    get "/lab/link_preview_modern", headers: { "User-Agent" => SAFARI_UA }
+
+    assert_response :success
+    assert_match(/data-lab-page="plain"/, response.body)
+    assert_nil response.headers["X-Studio-Link-Preview"]
+  end
+
+  test "a HEAD from the iMessage fetcher is exempt too" do
+    head "/lab/link_preview_modern", headers: { "User-Agent" => IMESSAGE_UA }
+
+    assert_response :success
+  end
+
+  test "the exemption is GET and HEAD only: a POST with the fetcher's UA is still refused" do
+    post "/lab/link_preview_modern", headers: { "User-Agent" => IMESSAGE_UA }
+
+    assert_response :not_acceptable
+  end
+
+  test "an app that still carries the app-side unless: patch behaves the same" do
+    get "/lab/link_preview_patched", headers: { "User-Agent" => IMESSAGE_UA }
+    assert_response :success
+    assert_equal "slim", response.headers["X-Studio-Link-Preview"]
+
+    get "/lab/link_preview_patched", headers: { "User-Agent" => OLD_SAFARI_UA }
+    assert_response :not_acceptable
+  end
+
+  # The exemption overrides the private instance method allow_browser's
+  # before_action calls. Pin that Rails still dispatches through it, so a Rails
+  # upgrade that renames it fails HERE, by name, rather than as a silent 406.
+  test "Rails still routes allow_browser through the instance method the concern wraps" do
+    assert ActionController::AllowBrowser.private_method_defined?(:allow_browser),
+           "ActionController::AllowBrowser#allow_browser is gone; Studio::LinkPreviewBots#allow_browser no longer intercepts"
+    assert_operator LinkPreviewModernLabController.ancestors.index(Studio::LinkPreviewBots), :<,
+                    LinkPreviewModernLabController.ancestors.index(ActionController::AllowBrowser),
+                    "the concern must sit above Rails' module so its allow_browser runs first"
+  end
+
+  # --- 7. image size and alt, the canonical base, and ErrorLog --------------
+
+  test "the static fallback's size and an alt ride with og:image" do
+    get "/lab/link_preview"
+
+    assert_equal "1", meta("og:image:width"), "the 1x1 fixture's header, read from public/og.png"
+    assert_equal "1", meta("og:image:height")
+    assert_equal "Studio", meta("og:image:alt"), "with no image_alt the card's title describes the picture"
+    assert_equal "Studio", meta("twitter:image:alt")
+  end
+
+  test "no image means no size and no alt tags" do
+    FileUtils.rm_f(STATIC_PNG)
+    Studio::SiteIdentity.reset_static_image!
+
+    get "/lab/link_preview"
+
+    assert_nil meta("og:image:width")
+    assert_nil meta("og:image:height")
+    assert_nil meta("og:image:alt")
+  end
+
+  test "an uploaded default carries its analyzed size, and none before analysis" do
+    upload_default_image
+
+    get "/lab/link_preview"
+    assert_match %r{/rails/active_storage/blobs/proxy/}, meta("og:image")
+    assert_nil meta("og:image:width"), "before the analyze job runs the size is unknown, so no tag"
+
+    blob = Studio::SiteIdentity.current.image.blob
+    blob.update!(metadata: blob.metadata.merge("width" => 1200, "height" => 630, "analyzed" => true))
+    Studio::SiteIdentity.bust_cache!
+
+    get "/lab/link_preview"
+    assert_equal "1200", meta("og:image:width")
+    assert_equal "630", meta("og:image:height")
+  end
+
+  test "a page's string image is never measured, and image_alt overrides the alt" do
+    get "/lab/link_preview/override", params: { title: "World Cup Contest", image: "/banners/contest.png",
+                                                image_alt: "The bracket" }
+
+    assert_equal "http://www.example.com/banners/contest.png", meta("og:image")
+    assert_nil meta("og:image:width"), "a URL string is not fetched to size it"
+    assert_equal "The bracket", meta("og:image:alt")
+  end
+
+  test "a page's attachment image carries its blob's analyzed size" do
+    blob = ActiveStorage::Blob.create_and_upload!(io: StringIO.new(PNG), filename: "avatar.png", content_type: "image/png",
+                                                  metadata: { "width" => 400, "height" => 400, "analyzed" => true })
+    view = ActionView::Base.empty
+    view.extend(Studio::LinkPreviewHelper)
+
+    view.link_preview(image: blob)
+    preview = view.studio_link_preview
+
+    assert_equal :page, preview[:image_source]
+    assert_equal [400, 400], [preview[:image_width], preview[:image_height]]
+  end
+
+  test "a pinned base URL fixes og:url and the image host, and drops the query" do
+    Studio.link_preview_base_url = "https://cyvasse.xyz/"
+
+    get "/lab/link_preview", params: { utm_source: "sms" }
+
+    assert_equal "https://cyvasse.xyz/lab/link_preview", meta("og:url")
+    assert_equal "https://cyvasse.xyz/og.png", meta("og:image")
+  end
+
+  test "unpinned, og:url is the URL as requested" do
+    get "/lab/link_preview", params: { utm_source: "sms" }
+
+    assert_equal "http://www.example.com/lab/link_preview?utm_source=sms", meta("og:url")
+  end
+
+  test "a slim render that fails is captured in ErrorLog and the fetcher still gets the full page" do
+    ErrorLog.delete_all
+    original = Studio::LinkPreview.method(:slim_document)
+    Studio::LinkPreview.define_singleton_method(:slim_document) { |*, **| raise ArgumentError, "slim exploded" }
+    begin
+      get "/lab/link_preview", headers: { "User-Agent" => IMESSAGE_UA }
+    ensure
+      Studio::LinkPreview.define_singleton_method(:slim_document, original)
+    end
+
+    assert_response :success
+    assert_match(/data-lab-page="plain"/, response.body)
+    assert_nil response.headers["X-Studio-Link-Preview"]
+    assert_equal ["slim exploded"], ErrorLog.pluck(:message)
   end
 end
