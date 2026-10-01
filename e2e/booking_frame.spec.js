@@ -315,8 +315,8 @@ test("with no dialog on the page, or on a modified click, the link's href is the
   // A modified click is left to the browser: a new tab on the booking page, and
   // no dialog here.
   const [tab] = await Promise.all([context.waitForEvent("page"), link.click({ modifiers: ["ControlOrMeta"] })]);
-  await tab.waitForLoadState("domcontentloaded");
-  expect(new URL(tab.url()).pathname).toBe("/lab/site_footer/schedule");
+  // A new tab starts on about:blank; wait for it to arrive, not merely to load.
+  await tab.waitForURL(/\/lab\/site_footer\/schedule$/);
   await expect(dialog(page)).toBeHidden();
   await tab.close();
 

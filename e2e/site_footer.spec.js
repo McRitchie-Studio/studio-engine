@@ -124,10 +124,17 @@ test("on a touch device a one-finger swipe on the map scrolls the page", async (
   });
   expect(before.scrollY).toBeGreaterThan(150);
 
+  // The finger goes down on the map and drags 160px down the screen, as real
+  // touch events (start, a run of moves a frame apart, end).
   const client = await context.newCDPSession(page);
-  await client.send("Input.synthesizeScrollGesture", {
-    x: before.x, y: before.y, yDistance: 120, speed: 800, gestureSourceType: "touch",
-  });
+  const touch = (type, y) =>
+    client.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x: before.x, y }] });
+  await touch("touchStart", before.y);
+  for (let step = 1; step <= 16; step++) {
+    await touch("touchMove", before.y + step * 10);
+    await page.waitForTimeout(16);
+  }
+  await touch("touchEnd");
 
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(before.scrollY - 60);
   const after = await map(page).evaluate((el) => {
