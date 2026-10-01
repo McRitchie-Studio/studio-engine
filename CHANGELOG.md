@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.84.0 — 2026-10-01
+
 ### Changed
 
 - **BREAKING for a 0.83.0 consumer that shows the booking frame: the frame is no
