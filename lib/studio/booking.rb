@@ -127,6 +127,26 @@ module Studio
             "(got #{declared.inspect}). See docs/BOOKING.md."
     end
 
+    # The declared value as it is stored: a stripped path, a callable, or nil.
+    def normalize_path(declared)
+      validate_path!(declared)
+      return declared unless declared.is_a?(String)
+
+      declared.strip.empty? ? nil : declared.strip
+    end
+
+    # The booking page's path for a view: the app's own (`declared`, a path or
+    # a callable receiving the view), else the engine's /schedule when it is
+    # `drawn`, else nil. A callable may decline with nil.
+    def path_for(declared, view, drawn: false)
+      unless declared.nil?
+        path = (declared.respond_to?(:call) ? declared.call(view) : declared).to_s.strip
+        return path unless path.empty?
+      end
+
+      drawn && view.respond_to?(:studio_booking_path) ? view.studio_booking_path : nil
+    end
+
     # True when `current` (a request path) is the page `declared` names. A query
     # string, a fragment and a trailing slash on either side do not count.
     def same_path?(current, declared)

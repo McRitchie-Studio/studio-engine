@@ -97,11 +97,11 @@ module Studio
     # True on the app's OWN booking page (Studio.booking_path), which keeps the
     # footer for a signed-in viewer as the engine's page does. Matched by the
     # request's path, because the app's controller could be named anything.
-    def booking_page?(view)
-      return false unless Studio.respond_to?(:booking_path) && Studio.booking_path
+    def booking_page?(view, booking_path)
+      return false if booking_path.nil?
       return false unless view.respond_to?(:request) && view.request.respond_to?(:path)
 
-      Studio::Booking.same_path?(view.request.path, Studio.booking_path_for(view))
+      Studio::Booking.same_path?(view.request.path, booking_path)
     end
 
     def validate!(declared)
@@ -159,9 +159,15 @@ module Studio
     #   config.site_footer_visible = ->(view) {
     #     Studio::SiteFooter.default_visible?(view) && !view.controller_path.start_with?("app/")
     #   }
-    def default_visible?(view, controllers: nil)
+    #
+    # `booking_path` is the app's own booking page (Studio.booking_path, resolved
+    # for this view); the engine's page is exempt by its controller instead.
+    def default_visible?(view, controllers: nil, booking_path: nil)
       controllers = Studio.site_footer_controllers if controllers.nil? && defined?(Studio.site_footer_controllers)
-      return true if booking_page?(view)
+      if booking_path.nil? && Studio.respond_to?(:booking_path) && Studio.booking_path
+        booking_path = Studio.booking_path_for(view)
+      end
+      return true if booking_page?(view, booking_path)
 
       visible?(
         logged_in: view.respond_to?(:logged_in?) && view.logged_in? ? true : false,

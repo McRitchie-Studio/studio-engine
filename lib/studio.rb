@@ -648,21 +648,13 @@ module Studio
   mattr_reader :booking_path, default: nil
 
   def self.booking_path=(declared)
-    Booking.validate_path!(declared)
-    declared = declared.strip if declared.is_a?(String)
-    @@booking_path = declared.is_a?(String) && declared.empty? ? nil : declared
+    @@booking_path = Booking.normalize_path(declared)
   end
 
   # The booking page's path for a view: Studio.booking_path, else the engine's
   # /schedule when it is drawn, else nil.
   def self.booking_path_for(view)
-    if booking_path
-      path = booking_path.respond_to?(:call) ? booking_path.call(view) : booking_path
-      path = path.to_s.strip
-      return path unless path.empty?
-    end
-
-    draw_booking_routes && view.respond_to?(:studio_booking_path) ? view.studio_booking_path : nil
+    Booking.path_for(booking_path, view, drawn: draw_booking_routes)
   end
 
   # THE FRAME'S CROP AT REST: nil or false (the default) shows Google's whole
