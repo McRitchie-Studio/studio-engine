@@ -194,13 +194,14 @@ class StylePageTest < ActiveSupport::TestCase
   # would 500 /admin/style in every host.
   test "the Tricks section stages the site footer and booking primitives" do
     saved = [Studio.site_footer, Studio.booking_url]
+    saved_crop = Studio.booking_crop
     Studio.site_footer = nil
     Studio.booking_url = nil
     doc = Nokogiri::HTML.fragment(render_index)
 
     group = doc.at_css("section#tricks section#site-footer")
     refute_nil group, "the group must sit inside the Tricks section, under its own anchor"
-    assert_equal %w[studio_site_footer studio_booking_link studio_booking_frame],
+    assert_equal %w[studio_site_footer studio_booking_link studio_booking_frame config.booking_crop],
                  group.css("article code[x-ref='klass']").map { |code| code.text.strip }
     assert_match(/footer\s+not declared.*booking\s+off.*booking page\s+not drawn/m,
                  group.at_css("[data-site-footer-status]").text)
@@ -212,7 +213,7 @@ class StylePageTest < ActiveSupport::TestCase
     refute_nil preview, "the preview must be the real footer partial"
     assert preview.at_css("[data-footer-map][data-lat]"), "the sample carries an address, so it shows the map"
     assert preview.at_css("span[aria-disabled='true']"), "and a disabled label"
-    assert_equal 2, group.css("article[aria-disabled='true']").size, "both booking specimens are flagged off"
+    assert_equal 3, group.css("article[aria-disabled='true']").size, "all three booking specimens are flagged off"
     assert_nil doc.at_css("dialog[data-booking-dialog]"), "no booking_url, so no popup"
 
     Studio.site_footer = { name: "Declared Co", legal: [["Privacy", "/privacy"]] }
@@ -226,8 +227,23 @@ class StylePageTest < ActiveSupport::TestCase
     assert_empty group.css("article[aria-disabled='true']")
     assert group.at_css("article a.btn.btn-primary[data-booking-popup]"), "the live booking link specimen"
     assert_nil group.at_css("iframe[data-booking-frame]"), "the style guide never embeds Google's frame"
+
+    # The frame's two states, drawn at quarter scale from a made-up schedule (a
+    # 720px page, box 200-600): the whole page, and the window a crop leaves.
+    px = ->(node, property) { node["style"][/(?:\A|; )#{property}: (-?\d+)px/, 1].to_i }
+    whole = group.at_css("[data-booking-specimen='whole'] > div")
+    cropped = group.at_css("[data-booking-specimen='cropped'] > div")
+    assert_equal [180, 0], [px.call(whole, "height"), px.call(whole.at_css("div"), "margin-top")]
+    assert_equal [103, -49], [px.call(cropped, "height"), px.call(cropped.at_css("div"), "margin-top")],
+                 "a 412px window, 194px down, at quarter scale"
+    assert_match(/frame\s+whole at rest/, group.at_css("[data-site-footer-status]").text)
+
+    Studio.booking_crop = { top: 200, bottom: 600, frame_height: 720 }
+    status = Nokogiri::HTML.fragment(render_index).at_css("section#site-footer [data-site-footer-status]").text
+    assert_match(/frame\s+cropped at rest/, status)
   ensure
     Studio.site_footer, Studio.booking_url = saved
+    Studio.booking_crop = saved_crop
   end
 
   test "the view is a bare content wrapper (no host layout of its own)" do

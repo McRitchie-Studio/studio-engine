@@ -790,7 +790,19 @@
 #   drop the description's line clamp      1 red (card description runs past two lines)
 # The phone-width spec guards the card's 1200:630 shape and sideways scroll.
 #   npx playwright test --list  -> 152 tests in 24 files
-total_specs: 174
+# + per-site-booking-crop: the booking frame's crop became the app's own
+# (config.booking_crop), so e2e/booking_frame.spec.js goes 13 -> 15: the one
+# "cropped at rest" spec became three (whole by default; cropped to a declared
+# window and open on use; two frames with different crops on one page, each
+# opening alone, the second by frame-to-frame focus that no window blur
+# announces) and "below 640px" now runs against wrappers that DO carry a crop.
+# And e2e/booking_crop_measure.spec.js, 4 specs in ONE new file, for the
+# measuring behind bin/booking-crop-measure: against a stub shaped like Google's
+# page it walks the bookable days and measures the box on the fullest one, at
+# both widths, and refuses a page that is not shaped like a schedule. The command
+# itself reaches the live Google page and is never run by this lane.
+#   npx playwright test --list  -> 180 tests in 27 files
+total_specs: 180
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -898,7 +910,15 @@ total_specs: 174
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 174
 # executed = total - devnet - allowed_skips = 174 - 0 - 0 = 174, so executed ==
 # total_specs and the equality assertion holds.
-executed: 174
+# Re-derived once more on THIS tree with the lister when the per-site booking crop
+# landed (per-site-booking-crop) — 6 more tests, 4 of them in ONE new file
+# (e2e/booking_frame.spec.js 13 -> 15, e2e/booking_crop_measure.spec.js 4):
+#   npx playwright test --list                                             -> 180 tests, 27 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 180
+# executed = total - devnet - allowed_skips = 180 - 0 - 0 = 180, so executed ==
+# total_specs and the equality assertion holds.
+executed: 180
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

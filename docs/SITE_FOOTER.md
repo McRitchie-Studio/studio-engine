@@ -1,9 +1,11 @@
-# Site footer and booking
+# Site footer
 
-Every app on studio-engine can end its public pages with the same footer, and
-take bookings through Google Calendar, from configuration alone. The gem ships
-the markup, the styles, the map, the scripts and Leaflet itself. The app declares
-facts.
+Every app on studio-engine can end its public pages with the same footer, from
+configuration alone. The gem ships the markup, the styles, the map, the scripts
+and Leaflet itself. The app declares facts.
+
+Booking through Google Calendar is its own primitive, usable with or without
+the footer: see [`BOOKING.md`](BOOKING.md). This page covers where the two meet.
 
 ## Adopt it
 
@@ -70,8 +72,9 @@ Rows may be tuples, as above, or hashes (`{ label:, href: }`, `{ heading:, links
   for a page that does not exist yet.
 - **A link to an `http(s)` URL** opens in a new tab.
 - **A booking link** opens the booking popup instead of leaving the page. A link
-  is a booking link when its path is the engine's booking page
-  (`studio_booking_path`), or when it says so:
+  is a booking link when its path is the booking page (the engine's
+  `studio_booking_path`, or the app's own `config.booking_path`), or when it
+  says so:
   `[ "Schedule a call", contact_path, { booking: true } ]`. Its href stays as the
   fallback.
 - **Only some hrefs are linked.** A link, a social URL, `home_path` and
@@ -110,6 +113,10 @@ address: { street: "123 Example St", city_line: "Washington, DC 20024",
   still zooms, and the zoom buttons and the directions link remain. With a
   mouse the map drags, and the wheel zooms only after a click on the map.
 
+`studio_footer_map class: "h-80"` renders the map alone, for a contact page. It
+maps the footer's address; pass `lat:`/`lng:` to map another. The element has no
+height of its own, so `class:` or `style:` sizes it.
+
 Leaflet numbers its own panes and controls up to `z-index: 1000`. The map
 element is its own stacking context (`isolation: isolate`), so none of that
 competes with the navbar or a modal. If you mount Leaflet yourself on another
@@ -131,7 +138,8 @@ receives the view. Its default:
 - **A signed-in viewer** sees it only on the controllers in
   `config.site_footer_controllers`, by controller name (`"landing"`) or path
   (`"admin/reports"`). Every other signed-in page is a working surface and stays
-  full height. The engine's booking page is always included.
+  full height. The booking page is always included: the engine's `/schedule`,
+  or the app's own when `config.booking_path` names it.
 
 The default shows the footer on any page a signed-out visitor can reach,
 including an app page that happens to be public. Narrow it by replacing the
@@ -147,77 +155,14 @@ config.site_footer_visible = ->(view) {
 
 ## Booking
 
-`config.booking_url` is the public link to a Google Calendar appointment
-schedule, as Google gives it to you, without `?gv=true` (the engine adds that for
-the embedded page). `nil`, the default, means no booking: the helpers below
-render nothing and no link opens a popup.
+With `config.booking_url` set, the footer renders the booking popup, and a
+booking link in a column opens it instead of leaving the page (the rule is under
+[The facts](#the-facts)). `booking: { label:, title: }` in the facts sets what the
+links, the popup and the booking page call the act.
 
-| Helper | What it renders |
-|--------|-----------------|
-| `studio_booking_frame` | Google's booking page inline, plus a line linking to the page itself. `crop: false` shows the whole page at rest; `title:` names the frame |
-| `studio_booking_link "Book a call", class: "btn btn-primary"` | A link that opens the popup in place. Its href is the booking page, so it works with scripts off |
-| `studio_booking_popup` | The dialog. The footer renders it; call it yourself only on a page with booking links and no footer |
-| `studio_footer_map class: "h-80"` | The map alone, for a contact page. Pass `lat:`/`lng:` to map another address |
-
-### The frame
-
-- **Deferred.** The URL waits in `data-src`. A script assigns `src` only after the
-  window's `load` event, and only once the frame is within 200px of the viewport.
-  `loading="lazy"` is not enough: a third-party frame that starts before `load`
-  holds that event open for as long as Google takes to answer.
-- **Cropped at rest, whole in use.** From 640px up, the frame shows only Google's
-  slot picker: a 414px window onto a 732px page, 205px down. When focus moves
-  into the frame, the window opens to the full page, because the form Google
-  shows after a slot is picked is centred in the frame's full height. Those
-  numbers are Google's layout as measured on 2026-09-30. If Google moves it, pass
-  `crop: false`.
-- **White in both themes.** Google's page cannot be themed.
-- **With scripts off** the frame is replaced by a plain link to the booking page.
-
-### The popup
-
-A booking link opens Google's page in a `<dialog>` without leaving the page. The
-frame inside is requested the first time the dialog opens, and kept while that
-page stays up: closing and reopening does not ask Google again.
-
-A Turbo restoration visit (back or forward) is a new page built from a snapshot,
-and it does ask again. The inline frame is restored with its `src`, so the
-browser re-requests Google's page for it. The popup's frame is not: its `src` is
-put back to waiting before the snapshot is taken, so a restored page asks Google
-for the popup only when someone opens it.
-
-- **On a page that already shows the inline frame**, a booking link scrolls to
-  that frame, opens its crop and moves focus into it. It does not open a second
-  calendar on top of the first.
-- **The link's href is the fallback**: with scripts off, on a modified click (new
-  tab), or on a page with no dialog, it is an ordinary link.
-- **The page behind does not scroll** while the dialog is open.
-- **It is sized to the visible viewport** (`dvh`, with `vh` as the fallback), so
-  a phone's toolbars do not push the Close button off screen.
-- **Escape closes it, with one limit.** Once focus is inside Google's frame, key
-  presses belong to Google (it is another origin), and Escape no longer reaches
-  the dialog. Nothing in the page can change that. The Close button and a click
-  on the backdrop always work.
-
-It is a native `<dialog>`, not the engine's modal host (`studio/modals/_host`),
-on purpose. The host needs Alpine, its store, and each modal registered inside
-the host's block in the layout, so the footer would no longer be one line and an
-app without a host would have no popup. The host's card is padded and scrolls,
-where this body is a full-bleed frame. And the host mounts content with
-`<template x-if>`, which would build a new frame and ask Google again on every
-open.
-
-### The page
-
-`config.draw_booking_routes = true` draws `GET /schedule`
-(`Studio::BookingsController`, helper `studio_booking_path`): a heading, the
-frame, and the footer, in the app's own layout. It is public, and answers `404`
-when no `booking_url` is set.
-
-The route is a flag, off by default, like every route a consumer might already
-own (mcritchie-studio draws its own `/schedule` today). An app that wants
-different words around the calendar renders `studio_booking_frame` in a view of
-its own instead; the page and the partial are the same frame.
+The frame, its crop, the popup, the `/schedule` page, an app's own booking page
+(`config.booking_path`) and how to set the schedule up in Google are in
+[`BOOKING.md`](BOOKING.md).
 
 ## What it costs a page
 
@@ -234,18 +179,17 @@ its own instead; the page and the partial are the same frame.
 
 ## Content Security Policy
 
-An app that enforces a policy must allow what these primitives fetch from other
-origins:
+An app that enforces a policy must allow what the footer fetches from other
+origins (the booking frame's `frame-src` is in [`BOOKING.md`](BOOKING.md#content-security-policy)):
 
 | Directive | Source | For |
 |-----------|--------|-----|
-| `frame-src` | `https://calendar.google.com` | The booking frame and the popup |
 | `img-src` | `https://tile.openstreetmap.org` | The map's tiles |
 
 Leaflet itself is same-origin (`script-src 'self'`, `style-src 'self'`), since it
 is served from the app's own assets.
 
-The footer's and the booking primitives' own `<style>` and `<script>` blocks are
+The footer's own `<style>` and `<script>` blocks are
 inline and carry no nonce, like the rest of the engine's partials, and Leaflet
 positions its tiles with inline `style` attributes. A policy that forbids inline
 script or style needs `'unsafe-inline'` for them (or hashes), exactly as it does
@@ -253,33 +197,27 @@ for the engine's head partial today.
 
 ## Coexisting with an app's own copy
 
-An app that still renders local footer or booking partials (mcritchie-studio,
-until it adopts these) uses the same `data-footer-map` and `data-booking-*`
-attributes. The engine's scripts keep out of its way: their guards are engine
-names (`__studioFooterMapsArmed`, `__studioBookingFramesArmed`,
-`__studioBookingPopupArmed`), and they act only on engine-rendered elements,
-which carry `data-leaflet-js` (the map) or `data-studio-booking` (the frame, its
-wrapper, the dialog and the links). Write a booking link with
-`studio_booking_link`, not by hand, so it carries the marker.
+An app that still renders a local footer partial uses the same
+`data-footer-map` attribute. The engine's script keeps out of its way: its guard
+is an engine name (`__studioFooterMapsArmed`), and it acts only on
+engine-rendered maps, which carry `data-leaflet-js`. The booking scripts follow
+the same rule ([`BOOKING.md`](BOOKING.md#coexisting-with-an-apps-own-copy)).
 
 ## Markup hooks
 
 Stable, for tests and for an app's own scripts:
-`footer[data-site-footer]`, `[data-footer-location]`, `[data-footer-map]`,
-`[data-booking-wrap]`, `iframe[data-booking-frame]`, `dialog[data-booking-dialog]`,
-`iframe[data-booking-popup-frame]`, `a[data-booking-popup]`, `[data-booking-close]`,
-`[data-booking-page]`. The booking elements also carry `data-studio-booking`.
+`footer[data-site-footer]`, `[data-footer-location]`, `[data-footer-map]`. The
+booking hooks are in [`BOOKING.md`](BOOKING.md#markup-hooks).
 
 ## Tests
 
-- `test/lib/studio/site_footer_test.rb`: the facts' rules, the visibility rule
-  and the booking URLs.
+- `test/lib/studio/site_footer_test.rb`: the facts' rules and the visibility rule.
 - `test/lib/vendored_leaflet_test.rb`: Leaflet is vendored, precompiled, and
   addressed through the asset pipeline.
 - `test/integration/site_footer_test.rb`: what a host renders, with and without
-  each fact, signed in and out, and the booking page.
-- `e2e/site_footer.spec.js`, `e2e/booking_frame.spec.js`: the scripts, in a
-  browser, with Google stubbed and the network closed. These lab pages load
-  Turbo, so the map's remount after a Turbo visit is covered.
+  each fact, signed in and out.
+- `e2e/site_footer.spec.js`: the map's script, in a browser, with the network
+  closed. These lab pages load Turbo, so the map's remount after a Turbo visit is
+  covered.
 
 `/admin/style` shows the footer under Tricks, with this app's facts or a sample.
