@@ -470,4 +470,70 @@ class LinkPreviewTest < ActionDispatch::IntegrationTest
 
     assert_match(/data-lab-page="plain"/, response.body)
   end
+
+  # --- 6. preview bots through allow_browser :modern -------------------------
+  #
+  # Apple's LinkPresentation sends a Safari 9.0.1 UA; Rails' allow_browser
+  # versions: :modern 406s it, so a Rails 8 app's links never previewed in
+  # iMessage. Including Studio::LinkPreviewBots must exempt the fetcher by
+  # itself, on GET/HEAD only, and nobody else.
+
+  OLD_SAFARI_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/601.2.4 (KHTML, like Gecko) " \
+                  "Version/9.0.1 Safari/601.2.4"
+
+  test "the iMessage fetcher gets the slim page from an allow_browser :modern app" do
+    get "/lab/link_preview_modern/heavy", headers: { "User-Agent" => IMESSAGE_UA }
+
+    assert_response :success
+    assert_equal "slim", response.headers["X-Studio-Link-Preview"]
+    assert_operator response.body.bytesize, :<, 10_000
+    assert_equal "Heavy contest", meta("og:title")
+  end
+
+  test "an old Safari that is not a preview fetcher is still refused with a 406" do
+    get "/lab/link_preview_modern", headers: { "User-Agent" => OLD_SAFARI_UA }
+
+    assert_response :not_acceptable
+    assert_equal "unsupported browser", response.body
+  end
+
+  test "a modern browser still gets the full page from an allow_browser :modern app" do
+    get "/lab/link_preview_modern", headers: { "User-Agent" => SAFARI_UA }
+
+    assert_response :success
+    assert_match(/data-lab-page="plain"/, response.body)
+    assert_nil response.headers["X-Studio-Link-Preview"]
+  end
+
+  test "a HEAD from the iMessage fetcher is exempt too" do
+    head "/lab/link_preview_modern", headers: { "User-Agent" => IMESSAGE_UA }
+
+    assert_response :success
+  end
+
+  test "the exemption is GET and HEAD only: a POST with the fetcher's UA is still refused" do
+    post "/lab/link_preview_modern", headers: { "User-Agent" => IMESSAGE_UA }
+
+    assert_response :not_acceptable
+  end
+
+  test "an app that still carries the app-side unless: patch behaves the same" do
+    get "/lab/link_preview_patched", headers: { "User-Agent" => IMESSAGE_UA }
+    assert_response :success
+    assert_equal "slim", response.headers["X-Studio-Link-Preview"]
+
+    get "/lab/link_preview_patched", headers: { "User-Agent" => OLD_SAFARI_UA }
+    assert_response :not_acceptable
+  end
+
+  # The exemption overrides the private instance method allow_browser's
+  # before_action calls. Pin that Rails still dispatches through it, so a Rails
+  # upgrade that renames it fails HERE, by name, rather than as a silent 406.
+  test "Rails still routes allow_browser through the instance method the concern wraps" do
+    assert ActionController::AllowBrowser.private_method_defined?(:allow_browser),
+           "ActionController::AllowBrowser#allow_browser is gone; Studio::LinkPreviewBots#allow_browser no longer intercepts"
+    assert_operator LinkPreviewModernLabController.ancestors.index(Studio::LinkPreviewBots), :<,
+                    LinkPreviewModernLabController.ancestors.index(ActionController::AllowBrowser),
+                    "the concern must sit above Rails' module so its allow_browser runs first"
+  end
 end
