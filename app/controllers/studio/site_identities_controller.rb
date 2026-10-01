@@ -27,7 +27,7 @@ module Studio
       @uploads_available = @installed && @setting.respond_to?(:image)
       @default_image_url = default_image_url
       @static_image_url = static_image_url
-      @domain = request.host
+      @domain = preview_domain
     end
 
     def update
@@ -95,13 +95,25 @@ module Studio
     # The uploaded image as the card shows it: the same URL the head emits.
     def default_image_url
       stored = Studio::SiteIdentity.stored
-      Studio::LinkPreview.absolute_url(stored[:image_url] || stored[:image_path], base_url: request.base_url)
+      Studio::LinkPreview.absolute_url(stored[:image_url] || stored[:image_path], base_url: preview_base_url)
     rescue StandardError
       nil
     end
 
+    # The same base the head's tags are built on (Studio.link_preview_base_url,
+    # else this request's), so the card shows the domain and URL an unfurl does.
+    def preview_base_url
+      Studio::LinkPreview.base_url(pinned: Studio.link_preview_base_url, request_base_url: request.base_url)
+    end
+
+    def preview_domain
+      URI.parse(preview_base_url.to_s).host || request.host
+    rescue URI::InvalidURIError
+      request.host
+    end
+
     def static_image_url
-      Studio::LinkPreview.absolute_url(Studio::SiteIdentity.static_image, base_url: request.base_url)
+      Studio::LinkPreview.absolute_url(Studio::SiteIdentity.static_image, base_url: preview_base_url)
     end
   end
 end

@@ -4,6 +4,41 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **Link previews now reach iMessage from a Rails 8 app.** Rails 8's
+  `allow_browser versions: :modern` answered iMessage's fetcher, which sends a
+  Safari 9.0.1 User-Agent, with a `406`, so no preview was drawn. This was live on
+  mcritchie.studio and cyvasse.xyz. `include Studio::LinkPreviewBots` now exempts a
+  preview fetcher's GET or HEAD from every `allow_browser` guard on the controller,
+  with no app code. It overrides the private method Rails' guard calls, so it
+  covers a guard declared anywhere in the controller chain. A POST, an old browser
+  that is not a fetcher, and every person are still checked. An app that already
+  wrote `allow_browser ..., unless: :link_preview_bot_request?` (the hub, cyvasse)
+  keeps working and can drop the `unless:`.
+- **A failed slim render is logged to `ErrorLog`.** `Studio::LinkPreviewBots` now
+  captures it with `ErrorLog.capture!` instead of a log line, and still serves the
+  fetcher the full page.
+- **`rails g studio:site_identity` indents the include it writes** into
+  `ApplicationController`. It landed at column 0 in cyvasse.
+
+### Added
+
+- **`og:image:width`, `og:image:height` and `og:image:alt`.** The size tags appear
+  when the image's size is known without a fetch: an analyzed Active Storage blob
+  (the operator's image or a page's attachment) or the static fallback file, whose
+  PNG, JPEG, GIF or WebP header is read. The alt is the page's new
+  `link_preview image_alt:`, else the card's title; `twitter:image:alt` matches.
+  The site identity cache key moves to `v2`, so the sizes appear without waiting
+  out the old entry.
+- **`config.link_preview_base_url`** pins the canonical base for previews. When
+  set, `og:url` is that base plus the path with no query string, and relative
+  images are made absolute on it, so a `herokuapp.com` host or a `?utm_` link does
+  not split one page's share count. The default, `nil`, keeps the request's URL.
+- [`docs/LINK_PREVIEW.md`](docs/LINK_PREVIEW.md) gains *The allow_browser 406
+  trap*, with a curl check that uses the iMessage User-Agent, and notes Applebot's
+  slim page as a known trade-off.
+
 ## 0.82.0 — 2026-09-30
 
 ### Added

@@ -211,4 +211,90 @@ class StudioLinkPreviewTest < Minitest::Test
     assert_includes doc, %(property="og:image")
     assert_includes doc, %(name="description")
   end
+
+  # --- image dimensions (og:image:width / og:image:height) -------------------
+  #
+  # Each fixture is a real header for a 1200x630 card (the og size), built byte
+  # by byte so the reader is checked against the format, not against itself.
+
+  def png_bytes(width, height)
+    "\x89PNG\r\n\x1A\n".b + [13].pack("N") + "IHDR" + [width, height].pack("NN") + "\x08\x06\x00\x00\x00".b
+  end
+
+  def jpeg_bytes(width, height)
+    app0 = "\xFF\xE0".b + [16].pack("n") + "JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00".b
+    sof0 = "\xFF\xC0".b + [17].pack("n") + "\x08".b + [height, width].pack("nn") + "\x03".b + ("\x00" * 9).b
+    "\xFF\xD8".b + app0 + sof0
+  end
+
+  def gif_bytes(width, height)
+    "GIF89a".b + [width, height].pack("vv") + "\x00\x00\x00".b
+  end
+
+  def webp_vp8x_bytes(width, height)
+    w = width - 1
+    h = height - 1
+    chunk = "VP8X".b + [10].pack("V") + "\x00\x00\x00\x00".b +
+            [w & 0xFF, (w >> 8) & 0xFF, (w >> 16) & 0xFF, h & 0xFF, (h >> 8) & 0xFF, (h >> 16) & 0xFF].pack("C*")
+    "RIFF".b + [chunk.bytesize + 4].pack("V") + "WEBP".b + chunk
+  end
+
+  def webp_vp8l_bytes(width, height)
+    bits = (width - 1) | ((height - 1) << 14)
+    chunk = "VP8L".b + [5].pack("V") + "\x2F".b + [bits].pack("V")
+    "RIFF".b + [chunk.bytesize + 4].pack("V") + "WEBP".b + chunk
+  end
+
+  def webp_vp8_bytes(width, height)
+    chunk = "VP8 ".b + [10].pack("V") + "\x00\x00\x00".b + "\x9D\x01\x2A".b + [width, height].pack("vv")
+    "RIFF".b + [chunk.bytesize + 4].pack("V") + "WEBP".b + chunk
+  end
+
+  def test_dimensions_are_read_from_each_supported_header
+    {
+      "PNG" => png_bytes(1200, 630),
+      "JPEG" => jpeg_bytes(1200, 630),
+      "GIF" => gif_bytes(1200, 630),
+      "WebP VP8X" => webp_vp8x_bytes(1200, 630),
+      "WebP VP8L" => webp_vp8l_bytes(1200, 630),
+      "WebP VP8" => webp_vp8_bytes(1200, 630)
+    }.each do |format, bytes|
+      assert_equal [1200, 630], LP.dimensions_from(bytes), "#{format} header"
+    end
+  end
+
+  def test_dimensions_are_nil_for_anything_unreadable
+    assert_nil LP.dimensions_from("%PDF-1.4".b), "another format"
+    assert_nil LP.dimensions_from("".b), "empty"
+    assert_nil LP.dimensions_from("\x89PNG\r\n\x1A\n".b), "a truncated PNG"
+    assert_nil LP.dimensions_from(png_bytes(0, 630)), "a zero side is not a size"
+    assert_nil LP.dimensions_from("\xFF\xD8\xFF\xE0\x00\x01".b), "a JPEG with a broken segment length"
+  end
+
+  def test_image_dimensions_reads_a_file_and_is_nil_without_one
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "og.png")
+      File.binwrite(path, png_bytes(1200, 630))
+
+      assert_equal [1200, 630], LP.image_dimensions(path)
+      assert_nil LP.image_dimensions(File.join(dir, "missing.png"))
+    end
+  end
+
+  # --- the canonical base (Studio.link_preview_base_url) ---------------------
+
+  def test_base_url_prefers_the_pinned_base
+    assert_equal "https://cyvasse.xyz", LP.base_url(pinned: "https://cyvasse.xyz/", request_base_url: "https://cyvasse-abc.herokuapp.com")
+    assert_equal "https://cyvasse-abc.herokuapp.com", LP.base_url(pinned: nil, request_base_url: "https://cyvasse-abc.herokuapp.com")
+    assert_equal "https://x.test", LP.base_url(pinned: "  ", request_base_url: "https://x.test")
+    assert_nil LP.base_url(pinned: nil, request_base_url: nil)
+  end
+
+  def test_page_url_pins_host_and_drops_the_query_only_when_pinned
+    requested = "https://cyvasse-abc.herokuapp.com/u/alex?utm_source=sms"
+
+    assert_equal "https://cyvasse.xyz/u/alex", LP.page_url(base_url: "https://cyvasse.xyz/", request_url: requested, path: "/u/alex")
+    assert_equal "https://cyvasse.xyz/", LP.page_url(base_url: "https://cyvasse.xyz", request_url: requested, path: "")
+    assert_equal requested, LP.page_url(base_url: nil, request_url: requested, path: "/u/alex"), "unpinned keeps today's og:url"
+  end
 end

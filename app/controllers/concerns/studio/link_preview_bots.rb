@@ -27,6 +27,14 @@ module Studio
   #
   # People, in-app browsers and unknown agents are never matched and always get
   # the full page. The allow-list is Studio::LinkPreview::BOT_TOKENS.
+  #
+  # ALLOW_BROWSER: Rails 8's `allow_browser versions: :modern` (in every new
+  # app's ApplicationController) answers Apple's LinkPresentation — which sends a
+  # Safari 9.0.1 User-Agent — with a 406, so no iMessage preview. Including this
+  # concern exempts preview fetchers from every allow_browser guard on the
+  # controller, GET and HEAD only, with no app code. An app that already wrote
+  # `allow_browser ..., unless: :link_preview_bot_request?` keeps working: its
+  # guard never runs for a fetcher, so this override is never reached.
   module LinkPreviewBots
     extend ActiveSupport::Concern
 
@@ -47,6 +55,24 @@ module Studio
 
     private
 
+    # Rails' allow_browser macro installs
+    # `before_action -> { allow_browser(versions:, block:) }`, which dispatches to
+    # the PRIVATE instance method ActionController::AllowBrowser#allow_browser (the
+    # same in Rails 7.2.3 and 8.1.4). This concern is included below
+    # ActionController::Base, so it sits above that module in the ancestor chain and
+    # this method answers first: a preview fetcher's GET/HEAD skips the browser
+    # check, everything else goes to Rails. Overriding the method rather than
+    # skipping the callback covers every allow_browser declaration (this
+    # controller, a parent or a subclass, before or after the include), and a
+    # lambda callback cannot be named to skip_before_action anyway. The integration
+    # suite pins the method, so a Rails rename fails loudly
+    # (test/integration/link_preview_test.rb).
+    def allow_browser(*args, **kwargs, &block)
+      return if link_preview_bot_request?
+
+      super
+    end
+
     def serve_link_preview_slim_document
       return unless link_preview_bot_request?
       return unless response.status == 200
@@ -55,13 +81,30 @@ module Studio
       body = response.body
       return unless body.is_a?(String) && !body.empty?
 
-      response.body = Studio::LinkPreview.slim_document(body, url: request.original_url)
+      response.body = Studio::LinkPreview.slim_document(body, url: studio_link_preview_page_url)
       response.headers[SLIM_HEADER] = "slim"
       # A shared cache must never hand the slim page to a person.
       response.headers["Vary"] = [response.headers["Vary"], "User-Agent"].compact.join(", ")
     rescue StandardError => e
       # The full page is still a valid (if large) answer; never 500 a fetcher.
-      Rails.logger&.warn("[studio.link_preview] slim render skipped: #{e.class}: #{e.message}")
+      # The failure goes to ErrorLog (and Sentry, when the host loads it) so it
+      # is triaged rather than lost in a log line; never re-raised, because the
+      # response is already rendered and the fetcher must still get the page.
+      studio_link_preview_capture(e)
+    end
+
+    def studio_link_preview_capture(error)
+      ErrorLog.capture!(error)
+    rescue StandardError, NameError => capture_error
+      Rails.logger&.warn("[studio.link_preview] slim render skipped: #{error.class}: #{error.message} " \
+                         "(ErrorLog unavailable: #{capture_error.class})")
+    end
+
+    # The page's canonical URL for the slim card's link: Studio.link_preview_base_url
+    # plus the path when the app pins one, else the URL as requested.
+    def studio_link_preview_page_url
+      Studio::LinkPreview.page_url(base_url: Studio.link_preview_base_url,
+                                   request_url: request.original_url, path: request.path)
     end
   end
 end

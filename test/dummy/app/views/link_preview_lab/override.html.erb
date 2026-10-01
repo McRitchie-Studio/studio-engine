@@ -1,4 +1,5 @@
 <%# The ONE override API. params stand in for a record (a contest, a user):
     `image` may be absent, which is a user with no avatar. %>
-<% link_preview title: params[:title], description: params[:description], image: params[:image].presence %>
+<% link_preview title: params[:title], description: params[:description], image: params[:image].presence,
+                image_alt: params[:image_alt] %>
 <p data-lab-page="override">A page that names its own preview.</p>

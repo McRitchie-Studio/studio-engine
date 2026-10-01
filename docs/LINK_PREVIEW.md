@@ -34,7 +34,7 @@ Most specific first; the first present rung wins.
 `Studio.site_identity` is the same chain without the page column.
 
 `link_preview image:` takes a URL, a root-relative path, or an Active Storage
-attachment or blob. `nil`, blank, or an attachment with nothing attached is a
+attachment or blob; `link_preview image_alt:` sets the image's text alternative. `nil`, blank, or an attachment with nothing attached is a
 blank rung, so `link_preview image: user.avatar` falls back to the site image when
 the user has no avatar.
 
@@ -47,6 +47,28 @@ a public-read bucket, name its service:
 ```ruby
 config.link_preview_image_service = :amazon_public   # read when the model loads
 ```
+
+**Size and alt.** `og:image:width` and `og:image:height` are emitted only when the
+winning image's size is known without a fetch: an attachment whose blob Active
+Storage has analyzed (the operator's image, or a page's `image: user.avatar`), or
+the static fallback file, whose PNG, JPEG, GIF or WebP header is read once per
+process. A URL string is never fetched to measure it, so it gets no size tags, and
+an upload has none until its analyze job runs. WhatsApp and others use the size to
+lay the card out before the image arrives. `og:image:alt` and `twitter:image:alt`
+are the page's `image_alt:`, else the card's title.
+
+**The canonical base.** Every preview URL is built on the request's base URL
+unless the app pins one:
+
+```ruby
+config.link_preview_base_url = "https://cyvasse.xyz" if Rails.env.production?
+```
+
+Pinned, `og:url` is that base plus the page's path, with no query string, and
+relative images are made absolute on it. So a share through the `herokuapp.com`
+host or a `?utm_` link counts as the same URL to an unfurler. Unpinned, `og:url`
+is the URL as requested. Pin it in production only, or a local page's card points
+at production.
 
 ## The tags are opt-in by installation
 
@@ -85,6 +107,45 @@ template. Because the slim page is built from the rendered page, a page's
 - A tag the page emits twice is kept once, the first occurrence.
 - The slim response carries `X-Studio-Link-Preview: slim` and `Vary: User-Agent`.
 - Only a 200 `text/html` GET or HEAD is rewritten. Anything else passes through.
+- A slim render that raises is captured with `ErrorLog.capture!` (and Sentry, when
+  the app loads it), and the fetcher gets the full page. It is never re-raised.
+- **Known trade-off: Applebot.** Applebot is on the list because it builds Siri
+  and Spotlight suggestions from the same tags. It also crawls for Apple's
+  search, so Apple indexes the slim page (head tags and a one-card body), not the
+  full one. Whether it should is a product call not yet made; it stays on the
+  list until then.
+
+## The allow_browser 406 trap
+
+Rails 8 writes `allow_browser versions: :modern` into every new app's
+`ApplicationController`. It answers any Safari older than 17.2 with
+`406 Not Acceptable`, and iMessage's fetcher sends a **Safari 9.0.1**
+User-Agent. So a stock Rails 8 app never previews in Messages, whatever its tags
+say. This was live on mcritchie.studio and cyvasse.xyz until 2026-09-30. Discord,
+Slack and X send their own User-Agents and kept working, which hides the fault.
+
+`include Studio::LinkPreviewBots` fixes it with no app code. The concern exempts
+a preview fetcher's GET or HEAD from every `allow_browser` guard on the
+controller. It overrides the private method that Rails' `allow_browser`
+`before_action` calls (`ActionController::AllowBrowser#allow_browser`; the same in
+Rails 7.2.3 and 8.1.4), so the exemption covers a guard declared before or after the
+include, in a parent or in a subclass. A POST, an old browser that is not a
+fetcher, and every person are still checked. An app that already wrote
+`allow_browser versions: :modern, unless: :link_preview_bot_request?` keeps
+working, and can drop the `unless:` once it is on this release.
+
+**Check an app** with curl and the iMessage User-Agent:
+
+```bash
+UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/601.2.4 (KHTML, like Gecko) Version/9.0.1 Safari/601.2.4 facebookexternalhit/1.1 Facebot Twitterbot/1.0'
+curl -s -o /dev/null -w '%{http_code} %{size_download} bytes\n' -A "$UA" https://cyvasse.xyz/
+curl -s -D - -o /dev/null -A "$UA" https://cyvasse.xyz/ | grep -i '^x-studio-link-preview'
+```
+
+A healthy app answers `200`, a few kilobytes, and `x-studio-link-preview: slim`.
+A `406` is this trap: the app is below this release or does not include the
+concern. A `200` well over 1 MiB without the header means the concern is missing
+and Apple's size limit will drop the preview instead.
 
 ## Drafting the copy
 
@@ -114,6 +175,7 @@ Studio::SiteIdentity.seed!(title: "Turf Monster", description: "Skill-based pick
 | `link_preview_tags` | `:auto` | See above |
 | `link_preview_image_service` | `nil` (app default) | Active Storage service for the image |
 | `link_preview_fallback_image` | `"/og.png"` | Last image rung; used only if the file exists under `public/` |
+| `link_preview_base_url` | `nil` (the request's) | Canonical base for `og:url` and image URLs; see above |
 | `draw_link_preview_routes` | `true` | Draw `/admin/link_preview` (`admin_link_preview_path`, `admin_link_preview_image_path`) |
 
 ## A page override, worked

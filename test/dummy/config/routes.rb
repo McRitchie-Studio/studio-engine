@@ -70,6 +70,12 @@ Rails.application.routes.draw do
   get "lab/link_preview", to: "link_preview_lab#plain"
   get "lab/link_preview/override", to: "link_preview_lab#override"
   get "lab/link_preview/heavy", to: "link_preview_lab#heavy"
+  # The same pages behind `allow_browser versions: :modern`: one host relying on
+  # the engine alone, one still carrying the app-side `unless:` patch.
+  get "lab/link_preview_modern", to: "link_preview_modern_lab#plain"
+  get "lab/link_preview_modern/heavy", to: "link_preview_modern_lab#heavy"
+  post "lab/link_preview_modern", to: "link_preview_modern_lab#submit"
+  get "lab/link_preview_patched", to: "link_preview_patched_lab#plain"
   post "lab/sign_in", to: "geo_lab_sessions#create"
 
   # A host app's ordinary page + sign-in/out, for the session-drift suite.

@@ -135,6 +135,97 @@ module Studio
       value
     end
 
+    # The base URL every preview URL is built on: the app's PINNED canonical
+    # base (Studio.link_preview_base_url) when it set one, else the request's.
+    # Trailing slash dropped, so a path joins cleanly. nil when neither exists.
+    def base_url(pinned:, request_base_url:)
+      pinned_value = pinned.to_s.strip.chomp("/")
+      return pinned_value unless pinned_value.empty?
+
+      request_value = request_base_url.to_s.strip.chomp("/")
+      request_value.empty? ? nil : request_value
+    end
+
+    # The page's og:url. With a pinned base it is that base plus the PATH: no
+    # herokuapp host, no ?utm_ query, so every share of a page counts as one URL.
+    # Without one it is the URL as requested, as it always was.
+    def page_url(base_url:, request_url:, path:)
+      pinned_value = base_url.to_s.strip.chomp("/")
+      return request_url.to_s.empty? ? nil : request_url.to_s if pinned_value.empty?
+
+      "#{pinned_value}#{path.to_s.empty? ? "/" : path}"
+    end
+
+    # [width, height] of a PNG, GIF, JPEG or WebP file, read from its header
+    # only, or nil when the file is missing, unreadable or another format. Lets
+    # the static fallback (public/og.png) emit og:image:width/height, which
+    # WhatsApp and others use to lay the card out before the image arrives.
+    def image_dimensions(path)
+      File.open(path.to_s, "rb") { |file| dimensions_from(file.read(64 * 1024).to_s.b) }
+    rescue SystemCallError, IOError
+      nil
+    end
+
+    def dimensions_from(bytes)
+      dims =
+        if bytes.start_with?("\x89PNG\r\n\x1A\n".b) && bytes.bytesize >= 24
+          bytes[16, 8].unpack("NN")
+        elsif bytes.start_with?("GIF8") && bytes.bytesize >= 10
+          bytes[6, 4].unpack("vv")
+        elsif bytes.start_with?("\xFF\xD8".b)
+          jpeg_dimensions(bytes)
+        elsif bytes.start_with?("RIFF") && bytes[8, 4] == "WEBP"
+          webp_dimensions(bytes)
+        end
+      dims && dims.all? { |n| n.is_a?(Integer) && n.positive? } ? dims : nil
+    end
+
+    # Walk the JPEG segments to the first start-of-frame marker.
+    JPEG_SOF_MARKERS = [0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF].freeze
+
+    def jpeg_dimensions(bytes)
+      offset = 2
+      while offset + 9 <= bytes.bytesize
+        return nil unless bytes.getbyte(offset) == 0xFF
+
+        marker = bytes.getbyte(offset + 1)
+        if marker == 0xFF # fill byte
+          offset += 1
+          next
+        end
+        length = bytes[offset + 2, 2].unpack1("n")
+        if JPEG_SOF_MARKERS.include?(marker)
+          height, width = bytes[offset + 5, 4].unpack("nn")
+          return [width, height]
+        end
+        return nil if length.nil? || length < 2
+
+        offset += 2 + length
+      end
+      nil
+    end
+
+    def webp_dimensions(bytes)
+      case bytes[12, 4]
+      when "VP8 "
+        return nil if bytes.bytesize < 30
+
+        width, height = bytes[26, 4].unpack("vv")
+        [width & 0x3FFF, height & 0x3FFF]
+      when "VP8L"
+        return nil if bytes.bytesize < 25
+
+        bits = bytes[21, 4].unpack1("V")
+        [(bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1]
+      when "VP8X"
+        return nil if bytes.bytesize < 30
+
+        w = bytes[24, 3].unpack("CCC")
+        h = bytes[27, 3].unpack("CCC")
+        [(w[0] | (w[1] << 8) | (w[2] << 16)) + 1, (h[0] | (h[1] << 8) | (h[2] << 16)) + 1]
+      end
+    end
+
     # The whole response a preview fetcher gets: the page's own identity tags,
     # lifted out of its <head>, and a one-card body. Built FROM the rendered
     # page, so the slim document cannot drift from what a person's page says.
