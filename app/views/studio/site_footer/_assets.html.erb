@@ -13,31 +13,35 @@
   .ftr-wrap { max-width: 72rem; margin-inline: auto; padding-inline: 1rem; }
   .ftr-link { color: inherit; opacity: .78; text-decoration: none; }
   /* A one-word label (an email address, a URL) stays on one line: a browser
-     would otherwise wrap it after a hyphen or a slash. Its column is as wide as
-     it is (the flex row below). Breaking it is the last resort, on a screen too
-     narrow to hold it whole. */
+     would otherwise wrap it after a hyphen or a slash. Its track is at least as
+     wide as it is (the grid below), and the tracks beside it give way. It is
+     broken only on a screen narrower than any phone, where no layout holds it. */
   .ftr-link-solid { white-space: nowrap; }
-  @media (max-width: 359px) { .ftr-link-solid { white-space: normal; overflow-wrap: anywhere; } }
+  @media (max-width: 299px) { .ftr-link-solid { white-space: normal; overflow-wrap: anywhere; } }
   .ftr-link-disabled { opacity: .38; cursor: not-allowed; }
   .ftr-link-plain { opacity: .78; }
   .ftr-link:hover, .ftr-link:focus-visible { opacity: 1; color: var(--ftr-primary); }
 
-  /* Brand, then the link columns (.ftr-col). A wrapping flex row, not a grid of
-     equal tracks: a flex item is never narrower than its longest word, so a
-     column holding an email address is as wide as the address, the others share
-     what is left, and a column that does not fit beside its neighbours wraps
-     under them instead of breaking the address in two.
-       phone:      the brand across the top, the columns two to a row
-       from 768px: the columns in one row, at most four across
-       from 1024px: the brand joins that row, at 1.7 shares to a column's 1
-     --ftr-w is a column's share (its width hint in the facts), 1 by default. */
-  .ftr-cols { display: flex; flex-wrap: wrap; gap: 3rem 2rem; padding-block: 4rem; }
-  .ftr-brand { flex: 1 1 100%; }
-  .ftr-col { flex: var(--ftr-w, 1) 1 calc(50% - 1rem); max-width: 100%; }
-  @media (min-width: 768px) { .ftr-col { flex-basis: calc(25% - 1.5rem); } }
+  /* Brand, then the link columns (.ftr-col), on a grid with explicit tracks.
+       below 768px: the brand across the top, the link columns two to a row
+       from 768px:  the brand across the top, every link column in one row
+       from 1024px: the brand in that row too, at 1.7 shares
+     A track is `Nfr`, never `minmax(0, Nfr)`: an fr track is at least as wide as
+     its longest unbreakable word, so the column holding an email address grows
+     to hold it and its neighbours give way. Nothing moves to another row.
+     --ftr-tracks is one track per link column (Studio::SiteFooter.tracks): the
+     first is wider by default, and a column's `width:` hint sets its own.
+     A footer with more than four link columns (.ftr-cols-many) keeps the brand
+     across the top and wraps the columns four to a row. */
+  .ftr-cols { display: grid; gap: 3rem 2rem; padding-block: 4rem; grid-template-columns: 1.2fr 1fr; }
+  .ftr-brand { grid-column: 1 / -1; }
+  @media (min-width: 768px) {
+    .ftr-cols { grid-template-columns: var(--ftr-tracks, 1fr); }
+    .ftr-cols-many { grid-template-columns: repeat(4, 1fr); }
+  }
   @media (min-width: 1024px) {
-    .ftr-brand { flex: 1.7 1 0; }
-    .ftr-col { flex-basis: 0; }
+    .ftr-cols:not(.ftr-cols-many) { grid-template-columns: 1.7fr var(--ftr-tracks,); }
+    .ftr-cols:not(.ftr-cols-many) .ftr-brand { grid-column: auto; }
   }
   .ftr-home { display: inline-flex; align-items: center; gap: .75rem; color: inherit; text-decoration: none; }
   .ftr-logo { width: 3rem; height: 3rem; object-fit: contain; }

@@ -255,7 +255,7 @@ module Studio
 
     # [ heading, links ], [ heading, links, { width: 1.5 } ] or { heading:,
     # links:, width: }. `width` is an optional hint: this column's share of the
-    # row against the others' 1 (studio/site_footer/_assets lays them out).
+    # row against the others' 1 (see `tracks`).
     def column(row, booking_path)
       heading, links, options =
         if row.respond_to?(:to_h) && !row.is_a?(Array)
@@ -282,6 +282,22 @@ module Studio
       return nil unless value >= MIN_COLUMN_WIDTH && value <= MAX_COLUMN_WIDTH
 
       value.to_f
+    end
+
+    # THE LINK COLUMNS' GRID TRACKS from 768px, one per column: its `width:`
+    # hint as an fr share, else FIRST_COLUMN_WIDTH for the first (the one that
+    # usually holds an email address) and 1 for the rest. nil when there are no
+    # columns, or more than MAX_ROW_COLUMNS: those wrap as equal tracks.
+    FIRST_COLUMN_WIDTH = 1.5
+    MAX_ROW_COLUMNS = 4
+
+    def tracks(columns)
+      columns = Array(columns)
+      return nil if columns.empty? || columns.size > MAX_ROW_COLUMNS
+
+      columns.each_with_index.map do |column, index|
+        "#{format('%g', column[:width] || (index.zero? ? FIRST_COLUMN_WIDTH : 1))}fr"
+      end.join(" ")
     end
 
     # [ label, href ], [ label, href, { booking: true } ] or { label:, href:,

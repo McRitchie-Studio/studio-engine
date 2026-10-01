@@ -13,7 +13,8 @@
 <%= studio_site_footer_assets %>
 <footer class="ftr" data-site-footer>
   <div class="ftr-wrap">
-    <div class="ftr-cols">
+    <% tracks = Studio::SiteFooter.tracks(columns) %>
+    <div class="ftr-cols<%= " ftr-cols-many" if columns.size > Studio::SiteFooter::MAX_ROW_COLUMNS %>"<% if tracks %> style="--ftr-tracks: <%= tracks %>"<% end %>>
       <div class="ftr-brand">
         <% if facts[:logo] || facts[:wordmark] %>
           <a href="<%= facts[:home_path] %>" class="ftr-home" aria-label="<%= facts[:name] %>">
@@ -48,8 +49,7 @@
       </div>
 
       <% columns.each do |column| %>
-        <%# A width hint is this column's share of the row; the others take 1. %>
-        <nav class="ftr-col" aria-label="<%= column[:heading] || "Footer" %>"<% if column[:width] %> style="--ftr-w: <%= format("%g", column[:width]) %>"<% end %>>
+        <nav class="ftr-col" aria-label="<%= column[:heading] || "Footer" %>">
           <% if column[:heading] %>
             <h2 class="ftr-heading"><%= column[:heading] %></h2>
           <% end %>

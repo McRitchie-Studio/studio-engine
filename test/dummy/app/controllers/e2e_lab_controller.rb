@@ -577,13 +577,16 @@ class E2eLabController < ActionController::Base
 
   SITE_FOOTER_VARIANTS = %w[index terms home schedule plain crops columns].freeze
 
-  # Link columns for /lab/site_footer/columns/:n, n of them. The first holds an
-  # email address and a URL, the two things a column must never break mid-word.
+  # Link columns for /lab/site_footer/columns/:n, the first n of these. They are
+  # shaped like a real site's: a Contact column holding an email address (with a
+  # hyphen in it, where a browser would wrap), then short columns. Two of them
+  # is a small site's footer; four is a full one. A fifth is past what one row
+  # holds. The names are made up.
   LAB_COLUMN_POOL = [
     ["Contact", [["team@lab-studio.example", "mailto:team@lab-studio.example"],
-                 ["https://booking.lab-studio.example", "https://booking.lab-studio.example"]]],
-    ["Company", [["Home", "/lab/site_footer"], ["Career", nil]]],
-    ["Products", [["Packages", "/lab/site_footer"], ["Pricing", "/lab/site_footer"]]],
+                 ["Schedule a call", "/lab/site_footer/schedule"], ["Contact", "/lab/site_footer"]]],
+    ["Company", [["Home", "/lab/site_footer"], ["About", "/lab/site_footer"], ["Career", nil]]],
+    ["Solutions", [["Packages", "/lab/site_footer"], ["Build an app", "/lab/site_footer"]]],
     ["Legal", [["Privacy Policy", "/lab/site_footer"], ["Terms of Service", "/lab/site_footer/terms"]]],
     ["Resources", [["Documentation", "/lab/site_footer"], ["Status", "/lab/site_footer"]]]
   ].freeze
