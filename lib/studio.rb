@@ -516,6 +516,17 @@ module Studio
   # trusted as given.
   mattr_accessor :link_preview_fallback_image, default: "/og.png"
 
+  # The app's CANONICAL base URL for previews, e.g. "https://cyvasse.xyz". When
+  # set, og:url is this base plus the page's path (no query string), and every
+  # relative preview image is made absolute on it — so a share through a
+  # herokuapp.com host or a ?utm_ link does not split one page into many URLs in
+  # an unfurler's share counts. nil (the default) uses the request's base URL,
+  # and og:url is the URL as requested. Set it in production only, or a local
+  # page's card points at production:
+  #
+  #   config.link_preview_base_url = "https://cyvasse.xyz" if Rails.env.production?
+  mattr_accessor :link_preview_base_url, default: nil
+
   # THE SITE IDENTITY'S DRAFTED DEFAULTS — this app's title and description as
   # written in code, under whatever the operator saves at /admin/link_preview.
   # The standing convention is that an agent drafts these when it sets an app up
