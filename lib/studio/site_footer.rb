@@ -284,6 +284,13 @@ module Studio
       value.to_f
     end
 
+    # True for a label that is an address rather than words: no space in it, and
+    # an "@", a "." or a "/". It is kept on one line (.ftr-link-solid).
+    def solid_label?(label)
+      string = label.to_s
+      !string.match?(/\s/) && string.match?(%r{[@./]})
+    end
+
     # THE LINK COLUMNS' GRID TRACKS from 768px, one per column: its `width:`
     # hint as an fr share, else FIRST_COLUMN_WIDTH for the first (the one that
     # usually holds an email address) and 1 for the rest. nil when there are no

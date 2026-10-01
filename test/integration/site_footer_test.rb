@@ -248,28 +248,37 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "the link columns are flex items sized to their content, with an optional width hint" do
+  test "the link columns are grid tracks, the first wider, with an optional width hint" do
     get "/footer_host/landing"
 
     assert_select "#{footer} .ftr-cols > nav.ftr-col", 2
-    assert_select "#{footer} .ftr-cols > nav.ftr-col[style]", 0, "no hint, no inline share"
-    assert_select "#{footer} .ftr-cols[style]", 0
-    # Never narrower than the longest word (a flex item's automatic minimum), and
-    # a word breaks only when it is wider than the footer itself.
-    assert_includes response.body, ".ftr-cols { display: flex; flex-wrap: wrap;"
-    assert_includes response.body, ".ftr-col { flex: var(--ftr-w, 1) 1 calc(50% - 1rem); max-width: 100%; }"
+    assert_select "#{footer} .ftr-cols:not(.ftr-cols-many)[style='--ftr-tracks: 1.5fr 1fr']", 1
+    # fr tracks, never minmax(0, ...): a track is at least as wide as its longest
+    # word, so the column holding an address grows and its neighbours give way.
+    assert_includes response.body, ".ftr-cols { display: grid; gap: 3rem 2rem; padding-block: 4rem; grid-template-columns: 1.2fr 1fr; }"
+    assert_includes response.body, ".ftr-cols { grid-template-columns: var(--ftr-tracks, 1fr); }"
+    assert_includes response.body, ".ftr-cols:not(.ftr-cols-many) { grid-template-columns: 1.7fr var(--ftr-tracks,); }"
+    assert_no_match(/\.ftr-cols[^{]*\{[^}]*minmax\(0/, response.body)
     assert_includes response.body, ".ftr-link-solid { white-space: nowrap; }"
-    assert_equal 1, response.body.scan("overflow-wrap: anywhere").size, "only inside the narrow-screen last resort"
-    assert_no_match(/grid-template-columns/, response.body)
-    # A one-word label is solid; a label with a space in it wraps as prose does.
+    assert_equal 1, response.body.scan("overflow-wrap: anywhere").size, "only on a screen narrower than any phone"
+    assert_includes response.body, "@media (max-width: 299px) { .ftr-link-solid { white-space: normal; overflow-wrap: anywhere; } }"
+    # An address is solid; a word and a phrase are not.
     assert_select "#{footer} a.ftr-link.ftr-link-solid[href='mailto:team@example.test']", 2
     assert_select "#{footer} a.ftr-link:not(.ftr-link-solid)", text: "Privacy Policy"
+    assert_select "#{footer} a.ftr-link:not(.ftr-link-solid)", text: "Home"
 
-    Studio.site_footer = { columns: [["Contact", [["team@example.test", "mailto:team@example.test"]], { width: 1.5 }],
-                                     ["Company", [["Home", "/"]]]] }
+    Studio.site_footer = { columns: [["Contact", [["team@example.test", "mailto:team@example.test"]], { width: 2.5 }],
+                                     ["Company", [["Home", "/"]]], ["Legal", [["Terms", "/terms"]]]] }
     get "/footer_host/landing"
-    assert_select "#{footer} nav.ftr-col[aria-label='Contact'][style='--ftr-w: 1.5']", 1
-    assert_select "#{footer} nav.ftr-col[aria-label='Company']:not([style])", 1
+    assert_select "#{footer} .ftr-cols[style='--ftr-tracks: 2.5fr 1fr 1fr']", 1
+
+    Studio.site_footer = { columns: %w[A B C D E].map { |heading| [heading, [["Home", "/"]]] } }
+    get "/footer_host/landing"
+    assert_select "#{footer} .ftr-cols.ftr-cols-many:not([style])", 1, "five columns wrap four to a row"
+
+    Studio.site_footer = { name: "Example Co" }
+    get "/footer_host/landing"
+    assert_select "#{footer} .ftr-cols:not([style]):not(.ftr-cols-many)", 1, "no columns, no tracks"
   end
 
   test "the footer and the booking note set their own line heights" do

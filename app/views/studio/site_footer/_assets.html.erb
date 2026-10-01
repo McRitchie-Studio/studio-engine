@@ -35,6 +35,12 @@
      across the top and wraps the columns four to a row. */
   .ftr-cols { display: grid; gap: 3rem 2rem; padding-block: 4rem; grid-template-columns: 1.2fr 1fr; }
   .ftr-brand { grid-column: 1 / -1; }
+  /* The smallest phones (320px): two columns still share a row beside an email
+     address, by a narrower gutter and a slightly smaller address. */
+  @media (max-width: 359px) {
+    .ftr-cols { column-gap: 1rem; }
+    .ftr-col .ftr-link-solid { font-size: .875rem; }
+  }
   @media (min-width: 768px) {
     .ftr-cols { grid-template-columns: var(--ftr-tracks, 1fr); }
     .ftr-cols-many { grid-template-columns: repeat(4, 1fr); }

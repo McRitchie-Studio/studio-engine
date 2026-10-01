@@ -201,6 +201,33 @@ class SiteFooterTest < Minitest::Test
     assert_equal 4.0, resolve({ columns: [["C", [["Home", "/"]], { width: 4 }]] })[:columns][0][:width]
   end
 
+  def test_each_column_is_a_track_the_first_wider_unless_hinted
+    plain = resolve({ columns: %w[A B C D].map { |heading| [heading, [["Home", "/"]]] } })[:columns]
+    hinted = resolve({ columns: [["A", [["Home", "/"]], { width: 2.5 }], ["B", [["Home", "/"]], { width: 0.5 }], ["C", [["Home", "/"]]]] })[:columns]
+
+    assert_equal "1.5fr 1fr 1fr 1fr", Studio::SiteFooter.tracks(plain)
+    assert_equal "1.5fr 1fr", Studio::SiteFooter.tracks(plain.first(2))
+    assert_equal "2.5fr 0.5fr 1fr", Studio::SiteFooter.tracks(hinted), "a hint sets its own column's track"
+    assert_no_match(/minmax/, Studio::SiteFooter.tracks(plain), "an fr track keeps its automatic minimum, the longest word")
+  end
+
+  def test_no_columns_or_more_than_a_row_holds_have_no_tracks
+    five = resolve({ columns: %w[A B C D E].map { |heading| [heading, [["Home", "/"]]] } })[:columns]
+
+    assert_nil Studio::SiteFooter.tracks([])
+    assert_nil Studio::SiteFooter.tracks(five), "five wrap four to a row as equal tracks"
+    assert_equal 4, Studio::SiteFooter::MAX_ROW_COLUMNS
+  end
+
+  def test_a_label_that_is_an_address_is_solid_and_a_word_is_not
+    ["team@example.com", "blog.example.com", "example.com/blog", "team@lab-studio.example"].each do |label|
+      assert Studio::SiteFooter.solid_label?(label), label
+    end
+    ["Home", "Packages", "Privacy Policy", "Email team@example.com", "", nil].each do |label|
+      refute Studio::SiteFooter.solid_label?(label), label.inspect
+    end
+  end
+
   def test_booking_copy_is_declared_under_booking
     facts = resolve({ booking: { label: "Book a call", title: "Book a call with Sam" } })
 
