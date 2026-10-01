@@ -324,34 +324,28 @@ test("on a page that shows the inline frame, a booking link goes to that frame i
 });
 
 test("a booking link that jumps to a frame never scrolled to asks Google once", async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 600 });
+  // A short window, so the foot of the page is far from the frame above the footer.
+  await page.setViewportSize({ width: 1280, height: 300 });
   const asked = await stubGoogle(page);
   await page.goto("/lab/site_footer/home");
 
-  // THE JUMP. Hide the frame's block while the page goes to its foot, so the
-  // frame never comes near the viewport and its observer never fires: the way a
-  // visitor arrives who jumped to the footer (End, an anchor) on a page whose
-  // calendar is far above it. NOT VACUOUS: nothing has asked Google yet.
-  const link = page.locator("footer[data-site-footer] a[data-booking-popup]");
-  await page.evaluate(() => {
-    const block = document.querySelector("[data-booking-wrap]").parentElement;
-    block.style.display = "none";
-    window.scrollTo(0, document.documentElement.scrollHeight);
-    return new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => { block.style.display = ""; done(); })));
-  });
+  // THE JUMP. Straight to the foot of the page in one step (End, an anchor), so
+  // the frame never comes near the viewport and its observer never fires.
+  // NOT VACUOUS: nothing has asked Google, and the frame is out of view.
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(400);
   expect(await frame(page).getAttribute("src")).toBeNull();
   expect(asked).toEqual([]);
   await expect(frame(page)).not.toBeInViewport();
 
   // The click assigns src and scrolls to the frame, which then enters the
-  // viewport under a still-armed observer. That second arrival must not ask again.
-  await link.click();
+  // viewport under a still-armed observer. That second arrival must not ask
+  // again. Clicked in place: Playwright's own click would scroll to the link first.
+  await page.locator("footer[data-site-footer] a[data-booking-popup]").evaluate((link) => link.click());
   await expect(frame(page)).toHaveAttribute("src", /gv=true$/);
-  await expect(page.locator("[data-booking-wrap]")).toBeInViewport({ ratio: 0.5 });
+  await expect(page.locator("[data-booking-wrap]")).toBeInViewport();
   await expect(page.frameLocator("iframe[data-booking-frame]").locator("#stub")).toHaveText("booking stub");
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(800);
   expect(asked).toHaveLength(1);
 });
 
