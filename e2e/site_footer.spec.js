@@ -321,6 +321,62 @@ test("with 2 link columns an email address and a URL are never broken mid-word",
 test("with 3 link columns an email address and a URL are never broken mid-word", neverBroken(3));
 test("with 4 link columns an email address and a URL are never broken mid-word", neverBroken(4));
 
+// A FIFTH COLUMN. From 768px a row holds at most four, so the fifth wraps under
+// them; from 1024px all five join the brand's row while they fit, and wrap when
+// they do not. Either way nothing is broken and nothing runs off the page.
+test("with 5 link columns an email address and a URL are never broken mid-word", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  for (const width of [1440, 1280, 1024, 900, 768, 390, 360]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/lab/site_footer/columns/5");
+
+    expect((await unbroken(page)).map((link) => link.lines), `at ${width}px`).toEqual([1, 1]);
+    expect(await fitsThePage(page), `no sideways scroll at ${width}px`).toBe(true);
+    await expect(page.locator("footer[data-site-footer] nav.ftr-col")).toHaveCount(5);
+    // No column is squeezed out of sight or pushed past the footer's edge.
+    const edges = await page.locator("footer[data-site-footer] nav.ftr-col").evaluateAll((els) =>
+      els.map((el) => { const box = el.getBoundingClientRect(); return [box.width > 40, box.right <= window.innerWidth]; })
+    );
+    expect(edges.flat().every(Boolean), `every column is whole at ${width}px`).toBe(true);
+  }
+
+  // At 768px a row holds four at most (fewer when one of them is wide), and the
+  // rest sit under them.
+  await page.setViewportSize({ width: 768, height: 900 });
+  await page.goto("/lab/site_footer/columns/5");
+  const tops = await page.locator("footer[data-site-footer] nav.ftr-col").evaluateAll((els) =>
+    els.map((el) => Math.round(el.getBoundingClientRect().top))
+  );
+  const firstRow = tops.filter((top) => top === tops[0]).length;
+  expect(firstRow).toBeGreaterThanOrEqual(2);
+  expect(firstRow).toBeLessThanOrEqual(4);
+  expect(tops[4]).toBeGreaterThan(tops[0]);
+});
+
+// AN APP'S LEFTOVER OVERRIDE. A host that patched the old equal-track grid from
+// its own stylesheet did it with rules like these, more specific than the
+// engine's. They must not bring the break back: the row is no longer a grid, so
+// grid-template-columns on it has nothing to act on.
+test("an app's leftover grid override on the columns does not bring the break back", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  for (const width of [1280, 900, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/lab/site_footer/columns/4");
+    await page.addStyleTag({ content: `
+      footer[data-site-footer] .ftr-cols { grid-template-columns: 1.2fr 1fr; }
+      footer[data-site-footer] .ftr-link[href^="mailto:"] { overflow-wrap: normal; }
+      @media (min-width: 768px) { footer[data-site-footer] .ftr-cols { grid-template-columns: 1.7fr 1fr 1fr 1fr; } }
+      @media (min-width: 1024px) { footer[data-site-footer] .ftr-cols { grid-template-columns: 1.7fr 1.5fr 1fr 1fr 1fr; } }` });
+
+    // NOT VACUOUS: the override is applied, and it is the engine's display that makes it idle.
+    const cols = page.locator("footer[data-site-footer] .ftr-cols");
+    expect(await cols.evaluate((el) => getComputedStyle(el).gridTemplateColumns)).not.toBe("none");
+    expect(await cols.evaluate((el) => getComputedStyle(el).display)).toBe("flex");
+    expect((await unbroken(page)).map((link) => link.lines), `at ${width}px`).toEqual([1, 1]);
+    expect(await fitsThePage(page)).toBe(true);
+  }
+});
+
 test("a word wider than the whole footer breaks rather than running off the page", async ({ page }) => {
   await blockOffsiteRequests(page);
   // 240px: narrower than the URL itself, so there is no layout that fits it whole.

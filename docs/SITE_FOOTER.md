@@ -240,8 +240,10 @@ The rest (`.ftr-wrap`, `.ftr-home`, the social and pin classes) may change.
 The footer's stylesheet is inline and unlayered, and comes after the app's own
 in the document, so an app rule needs more specificity to win: prefix it with
 `footer[data-site-footer]`. `.ftr-cols` was a grid before; it is a flex row now,
-so an app's `grid-template-columns` on it does nothing and can be deleted, along
-with any `overflow-wrap` override on `.ftr-link`.
+so an app's `grid-template-columns` on it does nothing (a browser spec holds
+that) and should be deleted, along with any `overflow-wrap` override on
+`.ftr-link`. A footer may have any number of columns: from 768px a row holds
+four at most, and a fifth wraps under them.
 
 ## Tests
 

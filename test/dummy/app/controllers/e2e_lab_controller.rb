@@ -584,21 +584,22 @@ class E2eLabController < ActionController::Base
                  ["https://booking.lab-studio.example", "https://booking.lab-studio.example"]]],
     ["Company", [["Home", "/lab/site_footer"], ["Career", nil]]],
     ["Products", [["Packages", "/lab/site_footer"], ["Pricing", "/lab/site_footer"]]],
-    ["Legal", [["Privacy Policy", "/lab/site_footer"], ["Terms of Service", "/lab/site_footer/terms"]]]
+    ["Legal", [["Privacy Policy", "/lab/site_footer"], ["Terms of Service", "/lab/site_footer/terms"]]],
+    ["Resources", [["Documentation", "/lab/site_footer"], ["Status", "/lab/site_footer"]]]
   ].freeze
 
   attr_reader :lab_site_footer
 
   # One action, seven pages. `plain` is the footer with no address: no Location
   # band, no map and no Leaflet request. `crops` is three booking frames, two
-  # cropped to different windows and one whole. `columns` is the footer with two,
-  # three or four link columns. The layout is the lab's plus Turbo,
+  # cropped to different windows and one whole. `columns` is the footer with two
+  # to five link columns. The layout is the lab's plus Turbo,
   # because the map's remount on a Turbo visit is one of the things under test.
   def site_footer
     variant = SITE_FOOTER_VARIANTS.include?(params[:variant]) ? params[:variant] : "index"
     @lab_site_footer = variant == "plain" ? LAB_SITE_FOOTER.except(:address) : LAB_SITE_FOOTER
     if variant == "columns"
-      columns = LAB_COLUMN_POOL.first(params[:n].to_i.clamp(2, 4))
+      columns = LAB_COLUMN_POOL.first(params[:n].to_i.clamp(2, 5))
       # ?hint=1.5 gives the first column a width hint, the way a host writes one.
       columns = [columns.first + [{ width: params[:hint].to_f }]] + columns.drop(1) if params[:hint].present?
       @lab_site_footer = LAB_SITE_FOOTER.merge(columns: columns)

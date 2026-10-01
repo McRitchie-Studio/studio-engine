@@ -802,16 +802,17 @@
 # both widths, and refuses a page that is not shaped like a schedule. The command
 # itself reaches the live Google page and is never run by this lane.
 #   npx playwright test --list  -> 180 tests in 27 files
-# + the same task's three footer fixes, 7 more specs. e2e/site_footer.spec.js
-# 9 -> 15: with two, three and four link columns an email address and a URL stay
+# + the same task's three footer fixes, 9 more specs. e2e/site_footer.spec.js
+# 9 -> 17: a fifth column wraps whole; an app's leftover grid override on the
+# columns does not bring the break back; with two, three and four link columns an email address and a URL stay
 # on one line at six widths (3 specs; the text is all there either way, so no
 # markup test can see a mid-word break); a word wider than the footer breaks
 # rather than running off the page; a column's width hint is its share of the
 # row; the Location heading, the legal lines and the booking note compute their
 # own line heights. e2e/booking_frame.spec.js 15 -> 16: a booking link that jumps
 # to a frame never scrolled to asks Google ONCE.
-#   npx playwright test --list  -> 187 tests in 27 files
-total_specs: 187
+#   npx playwright test --list  -> 189 tests in 27 files
+total_specs: 189
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -927,14 +928,14 @@ total_specs: 187
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 180
 # executed = total - devnet - allowed_skips = 180 - 0 - 0 = 180, so executed ==
 # total_specs and the equality assertion holds.
-# And again when that task's footer fixes landed — 7 more tests, no new file
-# (e2e/site_footer.spec.js 9 -> 15, e2e/booking_frame.spec.js 15 -> 16):
-#   npx playwright test --list                                             -> 187 tests, 27 files
+# And again when that task's footer fixes landed — 9 more tests, no new file
+# (e2e/site_footer.spec.js 9 -> 17, e2e/booking_frame.spec.js 15 -> 16):
+#   npx playwright test --list                                             -> 189 tests, 27 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
-#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 187
-# executed = total - devnet - allowed_skips = 187 - 0 - 0 = 187, so executed ==
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 189
+# executed = total - devnet - allowed_skips = 189 - 0 - 0 = 189, so executed ==
 # total_specs and the equality assertion holds.
-executed: 187
+executed: 189
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
