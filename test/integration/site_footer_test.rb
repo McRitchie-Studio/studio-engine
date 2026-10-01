@@ -65,10 +65,10 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
   BOOKING_URL = "https://calendar.google.com/calendar/appointments/schedules/TEST-SCHEDULE"
 
   FACTS = {
-    name: "McRitchie Studio",
-    tagline: "Software & Marketing Solutions",
+    name: "Example Co",
+    tagline: "Everything, by example",
     email: "team@example.test",
-    address: { street: "3000 Lawrence St", city_line: "Denver, CO 80205", lat: 39.7614786, lng: -104.978957 },
+    address: { street: "123 Example St", city_line: "Washington, DC 20024", lat: 38.8894, lng: -77.0352 },
     social: [
       ["LinkedIn", :linkedin, "https://www.linkedin.com/in/someone/"],
       ["Instagram", :instagram, nil],
@@ -117,13 +117,13 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select footer, 1 do
-      assert_select ".ftr-wordmark", text: /McRitchie\s*Studio/
-      assert_select ".ftr-wordmark .ftr-wordmark-accent", "Studio"
-      assert_select ".ftr-tagline", "Software & Marketing Solutions"
+      assert_select ".ftr-wordmark", text: /Example\s*Co/
+      assert_select ".ftr-wordmark .ftr-wordmark-accent", "Co"
+      assert_select ".ftr-tagline", "Everything, by example"
       assert_select ".ftr-email a[href='mailto:team@example.test']", "team@example.test"
 
-      assert_select "address a[href*='google.com/maps/dir']", { text: /3000 Lawrence St\s*Denver, CO 80205/m, count: 1 }
-      assert_select "[data-footer-map][data-lat='39.7614786'][data-lng='-104.978957'][data-zoom='15']", 1
+      assert_select "address a[href*='google.com/maps/dir']", { text: /123 Example St\s*Washington, DC 20024/m, count: 1 }
+      assert_select "[data-footer-map][data-lat='38.8894'][data-lng='-77.0352'][data-zoom='15']", 1
       assert_select "[data-footer-map] a.ftr-map-fallback[href*='google.com/maps']", 1
 
       assert_select "nav[aria-label='Company']" do
@@ -136,7 +136,7 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
 
       assert_select ".ftr-legal a[href='/privacy']", "Privacy Policy"
       assert_select ".ftr-legal a[href='/terms']", "Terms of Service"
-      assert_select ".ftr-copyright", "© #{Time.current.year} McRitchie Studio"
+      assert_select ".ftr-copyright", "© #{Time.current.year} Example Co"
     end
   end
 
@@ -174,6 +174,42 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     assert_select "#{footer} .ftr-wordmark-accent", "Title"
   end
 
+  test "an href that is not a path, http, https, mailto or tel is never written into the page" do
+    saved = Studio::SiteFooter.reporter
+    reports = []
+    Studio::SiteFooter.reporter = ->(message) { reports << message }
+    Studio::SiteFooter.reset_reported!
+    Studio.site_footer = {
+      name: "Example Co", home_path: "javascript:alert('home')",
+      address: { street: "123 Example St", lat: 38.8894, lng: -77.0352, directions_url: "javascript:alert('directions')" },
+      social: [["LinkedIn", :linkedin, "javascript:alert('social')"]],
+      columns: [["Company", [["Click me", "javascript:alert('link')"], ["Data", "data:text/html,<b>x</b>"], ["Call", "tel:+15555550100"]]]],
+      legal: [["Terms", "JAVASCRIPT:alert('legal')"]]
+    }
+
+    2.times { get "/footer_host/landing" }
+
+    assert_response :success
+    assert_no_match(/javascript:/i, response.body)
+    assert_no_match(/data:text/, response.body)
+    assert_select "#{footer} nav[aria-label='Company']" do
+      assert_select "a", 1
+      assert_select "a[href='tel:+15555550100']", "Call"
+      assert_select "span.ftr-link-plain", "Click me"
+      assert_select "span.ftr-link-plain", "Data"
+      assert_select "span[aria-disabled]", 0, "a refused link is not a page that is coming soon"
+    end
+    assert_select "#{footer} .ftr-legal span.ftr-link-plain", "Terms"
+    assert_select "#{footer} span.ftr-social[aria-label='LinkedIn'][title='LinkedIn']", 1
+    assert_select "#{footer} a.ftr-home[href='/']", 1
+    assert_select "#{footer} address a[href^='https://www.google.com/maps/dir/']", 1
+    assert_select "[data-footer-map] a.ftr-map-fallback[href^='https://www.google.com/maps/dir/']", 1
+    assert_equal 6, reports.size, "each refused href is reported once, not once per render"
+  ensure
+    Studio::SiteFooter.reporter = saved
+    Studio::SiteFooter.reset_reported!
+  end
+
   test "an empty footer is still a footer, with no part it was not given" do
     Studio.site_footer = { name: "Acme" }
 
@@ -201,7 +237,24 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     assert_no_match(/window\.__footerMapsArmed/, response.body)
     assert_includes response.body, "querySelectorAll('[data-footer-map][data-leaflet-js]')"
     assert_equal 1, response.body.scan(".booking-popup::backdrop").size, "booking styles rendered more than once"
-    assert_equal 1, response.body.scan("window.__bookingPopupArmed = true").size
+    assert_equal 1, response.body.scan("window.__studioBookingPopupArmed = true").size
+    assert_equal 1, response.body.scan("window.__studioBookingFramesArmed = true").size
+    # Not the names, nor the bare selectors, of an app's own local booking script:
+    # sharing them lets one script stand the other down across a Turbo visit, or
+    # act on the other's elements.
+    assert_no_match(/window\.__booking(Frames|Popup)Armed/, response.body)
+    assert_includes response.body, "querySelectorAll('iframe[data-booking-frame][data-studio-booking][data-src]')"
+    assert_includes response.body, "closest('a[data-booking-popup][data-studio-booking]')"
+    assert_includes response.body, "querySelector('dialog[data-booking-dialog][data-studio-booking]')"
+    script = response.body[/window\.__studioBookingFramesArmed = true.*\z/m]
+    assert_empty script.scan(/'(?:iframe|a|dialog)?\[data-booking-(?:frame|popup|dialog|wrap)\](?!\[data-studio-booking\])[^']*'/)
+                       .reject { |selector| selector.include?("data-studio-booking") },
+                 "a booking selector in the engine's script is not scoped to the engine's own elements"
+    # Every element those selectors need carries the marker.
+    assert_select "[data-booking-wrap][data-studio-booking] iframe[data-booking-frame][data-studio-booking]", 2
+    assert_select "dialog[data-booking-dialog][data-studio-booking]", 1
+    assert_select "a[data-booking-popup]:not([data-studio-booking])", 0
+    assert_select "a[data-booking-popup][data-studio-booking]", 4
   end
 
   # ---- 2. no address ----------------------------------------------------------
@@ -220,11 +273,11 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
   end
 
   test "an address without coordinates keeps the Location band and drops the map" do
-    Studio.site_footer = FACTS.merge(address: { street: "3000 Lawrence St", city_line: "Denver, CO 80205" })
+    Studio.site_footer = FACTS.merge(address: { street: "123 Example St", city_line: "Washington, DC 20024" })
 
     get "/footer_host/landing"
 
-    assert_select "#{footer} [data-footer-location] address a", /3000 Lawrence St/
+    assert_select "#{footer} [data-footer-location] address a", /123 Example St/
     assert_select "[data-footer-map]", 0
     assert_no_match(/leaflet\.(js|css)/, response.body)
   end
@@ -238,11 +291,13 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     assert_select "dialog[data-booking-dialog] iframe[data-booking-popup-frame]", 1 do |frames|
       assert_equal "#{BOOKING_URL}?gv=true", frames.first["data-src"]
       assert_nil frames.first["src"], "the frame must not load before the dialog opens"
-      assert_equal "Schedule a call with McRitchie Studio", frames.first["title"]
+      assert_equal "Schedule a call with Example Co", frames.first["title"]
     end
     assert_select "dialog[data-booking-dialog] form[method='dialog'] button[type='submit'][data-booking-close]", "Close ✕"
     assert_match(/html:has\(dialog\[data-booking-dialog\]\[open\]\) \{ overflow: hidden; \}/, response.body,
                  "the page behind the open dialog must not scroll")
+    assert_match(/height: min\(800px, calc\(100vh - 3rem\)\); height: min\(800px, calc\(100dvh - 3rem\)\);/, response.body,
+                 "the popup is sized in dvh (a phone's toolbar-aware height), with vh before it as the fallback")
     assert_select "#{footer} a[href='/contact'][data-booking-popup]", { text: "Schedule a call", count: 1 }
     assert_select "#{footer} a[data-booking-popup]", 1, "only the booking link opens the popup"
   end
@@ -257,16 +312,16 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     assert_select "[data-booking-popup]", 0
     assert_select "#{footer} a[href='/contact']", "Schedule a call"
     assert_no_match(/calendar\.google\.com/, response.body)
-    assert_no_match(/__bookingPopupArmed/, response.body, "no booking script without a booking_url")
+    assert_no_match(/BookingPopupArmed/, response.body, "no booking script without a booking_url")
   end
 
   test "the popup's label and frame title come from the facts' booking copy" do
-    Studio.site_footer = FACTS.merge(booking: { label: "Book a call", title: "Book a call with Alex" })
+    Studio.site_footer = FACTS.merge(booking: { label: "Book a call", title: "Book a call with Sam" })
 
     get "/footer_host/landing"
 
     assert_select "dialog[data-booking-dialog][aria-label='Book a call'] .booking-popup-title", "Book a call"
-    assert_select "iframe[data-booking-popup-frame][title='Book a call with Alex']", 1
+    assert_select "iframe[data-booking-popup-frame][title='Book a call with Sam']", 1
   end
 
   test "booking_url accepts a link pasted with gv=true, and refuses one that is not https" do
@@ -338,7 +393,7 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
   end
 
   test "assigning something that is not facts is refused when it is assigned" do
-    assert_raises(ArgumentError) { Studio.site_footer = "McRitchie Studio" }
+    assert_raises(ArgumentError) { Studio.site_footer = "Example Co" }
     assert_equal FACTS, Studio.site_footer
   end
 
@@ -390,7 +445,7 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     get "/schedule"
 
     assert_response :success
-    assert_select "title", "Schedule a call · McRitchie Studio"
+    assert_select "title", "Schedule a call · Example Co"
     assert_select "[data-booking-page] h1", "Schedule a call"
     assert_select "[data-booking-wrap].booking-frame-cropped iframe[data-booking-frame]", 1 do |frames|
       assert_equal "#{BOOKING_URL}?gv=true", frames.first["data-src"]
@@ -405,7 +460,7 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
 
     get "/schedule"
 
-    noscript = response.body[%r{<div class="booking-frame[^>]*data-booking-wrap>.*?<noscript>(.*?)</noscript>}m, 1]
+    noscript = response.body[%r{<div class="booking-frame[^>]*data-booking-wrap data-studio-booking>.*?<noscript>(.*?)</noscript>}m, 1]
     assert noscript, "the frame's wrapper must carry a <noscript>"
     assert_match(%r{<a href="#{Regexp.escape(BOOKING_URL)}"[^>]*>Open the booking page to pick a time</a>}, noscript)
     assert_match(/\.booking-frame iframe \{ display: none !important; \}/, noscript,
@@ -470,7 +525,7 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     get "/footer_host/helpers"
 
     assert_select "main [data-footer-map].contact-map[style='height: 20rem'][data-zoom='12'][data-controls='false']" \
-                  "[data-lat='39.7614786']", 1
+                  "[data-lat='38.8894']", 1
     assert_select "main [data-footer-map][data-lat='1.5'][data-lng='2.5'][aria-label='Map of 1 Main St, Town, ST']", 1
   end
 

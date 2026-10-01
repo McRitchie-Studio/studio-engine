@@ -4,6 +4,28 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **Footer hrefs are allow-listed.** A link, a social URL, `home_path` and
+  `directions_url` are linked only when they are a relative path or an `http:`,
+  `https:`, `mailto:` or `tel:` URL. Anything else (`javascript:`, `data:`) is
+  never written into the page, and is logged once. The first cut linked whatever the
+  facts declared.
+- **The sample footer on `/admin/style`, and every example in the docs and
+  tests, is fictional.** The first cut carried a real street address and coordinates
+  as sample data.
+- **The booking scripts act only on engine-rendered elements**
+  (`data-studio-booking`) under engine-named guards, so they coexist with an
+  app's own local booking partials. Write booking links with
+  `studio_booking_link` so they carry the marker.
+- **The booking popup's Close button** is the theme's ink on its surface, at
+  4.5:1 or better in both themes (it was white on the primary, 3.10:1), and the
+  popup is sized in `dvh` with a `vh` fallback.
+- **A Turbo snapshot no longer keeps the popup's frame loaded**, so a restored
+  page does not ask Google for a popup nobody opened.
+- [`docs/SITE_FOOTER.md`](docs/SITE_FOOTER.md) gains *Content Security Policy*
+  and *Coexisting with an app's own copy*.
+
 ## 0.83.0 — 2026-10-01
 
 ### Added

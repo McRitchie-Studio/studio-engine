@@ -187,6 +187,33 @@ test("a booking link opens the popup in place, centred, and Escape closes it", a
   const close = page.locator("dialog[data-booking-dialog] button[data-booking-close]");
   await expect(close).toHaveText("Close ✕");
   expect((await close.boundingBox()).height).toBeGreaterThanOrEqual(44);
+
+  // Its label reads at 4.5:1 or better against its fill, in both themes, by the
+  // colours the browser computed (WCAG relative luminance). The lab is dark by
+  // default; stripping the class gives the light palette.
+  const contrast = () =>
+    close.evaluate((el) => {
+      const channels = (value) => value.match(/[\d.]+/g).slice(0, 3).map(Number);
+      const luminance = (value) => {
+        const [r, g, b] = channels(value).map((c) => {
+          const s = c / 255;
+          return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+        });
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      };
+      const style = getComputedStyle(el);
+      const [hi, lo] = [luminance(style.color), luminance(style.backgroundColor)].sort((a, b) => b - a);
+      return { ratio: (hi + 0.05) / (lo + 0.05), color: style.color, background: style.backgroundColor };
+    });
+  const dark = await contrast();
+  expect(dark.color).toMatch(/^rgb\(/);
+  expect(dark.background).toMatch(/^rgb\(/);
+  expect(dark.ratio).toBeGreaterThanOrEqual(4.5);
+  await page.evaluate(() => document.documentElement.classList.remove("dark"));
+  const light = await contrast();
+  expect(light.background).not.toBe(dark.background);
+  expect(light.ratio).toBeGreaterThanOrEqual(4.5);
+  await page.evaluate(() => document.documentElement.classList.add("dark"));
   await close.click();
   await expect(dialog(page)).toBeHidden();
   expect(await overflow()).not.toBe("hidden");
@@ -303,6 +330,21 @@ test("a page's own booking link opens the same popup, and the backdrop closes it
   // A click outside the panel lands on the dialog element itself (its backdrop).
   await page.mouse.click(20, 20);
   await expect(dialog(page)).toBeHidden();
+
+  // AN APP'S OWN LOCAL LINK IS NOT THE ENGINE'S. A host that still renders its
+  // own booking partials marks its links a[data-booking-popup] too, without the
+  // engine's data-studio-booking. The engine's script leaves those alone.
+  await page.evaluate(() => {
+    const local = document.createElement("a");
+    local.href = "#local-booking";
+    local.setAttribute("data-booking-popup", "");
+    local.className = "local-booking-link";
+    local.textContent = "A host's own booking link";
+    document.querySelector("[data-lab-main]").appendChild(local);
+  });
+  await page.locator("a.local-booking-link").click();
+  await expect(page).toHaveURL(/#local-booking$/);
+  await expect(dialog(page)).toBeHidden();
 });
 
 test("with no dialog on the page, or on a modified click, the link's href is the fallback", async ({ page, context }) => {
@@ -329,7 +371,7 @@ test("with no dialog on the page, or on a modified click, the link's href is the
 
 test("the popup still opens after a Turbo visit, and is not restored open", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await stubGoogle(page);
+  const asked = await stubGoogle(page);
   await page.goto("/lab/site_footer");
   await page.evaluate(() => { window.__sameDocument = true; });
 
@@ -348,4 +390,8 @@ test("the popup still opens after a Turbo visit, and is not restored open", asyn
   await page.goBack();
   await expect(page.locator("[data-lab-page='terms']")).toBeVisible();
   await expect(dialog(page)).toBeHidden();
+  // Nor is its frame restored loaded: the snapshot was taken with the src put
+  // back to waiting, so the restored page does not ask Google for a closed popup.
+  expect(await page.locator("iframe[data-booking-popup-frame]").getAttribute("src")).toBeNull();
+  expect(asked).toHaveLength(1);
 });
