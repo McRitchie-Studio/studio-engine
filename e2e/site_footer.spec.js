@@ -292,8 +292,9 @@ const unbroken = (page) =>
   );
 const fitsThePage = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 
-for (const count of [2, 3, 4]) {
-  test(`with ${count} link columns an email address and a URL are never broken mid-word`, async ({ page }) => {
+// One spec per column count, each written out: test/lib/e2e_lane_contract_test.rb
+// counts the specs in this file from its source, and a loop would hide two.
+const neverBroken = (count) => async ({ page }) => {
     await blockOffsiteRequests(page);
     for (const width of [1280, 1024, 900, 768, 390, 360]) {
       await page.setViewportSize({ width, height: 900 });
@@ -314,8 +315,11 @@ for (const count of [2, 3, 4]) {
     );
     expect(tops).toHaveLength(count + 1);
     expect(new Set(tops).size).toBe(1);
-  });
-}
+};
+
+test("with 2 link columns an email address and a URL are never broken mid-word", neverBroken(2));
+test("with 3 link columns an email address and a URL are never broken mid-word", neverBroken(3));
+test("with 4 link columns an email address and a URL are never broken mid-word", neverBroken(4));
 
 test("a word wider than the whole footer breaks rather than running off the page", async ({ page }) => {
   await blockOffsiteRequests(page);
