@@ -83,16 +83,24 @@ Rows may be tuples, as above, or hashes (`{ label:, href: }`, `{ heading:, links
   into the page: a link or a social icon prints unlinked, `home_path` falls back
   to `/`, and `directions_url` falls back to the Google Maps default. Each
   refused value is logged once (`[studio.site_footer] ... is not linked`).
-- **A column is as wide as its longest word.** The columns share the row
-  equally, but none is narrower than its content, so a column holding an email
-  address or a URL widens and the others give way; one that cannot fit beside
-  its neighbours wraps under them. A label with no space in it is kept on one
-  line (a browser would otherwise wrap it after a hyphen or a slash). It is
-  broken only below 360px, where a screen may be too narrow to hold it whole.
-- **`width:` is a column's share of the row**, against the others' 1, from
-  768px up: `{ width: 1.5 }` as a tuple's third element, or `width:` in a hash
-  row. A number from 0.5 to 4; anything else is ignored. It is a preference, not
-  a need: no hint is required to keep an address whole.
+- **The columns sit on a grid with fixed rows.** Below 768px the brand runs
+  across the top and the link columns sit two to a row. From 768px every link
+  column is in one row under the brand. From 1024px the brand is in that row
+  too. A footer with more than four link columns keeps the brand across the top
+  and wraps the columns four to a row.
+- **An email address or a URL in a column is never broken mid-word.** A label
+  that is an address (no space, and an `@`, a `.` or a `/`) is kept on one line,
+  and its track is at least as wide as it is: the column grows to hold it and
+  the columns beside it give way. No column moves to another row. On the
+  smallest phones (under 360px) the gutter narrows and the address is set a
+  little smaller, which holds an address of about 25 characters beside a second
+  column at 320px; a longer one runs past the footer's edge there. Under 300px,
+  narrower than any phone, the address is allowed to break.
+- **`width:` is a column's track**, as a share of the row, from 768px:
+  `{ width: 2 }` as a tuple's third element, or `width:` in a hash row. A number
+  from 0.5 to 4; anything else is ignored. Without one, the first column is 1.5
+  and the rest are 1 (the brand, from 1024px, is 1.7). Below 768px the two tracks
+  are fixed at 1.2 and 1, and with more than four columns the hints are not used.
 - **A social profile with a `nil` URL** renders its icon unlinked, with a dashed
   outline. The engine draws `:linkedin`, `:instagram`, `:x`, `:facebook` and
   `:youtube`; any other icon falls back to the label's first letter.
@@ -226,11 +234,11 @@ These class names are stable, and an app may style against them:
 | Class | Element |
 |-------|---------|
 | `.ftr` | The footer |
-| `.ftr-cols` | The row of brand and link columns, a wrapping flex row |
+| `.ftr-cols` | The grid of brand and link columns; `--ftr-tracks` is its link-column tracks. `.ftr-cols-many` with more than four |
 | `.ftr-brand` | The brand block |
-| `.ftr-col` | One link column (a `nav`); `--ftr-w` is its share of the row |
+| `.ftr-col` | One link column (a `nav`) |
 | `.ftr-heading`, `.ftr-list` | A column's heading and its list |
-| `.ftr-link`, `.ftr-link-solid`, `.ftr-link-disabled` | A link; a one-word link kept on one line; a "coming soon" label |
+| `.ftr-link`, `.ftr-link-solid`, `.ftr-link-disabled` | A link; an address kept on one line; a "coming soon" label |
 | `.ftr-location`, `.ftr-location-title`, `.ftr-address` | The Location band |
 | `.ftr-legal`, `.ftr-copyright` | The legal line and the © line |
 | `.ftr-map` | The map |
@@ -239,11 +247,22 @@ The rest (`.ftr-wrap`, `.ftr-home`, the social and pin classes) may change.
 
 The footer's stylesheet is inline and unlayered, and comes after the app's own
 in the document, so an app rule needs more specificity to win: prefix it with
-`footer[data-site-footer]`. `.ftr-cols` was a grid before; it is a flex row now,
-so an app's `grid-template-columns` on it does nothing (a browser spec holds
-that) and should be deleted, along with any `overflow-wrap` override on
-`.ftr-link`. A footer may have any number of columns: from 768px a row holds
-four at most, and a fifth wraps under them.
+`footer[data-site-footer]`.
+
+### An app that overrode 0.83.0's tracks
+
+0.83.0 laid the columns on equal `minmax(0, 1fr)` tracks, and an app could only
+fix the broken address from its own stylesheet, with `grid-template-columns` on
+`footer[data-site-footer] .ftr-cols` and `overflow-wrap: normal` on the mailto
+link. Those rules are more specific than the engine's and still apply.
+
+- **Left in place** they draw the same rows as the engine now does, with the
+  address whole (a browser spec holds that, at 320, 390, 768, 1024 and 1280px).
+  Nothing breaks if the block outlives the upgrade.
+- **Delete the block once the app is on this version.** Not before: on 0.83.0 it
+  is the only thing keeping the address whole. While it stays it hides the
+  engine's tracks, so a `width:` hint does nothing and the narrow-phone gutter is
+  the only engine rule still acting on the row.
 
 ## Tests
 
@@ -253,8 +272,9 @@ four at most, and a fifth wraps under them.
 - `test/integration/site_footer_test.rb`: what a host renders, with and without
   each fact, signed in and out.
 - `e2e/site_footer.spec.js`: the map's script and the footer's layout, in a
-  browser, with the network closed: an address in a column is never broken
-  mid-word with two, three or four columns, and the line heights. These lab pages load Turbo, so the map's remount after a Turbo visit is
+  browser, with the network closed: which columns share a row at 320, 390, 768,
+  1024 and 1280px with two, three, four and five columns, the address on one
+  line inside its column at each, and the line heights. These lab pages load Turbo, so the map's remount after a Turbo visit is
   covered.
 
 `/admin/style` shows the footer under Tricks, with this app's facts or a sample.

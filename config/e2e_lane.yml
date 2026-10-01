@@ -803,14 +803,16 @@
 # itself reaches the live Google page and is never run by this lane.
 #   npx playwright test --list  -> 180 tests in 27 files
 # + the same task's three footer fixes, 9 more specs. e2e/site_footer.spec.js
-# 9 -> 17: a fifth column wraps whole; an app's leftover grid override on the
-# columns does not bring the break back; with two, three and four link columns an email address and a URL stay
-# on one line at six widths (3 specs; the text is all there either way, so no
-# markup test can see a mid-word break); a word wider than the footer breaks
-# rather than running off the page; a column's width hint is its share of the
-# row; the Location heading, the legal lines and the booking note compute their
-# own line heights. e2e/booking_frame.spec.js 15 -> 16: a booking link that jumps
-# to a frame never scrolled to asks Google ONCE.
+# 9 -> 17. Six read the footer's ROWS (which columns share a row) at 320, 390,
+# 768, 1024 and 1280px, with the address on one line INSIDE its column and
+# nothing overflowing at each: two, three and four link columns (3 specs), five
+# columns wrapping four to a row, an app's 0.83.0 track override left in place,
+# and a width hint setting its own track. Neither the 0.83.0 grid nor a wrapping
+# flex row passes them, and no markup test can tell the three apart. Then: under
+# 300px the address breaks rather than running off the page; and the Location
+# heading, the legal lines and the booking note compute their own line heights.
+# e2e/booking_frame.spec.js 15 -> 16: a booking link that jumps to a frame never
+# scrolled to asks Google ONCE.
 #   npx playwright test --list  -> 189 tests in 27 files
 total_specs: 189
 

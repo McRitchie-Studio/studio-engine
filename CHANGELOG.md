@@ -47,7 +47,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   rather than drawing the engine's `/schedule`, names that page here and gets
   what the engine's page had: a footer link to it opens the popup, it is
   `studio_booking_link`'s fallback href, and a signed-in viewer keeps the footer
-  on it. With neither set, nothing changes.
+  on it. With neither set, nothing changes. It must be a local path (one leading
+  `/`): a scheme or a protocol-relative `//host` is refused, from a String at
+  assignment and from a callable on each request.
 - [`docs/BOOKING.md`](docs/BOOKING.md): booking as a primitive of its own,
   adoptable without the footer. Setting the schedule up in Google, sharing other
   calendars in for conflict checking, the booking URL, measuring the crop, CSP,
@@ -57,13 +59,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 ### Fixed
 
 - **A footer link column no longer breaks an email address or a URL mid-word.**
-  The link columns were equal grid tracks with `overflow-wrap: anywhere`, so an
-  address in a column broke in two at every width. They are a wrapping flex row
-  now: each column takes an equal share but is never narrower than its longest
-  word, and a one-word label stays on one line (it is broken only below 360px).
-  A column may carry a width hint, `[ "Contact", links, { width: 1.5 } ]`.
-  `.ftr-cols` is no longer a grid, so an app's `grid-template-columns` override
-  on it is inert and can be deleted;
+  The link columns were equal `minmax(0, 1fr)` tracks with `overflow-wrap:
+  anywhere`, so an address in a column broke in two at every width. The rows are
+  unchanged (two link columns to a row on a phone, one row from 768px, beside the
+  brand from 1024px), but a track is now a plain `fr`, at least as wide as its
+  longest word, and an address is kept on one line: its column grows to hold it
+  and its neighbours give way. The first column is 1.5 shares by default and a
+  column may set its own, `[ "Contact", links, { width: 2 } ]`. More than four
+  columns wrap four to a row under the brand. An app that overrode 0.83.0's
+  tracks from its own stylesheet may leave that block (it draws the same rows) or
+  delete it once it is on this version; while it stays, `width:` hints do nothing.
   [`docs/SITE_FOOTER.md`](docs/SITE_FOOTER.md) lists the stable class hooks.
 - **A booking link that jumps to an inline frame asks Google once.** When the
   frame had never been scrolled near, the link assigned its `src` and the

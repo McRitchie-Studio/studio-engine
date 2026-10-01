@@ -642,7 +642,8 @@ module Studio
   # page, when drawn, as the booking page. With it set, the page is treated as
   # the engine's own is: a footer link to it opens the popup, `studio_booking_link`
   # falls back to it, and it keeps the footer for a signed-in viewer. It wins
-  # over the engine's page when both are declared.
+  # over the engine's page when both are declared. It is written into hrefs, so
+  # it must be a local path (one leading "/"); see Studio::Booking.local_path?.
   #
   #   config.booking_path = "/schedule"
   mattr_reader :booking_path, default: nil

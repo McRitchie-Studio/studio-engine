@@ -34,8 +34,9 @@ enforces a Content Security Policy must allow the frame: see
 
 ## Set up the schedule in Google
 
-These steps are Google Calendar's, as its menus read in October 2026. Google
-moves them; the things to end up with do not change.
+These steps are Google Calendar's, written from memory and not checked against
+Google's menus: the names and their order may differ from what you see. The
+things to end up with are what matter.
 
 1. **Create the appointment schedule.** In Google Calendar, signed in as the
    account that will own the bookings: *Create*, then *Appointment schedule*.
@@ -186,7 +187,8 @@ Each opens when focus moves into it.
 
 ### A crop that cannot be one
 
-A Hash whose values are not numbers, a negative `top`, a `bottom` that is not
+A Hash whose values are not numbers (a numeric string such as `"200"` is not
+coerced: it is refused like any other non-number), a negative `top`, a `bottom` that is not
 below `top` or is past `frame_height`, or a window as tall as the frame, is not
 applied. The frame shows whole, and one line is logged:
 
@@ -266,6 +268,12 @@ With it set the app's page is treated as the engine's own is:
 - `studio_booking_link` falls back to it, instead of to Google's page;
 - a signed-in viewer keeps the footer on it, without the controller being listed
   in `config.site_footer_controllers`. The page is matched by the request's path.
+
+The path is written into hrefs, so it must be a local path: one leading `/`.
+A String that is anything else (`javascript:...`, `https://...`, a
+protocol-relative `//host/...`) raises when it is assigned. A callable's result
+is held to the same rule on every request: anything else is logged once
+(`[studio.booking] booking_path ... is ignored`) and treated as no answer.
 
 Without `booking_path` (and without the engine's route) an app's own page gets
 none of the three: the engine has no way to know it is the booking page. If both
