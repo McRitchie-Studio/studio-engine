@@ -1,0 +1,20 @@
+<%# The lab layout for the site footer pages: layouts/e2e_lab plus Turbo.
+
+    Turbo is here, and only here, because the footer map has to remount after a
+    Turbo visit (the visit replaces the body but not the mount script's state).
+    e2e/boot.rb copies the real build out of the turbo-rails gem. The footer
+    itself is the layout's one line, exactly where a host puts it. %>
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>studio-engine e2e lab · site footer</title>
+    <%= render "layouts/studio/head" %>
+    <script type="module" src="/e2e/js/turbo.min.js"></script>
+  </head>
+  <body class="bg-page text-body">
+    <main data-lab-main><%= yield %></main>
+    <%= studio_site_footer %>
+  </body>
+</html>

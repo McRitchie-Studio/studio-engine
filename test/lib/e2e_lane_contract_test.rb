@@ -300,12 +300,20 @@ class E2eLaneContractTest < Minitest::Test
       # panel partial. A lab page that hand-rolled either side would prove nothing.
       "sidebar_panels.html.erb" => [
         "components/link_sidebar_trigger", "components/link_sidebar", "components/sidebar_panel"
-      ]
+      ],
+      # The booking frame is reached through its HELPER, which is the consumer's
+      # API (the helper is what resolves Studio.booking_url and renders
+      # studio/booking/_frame). The footer itself is the layout's one line, so it
+      # is asserted on the layout below rather than on a page.
+      "site_footer_home.html.erb" => ["studio_booking_frame"],
+      "site_footer_schedule.html.erb" => ["studio_booking_frame"],
+      "site_footer_index.html.erb" => ["studio_booking_link"]
     }.each do |page, partials|
       source = File.read(File.join(lab, page))
 
       partials.each do |partial|
-        assert_match(/render\s+"#{Regexp.escape(partial)}"/, source,
+        # `render "partial"`, or `<%= helper` for a primitive whose API is a helper.
+        assert_match(/render\s+"#{Regexp.escape(partial)}"|<%=\s*#{Regexp.escape(partial)}\b/, source,
                      "#{page} must render the engine partial #{partial} BY NAME. A lab page that " \
                      "reimplements the partial turns its spec into a test of the lab.")
       end
@@ -314,6 +322,19 @@ class E2eLaneContractTest < Minitest::Test
                    "#{page} carries its own <script>. The browser program under test must come " \
                    "from the ENGINE partial, never from the lab page around it.")
     end
+  end
+
+  # The site footer pages get the footer from their LAYOUT, in one line, exactly as
+  # a host does. The layout's only script is Turbo itself (the map's remount after
+  # a Turbo visit is under test); the footer's own program must still come from the
+  # engine.
+  def test_integration_the_site_footer_lab_layout_renders_the_engine_footer
+    layout = File.read(File.join(ROOT, "test", "dummy", "app", "views", "layouts", "site_footer_lab.html.erb"))
+
+    assert_match(/<%=\s*studio_site_footer\s*%>/, layout,
+                 "the footer lab layout must render the footer through studio_site_footer")
+    assert_equal ['<script type="module" src="/e2e/js/turbo.min.js">'], layout.scan(/<script[^>]*>/),
+                 "the footer lab layout may load Turbo and nothing else of its own"
   end
 
   # NO PATH FILTER ON THE GATING TRIGGERS — the subtler spelling of the same hole.

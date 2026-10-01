@@ -1,0 +1,79 @@
+<%#  The Site footer and booking group of the Tricks board (admin/style).
+     The primitives a public site ends with: the footer, its map, and the Google
+     Calendar booking frame, popup and link (docs/SITE_FOOTER.md). Each card
+     gives the helper to call; the preview below them is the real footer partial,
+     rendered with THIS app's facts when it has declared any and with a sample
+     when it has not, so the group is never empty.
+
+     The booking frame is described, not embedded: a style guide should not ask
+     Google for a calendar every time an admin scrolls past. %>
+<%
+  own_facts    = studio_site_footer_facts
+  sample       = {
+    name: Studio.site_identity[:title], tagline: "What this app is, in a line",
+    email: "team@example.com",
+    address: { street: "3000 Lawrence St", city_line: "Denver, CO 80205", lat: 39.7614786, lng: -104.978957 },
+    social: [ [ "LinkedIn", :linkedin, "https://www.linkedin.com/" ], [ "Instagram", :instagram, nil ], [ "X", :x, "https://x.com/" ] ],
+    columns: [ [ "Contact", [ [ "Schedule a call", "#site-footer", { booking: true } ], [ "Contact", "#site-footer" ] ] ],
+               [ "Company", [ [ "Home", "/" ], [ "Career", nil ], [ "Blog", "https://example.com" ] ] ] ],
+    legal: [ [ "Privacy Policy", "#site-footer" ], [ "Terms of Service", "#site-footer" ] ]
+  }
+  preview      = own_facts || Studio::SiteFooter.resolve(sample, self, logo: Studio.logo_for("Footer Logo"))
+  booking      = studio_booking?
+%>
+<section id="site-footer" class="space-y-5" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
+  <div class="space-y-1">
+    <h3 class="text-xl font-bold text-heading">Site footer and booking</h3>
+    <p class="text-muted text-sm max-w-2xl">
+      One layout line renders the public site's footer from
+      <code class="font-mono text-2xs">config.site_footer</code>; every part is optional. With
+      <code class="font-mono text-2xs">config.booking_url</code> the same pages get Google Calendar's
+      booking page inline, in a popup and on <code class="font-mono text-2xs">/schedule</code>.
+    </p>
+    <p class="text-muted text-sm" data-site-footer-status>
+      This app:
+      footer <strong class="text-body"><%= own_facts ? "declared" : "not declared" %></strong> &middot;
+      booking <strong class="text-body"><%= booking ? "on" : "off" %></strong> &middot;
+      booking page <strong class="text-body"><%= Studio.draw_booking_routes ? "drawn" : "not drawn" %></strong>
+    </p>
+  </div>
+
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <%= render layout: "style/specimen",
+          locals: { klass: "studio_site_footer",
+                    usage: %(studio_site_footer   # one line, at the end of the layout body) } do %>
+      <p class="text-sm text-secondary text-center">
+        The footer, where it should show: every page for a visitor, listed controllers when signed in.
+        Previewed below.
+      </p>
+    <% end %>
+
+    <%= render layout: "style/specimen",
+          locals: { klass: "studio_booking_link",
+                    disabled: !booking, disabled_label: "no booking_url",
+                    usage: %(studio_booking_link "Schedule a call", class: "btn btn-primary") } do %>
+      <% if booking %>
+        <%= studio_booking_link "Schedule a call", class: "btn btn-primary" %>
+      <% else %>
+        <span class="btn btn-primary">Schedule a call</span>
+      <% end %>
+    <% end %>
+
+    <%= render layout: "style/specimen",
+          locals: { klass: "studio_booking_frame",
+                    disabled: !booking, disabled_label: "no booking_url",
+                    usage: %(studio_booking_frame   # crop: false shows Google's whole page at rest) } do %>
+      <p class="text-sm text-secondary text-center">
+        Google's booking page inline. Asked for only after the page has loaded and the frame is near
+        the viewport; cropped to the slot picker until it is used.
+      </p>
+    <% end %>
+  </div>
+
+  <div class="space-y-2">
+    <p class="label-upper"><%= own_facts ? "This app's footer" : "Sample footer (this app declares none)" %></p>
+    <div class="card overflow-hidden" data-site-footer-preview>
+      <%= render "studio/site_footer/footer", facts: preview %>
+    </div>
+  </div>
+</section>
