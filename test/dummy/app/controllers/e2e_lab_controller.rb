@@ -575,16 +575,38 @@ class E2eLabController < ActionController::Base
     legal: [["Privacy Policy", "/lab/site_footer"], ["Terms of Service", "/lab/site_footer/terms"]]
   }.freeze
 
-  SITE_FOOTER_VARIANTS = %w[index terms home schedule plain].freeze
+  SITE_FOOTER_VARIANTS = %w[index terms home schedule plain crops columns].freeze
+
+  # Link columns for /lab/site_footer/columns/:n, the first n of these. They are
+  # shaped like a real site's: a Contact column holding an email address (with a
+  # hyphen in it, where a browser would wrap), then short columns. Two of them
+  # is a small site's footer; four is a full one. A fifth is past what one row
+  # holds. The names are made up.
+  LAB_COLUMN_POOL = [
+    ["Contact", [["team@lab-studio.example", "mailto:team@lab-studio.example"],
+                 ["Schedule a call", "/lab/site_footer/schedule"], ["Contact", "/lab/site_footer"]]],
+    ["Company", [["Home", "/lab/site_footer"], ["About", "/lab/site_footer"], ["Career", nil]]],
+    ["Solutions", [["Packages", "/lab/site_footer"], ["Build an app", "/lab/site_footer"]]],
+    ["Legal", [["Privacy Policy", "/lab/site_footer"], ["Terms of Service", "/lab/site_footer/terms"]]],
+    ["Resources", [["Documentation", "/lab/site_footer"], ["Status", "/lab/site_footer"]]]
+  ].freeze
 
   attr_reader :lab_site_footer
 
-  # One action, five pages. `plain` is the footer with no address: no Location
-  # band, no map and no Leaflet request. The layout is the lab's plus Turbo,
+  # One action, seven pages. `plain` is the footer with no address: no Location
+  # band, no map and no Leaflet request. `crops` is three booking frames, two
+  # cropped to different windows and one whole. `columns` is the footer with two
+  # to five link columns. The layout is the lab's plus Turbo,
   # because the map's remount on a Turbo visit is one of the things under test.
   def site_footer
     variant = SITE_FOOTER_VARIANTS.include?(params[:variant]) ? params[:variant] : "index"
     @lab_site_footer = variant == "plain" ? LAB_SITE_FOOTER.except(:address) : LAB_SITE_FOOTER
+    if variant == "columns"
+      columns = LAB_COLUMN_POOL.first(params[:n].to_i.clamp(2, 5))
+      # ?hint=1.5 gives the first column a width hint, the way a host writes one.
+      columns = [columns.first + [{ width: params[:hint].to_f }]] + columns.drop(1) if params[:hint].present?
+      @lab_site_footer = LAB_SITE_FOOTER.merge(columns: columns)
+    end
     render("site_footer_#{variant}", layout: "site_footer_lab")
   end
 

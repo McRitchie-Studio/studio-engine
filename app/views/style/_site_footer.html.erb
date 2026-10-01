@@ -1,12 +1,16 @@
 <%#  The Site footer and booking group of the Tricks board (admin/style).
      The primitives a public site ends with: the footer, its map, and the Google
-     Calendar booking frame, popup and link (docs/SITE_FOOTER.md). Each card
+     Calendar booking frame, popup and link (docs/SITE_FOOTER.md,
+     docs/BOOKING.md). Each card
      gives the helper to call; the preview below them is the real footer partial,
      rendered with THIS app's facts when it has declared any and with a sample
      when it has not, so the group is never empty.
 
-     The booking frame is described, not embedded: a style guide should not ask
-     Google for a calendar every time an admin scrolls past. %>
+     The booking frame is DRAWN, not embedded: a style guide should not ask
+     Google for a calendar every time an admin scrolls past. Its two states, whole
+     and cropped, are quarter-scale drawings of a made-up schedule (a 720px page
+     whose box runs from 200 to 600), cropped by the same arithmetic the real
+     wrapper uses (Studio::Booking.crop). No real schedule's numbers are here. %>
 <%
   own_facts    = studio_site_footer_facts
   sample       = {
@@ -20,6 +24,12 @@
   }
   preview      = own_facts || Studio::SiteFooter.resolve(sample, self, logo: Studio.logo_for("Footer Logo"))
   booking      = studio_booking?
+  own_crop     = studio_booking_crop
+  sample_crop  = Studio::Booking.crop(top: 200, bottom: 600, frame_height: 720)
+  scale        = 0.25
+  # The made-up page, top to bottom: [label, from, to, is it the box?].
+  sample_page  = [ [ "Google's header", 0, 200, false ], [ "Select an appointment time", 200, 600, true ],
+                   [ "Google's credit lines", 600, 720, false ] ]
 %>
 <section id="site-footer" class="space-y-5" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
   <div class="space-y-1">
@@ -34,7 +44,8 @@
       This app:
       footer <strong class="text-body"><%= own_facts ? "declared" : "not declared" %></strong> &middot;
       booking <strong class="text-body"><%= booking ? "on" : "off" %></strong> &middot;
-      booking page <strong class="text-body"><%= Studio.draw_booking_routes ? "drawn" : "not drawn" %></strong>
+      booking page <strong class="text-body"><%= Studio.draw_booking_routes ? "drawn" : "not drawn" %></strong> &middot;
+      frame <strong class="text-body"><%= own_crop ? "cropped at rest" : "whole at rest" %></strong>
     </p>
   </div>
 
@@ -59,14 +70,26 @@
       <% end %>
     <% end %>
 
-    <%= render layout: "style/specimen",
-          locals: { klass: "studio_booking_frame",
-                    disabled: !booking, disabled_label: "no booking_url",
-                    usage: %(studio_booking_frame   # crop: false shows Google's whole page at rest) } do %>
-      <p class="text-sm text-secondary text-center">
-        Google's booking page inline. Asked for only after the page has loaded and the frame is near
-        the viewport; cropped to the slot picker until it is used.
-      </p>
+    <% [ [ "studio_booking_frame", nil, "whole",
+           %(studio_booking_frame   # whole at rest: the default, and crop: false),
+           "Whole at rest, the default. Google's page as Google draws it: its header, the slot picker, its credit lines." ],
+         [ "config.booking_crop", sample_crop, "cropped",
+           %(config.booking_crop = { top: 200, bottom: 600, frame_height: 720 }   # bin/booking-crop-measure prints yours),
+           "Cropped at rest to the slot picker, from numbers measured on the app's own schedule. Opens to the whole page when it is used." ]
+       ].each do |klass, crop, state, usage, caption| %>
+      <%= render layout: "style/specimen",
+            locals: { klass: klass, disabled: !booking, disabled_label: "no booking_url", usage: usage } do %>
+        <div class="w-full space-y-3" data-booking-specimen="<%= state %>">
+          <div style="margin-inline: auto; width: 11rem; overflow: hidden; background: #fff; border-radius: .5rem; border: 1px solid rgb(127 127 127 / .35); height: <%= ((crop ? crop[:window] : 720) * scale).round %>px;">
+            <div style="margin-top: -<%= ((crop ? crop[:offset] : 0) * scale).round %>px;">
+              <% sample_page.each do |label, from, to, box| %>
+                <div style="box-sizing: border-box; height: <%= ((to - from) * scale).round %>px; display: flex; align-items: center; justify-content: center; padding: 0 .5rem; text-align: center; font-size: .625rem; line-height: 1.2; color: #374151;<%= box ? " margin: 0 .35rem; border: 1px solid rgb(17 24 39 / .45); border-radius: .35rem; font-weight: 700;" : " background: rgb(17 24 39 / .06);" %>"><%= label %></div>
+              <% end %>
+            </div>
+          </div>
+          <p class="text-sm text-secondary text-center"><%= caption %></p>
+        </div>
+      <% end %>
     <% end %>
   </div>
 

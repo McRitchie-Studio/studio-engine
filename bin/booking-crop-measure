@@ -1,0 +1,60 @@
+#!/usr/bin/env node
+// bin/booking-crop-measure — print config.booking_crop for an appointment schedule.
+//
+//   bin/booking-crop-measure https://calendar.google.com/calendar/appointments/schedules/EXAMPLE-SCHEDULE-ID
+//   bin/booking-crop-measure <booking url> --months 6     # walk further ahead (default 3)
+//   bin/booking-crop-measure <booking url> --json         # the measurements, for a script
+//
+// It opens Google's embedded page for the schedule in headless Chromium, at two
+// frame widths, walks every bookable day of the months ahead, and prints the Hash
+// to paste into the initializer, with what it was measured against. It books
+// nothing: it only selects days. How the numbers become a crop: lib/studio/booking.rb
+// and docs/BOOKING.md. The measuring itself: bin/lib/booking_crop_measure.js.
+//
+// Needs the browser lane's tools, once: `npm ci && npx playwright install chromium`.
+//
+// IT REACHES THE LIVE GOOGLE PAGE, SO IT NEVER RUNS IN CI. It refuses under a CI
+// environment, and it is not a spec: the browser lane (e2e/) proves the measuring
+// against a stub and never calls this file.
+
+const path = require("path");
+
+const USAGE = "usage: bin/booking-crop-measure <booking url> [--months N] [--json]";
+
+function fail(message, code) {
+  process.stderr.write(`${message}\n`);
+  process.exit(code);
+}
+
+async function main(argv) {
+  if (argv.includes("--help") || argv.includes("-h")) fail(USAGE, 1);
+  if (process.env.CI) fail("bin/booking-crop-measure reaches the live Google page and does not run in CI.", 2);
+
+  const json = argv.includes("--json");
+  const monthsAt = argv.indexOf("--months");
+  const months = monthsAt >= 0 ? Number(argv[monthsAt + 1]) : undefined;
+  const rest = argv.filter((arg, index) => !arg.startsWith("--") && (monthsAt < 0 || index !== monthsAt + 1));
+  if (rest.length !== 1 || !/^https:\/\/\S+$/.test(rest[0])) fail(USAGE, 2);
+  if (monthsAt >= 0 && !(Number.isInteger(months) && months > 0)) fail(USAGE, 2);
+
+  let chromium;
+  try {
+    ({ chromium } = require(path.join(__dirname, "..", "node_modules", "@playwright", "test")));
+  } catch (error) {
+    fail("Playwright is not installed here. Run: npm ci && npx playwright install chromium", 2);
+  }
+  const lib = require("./lib/booking_crop_measure");
+
+  const browser = await chromium.launch();
+  try {
+    const context = await browser.newContext({ locale: "en-US" });
+    const page = await context.newPage();
+    const measured = await lib.measure(page, rest[0], months ? { months } : {});
+    if (json) process.stdout.write(`${JSON.stringify({ crop: lib.derive(measured), measured }, null, 2)}\n`);
+    else process.stdout.write(`${lib.report(rest[0], measured)}\n`);
+  } finally {
+    await browser.close();
+  }
+}
+
+main(process.argv.slice(2)).catch((error) => fail(`bin/booking-crop-measure: ${error.message}`, 1));

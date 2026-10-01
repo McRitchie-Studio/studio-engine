@@ -1,0 +1,12 @@
+<%# /lab/site_footer/crops — three booking frames on one page: two cropped to
+    DIFFERENT windows, each by a Hash on its own call, and one whole. The dummy
+    declares no Studio.booking_crop, so /lab/site_footer/schedule is the default
+    (whole) and this page is where a crop is seen. The numbers belong to no real
+    schedule. test/integration/site_footer_test.rb proves a crop declared in
+    config renders this same wrapper. %>
+<h1 data-lab-page="crops">Booking frames, cropped and whole</h1>
+<div style="max-width: 56rem; margin-inline: auto; padding: 0 1rem 4rem;">
+  <div data-lab-crop="first"><%= studio_booking_frame title: "First schedule", crop: { top: 200, bottom: 600, frame_height: 720 } %></div>
+  <div data-lab-crop="second"><%= studio_booking_frame title: "Second schedule", crop: { top: 150, bottom: 480, frame_height: 640 } %></div>
+  <div data-lab-crop="whole"><%= studio_booking_frame title: "Whole schedule", crop: false %></div>
+</div>

@@ -94,6 +94,16 @@ module Studio
       nil
     end
 
+    # True on the app's OWN booking page (Studio.booking_path), which keeps the
+    # footer for a signed-in viewer as the engine's page does. Matched by the
+    # request's path, because the app's controller could be named anything.
+    def booking_page?(view, booking_path)
+      return false if booking_path.nil?
+      return false unless view.respond_to?(:request) && view.request.respond_to?(:path)
+
+      Studio::Booking.same_path?(view.request.path, booking_path)
+    end
+
     def validate!(declared)
       return if declared.nil? || declared.is_a?(Hash) || declared.respond_to?(:call)
 
@@ -106,7 +116,7 @@ module Studio
     #
     #   name:         the site name the engine resolved (the site identity's title)
     #   logo:         the logo the engine resolved (the navbar logo), or nil
-    #   booking_path: the booking page's path when the engine draws it, or nil
+    #   booking_path: the booking page's path (Studio.booking_path_for), or nil
     def resolve(declared, view, name: nil, logo: nil, booking_path: nil)
       raw = declared.respond_to?(:call) ? declared.call(view) : declared
       return nil if raw.nil?
@@ -149,8 +159,16 @@ module Studio
     #   config.site_footer_visible = ->(view) {
     #     Studio::SiteFooter.default_visible?(view) && !view.controller_path.start_with?("app/")
     #   }
-    def default_visible?(view, controllers: nil)
+    #
+    # `booking_path` is the app's own booking page (Studio.booking_path, resolved
+    # for this view); the engine's page is exempt by its controller instead.
+    def default_visible?(view, controllers: nil, booking_path: nil)
       controllers = Studio.site_footer_controllers if controllers.nil? && defined?(Studio.site_footer_controllers)
+      if booking_path.nil? && Studio.respond_to?(:booking_path) && Studio.booking_path
+        booking_path = Studio.booking_path_for(view)
+      end
+      return true if booking_page?(view, booking_path)
+
       visible?(
         logged_in: view.respond_to?(:logged_in?) && view.logged_in? ? true : false,
         controller_name: view.respond_to?(:controller_name) ? view.controller_name : nil,
@@ -235,12 +253,14 @@ module Studio
         unlinked: !text(url).nil? && safe_href(url, "social url").nil? }
     end
 
-    # [ heading, links ] or { heading:, links: }.
+    # [ heading, links ], [ heading, links, { width: 1.5 } ] or { heading:,
+    # links:, width: }. `width` is an optional hint: this column's share of the
+    # row against the others' 1 (see `tracks`).
     def column(row, booking_path)
-      heading, links =
+      heading, links, options =
         if row.respond_to?(:to_h) && !row.is_a?(Array)
           hash = symbolize(row)
-          [hash[:heading] || hash[:title], hash[:links]]
+          [hash[:heading] || hash[:title], hash[:links], hash]
         else
           Array(row)
         end
@@ -248,12 +268,48 @@ module Studio
       links = Array(links).filter_map { |link_row| link(link_row, booking_path) }
       return nil if heading.nil? && links.empty?
 
-      { heading: heading, links: links }
+      options = options.respond_to?(:to_h) && !options.is_a?(Array) ? symbolize(options) : {}
+      { heading: heading, links: links, width: column_width(options[:width]) }
+    end
+
+    # A column's width hint, or nil for the default share. Anything that is not a
+    # number between MIN_COLUMN_WIDTH and MAX_COLUMN_WIDTH is no hint.
+    MIN_COLUMN_WIDTH = 0.5
+    MAX_COLUMN_WIDTH = 4
+
+    def column_width(value)
+      return nil unless value.is_a?(Numeric) && value.respond_to?(:finite?) && value.finite?
+      return nil unless value >= MIN_COLUMN_WIDTH && value <= MAX_COLUMN_WIDTH
+
+      value.to_f
+    end
+
+    # True for a label that is an address rather than words: no space in it, and
+    # an "@", a "." or a "/". It is kept on one line (.ftr-link-solid).
+    def solid_label?(label)
+      string = label.to_s
+      !string.match?(/\s/) && string.match?(%r{[@./]})
+    end
+
+    # THE LINK COLUMNS' GRID TRACKS from 768px, one per column: its `width:`
+    # hint as an fr share, else FIRST_COLUMN_WIDTH for the first (the one that
+    # usually holds an email address) and 1 for the rest. nil when there are no
+    # columns, or more than MAX_ROW_COLUMNS: those wrap as equal tracks.
+    FIRST_COLUMN_WIDTH = 1.5
+    MAX_ROW_COLUMNS = 4
+
+    def tracks(columns)
+      columns = Array(columns)
+      return nil if columns.empty? || columns.size > MAX_ROW_COLUMNS
+
+      columns.each_with_index.map do |column, index|
+        "#{format('%g', column[:width] || (index.zero? ? FIRST_COLUMN_WIDTH : 1))}fr"
+      end.join(" ")
     end
 
     # [ label, href ], [ label, href, { booking: true } ] or { label:, href:,
     # booking: }. A nil href is a disabled label; an http(s) href opens in a new
-    # tab; `booking: true`, or an href equal to the engine's booking page, opens
+    # tab; `booking: true`, or an href equal to the booking page's path, opens
     # the booking popup (the href stays as the fallback).
     def link(row, booking_path = nil)
       label, href, options =
