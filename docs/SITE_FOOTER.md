@@ -250,8 +250,9 @@ with any `overflow-wrap` override on `.ftr-link`.
   addressed through the asset pipeline.
 - `test/integration/site_footer_test.rb`: what a host renders, with and without
   each fact, signed in and out.
-- `e2e/site_footer.spec.js`: the map's script, in a browser, with the network
-  closed. These lab pages load Turbo, so the map's remount after a Turbo visit is
+- `e2e/site_footer.spec.js`: the map's script and the footer's layout, in a
+  browser, with the network closed: an address in a column is never broken
+  mid-word with two, three or four columns, and the line heights. These lab pages load Turbo, so the map's remount after a Turbo visit is
   covered.
 
 `/admin/style` shows the footer under Tricks, with this app's facts or a sample.
