@@ -1,4 +1,4 @@
-const { test, expect } = require("@playwright/test");
+const { test, expect, devices } = require("@playwright/test");
 const { blockOffsiteRequests } = require("./helpers");
 
 // The site footer's map (studio/site_footer/_assets, docs/SITE_FOOTER.md).
@@ -69,6 +69,63 @@ test("the footer map mounts from the engine's own Leaflet, centred on the addres
 
   // Page scroll stays page scroll until the visitor clicks into the map.
   expect(await map(page).evaluate((el) => el.__footerMap.scrollWheelZoom.enabled())).toBe(false);
+  // With a mouse the map drags: the no-drag rule is for touch devices only.
+  expect(await map(page).evaluate((el) => el.__footerMap.dragging.enabled())).toBe(true);
+
+  // Leaflet puts .leaflet-container on the map element ITSELF. The footer's rule
+  // for it has to win over Leaflet's own grey (#ddd) and its 12px Helvetica.
+  const style = await map(page).evaluate((el) => {
+    const computed = getComputedStyle(el);
+    return { background: computed.backgroundColor, font: computed.fontFamily, body: getComputedStyle(document.body).fontFamily };
+  });
+  expect(style.background).not.toBe("rgb(221, 221, 221)");
+  expect(style.font).toBe(style.body);
+});
+
+test("on a touch device a one-finger swipe on the map scrolls the page", async ({ browser, baseURL }) => {
+  // A phone: touch input and a mobile user agent, which is what L.Browser.mobile reads.
+  const context = await browser.newContext({ ...devices["Pixel 5"], baseURL });
+  const page = await context.newPage();
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/site_footer");
+  await expectMounted(page);
+
+  // NOT VACUOUS: Leaflet itself sees a mobile browser here.
+  expect(await page.evaluate(() => window.L.Browser.mobile)).toBe(true);
+
+  const state = await map(page).evaluate((el) => ({
+    dragging: el.__footerMap.dragging.enabled(),
+    pinch: el.__footerMap.touchZoom.enabled(),
+    touchAction: getComputedStyle(el).touchAction,
+  }));
+  expect(state.dragging).toBe(false);
+  expect(state.pinch).toBe(true);
+  // The browser keeps the pan gesture for the page; `none` would hand it to the map.
+  expect(state.touchAction).toBe("pan-x pan-y");
+
+  // And the gesture itself: put the map mid-screen, swipe up on it with one
+  // finger, and the PAGE moves while the map's centre does not.
+  await map(page).evaluate((el) => el.scrollIntoView({ block: "center" }));
+  const before = await map(page).evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    const centre = el.__footerMap.getCenter();
+    return { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2),
+             scrollY: window.scrollY, centre: [centre.lat, centre.lng] };
+  });
+  expect(before.scrollY).toBeGreaterThan(150);
+
+  const client = await context.newCDPSession(page);
+  await client.send("Input.synthesizeScrollGesture", {
+    x: before.x, y: before.y, yDistance: 120, speed: 800, gestureSourceType: "touch",
+  });
+
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(before.scrollY - 60);
+  const after = await map(page).evaluate((el) => {
+    const centre = el.__footerMap.getCenter();
+    return [centre.lat, centre.lng];
+  });
+  expect(after).toEqual(before.centre);
+  await context.close();
 });
 
 test("the map's tiles follow the theme in CSS", async ({ page }) => {

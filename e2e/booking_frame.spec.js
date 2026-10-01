@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { blockOffsiteRequests } = require("./helpers");
+const { blockOffsiteRequests, watchPageErrors } = require("./helpers");
 
 // The booking primitives (studio/booking/_frame, _popup, _assets;
 // docs/SITE_FOOTER.md).
@@ -74,6 +74,11 @@ test("a frame already in view still waits for the window's load event", async ({
 
   // NOT VACUOUS: the document really is short of `load`, and the frame is in view.
   expect(await page.evaluate(() => document.readyState)).not.toBe("complete");
+
+  // Turbo 7 announces `turbo:load` at DOMContentLoaded, before the window's
+  // `load` (Turbo 8, which this lab runs, waits for it). The script listens for
+  // that event, so replay the early one: it must still wait.
+  await page.evaluate(() => document.dispatchEvent(new Event("turbo:load")));
   await page.waitForTimeout(300);
   expect(await frame(page).getAttribute("src")).toBeNull();
   expect(asked).toEqual([]);
@@ -132,6 +137,7 @@ test("below 640px nothing is cropped", async ({ page }) => {
 
 test("a booking link opens the popup in place, centred, and Escape closes it", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
+  const errors = watchPageErrors(page, { ownOriginOnly: true });
   const asked = await stubGoogle(page);
   await page.goto("/lab/site_footer");
 
@@ -156,15 +162,128 @@ test("a booking link opens the popup in place, centred, and Escape closes it", a
   expect(Math.abs(box.y + box.height / 2 - 450)).toBeLessThanOrEqual(1);
   expect(box.width).toBe(960);
 
+  // The page behind is locked while the dialog is open: a wheel does not move it.
+  const overflow = () => page.evaluate(() => getComputedStyle(document.documentElement).overflowY);
+  expect(await overflow()).toBe("hidden");
+  const scrolled = await page.evaluate(() => window.scrollY);
+  await page.mouse.move(20, 20);
+  await page.mouse.wheel(0, 400);
+  await page.waitForTimeout(150);
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled);
+
   await page.keyboard.press("Escape");
   await expect(dialog(page)).toBeHidden();
+  expect(await overflow()).not.toBe("hidden");
 
-  // Opening it again does not ask Google a second time.
+  // Opening it again does not ask Google a second time. Close is a real button,
+  // big enough to hit: it is the way out once focus is inside Google's frame.
   await page.locator("footer[data-site-footer] a[data-booking-popup]").click();
   await expect(dialog(page)).toBeVisible();
-  await page.locator("[data-booking-close]").click();
+  const close = page.locator("dialog[data-booking-dialog] button[data-booking-close]");
+  await expect(close).toHaveText("Close ✕");
+  expect((await close.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  await close.click();
   await expect(dialog(page)).toBeHidden();
+  expect(await overflow()).not.toBe("hidden");
   expect(asked).toHaveLength(1);
+  expect(errors).toEqual([]);
+});
+
+test("with focus inside the frame Escape cannot close the popup, and Close and the backdrop still do", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await stubGoogle(page);
+  await page.goto("/lab/site_footer");
+  await page.locator("footer[data-site-footer] a[data-booking-popup]").click();
+  await expect(dialog(page)).toBeVisible();
+
+  // THE LIMIT, RECORDED AS A FACT. The frame is another origin; once focus is in
+  // it, the key press is Google's. If a browser ever starts closing the dialog
+  // here, this goes red and the doc's caveat can go.
+  await page.frameLocator("iframe[data-booking-popup-frame]").locator("#stub").click();
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(200);
+  await expect(dialog(page)).toBeVisible();
+
+  await page.locator("dialog[data-booking-dialog] button[data-booking-close]").click();
+  await expect(dialog(page)).toBeHidden();
+
+  await page.locator("footer[data-site-footer] a[data-booking-popup]").click();
+  await page.frameLocator("iframe[data-booking-popup-frame]").locator("#stub").click();
+  await page.mouse.click(20, 20);
+  await expect(dialog(page)).toBeHidden();
+});
+
+test("on a page that shows the inline frame, a booking link goes to that frame instead of a popup", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
+  const asked = await stubGoogle(page);
+  await page.goto("/lab/site_footer/home");
+
+  // The frame is far below the fold and has not been asked for.
+  expect(await frame(page).getAttribute("src")).toBeNull();
+  const link = page.locator("footer[data-site-footer] a[data-booking-popup]");
+  await link.scrollIntoViewIfNeeded();
+  // Scrolling to the footer passes the frame, which is what asks Google for it.
+  await expect(frame(page)).toHaveAttribute("src", /gv=true$/);
+
+  await link.click();
+
+  // No popup, no navigation: the inline frame is brought up, opened and focused.
+  await expect(dialog(page)).toBeHidden();
+  await expect(page).toHaveURL(/\/lab\/site_footer\/home$/);
+  await expect(page.locator("[data-booking-wrap]")).toHaveClass(/is-open/);
+  await expect(page.locator("[data-booking-wrap]")).toBeInViewport({ ratio: 0.5 });
+  expect(await page.evaluate(() => document.activeElement.matches("iframe[data-booking-frame]"))).toBe(true);
+
+  // One calendar on the page, asked for once: the popup's frame was never loaded.
+  expect(await page.locator("iframe[data-booking-popup-frame]").getAttribute("src")).toBeNull();
+  expect(asked).toHaveLength(1);
+});
+
+test("with scripts off the frame is replaced by a plain link to the booking page", async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false, baseURL });
+  const page = await context.newPage();
+  await page.goto("/lab/site_footer/schedule");
+
+  const link = page.locator("[data-booking-wrap] .booking-frame-noscript a");
+  await expect(link).toBeVisible();
+  await expect(link).toHaveAttribute("href", "https://calendar.google.com/calendar/appointments/schedules/LAB-SCHEDULE");
+  // The frame that would never load is not left as an empty white box.
+  await expect(frame(page)).toBeHidden();
+  expect(await page.locator("[data-booking-wrap]").evaluate((el) => el.clientHeight)).toBeLessThan(200);
+  await context.close();
+});
+
+test("a third-party frame's console noise is scoped out by origin, and the page's own errors are not", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await blockOffsiteRequests(page);
+  // Google's real frame logs this on its own. Reproduce it from Google's origin:
+  // one console error, one uncaught exception.
+  await page.route("https://calendar.google.com/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<p id='stub'>booking stub</p><script>console.error('requestStorageAccess: Permission denied');" +
+            "setTimeout(function () { throw new Error('thrown inside the third-party frame'); }, 0);</script>",
+    })
+  );
+  const everything = watchPageErrors(page);
+  const ours = watchPageErrors(page, { ownOriginOnly: true });
+
+  await page.goto("/lab/site_footer/schedule");
+  await expect(page.frameLocator("iframe[data-booking-frame]").locator("#stub")).toHaveText("booking stub");
+
+  // NOT VACUOUS: the unscoped collector DID hear the frame, both ways.
+  await expect.poll(() => everything.join("\n")).toContain("requestStorageAccess: Permission denied");
+  await expect.poll(() => everything.join("\n")).toContain("thrown inside the third-party frame");
+  expect(ours).toEqual([]);
+
+  // The page's own errors still count, logged or thrown.
+  await page.evaluate(() => {
+    console.error("an error from the app's own origin");
+    setTimeout(() => { throw new Error("thrown by the app's own origin"); }, 0);
+  });
+  await expect.poll(() => ours.length).toBe(2);
+  expect(ours.join("\n")).toContain("an error from the app's own origin");
+  expect(ours.join("\n")).toContain("thrown by the app's own origin");
 });
 
 test("a page's own booking link opens the same popup, and the backdrop closes it", async ({ page }) => {
