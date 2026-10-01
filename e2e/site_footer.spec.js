@@ -305,7 +305,9 @@ const email = (page) =>
   page.locator("footer[data-site-footer] nav[aria-label='Contact'] a[href^='mailto:']").evaluate((link) => ({
     text: link.textContent.trim(),
     lines: link.getClientRects().length,
-    solid: getComputedStyle(link).whiteSpace,
+    // Held by its track, not only by nowrap: an unwrappable label in a track too
+    // narrow for it would run out of its column and over the next one.
+    inside: link.getBoundingClientRect().right <= link.closest("nav").getBoundingClientRect().right + 0.5,
   }));
 // Nothing runs off the page, and no column runs out of the footer's own column.
 const overflow = (page) =>
@@ -325,6 +327,7 @@ async function expectRows(page, count, expected) {
     const address = await email(page);
     expect(address.text).toBe("team@lab-studio.example");
     expect(address.lines, `the address is on one line at ${width}px`).toBe(1);
+    expect(address.inside, `the address stays inside its column at ${width}px`).toBe(true);
     expect(await overflow(page), `nothing overflows at ${width}px`).toEqual({ page: 0, footer: 0 });
   }
 }
@@ -357,25 +360,6 @@ test("two link columns: one row under the brand, and beside it from 1024px", asy
     1024: ["brand+Contact+Company"],
     1280: ["brand+Contact+Company"],
   });
-});
-
-// THE ADDRESS IS HELD BY ITS TRACK, NOT ONLY BY nowrap. With the label free to
-// wrap (as 0.83.0 had it, and as any label with no hyphen behaves), the column
-// must still be wide enough that it does not: that is the fr track's automatic
-// minimum doing its work, and equal minmax(0, 1fr) tracks fail it.
-test("the Contact column is as wide as the address it holds, at every width", async ({ page }) => {
-  await blockOffsiteRequests(page);
-  for (const count of [2, 4]) {
-    for (const width of [320, 390, 768, 1024, 1280]) {
-      await page.setViewportSize({ width, height: 900 });
-      await page.goto(`/lab/site_footer/columns/${count}`);
-      const fit = await page.locator("footer[data-site-footer] nav[aria-label='Contact']").evaluate((column) => {
-        const link = column.querySelector("a[href^='mailto:']");
-        return { column: column.getBoundingClientRect().width, address: link.getBoundingClientRect().width };
-      });
-      expect(fit.column + 0.5, `${count} columns at ${width}px`).toBeGreaterThanOrEqual(fit.address);
-    }
-  }
 });
 
 // A FIFTH COLUMN is past what one row holds: the brand stays across the top and
@@ -413,7 +397,9 @@ test("an app's 0.83.0 track override still draws the same rows, with the address
       @media (min-width: 1024px) { footer[data-site-footer] .ftr-cols { grid-template-columns: 1.7fr 1.5fr 1fr 1fr 1fr; } }` });
 
     expect(await rowsOf(page), `rows at ${width}px`).toEqual(rows);
-    expect((await email(page)).lines, `the address is on one line at ${width}px`).toBe(1);
+    const address = await email(page);
+    expect(address.lines, `the address is on one line at ${width}px`).toBe(1);
+    expect(address.inside, `the address stays inside its column at ${width}px`).toBe(true);
     expect(await overflow(page), `nothing overflows at ${width}px`).toEqual({ page: 0, footer: 0 });
   }
 });
