@@ -80,6 +80,16 @@ test("the footer map mounts from the engine's own Leaflet, centred on the addres
   });
   expect(style.background).not.toBe("rgb(221, 221, 221)");
   expect(style.font).toBe(style.body);
+
+  // Leaflet numbers its panes and controls up to z-index 1000. The map is its
+  // own stacking context, so none of that reaches the page's layers: this is
+  // the condition test/lib/layer_scale_contract_test.rb exempts leaflet.css on.
+  const stacking = await map(page).evaluate((el) => ({
+    isolation: getComputedStyle(el).isolation,
+    control: parseInt(getComputedStyle(el.querySelector(".leaflet-top")).zIndex, 10),
+  }));
+  expect(stacking.control).toBe(1000);
+  expect(stacking.isolation).toBe("isolate");
 });
 
 test("on a touch device a one-finger swipe on the map scrolls the page", async ({ browser, baseURL }) => {

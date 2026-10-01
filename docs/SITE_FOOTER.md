@@ -104,6 +104,11 @@ address: { street: "3000 Lawrence St", city_line: "Denver, CO 80205",
   still zooms, and the zoom buttons and the directions link remain. With a
   mouse the map drags, and the wheel zooms only after a click on the map.
 
+Leaflet numbers its own panes and controls up to `z-index: 1000`. The map
+element is its own stacking context (`isolation: isolate`), so none of that
+competes with the navbar or a modal. If you mount Leaflet yourself on another
+element, isolate that element too.
+
 Leaflet is served by the engine through the app's asset pipeline
 (`studio/leaflet.js`, `studio/leaflet.css`, both in the engine's precompile
 list), so it works on Heroku with no extra step in either a Sprockets or a
