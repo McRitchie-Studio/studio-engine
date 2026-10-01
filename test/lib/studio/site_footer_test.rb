@@ -208,7 +208,7 @@ class SiteFooterTest < Minitest::Test
     assert_equal "1.5fr 1fr 1fr 1fr", Studio::SiteFooter.tracks(plain)
     assert_equal "1.5fr 1fr", Studio::SiteFooter.tracks(plain.first(2))
     assert_equal "2.5fr 0.5fr 1fr", Studio::SiteFooter.tracks(hinted), "a hint sets its own column's track"
-    assert_no_match(/minmax/, Studio::SiteFooter.tracks(plain), "an fr track keeps its automatic minimum, the longest word")
+    refute_match(/minmax/, Studio::SiteFooter.tracks(plain), "an fr track keeps its automatic minimum, the longest word")
   end
 
   def test_no_columns_or_more_than_a_row_holds_have_no_tracks
