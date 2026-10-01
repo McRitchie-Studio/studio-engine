@@ -595,6 +595,23 @@ module Studio
   #   config.site_footer_controllers = %w[landing packages contact_submissions]
   mattr_accessor :site_footer_controllers, default: []
 
+  # THE WHOLE RULE for where the footer shows, as one callable receiving the
+  # view. The default is the rule above: every page for a visitor, the listed
+  # controllers for a signed-in viewer. That default shows the footer on ANY page
+  # a signed-out visitor can reach, an app page included, so an app with public
+  # working pages narrows it here. Compose with the default rather than
+  # restating it:
+  #
+  #   config.site_footer_visible = ->(view) {
+  #     Studio::SiteFooter.default_visible?(view) && !view.controller_path.start_with?("games/")
+  #   }
+  mattr_reader :site_footer_visible, default: ->(view) { Studio::SiteFooter.default_visible?(view) }
+
+  def self.site_footer_visible=(rule)
+    SiteFooter.validate_visible!(rule)
+    @@site_footer_visible = rule
+  end
+
   # The app's Google Calendar appointment schedule: the public link Google gives
   # you to share, WITHOUT `?gv=true` (the frame and the popup add it). nil (the
   # default) means no booking: `studio_booking_frame` and `studio_booking_popup`

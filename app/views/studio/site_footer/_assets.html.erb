@@ -66,7 +66,10 @@
     border-block: 1px solid var(--ftr-line, var(--color-border, rgb(127 127 127 / .25))); }
   .ftr-map-fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     padding: 1rem; text-align: center; font-size: .85rem; color: inherit; }
-  .ftr-map .leaflet-container, .ftr-map.leaflet-container { background: transparent; font: inherit; }
+  /* Leaflet puts .leaflet-container on the [data-footer-map] element ITSELF, so
+     this is a compound selector, not a descendant one. It keeps the tint behind
+     the tiles (Leaflet's own is #ddd) and the page's font in the controls. */
+  .ftr-map.leaflet-container { background: rgb(var(--ftr-primary-rgb, var(--color-primary-500-rgb, 139 92 246)) / .08); font: inherit; }
   .ftr-map .leaflet-control-attribution { font-size: 9px; background: rgb(0 0 0 / .45); color: #ddd; }
   .ftr-map .leaflet-control-attribution a { color: #fff; }
   .ftr-map .leaflet-bar a { background: var(--color-surface, #fff); color: var(--color-text, #111); border-color: rgb(127 127 127 / .3); }
@@ -123,8 +126,15 @@
       if (el.__footerMap) return;
       var at = [parseFloat(el.dataset.lat), parseFloat(el.dataset.lng)];
       if (isNaN(at[0]) || isNaN(at[1])) return;
+      // NO ONE-FINGER DRAG ON A TOUCH DEVICE. The map runs edge to edge, so on a
+      // phone a swipe that starts on it would pan the map instead of scrolling
+      // the page, and there is no gutter to scroll by. With dragging off Leaflet
+      // leaves touch-action at pan-x pan-y: one finger scrolls the page, and a
+      // pinch still zooms the map (touchZoom stays on, and moves it under the
+      // fingers). The zoom buttons and the directions link do the rest.
       var map = L.map(el, { center: at, zoom: parseInt(el.dataset.zoom, 10) || 15,
                             scrollWheelZoom: false, attributionControl: true,
+                            dragging: !L.Browser.mobile, touchZoom: true,
                             zoomControl: el.dataset.controls !== 'false' });
       map.attributionControl.setPrefix(false);
       L.tileLayer(TILES, { attribution: ATTRIBUTION, maxZoom: 19 }).addTo(map);

@@ -30,6 +30,9 @@ module Studio
     DEFAULT_BOOKING_LABEL = "Schedule a call"
     DEFAULT_ZOOM = 15
 
+    # The engine's own booking page keeps the footer for a signed-in viewer.
+    OWN_CONTROLLERS = %w[studio/bookings].freeze
+
     module_function
 
     def validate!(declared)
@@ -79,6 +82,30 @@ module Studio
 
       listed = Array(controllers).map(&:to_s)
       listed.include?(controller_name.to_s) || (!controller_path.nil? && listed.include?(controller_path.to_s))
+    end
+
+    # The default rule, asked of a view: the answer Studio.site_footer_visible
+    # gives until an app replaces it. An app narrowing the rule composes with it:
+    #
+    #   config.site_footer_visible = ->(view) {
+    #     Studio::SiteFooter.default_visible?(view) && !view.controller_path.start_with?("app/")
+    #   }
+    def default_visible?(view, controllers: nil)
+      controllers = Studio.site_footer_controllers if controllers.nil? && defined?(Studio.site_footer_controllers)
+      visible?(
+        logged_in: view.respond_to?(:logged_in?) && view.logged_in? ? true : false,
+        controller_name: view.respond_to?(:controller_name) ? view.controller_name : nil,
+        controller_path: view.respond_to?(:controller_path) ? view.controller_path : nil,
+        controllers: Array(controllers) + OWN_CONTROLLERS
+      )
+    end
+
+    def validate_visible!(rule)
+      return if rule.respond_to?(:call)
+
+      raise ArgumentError,
+            "Studio.site_footer_visible must be a callable receiving the view (got #{rule.class}). " \
+            "See docs/SITE_FOOTER.md."
     end
 
     # ---- normalization ------------------------------------------------------

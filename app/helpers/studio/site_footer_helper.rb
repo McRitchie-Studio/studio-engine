@@ -17,9 +17,6 @@ module Studio
   # Prefixed names for the reason Studio::GeoHelper gives: every helper module is
   # included into every view.
   module SiteFooterHelper
-    # The engine's own booking page keeps the footer for a signed-in viewer.
-    STUDIO_SITE_FOOTER_OWN_CONTROLLERS = %w[studio/bookings].freeze
-
     # The resolved facts (Studio::SiteFooter.resolve), or nil. Resolved once per
     # request.
     #
@@ -41,18 +38,14 @@ module Studio
         end
     end
 
-    # Where the footer shows: every page for a visitor; for a signed-in viewer,
-    # only the controllers in Studio.site_footer_controllers (and the engine's
-    # booking page).
+    # Where the footer shows: Studio.site_footer_visible, asked of this view. By
+    # default that is every page for a visitor and, for a signed-in viewer, only
+    # the controllers in Studio.site_footer_controllers (plus the engine's booking
+    # page). Always false for an app that declared no footer.
     def studio_show_site_footer?
       return false if studio_site_footer_facts.nil?
 
-      Studio::SiteFooter.visible?(
-        logged_in: respond_to?(:logged_in?) && logged_in?,
-        controller_name: controller_name,
-        controller_path: controller_path,
-        controllers: Array(Studio.site_footer_controllers) + STUDIO_SITE_FOOTER_OWN_CONTROLLERS
-      )
+      Studio.site_footer_visible.call(self) ? true : false
     end
 
     # The one layout line. Renders the footer (and, with a booking_url, the

@@ -6,7 +6,9 @@
   /* content-box, so the heights below are the WINDOW onto the frame whatever
      reset the host runs: under border-box the border would eat 2px of the crop. */
   .booking-frame { box-sizing: content-box; margin-inline: auto; overflow: hidden; background: #fff; border-radius: .75rem;
-    border: 1px solid var(--color-border, rgb(127 127 127 / .25)); }
+    border: 1px solid var(--color-border, rgb(127 127 127 / .25));
+    /* A booking link on this page scrolls here; land below the pinned navbar. */
+    scroll-margin-top: calc(var(--nav-bottom, 4rem) + 1rem); }
   .booking-frame iframe { display: block; width: 100%; border: 0; height: 1200px; }
   @media (min-width: 640px) {
     .booking-frame iframe { height: 732px; }
@@ -15,6 +17,10 @@
     .booking-frame-cropped.is-open { height: 732px; }
     .booking-frame-cropped.is-open iframe { margin-top: 0; }
   }
+  /* Scripts off: the frame never gets its src, so it is hidden and a plain link
+     stands in its place (the <noscript> in studio/booking/_frame). */
+  .booking-frame-noscript { margin: 0; padding: 3rem 1.5rem; text-align: center; color: #111; }
+  .booking-frame-noscript a { color: #4338ca; font-weight: 700; text-decoration: underline; }
   .booking-frame-note { margin: 1rem 0 0; text-align: center; font-size: .875rem; color: var(--color-text-muted, inherit); }
   .booking-frame-note a { color: var(--color-primary, #8b5cf6); }
   .booking-frame-note a:hover { text-decoration: underline; }
@@ -30,9 +36,18 @@
   .booking-popup-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0;
     padding: .6rem .75rem .6rem 1.1rem; }
   .booking-popup-title { font-weight: 700; color: var(--color-text, inherit); }
-  .booking-popup-close { padding: .45rem .9rem; border-radius: .5rem; border: 1px solid var(--color-border, rgb(127 127 127 / .3));
-    background: var(--color-surface-alt, transparent); color: inherit; font: inherit; font-size: .875rem; font-weight: 600; cursor: pointer; }
+  /* THE WAY OUT HAS TO BE UNMISSABLE. Once focus is inside Google's frame the
+     Escape key goes to Google, not to this dialog, and nothing here can change
+     that. So Close is a solid, full-size button, not a quiet glyph, and a click
+     anywhere on the backdrop closes too. */
+  .booking-popup-close { flex: none; min-height: 2.75rem; padding: .5rem 1.1rem; border-radius: .5rem; border: 0;
+    background: var(--color-primary, #8b5cf6); color: #fff; font: inherit; font-size: .95rem; font-weight: 700; cursor: pointer; }
   .booking-popup-close:hover { filter: brightness(1.12); }
+  .booking-popup-close:focus-visible { outline: 3px solid var(--color-text, currentColor); outline-offset: 2px; }
+  /* The page behind does not scroll while the dialog is open. Pure CSS, so every
+     way of closing it (the button, the backdrop, Escape) lifts the lock. On html
+     rather than body for the reason studio/modals/_host gives. */
+  html:has(dialog[data-booking-dialog][open]) { overflow: hidden; }
   .booking-popup iframe { flex: 1; width: 100%; border: 0; background: #fff; }
   @media (prefers-reduced-motion: reduce) { .booking-frame, .booking-frame iframe { transition: none; } }
 </style>
@@ -83,6 +98,10 @@
   // modified click (new tab, new window) is left alone, and so is everything
   // when the dialog is missing or <dialog> is unsupported: the link's own href
   // then takes the visitor to the booking page.
+  //
+  // ON A PAGE THAT ALREADY SHOWS THE INLINE FRAME the link goes to that frame
+  // instead: it scrolls there, opens the crop and moves focus in. A popup would
+  // be a second copy of the calendar on top of the first.
   (function () {
     if (window.__bookingPopupArmed) return;
     window.__bookingPopupArmed = true;
@@ -91,6 +110,20 @@
       var link = event.target.closest && event.target.closest('a[data-booking-popup]');
       if (!link) return;
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+      var inline = document.querySelector('iframe[data-booking-frame]');
+      if (inline) {
+        event.preventDefault();
+        var wrap = inline.closest('[data-booking-wrap]');
+        if (wrap) wrap.classList.add('is-open');
+        // Before `load` the frame keeps waiting: its own script assigns src then.
+        if (!inline.getAttribute('src') && document.readyState === 'complete') inline.src = inline.dataset.src;
+        var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        (wrap || inline).scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' });
+        inline.focus({ preventScroll: true });
+        return;
+      }
+
       var dialog = document.querySelector('dialog[data-booking-dialog]');
       if (!dialog || typeof dialog.showModal !== 'function') return;
 

@@ -7,7 +7,21 @@
     that script, its stylesheet and its icon font on every public page: the
     frame is requested only when the dialog first opens. The links keep their
     own href, so with scripts off, or on a modified click, they are ordinary
-    links to the booking page. %>
+    links to the booking page.
+
+    A NATIVE <dialog>, NOT THE MODAL HOST (studio/modals/_host), on purpose. The
+    host needs Alpine, its store, and each modal registered inside the host's
+    block in the layout, so the footer would stop being one layout line and an
+    app with no host would have no popup. Its card is padded and scrolls, where
+    this body is a full-bleed frame. And it mounts content through
+    <template x-if>, which would build a new frame, and ask Google again, on
+    every open; this dialog keeps the loaded one. showModal() gives the top
+    layer, the inert page and the focus trap without any of that.
+
+    ESCAPE HAS A LIMIT NOTHING HERE CAN LIFT. Once focus is inside Google's
+    frame, key presses go to Google (it is another origin), so Escape no longer
+    reaches the dialog. The Close button and a click on the backdrop always
+    work, which is why the button is a solid one. %>
 <%= studio_booking_assets %>
 <dialog class="booking-popup" data-booking-dialog aria-label="<%= label %>">
   <form method="dialog" class="booking-popup-bar">
