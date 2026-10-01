@@ -7,7 +7,7 @@
 # The configured value is the schedule's PUBLIC page, the URL Google gives you
 # to share, without `?gv=true`:
 #
-#   config.booking_url = "https://calendar.google.com/calendar/appointments/schedules/AcZss..."
+#   config.booking_url = "https://calendar.google.com/calendar/appointments/schedules/EXAMPLE-SCHEDULE-ID"
 #
 # `gv=true` is what makes Google serve the embeddable page, so the frame and the
 # popup add it; the "open the booking page" link does not.

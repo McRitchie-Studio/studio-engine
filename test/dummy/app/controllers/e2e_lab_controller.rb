@@ -559,9 +559,9 @@ class E2eLabController < ActionController::Base
   # mark of its own.
   LAB_SITE_FOOTER = {
     name: "Lab Studio",
-    tagline: "Software & Marketing Solutions",
+    tagline: "Everything, by example",
     email: "team@lab.example",
-    address: { street: "3000 Lawrence St", city_line: "Denver, CO 80205", lat: 39.7614786, lng: -104.978957 },
+    address: { street: "123 Example St", city_line: "Washington, DC 20024", lat: 38.8894, lng: -77.0352 },
     social: [
       ["LinkedIn", :linkedin, "https://www.linkedin.com/in/lab/"],
       ["Instagram", :instagram, nil],

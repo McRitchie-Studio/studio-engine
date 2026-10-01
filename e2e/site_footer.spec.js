@@ -65,7 +65,7 @@ test("the footer map mounts from the engine's own Leaflet, centred on the addres
     const c = el.__footerMap.getCenter();
     return [c.lat.toFixed(3), c.lng.toFixed(3)];
   });
-  expect(centre).toEqual(["39.761", "-104.979"]);
+  expect(centre).toEqual(["38.889", "-77.035"]);
 
   // Page scroll stays page scroll until the visitor clicks into the map.
   expect(await map(page).evaluate((el) => el.__footerMap.scrollWheelZoom.enabled())).toBe(false);
@@ -291,6 +291,6 @@ test("with scripts off the map is a link to directions", async ({ browser, baseU
   const fallback = page.locator("[data-footer-map] a.ftr-map-fallback");
   await expect(fallback).toBeVisible();
   await expect(fallback).toHaveAttribute("href", /google\.com\/maps\/dir/);
-  await expect(fallback).toContainText("3000 Lawrence St, Denver, CO 80205");
+  await expect(fallback).toContainText("123 Example St, Washington, DC 20024");
   await context.close();
 });
