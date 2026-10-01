@@ -391,8 +391,17 @@ Also not covered:
   `playwright.config.js` is a three-line change if a real defect ever needs it.
   Note it doubles `executed:` in the contract — Playwright counts one test per spec
   per project.
-- **Turbo navigation.** The lab serves Alpine but no Turbo, so `turbo:load` /
-  `turbo:render` listeners never fire. Specs assert the synchronous first pass.
+- **Turbo navigation, except on the site footer pages.** The lab serves Alpine
+  but no Turbo, so `turbo:load` / `turbo:render` listeners never fire and specs
+  assert the synchronous first pass. The one exception is `/lab/site_footer/*`:
+  their layout (`layouts/site_footer_lab`) loads the real Turbo build out of the
+  turbo-rails gem, because the footer map's remount after a Turbo visit, and on a
+  restored snapshot, is what `site_footer.spec.js` exists to see.
+- **A third party's console.** `watchPageErrors` hears every frame on the page,
+  so a page that embeds another origin's frame counts that origin's errors too.
+  `watchPageErrors(page, { ownOriginOnly: true })` scopes them out by origin
+  (never by message text) and still counts the lab's own.
+  `booking_frame.spec.js` proves both halves.
 - **The engine's asset-pipeline integration.** The lab delivers assets by its own
   route (`E2eLabController::AssetDelivery`) rather than through sprockets/propshaft.
   The CSS and JS bytes are the engine's real ones; the delivery mechanism is not a

@@ -42,6 +42,8 @@ resolved.
 - **Public user page**: `/u/:username` shows a user's avatar and username (nothing else), and unfurls with their avatar, falling back to the site image. Link any username to it with `link_to_user_profile(user)` or `studio_user_profile_path(user)`. Opt in with `config.draw_public_user_routes = true`. See [`docs/PUBLIC_USER_PAGE.md`](docs/PUBLIC_USER_PAGE.md).
 - **Transactional emails**: `Studio::EmailCatalog` — every email an app sends, its type, a live preview, and its banner — plus the shared `/admin/emails` page. Every app inherits the standard emails and their artwork on day one, and can register its own workflows and upload its own banners. See [Transactional emails](#transactional-emails).
 
+- **Site footer and booking**: `<%= studio_site_footer %>` in the layout renders the public site's footer from `config.site_footer` (brand, social profiles, link columns, an address with a live map, legal links), every part optional. With `config.booking_url`, `studio_booking_frame` embeds Google Calendar's appointment page, `studio_booking_link` opens it in a popup, and `config.draw_booking_routes = true` draws `/schedule`. Leaflet is vendored and served by the engine. See [`docs/SITE_FOOTER.md`](docs/SITE_FOOTER.md).
+
 ## Configuration
 
 Each consuming app configures the engine in `config/initializers/studio.rb`:
@@ -124,6 +126,8 @@ end
 This draws the enabled auth routes (`/login`, `/signup`, `/logout`, `POST /magic_link` to request a link, `GET`/`POST /l/:token` for the link itself, Solana routes), OAuth callbacks, optional SSO routes, `/error_logs`, and `/admin/theme`. Set `Studio.draw_geo_routes = true` to add the geo manager (`/admin/geo`) and its public probe (`/geo/check`) — off by default because turf-monster owns those helper names until its adoption lands. Magic-link emails point at the inert `GET /l/:token` confirmation page; the single-use token is burned only by the CSRF-protected `POST` to `link_consume_path`.
 
 Set `Studio.draw_session_routes = true` to add the session-drift rehydrate endpoint (`GET /session/state`) — off by default because it inherits the host's filters, which an app should check first ([`docs/SESSION_DRIFT.md`](docs/SESSION_DRIFT.md)).
+
+Set `Studio.draw_booking_routes = true` to add the booking page (`GET /schedule`, helper `studio_booking_path`) — off by default because mcritchie-studio draws its own `/schedule` until it adopts this one ([`docs/SITE_FOOTER.md`](docs/SITE_FOOTER.md)).
 
 **Magic links need the `studio_links` table.** Install it with `bin/rails studio_engine:install:migrations && bin/rails db:migrate` (install all of them) before enabling `:magic_link` — never by hand-copying the migration, which collides with the task's own copy on `class CreateStudioLinks`. Without the table, the first sign-in raises `Studio::Link::MissingTable`.
 
