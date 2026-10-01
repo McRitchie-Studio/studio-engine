@@ -181,6 +181,26 @@ class SiteFooterTest < Minitest::Test
     assert_equal "/", columns[0][:links][0][:href]
   end
 
+  # ---- column widths ---------------------------------------------------------
+
+  def test_a_column_may_carry_a_width_hint_as_a_tuple_or_a_hash
+    columns = resolve({ columns: [["Contact", [["Home", "/"]], { width: 1.5 }],
+                                  { heading: "Company", links: [["Home", "/"]], width: 2 },
+                                  ["Legal", [["Home", "/"]]]] })[:columns]
+
+    assert_equal [1.5, 2.0, nil], columns.map { |column| column[:width] }
+  end
+
+  def test_a_width_that_is_not_a_sensible_number_is_no_hint
+    ["1.5", 0, -1, 0.4, 4.1, Float::NAN, Float::INFINITY, true].each do |bad|
+      column = resolve({ columns: [["Contact", [["Home", "/"]], { width: bad }]] })[:columns][0]
+
+      assert_nil column[:width], "#{bad.inspect} must not become a track width"
+    end
+    assert_equal 0.5, resolve({ columns: [["C", [["Home", "/"]], { width: 0.5 }]] })[:columns][0][:width]
+    assert_equal 4.0, resolve({ columns: [["C", [["Home", "/"]], { width: 4 }]] })[:columns][0][:width]
+  end
+
   def test_booking_copy_is_declared_under_booking
     facts = resolve({ booking: { label: "Book a call", title: "Book a call with Sam" } })
 

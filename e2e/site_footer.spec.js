@@ -283,6 +283,87 @@ test("the footer lays out as a grid without the host's utilities", async ({ page
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
+// An email address or a URL in a link column. Equal grid tracks broke them
+// mid-word at every width ("team@lab-studio.exa / mple"), which no markup test
+// can see: the text is all there, on two lines.
+const unbroken = (page) =>
+  page.locator("footer[data-site-footer] nav[aria-label='Contact'] a.ftr-link").evaluateAll((links) =>
+    links.map((link) => ({ text: link.textContent.trim(), lines: link.getClientRects().length }))
+  );
+const fitsThePage = (page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+
+for (const count of [2, 3, 4]) {
+  test(`with ${count} link columns an email address and a URL are never broken mid-word`, async ({ page }) => {
+    await blockOffsiteRequests(page);
+    for (const width of [1280, 1024, 900, 768, 390, 360]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`/lab/site_footer/columns/${count}`);
+
+      const links = await unbroken(page);
+      expect(links.map((link) => link.text)).toEqual(["team@lab-studio.example", "https://booking.lab-studio.example"]);
+      expect(links.map((link) => link.lines), `at ${width}px`).toEqual([1, 1]);
+      expect(await fitsThePage(page), `no sideways scroll at ${width}px`).toBe(true);
+      await expect(page.locator("footer[data-site-footer] nav.ftr-col")).toHaveCount(count);
+    }
+
+    // At desktop width the brand and every column still share one row.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`/lab/site_footer/columns/${count}`);
+    const tops = await page.locator("footer[data-site-footer] .ftr-cols > *").evaluateAll((els) =>
+      els.map((el) => Math.round(el.getBoundingClientRect().top))
+    );
+    expect(tops).toHaveLength(count + 1);
+    expect(new Set(tops).size).toBe(1);
+  });
+}
+
+test("a word wider than the whole footer breaks rather than running off the page", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  // 240px: narrower than the URL itself, so there is no layout that fits it whole.
+  await page.setViewportSize({ width: 240, height: 800 });
+  await page.goto("/lab/site_footer/columns/2");
+
+  const links = await unbroken(page);
+  expect(links[1].lines).toBeGreaterThan(1);
+  const overhang = await page.locator("footer[data-site-footer] nav[aria-label='Contact'] a.ftr-link").evaluateAll((els) =>
+    Math.max(...els.map((el) => el.getBoundingClientRect().right)) - window.innerWidth
+  );
+  expect(overhang).toBeLessThanOrEqual(0);
+});
+
+test("a column's width hint is its share of the row", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const widths = () =>
+    page.locator("footer[data-site-footer] nav.ftr-col").evaluateAll((els) => els.map((el) => el.getBoundingClientRect().width));
+
+  await page.goto("/lab/site_footer/columns/3");
+  const plain = await widths();
+  // With no hint the columns hold equal shares, unless a long word needs more.
+  expect(Math.abs(plain[1] - plain[2])).toBeLessThanOrEqual(1);
+
+  await page.goto("/lab/site_footer/columns/3?hint=2.5");
+  const hinted = await widths();
+  expect(Math.abs(hinted[1] - hinted[2])).toBeLessThanOrEqual(1);
+  expect(hinted[0] / hinted[1]).toBeGreaterThan(2.4);
+  expect(hinted[0] / hinted[1]).toBeLessThan(2.6);
+  expect(hinted[0]).toBeGreaterThan(plain[0]);
+});
+
+test("the footer's headings and small print set their own line heights", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/lab/site_footer/schedule");
+
+  const lineHeight = (selector) => page.locator(selector).first().evaluate((el) => getComputedStyle(el).lineHeight);
+  // NOT VACUOUS: the page's own line height is 1.5, which would give 45px and 21px.
+  expect(await page.evaluate(() => getComputedStyle(document.body).lineHeight)).toBe("24px");
+  expect(await lineHeight("footer[data-site-footer] .ftr-location-title")).toBe("36px");
+  expect(await lineHeight("footer[data-site-footer] .ftr-legal p")).toBe("20px");
+  expect(await lineHeight("footer[data-site-footer] .ftr-copyright")).toBe("20px");
+  expect(await lineHeight(".booking-frame-note")).toBe("20px");
+});
+
 test("with scripts off the map is a link to directions", async ({ browser, baseURL }) => {
   const context = await browser.newContext({ javaScriptEnabled: false, baseURL });
   const page = await context.newPage();

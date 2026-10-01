@@ -25,7 +25,7 @@
      stands in its place (the <noscript> in studio/booking/_frame). */
   .booking-frame-noscript { margin: 0; padding: 3rem 1.5rem; text-align: center; color: #111; }
   .booking-frame-noscript a { color: #4338ca; font-weight: 700; text-decoration: underline; }
-  .booking-frame-note { margin: 1rem 0 0; text-align: center; font-size: .875rem; color: var(--color-text-muted, inherit); }
+  .booking-frame-note { margin: 1rem 0 0; text-align: center; font-size: .875rem; line-height: 1.25rem; color: var(--color-text-muted, inherit); }
   .booking-frame-note a { color: var(--color-primary, #8b5cf6); }
   .booking-frame-note a:hover { text-decoration: underline; }
 
@@ -73,15 +73,23 @@
     if (window.__studioBookingFramesArmed) return;
     window.__studioBookingFramesArmed = true;
 
+    // ASK GOOGLE ONCE. Two things can ask for a frame: scrolling near it, and a
+    // booking link that jumps to it. Assigning src a second time, even to the
+    // same URL, is a second request, so whoever comes second finds it set.
+    function load(frame) {
+      if (!frame.getAttribute('src')) frame.src = frame.dataset.src;
+    }
+    window.__studioBookingLoad = load;
+
     function arm() {
       document.querySelectorAll('iframe[data-booking-frame][data-studio-booking][data-src]').forEach(function (frame) {
         if (frame.__bookingArmed) return;
         frame.__bookingArmed = true;
-        if (typeof IntersectionObserver !== 'function') { frame.src = frame.dataset.src; return; }
+        if (typeof IntersectionObserver !== 'function') { load(frame); return; }
         var watcher = new IntersectionObserver(function (entries) {
           if (!entries.some(function (entry) { return entry.isIntersecting; })) return;
           watcher.disconnect();
-          frame.src = frame.dataset.src;
+          load(frame);
         }, { rootMargin: '200px' });
         watcher.observe(frame);
       });
@@ -153,7 +161,7 @@
         var wrap = inline.closest('[data-booking-wrap][data-studio-booking]');
         if (wrap) wrap.classList.add('is-open');
         // Before `load` the frame keeps waiting: its own script assigns src then.
-        if (!inline.getAttribute('src') && document.readyState === 'complete') inline.src = inline.dataset.src;
+        if (document.readyState === 'complete' && window.__studioBookingLoad) window.__studioBookingLoad(inline);
         var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         (wrap || inline).scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' });
         inline.focus({ preventScroll: true });

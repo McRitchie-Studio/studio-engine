@@ -323,6 +323,38 @@ test("on a page that shows the inline frame, a booking link goes to that frame i
   expect(asked).toHaveLength(1);
 });
 
+test("a booking link that jumps to a frame never scrolled to asks Google once", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
+  const asked = await stubGoogle(page);
+  await page.goto("/lab/site_footer/home");
+
+  // THE JUMP. Hide the frame's block while the page goes to its foot, so the
+  // frame never comes near the viewport and its observer never fires: the way a
+  // visitor arrives who jumped to the footer (End, an anchor) on a page whose
+  // calendar is far above it. NOT VACUOUS: nothing has asked Google yet.
+  const link = page.locator("footer[data-site-footer] a[data-booking-popup]");
+  await page.evaluate(() => {
+    const block = document.querySelector("[data-booking-wrap]").parentElement;
+    block.style.display = "none";
+    window.scrollTo(0, document.documentElement.scrollHeight);
+    return new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => { block.style.display = ""; done(); })));
+  });
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.waitForTimeout(300);
+  expect(await frame(page).getAttribute("src")).toBeNull();
+  expect(asked).toEqual([]);
+  await expect(frame(page)).not.toBeInViewport();
+
+  // The click assigns src and scrolls to the frame, which then enters the
+  // viewport under a still-armed observer. That second arrival must not ask again.
+  await link.click();
+  await expect(frame(page)).toHaveAttribute("src", /gv=true$/);
+  await expect(page.locator("[data-booking-wrap]")).toBeInViewport({ ratio: 0.5 });
+  await expect(page.frameLocator("iframe[data-booking-frame]").locator("#stub")).toHaveText("booking stub");
+  await page.waitForTimeout(600);
+  expect(asked).toHaveLength(1);
+});
+
 test("with scripts off the frame is replaced by a plain link to the booking page", async ({ browser, baseURL }) => {
   const context = await browser.newContext({ javaScriptEnabled: false, baseURL });
   const page = await context.newPage();

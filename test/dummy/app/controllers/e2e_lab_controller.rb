@@ -575,17 +575,34 @@ class E2eLabController < ActionController::Base
     legal: [["Privacy Policy", "/lab/site_footer"], ["Terms of Service", "/lab/site_footer/terms"]]
   }.freeze
 
-  SITE_FOOTER_VARIANTS = %w[index terms home schedule plain crops].freeze
+  SITE_FOOTER_VARIANTS = %w[index terms home schedule plain crops columns].freeze
+
+  # Link columns for /lab/site_footer/columns/:n, n of them. The first holds an
+  # email address and a URL, the two things a column must never break mid-word.
+  LAB_COLUMN_POOL = [
+    ["Contact", [["team@lab-studio.example", "mailto:team@lab-studio.example"],
+                 ["https://booking.lab-studio.example", "https://booking.lab-studio.example"]]],
+    ["Company", [["Home", "/lab/site_footer"], ["Career", nil]]],
+    ["Products", [["Packages", "/lab/site_footer"], ["Pricing", "/lab/site_footer"]]],
+    ["Legal", [["Privacy Policy", "/lab/site_footer"], ["Terms of Service", "/lab/site_footer/terms"]]]
+  ].freeze
 
   attr_reader :lab_site_footer
 
-  # One action, six pages. `plain` is the footer with no address: no Location
+  # One action, seven pages. `plain` is the footer with no address: no Location
   # band, no map and no Leaflet request. `crops` is three booking frames, two
-  # cropped to different windows and one whole. The layout is the lab's plus Turbo,
+  # cropped to different windows and one whole. `columns` is the footer with two,
+  # three or four link columns. The layout is the lab's plus Turbo,
   # because the map's remount on a Turbo visit is one of the things under test.
   def site_footer
     variant = SITE_FOOTER_VARIANTS.include?(params[:variant]) ? params[:variant] : "index"
     @lab_site_footer = variant == "plain" ? LAB_SITE_FOOTER.except(:address) : LAB_SITE_FOOTER
+    if variant == "columns"
+      columns = LAB_COLUMN_POOL.first(params[:n].to_i.clamp(2, 4))
+      # ?hint=1.5 gives the first column a width hint, the way a host writes one.
+      columns = [columns.first + [{ width: params[:hint].to_f }]] + columns.drop(1) if params[:hint].present?
+      @lab_site_footer = LAB_SITE_FOOTER.merge(columns: columns)
+    end
     render("site_footer_#{variant}", layout: "site_footer_lab")
   end
 

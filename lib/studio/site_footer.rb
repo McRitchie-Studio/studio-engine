@@ -253,12 +253,14 @@ module Studio
         unlinked: !text(url).nil? && safe_href(url, "social url").nil? }
     end
 
-    # [ heading, links ] or { heading:, links: }.
+    # [ heading, links ], [ heading, links, { width: 1.5 } ] or { heading:,
+    # links:, width: }. `width` is an optional hint: this column's share of the
+    # row against the others' 1 (studio/site_footer/_assets lays them out).
     def column(row, booking_path)
-      heading, links =
+      heading, links, options =
         if row.respond_to?(:to_h) && !row.is_a?(Array)
           hash = symbolize(row)
-          [hash[:heading] || hash[:title], hash[:links]]
+          [hash[:heading] || hash[:title], hash[:links], hash]
         else
           Array(row)
         end
@@ -266,7 +268,20 @@ module Studio
       links = Array(links).filter_map { |link_row| link(link_row, booking_path) }
       return nil if heading.nil? && links.empty?
 
-      { heading: heading, links: links }
+      options = options.respond_to?(:to_h) && !options.is_a?(Array) ? symbolize(options) : {}
+      { heading: heading, links: links, width: column_width(options[:width]) }
+    end
+
+    # A column's width hint, or nil for the default share. Anything that is not a
+    # number between MIN_COLUMN_WIDTH and MAX_COLUMN_WIDTH is no hint.
+    MIN_COLUMN_WIDTH = 0.5
+    MAX_COLUMN_WIDTH = 4
+
+    def column_width(value)
+      return nil unless value.is_a?(Numeric) && value.respond_to?(:finite?) && value.finite?
+      return nil unless value >= MIN_COLUMN_WIDTH && value <= MAX_COLUMN_WIDTH
+
+      value.to_f
     end
 
     # [ label, href ], [ label, href, { booking: true } ] or { label:, href:,

@@ -8,7 +8,9 @@
 <% elsif link[:disabled] %>
   <span class="ftr-link-disabled" aria-disabled="true" title="Coming soon"><%= link[:label] %></span>
 <% else %>
-  <%= link_to link[:label], link[:href], { class: "ftr-link" }
+  <%# A label with no space in it (an email address, a URL) is one word however
+      many hyphens and slashes it holds: .ftr-link-solid keeps it on one line. %>
+  <%= link_to link[:label], link[:href], { class: link[:label].match?(/\s/) ? "ftr-link" : "ftr-link ftr-link-solid" }
         .merge(link[:external] ? { target: "_blank", rel: "noopener" } : {})
         .merge(link[:booking] && booking ? { data: { booking_popup: true, studio_booking: true } } : {}) %>
 <% end %>

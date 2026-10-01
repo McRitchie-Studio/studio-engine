@@ -248,6 +248,38 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "the link columns are flex items sized to their content, with an optional width hint" do
+    get "/footer_host/landing"
+
+    assert_select "#{footer} .ftr-cols > nav.ftr-col", 2
+    assert_select "#{footer} .ftr-cols > nav.ftr-col[style]", 0, "no hint, no inline share"
+    assert_select "#{footer} .ftr-cols[style]", 0
+    # Never narrower than the longest word (a flex item's automatic minimum), and
+    # a word breaks only when it is wider than the footer itself.
+    assert_includes response.body, ".ftr-cols { display: flex; flex-wrap: wrap;"
+    assert_includes response.body, ".ftr-col { flex: var(--ftr-w, 1) 1 calc(50% - 1rem); max-width: 100%; }"
+    assert_includes response.body, ".ftr-link-solid { white-space: nowrap; }"
+    assert_equal 1, response.body.scan("overflow-wrap: anywhere").size, "only inside the narrow-screen last resort"
+    assert_no_match(/grid-template-columns/, response.body)
+    # A one-word label is solid; a label with a space in it wraps as prose does.
+    assert_select "#{footer} a.ftr-link.ftr-link-solid[href='mailto:team@example.test']", 2
+    assert_select "#{footer} a.ftr-link:not(.ftr-link-solid)", text: "Privacy Policy"
+
+    Studio.site_footer = { columns: [["Contact", [["team@example.test", "mailto:team@example.test"]], { width: 1.5 }],
+                                     ["Company", [["Home", "/"]]]] }
+    get "/footer_host/landing"
+    assert_select "#{footer} nav.ftr-col[aria-label='Contact'][style='--ftr-w: 1.5']", 1
+    assert_select "#{footer} nav.ftr-col[aria-label='Company']:not([style])", 1
+  end
+
+  test "the footer and the booking note set their own line heights" do
+    get "/footer_host/helpers"
+
+    assert_match(/\.ftr-location-title \{[^}]*font-size: 1\.875rem; line-height: 2\.25rem;/, response.body)
+    assert_match(/\.ftr-legal \{[^}]*font-size: \.875rem; line-height: 1\.25rem;/, response.body)
+    assert_match(/\.booking-frame-note \{[^}]*font-size: \.875rem; line-height: 1\.25rem;/, response.body)
+  end
+
   test "the footer's styles and script are on the page once" do
     get "/footer_host/helpers"
 

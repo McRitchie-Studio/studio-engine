@@ -69,6 +69,7 @@ Rails.application.routes.draw do
   get "lab/site_footer/schedule", to: "e2e_lab#site_footer", defaults: { variant: "schedule" }
   get "lab/site_footer/plain", to: "e2e_lab#site_footer", defaults: { variant: "plain" }
   get "lab/site_footer/crops", to: "e2e_lab#site_footer", defaults: { variant: "crops" }
+  get "lab/site_footer/columns/:n", to: "e2e_lab#site_footer", defaults: { variant: "columns" }
 
   # A host app's own pages, one open and one geo-LOCKED, for the geo suite.
   get "lab/geo", to: "geo_lab#open"
