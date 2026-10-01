@@ -94,12 +94,34 @@
 
     // Focus moving into the frame is the one signal a cross-origin frame gives
     // its parent. It means the visitor has started using the calendar.
-    window.addEventListener('blur', function () {
+    function openActive() {
       var active = document.activeElement;
       if (!active || !active.matches || !active.matches('iframe[data-booking-frame][data-studio-booking]')) return;
       var wrap = active.closest('[data-booking-wrap][data-studio-booking]');
       if (wrap) wrap.classList.add('is-open');
+    }
+
+    // THE WINDOW BLURS ONCE. Focus that moves from one frame straight into
+    // another never comes back through this window, so no second blur announces
+    // the second frame, and on a page with two cropped frames it would stay
+    // cropped under the visitor's cursor. So while focus is away in a frame and a
+    // cropped wrapper is still shut, look again a few times a second. It stops
+    // when focus returns here or nothing is left to open, and a page with one
+    // frame never starts it: that frame is open by then.
+    var watching = null;
+    function shut() { return document.querySelector('[data-booking-wrap][data-studio-booking][data-booking-crop]:not(.is-open)'); }
+    function stopWatching() { if (watching) { clearInterval(watching); watching = null; } }
+
+    window.addEventListener('blur', function () {
+      openActive();
+      var active = document.activeElement;
+      if (watching || !active || active.tagName !== 'IFRAME' || !shut()) return;
+      watching = setInterval(function () {
+        openActive();
+        if (!shut()) stopWatching();
+      }, 250);
     });
+    window.addEventListener('focus', stopWatching);
 
     document.addEventListener('turbo:load', armAfterLoad);
     armAfterLoad();

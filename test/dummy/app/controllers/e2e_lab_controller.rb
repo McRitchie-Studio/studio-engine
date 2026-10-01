@@ -575,12 +575,13 @@ class E2eLabController < ActionController::Base
     legal: [["Privacy Policy", "/lab/site_footer"], ["Terms of Service", "/lab/site_footer/terms"]]
   }.freeze
 
-  SITE_FOOTER_VARIANTS = %w[index terms home schedule plain].freeze
+  SITE_FOOTER_VARIANTS = %w[index terms home schedule plain crops].freeze
 
   attr_reader :lab_site_footer
 
-  # One action, five pages. `plain` is the footer with no address: no Location
-  # band, no map and no Leaflet request. The layout is the lab's plus Turbo,
+  # One action, six pages. `plain` is the footer with no address: no Location
+  # band, no map and no Leaflet request. `crops` is three booking frames, two
+  # cropped to different windows and one whole. The layout is the lab's plus Turbo,
   # because the map's remount on a Turbo visit is one of the things under test.
   def site_footer
     variant = SITE_FOOTER_VARIANTS.include?(params[:variant]) ? params[:variant] : "index"

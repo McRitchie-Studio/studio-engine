@@ -55,9 +55,9 @@ function snapshot() {
 }
 
 // The page redraws after a click; wait until two looks in a row agree.
-async function settled(page) {
+async function settled(page, limit = 40) {
   let last = null;
-  for (let tries = 0; tries < 40; tries += 1) {
+  for (let tries = 0; tries < limit; tries += 1) {
     await page.waitForTimeout(120);
     const now = await page.evaluate(snapshot);
     if (now && last && JSON.stringify(now) === JSON.stringify(last)) return now;
@@ -83,12 +83,13 @@ function bookableDays() {
 }
 
 // Walk the bookable days of `months` months at one frame width.
-async function measureAt(page, url, width, { months = DEFAULT_MONTHS } = {}) {
+// `patience` is how long to wait for Google's page to draw, in milliseconds.
+async function measureAt(page, url, width, { months = DEFAULT_MONTHS, patience = 30000 } = {}) {
   await page.setViewportSize({ width, height: VIEWPORT_HEIGHT });
   await page.goto(embedUrl(url), { waitUntil: "load" });
-  await page.locator("main table[role=grid]").first().waitFor({ state: "visible", timeout: 30000 }).catch(() => {});
+  await page.locator("main table[role=grid]").first().waitFor({ state: "visible", timeout: patience }).catch(() => {});
 
-  const views = [await settled(page)];
+  const views = [await settled(page, Math.max(3, Math.ceil(patience / 750)))];
   let days = 0;
   let monthsWalked = 0;
   for (let month = 0; month < months; month += 1) {
@@ -125,9 +126,9 @@ async function measureAt(page, url, width, { months = DEFAULT_MONTHS } = {}) {
   };
 }
 
-async function measure(page, url, { widths = WIDTHS, months = DEFAULT_MONTHS } = {}) {
+async function measure(page, url, { widths = WIDTHS, ...options } = {}) {
   const measured = [];
-  for (const width of widths) measured.push(await measureAt(page, url, width, { months }));
+  for (const width of widths) measured.push(await measureAt(page, url, width, options));
   return measured;
 }
 
@@ -145,14 +146,19 @@ function configLine(crop) {
   return `config.booking_crop = { top: ${crop.top}, bottom: ${crop.bottom}, frame_height: ${crop.frame_height} }`;
 }
 
+// A pixel either way is rounding (Google positions the box on half pixels), not
+// a different layout, and is not worth a note.
+const ROUNDING = 2;
+
 function warnings(measured) {
   const notes = [];
+  const spread = (values) => Math.max(...values) - Math.min(...values);
   measured.forEach((at) => {
-    if (at.tops.length > 1) notes.push(`at ${at.width}px the box's top moved between ${at.tops.join(" and ")}px while walking; the lowest is used, so the window may show a strip above the box.`);
+    if (spread(at.tops) > ROUNDING) notes.push(`at ${at.width}px the box's top moved between ${at.tops[0]} and ${at.tops[at.tops.length - 1]}px while walking; the highest is used, so the window may show a strip above the box.`);
     if (at.daysWalked === 0) notes.push(`at ${at.width}px no bookable day was found, so only the page as it opened was measured. Measure again when the schedule has open days.`);
   });
-  if (new Set(measured.map((at) => `${at.top}/${at.bottom}`)).size > 1) {
-    notes.push("the box sits differently at the widths measured; the Hash covers all of them, so the narrower one shows a little more than the box.");
+  if (spread(measured.map((at) => at.top)) > ROUNDING || spread(measured.map((at) => at.bottom)) > ROUNDING) {
+    notes.push("the box sits differently at the widths measured; the Hash covers all of them, so one of them shows a little more than the box.");
   }
   return notes;
 }
