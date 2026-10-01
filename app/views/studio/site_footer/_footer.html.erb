@@ -38,7 +38,7 @@
                 <%# A nil url renders the icon unlinked: the handle is not on record yet. %>
                 <%= content_tag(profile[:url] ? :a : :span,
                       render("studio/site_footer/social_icon", icon: profile[:icon], label: profile[:label]),
-                      { class: "ftr-social", title: profile[:url] ? profile[:label] : "#{profile[:label]} (handle needed)",
+                      { class: "ftr-social", title: profile[:url] || profile[:unlinked] ? profile[:label] : "#{profile[:label]} (handle needed)",
                         "aria-label": profile[:label] }
                         .merge(profile[:url] ? { href: profile[:url], target: "_blank", rel: "noopener" } : { "data-pending": true })) %>
               </li>

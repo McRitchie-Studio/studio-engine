@@ -133,7 +133,7 @@ module Studio
       href ||= studio_booking_fallback_path
       return if href.blank?
 
-      html_options[:data] = { booking_popup: true }.merge(html_options[:data] || {}) if studio_booking?
+      html_options[:data] = { booking_popup: true, studio_booking: true }.merge(html_options[:data] || {}) if studio_booking?
       content = block ? capture(&block) : (name || studio_booking_label)
       link_to(content, href, html_options)
     end
