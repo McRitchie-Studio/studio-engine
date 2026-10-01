@@ -142,3 +142,15 @@ Studio.sidebar_sections = lambda do |view|
 
   Array(controller.lab_sidebar_sections)
 end
+
+# The site footer's facts, the way a host declares them: a callable receiving the
+# view. Only the lab's footer pages carry any (E2eLabController#site_footer), so
+# every other page in the dummy resolves nil and renders no footer.
+Studio.site_footer = lambda do |view|
+  controller = view.controller if view.respond_to?(:controller)
+  controller.lab_site_footer if controller.respond_to?(:lab_site_footer)
+end
+
+# A schedule on Google's real host, so the browser lane can stub it by URL. No
+# such schedule exists; nothing in the suite is allowed to reach Google.
+Studio.booking_url = "https://calendar.google.com/calendar/appointments/schedules/LAB-SCHEDULE"

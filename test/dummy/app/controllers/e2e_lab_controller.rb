@@ -67,8 +67,16 @@ class E2eLabController < ActionController::Base
       studio/montserrat-latin-ext.woff2
     ].freeze
 
+    # Leaflet is addressed by LOGICAL path too (studio/site_footer/_map puts both
+    # URLs on the map element), and e2e/boot.rb copies the engine's real files here.
+    ENGINE_ASSET_PATHS = {
+      "studio/leaflet.js" => "/e2e/js/studio/leaflet.js",
+      "studio/leaflet.css" => "/e2e/css/studio/leaflet.css"
+    }.freeze
+
     def asset_path(source, **options)
       return "/e2e/fonts/#{source}" if ENGINE_FONTS.include?(source.to_s)
+      return ENGINE_ASSET_PATHS[source.to_s] if ENGINE_ASSET_PATHS.key?(source.to_s)
 
       super
     end
@@ -539,6 +547,46 @@ class E2eLabController < ActionController::Base
   # on the shared components/_sidebar_panel. The only page where the link sidebar's
   # click bridge can be caught claiming a close button it did not render.
   def sidebar_panels = render(:sidebar_panels)
+
+  # ---- The site footer and the booking primitives (docs/SITE_FOOTER.md) ------
+  #
+  # The facts a host would declare in config.site_footer. test/dummy's
+  # application.rb points Studio.site_footer at `lab_site_footer`, so only these
+  # pages have a footer: every other lab page answers nil and renders none.
+  #
+  # It exercises each rule a row can carry: a booking link, a disabled label (nil
+  # href), an off-site link, an unlinked social profile (nil url) and one with no
+  # mark of its own.
+  LAB_SITE_FOOTER = {
+    name: "Lab Studio",
+    tagline: "Software & Marketing Solutions",
+    email: "team@lab.example",
+    address: { street: "3000 Lawrence St", city_line: "Denver, CO 80205", lat: 39.7614786, lng: -104.978957 },
+    social: [
+      ["LinkedIn", :linkedin, "https://www.linkedin.com/in/lab/"],
+      ["Instagram", :instagram, nil],
+      ["Mastodon", :mastodon, "https://social.lab.example/@lab"]
+    ],
+    columns: [
+      ["Contact", [["Schedule a call", "/lab/site_footer/schedule", { booking: true }],
+                   ["Contact", "/lab/site_footer"]]],
+      ["Company", [["Home", "/lab/site_footer"], ["Career", nil], ["Blog", "https://blog.lab.example"]]]
+    ],
+    legal: [["Privacy Policy", "/lab/site_footer"], ["Terms of Service", "/lab/site_footer/terms"]]
+  }.freeze
+
+  SITE_FOOTER_VARIANTS = %w[index terms home schedule plain].freeze
+
+  attr_reader :lab_site_footer
+
+  # One action, five pages. `plain` is the footer with no address: no Location
+  # band, no map and no Leaflet request. The layout is the lab's plus Turbo,
+  # because the map's remount on a Turbo visit is one of the things under test.
+  def site_footer
+    variant = SITE_FOOTER_VARIANTS.include?(params[:variant]) ? params[:variant] : "index"
+    @lab_site_footer = variant == "plain" ? LAB_SITE_FOOTER.except(:address) : LAB_SITE_FOOTER
+    render("site_footer_#{variant}", layout: "site_footer_lab")
+  end
 
   def up = render(plain: "ok")
 end
