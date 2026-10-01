@@ -1,0 +1,34 @@
+<%# Google's inline booking page for the app's appointment schedule
+    (Studio.booking_url). Rendered by `studio_booking_frame`. It fills its
+    container, so it lines up with the cards around it. Google lays it out by
+    width: month beside the slots from about 600px, stacked below that. It
+    cannot be themed, so it sits on a white panel in both themes.
+
+    CROPPED AT REST, WHOLE IN USE. From 640px up the wrapper shows only the
+    "Select an appointment time" box: Google's header above it and its credit
+    lines below are clipped (measured in the frame at 640-862px wide: the box
+    spans 211-613px of a 732px page). The crop cannot stay on, because the form
+    that opens when a slot is picked is a dialog centred in the frame's FULL
+    height (93-640px), so a cropped frame cuts off its title and its Book
+    button. A cross-origin frame reports no clicks, but the parent window does
+    lose focus to it; on that signal the wrapper opens to the full frame.
+    Below 640px Google stacks the month above the slots and nothing is cropped.
+    Those numbers are Google's layout, measured 2026-09-30; `crop: false` drops
+    the crop if that layout moves.
+
+    THE SRC IS DEFERRED, and not with loading="lazy". The frame is a third
+    party, and a frame that starts loading before the window's `load` event
+    holds that event open for as long as Google takes to answer. So the URL
+    waits in data-src and the script in studio/booking/_assets assigns it only
+    AFTER `load`, once the frame is near the viewport. %>
+<%= studio_booking_assets %>
+<div class="booking-frame<%= " booking-frame-cropped" if crop %>" data-booking-wrap>
+  <iframe data-booking-frame
+          data-src="<%= studio_booking_embed_url %>"
+          title="<%= title %>"
+          width="100%" frameborder="0"></iframe>
+</div>
+<p class="booking-frame-note">
+  Scheduling by Google Calendar. Trouble seeing it?
+  <a href="<%= Studio.booking_url %>" target="_blank" rel="noopener">Open the booking page</a>.
+</p>

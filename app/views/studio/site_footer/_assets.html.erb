@@ -1,0 +1,167 @@
+<%# The site footer's styles and its map mount. Rendered once per page, by
+    `studio_site_footer_assets` (the footer and the map partial both ask).
+
+    SCOPED CSS, NOT UTILITIES. Everything the footer needs to lay out is here,
+    reading the theme's custom properties with a fallback beside each, so it
+    renders the same in an app whose Tailwind build has never seen these views. %>
+<style>
+  .ftr { --ftr-primary: var(--color-primary, #8b5cf6); --ftr-primary-rgb: var(--color-primary-500-rgb, 139 92 246);
+    --ftr-line: var(--color-border, rgb(127 127 127 / .25)); --ftr-ink: var(--color-text, inherit);
+    background: var(--color-surface-alt, transparent); color: var(--color-text-body, inherit);
+    border-top: 1px solid var(--ftr-line); }
+  .ftr a { transition: color .15s ease, opacity .15s ease; }
+  .ftr p { margin: 0; }
+  .ftr-wrap { max-width: 72rem; margin-inline: auto; padding-inline: 1rem; }
+  .ftr-link { color: inherit; opacity: .78; text-decoration: none; overflow-wrap: anywhere; }
+  .ftr-link-disabled { opacity: .38; cursor: not-allowed; }
+  .ftr-link:hover, .ftr-link:focus-visible { opacity: 1; color: var(--ftr-primary); }
+
+  /* Brand, then the link columns. Two tracks on a phone with the brand across
+     both; from 768px the links sit in one row (at most four across); from
+     1024px the brand joins that row. --ftr-n is the number of link columns. */
+  .ftr-cols { display: grid; gap: 3rem 2rem; padding-block: 4rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ftr-brand { grid-column: 1 / -1; }
+  @media (min-width: 768px) { .ftr-cols { grid-template-columns: repeat(var(--ftr-n-md, 4), minmax(0, 1fr)); } }
+  @media (min-width: 1024px) {
+    .ftr-cols { grid-template-columns: minmax(0, 1.7fr) repeat(var(--ftr-n, 4), minmax(0, 1fr)); }
+    .ftr-brand { grid-column: auto; }
+  }
+  .ftr-home { display: inline-flex; align-items: center; gap: .75rem; color: inherit; text-decoration: none; }
+  .ftr-logo { width: 3rem; height: 3rem; object-fit: contain; }
+  /* A dark mark on a light page: inverted in light mode, as drawn in dark. */
+  .ftr-logo-invert { filter: invert(1); }
+  .dark .ftr-logo-invert { filter: none; }
+  .ftr-wordmark { font-size: 1.5rem; font-weight: 800; line-height: 1.25; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ftr-ink); }
+  .ftr-wordmark span { display: block; }
+  .ftr-wordmark-accent { color: var(--ftr-primary); }
+  .ftr-tagline { margin-top: 1.5rem; line-height: 1.625; color: var(--color-text-secondary, inherit); }
+  .ftr-email { margin-top: .75rem; }
+  .ftr-socials { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin: 2rem 0 0; padding: 0; list-style: none; }
+  .ftr-social { display: inline-flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem;
+    border-radius: 9999px; background: var(--ftr-primary); color: #fff; transition: transform .15s ease, filter .15s ease; }
+  a.ftr-social:hover { transform: translateY(-2px); filter: brightness(1.12); }
+  .ftr-social[data-pending] { background: transparent; color: inherit; opacity: .5; border: 1px dashed currentColor; }
+  .ftr-social-letter { font-weight: 700; font-size: .95rem; line-height: 1; }
+  .ftr-heading { margin: 0 0 1rem; font-size: 1rem; font-weight: 700; color: var(--ftr-ink); }
+  .ftr-list { display: grid; gap: 1rem; margin: 0; padding: 0; list-style: none; }
+
+  .ftr-location { border-top: 1px solid var(--ftr-line); padding-block: 3.5rem 2rem; text-align: center; }
+  .ftr-location-title { margin: 0; font-size: 1.875rem; font-weight: 800; letter-spacing: -.025em; color: var(--ftr-ink); }
+  .ftr-address { margin-top: 1rem; font-style: normal; line-height: 1.625; }
+  .ftr-legal { padding-block: 2rem; text-align: center; font-size: .875rem; }
+  .ftr-copyright { margin-top: .5rem; color: var(--color-text-muted, inherit); }
+  /* With no map between them, a rule separates the legal line from what is above. */
+  .ftr-legal-ruled { border-top: 1px solid var(--ftr-line); }
+
+  /* The map. isolation keeps Leaflet's internal z-indexes (up to 1000) under
+     the pinned navbar and every modal. It reads the same properties outside
+     the footer, where .ftr has not set them. */
+  .ftr-map { position: relative; isolation: isolate; overflow: hidden;
+    background: rgb(var(--ftr-primary-rgb, var(--color-primary-500-rgb, 139 92 246)) / .08); }
+  /* One keyless basemap for both themes: in dark mode the light tiles are
+     inverted and pulled toward the site's violet rather than swapped. */
+  .dark .ftr-map .leaflet-tile-pane { filter: invert(1) hue-rotate(205deg) saturate(.55) brightness(.9) contrast(.92); }
+  .ftr-map-wide { width: 100%; height: clamp(16rem, 26vw, 26rem);
+    border-block: 1px solid var(--ftr-line, var(--color-border, rgb(127 127 127 / .25))); }
+  .ftr-map-fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    padding: 1rem; text-align: center; font-size: .85rem; color: inherit; }
+  .ftr-map .leaflet-container, .ftr-map.leaflet-container { background: transparent; font: inherit; }
+  .ftr-map .leaflet-control-attribution { font-size: 9px; background: rgb(0 0 0 / .45); color: #ddd; }
+  .ftr-map .leaflet-control-attribution a { color: #fff; }
+  .ftr-map .leaflet-bar a { background: var(--color-surface, #fff); color: var(--color-text, #111); border-color: rgb(127 127 127 / .3); }
+  .ftr-pin { position: relative; width: 18px; height: 18px; }
+  .ftr-pin::before, .ftr-pin::after { content: ""; position: absolute; inset: 0; border-radius: 9999px;
+    background: var(--ftr-primary, var(--color-primary, #8b5cf6)); }
+  .ftr-pin::before { animation: ftr-ping 2.2s cubic-bezier(0, 0, .2, 1) infinite; opacity: .6; }
+  .ftr-pin::after { border: 3px solid #fff; box-shadow: 0 2px 8px rgb(0 0 0 / .45); }
+  @keyframes ftr-ping { 75%, 100% { transform: scale(3.2); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .ftr-pin::before { animation: none; } .ftr a, .ftr-social { transition: none; } }
+</style>
+
+<script>
+  // Mounts a Leaflet map on every [data-footer-map]. Leaflet (script and
+  // stylesheet) is fetched once, on demand, from the URLs the element carries,
+  // so a page with no map pays nothing for it. The basemap follows the site
+  // theme in CSS (see .dark .leaflet-tile-pane above). Tiles are OpenStreetMap's
+  // keyless ones; a basemap that needs an API key does not belong in a gem.
+  (function () {
+    if (window.__footerMapsArmed) return;
+    window.__footerMapsArmed = true;
+
+    var TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+    var ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+    var maps = [];
+    var loading = null;
+
+    // Checked on every mount, not once: a page visit that rebuilds the head
+    // must not leave a mounted map without its stylesheet.
+    function ensureStylesheet(href) {
+      if (!href || document.querySelector('link[data-studio-leaflet]')) return;
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = href;
+      link.setAttribute('data-studio-leaflet', '');
+      document.head.appendChild(link);
+    }
+
+    function loadLeaflet(src) {
+      if (window.L) return Promise.resolve();
+      if (loading) return loading;
+      loading = new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = src;
+        s.onload = resolve;
+        // A failed fetch must not be remembered: the next visit tries again.
+        s.onerror = function () { loading = null; s.remove(); reject(new Error('leaflet failed to load')); };
+        document.head.appendChild(s);
+      });
+      return loading;
+    }
+
+    function mount(el) {
+      if (el.__footerMap) return;
+      var at = [parseFloat(el.dataset.lat), parseFloat(el.dataset.lng)];
+      if (isNaN(at[0]) || isNaN(at[1])) return;
+      var map = L.map(el, { center: at, zoom: parseInt(el.dataset.zoom, 10) || 15,
+                            scrollWheelZoom: false, attributionControl: true,
+                            zoomControl: el.dataset.controls !== 'false' });
+      map.attributionControl.setPrefix(false);
+      L.tileLayer(TILES, { attribution: ATTRIBUTION, maxZoom: 19 }).addTo(map);
+      L.marker(at, { icon: L.divIcon({ className: '', html: '<div class="ftr-pin"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }),
+                     keyboard: false }).addTo(map);
+      // Page scroll stays page scroll until the visitor commits to the map.
+      map.on('click', function () { map.scrollWheelZoom.enable(); });
+      map.on('mouseout', function () { map.scrollWheelZoom.disable(); });
+      var fallback = el.querySelector('.ftr-map-fallback');
+      if (fallback) { el.__footerFallback = fallback; fallback.remove(); }
+      el.__footerMap = map;
+      maps.push(el);
+    }
+
+    function mountAll() {
+      var targets = document.querySelectorAll('[data-footer-map]');
+      if (!targets.length) return;
+      var first = targets[0];
+      ensureStylesheet(first.dataset.leafletCss);
+      loadLeaflet(first.dataset.leafletJs)
+        .then(function () { document.querySelectorAll('[data-footer-map]').forEach(mount); })
+        .catch(function () { /* the fallback link stays */ });
+    }
+
+    // A cached Turbo snapshot would restore Leaflet's DOM without its state, so
+    // the map is taken down and its fallback link put back before the snapshot.
+    document.addEventListener('turbo:before-cache', function () {
+      maps.forEach(function (el) {
+        var fallback = el.__footerFallback;
+        el.__footerMap.remove();
+        el.__footerMap = null;
+        if (fallback && !el.querySelector('.ftr-map-fallback')) el.appendChild(fallback);
+      });
+      maps = [];
+    });
+    document.addEventListener('turbo:load', mountAll);
+    if (document.readyState !== 'loading') mountAll();
+    else document.addEventListener('DOMContentLoaded', mountAll);
+  })();
+</script>
