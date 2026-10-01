@@ -101,7 +101,6 @@
     var TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
     var ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
     var maps = [];
-    var watchers = [];
     var loading = null;
 
     // Checked on every mount, not once: a page visit that rebuilds the head
@@ -170,18 +169,12 @@
       if (typeof IntersectionObserver !== 'function') { fetchAndMount(el); return; }
       var watcher = new IntersectionObserver(function (entries) {
         if (!entries.some(function (entry) { return entry.isIntersecting; })) return;
-        unwatch(el);
+        watcher.disconnect();
+        el.__footerWatch = null;
         fetchAndMount(el);
       }, { rootMargin: '400px' });
       el.__footerWatch = watcher;
-      watchers.push(el);
       watcher.observe(el);
-    }
-
-    function unwatch(el) {
-      if (el.__footerWatch) el.__footerWatch.disconnect();
-      el.__footerWatch = null;
-      watchers = watchers.filter(function (other) { return other !== el; });
     }
 
     function armAll() { document.querySelectorAll('[data-footer-map]').forEach(watch); }
@@ -194,7 +187,6 @@
     // A cached Turbo snapshot would restore Leaflet's DOM without its state, so
     // the map is taken down and its fallback link put back before the snapshot.
     document.addEventListener('turbo:before-cache', function () {
-      watchers.slice().forEach(unwatch);
       maps.forEach(function (el) {
         var fallback = el.__footerFallback;
         el.__footerMap.remove();
