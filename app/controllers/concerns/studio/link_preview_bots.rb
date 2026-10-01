@@ -55,15 +55,18 @@ module Studio
 
     private
 
-    # Rails' allow_browser macro installs `before_action -> { allow_browser(versions:, block:) }`,
-    # which dispatches to the PRIVATE instance method ActionController::AllowBrowser#allow_browser
-    # (Rails 7.2 through 8.1). This concern is included below ActionController::Base, so it sits
-    # above that module in the ancestor chain and this method answers first: a preview
-    # fetcher's GET/HEAD skips the browser check, everything else goes to Rails. Overriding
-    # the method rather than skipping the callback covers every allow_browser declaration —
-    # in this controller, a parent, or a subclass, declared before or after the include —
-    # since a lambda callback cannot be named to skip_before_action. The integration suite
-    # pins the method so a Rails rename fails loudly (test/integration/link_preview_test.rb).
+    # Rails' allow_browser macro installs
+    # `before_action -> { allow_browser(versions:, block:) }`, which dispatches to
+    # the PRIVATE instance method ActionController::AllowBrowser#allow_browser (the
+    # same in Rails 7.2.3 and 8.1.4). This concern is included below
+    # ActionController::Base, so it sits above that module in the ancestor chain and
+    # this method answers first: a preview fetcher's GET/HEAD skips the browser
+    # check, everything else goes to Rails. Overriding the method rather than
+    # skipping the callback covers every allow_browser declaration (this
+    # controller, a parent or a subclass, before or after the include), and a
+    # lambda callback cannot be named to skip_before_action anyway. The integration
+    # suite pins the method, so a Rails rename fails loudly
+    # (test/integration/link_preview_test.rb).
     def allow_browser(*args, **kwargs, &block)
       return if link_preview_bot_request?
 
