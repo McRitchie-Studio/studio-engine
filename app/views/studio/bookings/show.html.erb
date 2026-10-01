@@ -2,8 +2,8 @@
     Studio.draw_booking_routes. It is where a booking link lands when the popup
     cannot open. An app that wants different words around the frame renders
     `studio_booking_frame` in a view of its own instead. %>
-<% label = studio_site_footer_facts&.dig(:booking_label) || Studio::SiteFooter::DEFAULT_BOOKING_LABEL %>
-<% content_for(:title, "#{label} · #{Studio.site_identity[:title]}") %>
+<% label = studio_booking_label %>
+<% content_for(:title, "#{label} · #{studio_site_footer_name}") %>
 <% content_for(:full_width, true) %>
 
 <section class="booking-page" data-booking-page>

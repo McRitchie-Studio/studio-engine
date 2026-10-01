@@ -1,0 +1,13 @@
+<%# A host layout for test/integration/site_footer_test.rb: a page, then the
+    footer in the one line a consuming app writes. %>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title><%= content_for(:title) || "Footer host" %></title>
+  </head>
+  <body>
+    <main><%= yield %></main>
+    <%= studio_site_footer %>
+  </body>
+</html>

@@ -80,6 +80,13 @@ Rails.application.routes.draw do
   post "lab/sign_in", to: "geo_lab_sessions#create"
 
   # A host app's ordinary page + sign-in/out, for the session-drift suite.
+  # Host pages for test/integration/site_footer_test.rb, which defines the
+  # controllers: a public page, a signed-in working surface, and a page that
+  # calls the helpers directly.
+  get "footer_host/landing", to: "footer_host_landing#show"
+  get "footer_host/board", to: "footer_host_board#show"
+  get "footer_host/helpers", to: "footer_host_landing#helpers"
+
   get "lab/session", to: "session_lab#show"
   post "lab/session/sign_in", to: "session_lab#sign_in"
   post "lab/session/sign_out", to: "session_lab#sign_out"

@@ -93,7 +93,17 @@ module Studio
     # The frame's accessible name.
     def studio_booking_title(title = nil)
       title.presence || studio_site_footer_facts&.dig(:booking_title) ||
-        "Schedule a call with #{Studio.site_identity[:title]}"
+        "#{studio_booking_label} with #{studio_site_footer_name}"
+    end
+
+    # What the booking links, the popup and the booking page call the act.
+    def studio_booking_label
+      studio_site_footer_facts&.dig(:booking_label) || Studio::SiteFooter::DEFAULT_BOOKING_LABEL
+    end
+
+    # The site's name: the footer's, else the site identity's title.
+    def studio_site_footer_name
+      studio_site_footer_facts&.dig(:name) || Studio.site_identity[:title]
     end
 
     # The inline booking frame. `crop: false` shows Google's whole page at rest.
@@ -112,7 +122,7 @@ module Studio
 
       @_studio_booking_popup_rendered = true
       render "studio/booking/popup",
-             label: label.presence || studio_site_footer_facts&.dig(:booking_label) || Studio::SiteFooter::DEFAULT_BOOKING_LABEL,
+             label: label.presence || studio_booking_label,
              title: studio_booking_title(title)
     end
 
@@ -131,7 +141,7 @@ module Studio
       return if href.blank?
 
       html_options[:data] = { booking_popup: true }.merge(html_options[:data] || {}) if studio_booking?
-      content = block ? capture(&block) : (name || Studio::SiteFooter::DEFAULT_BOOKING_LABEL)
+      content = block ? capture(&block) : (name || studio_booking_label)
       link_to(content, href, html_options)
     end
 
