@@ -3,7 +3,9 @@
     Scoped CSS for the reason studio/site_footer/_assets gives. %>
 <style>
   /* The inline frame. Google's page cannot be themed, so the panel is white. */
-  .booking-frame { margin-inline: auto; overflow: hidden; background: #fff; border-radius: .75rem;
+  /* content-box, so the heights below are the WINDOW onto the frame whatever
+     reset the host runs: under border-box the border would eat 2px of the crop. */
+  .booking-frame { box-sizing: content-box; margin-inline: auto; overflow: hidden; background: #fff; border-radius: .75rem;
     border: 1px solid var(--color-border, rgb(127 127 127 / .25)); }
   .booking-frame iframe { display: block; width: 100%; border: 0; height: 1200px; }
   @media (min-width: 640px) {

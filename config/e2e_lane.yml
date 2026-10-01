@@ -790,7 +790,7 @@
 #   drop the description's line clamp      1 red (card description runs past two lines)
 # The phone-width spec guards the card's 1200:630 shape and sideways scroll.
 #   npx playwright test --list  -> 152 tests in 24 files
-total_specs: 152
+total_specs: 167
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -890,7 +890,15 @@ total_specs: 152
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 152
 # executed = total - devnet - allowed_skips = 152 - 0 - 0 = 152, so executed ==
 # total_specs and the equality assertion holds.
-executed: 152
+# Re-derived once more on THIS tree with the lister when the site footer and booking
+# specs landed (site-footer-booking-primitive) — 15 tests in TWO new files
+# (e2e/site_footer.spec.js 6, e2e/booking_frame.spec.js 9):
+#   npx playwright test --list                                             -> 167 tests, 26 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 167
+# executed = total - devnet - allowed_skips = 167 - 0 - 0 = 167, so executed ==
+# total_specs and the equality assertion holds.
+executed: 167
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
