@@ -61,6 +61,13 @@ Rails.application.routes.draw do
   get "lab/style_modals", to: "e2e_lab#style_modals"
   get "lab/session_drift", to: "e2e_lab#session_drift"
   get "lab/sidebar_panels", to: "e2e_lab#sidebar_panels"
+  # One route per page, spelled out: test/integration/e2e_lab_isolation_test.rb
+  # visits every /lab route by its literal path, which an optional segment is not.
+  get "lab/site_footer", to: "e2e_lab#site_footer"
+  get "lab/site_footer/terms", to: "e2e_lab#site_footer", defaults: { variant: "terms" }
+  get "lab/site_footer/home", to: "e2e_lab#site_footer", defaults: { variant: "home" }
+  get "lab/site_footer/schedule", to: "e2e_lab#site_footer", defaults: { variant: "schedule" }
+  get "lab/site_footer/plain", to: "e2e_lab#site_footer", defaults: { variant: "plain" }
 
   # A host app's own pages, one open and one geo-LOCKED, for the geo suite.
   get "lab/geo", to: "geo_lab#open"
@@ -79,6 +86,13 @@ Rails.application.routes.draw do
   post "lab/sign_in", to: "geo_lab_sessions#create"
 
   # A host app's ordinary page + sign-in/out, for the session-drift suite.
+  # Host pages for test/integration/site_footer_test.rb, which defines the
+  # controllers: a public page, a signed-in working surface, and a page that
+  # calls the helpers directly.
+  get "footer_host/landing", to: "footer_host_landing#show"
+  get "footer_host/board", to: "footer_host_board#show"
+  get "footer_host/helpers", to: "footer_host_landing#helpers"
+
   get "lab/session", to: "session_lab#show"
   post "lab/session/sign_in", to: "session_lab#sign_in"
   post "lab/session/sign_out", to: "session_lab#sign_out"

@@ -1,0 +1,20 @@
+<%# /schedule — the booking page (Studio::BookingsController), drawn by
+    Studio.draw_booking_routes. It is where a booking link lands when the popup
+    cannot open. An app that wants different words around the frame renders
+    `studio_booking_frame` in a view of its own instead. %>
+<% label = studio_booking_label %>
+<% content_for(:title, "#{label} · #{studio_site_footer_name}") %>
+<% content_for(:full_width, true) %>
+
+<section class="booking-page" data-booking-page>
+  <h1 class="booking-page-title"><%= label %></h1>
+  <p class="booking-page-lede">Pick a time that works and it goes straight on the calendar.</p>
+  <%= studio_booking_frame %>
+</section>
+
+<style>
+  .booking-page { max-width: 56rem; margin-inline: auto; padding: 4rem 1rem; }
+  .booking-page-title { margin: 0; text-align: center; font-size: 2.25rem; font-weight: 800; letter-spacing: -.025em;
+    color: var(--color-text, inherit); }
+  .booking-page-lede { margin: .75rem 0 2rem; text-align: center; font-size: 1.125rem; color: var(--color-text-secondary, inherit); }
+</style>

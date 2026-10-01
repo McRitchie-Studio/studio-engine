@@ -1,0 +1,11 @@
+<%# One footer link (a normalized row from Studio::SiteFooter.link). A nil href
+    is a disabled label. An off-site link opens in a new tab, so the visitor
+    keeps the page. A booking link opens the booking popup when the app has a
+    booking_url; its href stays as the fallback. %>
+<% if link[:disabled] %>
+  <span class="ftr-link-disabled" aria-disabled="true" title="Coming soon"><%= link[:label] %></span>
+<% else %>
+  <%= link_to link[:label], link[:href], { class: "ftr-link" }
+        .merge(link[:external] ? { target: "_blank", rel: "noopener" } : {})
+        .merge(link[:booking] && booking ? { data: { booking_popup: true } } : {}) %>
+<% end %>

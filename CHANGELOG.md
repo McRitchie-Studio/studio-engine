@@ -4,6 +4,37 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **A site footer every app renders from configuration.** `<%= studio_site_footer %>`
+  in the layout prints what `config.site_footer` declares: brand and social
+  profiles, link columns, a Location band with a live map, and a legal line.
+  Every fact is optional and a missing one removes its part. The name defaults to
+  the site identity's title and the logo to the navbar logo. See
+  [`docs/SITE_FOOTER.md`](docs/SITE_FOOTER.md).
+  - **Where it shows** is `config.site_footer_visible`, one callable. By default a
+    visitor sees the footer on every page and a signed-in viewer only on
+    `config.site_footer_controllers`.
+  - **The map** is Leaflet 1.9.4 on OpenStreetMap's keyless tiles, vendored into
+    the engine and served through the app's asset pipeline (`studio/leaflet.js`,
+    `studio/leaflet.css`), so no app carries a copy in `public/`. It is fetched
+    only after the window's `load` event and only when the map nears the
+    viewport. On a touch device one finger scrolls the page rather than the map.
+    `studio_footer_map` renders it alone.
+- **Booking through Google Calendar.** `config.booking_url` is an appointment
+  schedule's public link. `studio_booking_frame` embeds it inline, asked for only
+  after `load` and when scrolled near, cropped to the slot picker until it is
+  used. `studio_booking_link` opens it in a popup without leaving the page, with
+  its href as the fallback; on a page that already shows the frame the link goes
+  to that frame instead. `config.draw_booking_routes = true` draws a public
+  `/schedule` page (`studio_booking_path`).
+- `/admin/style` gains a *Site footer and booking* group under Tricks.
+- **The browser lane's error collector can be scoped to the app's own origin.**
+  `watchPageErrors(page, { ownOriginOnly: true })` drops a console error or an
+  exception that came from another origin's frame (Google's booking frame logs
+  `requestStorageAccess: Permission denied` on its own) and still counts
+  everything the app's own origin logs or throws. The default is unchanged.
+
 ## 0.82.1 — 2026-09-30
 
 ### Fixed

@@ -1,0 +1,99 @@
+<%# The site footer (Studio.site_footer; docs/SITE_FOOTER.md): brand and social
+    profiles at the left, plain link columns under bold headings, a centred
+    Location band with a live map, then a quiet centred legal line. Rendered by
+    `studio_site_footer`, which passes the resolved `facts`.
+
+    Every part is optional and a missing fact removes its part. The layout lives
+    in studio/site_footer/_assets as scoped CSS (.ftr-*), not Tailwind
+    utilities: a utility a consumer's build has not already seen compiles to
+    nothing, and a footer that silently loses its grid is the result. %>
+<% address = facts[:address] %>
+<% booking = studio_booking? %>
+<% columns = facts[:columns] %>
+<%= studio_site_footer_assets %>
+<footer class="ftr" data-site-footer>
+  <div class="ftr-wrap">
+    <div class="ftr-cols" style="--ftr-n: <%= columns.size %>; --ftr-n-md: <%= [ columns.size, 4 ].min.clamp(1, 4) %>;">
+      <div class="ftr-brand">
+        <% if facts[:logo] || facts[:wordmark] %>
+          <a href="<%= facts[:home_path] %>" class="ftr-home" aria-label="<%= facts[:name] %>">
+            <% if facts[:logo] %>
+              <%= image_tag facts[:logo], class: [ "ftr-logo", ("ftr-logo-invert" if facts[:logo_invert]) ].compact.join(" "), alt: "" %>
+            <% end %>
+            <% if facts[:wordmark] %>
+              <span class="ftr-wordmark"><% if facts[:wordmark][0].present? %><span><%= facts[:wordmark][0] %></span><% end %><span class="ftr-wordmark-accent"><%= facts[:wordmark][1] %></span></span>
+            <% end %>
+          </a>
+        <% end %>
+        <% if facts[:tagline] %>
+          <p class="ftr-tagline"><%= facts[:tagline] %></p>
+        <% end %>
+        <% if facts[:email] %>
+          <p class="ftr-email"><a href="mailto:<%= facts[:email] %>" class="ftr-link"><%= facts[:email] %></a></p>
+        <% end %>
+        <% if facts[:social].any? %>
+          <ul class="ftr-socials" aria-label="Social profiles">
+            <% facts[:social].each do |profile| %>
+              <li>
+                <%# A nil url renders the icon unlinked: the handle is not on record yet. %>
+                <%= content_tag(profile[:url] ? :a : :span,
+                      render("studio/site_footer/social_icon", icon: profile[:icon], label: profile[:label]),
+                      { class: "ftr-social", title: profile[:url] ? profile[:label] : "#{profile[:label]} (handle needed)",
+                        "aria-label": profile[:label] }
+                        .merge(profile[:url] ? { href: profile[:url], target: "_blank", rel: "noopener" } : { "data-pending": true })) %>
+              </li>
+            <% end %>
+          </ul>
+        <% end %>
+      </div>
+
+      <% columns.each do |column| %>
+        <nav aria-label="<%= column[:heading] || "Footer" %>">
+          <% if column[:heading] %>
+            <h2 class="ftr-heading"><%= column[:heading] %></h2>
+          <% end %>
+          <ul class="ftr-list">
+            <% column[:links].each do |link| %>
+              <li><%= render "studio/site_footer/link", link: link, booking: booking %></li>
+            <% end %>
+          </ul>
+        </nav>
+      <% end %>
+    </div>
+
+    <% if address %>
+      <div class="ftr-location" data-footer-location>
+        <h2 class="ftr-location-title">Location</h2>
+        <address class="ftr-address">
+          <a href="<%= address[:directions_url] %>" target="_blank" rel="noopener" class="ftr-link"
+             aria-label="Get directions to <%= address[:full] %>">
+            <%= safe_join([ address[:street], address[:city_line] ].compact, tag.br) %>
+          </a>
+        </address>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Outside the centred column on purpose: the map runs edge to edge. %>
+  <% if address && address[:map] %>
+    <%= render "studio/site_footer/map", address: address, classes: "ftr-map-wide", style: nil, zoom: nil, controls: true %>
+  <% end %>
+
+  <div class="ftr-wrap">
+    <div class="ftr-legal<%= " ftr-legal-ruled" unless address && address[:map] %>">
+      <% if facts[:legal].any? %>
+        <p>
+          <% facts[:legal].each_with_index do |link, index| %>
+            <%= " · " unless index.zero? %><%= render "studio/site_footer/link", link: link, booking: booking %>
+          <% end %>
+        </p>
+      <% end %>
+      <% if facts[:name] %>
+        <p class="ftr-copyright">© <%= Time.current.year %> <%= facts[:name] %></p>
+      <% end %>
+    </div>
+  </div>
+</footer>
+
+<%# The dialog the footer's booking links open. Nothing without a booking_url. %>
+<%= studio_booking_popup(label: facts[:booking_label], title: facts[:booking_title]) %>

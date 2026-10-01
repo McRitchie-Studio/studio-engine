@@ -188,6 +188,48 @@ class StylePageTest < ActiveSupport::TestCase
     view.render(template: "style/index")
   end
 
+  # The site footer and booking group. It is the first Tricks group whose
+  # specimen is a whole engine PARTIAL fed from app config, so it renders here
+  # rather than being string-matched: a broken local in studio/site_footer/_footer
+  # would 500 /admin/style in every host.
+  test "the Tricks section stages the site footer and booking primitives" do
+    saved = [Studio.site_footer, Studio.booking_url]
+    Studio.site_footer = nil
+    Studio.booking_url = nil
+    doc = Nokogiri::HTML.fragment(render_index)
+
+    group = doc.at_css("section#tricks section#site-footer")
+    refute_nil group, "the group must sit inside the Tricks section, under its own anchor"
+    assert_equal %w[studio_site_footer studio_booking_link studio_booking_frame],
+                 group.css("article code[x-ref='klass']").map { |code| code.text.strip }
+    assert_match(/footer\s+not declared.*booking\s+off.*booking page\s+not drawn/m,
+                 group.at_css("[data-site-footer-status]").text)
+
+    # An app that declares nothing still sees the primitive: a sample footer, with
+    # every kind of row, and the booking specimens flagged rather than hidden.
+    assert_includes group.text, "Sample footer (this app declares none)"
+    preview = group.at_css("[data-site-footer-preview] footer[data-site-footer]")
+    refute_nil preview, "the preview must be the real footer partial"
+    assert preview.at_css("[data-footer-map][data-lat]"), "the sample carries an address, so it shows the map"
+    assert preview.at_css("span[aria-disabled='true']"), "and a disabled label"
+    assert_equal 2, group.css("article[aria-disabled='true']").size, "both booking specimens are flagged off"
+    assert_nil doc.at_css("dialog[data-booking-dialog]"), "no booking_url, so no popup"
+
+    Studio.site_footer = { name: "Declared Co", legal: [["Privacy", "/privacy"]] }
+    Studio.booking_url = "https://calendar.google.com/calendar/appointments/schedules/STYLE"
+    doc = Nokogiri::HTML.fragment(render_index)
+    group = doc.at_css("section#site-footer")
+
+    assert_includes group.text, "This app's footer"
+    assert_match(/footer\s+declared.*booking\s+on/m, group.at_css("[data-site-footer-status]").text)
+    assert_includes group.at_css("[data-site-footer-preview] .ftr-copyright").text, "Declared Co"
+    assert_empty group.css("article[aria-disabled='true']")
+    assert group.at_css("article a.btn.btn-primary[data-booking-popup]"), "the live booking link specimen"
+    assert_nil group.at_css("iframe[data-booking-frame]"), "the style guide never embeds Google's frame"
+  ensure
+    Studio.site_footer, Studio.booking_url = saved
+  end
+
   test "the view is a bare content wrapper (no host layout of its own)" do
     html = render_index
     assert_includes html, "Style", "expected the page heading"

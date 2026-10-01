@@ -169,8 +169,41 @@ class LayerScaleContractTest < ActiveSupport::TestCase
     end
   end
 
+  # VENDORED, AND CONTAINED. Leaflet's stylesheet numbers its own panes and
+  # controls from 100 to 1000. They are a third party's file, kept byte-faithful
+  # so it can be re-vendored, and they order the map's INSIDE: what goes over
+  # what within one map. They never reach the page's stack, because the only
+  # element the engine mounts Leaflet on is `.ftr-map`, which is its own stacking
+  # context (`isolation: isolate`). The exemption is that containment, so the
+  # next test measures it; e2e/site_footer.spec.js measures it in a browser.
+  CONTAINED_VENDOR_FILES = ["app/assets/stylesheets/studio/leaflet.css"].freeze
+
+  test "the vendored Leaflet stylesheet is exempt only while every map is its own stacking context" do
+    assets = File.read(File.join(ROOT, "app/views/studio/site_footer/_assets.html.erb")).gsub(%r{/\*.*?\*/}m, " ")
+    map = File.read(File.join(ROOT, "app/views/studio/site_footer/_map.html.erb")).gsub(/<%#.*?%>/m, "")
+
+    assert_match(/^\s*\.ftr-map \{[^}]*isolation:\s*isolate/, assets,
+                 ".ftr-map must isolate: it is what keeps Leaflet's z-indexes (up to 1000) under the " \
+                 "navbar and every modal, and the reason leaflet.css is exempt from the layer scale")
+    opening = map[/<div class="ftr-map (.*?)\bdata-footer-map\b/m, 1]
+    refute_nil opening, "the element Leaflet mounts on must carry .ftr-map, or the isolation never applies"
+    refute_includes opening, "<div", "the .ftr-map element and the [data-footer-map] element must be the same one"
+
+    mounts = Dir[File.join(ROOT, "app/views/**/*.erb")].select do |path|
+      # The attribute written on an element, on its own line, as _map writes it:
+      # not `[data-footer-map]` inside a selector or a comment.
+      File.read(path).gsub(/<%#.*?%>/m, "").match?(/^\s+data-footer-map\s*$/)
+    end
+    assert_equal ["app/views/studio/site_footer/_map.html.erb"], mounts.map { |path| path.delete_prefix(ROOT + "/") },
+                 "a second partial renders a [data-footer-map] element. Leaflet mounts on every one, so it " \
+                 "must carry .ftr-map too; add it here once it does."
+    assert_empty Dir[File.join(ROOT, "app/views/**/*.erb")].reject { |path| path.end_with?("studio/site_footer/_assets.html.erb") }
+                                                             .select { |path| File.read(path) =~ /\bL\.map\(/ },
+                 "Leaflet is mounted somewhere other than the footer's script, outside the isolation this exemption rests on"
+  end
+
   test "no engine layer paints at a bare blocking number" do
-    offenders = PAINTING_FILES.flat_map do |path|
+    offenders = (PAINTING_FILES - CONTAINED_VENDOR_FILES.map { |file| File.join(ROOT, file) }).flat_map do |path|
       code = code_of(path)
       hits  = code.scan(/z-index:\s*(\d+)/).flatten
       hits += code.scan(/\bz-\[(\d+)\]/).flatten

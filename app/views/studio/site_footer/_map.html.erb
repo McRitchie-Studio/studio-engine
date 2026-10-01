@@ -1,0 +1,22 @@
+<%# One live map of an address. Leaflet mounts on this element (see
+    studio/site_footer/_assets, which this partial pulls in); until it does, and
+    if it never does, the link inside is the whole map: an address that opens
+    directions. `classes` and `style` size and shape it.
+
+    Leaflet's two files ride the engine's asset pipeline (studio/leaflet.js,
+    studio/leaflet.css). Their URLs travel on the element, so the script fetches
+    them only on a page that has a map. %>
+<%= studio_site_footer_assets %>
+<div class="ftr-map <%= local_assigns[:classes] %>"
+     <% if local_assigns[:style].present? %>style="<%= style %>"<% end %>
+     data-footer-map
+     data-lat="<%= address[:lat] %>" data-lng="<%= address[:lng] %>"
+     data-zoom="<%= local_assigns[:zoom] || address[:zoom] %>"
+     data-controls="<%= local_assigns.fetch(:controls, true) %>"
+     data-leaflet-js="<%= asset_path("studio/leaflet.js") %>"
+     data-leaflet-css="<%= asset_path("studio/leaflet.css") %>"
+     role="region" aria-label="Map of <%= address[:full] %>">
+  <a href="<%= address[:directions_url] %>" target="_blank" rel="noopener" class="ftr-map-fallback">
+    <%= address[:full] %> · Open in Maps
+  </a>
+</div>

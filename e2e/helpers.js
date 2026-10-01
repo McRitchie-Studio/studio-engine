@@ -8,11 +8,38 @@
 // cheapest possible detector for that entire failure class, and no server-side tier
 // can produce it — the response bytes were valid, and the guard test written to
 // catch this exact bug passed on the broken page.
-function watchPageErrors(page) {
+//
+// IT HEARS EVERY FRAME ON THE PAGE, a third party's included. Playwright delivers a
+// cross-origin frame's console to the page's `console` event, so a spec that counts
+// errors on a page embedding someone else's frame counts THEIR errors as ours. The
+// measured instance is Google's booking frame, which logs `requestStorageAccess:
+// Permission denied` from calendar.google.com on its own.
+//
+// `ownOriginOnly: true` scopes that out BY ORIGIN, never by message text: a console
+// error is dropped only when the script that logged it was served from another host,
+// and a thrown error only when every frame of its stack was. Anything logged or
+// thrown by the lab's own origin is still counted, and so is an error with no
+// location or no stack at all (it cannot be shown to be someone else's, so it stays).
+// The default is unchanged, and counts everything.
+function isOffOrigin(url) {
+  if (!url || !/^https?:/.test(url)) return false;
+  const { hostname } = new URL(url);
+  return hostname !== "127.0.0.1" && hostname !== "localhost";
+}
+
+function watchPageErrors(page, { ownOriginOnly = false } = {}) {
   const errors = [];
-  page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
+  page.on("pageerror", (error) => {
+    if (ownOriginOnly) {
+      const sources = (error.stack || "").match(/https?:\/\/[^\s)]+/g) || [];
+      if (sources.length > 0 && sources.every(isOffOrigin)) return;
+    }
+    errors.push(`pageerror: ${error.message}`);
+  });
   page.on("console", (message) => {
-    if (message.type() === "error") errors.push(`console.error: ${message.text()}`);
+    if (message.type() !== "error") return;
+    if (ownOriginOnly && isOffOrigin(message.location().url)) return;
+    errors.push(`console.error: ${message.text()}`);
   });
   return errors;
 }
