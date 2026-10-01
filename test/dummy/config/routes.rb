@@ -61,7 +61,13 @@ Rails.application.routes.draw do
   get "lab/style_modals", to: "e2e_lab#style_modals"
   get "lab/session_drift", to: "e2e_lab#session_drift"
   get "lab/sidebar_panels", to: "e2e_lab#sidebar_panels"
-  get "lab/site_footer(/:variant)", to: "e2e_lab#site_footer"
+  # One route per page, spelled out: test/integration/e2e_lab_isolation_test.rb
+  # visits every /lab route by its literal path, which an optional segment is not.
+  get "lab/site_footer", to: "e2e_lab#site_footer"
+  get "lab/site_footer/terms", to: "e2e_lab#site_footer", defaults: { variant: "terms" }
+  get "lab/site_footer/home", to: "e2e_lab#site_footer", defaults: { variant: "home" }
+  get "lab/site_footer/schedule", to: "e2e_lab#site_footer", defaults: { variant: "schedule" }
+  get "lab/site_footer/plain", to: "e2e_lab#site_footer", defaults: { variant: "plain" }
 
   # A host app's own pages, one open and one geo-LOCKED, for the geo suite.
   get "lab/geo", to: "geo_lab#open"
