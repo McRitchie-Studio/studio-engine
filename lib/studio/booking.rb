@@ -107,23 +107,28 @@ module Studio
     end
 
     def refuse_crop(declared, why)
-      message = "[studio.booking] booking crop #{declared.inspect} is ignored (#{why}); the frame shows whole. " \
-                "See docs/BOOKING.md."
-      seen = Studio::Booking.reported
-      unless seen.key?(message)
-        seen[message] = true if seen.size < REPORTED_LIMIT
-        Studio::Booking.reporter.call(message)
-      end
+      report_once("[studio.booking] booking crop #{declared.inspect} is ignored (#{why}); the frame shows whole. " \
+                  "See docs/BOOKING.md.")
       nil
     end
 
-    # Studio.booking_path: nil, a path, or a callable receiving the view.
+    # A LOCAL PATH, and nothing else, may be the booking page: it is written into
+    # hrefs (the footer's booking links, `studio_booking_link`). It begins with
+    # one "/" and carries no control character. That refuses a scheme
+    # ("javascript:", "https:") and a protocol-relative "//host", which a browser
+    # reads as another site.
+    def local_path?(path)
+      string = path.to_s
+      string.start_with?("/") && !string.start_with?("//") && !string.match?(/[\x00-\x1f\x7f\\]/)
+    end
+
+    # Studio.booking_path: nil, a local path, or a callable receiving the view.
     def validate_path!(declared)
       return if declared.nil? || declared.respond_to?(:call)
-      return if declared.is_a?(String) && (declared.strip.empty? || declared.strip.start_with?("/"))
+      return if declared.is_a?(String) && (declared.strip.empty? || local_path?(declared.strip))
 
       raise ArgumentError,
-            "Studio.booking_path must be nil, a path beginning with \"/\", or a callable receiving the view " \
+            "Studio.booking_path must be nil, a path beginning with one \"/\", or a callable receiving the view " \
             "(got #{declared.inspect}). See docs/BOOKING.md."
     end
 
@@ -137,14 +142,32 @@ module Studio
 
     # The booking page's path for a view: the app's own (`declared`, a path or
     # a callable receiving the view), else the engine's /schedule when it is
-    # `drawn`, else nil. A callable may decline with nil.
+    # `drawn`, else nil. A callable may decline with nil. What a callable returns
+    # is held to the same rule as a declared String: anything but a local path is
+    # reported once and treated as no answer.
     def path_for(declared, view, drawn: false)
       unless declared.nil?
         path = (declared.respond_to?(:call) ? declared.call(view) : declared).to_s.strip
-        return path unless path.empty?
+        return path if local_path?(path)
+
+        refuse_path(path) unless path.empty?
       end
 
       drawn && view.respond_to?(:studio_booking_path) ? view.studio_booking_path : nil
+    end
+
+    def refuse_path(path)
+      report_once("[studio.booking] booking_path #{path.inspect} is ignored: it is not a local path " \
+                  "(one leading \"/\"). See docs/BOOKING.md.")
+      nil
+    end
+
+    def report_once(message)
+      seen = Studio::Booking.reported
+      return if seen.key?(message)
+
+      seen[message] = true if seen.size < REPORTED_LIMIT
+      Studio::Booking.reporter.call(message)
     end
 
     # True when `current` (a request path) is the page `declared` names. A query

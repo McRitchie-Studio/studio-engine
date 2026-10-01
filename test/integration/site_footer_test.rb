@@ -788,6 +788,24 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     assert_select footer, 1
   end
 
+  test "a booking_path callable that returns a script or another host is never written into an href" do
+    Studio.site_footer = { columns: [["Contact", [["Schedule a call", OWN_PAGE]]]] }
+
+    ["javascript:alert(1)", "//evil.example/schedule"].each do |bad|
+      Studio.booking_path = ->(_view) { bad }
+
+      get "/footer_host/helpers"
+      assert_response :success
+      assert_no_match(/javascript:alert|evil\.example/, response.body, "#{bad} reached the page")
+      assert_select "[data-own-links] a[href='#{BOOKING_URL}']", "Schedule a call"
+      assert_select "#{footer} a[href='#{OWN_PAGE}']:not([data-booking-popup])", 1, "nor does it name the booking page"
+    end
+    assert_equal 2, @booking_reports.size, "each refused value is reported once"
+
+    assert_raises(ArgumentError) { Studio.booking_path = "//evil.example/schedule" }
+    assert_raises(ArgumentError) { Studio.booking_path = "javascript:alert(1)" }
+  end
+
   test "booking_path wins over the engine's page, and is refused unless it is a path or a callable" do
     draw_booking_routes!
     Studio.booking_path = OWN_PAGE

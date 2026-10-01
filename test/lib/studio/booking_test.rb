@@ -149,9 +149,40 @@ class BookingPathTest < Minitest::Test
     assert_nil Studio::Booking.normalize_path("  "), "blank is unset"
     assert_same callable, Studio::Booking.normalize_path(callable)
 
-    ["schedule", "https://example.com/schedule", :schedule, 5].each do |bad|
+    ["schedule", "https://example.com/schedule", "//evil.example/schedule", "javascript:alert(1)",
+     "/sched\nule", "/\\evil.example", :schedule, 5].each do |bad|
       error = assert_raises(ArgumentError, bad.inspect) { Studio::Booking.normalize_path(bad) }
-      assert_match(%r{a path beginning with "/"}, error.message)
+      assert_match(%r{a path beginning with one "/"}, error.message)
+    end
+  end
+
+  # What a callable returns goes into hrefs, so it is held to the same rule as a
+  # declared String: a local path, or it is no answer.
+  def test_a_callable_that_returns_anything_but_a_local_path_is_refused_and_reported_once
+    reporter = Studio::Booking.reporter
+    reports = []
+    Studio::Booking.reporter = ->(message) { reports << message }
+    Studio::Booking.reported.clear
+
+    ["javascript:alert(1)", "//evil.example/schedule", "https://evil.example/schedule", "schedule", "/a\tb"].each do |bad|
+      declared = ->(_view) { bad }
+
+      assert_nil path_for(declared), "#{bad.inspect} must not become the booking page"
+      assert_equal "/schedule", path_for(declared, drawn: true), "#{bad.inspect}: the engine's page still answers"
+    end
+    assert_equal 5, reports.size, "each refused value once, however often it is asked"
+    assert_match(/booking_path "javascript:alert\(1\)" is ignored: it is not a local path/, reports.first)
+
+    assert_equal "/book?from=footer#top", path_for(->(_view) { "/book?from=footer#top" }), "a query and a fragment are part of a path"
+  ensure
+    Studio::Booking.reporter = reporter
+    Studio::Booking.reported.clear
+  end
+
+  def test_local_path_is_one_leading_slash_and_no_control_character
+    ["/", "/schedule", "/a/b?c=d#e"].each { |ok| assert Studio::Booking.local_path?(ok), ok }
+    ["", nil, "schedule", "//host", "///host", "javascript:alert(1)", "https://x", "/a\nb", "/\\host"].each do |bad|
+      refute Studio::Booking.local_path?(bad), bad.inspect
     end
   end
 
