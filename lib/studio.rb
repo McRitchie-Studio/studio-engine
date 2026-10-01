@@ -13,6 +13,8 @@ require "studio/js_literal"
 require "studio/js_identifier"
 require "studio/partial_block"
 require "studio/sidebar_sections"
+require "studio/site_footer"
+require "studio/booking"
 require "studio/navbar_links"
 require "studio/navbar_identity"
 require "studio/profile_sections"
@@ -558,6 +560,63 @@ module Studio
   #   config.draw_public_user_routes = true
   mattr_accessor :draw_public_user_routes, default: false
 
+  # ---- Site footer and booking (Studio::SiteFooter, Studio::Booking) -------
+  #
+  # The public site's footer: brand and social profiles, link columns, an
+  # optional Location band with a live map, and a legal line. And the booking
+  # primitives: Google Calendar's appointment page inline, in a popup, and on a
+  # page. See docs/SITE_FOOTER.md.
+
+  # The footer's facts: a Hash, or a callable receiving the view. nil (the
+  # default) means this app has no footer, and `studio_site_footer` renders
+  # nothing, so a layout can call it before the app declares one. Every key is
+  # optional; shape and rules: lib/studio/site_footer.rb.
+  #
+  #   config.site_footer = ->(view) {
+  #     { tagline: "Software & Marketing Solutions",
+  #       address: { street: "3000 Lawrence St", city_line: "Denver, CO 80205",
+  #                  lat: 39.7614786, lng: -104.978957 },
+  #       columns: [ [ "Company", [ [ "Home", view.root_path ], [ "Career", nil ] ] ] ],
+  #       legal:   [ [ "Privacy Policy", view.privacy_path ] ] }
+  #   }
+  mattr_reader :site_footer, default: nil
+
+  def self.site_footer=(declared)
+    SiteFooter.validate!(declared)
+    @@site_footer = declared
+  end
+
+  # Controllers whose pages keep the footer for a SIGNED-IN viewer, by
+  # controller name ("landing") or path ("admin/reports"). A visitor gets the
+  # footer on every page; a signed-in viewer gets it only here, because every
+  # other signed-in page is a working surface (a board, a queue, an editor) and
+  # stays full height. The engine's own booking page is always included.
+  #
+  #   config.site_footer_controllers = %w[landing packages contact_submissions]
+  mattr_accessor :site_footer_controllers, default: []
+
+  # The app's Google Calendar appointment schedule: the public link Google gives
+  # you to share, WITHOUT `?gv=true` (the frame and the popup add it). nil (the
+  # default) means no booking: `studio_booking_frame` and `studio_booking_popup`
+  # render nothing and no link opens a popup.
+  #
+  #   config.booking_url = "https://calendar.google.com/calendar/appointments/schedules/AcZss..."
+  mattr_reader :booking_url, default: nil
+
+  def self.booking_url=(url)
+    Booking.validate!(url)
+    @@booking_url = url.to_s.strip.empty? ? nil : Booking.page_url(url)
+  end
+
+  # Draw the booking page, GET /schedule (Studio::BookingsController, route
+  # helper studio_booking_path). OFF by default, like every route surface a
+  # consumer might already own: mcritchie-studio draws its own /schedule today,
+  # and its adoption turns this on as it deletes that route. With the flag on and
+  # no booking_url the page answers 404.
+  #
+  #   config.draw_booking_routes = true
+  mattr_accessor :draw_booking_routes, default: false
+
   # THE APP'S IDENTITY COPY, resolved: { title:, description:, image_url: }.
   # The operator's saved value (Studio::SiteIdentity, edited at
   # /admin/link_preview) wins, then the drafted Studio.site_title /
@@ -1057,6 +1116,18 @@ module Studio
     SidebarSections.resolve(sidebar_sections, view)
   end
 
+  # The site footer's facts resolved for a view (lib/studio/site_footer.rb), or
+  # nil when the app declared none. The name defaults to the site identity's
+  # title and the logo to the navbar logo, so an app that has set those up says
+  # them once.
+  def self.site_footer_for(view)
+    return nil if site_footer.nil?
+
+    booking_path = draw_booking_routes && view.respond_to?(:studio_booking_path) ? view.studio_booking_path : nil
+    SiteFooter.resolve(site_footer, view,
+                       name: site_identity[:title], logo: logo_for("Footer Logo"), booking_path: booking_path)
+  end
+
   # Navbar links resolved for a view context (lib/studio/navbar_links.rb).
   def self.navbar_links_for(view)
     NavbarLinks.resolve(navbar_links, view)
@@ -1259,6 +1330,12 @@ module Studio
       if Studio.draw_public_user_routes
         get "u/:username", to: "studio/public_users#show", as: :studio_public_user,
             format: false, constraints: { username: %r{[^/]+} }
+      end
+
+      # The booking page (/schedule): Google Calendar's appointment page inline,
+      # with the site footer. OPT-IN — see Studio.draw_booking_routes.
+      if Studio.draw_booking_routes
+        get "schedule", to: "studio/bookings#show", as: :studio_booking
       end
 
       # The living style guide. Canonical at /admin/style (StyleController#index);

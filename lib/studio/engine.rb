@@ -47,6 +47,8 @@ module Studio
         studio/canvas_confetti.js
         studio/studio_confetti.js
         studio/sortable.js
+        studio/leaflet.js
+        studio/leaflet.css
         studio/session.js
         studio/montserrat-latin.woff2
         studio/montserrat-latin-ext.woff2
