@@ -128,6 +128,60 @@ test("on a touch device a one-finger swipe on the map scrolls the page", async (
   await context.close();
 });
 
+test("a map below the fold costs nothing until the visitor scrolls near it", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
+  const asked = watchLeaflet(page);
+  const tiles = [];
+  page.on("request", (request) => { if (request.url().includes("tile.openstreetmap.org")) tiles.push(request.url()); });
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/site_footer/home");
+
+  // `load` has fired and the footer is thousands of pixels away: no Leaflet, no tile.
+  await expect(map(page)).toHaveCount(1);
+  await page.waitForTimeout(300);
+  expect(asked).toEqual([]);
+  expect(tiles).toEqual([]);
+  expect(await page.evaluate(() => typeof window.L)).toBe("undefined");
+  await expect(map(page).locator(".ftr-map-fallback")).toHaveCount(1);
+
+  await map(page).scrollIntoViewIfNeeded();
+  await expectMounted(page);
+  expect(asked.filter((path) => path.endsWith("leaflet.js"))).toHaveLength(1);
+  // NOT VACUOUS: once mounted the map does ask for tiles, so their absence above meant something.
+  await expect.poll(() => tiles.length).toBeGreaterThan(0);
+});
+
+test("a map already in view still waits for the window's load event", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const asked = watchLeaflet(page);
+  await blockOffsiteRequests(page);
+
+  // Hold `load` open on a subresource of the page (the footer's logo), as
+  // booking_frame.spec.js does for the frame.
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  let holding = false;
+  await page.route((url) => url.pathname.endsWith("/e2e/img/nav-logo.png"), async (route) => {
+    holding = true;
+    await held;
+    return route.continue();
+  });
+
+  await page.goto("/lab/site_footer", { waitUntil: "domcontentloaded" });
+  await expect(map(page)).toBeInViewport();
+  await expect.poll(() => holding).toBe(true);
+  expect(await page.evaluate(() => document.readyState)).not.toBe("complete");
+
+  // Turbo 7 announces `turbo:load` before `load`; replay it. The map must still wait.
+  await page.evaluate(() => document.dispatchEvent(new Event("turbo:load")));
+  await page.waitForTimeout(300);
+  expect(asked).toEqual([]);
+  await expect(map(page)).not.toHaveClass(/leaflet-container/);
+
+  release();
+  await expectMounted(page);
+});
+
 test("the map's tiles follow the theme in CSS", async ({ page }) => {
   await blockOffsiteRequests(page);
   await page.goto("/lab/site_footer");
