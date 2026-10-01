@@ -4,6 +4,85 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **BREAKING for a 0.83.0 consumer that shows the booking frame: the frame is no
+  longer cropped by default.** 0.83.0 cropped every `studio_booking_frame` to a
+  414px window, 205px down a 732px frame. Those three numbers were measured from
+  one Google schedule, and on a schedule with a different header they sliced the
+  heading and exposed blank space. A crop that fits one schedule must not be a
+  default, so the frame now shows Google's whole page at rest until the app
+  declares its own crop. To keep exactly what 0.83.0 drew, add:
+
+  ```ruby
+  config.booking_crop = { top: 211, bottom: 613, frame_height: 732 }
+  ```
+
+  Better, measure the app's own schedule (below): 613 was that schedule's box
+  with five slots showing, and its fullest day has eight, so the 0.83.0 window
+  cut off the last three. `crop: false` still shows the whole frame; `crop:
+  true`, the default, now means "the app's crop". See *Upgrading from 0.83.0* in
+  [`docs/BOOKING.md`](docs/BOOKING.md).
+
+### Added
+
+- **`config.booking_crop`: the booking frame's crop, per site.** A Hash of
+  `top:`, `bottom:` and `frame_height:`, in pixels of Google's own page: the
+  "Select an appointment time" box's top, its bottom on its fullest day, and the
+  page's height that day. The window is that box plus 6px on each edge. Because
+  `bottom` is the tallest the box gets, a day with fewer slots shows a strip of
+  Google's credit lines under a shorter box and never a cut one.
+  `studio_booking_frame crop:` takes `false`, `true` (the app's crop) or a Hash
+  for one frame. The numbers ride on each wrapper as custom properties, so two
+  frames with different crops share a page. The engine's `/schedule` honours the
+  app's crop; the popup is never cropped. A crop that cannot be one (not numbers,
+  negative, bottom not below top or outside the frame, a window as tall as the
+  frame) shows the frame whole and is logged once.
+- **`bin/booking-crop-measure <booking url>`** prints that Hash. It opens Google's
+  embedded page at two widths, selects every bookable day of the next three
+  months, and reports the month-grid rows and the slot rows of the fullest day it
+  measured against. It reaches the live Google page, so it refuses to run in CI.
+- **`config.booking_path`: an app's own booking page.** A path, or a callable
+  receiving the view. An app that renders `studio_booking_frame` in its own view,
+  rather than drawing the engine's `/schedule`, names that page here and gets
+  what the engine's page had: a footer link to it opens the popup, it is
+  `studio_booking_link`'s fallback href, and a signed-in viewer keeps the footer
+  on it. With neither set, nothing changes. It must be a local path (one leading
+  `/`): a scheme or a protocol-relative `//host` is refused, from a String at
+  assignment and from a callable on each request.
+- [`docs/BOOKING.md`](docs/BOOKING.md): booking as a primitive of its own,
+  adoptable without the footer. Setting the schedule up in Google, sharing other
+  calendars in for conflict checking, the booking URL, measuring the crop, CSP,
+  and the limits. [`docs/SITE_FOOTER.md`](docs/SITE_FOOTER.md) keeps the footer.
+- `/admin/style` shows the frame's two states, whole and cropped, as drawings.
+
+### Fixed
+
+- **A footer link column no longer breaks an email address or a URL mid-word.**
+  The link columns were equal `minmax(0, 1fr)` tracks with `overflow-wrap:
+  anywhere`, so an address in a column broke in two at every width. The rows are
+  unchanged (two link columns to a row on a phone, one row from 768px, beside the
+  brand from 1024px), but a track is now a plain `fr`, at least as wide as its
+  longest word, and an address is kept on one line: its column grows to hold it
+  and its neighbours give way. The first column is 1.5 shares by default and a
+  column may set its own, `[ "Contact", links, { width: 2 } ]`. More than four
+  columns wrap four to a row under the brand. An app that overrode 0.83.0's
+  tracks from its own stylesheet may leave that block (it draws the same rows) or
+  delete it once it is on this version; while it stays, `width:` hints do nothing.
+  [`docs/SITE_FOOTER.md`](docs/SITE_FOOTER.md) lists the stable class hooks.
+- **A booking link that jumps to an inline frame asks Google once.** When the
+  frame had never been scrolled near, the link assigned its `src` and the
+  still-armed observer assigned it again as the frame scrolled into view: two
+  requests for one calendar. Whoever comes second now finds it set.
+- **The footer and the booking note set their own line heights.** The Location
+  heading inherited the page's (a 45px line box at 1.5; it is 2.25rem, 36px,
+  now), and the legal line, the © line and the "Scheduling by Google Calendar"
+  note were each a pixel taller per line than their 1.25rem.
+- **A second cropped frame on a page opens when focus moves into it from the
+  first.** Focus that goes from one frame straight into another never passes
+  through the window, so no second `blur` fired and the second frame stayed
+  cropped under the cursor. Only a page with two cropped frames could show it.
+
 ## 0.83.0 — 2026-10-01
 
 ### Added

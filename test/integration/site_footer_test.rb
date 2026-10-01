@@ -39,11 +39,22 @@ class FooterHostLandingController < ApplicationController
       </div>
       <%= studio_footer_map class: "contact-map", style: "height: 20rem", zoom: 12, controls: false %>
       <%= studio_footer_map({ street: "1 Main St", city_line: "Town, ST", lat: 1.5, lng: 2.5 }) %>
-      <%= studio_booking_frame %>
-      <%= studio_booking_frame title: "Second frame", crop: false %>
+      <div data-frame="config"><%= studio_booking_frame %></div>
+      <div data-frame="whole"><%= studio_booking_frame title: "Second frame", crop: false %></div>
+      <div data-frame="one-off"><%= studio_booking_frame crop: { top: 150, bottom: 480, frame_height: 640 } %></div>
       <%= studio_booking_popup %>
     ERB
   end
+end
+
+# AN APP'S OWN BOOKING PAGE, the way an app that wants its own words around the
+# calendar writes one: its own controller and view, the engine's frame, and
+# nothing else. Signed-in only by default, like every controller here, and public
+# because the app says so. It is named to the engine by config.booking_path.
+class FooterHostScheduleController < ApplicationController
+  skip_before_action :require_authentication
+
+  def show = render(inline: "<h1>Book a time</h1><%= studio_booking_frame %>", layout: true)
 end
 
 # A working surface: signed-in only, and it keeps no footer.
@@ -59,6 +70,8 @@ end
 #   4. where it shows: every page for a visitor, listed controllers when signed in
 #   5. the booking page is drawn by a flag, public, and 404 with nothing to book
 #   6. the helpers a consumer calls from its own views
+#   7. the frame's crop: none by default, the app's when declared, one frame's own
+#   8. an app's own booking page (config.booking_path) is treated as the engine's is
 class SiteFooterTest < ActionDispatch::IntegrationTest
   ActionDispatch::IntegrationTest.app = Rails.application
 
@@ -89,18 +102,27 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
       site_footer: Studio.site_footer, booking_url: Studio.booking_url,
       site_footer_controllers: Studio.site_footer_controllers, draw_booking_routes: Studio.draw_booking_routes,
       site_title: Studio.site_title, theme_logos: Studio.theme_logos,
-      site_footer_visible: Studio.site_footer_visible
+      site_footer_visible: Studio.site_footer_visible,
+      booking_crop: Studio.booking_crop, booking_path: Studio.booking_path
     }
     Studio.site_footer = FACTS
     Studio.booking_url = BOOKING_URL
     Studio.site_footer_controllers = []
+    Studio.booking_crop = nil
+    Studio.booking_path = nil
     Studio::SiteFooterHelper.reported = nil
+    @booking_reporter = Studio::Booking.reporter
+    @booking_reports = []
+    Studio::Booking.reporter = ->(message) { @booking_reports << message }
+    Studio::Booking.reported.clear
   end
 
   def teardown
     @saved.each { |key, value| Studio.public_send("#{key}=", value) }
     Rails.application.reload_routes!
     Studio::SiteFooterHelper.reported = nil
+    Studio::Booking.reporter = @booking_reporter
+    Studio::Booking.reported.clear
   end
 
   def draw_booking_routes!(on = true)
@@ -226,6 +248,47 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "the link columns are grid tracks, the first wider, with an optional width hint" do
+    get "/footer_host/landing"
+
+    assert_select "#{footer} .ftr-cols > nav.ftr-col", 2
+    assert_select "#{footer} .ftr-cols:not(.ftr-cols-many)[style='--ftr-tracks: 1.5fr 1fr']", 1
+    # fr tracks, never minmax(0, ...): a track is at least as wide as its longest
+    # word, so the column holding an address grows and its neighbours give way.
+    assert_includes response.body, ".ftr-cols { display: grid; gap: 3rem 2rem; padding-block: 4rem; grid-template-columns: 1.2fr 1fr; }"
+    assert_includes response.body, ".ftr-cols { grid-template-columns: var(--ftr-tracks, 1fr); }"
+    assert_includes response.body, ".ftr-cols:not(.ftr-cols-many) { grid-template-columns: 1.7fr var(--ftr-tracks,); }"
+    assert_no_match(/\.ftr-cols[^{]*\{[^}]*minmax\(0/, response.body)
+    assert_includes response.body, ".ftr-link-solid { white-space: nowrap; }"
+    assert_equal 1, response.body.scan("overflow-wrap: anywhere").size, "only on a screen narrower than any phone"
+    assert_includes response.body, "@media (max-width: 299px) { .ftr-link-solid { white-space: normal; overflow-wrap: anywhere; } }"
+    # An address is solid; a word and a phrase are not.
+    assert_select "#{footer} a.ftr-link.ftr-link-solid[href='mailto:team@example.test']", 2
+    assert_select "#{footer} a.ftr-link:not(.ftr-link-solid)", text: "Privacy Policy"
+    assert_select "#{footer} a.ftr-link:not(.ftr-link-solid)", text: "Home"
+
+    Studio.site_footer = { columns: [["Contact", [["team@example.test", "mailto:team@example.test"]], { width: 2.5 }],
+                                     ["Company", [["Home", "/"]]], ["Legal", [["Terms", "/terms"]]]] }
+    get "/footer_host/landing"
+    assert_select "#{footer} .ftr-cols[style='--ftr-tracks: 2.5fr 1fr 1fr']", 1
+
+    Studio.site_footer = { columns: %w[A B C D E].map { |heading| [heading, [["Home", "/"]]] } }
+    get "/footer_host/landing"
+    assert_select "#{footer} .ftr-cols.ftr-cols-many:not([style])", 1, "five columns wrap four to a row"
+
+    Studio.site_footer = { name: "Example Co" }
+    get "/footer_host/landing"
+    assert_select "#{footer} .ftr-cols:not([style]):not(.ftr-cols-many)", 1, "no columns, no tracks"
+  end
+
+  test "the footer and the booking note set their own line heights" do
+    get "/footer_host/helpers"
+
+    assert_match(/\.ftr-location-title \{[^}]*font-size: 1\.875rem; line-height: 2\.25rem;/, response.body)
+    assert_match(/\.ftr-legal \{[^}]*font-size: \.875rem; line-height: 1\.25rem;/, response.body)
+    assert_match(/\.booking-frame-note \{[^}]*font-size: \.875rem; line-height: 1\.25rem;/, response.body)
+  end
+
   test "the footer's styles and script are on the page once" do
     get "/footer_host/helpers"
 
@@ -251,7 +314,7 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
                        .reject { |selector| selector.include?("data-studio-booking") },
                  "a booking selector in the engine's script is not scoped to the engine's own elements"
     # Every element those selectors need carries the marker.
-    assert_select "[data-booking-wrap][data-studio-booking] iframe[data-booking-frame][data-studio-booking]", 2
+    assert_select "[data-booking-wrap][data-studio-booking] iframe[data-booking-frame][data-studio-booking]", 3
     assert_select "dialog[data-booking-dialog][data-studio-booking]", 1
     assert_select "a[data-booking-popup]:not([data-studio-booking])", 0
     assert_select "a[data-booking-popup][data-studio-booking]", 4
@@ -447,7 +510,7 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "title", "Schedule a call · Example Co"
     assert_select "[data-booking-page] h1", "Schedule a call"
-    assert_select "[data-booking-wrap].booking-frame-cropped iframe[data-booking-frame]", 1 do |frames|
+    assert_select "[data-booking-wrap]:not(.booking-frame-cropped) iframe[data-booking-frame]", 1 do |frames|
       assert_equal "#{BOOKING_URL}?gv=true", frames.first["data-src"]
       assert_nil frames.first["src"], "the page's script assigns src after `load`"
     end
@@ -529,12 +592,232 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     assert_select "main [data-footer-map][data-lat='1.5'][data-lng='2.5'][aria-label='Map of 1 Main St, Town, ST']", 1
   end
 
-  test "studio_booking_frame can be titled and uncropped, and the popup renders once" do
+  test "studio_booking_frame can be titled, and the popup renders once" do
     get "/footer_host/helpers"
 
-    assert_select "main [data-booking-wrap]", 2
-    assert_select "main [data-booking-wrap].booking-frame-cropped", 1
+    assert_select "main [data-booking-wrap]", 3
     assert_select "main iframe[data-booking-frame][title='Second frame']", 1
     assert_select "dialog[data-booking-dialog]", 1, "asked for by the page and by the footer, rendered once"
+  end
+
+  # ---- 7. the crop ------------------------------------------------------------
+
+  CROP = { top: 200, bottom: 600, frame_height: 720 }.freeze
+  CROP_STYLE = "--booking-crop-offset: 194px; --booking-crop-window: 412px; --booking-frame-height: 720px"
+  ONE_OFF_STYLE = "--booking-crop-offset: 144px; --booking-crop-window: 342px; --booking-frame-height: 640px"
+
+  def frame_wrap(name) = "main [data-frame='#{name}'] [data-booking-wrap]"
+
+  test "with no crop declared a frame shows whole, and carries no crop of any schedule" do
+    get "/footer_host/helpers"
+
+    assert_response :success
+    assert_select frame_wrap("config"), 1
+    assert_select "#{frame_wrap('config')}.booking-frame-cropped", 0
+    assert_select "#{frame_wrap('config')}[style]", 0
+    assert_select "#{frame_wrap('config')}[data-booking-crop]", 0
+    assert_no_match(/414px|205px/, response.body, "the 0.83.0 crop was one schedule's and is no longer a default")
+    assert_empty @booking_reports
+  end
+
+  test "a declared crop renders the measured window on the frame's own wrapper" do
+    Studio.booking_crop = CROP
+
+    get "/footer_host/helpers"
+
+    assert_select "#{frame_wrap('config')}.booking-frame-cropped[data-booking-crop]", 1 do |wraps|
+      assert_equal CROP_STYLE, wraps.first["style"]
+    end
+    # The stylesheet reads those properties; it names no schedule's numbers.
+    assert_includes response.body, ".booking-frame-cropped { height: var(--booking-crop-window);"
+    assert_includes response.body, "margin-top: calc(-1 * var(--booking-crop-offset));"
+    assert_includes response.body, ".booking-frame-cropped.is-open { height: var(--booking-frame-height, 732px); }"
+    assert_empty @booking_reports
+  end
+
+  test "crop: false shows one frame whole whatever the app declares" do
+    Studio.booking_crop = CROP
+
+    get "/footer_host/helpers"
+
+    assert_select "#{frame_wrap('whole')}:not(.booking-frame-cropped):not([style]):not([data-booking-crop])", 1
+  end
+
+  test "a Hash on the call crops that frame alone, with or without an app crop" do
+    get "/footer_host/helpers"
+    assert_select "#{frame_wrap('one-off')}.booking-frame-cropped", 1 do |wraps|
+      assert_equal ONE_OFF_STYLE, wraps.first["style"]
+    end
+    assert_select "main .booking-frame-cropped", 1, "the other two frames are whole"
+
+    Studio.booking_crop = CROP
+    get "/footer_host/helpers"
+    assert_select "#{frame_wrap('one-off')}.booking-frame-cropped", 1 do |wraps|
+      assert_equal ONE_OFF_STYLE, wraps.first["style"], "the call's own crop wins over the app's"
+    end
+    assert_select "#{frame_wrap('config')}.booking-frame-cropped[style='#{CROP_STYLE}']", 1,
+                  "and two crops share the page, each on its own wrapper"
+  end
+
+  test "the engine's booking page honours the app's crop" do
+    draw_booking_routes!
+
+    get "/schedule"
+    assert_select "[data-booking-page] [data-booking-wrap]", 1
+    assert_select "[data-booking-page] .booking-frame-cropped", 0
+
+    Studio.booking_crop = CROP
+    get "/schedule"
+    assert_select "[data-booking-page] [data-booking-wrap].booking-frame-cropped[style='#{CROP_STYLE}']", 1
+  end
+
+  test "the popup is never cropped" do
+    Studio.booking_crop = CROP
+
+    get "/footer_host/landing"
+
+    assert_select "dialog[data-booking-dialog]", 1
+    assert_select "dialog[data-booking-dialog] iframe[data-booking-popup-frame]:not([style])", 1
+    assert_select "dialog[data-booking-dialog][style], dialog[data-booking-dialog] [data-booking-crop]", 0
+    assert_select ".booking-frame-cropped", 0, "this page has a popup and no inline frame"
+  end
+
+  test "a crop that cannot be one shows the frame whole and is reported once" do
+    Studio.booking_crop = { top: 600, bottom: 200, frame_height: 720 }
+    assert_equal 1, @booking_reports.size, "reported when it is assigned, which is boot"
+
+    2.times { get "/footer_host/helpers" }
+
+    assert_response :success
+    assert_select "#{frame_wrap('config')}:not(.booking-frame-cropped):not([style])", 1
+    assert_select "#{frame_wrap('one-off')}.booking-frame-cropped", 1, "a sound one-off on the same page still crops"
+    assert_equal 1, @booking_reports.size, "and not again on any render"
+    assert_match(/\[studio\.booking\] booking crop .* is ignored \(bottom is not below top\); the frame shows whole/,
+                 @booking_reports.first)
+  end
+
+  test "booking_crop takes a Hash, nil or false, and refuses anything else when it is assigned" do
+    Studio.booking_crop = CROP
+    assert_equal CROP, Studio.booking_crop
+
+    [true, "200-600", [200, 600, 720], 414].each do |bad|
+      error = assert_raises(ArgumentError, bad.inspect) { Studio.booking_crop = bad }
+      assert_match(/top:, bottom: and frame_height:/, error.message)
+    end
+    assert_equal CROP, Studio.booking_crop, "a refused value leaves the old one in place"
+
+    Studio.booking_crop = false
+    assert_nil Studio.booking_crop
+  end
+
+  # ---- 8. an app's own booking page -------------------------------------------
+
+  OWN_PAGE = "/footer_host/schedule"
+
+  test "with neither booking_path nor the engine's route, the app's page is an ordinary page" do
+    Studio.site_footer = { columns: [["Contact", [["Schedule a call", OWN_PAGE]]]] }
+
+    get "/footer_host/helpers"
+    assert_select "#{footer} a[href='#{OWN_PAGE}']:not([data-booking-popup])", 1
+    assert_select "[data-own-links] a[href='#{BOOKING_URL}']", "Schedule a call"
+
+    get OWN_PAGE, headers: SIGNED_IN
+    assert_select "h1", "Book a time"
+    assert_select footer, 0, "a signed-in viewer's unlisted page keeps no footer"
+  end
+
+  test "booking_path makes a footer link to the app's page open the popup without being told to" do
+    Studio.booking_path = OWN_PAGE
+    Studio.site_footer = { columns: [["Contact", [["Schedule a call", OWN_PAGE], ["Contact", "/contact"]]]] }
+
+    get "/footer_host/landing"
+
+    assert_select "#{footer} a[href='#{OWN_PAGE}'][data-booking-popup][data-studio-booking]", 1
+    assert_select "#{footer} a[href='/contact']:not([data-booking-popup])", 1
+  end
+
+  test "booking_path is where studio_booking_link falls back to" do
+    Studio.booking_path = OWN_PAGE
+
+    get "/footer_host/helpers"
+
+    assert_select "[data-own-links] a[href='#{OWN_PAGE}'][data-booking-popup]", 2
+    assert_select "[data-own-links] a.btn[href='/contact']", "Talk to us"
+    assert_select "[data-own-links] a[href='#{BOOKING_URL}']", 0
+  end
+
+  test "booking_path keeps the footer on the app's page for a signed-in viewer, and only there" do
+    Studio.booking_path = OWN_PAGE
+
+    get OWN_PAGE, headers: SIGNED_IN
+    assert_response :success
+    assert_select "h1", "Book a time"
+    assert_select footer, 1
+
+    get "/footer_host/board", headers: SIGNED_IN
+    assert_select footer, 0, "a working surface is still a working surface"
+  end
+
+  test "booking_path may be a callable that receives the view" do
+    seen = []
+    Studio.booking_path = lambda do |view|
+      seen << view.controller_name
+      view.url_for(controller: "/footer_host_schedule", action: "show", only_path: true)
+    end
+    Studio.site_footer = { columns: [["Contact", [["Schedule a call", OWN_PAGE]]]] }
+
+    get "/footer_host/helpers", headers: SIGNED_IN
+    assert_select "[data-own-links] a[href='#{OWN_PAGE}'][data-booking-popup]", 2
+    assert_includes seen, "footer_host_landing"
+
+    get OWN_PAGE, headers: SIGNED_IN
+    assert_select footer, 1
+    assert_select "#{footer} a[href='#{OWN_PAGE}'][data-booking-popup]", 1
+  end
+
+  test "the app's own page renders the frame with the app's crop and nothing special" do
+    Studio.booking_path = OWN_PAGE
+    Studio.booking_crop = CROP
+
+    get OWN_PAGE
+
+    assert_response :success
+    assert_select "main [data-booking-wrap].booking-frame-cropped[style='#{CROP_STYLE}'] iframe[data-booking-frame]", 1 do |frames|
+      assert_equal "#{BOOKING_URL}?gv=true", frames.first["data-src"]
+    end
+    assert_select footer, 1
+  end
+
+  test "a booking_path callable that returns a script or another host is never written into an href" do
+    Studio.site_footer = { columns: [["Contact", [["Schedule a call", OWN_PAGE]]]] }
+
+    ["javascript:alert(1)", "//evil.example/schedule"].each do |bad|
+      Studio.booking_path = ->(_view) { bad }
+
+      get "/footer_host/helpers"
+      assert_response :success
+      assert_no_match(/javascript:alert|evil\.example/, response.body, "#{bad} reached the page")
+      assert_select "[data-own-links] a[href='#{BOOKING_URL}']", "Schedule a call"
+      assert_select "#{footer} a[href='#{OWN_PAGE}']:not([data-booking-popup])", 1, "nor does it name the booking page"
+    end
+    assert_equal 2, @booking_reports.size, "each refused value is reported once"
+
+    assert_raises(ArgumentError) { Studio.booking_path = "//evil.example/schedule" }
+    assert_raises(ArgumentError) { Studio.booking_path = "javascript:alert(1)" }
+  end
+
+  test "booking_path wins over the engine's page, and is refused unless it is a path or a callable" do
+    draw_booking_routes!
+    Studio.booking_path = OWN_PAGE
+
+    get "/footer_host/helpers"
+    assert_select "[data-own-links] a[href='#{OWN_PAGE}'][data-booking-popup]", 2
+    get "/schedule", headers: SIGNED_IN
+    assert_select footer, 1, "the engine's own page keeps its exemption"
+
+    assert_raises(ArgumentError) { Studio.booking_path = "footer_host/schedule" }
+    assert_equal OWN_PAGE, Studio.booking_path, "a refused value leaves the old one in place"
+    Studio.booking_path = " "
+    assert_nil Studio.booking_path
   end
 end

@@ -13,7 +13,8 @@
 <%= studio_site_footer_assets %>
 <footer class="ftr" data-site-footer>
   <div class="ftr-wrap">
-    <div class="ftr-cols" style="--ftr-n: <%= columns.size %>; --ftr-n-md: <%= [ columns.size, 4 ].min.clamp(1, 4) %>;">
+    <% tracks = Studio::SiteFooter.tracks(columns) %>
+    <div class="ftr-cols<%= " ftr-cols-many" if columns.size > Studio::SiteFooter::MAX_ROW_COLUMNS %>"<% if tracks %> style="--ftr-tracks: <%= tracks %>"<% end %>>
       <div class="ftr-brand">
         <% if facts[:logo] || facts[:wordmark] %>
           <a href="<%= facts[:home_path] %>" class="ftr-home" aria-label="<%= facts[:name] %>">
@@ -29,7 +30,7 @@
           <p class="ftr-tagline"><%= facts[:tagline] %></p>
         <% end %>
         <% if facts[:email] %>
-          <p class="ftr-email"><a href="mailto:<%= facts[:email] %>" class="ftr-link"><%= facts[:email] %></a></p>
+          <p class="ftr-email"><a href="mailto:<%= facts[:email] %>" class="ftr-link ftr-link-solid"><%= facts[:email] %></a></p>
         <% end %>
         <% if facts[:social].any? %>
           <ul class="ftr-socials" aria-label="Social profiles">
@@ -48,7 +49,7 @@
       </div>
 
       <% columns.each do |column| %>
-        <nav aria-label="<%= column[:heading] || "Footer" %>">
+        <nav class="ftr-col" aria-label="<%= column[:heading] || "Footer" %>">
           <% if column[:heading] %>
             <h2 class="ftr-heading"><%= column[:heading] %></h2>
           <% end %>

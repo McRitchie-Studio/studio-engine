@@ -68,6 +68,8 @@ Rails.application.routes.draw do
   get "lab/site_footer/home", to: "e2e_lab#site_footer", defaults: { variant: "home" }
   get "lab/site_footer/schedule", to: "e2e_lab#site_footer", defaults: { variant: "schedule" }
   get "lab/site_footer/plain", to: "e2e_lab#site_footer", defaults: { variant: "plain" }
+  get "lab/site_footer/crops", to: "e2e_lab#site_footer", defaults: { variant: "crops" }
+  get "lab/site_footer/columns/:n", to: "e2e_lab#site_footer", defaults: { variant: "columns" }
 
   # A host app's own pages, one open and one geo-LOCKED, for the geo suite.
   get "lab/geo", to: "geo_lab#open"
@@ -92,6 +94,8 @@ Rails.application.routes.draw do
   get "footer_host/landing", to: "footer_host_landing#show"
   get "footer_host/board", to: "footer_host_board#show"
   get "footer_host/helpers", to: "footer_host_landing#helpers"
+  # An app's OWN booking page (config.booking_path), not the engine's /schedule.
+  get "footer_host/schedule", to: "footer_host_schedule#show"
 
   get "lab/session", to: "session_lab#show"
   post "lab/session/sign_in", to: "session_lab#sign_in"

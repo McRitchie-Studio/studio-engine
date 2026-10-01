@@ -2,7 +2,7 @@ const { test, expect } = require("@playwright/test");
 const { blockOffsiteRequests, watchPageErrors } = require("./helpers");
 
 // The booking primitives (studio/booking/_frame, _popup, _assets;
-// docs/SITE_FOOTER.md).
+// docs/BOOKING.md).
 //
 // WHY A BROWSER TIER EARNS ITS PLACE HERE. The frame's URL waits in data-src and
 // an inline script assigns src only after the window's `load` event, once the
@@ -32,7 +32,7 @@ async function stubGoogle(page) {
     asked.push(route.request().url());
     return route.fulfill({
       contentType: "text/html",
-      // 300px down: inside the window the cropped frame shows, so it can be clicked.
+      // 300px down: inside the window every cropped lab frame shows, so it can be clicked.
       body: "<p id='stub' style='margin-top:300px'>booking stub</p>",
     });
   });
@@ -106,7 +106,16 @@ test("the frame fills its column", async ({ page }) => {
   expect(box.width).toBeLessThanOrEqual(896);
 });
 
-test("the frame is cropped to the slot picker at rest and opens fully once it is used", async ({ page }) => {
+// [wrapper height, frame height, frame margin-top] for one lab frame.
+const sizes = (page, name) =>
+  page.locator(`[data-lab-crop="${name}"] [data-booking-wrap]`).evaluate((el) => {
+    const inner = el.querySelector("iframe");
+    return [el.clientHeight, inner.offsetHeight, parseInt(getComputedStyle(inner).marginTop, 10)];
+  });
+const labFrame = (page, name) => page.frameLocator(`[data-lab-crop="${name}"] iframe[data-booking-frame]`);
+const labWrap = (page, name) => page.locator(`[data-lab-crop="${name}"] [data-booking-wrap]`);
+
+test("with no crop declared the frame is whole at rest, and using it changes nothing", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await stubGoogle(page);
   await page.goto("/lab/site_footer/schedule");
@@ -117,27 +126,70 @@ test("the frame is cropped to the slot picker at rest and opens fully once it is
     wrap.evaluate((el) => [el.clientHeight, el.querySelector("iframe").offsetHeight,
                            parseInt(getComputedStyle(el.querySelector("iframe")).marginTop, 10)]);
 
-  // At rest the wrapper shows a 414px window onto a 732px frame, 205px down it.
-  expect(await heights()).toEqual([414, 732, -205]);
-  await expect(wrap).not.toHaveClass(/is-open/);
+  // The whole 732px frame, not a window onto it: no schedule's crop is a default.
+  expect(await heights()).toEqual([732, 732, 0]);
+  await expect(wrap).not.toHaveClass(/booking-frame-cropped/);
+  expect(await wrap.getAttribute("style")).toBeNull();
 
-  // A click inside the frame moves focus into it; the parent sees only a blur.
   await page.frameLocator("iframe[data-booking-frame]").locator("#stub").click();
   await expect(wrap).toHaveClass(/is-open/);
-  await expect.poll(async () => await heights()).toEqual([732, 732, 0]);
+  await page.waitForTimeout(350);
+  expect(await heights()).toEqual([732, 732, 0]);
 });
 
-test("below 640px nothing is cropped", async ({ page }) => {
+test("a cropped frame shows its own window at rest and opens to its own full height once it is used", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await stubGoogle(page);
+  await page.goto("/lab/site_footer/crops");
+  await expect(page.locator('[data-lab-crop="first"] iframe')).toHaveAttribute("src", /gv=true$/);
+
+  // top 200, bottom 600, frame 720: a 412px window, 194px down a 720px frame.
+  expect(await sizes(page, "first")).toEqual([412, 720, -194]);
+  await expect(labWrap(page, "first")).not.toHaveClass(/is-open/);
+
+  // A click inside the frame moves focus into it; the parent sees only a blur.
+  await labFrame(page, "first").locator("#stub").click();
+  await expect(labWrap(page, "first")).toHaveClass(/is-open/);
+  await expect.poll(async () => await sizes(page, "first")).toEqual([720, 720, 0]);
+});
+
+test("two frames with different crops share a page, and each opens alone", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await stubGoogle(page);
+  await page.goto("/lab/site_footer/crops");
+  for (const name of ["first", "second", "whole"]) {
+    await page.locator(`[data-lab-crop="${name}"] iframe`).scrollIntoViewIfNeeded();
+    await expect(page.locator(`[data-lab-crop="${name}"] iframe`)).toHaveAttribute("src", /gv=true$/);
+  }
+
+  // Each wrapper carries its own numbers; neither leaks into the other, nor into
+  // the frame that has none.
+  expect(await sizes(page, "first")).toEqual([412, 720, -194]);
+  expect(await sizes(page, "second")).toEqual([342, 640, -144]);
+  expect(await sizes(page, "whole")).toEqual([732, 732, 0]);
+
+  await labFrame(page, "second").locator("#stub").click();
+  await expect(labWrap(page, "second")).toHaveClass(/is-open/);
+  await expect.poll(async () => await sizes(page, "second")).toEqual([640, 640, 0]);
+  await expect(labWrap(page, "first")).not.toHaveClass(/is-open/);
+  expect(await sizes(page, "first")).toEqual([412, 720, -194]);
+
+  // FRAME TO FRAME. Focus goes from the second frame straight into the first and
+  // never through this window, so no second blur fires; the first must open anyway.
+  await labFrame(page, "first").locator("#stub").click();
+  await expect.poll(async () => await sizes(page, "first")).toEqual([720, 720, 0]);
+  expect(await sizes(page, "second")).toEqual([640, 640, 0]);
+});
+
+test("below 640px nothing is cropped, declared or not", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await stubGoogle(page);
-  await page.goto("/lab/site_footer/schedule");
-  await expect(frame(page)).toHaveAttribute("src", /gv=true$/);
+  await page.goto("/lab/site_footer/crops");
 
-  const sizes = await page.locator("[data-booking-wrap]").evaluate((el) => {
-    const inner = el.querySelector("iframe");
-    return [el.clientHeight, inner.offsetHeight, parseInt(getComputedStyle(inner).marginTop, 10)];
-  });
-  expect(sizes).toEqual([1200, 1200, 0]);
+  // NOT VACUOUS: these two wrappers do carry a crop; the width is what drops it.
+  await expect(labWrap(page, "first")).toHaveClass(/booking-frame-cropped/);
+  await expect(labWrap(page, "second")).toHaveClass(/booking-frame-cropped/);
+  for (const name of ["first", "second", "whole"]) expect(await sizes(page, name)).toEqual([1200, 1200, 0]);
 });
 
 test("a booking link opens the popup in place, centred, and Escape closes it", async ({ page }) => {
@@ -268,6 +320,32 @@ test("on a page that shows the inline frame, a booking link goes to that frame i
 
   // One calendar on the page, asked for once: the popup's frame was never loaded.
   expect(await page.locator("iframe[data-booking-popup-frame]").getAttribute("src")).toBeNull();
+  expect(asked).toHaveLength(1);
+});
+
+test("a booking link that jumps to a frame never scrolled to asks Google once", async ({ page }) => {
+  // A short window, so the foot of the page is far from the frame above the footer.
+  await page.setViewportSize({ width: 1280, height: 300 });
+  const asked = await stubGoogle(page);
+  await page.goto("/lab/site_footer/home");
+
+  // THE JUMP. Straight to the foot of the page in one step (End, an anchor), so
+  // the frame never comes near the viewport and its observer never fires.
+  // NOT VACUOUS: nothing has asked Google, and the frame is out of view.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.waitForTimeout(400);
+  expect(await frame(page).getAttribute("src")).toBeNull();
+  expect(asked).toEqual([]);
+  await expect(frame(page)).not.toBeInViewport();
+
+  // The click assigns src and scrolls to the frame, which then enters the
+  // viewport under a still-armed observer. That second arrival must not ask
+  // again. Clicked in place: Playwright's own click would scroll to the link first.
+  await page.locator("footer[data-site-footer] a[data-booking-popup]").evaluate((link) => link.click());
+  await expect(frame(page)).toHaveAttribute("src", /gv=true$/);
+  await expect(page.locator("[data-booking-wrap]")).toBeInViewport();
+  await expect(page.frameLocator("iframe[data-booking-frame]").locator("#stub")).toHaveText("booking stub");
+  await page.waitForTimeout(800);
   expect(asked).toHaveLength(1);
 });
 
