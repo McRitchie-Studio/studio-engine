@@ -7,7 +7,7 @@
   THREE RULES ARE REMOVED from the published file: the two layers-control
   toggle backgrounds and .leaflet-default-icon-path. Each pointed at an image
   (images/layers.png, images/layers-2x.png, images/marker-icon.png) that is not
-  shipped, and an asset pipeline that resolves url() would warn on every build.
+  shipped, and an asset pipeline that resolves stylesheet URLs would warn on every build.
   So Leaflet's DEFAULT marker icon and its layers control have no artwork here:
   mark a point with L.divIcon, as the footer map does.
 

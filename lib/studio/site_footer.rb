@@ -101,7 +101,7 @@ module Studio
     # no address at all: no Location band and no map.
     def address(facts)
       declared = facts[:address]
-      source = declared.respond_to?(:to_h) ? symbolize(declared) : facts
+      source = declared.nil? ? facts : symbolize(declared)
       street = text(source[:street])
       city_line = text(source[:city_line])
       return nil if street.nil? && city_line.nil?
