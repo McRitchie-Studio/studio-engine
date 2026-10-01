@@ -61,7 +61,7 @@ Every key is optional. A missing key removes its part of the footer.
 | `email` | A `mailto:` link under the tagline | No line. (To list the email in a column instead, write it as a column link.) |
 | `address` | The Location band, and the map | No Location band, no map, and Leaflet is never requested |
 | `social` | A row of round icons | No row |
-| `columns` | Link columns under bold headings | Brand only |
+| `columns` | Link columns under bold headings. A column may carry a width hint: `[ "Contact", links, { width: 1.5 } ]` | Brand only |
 | `legal` | The centred line above the © | The © alone |
 | `booking` | `{ label:, title: }` for the popup's heading and the frame's accessible name | "Schedule a call", and "Schedule a call with <name>" |
 
@@ -83,6 +83,16 @@ Rows may be tuples, as above, or hashes (`{ label:, href: }`, `{ heading:, links
   into the page: a link or a social icon prints unlinked, `home_path` falls back
   to `/`, and `directions_url` falls back to the Google Maps default. Each
   refused value is logged once (`[studio.site_footer] ... is not linked`).
+- **A column is as wide as its longest word.** The columns share the row
+  equally, but none is narrower than its content, so a column holding an email
+  address or a URL widens and the others give way; one that cannot fit beside
+  its neighbours wraps under them. A label with no space in it is kept on one
+  line (a browser would otherwise wrap it after a hyphen or a slash). It is
+  broken only below 360px, where a screen may be too narrow to hold it whole.
+- **`width:` is a column's share of the row**, against the others' 1, from
+  768px up: `{ width: 1.5 }` as a tuple's third element, or `width:` in a hash
+  row. A number from 0.5 to 4; anything else is ignored. It is a preference, not
+  a need: no hint is required to keep an address whole.
 - **A social profile with a `nil` URL** renders its icon unlinked, with a dashed
   outline. The engine draws `:linkedin`, `:instagram`, `:x`, `:facebook` and
   `:youtube`; any other icon falls back to the label's first letter.
@@ -208,6 +218,30 @@ the same rule ([`BOOKING.md`](BOOKING.md#coexisting-with-an-apps-own-copy)).
 Stable, for tests and for an app's own scripts:
 `footer[data-site-footer]`, `[data-footer-location]`, `[data-footer-map]`. The
 booking hooks are in [`BOOKING.md`](BOOKING.md#markup-hooks).
+
+## Class hooks
+
+These class names are stable, and an app may style against them:
+
+| Class | Element |
+|-------|---------|
+| `.ftr` | The footer |
+| `.ftr-cols` | The row of brand and link columns, a wrapping flex row |
+| `.ftr-brand` | The brand block |
+| `.ftr-col` | One link column (a `nav`); `--ftr-w` is its share of the row |
+| `.ftr-heading`, `.ftr-list` | A column's heading and its list |
+| `.ftr-link`, `.ftr-link-solid`, `.ftr-link-disabled` | A link; a one-word link kept on one line; a "coming soon" label |
+| `.ftr-location`, `.ftr-location-title`, `.ftr-address` | The Location band |
+| `.ftr-legal`, `.ftr-copyright` | The legal line and the © line |
+| `.ftr-map` | The map |
+
+The rest (`.ftr-wrap`, `.ftr-home`, the social and pin classes) may change.
+
+The footer's stylesheet is inline and unlayered, and comes after the app's own
+in the document, so an app rule needs more specificity to win: prefix it with
+`footer[data-site-footer]`. `.ftr-cols` was a grid before; it is a flex row now,
+so an app's `grid-template-columns` on it does nothing and can be deleted, along
+with any `overflow-wrap` override on `.ftr-link`.
 
 ## Tests
 

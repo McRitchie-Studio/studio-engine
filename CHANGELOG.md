@@ -56,6 +56,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **A footer link column no longer breaks an email address or a URL mid-word.**
+  The link columns were equal grid tracks with `overflow-wrap: anywhere`, so an
+  address in a column broke in two at every width. They are a wrapping flex row
+  now: each column takes an equal share but is never narrower than its longest
+  word, and a one-word label stays on one line (it is broken only below 360px).
+  A column may carry a width hint, `[ "Contact", links, { width: 1.5 } ]`.
+  `.ftr-cols` is no longer a grid, so an app's `grid-template-columns` override
+  on it is inert and can be deleted;
+  [`docs/SITE_FOOTER.md`](docs/SITE_FOOTER.md) lists the stable class hooks.
+- **A booking link that jumps to an inline frame asks Google once.** When the
+  frame had never been scrolled near, the link assigned its `src` and the
+  still-armed observer assigned it again as the frame scrolled into view: two
+  requests for one calendar. Whoever comes second now finds it set.
+- **The footer and the booking note set their own line heights.** The Location
+  heading inherited the page's (a 45px line box at 1.5; it is 2.25rem, 36px,
+  now), and the legal line, the © line and the "Scheduling by Google Calendar"
+  note were each a pixel taller per line than their 1.25rem.
 - **A second cropped frame on a page opens when focus moves into it from the
   first.** Focus that goes from one frame straight into another never passes
   through the window, so no second `blur` fired and the second frame stayed
