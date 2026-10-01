@@ -88,7 +88,8 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     @saved = {
       site_footer: Studio.site_footer, booking_url: Studio.booking_url,
       site_footer_controllers: Studio.site_footer_controllers, draw_booking_routes: Studio.draw_booking_routes,
-      site_title: Studio.site_title, theme_logos: Studio.theme_logos
+      site_title: Studio.site_title, theme_logos: Studio.theme_logos,
+      site_footer_visible: Studio.site_footer_visible
     }
     Studio.site_footer = FACTS
     Studio.booking_url = BOOKING_URL
@@ -235,6 +236,9 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
       assert_nil frames.first["src"], "the frame must not load before the dialog opens"
       assert_equal "Schedule a call with McRitchie Studio", frames.first["title"]
     end
+    assert_select "dialog[data-booking-dialog] form[method='dialog'] button[type='submit'][data-booking-close]", "Close ✕"
+    assert_match(/html:has\(dialog\[data-booking-dialog\]\[open\]\) \{ overflow: hidden; \}/, response.body,
+                 "the page behind the open dialog must not scroll")
     assert_select "#{footer} a[href='/contact'][data-booking-popup]", { text: "Schedule a call", count: 1 }
     assert_select "#{footer} a[data-booking-popup]", 1, "only the booking link opens the popup"
   end
@@ -306,6 +310,29 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     assert_select footer, 0
   end
 
+  test "site_footer_visible replaces the rule, so an app can narrow where a visitor sees the footer" do
+    Studio.site_footer_visible = lambda do |view|
+      Studio::SiteFooter.default_visible?(view) && view.controller_name != "footer_host_landing"
+    end
+
+    get "/footer_host/landing"
+
+    assert_response :success
+    assert_select "h1", "Landing"
+    assert_select footer, 0, "the narrowed rule hides it from a visitor on this controller"
+    assert_select "dialog[data-booking-dialog]", 0
+
+    draw_booking_routes!
+    get "/schedule"
+    assert_select footer, 1, "and the default still answers everywhere else"
+  end
+
+  test "the default rule is a callable an app can read back and compose with" do
+    assert_respond_to Studio.site_footer_visible, :call
+    assert_raises(ArgumentError) { Studio.site_footer_visible = %w[landing] }
+    assert_respond_to Studio.site_footer_visible, :call, "a refused value leaves the old rule in place"
+  end
+
   test "assigning something that is not facts is refused when it is assigned" do
     assert_raises(ArgumentError) { Studio.site_footer = "McRitchie Studio" }
     assert_equal FACTS, Studio.site_footer
@@ -367,6 +394,18 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     end
     assert_select "a[href='#{BOOKING_URL}'][target='_blank']", "Open the booking page"
     assert_select footer, 1
+  end
+
+  test "with scripts off the frame's place is taken by a plain link to the booking page" do
+    draw_booking_routes!
+
+    get "/schedule"
+
+    noscript = response.body[%r{<div class="booking-frame[^>]*data-booking-wrap>.*?<noscript>(.*?)</noscript>}m, 1]
+    assert noscript, "the frame's wrapper must carry a <noscript>"
+    assert_match(%r{<a href="#{Regexp.escape(BOOKING_URL)}"[^>]*>Open the booking page to pick a time</a>}, noscript)
+    assert_match(/\.booking-frame iframe \{ display: none !important; \}/, noscript,
+                 "the frame that will never load must not be left as an empty box")
   end
 
   test "the booking page keeps the footer for a signed-in viewer without being listed" do

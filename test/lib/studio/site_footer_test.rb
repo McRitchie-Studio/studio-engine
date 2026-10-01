@@ -205,6 +205,41 @@ class SiteFooterTest < Minitest::Test
     assert Studio::SiteFooter.visible?(logged_in: true, controller_name: "landing", controllers: [:landing]), "symbols are fine"
     refute Studio::SiteFooter.visible?(logged_in: true, controller_name: "landing", controllers: nil)
   end
+
+  # ---- the default rule, asked of a view ---------------------------------------
+
+  Viewer = Struct.new(:signed_in, :controller_name, :controller_path) do
+    def logged_in? = signed_in
+  end
+
+  def test_the_default_rule_reads_the_view_and_the_listed_controllers
+    visitor = Viewer.new(false, "tasks", "tasks")
+    worker = Viewer.new(true, "tasks", "tasks")
+    reader = Viewer.new(true, "landing", "landing")
+
+    assert Studio::SiteFooter.default_visible?(visitor, controllers: [])
+    refute Studio::SiteFooter.default_visible?(worker, controllers: %w[landing])
+    assert Studio::SiteFooter.default_visible?(reader, controllers: %w[landing])
+  end
+
+  def test_the_engines_booking_page_is_always_listed
+    booking = Viewer.new(true, "bookings", "studio/bookings")
+
+    assert Studio::SiteFooter.default_visible?(booking, controllers: [])
+    refute Studio::SiteFooter.default_visible?(Viewer.new(true, "bookings", "admin/bookings"), controllers: []),
+           "a host's own bookings controller is not the engine's"
+  end
+
+  def test_a_view_that_cannot_say_who_is_signed_in_is_treated_as_a_visitor
+    assert Studio::SiteFooter.default_visible?(Object.new, controllers: [])
+  end
+
+  def test_the_visibility_rule_must_be_a_callable
+    assert_nil Studio::SiteFooter.validate_visible!(->(_view) { true })
+    [nil, true, "landing", %w[landing]].each do |bad|
+      assert_raises(ArgumentError, bad.inspect) { Studio::SiteFooter.validate_visible!(bad) }
+    end
+  end
 end
 
 class BookingUrlTest < Minitest::Test

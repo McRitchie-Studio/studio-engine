@@ -17,13 +17,18 @@ const { blockOffsiteRequests, watchPageErrors } = require("./helpers");
 // off-origin is refused (blockOffsiteRequests), the stub is registered after it,
 // and Playwright runs the last route registered first.
 
+// A predicate, not a glob. test/lib/e2e_lane_contract_test.rb counts the specs
+// in this file after stripping comments, and a glob ending in slash-star-star
+// reads to it as the start of a block comment: two tests vanished from its count.
+const isGoogle = (url) => url.hostname === "calendar.google.com";
+
 const frame = (page) => page.locator("iframe[data-booking-frame]");
 const dialog = (page) => page.locator("dialog[data-booking-dialog]");
 
 async function stubGoogle(page) {
   const asked = [];
   await blockOffsiteRequests(page);
-  await page.route("https://calendar.google.com/**", (route) => {
+  await page.route(isGoogle, (route) => {
     asked.push(route.request().url());
     return route.fulfill({
       contentType: "text/html",
@@ -62,7 +67,7 @@ test("a frame already in view still waits for the window's load event", async ({
   let release;
   const held = new Promise((resolve) => { release = resolve; });
   let holding = false;
-  await page.route("**/e2e/img/nav-logo.png", async (route) => {
+  await page.route((url) => url.pathname.endsWith("/e2e/img/nav-logo.png"), async (route) => {
     holding = true;
     await held;
     return route.continue();
@@ -258,7 +263,7 @@ test("a third-party frame's console noise is scoped out by origin, and the page'
   await blockOffsiteRequests(page);
   // Google's real frame logs this on its own. Reproduce it from Google's origin:
   // one console error, one uncaught exception.
-  await page.route("https://calendar.google.com/**", (route) =>
+  await page.route(isGoogle, (route) =>
     route.fulfill({
       contentType: "text/html",
       body: "<p id='stub'>booking stub</p><script>console.error('requestStorageAccess: Permission denied');" +
