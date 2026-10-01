@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.83.0 — 2026-10-01
+
 ### Added
 
 - **A site footer every app renders from configuration.** `<%= studio_site_footer %>`
