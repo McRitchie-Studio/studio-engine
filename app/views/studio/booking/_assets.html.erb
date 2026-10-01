@@ -26,7 +26,7 @@
   .booking-frame-note a:hover { text-decoration: underline; }
 
   /* The popup. */
-  .booking-popup { width: min(960px, calc(100vw - 2rem)); height: min(800px, calc(100vh - 3rem)); max-width: none; max-height: none;
+  .booking-popup { width: min(960px, calc(100vw - 2rem)); height: min(800px, calc(100vh - 3rem)); height: min(800px, calc(100dvh - 3rem)); max-width: none; max-height: none;
     /* Tailwind's reset zeroes a dialog's margin, which is what centres it. */
     margin: auto; inset: 0;
     padding: 0; border: 1px solid rgb(127 127 127 / .3); border-radius: .75rem; overflow: hidden;
@@ -40,10 +40,13 @@
      Escape key goes to Google, not to this dialog, and nothing here can change
      that. So Close is a solid, full-size button, not a quiet glyph, and a click
      anywhere on the backdrop closes too. */
+  /* Ink on surface, inverted: the theme's text colour as the fill and its
+     surface as the label. That pair is the theme's own highest contrast in both
+     modes (white on the primary measured 3.10:1, under the 4.5:1 a label needs). */
   .booking-popup-close { flex: none; min-height: 2.75rem; padding: .5rem 1.1rem; border-radius: .5rem; border: 0;
-    background: var(--color-primary, #8b5cf6); color: #fff; font: inherit; font-size: .95rem; font-weight: 700; cursor: pointer; }
+    background: var(--color-text, #111827); color: var(--color-surface, #fff); font: inherit; font-size: .95rem; font-weight: 700; cursor: pointer; }
   .booking-popup-close:hover { filter: brightness(1.12); }
-  .booking-popup-close:focus-visible { outline: 3px solid var(--color-text, currentColor); outline-offset: 2px; }
+  .booking-popup-close:focus-visible { outline: 3px solid var(--color-primary, #8b5cf6); outline-offset: 2px; }
   /* The page behind does not scroll while the dialog is open. Pure CSS, so every
      way of closing it (the button, the backdrop, Escape) lifts the lock. On html
      rather than body for the reason studio/modals/_host gives. */
@@ -55,12 +58,19 @@
 <script>
   // The inline frame: assign src after `load`, once the frame is near the
   // viewport, and open the crop when focus moves into the frame.
+  //
+  // THE GUARDS ARE THE ENGINE'S OWN NAMES, AND THE ELEMENTS ARE THE ENGINE'S OWN
+  // (data-studio-booking), for the reason studio/site_footer/_assets gives for
+  // the map: an app that still renders a local booking script guards it with
+  // the unprefixed names and marks its frame, dialog and links with the same
+  // data-booking-* attributes. Sharing either lets one script stand the other
+  // down across a Turbo visit, or act on elements that are not its own.
   (function () {
-    if (window.__bookingFramesArmed) return;
-    window.__bookingFramesArmed = true;
+    if (window.__studioBookingFramesArmed) return;
+    window.__studioBookingFramesArmed = true;
 
     function arm() {
-      document.querySelectorAll('iframe[data-booking-frame][data-src]').forEach(function (frame) {
+      document.querySelectorAll('iframe[data-booking-frame][data-studio-booking][data-src]').forEach(function (frame) {
         if (frame.__bookingArmed) return;
         frame.__bookingArmed = true;
         if (typeof IntersectionObserver !== 'function') { frame.src = frame.dataset.src; return; }
@@ -82,8 +92,8 @@
     // its parent. It means the visitor has started using the calendar.
     window.addEventListener('blur', function () {
       var active = document.activeElement;
-      if (!active || !active.matches || !active.matches('iframe[data-booking-frame]')) return;
-      var wrap = active.closest('[data-booking-wrap]');
+      if (!active || !active.matches || !active.matches('iframe[data-booking-frame][data-studio-booking]')) return;
+      var wrap = active.closest('[data-booking-wrap][data-studio-booking]');
       if (wrap) wrap.classList.add('is-open');
     });
 
@@ -103,18 +113,18 @@
   // instead: it scrolls there, opens the crop and moves focus in. A popup would
   // be a second copy of the calendar on top of the first.
   (function () {
-    if (window.__bookingPopupArmed) return;
-    window.__bookingPopupArmed = true;
+    if (window.__studioBookingPopupArmed) return;
+    window.__studioBookingPopupArmed = true;
 
     document.addEventListener('click', function (event) {
-      var link = event.target.closest && event.target.closest('a[data-booking-popup]');
+      var link = event.target.closest && event.target.closest('a[data-booking-popup][data-studio-booking]');
       if (!link) return;
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
-      var inline = document.querySelector('iframe[data-booking-frame]');
+      var inline = document.querySelector('iframe[data-booking-frame][data-studio-booking]');
       if (inline) {
         event.preventDefault();
-        var wrap = inline.closest('[data-booking-wrap]');
+        var wrap = inline.closest('[data-booking-wrap][data-studio-booking]');
         if (wrap) wrap.classList.add('is-open');
         // Before `load` the frame keeps waiting: its own script assigns src then.
         if (!inline.getAttribute('src') && document.readyState === 'complete') inline.src = inline.dataset.src;
@@ -124,7 +134,7 @@
         return;
       }
 
-      var dialog = document.querySelector('dialog[data-booking-dialog]');
+      var dialog = document.querySelector('dialog[data-booking-dialog][data-studio-booking]');
       if (!dialog || typeof dialog.showModal !== 'function') return;
 
       event.preventDefault();
@@ -135,13 +145,18 @@
 
     // A click on the backdrop lands on the dialog element itself.
     document.addEventListener('click', function (event) {
-      if (event.target.matches && event.target.matches('dialog[data-booking-dialog]')) event.target.close();
+      if (event.target.matches && event.target.matches('dialog[data-booking-dialog][data-studio-booking]')) event.target.close();
     });
 
-    // Never snapshot the dialog open: a restored page would show it stuck.
+    // Never snapshot the dialog open: a restored page would show it stuck. And
+    // never snapshot its frame loaded: a restored page would ask Google for a
+    // popup nobody has opened. The src goes back to waiting in data-src.
     document.addEventListener('turbo:before-cache', function () {
-      var dialog = document.querySelector('dialog[data-booking-dialog][open]');
-      if (dialog) dialog.close();
+      var dialog = document.querySelector('dialog[data-booking-dialog][data-studio-booking]');
+      if (!dialog) return;
+      if (dialog.open) dialog.close();
+      var frame = dialog.querySelector('iframe[data-booking-popup-frame]');
+      if (frame) frame.removeAttribute('src');
     });
   })();
 </script>

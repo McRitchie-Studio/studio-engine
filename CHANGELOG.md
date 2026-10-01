@@ -28,6 +28,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   its href as the fallback; on a page that already shows the frame the link goes
   to that frame instead. `config.draw_booking_routes = true` draws a public
   `/schedule` page (`studio_booking_path`).
+- **Footer hrefs are allow-listed.** A link, a social URL, `home_path` and
+  `directions_url` are linked only when they are a relative path or an `http:`,
+  `https:`, `mailto:` or `tel:` URL. Anything else (`javascript:`, `data:`) is
+  never written into the page, and is logged once.
 - `/admin/style` gains a *Site footer and booking* group under Tricks.
 - **The browser lane's error collector can be scoped to the app's own origin.**
   `watchPageErrors(page, { ownOriginOnly: true })` drops a console error or an

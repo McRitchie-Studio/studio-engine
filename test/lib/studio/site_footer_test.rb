@@ -9,10 +9,10 @@ class SiteFooterTest < Minitest::Test
   View = Struct.new(:root_path)
 
   FULL = {
-    name: "McRitchie Studio",
-    tagline: "Software & Marketing Solutions",
+    name: "Example Co",
+    tagline: "Everything, by example",
     email: "team@example.com",
-    address: { street: "3000 Lawrence St", city_line: "Denver, CO 80205", lat: 39.7614786, lng: "-104.978957" },
+    address: { street: "123 Example St", city_line: "Washington, DC 20024", lat: 38.8894, lng: "-77.0352" },
     social: [["LinkedIn", :linkedin, "https://www.linkedin.com/in/someone/"], ["Instagram", :instagram, nil]],
     columns: [["Company", [["Home", "/"], ["Career", nil], ["Blog", "https://blog.example.com"]]]],
     legal: [["Privacy Policy", "/privacy"]]
@@ -36,7 +36,7 @@ class SiteFooterTest < Minitest::Test
   def test_validate_accepts_nil_a_hash_and_a_callable_and_refuses_anything_else
     [nil, {}, ->(_view) { {} }].each { |ok| assert_nil Studio::SiteFooter.validate!(ok) }
 
-    error = assert_raises(ArgumentError) { Studio::SiteFooter.validate!("McRitchie Studio") }
+    error = assert_raises(ArgumentError) { Studio::SiteFooter.validate!("Example Co") }
     assert_match(/Hash, or a callable/, error.message)
     assert_raises(ArgumentError) { Studio::SiteFooter.validate!([]) }
   end
@@ -88,7 +88,7 @@ class SiteFooterTest < Minitest::Test
   end
 
   def test_a_declared_wordmark_is_taken_as_its_two_parts
-    assert_equal ["McRitchie", "Studio"], resolve({ wordmark: %w[McRitchie Studio] })[:wordmark]
+    assert_equal ["Example", "Co"], resolve({ wordmark: %w[Example Co] })[:wordmark]
     assert_equal ["Big Blue", "Co"], resolve({ wordmark: "Big Blue Co" })[:wordmark]
   end
 
@@ -102,12 +102,12 @@ class SiteFooterTest < Minitest::Test
   def test_an_address_with_coordinates_has_a_map_and_default_directions
     address = resolve(FULL)[:address]
 
-    assert_equal "3000 Lawrence St, Denver, CO 80205", address[:full]
+    assert_equal "123 Example St, Washington, DC 20024", address[:full]
     assert_equal true, address[:map]
-    assert_in_delta 39.7614786, address[:lat]
-    assert_in_delta(-104.978957, address[:lng], 1e-9, "a string coordinate is read as a number")
+    assert_in_delta 38.8894, address[:lat]
+    assert_in_delta(-77.0352, address[:lng], 1e-9, "a string coordinate is read as a number")
     assert_equal 15, address[:zoom]
-    assert_equal "https://www.google.com/maps/dir/?api=1&destination=3000+Lawrence+St%2C+Denver%2C+CO+80205",
+    assert_equal "https://www.google.com/maps/dir/?api=1&destination=123+Example+St%2C+Washington%2C+DC+20024",
                  address[:directions_url]
   end
 
@@ -135,23 +135,23 @@ class SiteFooterTest < Minitest::Test
   def test_social_rows_keep_a_nil_url_as_unlinked
     social = resolve(FULL)[:social]
 
-    assert_equal({ label: "LinkedIn", icon: :linkedin, url: "https://www.linkedin.com/in/someone/" }, social[0])
-    assert_equal({ label: "Instagram", icon: :instagram, url: nil }, social[1])
+    assert_equal({ label: "LinkedIn", icon: :linkedin, url: "https://www.linkedin.com/in/someone/", unlinked: false }, social[0])
+    assert_equal({ label: "Instagram", icon: :instagram, url: nil, unlinked: false }, social[1])
   end
 
   def test_social_rows_may_be_hashes_and_the_icon_defaults_to_the_label
     social = resolve({ social: [{ "label" => "YouTube", "url" => "https://youtube.com/@x" }, [nil, :x, "https://x.com"]] })[:social]
 
-    assert_equal [{ label: "YouTube", icon: :youtube, url: "https://youtube.com/@x" }], social,
+    assert_equal [{ label: "YouTube", icon: :youtube, url: "https://youtube.com/@x", unlinked: false }], social,
                  "a row with no label is dropped"
   end
 
   def test_links_disabled_external_and_internal
     home, career, blog = resolve(FULL)[:columns][0][:links]
 
-    assert_equal({ label: "Home", href: "/", disabled: false, external: false, booking: false }, home)
-    assert_equal({ label: "Career", href: nil, disabled: true, external: false, booking: false }, career)
-    assert_equal({ label: "Blog", href: "https://blog.example.com", disabled: false, external: true, booking: false }, blog)
+    assert_equal({ label: "Home", href: "/", disabled: false, unlinked: false, external: false, booking: false }, home)
+    assert_equal({ label: "Career", href: nil, disabled: true, unlinked: false, external: false, booking: false }, career)
+    assert_equal({ label: "Blog", href: "https://blog.example.com", disabled: false, unlinked: false, external: true, booking: false }, blog)
   end
 
   def test_a_mailto_link_is_not_external
@@ -182,10 +182,74 @@ class SiteFooterTest < Minitest::Test
   end
 
   def test_booking_copy_is_declared_under_booking
-    facts = resolve({ booking: { label: "Book a call", title: "Book a call with Alex" } })
+    facts = resolve({ booking: { label: "Book a call", title: "Book a call with Sam" } })
 
     assert_equal "Book a call", facts[:booking_label]
-    assert_equal "Book a call with Alex", facts[:booking_title]
+    assert_equal "Book a call with Sam", facts[:booking_title]
+  end
+
+  # ---- the href allow-list ----------------------------------------------------
+
+  def capture_reports
+    saved = Studio::SiteFooter.reporter
+    reports = []
+    Studio::SiteFooter.reporter = ->(message) { reports << message }
+    Studio::SiteFooter.reset_reported!
+    yield reports
+  ensure
+    Studio::SiteFooter.reporter = saved
+    Studio::SiteFooter.reset_reported!
+  end
+
+  def test_relative_paths_and_the_four_schemes_are_safe
+    ["/", "/privacy", "privacy", "#top", "?page=2", "../up", "//cdn.example.com/x",
+     "http://example.com", "https://example.com/a?b=c#d", "HTTPS://EXAMPLE.COM",
+     "mailto:team@example.com", "tel:+15555550100", "/a:b", "docs/a:b"].each do |href|
+      assert Studio::SiteFooter.safe_href?(href), "#{href.inspect} should be allowed"
+    end
+  end
+
+  def test_every_other_scheme_is_refused_however_it_is_spelled
+    ["javascript:alert(1)", "JavaScript:alert(1)", "  javascript:alert(1)", "java\tscript:alert(1)",
+     "java\nscript:alert(1)", "\u0001javascript:alert(1)", "data:text/html,<script>alert(1)</script>",
+     "vbscript:msgbox(1)", "file:///etc/passwd", "ftp://example.com", "blob:https://example.com/x",
+     "sms:+15555550100"].each do |href|
+      refute Studio::SiteFooter.safe_href?(href), "#{href.inspect} should be refused"
+    end
+  end
+
+  def test_a_refused_link_keeps_its_label_unlinked_and_is_not_coming_soon
+    capture_reports do |reports|
+      link = Studio::SiteFooter.link(["Click me", "javascript:alert(1)", { booking: true }])
+
+      assert_equal({ label: "Click me", href: nil, disabled: false, unlinked: true, external: false, booking: false }, link)
+      assert_equal 1, reports.size
+      assert_match(/link href "javascript:alert\(1\)" is not linked/, reports.first)
+    end
+  end
+
+  def test_a_refused_social_url_home_path_and_directions_url_are_never_emitted
+    capture_reports do |reports|
+      facts = resolve({ home_path: "javascript:alert(1)",
+                        social: [["LinkedIn", :linkedin, "data:text/html,x"]],
+                        address: { street: "1 Main St", directions_url: "javascript:alert(2)" } })
+
+      assert_equal "/", facts[:home_path]
+      assert_equal({ label: "LinkedIn", icon: :linkedin, url: nil, unlinked: true }, facts[:social][0])
+      assert_equal "https://www.google.com/maps/dir/?api=1&destination=1+Main+St", facts[:address][:directions_url]
+      assert_equal 3, reports.size
+      refute_includes facts.inspect, "javascript:"
+      refute_includes facts.inspect, "data:"
+    end
+  end
+
+  def test_a_refused_href_is_reported_once_however_often_the_footer_renders
+    capture_reports do |reports|
+      3.times { Studio::SiteFooter.link(["Click me", "javascript:alert(1)"]) }
+      Studio::SiteFooter.link(["Other", "data:x"])
+
+      assert_equal 2, reports.size
+    end
   end
 
   # ---- where it shows ---------------------------------------------------------
@@ -243,7 +307,7 @@ class SiteFooterTest < Minitest::Test
 end
 
 class BookingUrlTest < Minitest::Test
-  URL = "https://calendar.google.com/calendar/appointments/schedules/AcZss"
+  URL = "https://calendar.google.com/calendar/appointments/schedules/EXAMPLE"
 
   def test_unset_is_nil_everywhere
     [nil, "", "  "].each do |blank|

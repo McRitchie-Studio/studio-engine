@@ -11,9 +11,9 @@ require "cgi"
 # footer rather than printing a placeholder:
 #
 #   config.site_footer = ->(view) {
-#     { tagline: "Software & Marketing Solutions",
-#       address: { street: "3000 Lawrence St", city_line: "Denver, CO 80205",
-#                  lat: 39.7614786, lng: -104.978957 },
+#     { tagline: "Everything, by example",
+#       address: { street: "123 Example St", city_line: "Washington, DC 20024",
+#                  lat: 38.8894, lng: -77.0352 },
 #       email:   "team@example.com",
 #       social:  [ [ "LinkedIn", :linkedin, "https://www.linkedin.com/in/someone/" ],
 #                  [ "Instagram", :instagram, nil ] ],          # nil url: unlinked
@@ -33,7 +33,66 @@ module Studio
     # The engine's own booking page keeps the footer for a signed-in viewer.
     OWN_CONTROLLERS = %w[studio/bookings].freeze
 
+    # The only schemes a footer href may carry. Anything else, notably
+    # `javascript:` and `data:`, is never written into an href: the label is
+    # printed unlinked and the rejection is reported once.
+    SAFE_SCHEMES = %w[http https mailto tel].freeze
+    REPORTED_LIMIT = 100
+
+    class << self
+      # Where a rejected href is reported: a callable taking the message. The
+      # default writes one warning to the Rails log (or to stderr without Rails).
+      attr_writer :reporter
+
+      def reporter
+        @reporter ||= lambda do |message|
+          if defined?(::Rails) && ::Rails.respond_to?(:logger) && ::Rails.logger
+            ::Rails.logger.warn(message)
+          else
+            warn(message)
+          end
+        end
+      end
+
+      def reported
+        @reported ||= {}
+      end
+
+      def reset_reported!
+        @reported = {}
+      end
+    end
+
     module_function
+
+    # A relative path (no scheme), or one of SAFE_SCHEMES. A control character
+    # anywhere fails it: browsers drop tabs and newlines inside a scheme, so
+    # "java\tscript:" would otherwise read as a relative path here and as
+    # script there.
+    def safe_href?(href)
+      string = href.to_s
+      return false if string.match?(/[\x00-\x1f\x7f]/)
+
+      scheme = string[/\A\s*([a-z][a-z0-9+.\-]*):/i, 1]
+      scheme.nil? || SAFE_SCHEMES.include?(scheme.downcase)
+    end
+
+    # The href when it may be linked, else nil, reported once per value.
+    def safe_href(value, where)
+      raw = value.nil? || value == false ? nil : value.to_s
+      return nil if raw.nil? || raw.strip.empty?
+      return raw.strip if safe_href?(raw)
+
+      key = "#{where}:#{raw}"
+      unless SiteFooter.reported.key?(key) || SiteFooter.reported.size >= REPORTED_LIMIT
+        SiteFooter.reported[key] = true
+        SiteFooter.reporter.call(
+          "[studio.site_footer] #{where} #{raw[0, 80].inspect} is not linked: only relative paths, " \
+          "http:, https:, mailto: and tel: are allowed"
+        )
+      end
+      nil
+    end
 
     def validate!(declared)
       return if declared.nil? || declared.is_a?(Hash) || declared.respond_to?(:call)
@@ -61,7 +120,7 @@ module Studio
         wordmark: wordmark(facts[:wordmark], site_name),
         logo: facts.key?(:logo) ? text(facts[:logo]) : text(logo),
         logo_invert: facts[:logo_invert] ? true : false,
-        home_path: text(facts[:home_path]) || "/",
+        home_path: safe_href(facts[:home_path], "home_path") || "/",
         tagline: text(facts[:tagline]),
         email: text(facts[:email]),
         address: address(facts),
@@ -144,7 +203,9 @@ module Studio
         lng: lng,
         map: !lat.nil? && !lng.nil?,
         zoom: (source[:zoom] || DEFAULT_ZOOM).to_i,
-        directions_url: text(source[:directions_url]) ||
+        # A directions_url that may not be linked falls back to the default, so
+        # the address and the map's no-script link still lead somewhere.
+        directions_url: safe_href(source[:directions_url], "directions_url") ||
           "https://www.google.com/maps/dir/?api=1&destination=#{CGI.escape(full)}"
       }
     end
@@ -170,7 +231,8 @@ module Studio
       label = text(label)
       return nil if label.nil?
 
-      { label: label, icon: (icon || label).to_s.downcase.to_sym, url: text(url) }
+      { label: label, icon: (icon || label).to_s.downcase.to_sym, url: safe_href(url, "social url"),
+        unlinked: !text(url).nil? && safe_href(url, "social url").nil? }
     end
 
     # [ heading, links ] or { heading:, links: }.
@@ -204,13 +266,17 @@ module Studio
       label = text(label)
       return nil if label.nil?
 
-      href = text(href)
+      declared = text(href)
+      href = safe_href(href, "link href")
       options = options.respond_to?(:to_h) ? symbolize(options) : {}
       booking = !href.nil? && (options[:booking] ? true : (!booking_path.nil? && href == booking_path))
       {
         label: label,
         href: href,
-        disabled: href.nil?,
+        # A nil href is a page that does not exist yet. A REFUSED href is not
+        # that: the label prints plain, with no "coming soon".
+        disabled: declared.nil?,
+        unlinked: !declared.nil? && href.nil?,
         external: !href.nil? && href.match?(%r{\Ahttps?://}i),
         booking: booking
       }
