@@ -195,7 +195,11 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
 
     assert_select "[data-footer-map]", 3, "the footer's map and two standalone maps"
     assert_equal 1, response.body.scan(".ftr-wrap {").size, "footer styles rendered more than once"
-    assert_equal 1, response.body.scan("window.__footerMapsArmed = true").size
+    assert_equal 1, response.body.scan("window.__studioFooterMapsArmed = true").size
+    # Not the name, nor the bare selector, of an app's own local footer script:
+    # sharing them lets one script stand the other down across a Turbo visit.
+    assert_no_match(/window\.__footerMapsArmed/, response.body)
+    assert_includes response.body, "querySelectorAll('[data-footer-map][data-leaflet-js]')"
     assert_equal 1, response.body.scan(".booking-popup::backdrop").size, "booking styles rendered more than once"
     assert_equal 1, response.body.scan("window.__bookingPopupArmed = true").size
   end

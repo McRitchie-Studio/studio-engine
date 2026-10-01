@@ -94,9 +94,16 @@
   // before `load` holds that event open for as long as the third party takes to
   // answer. The map is also at the bottom of every public page, where most
   // visits never reach: those pay for neither Leaflet nor a single tile.
+  //
+  // THE GUARD IS THE ENGINE'S OWN NAME, AND THE ELEMENTS ARE THE ENGINE'S OWN. An
+  // app that still renders a local footer script (mcritchie-studio, until it
+  // adopts this one) guards it with the unprefixed name and marks its map
+  // [data-footer-map] too. Sharing either would let whichever script ran first
+  // in a Turbo session stand the other down and then fail on its elements: that
+  // app's map carries no data-leaflet-js, so there is nothing here to fetch.
   (function () {
-    if (window.__footerMapsArmed) return;
-    window.__footerMapsArmed = true;
+    if (window.__studioFooterMapsArmed) return;
+    window.__studioFooterMapsArmed = true;
 
     var TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
     var ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
@@ -177,7 +184,7 @@
       watcher.observe(el);
     }
 
-    function armAll() { document.querySelectorAll('[data-footer-map]').forEach(watch); }
+    function armAll() { document.querySelectorAll('[data-footer-map][data-leaflet-js]').forEach(watch); }
 
     function armAfterLoad() {
       if (document.readyState === 'complete') armAll();
