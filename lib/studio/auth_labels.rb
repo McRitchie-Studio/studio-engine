@@ -22,9 +22,11 @@
 # the label renders byte-identical pages (test/integration/auth_page_labels_render_test.rb).
 #
 # Pure Ruby, so the unit suite covers it without the dummy app.
+require_relative "navbar_identity"
+
 module Studio
   module AuthLabels
-    DEFAULT = "Log in" # Studio::NavbarIdentity::DEFAULT_SIGN_IN_LABEL; restated so this file loads alone
+    DEFAULT = NavbarIdentity::DEFAULT_SIGN_IN_LABEL
 
     module_function
 
@@ -54,22 +56,17 @@ module Studio
 
     # The divider under the SSO "Continue as" button.
     def or_below(label)
-      configured?(label) ? "or #{downcase_first(label)} below" : "or sign in below"
+      configured?(label) ? "or #{label.to_s.downcase} below" : "or sign in below"
     end
 
     # The emailed link's noun: the magic-link button and the "sent" notice.
     def link_noun(label)
-      configured?(label) ? "#{downcase_first(label).tr(' ', '-')} link" : "sign-in link"
+      configured?(label) ? "#{label.to_s.downcase.tr(' ', '-')} link" : "sign-in link"
     end
 
-    # Only the first letter changes case, so "Sign In" stays "Sign In" in a
-    # title and a proper noun inside a label keeps its capital mid-sentence.
-    def capitalize_first(text)
-      text.to_s.sub(/\A\p{Ll}/) { |c| c.upcase }
-    end
-
-    def downcase_first(text)
-      text.to_s.sub(/\A\p{Lu}/) { |c| c.downcase }
+    # Only the first letter changes, so an already-capital word is untouched.
+    def capitalize_first(word)
+      word.sub(/\A\p{Ll}/) { |c| c.upcase }
     end
   end
 end
