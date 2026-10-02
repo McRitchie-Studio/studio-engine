@@ -11,7 +11,7 @@
 
     <div class="flex items-center gap-3 mt-5">
       <div class="flex-1 h-px border-t border-subtle"></div>
-      <span class="text-muted text-xs uppercase tracking-wider">or sign in below</span>
+      <span class="text-muted text-xs uppercase tracking-wider"><%= Studio::AuthLabels.or_below(Studio.sign_in_label) %></span>
       <div class="flex-1 h-px border-t border-subtle"></div>
     </div>
   </div>

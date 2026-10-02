@@ -4,6 +4,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The engine's auth pages speak `Studio.sign_in_label`.** 0.80.0 put the label
+  on the navbar's signed-out buttons only, so an app that set `"Sign in"` still
+  showed "Log in to continue", a "Log In" button and a "Log in" link on its
+  `/login` and `/signup` pages. Those words, the magic-link button, the SSO
+  divider, the magic-link confirm page's button and the link-sent notice now
+  derive from the label (`lib/studio/auth_labels.rb`; README, *Navbar
+  identity*). An app that leaves the label at its default renders those pages
+  byte-identical to before. No routes change.
+
 ## 0.84.0 — 2026-10-01
 
 ### Changed
