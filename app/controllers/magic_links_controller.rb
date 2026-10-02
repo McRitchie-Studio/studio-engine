@@ -28,7 +28,7 @@ class MagicLinksController < ApplicationController
     end
     respond_to do |format|
       format.json { render json: { success: true } }
-      format.html { redirect_to login_path, notice: "Check your inbox — we just emailed you a sign-in link." }
+      format.html { redirect_to login_path, notice: "Check your inbox — we just emailed you a #{Studio::AuthLabels.link_noun(Studio.sign_in_label)}." }
     end
   end
 
