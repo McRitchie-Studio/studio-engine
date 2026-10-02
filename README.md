@@ -984,14 +984,17 @@ Without the lifecycle rule, trash never expires. In the Cloudflare dashboard:
 R2 → the bucket → Settings → Object lifecycle rules → add a rule for prefix
 `trash/` that deletes objects 3 days after upload. A trash copy is a new object,
 so "uploaded" is the moment it was deleted. The same rule as S3 lifecycle JSON
-(R2's S3 API and AWS both take it, via `aws s3api
-put-bucket-lifecycle-configuration --lifecycle-configuration file://rule.json`):
+(R2's S3 API and AWS both take it). `aws s3api
+put-bucket-lifecycle-configuration` REPLACES the bucket's whole lifecycle
+configuration, R2's default abort-incomplete-multipart rule included, so read
+the current rules first (`get-bucket-lifecycle-configuration`) and send them
+together with this one, or use the dashboard:
 
 ```json
 {
   "Rules": [
     {
-      "ID": "trash-expires-after-3-days",
+      "ID": "expire-trash-3d",
       "Status": "Enabled",
       "Filter": { "Prefix": "trash/" },
       "Expiration": { "Days": 3 }
