@@ -629,7 +629,8 @@ Studio.configure do |config|
   config.navbar_user_name = :player_name                        # a method on the user
   # config.navbar_user_name = ->(user, view) { user.player_name } # or a callable
 
-  # The signed-out button in layouts/_navbar and components/_user_nav.
+  # The signed-out button in layouts/_navbar and components/_user_nav, and the
+  # sign-in wording on the engine's own auth pages (below).
   config.sign_in_label = "Sign in"                              # default "Log in"
 end
 ```
@@ -646,6 +647,24 @@ end
 - The engine has no I18n catalogue, so the label is plain config, not a locale
   key. A blank or non-String label, or a `navbar_user_name` of any other type,
   raises `Studio::NavbarIdentity::InvalidConfig` at assignment.
+- The label also sets the sign-in words on the engine's own auth pages, so the
+  navbar and `/login` never disagree. Rules: `lib/studio/auth_labels.rb`.
+
+  | Where | `"Log in"` (default) | `"Sign in"` |
+  |-------|----------------------|-------------|
+  | `/login` prompt | Log in to continue | Sign in to continue |
+  | `/login` password button | Log In | Sign In |
+  | `/login` magic-link button | Send sign-in link | Send sign-in link |
+  | `/login` SSO divider | or sign in below | or sign in below |
+  | `/signup` link back to `/login` | Log in | Sign in |
+  | Magic-link confirm page button | Sign in to *App* | Sign in to *App* |
+  | Link-sent notice | …emailed you a sign-in link. | …emailed you a sign-in link. |
+
+  The default reproduces the pages' earlier wording byte for byte, including the
+  four places that already said "sign in". Any other label derives every form:
+  `"Log on"` gives *Log On*, *Log on to continue*, *or log on below* and
+  *log-on link*. The "Sign in with Google" and "Sign up" buttons are not
+  sign-in labels and do not change.
 
 ### User nav slots
 

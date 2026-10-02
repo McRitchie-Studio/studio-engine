@@ -75,7 +75,7 @@
               method: :post,
               form: { id: "magic-consume-form", data: { turbo: "false" } },
               class: "magic-submit" do %>
-          Sign in to <%= Studio.app_name %>
+          <%= Studio::AuthLabels.to_app(Studio.sign_in_label, Studio.app_name) %>
         <% end %>
       </div>
     </main>

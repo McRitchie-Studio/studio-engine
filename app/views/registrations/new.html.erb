@@ -73,7 +73,7 @@
 
       <p class="text-center text-secondary text-sm mt-6">
         Already have an account?
-        <%= link_to "Log in", login_path, class: "text-primary hover:text-primary-300 font-medium underline underline-offset-2" %>
+        <%= link_to Studio::AuthLabels.link(Studio.sign_in_label), login_path, class: "text-primary hover:text-primary-300 font-medium underline underline-offset-2" %>
       </p>
     </div>
   </div>

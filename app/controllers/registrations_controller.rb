@@ -18,7 +18,7 @@ class RegistrationsController < ApplicationController
         token = issue_magic_link(email, nil)
         Studio::Email.deliver(UserMailer, :magic_link, email, token, to: email)
       end
-      return redirect_to login_path, notice: "Check your inbox — we just emailed you a sign-in link."
+      return redirect_to login_path, notice: "Check your inbox — we just emailed you a #{Studio::AuthLabels.link_noun(Studio.sign_in_label)}."
     end
 
     @user = User.new(user_params)

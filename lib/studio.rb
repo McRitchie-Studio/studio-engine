@@ -17,6 +17,7 @@ require "studio/site_footer"
 require "studio/booking"
 require "studio/navbar_links"
 require "studio/navbar_identity"
+require "studio/auth_labels"
 require "studio/profile_sections"
 require "studio/profile_image"
 require "studio/oauth_identity"
@@ -201,6 +202,7 @@ module Studio
   # The name the signed-in user nav prints, and the signed-out button's label.
   # Both defaults render the navbar byte-identical to before. The engine has no
   # I18n catalogue, so the label is plain config rather than a locale key.
+  # The label also words the engine's auth pages (lib/studio/auth_labels.rb).
   # Rules: lib/studio/navbar_identity.rb.
   #
   #   config.navbar_user_name = :player_name                          # a method on the user
