@@ -54,6 +54,10 @@ for file in \
   app/jobs/studio/email_delivery_job.rb \
   lib/tasks/studio_email.rake \
   lib/tasks/studio_ses.rake \
+  lib/tasks/studio_trash.rake \
+  lib/studio/s3.rb \
+  lib/studio/s3/trash.rb \
+  lib/active_storage/service/studio_trash_s3_service.rb \
   studio-engine.gemspec
 do
   ruby -c "$file"
