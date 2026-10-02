@@ -55,15 +55,66 @@ module Studio
         false
       end
 
+      # A RECOVERABLE delete: the object moves under trash/ in the same bucket
+      # (Studio::S3::Trash) and the bucket's lifecycle rule expires it after
+      # three days. Returns the trash key, or nil when there was nothing to
+      # move. Refused outright when a non-production process is pointed at a
+      # production bucket. purge! is the delete that cannot be undone.
       def delete(key:)
-        client.delete_object(bucket: bucket, key: full_key(key))
+        target = bucket
+        guard_production_bucket!(target)
+        Trash.trash!(client: client, bucket: target, key: full_key(key), env: deletion_environment)
+      end
+
+      # The HARD delete, gone at once with no trash copy. For objects with no
+      # value after deletion (regenerable derivatives, a trash copy itself).
+      # The same production-bucket guard as delete.
+      def purge!(key:)
+        target = bucket
+        guard_production_bucket!(target)
+        client.delete_object(bucket: target, key: full_key(key))
       end
 
       # Returns LOGICAL keys (the app's key namespace stripped back off), so a
       # caller can feed any result straight back into download/delete/url.
-      def list(prefix: nil, max: 1000)
+      # Trashed objects are deleted objects, so trash/ keys are left out unless
+      # include_trash: true. The filter runs after S3's max_keys, so a listing
+      # with trash in range can return fewer than max keys.
+      def list(prefix: nil, max: 1000, include_trash: false)
         resp = client.list_objects_v2(bucket: bucket, prefix: full_key(prefix), max_keys: max)
-        resp.contents.map { |object| logical_key(object.key) }
+        keys = resp.contents.map(&:key)
+        keys = keys.reject { |key| Trash.trash_key?(key) } unless include_trash
+        keys.map { |key| logical_key(key) }
+      end
+
+      # Whether this process is real production, by the SAME resolution that
+      # picks the bucket half (QA_ENV first, then Rails.env). Public because the
+      # Active Storage trash service guards on it too.
+      def production_environment?
+        environment == "production"
+      end
+
+      # A non-production process (a laptop, a QA app, CI) may never delete from
+      # a bucket named "*-production", whoever handed it the bucket name or the
+      # key. Studio::S3 derives its bucket from the same environment, so here it
+      # is a backstop; for an Active Storage service, whose bucket comes from
+      # storage.yml, it is the guard.
+      def guard_production_bucket!(bucket_name)
+        return unless bucket_name.to_s.end_with?("-production")
+        return if production_environment?
+
+        raise Trash::ProductionBucketRefused,
+              "refusing to delete from #{bucket_name}: this process resolves to a non-production " \
+              "environment (#{deletion_environment}); only production deletes production objects"
+      end
+
+      # The environment a trash copy records in its deleted-env metadata:
+      # "qa" for a QA app (which runs Rails as production), else Rails.env.
+      def deletion_environment
+        return "qa" if EnvironmentBanner.qa_environment?
+        return Rails.env.to_s if defined?(Rails) && Rails.respond_to?(:env) && Rails.env
+
+        "unknown"
       end
 
       def bucket
@@ -190,3 +241,5 @@ module Studio
     end
   end
 end
+
+require_relative "s3/trash"
