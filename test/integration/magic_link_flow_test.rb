@@ -367,6 +367,28 @@ class MagicLinkFlowTest < ActionDispatch::IntegrationTest
     assert_redirected_to "/"
   end
 
+  # --- 8. the "sent" notice speaks the app's sign-in label ------------------
+
+  # A malformed email gets the same notice with no mail sent, so these drive
+  # the controller without a mailer.
+  test "the link-sent notice keeps its default words when no label is configured" do
+    post "/magic_link", params: { email: "not-an-email" }
+
+    assert_redirected_to "/login"
+    assert_equal "Check your inbox — we just emailed you a sign-in link.", flash[:notice]
+  end
+
+  test "the link-sent notice follows a configured sign-in label" do
+    prior = Studio.sign_in_label
+    Studio.sign_in_label = "Log on"
+
+    post "/magic_link", params: { email: "not-an-email" }
+
+    assert_equal "Check your inbox — we just emailed you a log-on link.", flash[:notice]
+  ensure
+    Studio.sign_in_label = prior
+  end
+
   private
 
   def mint(email, return_to: nil, expires_at: nil)

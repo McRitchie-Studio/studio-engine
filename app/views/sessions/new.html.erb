@@ -4,6 +4,9 @@
   words = Studio.app_name.split
   last_word = words.pop
   prefix = words.join(" ")
+  # The sign-in wording follows Studio.sign_in_label, as the navbar does
+  # (lib/studio/auth_labels.rb); the default label prints the wording these pages always had.
+  sign_in_label = Studio.sign_in_label
 %>
 
 <div class="min-h-[70vh] flex items-center justify-center">
@@ -13,7 +16,7 @@
         <img src="<%= logo_path %>" alt="<%= Studio.app_name %>" class="w-20 h-20 rounded-full shadow-lg mx-auto mb-4">
       <% end %>
       <h1 class="text-3xl font-extrabold text-heading tracking-tight"><%= prefix %> <span class="text-primary"><%= last_word %></span></h1>
-      <p class="text-secondary mt-2">Log in to continue</p>
+      <p class="text-secondary mt-2"><%= Studio::AuthLabels.prompt(sign_in_label) %></p>
     </div>
 
     <% if has_sso %>
@@ -57,7 +60,7 @@
           </div>
 
           <button type="submit" class="btn btn-primary btn-lg w-full">
-            Log In
+            <%= Studio::AuthLabels.button(sign_in_label) %>
           </button>
         <% end %>
       <% elsif Studio.auth_method?(:magic_link) %>
@@ -71,7 +74,7 @@
           </div>
 
           <button type="submit" class="btn btn-primary btn-lg w-full">
-            Send sign-in link
+            Send <%= Studio::AuthLabels.link_noun(sign_in_label) %>
           </button>
         <% end %>
       <% end %>

@@ -4,6 +4,49 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **`Studio::S3.delete` now moves the object to `trash/` instead of deleting
+  it.** The object is copied to `trash/<UTC date>/<epoch ms>/<key>` in the same
+  bucket, then deleted; a failed copy raises and never deletes. It returns the
+  trash key (nil when nothing was there) rather than the S3 response. The
+  bucket's lifecycle rule must expire `trash/` after three days, or trash never
+  expires: set it up before upgrading (README, *Trash and restore*). The
+  `/admin/emails` banner and logo replace and revert paths go through this
+  delete.
+- **`Studio::S3.list` leaves `trash/` keys out.** Pass `include_trash: true` to
+  keep them. The filter runs after `max_keys`, so a page can come back short.
+- **The engine's auth pages speak `Studio.sign_in_label`.** 0.80.0 put the label
+  on the navbar's signed-out buttons only, so an app that set `"Sign in"` still
+  showed "Log in to continue", a "Log In" button and a "Log in" link on its
+  `/login` and `/signup` pages. Those words, the magic-link button, the SSO
+  divider, the magic-link confirm page's button and the link-sent notice now
+  derive from the label (`lib/studio/auth_labels.rb`; README, *Navbar
+  identity*). An app that leaves the label at its default renders those pages
+  byte-identical to before. No routes change.
+
+### Added
+
+- **`Studio::S3.purge!(key:)`**, the hard delete, for objects with no value
+  after deletion.
+- **A production-bucket guard.** `Studio::S3.delete`, `purge!`, and the trash
+  service's `delete` and `delete_prefixed` raise
+  `Studio::S3::Trash::ProductionBucketRefused` before any request when the
+  bucket ends in `-production` and the process is not production (`QA_ENV`
+  first, then `Rails.env`).
+- **`ActiveStorage::Service::StudioTrashS3Service`** (`service: StudioTrashS3`
+  in `config/storage.yml`): Active Storage's S3 service whose `delete` trashes
+  the blob's object, recording the content type, byte size, checksum and
+  filename it can read off the object so a blob row can be rebuilt.
+  `delete_prefixed` (variants) stays a hard delete. Opt-in per app.
+- **`rake studio:trash:list[KEY]` and `studio:trash:restore[TRASH_KEY]`**: find
+  a key's trash copies, and copy one back to its original key (`FORCE=1` to
+  overwrite, `SERVICE=<name>` for an Active Storage bucket). A restore prints the
+  `ActiveStorage::Blob.create!` that re-creates the blob row.
+- **`Studio::S3::Trash`**, the shared copy-then-delete, key mapping, listing and
+  restore. A single CopyObject moves at most 5 GiB, so a larger object raises
+  `TooLarge` and is left in place.
+
 ## 0.84.0 — 2026-10-01
 
 ### Changed

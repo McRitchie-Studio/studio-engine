@@ -629,7 +629,8 @@ Studio.configure do |config|
   config.navbar_user_name = :player_name                        # a method on the user
   # config.navbar_user_name = ->(user, view) { user.player_name } # or a callable
 
-  # The signed-out button in layouts/_navbar and components/_user_nav.
+  # The signed-out button in layouts/_navbar and components/_user_nav, and the
+  # sign-in wording on the engine's own auth pages (below).
   config.sign_in_label = "Sign in"                              # default "Log in"
 end
 ```
@@ -646,6 +647,24 @@ end
 - The engine has no I18n catalogue, so the label is plain config, not a locale
   key. A blank or non-String label, or a `navbar_user_name` of any other type,
   raises `Studio::NavbarIdentity::InvalidConfig` at assignment.
+- The label also sets the sign-in words on the engine's own auth pages, so the
+  navbar and `/login` never disagree. Rules: `lib/studio/auth_labels.rb`.
+
+  | Where | `"Log in"` (default) | `"Sign in"` |
+  |-------|----------------------|-------------|
+  | `/login` prompt | Log in to continue | Sign in to continue |
+  | `/login` password button | Log In | Sign In |
+  | `/login` magic-link button | Send sign-in link | Send sign-in link |
+  | `/login` SSO divider | or sign in below | or sign in below |
+  | `/signup` link back to `/login` | Log in | Sign in |
+  | Magic-link confirm page button | Sign in to *App* | Sign in to *App* |
+  | Link-sent notice | …emailed you a sign-in link. | …emailed you a sign-in link. |
+
+  The default reproduces the pages' earlier wording byte for byte, including the
+  four places that already said "sign in". Any other label derives every form:
+  `"Log on"` gives *Log On*, *Log on to continue*, *or log on below* and
+  *log-on link*. The "Sign in with Google" and "Sign up" buttons are not
+  sign-in labels and do not change.
 
 ### User nav slots
 
@@ -920,6 +939,9 @@ set as a pair. R2 serves nothing anonymously from its S3 endpoint, so with an
 endpoint and no `s3_public_url`, `Studio::S3.url` raises `NotConfigured` and
 `upload` writes but returns `nil`; serve private objects with `signed_url`.
 
+`Studio::S3.delete` moves the object to `trash/` for three days rather than
+deleting it; see [Trash and restore](#trash-and-restore).
+
 An app with **no** bucket configured does not error — `/admin/emails` renders
 read-only, showing the inherited defaults it is genuinely sending and naming the
 one setting that turns uploads on.
@@ -931,6 +953,137 @@ Add it to the app's admin sidebar section:
 ```ruby
 { label: "Emails", href: admin_emails_path, emoji: "✉️", desc: "Transactional email banners" }
 ```
+
+## Trash and restore
+
+A delete through the engine is recoverable for three days. R2 has no object
+versioning, so instead of deleting, the engine **moves** the object under
+`trash/` in the same bucket, and a lifecycle rule on the bucket expires
+`trash/` after three days:
+
+```text
+avatars/abc.png  ->  trash/2026-10-01/1759302000123/avatars/abc.png
+                     trash/<UTC date>/<epoch ms>/<original key>
+```
+
+The copy goes first and the delete second. A copy that fails raises and the
+delete is never sent, so a failure leaves the original in place. The trash copy
+keeps the object's content type, cache headers and metadata, and adds
+`original-key`, `deleted-at`, `deleted-env`, and what an Active Storage blob row
+needs to be rebuilt (`blob-content-type`, `blob-byte-size`, `blob-checksum`
+from a single-part ETag, and `blob-filename` when the upload carried a
+Content-Disposition). A single CopyObject moves at most 5 GiB, so a larger
+object raises `Studio::S3::Trash::TooLarge` and stays where it is.
+
+`trash/` always sits at the bucket **root**, even for an app under a
+`s3_key_prefix` in a shared bucket, so one lifecycle rule and one Cloudflare
+rule cover every app in the bucket.
+
+### What deletes, and what purges
+
+| Call | Effect |
+|------|--------|
+| `Studio::S3.delete(key:)` | Moves to trash; returns the trash key (nil if nothing was there) |
+| `Studio::S3.purge!(key:)` | Hard delete, gone at once |
+| `Studio::S3.list` | Leaves `trash/` keys out; `include_trash: true` keeps them |
+| Active Storage `service: StudioTrashS3`, `delete` | Moves the blob's object to trash (`Blob#purge`, a replaced attachment) |
+| Active Storage `service: StudioTrashS3`, `delete_prefixed` | Hard delete: Active Storage calls it for `variants/<key>/`, which regenerate from the original |
+
+**The production guard.** All four destructive paths refuse a bucket whose name
+ends in `-production` when the process is not production, by `Studio::S3`'s own
+resolution (`QA_ENV` first, so a QA app running Rails as production is NOT
+production, then `Rails.env`). They raise
+`Studio::S3::Trash::ProductionBucketRefused` before sending any request. The
+guard reads the bucket NAME, so it protects only buckets that follow the
+`<app>-production` convention.
+
+### Set up the bucket (once per bucket, before an app adopts)
+
+Without the lifecycle rule, trash never expires. In the Cloudflare dashboard:
+R2 → the bucket → Settings → Object lifecycle rules → add a rule for prefix
+`trash/` that deletes objects 3 days after upload. A trash copy is a new object,
+so "uploaded" is the moment it was deleted. The same rule as S3 lifecycle JSON
+(R2's S3 API and AWS both take it). `aws s3api
+put-bucket-lifecycle-configuration` REPLACES the bucket's whole lifecycle
+configuration, R2's default abort-incomplete-multipart rule included, so read
+the current rules first (`get-bucket-lifecycle-configuration`) and send them
+together with this one, or use the dashboard:
+
+```json
+{
+  "Rules": [
+    {
+      "ID": "expire-trash-3d",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "trash/" },
+      "Expiration": { "Days": 3 }
+    }
+  ]
+}
+```
+
+A public bucket also serves `trash/` from its custom domain unless it is
+blocked, which would keep a "deleted" profile picture reachable by URL for three
+days. Add a Cloudflare WAF custom rule on the zone, action **Block**:
+
+```text
+(http.host in {"assets.example.com"} and starts_with(http.request.uri.path, "/trash/"))
+```
+
+Name every `assets.<domain>` host the bucket answers on. If the bucket has the
+`r2.dev` public URL enabled, turn it off; a WAF rule cannot cover it.
+
+### Adopt it in an app
+
+Active Storage: change the R2 service in `config/storage.yml` from `service: S3`
+to `service: StudioTrashS3`. Every other key stays as it is:
+
+```yaml
+r2:
+  service: StudioTrashS3
+  bucket: my-app-production
+  endpoint: <%= ENV["R2_ENDPOINT"] %>
+  region: auto
+  access_key_id: <%= ENV["R2_ACCESS_KEY_ID"] %>
+  secret_access_key: <%= ENV["R2_SECRET_ACCESS_KEY"] %>
+```
+
+An app with its own S3 service subclass (turf-monster's
+`ActiveStorage::Service::R2PublicService`) inherits from the trash service
+instead:
+
+```ruby
+require "active_storage/service/studio_trash_s3_service"
+
+module ActiveStorage
+  class Service::R2PublicService < Service::StudioTrashS3Service
+    # ...
+  end
+end
+```
+
+`Studio::S3` callers need no change: `delete` trashes from this release on. Call
+`purge!` where an object truly has no value after deletion.
+
+### Find and restore a deleted object
+
+```bash
+bin/rails "studio:trash:list"                      # everything in trash
+bin/rails "studio:trash:list[avatars/abc.png]"     # one key's trash copies
+bin/rails "studio:trash:restore[trash/2026-10-01/1759302000123/avatars/abc.png]"
+```
+
+Both read `Studio::S3`'s bucket. `SERVICE=<storage.yml service name>` reads an
+Active Storage service's bucket instead, e.g. `SERVICE=r2`. A restore copies the
+object back to its original key and leaves the trash copy for the lifecycle rule
+to expire. It refuses to overwrite an object already at the original key unless
+`FORCE=1`.
+
+Restoring an Active Storage object restores its **bytes only**. The blob row was
+destroyed before the object was trashed, so the task prints the
+`ActiveStorage::Blob.create!(...)` to run, filled from the trash copy's metadata,
+and the record must be re-attached by hand. `filename` is known only when the
+upload carried a Content-Disposition; supply it otherwise.
 
 ## Overriding Views
 
