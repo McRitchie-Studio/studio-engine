@@ -12,7 +12,7 @@ class VendoredLeafletTest < Minitest::Test
   SCRIPT = File.join(ROOT, "app/assets/javascripts/studio/leaflet.js")
   STYLES = File.join(ROOT, "app/assets/stylesheets/studio/leaflet.css")
   MAP    = File.join(ROOT, "app/views/studio/site_footer/_map.html.erb")
-  ASSETS = File.join(ROOT, "app/views/studio/site_footer/_assets.html.erb")
+  ASSETS = File.join(ROOT, "app/views/studio/site_footer/_map_assets.html.erb")
   HEAD   = File.join(ROOT, "app/views/layouts/studio/_head.html.erb")
 
   def test_both_files_are_precompiled

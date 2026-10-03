@@ -131,4 +131,34 @@ class EngineRails81BootTest < ActiveSupport::TestCase
     assert_equal "/login", routes.login_path
     assert_equal "/error_logs", routes.error_logs_path
   end
+
+  # ---- the footer-only switch, from the ActiveRecord side ---------------------
+  #
+  # Every footer-only accommodation (test/integration/footer_only_consumer_test.rb)
+  # is gated on Studio.active_record? reading false. This host loads
+  # active_record/railtie, so each of them must be OFF here: the engine a
+  # database-backed consumer gets is the engine it got before.
+
+  test "a host that loads ActiveRecord reads Studio.active_record? as true" do
+    assert Studio.active_record?
+  end
+
+  test "a host with ActiveRecord keeps every engine root in eager loading" do
+    excluded = Rails.autoloaders.main.send(:eager_load_exclusions).to_a
+    engine_root = Studio::Engine.root.to_s
+
+    assert_empty excluded.select { |path| path.start_with?(engine_root) },
+                 "the footer-only eager-load exclusion leaked into a host with ActiveRecord"
+  end
+
+  test "a host with ActiveRecord gets Rails' own install:migrations task, not the no-op" do
+    require "rake"
+    Rails.application.load_tasks unless Rake::Task.task_defined?("studio_engine:install:migrations")
+    task = Rake::Task["studio_engine:install:migrations"]
+
+    assert_equal 1, task.actions.size, "exactly one action: Rails' own"
+    source = task.actions.first.source_location.first
+    assert_includes source, File.join("rails", "engine.rb"),
+                    "studio_engine:install:migrations must be Rails' installer here, not the footer-only no-op (#{source})"
+  end
 end

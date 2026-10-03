@@ -22,7 +22,14 @@ Gem::Specification.new do |spec|
   # read by bin/e2e-executed-set-check and test/lib/e2e_lane_contract_test.rb. It is
   # the only thing under config/, and it has no meaning in a consuming app, so it is
   # excluded rather than shipped. (e2e/, bin/ and test/ were never in this list.)
-  spec.files = Dir["lib/**/*", "app/**/*", "config/**/*", "db/**/*", "tailwind/**/*", "Gemfile", "studio-engine.gemspec", "README.md", "CHANGELOG.md", "LICENSE"] - ["config/e2e_lane.yml"]
+  #
+  # docs/SITE_FOOTER.md and docs/BOOKING.md ship because consumers cite them from
+  # their own initializers ("docs/SITE_FOOTER.md is the contract"), and a
+  # citation should resolve in the installed gem, not only on GitHub. The rest of
+  # docs/ is the engine's own operating material. Guarded by
+  # test/lib/gemspec_ships_footer_docs_test.rb.
+  spec.files = Dir["lib/**/*", "app/**/*", "config/**/*", "db/**/*", "tailwind/**/*", "Gemfile", "studio-engine.gemspec", "README.md", "CHANGELOG.md", "LICENSE",
+                   "docs/SITE_FOOTER.md", "docs/BOOKING.md"] - ["config/e2e_lane.yml"]
   spec.require_paths = ["lib"]
 
   spec.add_dependency "rails", ">= 7.2", "< 8.2"

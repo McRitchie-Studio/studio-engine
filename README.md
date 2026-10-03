@@ -73,6 +73,14 @@ Studio.configure do |config|
 end
 ```
 
+`auth_methods` draws both auth pages. `/login` and `/signup` render the password
+form only when `:password` is enabled and the User has `authenticate`
+(`Studio.password_login_available?`); otherwise they render the email-only
+sign-in-link form when `:magic_link` is enabled, and the Google button only with
+`:google`. A passwordless signup stores nothing from the form: it mails a link,
+and using the link creates the account. So `registration_params`' `:name` shows a
+Name field only on a password app.
+
 ### Local log rotation (automatic — nothing to configure)
 
 The engine caps the host app's **development** log at 16 MB and its **test** log

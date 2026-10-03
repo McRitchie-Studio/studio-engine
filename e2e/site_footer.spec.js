@@ -54,6 +54,11 @@ test("the footer map mounts from the engine's own Leaflet, centred on the addres
   // Leaflet came from this origin, once each: the script and the stylesheet.
   expect(asked.sort()).toEqual(["127.0.0.1/e2e/css/studio/leaflet.css", "127.0.0.1/e2e/js/studio/leaflet.js"]);
   expect(await page.evaluate(() => window.L.version)).toBe("1.9.4");
+  // The mount script ran: it rides studio/site_footer/_map_assets, which only a
+  // map renders, and arms itself once.
+  expect(await page.evaluate(() => window.__studioFooterMapsArmed)).toBe(true);
+  // The map's own styles applied: .ftr-map isolates (Leaflet's z-indexes stay inside).
+  expect(await map(page).evaluate((el) => getComputedStyle(el).isolation)).toBe("isolate");
 
   // The map runs edge to edge: as wide as the viewport, not the centred column.
   const widths = await map(page).evaluate((el) => [el.getBoundingClientRect().width, document.documentElement.clientWidth]);
@@ -255,6 +260,24 @@ test("a footer with no address has no map and never asks for Leaflet", async ({ 
   await page.waitForTimeout(300);
   expect(asked).toEqual([]);
   expect(await page.evaluate(() => typeof window.L)).toBe("undefined");
+  // No map, so the map's script never ran and its styles are not on the page:
+  // studio/site_footer/_map_assets is rendered only with a map.
+  expect(await page.evaluate(() => window.__studioFooterMapsArmed)).toBeUndefined();
+  expect(await page.evaluate(() => [...document.styleSheets].some((sheet) => {
+    try { return [...sheet.cssRules].some((rule) => /leaflet|\.ftr-map/.test(rule.cssText)); } catch (e) { return false; }
+  }))).toBe(false);
+  // The footer's own styles still applied, and a link is painted at full
+  // opacity in the link ink (--ftr-link-ink), not the body colour faded.
+  const link = page.locator("footer[data-site-footer] a.ftr-link").first();
+  expect(await link.evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
+  expect(await link.evaluate((el) => {
+    const probe = document.createElement("span");
+    probe.style.color = getComputedStyle(el.closest(".ftr")).getPropertyValue("--ftr-link-ink");
+    el.closest(".ftr").appendChild(probe);
+    const want = getComputedStyle(probe).color;
+    probe.remove();
+    return getComputedStyle(el).color === want;
+  })).toBe(true);
 });
 
 test("the footer lays out as a grid without the host's utilities", async ({ page }) => {
