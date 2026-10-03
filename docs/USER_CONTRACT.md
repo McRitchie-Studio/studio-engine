@@ -129,4 +129,9 @@ enables `Studio.auth_methods << :password` and has a `password_digest` column.
 
 Before 2026-05-17 (audit Tier 2 #16) the engine called these methods with no formal contract, so new apps onboarding to the engine would hit cryptic `NoMethodError` at runtime. The boot-time validator now catches missing methods early and points at this doc.
 
+The validator runs only in a host that loads ActiveRecord, and only against an
+ActiveRecord `User`. An app with no ActiveRecord (a footer-only consumer,
+[`SITE_FOOTER.md`](SITE_FOOTER.md#an-app-with-no-database)) is never checked,
+even when it defines a `::User` of its own, and needs no opt-out.
+
 To temporarily skip the validator (e.g. during a migration that intentionally breaks the contract), set `Studio.validate_user_contract = false` in `config/initializers/studio.rb`.

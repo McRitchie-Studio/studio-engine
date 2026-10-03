@@ -1,0 +1,157 @@
+<%# The map's styles and its mount script. Rendered once per page, by
+    `studio_footer_map_assets`, which only studio/site_footer/_map calls: a page
+    with no map (a footer with no address) carries none of this and names no
+    Leaflet. The footer's own styles are studio/site_footer/_assets. %>
+<style>
+  /* The map. isolation keeps Leaflet's internal z-indexes (up to 1000) under
+     the pinned navbar and every modal. It reads the same properties outside
+     the footer, where .ftr has not set them. */
+  .ftr-map { position: relative; isolation: isolate; overflow: hidden;
+    background: rgb(var(--ftr-primary-rgb, var(--color-primary-500-rgb, 139 92 246)) / .08); }
+  /* One keyless basemap for both themes: in dark mode the light tiles are
+     inverted and pulled toward the site's violet rather than swapped. */
+  .dark .ftr-map .leaflet-tile-pane { filter: invert(1) hue-rotate(205deg) saturate(.55) brightness(.9) contrast(.92); }
+  .ftr-map-wide { width: 100%; height: clamp(16rem, 26vw, 26rem);
+    border-block: 1px solid var(--ftr-line, var(--color-border, rgb(127 127 127 / .25))); }
+  .ftr-map-fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    padding: 1rem; text-align: center; font-size: .85rem; color: inherit; }
+  /* Leaflet puts .leaflet-container on the [data-footer-map] element ITSELF, so
+     this is a compound selector, not a descendant one. It keeps the tint behind
+     the tiles (Leaflet's own is #ddd) and the page's font in the controls. */
+  .ftr-map.leaflet-container { background: rgb(var(--ftr-primary-rgb, var(--color-primary-500-rgb, 139 92 246)) / .08); font: inherit; }
+  .ftr-map .leaflet-control-attribution { font-size: 9px; background: rgb(0 0 0 / .45); color: #ddd; }
+  .ftr-map .leaflet-control-attribution a { color: #fff; }
+  .ftr-map .leaflet-bar a { background: var(--color-surface, #fff); color: var(--color-text, #111); border-color: rgb(127 127 127 / .3); }
+  .ftr-pin { position: relative; width: 18px; height: 18px; }
+  .ftr-pin::before, .ftr-pin::after { content: ""; position: absolute; inset: 0; border-radius: 9999px;
+    background: var(--ftr-primary, var(--color-primary, #8b5cf6)); }
+  .ftr-pin::before { animation: ftr-ping 2.2s cubic-bezier(0, 0, .2, 1) infinite; opacity: .6; }
+  .ftr-pin::after { border: 3px solid #fff; box-shadow: 0 2px 8px rgb(0 0 0 / .45); }
+  @keyframes ftr-ping { 75%, 100% { transform: scale(3.2); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .ftr-pin::before { animation: none; } }
+</style>
+
+<script>
+  // Mounts a Leaflet map on every [data-footer-map]. Leaflet (script and
+  // stylesheet) is fetched once, on demand, from the URLs the element carries,
+  // so a page with no map pays nothing for it. The basemap follows the site
+  // theme in CSS (see .dark .leaflet-tile-pane above). Tiles are OpenStreetMap's
+  // keyless ones; a basemap that needs an API key does not belong in a gem.
+  //
+  // NOTHING STARTS BEFORE THE WINDOW'S `load`, AND NOTHING UNTIL THE MAP IS NEAR
+  // THE VIEWPORT. The tiles are a third party's, and a request that starts
+  // before `load` holds that event open for as long as the third party takes to
+  // answer. The map is also at the bottom of every public page, where most
+  // visits never reach: those pay for neither Leaflet nor a single tile.
+  //
+  // THE GUARD IS THE ENGINE'S OWN NAME, AND THE ELEMENTS ARE THE ENGINE'S OWN. An
+  // app that still renders a local footer script (mcritchie-studio, until it
+  // adopts this one) guards it with the unprefixed name and marks its map
+  // [data-footer-map] too. Sharing either would let whichever script ran first
+  // in a Turbo session stand the other down and then fail on its elements: that
+  // app's map carries no data-leaflet-js, so there is nothing here to fetch.
+  (function () {
+    if (window.__studioFooterMapsArmed) return;
+    window.__studioFooterMapsArmed = true;
+
+    var TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+    var ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+    var maps = [];
+    var loading = null;
+
+    // Checked on every mount, not once: a page visit that rebuilds the head
+    // must not leave a mounted map without its stylesheet.
+    function ensureStylesheet(href) {
+      if (!href || document.querySelector('link[data-studio-leaflet]')) return;
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = href;
+      link.setAttribute('data-studio-leaflet', '');
+      document.head.appendChild(link);
+    }
+
+    function loadLeaflet(src) {
+      if (window.L) return Promise.resolve();
+      if (loading) return loading;
+      loading = new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = src;
+        s.onload = resolve;
+        // A failed fetch must not be remembered: the next visit tries again.
+        s.onerror = function () { loading = null; s.remove(); reject(new Error('leaflet failed to load')); };
+        document.head.appendChild(s);
+      });
+      return loading;
+    }
+
+    function mount(el) {
+      if (el.__footerMap) return;
+      var at = [parseFloat(el.dataset.lat), parseFloat(el.dataset.lng)];
+      if (isNaN(at[0]) || isNaN(at[1])) return;
+      // NO ONE-FINGER DRAG ON A TOUCH DEVICE. The map runs edge to edge, so on a
+      // phone a swipe that starts on it would pan the map instead of scrolling
+      // the page, and there is no gutter to scroll by. With dragging off Leaflet
+      // leaves touch-action at pan-x pan-y: one finger scrolls the page, and a
+      // pinch still zooms the map (touchZoom stays on, and moves it under the
+      // fingers). The zoom buttons and the directions link do the rest.
+      var map = L.map(el, { center: at, zoom: parseInt(el.dataset.zoom, 10) || 15,
+                            scrollWheelZoom: false, attributionControl: true,
+                            dragging: !L.Browser.mobile, touchZoom: true,
+                            zoomControl: el.dataset.controls !== 'false' });
+      map.attributionControl.setPrefix(false);
+      L.tileLayer(TILES, { attribution: ATTRIBUTION, maxZoom: 19 }).addTo(map);
+      L.marker(at, { icon: L.divIcon({ className: '', html: '<div class="ftr-pin"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }),
+                     keyboard: false }).addTo(map);
+      // Page scroll stays page scroll until the visitor commits to the map.
+      map.on('click', function () { map.scrollWheelZoom.enable(); });
+      map.on('mouseout', function () { map.scrollWheelZoom.disable(); });
+      var fallback = el.querySelector('.ftr-map-fallback');
+      if (fallback) { el.__footerFallback = fallback; fallback.remove(); }
+      el.__footerMap = map;
+      maps.push(el);
+    }
+
+    function fetchAndMount(el) {
+      ensureStylesheet(el.dataset.leafletCss);
+      loadLeaflet(el.dataset.leafletJs)
+        .then(function () { if (el.isConnected) mount(el); })
+        .catch(function () { /* the fallback link stays */ });
+    }
+
+    // One observer per map: it fires once, when the map comes within 400px of
+    // the viewport, and is then dropped.
+    function watch(el) {
+      if (el.__footerMap || el.__footerWatch) return;
+      if (typeof IntersectionObserver !== 'function') { fetchAndMount(el); return; }
+      var watcher = new IntersectionObserver(function (entries) {
+        if (!entries.some(function (entry) { return entry.isIntersecting; })) return;
+        watcher.disconnect();
+        el.__footerWatch = null;
+        fetchAndMount(el);
+      }, { rootMargin: '400px' });
+      el.__footerWatch = watcher;
+      watcher.observe(el);
+    }
+
+    function armAll() { document.querySelectorAll('[data-footer-map][data-leaflet-js]').forEach(watch); }
+
+    function armAfterLoad() {
+      if (document.readyState === 'complete') armAll();
+      else window.addEventListener('load', armAll, { once: true });
+    }
+
+    // A cached Turbo snapshot would restore Leaflet's DOM without its state, so
+    // the map is taken down and its fallback link put back before the snapshot.
+    document.addEventListener('turbo:before-cache', function () {
+      maps.forEach(function (el) {
+        var fallback = el.__footerFallback;
+        el.__footerMap.remove();
+        el.__footerMap = null;
+        if (fallback && !el.querySelector('.ftr-map-fallback')) el.appendChild(fallback);
+      });
+      maps = [];
+    });
+    document.addEventListener('turbo:load', armAfterLoad);
+    armAfterLoad();
+  })();
+</script>

@@ -179,7 +179,7 @@ class LayerScaleContractTest < ActiveSupport::TestCase
   CONTAINED_VENDOR_FILES = ["app/assets/stylesheets/studio/leaflet.css"].freeze
 
   test "the vendored Leaflet stylesheet is exempt only while every map is its own stacking context" do
-    assets = File.read(File.join(ROOT, "app/views/studio/site_footer/_assets.html.erb")).gsub(%r{/\*.*?\*/}m, " ")
+    assets = File.read(File.join(ROOT, "app/views/studio/site_footer/_map_assets.html.erb")).gsub(%r{/\*.*?\*/}m, " ")
     map = File.read(File.join(ROOT, "app/views/studio/site_footer/_map.html.erb")).gsub(/<%#.*?%>/m, "")
 
     assert_match(/^\s*\.ftr-map \{[^}]*isolation:\s*isolate/, assets,
@@ -197,7 +197,7 @@ class LayerScaleContractTest < ActiveSupport::TestCase
     assert_equal ["app/views/studio/site_footer/_map.html.erb"], mounts.map { |path| path.delete_prefix(ROOT + "/") },
                  "a second partial renders a [data-footer-map] element. Leaflet mounts on every one, so it " \
                  "must carry .ftr-map too; add it here once it does."
-    assert_empty Dir[File.join(ROOT, "app/views/**/*.erb")].reject { |path| path.end_with?("studio/site_footer/_assets.html.erb") }
+    assert_empty Dir[File.join(ROOT, "app/views/**/*.erb")].reject { |path| path.end_with?("studio/site_footer/_map_assets.html.erb") }
                                                              .select { |path| File.read(path) =~ /\bL\.map\(/ },
                  "Leaflet is mounted somewhere other than the footer's script, outside the isolation this exemption rests on"
   end

@@ -155,6 +155,15 @@ module Studio
       render "studio/site_footer/assets"
     end
 
+    # The map's styles and mount script, once per page. Only the map partial
+    # asks, so a page with no map names no Leaflet.
+    def studio_footer_map_assets
+      return if @_studio_footer_map_assets_rendered
+
+      @_studio_footer_map_assets_rendered = true
+      render "studio/site_footer/map_assets"
+    end
+
     def studio_booking_assets
       return if @_studio_booking_assets_rendered
 

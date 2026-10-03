@@ -4,6 +4,37 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **Footer-only consumers: an app with no ActiveRecord can take the site
+  footer alone, with no workarounds.** When `ActiveRecord::Railtie` is not
+  loaded (`Studio.active_record?` reads false) the engine requires the
+  ActiveSupport core extensions it calls at load time, skips the user-contract
+  check, keeps every `app/` root but `app/helpers` (the two `concerns` roots
+  included) out of eager loading, and answers
+  `studio_engine:install:migrations` with a no-op that exits 0 and writes
+  nothing. A host with ActiveRecord is unchanged. docs/SITE_FOOTER.md, *An app
+  with no database*, has the recipe; rantly can drop its four workarounds
+  (`require "active_support/core_ext/integer/time"`,
+  `Studio.validate_user_contract = false`, its `do_not_eager_load` loop, and its
+  replacement rake task).
+- **docs/SITE_FOOTER.md and docs/BOOKING.md ship in the gem**, so a consumer's
+  citation of them resolves in the installed copy.
+
+### Changed
+
+- **Footer links are painted at full opacity in `--ftr-link-ink`**, which
+  defaults to `--color-text-secondary`, instead of the inherited body colour at
+  78% opacity. On the default theme the links clear WCAG AA on the band in both
+  themes; an app that maps the tokens onto its own palette sets
+  `--color-text-secondary` (or `--ftr-link-ink`) to an ink that clears 4.5:1 on
+  its `--color-surface-alt` (docs/SITE_FOOTER.md, *Colours*). A refused href's
+  label (`.ftr-link-plain`) takes the same ink.
+- **A footer with no address names no Leaflet.** The map's styles and mount
+  script moved from `studio/site_footer/_assets` to a new
+  `studio/site_footer/_map_assets`, rendered only with a map
+  (`studio_footer_map_assets`).
+
 ### Fixed
 
 - **`/signup` honours `Studio.auth_methods`, as `/login` already did.** The

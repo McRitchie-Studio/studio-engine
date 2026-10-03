@@ -100,6 +100,76 @@ module Studio
       load File.expand_path("../tasks/studio_ses.rake", __dir__)
     end
 
+    # ---- A FOOTER-ONLY CONSUMER: a host with no ActiveRecord ------------------
+    #
+    # An app with no database can take the engine for its site footer alone
+    # (docs/SITE_FOOTER.md, "An app with no database"). Each block below changes
+    # nothing for a host that loads ActiveRecord; each one used to be a
+    # workaround in the consumer (rantly). Studio.active_record? is the switch.
+    # test/integration/footer_only_consumer_test.rb boots that host.
+
+    # The engine's app/ roots a footer-only host must not EAGER load: every one
+    # but app/helpers. Its models subclass ApplicationRecord, its controllers
+    # skip :require_authentication, its mailers and jobs subclass ActionMailer
+    # and ActiveJob, and the two concerns roots (app/controllers/concerns,
+    # app/models/concerns) are roots of their OWN to Zeitwerk: excluding
+    # app/models does not exclude app/models/concerns, and Sluggable and
+    # Studio::UserProfile sit there. They stay lazily loadable, and nothing in a
+    # host that draws no Studio.routes asks for them.
+    #
+    # Read off the engine's own eager-load paths rather than listed, so a root
+    # added later is excluded by default: the footer-only surface is the helpers
+    # (studio_site_footer and its siblings), and a new root earns a place beside
+    # them by being made to load without ActiveRecord.
+    FOOTER_ONLY_EAGER_ROOTS = %w[app/helpers].freeze
+
+    def self.active_record_dependent_roots
+      root_path = root.to_s
+      config.all_eager_load_paths.map(&:to_s)
+            .select { |path| path.start_with?("#{root_path}/") && File.directory?(path) }
+            .reject { |path| FOOTER_ONLY_EAGER_ROOTS.include?(path.delete_prefix("#{root_path}/")) }
+            .sort
+    end
+
+    initializer "studio.footer_only_eager_load" do
+      next if Studio.active_record?
+
+      Studio::Engine.active_record_dependent_roots.each do |path|
+        Rails.autoloaders.main.do_not_eager_load(path)
+      end
+    end
+
+    # `studio_engine:install:migrations` with no ActiveRecord. Rails defines it
+    # for every engine that ships db/migrate, and it invokes
+    # `railties:install:migrations`, which only ActiveRecord's tasks define, so
+    # it raised and rake exited 1. The hub's release sweep runs it in every
+    # member after each engine publish (mcritchie-studio bin/release.rb,
+    # install_engine_migrations!) and aborts on a non-zero exit. With no
+    # ActiveRecord, Rails' version is not drawn (has_migrations? below) and this
+    # one says so and exits 0, writing nothing.
+    rake_tasks do
+      next if Studio.active_record?
+
+      namespace railtie_name do
+        namespace :install do
+          desc "No-op: this app loads no ActiveRecord, so it installs none of studio-engine's migrations"
+          task :migrations do
+            puts "studio-engine: this app loads no ActiveRecord, so there are no migrations to install"
+          end
+        end
+      end
+    end
+
+    private
+
+    # Rails' engine reads this to decide whether to draw
+    # `<engine>:install:migrations` (Rails::Engine, its rake_tasks block).
+    def has_migrations?
+      Studio.active_record? && super
+    end
+
+    public
+
     config.after_initialize do
       # Configure the IP -> location provider for every app that has the gem,
       # so geo detection works the same way everywhere: HTTPS (without which
@@ -113,8 +183,17 @@ module Studio
 
       # Validate the host app's User model satisfies the engine's contract.
       # See docs/USER_CONTRACT.md. Opt out with Studio.validate_user_contract = false.
-      if defined?(::User) && ::User.is_a?(Class) &&
-         (!defined?(::ActiveRecord::Base) || ::User.ancestors.include?(::ActiveRecord::Base))
+      #
+      # ONLY A HOST WITH ACTIVERECORD, and only an ActiveRecord User. The
+      # contract is what the engine's sign-in, admin and error-log surfaces call
+      # on a user RECORD, and every one of them needs a database. A host with no
+      # ActiveRecord (a footer-only consumer) has no such surface to break, and
+      # a ::User it does define is its own business: rantly's is a sample
+      # profile read from YAML. The rule is ActiveRecord's absence rather than
+      # "drew no Studio.routes", because the routes are drawn after this check's
+      # inputs exist and an app can call the helpers without drawing them.
+      if Studio.active_record? && defined?(::User) && ::User.is_a?(Class) &&
+         ::User.ancestors.include?(::ActiveRecord::Base)
         Studio.validate_user_contract!(::User)
       end
     end

@@ -1,3 +1,16 @@
+# What this file and lib/studio/* call at REQUIRE time, required here rather
+# than left to the host. `15.minutes` and `24.hours` below are evaluated the
+# moment `require "studio"` runs, which is Bundler.require in the host's
+# config/application.rb, BEFORE Rails' :load_active_support initializer pulls in
+# any core extension. A host on `rails/all` happens to have them already (the
+# ActiveRecord and ActiveJob railties load them); a host with no ActiveRecord
+# does not, and its boot died on `Integer#minutes` until it required
+# active_support/core_ext/integer/time itself. A gem requires what it uses.
+# test/integration/footer_only_consumer_test.rb boots that host.
+require "active_support"
+require "active_support/core_ext/module/attribute_accessors"
+require "active_support/core_ext/numeric/time"
+require "active_support/core_ext/integer/time"
 require "studio/version"
 require "studio/log_rotation"
 require "studio/ip_locations"
@@ -951,6 +964,25 @@ module Studio
   # Set to false in config/initializers/studio.rb to bypass (e.g. during migrations
   # that intentionally break the contract).
   mattr_accessor :validate_user_contract, default: true
+
+  # Does the host load ActiveRecord at all? True for every app that requires
+  # `rails/all` or `active_record/railtie` (all the engine's database-backed
+  # consumers); false for a FOOTER-ONLY consumer, an app with no database that
+  # takes the engine for its site footer and nothing else (docs/SITE_FOOTER.md,
+  # "An app with no database").
+  #
+  # The RAILTIE, not ActiveRecord::Base: the railtie is what an app chooses in
+  # config/application.rb, it is defined at require time (before any engine
+  # initializer runs), and asking for it autoloads nothing.
+  #
+  # Three things key off it, each only when it reads false (Studio::Engine):
+  # the user-contract check is skipped, the engine's ActiveRecord-dependent
+  # app/ roots are kept out of eager loading, and
+  # `studio_engine:install:migrations` is a no-op that exits 0. An app WITH
+  # ActiveRecord sees none of them change.
+  def self.active_record?
+    defined?(::ActiveRecord::Railtie) ? true : false
+  end
 
   # Only methods that consumers must explicitly define are checked here.
   # Column accessors (#email, #name, #role) are NOT validated because
