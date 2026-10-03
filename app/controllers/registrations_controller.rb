@@ -12,7 +12,9 @@ class RegistrationsController < ApplicationController
     # straight from a signup POST would skip proof of email ownership, so we
     # treat "sign up" as a magic-link request — the create-or-login link (which
     # only fires after the recipient clicks it) does the account creation.
-    unless Studio.auth_method?(:password)
+    # Gated on the same predicate registrations/new renders the password form on,
+    # so the form a visitor sees is always the form this action reads.
+    unless Studio.password_login_available?
       email = (params.dig(:user, :email) || params[:email]).to_s.strip.downcase
       if email.match?(URI::MailTo::EMAIL_REGEXP)
         token = issue_magic_link(email, nil)

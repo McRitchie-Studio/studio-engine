@@ -153,6 +153,15 @@ class SignupHonoursAuthMethodsTest < ActionDispatch::IntegrationTest
     assert_equal 0, User.count, "the account is created when the link is used, not by the POST"
   end
 
+  test "the passwordless signup button speaks Studio.sign_in_label, as /login does" do
+    prior = Studio.sign_in_label
+    Studio.sign_in_label = "Log on"
+
+    assert_equal "Send log-on link", submit_text(signup_page(%i[magic_link], NAME_AND_EMAIL))
+  ensure
+    Studio.sign_in_label = prior
+  end
+
   # --- Google only, and the password opt-in -------------------------------
 
   test "a Google-only app renders the Google button with no email form and no divider" do
@@ -190,6 +199,13 @@ class SignupHonoursAuthMethodsTest < ActionDispatch::IntegrationTest
 
     assert_empty page.css("input[type=password]"), "password_login_available? gates it, as on /login"
     assert_equal "Send sign-in link", submit_text(page)
+
+    # The action takes the same branch the view rendered: it mails a link rather
+    # than trying to save a user from a form that carried no password.
+    post "/signup", params: { user: { email: "reader@example.com" } }
+    assert_redirected_to "/login"
+    assert_equal ["reader@example.com"], ActionMailer::Base.deliveries.last&.to
+    assert_equal 0, User.count
   end
 
   private

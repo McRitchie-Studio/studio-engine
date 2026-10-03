@@ -3,6 +3,15 @@
   words = Studio.app_name.split
   last_word = words.pop
   prefix = words.join(" ")
+  # /signup renders from the app's configured auth_methods, exactly as /login does
+  # (sessions/new.html.erb): the PASSWORD form only when passwords are available
+  # (Studio.password_login_available?), otherwise the passwordless email form when
+  # :magic_link is enabled, and the Google button only when :google is. The passwordless
+  # POST (RegistrationsController#create) reads the email alone and mails a sign-in link,
+  # so that form asks for no password and no name: neither would be stored.
+  password_signup = Studio.password_login_available?
+  email_signup = password_signup || Studio.auth_method?(:magic_link)
+  ask_name = password_signup && Studio.registration_params.include?(:name)
 %>
 
 <div class="min-h-[70vh] flex items-center justify-center">
@@ -24,51 +33,65 @@
         </div>
       <% end %>
 
-      <%= form_with model: @user, url: signup_path, method: :post do |f| %>
-        <% if Studio.registration_params.include?(:name) %>
+      <% if email_signup %>
+        <%= form_with model: @user, url: signup_path, method: :post do |f| %>
+          <% if ask_name %>
+            <div class="mb-5">
+              <label for="user_name" class="block text-sm text-secondary mb-2 font-medium">Name</label>
+              <%= f.text_field :name, id: "user_name", autofocus: true,
+                class: "input-field",
+                placeholder: "Your name" %>
+            </div>
+          <% end %>
+
           <div class="mb-5">
-            <label for="user_name" class="block text-sm text-secondary mb-2 font-medium">Name</label>
-            <%= f.text_field :name, id: "user_name", autofocus: true,
+            <label for="user_email" class="block text-sm text-secondary mb-2 font-medium">Email</label>
+            <%= f.email_field :email, id: "user_email", autofocus: !ask_name,
               class: "input-field",
-              placeholder: "Your name" %>
+              placeholder: "you@example.com" %>
+          </div>
+
+          <% if password_signup %>
+            <div class="mb-5">
+              <label for="user_password" class="block text-sm text-secondary mb-2 font-medium">Password</label>
+              <%= f.password_field :password, id: "user_password",
+                class: "input-field",
+                placeholder: "Choose a password" %>
+            </div>
+
+            <div class="mb-6">
+              <label for="user_password_confirmation" class="block text-sm text-secondary mb-2 font-medium">Confirm Password</label>
+              <%= f.password_field :password_confirmation, id: "user_password_confirmation",
+                class: "input-field",
+                placeholder: "Confirm your password" %>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg w-full">
+              Sign Up
+            </button>
+          <% else %>
+            <button type="submit" class="btn btn-primary btn-lg w-full">
+              Send <%= Studio::AuthLabels.link_noun(Studio.sign_in_label) %>
+            </button>
+
+            <p class="text-center text-secondary text-sm mt-4">We will email you a link that signs you in and creates your account.</p>
+          <% end %>
+        <% end %>
+      <% end %>
+
+      <% if Studio.auth_method?(:google) %>
+        <% if email_signup %>
+          <div class="relative my-6">
+            <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-subtle"></div></div>
+            <div class="relative flex justify-center text-sm"><span class="bg-surface px-3 text-secondary">or</span></div>
           </div>
         <% end %>
 
-        <div class="mb-5">
-          <label for="user_email" class="block text-sm text-secondary mb-2 font-medium">Email</label>
-          <%= f.email_field :email, id: "user_email", autofocus: !Studio.registration_params.include?(:name),
-            class: "input-field",
-            placeholder: "you@example.com" %>
-        </div>
-
-        <div class="mb-5">
-          <label for="user_password" class="block text-sm text-secondary mb-2 font-medium">Password</label>
-          <%= f.password_field :password, id: "user_password",
-            class: "input-field",
-            placeholder: "Choose a password" %>
-        </div>
-
-        <div class="mb-6">
-          <label for="user_password_confirmation" class="block text-sm text-secondary mb-2 font-medium">Confirm Password</label>
-          <%= f.password_field :password_confirmation, id: "user_password_confirmation",
-            class: "input-field",
-            placeholder: "Confirm your password" %>
-        </div>
-
-        <button type="submit" class="btn btn-primary btn-lg w-full">
-          Sign Up
-        </button>
-      <% end %>
-
-      <div class="relative my-6">
-        <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-subtle"></div></div>
-        <div class="relative flex justify-center text-sm"><span class="bg-surface px-3 text-secondary">or</span></div>
-      </div>
-
-      <%= button_to "/auth/google_oauth2", method: :post, data: { turbo: false },
-        class: "btn btn-google btn-lg w-full gap-3" do %>
-        <%= render "components/google_logo" %>
-        Sign up with Google
+        <%= button_to "/auth/google_oauth2", method: :post, data: { turbo: false },
+          class: "btn btn-google btn-lg w-full gap-3" do %>
+          <%= render "components/google_logo" %>
+          Sign up with Google
+        <% end %>
       <% end %>
 
       <p class="text-center text-secondary text-sm mt-6">
