@@ -70,12 +70,6 @@ end
 # user-contract check must leave it alone in an app with no ActiveRecord.
 User = Data.define(:name)
 
-class ApplicationController < ActionController::Base; end
-
-class PagesController < ApplicationController
-  def show = render(inline: "<main>Home</main><%= studio_site_footer %>")
-end
-
 Studio.configure do |config|
   config.site_footer = lambda do |view|
     {
@@ -89,6 +83,16 @@ Studio.configure do |config|
 end
 
 FooterOnlyProbe::Application.initialize!
+
+# After the boot, as a real app's app/controllers would autoload: ActionController
+# runs `helper :all` when the class is defined, against the helpers path the
+# boot assembled, which is how the engine's helpers reach the view.
+class ApplicationController < ActionController::Base; end
+
+class PagesController < ApplicationController
+  def show = render(inline: "<main>Home</main><%= studio_site_footer %>")
+end
+
 Rails.application.routes.draw { root "pages#show" }
 
 result = {
