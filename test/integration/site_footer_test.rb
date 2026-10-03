@@ -332,6 +332,12 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     assert_select "[data-footer-map]", 0
     assert_select "address", 0
     assert_no_match(/leaflet\.(js|css)/, response.body, "a page with no map must not name Leaflet's files")
+    # Nor Leaflet at all: the map's styles (.leaflet-* rules) and its mount
+    # script ride studio/site_footer/_map_assets, which only a map renders.
+    assert_no_match(/leaflet/i, response.body, "a page with no map must not name Leaflet")
+    assert_no_match(/__studioFooterMapsArmed/, response.body, "a page with no map must not ship the map script")
+    assert_no_match(/\.ftr-map/, response.body, "a page with no map must not ship the map's styles")
+    assert_includes response.body, ".ftr-wrap {", "the footer's own styles still ship"
     assert_select "#{footer} .ftr-legal.ftr-legal-ruled", 1, "with no map above it the legal line carries the rule"
   end
 
@@ -342,7 +348,7 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
 
     assert_select "#{footer} [data-footer-location] address a", /123 Example St/
     assert_select "[data-footer-map]", 0
-    assert_no_match(/leaflet\.(js|css)/, response.body)
+    assert_no_match(/leaflet/i, response.body)
   end
 
   # ---- 3. booking -------------------------------------------------------------
