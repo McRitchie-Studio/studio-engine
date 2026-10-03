@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.86.0 — 2026-10-03
+
 ### Added
 
 - **Footer-only consumers: an app with no ActiveRecord can take the site
