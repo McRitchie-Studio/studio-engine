@@ -7,6 +7,11 @@ and Leaflet itself. The app declares facts.
 Booking through Google Calendar is its own primitive, usable with or without
 the footer: see [`BOOKING.md`](BOOKING.md). This page covers where the two meet.
 
+This page and `BOOKING.md` ship inside the gem (`docs/` in the installed
+studio-engine), so a consumer can cite them by path: `bundle exec gem contents
+studio-engine | grep docs/` finds them. The repository copy is
+<https://github.com/McRitchie-Studio/studio-engine/blob/main/docs/SITE_FOOTER.md>.
+
 ## Adopt it
 
 ```ruby
@@ -41,6 +46,63 @@ end
 
 That is the whole adoption. Nothing is copied into the app's `public/`, and
 nothing is added to its asset manifest or its Tailwind build.
+
+## An app with no database
+
+An app with no ActiveRecord (a public site with no accounts, such as rantly)
+can take the engine for its footer alone, with nothing else to set:
+
+```ruby
+# Gemfile
+gem "studio-engine"   # pin the first release whose CHANGELOG lists footer-only support
+```
+
+```ruby
+# config/application.rb: the app's own framework choice, unchanged
+require "rails"
+require "active_model/railtie"
+require "action_controller/railtie"
+require "action_view/railtie"
+# no active_record/railtie
+```
+
+```ruby
+# config/initializers/studio.rb
+Studio.configure do |config|
+  config.site_footer = ->(view) { { name: "Example", columns: [ [ "About", [ [ "Home", view.root_path ] ] ] ] } }
+end
+```
+
+```erb
+<%# app/views/layouts/application.html.erb, at the end of <body> %>
+<%= studio_site_footer %>
+```
+
+Do not call `Studio.routes(self)`: everything it draws (sign-in, admin, error
+logs) needs a database. The app also needs an asset pipeline (Propshaft or
+Sprockets), as every Rails 8 app has, and a mapping of the theme tokens onto its
+own palette (see [Colours](#colours)).
+
+When the app loads no ActiveRecord (`Studio.active_record?` reads false, because
+`ActiveRecord::Railtie` is not defined), the engine itself:
+
+- requires the ActiveSupport core extensions it calls at load time
+  (`Integer#minutes` and the like), so the app need not;
+- skips the user-contract check ([`USER_CONTRACT.md`](USER_CONTRACT.md)), even
+  when the app defines a `::User` of its own: the contract is what the engine's
+  database-backed surfaces call on a user record, and the app has none;
+- keeps every one of its `app/` roots but `app/helpers` out of eager loading
+  (controllers, models, mailers, jobs, services, and the two `concerns` roots,
+  which Zeitwerk treats as roots of their own), so a production boot does not
+  load code that needs ActiveRecord, ActionMailer or ActiveJob. The helpers,
+  the footer's among them, still eager load;
+- answers `bin/rails studio_engine:install:migrations` with a no-op that exits 0
+  and writes nothing, which is what the hub's release sweep runs in every member
+  after an engine publish.
+
+An app WITH ActiveRecord sees none of this change.
+`test/integration/footer_only_consumer_test.rb` boots such an app, in
+development and with `eager_load = true`.
 
 ## The facts
 
@@ -189,11 +251,39 @@ The frame, its crop, the popup, the `/schedule` page, an app's own booking page
   fallback beside each, so the footer lays out the same in an app whose Tailwind
   build has never seen these views. Do not restyle it with utilities that your
   build may not emit.
-- A page with no address never names Leaflet. A page with no `booking_url`
-  carries no booking script.
+- A page with no address never names Leaflet: the map's styles and its mount
+  script are rendered only with a map (`studio/site_footer/_map_assets`). A page
+  with no `booking_url` carries no booking script.
 - A facts callable that raises costs the footer, not the page: in production the
   error is logged once and the page renders without a footer. In development and
   test it raises.
+
+## Colours
+
+The footer reads the engine's theme tokens, with a fallback beside each:
+
+| Token | Paints |
+|-------|--------|
+| `--color-surface-alt` | The band's background |
+| `--color-text-body` | The band's text |
+| `--color-text` | The wordmark, the headings and the Location title |
+| `--color-text-secondary` | The links (through `--ftr-link-ink`) and the tagline |
+| `--color-text-muted` | The © line |
+| `--color-primary`, `--color-primary-500-rgb` | The wordmark accent, link hover, social icons and the map tint |
+| `--color-border` | The rules |
+
+**Links are painted at full opacity** in `--ftr-link-ink`, which defaults to
+`--color-text-secondary`. On the engine's default theme that ink clears WCAG AA
+4.5:1 on the band in both themes (`test/lib/site_footer_link_contrast_test.rb`
+measures it). An app that maps the tokens onto its own palette owes the same:
+set `--color-text-secondary` to an ink that clears 4.5:1 on its
+`--color-surface-alt`, in light and dark. To give the footer's links a colour of
+their own without touching the token, set `--ftr-link-ink` on the footer:
+
+```css
+footer[data-site-footer] { --ftr-link-ink: #4a4a4a; }
+@media (prefers-color-scheme: dark) { footer[data-site-footer] { --ftr-link-ink: #c8c8c8; } }
+```
 
 ## Content Security Policy
 
@@ -238,7 +328,7 @@ These class names are stable, and an app may style against them:
 | `.ftr-brand` | The brand block |
 | `.ftr-col` | One link column (a `nav`) |
 | `.ftr-heading`, `.ftr-list` | A column's heading and its list |
-| `.ftr-link`, `.ftr-link-solid`, `.ftr-link-disabled` | A link; an address kept on one line; a "coming soon" label |
+| `.ftr-link`, `.ftr-link-solid`, `.ftr-link-disabled` | A link; an address kept on one line; a "coming soon" label. `--ftr-link-ink` on `.ftr` is the link colour |
 | `.ftr-location`, `.ftr-location-title`, `.ftr-address` | The Location band |
 | `.ftr-legal`, `.ftr-copyright` | The legal line and the © line |
 | `.ftr-map` | The map |
@@ -271,6 +361,11 @@ link. Those rules are more specific than the engine's and still apply.
   addressed through the asset pipeline.
 - `test/integration/site_footer_test.rb`: what a host renders, with and without
   each fact, signed in and out.
+- `test/integration/footer_only_consumer_test.rb`: an app with no ActiveRecord
+  boots (development and eager-loaded), renders the footer with no Leaflet, and
+  runs `studio_engine:install:migrations` to a clean exit.
+- `test/lib/site_footer_link_contrast_test.rb`: the link ink clears 4.5:1 on the
+  band, on the default tokens, in both themes.
 - `e2e/site_footer.spec.js`: the map's script and the footer's layout, in a
   browser, with the network closed: which columns share a row at 320, 390, 768,
   1024 and 1280px with two, three, four and five columns, the address on one
