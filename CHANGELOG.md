@@ -4,6 +4,24 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **`/signup` honours `Studio.auth_methods`, as `/login` already did.** The
+  engine's `registrations/new` rendered Password, Confirm Password and "Sign up
+  with Google" whatever the app configured, while the passwordless
+  `RegistrationsController#create` reads the email alone. It now renders the
+  password form only when `Studio.password_login_available?`, otherwise the
+  email-only form (button "Send sign-in link", wording from
+  `Studio.sign_in_label`) when `:magic_link` is enabled, and the Google button and
+  its divider only with `:google`. The Name field renders only on the password
+  path, the one path that stores it; a passwordless signup discarded the name, so
+  it no longer asks. `#create` now branches on the same predicate the view does
+  (`password_login_available?` rather than `auth_method?(:password)`); for every
+  app that boots, the two agree. A password app renders exactly as before.
+  Consumers that wrote a host `app/views/registrations/new.html.erb` to hide the
+  password fields (McRitchie Industries) may delete it after the bump; the hub
+  and Turf Monster override it for their unified auth card and keep theirs.
+
 ## 0.85.0 — 2026-10-02
 
 ### Changed
