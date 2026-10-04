@@ -29,6 +29,8 @@ require "bundler/setup"
 #   PROBE_EAGER   "1" boots with config.eager_load = true (what production does)
 #   PROBE_ACTION  render | rake
 #   PROBE_RESULT  file to write the JSON result to
+#   PROBE_FOOTER  "default" leaves Studio.site_footer UNSET (the default footer)
+#                 and draws a `privacy` route; anything else declares the facts
 #   RAILS_ENV     the environment to boot
 
 require "json"
@@ -70,7 +72,10 @@ end
 # user-contract check must leave it alone in an app with no ActiveRecord.
 User = Data.define(:name)
 
+DEFAULT_FOOTER = ENV["PROBE_FOOTER"] == "default"
+
 Studio.configure do |config|
+  config.app_name = "Default Probe" if DEFAULT_FOOTER
   config.site_footer = lambda do |view|
     {
       name: "Footer Only",
@@ -80,6 +85,8 @@ Studio.configure do |config|
       legal: [["Home", view.root_path]]
     }
   end
+  # The app that sets nothing: no facts at all, so the engine's default footer.
+  config.site_footer = nil if DEFAULT_FOOTER
 end
 
 FooterOnlyProbe::Application.initialize!
@@ -93,7 +100,10 @@ class PagesController < ApplicationController
   def show = render(inline: "<main>Home</main><%= studio_site_footer %>")
 end
 
-Rails.application.routes.draw { root "pages#show" }
+Rails.application.routes.draw do
+  root "pages#show"
+  get "privacy", to: "pages#show", as: :privacy if DEFAULT_FOOTER
+end
 
 result = {
   env: Rails.env.to_s,

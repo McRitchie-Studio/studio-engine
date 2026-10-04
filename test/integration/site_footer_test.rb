@@ -72,6 +72,7 @@ end
 #   6. the helpers a consumer calls from its own views
 #   7. the frame's crop: none by default, the app's when declared, one frame's own
 #   8. an app's own booking page (config.booking_path) is treated as the engine's is
+#   9. unset is the default footer, false is none, and the location is one setting
 class SiteFooterTest < ActionDispatch::IntegrationTest
   ActionDispatch::IntegrationTest.app = Rails.application
 
@@ -103,8 +104,10 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
       site_footer_controllers: Studio.site_footer_controllers, draw_booking_routes: Studio.draw_booking_routes,
       site_title: Studio.site_title, theme_logos: Studio.theme_logos,
       site_footer_visible: Studio.site_footer_visible,
-      booking_crop: Studio.booking_crop, booking_path: Studio.booking_path
+      booking_crop: Studio.booking_crop, booking_path: Studio.booking_path,
+      site_footer_address: Studio.site_footer_address
     }
+    Studio.site_footer_address = nil
     Studio.site_footer = FACTS
     Studio.booking_url = BOOKING_URL
     Studio.site_footer_controllers = []
@@ -119,6 +122,8 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
 
   def teardown
     @saved.each { |key, value| Studio.public_send("#{key}=", value) }
+    Rails.application.config.x.footer_host_legal = nil
+    Rails.application.config.x.footer_host_legal_post = nil
     Rails.application.reload_routes!
     Studio::SiteFooterHelper.reported = nil
     Studio::Booking.reporter = @booking_reporter
@@ -127,6 +132,12 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
 
   def draw_booking_routes!(on = true)
     Studio.draw_booking_routes = on
+    Rails.application.reload_routes!
+  end
+
+  def draw_legal_routes!(*names, post_terms: false)
+    Rails.application.config.x.footer_host_legal = names
+    Rails.application.config.x.footer_host_legal_post = post_terms
     Rails.application.reload_routes!
   end
 
@@ -406,15 +417,156 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
 
   # ---- 4. where it shows ------------------------------------------------------
 
-  test "an app that declares no footer renders none, and the layout line is safe" do
+  # ---- 9. the default footer, the opt-out, the one-setting location ------------
+
+  test "an app that sets nothing gets the default footer: its name and logo, and no location" do
     Studio.site_footer = nil
+    Studio.booking_url = nil
+    Studio.site_title = "Default Co"
+    Studio.theme_logos = [{ file: "nav-logo.png", title: "Navbar Logo" }]
+
+    get "/footer_host/landing"
+
+    assert_response :success
+    assert_select "h1", "Landing"
+    assert_select footer, 1 do
+      assert_select "a.ftr-home[href='/'][aria-label='Default Co'] img.ftr-logo[src='/nav-logo.png']", 1
+      assert_select ".ftr-wordmark", text: /Default\s*Co/
+      assert_select ".ftr-copyright", "© #{Time.current.year} Default Co"
+      assert_select "nav.ftr-col", 0, "no link columns: the engine guesses no links"
+      assert_select "a", 1, "the only link is the brand's own, to the home page"
+      assert_select ".ftr-tagline", 0
+      assert_select ".ftr-email", 0
+      assert_select ".ftr-socials", 0
+    end
+    assert_select "[data-footer-location]", 0
+    assert_select "[data-footer-map]", 0
+    assert_select "address", 0
+    assert_no_match(/leaflet/i, response.body, "the default footer has no map, so it must not name Leaflet")
+    assert_no_match(/mailto:|tel:/, response.body, "no email and no phone by default")
+    assert_select "dialog[data-booking-dialog]", 0
+  end
+
+  test "the default footer keeps the rule for where it shows" do
+    Studio.site_footer = nil
+
+    get "/footer_host/board", headers: SIGNED_IN
+    assert_select footer, 0, "a signed-in working surface keeps no footer"
+
+    Studio.site_footer_controllers = %w[footer_host_board]
+    get "/footer_host/board", headers: SIGNED_IN
+    assert_select footer, 1
+  end
+
+  test "config.site_footer = false is the opt-out: no footer, and the layout line is safe" do
+    Studio.site_footer = false
+    Studio.site_footer_address = { street: "9 Setting Rd", city_line: "Denver, CO 80202", lat: 39.7392, lng: -104.9903 }
 
     get "/footer_host/landing"
 
     assert_response :success
     assert_select footer, 0
+    assert_select "[data-footer-map]", 0
     assert_select "dialog[data-booking-dialog]", 0
     assert_select "h1", "Landing"
+    refute Studio.site_footer_enabled?
+    refute Studio.site_footer_declared?
+
+    Studio.site_footer = nil
+    assert Studio.site_footer_enabled?, "unset is not off"
+    refute Studio.site_footer_declared?
+  end
+
+  test "a callable that answers nil still declines the footer for that request" do
+    Studio.site_footer = ->(_view) {}
+
+    get "/footer_host/landing"
+
+    assert_response :success
+    assert_select footer, 0
+  end
+
+  test "one setting gives the default footer its Location band and its map" do
+    Studio.site_footer = nil
+    Studio.site_title = "Default Co"
+    Studio.site_footer_address = { street: "9 Setting Rd", city_line: "Denver, CO 80202", lat: 39.7392, lng: -104.9903 }
+
+    get "/footer_host/landing"
+
+    assert_select footer, 1 do
+      assert_select "[data-footer-location] address a[href*='google.com/maps/dir']",
+                    { text: /9 Setting Rd\s*Denver, CO 80202/m, count: 1 }
+      assert_select "[data-footer-map][data-lat='39.7392'][data-lng='-104.9903'][data-zoom='15']", 1
+      assert_select ".ftr-copyright", "© #{Time.current.year} Default Co"
+      assert_select "nav.ftr-col", 0
+    end
+    assert_match(/leaflet/i, response.body)
+
+    Studio.site_footer_address = { street: "9 Setting Rd", city_line: "Denver, CO 80202" }
+    get "/footer_host/landing"
+    assert_select "[data-footer-location]", 1
+    assert_select "[data-footer-map]", 0, "no coordinates: the band without the map"
+  end
+
+  test "an app's own facts are unchanged by the setting when they carry an address, and theirs wins" do
+    get "/footer_host/landing"
+    before = response.body
+
+    Studio.site_footer_address = { street: "9 Setting Rd", city_line: "Denver, CO 80202", lat: 39.7392, lng: -104.9903 }
+    get "/footer_host/landing"
+
+    assert_equal before, response.body, "the page is byte for byte what it was without the setting"
+    assert_select "address a", { text: /123 Example St/, count: 1 }
+    assert_select "[data-footer-map][data-lat='38.8894']", 1
+    assert_no_match(/Setting Rd/, response.body)
+
+    Studio.site_footer = ->(_view) { FACTS.except(:address) }
+    get "/footer_host/landing"
+    assert_select "address a", { text: /9 Setting Rd/, count: 1 }, "own facts with no address take the setting"
+    assert_select "nav[aria-label='Company']", 1, "and keep everything else they declared"
+
+    Studio.site_footer = FACTS.merge(address: false)
+    get "/footer_host/landing"
+    assert_select "[data-footer-location]", 0, "address: false in the app's facts refuses the setting"
+  end
+
+  test "the default legal line links the host's privacy and terms routes, and only those it has" do
+    Studio.site_footer = nil
+
+    get "/footer_host/landing"
+    assert_select "#{footer} .ftr-legal a", 0, "a host with no legal routes gets no legal links"
+    assert_select "#{footer} .ftr-copyright", 1
+
+    draw_legal_routes!(:privacy)
+    get "/footer_host/landing"
+    assert_select "#{footer} .ftr-legal a", 1
+    assert_select "#{footer} .ftr-legal a[href='/footer_host/privacy']", "Privacy Policy"
+    get "/footer_host/privacy"
+    assert_response :success, "the link the footer printed leads to a page"
+
+    draw_legal_routes!(:privacy, :terms)
+    get "/footer_host/landing"
+    assert_select "#{footer} .ftr-legal a", 2
+    assert_select "#{footer} .ftr-legal a[href='/footer_host/terms']", "Terms of Service"
+  end
+
+  test "a route named terms that a visitor cannot open is not linked" do
+    Studio.site_footer = nil
+    draw_legal_routes!(:privacy, post_terms: true)
+
+    get "/footer_host/landing"
+
+    assert_select "#{footer} .ftr-legal a", 1
+    assert_select "#{footer} .ftr-legal a[href='/footer_host/privacy']", 1
+    assert_no_match(/Terms of Service/, response.body)
+  end
+
+  test "the address setting is refused at assignment unless it is a Hash" do
+    assert_raises(ArgumentError) { Studio.site_footer_address = "9 Setting Rd" }
+    assert_nil Studio.site_footer_address, "a refused value leaves the old one in place"
+
+    Studio.site_footer_address = false
+    assert_nil Studio.site_footer_address
   end
 
   test "a signed-in viewer keeps the footer on listed controllers and loses it on working ones" do

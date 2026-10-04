@@ -22,6 +22,9 @@ require "rbconfig"
 #      loaded without ActiveRecord; its helpers still are
 #   4. `studio_engine:install:migrations`: a clean no-op, exit 0, nothing written
 #   7. a footer with no address names no Leaflet: no map script, no map CSS
+#   8. the same app with Studio.site_footer UNSET gets the default footer: its
+#      name from config.app_name (there is no site-identity table to ask), the
+#      legal link its one route earns, and no Leaflet
 #
 # The ActiveRecord half (the engine unchanged for a host WITH a database) is the
 # rest of the suite: every other integration test boots test/dummy, which loads
@@ -63,6 +66,21 @@ class FooterOnlyConsumerTest < Minitest::Test
     assert_includes helpers, "app/helpers/studio/site_footer_helper.rb", "the footer helper must still eager load"
     expected_helpers = Dir.glob("app/helpers/**/*.rb", base: ENGINE_ROOT)
     assert_equal expected_helpers.sort, helpers.sort, "every engine helper must eager load without ActiveRecord"
+  end
+
+  def test_an_app_that_sets_no_footer_gets_the_default_one_without_active_record
+    result = probe(env: "production", eager: true, footer: "default")
+
+    refute result["active_record_loaded"], "the default footer must not pull in ActiveRecord"
+    assert_equal 200, result["status"], "the page did not render:\n#{result['html'].to_s[0, 2000]}"
+    html = result["html"]
+    assert_includes html, "data-site-footer", "the default footer did not render"
+    assert_match(/© \d{4} Default Probe/, html)
+    assert_match(%r{<a[^>]*href="/privacy"[^>]*>Privacy Policy</a>}, html)
+    refute_includes html, "Terms of Service", "the app has no terms route"
+    refute_includes html, "data-footer-location"
+    refute_includes html, "Footer Only", "the declared facts must not be in play"
+    assert_no_leaflet(html)
   end
 
   def test_install_migrations_is_a_clean_no_op_without_active_record
@@ -116,7 +134,7 @@ class FooterOnlyConsumerTest < Minitest::Test
     refute_includes html, ".ftr-map", "a footer with no address must not ship the map's CSS"
   end
 
-  def probe(env:, eager:, action: "render")
+  def probe(env:, eager:, action: "render", footer: "declared")
     Dir.mktmpdir("studio-footer-only") do |root|
       result_path = File.join(root, "result.json")
       env_vars = {
@@ -125,6 +143,7 @@ class FooterOnlyConsumerTest < Minitest::Test
         "PROBE_EAGER" => eager ? "1" : "0",
         "PROBE_ACTION" => action,
         "PROBE_RESULT" => result_path,
+        "PROBE_FOOTER" => footer,
         "BUNDLE_GEMFILE" => File.join(ENGINE_ROOT, "Gemfile")
       }
       out = IO.popen(env_vars, [RbConfig.ruby, "-I#{File.join(ENGINE_ROOT, 'lib')}", PROBE], err: %i[child out], &:read)

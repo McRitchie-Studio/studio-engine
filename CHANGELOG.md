@@ -4,6 +4,41 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The site footer is on by default. An unset `config.site_footer` now renders
+  a footer wherever `studio_site_footer` is called**; before, it rendered
+  nothing. The default footer is built from what the engine already knows: the
+  app's name (the site identity's title, else `config.app_name`), its footer or
+  navbar logo, the © line, and a Privacy Policy and a Terms of Service link for
+  each of the routes named `privacy` and `terms` that the host has (a GET route
+  that needs no arguments; anything else is not linked). It has no address, no
+  map, no phone, no email, no tagline, no social row and no link columns, and
+  names no Leaflet. The rule for where it shows is unchanged. **An app that
+  sets `config.site_footer` to a Hash or a callable renders exactly what it did**,
+  and an app that does not call the helper is unaffected. A callable that
+  answers `nil` still declines the footer for that request.
+
+### Added
+
+- **`config.site_footer = false` turns the footer off.** It is the one opt-out,
+  and it is distinct from unset (`nil`), which is the default footer.
+  `Studio.site_footer_enabled?` and `Studio.site_footer_declared?` read the
+  three states.
+- **`config.site_footer_address`: the location, as one setting.** A Hash of the
+  facts' `address:` keys (`street:`, `city_line:`, `lat:`, `lng:`, and the
+  optional `zoom:` and `directions_url:`) gives the footer its Location band,
+  and its map when both coordinates are present, without writing the facts
+  callable. It applies to the default footer and to an app's own facts that
+  carry no address. An address in the app's own facts wins, whole, and
+  `address: false` there shows none.
+- **docs/NEW_APP_SETUP.md has a Site Footer step (§ 10)**, and its layout ends
+  with `<%= studio_site_footer %>`. The sections after it moved down by one.
+
+### Fixed
+
+- `address: false` in the footer's facts shows no address instead of raising.
+
 ## 0.86.0 — 2026-10-03
 
 ### Added

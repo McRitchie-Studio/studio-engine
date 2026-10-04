@@ -203,7 +203,7 @@ class StylePageTest < ActiveSupport::TestCase
     refute_nil group, "the group must sit inside the Tricks section, under its own anchor"
     assert_equal %w[studio_site_footer studio_booking_link studio_booking_frame config.booking_crop],
                  group.css("article code[x-ref='klass']").map { |code| code.text.strip }
-    assert_match(/footer\s+not declared.*booking\s+off.*booking page\s+not drawn/m,
+    assert_match(/footer\s+default \(not declared\).*booking\s+off.*booking page\s+not drawn/m,
                  group.at_css("[data-site-footer-status]").text)
 
     # An app that declares nothing still sees the primitive: a sample footer, with
@@ -215,6 +215,11 @@ class StylePageTest < ActiveSupport::TestCase
     assert preview.at_css("span[aria-disabled='true']"), "and a disabled label"
     assert_equal 3, group.css("article[aria-disabled='true']").size, "all three booking specimens are flagged off"
     assert_nil doc.at_css("dialog[data-booking-dialog]"), "no booking_url, so no popup"
+
+    Studio.site_footer = false
+    off = Nokogiri::HTML.fragment(render_index).at_css("section#site-footer")
+    assert_match(/footer\s+off/, off.at_css("[data-site-footer-status]").text)
+    assert_includes off.text, "Sample footer (this app declares none)"
 
     Studio.site_footer = { name: "Declared Co", legal: [["Privacy", "/privacy"]] }
     Studio.booking_url = "https://calendar.google.com/calendar/appointments/schedules/STYLE"
