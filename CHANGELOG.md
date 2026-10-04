@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.87.0 — 2026-10-04
+
 ### Changed
 
 - **The site footer is on by default. An unset `config.site_footer` now renders
