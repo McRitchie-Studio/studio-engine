@@ -97,12 +97,13 @@ Rails.application.routes.draw do
   # The host's legal pages, drawn only when a test names them
   # (config.x.footer_host_legal = %i[privacy terms]): the default footer links
   # the `privacy` and `terms` routes a host HAS, so both states need a host.
-  Array(Rails.application.config.x.footer_host_legal.presence).each do |name|
+  legal = Rails.application.config.x.footer_host_legal
+  (legal.is_a?(Array) ? legal : []).each do |name|
     get "footer_host/#{name}", to: "footer_host_landing#show", as: name
   end
   # A route NAMED like a legal page that no visitor can open: the default footer
   # must not link it (config.x.footer_host_legal_post = true).
-  post "footer_host/terms", to: "footer_host_landing#show", as: :terms if Rails.application.config.x.footer_host_legal_post
+  post "footer_host/terms", to: "footer_host_landing#show", as: :terms if Rails.application.config.x.footer_host_legal_post == true
   # An app's OWN booking page (config.booking_path), not the engine's /schedule.
   get "footer_host/schedule", to: "footer_host_schedule#show"
 
