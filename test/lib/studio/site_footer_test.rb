@@ -22,7 +22,7 @@ class SiteFooterTest < Minitest::Test
 
   # ---- declared value ---------------------------------------------------------
 
-  def test_nil_means_no_footer
+  def test_nil_facts_resolve_to_no_footer
     assert_nil resolve(nil)
     assert_nil resolve(->(_view) { nil }), "a callable may decline per request"
   end
@@ -33,12 +33,117 @@ class SiteFooterTest < Minitest::Test
     assert_equal "/", facts[:columns][0][:links][0][:href]
   end
 
-  def test_validate_accepts_nil_a_hash_and_a_callable_and_refuses_anything_else
-    [nil, {}, ->(_view) { {} }].each { |ok| assert_nil Studio::SiteFooter.validate!(ok) }
+  def test_validate_accepts_nil_false_a_hash_and_a_callable_and_refuses_anything_else
+    [nil, false, {}, ->(_view) { {} }].each { |ok| assert_nil Studio::SiteFooter.validate!(ok) }
 
     error = assert_raises(ArgumentError) { Studio::SiteFooter.validate!("Example Co") }
     assert_match(/Hash, or a callable/, error.message)
     assert_raises(ArgumentError) { Studio::SiteFooter.validate!([]) }
+  end
+
+  # ---- the default footer, the opt-out, the one-setting location ----------------
+
+  # A host view: it answers only the route helpers it was given.
+  class HostView
+    def initialize(paths) = @paths = paths
+
+    def respond_to_missing?(name, include_private = false) = @paths.key?(name) || super
+
+    def method_missing(name, *args)
+      return super unless @paths.key?(name)
+
+      value = @paths[name]
+      value.respond_to?(:call) ? value.call(*args) : value
+    end
+  end
+
+  Route = Struct.new(:verb, :required_parts)
+  RouteSet = Struct.new(:named_routes)
+
+  def default_facts(paths, routes: nil) = Studio::SiteFooter.default_facts(HostView.new(paths), routes: routes)
+
+  def test_false_means_no_footer_and_is_a_valid_declaration
+    assert_nil Studio::SiteFooter.validate!(false)
+    assert_nil resolve(false)
+    assert_nil resolve(->(_view) { false }), "a callable may decline with false too"
+  end
+
+  def test_the_default_footer_carries_the_name_and_logo_and_nothing_the_engine_cannot_know
+    facts = Studio::SiteFooter.resolve(default_facts({}), HostView.new({}), name: "Example Co", logo: "/logo.png")
+
+    assert_equal "Example Co", facts[:name]
+    assert_equal ["Example", "Co"], facts[:wordmark]
+    assert_equal "/logo.png", facts[:logo]
+    assert_nil facts[:address], "no address, so no Location band and no map"
+    assert_nil facts[:email]
+    assert_nil facts[:tagline]
+    assert_equal [], facts[:social]
+    assert_equal [], facts[:columns], "no link columns: a guessed link is a dead one"
+    assert_equal [], facts[:legal], "and no legal line for a host with no legal routes"
+  end
+
+  def test_the_default_legal_line_links_only_the_routes_the_host_has
+    assert_equal({ legal: [] }, default_facts({}))
+    assert_equal({ legal: [["Privacy Policy", "/privacy"]] }, default_facts({ privacy_path: "/privacy" }))
+    assert_equal({ legal: [["Privacy Policy", "/legal/privacy"], ["Terms of Service", "/terms"]] },
+                 default_facts({ privacy_path: "/legal/privacy", terms_path: "/terms" }))
+  end
+
+  def test_a_route_that_needs_arguments_or_raises_is_not_linked
+    needs_an_id = ->(*args) { args.empty? ? raise(ArgumentError, "missing required keys: [:id]") : "/terms/1" }
+
+    assert_equal({ legal: [] }, default_facts({ terms_path: needs_an_id }))
+    assert_equal({ legal: [] }, default_facts({ privacy_path: "  " }), "a blank path is no link")
+  end
+
+  def test_with_the_route_set_only_a_get_route_with_no_required_parts_is_linked
+    paths = { privacy_path: "/privacy", terms_path: "/terms" }
+    routes = ->(privacy, terms) { RouteSet.new({ privacy: privacy, terms: terms }) }
+    both = [["Privacy Policy", "/privacy"], ["Terms of Service", "/terms"]]
+
+    assert_equal both, default_facts(paths, routes: routes.call(Route.new("GET", []), Route.new("", [])))[:legal],
+                 "an empty verb is a route matched on every verb"
+    assert_equal [both[0]], default_facts(paths, routes: routes.call(Route.new("GET|HEAD", []), Route.new("POST", [])))[:legal],
+                 "a POST-only route is not a page"
+    assert_equal [both[1]], default_facts(paths, routes: routes.call(Route.new("GET", [:id]), Route.new("GET", [])))[:legal]
+    assert_equal [], default_facts(paths, routes: RouteSet.new({}))[:legal],
+                 "a helper the view answers but the host's routes do not name is not linked"
+  end
+
+  ADDRESS = { street: "9 Setting Rd", city_line: "Denver, CO 80202", lat: 39.7392, lng: -104.9903 }.freeze
+
+  def test_the_configured_address_gives_the_default_footer_its_location_and_map
+    facts = resolve({ legal: [] }, name: "Example Co", address: ADDRESS)
+
+    assert_equal "9 Setting Rd, Denver, CO 80202", facts[:address][:full]
+    assert facts[:address][:map]
+    assert_in_delta 39.7392, facts[:address][:lat]
+    assert_nil resolve({ legal: [] }, name: "Example Co")[:address], "and without the setting there is none"
+    assert_nil resolve({}, address: false)[:address]
+  end
+
+  def test_an_address_in_the_apps_own_facts_wins_over_the_configured_one
+    assert_equal "123 Example St, Washington, DC 20024", resolve(FULL, address: ADDRESS)[:address][:full]
+    assert_equal resolve(FULL), resolve(FULL, address: ADDRESS), "own facts with an address resolve the same either way"
+
+    flat = resolve({ street: "1 Flat St" }, address: ADDRESS)
+    assert_equal "1 Flat St", flat[:address][:full], "an address written flat is the app's own too"
+    refute flat[:address][:map], "and it is used whole: no coordinates borrowed from the setting"
+  end
+
+  def test_own_facts_without_an_address_take_the_configured_one_and_can_refuse_it
+    assert_equal "9 Setting Rd, Denver, CO 80202", resolve(FULL.except(:address), address: ADDRESS)[:address][:full]
+    assert_nil resolve(FULL.merge(address: false), address: ADDRESS)[:address], "address: false shows none"
+    assert_nil resolve(FULL.merge(address: nil), address: ADDRESS)[:address]
+    assert_nil resolve(FULL.merge(address: false))[:address], "and false is accepted without the setting"
+  end
+
+  def test_the_address_setting_is_a_hash_or_nothing
+    [nil, false, {}, ADDRESS].each { |ok| assert_nil Studio::SiteFooter.validate_address!(ok) }
+
+    error = assert_raises(ArgumentError) { Studio::SiteFooter.validate_address!("9 Setting Rd") }
+    assert_match(/street:, city_line:, lat:, lng:/, error.message)
+    assert_raises(ArgumentError) { Studio::SiteFooter.validate_address!(->(_view) { ADDRESS }) }
   end
 
   # ---- every part is optional -------------------------------------------------
