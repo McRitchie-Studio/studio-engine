@@ -582,10 +582,16 @@ module Studio
   # primitives: Google Calendar's appointment page inline, in a popup, and on a
   # page. See docs/SITE_FOOTER.md and docs/BOOKING.md.
 
-  # The footer's facts: a Hash, or a callable receiving the view. nil (the
-  # default) means this app has no footer, and `studio_site_footer` renders
-  # nothing, so a layout can call it before the app declares one. Every key is
-  # optional; shape and rules: lib/studio/site_footer.rb.
+  # The footer's facts. THE FOOTER IS ON BY DEFAULT: left unset (nil), the
+  # layout line `studio_site_footer` renders the DEFAULT footer, built from what
+  # the engine already knows (the site name, the footer or navbar logo, and a
+  # legal line linking the host's `privacy` and `terms` routes when it has
+  # them). No address, no map, no email, no link columns.
+  #
+  #   nil (unset)   the default footer
+  #   false         NO footer: the one opt-out
+  #   a Hash, or a callable receiving the view: the app's own facts. Every key
+  #   is optional; shape and rules: lib/studio/site_footer.rb.
   #
   #   config.site_footer = ->(view) {
   #     { tagline: "Everything, by example",
@@ -599,6 +605,35 @@ module Studio
   def self.site_footer=(declared)
     SiteFooter.validate!(declared)
     @@site_footer = declared
+  end
+
+  # True unless the app turned the footer off (`config.site_footer = false`).
+  def self.site_footer_enabled?
+    site_footer != false
+  end
+
+  # True when the app wrote its own facts, as against taking the default footer
+  # (unset) or none (false).
+  def self.site_footer_declared?
+    !site_footer.nil? && site_footer != false
+  end
+
+  # THE LOCATION, AS ONE SETTING: the address the footer prints in its Location
+  # band, and maps when it carries lat: and lng:. nil (the default) is no
+  # location. It is how an app on the default footer adds one without writing
+  # the facts callable:
+  #
+  #   config.site_footer_address = { street: "123 Example St", city_line: "Washington, DC 20024",
+  #                                  lat: 38.8894, lng: -77.0352 }
+  #
+  # The keys are the facts' `address:` keys (docs/SITE_FOOTER.md). An app's own
+  # facts WIN: when they carry an address this is not read, and `address: false`
+  # there shows none.
+  mattr_reader :site_footer_address, default: nil
+
+  def self.site_footer_address=(declared)
+    SiteFooter.validate_address!(declared)
+    @@site_footer_address = declared || nil
   end
 
   # Controllers whose pages keep the footer for a SIGNED-IN viewer, by
@@ -1207,14 +1242,25 @@ module Studio
   end
 
   # The site footer's facts resolved for a view (lib/studio/site_footer.rb), or
-  # nil when the app declared none. The name defaults to the site identity's
-  # title and the logo to the navbar logo, so an app that has set those up says
-  # them once.
+  # nil when the app turned the footer off (or its own callable answered nil).
+  # Unset, the facts are the default footer's. The name defaults to the site
+  # identity's title and the logo to the navbar logo, so an app that has set
+  # those up says them once; Studio.site_footer_address is the address of any
+  # facts that carry none.
   def self.site_footer_for(view)
-    return nil if site_footer.nil?
+    return nil unless site_footer_enabled?
 
-    SiteFooter.resolve(site_footer, view, name: site_identity[:title], logo: logo_for("Footer Logo"),
-                                          booking_path: booking_path_for(view))
+    declared = site_footer.nil? ? SiteFooter.default_facts(view, routes: host_route_set) : site_footer
+    SiteFooter.resolve(declared, view, name: site_identity[:title], logo: logo_for("Footer Logo"),
+                                       booking_path: booking_path_for(view), address: site_footer_address)
+  end
+
+  # The host's route set, for the default footer's legal links. nil outside a
+  # booted Rails app.
+  def self.host_route_set
+    return nil unless defined?(::Rails) && ::Rails.respond_to?(:application) && ::Rails.application
+
+    ::Rails.application.routes
   end
 
   # Navbar links resolved for a view context (lib/studio/navbar_links.rb).

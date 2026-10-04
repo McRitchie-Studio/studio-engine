@@ -12,7 +12,9 @@
      whose box runs from 200 to 600), cropped by the same arithmetic the real
      wrapper uses (Studio::Booking.crop). No real schedule's numbers are here. %>
 <%
-  own_facts    = studio_site_footer_facts
+  # The app's OWN facts only. An app on the default footer (nothing declared)
+  # sees the sample, which shows every kind of row the default does not have.
+  own_facts    = Studio.site_footer_declared? ? studio_site_footer_facts : nil
   sample       = {
     name: Studio.site_identity[:title], tagline: "What this app is, in a line",
     email: "team@example.com",
@@ -42,7 +44,7 @@
     </p>
     <p class="text-muted text-sm" data-site-footer-status>
       This app:
-      footer <strong class="text-body"><%= own_facts ? "declared" : "not declared" %></strong> &middot;
+      footer <strong class="text-body"><%= own_facts ? "declared" : (Studio.site_footer_enabled? ? "default (not declared)" : "off") %></strong> &middot;
       booking <strong class="text-body"><%= booking ? "on" : "off" %></strong> &middot;
       booking page <strong class="text-body"><%= Studio.draw_booking_routes ? "drawn" : "not drawn" %></strong> &middot;
       frame <strong class="text-body"><%= own_crop ? "cropped at rest" : "whole at rest" %></strong>

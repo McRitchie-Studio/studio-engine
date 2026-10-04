@@ -442,9 +442,13 @@ bespoke layout. Use Turf Monster's `/signin` flow as the full-featured reference
       <%= render "layouts/studio/flash" %>
       <%= yield %>
     </div>
+
+    <%= studio_site_footer %>
   </body>
 </html>
 ```
+
+The last line of `<body>` is the site footer (§ 10).
 
 **Bar stack**: render `studio/banners/stack` — not the individual banners — as
 the navbar's **sibling, immediately above it**. The stack decides which bars
@@ -527,14 +531,50 @@ path **and** that it answered `200`. A bare `curl /admin/whatever` returning
 
 Copy from the engine base and add your nav links to the desktop `<nav>` and mobile sub-navbar sections. See [NAVBAR_SETUP.md](NAVBAR_SETUP.md).
 
-## 10. Public Assets
+## 10. Site Footer
+
+The app owns its layout, so the footer is one line you write: the engine does
+not inject it. End `<body>` with it, as the layout in § 9 does:
+
+```erb
+<%# app/views/layouts/application.html.erb, the last line of <body> %>
+<%= studio_site_footer %>
+```
+
+**That line is the whole step.** With nothing configured it renders the default
+footer: the app's name (the site identity's title, else `config.app_name`), its
+logo (`config.theme_logos`), a `©` line, and a Privacy Policy and Terms of
+Service link for each of the routes named `privacy` and `terms` the app has. It
+carries no address, no map, no phone, no email and no link columns. A signed-out
+visitor sees it on every page; a signed-in viewer only on the controllers in
+`config.site_footer_controllers`.
+
+Three settings in `config/initializers/studio.rb`, all optional:
+
+```ruby
+# A location: the Location band, and the map when lat: and lng: are given.
+config.site_footer_address = { street: "123 Example St", city_line: "Washington, DC 20024",
+                               lat: 38.8894, lng: -77.0352 }
+
+# The app's own facts (tagline, email, social, link columns, legal), instead of the default.
+config.site_footer = ->(view) { { tagline: "Everything, by example",
+                                  columns: [ [ "Company", [ [ "Home", view.root_path ] ] ] ] } }
+
+# No footer at all.
+config.site_footer = false
+```
+
+Every key, the rules a row can carry, and where the footer shows are in
+[SITE_FOOTER.md](SITE_FOOTER.md).
+
+## 11. Public Assets
 
 Place in `public/`:
 - `favicon.png` — browser tab icon
 - `logo.png` — navbar + auth page logo
 - `studio-logo.svg` — optional, only if the app participates in one-way SSO
 
-## 11. Seeds
+## 12. Seeds
 
 Seed **three** identities, not one. This is the standard every McRitchie app
 forks with:
@@ -614,7 +654,7 @@ first row that happens to have no wallet, so a seed adopting rows by wallet will
 adopt a stranger's account and overwrite it. turf-monster hit exactly this when
 it added an email-only admin.
 
-## 12. Google Cloud Console
+## 13. Google Cloud Console
 
 Add redirect URI for your app's port:
 ```
@@ -623,7 +663,7 @@ http://localhost:{PORT}/auth/google_oauth2/callback
 
 See [GOOGLE_AUTH_SETUP.md](GOOGLE_AUTH_SETUP.md) for full instructions.
 
-## 13. CSS Component Classes
+## 14. CSS Component Classes
 
 The engine ships the shared component classes — do NOT copy them from another
 app. Add ONE line to `app/assets/tailwind/application.css` (after
@@ -654,11 +694,11 @@ Section 3's `content` glob entry for the engine's views
 classes are only emitted when Tailwind sees them used, so an app that skips
 that glob gets silently unstyled engine partials.
 
-## 14. Hub Link (McRitchie Studio)
+## 15. Hub Link (McRitchie Studio)
 
 Add a nav link in McRitchie Studio only after the app is registered in `mcritchie-studio/config/satellites.yml`. If the app participates in one-way SSO, point the link at `/sso_login`; otherwise point at the app root or a public landing page.
 
-## 15. Lint And CI
+## 16. Lint And CI
 
 Two things a fresh app gets wrong by default. Both fail as a RED CI lane on the
 app's very first push, and both look like code defects when they aren't.
@@ -803,13 +843,14 @@ cost through the real browser — JS actually executing, a redirect actually
 followed — so asserting only server-rendered markup here duplicates an integration
 test at many times the runtime.
 
-## 16. Verify
+## 17. Verify
 
 ```bash
 bin/rails server -p {PORT}
 ```
 
 - [ ] Homepage loads with navbar, logo, brand title
+- [ ] Signed out, the homepage ends with the site footer: the app's name and the © line (§ 10)
 - [ ] Environment banner shows "Development Environment" + DEV MODE + the Local Inbox link (§ 9)
 - [ ] Dark/light mode toggle works
 - [ ] `/signin` (or the app's chosen auth page) shows logo + enabled auth methods
