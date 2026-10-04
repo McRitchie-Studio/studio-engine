@@ -7,7 +7,8 @@ require "cgi"
 # booting the dummy app. See docs/SITE_FOOTER.md.
 #
 # The declared value is a Hash, or a callable that receives the view (for route
-# helpers). EVERY KEY IS OPTIONAL, and a missing key removes its part of the
+# helpers). Unset (nil) is the DEFAULT footer (`default_facts`), and `false` is
+# no footer. EVERY KEY IS OPTIONAL, and a missing key removes its part of the
 # footer rather than printing a placeholder:
 #
 #   config.site_footer = ->(view) {
@@ -105,21 +106,73 @@ module Studio
     end
 
     def validate!(declared)
-      return if declared.nil? || declared.is_a?(Hash) || declared.respond_to?(:call)
+      return if declared.nil? || declared == false || declared.is_a?(Hash) || declared.respond_to?(:call)
 
       raise ArgumentError,
-            "Studio.site_footer must be nil, a Hash, or a callable receiving the view " \
+            "Studio.site_footer must be nil (the default footer), false (no footer), a Hash, or a " \
+            "callable receiving the view (got #{declared.class}). See docs/SITE_FOOTER.md."
+    end
+
+    def validate_address!(declared)
+      return if declared.nil? || declared == false || declared.is_a?(Hash)
+
+      raise ArgumentError,
+            "Studio.site_footer_address must be nil or a Hash of street:, city_line:, lat:, lng: " \
             "(got #{declared.class}). See docs/SITE_FOOTER.md."
     end
 
-    # The normalized facts, or nil when the app declared no footer.
+    # THE DEFAULT FOOTER'S FACTS: what an app that sets nothing gets. Only what
+    # is known to be true of the host: a legal line linking the routes in
+    # DEFAULT_LEGAL that the host really has. The name and the logo come from
+    # `resolve`'s own fallbacks. No address, no email, no tagline, no social row
+    # and no link columns: the engine cannot know them, and a guessed link is a
+    # dead one.
+    #
+    #   routes: the host's route set (Rails.application.routes), or nil to ask
+    #           the view alone.
+    DEFAULT_LEGAL = [["Privacy Policy", :privacy], ["Terms of Service", :terms]].freeze
+
+    def default_facts(view, routes: nil)
+      legal = DEFAULT_LEGAL.filter_map do |label, route_name|
+        path = host_path(view, route_name, routes)
+        [label, path] unless path.nil?
+      end
+      { legal: legal }
+    end
+
+    # The path of the host's route `name`, or nil unless the view can build it
+    # with no arguments and (when the route set is given) a GET reaches it.
+    def host_path(view, name, routes = nil)
+      helper = :"#{name}_path"
+      return nil unless view.respond_to?(helper)
+      return nil unless routes.nil? || get_route?(routes, name)
+
+      text(view.public_send(helper))
+    rescue StandardError
+      nil
+    end
+
+    def get_route?(routes, name)
+      route = routes.named_routes[name]
+      return false if route.nil? || route.required_parts.any?
+
+      verbs = route.verb.to_s
+      verbs.empty? || verbs.split("|").include?("GET")
+    rescue StandardError
+      false
+    end
+
+    # The normalized facts, or nil when there is no footer (the declared value,
+    # or what its callable answered, is nil or false).
     #
     #   name:         the site name the engine resolved (the site identity's title)
     #   logo:         the logo the engine resolved (the navbar logo), or nil
     #   booking_path: the booking page's path (Studio.booking_path_for), or nil
-    def resolve(declared, view, name: nil, logo: nil, booking_path: nil)
+    #   address:      Studio.site_footer_address: the address of facts that
+    #                 carry none of their own
+    def resolve(declared, view, name: nil, logo: nil, booking_path: nil, address: nil)
       raw = declared.respond_to?(:call) ? declared.call(view) : declared
-      return nil if raw.nil?
+      return nil if raw.nil? || raw == false
 
       facts = symbolize(raw)
       site_name = text(facts[:name]) || text(name)
@@ -133,7 +186,7 @@ module Studio
         home_path: safe_href(facts[:home_path], "home_path") || "/",
         tagline: text(facts[:tagline]),
         email: text(facts[:email]),
-        address: address(facts),
+        address: address_for(facts, address),
         social: Array(facts[:social]).filter_map { |row| social(row) },
         columns: Array(facts[:columns]).filter_map { |row| column(row, booking_path) },
         legal: Array(facts[:legal]).filter_map { |row| link(row, booking_path) },
@@ -205,7 +258,7 @@ module Studio
     # no address at all: no Location band and no map.
     def address(facts)
       declared = facts[:address]
-      source = declared.nil? ? facts : symbolize(declared)
+      source = declared.nil? || declared == false ? facts : symbolize(declared)
       street = text(source[:street])
       city_line = text(source[:city_line])
       return nil if street.nil? && city_line.nil?
@@ -226,6 +279,16 @@ module Studio
         directions_url: safe_href(source[:directions_url], "directions_url") ||
           "https://www.google.com/maps/dir/?api=1&destination=#{CGI.escape(full)}"
       }
+    end
+
+    # The facts' own address, else the configured one (Studio.site_footer_address).
+    # The facts win: an address of their own is used whole, and an `address:` key
+    # they wrote, even nil or false, is their answer.
+    def address_for(facts, configured)
+      own = address(facts)
+      return own if !own.nil? || facts.key?(:address) || configured.nil? || configured == false
+
+      address(symbolize(configured))
     end
 
     def coordinate(value)

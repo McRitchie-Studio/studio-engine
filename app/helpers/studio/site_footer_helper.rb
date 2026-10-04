@@ -10,15 +10,18 @@ module Studio
   #   <%= studio_booking_popup %>           the dialog those links open
   #   <%= studio_footer_map %>              the map alone, e.g. on a contact page
   #
-  # Every one of them renders NOTHING when its configuration is absent
-  # (Studio.site_footer, Studio.booking_url), so a layout or a shared view can
-  # call them before an app has declared anything.
+  # THE FOOTER IS ON BY DEFAULT: with Studio.site_footer unset, the layout line
+  # renders the default footer (the site name, the logo, and the legal links the
+  # host has routes for), and `config.site_footer = false` turns it off. The
+  # booking helpers render NOTHING without Studio.booking_url, and the map
+  # nothing without an address, so a layout or a shared view can call any of
+  # them before an app has declared anything.
   #
   # Prefixed names for the reason Studio::GeoHelper gives: every helper module is
   # included into every view.
   module SiteFooterHelper
-    # The resolved facts (Studio::SiteFooter.resolve), or nil. Resolved once per
-    # request.
+    # The resolved facts (Studio::SiteFooter.resolve): the app's own, else the
+    # default footer's. nil when the footer is off. Resolved once per request.
     #
     # A callable that RAISES must not take every page down with it, because the
     # footer is in the layout. In production the error is logged once per process
@@ -41,7 +44,7 @@ module Studio
     # Where the footer shows: Studio.site_footer_visible, asked of this view. By
     # default that is every page for a visitor and, for a signed-in viewer, only
     # the controllers in Studio.site_footer_controllers (plus the booking page).
-    # Always false for an app that declared no footer.
+    # Always false for an app that turned the footer off.
     def studio_show_site_footer?
       return false if studio_site_footer_facts.nil?
 
