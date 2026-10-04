@@ -14,6 +14,79 @@ studio-engine | grep docs/` finds them. The repository copy is
 
 ## Adopt it
 
+The app owns its layout, so the footer is one line the app writes. The engine
+never injects it.
+
+```erb
+<%# app/views/layouts/application.html.erb, at the end of <body> %>
+<%= studio_site_footer %>
+```
+
+**The footer is on by default.** That line, with nothing configured, renders
+the default footer. `config.site_footer` has three states:
+
+| `config.site_footer` | What `studio_site_footer` renders |
+|----------------------|-----------------------------------|
+| unset (`nil`) | The default footer |
+| a Hash, or a callable receiving the view | The app's own facts ([Your own facts](#your-own-facts)) |
+| `false` | Nothing: the opt-out |
+
+### The default footer
+
+```ruby
+# config/initializers/studio.rb
+Studio.configure do |config|
+  config.app_name = "Example Co"   # nothing about the footer: it is already on
+end
+```
+
+It prints only what the engine knows to be true of the app:
+
+- **The name**, as the wordmark and the © line: the site identity's title
+  (`Studio.site_identity[:title]`), which is `config.app_name` until the
+  operator or `config.site_title` says otherwise.
+- **The logo**: the app's "Footer Logo" in `config.theme_logos`, else its
+  navbar logo. None configured, none shown.
+- **A legal line**, for the routes the host has: "Privacy Policy" when it has a
+  route named `privacy`, "Terms of Service" when it has one named `terms`
+  (`get "privacy", to: "legal#privacy", as: :privacy`). A route is linked only
+  when a GET reaches it and its path needs no arguments. A host with neither
+  gets the © line alone.
+
+It has no address, no map, no phone, no email, no tagline, no social row and no
+link columns, and the page names no Leaflet. The engine cannot know those, and
+a guessed link is a dead one. For any of them, add a location (below) or
+declare [your own facts](#your-own-facts).
+
+### A location, in one setting
+
+```ruby
+Studio.configure do |config|
+  config.site_footer_address = { street: "123 Example St", city_line: "Washington, DC 20024",
+                                 lat: 38.8894, lng: -77.0352 }
+end
+```
+
+That adds the Location band, and the map when `lat:` and `lng:` are both there,
+to the default footer. The keys are the facts' `address:` keys
+([The address and the map](#the-address-and-the-map)). It also gives a location
+to an app's own facts that carry none. **An address in the app's own facts
+wins**, whole, and `address: false` there shows none.
+
+### Turning it off
+
+```ruby
+Studio.configure do |config|
+  config.site_footer = false   # no footer on any page; unset (nil) is the default footer
+end
+```
+
+To keep the footer off some pages rather than all of them, narrow
+[where it shows](#where-it-shows) instead. A facts callable that answers `nil`
+for a request renders no footer for that request.
+
+### Your own facts
+
 ```ruby
 # config/initializers/studio.rb
 Studio.configure do |config|
@@ -37,11 +110,6 @@ Studio.configure do |config|
   config.booking_url = "https://calendar.google.com/calendar/appointments/schedules/EXAMPLE-SCHEDULE-ID"
   config.draw_booking_routes = true
 end
-```
-
-```erb
-<%# app/views/layouts/application.html.erb, at the end of <body> %>
-<%= studio_site_footer %>
 ```
 
 That is the whole adoption. Nothing is copied into the app's `public/`, and
@@ -78,6 +146,10 @@ end
 <%= studio_site_footer %>
 ```
 
+Leave `config.site_footer` unset and the same app gets
+[the default footer](#the-default-footer), its name read from `config.app_name`
+since there is no site-identity table to ask.
+
 Do not call `Studio.routes(self)`: everything it draws (sign-in, admin, error
 logs) needs a database. The app also needs an asset pipeline (Propshaft or
 Sprockets), as every Rails 8 app has, and a mapping of the theme tokens onto its
@@ -107,8 +179,9 @@ development and with `eager_load = true`.
 ## The facts
 
 `config.site_footer` is a Hash, or a callable that receives the view (so it can
-use route helpers). `nil`, the default, means the app has no footer and
-`studio_site_footer` renders nothing.
+use route helpers). Unset (`nil`), the facts are the default footer's; `false`
+means the app has no footer and `studio_site_footer` renders nothing
+([Adopt it](#adopt-it)).
 
 Every key is optional. A missing key removes its part of the footer.
 
@@ -121,7 +194,7 @@ Every key is optional. A missing key removes its part of the footer.
 | `home_path` | Where the logo and wordmark link | `/` |
 | `tagline` | A line under the wordmark | No line |
 | `email` | A `mailto:` link under the tagline | No line. (To list the email in a column instead, write it as a column link.) |
-| `address` | The Location band, and the map | No Location band, no map, and Leaflet is never requested |
+| `address` | The Location band, and the map | `config.site_footer_address`; with neither, no Location band, no map, and Leaflet is never requested. `address: false` shows none even with the setting |
 | `social` | A row of round icons | No row |
 | `columns` | Link columns under bold headings. A column may carry a width hint: `[ "Contact", links, { width: 1.5 } ]` | Brand only |
 | `legal` | The centred line above the © | The © alone |
@@ -356,14 +429,19 @@ link. Those rules are more specific than the engine's and still apply.
 
 ## Tests
 
-- `test/lib/studio/site_footer_test.rb`: the facts' rules and the visibility rule.
+- `test/lib/studio/site_footer_test.rb`: the facts' rules, the default facts, the
+  address setting's precedence, and the visibility rule.
 - `test/lib/vendored_leaflet_test.rb`: Leaflet is vendored, precompiled, and
   addressed through the asset pipeline.
 - `test/integration/site_footer_test.rb`: what a host renders, with and without
-  each fact, signed in and out.
+  each fact, signed in and out; the default footer with nothing set, the
+  `false` opt-out, `config.site_footer_address` on the default footer and
+  against an app's own address, and the default legal links with and without
+  the host's routes.
 - `test/integration/footer_only_consumer_test.rb`: an app with no ActiveRecord
   boots (development and eager-loaded), renders the footer with no Leaflet, and
-  runs `studio_engine:install:migrations` to a clean exit.
+  runs `studio_engine:install:migrations` to a clean exit; with nothing set it
+  renders the default footer.
 - `test/lib/site_footer_link_contrast_test.rb`: the link ink clears 4.5:1 on the
   band, on the default tokens, in both themes.
 - `e2e/site_footer.spec.js`: the map's script and the footer's layout, in a
@@ -372,4 +450,5 @@ link. Those rules are more specific than the engine's and still apply.
   line inside its column at each, and the line heights. These lab pages load Turbo, so the map's remount after a Turbo visit is
   covered.
 
-`/admin/style` shows the footer under Tricks, with this app's facts or a sample.
+`/admin/style` shows the footer under Tricks, with this app's own facts, or a
+sample when it has declared none (the default footer or `false`).
