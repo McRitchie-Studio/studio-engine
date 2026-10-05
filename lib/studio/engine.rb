@@ -170,6 +170,15 @@ module Studio
 
     public
 
+    # Survey definitions (docs/SURVEYS.md): every *.rb under
+    # Studio.survey_definitions_path, loaded on boot and again on each
+    # development reload so an edited definition takes effect without a restart.
+    # Surveys defined in an initializer instead stay registered either way.
+    config.to_prepare do
+      dir = Studio.survey_definitions_path
+      Studio::Survey.load_definitions!(Rails.root.join(dir)) if dir.present? && Rails.root
+    end
+
     config.after_initialize do
       # Configure the IP -> location provider for every app that has the gem,
       # so geo detection works the same way everywhere: HTTPS (without which

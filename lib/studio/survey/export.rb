@@ -14,7 +14,8 @@ module Studio
       META = %w[response_id survey_version status started_at completed_at respondent user_id email_ref user_agent_class].freeze
       FORMULA_LEAD = /\A[=+\-@\t\r]/
 
-      # rows: hashes with the META keys (as symbols) plus :answers.
+      # rows: hashes with the META keys (as symbols) plus :answers. survey may be
+      # nil for a slug whose definition was deleted; its stored keys still export.
       def initialize(survey, rows)
         @survey = survey
         @rows = rows.to_a
@@ -22,7 +23,7 @@ module Studio
 
       def keys
         @keys ||= begin
-          current = @survey.keys
+          current = @survey ? @survey.keys : []
           retired = @rows.flat_map { |r| (r[:answers] || {}).keys }.uniq - current
           current + retired.sort
         end
