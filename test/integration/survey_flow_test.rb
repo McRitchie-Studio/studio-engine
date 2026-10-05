@@ -55,18 +55,29 @@ class SurveyFlowTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Survey not found"
   end
 
+  # Drawn into a FRESH route set: the dummy's routes.rb turns both flags on at
+  # the top of every reload, so reloading the app's routes cannot show "off".
   test "the routes are opt-in" do
-    Studio.draw_survey_routes = false
-    Studio.draw_admin_survey_routes = false
-    Rails.application.reload_routes!
-    refute Rails.application.routes.named_routes.key?(:studio_survey)
-    refute Rails.application.routes.named_routes.key?(:admin_surveys)
+    draw = lambda do |public_on, admin_on|
+      Studio.draw_survey_routes = public_on
+      Studio.draw_admin_survey_routes = admin_on
+      ActionDispatch::Routing::RouteSet.new.tap { |set| set.draw { Studio.routes(self) } }.named_routes
+    end
+
+    off = draw.call(false, false)
+    refute off.key?(:studio_survey)
+    refute off.key?(:admin_surveys)
+
+    public_only = draw.call(true, false)
+    assert public_only.key?(:studio_survey)
+    assert public_only.key?(:studio_survey_answer)
+    refute public_only.key?(:admin_surveys), "the admin panel is its own opt-in"
+
+    both = draw.call(true, true)
+    assert both.key?(:admin_survey_export)
   ensure
     Studio.draw_survey_routes = true
     Studio.draw_admin_survey_routes = true
-    Rails.application.reload_routes!
-    Rails.application.routes.append { post "survey_test_sign_in/:id", to: "survey_test_sessions#create" }
-    Rails.application.reload_routes!
   end
 
   # --- autosave and resume ------------------------------------------------------
