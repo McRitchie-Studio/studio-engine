@@ -124,7 +124,8 @@
       var position = onIntro ? 0 : index;
       fill.style.width = (total ? (position / total) * 100 : 0) + "%";
       bar.setAttribute("aria-valuenow", String(position));
-      count.textContent = onIntro ? total + (total === 1 ? " question" : " questions") : "Question " + index + " of " + total;
+      // The intro already says how many questions there are.
+      count.textContent = onIntro ? "" : "Question " + index + " of " + total;
 
       var focusTarget = steps[index].querySelector("[data-survey-focus]");
       if (focusTarget && direction) focusTarget.focus({ preventScroll: true });
