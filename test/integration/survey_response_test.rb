@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "bundler/setup"
 require_relative "../support/survey_host"
 
 # [unit] Studio::SurveyResponse against the engine's real migration: answer

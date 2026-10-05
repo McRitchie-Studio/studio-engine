@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "bundler/setup"
 require_relative "../support/survey_host"
 
 # [integration] The admin results panel: the engine's admin gate, the index

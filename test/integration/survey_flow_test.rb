@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "bundler/setup"
 require_relative "../support/survey_host"
 
 # [integration] The public survey flow over HTTP: the page (JS-free form and
