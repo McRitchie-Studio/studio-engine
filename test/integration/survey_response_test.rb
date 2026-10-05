@@ -150,6 +150,15 @@ class SurveyResponseTest < ActiveSupport::TestCase
     assert_equal "unknown", Studio::SurveyResponse.user_agent_class(nil)
   end
 
+  test "the engine loads config/surveys at boot, and load_definitions! reloads it" do
+    assert_includes SurveyHost::BOOT_KEYS, "one_word", "the dummy's config/surveys/first_game.rb was loaded on boot"
+
+    Studio::Survey.reset!
+    Studio::Survey.load_definitions!(Rails.root.join(Studio.survey_definitions_path))
+    assert Studio.survey("first-game").question(:one_word)
+    assert_equal [], Studio::Survey.load_definitions!(Rails.root.join("config/no-such-dir"))
+  end
+
   test "respondent_label is the username, else anonymous" do
     assert_equal "anonymous", open!.respondent_label
     assert_equal "pat", open!(user: @user, token: "u").respondent_label

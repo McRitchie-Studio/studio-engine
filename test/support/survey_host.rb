@@ -74,6 +74,10 @@ end
 Rails.application.reload_routes!
 
 module SurveyHost
+  # What the engine's to_prepare loaded from test/dummy/config/surveys at boot,
+  # read before any test resets the registry.
+  BOOT_KEYS = Studio.survey("first-game")&.keys
+
   def self.define_surveys!
     Studio::Survey.reset!
     Studio.define_survey "first-game" do
