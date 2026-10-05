@@ -1,0 +1,259 @@
+<%# The survey stepper: progressive enhancement over studio/surveys/show.
+    Plain JavaScript (no Alpine dependency), idempotent per root so a Turbo
+    render that re-runs it never double-binds. Autosave is best effort: the
+    final Submit posts the whole form, so a failed autosave loses nothing. %>
+<%= javascript_tag nonce: true do %>
+(function () {
+  "use strict";
+
+  function init(root) {
+    if (root.dataset.enhanced === "1") return;
+    root.dataset.enhanced = "1";
+
+    var form = root.querySelector("[data-survey-form]");
+    var steps = Array.prototype.slice.call(root.querySelectorAll("[data-survey-step]"));
+    var total = steps.length - 1;
+    var back = root.querySelector("[data-survey-back]");
+    var next = root.querySelector("[data-survey-next]");
+    var submit = root.querySelector("[data-survey-submit]");
+    var top = root.querySelector("[data-survey-top]");
+    var bar = root.querySelector("[data-survey-progress]");
+    var fill = root.querySelector("[data-survey-progress-fill]");
+    var count = root.querySelector("[data-survey-count]");
+    var status = root.querySelector("[data-survey-status]");
+    var hint = root.querySelector("[data-survey-hint]");
+    var tokenInput = form.querySelector("input[name='authenticity_token']");
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var saved = {};
+    var timers = {};
+    var current = -1;
+    var pointerPick = false;
+
+    form.noValidate = true;
+    root.classList.add("is-enhanced");
+    top.hidden = false;
+    hint.hidden = false;
+
+    function typeOf(step) { return step.dataset.type || ""; }
+    function isChoice(step) { return /^(emoji_scale|rating|choice)$/.test(typeOf(step)); }
+    function isMulti(step) { return typeOf(step) === "multi_choice"; }
+    function inputs(step) { return Array.prototype.slice.call(step.querySelectorAll("input.studio-survey__input")); }
+
+    function valueOf(step) {
+      if (isMulti(step)) return inputs(step).filter(function (i) { return i.checked; }).map(function (i) { return i.value; });
+      if (isChoice(step)) {
+        var picked = inputs(step).filter(function (i) { return i.checked; })[0];
+        return picked ? picked.value : "";
+      }
+      var field = step.querySelector("[data-survey-text]");
+      return field ? field.value.trim() : "";
+    }
+
+    function answered(step) {
+      var v = valueOf(step);
+      return Array.isArray(v) ? v.length > 0 : v !== "";
+    }
+
+    function setError(step, message) {
+      var el = step.querySelector("[data-survey-error]");
+      if (!el) return;
+      el.textContent = message || "";
+      el.hidden = !message;
+      step.classList.toggle("is-invalid", !!message);
+    }
+
+    function save(step) {
+      var key = step.dataset.key;
+      if (!key) return Promise.resolve(true);
+      var value = valueOf(step);
+      var fingerprint = JSON.stringify(value);
+      if (saved[key] === fingerprint) return Promise.resolve(true);
+
+      var body = new FormData();
+      if (Array.isArray(value)) {
+        if (value.length === 0) body.append("value[]", "");
+        value.forEach(function (v) { body.append("value[]", v); });
+      } else {
+        body.append("value", value);
+      }
+      var url = root.dataset.answerUrl.replace("__KEY__", encodeURIComponent(key));
+      status.textContent = "Saving…";
+      return fetch(url, {
+        method: "PATCH",
+        body: body,
+        credentials: "same-origin",
+        headers: { "Accept": "application/json", "X-CSRF-Token": tokenInput ? tokenInput.value : "" }
+      }).then(function (res) {
+        // fetch resolves on a 4xx/5xx — the status is the only signal.
+        if (!res.ok) {
+          return res.json().catch(function () { return {}; }).then(function (data) {
+            if (res.status === 422 && data.error) setError(step, data.error);
+            status.textContent = "Not saved yet — your answers still go in when you submit.";
+            return false;
+          });
+        }
+        saved[key] = fingerprint;
+        status.textContent = "Saved";
+        return true;
+      }).catch(function () {
+        status.textContent = "Offline? Your answers still go in when you submit.";
+        return false;
+      });
+    }
+
+    function render(index, direction) {
+      steps.forEach(function (step, i) {
+        var active = i === index;
+        step.hidden = !active;
+        step.classList.toggle("is-active", active);
+        if (active) {
+          if (direction && !reduce) step.dataset.dir = direction; else delete step.dataset.dir;
+        }
+      });
+      current = index;
+      var onIntro = index === 0;
+      var last = index === steps.length - 1;
+      back.hidden = onIntro;
+      next.hidden = last;
+      next.textContent = onIntro ? "Start" : "Next";
+      submit.hidden = !last;
+
+      var position = onIntro ? 0 : index;
+      fill.style.width = (total ? (position / total) * 100 : 0) + "%";
+      bar.setAttribute("aria-valuenow", String(position));
+      count.textContent = onIntro ? total + (total === 1 ? " question" : " questions") : "Question " + index + " of " + total;
+
+      var focusTarget = steps[index].querySelector("[data-survey-focus]");
+      if (focusTarget && direction) focusTarget.focus({ preventScroll: true });
+      if (direction) window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+    }
+
+    function go(index) {
+      if (index < 0 || index >= steps.length || index === current) return;
+      render(index, index > current ? "fwd" : "back");
+    }
+
+    function forward() {
+      var step = steps[current];
+      if (step.dataset.key) {
+        if (step.dataset.required === "true" && !answered(step)) {
+          setError(step, "This one is required.");
+          var first = step.querySelector("input:not([type=hidden]), textarea");
+          if (first) first.focus();
+          return;
+        }
+        setError(step, "");
+        save(step);
+      }
+      if (current === steps.length - 1) {
+        submitForm();
+      } else {
+        go(current + 1);
+      }
+    }
+
+    function submitForm() {
+      if (form.requestSubmit) form.requestSubmit(submit); else form.submit();
+    }
+
+    // The first required question still missing an answer, for a Submit that
+    // jumps ahead (Enter on the last step, or a mid-survey reload).
+    form.addEventListener("submit", function (event) {
+      for (var i = 1; i < steps.length; i++) {
+        if (steps[i].dataset.required === "true" && !answered(steps[i])) {
+          event.preventDefault();
+          go(i);
+          setError(steps[i], "This one is required.");
+          return;
+        }
+      }
+      submit.disabled = true;
+      submit.textContent = "Sending…";
+    });
+
+    back.addEventListener("click", function () { go(current - 1); });
+    next.addEventListener("click", forward);
+
+    root.addEventListener("pointerdown", function (event) {
+      pointerPick = !!event.target.closest("[data-survey-choice]");
+    });
+
+    root.addEventListener("change", function (event) {
+      var step = event.target.closest("[data-survey-step]");
+      if (!step || !step.dataset.key || step.hidden) return;
+      setError(step, "");
+      if (isChoice(step)) {
+        save(step);
+        // Advance on a tap or a number key, never on arrow keys: arrows move
+        // through a radio group and must not jump the reader off the question.
+        if (pointerPick) {
+          pointerPick = false;
+          setTimeout(function () { if (steps[current] === step) forward(); }, reduce ? 0 : 260);
+        }
+      } else if (isMulti(step)) {
+        save(step);
+      }
+    });
+
+    root.addEventListener("input", function (event) {
+      var field = event.target.closest("[data-survey-text]");
+      if (!field) return;
+      var step = field.closest("[data-survey-step]");
+      var counter = step.querySelector("[data-survey-counter]");
+      if (counter) counter.textContent = String(field.value.length);
+      clearTimeout(timers[step.dataset.key]);
+      timers[step.dataset.key] = setTimeout(function () { save(step); }, 900);
+    });
+
+    root.addEventListener("keydown", function (event) {
+      if (event.defaultPrevented || event.altKey) return;
+      var step = steps[current];
+      var target = event.target;
+      var inText = target.matches && target.matches("textarea, input[type=text]");
+
+      if (event.key === "Enter") {
+        if (target.tagName === "BUTTON" || target.tagName === "A") return;
+        if (target.tagName === "TEXTAREA" && !(event.metaKey || event.ctrlKey)) return;
+        event.preventDefault();
+        forward();
+        return;
+      }
+
+      if (inText || event.metaKey || event.ctrlKey || !/^[1-9]$/.test(event.key)) return;
+      if (!step.dataset.key || !(isChoice(step) || isMulti(step))) return;
+      var option = inputs(step)[parseInt(event.key, 10) - 1];
+      if (!option) return;
+      event.preventDefault();
+      option.checked = isMulti(step) ? !option.checked : true;
+      option.focus({ preventScroll: true });
+      pointerPick = isChoice(step);
+      option.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    var resume = root.dataset.resumeIndex;
+    var start = resume === "" || resume === undefined ? 0 : parseInt(resume, 10) + 1;
+    var hasErrors = root.dataset.hasErrors === "true";
+    // A fresh visitor sees the intro; a returning one lands on their next
+    // question, and a failed submit on the first question it flagged.
+    render(start > 0 ? start : 0, null);
+    if (start > 0 || hasErrors) {
+      var focusTarget = steps[current].querySelector("[data-survey-focus]");
+      if (focusTarget) focusTarget.focus({ preventScroll: true });
+      if (start > 0 && !hasErrors) status.textContent = "Welcome back — picking up where you left off.";
+    }
+    // Answers already on the page are already stored.
+    steps.forEach(function (step) { if (step.dataset.key) saved[step.dataset.key] = JSON.stringify(valueOf(step)); });
+  }
+
+  function boot() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-studio-survey]"), init);
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
+  // Turbo re-runs this script on every visit; bind the turbo:load hook once.
+  if (!window.__studioSurveyTurboHook) {
+    window.__studioSurveyTurboHook = true;
+    document.addEventListener("turbo:load", boot);
+  }
+})();
+<% end %>
