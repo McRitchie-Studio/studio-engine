@@ -1603,6 +1603,25 @@ module Studio
       patch "admin/email_images/:variant", to: "studio/email_images#update", as: :admin_email_image,
             constraints: { variant: /[a-z_]+/ }
 
+      # Surveys (docs/SURVEYS.md). Both halves OPT-IN — see
+      # Studio.draw_survey_routes and Studio.draw_admin_survey_routes.
+      if Studio.draw_survey_routes
+        slug = { slug: Studio::Survey::ROUTE_SLUG }
+        get   "surveys/:slug",              to: "studio/surveys#show",   as: :studio_survey, constraints: slug
+        post  "surveys/:slug",              to: "studio/surveys#submit", constraints: slug
+        patch "surveys/:slug/answers/:key", to: "studio/surveys#answer", as: :studio_survey_answer,
+              constraints: slug.merge(key: Studio::Survey::ROUTE_KEY)
+        get   "surveys/:slug/thanks",       to: "studio/surveys#thanks", as: :studio_survey_thanks, constraints: slug
+      end
+
+      if Studio.draw_admin_survey_routes
+        get "admin/surveys",              to: "studio/admin_surveys#index",  as: :admin_surveys
+        get "admin/surveys/:slug/export", to: "studio/admin_surveys#export", as: :admin_survey_export,
+            constraints: { slug: %r{[^/.]+} }, defaults: { format: :csv }
+        get "admin/surveys/:slug",        to: "studio/admin_surveys#show",   as: :admin_survey,
+            constraints: { slug: %r{[^/.]+} }
+      end
+
       # Model-page protocol (v1) — a reusable per-record inspector. Drawn into
       # every consuming app: /models/:model/:id renders one record as pretty JSON
       # plus a copy/paste rails-console command; /models/:model/random bounces to

@@ -32,6 +32,9 @@ module Studio
 
     SLUG_FORMAT = /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/
     KEY_FORMAT = /\A[a-z][a-z0-9_]{0,62}\z/
+    # The same two shapes, unanchored, for route constraints.
+    ROUTE_SLUG = /[a-z0-9]+(?:-[a-z0-9]+)*/
+    ROUTE_KEY = /[a-z][a-z0-9_]{0,62}/
     TYPES = %i[emoji_scale rating choice multi_choice short_text long_text].freeze
     SCALE_TYPES = %i[emoji_scale rating].freeze
     SELECT_TYPES = %i[emoji_scale rating choice].freeze
