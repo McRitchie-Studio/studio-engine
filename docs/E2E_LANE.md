@@ -391,12 +391,15 @@ Also not covered:
   `playwright.config.js` is a three-line change if a real defect ever needs it.
   Note it doubles `executed:` in the contract — Playwright counts one test per spec
   per project.
-- **Turbo navigation, except on the site footer pages.** The lab serves Alpine
-  but no Turbo, so `turbo:load` / `turbo:render` listeners never fire and specs
-  assert the synchronous first pass. The one exception is `/lab/site_footer/*`:
-  their layout (`layouts/site_footer_lab`) loads the real Turbo build out of the
-  turbo-rails gem, because the footer map's remount after a Turbo visit, and on a
-  restored snapshot, is what `site_footer.spec.js` exists to see.
+- **Turbo navigation, except on the site footer pages and one survey spec.** The
+  lab serves Alpine but no Turbo, so `turbo:load` / `turbo:render` listeners never
+  fire and specs assert the synchronous first pass. The exceptions load the real
+  Turbo build out of the turbo-rails gem: `/lab/site_footer/*`
+  (`layouts/site_footer_lab`), because the footer map's remount after a Turbo
+  visit, and on a restored snapshot, is what `site_footer.spec.js` exists to see;
+  and the survey pages when the `survey_lab_turbo` cookie is set
+  (`layouts/survey_turbo_lab`), so `survey_flow.spec.js` can see the stepper come
+  alive on the clone Turbo restores on Back.
 - **A third party's console.** `watchPageErrors` hears every frame on the page,
   so a page that embeds another origin's frame counts that origin's errors too.
   `watchPageErrors(page, { ownOriginOnly: true })` scopes them out by origin
