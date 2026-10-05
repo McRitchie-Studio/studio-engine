@@ -18,6 +18,11 @@ Studio.draw_geo_routes = true
 # consuming app does. OFF by default — see Studio.draw_session_routes.
 Studio.draw_session_routes = true
 
+# Opt in to the survey pages and the admin results panel, as a consuming app
+# does. OFF by default — see Studio.draw_survey_routes.
+Studio.draw_survey_routes = true
+Studio.draw_admin_survey_routes = true
+
 Rails.application.routes.draw do
   # Draw the engine's shared route table the same way every consuming app does
   # (Studio.routes(self), not `mount`). The boot test asserts the named path
@@ -106,6 +111,10 @@ Rails.application.routes.draw do
   post "footer_host/terms", to: "footer_host_landing#show", as: :terms if Rails.application.config.x.footer_host_legal_post == true
   # An app's OWN booking page (config.booking_path), not the engine's /schedule.
   get "footer_host/schedule", to: "footer_host_schedule#show"
+
+  # The survey lane's admin sign-in (SurveyLabSessionsController). Outside /lab
+  # on purpose: see that controller.
+  get "survey_lab/sign_in", to: "survey_lab_sessions#create"
 
   get "lab/session", to: "session_lab#show"
   post "lab/session/sign_in", to: "session_lab#sign_in"
