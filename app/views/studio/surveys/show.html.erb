@@ -12,7 +12,8 @@
 <%= render "studio/surveys/styles" %>
 
 <main class="studio-survey" data-studio-survey
-      data-answer-url="<%= studio_survey_answer_path(@survey.slug, key: "__KEY__") %>"
+      data-answer-base="<%= studio_survey_path(@survey.slug) %>/answers/"
+      data-csrf="<%= form_authenticity_token %>"
       data-resume-index="<%= @resume_index %>"
       data-has-errors="<%= @errors.any? %>"
       data-total="<%= total %>">

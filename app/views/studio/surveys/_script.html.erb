@@ -22,7 +22,9 @@
     var count = root.querySelector("[data-survey-count]");
     var status = root.querySelector("[data-survey-status]");
     var hint = root.querySelector("[data-survey-hint]");
-    var tokenInput = form.querySelector("input[name='authenticity_token']");
+    // The GLOBAL token, not the form's: with per_form_csrf_tokens on, the
+    // form's hidden token is bound to the POST and refused on the PATCH.
+    var csrf = root.dataset.csrf || "";
     var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     var saved = {};
     var timers = {};
@@ -76,13 +78,13 @@
       } else {
         body.append("value", value);
       }
-      var url = root.dataset.answerUrl.replace("__KEY__", encodeURIComponent(key));
+      var url = root.dataset.answerBase + encodeURIComponent(key);
       status.textContent = "Saving…";
       return fetch(url, {
         method: "PATCH",
         body: body,
         credentials: "same-origin",
-        headers: { "Accept": "application/json", "X-CSRF-Token": tokenInput ? tokenInput.value : "" }
+        headers: { "Accept": "application/json", "X-CSRF-Token": csrf }
       }).then(function (res) {
         // fetch resolves on a 4xx/5xx — the status is the only signal.
         if (!res.ok) {
