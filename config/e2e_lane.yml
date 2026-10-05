@@ -814,7 +814,15 @@
 # e2e/booking_frame.spec.js 15 -> 16: a booking link that jumps to a frame never
 # scrolled to asks Google ONCE.
 #   npx playwright test --list  -> 189 tests in 27 files
-total_specs: 189
+# + studio-survey-primitive: e2e/survey_flow.spec.js, 11 specs in ONE new file,
+# for the survey stepper at 375px: intro then one question per screen with the
+# progress bar and focus on the question; tap-to-advance with autosave; number
+# keys, Enter and Back; the required gate; a full keyboard walk to the thank-you
+# screen; resume on reload; reduced motion off and on; the chosen tile in the
+# theme accent in dark and light; the JS-off single form; the admin panel's
+# phone layout.
+#   npx playwright test --list  -> 200 tests in 28 files
+total_specs: 200
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -937,7 +945,7 @@ total_specs: 189
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 189
 # executed = total - devnet - allowed_skips = 189 - 0 - 0 = 189, so executed ==
 # total_specs and the equality assertion holds.
-executed: 189
+executed: 200
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

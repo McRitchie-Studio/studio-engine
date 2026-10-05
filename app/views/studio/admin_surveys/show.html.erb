@@ -82,7 +82,7 @@
               <% result.buckets.each do |bucket| %>
                 <li class="grid items-center gap-3" style="grid-template-columns: minmax(6rem, 11rem) 1fr 4.5rem;" data-survey-bucket="<%= bucket.value %>">
                   <span class="text-sm text-body truncate" title="<%= bucket.label %>">
-                    <% if bucket.face %><span aria-hidden="true" class="mr-1"><%= bucket.face %></span><% end %><%= bucket.label %><% if bucket.retired %> <span class="text-xs text-muted">(retired)</span><% end %>
+                    <% if bucket.face %><span aria-hidden="true" class="mr-1"><%= bucket.face %></span><% end %><%= bucket.label %><% end_label = { 1 => q.low_label, 5 => q.high_label }[bucket.value] if q.type == :rating %><% if end_label %> <span class="text-xs text-muted">· <%= end_label %></span><% end %><% if bucket.retired %> <span class="text-xs text-muted">(retired)</span><% end %>
                   </span>
                   <span class="h-3 rounded-full bg-inset overflow-hidden" role="img" aria-label="<%= bucket.percent %> percent">
                     <span class="block h-full rounded-full" style="width: <%= bucket.percent %>%; background: var(--color-cta);"></span>
