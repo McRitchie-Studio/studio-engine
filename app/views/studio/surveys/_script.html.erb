@@ -30,6 +30,7 @@
     var timers = {};
     var current = -1;
     var pointerPick = false;
+    var submitting = false;
 
     form.noValidate = true;
     root.classList.add("is-enhanced");
@@ -66,7 +67,7 @@
 
     function save(step) {
       var key = step.dataset.key;
-      if (!key) return Promise.resolve(true);
+      if (!key || submitting) return Promise.resolve(true);
       var value = valueOf(step);
       var fingerprint = JSON.stringify(value);
       if (saved[key] === fingerprint) return Promise.resolve(true);
@@ -145,11 +146,13 @@
           return;
         }
         setError(step, "");
-        save(step);
       }
       if (current === steps.length - 1) {
+        // No autosave here: the POST carries every answer, and a PATCH racing
+        // it would land after completion and be refused.
         submitForm();
       } else {
+        if (step.dataset.key) save(step);
         go(current + 1);
       }
     }
@@ -169,6 +172,8 @@
           return;
         }
       }
+      Object.keys(timers).forEach(function (key) { clearTimeout(timers[key]); });
+      submitting = true;
       submit.disabled = true;
       submit.textContent = "Sending…";
     });
