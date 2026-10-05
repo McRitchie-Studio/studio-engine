@@ -69,7 +69,7 @@ module Studio
 
     def thanks
       @response = locate_response
-      return redirect_to(studio_survey_path(@survey.slug), status: :see_other) unless @response&.completed?
+      redirect_to(studio_survey_path(@survey.slug), status: :see_other) unless @response&.completed?
     end
 
     private
