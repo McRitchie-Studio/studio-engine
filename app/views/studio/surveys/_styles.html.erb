@@ -52,7 +52,9 @@
   .studio-survey__kbd { display: none; font-size: .625rem; font-weight: 600; color: var(--color-text-muted); border: 1px solid var(--color-border); border-radius: .25rem; padding: 0 .3rem; line-height: 1.4; }
   .studio-survey__tile .studio-survey__kbd { position: absolute; top: .3rem; right: .35rem; }
   .studio-survey__option .studio-survey__kbd { margin-left: auto; }
-  @media (hover: hover) and (pointer: fine) { .studio-survey.is-enhanced .studio-survey__kbd { display: inline-block; } }
+  @media (hover: hover) and (pointer: fine) { .studio-survey.is-enhanced .studio-survey__option .studio-survey__kbd { display: inline-block; } }
+  /* On a scale tile the badge needs the room a phone-width tile does not have. */
+  @media (hover: hover) and (pointer: fine) and (min-width: 640px) { .studio-survey.is-enhanced .studio-survey__tile .studio-survey__kbd { display: inline-block; } }
 
   .studio-survey__text { width: 100%; font-size: 1rem; }
   textarea.studio-survey__text { min-height: 9rem; resize: vertical; line-height: 1.5; }
