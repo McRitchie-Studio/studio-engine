@@ -4,6 +4,32 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **Surveys.** Define a survey in app code — `Studio.define_survey "first-game"
+  do ... end` in `config/surveys/*.rb`, loaded on boot and each reload — with six
+  question types (`emoji_scale`, `rating`, `choice`, `multi_choice`,
+  `short_text`, `long_text`), each with `required:` and `help:`. The engine
+  serves it at `GET /surveys/:slug`: one question per screen with a progress
+  bar, tap-to-advance, number keys and Enter, autosave of every answer, resume
+  where the respondent left off, a thank-you screen with the survey's
+  `next_action`, `prefers-reduced-motion` support, and a single-form fallback
+  without JavaScript. Answers are stored in the new `studio_survey_responses`
+  table (`Studio::SurveyResponse`) with a snapshot of each question's label and
+  the chosen option's label, so editing a survey never rewrites old responses.
+  **Opt in** with `config.draw_survey_routes = true`; **run
+  `bin/rails studio_engine:install:migrations && bin/rails db:migrate`** first.
+- **`config.survey_ref_resolver`** (`->(controller) { ref }`) attributes an email
+  arrival, and **`config.on_survey_completed`** (`->(response) { ... }`) runs once
+  when a response completes; a raising hook is logged, never shown. A survey
+  answers to a signed-in user, an attributed email arrival, or anyone when it
+  declares `allow_anonymous true`.
+- **The survey results panel at `/admin/surveys`**, admin-only: started,
+  completed and completion rate per survey; per-question distribution bars and
+  averages, a scrolling list of text answers with the respondent's username or
+  "anonymous"; date-range and completed-only filters; CSV export. **Opt in**
+  with `config.draw_admin_survey_routes = true`. See `docs/SURVEYS.md`.
+
 ## 0.87.0 — 2026-10-04
 
 ### Changed

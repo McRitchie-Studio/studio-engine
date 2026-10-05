@@ -1,0 +1,15 @@
+<%# A survey without allow_anonymous, opened by a visitor who is neither
+    signed in nor arriving by an attributed email link. %>
+<% content_for(:title, @survey.title) %>
+<%= render "studio/surveys/styles" %>
+<main class="studio-survey" data-studio-survey-sign-in>
+  <div class="studio-survey__shell">
+    <div class="studio-survey__card">
+      <h1 class="studio-survey__title"><%= @survey.title %></h1>
+      <p class="studio-survey__intro-copy">Sign in to answer this survey.</p>
+      <% if respond_to?(:login_path) %>
+        <a href="<%= login_path %>" class="btn btn-primary btn-lg">Sign in</a>
+      <% end %>
+    </div>
+  </div>
+</main>

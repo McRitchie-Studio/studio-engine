@@ -114,13 +114,14 @@ end
 # image 404s, and the lane's own error watch counts a failed resource load as a
 # failure — so a stub would make the page noisy about something the spec does not
 # care about while measuring boxes.
-# ---- Turbo, for the site footer pages only ------------------------------------
+# ---- Turbo, for the site footer pages and one survey spec ---------------------
 #
 # The lab has no Turbo (docs/E2E_LANE.md, "Not covered"), and the footer map's
 # remount after a Turbo visit is exactly the behaviour its spec exists to see. So
 # the footer pages' own layout (layouts/site_footer_lab) loads the real Turbo
-# build out of the turbo-rails gem the engine already depends on. Every other lab
-# page keeps the lab layout and stays Turbo-free.
+# build out of the turbo-rails gem the engine already depends on. The survey's
+# Turbo restore spec opts in by cookie (layouts/survey_turbo_lab). Every other
+# lab page keeps the lab layout and stays Turbo-free.
 turbo_source = File.join(Gem.loaded_specs.fetch("turbo-rails").full_gem_path, "app", "assets", "javascripts", "turbo.min.js")
 abort "e2e/boot: turbo.min.js missing from turbo-rails at #{turbo_source}" unless File.exist?(turbo_source)
 FileUtils.mkdir_p(File.join(PUBLIC_DIR, "js"))
@@ -229,6 +230,7 @@ require_relative "../db/migrate/20260818120000_create_studio_geo_settings"
 # The site identity page (/lab/site_identity) renders its form from the real
 # model, which needs its real table.
 require_relative "../db/migrate/20260930120000_create_studio_site_identities"
+require_relative "../db/migrate/20261005120000_create_studio_survey_responses"
 
 lab_db = File.join(ROOT, "tmp", "e2e-lab.sqlite3")
 FileUtils.mkdir_p(File.dirname(lab_db))
@@ -237,6 +239,44 @@ ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: lab_db)
 ActiveRecord::Migration.suppress_messages do
   CreateStudioGeoSettings.new.migrate(:up)
   CreateStudioSiteIdentities.new.migrate(:up)
+  CreateStudioSurveyResponses.new.migrate(:up)
+  # The host's users table, as far as the survey pages read it.
+  ActiveRecord::Base.connection.create_table(:users) do |t|
+    t.string :email
+    t.string :username
+    t.string :role
+    t.timestamps
+  end
+  ActiveRecord::Base.connection.create_table(:error_logs) do |t|
+    t.string :slug
+    t.text :message
+    t.text :inspect
+    t.text :backtrace
+    t.string :target_type
+    t.bigint :target_id
+    t.string :parent_type
+    t.bigint :parent_id
+    t.timestamps
+  end
+end
+abort "e2e/boot: survey table missing" unless ActiveRecord::Base.connection.table_exists?(:studio_survey_responses)
+abort "e2e/boot: survey definition not loaded from test/dummy/config/surveys" unless Studio.survey("first-game")
+
+# The HOST's base controller, which the engine's survey controllers inherit.
+# Shaped like every consumer's: Studio::ErrorHandling (current_user, the admin
+# gate, require_authentication) in the lab's real layout and asset delivery.
+class ApplicationController < ActionController::Base
+  include Studio::ErrorHandling
+
+  helper E2eLabController::AssetDelivery
+  # The survey Turbo spec sets the survey_lab_turbo cookie to get the same page
+  # under Turbo (layouts/survey_turbo_lab); everything else stays Turbo-free.
+  layout -> { cookies[:survey_lab_turbo] == "1" ? "survey_turbo_lab" : "e2e_lab" }
+end
+
+class User < ApplicationRecord
+  def admin? = role == "admin"
+  def display_name = username.presence || email.to_s.split("@").first
 end
 abort "e2e/boot: geo table missing" unless ActiveRecord::Base.connection.table_exists?(:studio_geo_settings)
 

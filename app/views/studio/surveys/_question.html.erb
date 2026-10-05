@@ -1,0 +1,77 @@
+<%# One survey question as a fieldset (studio/surveys/show). It is a complete
+    form control without JavaScript: native radios, checkboxes and text fields
+    named answers[key], with `required` so the no-JS form validates in the
+    browser too. The script enhances it into one screen of the stepper. %>
+<% key = question.key %>
+<% dom = "studio-survey-#{key}" %>
+<% value = response&.answer_value(key) %>
+<% ends = %i[emoji_scale rating].include?(question.type) && (question.low_label || question.high_label) %>
+<% described = [("#{dom}-help" if question.help), ("#{dom}-scale" if ends), "#{dom}-error"].compact.join(" ") %>
+<fieldset class="studio-survey__step" id="<%= dom %>" data-survey-step
+          data-key="<%= key %>" data-type="<%= question.type %>" data-required="<%= question.required? %>"
+          aria-describedby="<%= described %>">
+  <legend class="studio-survey__question" id="<%= dom %>-label" tabindex="-1" data-survey-focus>
+    <span class="studio-survey__qnum">Question <%= index + 1 %> of <%= total %></span>
+    <%= question.label %><% if question.required? %><span class="studio-survey__req" aria-hidden="true">*</span><span class="studio-survey__sr"> (required)</span><% end %>
+  </legend>
+  <% if question.help %>
+    <p class="studio-survey__help" id="<%= dom %>-help"><%= question.help %></p>
+  <% end %>
+
+  <div class="studio-survey__body">
+    <% case question.type %>
+    <% when :emoji_scale, :rating %>
+      <div class="studio-survey__scale">
+        <% question.options.each_with_index do |opt, i| %>
+          <label class="studio-survey__tile" data-survey-choice>
+            <input type="radio" class="studio-survey__input" name="answers[<%= key %>]" value="<%= opt.value %>"
+                   <%= "checked" if value.to_s == opt.value.to_s %> <%= "required" if question.required? %>
+                   <% if opt.face %>aria-label="<%= opt.label %>"<% end %>>
+            <% if opt.face %>
+              <span class="studio-survey__face" aria-hidden="true"><%= opt.face %></span>
+              <span class="studio-survey__tile-label" aria-hidden="true"><%= opt.label %></span>
+            <% else %>
+              <span class="studio-survey__num"><%= opt.label %></span>
+            <% end %>
+            <span class="studio-survey__kbd" aria-hidden="true"><%= i + 1 %></span>
+          </label>
+        <% end %>
+      </div>
+      <% if ends %>
+        <div class="studio-survey__ends" aria-hidden="true">
+          <span>1 · <%= question.low_label %></span><span><%= question.high_label %> · 5</span>
+        </div>
+        <p class="studio-survey__sr" id="<%= dom %>-scale">1 means <%= question.low_label || "lowest" %>, 5 means <%= question.high_label || "highest" %>.</p>
+      <% end %>
+    <% when :choice, :multi_choice %>
+      <% multi = question.multi? %>
+      <% chosen = Array(value).map(&:to_s) %>
+      <div class="studio-survey__options">
+        <% if multi %><input type="hidden" name="answers[<%= key %>][]" value=""><% end %>
+        <% question.options.each_with_index do |opt, i| %>
+          <label class="studio-survey__option" data-survey-choice>
+            <input type="<%= multi ? "checkbox" : "radio" %>" class="studio-survey__input"
+                   name="answers[<%= key %>]<%= "[]" if multi %>" value="<%= opt.value %>"
+                   <%= "checked" if chosen.include?(opt.value.to_s) %> <%= "required" if question.required? && !multi %>>
+            <span class="studio-survey__mark<%= " studio-survey__mark--box" if multi %>" aria-hidden="true"></span>
+            <span class="studio-survey__option-label"><%= opt.label %></span>
+            <% if i < 9 %><span class="studio-survey__kbd" aria-hidden="true"><%= i + 1 %></span><% end %>
+          </label>
+        <% end %>
+      </div>
+    <% when :short_text %>
+      <input type="text" class="input-field studio-survey__text" id="<%= dom %>-input" name="answers[<%= key %>]"
+             value="<%= value %>" maxlength="<%= question.max_length %>" aria-labelledby="<%= dom %>-label"
+             placeholder="<%= question.placeholder || "Type your answer" %>" autocomplete="off"
+             <%= "required" if question.required? %> data-survey-text>
+    <% when :long_text %>
+      <textarea class="input-field studio-survey__text" id="<%= dom %>-input" name="answers[<%= key %>]" rows="5"
+                maxlength="<%= question.max_length %>" aria-labelledby="<%= dom %>-label"
+                placeholder="<%= question.placeholder || "Type your answer" %>"
+                <%= "required" if question.required? %> data-survey-text><%= value %></textarea>
+      <p class="studio-survey__counter" aria-hidden="true"><span data-survey-counter><%= value.to_s.length %></span> / <%= question.max_length %></p>
+    <% end %>
+  </div>
+
+  <p class="studio-survey__error" id="<%= dom %>-error" role="alert" data-survey-error <%= "hidden" unless error %>><%= error %></p>
+</fieldset>
