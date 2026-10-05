@@ -1,14 +1,21 @@
 <%# The survey stepper: progressive enhancement over studio/surveys/show.
     Plain JavaScript (no Alpine dependency), idempotent per root so a Turbo
-    render that re-runs it never double-binds. Autosave is best effort: the
-    final Submit posts the whole form, so a failed autosave loses nothing. %>
+    render that re-runs it never double-binds. Bound roots are tracked in a
+    WeakSet, never in a DOM attribute: Turbo's snapshot cache clones the page,
+    and a clone keeps every attribute but none of the listeners, so a marker
+    in the DOM would make a restored page look set up while it is dead.
+    Autosave is best effort: the final Submit posts the whole form, so a
+    failed autosave loses nothing. %>
 <%= javascript_tag nonce: true do %>
 (function () {
   "use strict";
 
+  // Shared across re-runs of this script (Turbo evaluates it on every visit).
+  var bound = window.__studioSurveyBound || (window.__studioSurveyBound = new WeakSet());
+
   function init(root) {
-    if (root.dataset.enhanced === "1") return;
-    root.dataset.enhanced = "1";
+    if (bound.has(root)) return;
+    bound.add(root);
 
     var form = root.querySelector("[data-survey-form]");
     var steps = Array.prototype.slice.call(root.querySelectorAll("[data-survey-step]"));
@@ -22,6 +29,9 @@
     var count = root.querySelector("[data-survey-count]");
     var status = root.querySelector("[data-survey-status]");
     var hint = root.querySelector("[data-survey-hint]");
+    // A page restored from Turbo's cache comes back on the step it was left
+    // on; resume there rather than at the server's original resume point.
+    var restored = -1;
     // The GLOBAL token, not the form's: with per_form_csrf_tokens on, the
     // form's hidden token is bound to the POST and refused on the PATCH.
     var csrf = root.dataset.csrf || "";
@@ -33,9 +43,13 @@
     var submitting = false;
 
     form.noValidate = true;
+    if (root.classList.contains("is-enhanced")) {
+      Array.prototype.forEach.call(root.querySelectorAll("[data-survey-step]"), function (step, i) {
+        if (step.classList.contains("is-active")) restored = i;
+      });
+    }
     root.classList.add("is-enhanced");
     top.hidden = false;
-    hint.hidden = false;
 
     function typeOf(step) { return step.dataset.type || ""; }
     function isChoice(step) { return /^(emoji_scale|rating|choice)$/.test(typeOf(step)); }
@@ -120,6 +134,9 @@
       next.hidden = last;
       next.textContent = onIntro ? "Start" : "Next";
       submit.hidden = !last;
+      // The number-key shortcut only means something on a choice or scale.
+      var step = steps[index];
+      hint.hidden = !(step.dataset.key && (isChoice(step) || isMulti(step)));
 
       var position = onIntro ? 0 : index;
       fill.style.width = (total ? (position / total) * 100 : 0) + "%";
@@ -215,6 +232,9 @@
 
     root.addEventListener("keydown", function (event) {
       if (event.defaultPrevented || event.altKey) return;
+      // A tap on an already-chosen option fires pointerdown but no change, so
+      // the flag would outlive it and make the next arrow key advance.
+      pointerPick = false;
       var step = steps[current];
       var target = event.target;
       var inText = target.matches && target.matches("textarea, input[type=text]");
@@ -243,8 +263,9 @@
     var hasErrors = root.dataset.hasErrors === "true";
     // A fresh visitor sees the intro; a returning one lands on their next
     // question, and a failed submit on the first question it flagged.
+    if (restored >= 0) start = restored;
     render(start > 0 ? start : 0, null);
-    if (start > 0 || hasErrors) {
+    if (restored < 0 && (start > 0 || hasErrors)) {
       var focusTarget = steps[current].querySelector("[data-survey-focus]");
       if (focusTarget) focusTarget.focus({ preventScroll: true });
       if (start > 0 && !hasErrors) status.textContent = "Welcome back — picking up where you left off.";

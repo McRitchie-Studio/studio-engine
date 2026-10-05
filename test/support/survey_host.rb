@@ -83,7 +83,7 @@ module SurveyHost
     Studio.define_survey "first-game" do
       title "How was your first game?"
       intro "Six quick questions."
-      thank_you "Thanks — we read every answer."
+      thank_you "We read every answer."
       next_action label: "Play again", url: "/play"
       allow_anonymous true
       emoji_scale :overall, "How was it?", required: true

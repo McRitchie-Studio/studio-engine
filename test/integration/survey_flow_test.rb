@@ -50,6 +50,16 @@ class SurveyFlowTest < ActionDispatch::IntegrationTest
     assert_equal 0, Studio::SurveyResponse.count, "a page view never creates a response"
   end
 
+  test "a rating's end labels describe its group to a screen reader" do
+    get "/surveys/first-game"
+
+    rules = response.body[/<fieldset[^>]*id="studio-survey-rules".*?<\/fieldset>/m]
+    assert_match(/aria-describedby="studio-survey-rules-scale studio-survey-rules-error"/, rules)
+    assert_match(/<p class="studio-survey__sr" id="studio-survey-rules-scale">1 means Lost, 5 means Clear\.<\/p>/, rules)
+    found_us = response.body[/<fieldset[^>]*id="studio-survey-found_us"[^>]*>/]
+    refute_includes found_us, "-scale", "a choice question has no scale ends to describe"
+  end
+
   test "an unknown survey is a 404" do
     get "/surveys/no-such-survey"
     assert_response :not_found
@@ -155,7 +165,7 @@ class SurveyFlowTest < ActionDispatch::IntegrationTest
     assert_equal [stored], @completed
 
     follow_redirect!
-    assert_includes response.body, "Thanks — we read every answer."
+    assert_includes response.body, "We read every answer."
     assert_includes response.body, %(href="/play")
     assert_includes response.body, "Play again"
 

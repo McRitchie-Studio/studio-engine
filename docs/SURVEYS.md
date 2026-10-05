@@ -56,7 +56,7 @@ one may also live in an initializer.
 Studio.define_survey "first-game" do
   title "How was your first game?"
   intro "Six quick questions. Your answers shape what we build next."
-  thank_you "Thanks — we read every single answer."
+  thank_you "We read every single answer."
   next_action label: "Play another game", url: "/play"
   allow_anonymous true
 
@@ -78,7 +78,7 @@ lowercase words joined by hyphens; question keys are lowercase snake_case.
 |---------|---------|
 | `title` | Required. The intro heading and the page title |
 | `intro` | Optional text under the title on the first screen |
-| `thank_you` | The thank-you screen's copy (default "Thanks for taking the time.") |
+| `thank_you` | The thank-you screen's copy (default "We appreciate you taking the time."), under a "Thank you!" heading |
 | `next_action label:, url:` | Optional button on the thank-you screen. `url` is a `/path` or an `http(s)` URL |
 | `allow_anonymous` | Let anyone answer. Off by default (see *Who may answer*) |
 | `version` | Optional explicit version string; defaults to a digest of the questions |

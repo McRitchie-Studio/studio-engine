@@ -35,6 +35,12 @@ async function start(page) {
   await expect(activeStep(page)).toHaveAttribute("data-key", "overall");
 }
 
+// Press a key and wait for the step it should land on (tap-advance is delayed).
+async function keyTo(page, key, nextKey) {
+  await page.keyboard.press(key);
+  await expect(activeStep(page)).toHaveAttribute("data-key", nextKey);
+}
+
 function waitForSave(page, key) {
   return page.waitForResponse((r) => r.url().endsWith(`/answers/${key}`) && r.request().method() === "PATCH");
 }
@@ -185,6 +191,79 @@ test("a chosen tile is marked in the theme accent, dark and light", async ({ pag
   }
 });
 
+test("the number-key hint shows on choice and scale questions only", async ({ page }) => {
+  await start(page);
+  const hint = page.locator("[data-survey-hint]");
+  await expect(hint).toBeVisible(); // overall: emoji scale
+  await keyTo(page, "4", "rules");
+  await keyTo(page, "5", "found_us");
+  await keyTo(page, "2", "liked");
+  await expect(hint).toBeVisible(); // multi choice
+  await page.keyboard.press("Enter");
+  await expect(activeStep(page)).toHaveAttribute("data-key", "one_word");
+  await expect(hint).toBeHidden(); // short text
+  await page.keyboard.press("Enter");
+  await expect(activeStep(page)).toHaveAttribute("data-key", "anything_else");
+  await expect(hint).toBeHidden(); // long text
+  await page.getByRole("button", { name: "Back" }).click();
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(hint).toBeVisible();
+});
+
+test("re-tapping the chosen option leaves no flag for the next arrow key", async ({ page }) => {
+  await start(page);
+  await keyTo(page, "4", "rules");
+  await keyTo(page, "5", "found_us");
+  const chosen = page.locator("[data-key=found_us] .studio-survey__option").nth(1);
+  await chosen.click(); // a tap that changes the answer advances
+  await expect(activeStep(page)).toHaveAttribute("data-key", "liked");
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(activeStep(page)).toHaveAttribute("data-key", "found_us");
+
+  // Tapping the option already chosen fires no change, so nothing advances...
+  await chosen.click();
+  await page.waitForTimeout(400);
+  await expect(activeStep(page)).toHaveAttribute("data-key", "found_us");
+  // ...and an arrow key then moves the choice without jumping off the question.
+  await page.keyboard.press("ArrowDown");
+  await expect(page.locator("[data-key=found_us] input").nth(2)).toBeChecked();
+  await page.waitForTimeout(400);
+  await expect(activeStep(page)).toHaveAttribute("data-key", "found_us");
+});
+
+test("an unchosen radio or checkbox ring reads at 3:1 against its card, dark and light", async ({ page }) => {
+  await start(page);
+  await keyTo(page, "4", "rules");
+  await keyTo(page, "5", "found_us");
+  const mark = page.locator("[data-key=found_us] .studio-survey__mark").first();
+
+  for (const mode of ["dark", "light"]) {
+    if (mode === "light") {
+      await page.evaluate(() => document.documentElement.classList.remove("dark"));
+      await page.waitForTimeout(300); // the card's background-color transition
+    }
+    const ratio = await mark.evaluate((el) => {
+      const rgb = (c) => (c.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+      const lum = ([r, g, b]) => {
+        const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+      };
+      const cardRgb = rgb(getComputedStyle(el.closest(".studio-survey__option")).backgroundColor);
+      // A translucent ring is seen composited over the card.
+      const parts = (getComputedStyle(el).borderTopColor.match(/[\d.]+/g) || []).map(Number);
+      const alpha = parts.length > 3 ? parts[3] : 1;
+      const ringRgb = parts.slice(0, 3).map((v, i) => v * alpha + cardRgb[i] * (1 - alpha));
+      const ring = lum(ringRgb);
+      const card = lum(cardRgb);
+      return {
+        value: (Math.max(ring, card) + 0.05) / (Math.min(ring, card) + 0.05),
+        colors: `${getComputedStyle(el).borderTopColor} on ${getComputedStyle(el.closest(".studio-survey__option")).backgroundColor}`
+      };
+    });
+    expect(ratio.value, `${mode}: ring vs card (${ratio.colors})`).toBeGreaterThanOrEqual(3);
+  }
+});
+
 test.describe("without JavaScript", () => {
   test.use({ javaScriptEnabled: false });
 
@@ -210,5 +289,38 @@ test("the admin results panel lays out at phone width", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Export CSV" })).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+  expect(errors).toEqual([]);
+});
+
+// Turbo restores the page on Back from its snapshot cache: a CLONE of the DOM,
+// which keeps every attribute the stepper wrote but none of its listeners. The
+// stepper must come alive again on that clone. Before the fix a data-enhanced
+// marker survived into the clone, setup returned early, and Next did nothing.
+test("the stepper still works after Turbo restores it on Back", async ({ page, context, baseURL }) => {
+  const errors = watchPageErrors(page);
+  await context.addCookies([{ name: "survey_lab_turbo", value: "1", url: baseURL }]);
+  await start(page);
+  await page.locator("[data-key=overall] .studio-survey__tile").nth(3).click();
+  await expect(activeStep(page)).toHaveAttribute("data-key", "rules");
+
+  // NOT VACUOUS: a marker on window survives a Turbo visit and dies with a full
+  // page load, so this proves Back was a Turbo restore and not a reload.
+  await page.evaluate(() => { window.__sameDocument = true; });
+  await page.locator("[data-survey-lab-away]").click();
+  await expect(page.locator("[data-lab-page='terms']")).toBeVisible();
+  await page.goBack();
+  await expect(page.locator("[data-studio-survey]")).toBeVisible();
+  expect(await page.evaluate(() => window.__sameDocument)).toBe(true);
+
+  // The restored clone comes back on the step it was left on, and every
+  // control is live: Next advances, Back returns, a tap advances.
+  await expect(activeStep(page)).toHaveAttribute("data-key", "rules");
+  await page.locator("[data-key=rules] .studio-survey__tile").nth(4).click();
+  await expect(activeStep(page)).not.toHaveAttribute("data-key", "rules");
+  const after = await activeStep(page).getAttribute("data-key");
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(activeStep(page)).toHaveAttribute("data-key", "rules");
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(activeStep(page)).toHaveAttribute("data-key", after);
   expect(errors).toEqual([]);
 });

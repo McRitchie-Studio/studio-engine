@@ -1,0 +1,20 @@
+<%# The survey pages' lab layout with Turbo: layouts/e2e_lab plus Turbo and one
+    link away. Chosen only when the survey_lab_turbo cookie is set (see
+    ApplicationController in e2e/boot.rb), so every other survey spec keeps the
+    Turbo-free lab. It exists for one behaviour: Turbo restores a CLONE of the
+    survey from its snapshot cache on Back, and the stepper has to come alive on
+    that clone. mcritchie-studio and turf-monster both load Turbo. %>
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>studio-engine e2e lab · survey with Turbo</title>
+    <%= render "layouts/studio/head" %>
+    <script type="module" src="/e2e/js/turbo.min.js"></script>
+  </head>
+  <body class="bg-page text-body">
+    <nav><a href="/lab/site_footer/terms" data-survey-lab-away>Elsewhere</a></nav>
+    <%= yield %>
+  </body>
+</html>

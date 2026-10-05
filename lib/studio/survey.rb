@@ -10,7 +10,7 @@ module Studio
   #   Studio.define_survey "first-game" do
   #     title "How was your first game?"
   #     intro "Two minutes, six questions. It shapes what we build next."
-  #     thank_you "Thanks — we read every answer."
+  #     thank_you "We read every answer."
   #     next_action label: "Play another game", url: "/play"
   #     allow_anonymous true
   #
@@ -223,7 +223,7 @@ module Studio
       @slug = slug.to_s
       @title = title.to_s.strip
       @intro = intro.to_s.strip.presence
-      @thank_you = thank_you.to_s.strip.presence || "Thanks for taking the time."
+      @thank_you = thank_you.to_s.strip.presence || "We appreciate you taking the time."
       @next_action = next_action
       @allow_anonymous = allow_anonymous == true
       @questions = questions.dup.freeze

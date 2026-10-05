@@ -5,7 +5,8 @@
 <% key = question.key %>
 <% dom = "studio-survey-#{key}" %>
 <% value = response&.answer_value(key) %>
-<% described = [("#{dom}-help" if question.help), "#{dom}-error"].compact.join(" ") %>
+<% ends = %i[emoji_scale rating].include?(question.type) && (question.low_label || question.high_label) %>
+<% described = [("#{dom}-help" if question.help), ("#{dom}-scale" if ends), "#{dom}-error"].compact.join(" ") %>
 <fieldset class="studio-survey__step" id="<%= dom %>" data-survey-step
           data-key="<%= key %>" data-type="<%= question.type %>" data-required="<%= question.required? %>"
           aria-describedby="<%= described %>">
@@ -36,11 +37,11 @@
           </label>
         <% end %>
       </div>
-      <% if question.low_label || question.high_label %>
+      <% if ends %>
         <div class="studio-survey__ends" aria-hidden="true">
           <span>1 · <%= question.low_label %></span><span><%= question.high_label %> · 5</span>
         </div>
-        <p class="studio-survey__sr">1 means <%= question.low_label || "lowest" %>, 5 means <%= question.high_label || "highest" %>.</p>
+        <p class="studio-survey__sr" id="<%= dom %>-scale">1 means <%= question.low_label || "lowest" %>, 5 means <%= question.high_label || "highest" %>.</p>
       <% end %>
     <% when :choice, :multi_choice %>
       <% multi = question.multi? %>

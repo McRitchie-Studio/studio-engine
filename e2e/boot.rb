@@ -114,13 +114,14 @@ end
 # image 404s, and the lane's own error watch counts a failed resource load as a
 # failure — so a stub would make the page noisy about something the spec does not
 # care about while measuring boxes.
-# ---- Turbo, for the site footer pages only ------------------------------------
+# ---- Turbo, for the site footer pages and one survey spec ---------------------
 #
 # The lab has no Turbo (docs/E2E_LANE.md, "Not covered"), and the footer map's
 # remount after a Turbo visit is exactly the behaviour its spec exists to see. So
 # the footer pages' own layout (layouts/site_footer_lab) loads the real Turbo
-# build out of the turbo-rails gem the engine already depends on. Every other lab
-# page keeps the lab layout and stays Turbo-free.
+# build out of the turbo-rails gem the engine already depends on. The survey's
+# Turbo restore spec opts in by cookie (layouts/survey_turbo_lab). Every other
+# lab page keeps the lab layout and stays Turbo-free.
 turbo_source = File.join(Gem.loaded_specs.fetch("turbo-rails").full_gem_path, "app", "assets", "javascripts", "turbo.min.js")
 abort "e2e/boot: turbo.min.js missing from turbo-rails at #{turbo_source}" unless File.exist?(turbo_source)
 FileUtils.mkdir_p(File.join(PUBLIC_DIR, "js"))
@@ -268,7 +269,9 @@ class ApplicationController < ActionController::Base
   include Studio::ErrorHandling
 
   helper E2eLabController::AssetDelivery
-  layout "e2e_lab"
+  # The survey Turbo spec sets the survey_lab_turbo cookie to get the same page
+  # under Turbo (layouts/survey_turbo_lab); everything else stays Turbo-free.
+  layout -> { cookies[:survey_lab_turbo] == "1" ? "survey_turbo_lab" : "e2e_lab" }
 end
 
 class User < ApplicationRecord
