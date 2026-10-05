@@ -49,6 +49,9 @@ require "studio/email_smoke"
 require "studio/mail_transport"
 require "studio/redis"
 require "studio/cable"
+require "studio/survey"
+require "studio/survey/breakdown"
+require "studio/survey/export"
 
 module Studio
   mattr_accessor :app_name,            default: "Studio"
@@ -706,6 +709,48 @@ module Studio
   # /schedule when it is drawn, else nil.
   def self.booking_path_for(view)
     Booking.path_for(booking_path, view, drawn: draw_booking_routes)
+  end
+
+  # ── Surveys (docs/SURVEYS.md) ──────────────────────────────────────────────
+  # The public survey pages, /surveys/:slug (Studio::SurveysController). OPT-IN:
+  # `/surveys` is a path an app may already own, and a duplicate helper name
+  # raises while the host's routes.rb loads, which kills every route in it.
+  #
+  #   config.draw_survey_routes = true
+  mattr_accessor :draw_survey_routes, default: false
+
+  # The admin results panel, /admin/surveys (Studio::AdminSurveysController).
+  # OPT-IN for the same reason, and independent of the public pages, so an app
+  # can read results it collects elsewhere.
+  #
+  #   config.draw_admin_survey_routes = true
+  mattr_accessor :draw_admin_survey_routes, default: false
+
+  # Where the app's survey definitions live, relative to Rails.root. Every *.rb
+  # in it is loaded at boot and on each development reload.
+  mattr_accessor :survey_definitions_path, default: "config/surveys"
+
+  # Attribution for an email arrival: ->(controller) { String | nil }. Called on
+  # every survey request; its answer is stamped on the response as email_ref the
+  # first time one is present. Cyvasse passes its EmailReferral ref here.
+  mattr_accessor :survey_ref_resolver, default: ->(_controller) {}
+
+  # Called once, after a response completes: ->(response) { ... }. A raise is
+  # logged and swallowed — the respondent still lands on the thank-you screen.
+  mattr_accessor :on_survey_completed, default: ->(_response) {}
+
+  # Define a survey in app code. See Studio::Survey for the DSL.
+  def self.define_survey(slug, &block)
+    Survey.define(slug, &block)
+  end
+
+  # Every defined survey, by slug.
+  def self.surveys
+    Survey.all
+  end
+
+  def self.survey(slug)
+    Survey.find(slug)
   end
 
   # THE FRAME'S CROP AT REST: nil or false (the default) shows Google's whole
