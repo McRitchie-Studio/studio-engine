@@ -1,0 +1,99 @@
+<%# /admin/surveys/:slug — one survey's results (Studio::AdminSurveysController).
+    Distribution bars for scale and choice questions (percent of those who
+    answered that question), a scrolling list for text answers, and filters
+    that the CSV export carries along. %>
+<% title = @survey&.title || @slug %>
+<% content_for(:title, "#{title} · Surveys") %>
+<% filter_params = { from: @filters[:from]&.iso8601, to: @filters[:to]&.iso8601, completed: (@filters[:completed] ? "1" : nil) }.compact %>
+<div class="max-w-4xl mx-auto px-4 py-6" data-admin-survey="<%= @slug %>">
+  <a href="<%= admin_surveys_path %>" class="text-sm text-secondary hover:underline">&larr; All surveys</a>
+  <div class="flex flex-wrap items-end justify-between gap-3 mt-2 mb-6">
+    <div>
+      <h1 class="text-2xl font-extrabold text-heading"><%= title %></h1>
+      <p class="text-xs text-muted font-mono">/surveys/<%= @slug %><% if @survey %> · version <%= @survey.version %><% end %></p>
+    </div>
+    <a href="<%= admin_survey_export_path(@slug, **filter_params) %>" class="btn btn-neutral btn-sm" data-survey-export>Export CSV</a>
+  </div>
+
+  <form method="get" action="<%= admin_survey_path(@slug) %>" class="card p-4 mb-6 flex flex-wrap items-end gap-4" data-survey-filters>
+    <label class="flex flex-col gap-1 text-sm">
+      <span class="label-upper">From</span>
+      <input type="date" name="from" value="<%= @filters[:from]&.iso8601 %>" class="input-field py-2">
+    </label>
+    <label class="flex flex-col gap-1 text-sm">
+      <span class="label-upper">To</span>
+      <input type="date" name="to" value="<%= @filters[:to]&.iso8601 %>" class="input-field py-2">
+    </label>
+    <label class="flex items-center gap-2 text-sm text-body py-2">
+      <input type="checkbox" name="completed" value="1" <%= "checked" if @filters[:completed] %>>
+      Completed only
+    </label>
+    <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+    <% if filter_params.any? %><a href="<%= admin_survey_path(@slug) %>" class="text-sm text-secondary hover:underline py-2">Clear</a><% end %>
+  </form>
+
+  <div class="grid grid-cols-3 gap-3 mb-6">
+    <div class="card p-4 text-center">
+      <div class="label-upper mb-1">Started</div>
+      <div class="text-2xl font-bold text-heading tabular-nums" data-stat="started"><%= @started %></div>
+    </div>
+    <div class="card p-4 text-center">
+      <div class="label-upper mb-1">Completed</div>
+      <div class="text-2xl font-bold text-heading tabular-nums" data-stat="completed"><%= @completed %></div>
+    </div>
+    <div class="card p-4 text-center">
+      <div class="label-upper mb-1">Completion</div>
+      <div class="text-2xl font-bold text-heading tabular-nums" data-stat="rate"><%= @started.zero? ? "—" : "#{Studio::Survey::Breakdown.percent(@completed, @started)}%" %></div>
+    </div>
+  </div>
+
+  <% if @breakdown.nil? %>
+    <div class="empty-state">
+      <p class="text-heading font-semibold mb-1">This survey's definition was removed</p>
+      <p class="text-sm text-muted">Its responses are still stored — the CSV export lists every answer under its original question key.</p>
+    </div>
+  <% else %>
+    <div class="flex flex-col gap-4">
+      <% @breakdown.results.each_with_index do |result, i| %>
+        <% q = result.question %>
+        <section class="card p-5" data-survey-question="<%= q.key %>">
+          <div class="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+            <h2 class="text-base font-bold text-heading"><span class="text-muted font-medium mr-1"><%= i + 1 %>.</span><%= q.label %></h2>
+            <p class="text-xs text-muted">
+              <%= pluralize(result.answered, "answer") %><% if result.average %> · average <span class="font-semibold text-heading" data-survey-average><%= result.average %></span> / 5<% end %>
+            </p>
+          </div>
+
+          <% if result.text? %>
+            <% if result.entries.empty? %>
+              <p class="text-sm text-muted">No answers yet.</p>
+            <% else %>
+              <ul class="flex flex-col gap-2 overflow-y-auto pr-1" style="max-height: 22rem;" data-survey-text-answers>
+                <% result.entries.each do |entry| %>
+                  <li class="bg-inset rounded-lg px-3 py-2">
+                    <p class="text-sm text-body whitespace-pre-line break-words"><%= entry.text %></p>
+                    <p class="text-xs text-muted mt-1"><%= entry.respondent %><% if entry.at %> · <%= entry.at.strftime("%b %-d, %Y") %><% end %></p>
+                  </li>
+                <% end %>
+              </ul>
+            <% end %>
+          <% else %>
+            <ul class="flex flex-col gap-2" data-survey-buckets>
+              <% result.buckets.each do |bucket| %>
+                <li class="grid items-center gap-3" style="grid-template-columns: minmax(6rem, 11rem) 1fr 4.5rem;" data-survey-bucket="<%= bucket.value %>">
+                  <span class="text-sm text-body truncate" title="<%= bucket.label %>">
+                    <% if bucket.face %><span aria-hidden="true" class="mr-1"><%= bucket.face %></span><% end %><%= bucket.label %><% if bucket.retired %> <span class="text-xs text-muted">(retired)</span><% end %>
+                  </span>
+                  <span class="h-3 rounded-full bg-inset overflow-hidden" role="img" aria-label="<%= bucket.percent %> percent">
+                    <span class="block h-full rounded-full" style="width: <%= bucket.percent %>%; background: var(--color-cta);"></span>
+                  </span>
+                  <span class="text-sm tabular-nums text-right text-heading"><span data-survey-percent><%= bucket.percent %>%</span> <span class="text-xs text-muted">(<span data-survey-count><%= bucket.count %></span>)</span></span>
+                </li>
+              <% end %>
+            </ul>
+          <% end %>
+        </section>
+      <% end %>
+    </div>
+  <% end %>
+</div>
