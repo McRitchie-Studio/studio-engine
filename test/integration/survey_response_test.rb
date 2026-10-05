@@ -103,8 +103,21 @@ class SurveyResponseTest < ActiveSupport::TestCase
     assert_equal 1, Studio::SurveyResponse.count
   end
 
+  test "a session token left by a previous user never reaches the next one" do
+    claimed = open!(token: "shared")
+    Studio::SurveyResponse.locate(survey, user: @user, token: "shared")
+    direct = open!(user: @user, token: "shared")
+    sam = User.create!(email: "sam@example.test", username: "sam")
+
+    assert_equal claimed, direct
+    assert_nil Studio::SurveyResponse.locate(survey, user: sam, token: "shared")
+    refute_equal claimed, open!(user: sam, token: "shared")
+    assert_nil Studio::SurveyResponse.locate(survey, token: "shared")
+  end
+
   test "the database allows one open response per user and per session" do
-    open!(user: @user, token: "a")
+    open!(user: @user)
+    open!(token: "a")
     assert_raises(ActiveRecord::RecordNotUnique) do
       Studio::SurveyResponse.create!(survey_slug: "first-game", user_id: @user.id, session_token: "b")
     end

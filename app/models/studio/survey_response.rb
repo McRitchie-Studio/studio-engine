@@ -46,15 +46,17 @@ module Studio
 
       # The visitor's open response, or their latest completed one: by user
       # first, then by the session token. An anonymous response found by token
-      # is claimed by the user who signs in mid-survey.
+      # is claimed by the user who signs in mid-survey, and the claim drops the
+      # token: logout keeps the survey session key, so a token on a user's row
+      # would hand it to the next person to sign in on that browser.
       def locate(survey, user: nil, token: nil)
         scope = for_survey(survey.slug)
         found = user && scope.where(user_id: user.id).order(completed_at: :desc, id: :desc).find_by(completed_at: nil)
-        found ||= token.present? && scope.where(session_token: token).order(id: :desc).first
+        found ||= token.present? && scope.where(session_token: token, user_id: nil).order(id: :desc).first
         found ||= user && scope.where(user_id: user.id).order(id: :desc).first
         return nil unless found
 
-        found.update!(user_id: user.id) if user && found.user_id.nil? && found.open?
+        found.update!(user_id: user.id, session_token: nil) if user && found.user_id.nil? && found.open?
         found
       end
 
@@ -65,7 +67,7 @@ module Studio
         return existing if existing&.open?
 
         create!(survey_slug: survey.slug, survey_version: survey.version, user_id: user&.id,
-                session_token: token, email_ref: email_ref.to_s.strip.presence&.first(255),
+                session_token: (token unless user), email_ref: email_ref.to_s.strip.presence&.first(255),
                 user_agent_class: user_agent_class(user_agent), answers: {})
       rescue ActiveRecord::RecordNotUnique
         locate(survey, user: user, token: token) || raise
