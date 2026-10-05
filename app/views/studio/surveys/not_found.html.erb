@@ -1,0 +1,11 @@
+<%# An unknown survey slug. Says nothing about why. %>
+<% content_for(:title, "Survey not found") %>
+<%= render "studio/surveys/styles" %>
+<main class="studio-survey" data-studio-survey-missing>
+  <div class="studio-survey__shell">
+    <div class="studio-survey__card">
+      <h1 class="studio-survey__title">Survey not found</h1>
+      <p class="studio-survey__intro-copy">This survey doesn't exist or has closed.</p>
+    </div>
+  </div>
+</main>

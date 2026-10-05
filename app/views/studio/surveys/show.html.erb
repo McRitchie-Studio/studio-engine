@@ -1,0 +1,60 @@
+<%# /surveys/:slug — the survey (Studio::SurveysController#show, docs/SURVEYS.md).
+
+    ONE FORM, TWO PRESENTATIONS. Without JavaScript every question renders in
+    order and the Submit button posts the lot. The script below adds
+    .is-enhanced and turns the same markup into one question per screen, with a
+    progress bar, Back and Next, number-key and Enter shortcuts, and an
+    autosave on each answer. Submit is still the same POST either way, so the
+    server's validation is the one rule. %>
+<% total = @survey.questions.size %>
+<% minutes = [(total / 3.0).ceil, 1].max %>
+<% content_for(:title, @survey.title) %>
+<%= render "studio/surveys/styles" %>
+
+<main class="studio-survey" data-studio-survey
+      data-answer-base="<%= studio_survey_path(@survey.slug) %>/answers/"
+      data-csrf="<%= form_authenticity_token %>"
+      data-resume-index="<%= @resume_index %>"
+      data-has-errors="<%= @errors.any? %>"
+      data-total="<%= total %>">
+  <div class="studio-survey__shell">
+    <div class="studio-survey__top" data-survey-top hidden>
+      <div class="studio-survey__progress" role="progressbar" aria-label="Survey progress"
+           aria-valuemin="0" aria-valuemax="<%= total %>" aria-valuenow="0" data-survey-progress>
+        <span class="studio-survey__progress-fill" data-survey-progress-fill></span>
+      </div>
+      <p class="studio-survey__count" aria-live="polite" data-survey-count></p>
+    </div>
+
+    <%= form_with url: studio_survey_path(@survey.slug), method: :post, local: true,
+                  html: { class: "studio-survey__form", data: { survey_form: true } } do %>
+      <section class="studio-survey__step" data-survey-step data-intro aria-labelledby="studio-survey-title">
+        <h1 class="studio-survey__title" id="studio-survey-title" tabindex="-1" data-survey-focus><%= @survey.title %></h1>
+        <% if @survey.intro %>
+          <p class="studio-survey__intro-copy"><%= @survey.intro %></p>
+        <% end %>
+        <p class="studio-survey__meta">
+          <%= pluralize(total, "question") %> · about <%= pluralize(minutes, "minute") %><% if @survey.required_keys.any? %> · <span aria-hidden="true">*</span> required<% end %>
+        </p>
+        <% if @errors.any? %>
+          <p class="studio-survey__error" role="alert">A few answers need another look before this can be sent.</p>
+        <% end %>
+      </section>
+
+      <% @survey.questions.each_with_index do |question, index| %>
+        <%= render "studio/surveys/question", question: question, index: index, total: total,
+                                              response: @response, error: @errors[question.key] %>
+      <% end %>
+
+      <div class="studio-survey__nav">
+        <button type="button" class="btn btn-neutral" data-survey-back hidden>Back</button>
+        <button type="button" class="btn btn-primary studio-survey__forward" data-survey-next hidden>Start</button>
+        <button type="submit" class="btn btn-primary studio-survey__forward" data-survey-submit>Submit</button>
+      </div>
+      <p class="studio-survey__status" aria-live="polite" data-survey-status></p>
+      <p class="studio-survey__hint" data-survey-hint hidden>Press a number to choose · Enter to continue</p>
+    <% end %>
+  </div>
+</main>
+
+<%= render "studio/surveys/script" %>

@@ -1,0 +1,16 @@
+<%# /surveys/:slug/thanks — shown once a response completes. The next action is
+    the survey's own (next_action label:, url:), when it declares one. %>
+<% content_for(:title, "Thank you") %>
+<%= render "studio/surveys/styles" %>
+<main class="studio-survey" data-studio-survey-thanks>
+  <div class="studio-survey__shell">
+    <div class="studio-survey__card">
+      <div class="studio-survey__burst" aria-hidden="true">&#x1F64C;</div>
+      <h1 class="studio-survey__title" tabindex="-1" autofocus>Thank you!</h1>
+      <p class="studio-survey__intro-copy"><%= @survey.thank_you %></p>
+      <% if @survey.next_action %>
+        <a href="<%= @survey.next_action[:url] %>" class="btn btn-primary btn-lg" data-survey-next-action><%= @survey.next_action[:label] %></a>
+      <% end %>
+    </div>
+  </div>
+</main>

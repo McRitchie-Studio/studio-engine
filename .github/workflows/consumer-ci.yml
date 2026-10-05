@@ -291,13 +291,17 @@ jobs:
       # hub's test/lib/workspace_icon_render_test.rb (landed 2026-09-25) renders
       # an SVG mark. The hub's own ci.yml installs it; without it here every
       # engine PR fails the mcritchie_studio shard that runs that test.
+      # ffmpeg: the hub's test/lib/music_videos/stitcher_test.rb (landed on its
+      # main 2026-10-05) stitches video for real and refuses to skip without
+      # ffmpeg and ffprobe; the hub's ci.yml installs it for the same reason.
+      # Without it here every engine PR fails mcritchie_studio shard 4/4.
       - name: Install system packages
         timeout-minutes: 13
         run: |
           for attempt in 1 2; do
             if timeout 120 sudo apt-get update && \
                timeout 240 sudo apt-get install --no-install-recommends -y \
-                 libpq-dev libvips imagemagick librsvg2-bin postgresql-client; then
+                 libpq-dev libvips imagemagick librsvg2-bin postgresql-client ffmpeg; then
               exit 0
             fi
             echo "::warning::apt attempt $attempt failed or hung; retrying"
