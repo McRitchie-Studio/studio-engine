@@ -118,11 +118,25 @@ module Studio
     end
 
     # Completes the response if every required question is answered. Returns
-    # true when this call completed it (false if incomplete or already done).
+    # true only when THIS call completed it (false if incomplete or already
+    # done). The flip is one conditional UPDATE, so two racing submits (a no-JS
+    # double click) cannot both win and fire on_survey_completed twice; the
+    # loser reloads and sees the winner's completed_at.
     def complete!(survey)
       return false if completed? || missing_required(survey).any?
 
-      update!(completed_at: Time.current, survey_version: survey.version)
+      now = Time.current
+      flipped = self.class.where(id: id, completed_at: nil)
+                          .update_all(completed_at: now, survey_version: survey.version, updated_at: now)
+      unless flipped == 1
+        reload
+        return false
+      end
+
+      self.completed_at = now
+      self.survey_version = survey.version
+      self.updated_at = now
+      clear_attribute_changes(%w[completed_at survey_version updated_at])
       true
     end
 

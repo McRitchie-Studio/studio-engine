@@ -138,6 +138,22 @@ class SurveyResponseTest < ActiveSupport::TestCase
     refute response.complete!(survey), "a second completion is a no-op"
   end
 
+  test "complete! lets only one of two racing copies win" do
+    response = open!
+    response.record_answer(survey.question(:overall), 5)
+    response.record_answer(survey.question(:more), "Great fun")
+    # Two requests that each loaded the row before either completed it.
+    first = Studio::SurveyResponse.find(response.id)
+    second = Studio::SurveyResponse.find(response.id)
+
+    assert first.complete!(survey), "the first flip completes it"
+    stamped = first.reload.completed_at
+    refute second.complete!(survey), "the stale copy must not complete it again"
+    assert second.completed?, "the loser reloads and sees the winner's stamp"
+    assert_equal stamped, second.completed_at
+    assert_equal stamped, Studio::SurveyResponse.find(response.id).completed_at
+  end
+
   test "a completed response frees the slot and refuses further answers" do
     response = open!(user: @user)
     response.record_answer(survey.question(:overall), 5)

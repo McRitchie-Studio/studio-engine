@@ -61,6 +61,9 @@ module Studio
       if @errors.empty? && response.complete!(@survey)
         run_completed_hook(response)
         redirect_to studio_survey_thanks_path(@survey.slug), status: :see_other
+      elsif response.completed?
+        # A racing submit completed it first; that one fired the hook.
+        redirect_to studio_survey_thanks_path(@survey.slug), status: :see_other
       else
         @response = response
         render_survey(status: :unprocessable_entity)
