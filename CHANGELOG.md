@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.88.0 — 2026-10-05
+
 ### Added
 
 - **Surveys.** Define a survey in app code — `Studio.define_survey "first-game"
