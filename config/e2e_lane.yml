@@ -841,7 +841,11 @@
 # scroll; the portal follows the button's state and palette; the hold's hooks
 # fire in order at validate_at and early_action_at.
 #   npx playwright test --list  -> 211 tests in 28 files
-total_specs: 211
+# Moved 211 -> 213 by the hold-button-fizz-escapes-frame review, no new file
+# (e2e/hold_button.spec.js 9 -> 11): the box lands one rung above a z 200
+# card, and a stack removed while parked off screen takes its box with it.
+#   npx playwright test --list  -> 213 tests in 28 files
+total_specs: 213
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -982,7 +986,13 @@ total_specs: 211
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 211
 # executed = total - devnet - allowed_skips = 211 - 0 - 0 = 211, so executed ==
 # total_specs and the equality assertion holds.
-executed: 211
+# And again for the hold-button-fizz-escapes-frame review — 2 more tests, no new file:
+#   npx playwright test --list                                             -> 213 tests, 28 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 213
+# executed = total - devnet - allowed_skips = 213 - 0 - 0 = 213, so executed ==
+# total_specs and the equality assertion holds.
+executed: 213
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
