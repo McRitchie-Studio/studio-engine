@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.91.1 — 2026-10-06
+
 ### Fixed
 
 - **`POST /login` is drawn only for apps that declare `:password`.** A passwordless
