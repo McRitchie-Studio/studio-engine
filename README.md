@@ -34,7 +34,7 @@ resolved.
 - **Session drift**: every page carries a session stamp and loads `window.StudioSession`, which notices when another tab signs in or out, the session expires, or the server revokes it; `session:changed` / `session:mismatch` events, cross-tab sync, an identity-source plug-in interface, and `expectChange` holds for deliberate switches. The rehydrate endpoint (`GET /session/state`) is opt-in. See [`docs/SESSION_DRIFT.md`](docs/SESSION_DRIFT.md).
 - **Theme system**: Dynamic CSS custom properties generated from 7 role colors (primary, dark, light, success, accent, warning, danger). Dark/light mode toggle. Admin theme editor at `/admin/theme`.
 - **UI primitives**: Shared component partials and CSS primitives such as `components/emoji_swap` for nav/sidebar emoji hover transitions.
-- **Operator tooling**: Shared `studio/banners/environment` banner with Dev Mode + email connector controls, `studio/banners/impersonation`, and an opt-in `Studio::Impersonation` concern for Act As session conventions.
+- **Operator tooling**: Shared `studio/banners/environment` banner with Dev Mode + email connector controls and `studio/banners/impersonation`.
 - **Sluggable concern**: `before_save :set_slug` with `to_param` for human-readable URLs
 - **ThemeSetting model**: Per-app DB overrides with fallback to config defaults
 - **Geo**: `Studio::GeoDetection` places every visitor (IP → country + subdivision, session-cached), `Studio::GeoSetting` stores the operator's blocked countries and regions, `require_geo_allowed` locks whichever surfaces an app chooses, and the shared badge + `/admin/geo` manager ship with it. See [`docs/GEO.md`](docs/GEO.md).
@@ -169,22 +169,8 @@ with their own users and return route:
            stop_path: admin_stop_impersonating_path %>
 ```
 
-The engine also provides an optional `Studio::Impersonation` concern for the
-session convention:
-
-```ruby
-class ApplicationController < ActionController::Base
-  include Studio::ErrorHandling
-  include Studio::Impersonation
-end
-```
-
-The concern adds `true_user`, `impersonated_user`, `impersonating?`,
-`start_impersonation_session(target_user, actor:)`, and
-`clear_impersonation_session`. Consumer apps still own the authorization rule,
-audit log, enter/exit controller actions, and any app-specific safeguards such
-as binding session-token checks to `true_user` or disabling wallet-only
-privileges while impersonating.
+Each app owns its Act As session, authorization rule, audit log and enter/exit
+actions; the engine supplies only the banner.
 
 ## UI Primitives
 
@@ -702,8 +688,7 @@ matching slot is absent, so existing call sites render unchanged.
 Every consuming app can render the same admin page — **`/admin/emails`** —
 listing each transactional email it sends with the banner riding at the top of
 that email, and whether that banner is the **inherited default** or an
-**app-owned override**. Supersedes the old `/admin/email_images`, which is
-deprecated but still renders for one release.
+**app-owned override**.
 
 **The page is opt-in:**
 

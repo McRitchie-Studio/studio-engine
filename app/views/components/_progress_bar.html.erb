@@ -1,9 +1,0 @@
-<%# locals: (percent:, height: "h-3", color: "var(--color-cta)", label: nil, animated: false) %>
-<div class="w-full <%= height %> rounded-full bg-surface-alt overflow-hidden">
-  <div class="h-full rounded-full<%= ' transition-all duration-500 ease-out' if animated %>"
-       style="width: <%= [percent.to_f, 100].min %>%; background-color: <%= color %>">
-  </div>
-</div>
-<% if label %>
-  <p class="text-xs text-muted mt-1"><%= label %></p>
-<% end %>

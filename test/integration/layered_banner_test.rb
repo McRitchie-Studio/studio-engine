@@ -632,8 +632,8 @@ class LayeredBannerTest < ActiveSupport::TestCase
 
   # THE THIRD READER. background_url is not the only method that answers "does
   # this email layer" — preview_asset_path answers it too, for every surface that
-  # draws the artwork as a plain <img>: /admin/email_images, and the "Artwork"
-  # frame on /admin/emails/:key. Both guards must ask the SAME question, because
+  # draws the artwork as a plain <img>: the "Artwork" frame on
+  # /admin/emails/:key. Both guards must ask the SAME question, because
   # the guard that drifts is the one nobody is looking at.
   #
   # This one drifted. background_url moved to layered? and preview_asset_path
