@@ -404,7 +404,8 @@ groups are independent: `POST /magic_link` (request a link) when
 `Studio.auth_methods` includes `:magic_link`, the Solana trio
 (`/auth/solana/nonce`, `/auth/solana/verify`, `/auth/phantom/callback`) only when
 it includes `:wallet` — a web2 app keeps magic-link and draws no Solana route —
-and `GET`/`POST /l/:token` (the
+`POST /login` (email and password) only when it includes `:password`, so a
+passwordless app answers that POST with 404, and `GET`/`POST /l/:token` (the
 scanner-safe confirm page and the consume that burns the token) whenever
 `Studio.draw_link_routes` is on. **A magic link needs the `studio_links`
 table**, which section 5's `bin/rails studio_engine:install:migrations` already

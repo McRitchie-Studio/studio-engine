@@ -55,9 +55,15 @@ class SessionsController < ApplicationController
         email:    session[:sso_email],
         name:     session[:sso_name],
         provider: session[:sso_provider],
-        uid:      session[:sso_uid],
-        password: SecureRandom.hex(16)
+        uid:      session[:sso_uid]
       )
+      # Only a host that takes a password gets one: has_secure_password defines
+      # `password=` and requires a value on create, so those apps need a random
+      # placeholder. A passwordless User has no such writer, and passing
+      # `password:` to User.new raised UnknownAttributeError, which sso_continue
+      # rescued into a redirect: SSO sign-up failed silently on every passwordless
+      # app (/tasks/engine-sso-creates-passwordless-users).
+      user.password = SecureRandom.hex(16) if user.respond_to?(:password=)
       Studio.configure_sso_user.call(user)
       rescue_and_log(target: user) do
         user.save!
