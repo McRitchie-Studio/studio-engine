@@ -62,9 +62,12 @@ Gem::Specification.new do |spec|
   # ViewComponent classes, so it is a runtime dependency, and an app takes it
   # through the engine rather than its own Gemfile.
   spec.add_dependency "view_component", ">= 4.0", "< 5"
-  # The component gallery at /admin/style/components. Runtime, not development
-  # only, because the hub serves it in production behind the admin wall
-  # (Studio.lookbook_in_production). Every other app draws it in development
-  # and test only; see Studio::Lookbook.
-  spec.add_dependency "lookbook", ">= 2.3", "< 3"
+  # The component gallery at /admin/style/components is Lookbook, and Lookbook is
+  # NOT a runtime dependency: eager-loaded in production it costs every process
+  # tens of megabytes, and most consumers run on 512 MB dynos. An app opts in by
+  # bundling it after studio-engine, `gem "lookbook", group: [:development, :test]`
+  # for a development gallery, ungrouped plus Studio.lookbook_in_production for a
+  # live one. The engine never requires it; it mounts the gallery only when the
+  # host's bundle has loaded it. See Studio::ComponentGallery.
+  spec.add_development_dependency "lookbook", ">= 2.3", "< 3"
 end

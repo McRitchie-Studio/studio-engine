@@ -2,6 +2,7 @@
 
 require "active_support/security_utils"
 require "active_support/core_ext/object/blank"
+require "active_support/core_ext/module/attribute_accessors"
 
 module Studio
   # The component gallery: Lookbook, mounted by Studio.routes at
@@ -11,10 +12,12 @@ module Studio
   # Three rules hold it, each here so the routes, the engine initializers and
   # the preview controller read one answer:
   #
-  # 1. WHERE IT IS DRAWN. Every app draws it in development and test. In
-  #    production only an app that sets Studio.lookbook_in_production = true
-  #    draws it (the hub). Everywhere else there is no route, no
-  #    ViewComponent preview route, and no /lookbook-assets middleware.
+  # 1. WHERE IT IS DRAWN. Only in an app whose bundle loads lookbook (the
+  #    engine never requires it; a host adds `gem "lookbook"` after
+  #    studio-engine). Such an app draws it in development and test, and in
+  #    production only if it also sets Studio.lookbook_in_production = true.
+  #    Everywhere else there is no route, no ViewComponent preview route, no
+  #    /lookbook-assets middleware, and no Lookbook in memory.
   # 2. WHO SEES IT. An admin with a live session. Anyone else gets 404, not a
   #    redirect, so the gallery's existence is not advertised. The check runs
   #    in the router (AdminConstraint), because Lookbook's controllers inherit
@@ -40,10 +43,28 @@ module Studio
 
     module_function
 
-    # Whether this app draws the gallery. Pure: the env and the flag are passed
-    # in so the rule unit-tests without booting Rails.
-    def mounted?(env:, in_production:)
+    # Whether the engine saw Lookbook already loaded when it was required, which
+    # means the host listed lookbook BEFORE studio-engine (set by
+    # lib/studio/engine.rb).
+    mattr_accessor :lookbook_loaded_before_engine, default: false
+
+    # Whether this app draws the gallery. Pure: the env, the flag and whether
+    # lookbook is loaded are passed in, so the rule unit-tests without Rails.
+    def mounted?(env:, in_production:, lookbook_loaded:)
+      return false unless lookbook_loaded
+
       !env.to_s.casecmp?("production") || in_production == true
+    end
+
+    # Whether the host's bundle loaded Lookbook. The engine never requires it.
+    def lookbook_loaded?
+      defined?(::Lookbook::Engine) ? true : false
+    end
+
+    # Lookbook required after view_component, so ViewComponent's after_initialize
+    # draws (or does not draw) its preview routes before Lookbook turns previews on.
+    def load_order_ok?
+      !lookbook_loaded_before_engine
     end
 
     # Whether this request comes from an admin with a live session. It reads the

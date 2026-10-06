@@ -692,16 +692,19 @@ module Studio
   mattr_accessor :draw_booking_routes, default: false
 
   # Draw the component gallery (Lookbook at /admin/style/components) in
-  # PRODUCTION. Every app draws it in development and test; in production only
-  # an app that sets this does, and the hub is the one that does. Admins only,
-  # 404 to anyone else. See Studio::ComponentGallery.
+  # PRODUCTION. An app whose bundle loads lookbook draws it in development and
+  # test; in production only an app that also sets this does. No app sets it
+  # yet; the hub is meant to, with lookbook in its production bundle. Admins
+  # only, 404 to anyone else. See Studio::ComponentGallery.
   #
   #   config.lookbook_in_production = true
   mattr_accessor :lookbook_in_production, default: false
 
-  # Whether this app draws the component gallery in this environment.
+  # Whether this app draws the component gallery: its bundle loaded lookbook,
+  # and this is development or test, or production with the flag.
   def self.lookbook_mounted?
-    ComponentGallery.mounted?(env: Rails.env, in_production: lookbook_in_production)
+    ComponentGallery.mounted?(env: Rails.env, in_production: lookbook_in_production,
+                              lookbook_loaded: ComponentGallery.lookbook_loaded?)
   end
 
   # WHERE THE APP'S OWN BOOKING PAGE LIVES, for an app that renders
@@ -1547,9 +1550,9 @@ module Studio
 
       # The component gallery: Lookbook over the engine's ViewComponent previews.
       # The router refuses anyone but a signed-in admin, so a visitor and a
-      # non-admin get 404 (Studio::ComponentGallery::AdminConstraint). Drawn in
-      # development and test everywhere, in production only where
-      # Studio.lookbook_in_production is set.
+      # non-admin get 404 (Studio::ComponentGallery::AdminConstraint). Drawn
+      # only where the host's bundle loaded lookbook: in development and test,
+      # and in production only where Studio.lookbook_in_production is set.
       if Studio.lookbook_mounted?
         constraints(Studio::ComponentGallery::AdminConstraint.new) do
           mount Lookbook::Engine, at: Studio::ComponentGallery::MOUNT_PATH, as: :studio_component_gallery

@@ -26,9 +26,9 @@ previews, so the gallery cannot drift from the component. A component used by
 one app lives in that app's `app/components` under the same rules and moves to
 the engine when a second app needs it.
 
-**Today.** ViewComponent and Lookbook are runtime dependencies of the
-engine, so every app has them through the engine and lists neither in its own
-Gemfile. The badge is the first component: `Studio::BadgeComponent`, with its
+**Today.** ViewComponent is a runtime dependency of the engine, so every app
+has it through the engine and lists it nowhere else. Lookbook, the gallery, is
+opt-in by bundle (below). The badge is the first component: `Studio::BadgeComponent`, with its
 unit test in `test/components/studio` and its preview in
 `app/components/previews/studio`. The rest are still ERB partials, 17 in
 `app/views/components/` and more under `app/views/studio/` (the board, the hold
@@ -40,10 +40,17 @@ preview.
 **The gallery.** Lookbook serves the previews at `/admin/style/components`,
 drawn by `Studio.routes` (`Studio::ComponentGallery`):
 
-- Every app draws it in development and test. In production only an app that
-  sets `Studio.lookbook_in_production = true` draws it; the hub does, and no
-  other app does. Without the flag a production app serves no gallery route,
-  no Lookbook asset, and no ViewComponent preview route.
+- Lookbook is not a runtime dependency. Loaded in production it costs each
+  process tens of megabytes, and most apps run on 512 MB dynos. The engine never
+  requires it; an app that wants the gallery bundles it **after** studio-engine
+  (so ViewComponent loads first):
+  `gem "lookbook", group: [:development, :test]` for a development gallery, or
+  ungrouped plus `Studio.lookbook_in_production = true` for a live one. The hub
+  is meant to be the one live gallery; no app sets the flag yet.
+- An app without lookbook in its bundle draws no gallery route, serves no
+  Lookbook asset, and loads no Lookbook code. A production app without the flag
+  draws none of it either, and no app draws ViewComponent's preview routes in
+  production.
 - The router admits a signed-in admin whose session token is live. Anyone else
   gets 404, not a redirect.
 - It shows output only: the rendered preview and its HTML. The Source and Params

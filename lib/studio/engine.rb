@@ -1,12 +1,16 @@
 require_relative "log_rotation"
 require_relative "component_gallery"
-# Components and their gallery (docs/FRONT_END_STANDARD.md). Required here, not
-# left to the host's Gemfile, because every app takes ViewComponent through this
-# engine. view_component FIRST: its after_initialize, which decides whether to
-# draw its own preview routes, must run before Lookbook's, which turns previews
-# on for its own use. See Studio::ComponentGallery.
+# Components (docs/FRONT_END_STANDARD.md). Required here, not left to the host's
+# Gemfile, because every app takes ViewComponent through this engine.
+#
+# Lookbook, the gallery, is NOT required here: an app that wants it bundles it
+# (see the gemspec), and Bundler.require loads it. Listed AFTER studio-engine, so
+# view_component is required first: its after_initialize, which decides whether
+# to draw its own preview routes, must run before Lookbook's, which turns
+# previews on for its own use. Studio::ComponentGallery.load_order_ok? records
+# the order this file saw.
+Studio::ComponentGallery.lookbook_loaded_before_engine = defined?(::Lookbook::Engine) ? true : false
 require "view_component"
-require "lookbook"
 
 module Studio
   class Engine < ::Rails::Engine
@@ -142,6 +146,12 @@ module Studio
     # of Lookbook and a visitor never learns it is there. The delete matches by
     # class, so a host cannot add a Rack::Static of its own (none does).
     initializer "studio.component_gallery", after: "lookbook.assets.serve" do
+      next unless Studio::ComponentGallery.lookbook_loaded?
+
+      unless Studio::ComponentGallery.load_order_ok?
+        warn "studio-engine: lookbook was required before studio-engine; list it after " \
+             "studio-engine in the Gemfile so ViewComponent decides its preview routes first"
+      end
       Studio::ComponentGallery.configure_lookbook!(::Lookbook.config)
       config.app_middleware.delete(::Rack::Static)
     end

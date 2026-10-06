@@ -34,19 +34,38 @@ class StudioComponentGalleryTest < Minitest::Test
     Studio::ComponentGallery.admin_request?(Request.new(session))
   end
 
+  def mounted?(env, in_production, lookbook_loaded: true)
+    Studio::ComponentGallery.mounted?(env: env, in_production: in_production, lookbook_loaded: lookbook_loaded)
+  end
+
   def test_drawn_in_development_and_test_whatever_the_flag
     %w[development test].each do |env|
-      assert Studio::ComponentGallery.mounted?(env: env, in_production: false), env
-      assert Studio::ComponentGallery.mounted?(env: env, in_production: true), env
+      assert mounted?(env, false), env
+      assert mounted?(env, true), env
     end
   end
 
   def test_drawn_in_production_only_when_the_app_opts_in
-    refute Studio::ComponentGallery.mounted?(env: "production", in_production: false)
-    refute Studio::ComponentGallery.mounted?(env: "production", in_production: nil)
-    refute Studio::ComponentGallery.mounted?(env: "production", in_production: "true"),
-           "only true opts in, not a truthy string from an env var"
-    assert Studio::ComponentGallery.mounted?(env: "production", in_production: true)
+    refute mounted?("production", false)
+    refute mounted?("production", nil)
+    refute mounted?("production", "true"), "only true opts in, not a truthy string from an env var"
+    assert mounted?("production", true)
+  end
+
+  def test_never_drawn_when_the_bundle_has_no_lookbook
+    %w[development test production].each do |env|
+      refute mounted?(env, true, lookbook_loaded: false), env
+    end
+  end
+
+  def test_the_load_order_is_ok_unless_lookbook_came_first
+    original = Studio::ComponentGallery.lookbook_loaded_before_engine
+    Studio::ComponentGallery.lookbook_loaded_before_engine = false
+    assert Studio::ComponentGallery.load_order_ok?
+    Studio::ComponentGallery.lookbook_loaded_before_engine = true
+    refute Studio::ComponentGallery.load_order_ok?
+  ensure
+    Studio::ComponentGallery.lookbook_loaded_before_engine = original
   end
 
   def test_an_admin_with_a_matching_token_is_let_in

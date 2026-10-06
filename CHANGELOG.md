@@ -6,9 +6,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
-- **ViewComponent and Lookbook come with the engine.** Both are runtime
-  dependencies, so an app renders the engine's components with no Gemfile line
-  of its own. The front-end standard (`docs/FRONT_END_STANDARD.md`) now names a
+- **ViewComponent comes with the engine.** It is a runtime dependency, so an
+  app renders the engine's components with no Gemfile line of its own. Lookbook
+  is not: an app that wants the component gallery adds
+  `gem "lookbook", group: [:development, :test]` after studio-engine (ungrouped,
+  with `Studio.lookbook_in_production`, for a live gallery). Without it the app
+  loads no Lookbook code, which keeps tens of megabytes out of every production
+  process. The front-end standard (`docs/FRONT_END_STANDARD.md`) now names a
   primitive's public surface (its inputs, its `data-*` hooks and its named CSS
   classes) and what a change to it takes: a Breaking line here and a
   consumer-CI run against every consumer before publish.
@@ -22,11 +26,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **The component gallery at `/admin/style/components`.** Lookbook over the
   engine's previews, with a Components section on `/admin/style` linking each
   state. A signed-in admin gets it; a visitor or non-admin gets 404. It shows
-  the rendered output only (no Source or Params panel). Every app draws it in
-  development and test; in production only an app that sets
-  `Studio.lookbook_in_production = true` draws it, and without that flag a
-  production app serves no gallery route, no Lookbook asset and no
-  ViewComponent preview route. ViewComponent's own preview pages move to
+  the rendered output only (no Source or Params panel). It is drawn only where
+  the app's bundle loads lookbook: in development and test, and in production
+  only with `Studio.lookbook_in_production = true`. No app draws ViewComponent's
+  preview routes in production. ViewComponent's own preview pages move to
   `/admin/style/previews`, behind the same wall.
 - **The engine's own importmap pins.** The engine's `config/importmap.rb` pins
   each module under `app/javascript/studio` as `studio/<name>` (not preloaded),

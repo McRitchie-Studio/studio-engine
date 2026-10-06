@@ -22,6 +22,13 @@ require "studio"
 # engine's pins the way a host does (studio.importmap in lib/studio/engine.rb).
 require "importmap-rails"
 
+# Lookbook, the way a consumer that wants the development gallery bundles it:
+# `gem "lookbook", group: [:development, :test]`, listed after studio-engine,
+# which Bundler.require loads after the engine. The engine never requires it
+# (Studio::ComponentGallery); test/integration/component_gallery_production_test.rb
+# boots hosts without it.
+require "lookbook"
+
 # THE WEB3 HALF, WHICH THIS ENGINE NO LONGER SHIPS. wallet_connect and
 # web3_step_up used to live in app/views/studio/modals; the two-template split
 # moved them to solana-studio (BASE is studio-engine + mcritchie-studio, WEB3
