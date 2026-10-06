@@ -43,6 +43,7 @@ The engine accesses these via `try:` or only inside config procs you write. They
 | `#session_token` (+ `#update_column`) | `set_app_session`, `verify_session_token`, `Studio::SessionFingerprint` | OPSEC-045's rotating per-user token (a string column). `set_app_session` binds it into the cookie, backfilling a blank one; `verify_session_token` signs out a cookie that no longer matches; the session fingerprint includes it, so a rotation is visible to every open page ([`SESSION_DRIFT.md`](SESSION_DRIFT.md)). Without the column, sessions cannot be revoked server-side and the fingerprint is per account only. |
 | `#regenerate_session_token!` | `Studio::ProfilesController` (email change) | Rotates `session_token` so every other session is signed out; the controller re-binds the current one. Skipped when absent. |
 | `#wallet_address` or `#solana_address` | `Studio.user_wallet_address`, `set_app_session`, `SessionContext#address` | For wallet-auth apps. Override with `Studio.wallet_address_method = :your_method` if the app uses another helper. |
+| `#password=` | `SessionsController#sso_continue` (SSO sign-up) | Answered by `has_secure_password`. When present, a first-time SSO user gets a random password nobody knows, because `has_secure_password` refuses a create without one. A passwordless User gets none. |
 | `#role=` | `configure_sso_user` proc in host app | Only required if the host's `Studio.configure_sso_user` proc sets `user.role = ...`. |
 | `#balance_cents=` | `configure_sso_user` proc | Same — only if the host proc uses it. |
 

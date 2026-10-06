@@ -275,10 +275,25 @@ class StylePageTest < ActiveSupport::TestCase
     # Every staged stack has its bubbles as a SIBLING of the button — the shape
     # that lets them sit behind it.
     doc.css(".hold-stack").each do |stack|
-      assert stack.at_css("> .hold-fizz"), "each staged stack renders its fizz layer"
+      assert stack.at_css("> .hold-fizz") || stack.at_css("> .hold-fizz-portal > .hold-fizz"),
+        "each staged stack renders its fizz layer"
       assert_nil stack.at_css("button.hold-btn .fizz-bit"),
         "no bubble may render inside the button"
     end
+
+    # The live specimen sits in a card that clips, so it lifts its bubbles out
+    # with fizz_portal; the re-themed one keeps the default stack beside it.
+    live = doc.at_css(".hold-stack:has(> .hold-btn[data-hold-id='style-hold'])")
+    assert live.key?("data-fizz-portal"), "the live specimen opts in to the portal"
+    assert live.at_css("> .hold-fizz-portal"), "and wraps its layers for the script to move"
+    rethemed_stack = doc.at_css(".hold-stack:has(> .hold-btn[data-hold-id='style-hold-custom'])")
+    refute rethemed_stack.key?("data-fizz-portal"), "the default stays the default"
+
+    # The section nav must sit above the portal's --z-raised floor, or the
+    # bubbles paint over it as the button scrolls under it.
+    nav = doc.at_css("nav[aria-label='Style guide sections']")
+    assert_includes nav["style"], "z-index: var(--z-sticky", "the nav sits on the sticky rung"
+    refute_includes nav["class"].split, "z-20", "not tied with the portal floor"
 
     # The standalone fizz specimen binds a palette, so its bubbles resolve to
     # slots rather than their fallback hues.
