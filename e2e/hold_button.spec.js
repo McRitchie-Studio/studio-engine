@@ -179,3 +179,139 @@ test("a viewer who asked for less motion gets no bubbles at all", async ({ page 
   expect(bits.length).toBeGreaterThan(0);
   expect([...new Set(bits)]).toEqual(["none:0"]);
 });
+
+// ── The portal (fizz_portal: true) ──────────────────────────────────────────
+//
+// A button near the top of an overflow-hidden card has its bubbles cut off at
+// the card's edge. The portal moves the layers to <body> in a fixed box that
+// tracks the stack. What a markup test cannot see, and these assert: that the
+// box really left every clipping ancestor, that it stays on the button through
+// a scroll, that it paints above the card, and that it still follows the
+// button's state once :has() can no longer reach it.
+
+const clippingAncestors = (el) => {
+  const found = [];
+  for (let n = el.parentElement; n; n = n.parentElement) {
+    const { overflowX, overflowY } = getComputedStyle(n);
+    if (/hidden|clip/.test(overflowX + overflowY)) found.push(n.dataset.test || n.tagName);
+  }
+  return found;
+};
+
+test("the default stack stays inside the card, which clips it", async ({ page }) => {
+  await page.goto("/lab/hold_button");
+
+  const clipped = await page.evaluate((walk) => {
+    const stack = document.querySelector('.hold-stack:has(> .hold-btn[data-hold-id="clipped"])');
+    const bit = stack.querySelector(".fizz-bit");
+    return {
+      portalAttr: stack.hasAttribute("data-fizz-portal"),
+      layersInStack: stack.querySelectorAll(":scope > .hold-fizz").length,
+      clippedBy: new Function("return " + walk)()(bit)
+    };
+  }, clippingAncestors.toString());
+
+  expect(clipped.portalAttr).toBe(false);
+  expect(clipped.layersInStack).toBe(2);
+  expect(clipped.clippedBy).toContain("phone-clipped");
+});
+
+test("with fizz_portal the bubbles leave the card and track the button", async ({ page }) => {
+  const errors = watchPageErrors(page);
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/hold_button");
+
+  const read = () =>
+    page.evaluate((walk) => {
+      const stack = document.querySelector('.hold-stack:has(> .hold-btn[data-hold-id="escaping"])');
+      const box = stack._fizzPortal && stack._fizzPortal.box;
+      if (!box) return null;
+      const s = stack.getBoundingClientRect();
+      const b = box.getBoundingClientRect();
+      const card = document.querySelector('[data-test="phone-escaping"]');
+      return {
+        parent: box.parentElement.tagName,
+        layersLeftInStack: stack.querySelectorAll(".fizz-bit").length,
+        bubbles: box.querySelectorAll(".fizz-bit").length,
+        clippedBy: new Function("return " + walk)()(box.querySelector(".fizz-bit")),
+        position: getComputedStyle(box).position,
+        boxZ: Number(getComputedStyle(box).zIndex),
+        cardZ: Number(getComputedStyle(card).zIndex),
+        drift: Math.max(Math.abs(s.left - b.left), Math.abs(s.top - b.top),
+                        Math.abs(s.width - b.width), Math.abs(s.height - b.height)),
+        top: b.top
+      };
+    }, clippingAncestors.toString());
+
+  await expect.poll(read).not.toBeNull();
+  const mounted = await read();
+  expect(mounted.parent).toBe("BODY");
+  expect(mounted.layersLeftInStack).toBe(0);
+  expect(mounted.bubbles).toBe(60);
+  expect(mounted.clippedBy, "no ancestor of the moved bubbles may clip them").toEqual([]);
+  expect(mounted.position).toBe("fixed");
+  expect(mounted.boxZ, "the box paints above the card the button sits in").toBeGreaterThan(mounted.cardZ);
+  expect(mounted.drift).toBeLessThan(1);
+
+  // Scroll the page and the box must follow the button, not stay where it was.
+  await page.evaluate(() => { document.body.style.minHeight = "300vh"; window.scrollTo(0, 120); });
+  await expect.poll(async () => (await read()).drift).toBeLessThan(1);
+  expect((await read()).top).toBeLessThan(mounted.top - 100);
+
+  expect(errors).toEqual([]);
+});
+
+test("the portal follows the button's state and palette", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/lab/hold_button");
+
+  const box = page.locator("body > .hold-fizz-portal");
+  await expect(box).toHaveCount(1);
+  const button = page.locator('.hold-btn[data-hold-id="escaping"]');
+
+  await button.hover();
+  await expect(box).toHaveClass(/\bis-hover\b/);
+  await expect.poll(() =>
+    box.evaluate((el) => getComputedStyle(el.querySelector(".hold-fizz-extra")).opacity)).toBe("1");
+
+  await page.mouse.down();
+  await expect(box).toHaveClass(/\bis-process\b/);
+  await expect(box).toHaveClass(/\bis-success\b/, { timeout: 3000 });
+  await page.mouse.up();
+  expect(await box.evaluate((el) => getComputedStyle(el.querySelector(".fizz-bit")).animationName)).toBe("fizz-burst");
+
+  // The stack's palette rides along: slot 1 is bound to red on the stack, and
+  // zone 1's resting bubbles must still resolve to it out on <body>.
+  const zoneOne = await box.evaluate((el) =>
+    [...el.querySelectorAll(".hold-fizz:not(.hold-fizz-extra) .fizz-bit")]
+      .filter((bit) => /--fizz-c-1,/.test(bit.style.getPropertyValue("--fc")))
+      .map((bit) => getComputedStyle(bit).backgroundColor));
+  expect(zoneOne.length).toBeGreaterThan(0);
+  expect([...new Set(zoneOne)]).toEqual(["rgb(255, 0, 0)"]);
+});
+
+// ── The timers ──────────────────────────────────────────────────────────────
+//
+// on_hold_start fires at the press, validate at validate_at, the early action
+// at early_action_at, and an early action that fires cancels on_success. The
+// turf-monster confirm runs these at 0 / 750 / 1500 against a 2000 ms hold; the
+// lab runs them at 0 / 150 / 400 against 600 so the lane stays quick, and the
+// order and the gaps are what is asserted.
+
+test("the hold's hooks fire in order, each at its own time", async ({ page }) => {
+  await page.goto("/lab/hold_button");
+
+  await page.locator('.hold-btn[data-hold-id="timed"]').hover();
+  await page.mouse.down();
+  await page.waitForTimeout(1300);
+  await page.mouse.up();
+
+  const log = await page.evaluate(() => window.__holdLog);
+  expect(log.map(([name]) => name)).toEqual(["start", "validate", "early"]);
+  const at = Object.fromEntries(log);
+  expect(at.start).toBeLessThan(50);
+  expect(at.validate).toBeGreaterThanOrEqual(150);
+  expect(at.validate).toBeLessThan(400);
+  expect(at.early).toBeGreaterThanOrEqual(400);
+  expect(at.early).toBeLessThan(600);
+});

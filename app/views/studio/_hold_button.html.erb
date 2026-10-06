@@ -39,6 +39,13 @@
                          layer, for a button that should not compete.
     fizz_colors        - Up to 12 CSS colors the bubbles wear, as a static
                          array (default: none = the built-in candy palette).
+    fizz_portal        - Lift the bubbles out of the stack into a fixed layer on
+                         <body> that tracks the button (default: false). For a
+                         button inside an overflow-hidden card, whose bubbles
+                         are otherwise cut off at the card's edge: with it set
+                         they rise past the edge. The button, its timers and its
+                         states are the same either way. See THE PORTAL in
+                         engine-motion.css.
     fizz_bind          - Alpine expression bound to the stack's :style, for a
                          palette that changes at runtime (default: none). The
                          turf-monster's board passes "fizzPalette", mapping
@@ -65,6 +72,7 @@
 <% fizz_colors ||= nil %>
 <% fizz_bind ||= nil %>
 <% fizz_level ||= :lively %>
+<% fizz_portal = fizz && local_assigns[:fizz_portal] %>
 <%# Static palette (gallery, or any call site with fixed colors). A runtime
     palette rides fizz_bind instead. %>
 <% fizz_style = Array(fizz_colors).first(Studio::FizzHelper::SLOTS)
@@ -75,17 +83,26 @@
     transform makes it a stacking context), so the bubbles have to be a
     sibling the button paints over — they only show where they escape its
     edges, like carbonation coming off the sides. %>
-<span class="hold-stack<%= " fizz-lively" if fizz_level.to_s == "lively" %>"<% if fizz_bind %> :style="<%= fizz_bind %>"<% end %><% if fizz_style.present? %> style="<%= fizz_style %>"<% end %>>
+<span class="hold-stack<%= " fizz-lively" if fizz_level.to_s == "lively" %>"<% if fizz_bind %> :style="<%= fizz_bind %>"<% end %><% if fizz_style.present? %> style="<%= fizz_style %>"<% end %><% if fizz_portal %> data-fizz-portal x-init="window.studioFizzPortal && window.studioFizzPortal.mount($el)"<% end %>>
   <%# Fizz layer — bubbles that simmer at rest, boil while the button is held,
       and burst outward on success. Purely decorative, so it is aria-hidden and
       pointer-events:none; the table behind it is seeded per hold_id (see Studio::FizzHelper). %>
   <% if fizz %>
+    <%# With fizz_portal the layers ride one wrapper, which the script below
+        moves to <body>. Until it does, the wrapper sits in the stack exactly
+        where the layers would. %>
+    <% if fizz_portal %>
+    <span class="hold-fizz-portal<%= " fizz-lively" if fizz_level.to_s == "lively" %>" aria-hidden="true">
+    <% end %>
     <%= render "studio/fizz_layer", seed: hold_id %>
     <%# Lively's hover doubles the COUNT, not the speed: a second scatter that
         rests invisible, fades in over the gaps in the first, and fades back
         out when the pointer leaves. %>
     <% if fizz_level.to_s == "lively" %>
       <%= render "studio/fizz_layer", seed: "#{hold_id}~extra", extra: true %>
+    <% end %>
+    <% if fizz_portal %>
+    </span>
     <% end %>
   <% end %>
 <button class="hold-btn"
@@ -235,6 +252,133 @@
     document.addEventListener('turbo:before-cache', function() {
       Object.keys(nudgeTimers).forEach(function(id) { stopNudgeCycle(id); });
     });
+
+    // ── The fizz portal (fizz_portal: true) ─────────────────────────────
+    // Moves a stack's bubble layers to <body> in one fixed box that tracks the
+    // stack's rect, so a card's overflow clip cannot cut them off. The box
+    // mirrors the button's state classes and the stack's palette, because the
+    // CSS can no longer read either through the stack. engine-motion.css,
+    // THE PORTAL, holds the other half.
+    var PORTAL_STATES = ['process', 'loading', 'success', 'error', 'nudge', 'nudge-soft'];
+    var portals = [];
+
+    // One rung above the highest z-index among the stack's ancestors, so the
+    // bubbles clear the card, the panel or the modal the button sits in,
+    // and never below --z-raised.
+    function portalZ(stack) {
+      var floor = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--z-raised'), 10);
+      var top = isNaN(floor) ? 20 : floor;
+      for (var n = stack.parentElement; n && n !== document.body; n = n.parentElement) {
+        var z = parseInt(getComputedStyle(n).zIndex, 10);
+        if (!isNaN(z) && z + 1 > top) top = z + 1;
+      }
+      return top;
+    }
+
+    function syncPortalState(p) {
+      PORTAL_STATES.forEach(function(s) {
+        p.box.classList.toggle('is-' + s, p.button.classList.contains(s));
+      });
+    }
+
+    function syncPortalPalette(p) {
+      var cs = getComputedStyle(p.stack);
+      for (var i = 1; i <= <%= Studio::FizzHelper::SLOTS %>; i++) {
+        var v = cs.getPropertyValue('--fizz-c-' + i).trim();
+        if (v) p.box.style.setProperty('--fizz-c-' + i, v);
+        else p.box.style.removeProperty('--fizz-c-' + i);
+      }
+    }
+
+    function placePortal(p) {
+      if (!p.stack.isConnected) { unmountPortal(p, false); return; }
+      var r = p.stack.getBoundingClientRect();
+      var shown = p.visible && r.width > 0 && r.height > 0;
+      p.box.style.visibility = shown ? '' : 'hidden';
+      if (shown) {
+        p.box.style.transform = 'translate(' + r.left + 'px, ' + r.top + 'px)';
+        p.box.style.width = r.width + 'px';
+        p.box.style.height = r.height + 'px';
+        p.frame = requestAnimationFrame(function() { placePortal(p); });
+      } else {
+        p.frame = null;
+      }
+    }
+
+    function unmountPortal(p, restore) {
+      if (p.frame) cancelAnimationFrame(p.frame);
+      p.observers.forEach(function(o) { o.disconnect(); });
+      p.button.removeEventListener('mouseenter', p.enter);
+      p.button.removeEventListener('mouseleave', p.leave);
+      if (restore && p.stack.isConnected) {
+        // Back where the server rendered it, with nothing the script added,
+        // so a cached snapshot restores to the markup it came from.
+        p.box.className = p.box.className.replace(/\s*\bis-[\w-]+/g, '');
+        p.box.removeAttribute('style');
+        p.stack.insertBefore(p.box, p.stack.firstChild);
+      } else {
+        p.box.remove();
+      }
+      delete p.stack._fizzPortal;
+      portals = portals.filter(function(q) { return q !== p; });
+    }
+
+    function mountPortal(stack) {
+      if (stack._fizzPortal) return stack._fizzPortal;
+      var box = stack.querySelector(':scope > .hold-fizz-portal');
+      var button = stack.querySelector(':scope > .hold-btn');
+      if (!box || !button) return null;
+
+      var p = { stack: stack, box: box, button: button, visible: true, frame: null, observers: [] };
+      stack._fizzPortal = p;
+      portals.push(p);
+
+      document.body.appendChild(box);
+      box.classList.add('is-portaled');
+      box.style.zIndex = portalZ(stack);
+      syncPortalState(p);
+      syncPortalPalette(p);
+
+      p.enter = function() { box.classList.add('is-hover'); };
+      p.leave = function() { box.classList.remove('is-hover'); };
+      button.addEventListener('mouseenter', p.enter);
+      button.addEventListener('mouseleave', p.leave);
+
+      var states = new MutationObserver(function() { syncPortalState(p); });
+      states.observe(button, { attributes: true, attributeFilter: ['class'] });
+      var palette = new MutationObserver(function() { syncPortalPalette(p); });
+      palette.observe(stack, { attributes: true, attributeFilter: ['style'] });
+      p.observers.push(states, palette);
+
+      // Track the rect every frame while the stack is on screen, and park the
+      // box while it is not (scrolled away, inside a closed panel, or clipped
+      // out of a scroll container), so an idle page pays nothing.
+      if ('IntersectionObserver' in window) {
+        var seen = new IntersectionObserver(function(entries) {
+          p.visible = entries[entries.length - 1].isIntersecting;
+          if (!p.stack.isConnected) { unmountPortal(p, false); return; }
+          if (p.visible && !p.frame) placePortal(p);
+          if (!p.visible) placePortal(p);
+        });
+        seen.observe(stack);
+        p.observers.push(seen);
+      }
+      placePortal(p);
+      return p;
+    }
+
+    function mountAllPortals() {
+      portals.slice().forEach(function(p) { if (!p.stack.isConnected) unmountPortal(p, false); });
+      document.querySelectorAll('.hold-stack[data-fizz-portal]').forEach(mountPortal);
+    }
+
+    window.studioFizzPortal = { mount: mountPortal, mountAll: mountAllPortals };
+    document.addEventListener('turbo:load', mountAllPortals);
+    document.addEventListener('turbo:before-cache', function() {
+      portals.slice().forEach(function(p) { unmountPortal(p, true); });
+    });
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountAllPortals);
+    else mountAllPortals();
 
     window.holdBtnStart = function(el) {
       var holdId = el.dataset.holdId || 'hold';

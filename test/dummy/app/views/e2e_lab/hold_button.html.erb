@@ -41,4 +41,36 @@
           duration: 600,
           default_text: "Hold to Confirm" %>
   </div>
+
+  <%# A PHONE-SHAPED CARD that clips, the frame the portal exists for: an
+      overflow-hidden, rounded box with the button near its top edge. "clipped"
+      is the default stack, whose bubbles the card cuts off; "escaping" opts in
+      to fizz_portal and should rise past the edge. %>
+  <div style="display: flex; gap: 3rem; margin-top: 6rem">
+    <div data-test="phone-clipped" style="width: 16rem; height: 8rem; overflow: hidden; border-radius: 2rem; background: #111; padding: 1.25rem 1rem; position: relative; z-index: 5">
+      <%= render "studio/hold_button", hold_id: "clipped", duration: 600, default_text: "Hold to Confirm" %>
+    </div>
+    <div data-test="phone-escaping" style="width: 16rem; height: 8rem; overflow: hidden; border-radius: 2rem; background: #111; padding: 1.25rem 1rem; position: relative; z-index: 5">
+      <%= render "studio/hold_button", hold_id: "escaping", duration: 600, default_text: "Hold to Confirm",
+                 fizz_colors: %w[#ff0000], fizz_portal: true %>
+    </div>
+  </div>
+
+  <%# THE TIMERS. Each hook writes when it ran, relative to the press, so a
+      spec can read the order and the gaps: on_hold_start at once, validate at
+      validate_at, the early action at early_action_at, and on_success never,
+      because an early action that fires cancels the hold's own timer. %>
+  <div style="max-width: 20rem; margin-top: 3rem"
+       x-data="{ submitting: false, log: [], at(name) { this.log.push([name, Math.round(performance.now() - window.__holdT0)]); window.__holdLog = this.log; } }">
+    <%= render "studio/hold_button",
+          hold_id: "timed",
+          duration: 600,
+          default_text: "Hold to Confirm",
+          on_hold_start: "window.__holdT0 = performance.now(); d.log.splice(0); d.at('start')",
+          validate: "(d.at('validate'), true)",
+          validate_at: 150,
+          early_action: "d.at('early')",
+          early_action_at: 400,
+          on_success: "d.at('success')" %>
+  </div>
 </main>
