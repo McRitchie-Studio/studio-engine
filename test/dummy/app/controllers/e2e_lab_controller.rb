@@ -76,10 +76,17 @@ class E2eLabController < ActionController::Base
 
     def asset_path(source, **options)
       return "/e2e/fonts/#{source}" if ENGINE_FONTS.include?(source.to_s)
+      # The engine's pinned ES modules, which e2e/boot.rb copies to /e2e/modules.
+      return "/e2e/modules/#{source}" if Studio::Engine.javascript_module_logical_paths.include?(source.to_s)
       return ENGINE_ASSET_PATHS[source.to_s] if ENGINE_ASSET_PATHS.key?(source.to_s)
 
       super
     end
+
+    # importmap-rails resolves each pin through path_to_asset, which Rails defines
+    # as an alias bound to the ORIGINAL asset_path, so the override above would not
+    # reach it.
+    def path_to_asset(source, options = {}) = asset_path(source, **options)
 
     def stylesheet_link_tag(*sources, **options)
       links = sources.filter_map do |source|
@@ -316,6 +323,12 @@ class E2eLabController < ActionController::Base
   # Renders studio/_at_time_script plus stamps for it to localise. The script is the
   # subject; the stamps are what prove it ran.
   def at_time = render(:at_time)
+
+  # The engine's importmap pins, in a browser. The page renders the host's real
+  # import map (javascript_inline_importmap_tag, the map the dummy drew from the
+  # engine's config/importmap.rb with no host edit) and no entry point; the spec
+  # imports "studio/<name>" through it.
+  def engine_modules = render(:engine_modules)
 
   # The site identity manager (/admin/link_preview), rendered from the engine's
   # own template with the instance variables its controller sets. A lab page

@@ -122,6 +122,13 @@ end
 # build out of the turbo-rails gem the engine already depends on. The survey's
 # Turbo restore spec opts in by cookie (layouts/survey_turbo_lab). Every other
 # lab page keeps the lab layout and stays Turbo-free.
+# The engine's ES modules (app/javascript), which its importmap pins. Served under
+# /e2e/modules so a lab page's import map resolves "studio/<name>" to the real file
+# (E2eLabController::AssetDelivery maps the pin's asset path here).
+MODULE_SOURCE = File.join(ROOT, "app", "javascript")
+FileUtils.mkdir_p(File.join(PUBLIC_DIR, "modules"))
+FileUtils.cp_r(Dir.glob(File.join(MODULE_SOURCE, "*")), File.join(PUBLIC_DIR, "modules"))
+
 turbo_source = File.join(Gem.loaded_specs.fetch("turbo-rails").full_gem_path, "app", "assets", "javascripts", "turbo.min.js")
 abort "e2e/boot: turbo.min.js missing from turbo-rails at #{turbo_source}" unless File.exist?(turbo_source)
 FileUtils.mkdir_p(File.join(PUBLIC_DIR, "js"))
