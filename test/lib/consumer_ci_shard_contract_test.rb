@@ -58,7 +58,7 @@ class ConsumerCiShardContractTest < Minitest::Test
   end
 
   def test_unit_only_the_consumer_with_the_tooling_is_sharded
-    # turf-monster and mcritchie-industries have no bin/ci-shard. Sharding them would cut a
+    # turf-monster, mcritchie-industries and cyvasse have no bin/ci-shard. Sharding them would cut a
     # suite with a planner they do not carry — the `if [ -x bin/ci-shard ]` fallback in the
     # run step keeps them whole, and this keeps the matrix honest about it.
     strays = entries.reject { |e| e["consumer"] == SHARDED_CONSUMER }.select { |e| e["shard"] }

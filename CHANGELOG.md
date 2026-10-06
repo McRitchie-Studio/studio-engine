@@ -4,6 +4,39 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **ViewComponent and Lookbook come with the engine.** Both are runtime
+  dependencies, so an app renders the engine's components with no Gemfile line
+  of its own. The front-end standard (`docs/FRONT_END_STANDARD.md`) now names a
+  primitive's public surface (its inputs, its `data-*` hooks and its named CSS
+  classes) and what a change to it takes: a Breaking line here and a
+  consumer-CI run against every consumer before publish.
+- **`Studio::BadgeComponent`, the first component.** It takes `text:`,
+  `data_board_count:`, and either `tone:` (one of the five status roles,
+  `success`, `warning`, `danger`, `primary`, `muted`, with the same chip classes
+  as the hub's `status_tone`) or `scheme:` (the palette the badge partial took).
+  The `components/badge` partial now renders the component and its output is
+  unchanged, so no caller changes this release. `engine.css` adds the engine's
+  `app/components` to every host's Tailwind scan.
+- **The component gallery at `/admin/style/components`.** Lookbook over the
+  engine's previews, with a Components section on `/admin/style` linking each
+  state. A signed-in admin gets it; a visitor or non-admin gets 404. It shows
+  the rendered output only (no Source or Params panel). Every app draws it in
+  development and test; in production only an app that sets
+  `Studio.lookbook_in_production = true` draws it, and without that flag a
+  production app serves no gallery route, no Lookbook asset and no
+  ViewComponent preview route. ViewComponent's own preview pages move to
+  `/admin/style/previews`, behind the same wall.
+- **The engine's own importmap pins.** The engine's `config/importmap.rb` pins
+  each module under `app/javascript/studio` as `studio/<name>` (not preloaded),
+  and the `studio.importmap` initializer draws it into every host that has
+  importmap-rails, before the host's own map, so a host pin of the same name
+  wins. No host edit. The first module is `studio/local_path`, the browser twin
+  of `Studio::LocalPath.local?`.
+- **Consumer CI runs Cyvasse's suite** against each engine change, beside the
+  hub, Turf Monster and McRitchie Industries.
+
 ### Security
 
 - **A return path beginning `/\` no longer redirects off-site.** Browsers read

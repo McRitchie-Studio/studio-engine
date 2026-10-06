@@ -115,7 +115,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           CANDIDATE: ${{ github.base_ref || github.ref_name }}
-          CONSUMER_REPOS: mcritchie-studio turf-monster mcritchie-industries
+          CONSUMER_REPOS: mcritchie-studio turf-monster mcritchie-industries cyvasse
         run: |
           set -euo pipefail
 
@@ -173,9 +173,9 @@ jobs:
           # `release` AND `accepted`, so no reachable pairing lands on a tree that cannot cut.
           #
           # FOUR EXPLICIT ENTRIES rather than a `shard` dimension: this is an `include:`-only
-          # matrix, so a second dimension would cross-product onto turf and industries, which
+          # matrix, so a second dimension would cross-product onto turf, industries and cyvasse, which
           # have no bin/ci-shard and must keep running whole. GitHub Actions does not support
-          # YAML anchors, so the repetition is the honest cost of keeping the other two lanes
+          # YAML anchors, so the repetition is the honest cost of keeping the other lanes
           # untouched.
           - consumer: mcritchie_studio
             repo: mcritchie-studio
@@ -221,6 +221,16 @@ jobs:
           # one included; no per-repo secret needed.
           - consumer: mcritchie_industries
             repo: mcritchie-industries
+            managed_wallet_encryption_key: ""
+            needs_rails_credentials: false
+            needs_solana_admin_key: false
+            needs_tailwind_build: true
+          # Cyvasse renders the engine's shell and components like the others,
+          # and its pages link the compiled Tailwind build (its own ci.yml builds
+          # it first), so it needs the build too. Its suite runs whole: it has no
+          # bin/ci-shard. Its system tests stay in its own CI.
+          - consumer: cyvasse
+            repo: cyvasse
             managed_wallet_encryption_key: ""
             needs_rails_credentials: false
             needs_solana_admin_key: false
@@ -450,7 +460,7 @@ jobs:
 
       # ALWAYS, not `if: failure()`. A FAILING test still RAN — the executed-set gate must
       # see the receipt to count it. `matrix.shard` scopes this to the sharded hub entries;
-      # turf and industries run whole and produce no receipt, which is why the gate below
+      # turf, industries and cyvasse run whole and produce no receipt, which is why the gate below
       # expects exactly the hub's shards and not one per matrix entry.
       - name: Upload this shard's executed-set receipt
         if: always() && matrix.shard

@@ -60,7 +60,7 @@ class ConsumerCiRefPairingTest < Minitest::Test
   # `git ls-remote --heads origin main release accepted` against all three repos on
   # 2026-08-21: all nine branches exist. Kept as data so the integration tier can also drive
   # the branch-is-MISSING path, which no live repo currently exercises.
-  CONSUMER_REPOS = %w[mcritchie-studio turf-monster mcritchie-industries].freeze
+  CONSUMER_REPOS = %w[mcritchie-studio turf-monster mcritchie-industries cyvasse].freeze
 
   # The resolution this lane promises, as a table. Left column is the engine trigger context
   # reduced to its candidate (`github.base_ref || github.ref_name`); right column is the
