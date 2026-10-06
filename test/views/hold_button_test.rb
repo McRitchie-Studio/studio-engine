@@ -88,6 +88,50 @@ class HoldButtonTest < ActiveSupport::TestCase
     assert_nil doc.at_css(".hold-fizz"), "with no particle layer"
   end
 
+  # ── E. the portal (fizz_portal) ─────────────────────────────
+
+  test "the default stack is unchanged: no portal hook, layers straight under the stack" do
+    doc = render_button(hold_id: "desktop")
+
+    stack = doc.at_css(".hold-stack")
+    assert_nil stack["data-fizz-portal"], "no portal unless the caller opts in"
+    assert_nil stack["x-init"], "and no script hook on the stack"
+    assert_nil doc.at_css(".hold-fizz-portal"), "no wrapper around the layers"
+    assert_equal 2, doc.css(".hold-stack > .hold-fizz").size, "both layers sit directly in the stack"
+    assert_equal render_button(hold_id: "desktop").to_html, render_button(hold_id: "desktop", fizz_portal: false).to_html,
+      "fizz_portal: false renders exactly what the default renders"
+  end
+
+  test "fizz_portal wraps the layers and marks the stack for the script to lift them out" do
+    doc = render_button(hold_id: "phone", fizz_portal: true)
+
+    stack = doc.at_css(".hold-stack")
+    assert stack.key?("data-fizz-portal"), "the stack is marked"
+    assert_includes stack["x-init"], "studioFizzPortal.mount($el)",
+      "a stack mounted later (x-if, a modal) lifts its own layers"
+    portal = doc.at_css(".hold-stack > .hold-fizz-portal")
+    assert portal, "one wrapper, in the stack until the script moves it"
+    assert_equal "true", portal["aria-hidden"]
+    assert_includes portal["class"], "fizz-lively", "the wrapper carries the level the stack has"
+    assert_equal 2, portal.css("> .hold-fizz").size, "both layers ride the wrapper"
+    assert doc.at_css(".hold-stack > button.hold-btn"), "the button stays in the stack"
+    assert_nil doc.at_css(".hold-btn .fizz-bit")
+  end
+
+  test "fizz_portal does nothing when there is no fizz" do
+    doc = render_button(fizz: false, fizz_portal: true)
+
+    assert_nil doc.at_css(".hold-stack")["data-fizz-portal"]
+    assert_nil doc.at_css(".hold-fizz-portal")
+  end
+
+  test "the calm level's wrapper carries no lively modifier" do
+    doc = render_button(hold_id: "calm", fizz_level: :calm, fizz_portal: true)
+
+    refute_includes doc.at_css(".hold-fizz-portal")["class"], "fizz-lively"
+    assert_equal 1, doc.css(".hold-fizz-portal > .hold-fizz").size
+  end
+
   # ── D. the palette ──────────────────────────────────────────
 
   test "each bubble reads its own slot and falls back to its hue" do

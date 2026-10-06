@@ -4,6 +4,15 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`fizz_portal: true` on `studio/hold_button`** lifts the bubbles out of a card
+  that clips them: the layers move to `<body>` in a fixed box that tracks the
+  button through scroll and resize, paints one rung above the button's highest
+  ancestor z-index, and mirrors its state and palette. The default is off, so
+  every existing caller renders as before. The style guide's live hold button
+  uses it.
+
 ## 0.90.0 — 2026-10-06
 
 ### Removed

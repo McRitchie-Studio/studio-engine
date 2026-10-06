@@ -65,9 +65,11 @@
 
   <%# Section nav — sticky under the host navbar (--nav-h, 0 fallback). A pill per
       section; the row scrolls horizontally on narrow screens, its edges softened
-      by the .fade-edge-x primitive. Order leads with Theme (the color foundation). %>
-  <nav class="sticky z-20 -mx-4 px-4 py-3 bg-surface border-y border-subtle"
-       style="top: var(--nav-h, 0px)" aria-label="Style guide sections">
+      by the .fade-edge-x primitive. Order leads with Theme (the color foundation).
+      It sits at --z-sticky, above --z-raised, so the live hold button's portal
+      bubbles scroll under it rather than over it. %>
+  <nav class="sticky -mx-4 px-4 py-3 bg-surface border-y border-subtle"
+       style="top: var(--nav-h, 0px); z-index: var(--z-sticky, 30)" aria-label="Style guide sections">
     <div class="fade-edge-x overflow-x-auto">
       <div class="flex items-center gap-2 min-w-max">
         <% sections.each do |anchor, label| %>
