@@ -13,6 +13,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   every existing caller renders as before. The style guide's live hold button
   uses it.
 
+### Fixed
+
+- **SSO sign-up works on passwordless apps.** "Continue as …" (`POST
+  /sso_continue`) created a first-time visitor with `password:
+  SecureRandom.hex(16)`, which raised `UnknownAttributeError` on any User without
+  `has_secure_password`; the engine logged it and bounced to the login page. The
+  engine now sets a random password only when the User answers `password=`.
+
 ## 0.90.0 — 2026-10-06
 
 ### Removed
