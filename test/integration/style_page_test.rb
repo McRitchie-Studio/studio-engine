@@ -289,6 +289,12 @@ class StylePageTest < ActiveSupport::TestCase
     rethemed_stack = doc.at_css(".hold-stack:has(> .hold-btn[data-hold-id='style-hold-custom'])")
     refute rethemed_stack.key?("data-fizz-portal"), "the default stays the default"
 
+    # The section nav must sit above the portal's --z-raised floor, or the
+    # bubbles paint over it as the button scrolls under it.
+    nav = doc.at_css("nav[aria-label='Style guide sections']")
+    assert_includes nav["style"], "z-index: var(--z-sticky", "the nav sits on the sticky rung"
+    refute_includes nav["class"].split, "z-20", "not tied with the portal floor"
+
     # The standalone fizz specimen binds a palette, so its bubbles resolve to
     # slots rather than their fallback hues.
     palette = doc.css(".hold-stack[style*='--fizz-c-1:']")

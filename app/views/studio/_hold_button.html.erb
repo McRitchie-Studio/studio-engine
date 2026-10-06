@@ -299,14 +299,24 @@
         p.box.style.transform = 'translate(' + r.left + 'px, ' + r.top + 'px)';
         p.box.style.width = r.width + 'px';
         p.box.style.height = r.height + 'px';
+        if (p.parked) { clearInterval(p.parked); p.parked = null; }
         p.frame = requestAnimationFrame(function() { placePortal(p); });
       } else {
         p.frame = null;
+        // Parked: no frames run, so nothing would notice the stack leaving the
+        // DOM (an x-if, a Turbo stream, a closed modal) until the next page
+        // load. A slow check tears the box and its observers down when it does.
+        if (!p.parked) {
+          p.parked = setInterval(function() {
+            if (!p.stack.isConnected) unmountPortal(p, false);
+          }, 1000);
+        }
       }
     }
 
     function unmountPortal(p, restore) {
       if (p.frame) cancelAnimationFrame(p.frame);
+      if (p.parked) clearInterval(p.parked);
       p.observers.forEach(function(o) { o.disconnect(); });
       p.button.removeEventListener('mouseenter', p.enter);
       p.button.removeEventListener('mouseleave', p.leave);
@@ -315,6 +325,7 @@
         // so a cached snapshot restores to the markup it came from.
         p.box.className = p.box.className.replace(/\s*\bis-[\w-]+/g, '');
         p.box.removeAttribute('style');
+        p.box.removeAttribute('data-fizz-portal-for');
         p.stack.insertBefore(p.box, p.stack.firstChild);
       } else {
         p.box.remove();
@@ -329,12 +340,13 @@
       var button = stack.querySelector(':scope > .hold-btn');
       if (!box || !button) return null;
 
-      var p = { stack: stack, box: box, button: button, visible: true, frame: null, observers: [] };
+      var p = { stack: stack, box: box, button: button, visible: true, frame: null, parked: null, observers: [] };
       stack._fizzPortal = p;
       portals.push(p);
 
       document.body.appendChild(box);
       box.classList.add('is-portaled');
+      box.setAttribute('data-fizz-portal-for', button.dataset.holdId || 'hold');
       box.style.zIndex = portalZ(stack);
       syncPortalState(p);
       syncPortalPalette(p);
@@ -350,9 +362,11 @@
       palette.observe(stack, { attributes: true, attributeFilter: ['style'] });
       p.observers.push(states, palette);
 
-      // Track the rect every frame while the stack is on screen, and park the
-      // box while it is not (scrolled away, inside a closed panel, or clipped
-      // out of a scroll container), so an idle page pays nothing.
+      // Track the rect every frame while the stack is on screen: a visible
+      // portal reads one rect per frame. Park the box while the stack is not
+      // on screen (scrolled away, inside a closed panel, or clipped out of a
+      // scroll container): no frames, only a once-a-second check that the
+      // stack is still in the DOM.
       if ('IntersectionObserver' in window) {
         var seen = new IntersectionObserver(function(entries) {
           p.visible = entries[entries.length - 1].isIntersecting;
@@ -372,7 +386,11 @@
       document.querySelectorAll('.hold-stack[data-fizz-portal]').forEach(mountPortal);
     }
 
-    window.studioFizzPortal = { mount: mountPortal, mountAll: mountAllPortals };
+    window.studioFizzPortal = {
+      mount: mountPortal,
+      mountAll: mountAllPortals,
+      count: function() { return portals.length; }
+    };
     document.addEventListener('turbo:load', mountAllPortals);
     document.addEventListener('turbo:before-cache', function() {
       portals.slice().forEach(function(p) { unmountPortal(p, true); });

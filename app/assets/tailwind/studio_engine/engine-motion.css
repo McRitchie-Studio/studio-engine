@@ -1829,7 +1829,10 @@ body.modal-open { overflow: visible; }
    and copies the stack's --fizz-c-* palette onto it.
 
    It paints one rung above the highest z-index among the button's ancestors
-   (never below --z-raised), which the script sets inline. Painting above the
+   (never below --z-raised), which the script sets inline. A page's own sticky
+   or fixed bar must therefore sit ABOVE --z-raised (--z-sticky is the rung for
+   one); a bar at z 20 or lower, such as Tailwind's sticky z-10 or z-20, ties or
+   loses to the box, and the bubbles paint over it. Painting above the
    button would put bubbles on its face, so the clip path cuts the button's own
    rect out of the box: the bubbles show only outside it, as they do in the
    stack. The 50vmax margin is the room they have to rise. */

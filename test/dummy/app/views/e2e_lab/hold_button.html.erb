@@ -54,6 +54,11 @@
       <%= render "studio/hold_button", hold_id: "escaping", duration: 600, default_text: "Hold to Confirm",
                  fizz_colors: %w[#ff0000], fizz_portal: true %>
     </div>
+    <%# A card at modal height (z 200): the box must land one rung above it, at
+        201, rather than at the --z-raised floor, or the modal would cover it. %>
+    <div data-test="phone-modal" style="width: 16rem; height: 8rem; overflow: hidden; border-radius: 2rem; background: #111; padding: 1.25rem 1rem; position: relative; z-index: 200">
+      <%= render "studio/hold_button", hold_id: "modal", duration: 600, default_text: "Hold to Confirm", fizz_portal: true %>
+    </div>
   </div>
 
   <%# THE TIMERS. Each hook writes when it ran, relative to the press, so a

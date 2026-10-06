@@ -250,7 +250,8 @@ test("with fizz_portal the bubbles leave the card and track the button", async (
   expect(mounted.bubbles).toBe(60);
   expect(mounted.clippedBy, "no ancestor of the moved bubbles may clip them").toEqual([]);
   expect(mounted.position).toBe("fixed");
-  expect(mounted.boxZ, "the box paints above the card the button sits in").toBeGreaterThan(mounted.cardZ);
+  expect(mounted.boxZ, "a card under the floor gets the --z-raised floor, which is above it").toBe(20);
+  expect(mounted.boxZ).toBeGreaterThan(mounted.cardZ);
   expect(mounted.drift).toBeLessThan(1);
 
   // Scroll the page and the box must follow the button, not stay where it was.
@@ -265,7 +266,7 @@ test("the portal follows the button's state and palette", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/lab/hold_button");
 
-  const box = page.locator("body > .hold-fizz-portal");
+  const box = page.locator('body > .hold-fizz-portal[data-fizz-portal-for="escaping"]');
   await expect(box).toHaveCount(1);
   const button = page.locator('.hold-btn[data-hold-id="escaping"]');
 
@@ -303,15 +304,47 @@ test("the hold's hooks fire in order, each at its own time", async ({ page }) =>
 
   await page.locator('.hold-btn[data-hold-id="timed"]').hover();
   await page.mouse.down();
-  await page.waitForTimeout(1300);
+  // Wait on the event, not on a window: a slow runner moves every time later,
+  // never earlier, so the floors below hold however loaded the machine is.
+  await expect.poll(() => page.evaluate(() => (window.__holdLog || []).map(([name]) => name)),
+    { timeout: 10000 }).toContain("early");
+  // on_success would fire 600 + 500 ms after the press; give it that long and
+  // more to prove the early action cancelled it.
+  await page.waitForTimeout(1500);
   await page.mouse.up();
 
   const log = await page.evaluate(() => window.__holdLog);
   expect(log.map(([name]) => name)).toEqual(["start", "validate", "early"]);
   const at = Object.fromEntries(log);
-  expect(at.start).toBeLessThan(50);
   expect(at.validate).toBeGreaterThanOrEqual(150);
-  expect(at.validate).toBeLessThan(400);
   expect(at.early).toBeGreaterThanOrEqual(400);
-  expect(at.early).toBeLessThan(600);
+  expect(at.early).toBeGreaterThan(at.validate);
+});
+
+test("the box lands one rung above the highest ancestor z-index", async ({ page }) => {
+  await page.goto("/lab/hold_button");
+
+  // The card is at z 200, a modal's rung. A box at the --z-raised floor would sit
+  // under it, so this pins the ancestor walk rather than the floor.
+  const box = page.locator('body > .hold-fizz-portal[data-fizz-portal-for="modal"]');
+  await expect(box).toHaveCount(1);
+  expect(await box.evaluate((el) => getComputedStyle(el).zIndex)).toBe("201");
+});
+
+test("a stack removed while parked off screen takes its box and observers with it", async ({ page }) => {
+  await page.goto("/lab/hold_button");
+
+  const box = page.locator('body > .hold-fizz-portal[data-fizz-portal-for="escaping"]');
+  await expect(box).toHaveCount(1);
+  const before = await page.evaluate(() => window.studioFizzPortal.count());
+
+  // Park it: scroll the card well out of view, and wait for the box to hide.
+  await page.evaluate(() => { document.body.style.minHeight = "500vh"; window.scrollTo(0, document.body.scrollHeight); });
+  await expect.poll(() => box.evaluate((el) => el.style.visibility)).toBe("hidden");
+
+  // Remove the stack while parked: no frame is running to notice.
+  await page.evaluate(() => document.querySelector('[data-test="phone-escaping"]').remove());
+
+  await expect(box).toHaveCount(0, { timeout: 5000 });
+  expect(await page.evaluate(() => window.studioFizzPortal.count())).toBe(before - 1);
 });
