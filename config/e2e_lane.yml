@@ -835,7 +835,13 @@
 # hint, now a desktop-only affordance, gets two specs that it stays off: at
 # phone width, and on a touch screen at desktop width.
 #   npx playwright test --list  -> 207 tests in 28 files
-total_specs: 207
+# Moved 207 -> 211 by hold-button-fizz-escapes-frame, no new file
+# (e2e/hold_button.spec.js 5 -> 9): the default stack stays clipped by its card;
+# fizz_portal lifts the bubbles out of the card and tracks the button through a
+# scroll; the portal follows the button's state and palette; the hold's hooks
+# fire in order at validate_at and early_action_at.
+#   npx playwright test --list  -> 211 tests in 28 files
+total_specs: 211
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -970,7 +976,13 @@ total_specs: 207
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 207
 # executed = total - devnet - allowed_skips = 207 - 0 - 0 = 207, so executed ==
 # total_specs and the equality assertion holds.
-executed: 207
+# And again for hold-button-fizz-escapes-frame — 4 more tests, no new file:
+#   npx playwright test --list                                             -> 211 tests, 28 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 211
+# executed = total - devnet - allowed_skips = 211 - 0 - 0 = 211, so executed ==
+# total_specs and the equality assertion holds.
+executed: 211
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
