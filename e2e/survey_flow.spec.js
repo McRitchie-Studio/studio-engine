@@ -233,7 +233,30 @@ test("a chosen tile is marked in the theme accent, dark and light", async ({ pag
   }
 });
 
-test("the number-key hint shows on choice and scale questions only", async ({ page }) => {
+// The hint speaks to a keyboard, so it is a desktop affordance: at phone
+// width and on a touch screen it never shows (Shannon's Cyvasse review).
+test("the number-key hint stays off at phone width", async ({ page }) => {
+  await start(page);
+  const hint = page.locator("[data-survey-hint]");
+  // The script did un-hide it (overall is a scale), so only the CSS can hide it.
+  await expect(hint).not.toHaveAttribute("hidden", "");
+  await expect(hint).toBeHidden();
+});
+
+test.describe("on a touch screen at desktop width", () => {
+  test.use({ viewport: { width: 1024, height: 768 }, hasTouch: true, isMobile: true });
+
+  test("the number-key hint stays off", async ({ page }) => {
+    await start(page);
+    expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);
+    const hint = page.locator("[data-survey-hint]");
+    await expect(hint).not.toHaveAttribute("hidden", "");
+    await expect(hint).toBeHidden();
+  });
+});
+
+test("the number-key hint shows on choice and scale questions only, at desktop width", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
   await start(page);
   const hint = page.locator("[data-survey-hint]");
   await expect(hint).toBeVisible(); // overall: emoji scale

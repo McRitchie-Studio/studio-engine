@@ -234,7 +234,7 @@
       timers[step.dataset.key] = setTimeout(function () { save(step); }, 900);
     });
 
-    root.addEventListener("keydown", function (event) {
+    function onKey(event) {
       if (event.defaultPrevented || event.altKey) return;
       // A tap on an already-chosen option fires pointerdown but no change, so
       // the flag would outlive it and make the next arrow key advance.
@@ -260,7 +260,19 @@
       option.focus({ preventScroll: true });
       pointerPick = isChoice(step);
       option.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    }
+
+    root.addEventListener("keydown", onKey);
+    // The survey opens on question 1 with nothing focused, so a first key
+    // lands on <body>, outside the root. Take those keys too, and only those:
+    // a key aimed at any other control on the page is not the survey's. The
+    // listener retires itself once a Turbo visit has taken this root away.
+    function onPageKey(event) {
+      if (!root.isConnected) { document.removeEventListener("keydown", onPageKey); return; }
+      var target = event.target;
+      if (target === document.body || target === document.documentElement) onKey(event);
+    }
+    document.addEventListener("keydown", onPageKey);
 
     var resume = root.dataset.resumeIndex;
     // resume-index is the question's own index, and every step is a question.
