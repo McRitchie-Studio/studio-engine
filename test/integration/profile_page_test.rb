@@ -13,8 +13,7 @@ require "active_support/test_case"
 # elsewhere in the engine.
 #
 # The resolution rules are pure logic and covered in
-# test/lib/studio/profile_sections_test.rb; the display helpers in
-# test/lib/studio/user_profile_test.rb; the navbar's link in
+# test/lib/studio/profile_sections_test.rb; the navbar's link in
 # test/views/user_nav_test.rb. What only shows up once a real Rails app is
 # booted is whether the routes actually draw and dispatch.
 #

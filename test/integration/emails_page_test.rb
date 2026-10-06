@@ -17,10 +17,8 @@ require "nokogiri"
 # The load-bearing properties, each exercised rather than declared:
 #
 #   1. Studio.routes draws admin_emails_path -> studio/emails#index plus the
-#      per-email PATCH/DELETE, AND keeps the legacy admin_email_images_path
-#      helper resolving as a redirect (mcritchie-studio's link tree and
-#      turf-monster's admin hub both link the old helper TODAY — they must not
-#      404 between this gem release and each app's adoption).
+#      per-email PATCH/DELETE. The page it replaced, /admin/email_images, is
+#      not drawn at all.
 #   2. The engine's default banners are real files that ship in the gem, and the
 #      asset initializer enumerates them for a sprockets host.
 #   3. The controller gates every action with require_admin, and gates the two
@@ -110,76 +108,15 @@ class EmailsPageTest < ActiveSupport::TestCase
     assert_includes verbs, "DELETE", "an app must be able to revert to the inherited default"
   end
 
-  # The legacy page is DEPRECATED but still SERVED for one release — deliberately
-  # not a redirect and not deleted. consumer-ci.yml runs each consumer's
-  # DEFAULT-BRANCH suite against this engine, and mcritchie-studio
-  # (test/integration/studio_email_image_test.rb) and turf-monster
-  # (test/integration/email_banner_test.rb) both GET this page and PATCH through
-  # admin_email_image_path on `main` today. Retiring it here would redden their
-  # lanes from the moment the PR opens, and no change inside the engine PR could
-  # fix it — the consumer PRs would have to reach accepted -> release -> main in
-  # BOTH apps first. So the retirement is staged across releases.
-  test "the legacy email-images page is still SERVED (staged retirement, not a redirect)" do
-    assert_equal "/admin/email_images", routes.admin_email_images_path
-    assert_equal "/admin/email_images/magic_link", routes.admin_email_image_path("magic_link")
-
-    route = Rails.application.routes.routes.find { |r| r.name == "admin_email_images" }
-    refute_nil route, "the admin_email_images helper must keep resolving"
-    assert_equal "studio/email_images", route.defaults[:controller],
-      "it must still DISPATCH — a consumer suite on main asserts this page renders"
-
-    patch_route = Rails.application.routes.routes.find { |r| r.name == "admin_email_image" }
-    refute_nil patch_route, "admin_email_image_path is called by consumer tests on main"
-    assert_equal "update", patch_route.defaults[:action]
-  end
-
-  # REGRESSION GUARD. The deprecated page links forward to /admin/emails — but
-  # that page is OPT-IN, so on an app that has not drawn it the helper does not
-  # exist and a bare call raises NameError, 500ing the very page the deprecation
-  # window exists to keep working. Consumer CI caught this on mcritchie-studio:
-  # "undefined local variable or method `admin_emails_path' for an instance of
-  # Studio::EmailImagesController".
-  test "the legacy page's forward link is guarded on the successor route existing" do
-    controller_source = File.read(
-      File.expand_path("../../app/controllers/studio/email_images_controller.rb", __dir__)
-    )
-    view_source = File.read(
-      File.expand_path("../../app/views/studio/email_images/index.html.erb", __dir__)
-    )
-
-    assert_includes controller_source, "named_routes.key?(:admin_emails)",
-      "successor_path must ask the router, not assume the opt-in route was drawn"
-    assert_includes view_source, "<% if successor_path %>",
-      "the forward-link banner must render only when there is a successor to link to"
-  end
-
-  test "successor_path returns nil when the opt-in page was never drawn" do
-    ensure_application_controller!
-    controller = Studio::EmailImagesController.new
-
-    # Stand in a router with no admin_emails route — an app that did not opt in.
-    # Hand-rolled singleton stub with ensure-restore; Minitest 6 dropped
-    # minitest/mock, so there is no .stub here.
-    app = Rails.application
-    original = app.method(:routes)
-    app.define_singleton_method(:routes) { ActionDispatch::Routing::RouteSet.new }
-
-    assert_nil controller.send(:successor_path),
-      "a page that 500s is worse than a page with no forward link"
-  ensure
-    app&.define_singleton_method(:routes, original) if original
-  end
-
-  # Even on its way out, the old page must not keep telling the operator the
-  # WRONG thing — reading only the S3 override is the bug this work exists to
-  # fix, and it lives in both views until the old one is deleted.
-  test "the legacy page reports the live image, not just the override" do
-    source = File.read(File.expand_path("../../app/views/studio/email_images/index.html.erb", __dir__))
-
-    assert_includes source, "Studio::EmailCatalog.preview_url(variant)"
-    refute_includes source, "Studio::EmailCatalog.url(variant)",
-      "the legacy page's original bug was reading ONLY the override, so it claimed " \
-      "'No image yet' about an email that was visibly sending a repo-asset banner"
+  # /admin/emails replaces /admin/email_images, and no consumer links or tests
+  # the old page, so the engine draws neither of its routes.
+  test "the retired email-images page is not drawn" do
+    names = Rails.application.routes.routes.map(&:name)
+    refute_includes names, "admin_email_images"
+    refute_includes names, "admin_email_image"
+    refute Rails.application.routes.routes.any? { |r| r.path.spec.to_s.start_with?("/admin/email_images") },
+      "no route may still answer at /admin/email_images"
+    refute defined?(Studio::EmailImagesController), "the controller goes with its routes"
   end
 
   # --- 1b. a layered email is not "no image" --------------------------------

@@ -762,8 +762,8 @@ module Studio
     # THE SAME QUESTION background_url ASKS, so it must ask it the same way.
     # This guard read engine_artwork? while background_url read layered?, and the
     # two answer differently for a host that registers its own background: the
-    # mailer sent the layered banner while /admin/email_images and the detail
-    # page's "Artwork" frame both drew the flat asset. That frame is where
+    # mailer sent the layered banner while the detail page's "Artwork" frame
+    # drew the flat asset. That frame is where
     # "Modify image" lives, and an upload writes the row background_url reads
     # FIRST — so the operator was shown one picture and told it was the one the
     # button would replace.
