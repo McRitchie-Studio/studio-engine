@@ -54,6 +54,21 @@ class SurveyDslTest < Minitest::Test
     assert_equal "All welcome.", survey.question(:more).help
   end
 
+  # The survey opens on question 1, so a title that asks the same thing is
+  # kept for screen readers but not painted twice (studio/surveys/show).
+  def test_title_repeats_first_question_ignores_case_and_punctuation
+    same = define { emoji_scale :overall, "how was your FIRST game", required: true }
+    assert same.title_repeats_first_question?
+
+    Studio::Survey.reset!
+    refute full_survey.title_repeats_first_question?, "'How was it?' is a different question"
+  end
+
+  def test_title_repeats_first_question_needs_the_same_words_not_a_prefix
+    survey = define { emoji_scale :overall, "How was your first game? Be honest.", required: true }
+    refute survey.title_repeats_first_question?
+  end
+
   def test_emoji_scale_has_five_faces_with_default_or_custom_labels
     q = full_survey.question(:overall)
     assert_equal 5, q.options.size

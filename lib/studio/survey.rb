@@ -241,6 +241,15 @@ module Studio
     def keys = questions.map(&:key)
     def required_keys = questions.select(&:required?).map(&:key)
 
+    # True when the title says what the first question asks ("How was your
+    # first game?" twice). The survey opens on that question, so the stepper
+    # keeps the title as the page's heading for a screen reader but does not
+    # paint it twice. Compared on letters and digits alone, ignoring case.
+    def title_repeats_first_question?
+      squash = ->(text) { text.to_s.downcase.gsub(/[^[:alnum:]]/, "") }
+      squash.call(title) == squash.call(questions.first.label)
+    end
+
     private
 
     def validate!
