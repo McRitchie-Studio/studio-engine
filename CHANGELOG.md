@@ -6,6 +6,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **`POST /login` is drawn only for apps that declare `:password`.** A passwordless
+  app answered it 500 for a member's address and 422 for a stranger's, so the
+  answer revealed who is a member; it now answers 404 for every address. `GET
+  /login` and `login_path` are unchanged. An app that still wants a `POST /login`
+  of its own draws it before `Studio.routes(self)`.
+
 - **SSO sign-up works on passwordless apps.** "Continue as …" (`POST
   /sso_continue`) created a first-time visitor with `password:
   SecureRandom.hex(16)`, which raised `UnknownAttributeError` on any User without

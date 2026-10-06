@@ -82,6 +82,11 @@ sign-in-link form when `:magic_link` is enabled, and the Google button only with
 and using the link creates the account. So `registration_params`' `:name` shows a
 Name field only on a password app.
 
+`POST /login`, the password exchange, is drawn only when `auth_methods` includes
+`:password`. A passwordless app answers it with 404 for every address, so it
+cannot tell a member from a stranger. `GET /login` and `login_path` are drawn for
+every app.
+
 ### Local log rotation (automatic — nothing to configure)
 
 The engine caps the host app's **development** log at 16 MB and its **test** log
