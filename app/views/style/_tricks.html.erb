@@ -344,6 +344,8 @@
         brand — and every color also reads a <code class="font-mono text-2xs">--hold-*</code>
         input, so one instance can be re-themed from any ancestor.
         <code class="font-mono text-2xs">prefers-reduced-motion</code> switches the bubbles off.
+        Inside a card that clips, pass <code class="font-mono text-2xs">fizz_portal: true</code>
+        and the bubbles rise past the card&rsquo;s edge instead of stopping at it.
       </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -360,12 +362,14 @@
         </div>
       <% end %>
 
-      <%# 2. The button itself, live: press and hold for two seconds. %>
+      <%# 2. The button itself, live: press and hold for two seconds. The card
+          clips, so this one sets fizz_portal and its bubbles rise past the
+          card's edge. %>
       <%= render layout: "style/specimen",
             locals: { klass: ".hold-btn  (studio/hold_button)",
-                      usage: %(render "studio/hold_button", hold_id: "confirm", duration: 2000) } do %>
+                      usage: %(render "studio/hold_button", hold_id: "confirm", duration: 2000, fizz_portal: true) } do %>
         <div class="w-full max-w-xs" x-data="{ submitting: false }">
-          <%= render "studio/hold_button", hold_id: "style-hold", duration: 2000,
+          <%= render "studio/hold_button", hold_id: "style-hold", duration: 2000, fizz_portal: true,
                 default_text: "Hold to Confirm", hold_text: "Almost there…", success_text: "Confirmed!" %>
           <button type="button" class="btn btn-neutral btn-sm mt-3 mx-auto block"
                   @click="document.querySelector('.hold-btn[data-hold-id=style-hold]').classList.remove('process','success','error','loading')">Reset</button>
