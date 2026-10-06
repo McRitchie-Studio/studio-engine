@@ -13,6 +13,7 @@ require "active_support/core_ext/numeric/time"
 require "active_support/core_ext/integer/time"
 require "studio/version"
 require "studio/local_path"
+require "studio/component_gallery"
 require "studio/log_rotation"
 require "studio/ip_locations"
 require "studio/geo"
@@ -689,6 +690,22 @@ module Studio
   #
   #   config.draw_booking_routes = true
   mattr_accessor :draw_booking_routes, default: false
+
+  # Draw the component gallery (Lookbook at /admin/style/components) in
+  # PRODUCTION. An app whose bundle loads lookbook draws it in development and
+  # test; in production only an app that also sets this does. No app sets it
+  # yet; the hub is meant to, with lookbook in its production bundle. Admins
+  # only, 404 to anyone else. See Studio::ComponentGallery.
+  #
+  #   config.lookbook_in_production = true
+  mattr_accessor :lookbook_in_production, default: false
+
+  # Whether this app draws the component gallery: its bundle loaded lookbook,
+  # and this is development or test, or production with the flag.
+  def self.lookbook_mounted?
+    ComponentGallery.mounted?(env: Rails.env, in_production: lookbook_in_production,
+                              lookbook_loaded: ComponentGallery.lookbook_loaded?)
+  end
 
   # WHERE THE APP'S OWN BOOKING PAGE LIVES, for an app that renders
   # `studio_booking_frame` in a view of its own instead of drawing the engine's
@@ -1530,6 +1547,19 @@ module Studio
       # helper so a shipped host sidebar link on the old helper still resolves.
       get   "admin/style",            to: "style#index",               as: :admin_style
       get   "admin/design_system",    to: redirect("/admin/style"),    as: :admin_design_system
+
+      # The component gallery: Lookbook over the engine's ViewComponent previews.
+      # The router refuses anyone but a signed-in admin, so a visitor and a
+      # non-admin get 404 (Studio::ComponentGallery::AdminConstraint). Drawn
+      # only where the host's bundle loaded lookbook: in development and test,
+      # and in production only where Studio.lookbook_in_production is set.
+      if Studio.lookbook_mounted?
+        constraints(Studio::ComponentGallery::AdminConstraint.new) do
+          mount Lookbook::Engine, at: Studio::ComponentGallery::MOUNT_PATH, as: :studio_component_gallery
+          mount Rack::Files.new(Studio::ComponentGallery.lookbook_assets_root),
+                at: Studio::ComponentGallery::ASSETS_PATH, as: :studio_component_gallery_assets
+        end
+      end
 
       # The standard transactional-email page. Canonical at /admin/emails
       # (Studio::EmailsController): index lists every registered email with its

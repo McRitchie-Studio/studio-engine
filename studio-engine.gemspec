@@ -19,9 +19,11 @@ Gem::Specification.new do |spec|
   }
 
   # config/e2e_lane.yml is the BROWSER LANE's contract — a fact about this repo's CI,
-  # read by bin/e2e-executed-set-check and test/lib/e2e_lane_contract_test.rb. It is
-  # the only thing under config/, and it has no meaning in a consuming app, so it is
-  # excluded rather than shipped. (e2e/, bin/ and test/ were never in this list.)
+  # read by bin/e2e-executed-set-check and test/lib/e2e_lane_contract_test.rb. It
+  # has no meaning in a consuming app, so it is excluded rather than shipped.
+  # config/importmap.rb ships: it is the engine's pins, which every host draws
+  # (lib/studio/engine.rb, studio.importmap). (e2e/, bin/ and test/ were never in
+  # this list.)
   #
   # docs/SITE_FOOTER.md and docs/BOOKING.md ship because consumers cite them from
   # their own initializers ("docs/SITE_FOOTER.md is the contract"), and a
@@ -56,4 +58,16 @@ Gem::Specification.new do |spec|
   # because the point of the geo primitive is that EVERY app has the capacity:
   # an app that has to add a gem before it can place a visitor does not.
   spec.add_dependency "geocoder", ">= 1.8", "< 2.0"
+  # Components (docs/FRONT_END_STANDARD.md). Every consumer renders the engine's
+  # ViewComponent classes, so it is a runtime dependency, and an app takes it
+  # through the engine rather than its own Gemfile.
+  spec.add_dependency "view_component", ">= 4.0", "< 5"
+  # The component gallery at /admin/style/components is Lookbook, and Lookbook is
+  # NOT a runtime dependency: eager-loaded in production it costs every process
+  # tens of megabytes, and most consumers run on 512 MB dynos. An app opts in by
+  # bundling it after studio-engine, `gem "lookbook", group: [:development, :test]`
+  # for a development gallery, ungrouped plus Studio.lookbook_in_production for a
+  # live one. The engine never requires it; it mounts the gallery only when the
+  # host's bundle has loaded it. See Studio::ComponentGallery.
+  spec.add_development_dependency "lookbook", ">= 2.3", "< 3"
 end

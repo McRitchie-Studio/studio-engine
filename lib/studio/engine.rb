@@ -1,4 +1,16 @@
 require_relative "log_rotation"
+require_relative "component_gallery"
+# Components (docs/FRONT_END_STANDARD.md). Required here, not left to the host's
+# Gemfile, because every app takes ViewComponent through this engine.
+#
+# Lookbook, the gallery, is NOT required here: an app that wants it bundles it
+# (see the gemspec), and Bundler.require loads it. Listed AFTER studio-engine, so
+# view_component is required first: its after_initialize, which decides whether
+# to draw its own preview routes, must run before Lookbook's, which turns
+# previews on for its own use. Studio::ComponentGallery.load_order_ok? records
+# the order this file saw.
+Studio::ComponentGallery.lookbook_loaded_before_engine = defined?(::Lookbook::Engine) ? true : false
+require "view_component"
 
 module Studio
   class Engine < ::Rails::Engine
@@ -71,6 +83,77 @@ module Studio
       # US set ships — every other country's badge renders an emoji flag, which
       # costs no bytes at all.
       app.config.assets.precompile += Studio::Engine.subdivision_flag_logical_paths
+
+      # The engine's ES modules (app/javascript), which config/importmap.rb pins.
+      # On the asset paths so an importmap pin resolves on sprockets and propshaft
+      # alike, and enumerated for sprockets' precompile list like the banners.
+      javascript_root = Studio::Engine.root.join("app/javascript").to_s
+      if app.config.assets.respond_to?(:paths) && app.config.assets.paths.is_a?(Array)
+        app.config.assets.paths << javascript_root unless app.config.assets.paths.map(&:to_s).include?(javascript_root)
+      end
+      app.config.assets.precompile += Studio::Engine.javascript_module_logical_paths
+    end
+
+    # ---- THE ENGINE'S IMPORTMAP PINS ------------------------------------------
+    #
+    # A host draws the engine's pins with no edit of its own: this adds the
+    # engine's config/importmap.rb to importmap-rails' list of maps BEFORE
+    # importmap-rails draws them (its "importmap" initializer appends the host's
+    # config/importmap.rb last). The host's map is drawn after the engine's, so a
+    # host that pins the same name wins. This is the mechanism importmap-rails
+    # documents for engines ("Composing import maps").
+    #
+    # The contract a module joins by being here:
+    #   - it lives under app/javascript/studio/ and is pinned as "studio/<name>";
+    #   - pins are NOT preloaded, so a page fetches only the modules it imports;
+    #   - its logical asset path shares the studio/ prefix with the classic
+    #     scripts in app/assets/javascripts/studio, so a module may not reuse one
+    #     of those names (test/integration/engine_importmap_pins_test.rb).
+    # A host without importmap-rails (a footer-only consumer) skips this.
+    initializer "studio.importmap", before: "importmap" do |app|
+      next unless app.config.respond_to?(:importmap)
+
+      app.config.importmap.paths << Studio::Engine.root.join("config/importmap.rb")
+      app.config.importmap.cache_sweepers << Studio::Engine.root.join("app/javascript")
+    end
+
+    # ---- COMPONENTS AND THE GALLERY -------------------------------------------
+    #
+    # ViewComponent reads its preview settings in "view_component.set_configs",
+    # so these land first. The previews live in app/components/previews, which
+    # is its own autoload root (below): Studio::BadgeComponentPreview, not
+    # Previews::Studio::BadgeComponentPreview. ViewComponent's own preview pages
+    # move behind the admin wall (PREVIEWS_ROUTE, PREVIEWS_CONTROLLER), and each
+    # preview renders in a layout carrying the host's stylesheets.
+    paths.add "app/components/previews", autoload: true
+
+    initializer "studio.view_component", before: "view_component.set_configs" do |app|
+      previews = app.config.view_component.previews
+      preview_path = Studio::Engine.root.join("app/components/previews").to_s
+      previews.paths << preview_path unless previews.paths.include?(preview_path)
+      previews.route = Studio::ComponentGallery::PREVIEWS_ROUTE
+      previews.controller = Studio::ComponentGallery::PREVIEWS_CONTROLLER
+      previews.default_layout = Studio::ComponentGallery::PREVIEW_LAYOUT
+    end
+
+    # Lookbook's settings, before Lookbook's after_initialize reads them and
+    # before the host's config/initializers, so a host can still change one.
+    #
+    # It also takes Lookbook's UI assets off the public middleware stack.
+    # Lookbook serves /lookbook-assets through a Rack::Static it adds for every
+    # request; Studio.routes serves the same files from inside the admin
+    # constraint instead, so an app that does not draw the gallery serves none
+    # of Lookbook and a visitor never learns it is there. The delete matches by
+    # class, so a host cannot add a Rack::Static of its own (none does).
+    initializer "studio.component_gallery", after: "lookbook.assets.serve" do
+      next unless Studio::ComponentGallery.lookbook_loaded?
+
+      unless Studio::ComponentGallery.load_order_ok?
+        warn "studio-engine: lookbook was required before studio-engine; list it after " \
+             "studio-engine in the Gemfile so ViewComponent decides its preview routes first"
+      end
+      Studio::ComponentGallery.configure_lookbook!(::Lookbook.config)
+      config.app_middleware.delete(::Rack::Static)
     end
 
     # Logical asset paths ("emails/magic-link.png") for every default banner the
@@ -79,6 +162,16 @@ module Studio
       Dir[File.expand_path("../../app/assets/images/emails/*", __dir__)]
         .select { |path| File.file?(path) }
         .map { |path| "emails/#{File.basename(path)}" }
+        .sort
+    end
+
+    # Logical asset paths ("studio/local_path.js") for every ES module the
+    # engine pins (config/importmap.rb).
+    def self.javascript_module_logical_paths
+      base = File.expand_path("../../app/javascript", __dir__)
+      Dir[File.join(base, "**/*.js")]
+        .select { |path| File.file?(path) }
+        .map { |path| path.delete_prefix("#{base}/") }
         .sort
     end
 
@@ -206,5 +299,6 @@ module Studio
         Studio.validate_user_contract!(::User)
       end
     end
+
   end
 end

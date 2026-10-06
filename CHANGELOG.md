@@ -4,6 +4,42 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **ViewComponent comes with the engine.** It is a runtime dependency, so an
+  app renders the engine's components with no Gemfile line of its own. Lookbook
+  is not: an app that wants the component gallery adds
+  `gem "lookbook", group: [:development, :test]` after studio-engine (ungrouped,
+  with `Studio.lookbook_in_production`, for a live gallery). Without it the app
+  loads no Lookbook code, which keeps tens of megabytes out of every production
+  process. The front-end standard (`docs/FRONT_END_STANDARD.md`) now names a
+  primitive's public surface (its inputs, its `data-*` hooks and its named CSS
+  classes) and what a change to it takes: a Breaking line here and a
+  consumer-CI run against every consumer before publish.
+- **`Studio::BadgeComponent`, the first component.** It takes `text:`,
+  `data_board_count:`, and either `tone:` (one of the five status roles,
+  `success`, `warning`, `danger`, `primary`, `muted`, with the same chip classes
+  as the hub's `status_tone`) or `scheme:` (the palette the badge partial took).
+  The `components/badge` partial now renders the component and its output is
+  unchanged, so no caller changes this release. `engine.css` adds the engine's
+  `app/components` to every host's Tailwind scan.
+- **The component gallery at `/admin/style/components`.** Lookbook over the
+  engine's previews, with a Components section on `/admin/style` linking each
+  state. A signed-in admin gets it; a visitor or non-admin gets 404. It shows
+  the rendered output only (no Source or Params panel). It is drawn only where
+  the app's bundle loads lookbook: in development and test, and in production
+  only with `Studio.lookbook_in_production = true`. No app draws ViewComponent's
+  preview routes in production. ViewComponent's own preview pages move to
+  `/admin/style/previews`, behind the same wall.
+- **The engine's own importmap pins.** The engine's `config/importmap.rb` pins
+  each module under `app/javascript/studio` as `studio/<name>` (not preloaded),
+  and the `studio.importmap` initializer draws it into every host that has
+  importmap-rails, before the host's own map, so a host pin of the same name
+  wins. No host edit. The first module is `studio/local_path`, the browser twin
+  of `Studio::LocalPath.local?`.
+- **Consumer CI runs Cyvasse's suite** against each engine change, beside the
+  hub, Turf Monster and McRitchie Industries.
+
 ## 0.91.2 — 2026-10-06
 
 ### Security

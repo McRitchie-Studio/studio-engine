@@ -12,7 +12,7 @@ require "nokogiri"
 
 # [unit] The living style guide's HOST SECTION SEAM.
 #
-# THE SEAM. style/index.html.erb renders four engine sections. A consuming app
+# THE SEAM. style/index.html.erb renders five engine sections. A consuming app
 # grows a FIFTH — its own modals — by defining app/views/style/host/_modals.html.erb.
 # The guide finds it by convention, the same three-term
 # lookup_context.exists?(name, prefixes, partial) the modal host uses for
@@ -53,7 +53,7 @@ class StyleHostSectionTest < ActiveSupport::TestCase
   MARKER = "HOST-SECTION-MARKER"
 
   # The engine's own sections, in the order the page publishes them.
-  ENGINE_SECTIONS = %w[theme modals tricks tasks].freeze
+  ENGINE_SECTIONS = %w[theme modals tricks tasks components].freeze
 
   # --- absent: the page is what it was ------------------------------------
 
@@ -68,14 +68,15 @@ class StyleHostSectionTest < ActiveSupport::TestCase
                      "a base app's page must carry no trace of the host anchor"
   end
 
-  def test_a_base_app_renders_exactly_the_four_engine_sections
+  def test_a_base_app_renders_exactly_the_five_engine_sections
     # Catches the empty container the seam must never emit: a wrapper with a
     # different id, or none at all, passes the string refutes above.
     assert_equal ENGINE_SECTIONS, top_section_ids(base_html)
   end
 
-  def test_a_base_app_navs_exactly_the_four_engine_pills
-    assert_equal [%w[#theme Theme], %w[#modals Modals], %w[#tricks Tricks], %w[#tasks Tasks]],
+  def test_a_base_app_navs_exactly_the_five_engine_pills
+    assert_equal [%w[#theme Theme], %w[#modals Modals], %w[#tricks Tricks], %w[#tasks Tasks],
+                  %w[#components Components]],
                  nav_pills(base_html)
   end
 
@@ -100,7 +101,7 @@ class StyleHostSectionTest < ActiveSupport::TestCase
   end
 
   def test_the_section_lands_between_modals_and_tricks
-    assert_equal %w[theme modals host-modals tricks tasks], top_section_ids(host_html)
+    assert_equal %w[theme modals host-modals tricks tasks components], top_section_ids(host_html)
   end
 
   # --- the nav pill follows the section ------------------------------------
@@ -108,7 +109,7 @@ class StyleHostSectionTest < ActiveSupport::TestCase
   def test_the_nav_grows_one_pill_for_the_host_section_in_the_same_place
     assert_equal [["#theme", "Theme"], ["#modals", "Modals"],
                   ["##{ANCHOR}", Studio.app_name],
-                  ["#tricks", "Tricks"], ["#tasks", "Tasks"]],
+                  ["#tricks", "Tricks"], ["#tasks", "Tasks"], ["#components", "Components"]],
                  nav_pills(host_html)
   end
 

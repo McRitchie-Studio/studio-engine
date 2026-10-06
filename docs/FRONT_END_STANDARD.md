@@ -26,15 +26,46 @@ previews, so the gallery cannot drift from the component. A component used by
 one app lives in that app's `app/components` under the same rules and moves to
 the engine when a second app needs it.
 
-**Today.** Components are ERB partials: 17 in `app/views/components/`, more
-under `app/views/studio/` (the board, the hold button, modals, banners). Each
-documents its locals in a header comment; 14 of the engine's 144 partials
-declare strict locals. View tests in `test/views` render partials, and
-`/admin/style` frames hand-written specimens with `style/_specimen`. ViewComponent
-and Lookbook are not dependencies of the engine yet; piece 4b of the
-platform-audit-refactors epic adds them.
+**Today.** ViewComponent is a runtime dependency of the engine, so every app
+has it through the engine and lists it nowhere else. Lookbook, the gallery, is
+opt-in by bundle (below). The badge is the first component: `Studio::BadgeComponent`, with its
+unit test in `test/components/studio` and its preview in
+`app/components/previews/studio`. The rest are still ERB partials, 17 in
+`app/views/components/` and more under `app/views/studio/` (the board, the hold
+button, modals, banners); each documents its locals in a header comment. View
+tests in `test/views` render partials, and `/admin/style` frames hand-written
+specimens with `style/_specimen` beside a Components section that lists every
+preview.
 
-**Until 4b lands**, a new or edited partial takes the shape a component will:
+**The gallery.** Lookbook serves the previews at `/admin/style/components`,
+drawn by `Studio.routes` (`Studio::ComponentGallery`):
+
+- Lookbook is not a runtime dependency. Loaded in production it costs each
+  process tens of megabytes, and most apps run on 512 MB dynos. The engine never
+  requires it; an app that wants the gallery bundles it **after** studio-engine
+  (so ViewComponent loads first):
+  `gem "lookbook", group: [:development, :test]` for a development gallery, or
+  ungrouped plus `Studio.lookbook_in_production = true` for a live one. The hub
+  is meant to be the one live gallery; no app sets the flag yet.
+- An app without lookbook in its bundle draws no gallery route, serves no
+  Lookbook asset, and loads no Lookbook code. A production app without the flag
+  draws none of it either, and no app draws ViewComponent's preview routes in
+  production.
+- The router admits a signed-in admin whose session token is live. Anyone else
+  gets 404, not a redirect.
+- It shows output only: the rendered preview and its HTML. The Source and Params
+  panels, embeds and pages are off, and previews declare no `@param` tags.
+- Previews live in `app/components/previews` (their own autoload root, so the
+  badge's preview is `Studio::BadgeComponentPreview`) and render in the
+  `studio/component_preview` layout, which carries the host's stylesheets.
+
+**Tailwind.** A component keeps its class strings in Ruby, and each host's
+Tailwind config scans only the engine's `app/views`. `engine.css` adds
+`@source "../../../components"`, so every host that imports it compiles the
+engine's component classes with no edit of its own.
+
+**Until a partial is converted**, a new or edited partial takes the shape a
+component will:
 
 - It declares strict locals on its first line:
   `<%# locals: (title:, tone: :neutral, actions: []) -%>`. A render with a
@@ -47,6 +78,24 @@ keywords, the header comment becomes the class comment, the `test/views` test
 becomes the component test, and the specimen becomes a preview. The partial
 stays for one release as a single `render Studio::NameComponent.new(...)` line,
 then goes.
+
+## A primitive's public surface
+
+A shared primitive's public surface is three things:
+
+- its component inputs (the initializer's keywords and the values each takes);
+- its `data-*` hooks (`data-board-count` on the badge, for one);
+- its named CSS classes (`badge`, `card`, `btn` and their variants).
+
+Everything else is internal and may change in any release: the template's
+structure, its wrapper elements, its utility classes. A consumer that selects
+on an internal (a nested `span`, a utility class) is relying on something no
+release promises.
+
+A change to the public surface is a breaking change. It gets a **Breaking**
+line in the changelog naming the input, hook or class, and a consumer-CI run
+(`.github/workflows/consumer-ci.yml`) against every consumer before the gem is
+published. The badge's public surface is written in its class comment.
 
 ## Behaviour
 
@@ -73,12 +122,24 @@ that needs a name, a branch or a test is a module.
 The nonce rule has a reason: every inline script is what keeps `unsafe_inline`
 in an app's `script_src` (Turf Monster's policy carries it today).
 
+**The engine's modules.** The engine pins its own ES modules, and a host draws
+them with no edit: the engine's `config/importmap.rb` pins each module under
+`app/javascript/studio` as `studio/<name>`, and the `studio.importmap`
+initializer adds that file to importmap-rails' maps before the host's own, so a
+host that pins the same name wins. Engine pins are not preloaded. A module's
+logical asset path shares the `studio/` prefix with the classic scripts in
+`app/assets/javascripts/studio`, so it may not reuse one of their names. The
+first module is `studio/local_path`, the browser twin of
+`Studio::LocalPath.local?`. Its `node:test` file is in `test/javascript`, and
+`test/lib/studio/local_path_js_parity_test.rb` runs those files in the engine
+suite and holds the module to the Ruby rule.
+
 **Today.** The engine ships behaviour as scripts inside partials. The board's
 Alpine factory, `window.studioBoard`, is 454 lines in `studio/_board_assets`;
 the hold button takes `guard:`, `on_success:` and `validate:` as JavaScript
 strings that `Alpine.evaluate` runs; the shared head carries inline scripts.
-The engine vendors Alpine and loads it with `javascript_include_tag`; it has no
-importmap pins and no Stimulus. Every app pins its modules with importmap.
+The engine vendors Alpine and loads it with `javascript_include_tag`, and it
+has no Stimulus. Every app pins its modules with importmap.
 Cyvasse and Industries pin Stimulus; the hub has `stimulus-rails` in its
 Gemfile but no Stimulus pin and no controllers, four modules in
 `app/javascript`, and 35 inline script tags across 31 views, the largest being
@@ -100,7 +161,9 @@ calls it, swap the markup to `data-controller`, and delete the script tag.
   `var(--color-*)`; for alpha, `rgb(var(--color-primary-rgb) / 0.4)`.
 - Status colour (a stage, a grade, a run result) comes from one status tone
   helper, `status_tone(:success)` and its siblings, never from hand-picked
-  classes. Piece 4g builds it.
+  classes. An engine component that shows a status takes `tone:`, one of the
+  same five roles (`success`, `warning`, `danger`, `primary`, `muted`), as
+  `Studio::BadgeComponent` does.
 - Buttons, cards, badges and inputs use the engine utilities in
   `engine.css`: `btn` and its variants, `card`, `badge`, `input-field`,
   `label-upper`, `empty-state`.
@@ -114,16 +177,16 @@ the fixed brand scales (`mint`, `navy`, `violet`) for surfaces or status.
 
 **Today.** The tokens exist and most engine UI uses them. Engine views still
 carry a raw hex in 29 files and `dark:` in 2; hub views carry a hex in 36 and
-`dark:` in 24. No shared status helper exists: the hub has several per-feature
-tone maps in its helpers (`pipeline_chip_classes`, `merit_reason_classes`,
-`release_meter_tone` among them).
+`dark:` in 24. The hub's `StatusToneHelper` maps status words onto the five
+roles, and the badge's `tone:` renders the same chip classes. The badge's older
+`scheme:` palette, which uses the brand scales, stays for existing callers.
 
 ## Tests by layer
 
 | Layer | Test | Where |
 |-------|------|-------|
-| Component | Unit: render, assert on the interface's output | `test/components` (today `test/views`) |
-| Component states | Lookbook preview, one per state | `test/components/previews` |
+| Component | Unit: render, assert on the interface's output | `test/components` (a partial: `test/views`) |
+| Component states | Lookbook preview, one per state | `app/components/previews` |
 | Logic module | `node:test`, no DOM | `test/javascript` |
 | Controller wiring | System or e2e, only where the wiring is the risk | the app's system or e2e lane |
 | Page | System or e2e, as the task's shape demands | the app's lane |
@@ -166,21 +229,21 @@ touch loses its logic to a module.
 - No raw hex, `dark:` variant, arbitrary size or hand-picked status colour.
 - Logic modules have `node:test` tests, and the app's lane runs them.
 
-## Open questions for Alex
+## Decisions and open questions
 
-These are recorded on the task `front-end-standard-page` and decided before
-piece 4b starts:
+Decided by Alex:
 
-1. **ViewComponent and Lookbook as dependencies.** Does ViewComponent
-   become a runtime dependency of the gem, since every app renders its
-   components? Does Lookbook run only in development and test, or also in production
-   behind the admin wall so `/admin/style` serves the previews?
-2. **How the engine ships modules.** The engine gains its own importmap pins
-   that each app draws in, or each app pins the engine's modules itself.
-3. **Alpine's future.** Alpine stays as the binding layer, or retires in
-   favour of Stimulus once the migration ends. Alpine's standard build needs
-   `unsafe_eval` in `script_src`.
-4. **The CSP target.** Once inline scripts are gone, does every app drop
+- ViewComponent is a runtime dependency of the engine, and every app takes it
+  through the engine.
+- Lookbook runs in production on the hub only, behind the admin wall; every
+  other app draws it in development and test.
+- The engine supplies its modules through its own importmap pins; no app lists
+  them.
+- The Stimulus migration proceeds, engine behaviour first.
+
+Still open, recorded on the task `front-end-standard-page`:
+
+1. **The CSP target.** Once inline scripts are gone, does every app drop
    `unsafe_inline` from `script_src`?
-5. **One Node version.** The engine's `package.json` pins Node 20; the hub
+2. **One Node version.** The engine's `package.json` pins Node 20; the hub
    pins 22.

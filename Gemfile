@@ -102,3 +102,11 @@ end
 group :development, :test do
   gem "solana-studio", ">= 0.5.3"
 end
+
+# importmap-rails is the dummy host's importmap, so the engine's pin contract
+# (config/importmap.rb, drawn in by the studio.importmap initializer) is tested
+# against the real gem every consumer runs. Not a runtime dependency: the
+# initializer skips a host without importmap-rails (a footer-only consumer).
+group :development, :test do
+  gem "importmap-rails", ">= 2.0"
+end

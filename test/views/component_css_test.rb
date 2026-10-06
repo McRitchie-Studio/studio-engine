@@ -17,11 +17,13 @@ class ComponentCssTest < Minitest::Test
   CSS_PATH = File.expand_path("../../app/assets/tailwind/studio_engine/engine.css", __dir__)
   PRESET_PATH = File.expand_path("../../tailwind/studio.tailwind.config.js", __dir__)
 
-  # Everything that can reference a component class: ERB views plus Ruby
-  # helpers (a helper growing a btn-* class must not slip the invariant).
+  # Everything that can reference a component class: ERB views, Ruby helpers
+  # (a helper growing a btn-* class must not slip the invariant), and the
+  # ViewComponent classes and templates.
   SCAN_GLOBS = [
     File.expand_path("../../app/views/**/*.erb", __dir__),
-    File.expand_path("../../app/helpers/**/*.rb", __dir__)
+    File.expand_path("../../app/helpers/**/*.rb", __dir__),
+    File.expand_path("../../app/components/**/*.{rb,erb}", __dir__)
   ].freeze
 
   # The class-name families this stylesheet owns. Tokens of these shapes found
@@ -115,12 +117,14 @@ class ComponentCssTest < Minitest::Test
 
   # -- Partials render with the shipped classes -----------------------------
 
-  def test_badge_partial_renders_shipped_badge_class
-    html = view.render(partial: "components/badge", locals: { text: "Live", scheme: "success" })
+  # The badge partial renders Studio::BadgeComponent, which needs a booted Rails
+  # app to render; test/components/studio/badge_component_test.rb renders both
+  # there. This holds the component's template to the shipped .badge class.
+  def test_badge_component_emits_shipped_badge_class
+    template = File.read(File.expand_path("../../app/components/studio/badge_component.html.erb", __dir__))
 
-    assert_includes html, 'class="badge '
+    assert_includes template, 'class: "badge '
     assert_includes defined_utilities, "badge"
-    assert_includes html, ">Live<"
   end
 
   def test_empty_state_partial_renders_shipped_empty_state_class

@@ -43,13 +43,19 @@ require_relative "../support/engine_tailwind_build"
 # registered). Those were fixed, not listed, so there is no longer anywhere to
 # park a host-only class: an engine view either names engine vocabulary or fails.
 #
-# A BLIND SPOT, stated plainly. A class written inside Ruby (`badge_class =
+# COMPONENTS TOO. The engine's ViewComponent classes (app/components) are read
+# with the views: their templates like any view, and their Ruby for the class
+# lists a component keeps in string constants (Studio::BadgeComponent's TONES and
+# SCHEMES): a string literal of two or more class-shaped words, not a hash key.
+#
+# A BLIND SPOT, stated plainly. A class written inside a VIEW's Ruby (`badge_class =
 # "..."`, a ternary in `<%= %>`) never reaches this scanner. The status-role
 # colours, which lived exactly there, have their own raw-source guard below
 # (test_status_role_colours_resolve_wherever_a_view_writes_them).
 class EngineClassVocabularyTest < ActiveSupport::TestCase
   ROOT       = File.expand_path("../..", __dir__)
   VIEWS      = File.join(ROOT, "app/views")
+  COMPONENTS = File.join(ROOT, "app/components")
   PLAIN_CSS  = File.join(ROOT, "app/assets/stylesheets/**/*.css")
 
   # Stands in for any ERB tag, so a token it touches is recognisably dynamic.
@@ -136,15 +142,45 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
   end
 
   def self.view_paths = Dir.glob(File.join(VIEWS, "**", "*.erb")).sort
-  def self.relative(path) = path.delete_prefix("#{VIEWS}/")
+  def self.component_paths = Dir.glob(File.join(COMPONENTS, "**", "*.{rb,erb}")).sort
+  def self.source_paths = view_paths + component_paths
+
+  # A view by its path under app/views (the allow-lists' spelling); a component
+  # by its path from the engine root, so it cannot be mistaken for
+  # app/views/components.
+  def self.relative(path)
+    path.start_with?("#{VIEWS}/") ? path.delete_prefix("#{VIEWS}/") : path.delete_prefix("#{ROOT}/")
+  end
+
+  # The class lists a component's Ruby keeps in strings: each double-quoted
+  # literal of two or more class-shaped words that is not a hash key. Comment
+  # lines are prose and are skipped.
+  CLASS_WORD = %r{\A[a-z][a-z0-9:/.\[\]-]*\z}
+
+  def self.ruby_class_tokens(source)
+    code = source.lines.reject { |line| line.lstrip.start_with?("#") }.join
+    # Every literal in order, so a key's closing quote is never read as an
+    # opening one; a literal followed by => is a key and is dropped.
+    code.scan(/"([^"]*)"(\s*=>)?/).flat_map do |literal, key|
+      next [] if key || literal.include?("\#{")
+
+      words = literal.split(/\s+/).reject(&:empty?)
+      words.length >= 2 && words.all? { |word| word.match?(CLASS_WORD) } ? words : []
+    end
+  end
+
+  def self.tokens_for(path)
+    source = File.read(path)
+    path.end_with?(".rb") ? ruby_class_tokens(source) : tokens_in(source)
+  end
 
   # { token => Set[view] } for every STATIC token, plus the dynamic ones dropped.
   def self.scan
     @scan ||= begin
       by_token = Hash.new { |h, k| h[k] = Set.new }
       dynamic = Set.new
-      view_paths.each do |path|
-        tokens_in(File.read(path)).each do |t|
+      source_paths.each do |path|
+        tokens_for(path).each do |t|
           t.include?(ERB) ? dynamic << t : by_token[t] << relative(path)
         end
       end
@@ -228,7 +264,7 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
   STATUS_ROLE = /(?<![\w-])(?:[a-z-]+:)*(?:bg|border|text)-(?:success|warning|danger)(?:-ink)?(?:\/\d+)?(?![\w-])/
 
   def self.status_role_tokens
-    view_paths.each_with_object(Hash.new { |h, k| h[k] = Set.new }) do |path, found|
+    source_paths.each_with_object(Hash.new { |h, k| h[k] = Set.new }) do |path, found|
       File.read(path).gsub(/<%#.*?%>/m, "").scan(STATUS_ROLE) { |t| found[t] << relative(path) }
     end
   end
@@ -252,8 +288,16 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
   # per LINE of raw source, because the combination usually hides in a Ruby
   # ternary whose nested quotes defeat attribute parsing. The limit: a class
   # list split across lines would slip past.
+  # Known and owned elsewhere: the badge's danger tone is the hub's status_tone
+  # danger chip (danger ink on a 10% danger tint, 4.17:1). Raising the ink is the
+  # task engine-status-ink-meets-aa, which fixes the chip and the badge together.
+  # Policed: the entry fails as stale once that file no longer pairs them.
+  DANGER_TINT_PENDING = {
+    "app/components/studio/badge_component.rb" => "engine-status-ink-meets-aa raises danger ink on its tint"
+  }.freeze
+
   def test_no_view_puts_danger_ink_on_a_danger_tint
-    offenders = self.class.view_paths.flat_map do |path|
+    offenders = self.class.source_paths.flat_map do |path|
       source = File.read(path).gsub(/<%#.*?%>/m) { |c| "\n" * c.count("\n") }
       source.lines.each_with_index.filter_map do |line, i|
         next unless line.match?(/(?<![\w-])bg-danger(?![\w-])/) && line.include?("text-danger-ink")
@@ -262,7 +306,11 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
       end
     end
 
-    assert_empty offenders, "danger-ink on a danger tint fails AA; put danger text on a theme surface"
+    pending, rest = offenders.partition { |where| DANGER_TINT_PENDING.key?(where.split(":").first) }
+
+    assert_empty rest, "danger-ink on a danger tint fails AA; put danger text on a theme surface"
+    stale = DANGER_TINT_PENDING.keys - pending.map { |where| where.split(":").first }
+    assert_empty stale, "#{stale.inspect} no longer pair danger ink with a danger tint; delete the entry"
   end
 
   # ── the opt-in layer is a declared dependency ─────────────────────────────
@@ -296,6 +344,18 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
     assert_operator dynamic.length, :<=, 40,
                     "#{dynamic.length} tokens were dropped as ERB-interpolated — a jump means the " \
                     "neutraliser is eating static classes"
+  end
+
+  # The component half is read, from both its Ruby and its templates: the
+  # badge's tone and scheme classes, and a preview template's layout classes.
+  def test_the_components_are_read
+    badge = "app/components/studio/badge_component.rb"
+    %w[text-success-ink border-danger/40 bg-violet/10 text-secondary].each do |token|
+      assert_includes by_token[token].to_a, badge, "#{token} was not read from #{badge}"
+    end
+    assert(by_token["gap-2"].any? { |where| where.start_with?("app/components/previews/") },
+           "no preview template was read")
+    refute by_token.key?("neutral"), "a bare scheme key was read as a class"
   end
 
   # Every source of the vocabulary must actually contribute, or the guard would

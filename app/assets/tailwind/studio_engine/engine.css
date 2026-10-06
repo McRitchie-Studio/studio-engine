@@ -28,6 +28,14 @@
   their local copies for this import.
 */
 
+/* -- Components: in every host's class scan --------------------------------
+   The engine's ViewComponent classes (app/components) carry their colour
+   classes in Ruby, and a host's Tailwind config scans only the engine's
+   app/views. This adds app/components to the scan of every host that imports
+   this file, with no host edit. The path is relative to this file.
+   test/integration/component_tailwind_source_test.rb proves it compiles. */
+@source "../../../components";
+
 /* -- Layer scale ------------------------------------------------------------
    The ONE stacking order every Studio app shares. Read the ORDER, not the
    number: the tier is the contract, the integer is an implementation detail.

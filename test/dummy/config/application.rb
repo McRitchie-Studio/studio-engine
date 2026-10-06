@@ -18,6 +18,17 @@ require "active_storage/engine"
 # which auto-registers the engine's app/* paths as a railtie of this app.
 require "studio"
 
+# importmap-rails, as every consuming app has it, so the dummy draws the
+# engine's pins the way a host does (studio.importmap in lib/studio/engine.rb).
+require "importmap-rails"
+
+# Lookbook, the way a consumer that wants the development gallery bundles it:
+# `gem "lookbook", group: [:development, :test]`, listed after studio-engine,
+# which Bundler.require loads after the engine. The engine never requires it
+# (Studio::ComponentGallery); test/integration/component_gallery_production_test.rb
+# boots hosts without it.
+require "lookbook"
+
 # THE WEB3 HALF, WHICH THIS ENGINE NO LONGER SHIPS. wallet_connect and
 # web3_step_up used to live in app/views/studio/modals; the two-template split
 # moved them to solana-studio (BASE is studio-engine + mcritchie-studio, WEB3
@@ -78,6 +89,8 @@ module Dummy
     # precompile list the initializer can append to without raising.
     assets = ActiveSupport::OrderedOptions.new
     assets.precompile = []
+    # importmap-rails and the engine append their JavaScript roots here.
+    assets.paths = []
     config.assets = assets
 
     # Disk services under tmp/, one private (the default) and one PUBLIC, so the

@@ -1,37 +1,6 @@
-<%# locals: (text:, scheme: "neutral", data_board_count: nil) %>
-<%#
-  Stage roles (stage-fresh ... stage-closed) form a shared pipeline palette
-  used by News and Content (and any future pipelines). Mapping:
-    stage-fresh      → first stage (blue)
-    stage-shaping    → 2nd stage    (yellow)
-    stage-structured → 3rd stage    (mint)
-    stage-refined    → 4th stage    (emerald)
-    stage-cohered    → 5th stage    (violet)
-    stage-shipped    → published    (emerald)
-    stage-closed     → archived/done (gray)
-%>
-<%
-  scheme_classes = case scheme.to_s
-    when "success"          then "bg-mint/10 text-mint border-mint/30"
-    when "danger"           then "bg-red-600/10 text-red-400 border-red-600/30"
-    when "warning"          then "bg-yellow-500/10 text-yellow-400 border-yellow-500/30"
-    when "info"             then "bg-blue-500/10 text-blue-500 border-blue-500/30"
-    when "violet"           then "bg-violet/10 text-violet border-violet/30"
-    when "primary"          then "bg-primary/10 text-primary border-primary/30"
-    when "orange"           then "bg-orange-500/10 text-orange-500 border-orange-500/30"
-    when "emerald"          then "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
-    when "gray"             then "bg-gray-500/10 text-gray-400 border-gray-500/30"
-    when "stage-fresh"      then "bg-blue-500/10 text-blue-500 border-blue-500/30"
-    when "stage-shaping"    then "bg-yellow-500/10 text-yellow-400 border-yellow-500/30"
-    when "stage-structured" then "bg-mint/10 text-mint border-mint/30"
-    when "stage-refined"    then "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
-    when "stage-cohered"    then "bg-violet/10 text-violet border-violet/30"
-    when "stage-shipped"    then "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
-    when "stage-closed"     then "bg-gray-500/10 text-gray-400 border-gray-500/30"
-    when "neutral"          then "bg-surface-alt text-secondary border-subtle"
-    else                         "bg-surface-alt text-body border-subtle"
-    end
-%>
-<%# data_board_count wires the badge as a studio/board count target (updateCounts sets
-    its textContent) — additive + opt-in, so every existing caller renders identically. %>
-<span class="badge <%= scheme_classes %>"<% if local_assigns[:data_board_count] %> data-board-count="<%= data_board_count %>"<% end %>><%= text %></span>
+<%# locals: (text:, scheme: "neutral", data_board_count: nil) -%>
+<%# The badge is Studio::BadgeComponent; this partial keeps every existing
+    `render "components/badge"` call working for one release and renders exactly
+    what it rendered before. New code renders the component, which also takes
+    tone: (the shared status roles). -%>
+<%= render Studio::BadgeComponent.new(text: text, scheme: scheme, data_board_count: data_board_count) %>

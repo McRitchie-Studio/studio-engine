@@ -1,0 +1,37 @@
+<%# locals: () -%>
+<%# Components: every ViewComponent preview the gallery serves, each state a link
+    to its page in the gallery (Lookbook at Studio::ComponentGallery::MOUNT_PATH).
+    The previews ARE the specimens, so this list cannot drift from the components.
+    An app that does not draw the gallery here (lookbook not in its bundle, or
+    production without Studio.lookbook_in_production) says so instead of linking
+    to a 404. -%>
+<section id="components" class="space-y-6" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
+  <div class="space-y-1">
+    <h2 class="text-2xl font-bold text-heading">Components</h2>
+    <p class="text-muted text-sm max-w-2xl">
+      The engine's ViewComponent classes, one preview per state, in the component gallery.
+    </p>
+  </div>
+
+  <% if Studio.lookbook_mounted? %>
+    <ul class="grid gap-4 sm:grid-cols-2" data-component-previews>
+      <% Lookbook.previews.each do |preview| %>
+        <li class="card p-5 space-y-3" data-component-preview="<%= preview.lookup_path %>">
+          <p class="font-semibold text-heading"><%= preview.label %></p>
+          <div class="flex flex-wrap gap-2">
+            <% preview.scenarios.each do |scenario| %>
+              <%= link_to scenario.label, scenario.url_path, class: "btn btn-neutral btn-sm" %>
+            <% end %>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+    <%= link_to "Open the component gallery", Studio::ComponentGallery::MOUNT_PATH, class: "btn btn-primary btn-sm" %>
+  <% else %>
+    <p class="empty-state">
+      This app does not serve the component gallery here. It needs lookbook in its bundle
+      (<code class="font-mono text-2xs">gem "lookbook"</code> after studio-engine), and in
+      production <code class="font-mono text-2xs">Studio.lookbook_in_production</code> too.
+    </p>
+  <% end %>
+</section>

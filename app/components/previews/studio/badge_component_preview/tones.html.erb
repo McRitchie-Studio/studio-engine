@@ -1,0 +1,5 @@
+<div class="flex flex-wrap gap-2">
+  <% tones.each do |tone| %>
+    <%= render Studio::BadgeComponent.new(text: tone.to_s, tone: tone) %>
+  <% end %>
+</div>

@@ -845,7 +845,12 @@
 # (e2e/hold_button.spec.js 9 -> 11): the box lands one rung above a z 200
 # card, and a stack removed while parked off screen takes its box with it.
 #   npx playwright test --list  -> 213 tests in 28 files
-total_specs: 213
+# Moved 213 -> 215 by engine-ships-viewcomponent-and-lookbook, one new file
+# (e2e/engine_importmap_pins.spec.js, 2 tests): studio/local_path imports
+# through the host's import map and answers like the server, and the engine's
+# pins are not preloaded.
+#   npx playwright test --list  -> 215 tests in 29 files
+total_specs: 215
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -992,7 +997,7 @@ total_specs: 213
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 213
 # executed = total - devnet - allowed_skips = 213 - 0 - 0 = 213, so executed ==
 # total_specs and the equality assertion holds.
-executed: 213
+executed: 215
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
