@@ -47,7 +47,6 @@ for file in \
   lib/studio/email_smoke.rb \
   lib/studio/mail_transport.rb \
   app/helpers/studio_email_delivery_helper.rb \
-  app/controllers/concerns/studio/impersonation.rb \
   app/controllers/magic_links_controller.rb \
   app/controllers/studio/local_emails_controller.rb \
   app/models/studio/email_delivery.rb \
