@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.89.0 — 2026-10-05
+
 ### Changed
 
 - **A survey opens on question 1.** The intro screen and its Start button are
