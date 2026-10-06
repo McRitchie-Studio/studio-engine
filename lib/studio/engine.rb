@@ -113,8 +113,8 @@ module Studio
     # skip :require_authentication, its mailers and jobs subclass ActionMailer
     # and ActiveJob, and the two concerns roots (app/controllers/concerns,
     # app/models/concerns) are roots of their OWN to Zeitwerk: excluding
-    # app/models does not exclude app/models/concerns, and Sluggable and
-    # Studio::UserProfile sit there. They stay lazily loadable, and nothing in a
+    # app/models does not exclude app/models/concerns, and Sluggable sits
+    # there. They stay lazily loadable, and nothing in a
     # host that draws no Studio.routes asks for them.
     #
     # Read off the engine's own eager-load paths rather than listed, so a root

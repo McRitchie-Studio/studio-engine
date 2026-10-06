@@ -19,7 +19,7 @@
       <%= render "components/avatar", user: @public_user, size: "xl", alt: username %>
     <% else %>
       <%# Drawn from the username alone: a host's avatar_initials / avatar_color may read the name or email (cyvasse's do). %>
-      <% colors = Studio::UserProfile::AVATAR_COLORS %>
+      <% colors = Studio::AVATAR_COLORS %>
       <div class="w-28 h-28 text-4xl rounded-full flex items-center justify-center font-bold text-white"
            style="background-color: <%= colors[Digest::MD5.hexdigest(username).hex % colors.size] %>"><%= username[0].upcase %></div>
     <% end %>

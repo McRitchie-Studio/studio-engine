@@ -40,7 +40,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "mini_magick", "~> 5.0"
   spec.add_dependency "resend", "~> 1.1"
   # Realtime: the redis cable/cache/Sidekiq adapter (Studio::Redis) + Turbo Streams
-  # broadcasting (Studio::Broadcastable). `redis` is the dependency whose ABSENCE
+  # broadcasting (Studio::Cable). `redis` is the dependency whose ABSENCE
   # 500'd a host app's task board — declaring it here makes that impossible to repeat.
   #
   # The `< 6` ceiling is ActionCable's, not ours. Its redis pubsub adapter

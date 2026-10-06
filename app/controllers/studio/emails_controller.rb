@@ -7,7 +7,7 @@ module Studio
   # It lists Studio::EmailCatalog's registry — one row per registered email, each
   # showing its live banner and whether that banner is the INHERITED engine
   # default or an APP-OWNED override — and writes an override through the shared
-  # crop modal. Replaces /admin/email_images, which now redirects here.
+  # crop modal.
   #
   # An app whose host never set Studio.s3_bucket_prefix cannot store an override.
   # That is a read-only page, not an error: uploads_available? gates the write
