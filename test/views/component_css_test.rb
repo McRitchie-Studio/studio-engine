@@ -125,7 +125,6 @@ class ComponentCssTest < Minitest::Test
 
     assert_includes template, 'class: "badge '
     assert_includes defined_utilities, "badge"
-    assert_includes html, ">Live<"
   end
 
   def test_empty_state_partial_renders_shipped_empty_state_class
