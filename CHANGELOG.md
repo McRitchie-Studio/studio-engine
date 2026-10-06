@@ -11,6 +11,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   SecureRandom.hex(16)`, which raised `UnknownAttributeError` on any User without
   `has_secure_password`; the engine logged it and bounced to the login page. The
   engine now sets a random password only when the User answers `password=`.
+- **The survey keeps its h1 for a screen reader on every step.** From question 2
+  on, the stepper set `hidden` on the survey head, which took the page's only
+  h1 out of the accessibility tree. The head now steps into a 1px visual clip
+  instead, holding only the title.
+
+### Changed
+
+- **The survey partials declare strict locals.** `studio/surveys/_question`
+  takes `question:`, `index:`, `total:`, `response:` and an optional `error:`;
+  `_script` and `_styles` take none. A render with an unknown or missing local
+  now raises instead of painting a blank. The survey accent's fallback reads
+  `Studio::ThemeResolver::DEFAULT_PRIMARY` instead of a copied hex.
 
 ## 0.91.0 — 2026-10-06
 

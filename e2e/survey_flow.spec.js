@@ -95,6 +95,11 @@ test("Next moves on one question per screen, focus follows, Back appears", async
   await expect(page.locator("#studio-survey-rules-label")).toBeFocused();
   await expect(page.getByRole("button", { name: "Back" })).toBeVisible();
   await expect(page.locator("[data-survey-intro]")).toBeHidden();
+  // The head steps aside visually, but the page keeps its h1 for a screen
+  // reader on every step: it is found by role and name, in a 1px clip.
+  const title = page.getByRole("heading", { level: 1, name: "How was your first game?" });
+  await expect(title).toHaveCount(1);
+  expect((await title.boundingBox()).width).toBeLessThanOrEqual(1);
   // Next holds its place whether or not Back is showing beside it.
   const movedBox = await page.getByRole("button", { name: "Next" }).boundingBox();
   expect(Math.abs(movedBox.x - nextBox.x)).toBeLessThanOrEqual(1);
