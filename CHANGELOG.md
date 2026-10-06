@@ -4,6 +4,20 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **A survey opens on question 1.** The intro screen and its Start button are
+  gone: a respondent lands on "Question 1 of N" with the progress bar started,
+  and question 1 shows no Back button. The definition's `intro` becomes a quiet
+  lead line above question 1, and its `title` stays the page's `h1`; when the
+  title repeats question 1 (`Studio::Survey#title_repeats_first_question?`), the
+  stepper hides it visually so the same words are not painted twice. Number keys
+  and Enter work from the first paint. Returning respondents still resume on
+  their first unanswered question, and the no-JavaScript form shows the title
+  and intro at the top. No host change is needed.
+- **The survey's "Press a number to choose" hint** no longer shows at phone width
+  (under 640px), as well as on touch screens.
+
 ## 0.88.0 — 2026-10-05
 
 ### Added
