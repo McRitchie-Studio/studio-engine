@@ -1,3 +1,4 @@
+<%# locals: () %>
 <%# Survey styles, scoped under .studio-survey. Plain CSS on the theme's CSS
     custom properties (--color-cta, --color-surface, ...) rather than Tailwind
     utilities, so the page looks the same in every host whatever its Tailwind
@@ -6,7 +7,7 @@
 <style>
   /* overflow-x: clip, not hidden: the slide-in must never widen the page, and
      clip makes no scroll container, so the sticky nav still sticks. */
-  .studio-survey { --sv-accent: var(--color-cta, #8E82FE); display: flex; justify-content: center; padding: 1.25rem 1rem 2rem; color: var(--color-text-body); overflow-x: clip; }
+  .studio-survey { --sv-accent: var(--color-cta, <%= Studio::ThemeResolver::DEFAULT_PRIMARY %>); display: flex; justify-content: center; padding: 1.25rem 1rem 2rem; color: var(--color-text-body); overflow-x: clip; }
   .studio-survey [hidden] { display: none !important; }
   .studio-survey__shell { width: 100%; max-width: 36rem; }
   .studio-survey__sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
@@ -25,6 +26,11 @@
   .studio-survey.is-enhanced .studio-survey__head { margin-bottom: 1.25rem; }
   .studio-survey.is-enhanced .studio-survey__title { margin: 0 0 .375rem; font-size: 1rem; line-height: 1.4; font-weight: 700; color: var(--color-text-secondary); }
   .studio-survey.is-enhanced .studio-survey__head--echo .studio-survey__title { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  /* After question 1 the head steps aside visually, but its h1 stays the page's
+     heading for a screen reader: the head goes into a 1px clip and only the
+     title remains inside it. */
+  .studio-survey.is-enhanced .studio-survey__head--later { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .studio-survey.is-enhanced .studio-survey__head--later > :not(.studio-survey__title) { display: none; }
   .studio-survey.is-enhanced .studio-survey__intro-copy { margin: 0; font-size: .9375rem; line-height: 1.5; color: var(--color-text-secondary); }
   .studio-survey.is-enhanced .studio-survey__meta { display: none; }
   .studio-survey__question { display: block; width: 100%; padding: 0; margin: 0 0 .5rem; font-size: 1.375rem; line-height: 1.3; font-weight: 700; color: var(--color-text); outline: none; }

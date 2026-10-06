@@ -1,3 +1,4 @@
+<%# locals: () %>
 <%# The survey stepper: progressive enhancement over studio/surveys/show.
     Plain JavaScript (no Alpine dependency), idempotent per root so a Turbo
     render that re-runs it never double-binds. Bound roots are tracked in a
@@ -137,8 +138,10 @@
       back.hidden = first;
       next.hidden = last;
       submit.hidden = !last;
-      // The title and intro lead question 1 only; later screens are the question alone.
-      if (head) head.hidden = !first;
+      // The title and intro lead question 1 only; later screens show the
+      // question alone. The head steps into a visual clip rather than
+      // `hidden`, so the page keeps its h1 for a screen reader on every step.
+      if (head) head.classList.toggle("studio-survey__head--later", !first);
       // The number-key shortcut only means something on a choice or scale.
       var step = steps[index];
       hint.hidden = !(step.dataset.key && (isChoice(step) || isMulti(step)));
