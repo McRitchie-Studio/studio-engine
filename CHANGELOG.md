@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.91.0 — 2026-10-06
+
 ### Added
 
 - **`fizz_portal: true` on `studio/hold_button`** lifts the bubbles out of a card
