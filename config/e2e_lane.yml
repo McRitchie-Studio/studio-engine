@@ -827,13 +827,15 @@
 # only, a re-tapped option leaving no flag for the next arrow key, the unchosen
 # ring at 3:1 in dark and light, and the stepper alive after a Turbo restore.
 #   npx playwright test --list  -> 204 tests in 28 files
-# Moved 204 -> 205 by survey-opens-on-first-question, no new file
-# (e2e/survey_flow.spec.js 15 -> 16): the intro screen is gone, so the old
+# Moved 204 -> 207 by survey-opens-on-first-question, no new file
+# (e2e/survey_flow.spec.js 15 -> 18): the intro screen is gone, so the old
 # "intro, then one question per screen" spec splits in two: the FIRST PAINT is
 # question 1 with no Start and no Back, and Next moves one question per screen
-# with focus following and Back appearing from question 2.
-#   npx playwright test --list  -> 205 tests in 28 files
-total_specs: 205
+# with focus following and Back appearing from question 2. And the number-key
+# hint, now a desktop-only affordance, gets two specs that it stays off: at
+# phone width, and on a touch screen at desktop width.
+#   npx playwright test --list  -> 207 tests in 28 files
+total_specs: 207
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -962,13 +964,13 @@ total_specs: 205
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 204
 # executed = total - devnet - allowed_skips = 204 - 0 - 0 = 204, so executed ==
 # total_specs and the equality assertion holds.
-# And again for survey-opens-on-first-question — 1 more test, no new file:
-#   npx playwright test --list                                             -> 205 tests, 28 files
+# And again for survey-opens-on-first-question — 3 more tests, no new file:
+#   npx playwright test --list                                             -> 207 tests, 28 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
-#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 205
-# executed = total - devnet - allowed_skips = 205 - 0 - 0 = 205, so executed ==
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 207
+# executed = total - devnet - allowed_skips = 207 - 0 - 0 = 207, so executed ==
 # total_specs and the equality assertion holds.
-executed: 205
+executed: 207
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
