@@ -1,9 +1,10 @@
 <%# /surveys/:slug — the survey (Studio::SurveysController#show, docs/SURVEYS.md).
 
     ONE FORM, TWO PRESENTATIONS. Without JavaScript every question renders in
-    order and the Submit button posts the lot. The script below adds
-    .is-enhanced and turns the same markup into one question per screen, with a
-    progress bar, Back and Next, number-key and Enter shortcuts, and an
+    order under the title and intro, and the Submit button posts the lot. The
+    script below adds .is-enhanced and turns the same markup into one question
+    per screen, opening on question 1 with no intro screen, with a progress
+    bar, Back (from question 2 on) and Next, number-key and Enter shortcuts, and an
     autosave on each answer. Submit is still the same POST either way, so the
     server's validation is the one rule. %>
 <% total = @survey.questions.size %>
@@ -28,10 +29,14 @@
 
     <%= form_with url: studio_survey_path(@survey.slug), method: :post, local: true,
                   html: { class: "studio-survey__form", data: { survey_form: true } } do %>
-      <section class="studio-survey__step" data-survey-step data-intro aria-labelledby="studio-survey-title">
-        <h1 class="studio-survey__title" id="studio-survey-title" tabindex="-1" data-survey-focus><%= @survey.title %></h1>
+      <%# The head is not a step: the survey opens straight on question 1. The
+          title stays the page's h1 for a screen reader; when it says what
+          question 1 asks, the stepper hides it visually rather than paint the
+          same words twice. The intro is a quiet lead line over question 1. %>
+      <header class="studio-survey__head<%= " studio-survey__head--echo" if @survey.title_repeats_first_question? %>" data-survey-head>
+        <h1 class="studio-survey__title" id="studio-survey-title"><%= @survey.title %></h1>
         <% if @survey.intro %>
-          <p class="studio-survey__intro-copy"><%= @survey.intro %></p>
+          <p class="studio-survey__intro-copy" data-survey-intro><%= @survey.intro %></p>
         <% end %>
         <p class="studio-survey__meta">
           <%= pluralize(total, "question") %> · about <%= pluralize(minutes, "minute") %><% if @survey.required_keys.any? %> · <span aria-hidden="true">*</span> required<% end %>
@@ -39,7 +44,7 @@
         <% if @errors.any? %>
           <p class="studio-survey__error" role="alert">A few answers need another look before this can be sent.</p>
         <% end %>
-      </section>
+      </header>
 
       <% @survey.questions.each_with_index do |question, index| %>
         <%= render "studio/surveys/question", question: question, index: index, total: total,
@@ -48,7 +53,7 @@
 
       <div class="studio-survey__nav">
         <button type="button" class="btn btn-neutral" data-survey-back hidden>Back</button>
-        <button type="button" class="btn btn-primary studio-survey__forward" data-survey-next hidden>Start</button>
+        <button type="button" class="btn btn-primary studio-survey__forward" data-survey-next hidden>Next</button>
         <button type="submit" class="btn btn-primary studio-survey__forward" data-survey-submit>Submit</button>
       </div>
       <p class="studio-survey__status" aria-live="polite" data-survey-status></p>
