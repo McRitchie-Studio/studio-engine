@@ -31,7 +31,6 @@ async function visibleSteps(page) {
 async function start(page) {
   await page.goto(SURVEY);
   await expect(page.locator("[data-studio-survey].is-enhanced")).toHaveCount(1);
-  await page.getByRole("button", { name: "Start" }).click();
   await expect(activeStep(page)).toHaveAttribute("data-key", "overall");
 }
 
@@ -49,20 +48,61 @@ test.beforeEach(async ({ page }) => {
   await blockOffsiteRequests(page);
 });
 
-test("shows the intro, then exactly one question per screen with progress", async ({ page }) => {
+// Alex, 2026-10-05: "why don't we just start with the first question as the
+// landing page. One less click." The FIRST PAINT is question 1: no intro
+// screen, no Start button, no Back, and the count and bar already on 1 of 6.
+test("the first paint is question 1, with no Start and no Back", async ({ page }) => {
   const errors = watchPageErrors(page);
   await page.goto(SURVEY);
+  await expect(page.locator("[data-studio-survey].is-enhanced")).toHaveCount(1);
 
-  await expect(page.getByRole("heading", { name: "How was your first game?" })).toBeVisible();
   expect(await visibleSteps(page)).toBe(1);
-  await expect(page.locator("[data-survey-submit]")).toBeHidden();
-
-  await page.getByRole("button", { name: "Start" }).click();
-  expect(await visibleSteps(page)).toBe(1);
+  await expect(activeStep(page)).toHaveAttribute("data-key", "overall");
   await expect(page.locator("[data-survey-count]")).toHaveText("Question 1 of 6");
   await expect(page.locator("[data-survey-progress]")).toHaveAttribute("aria-valuenow", "1");
+  await expect(page.getByRole("button", { name: "Start" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Back" })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Next" })).toBeVisible();
+  await expect(page.locator("[data-survey-submit]")).toBeHidden();
+
+  // The intro is a lead line over question 1, and leaves with it.
+  await expect(page.locator("[data-survey-intro]")).toBeVisible();
+  await expect(page.locator("[data-survey-intro]")).toContainText("Six quick questions");
+  // The title repeats question 1 here, so it stays the page's h1 for a screen
+  // reader but is not painted twice: it renders in a 1px clip.
+  const title = page.getByRole("heading", { level: 1, name: "How was your first game?" });
+  await expect(title).toHaveCount(1);
+  const titleBox = await title.boundingBox();
+  expect(titleBox.width).toBeLessThanOrEqual(1);
+  await expect(page.locator("#studio-survey-overall-label")).toBeVisible();
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+  expect(errors).toEqual([]);
+});
+
+test("Next moves on one question per screen, focus follows, Back appears", async ({ page }) => {
+  const errors = watchPageErrors(page);
+  await start(page);
+  const nextBox = await page.getByRole("button", { name: "Next" }).boundingBox();
+
+  await page.keyboard.press("4");
+  await expect(activeStep(page)).toHaveAttribute("data-key", "rules");
+  expect(await visibleSteps(page)).toBe(1);
+  await expect(page.locator("[data-survey-count]")).toHaveText("Question 2 of 6");
+  await expect(page.locator("[data-survey-progress]")).toHaveAttribute("aria-valuenow", "2");
   // Focus moves to the question, so a screen reader announces it.
-  await expect(page.locator("#studio-survey-overall-label")).toBeFocused();
+  await expect(page.locator("#studio-survey-rules-label")).toBeFocused();
+  await expect(page.getByRole("button", { name: "Back" })).toBeVisible();
+  await expect(page.locator("[data-survey-intro]")).toBeHidden();
+  // Next holds its place whether or not Back is showing beside it.
+  const movedBox = await page.getByRole("button", { name: "Next" }).boundingBox();
+  expect(Math.abs(movedBox.x - nextBox.x)).toBeLessThanOrEqual(1);
+
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(activeStep(page)).toHaveAttribute("data-key", "overall");
+  await expect(page.getByRole("button", { name: "Back" })).toBeHidden();
+  await expect(page.locator("[data-survey-intro]")).toBeVisible();
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
@@ -156,6 +196,7 @@ test("a reload resumes at the first unanswered question", async ({ page }) => {
 test("reduced motion turns the step transition off", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await start(page);
+  await keyTo(page, "4", "rules");
   const animation = await activeStep(page).evaluate((el) => getComputedStyle(el).animationName);
   expect(animation).toBe("none");
 });
@@ -163,6 +204,7 @@ test("reduced motion turns the step transition off", async ({ page }) => {
 test("the step slides in when motion is allowed", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await start(page);
+  await keyTo(page, "4", "rules");
   const animation = await activeStep(page).evaluate((el) => getComputedStyle(el).animationName);
   expect(animation).toBe("studio-survey-in-fwd");
 });
@@ -269,7 +311,10 @@ test.describe("without JavaScript", () => {
 
   test("every question shows in one form that submits", async ({ page }) => {
     await page.goto(SURVEY);
-    expect(await visibleSteps(page)).toBe(7); // the intro and six questions
+    expect(await visibleSteps(page)).toBe(6); // six questions, under the title and intro
+    await expect(page.getByRole("heading", { level: 1, name: "How was your first game?" })).toBeVisible();
+    await expect(page.locator("[data-survey-intro]")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Start" })).toHaveCount(0);
     await page.locator("[data-key=overall] .studio-survey__tile").nth(2).click();
     await page.locator("[data-key=found_us] .studio-survey__option").nth(0).click();
     await page.locator("[data-survey-submit]").click();

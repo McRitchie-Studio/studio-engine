@@ -246,11 +246,8 @@ module Studio
     # keeps the title as the page's heading for a screen reader but does not
     # paint it twice. Compared on letters and digits alone, ignoring case.
     def title_repeats_first_question?
-      first = questions.first
-      return false if first.nil? || title.empty?
-
       squash = ->(text) { text.to_s.downcase.gsub(/[^[:alnum:]]/, "") }
-      squash.call(title) == squash.call(first.label)
+      squash.call(title) == squash.call(questions.first.label)
     end
 
     private
