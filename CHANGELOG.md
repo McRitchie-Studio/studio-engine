@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.91.2 — 2026-10-06
+
 ### Security
 
 - **A return path beginning `/\` no longer redirects off-site.** Browsers read
