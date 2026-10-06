@@ -298,6 +298,13 @@ module Studio
          ::User.ancestors.include?(::ActiveRecord::Base)
         Studio.validate_user_contract!(::User)
       end
+
+      # The host's error_logs, theme_settings and image_caches carry every
+      # column the engine's models write (Studio::HostSchema). Skipped in a
+      # rake task, which boots to migrate rather than to serve.
+      if Studio.active_record? && !Studio::HostSchema.inside_rake_task?
+        Studio::HostSchema.check!
+      end
     end
 
   end

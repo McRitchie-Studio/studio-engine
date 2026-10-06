@@ -164,6 +164,13 @@ Studio.site_footer = lambda do |view|
   controller.lab_site_footer if controller.respond_to?(:lab_site_footer)
 end
 
+# The host schema boot check (Studio::HostSchema) is off for the dummy. Its
+# database is an empty in-memory SQLite at boot, and each suite builds the tables
+# it needs afterwards, so a boot-time check here would report every table
+# missing. test/integration/host_schema_check_test.rb runs the check itself,
+# against tables built from the engine's migrations.
+Studio.host_schema_check = false
+
 # A schedule on Google's real host, so the browser lane can stub it by URL. No
 # such schedule exists; nothing in the suite is allowed to reach Google.
 Studio.booking_url = "https://calendar.google.com/calendar/appointments/schedules/LAB-SCHEDULE"

@@ -42,6 +42,7 @@ require "studio/public_user"
 require "studio/name_parts"
 require "studio/s3"
 require "studio/image_cache"
+require "studio/host_schema"
 require "studio/link_token"
 require "studio/link_resolution"
 require "studio/session_fingerprint"
@@ -1060,6 +1061,11 @@ module Studio
   # that intentionally break the contract).
   mattr_accessor :validate_user_contract, default: true
 
+  # How loudly the boot check reports a host database missing a column the
+  # engine's models write (Studio::HostSchema): :raise, :log, or false for off.
+  # nil, the default, means :raise in development and test and :log elsewhere.
+  mattr_accessor :host_schema_check, default: nil
+
   # Does the host load ActiveRecord at all? True for every app that requires
   # `rails/all` or `active_record/railtie` (all the engine's database-backed
   # consumers); false for a FOOTER-ONLY consumer, an app with no database that
@@ -1091,6 +1097,7 @@ module Studio
   PASSWORD_USER_INSTANCE_METHODS = %i[authenticate].freeze
 
   class UserContractError < StandardError; end
+  class HostSchemaError < StandardError; end
 
   def self.configure
     yield self
