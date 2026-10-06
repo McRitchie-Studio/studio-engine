@@ -76,8 +76,8 @@ lowercase words joined by hyphens; question keys are lowercase snake_case.
 
 | Setting | Meaning |
 |---------|---------|
-| `title` | Required. The intro heading and the page title |
-| `intro` | Optional text under the title on the first screen |
+| `title` | Required. The page title and its `h1`. When it says what question 1 asks, the stepper keeps it for screen readers but does not paint it twice |
+| `intro` | Optional. One quiet lead line above question 1 (and at the top of the no-JavaScript form) |
 | `thank_you` | The thank-you screen's copy (default "We appreciate you taking the time."), under a "Thank you!" heading |
 | `next_action label:, url:` | Optional button on the thank-you screen. `url` is a `/path` or an `http(s)` URL |
 | `allow_anonymous` | Let anyone answer. Off by default (see *Who may answer*) |
@@ -114,17 +114,22 @@ the definition no longer has.
 
 ## The respondent's experience
 
-- **One question per screen** with a progress bar, Back and Next. The first
-  screen is the intro with a Start button.
+- **Opens on question 1.** There is no intro screen and no Start button: a new
+  respondent lands on "Question 1 of N" with the progress bar already started.
+  The `intro`, if any, is a small lead line above question 1 and leaves with it.
+- **One question per screen** with a progress bar, Back and Next. Question 1 has
+  no Back, since nothing comes before it.
 - **Tap to answer**: a tap on a face, a number or an option saves it and moves
   on. Multiple choice and text wait for Next.
 - **Keyboard**: number keys choose an option (and toggle one in multiple choice),
   Enter continues, Ctrl/⌘+Enter continues from a long-text box. Arrow keys move
-  within a group and never skip ahead.
+  within a group and never skip ahead. They work from the first paint, before
+  anything has focus. The "Press a number" hint shows only on a desktop-width
+  screen with a fine pointer, never on a phone or touch screen.
 - **Autosave and resume**: each answer is saved as it is given. A respondent who
   leaves and comes back lands on their first unanswered question.
 - **Accessible**: each question is a `fieldset` whose `legend` takes focus on
-  every step, errors are announced, a required question says so, and
+  every step you move to, errors are announced, a required question says so, and
   `prefers-reduced-motion` turns the transitions off.
 - **Theme**: it follows the app's theme tokens in dark and light mode.
 - **Without JavaScript** every question shows in one form with a Submit button,

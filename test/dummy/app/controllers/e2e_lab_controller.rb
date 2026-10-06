@@ -376,8 +376,8 @@ class E2eLabController < ActionController::Base
   # A PORO rather than a record, on purpose. The dummy runs sqlite :memory: (see
   # e2e/boot.rb) and the partials under test read the user through duck-typed
   # accessors — display_name, email, avatar_initials, avatar_color, first_name —
-  # which is the interface every host User defines for itself. There is no row for a spec to seed and nothing here that a database would make more
-  # true.
+  # which is the interface every host User defines for itself. There is no row for
+  # a spec to seed and nothing here that a database would make more true.
   #
   # `avatar` is deliberately ABSENT: the header's attachable guard drops the
   # upload affordance for a model with no attachment, which is both the cheaper

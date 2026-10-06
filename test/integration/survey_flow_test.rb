@@ -50,6 +50,40 @@ class SurveyFlowTest < ActionDispatch::IntegrationTest
     assert_equal 0, Studio::SurveyResponse.count, "a page view never creates a response"
   end
 
+  # Alex, 2026-10-05: "start with the first question as the landing page. One
+  # less click." The page carries no intro step and no Start button; the title
+  # is the h1 and the intro sits at the top of the form, outside every step, so
+  # the stepper's first screen is question 1 and the no-JS form still reads it.
+  test "the page opens on question 1: no intro step, no Start, the intro as a lead line" do
+    get "/surveys/first-game"
+
+    body = response.body
+    refute_includes body, "data-intro", "no intro step"
+    refute_match(/>\s*Start\s*</, body, "no Start button")
+    assert_equal 6, body.scan(/<\w+ [^>]*\bdata-survey-step\b/).size, "every step is a question"
+    head = body[%r{<header class="studio-survey__head[^"]*" data-survey-head>.*?</header>}m]
+    assert head, "the title and intro sit in the head, outside the steps"
+    assert_includes head, %(<h1 class="studio-survey__title" id="studio-survey-title">How was your first game?</h1>)
+    assert_includes head, "Six quick questions."
+    assert_operator body.index("data-survey-head>"), :<, body.index('id="studio-survey-overall"'), "the head comes before question 1"
+    refute_includes head, "studio-survey__head--echo", "'How was it?' does not repeat the title"
+    assert_match(/data-survey-next hidden>Next</, body)
+  end
+
+  test "a title that repeats question 1 is marked so the stepper paints it once" do
+    Studio::Survey.define("same-words") do
+      title "How was your first game?"
+      allow_anonymous true
+      emoji_scale :overall, "How was your first game?", required: true
+    end
+    get "/surveys/same-words"
+
+    assert_response :success
+    assert_includes response.body, %(class="studio-survey__head studio-survey__head--echo")
+    assert_includes response.body, %(<h1 class="studio-survey__title" id="studio-survey-title">How was your first game?</h1>),
+                    "the h1 stays for screen readers"
+  end
+
   test "a rating's end labels describe its group to a screen reader" do
     get "/surveys/first-game"
 

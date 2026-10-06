@@ -1525,7 +1525,7 @@ module Studio
       # live banner and whether that banner is inherited or app-owned; update
       # stores this app's own override; destroy drops it back to the inherited
       # default. Surfaced from each app's admin sidebar.
-
+      #
       # OPT-IN, and it has to be. turf-monster ALREADY owns /admin/emails —
       # `namespace :admin { get "emails", as: :emails }` (its EmailCatalog
       # manager) — which claims the SAME path and the SAME helper names,

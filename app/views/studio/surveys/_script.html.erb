@@ -19,7 +19,9 @@
 
     var form = root.querySelector("[data-survey-form]");
     var steps = Array.prototype.slice.call(root.querySelectorAll("[data-survey-step]"));
-    var total = steps.length - 1;
+    // Every step is a question: the survey opens on question 1, no intro screen.
+    var total = steps.length;
+    var head = root.querySelector("[data-survey-head]");
     var back = root.querySelector("[data-survey-back]");
     var next = root.querySelector("[data-survey-next]");
     var submit = root.querySelector("[data-survey-submit]");
@@ -128,21 +130,23 @@
         }
       });
       current = index;
-      var onIntro = index === 0;
+      var first = index === 0;
       var last = index === steps.length - 1;
-      back.hidden = onIntro;
+      // Nothing comes before question 1, so it has no Back. Next keeps the
+      // right edge on its own (margin-left: auto), so the row does not shift.
+      back.hidden = first;
       next.hidden = last;
-      next.textContent = onIntro ? "Start" : "Next";
       submit.hidden = !last;
+      // The title and intro lead question 1 only; later screens are the question alone.
+      if (head) head.hidden = !first;
       // The number-key shortcut only means something on a choice or scale.
       var step = steps[index];
       hint.hidden = !(step.dataset.key && (isChoice(step) || isMulti(step)));
 
-      var position = onIntro ? 0 : index;
+      var position = index + 1;
       fill.style.width = (total ? (position / total) * 100 : 0) + "%";
       bar.setAttribute("aria-valuenow", String(position));
-      // The intro already says how many questions there are.
-      count.textContent = onIntro ? "" : "Question " + index + " of " + total;
+      count.textContent = "Question " + position + " of " + total;
 
       var focusTarget = steps[index].querySelector("[data-survey-focus]");
       if (focusTarget && direction) focusTarget.focus({ preventScroll: true });
@@ -182,7 +186,7 @@
     // The first required question still missing an answer, for a Submit that
     // jumps ahead (Enter on the last step, or a mid-survey reload).
     form.addEventListener("submit", function (event) {
-      for (var i = 1; i < steps.length; i++) {
+      for (var i = 0; i < steps.length; i++) {
         if (steps[i].dataset.required === "true" && !answered(steps[i])) {
           event.preventDefault();
           go(i);
@@ -230,7 +234,7 @@
       timers[step.dataset.key] = setTimeout(function () { save(step); }, 900);
     });
 
-    root.addEventListener("keydown", function (event) {
+    function onKey(event) {
       if (event.defaultPrevented || event.altKey) return;
       // A tap on an already-chosen option fires pointerdown but no change, so
       // the flag would outlive it and make the next arrow key advance.
@@ -256,15 +260,29 @@
       option.focus({ preventScroll: true });
       pointerPick = isChoice(step);
       option.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    }
+
+    root.addEventListener("keydown", onKey);
+    // The survey opens on question 1 with nothing focused, so a first key
+    // lands on <body>, outside the root. Take those keys too, and only those:
+    // a key aimed at any other control on the page is not the survey's. The
+    // listener retires itself once a Turbo visit has taken this root away.
+    function onPageKey(event) {
+      if (!root.isConnected) { document.removeEventListener("keydown", onPageKey); return; }
+      var target = event.target;
+      if (target === document.body || target === document.documentElement) onKey(event);
+    }
+    document.addEventListener("keydown", onPageKey);
 
     var resume = root.dataset.resumeIndex;
-    var start = resume === "" || resume === undefined ? 0 : parseInt(resume, 10) + 1;
+    // resume-index is the question's own index, and every step is a question.
+    var start = resume === "" || resume === undefined ? 0 : parseInt(resume, 10);
+    if (!(start >= 0 && start < steps.length)) start = 0;
     var hasErrors = root.dataset.hasErrors === "true";
-    // A fresh visitor sees the intro; a returning one lands on their next
+    // A fresh visitor lands on question 1; a returning one on their next
     // question, and a failed submit on the first question it flagged.
     if (restored >= 0) start = restored;
-    render(start > 0 ? start : 0, null);
+    render(start, null);
     if (restored < 0 && (start > 0 || hasErrors)) {
       var focusTarget = steps[current].querySelector("[data-survey-focus]");
       if (focusTarget) focusTarget.focus({ preventScroll: true });
