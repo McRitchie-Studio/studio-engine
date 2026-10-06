@@ -113,9 +113,8 @@ class User < ApplicationRecord
   def admin? = role == "admin"
 
   # The engine's avatar contract, which components/_avatar has required since
-  # long before /profile existed — every real consumer defines these (that is
-  # what Studio::UserProfile exists to supply). A double without them is thinner
-  # than any app the engine actually ships to.
+  # long before /profile existed — every real consumer defines these. A double
+  # without them is thinner than any app the engine actually ships to.
   def display_name = name.presence || email.to_s.split("@").first.presence || "anon"
   def avatar_initials = display_name.to_s[0].to_s.upcase
   def avatar_color = "#6366f1"

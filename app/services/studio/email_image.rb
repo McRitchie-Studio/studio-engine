@@ -20,8 +20,7 @@ module Studio
   # stays green. A host that did reference it gets a NameError, not a silent
   # wrong answer.
   #
-  # Delete it once no consumer's main names it — the same staged retirement
-  # /admin/email_images is on.
+  # Delete it once no consumer's main names it.
   #
   # Deliberately explicit rather than method_missing: a typo should still raise
   # NoMethodError here, and the delegated surface should be readable as a list.

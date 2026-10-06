@@ -839,6 +839,10 @@ module Studio
   # Studio::ProfilesController to get it would couple the two for no reason.
   FIRST_NAME_MAX_LENGTH = 40
 
+  # The house palette for initial-circle backgrounds. /u/:username hashes the
+  # username into it, so one person draws the same circle on every render.
+  AVATAR_COLORS = %w[#EF4444 #F97316 #EAB308 #22C55E #06B6D4 #3B82F6 #8B5CF6 #EC4899].freeze
+
   # How long a WHOLE typed answer may be — one string holding a full name, which
   # the onboarding step stores as users.name and SPLITS into the two halves
   # above (Studio::NameParts).
@@ -913,14 +917,6 @@ module Studio
     user.update_columns(ip_locations: updated)
     true
   end
-
-  # Optional admin Act As / impersonation session conventions. Consumers that
-  # include Studio::Impersonation get current_user layered over true_user with
-  # these session keys, but still own authorization, audit logging, and routes.
-  mattr_accessor :impersonation_target_session_key, default: :impersonated_user_id
-  mattr_accessor :impersonation_actor_session_key,  default: :true_admin_id
-  mattr_accessor :impersonation_started_at_session_key, default: :impersonation_started_at
-  mattr_accessor :impersonation_max_minutes, default: 30
 
   # Cap for the host app's local (development + test) log file, in bytes.
   # nil means "use the engine's defaults" — Studio::Engine::DEVELOPMENT_LOG_MAX_BYTES
@@ -1529,10 +1525,7 @@ module Studio
       # live banner and whether that banner is inherited or app-owned; update
       # stores this app's own override; destroy drops it back to the inherited
       # default. Surfaced from each app's admin sidebar.
-      #
-      # /admin/email_images redirects here but KEEPS its admin_email_images_path
-      # helper, so a shipped host sidebar link on the old helper still resolves
-      # (same treatment as /admin/design_system -> /admin/style).
+
       # OPT-IN, and it has to be. turf-monster ALREADY owns /admin/emails —
       # `namespace :admin { get "emails", as: :emails }` (its EmailCatalog
       # manager) — which claims the SAME path and the SAME helper names,
@@ -1591,17 +1584,6 @@ module Studio
         post "onboarding/skip_first_name", to: "studio/onboarding#skip_first_name",
              as: :onboarding_skip_first_name
       end
-
-      # DEPRECATED, kept for ONE release. Not a redirect: consumer-ci.yml runs
-      # each consumer's DEFAULT-BRANCH suite against this engine, and both
-      # mcritchie-studio and turf-monster have tests on `main` that GET this page
-      # and PATCH through admin_email_image_path. Redirecting (or deleting) here
-      # reddens their lanes the moment the PR opens, and no change inside the
-      # engine PR can fix it. Each app's adoption task moves its link + tests; a
-      # later engine minor deletes these two routes with the controller and view.
-      get   "admin/email_images",          to: "studio/email_images#index",  as: :admin_email_images
-      patch "admin/email_images/:variant", to: "studio/email_images#update", as: :admin_email_image,
-            constraints: { variant: /[a-z_]+/ }
 
       # Surveys (docs/SURVEYS.md). Both halves OPT-IN — see
       # Studio.draw_survey_routes and Studio.draw_admin_survey_routes.

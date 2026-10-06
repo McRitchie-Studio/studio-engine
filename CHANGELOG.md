@@ -4,6 +4,26 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Removed
+
+- **`components/card`, `components/input` and `components/progress_bar`.** No
+  app renders these partials. The `card` and `input-field` utilities they wrapped
+  still ship; write the classes on your own markup.
+- **`Studio::Impersonation`** and its four settings,
+  `impersonation_target_session_key`, `impersonation_actor_session_key`,
+  `impersonation_started_at_session_key` and `impersonation_max_minutes`. No app
+  includes the concern; each owns its Act As session. The
+  `studio/banners/impersonation` banner stays.
+- **`Studio::Broadcastable`.** No app includes it. Wrap a broadcast in
+  `Studio::Cable.safe_broadcast { broadcast_replace_to ... }` instead
+  (`docs/CABLE.md`).
+- **`Studio::UserProfile`.** No app includes it; each `User` defines
+  `display_name`, `avatar_initials` and `avatar_color` itself. The initial-circle
+  palette moves to `Studio::AVATAR_COLORS`.
+- **`/admin/email_images`**, `Studio::EmailImagesController`, its view and the
+  `admin_email_images_path` and `admin_email_image_path` helpers. `/admin/emails`
+  replaces the page, and no app links or tests it.
+
 ## 0.88.0 — 2026-10-05
 
 ### Added

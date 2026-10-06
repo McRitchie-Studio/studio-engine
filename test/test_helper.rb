@@ -145,10 +145,6 @@ module Studio
   mattr_accessor :mailer_from, default: nil
   mattr_accessor :resend_mailer_from, default: "McRitchie Studio <team@mcritchie.studio>"
   mattr_accessor :local_email_capture, default: nil
-  mattr_accessor :impersonation_target_session_key, default: :impersonated_user_id
-  mattr_accessor :impersonation_actor_session_key,  default: :true_admin_id
-  mattr_accessor :impersonation_started_at_session_key, default: :impersonation_started_at
-  mattr_accessor :impersonation_max_minutes, default: 30
 
   # S3 / object storage. s3_key_prefix is the optional key namespace inside the
   # bucket, so a satellite app can share an existing bucket (see lib/studio/s3.rb).

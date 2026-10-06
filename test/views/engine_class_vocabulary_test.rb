@@ -218,8 +218,8 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
 
   # ── the status-role colours, wherever a view writes them ──────────────────
   # These were the colour half of the open defects, and most of their uses sat
-  # where the scanner above cannot look: Ruby strings in emails/show's badge
-  # `case` and a ternary in email_images/index's flash. So this reads RAW source.
+  # where the scanner above cannot look: Ruby strings such as emails/show's
+  # badge `case`. So this reads RAW source.
   #
   # The contract (tailwind/studio.tailwind.config.js + ThemeResolver): a status
   # role is a FILL (bg-/border-<role>, vivid, free) or an INK (text-<role>-ink,

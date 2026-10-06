@@ -28,8 +28,17 @@ end
 
 # A host User with every private field the page must NOT show: a full name, a
 # first name, an email and a wallet (turf-monster's truncated_solana shape).
+# The avatar contract every host User defines for itself (display_name,
+# avatar_initials, avatar_color), username first as turf-monster's is. It sits in
+# a module so a test can override a method on User and remove it again.
+module PublicUserPageHostProfile
+  def display_name = username.presence || name.presence || email.to_s.split("@").first.presence || "anon"
+  def avatar_initials = (username.presence || name.presence || "?").to_s[0].upcase
+  def avatar_color = "#6366f1"
+end
+
 class User < ApplicationRecord
-  include Studio::UserProfile
+  include PublicUserPageHostProfile
 
   has_one_attached :avatar
 

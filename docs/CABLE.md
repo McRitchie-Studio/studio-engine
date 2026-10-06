@@ -5,13 +5,12 @@ by Redis. This primitive gives every host app the *correct* setup in one place, 
 no app has to re-derive (or forget) it. It exists because forgetting it caused a
 production outage — see the post-mortem at the bottom.
 
-Three pieces:
+Two pieces:
 
 | Piece | What it is | Used by |
 |---|---|---|
 | `Studio::Redis` | The single source of Redis **connection** truth (URL + TLS) | `cable.yml`, `cache_store`, Sidekiq |
 | `Studio::Cable.safe_broadcast` | Best-effort **broadcast guard** (StandardError **and** ScriptError) | every broadcast |
-| `Studio::Broadcastable` | Model concern: safe Turbo-Streams **wrappers** | broadcasting models |
 
 The engine also declares **`redis`** and **`turbo-rails`** as dependencies, so a
 consuming app can't ship a cable feature with the gem missing.
@@ -64,22 +63,22 @@ plain `rescue StandardError` does **not** catch it. In an `after_commit` that me
 the exception escapes and 500s the write. This guard closes that hole. Failures are
 captured to `ErrorLog` (if the host defines it) or logged; it returns `nil`.
 
-## 3. `Studio::Broadcastable` — safe Turbo wrappers
+## 3. Broadcasting from a model
+
+Wrap turbo-rails' `broadcast_*_to` (already on every model, because turbo-rails
+mixes `Turbo::Broadcastable` into `ActiveRecord::Base`) in the guard, so a cable
+hiccup can never break a save:
 
 ```ruby
 class Task < ApplicationRecord
-  include Studio::Broadcastable
   after_create_commit do
-    safe_broadcast_replace_to [:board], target: "card_#{id}",
-                              partial: "tasks/card", locals: { task: self }
+    Studio::Cable.safe_broadcast do
+      broadcast_replace_to [:board], target: "card_#{id}",
+                           partial: "tasks/card", locals: { task: self }
+    end
   end
 end
 ```
-
-`safe_broadcast_{replace,append,prepend,update,remove}_to` wrap turbo-rails'
-`broadcast_*_to` in `safe_broadcast`. The model already has the raw methods
-(turbo-rails mixes `Turbo::Broadcastable` into `ActiveRecord::Base`); broadcast
-through the **safe** variants so a cable hiccup can never break a save.
 
 ## Heroku readiness (do this before a host app's realtime can work)
 

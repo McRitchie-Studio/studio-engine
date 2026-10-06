@@ -131,22 +131,11 @@ class ComponentCssTest < Minitest::Test
     assert_includes html, "Nothing here"
   end
 
-  def test_input_partial_renders_shipped_input_field_class
-    record = Struct.new(:email).new("shannon@example.com")
-    form = ActionView::Helpers::FormBuilder.new(:user, record, view, {})
-    html = view.render(partial: "components/input", locals: { form: form, field: :email, label: "Email" })
-
-    assert_includes html, 'class="input-field"'
-    assert_includes defined_utilities, "input-field"
-    assert_includes html, 'value="shannon@example.com"'
-  end
-
-  def test_card_partial_renders_shipped_card_class
-    html = view.render(layout: "components/card", locals: { padding: "p-4" }) { "Card body" }
-
-    assert_includes html, 'class="card p-4"'
+  # The card and input-field utilities ship without a partial: apps write
+  # class="card" and class="input-field" on their own markup.
+  def test_card_and_input_field_utilities_ship_without_partials
     assert_includes defined_utilities, "card"
-    assert_includes html, "Card body"
+    assert_includes defined_utilities, "input-field"
   end
 
   # btn-primary's LABEL is token-driven: a light brand primary fails contrast
