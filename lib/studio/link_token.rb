@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "securerandom"
+require_relative "local_path"
 
 module Studio
   # Pure-Ruby helpers behind the Studio::Link model — token minting, the kind
@@ -53,12 +54,13 @@ module Studio
       email.to_s.strip.downcase
     end
 
-    # Only same-origin absolute paths survive; protocol-relative ("//evil"),
+    # Only local paths survive (Studio::LocalPath: one leading "/", no
+    # backslash, no control character); protocol-relative ("//evil", "/\evil"),
     # absolute URLs, and blanks collapse to nil so callers fall back to a safe
-    # default redirect. Mirrors the MagicLink service's sanitizer.
+    # default redirect.
     def sanitize_path(path)
       p = path.to_s
-      p.start_with?("/") && !p.start_with?("//") ? p : nil
+      Studio::LocalPath.local?(p) ? p : nil
     end
   end
 end

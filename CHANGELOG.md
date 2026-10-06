@@ -4,6 +4,20 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Security
+
+- **A return path beginning `/\` no longer redirects off-site.** Browsers read
+  `/\evil.com` as `//evil.com`, and the engine's path sanitizers checked only for
+  one leading `/` and not two, so a magic link minted with `return_to=/\evil.com`
+  sent the visitor to another host after sign-in (or, under Rails'
+  `raise_on_open_redirects`, answered 500). One predicate, `Studio::LocalPath.local?`,
+  now holds the rule (one leading `/`, no backslash, no control character) and
+  every engine site uses it: `Studio::LinkToken.sanitize_path`, the link-consume
+  redirect, `Studio::Booking.local_path?`, and the link-preview fallback image.
+  Each site keeps its fallback: a refused return path lands on the default page.
+  Consumers that sanitize a return path themselves should call
+  `Studio::LocalPath.local?` instead of a bare `start_with?("/")` check.
+
 ## 0.91.1 — 2026-10-06
 
 ### Fixed

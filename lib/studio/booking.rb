@@ -11,6 +11,8 @@
 #
 # `gv=true` is what makes Google serve the embeddable page, so the frame and the
 # popup add it; the "open the booking page" link does not.
+require_relative "local_path"
+
 module Studio
   module Booking
     EMBED_PARAM = "gv=true"
@@ -116,10 +118,10 @@ module Studio
     # hrefs (the footer's booking links, `studio_booking_link`). It begins with
     # one "/" and carries no control character. That refuses a scheme
     # ("javascript:", "https:") and a protocol-relative "//host", which a browser
-    # reads as another site.
+    # reads as another site. The rule is Studio::LocalPath's, shared with every
+    # other engine path sanitizer.
     def local_path?(path)
-      string = path.to_s
-      string.start_with?("/") && !string.start_with?("//") && !string.match?(/[\x00-\x1f\x7f\\]/)
+      Studio::LocalPath.local?(path)
     end
 
     # Studio.booking_path: nil, a local path, or a callable receiving the view.

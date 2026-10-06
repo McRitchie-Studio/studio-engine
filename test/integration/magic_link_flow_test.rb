@@ -367,6 +367,29 @@ class MagicLinkFlowTest < ActionDispatch::IntegrationTest
     assert_redirected_to "/"
   end
 
+  # Browsers read "/\\evil.test" as "//evil.test" (WHATWG treats "\\" as "/"),
+  # so a bare one-leading-slash check let this through as an open redirect.
+  test "a backslash return_to is dropped at mint and the consume lands on the default" do
+    link = mint(OWNER, return_to: "/\\evil.test/steal")
+
+    post "/l/#{link.token}"
+
+    assert_equal @owner.id, session[:user_id], "the sign-in itself still succeeds"
+    assert_redirected_to "/", "a backslash path must collapse to the safe default, not go off-site"
+  end
+
+  # A row written before this rule (or by any path around the minting sanitizer)
+  # still carries the raw value; the consume must refuse it on the way out.
+  test "a backslash return_to already stored on a row is refused at consume" do
+    link = mint(OWNER, return_to: TARGET)
+    link.update_column(:metadata, link.metadata.merge("return_to" => "/\\evil.test/steal"))
+
+    post "/l/#{link.token}"
+
+    assert_redirected_to "/"
+    refute_match(/evil/, response.location.to_s)
+  end
+
   # --- 8. the "sent" notice speaks the app's sign-in label ------------------
 
   # A malformed email gets the same notice with no mail sent, so these drive
