@@ -146,8 +146,9 @@ module Studio
   # Which sign-in methods this app offers. The shared login/signup views render
   # a button/field per enabled method (gate with Studio.auth_method?). Order is
   # display order. Both McRitchie Studio + Turf Monster are passwordless; legacy
-  # email+password is opt-in via :password (which also re-arms the User#authenticate
-  # contract check — see validate_user_contract!).
+  # email+password is opt-in via :password, which also draws POST /login (see
+  # Studio.routes) and re-arms the User#authenticate contract check (see
+  # validate_user_contract!).
   #
   # :wallet is deliberately NOT in the default. This engine plus McRitchie Studio
   # is the BASE template for every app, web2 and web3 alike; solana-studio plus
@@ -1336,7 +1337,16 @@ module Studio
   def self.routes(router)
     router.instance_exec do
       get  "login",  to: "sessions#new"
-      post "login",  to: "sessions#create"
+
+      # Email + password sign-in, drawn only for an app that declares :password.
+      # SessionsController#create calls user.authenticate, which a passwordless
+      # User does not define: on a passwordless app this POST answered 500 for a
+      # member's address and 422 for a stranger's, which told anyone who asked
+      # who the members are. Undrawn, it answers 404 for every address.
+      # GET /login stays drawn for every app: it is the sign-in page, and
+      # login_path names it.
+      post "login", to: "sessions#create" if Studio.auth_method?(:password)
+
       post "sso_continue", to: "sessions#sso_continue"
       get  "sso_login",    to: "sessions#sso_login"
       get  "logout", to: "sessions#destroy"
