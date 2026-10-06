@@ -13,6 +13,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   every existing caller renders as before. The style guide's live hold button
   uses it.
 
+## 0.90.0 — 2026-10-06
+
 ### Removed
 
 - **`components/card`, `components/input` and `components/progress_bar`.** No
