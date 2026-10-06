@@ -129,7 +129,7 @@ the definition no longer has.
 - **Autosave and resume**: each answer is saved as it is given. A respondent who
   leaves and comes back lands on their first unanswered question.
 - **Accessible**: each question is a `fieldset` whose `legend` takes focus on
-  every step, errors are announced, a required question says so, and
+  every step you move to, errors are announced, a required question says so, and
   `prefers-reduced-motion` turns the transitions off.
 - **Theme**: it follows the app's theme tokens in dark and light mode.
 - **Without JavaScript** every question shows in one form with a Submit button,
