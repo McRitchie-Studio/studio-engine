@@ -163,10 +163,10 @@ module Studio
       user.update!(email_verified_at: Time.current)
     end
 
-    # Only same-origin absolute paths survive; everything else collapses to nil.
+    # Only local paths survive (Studio::LocalPath); everything else collapses to nil.
     def safe_path(path)
       p = path.to_s
-      p.start_with?("/") && !p.start_with?("//") ? p : nil
+      Studio::LocalPath.local?(p) ? p : nil
     end
   end
 end

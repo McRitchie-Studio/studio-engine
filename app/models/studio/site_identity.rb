@@ -183,7 +183,7 @@ module Studio
       def static_image
         path = Studio.link_preview_fallback_image.to_s
         return nil if path.empty?
-        return path unless path.start_with?("/") && !path.start_with?("//")
+        return path unless Studio::LocalPath.local?(path)
 
         @static_files ||= Concurrent::Map.new
         present = @static_files.compute_if_absent(path) do
@@ -203,7 +203,7 @@ module Studio
       # per path like static_image.
       def static_image_dimensions
         path = static_image
-        return nil if path.nil? || !path.start_with?("/") || path.start_with?("//")
+        return nil unless Studio::LocalPath.local?(path)
 
         @static_dimensions ||= Concurrent::Map.new
         dims = @static_dimensions.compute_if_absent(path) do
