@@ -56,4 +56,13 @@ Gem::Specification.new do |spec|
   # because the point of the geo primitive is that EVERY app has the capacity:
   # an app that has to add a gem before it can place a visitor does not.
   spec.add_dependency "geocoder", ">= 1.8", "< 2.0"
+  # Components (docs/FRONT_END_STANDARD.md). Every consumer renders the engine's
+  # ViewComponent classes, so it is a runtime dependency, and an app takes it
+  # through the engine rather than its own Gemfile.
+  spec.add_dependency "view_component", ">= 4.0", "< 5"
+  # The component gallery at /admin/style/components. Runtime, not development
+  # only, because the hub serves it in production behind the admin wall
+  # (Studio.lookbook_in_production). Every other app draws it in development
+  # and test only; see Studio::Lookbook.
+  spec.add_dependency "lookbook", ">= 2.3", "< 3"
 end

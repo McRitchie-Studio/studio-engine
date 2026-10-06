@@ -1,0 +1,16 @@
+<%# The page a component preview renders in, in the gallery and on
+    ViewComponent's own preview pages: the host's theme tokens and stylesheets,
+    so a preview looks as it does in the app, and nothing else: no navbar, no
+    session, no script. -%>
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= studio_theme_css_tag if respond_to?(:studio_theme_css_tag) %>
+    <%= stylesheet_link_tag "tailwind", "application" %>
+  </head>
+  <body class="bg-page text-body p-6">
+    <%= yield %>
+  </body>
+</html>
