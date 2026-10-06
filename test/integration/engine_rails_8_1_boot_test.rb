@@ -146,8 +146,11 @@ class EngineRails81BootTest < ActiveSupport::TestCase
   test "a host with ActiveRecord keeps every engine root in eager loading" do
     excluded = Rails.autoloaders.main.send(:eager_load_exclusions).to_a
     engine_root = Studio::Engine.root.to_s
+    # The one engine root no host eager loads: the component previews, an
+    # autoload-only path (lib/studio/engine.rb) that only the gallery reads.
+    previews = Studio::Engine.root.join("app/components/previews").to_s
 
-    assert_empty excluded.select { |path| path.start_with?(engine_root) },
+    assert_empty excluded.select { |path| path.start_with?(engine_root) } - [previews],
                  "the footer-only eager-load exclusion leaked into a host with ActiveRecord"
   end
 
