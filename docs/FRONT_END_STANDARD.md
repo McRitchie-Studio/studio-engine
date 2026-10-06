@@ -53,7 +53,7 @@ then goes.
 **Rule.** Behaviour is ES modules pinned by importmap. Each behaviour is one
 Stimulus controller, thin glue that reads its `values`, finds its `targets`
 and handles its `actions`. Logic lives in a plain module with no DOM access,
-and that module has `node:test` unit tests. Cyvasse is the reference: 13
+and that module has `node:test` unit tests. Cyvasse is the reference: 11
 controllers in `app/javascript/controllers`, 27 logic modules in
 `app/javascript/cyvasse`, and 31 test files in `test/javascript` that
 `bin/test-js` runs with `node --test` and no npm install, through a loader hook
@@ -113,7 +113,7 @@ both); a palette private to one page; an arbitrary size such as `text-[11px]`;
 the fixed brand scales (`mint`, `navy`, `violet`) for surfaces or status.
 
 **Today.** The tokens exist and most engine UI uses them. Engine views still
-carry a raw hex in 31 files and `dark:` in 2; hub views carry a hex in 42 and
+carry a raw hex in 29 files and `dark:` in 2; hub views carry a hex in 36 and
 `dark:` in 24. No shared status helper exists: the hub has several per-feature
 tone maps in its helpers (`pipeline_chip_classes`, `merit_reason_classes`,
 `release_meter_tone` among them).
@@ -148,9 +148,9 @@ Existing code moves in this order, one task each, highest traffic first:
    own, four variants in all, with Turf Monster's
    `app/views/modals/_auth.html.erb` as the authority. It becomes one engine
    shell component (piece 4e).
-5. **The heartbeat pages' private palette.** Eight `app/views/heartbeat`
-   views carry 17 distinct hex values; they move to tokens and the status
-   tone helper (piece 4g).
+5. **The heartbeat pages' private palette.** `heartbeat/insights` and
+   `heartbeat/pipeline` share one dark palette of 11 raw hex values; they
+   move to tokens and the status tone helper (piece 4g).
 
 **New work** follows the standard from day one. **Edited code** leaves no
 further from it: a partial you touch gains strict locals, and a script you
@@ -171,16 +171,16 @@ touch loses its logic to a module.
 These are recorded on the task `front-end-standard-page` and decided before
 piece 4b starts:
 
-1. **ViewComponent and Lookbook as dependencies.** ViewComponent becomes a
-   runtime dependency of the gem, since every app renders its components.
-   Does Lookbook run only in development and test, or also in production
+1. **ViewComponent and Lookbook as dependencies.** Does ViewComponent
+   become a runtime dependency of the gem, since every app renders its
+   components? Does Lookbook run only in development and test, or also in production
    behind the admin wall so `/admin/style` serves the previews?
 2. **How the engine ships modules.** The engine gains its own importmap pins
    that each app draws in, or each app pins the engine's modules itself.
 3. **Alpine's future.** Alpine stays as the binding layer, or retires in
    favour of Stimulus once the migration ends. Alpine's standard build needs
    `unsafe_eval` in `script_src`.
-4. **The CSP target.** Once inline scripts are gone, every app drops
-   `unsafe_inline` from `script_src`.
+4. **The CSP target.** Once inline scripts are gone, does every app drop
+   `unsafe_inline` from `script_src`?
 5. **One Node version.** The engine's `package.json` pins Node 20; the hub
    pins 22.
