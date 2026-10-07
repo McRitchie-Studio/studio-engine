@@ -180,6 +180,7 @@ class StudioSessionStoreTest < Minitest::Test
     def view.csp_meta_tag = ""
     def view.studio_theme_css_tag = ""
     def view.javascript_importmap_tags = "<script></script>"
+    def view.javascript_import_module_tag(*) = ""
     yield view if block_given?
 
     view.render(partial: "layouts/studio/head")

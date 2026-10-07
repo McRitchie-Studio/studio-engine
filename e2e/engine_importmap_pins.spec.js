@@ -27,18 +27,22 @@ test("studio/local_path imports through the host's import map and answers like t
   expect(moduleResponses).toEqual([200]);
 });
 
-test("the engine's pins are not preloaded: the page fetches nothing until it imports", async ({ page }) => {
+// Every page runs the engine's boot (studio/application), so its graph is
+// preloaded. Any other pin stays unfetched until something imports it.
+test("a pin outside the boot graph is not preloaded: the page fetches it only when it imports", async ({ page }) => {
   await blockOffsiteRequests(page);
-  const moduleRequests = [];
+  const localPathRequests = [];
   page.on("request", (request) => {
-    if (request.url().includes("/e2e/modules/")) moduleRequests.push(request.url());
+    if (request.url().includes("/studio/local_path")) localPathRequests.push(request.url());
   });
 
   await page.goto("/lab/engine_modules");
   await page.waitForLoadState("networkidle");
 
-  expect(await page.locator("link[rel=modulepreload]").count()).toBe(0);
-  expect(moduleRequests).toEqual([]);
+  const preloads = await page.locator("link[rel=modulepreload]").evaluateAll((links) => links.map((link) => link.getAttribute("href")));
+  expect(preloads.some((href) => href.includes("/studio/application"))).toBe(true);
+  expect(preloads.some((href) => href.includes("/studio/local_path"))).toBe(false);
+  expect(localPathRequests).toEqual([]);
 
   const imports = await page.evaluate(() => JSON.parse(document.querySelector("script[type=importmap]").textContent).imports);
   expect(Object.keys(imports)).toContain("studio/local_path");

@@ -26,6 +26,8 @@ require "action_view"
 # browser lane, so this holds the CONTRACT, not the pixels. The pixel proof has to
 # come from a consumer that has one.
 class NavOffsetContractTest < Minitest::Test
+  PINNED_STACK_SOURCE = File.read(File.expand_path("../../app/javascript/studio/pinned_stack.js", __dir__))
+
   # ASSERT THE ASSIGNMENT PAIR, NOT THE TOKENS.
   #
   # The first version of this file asked whether '--nav-h', '--nav-bottom',
@@ -61,8 +63,8 @@ class NavOffsetContractTest < Minitest::Test
     # named "nav" that ALSO writes the legacy pair, from the same reading, so it
     # is never measured twice per frame. measure() takes both measurements;
     # write() writes them.
-    read = html[/function measure\(el, name, legacy\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
-    write = html[/function write\(pins, stack\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    read = html[/function measure\(el, name, legacy\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
+    write = html[/function write\(pins, stack\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     refute_empty read, "could not isolate measure()"
     refute_empty write, "could not isolate write()"
 
@@ -103,7 +105,7 @@ class NavOffsetContractTest < Minitest::Test
   # pass off; at 10x, 84/180 against 4/180.
   def test_head_reads_every_measurement_before_writing_any
     html = render_head
-    body = html[/function publishAll\(\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    body = html[/function publishAll\(\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     refute_empty body, "could not isolate publishAll()"
 
     last_read = body.index("readPins")
@@ -122,7 +124,7 @@ class NavOffsetContractTest < Minitest::Test
     tail = body[first_write..].to_s
     refute_match(/getBoundingClientRect|offsetHeight|getComputedStyle/, tail,
                  "nothing may measure the layout after the write pass has begun")
-    comp = html[/function composed\(pins\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    comp = html[/function composed\(pins\)\s*\{([\s\S]*?)\n\}/, 1].to_s
     refute_empty comp, "could not isolate composed()"
     refute_match(/getBoundingClientRect|offsetHeight|getComputedStyle/, comp,
                  "composing the stack must be arithmetic over readings already taken")
@@ -161,7 +163,7 @@ class NavOffsetContractTest < Minitest::Test
     # pinned chrome would otherwise keep publishing from DETACHED nodes — an
     # all-zero rect, which drives the properties to 0px. The guard lives with the
     # observer now, because the observer is the only thing left that holds a node.
-    body = html[/function syncObserver\(pins\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    body = html[/function syncObserver\(pins\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     refute_empty body, "could not isolate syncObserver()"
 
     assert_match(/if\s*\(\s*!pins\.length\s*\)\s*\{[\s\S]{0,200}?disconnect\(\)/, body,
@@ -215,7 +217,7 @@ class NavOffsetContractTest < Minitest::Test
     # bottom from the CLAMPED rect. A hidden layer must measure 0 so it drops
     # out of the stack — that is what removes the need for a declared stacking
     # order, and an unclamped rect bottom could go negative and win.
-    pin = html[/function measure\(el, name, legacy\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    pin = html[/function measure\(el, name, legacy\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     refute_empty pin, "could not isolate measure()"
     assert_match(/el\.offsetHeight/, pin, "pin height comes from offsetHeight")
     assert_match(/Math\.max\(\s*0\s*,\s*r\.bottom\s*\)/, pin,
@@ -224,7 +226,7 @@ class NavOffsetContractTest < Minitest::Test
     # No-op writes still skipped: these are INHERITED properties on
     # documentElement, so an unchanged write still invalidates the document, and
     # a scroll frame reaches this four times per layer.
-    write = html[/function write\(pins, stack\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    write = html[/function write\(pins, stack\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     assert_match(/if\s*\(force \|\| p\.h !== prev\.h\)/, write,
                  "an unchanged height must skip its write unless a structural change forced it")
     assert_match(/if\s*\(force \|\| p\.bottom !== prev\.bottom\)/, write,
@@ -233,7 +235,7 @@ class NavOffsetContractTest < Minitest::Test
                  "an unchanged top must skip its write unless a structural change forced it")
     assert_match(/if\s*\(force \|\| stack !== lastStack\)/, write,
                  "an unchanged stack bottom must skip its write — it is read by every consumer")
-    sched = html[/function schedule\(\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    sched = html[/function schedule\(\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     assert_match(/publishAll\(/, sched, "pins must publish inside the coalesced frame, not on their own")
   end
 
@@ -250,7 +252,7 @@ class NavOffsetContractTest < Minitest::Test
     # The registry is DERIVED PER PUBLISH now, which is stronger than
     # re-registering on an event: there is no window between a DOM patch and a
     # re-scan in which anything can be pointed at the wrong node.
-    reads = html[/function readPins\(\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    reads = html[/function readPins\(\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     refute_empty reads, "could not isolate readPins()"
     assert_match(/querySelectorAll\(\s*['"]\[data-pin\]['"]\s*\)/, reads,
                  "readPins must rebuild from the DOCUMENT on every publish")
@@ -261,7 +263,7 @@ class NavOffsetContractTest < Minitest::Test
     # publishAll" is satisfied by `pins = cache || (cache = readPins())`, which
     # is the cached registry wearing the call as a disguise — that mutation
     # survived a first version of this line. Pin the whole statement.
-    pub = html[/function publishAll\(\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    pub = html[/function publishAll\(\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     assert_match(/^\s*var pins = readPins\(\);$/, pub,
                  "every publish must re-derive the registry OUTRIGHT, never behind a cache or a guard")
     refute_match(/\|\||&&|\?/, pub,
@@ -269,7 +271,7 @@ class NavOffsetContractTest < Minitest::Test
 
     # AND THE HELD-NODE FIELD IS GONE. A module-level `pins` array outliving a
     # publish is the exact shape of the bug; if one comes back, this goes red.
-    body = html[/\(function \(\) \{\s*if \(!window\.ResizeObserver\)([\s\S]*?)\n  \}\)\(\);/, 1].to_s
+    body = html[/export function startPinnedStack\(\) \{\s*if \(started \|\| !window\.ResizeObserver\) return;([\s\S]*?)\n\}/, 1].to_s
     refute_empty body, "could not isolate the publisher"
     refute_match(/^\s*var pins = \[\];/, body,
                  "a module-level pins array is a cached registry — the defect this replaced")
@@ -294,7 +296,7 @@ class NavOffsetContractTest < Minitest::Test
   # of this primitive's headline promise.
   def test_a_departed_pin_has_its_properties_removed
     html = render_head
-    w = html[/function write\(pins, stack\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    w = html[/function write\(pins, stack\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     refute_empty w, "could not isolate write()"
 
     assert_match(/removeProperty\(\s*'--pin-'\s*\+\s*\w+\s*\+\s*'-h'\s*\)/, w,
@@ -338,7 +340,7 @@ class NavOffsetContractTest < Minitest::Test
   # on their next bundle update with no floor bump.
   def test_a_header_without_data_pin_still_publishes_the_legacy_properties
     html = render_head
-    reads = html[/function readPins\(\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    reads = html[/function readPins\(\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     refute_empty reads, "could not isolate readPins()"
 
     # It must NOTICE that the header was absent from the scan...
@@ -351,7 +353,7 @@ class NavOffsetContractTest < Minitest::Test
     # AND IT MUST BE OBSERVED. The observer is synced from the SAME list this
     # returns, so an adopted header is observed by construction rather than by a
     # second branch that could be forgotten — assert that binding, not a call.
-    pub = html[/function publishAll\(\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    pub = html[/function publishAll\(\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     assert_match(/syncObserver\(pins\)/, pub,
                  "the observer must be synced from the derived registry, so an adopted header tracks the collapse")
   end
@@ -376,7 +378,7 @@ class NavOffsetContractTest < Minitest::Test
   # the defect, stated as a requirement.
   def test_a_size_change_publishes_synchronously_rather_than_a_frame_late
     html = render_head
-    body = html[/function onResize\(\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    body = html[/function onResize\(\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     refute_empty body, "could not isolate onResize()"
 
     assert_match(/publishAll\(\)/, body,
@@ -409,7 +411,7 @@ class NavOffsetContractTest < Minitest::Test
   # coalesces the burst iOS momentum fires far above 60Hz.
   def test_scroll_still_publishes_through_a_coalesced_frame
     html = render_head
-    sched = html[/function schedule\(\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    sched = html[/function schedule\(\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     refute_empty sched, "could not isolate schedule()"
 
     assert_match(/requestAnimationFrame/, sched, "the scroll path must coalesce into one write per frame")
@@ -435,7 +437,7 @@ class NavOffsetContractTest < Minitest::Test
   # cache, so one full write is owed.
   def test_a_structural_change_republishes_even_unchanged_values
     html = render_head
-    body = html[/\(function \(\) \{\s*if \(!window\.ResizeObserver\)([\s\S]*?)\n  \}\)\(\);/, 1].to_s
+    body = html[/export function startPinnedStack\(\) \{\s*if \(started \|\| !window\.ResizeObserver\) return;([\s\S]*?)\n\}/, 1].to_s
     refute_empty body, "could not isolate the publisher"
 
     # It must START dirty: the first publish of a document has nothing cached and
@@ -453,7 +455,7 @@ class NavOffsetContractTest < Minitest::Test
 
     # A ROSTER CHANGE counts too, and it is not always announced by an event —
     # an x-show that adds a node fires no stream render.
-    w = html[/function write\(pins, stack\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    w = html[/function write\(pins, stack\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     assert_match(/if\s*\(!last\.hasOwnProperty\(pins\[i\]\.name\)\)\s*\{\s*force = true/, w,
                  "a layer that was not in the last publish must force a full write")
 
@@ -465,9 +467,9 @@ class NavOffsetContractTest < Minitest::Test
     # THE SCROLL PATH MUST NOT FORCE. If it did, every scroll frame would write
     # four properties per layer on documentElement, which is the style
     # invalidation the skip exists to avoid.
-    sched = html[/function schedule\(\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    sched = html[/function schedule\(\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     refute_match(/forceWrite/, sched, "a scroll frame must still skip unchanged writes")
-    ro = html[/function onResize\(\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    ro = html[/function onResize\(\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     refute_match(/forceWrite/, ro, "a plain resize must still skip unchanged writes")
   end
 
@@ -486,7 +488,7 @@ class NavOffsetContractTest < Minitest::Test
     assert_match(/setProperty\(\s*'--pin-stack-bottom'/, html,
                  "the publisher must publish the stack's own bottom edge as one value")
 
-    comp = html[/function composed\(pins\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    comp = html[/function composed\(pins\)\s*\{([\s\S]*?)\n\}/, 1].to_s
     refute_empty comp, "could not isolate composed()"
 
     # THE STACK BOTTOM IS THE LOWEST EDGE of any layer — a max, not a sum. Layers
@@ -511,7 +513,7 @@ class NavOffsetContractTest < Minitest::Test
   # match where it sits on screen, and needs to exist on only that layer.
   def test_stacking_order_defaults_to_document_order
     html = render_head
-    comp = html[/function composed\(pins\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    comp = html[/function composed\(pins\)\s*\{([\s\S]*?)\n\}/, 1].to_s
     refute_empty comp, "could not isolate composed()"
 
     assert_match(/j\s*<\s*i/, comp,
@@ -519,7 +521,7 @@ class NavOffsetContractTest < Minitest::Test
     assert_match(/oj\s*<\s*oi/, comp,
                  "two explicitly ordered layers must compare their numbers, lower being higher up")
 
-    ord = html[/function order\(p\)\s*\{([\s\S]*?)\n    \}/, 1].to_s
+    ord = html[/function order\(p\)\s*\{([\s\S]*?)\n\}/, 1].to_s
     refute_empty ord, "could not isolate order()"
     assert_match(/getAttribute\(\s*'data-pin-order'\s*\)/, ord, "the override is read off the element")
     assert_match(/isNaN\(raw\)\s*\?\s*null/, ord,
@@ -529,14 +531,17 @@ class NavOffsetContractTest < Minitest::Test
 
   private
 
+  # The head AND the publisher it boots: the pinned stack is studio/pinned_stack
+  # now, imported by studio/application, so its wiring is read from the module.
   def render_head
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
     def view.csrf_meta_tags = ""
     def view.csp_meta_tag = ""
     def view.studio_theme_css_tag = ""
     def view.javascript_importmap_tags = "<script></script>"
+    def view.javascript_import_module_tag(*) = ""
 
-    view.render(partial: "layouts/studio/head")
+    "#{view.render(partial: "layouts/studio/head")}\n#{PINNED_STACK_SOURCE}"
   end
 
   def render_sidebar_panel

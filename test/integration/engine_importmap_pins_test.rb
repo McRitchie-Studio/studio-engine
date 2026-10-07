@@ -17,7 +17,8 @@ require "nokogiri"
 # host's, which this holds:
 #
 #   1. every module under app/javascript/studio is pinned as studio/<name>, and
-#      the rendered importmap tags carry it without preloading it;
+#      the rendered importmap tags carry it, preloading only the boot graph
+#      (studio/application and what it imports) and @hotwired/stimulus;
 #   2. the engine's map is drawn before the host's, so a host pin of the same
 #      name wins (the control: the same draw with the engine's map last loses);
 #   3. each module resolves as an asset: on the asset paths and in sprockets'
@@ -28,10 +29,12 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
   ENGINE_MAP = ENGINE_ROOT.join("config/importmap.rb")
   MODULE_ROOT = ENGINE_ROOT.join("app/javascript")
 
+  # The engine's own modules. A vendored library (studio/vendor/) is pinned
+  # under its package name instead, asserted below.
   def engine_modules
     Dir[MODULE_ROOT.join("studio/**/*.js").to_s].sort.map do |path|
       Pathname(path).relative_path_from(MODULE_ROOT).to_s.delete_suffix(".js")
-    end
+    end.reject { |name| name.start_with?("studio/vendor/") }
   end
 
   def pins(map = Rails.application.importmap)
@@ -44,18 +47,30 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
     assert_includes Rails.application.config.importmap.paths.map(&:to_s), ENGINE_MAP.to_s
   end
 
-  test "every engine module is pinned as studio/<name>, not preloaded" do
+  def boot_graph = Studio::Engine.javascript_boot_graph
+
+  test "every engine module is pinned as studio/<name>, and only the boot graph is preloaded" do
     refute_empty engine_modules, "the engine ships no module under app/javascript/studio"
 
     engine_modules.each do |name|
       pin = pins[name]
       refute_nil pin, "#{name} is not in the host's importmap"
       assert_equal "#{name}.js", pin.path
-      assert_equal false, pin.preload, "#{name} is preloaded on every page"
+      assert_equal boot_graph.include?(name), pin.preload,
+                   boot_graph.include?(name) ? "#{name} is in the boot graph but not preloaded" : "#{name} is preloaded on every page"
     end
+    assert_equal "studio/vendor/stimulus.js", pins["@hotwired/stimulus"].path
+    assert_equal true, pins["@hotwired/stimulus"].preload
+    assert_nil pins["studio/vendor/stimulus"], "a vendored library is pinned by its package name only"
   end
 
-  test "the rendered importmap tags carry the pins and preload none of them" do
+  test "the boot graph follows studio/application's static imports" do
+    assert_equal %w[studio/alpine_shims studio/application studio/controllers/nav_collapse_controller
+                    studio/head_chrome studio/nav_collapse studio/pinned_stack], boot_graph
+    refute_includes boot_graph, "studio/local_path", "a module nothing in the boot imports is not preloaded"
+  end
+
+  test "the rendered importmap tags carry the pins and preload only the boot graph" do
     html = ActionController::Base.helpers.javascript_importmap_tags("application")
     doc = Nokogiri::HTML.fragment(html)
 
@@ -64,7 +79,8 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
 
     preloads = doc.css("link[rel=modulepreload]").map { |link| link["href"] }
     engine_modules.each do |name|
-      refute(preloads.any? { |href| href.include?("/#{name}") }, "#{name} is preloaded")
+      preloaded = preloads.any? { |href| href.include?("/#{name}.js") || href.include?("/#{name}-") }
+      assert_equal boot_graph.include?(name), preloaded, "#{name}: preloaded #{preloaded}, in the boot graph #{boot_graph.include?(name)}"
     end
   end
 

@@ -1,12 +1,21 @@
-<script>
+<%# The request's CSP nonce, for the one inline script left in this head and
+    for javascript_import_module_tag below (importmap-rails nonces its own tags).
+    nil when the host sets no nonce generator, and then no attribute renders. %>
+<% studio_script_nonce = (content_security_policy_nonce if respond_to?(:content_security_policy_nonce)) %>
+<%# PRE-PAINT THEME. Inline, and the only inline script this head keeps: it adds
+    `dark` before the first paint, which no deferred module can do. The toggle
+    lives in studio/head_chrome. %>
+<%= tag.script(nonce: studio_script_nonce) do %>
   (function(){
     if (localStorage.getItem('theme') !== 'light') {
       document.documentElement.classList.add('dark');
     }
   })();
-</script>
+<% end %>
 
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<%# Studio.nav_spinner_min_ms, read by the nav spinner in studio/head_chrome. %>
+<meta name="studio-nav-spinner-min-ms" content="<%= Studio.nav_spinner_min_ms.to_i %>">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <%= csrf_meta_tags %>
 <%= csp_meta_tag %>
@@ -97,31 +106,11 @@
   }
 </style>
 
-<%# Alpine is VENDORED into the engine (studio/alpine.js) and shipped through the
-    asset pipeline — no CDN, CSP-safe (same-origin :self), mirroring canvas_confetti
-    and sortable below. PINNED AT 3.16.1.
-
-    WHAT THIS REPLACED, and why it is worth the 47KB in the repo: the tag here was
-
-      <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js">
-
-    — a FLOATING major range, fetched from a third party at page load, for the
-    library every chip, drawer, modal and board filter in the fleet depends on.
-    Three consequences, none of them visible in a diff: two CI runs on ONE SHA could
-    execute different Alpine builds; production interactivity depended on jsDelivr
-    being reachable and honest; and an upgrade arrived with no review, because
-    nothing changed in the repo when it did. Bumping is now a deliberate act —
-    replace the file, change the version in this comment, and the diff shows it.
-
-    Investigated as a suspect in the board-filter flake (three PRs reddened in one
-    day, 2026-08-15). This removes a real source of run-to-run variance; it does NOT
-    claim to be that flake's cause, and the remaining suspect there is untouched. %>
-<%= javascript_include_tag "studio/alpine", defer: true, "data-turbo-track": "reload" %>
 <%# canvas-confetti is VENDORED into the engine (studio/canvas_confetti.js) and
     shipped through the asset pipeline — no CDN, CSP-safe (same-origin :self),
     zero-per-app dependency. Defines the global `confetti`; studio_confetti.js
-    then builds window.studioConfetti (burst/cannons). fireSuccessConfetti below
-    is unchanged and rides the same global. %>
+    then builds window.studioConfetti (burst/cannons). fireSuccessConfetti
+    (studio/head_chrome) rides the same global. %>
 <%= javascript_include_tag "studio/canvas_confetti", "data-turbo-track": "reload" %>
 <%= javascript_include_tag "studio/studio_confetti", "data-turbo-track": "reload" %>
 <%# SortableJS is VENDORED into the engine (studio/sortable.js) and shipped through
@@ -130,57 +119,8 @@
     drives it for drag-reorder kanban AND depth-chart boards. Loaded here (deferred)
     so any board consumer has it with zero per-app wiring, mirroring canvas_confetti. %>
 <%= javascript_include_tag "studio/sortable", defer: true, "data-turbo-track": "reload" %>
-<script>
-  window.fireSuccessConfetti = function() {
-    if (typeof confetti === 'undefined') return;
-    var colors = window.CONFETTI_COLORS || ['#4BAF50', '#8E82FE', '#06D6A0', '#FF7C47', '#FFD700', '#00BFFF', '#FF6B9D', '#C084FC'];
-    confetti({ particleCount: 150, spread: 100, origin: { x: 0.5, y: 0.5 }, colors: colors, zIndex: 9999, startVelocity: 45, gravity: 0.8, ticks: 300, scalar: 1.2 });
-    setTimeout(function() { confetti({ particleCount: 80, angle: 60, spread: 60, origin: { x: 0, y: 0.6 }, colors: colors, zIndex: 9999, startVelocity: 55, gravity: 1, ticks: 250 }); }, 150);
-    setTimeout(function() { confetti({ particleCount: 80, angle: 120, spread: 60, origin: { x: 1, y: 0.6 }, colors: colors, zIndex: 9999, startVelocity: 55, gravity: 1, ticks: 250 }); }, 150);
-    setTimeout(function() { confetti({ particleCount: 100, spread: 160, origin: { x: 0.5, y: 0.3 }, colors: colors, zIndex: 9999, startVelocity: 30, gravity: 1.2, ticks: 200, scalar: 0.8 }); }, 400);
-  };
-</script>
-<script>
-  // Nav spinner — scale morph between theme toggle and loading spinner
-  // Minimum display time prevents quick flashes; per-app via
-  // Studio.nav_spinner_min_ms (smooth-load apps drop it to ~300).
-  window._navSpinnerShownAt = 0;
-  window._navSpinnerMinMs = <%= Studio.nav_spinner_min_ms.to_i %>;
-  window.showNavSpinner = function() {
-    window._navSpinnerShownAt = Date.now();
-    document.querySelectorAll('.nav-toggle-icon').forEach(function(e) { e.style.opacity = '0'; e.style.transform = 'scale(0) rotate(90deg)'; });
-    document.querySelectorAll('.nav-spinner-icon').forEach(function(e) { e.style.opacity = '1'; e.style.transform = 'scale(1) rotate(0deg)'; });
-  };
-  window.hideNavSpinner = function() {
-    var elapsed = Date.now() - window._navSpinnerShownAt;
-    var remaining = Math.max(0, window._navSpinnerMinMs - elapsed);
-    setTimeout(function() {
-      document.querySelectorAll('.nav-toggle-icon').forEach(function(e) { e.style.opacity = '1'; e.style.transform = 'scale(1) rotate(0deg)'; });
-      document.querySelectorAll('.nav-spinner-icon').forEach(function(e) { e.style.opacity = '0'; e.style.transform = 'scale(0) rotate(-90deg)'; });
-    }, remaining);
-  };
-  // Reset spinner state before Turbo caches the page
-  document.addEventListener('turbo:before-cache', function() {
-    document.querySelectorAll('.nav-toggle-icon').forEach(function(e) { e.style.opacity = '1'; e.style.transform = 'scale(1) rotate(0deg)'; });
-    document.querySelectorAll('.nav-spinner-icon').forEach(function(e) { e.style.opacity = '0'; e.style.transform = 'scale(0) rotate(-90deg)'; });
-  });
-</script>
-<script>
-  document.addEventListener('alpine:init', () => {
-    Alpine.store('devMode', localStorage.getItem('devMode') === 'true');
-    Alpine.store('theme', {
-      value: localStorage.getItem('theme') || 'dark',
-      get isDark() { return this.value === 'dark'; },
-      toggle() {
-        document.documentElement.classList.add('theme-transition');
-        document.documentElement.classList.toggle('dark');
-        this.value = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-        localStorage.setItem('theme', this.value);
-        setTimeout(() => document.documentElement.classList.remove('theme-transition'), 300);
-      }
-    });
-  });
-</script>
+<%# The theme and devMode stores, showNavSpinner / hideNavSpinner and
+    fireSuccessConfetti are studio/head_chrome, installed by studio/alpine_shims. %>
 
 <style>
   /* studio-engine: a sticky navbar that shrinks on scroll changes layout
@@ -190,300 +130,9 @@
      navbar resize. */
   body { overflow-anchor: none; }
 </style>
-<script>
-  // studio-engine: THE PINNED STACK. Publishes the live geometry of every layer
-  // of pinned page chrome as CSS custom properties, so anything fixed or sticky
-  // positions off it in CSS with no hardcoded px and no JS of its own.
-  //
-  // A layer joins by carrying `data-pin="<name>"`. Nothing else is required:
-  // no registration call, no declared stacking order, no consumer edit.
-  //
-  // WHAT A CONSUMER READS — prefer the first two; they are the reason this is a
-  // primitive rather than an arithmetic helper:
-  //
-  //   --pin-stack-bottom  the bottom of the WHOLE stack. What something sitting
-  //                       BENEATH all the pinned chrome positions off.
-  //   --pin-<name>-top    the bottom of everything ABOVE that layer. What a layer
-  //                       that is ITSELF in the stack positions off.
-  //   --pin-<name>-h      that layer's HEIGHT.
-  //   --pin-<name>-bottom that layer's own BOTTOM EDGE, in viewport coordinates.
-  //   --nav-h / --nav-bottom  the <header>'s height and bottom edge, under their
-  //                       legacy names, from the same measurement.
-  //
-  // DO NOT COMPOSE THE STACK IN A CONSUMER. `top: max(var(--pin-nav-bottom),
-  // var(--pin-apps-bottom))` is what this replaced, and it fails twice: it does
-  // not scale, because a fourth layer means editing every consumer that ever
-  // wanted to sit under the stack; and it is not sound, because a max() over two
-  // custom properties is only meaningful if they were written in the same frame.
-  // --pin-stack-bottom is one value that cannot disagree with itself.
-  //
-  // --nav-h AND --nav-bottom ARE NOT THE SAME NUMBER. They are equal only when
-  // the header sits at the top of the viewport, which is why one was long
-  // mistaken for the other. An app that stacks chrome ABOVE the header — an
-  // environment banner rendered before the navbar, as mcritchie-industries does —
-  // pushes the header down, and a `fixed` overlay positioned at --nav-h then
-  // rides UP over the header by exactly the height of that chrome. Use --nav-h to
-  // SIZE something as tall as the header; use --nav-bottom to START something
-  // underneath it. Same distinction for --pin-<name>-h vs --pin-<name>-bottom.
-  (function () {
-    if (!window.ResizeObserver) return;
-    var ro = null;
-    var queued = false;
-    // WHAT WAS LAST PUBLISHED, per layer name: { h, bottom, top }. It does two
-    // jobs. It is the record of which names this publisher has written, so a
-    // DEPARTED layer can be cleared. And it is what lets an UNCHANGED value skip
-    // its write — these are INHERITED custom properties on documentElement, so
-    // even a write of the same number invalidates style for the whole document,
-    // and a scroll frame touches this four times per layer.
-    var last = {};
-    var lastStack = null;
-    // SKIPPING AN UNCHANGED WRITE IS ONLY SAFE WHILE NOTHING ELSE TOUCHES THESE
-    // PROPERTIES. On a scroll frame that holds, and skipping is most of why this
-    // is cheap. On a STRUCTURAL change it does not: a layer arriving or leaving,
-    // a Turbo patch, a fresh document — anything there may have cleared a
-    // property out from under the cache, and a skip would then never write it
-    // again. So a structural change forces a full write, once.
-    var forceWrite = true;
-    // The nodes currently under observation, held only to know what to unobserve
-    // when one departs. The REGISTRY ITSELF is never cached; see readPins().
-    var observed = [];
-
-    // THE REGISTRY IS DERIVED, NEVER CACHED — and that is a correctness rule.
-    //
-    // This used to build a `pins` array once and hold each element by reference
-    // until something re-registered it. A Turbo Stream replaces a pinned layer's
-    // node WITHOUT a turbo:load, so between the patch and the re-scan the held
-    // reference pointed at the DETACHED predecessor — and a detached node's rect
-    // is all zeros, which is indistinguishable from a layer that is legitimately
-    // hidden. Measured on mcritchie-studio's /deployments: --pin-apps-bottom
-    // published 0px while the live strip stood at display:block, bottom 152px,
-    // and the board's lane headers slammed 99px up and back on every broadcast.
-    //
-    // Re-querying costs one querySelectorAll over a handful of nodes per publish.
-    // That is cheaper than the class of bug it removes, because it makes a stale
-    // reference IMPOSSIBLE rather than merely unlikely: there is no window between
-    // a DOM patch and a re-scan in which this can be pointed at the wrong node.
-    function readPins() {
-      var header = document.querySelector('header');
-      var nodes = document.querySelectorAll('[data-pin]');
-      var list = [];
-      var headerPinned = false;
-      for (var i = 0; i < nodes.length; i++) {
-        var name = nodes[i].getAttribute('data-pin');
-        // An unnamed pin would write `--pin--h`, a valid property name and a
-        // silent nonsense one. Skip it rather than publish it.
-        if (!name) continue;
-        if (nodes[i] === header) headerPinned = true;
-        list.push(measure(nodes[i], name, nodes[i] === header));
-      }
-      // THE HOST-OWNED HEADER, and the back-compat promise that depends on it.
-      // A header that does not carry [data-pin] is not in the registry, so the
-      // legacy --nav-h / --nav-bottom — which studio/_sidebar_panel, turf's
-      // contest board and mcritchie-studio's heartbeat CSS all read — would
-      // never publish at all. Both live consumers own their header, so it is
-      // adopted as a pin even when it does not ask to be.
-      if (header && !headerPinned) list.push(measure(header, 'nav', true));
-      return list;
-    }
-
-    // ONE READ PER ELEMENT PER PUBLISH, and every read before every write.
-    // A read after a write to the root forces a fresh layout, which is the
-    // thrash this publisher exists without. Measured by review at 6x CPU
-    // throttle over 175 frames: frames past 20ms 62 vs 42, median 17.7 vs
-    // 14.9ms, p90 34.2 vs 26.0ms; at 10x, 84/180 vs 4/180.
-    function measure(el, name, legacy) {
-      // A hidden layer needs no special case: display:none gives offsetHeight 0
-      // and an all-zero rect, so it measures 0 and drops out of the stack on its
-      // own. That is what lets a layer come and go without anyone declaring a
-      // stacking order, and it is load-bearing rather than incidental.
-      var r = el.getBoundingClientRect();
-      return { el: el, name: name, legacy: legacy, h: el.offsetHeight, bottom: Math.max(0, r.bottom) };
-    }
-
-    // THE STACK, COMPOSED HERE RATHER THAN BY EVERY CONSUMER.
-    //
-    // Consumers used to write `top: max(var(--pin-nav-bottom), var(--pin-apps-bottom))`
-    // — every layer enumerated, in every consumer. That is two failures at once.
-    // It does not SCALE: a fourth pinned layer means editing every consumer that
-    // ever wanted to sit under the stack. And it is not SOUND: max() over two
-    // independently-written custom properties is only meaningful if they were
-    // written in the same frame, and any skew between them is expressed instantly
-    // as layout. Composing here means a consumer reads ONE value that cannot
-    // disagree with itself.
-    //
-    //   --pin-stack-bottom  the bottom of the WHOLE pinned stack. What something
-    //                       sitting beneath all the chrome positions off.
-    //   --pin-<name>-top    the bottom of everything ABOVE that layer. What a
-    //                       layer that is ITSELF in the stack positions off —
-    //                       --pin-stack-bottom would include the layer's own
-    //                       edge, so a layer positioned off it would chase itself
-    //                       down the page.
-    //
-    // ORDER is document order, which is the order the layers were declared and
-    // therefore the order they read in. `data-pin-order` overrides it for a layer
-    // whose DOM position does not match where it sits on screen; it is a plain
-    // number, lower is higher up, and it needs to exist on only the layer that
-    // disagrees rather than on all of them.
-    function order(p) {
-      var raw = parseFloat(p.el.getAttribute('data-pin-order'));
-      return isNaN(raw) ? null : raw;
-    }
-    function composed(pins) {
-      var i, j, stack = 0;
-      for (i = 0; i < pins.length; i++) {
-        if (pins[i].bottom > stack) stack = pins[i].bottom;
-        var above = 0;
-        for (j = 0; j < pins.length; j++) {
-          if (i === j) continue;
-          var oi = order(pins[i]), oj = order(pins[j]);
-          // Both ordered: compare the numbers. Otherwise fall back to document
-          // order, which querySelectorAll already returns them in.
-          var jIsAbove = (oi !== null && oj !== null) ? oj < oi : j < i;
-          if (jIsAbove && pins[j].bottom > above) above = pins[j].bottom;
-        }
-        pins[i].top = above;
-      }
-      return stack;
-    }
-
-    function write(pins, stack) {
-      var style = document.documentElement.style;
-      var seen = {};
-      var i, p, prev;
-      // A ROSTER CHANGE IS STRUCTURAL TOO, and it is not always announced by an
-      // event: an x-show that adds the node, a layer rendered by something other
-      // than a stream. Compare the names against what was published last.
-      var force = forceWrite;
-      forceWrite = false;
-      if (!force) {
-        for (i = 0; i < pins.length; i++) { if (!last.hasOwnProperty(pins[i].name)) { force = true; break; } }
-      }
-      for (i = 0; i < pins.length; i++) {
-        p = pins[i];
-        seen[p.name] = true;
-        prev = last[p.name] || {};
-        if (force || p.h !== prev.h) {
-          style.setProperty('--pin-' + p.name + '-h', p.h + 'px');
-          if (p.legacy) style.setProperty('--nav-h', p.h + 'px');
-        }
-        if (force || p.bottom !== prev.bottom) {
-          style.setProperty('--pin-' + p.name + '-bottom', p.bottom + 'px');
-          if (p.legacy) style.setProperty('--nav-bottom', p.bottom + 'px');
-        }
-        if (force || p.top !== prev.top) style.setProperty('--pin-' + p.name + '-top', p.top + 'px');
-        last[p.name] = { h: p.h, bottom: p.bottom, top: p.top };
-      }
-      if (force || stack !== lastStack) {
-        style.setProperty('--pin-stack-bottom', stack + 'px');
-        lastStack = stack;
-      }
-
-      // CLEAR WHAT LEFT. A layer goes away three ways: display:none and x-show
-      // both keep the node, so it measures 0 and drops out of the stack on its
-      // own. REMOVAL does not — nothing is left to measure, and without this the
-      // last published value stands forever while the consumer sits at the height
-      // of a strip that is gone. Review measured a removed 300px strip holding
-      // --pin-apps-bottom at 300px against a real stack bottom of 160px.
-      for (var name in last) {
-        if (last.hasOwnProperty(name) && !seen[name]) {
-          style.removeProperty('--pin-' + name + '-h');
-          style.removeProperty('--pin-' + name + '-bottom');
-          style.removeProperty('--pin-' + name + '-top');
-          delete last[name];
-        }
-      }
-    }
-
-    function publishAll() {
-      var pins = readPins();
-      write(pins, composed(pins));
-      syncObserver(pins);
-    }
-
-    // Observe whatever is pinned RIGHT NOW. observe() on an already-observed node
-    // is a no-op, so this only ever adds the new; unobserve() drops the departed
-    // so a replaced node cannot keep waking us from outside the document.
-    function syncObserver(pins) {
-      if (!pins.length) {
-        if (ro) { ro.disconnect(); ro = null; observed = []; }
-        return;
-      }
-      if (!ro) ro = new ResizeObserver(onResize);
-      var i, next = [];
-      for (i = 0; i < pins.length; i++) { next.push(pins[i].el); ro.observe(pins[i].el); }
-      for (i = 0; i < observed.length; i++) {
-        if (next.indexOf(observed[i]) === -1) ro.unobserve(observed[i]);
-      }
-      observed = next;
-    }
-
-    // PUBLISH IN THE ResizeObserver CALLBACK, SYNCHRONOUSLY. This is the whole
-    // fix, and it is a statement about WHEN a frame does its work rather than
-    // about what this code computes.
-    //
-    // A frame runs: rAF callbacks -> style/layout -> ResizeObserver callbacks ->
-    // paint. This publisher used to be woken by the observer and then DEFER the
-    // write to requestAnimationFrame, which lands at the top of the NEXT frame —
-    // so the frame in which a layer actually appeared or disappeared painted with
-    // the previous frame's number, every time. The RO callback runs after layout
-    // and before paint, which is exactly the last moment a write can still land
-    // in the frame that caused it.
-    //
-    // A/B measured in isolation, toggling a pinned layer's display and sampling
-    // what the changing frame paints: rAF-deferred wrong on 8/8 changing frames,
-    // RO-synchronous wrong on 0/8.
-    //
-    // This cannot loop. The values written here move CONSUMERS, and a consumer is
-    // not a pin — nothing this writes resizes anything it observes. A pinned layer
-    // that positions off --pin-<name>-top MOVES without RESIZING, and the observer
-    // fires on size, so it settles in one pass rather than ringing.
-    // The one way a SYNCHRONOUS publish could misbehave: a consumer that both
-    // reads a published value and is itself a pin, sized off what it reads
-    // (`height: calc(100vh - var(--pin-apps-top))`). That resizes an observed
-    // node from inside the observer's own callback, and left alone the browser
-    // reports "ResizeObserver loop completed with undelivered notifications" and
-    // drops the frame. So re-entry is counted, and past a couple of settling
-    // passes this hands the rest to the frame callback: the pathological page
-    // degrades to the OLD one-frame-late behaviour instead of wedging, and the
-    // ordinary page never reaches the branch. Reset on the next frame, so the
-    // count measures one frame's settling rather than the session's.
-    var depth = 0, resetQueued = false;
-    function onResize() {
-      if (depth >= 3) { schedule(); return; }
-      depth++;
-      if (!resetQueued) {
-        resetQueued = true;
-        window.requestAnimationFrame(function () { resetQueued = false; depth = 0; });
-      }
-      publishAll();
-    }
-
-    // SCROLL STILL NEEDS THE FRAME CALLBACK. A scroll changes a sticky header's
-    // bottom EDGE without changing its size, so the observer never sees it and
-    // there is nothing to be synchronous with — rAF is the right clock, and it
-    // coalesces the burst iOS momentum fires far above 60Hz.
-    function schedule() {
-      if (queued) return;
-      queued = true;
-      window.requestAnimationFrame(function () { queued = false; publishAll(); });
-    }
-
-    function invalidate() { forceWrite = true; publishAll(); }
-    document.addEventListener('DOMContentLoaded', invalidate);
-    document.addEventListener('turbo:load', invalidate);
-    // A Turbo Stream replaces nodes WITHOUT a turbo:load. The registry is derived
-    // per publish, so a stale reference is no longer possible either way — but the
-    // OBSERVER still has to be moved onto the incoming node, and the stack has to
-    // be recomposed for a layer that arrived or left. Both happen in publishAll.
-    document.addEventListener('turbo:before-stream-render', function () {
-      window.requestAnimationFrame(invalidate);
-    });
-    // Registered ONCE at script eval, not inside a re-scan, so a Turbo nav
-    // re-publishes instead of stacking another listener per visit.
-    window.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule, { passive: true });
-  })();
-</script>
+<%# THE PINNED STACK: studio/pinned_stack publishes --pin-<name>-h, -bottom and
+    -top for every [data-pin] layer, --pin-stack-bottom, and the legacy --nav-h /
+    --nav-bottom. Started by studio/application. %>
 
 <style>
   /* studio-engine: --nav-p, the sticky header's COLLAPSE PROGRESS, 0 (expanded)
@@ -504,204 +153,9 @@
     initial-value: 0;
   }
 </style>
-<script>
-  // studio-engine: navCollapse — the scroll-linked navbar collapse.
-  //
-  // Publishes --nav-p on the <header> once per animation frame from
-  // window.scrollY. The navbar's own stylesheet derives every collapsing
-  // dimension from it with calc(), so the header moves only in a frame the
-  // finger moved it, and stops the instant the finger does.
-  //
-  // It replaces `@scroll.window="scrolled = scrolled ? (scrollY > 5) : (scrollY
-  // > 60)"` plus `transition-all duration-300`. That pair let the FINGER set a
-  // step and an ease curve own everything after it. Measured in turf-monster at
-  // 390x844 before the change: the header ran 178px -> 139px and 34 of those
-  // 39px of document reflow landed AFTER the scroll had stopped, over 232ms, at
-  // up to 3px per frame of content nobody asked to move -- plus a 1px REVERSE
-  // lurch in the frame the class flipped, where a discrete text-3xl -> text-xl
-  // swap collided with the stylesheet's own `transition: font-size`.
-  //
-  // ADOPTING IT: put `nav-shell` and `x-data="navCollapse()"` on the header,
-  // give each breakpoint band a `--nav-ramp`, and write the collapsing
-  // dimensions as calc()s off --nav-p. This file ships NO sizing opinion, so an
-  // app whose navbar collapses to different endpoints than the engine's adopts
-  // the mechanism without touching its markup.
-  //
-  // Four details are load-bearing:
-  //
-  //   passive + rAF — the listener never blocks the compositor and coalesces a
-  //   burst of scroll events (iOS momentum fires far above 60Hz) into one write
-  //   per frame. The write lands on the HEADER, not :root: an inherited custom
-  //   property written on :root dirties style for the whole document every
-  //   frame, and it would leak the live page's scroll progress into the preview
-  //   headers on /navbar.
-  //
-  //   the smoothstep — collapsing a sticky, IN-FLOW header pulls the page up,
-  //   so during the collapse content moves by the scroll AND by the shrink:
-  //   faster than the finger, always. That is inherent; reclaiming the vertical
-  //   space is the point. What is tunable is the shape of the burst. --nav-ramp
-  //   is sized at 3x the band's collapse total and the ramp is smoothstepped,
-  //   whose slope is zero at both ends, so content speed LEAVES 1x, peaks near
-  //   1.5x mid-ramp, and returns to 1x with no velocity step. A linear ramp
-  //   equal to the collapse hits 2x and steps straight back to 1x.
-  //
-  //   the short-page guard — collapsing shortens the document by the collapse
-  //   total. On a page with barely more than that to scroll, the collapse
-  //   deletes the very scroll room that triggered it, the browser clamps
-  //   scrollY to 0, and the navbar flaps open and shut forever. roomExpanded
-  //   adds back the shrink ALREADY applied, so the measurement cannot chase
-  //   itself as it collapses.
-  //
-  //   reduced motion — scroll-linked motion has no clock left to slow down, but
-  //   resizing type under a moving finger is itself the motion some readers are
-  //   asking us to drop. Under the query --nav-p snaps 0/1 on the old
-  //   60/5 hysteresis instead of interpolating.
-  window.navCollapse = function () {
-    return {
-      scrolled: false,
-      p: 0,
-      _ramp: 144,
-      _maxPx: 5,
-      _reduce: null,
-      _onScroll: null,
-      _onResize: null,
-      _onReduce: null,
-      init: function () {
-        var self = this;
-        var el = this.$el;
-        var queued = false;
-
-        this._reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-
-        function readRamp() {
-          var style = getComputedStyle(el);
-          var raw = parseFloat(style.getPropertyValue('--nav-ramp'));
-          self._ramp = raw > 0 ? raw : 144;
-          var step = parseFloat(style.getPropertyValue('--nav-max-step'));
-          self._maxPx = step > 0 ? step : 5;
-        }
-
-        function apply() {
-          queued = false;
-          var ramp = self._ramp;
-          // Clamped: rubber-band overscroll reports a NEGATIVE scrollY, and a
-          // negative progress inflates the navbar past its expanded size.
-          var y = Math.max(0, window.scrollY);
-
-          // The height the document WOULD have with the navbar expanded. The
-          // add-back is the whole trick — see the guard note above.
-          var roomExpanded = document.documentElement.scrollHeight
-                             - window.innerHeight
-                             + ramp * self.p;
-
-          // WHERE THE COLLAPSE WANTS TO BE, from scroll position alone.
-          var target;
-          var snap = false;
-          if (roomExpanded < ramp + 24) {
-            target = 0;
-            snap = true;
-          } else if (self._reduce.matches) {
-            target = (self.p > 0 ? y > 5 : y > 60) ? 1 : 0;
-            snap = true;
-          } else {
-            var t = Math.min(1, y / ramp);
-            target = t * t * (3 - 2 * t);
-          }
-
-          // THE RATE LIMIT — how far the collapse may travel in ONE frame.
-          //
-          // Position-linked progress fixed motion that OUTLIVED the gesture. It
-          // also guaranteed the opposite defect: if scrollY moves 90px between
-          // two frames, so does the header's whole range. Measured in
-          // turf-monster at 390x844, worst single-frame header height change by
-          // scroll profile —
-          //
-          //     8px/frame (slow, deliberate)   3.9px
-          //    24px/frame (normal swipe)      14.1px
-          //    momentum flick                 39.0px   <- the ENTIRE collapse
-          //    hard flick                     39.0px
-          //
-          // 39px is the full 178 -> 139. It was found on a phone: slow
-          // scrolling looked right, a flick jumped. The measurements behind the
-          // original primitive all walked a constant 8px/frame, which is
-          // exactly the case that already worked.
-          //
-          // So the TARGET stays position-linked and the STEP is clamped. What
-          // makes this safe is that a slow scroll never REACHES the clamp —
-          // under --nav-max-step of header travel per frame the branch below
-          // returns `target` untouched, so the slow feel is not approximated,
-          // it is the same arithmetic.
-          //
-          // maxStep is derived, not tuned per band: engine.css sizes --nav-ramp
-          // at 3x the band's collapse total, so a cap of MAX px/frame is
-          // 3*MAX/ramp in --nav-p units. Mobile (ramp 120) gives 4.9px/frame,
-          // desktop (ramp 144) 5.0px. Retune --nav-ramp without keeping that 3x
-          // relation and this cap silently drifts with it.
-          var p;
-          if (snap) {
-            // A guard refusal and a reduced-motion state are DECISIONS, not
-            // motion; ramping them would animate the very thing each exists to
-            // avoid.
-            p = target;
-          } else {
-            var maxStep = (3 * self._maxPx) / ramp;
-            var delta = target - self.p;
-            p = Math.abs(delta) <= maxStep
-              ? target
-              : self.p + (delta > 0 ? maxStep : -maxStep);
-          }
-
-          if (p !== self.p) {
-            self.p = p;
-            el.style.setProperty('--nav-p', p.toFixed(4));
-          }
-
-          // KEEP FRAMES COMING WHILE CATCHING UP. Nothing else will schedule
-          // one: the finger is off, so no more scroll events arrive, and
-          // without this the collapse freezes wherever the clamp left it. It
-          // converges LINEARLY and lands exactly — about 8 frames (~133ms) at
-          // the mobile --nav-ramp of 120, and about 10 (~167ms) at the default
-          // 144, from a hard flick — rather than crawling asymptotically the
-          // way the 300ms ease this replaced did.
-          if (!snap && p !== target) {
-            queued = true;
-            requestAnimationFrame(apply);
-          }
-
-          // The shadow is the one thing still on a clock, and it may stay
-          // there: box-shadow paints, it never reflows, so it cannot move
-          // content. Hysteresis keeps it from strobing at the boundary.
-          var lit = self.scrolled ? y > 5 : y > 60;
-          if (lit !== self.scrolled) self.scrolled = lit;
-        }
-
-        this._onScroll = function () {
-          if (queued) return;
-          queued = true;
-          requestAnimationFrame(apply);
-        };
-        this._onResize = function () { readRamp(); self._onScroll(); };
-        this._onReduce = apply;
-
-        readRamp();
-        apply();
-
-        window.addEventListener('scroll', this._onScroll, { passive: true });
-        window.addEventListener('resize', this._onResize, { passive: true });
-        if (this._reduce.addEventListener) this._reduce.addEventListener('change', this._onReduce);
-      },
-      destroy: function () {
-        // A Turbo visit tears the header down and builds a new one; without
-        // this every visit would stack another listener on window.
-        if (this._onScroll) window.removeEventListener('scroll', this._onScroll);
-        if (this._onResize) window.removeEventListener('resize', this._onResize);
-        if (this._reduce && this._reduce.removeEventListener && this._onReduce) {
-          this._reduce.removeEventListener('change', this._onReduce);
-        }
-      }
-    };
-  };
-</script>
+<%# The collapse itself is studio/nav_collapse, bound by the engine's nav-collapse
+    controller (and by the navCollapse() Alpine shim for headers that still say
+    x-data="navCollapse()"). %>
 
 <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
 <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
@@ -709,6 +163,35 @@
   <%= stylesheet_link_tag "studio/sticky_table_header", "data-turbo-track": "reload" %>
 <% end %>
 <%= javascript_importmap_tags %>
+<%# THE ENGINE'S BROWSER BOOT (studio/application): its Stimulus application,
+    the pinned stack, and the Alpine shims. A module tag, so it carries the nonce. %>
+<%= javascript_import_module_tag "studio/application" %>
+<%# ALPINE LOADS AFTER THE MODULE TAGS, and the order is the contract. Deferred
+    classic scripts and module scripts execute in document order, so by the time
+    Alpine starts, studio/application has defined the shims it evaluates
+    (x-data="navCollapse()") and registered the `alpine:init` listener that
+    installs $store.theme and $store.devMode. Moved above the module tags, Alpine
+    would evaluate those before they exist (e2e/stimulus_boot.spec.js). %>
+<%# Alpine is VENDORED into the engine (studio/alpine.js) and shipped through the
+    asset pipeline — no CDN, CSP-safe (same-origin :self), mirroring canvas_confetti
+    and sortable below. PINNED AT 3.16.1.
+
+    WHAT THIS REPLACED, and why it is worth the 47KB in the repo: the tag here was
+
+      <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js">
+
+    — a FLOATING major range, fetched from a third party at page load, for the
+    library every chip, drawer, modal and board filter in the fleet depends on.
+    Three consequences, none of them visible in a diff: two CI runs on ONE SHA could
+    execute different Alpine builds; production interactivity depended on jsDelivr
+    being reachable and honest; and an upgrade arrived with no review, because
+    nothing changed in the repo when it did. Bumping is now a deliberate act —
+    replace the file, change the version in this comment, and the diff shows it.
+
+    Investigated as a suspect in the board-filter flake (three PRs reddened in one
+    day, 2026-08-15). This removes a real source of run-to-run variance; it does NOT
+    claim to be that flake's cause, and the remaining suspect there is untouched. %>
+<%= javascript_include_tag "studio/alpine", defer: true, "data-turbo-track": "reload" %>
 <% if Studio.sticky_table_headers %>
   <%= javascript_include_tag "studio/sticky_table_header", defer: true, "data-turbo-track": "reload" %>
 <% end %>

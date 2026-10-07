@@ -4,6 +4,52 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **The engine boots its own Stimulus application** (`studio/application`),
+  imported on every page by `layouts/studio/_head` through
+  `javascript_import_module_tag`, which carries the request's CSP nonce. Engine
+  application reads its own attributes (`data-studio-controller`,
+  `data-studio-action`, `data-studio-target`), so a host's Stimulus application
+  and its lazy loader never see an engine controller. Stimulus 3.2.2 is vendored
+  (`studio/vendor/stimulus.js`) and pinned as `@hotwired/stimulus`; a host that
+  pins its own wins. The boot's module graph is preloaded
+  (`Studio::Engine.javascript_boot_graph`); every other engine pin is still
+  fetched only when imported.
+- **`nav-collapse`**, the navbar collapse as a Stimulus controller
+  (`data-studio-controller="nav-collapse"`). The engine navbar uses it;
+  `data-nav-collapse-scrolled-class` names the
+  classes it toggles when the shadow's hysteresis flips.
+
+### Changed
+
+- **The head's behaviour moves from inline scripts to ES modules.**
+  `layouts/studio/_head` goes from 714 lines and seven inline scripts to 197
+  lines and one: the pre-paint theme script, which now carries the request's
+  CSP nonce. The navbar collapse is `studio/nav_collapse`, the pinned stack is
+  `studio/pinned_stack`, and the theme and devMode stores, nav spinner and
+  success confetti are `studio/head_chrome`, each with `node:test` unit tests.
+  `window.navCollapse`, `window.showNavSpinner`, `window.hideNavSpinner`,
+  `window.fireSuccessConfetti`, `$store.theme` and `$store.devMode` keep their
+  names as thin shims (`studio/alpine_shims`); a host that defines its own
+  `window.navCollapse` keeps it.
+- **Alpine loads after the module tags.** So the shims exist before Alpine
+  starts, the head now loads Alpine after `javascript_importmap_tags`. A host
+  module therefore evaluates before `window.Alpine` exists: register Alpine
+  data and stores in an `alpine:init` listener (which now fires for host
+  modules), not at module evaluation. Inline scripts in the page are unaffected.
+- **The engine navbar's header binds `data-studio-controller="nav-collapse"`**
+  in place of `x-data="navCollapse()"`, and keeps a bare `x-data` as the Alpine
+  scope its descendants bind through. A forked header may keep
+  `x-data="navCollapse()"`.
+- Studio.nav_spinner_min_ms reaches the browser as
+  `<meta name="studio-nav-spinner-min-ms">`.
+
+### Breaking
+
+- **`window._navSpinnerShownAt` and `window._navSpinnerMinMs` are removed.**
+  The spinner's state is private to `studio/head_chrome`; no consumer reads them.
+
 ## 0.93.0 — 2026-10-07
 
 ## 0.92.2 — 2026-10-07

@@ -1,9 +1,8 @@
-<%# The engine's importmap pins, in a browser. The import map below is the one
-    the dummy host drew with no config/importmap.rb of its own, so every pin in
-    it came from the engine (lib/studio/engine.rb, studio.importmap). There is no
-    entry point and no preload: e2e/engine_importmap_pins.spec.js imports each
-    module through the map and calls it. -%>
-<%= javascript_inline_importmap_tag %>
+<%# The engine's importmap pins, in a browser. The lab layout's head renders the
+    import map the dummy host drew with no config/importmap.rb of its own, so
+    every pin in it came from the engine (lib/studio/engine.rb, studio.importmap).
+    e2e/engine_importmap_pins.spec.js imports modules through the map and calls
+    them. -%>
 <main class="p-6">
   <h1 class="text-heading">Engine modules</h1>
   <p class="text-body">The import map on this page carries the engine's pins.</p>

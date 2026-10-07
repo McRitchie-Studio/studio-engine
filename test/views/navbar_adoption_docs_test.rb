@@ -17,7 +17,8 @@ require "minitest/autorun"
 class NavbarAdoptionDocsTest < Minitest::Test
   ENGINE_CSS = "app/assets/tailwind/studio_engine/engine.css"
   NAVBAR     = "app/views/layouts/_navbar.html.erb"
-  HEAD_ERB   = "app/views/layouts/studio/_head.html.erb"
+  # The collapse's own adoption note moved here from layouts/studio/_head.
+  NAV_COLLAPSE_JS = "app/javascript/studio/nav_collapse.js"
 
   # ONLY THE DOCUMENTATION COUNTS. `nav-logo-link` is also a real class on
   # _navbar's own markup, so asserting it against the whole FILE passes even when
@@ -34,11 +35,11 @@ class NavbarAdoptionDocsTest < Minitest::Test
     assert_includes File.read(ENGINE_CSS),
                     "override only the endpoints that differ\n   from the defaults below."
 
-    # BOTH splice sites, not one. The same edit severed _head's sentence too,
-    # and pinning only engine.css left that half free to regress — shown by
-    # mutation: re-severing this sentence failed nothing in the whole repo.
-    assert_includes File.read(HEAD_ERB),
-                    "on the header,\n  // give each breakpoint band a `--nav-ramp`,"
+    # BOTH splice sites, not one. The same edit severed the collapse's own
+    # sentence too, and pinning only engine.css left that half free to regress —
+    # shown by mutation: re-severing this sentence failed nothing in the whole repo.
+    assert_includes File.read(NAV_COLLAPSE_JS),
+                    "on\n// the header (studio/controllers/nav_collapse_controller), give each breakpoint\n// band a `--nav-ramp`,"
   end
 
   def test_every_site_stating_the_opt_in_also_states_the_real_cost
