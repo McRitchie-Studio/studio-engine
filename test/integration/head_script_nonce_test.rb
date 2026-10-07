@@ -16,7 +16,8 @@ require "nokogiri"
 #
 # The head's behaviour lives in ES modules (app/javascript/studio), booted by
 # studio/application. What is left inline is the pre-paint theme script, the
-# import map, and the module tag that imports the boot; each carries the nonce,
+# import map, the module tag that imports the boot, and the one that imports the
+# Alpine stores on their own (so a failed boot keeps them); each carries the nonce,
 # so a host whose policy names a nonce (and so ignores 'unsafe-inline') still
 # runs all of them. A new inline <script> in the head without the nonce fails
 # here.
@@ -53,14 +54,30 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "what stays inline is the pre-paint theme, the import map, and the boot import" do
+  test "what stays inline is the pre-paint theme, the import map, the boot import and the stores import" do
     inline = head_scripts("/lab/bar_stack").reject { |script| script["src"] }
 
-    assert_equal 3, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
+    assert_equal 4, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
     assert_includes inline[0].text, "classList.add('dark')", "the pre-paint theme script comes first"
     assert_equal "importmap", inline[1]["type"]
     assert_equal "module", inline[2]["type"]
     assert_equal %(import "studio/application"), inline[2].text.strip
+    assert_equal "module", inline[3]["type"]
+    assert_equal %(import "studio/alpine_stores"), inline[3].text.strip
+  end
+
+  # The stores' own door. Its own tag, not a line inside the boot import, so a
+  # boot module that fails to load cannot take it down; nonced like the rest;
+  # and before Alpine, so the alpine:init listener is in place when Alpine fires it.
+  test "the Alpine stores load by their own nonced module tag, before Alpine" do
+    scripts = head_scripts("/lab/bar_stack")
+    stores = scripts.index { |script| script.text.strip == %(import "studio/alpine_stores") }
+    alpine = scripts.index { |script| script["src"].to_s.include?("studio/alpine") }
+
+    refute_nil stores, "the head does not import studio/alpine_stores by its own tag"
+    assert_equal NONCE, scripts[stores]["nonce"]
+    assert_equal "module", scripts[stores]["type"]
+    assert_operator stores, :<, alpine, "the stores' listener must be registered before Alpine starts"
   end
 
   test "Alpine loads after the boot import, so its shims exist before Alpine starts" do

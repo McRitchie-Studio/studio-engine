@@ -156,7 +156,13 @@ components:
 |---|---|---|---|
 | Navbar collapse | `studio/nav_collapse` | `nav-collapse` | `x-data="navCollapse()"` |
 | Pinned stack (`--pin-*`, `--nav-h`, `--nav-bottom`) | `studio/pinned_stack` | the boot | none needed (CSS only) |
-| Theme, dev mode, nav spinner, success confetti | `studio/head_chrome` | the boot | `$store.theme`, `$store.devMode`, `showNavSpinner`, `hideNavSpinner`, `fireSuccessConfetti` |
+| Theme and dev mode | `studio/alpine_stores` | its own module tag, and the boot | `$store.theme`, `$store.devMode` |
+| Nav spinner, success confetti | `studio/head_chrome` | the boot | `showNavSpinner`, `hideNavSpinner`, `fireSuccessConfetti` |
+
+The stores load by their own nonced module tag as well as the boot, because
+every host's `<body>` binds `$store.devMode`: a boot that fails to load must
+not make that binding throw. `studio/alpine_stores` imports nothing, and
+registers a store only where Alpine has none of that name.
 
 **Today.** The engine ships behaviour as scripts inside partials. The board's
 Alpine factory, `window.studioBoard`, is 454 lines in `studio/_board_assets`;

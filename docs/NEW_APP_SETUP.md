@@ -456,8 +456,8 @@ message).
 
 The banner uses inline styles rather than Tailwind classes so it renders
 identically across apps with different CSS builds. The `devMode` Alpine store is
-initialized by the engine's boot (`studio/alpine_shims`, imported by
-`_head.html.erb`), and the `dev-mode` body class
+initialized by `studio/alpine_stores`, which `_head.html.erb` imports by its
+own module tag so it survives a boot that fails to load, and the `dev-mode` body class
 drives dev-only UI.
 
 **QA and email, stated plainly:** on QA the inbox page is unreachable and email
