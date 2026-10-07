@@ -34,8 +34,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **A slug is written once, at create.** `Sluggable` no longer recomputes
   `slug` from `name_slug` on every save, so a name edit stops renaming the row
   and orphaning the child rows that point at it. A persisted row with a blank
-  slug still gets one on its next save. Code that relied on a save moving the
-  slug calls `rename_slug!(name_slug)` instead.
+  slug still gets one on its next save, and a `name_slug` that reads the id is
+  settled inside the create, so `user-<id>` no longer waits for a second save.
+  Code that relied on a save moving the slug calls `rename_slug!(name_slug)`
+  instead.
 
 ### Fixed
 

@@ -4,7 +4,9 @@
 # and never recomputed by a later save, because other tables point at it by
 # value: a display-name edit must not rename the row and orphan its children.
 # A persisted row whose slug is blank gets one on its next save, since filling a
-# blank is still the first write.
+# blank is still the first write. A `name_slug` that reads the id (`user-<id>`)
+# is settled once more right after the insert, inside the create, because the
+# id does not exist when before_save runs.
 #
 # The one way to change a persisted slug is `rename_slug!` (or `rename_slug`),
 # which updates the row and every child column that references it in one
@@ -45,6 +47,7 @@ module Sluggable
     class_attribute :declared_slug_children, instance_writer: false, default: [].freeze
 
     before_save :set_slug, if: :sluggable_unwritten?
+    after_create :sluggable_settle_derived_slug
   end
 
   class_methods do
@@ -126,8 +129,19 @@ module Sluggable
     new_record? || slug.blank?
   end
 
+  # A model may override this; the override owns its slug, and the post-insert
+  # settle below leaves it alone.
   def set_slug
-    self.slug = name_slug
+    self.slug = @sluggable_derived_slug = name_slug
+  end
+
+  def sluggable_settle_derived_slug
+    derived = @sluggable_derived_slug
+    @sluggable_derived_slug = nil
+    return if derived.nil? || slug != derived
+
+    settled = name_slug
+    update_column(:slug, settled) if settled.present? && settled != slug
   end
 
   def sluggable_taken?(candidate)

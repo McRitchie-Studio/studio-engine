@@ -54,6 +54,32 @@ class SluggablePerson < ApplicationRecord
   end
 end
 
+# name_slug reads the id, which does not exist when before_save runs.
+class SluggableAccount < ApplicationRecord
+  self.table_name = "people"
+  include Sluggable
+
+  def name_slug
+    "account-#{id}"
+  end
+end
+
+# Owns its slug: an explicit value wins, and the post-insert settle stays out.
+class SluggableExplicit < ApplicationRecord
+  self.table_name = "people"
+  include Sluggable
+
+  def name_slug
+    "derived-#{id}"
+  end
+
+  private
+
+  def set_slug
+    self.slug = "explicit-#{name.to_s.parameterize}" if slug.blank?
+  end
+end
+
 class SluggableAthlete < ApplicationRecord
   self.table_name = "athletes"
 end
@@ -87,6 +113,20 @@ class SluggableSetOnceTest < ActiveSupport::TestCase
     @person.update!(name: "Pat Filled")
 
     assert_equal "pat-filled", @person.reload.slug
+  end
+
+  test "a name_slug that reads the id is settled inside the create" do
+    first = SluggableAccount.create!(name: "One")
+    second = SluggableAccount.create!(name: "Two")
+
+    assert_equal "account-#{first.id}", first.slug
+    assert_equal "account-#{second.id}", second.reload.slug
+  end
+
+  test "a model that overrides set_slug keeps the slug it wrote" do
+    row = SluggableExplicit.create!(name: "Kept")
+
+    assert_equal "explicit-kept", row.reload.slug
   end
 
   # --- rename_slug! -------------------------------------------------------------
