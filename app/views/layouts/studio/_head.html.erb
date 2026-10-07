@@ -175,11 +175,19 @@
     registers nothing twice. A module tag, so it carries the nonce: never a bare
     inline fallback (e2e/stores_survive_boot_failure.spec.js). %>
 <%= javascript_import_module_tag "studio/alpine_stores" %>
+<%# THE MODAL STACK, BY ITS OWN DOOR, for the same reason. studio/modal_host
+    registers $store.modals (and each page-scoped host's store) on alpine:init and
+    publishes window.ModalAnimations and window.StudioModals; a host's template
+    binds $store.modals.current(), so a failed boot must not take the store with
+    it. It imports nothing, and the modal-host controller imports it, so this
+    resolves to the same preloaded module. %>
+<%= javascript_import_module_tag "studio/modal_host" %>
 <%# ALPINE LOADS AFTER THE MODULE TAGS, and the order is the contract. Deferred
     classic scripts and module scripts execute in document order, so by the time
     Alpine starts, studio/application has defined the shims it evaluates
-    (x-data="navCollapse()") and studio/alpine_stores has registered the
-    `alpine:init` listener that installs $store.theme and $store.devMode. Moved
+    (x-data="navCollapse()"), studio/alpine_stores has registered the
+    `alpine:init` listener that installs $store.theme and $store.devMode, and
+    studio/modal_host the one that installs each modal host's store. Moved
     above the module tags, Alpine would evaluate those before they exist (e2e/stimulus_boot.spec.js). %>
 <%# Alpine is VENDORED into the engine (studio/alpine.js) and shipped through the
     asset pipeline — no CDN, CSP-safe (same-origin :self), mirroring canvas_confetti

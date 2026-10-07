@@ -362,11 +362,10 @@
   </script>
 
   <%# The minimum-visible-duration convention (window.StudioModals.holdAtLeast +
-      MIN_LOAD_MS) — the SAME single definition the shared modal host renders, so
-      the demo load modals here (payment/entry processing, on-chain tx, saving)
-      honor resolveAt = max(min_duration, actual) and auto-resolve after
-      min_duration in demo mode. A consumer app already has it via the host. %>
-  <%= render "studio/modals/load_convention" %>
+      MIN_LOAD_MS) is studio/modal_host's, published on every page, so the demo
+      load modals here (payment/entry processing, on-chain tx, saving) honor
+      resolveAt = max(min_duration, actual) and auto-resolve after min_duration
+      in demo mode. %>
 
   <%# Cropper.js + the cropPhotoModal factory — makes the Profile crop / upload
       modals openable on this page (loads cropper.js via <script defer> and
@@ -1642,7 +1641,7 @@
         </div>
       </div>
 
-      <%# The anti-flicker floor from studio/modals/_load_convention. %>
+      <%# The anti-flicker floor from studio/modal_host (window.StudioModals.holdAtLeast). %>
       <div class="card p-5 space-y-3">
         <h4 class="text-heading font-semibold text-sm">Hold at least</h4>
         <p class="text-secondary text-xs">
