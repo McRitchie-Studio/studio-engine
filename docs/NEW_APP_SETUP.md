@@ -276,7 +276,7 @@ add_column :users, :password_digest, :string, null: false, default: ""
 ### Error Logs, Theme Settings and Image Caches
 
 Do not write these by hand: the engine's migrations above create `error_logs`,
-`theme_settings` (with the `slug` column `ThemeSetting` writes on every save) and
+`theme_settings` (with the `slug` column `ThemeSetting` writes at create) and
 `image_caches`.
 
 ```bash
@@ -585,8 +585,8 @@ end
 bin/rails db:seed
 ```
 
-**Names must be distinct.** If the app uses `Sluggable`, slug is derived from
-`name.parameterize` under a unique index, so any two names that parameterize to
+**Names must be distinct.** If the app uses `Sluggable`, the slug is derived
+from `name.parameterize` at create under a unique index, so any two names that parameterize to
 the same slug collide on insert — hence "Alex McRitchie (Your App)" rather than
 a second "Alex McRitchie". The rule is the slug, not the spelling: "Alex
 McRitchie" and "Alex Mcritchie" look distinct and are not.

@@ -17,6 +17,8 @@ module Studio
       # handlers BELOW this line, never above it.
       rescue_from StandardError, with: :handle_unexpected_error
       rescue_from ActiveRecord::RecordNotFound, with: :handle_not_found
+      # A string, so including this concern does not load the model concern.
+      rescue_from "Sluggable::SlugRefused", with: :handle_slug_refused
 
       before_action :require_authentication
 
@@ -241,6 +243,19 @@ module Studio
     # copy — never the status code, the format, or the body.
     def handle_not_found(exception)
       raise exception
+    end
+
+    # Layer 1: a refused slug rename (Sluggable#rename_slug!) is the caller's
+    # input, not a fault: 422 with the reason for JSON and other formats, and a
+    # redirect back with the reason as the alert for HTML. No ErrorLog row.
+    def handle_slug_refused(exception)
+      reason = exception.record.errors.full_messages_for(:slug).to_sentence.presence || exception.message
+
+      respond_to do |format|
+        format.html { redirect_back_or_to root_path, alert: reason }
+        format.json { render json: { error: reason }, status: :unprocessable_entity }
+        format.any  { render plain: reason, status: :unprocessable_entity }
+      end
     end
 
     # Layer 1: Catch-all for unexpected errors — log + friendly response.

@@ -18,6 +18,24 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   raises `Studio::HostSchemaError` in development and test, and logs (and reports
   to Sentry) in production; `Studio.host_schema_check = :raise | :log | false`
   overrides. Extra host columns are never reported, and rake tasks skip it.
+- **`Sluggable#rename_slug!` changes a slug on purpose and cascades.** It updates
+  the row and every child column that holds the old slug in one transaction:
+  each `has_many`/`has_one` declared with `primary_key: :slug`, plus the pairs a
+  model declares with `has_slug_children "table" => :column`. A blank, badly
+  formed (`slug_format`, parameterize-shaped by default) or taken slug raises
+  `Sluggable::SlugRefused`, a `RecordInvalid` with the reason on
+  `errors[:slug]`; `rename_slug` returns false instead.
+- **`Studio::ErrorHandling` answers a refused slug rename with 422** and the
+  reason (JSON and other formats), or a redirect back with the reason as the
+  alert (HTML), never the 500 catch-all and no ErrorLog row.
+
+### Changed
+
+- **A slug is written once, at create.** `Sluggable` no longer recomputes
+  `slug` from `name_slug` on every save, so a name edit stops renaming the row
+  and orphaning the child rows that point at it. A persisted row with a blank
+  slug still gets one on its next save. Code that relied on a save moving the
+  slug calls `rename_slug!(name_slug)` instead.
 
 ### Fixed
 

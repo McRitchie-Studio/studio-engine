@@ -23,8 +23,9 @@
 # The declaration lives on the parent so the cascade never depends on whether a
 # child class happens to be loaded.
 #
-# A refusal (blank, badly formed, or taken) raises ActiveRecord::RecordInvalid
-# with the reason on `errors[:slug]`; Rails answers that exception with 422, and
+# A refusal (blank, badly formed, or taken) raises Sluggable::SlugRefused, a
+# subclass of ActiveRecord::RecordInvalid, with the reason on `errors[:slug]`.
+# Studio::ErrorHandling answers it with 422 and the reason, never a 500, and
 # `rename_slug` returns false instead of raising, for an inline form error.
 module Sluggable
   extend ActiveSupport::Concern
@@ -33,6 +34,11 @@ module Sluggable
   # `String#parameterize` produces. A model whose slugs legitimately hold other
   # characters sets its own `self.slug_format`.
   DEFAULT_SLUG_FORMAT = /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/
+
+  # The refusal rename_slug! raises: a RecordInvalid, so a caller that already
+  # rescues RecordInvalid keeps working, with a class of its own so the
+  # controller layer can answer it with 422 without claiming every invalid save.
+  class SlugRefused < ActiveRecord::RecordInvalid; end
 
   included do
     class_attribute :slug_format, instance_writer: false, default: DEFAULT_SLUG_FORMAT
@@ -71,7 +77,7 @@ module Sluggable
 
   # Changes this row's slug to `new_slug` and rewrites every child column that
   # held the old one, all or nothing. Returns { "table.column" => rows updated }.
-  # Raises ActiveRecord::RecordInvalid, with the reason on errors[:slug], when
+  # Raises Sluggable::SlugRefused, with the reason on errors[:slug], when
   # the slug is blank, badly formed, or already taken.
   def rename_slug!(new_slug)
     raise ActiveRecord::RecordNotSaved.new("a slug can be renamed only on a saved record", self) unless persisted?
@@ -110,7 +116,7 @@ module Sluggable
   def rename_slug(new_slug)
     rename_slug!(new_slug)
     true
-  rescue ActiveRecord::RecordInvalid
+  rescue SlugRefused
     false
   end
 
@@ -142,6 +148,6 @@ module Sluggable
 
   def sluggable_refuse!(reason, **options)
     errors.add(:slug, reason, **options)
-    raise ActiveRecord::RecordInvalid, self
+    raise SlugRefused, self
   end
 end
