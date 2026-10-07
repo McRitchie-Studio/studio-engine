@@ -79,12 +79,10 @@ module Studio
         #   2. It steps around any host before_save that DERIVES first_name FROM
         #      name — set_name_parts does exactly that — which would discard the
         #      value we were just handed.
-        #   3. THE SLUG. Sluggable's `before_save :set_slug` is UNGATED, and
-        #      mcritchie-studio's User#name_slug is built from `name`. A full
-        #      save right after this writes `name` would therefore re-point the
-        #      slug the account answers on — a URL change, on a column carrying
-        #      a unique index, for every signup. That is the constraint this
-        #      endpoint has always been protecting; it is not a shortcut.
+        #   3. A host save can carry other callbacks that react to a name
+        #      write; this endpoint writes only the name columns. (Sluggable
+        #      writes the slug once, at create, so the slug stays put either
+        #      way.)
         #
         # WHAT SKIPPING CALLBACKS USED TO COST. Because set_name_parts never
         # ran, `first_name` got the WHOLE typed value: someone answering "Ada

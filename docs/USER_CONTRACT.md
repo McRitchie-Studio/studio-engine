@@ -58,9 +58,8 @@ before_save :set_name_parts, if: -> { name_changed? }
 Two things about that are the host's problem, and the engine now helps with both.
 
 1. **A callback-free writer owes the same derivation.** `Studio::OnboardingController`
-   writes with `update_columns` on purpose — `Sluggable`'s `before_save :set_slug`
-   is UNGATED, so a full save right after a `name` write re-points the slug the
-   account answers on. Any writer in that position should derive with
+   writes with `update_columns` on purpose, so a host's other save callbacks do
+   not react to a name typed mid-onboarding. Any writer in that position should derive with
    **`Studio::NameParts.from(name)`** (`lib/studio/name_parts.rb`) rather than
    retyping the split, so every door leaves the row split the same way. A host's
    own `set_name_parts` may delegate to it too.

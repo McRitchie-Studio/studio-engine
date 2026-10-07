@@ -26,21 +26,20 @@ require "action_dispatch/testing/integration"
 # every consuming app's User actually carries, copied from
 # mcritchie-studio/app/models/user.rb:
 #
-#   include Sluggable                                  # ungated before_save :set_slug
+#   include Sluggable                                  # slug written once, at create
 #   before_save :set_name_parts, if: -> { name_changed? }
 #
 # Both are load-bearing here and pull in OPPOSITE directions, which is the whole
 # design problem this endpoint sits inside:
 #
 #   * set_name_parts is what the write must AGREE WITH.
-#   * set_slug is why the write must not be a full save — Sluggable's hook is
-#     UNGATED and mcritchie-studio's User#name_slug is built from `name`, so a
-#     save right after this endpoint writes `name` would re-point the slug the
-#     account answers on. On a column with a unique index. Every signup.
+#   * the slug must not move. Sluggable writes it once, at create, so a name
+#     written later never re-points the URL the account answers on, whichever
+#     way the write is made.
 #
-# So `test_a_full_save_would_repoint_the_slug` is a CONTROL, not decoration: it
-# proves the constraint is live in this harness rather than asserted from
-# reading, which is what makes the guard next to it mean something.
+# `test_a_full_save_after_the_same_write_keeps_the_slug` pins the same promise
+# for an ordinary save, so the endpoint's guard holds for a reason the harness
+# shows rather than one asserted from reading.
 #
 # IT ALSO CARRIES THE LENGTH CAP, for the same reason: the cap and the split are
 # one decision. The endpoint bounds a WHOLE typed answer
@@ -98,8 +97,8 @@ end
 
 class User < ApplicationRecord
   # The engine's own concern (app/models/concerns/sluggable.rb), included the
-  # way both consumers include it — NOT a local imitation. Its before_save is
-  # ungated by construction, and that is the property under test.
+  # way both consumers include it — NOT a local imitation. That it writes the
+  # slug only at create is the property under test.
   include Sluggable
 
   before_save :set_name_parts, if: -> { name_changed? }
@@ -310,17 +309,17 @@ class OnboardingNamePartsTest < ActionDispatch::IntegrationTest
                  "a signup answering a name must not change the URL the account answers on"
   end
 
-  # THE CONTROL for the guard above. If a full save did NOT move the slug, that
-  # guard would pass for the wrong reason and this endpoint's `update_columns`
-  # would look like an unjustified shortcut. It moves.
-  test "a full save after the same write would repoint the slug" do
+  # The same promise through a full save: Sluggable writes the slug once, at
+  # create, so a later name never re-points it, and name_slug really would
+  # produce a different slug for this name.
+  test "a full save after the same write keeps the slug" do
     before = @user.reload.slug
 
     @user.update!(name: "Ada Lovelace")
 
-    refute_equal before, @user.reload.slug,
-                 "Sluggable's before_save is UNGATED and name_slug reads `name` — " \
-                 "this is the cost the endpoint's update_columns is avoiding"
+    refute_equal before, @user.send(:name_slug), "the name now derives a different slug"
+    assert_equal before, @user.reload.slug,
+                 "a saved name must not re-point the URL the account answers on"
   end
 
   # --- carry-over and backfill, unchanged by the fix --------------------------

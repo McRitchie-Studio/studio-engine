@@ -35,7 +35,7 @@ resolved.
 - **Theme system**: Dynamic CSS custom properties generated from 7 role colors (primary, dark, light, success, accent, warning, danger). Dark/light mode toggle. Admin theme editor at `/admin/theme`.
 - **UI primitives**: Shared component partials and CSS primitives such as `components/emoji_swap` for nav/sidebar emoji hover transitions.
 - **Operator tooling**: Shared `studio/banners/environment` banner with Dev Mode + email connector controls and `studio/banners/impersonation`.
-- **Sluggable concern**: `before_save :set_slug` with `to_param` for human-readable URLs
+- **Sluggable concern**: a human-readable slug written once at create (`to_param` returns it); `rename_slug!` changes it and cascades to every child column in one transaction, and a refused rename answers 422
 - **ThemeSetting model**: Per-app DB overrides with fallback to config defaults
 - **Geo**: `Studio::GeoDetection` places every visitor (IP → country + subdivision, session-cached), `Studio::GeoSetting` stores the operator's blocked countries and regions, `require_geo_allowed` locks whichever surfaces an app chooses, and the shared badge + `/admin/geo` manager ship with it. See [`docs/GEO.md`](docs/GEO.md).
 - **Site identity and link previews**: `Studio::SiteIdentity` holds the app's title, description and image, edited at `/admin/link_preview` beside a live unfurl card and read anywhere through `Studio.site_identity`. Every page unfurls with it unless it calls `link_preview image:, title:, description:`, and `Studio::LinkPreviewBots` serves preview fetchers a slim page under iMessage's 1 MiB limit. Adopt with `bin/rails g studio:site_identity`. See [`docs/LINK_PREVIEW.md`](docs/LINK_PREVIEW.md).
