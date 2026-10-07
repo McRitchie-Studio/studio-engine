@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.92.0 — 2026-10-06
+
 ### Added
 
 - **ViewComponent comes with the engine.** It is a runtime dependency, so an

@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    studio-engine (0.91.2)
+    studio-engine (0.92.0)
       aws-sdk-s3 (~> 1.218)
       faker (>= 2.0, < 4.0)
       geocoder (>= 1.8, < 2.0)
@@ -271,7 +271,7 @@ GEM
     rouge (5.1.0)
       strscan (~> 3.1)
     securerandom (0.4.1)
-    solana-studio (0.12.1)
+    solana-studio (0.12.2)
       ed25519 (~> 1.3)
     solid_queue (1.4.0)
       activejob (>= 7.1)
