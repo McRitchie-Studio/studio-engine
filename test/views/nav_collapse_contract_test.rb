@@ -177,6 +177,11 @@ class NavCollapseContractTest < Minitest::Test
                  "the header must own the scroll-linked collapse controller")
     assert_match(/data-studio--nav-collapse-scrolled-class="shadow-lg border-b border-subtle is-scrolled"/, navbar_markup,
                  "the controller must toggle the shadow classes the Alpine :class used to")
+    # The header stays an Alpine component for its descendants: without it the
+    # user nav's $store.devMode bindings and the sidebar trigger's @click never
+    # initialize (e2e/header_phone_width.spec.js reds at 320px).
+    assert_match(/<header\b[\s\S]{0,200}?'x-data data-controller=/, navbar_markup,
+                 "the header must keep the bare x-data its descendants bind through")
     # ANCHORED ON THE ATTRIBUTE, not the bare name. `navbar_source` is File.read of
     # raw ERB, so the file's OWN COMMENTS count as source: with a bare
     # `assert_includes nav, "nav-shell"`, deleting nav-shell from the header's class

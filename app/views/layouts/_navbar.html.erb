@@ -56,7 +56,11 @@
     layouts/studio/_head publishes --pin-nav-h and --pin-nav-bottom for it and
     anything below can position off it in pure CSS. The legacy --nav-h /
     --nav-bottom keep publishing unchanged; this is additive. %>
-<header data-pin="nav" <%= 'data-controller="studio--nav-collapse" data-studio--nav-collapse-scrolled-class="shadow-lg border-b border-subtle is-scrolled"'.html_safe unless is_preview %>
+<%# The bare x-data is the Alpine scope the header's descendants still bind
+    through ($store.devMode on the user nav, the sidebar trigger's @click):
+    Alpine initializes directives only inside a component, and the header was
+    that component while navCollapse() lived on it. %>
+<header data-pin="nav" <%= 'x-data data-controller="studio--nav-collapse" data-studio--nav-collapse-scrolled-class="shadow-lg border-b border-subtle is-scrolled"'.html_safe unless is_preview %>
         <%# top-0, a STATIC value, and never a custom property. Any bars render as
             this header's sibling in normal flow (studio/banners/_stack), so they
             already occupy their own height above it and there is nothing to
