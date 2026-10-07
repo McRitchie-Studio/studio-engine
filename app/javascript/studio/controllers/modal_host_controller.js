@@ -12,10 +12,10 @@
 //             data-modal-host-scoped-value="true">          (studio/modals/_scoped_host)
 //
 // The stack, the focus trap and the registries are studio/modal_host, which
-// registers each host's store before Alpine starts or before a Turbo render
-// (a controller connects too late for that). connect() registers the store
-// only for markup that arrived some other way, and binds the bfcache and Turbo
-// snapshot cleanup to this host for as long as it is on the page.
+// registers each host's store on alpine:init (a full load, where a controller
+// connects too late) and before a Turbo render. connect() registers it too, for
+// a Turbo visit and for markup that arrived any other way, and binds the
+// bfcache and Turbo snapshot cleanup to this host while it is on the page.
 // Registered by studio/application.
 import { Controller } from "@hotwired/stimulus"
 import { registerModalStore, clearStaleModals } from "studio/modal_host"

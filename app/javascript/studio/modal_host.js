@@ -22,11 +22,18 @@
 // (a host's own wins, and a host rendered twice registers once):
 //
 //   1. alpine:init, on a full load: every host element in the parsed document.
+//      The only path that is early enough there.
 //   2. turbo:before-render and turbo:before-frame-render: every host element
 //      in the incoming body or frame, before Alpine sees it. Alpine fires
 //      alpine:init once per document, so a page that brings its own scoped
-//      host on a Turbo visit needs this path.
-//   3. the controller's connect(), for markup inserted any other way.
+//      host on a Turbo visit needs a later path.
+//   3. the controller's connect(), for a Turbo visit too and for markup
+//      inserted any other way.
+//
+// MEASURED on a consumer (moms-app, a Turbo visit from /profile to
+// /profile/edit, which brings profileModals): path 2 alone and path 3 alone
+// each register the store before Alpine reads it; with both removed the visit
+// throws "Cannot read properties of undefined (reading 'current')".
 //
 // THE WINDOW GLOBALS. window.ModalAnimations and window.StudioModals
 // (CARD_WIDTHS, DEFAULT_CARD_WIDTH, MIN_LOAD_MS, holdAtLeast) are published
