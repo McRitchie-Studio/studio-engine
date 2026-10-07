@@ -4,7 +4,7 @@
 <% studio_script_nonce = (content_security_policy_nonce if respond_to?(:content_security_policy_nonce)) %>
 <%# PRE-PAINT THEME. Inline, and the only inline script this head keeps: it adds
     `dark` before the first paint, which no deferred module can do. The toggle
-    lives in studio/head_chrome. %>
+    lives in studio/alpine_stores. %>
 <%= tag.script(nonce: studio_script_nonce) do %>
   (function(){
     if (localStorage.getItem('theme') !== 'light') {
@@ -119,8 +119,9 @@
     drives it for drag-reorder kanban AND depth-chart boards. Loaded here (deferred)
     so any board consumer has it with zero per-app wiring, mirroring canvas_confetti. %>
 <%= javascript_include_tag "studio/sortable", defer: true, "data-turbo-track": "reload" %>
-<%# The theme and devMode stores, showNavSpinner / hideNavSpinner and
-    fireSuccessConfetti are studio/head_chrome, installed by studio/alpine_shims. %>
+<%# The theme and devMode stores are studio/alpine_stores (its module tag is below).
+    showNavSpinner / hideNavSpinner and fireSuccessConfetti are studio/head_chrome,
+    installed by studio/alpine_shims. %>
 
 <style>
   /* studio-engine: a sticky navbar that shrinks on scroll changes layout
@@ -166,12 +167,20 @@
 <%# THE ENGINE'S BROWSER BOOT (studio/application): its Stimulus application,
     the pinned stack, and the Alpine shims. A module tag, so it carries the nonce. %>
 <%= javascript_import_module_tag "studio/application" %>
+<%# THE STORES, BY THEIR OWN DOOR. Every host's <body> binds $store.devMode and the
+    theme toggle binds $store.theme, so a boot that fails to load (a missing digest,
+    a network drop, a throw anywhere in its graph) must not take the stores with it.
+    studio/alpine_stores imports nothing and installs them on alpine:init; it is
+    also in the boot graph, so this resolves to the same preloaded module and
+    registers nothing twice. A module tag, so it carries the nonce: never a bare
+    inline fallback (e2e/stores_survive_boot_failure.spec.js). %>
+<%= javascript_import_module_tag "studio/alpine_stores" %>
 <%# ALPINE LOADS AFTER THE MODULE TAGS, and the order is the contract. Deferred
     classic scripts and module scripts execute in document order, so by the time
     Alpine starts, studio/application has defined the shims it evaluates
-    (x-data="navCollapse()") and registered the `alpine:init` listener that
-    installs $store.theme and $store.devMode. Moved above the module tags, Alpine
-    would evaluate those before they exist (e2e/stimulus_boot.spec.js). %>
+    (x-data="navCollapse()") and studio/alpine_stores has registered the
+    `alpine:init` listener that installs $store.theme and $store.devMode. Moved
+    above the module tags, Alpine would evaluate those before they exist (e2e/stimulus_boot.spec.js). %>
 <%# Alpine is VENDORED into the engine (studio/alpine.js) and shipped through the
     asset pipeline — no CDN, CSP-safe (same-origin :self), mirroring canvas_confetti
     and sortable below. PINNED AT 3.16.1.

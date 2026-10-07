@@ -9,10 +9,15 @@
 // the module tags, and deferred classic scripts and module scripts execute in
 // document order. So this module has run, and its `alpine:init` listener is
 // registered, before Alpine evaluates its first x-data.
+//
+// THE STORES ARE NOT HERE. $store.theme and $store.devMode are
+// studio/alpine_stores, which the head also loads by its own module tag, so a
+// host's body binding survives a boot that failed to load. Importing it here
+// keeps it in the boot graph, preloaded; it installs itself on evaluation.
+import "studio/alpine_stores"
 import { NavCollapse } from "studio/nav_collapse"
 import {
-  storedTheme, toggleTheme, showNavSpinner, hideNavSpinner,
-  installSpinnerReset, fireSuccessConfetti
+  showNavSpinner, hideNavSpinner, installSpinnerReset, fireSuccessConfetti
 } from "studio/head_chrome"
 
 // x-data="navCollapse()": the hub's own header. A host that defines its own
@@ -37,16 +42,4 @@ export function installAlpineShims() {
   if (!window.hideNavSpinner) window.hideNavSpinner = hideNavSpinner
   if (!window.fireSuccessConfetti) window.fireSuccessConfetti = fireSuccessConfetti
   installSpinnerReset()
-
-  document.addEventListener('alpine:init', function () {
-    var Alpine = window.Alpine
-    Alpine.store('devMode', localStorage.getItem('devMode') === 'true')
-    Alpine.store('theme', {
-      value: storedTheme(localStorage),
-      get isDark() { return this.value === 'dark' },
-      toggle: function () {
-        this.value = toggleTheme(document.documentElement, localStorage, function (fn, ms) { setTimeout(fn, ms) })
-      }
-    })
-  })
 }

@@ -1,35 +1,13 @@
 // studio/head_chrome: the small behaviours every page's chrome carries. Each
 // piece below used to be an inline <script> in layouts/studio/_head.
 //
-//   theme         the dark/light value, read from and written to localStorage
 //   nav spinner   the scale morph between the theme toggle and a spinner
 //   confetti      the success burst a completed flow fires
 //
 // The logic is exported for test/javascript/head_chrome.test.mjs. The window
-// globals and Alpine stores that consumers bind to are installed by
-// studio/alpine_shims.
-
-// ---- THEME ------------------------------------------------------------------
-//
-// The pre-paint half (adding `dark` before first paint) stays an inline,
-// nonced script in the head: it must run before the stylesheet paints, which
-// no deferred module can. This half is the toggle.
-
-// The stored theme, dark unless the reader chose light.
-export function storedTheme(storage) {
-  return storage.getItem('theme') || 'dark'
-}
-
-// Flips the root's `dark` class under a short transition class, stores the
-// result, and answers it.
-export function toggleTheme(root, storage, later) {
-  root.classList.add('theme-transition')
-  root.classList.toggle('dark')
-  var value = root.classList.contains('dark') ? 'dark' : 'light'
-  storage.setItem('theme', value)
-  later(function () { root.classList.remove('theme-transition') }, 300)
-  return value
-}
+// globals that consumers bind to are installed by studio/alpine_shims. The
+// theme and its Alpine store are studio/alpine_stores, which loads even when
+// this module does not.
 
 // ---- NAV SPINNER ------------------------------------------------------------
 //

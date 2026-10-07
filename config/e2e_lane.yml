@@ -856,7 +856,7 @@
 # stores exist first; a header bound with x-data="navCollapse()" collapses
 # through the shim; the theme store toggles and remembers.
 #   npx playwright test --list  -> 219 tests in 30 files
-total_specs: 219
+total_specs: 221
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1003,7 +1003,7 @@ total_specs: 219
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 213
 # executed = total - devnet - allowed_skips = 213 - 0 - 0 = 213, so executed ==
 # total_specs and the equality assertion holds.
-executed: 219
+executed: 221
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

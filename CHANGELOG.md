@@ -45,6 +45,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - Studio.nav_spinner_min_ms reaches the browser as
   `<meta name="studio-nav-spinner-min-ms">`.
 
+### Fixed
+
+- **The theme and devMode Alpine stores survive a boot that fails to load.**
+  They move to `studio/alpine_stores`, a module that imports nothing, and
+  `layouts/studio/_head` imports it by its own `javascript_import_module_tag`
+  (nonced, before Alpine) as well as through the boot's graph. So when
+  `studio/application` fails to load, a host's
+  `:class="{ 'dev-mode': $store.devMode }"` body binding and the theme toggle
+  still find their stores instead of throwing. A store registers only where
+  Alpine has none of that name, so the two paths never register twice and a
+  host's own store wins. `storedTheme` and `toggleTheme` move from
+  `studio/head_chrome` to `studio/alpine_stores`.
+
 ### Breaking
 
 - **`window._navSpinnerShownAt` and `window._navSpinnerMinMs` are removed.**
