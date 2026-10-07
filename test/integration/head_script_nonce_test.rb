@@ -54,16 +54,31 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "what stays inline is the pre-paint theme, the import map, the boot import and the stores import" do
+  test "what stays inline is the pre-paint theme, the import map, the boot import and the two store imports" do
     inline = head_scripts("/lab/bar_stack").reject { |script| script["src"] }
 
-    assert_equal 4, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
+    assert_equal 5, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
     assert_includes inline[0].text, "classList.add('dark')", "the pre-paint theme script comes first"
     assert_equal "importmap", inline[1]["type"]
     assert_equal "module", inline[2]["type"]
     assert_equal %(import "studio/application"), inline[2].text.strip
     assert_equal "module", inline[3]["type"]
     assert_equal %(import "studio/alpine_stores"), inline[3].text.strip
+    assert_equal "module", inline[4]["type"]
+    assert_equal %(import "studio/modal_host"), inline[4].text.strip
+  end
+
+  # The modal stack's own door, for the same reason as the stores': a host's
+  # template binds $store.modals.current(), so a failed boot must not take it.
+  test "the modal stack loads by its own nonced module tag, before Alpine" do
+    scripts = head_scripts("/lab/bar_stack")
+    modals = scripts.index { |script| script.text.strip == %(import "studio/modal_host") }
+    alpine = scripts.index { |script| script["src"].to_s.include?("studio/alpine") }
+
+    refute_nil modals, "the head does not import studio/modal_host by its own tag"
+    assert_equal NONCE, scripts[modals]["nonce"]
+    assert_equal "module", scripts[modals]["type"]
+    assert_operator modals, :<, alpine, "the modal stores' listener must be registered before Alpine starts"
   end
 
   # The stores' own door. Its own tag, not a line inside the boot import, so a

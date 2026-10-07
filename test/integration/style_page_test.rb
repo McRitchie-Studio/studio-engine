@@ -556,12 +556,13 @@ class StylePageTest < ActiveSupport::TestCase
   test "the minimum-visible-duration convention ships and the demo load modals honor it" do
     html = render_index
 
-    # The single convention definition (rendered by the page + the shared host).
-    assert_includes html, "window.StudioModals.holdAtLeast", "holdAtLeast helper ships"
-    assert_includes html, "MIN_LOAD_MS = window.StudioModals.MIN_LOAD_MS || 1400",
-      "the standard default min duration ships"
+    # The single convention definition is studio/modal_host's, on every page.
+    source = File.read(File.expand_path("../../app/javascript/studio/modal_host.js", __dir__))
+    assert_includes source, "sm.holdAtLeast = sm.holdAtLeast ||", "holdAtLeast helper ships"
+    assert_includes source, "export const MIN_LOAD_MS = 1400", "the standard default min duration ships"
+    assert_includes source, "sm.MIN_LOAD_MS = sm.MIN_LOAD_MS || MIN_LOAD_MS"
     # resolveAt = max(min_duration, actual): the anti-flicker floor math.
-    assert_includes html, "Math.max(0, minMs - (Date.now() - startedAt))",
+    assert_includes source, "Math.max(0, minMs - (now() - startedAt))",
       "holdAtLeast waits the remainder of the floor"
 
     # _processing_card's reusable prop: the retrofit demos self-resolve after the floor.

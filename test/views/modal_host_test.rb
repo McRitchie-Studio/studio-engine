@@ -4,11 +4,11 @@ require "test_helper"
 require "action_view"
 
 # Renders the canonical modal host (studio/modals/_host.html.erb) through
-# ActionView and pins its contract: the Alpine.store('modals') API surface,
-# the animation registry + inline keyframes (upstreamed from Turf Monster's
-# shadow copy), dismissal guards, and block-based modal registration. These
-# are string assertions on the emitted HTML/JS — the store logic itself runs
-# in the browser, but the contract a consumer codes against is all here.
+# ActionView and pins its contract: the markup, the inline keyframes, the
+# dismissal guards, block-based modal registration, and the wiring to the
+# module that owns the store (studio/modal_host, through the modal-host
+# controller). The store's BEHAVIOUR is executed in
+# test/javascript/modal_host.test.mjs; what is read here is its source surface.
 class ModalHostTest < Minitest::Test
   # --- registration -----------------------------------------------------
 
@@ -68,69 +68,61 @@ class ModalHostTest < Minitest::Test
   end
 
   def test_card_width_registry_is_a_merge_not_a_replacement
-    # Source-level contract only — that the merge RESOLVES correctly is executed
-    # under node in modal_host_store_behavior_test.rb, which a string assertion
-    # here cannot stand in for.
-    html = render_host
-
-    assert_includes html, "window.StudioModals.CARD_WIDTHS = Object.assign({}, widthOverrides);"
-    assert_includes html, "window.StudioModals.DEFAULT_CARD_WIDTH ||"
+    # Source surface only; that the merge RESOLVES is executed in
+    # test/javascript/modal_host.test.mjs.
+    assert_includes module_source, "sm.CARD_WIDTHS = Object.assign({}, sm.CARD_WIDTHS || {})"
+    assert_includes module_source, "sm.DEFAULT_CARD_WIDTH = sm.DEFAULT_CARD_WIDTH ||"
   end
 
-  def test_renders_without_a_block
+  def test_renders_without_a_block_and_names_its_store_for_the_controller
     html = render_host
 
-    assert_includes html, "Alpine.store('modals'"
+    assert_includes html, 'data-studio-controller="modal-host"'
+    assert_includes html, 'data-modal-host-store-value="modals"'
+    refute_includes html, "data-modal-host-scoped-value", "the shared host gets the animated store"
+  end
+
+  def test_the_host_renders_no_script
+    refute_includes render_host, "<script", "the store is studio/modal_host; an inline script carries no nonce"
   end
 
   # --- store API surface ------------------------------------------------
 
   def test_store_exposes_the_full_stack_api
-    html = render_host
-
-    # Surface only. What isOpen/isLive actually RETURN across the lifecycle
-    # is asserted by executing the store in
-    # test/views/modal_host_store_behavior_test.rb — a substring match
-    # cannot tell the two apart.
-    %w[open: swap: advance: close: closeAll: closeAllDismissible: isOpen: isLive: current: cardClasses:
-       _sync:].each do |method|
-      assert_includes html, method, "expected Alpine store to define #{method}"
+    %w[captureFocus: refocus: releaseFocus: focusables: cycleFocus: dialogLabel: isOpen: isLive: current:
+       closeAll: closeAllDismissible: _sync:].each do |method|
+      assert_includes module_source, method, "expected the focus trap to define #{method}"
+    end
+    %w[open swap advance close cardClasses].each do |method|
+      assert_includes module_source, "store.#{method} = function", "expected the store to define #{method}"
     end
   end
 
   def test_open_supports_replace_swap_with_direction
-    html = render_host
-
-    assert_includes html, "opts.replace"
-    assert_includes html, "(opts.direction === 'back') ? 'back' : 'forward'"
-    assert_includes html, "_swappingOut"
-    assert_includes html, "_swappingIn"
-    assert_includes html, "_settled"
+    assert_includes module_source, "opts.replace"
+    assert_includes module_source, "(opts.direction === 'back') ? 'back' : 'forward'"
+    assert_includes module_source, "_swappingOut"
+    assert_includes module_source, "_swappingIn"
+    assert_includes module_source, "_settled"
   end
 
   def test_close_delays_splice_by_the_exit_animation_duration
-    html = render_host
-
-    assert_includes html, "modalAnim('exit', entry.props && entry.props.exitAnim).ms"
-    assert_includes html, "self.stack.splice(idx, 1)"
+    assert_includes module_source, "modalAnim(win, 'exit', entry.props && entry.props.exitAnim).ms"
+    assert_includes module_source, "self.stack.splice(idx, 1)"
   end
 
   def test_close_all_dismissible_keeps_non_dismissible_modals
-    html = render_host
-
-    assert_includes html, "modal.props.dismissible === false"
+    assert_includes module_source, "entry.props.dismissible === false"
   end
 
   def test_hold_at_least_helper_ships
-    html = render_host
-
-    assert_includes html, "window.StudioModals.holdAtLeast"
+    assert_includes module_source, "sm.holdAtLeast = sm.holdAtLeast ||"
   end
 
   # --- animation registry -----------------------------------------------
 
   def test_animation_registry_ships_pop_shake_slide_defaults
-    entries = registry_entries(render_host)
+    entries = registry_entries(module_source)
 
     # Whitespace-tolerant parse (exact source columns are not the contract).
     # The registry's semantics — merge behavior, cardClasses resolution —
@@ -144,7 +136,7 @@ class ModalHostTest < Minitest::Test
 
   def test_css_durations_equal_registry_ms_and_store_constants
     html = render_host
-    registry = registry_entries(html)
+    registry = registry_entries(module_source)
     css = css_durations(html)
 
     refute_empty registry
@@ -154,8 +146,8 @@ class ModalHostTest < Minitest::Test
                    "(the store waits registry ms before splicing — a mismatch truncates or freezes the keyframe)"
     end
 
-    close_anim_ms = html[/var CLOSE_ANIM_MS = (\d+)/, 1]&.to_i
-    swap_in_ms    = html[/var SWAP_IN_MS\s*= (\d+)/, 1]&.to_i
+    close_anim_ms = module_source[/export const CLOSE_ANIM_MS = (\d+)/, 1]&.to_i
+    swap_in_ms    = module_source[/export const SWAP_IN_MS = (\d+)/, 1]&.to_i
     refute_nil close_anim_ms
     refute_nil swap_in_ms
     # Phase timing constants must match the keyframes they wait for.
@@ -172,7 +164,7 @@ class ModalHostTest < Minitest::Test
     assert_includes html, ':class="$store.modals.cardClasses()"'
     # Directional swap classes stay fixed names regardless of registry keys.
     %w[modal-card-swap-in modal-card-swap-out modal-card-swap-in-back modal-card-swap-out-back].each do |cls|
-      assert_includes html, "'#{cls}'"
+      assert_includes module_source, "'#{cls}'"
     end
   end
 
@@ -233,10 +225,11 @@ class ModalHostTest < Minitest::Test
   end
 
   def test_bfcache_and_turbo_cleanup_registered
-    html = render_host
+    controller = File.read(File.expand_path("../../app/javascript/studio/controllers/modal_host_controller.js", __dir__))
 
-    assert_includes html, "window.addEventListener('pageshow'"
-    assert_includes html, "document.addEventListener('turbo:before-cache'"
+    assert_includes controller, 'window.addEventListener("pageshow"'
+    assert_includes controller, 'document.addEventListener("turbo:before-cache"'
+    assert_includes controller, 'document.removeEventListener("turbo:before-cache"', "and unbinds on disconnect"
   end
 
   # --- structure --------------------------------------------------------
@@ -244,7 +237,7 @@ class ModalHostTest < Minitest::Test
   def test_template_x_if_has_a_single_root_element
     html = render_host
 
-    template_body = html[/<template x-if="\$store\.modals\.current\(\)">(.*)<\/template>/m, 1]
+    template_body = html[/<template x-if="\$store\.modals\.current\(\)"[^>]*>(.*)<\/template>/m, 1]
     refute_nil template_body, "expected the x-if template wrapper"
     # Exactly one top-level element: the backdrop div opens immediately and
     # every other tag nests inside it (Alpine silently no-ops multi-root
@@ -263,6 +256,10 @@ class ModalHostTest < Minitest::Test
   end
 
   private
+
+  def module_source
+    @module_source ||= File.read(File.expand_path("../../app/javascript/studio/modal_host.js", __dir__))
+  end
 
   # { "modal-card-mount" => 320, ... } parsed from the ModalAnimations
   # registry literals, whitespace-tolerant.

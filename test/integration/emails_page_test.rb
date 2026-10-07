@@ -1112,9 +1112,10 @@ class EmailsPageTest < ActiveSupport::TestCase
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
     html = view.render(partial: "studio/modals/scoped_host", locals: { store: "emailModals" })
 
-    assert_includes html, "var STORE_NAME    = 'emailModals';"
+    assert_includes html, 'data-modal-host-store-value="emailModals"'
+    assert_includes html, 'data-modal-host-scoped-value="true"'
     assert_includes html, "$store.emailModals.current()"
-    refute_includes html, "Alpine.store('modals'",
+    refute_includes html, "$store.modals.",
       "a page-scoped host must never touch the app's shared store"
   end
 
@@ -1123,10 +1124,13 @@ class EmailsPageTest < ActiveSupport::TestCase
     html = view.render(partial: "studio/modals/scoped_host", locals: { store: "emailModals" })
 
     # alpine:init fires once per full document load. A host living in a PAGE BODY
-    # was absent for it, so a Turbo Drive visit needs the direct-call branch or
+    # is absent for it, so studio/modal_host registers the hosts in the incoming
+    # body before a Turbo render, read from the template's data attributes, or
     # the store is undefined and every x-data on the page throws.
-    assert_includes html, "if (window.Alpine) { registerScopedStore(); }"
-    assert_includes html, "else { document.addEventListener('alpine:init', registerScopedStore); }"
+    source = File.read(File.expand_path("../../app/javascript/studio/modal_host.js", __dir__))
+    assert_includes html, 'data-studio-controller="modal-host"'
+    assert_includes source, "doc.addEventListener('turbo:before-render'"
+    assert_includes source, "registerHostsIn(event.detail.newBody, env)"
   end
 
   test "the scoped host ships the API the crop and saving modals call" do
@@ -1136,9 +1140,16 @@ class EmailsPageTest < ActiveSupport::TestCase
     # studio/modals/_crop_photo calls current()/close(); submitFormWithProgress
     # calls open(id, props, { replace: true }) to turn crop-photo into saving;
     # the backdrop binds cardClasses(). A missing one of these is a dead button.
-    %w[current: close: open: cardClasses: closeAllDismissible:].each do |method|
-      assert_includes html, method, "the scoped store must implement #{method.chomp(':')}()"
+    source = File.read(File.expand_path("../../app/javascript/studio/modal_host.js", __dir__))
+    scoped = source[/export function createScopedModalStore.*?\n}\n/m]
+    refute_nil scoped, "studio/modal_host must define createScopedModalStore"
+    %w[open close swap cardClasses].each do |method|
+      assert_includes scoped, "store.#{method} = function", "the scoped store must implement #{method}()"
     end
+    %w[current: closeAllDismissible:].each do |method|
+      assert_includes source, method, "the shared focus trap must implement #{method.chomp(':')}()"
+    end
+    assert_includes html, "$store.emailModals.cardClasses()"
   end
 
   test "the shared modal host was left exactly as every app already renders it" do

@@ -44,10 +44,9 @@ class UiPrimitivesRenderTest < ActiveSupport::TestCase
     ERB
 
     assert_includes html, "DUMMY-REGISTERED-MODAL"
-    assert_includes html, "Alpine.store('modals'"
-    assert_includes html, "advance: function(propsPatch, opts)"
+    assert_includes html, 'data-studio-controller="modal-host"'
+    assert_includes html, 'data-modal-host-store-value="modals"'
     assert_includes html, "@keyframes modal-card-in"
-    assert_includes html, "window.ModalAnimations"
   end
 
   # THE SHARED HOST'S FOCUS WIRING, which nothing covered until now.
@@ -82,63 +81,42 @@ class UiPrimitivesRenderTest < ActiveSupport::TestCase
   # focus fell to <body> and the trap released. refocus() closes that, and BOTH
   # hosts must carry it: they diverge only in the scoped store name.
   test "both hosts re-focus the backdrop after the top entry changes" do
-    {
-      "studio/modals/host" => {},
-      "studio/modals/scoped_host" => { store: "pageModals" }
-    }.each do |partial, locals|
-      html = ActionController::Base.render(partial: partial, locals: locals)
+    source = File.read(File.expand_path("../../app/javascript/studio/modal_host.js", __dir__))
 
-      assert_includes html, "refocus: function",
-                      "#{partial} has no refocus() — a swap releases the focus trap"
-      # ANCHORED ON THE RECEIVER, not the bare name. Both hosts DOCUMENT refocus()
-      # in prose, so /refocus\(\)/ matches the comment and stays green with every
-      # call deleted — mutation caught exactly that. A call has a receiver.
-      assert_match(/(?:self|this)\.refocus\(\)/, html,
-                   "#{partial} defines refocus() but never CALLS it, which is the same as not " \
-                   "having it")
+    assert_includes source, "refocus: function",
+                    "the focus trap has no refocus(): a swap releases it"
+    { "createModalStore" => "shared", "createScopedModalStore" => "scoped" }.each do |factory, label|
+      body = source[/export function #{factory}\(.*?\n}\n/m]
+      refute_nil body, "studio/modal_host must define #{factory}"
+      # ANCHORED ON THE RECEIVER, not the bare name: the module DOCUMENTS
+      # refocus() in prose, so /refocus\(\)/ matches a comment and stays green
+      # with every call deleted. A call has a receiver.
+      assert_match(/(?:self|this)\.refocus\(\)/, body,
+                   "the #{label} store never CALLS refocus(), which is the same as not having it")
     end
   end
 
-  # Both hosts, rendered through the REAL controller render path, must emit a
-  # store script that actually PARSES. The unit harness executes the store
-  # under stubs; this asserts the thing that harness cannot see — that what a
-  # live Rails app emits is syntactically whole.
-  #
-  # This is not hypothetical. An ERB comment ends at its FIRST "%" + ">", so a
-  # comment body containing one closes early and leaks its prose into the
-  # document; if that prose contains a literal script tag it opens a phantom
-  # element that swallows the real script in every browser. That shipped once
-  # (the propagate-at-format-gem defect). A substring assertion is blind to it;
-  # a parse is not.
-  test "both modal hosts emit a syntactically whole store script" do
-    node = `which node 2>/dev/null`.strip
-    refute_empty node,
-                 "node runtime NOT FOUND. This test parses the rendered store script; " \
-                 "skipping it would report green with zero coverage of script integrity. " \
-                 "Install node (mise install node@20) and re-run."
-
+  # Both hosts, rendered through the REAL controller render path, emit NO script:
+  # the store is studio/modal_host, a nonced module. An ERB comment ends at its
+  # FIRST "%" + ">", so a comment body containing one closes early and leaks its
+  # prose into the document; prose carrying a literal script tag opens a phantom
+  # element (the propagate-at-format-gem defect). So the render must carry no
+  # script tag at all, and the module itself must parse.
+  test "both modal hosts emit no script, and the module they bind parses" do
     {
       "studio/modals/host" => {},
       "studio/modals/scoped_host" => { store: "pageModals" }
     }.each do |partial, locals|
       html = ActionController::Base.render(partial: partial, locals: locals)
-
-      # The store lives in each partial's FIRST script block by design.
-      script = html[%r{<script>(.*?)</script>}m, 1]
-      refute_nil script, "#{partial} must emit a store <script>"
-
-      assert_includes script, "isLive: function(id)",
-                      "#{partial} must ship isLive through the real render path"
-
-      Tempfile.create(["rendered_host", ".js"]) do |f|
-        f.write(script)
-        f.flush
-        out = `#{node} --check #{f.path} 2>&1`
-        assert $?.success?,
-               "#{partial}'s emitted store script does not parse — a truncated ERB comment " \
-               "or an unbalanced tag can leak prose into it:\n#{out}"
-      end
+      refute_match(/<script/i, html, "#{partial} must emit no script: its store is studio/modal_host")
+      assert_includes html, 'data-studio-controller="modal-host"', "#{partial} must bind the modal-host controller"
     end
+
+    node = `which node 2>/dev/null`.strip
+    refute_empty node, "node runtime NOT FOUND (mise install node@20)"
+    path = File.expand_path("../../app/javascript/studio/modal_host.js", __dir__)
+    out = `#{node} --input-type=module --check < #{path} 2>&1`
+    assert $?.success?, "studio/modal_host does not parse:\n#{out}"
   end
 
   test "user nav renders the hub-style legacy call through the dummy app" do
