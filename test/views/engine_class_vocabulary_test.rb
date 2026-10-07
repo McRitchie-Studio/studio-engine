@@ -112,10 +112,11 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
   # early (the trap documented in modal_error_lines_announce_test.rb).
   def self.neutralise(src) = src.gsub(/<%#.*?%>/m, "").gsub(/<%.*?%>/m, ERB)
 
-  # `class="..."` — the lookbehind keeps `:class` and `x-bind:class` out, since
-  # those hold JS expressions, not class lists.
+  # `class="..."`, and a Stimulus class attribute (`data-<controller>-<name>-class`),
+  # which is a class list too. The lookbehind keeps `:class` and `x-bind:class`
+  # out, since those hold JS expressions, not class lists.
   def self.static_tokens(markup)
-    markup.scan(/(?<![:\w-])class\s*=\s*"([^"]*)"/m).flatten.flat_map { |v| v.split(/\s+/) }
+    markup.scan(/(?<![:\w-])(?:class|data-[\w-]+-class)\s*=\s*"([^"]*)"/m).flatten.flat_map { |v| v.split(/\s+/) }
   end
 
   # `:class` / `x-bind:class` — quoted literals that are object KEYS or ternary

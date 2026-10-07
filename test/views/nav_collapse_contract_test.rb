@@ -180,7 +180,7 @@ class NavCollapseContractTest < Minitest::Test
     # The header stays an Alpine component for its descendants: without it the
     # user nav's $store.devMode bindings and the sidebar trigger's @click never
     # initialize (e2e/header_phone_width.spec.js reds at 320px).
-    assert_match(/<header\b[\s\S]{0,200}?'x-data data-controller=/, navbar_markup,
+    assert_match(/<header\b[\s\S]{0,200}?\sx-data data-controller="studio--nav-collapse"/, navbar_markup,
                  "the header must keep the bare x-data its descendants bind through")
     # ANCHORED ON THE ATTRIBUTE, not the bare name. `navbar_source` is File.read of
     # raw ERB, so the file's OWN COMMENTS count as source: with a bare
