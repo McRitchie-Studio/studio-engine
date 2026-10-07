@@ -477,9 +477,12 @@ Recognized props: `dismissible: false` disables escape/click-outside dismissal
 animation from the registry (`'pop'` default, `'shake'`, `'slide'`).
 
 `window.ModalAnimations` is the animation registry — each key maps a CSS class
-to its duration. To add a custom animation, define `window.ModalAnimations`
-**before** the host renders with your extra keys (they merge over the engine
-defaults) and ship the matching CSS class in the app stylesheet:
+to its duration. `studio/modal_host` (an ES module the engine head imports on
+every page, which also owns `$store.modals`, the focus trap and
+`window.StudioModals`) merges an app's entries over the engine defaults once
+the document has parsed. To add a custom animation, define
+`window.ModalAnimations` in a script anywhere in the page with your extra keys
+and ship the matching CSS class in the app stylesheet:
 
 ```html
 <script>
@@ -487,16 +490,17 @@ defaults) and ship the matching CSS class in the app stylesheet:
 </script>
 ```
 
-Prefer an inline script placed before the host render, as above. A module that
-loads after the host (e.g. via importmap) and assigns `window.ModalAnimations`
-**replaces** the merged registry rather than extending it — the host guards
-against this (unknown keys and gutted registries fall back to the built-in
-`'pop'`), but your other custom keys are lost unless the late script merges
-into the existing object instead of assigning over it.
+An inline script anywhere in the page, as above, or a host module (it
+evaluates before the engine's) both merge. A script that assigns
+`window.ModalAnimations` LATER, after the page has loaded, **replaces** the
+merged registry rather than extending it: the store guards against this
+(unknown keys and gutted registries fall back to the built-in `'pop'`), but
+your other custom keys are lost unless the late script merges into the existing
+object instead of assigning over it.
 
 `window.StudioModals.CARD_WIDTHS` is the **card-width registry**, and it works
-exactly like the animation one: define it **before** the host renders and your
-entries merge over the engine defaults. Keys are modal ids, values are the
+exactly like the animation one: define it in the page and your entries merge
+over the engine defaults. Keys are modal ids, values are the
 Tailwind `max-w-*` class that card should use. `DEFAULT_CARD_WIDTH` (default
 `max-w-sm`) covers every id you don't name:
 

@@ -4,6 +4,33 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The modal host and the scoped host move to an ES module and a Stimulus
+  controller.** `studio/modals/_host` and `studio/modals/_scoped_host` render
+  markup and styles only; their inline scripts (the shared host's store,
+  registry and cleanup, the load convention it rendered, and the scoped host's
+  copy of the stack) are gone. The stacks, the focus trap both share, the
+  animation and card-width registries and `holdAtLeast` are `studio/modal_host`,
+  with `node:test` unit tests; each host's `<template>` carries
+  `data-studio-controller="modal-host"` and `data-modal-host-store-value`
+  (the scoped host adds `data-modal-host-scoped-value="true"`), and the
+  `modal-host` controller binds the bfcache and Turbo snapshot cleanup to it.
+  `layouts/studio/_head` imports `studio/modal_host` by its own nonced module
+  tag, as it does `studio/alpine_stores`, so a failed boot keeps the stores.
+  Stores register on `alpine:init`, before a Turbo render, and on connect, and
+  only where a host renders: an app with no shared host still has no
+  `$store.modals`. `$store.modals`, every scoped `$store.<name>`,
+  `window.ModalAnimations` and `window.StudioModals` keep their names and API.
+- **`window.ModalAnimations` and `window.StudioModals` (`CARD_WIDTHS`,
+  `DEFAULT_CARD_WIDTH`, `MIN_LOAD_MS`, `holdAtLeast`) are published on every
+  page**, once the document has parsed, merged over whatever the app defined
+  first. They were published only by a host's inline script, so an app's
+  definition had to come before the host render; anywhere in the page works now.
+- **`studio/modals/_load_convention` renders nothing.** The convention it carried
+  is `studio/modal_host`'s; the partial stays so a render of it by name still
+  resolves.
+
 ## 0.94.0 — 2026-10-07
 
 ### Added
