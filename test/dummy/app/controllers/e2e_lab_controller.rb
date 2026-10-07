@@ -105,12 +105,20 @@ class E2eLabController < ActionController::Base
       safe_join(scripts)
     end
 
-    # The host's importmap delivers NOTHING the lane needs, and that is the honest
-    # stand-in. It used to serve Alpine from node_modules — necessary while the
-    # engine's head fetched Alpine from a CDN this lane will not call. Now the engine
-    # vendors Alpine and the head's own javascript_include_tag above delivers it, so
-    # serving a second copy here would only mask whether that delivery works.
-    def javascript_importmap_tags(*) = "".html_safe
+    # What a host's javascript_importmap_tags renders, less the entry point: the
+    # import map (the engine's pins alone, since the dummy has no
+    # config/importmap.rb) and the modulepreload links for what it preloads. The
+    # dummy has no application.js to import, so there is no `import "application"`;
+    # the head's own javascript_import_module_tag then boots studio/application
+    # through this map, the path every consumer takes.
+    #
+    # It once served Alpine from node_modules, while the engine's head fetched
+    # Alpine from a CDN this lane will not call. The engine vendors Alpine now and
+    # the head's javascript_include_tag delivers it, so a second copy here would
+    # only mask whether that delivery works.
+    def javascript_importmap_tags(*)
+      safe_join([javascript_inline_importmap_tag, javascript_importmap_module_preload_tags], "\n")
+    end
   end
 
   helper AssetDelivery

@@ -33,6 +33,7 @@ class StickyTableHeaderAssetsTest < Minitest::Test
     def view.csp_meta_tag = ""
     def view.studio_theme_css_tag = ""
     def view.javascript_importmap_tags = "<script></script>"
+    def view.javascript_import_module_tag(*) = ""
 
     view.render(partial: "layouts/studio/head")
   end

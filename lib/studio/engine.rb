@@ -165,6 +165,32 @@ module Studio
         .sort
     end
 
+    # The engine's browser boot, which layouts/studio/_head imports on every page.
+    JAVASCRIPT_BOOT_MODULE = "studio/application"
+
+    # A static `import ... from "x"` or `import "x"`, across lines.
+    JAVASCRIPT_STATIC_IMPORT = /^\s*import\s+(?:[\w$*{}\s,]+?\s+from\s+)?["']([^"']+)["']/
+
+    # Every "studio/<name>" module the boot imports statically, followed through
+    # their own imports. config/importmap.rb preloads exactly these, so the boot
+    # costs one round trip and a page still fetches no other engine module until
+    # it imports one. Derived from the import statements, so a controller the boot
+    # registers is preloaded by being imported.
+    def self.javascript_boot_graph
+      base = File.expand_path("../../app/javascript", __dir__)
+      graph = []
+      queue = [JAVASCRIPT_BOOT_MODULE]
+      while (name = queue.shift)
+        path = File.join(base, "#{name}.js")
+        next if graph.include?(name) || !File.file?(path)
+
+        graph << name
+        imports = File.read(path).scan(JAVASCRIPT_STATIC_IMPORT).flatten
+        queue.concat(imports.select { |dependency| dependency.start_with?("studio/") })
+      end
+      graph.sort
+    end
+
     # Logical asset paths ("studio/local_path.js") for every ES module the
     # engine pins (config/importmap.rb).
     def self.javascript_module_logical_paths

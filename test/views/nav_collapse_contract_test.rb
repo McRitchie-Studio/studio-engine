@@ -33,6 +33,15 @@ require "action_view"
 # the scroll stops. (Its sibling nav_offset_contract_test says the engine has no
 # browser lane; that was true when it was written and is not now.)
 class NavCollapseContractTest < Minitest::Test
+  # The behaviour left the head for ES modules: the collapse is studio/nav_collapse
+  # (bound by studio/controllers/nav_collapse_controller and the navCollapse()
+  # Alpine shim), the geometry publisher is studio/pinned_stack. render_head reads
+  # the head AND those modules, so every wiring assertion below still lands on the
+  # code that runs.
+  MODULE_SOURCES = %w[nav_collapse controllers/nav_collapse_controller alpine_shims pinned_stack].map do |name|
+    File.read(File.expand_path("../../app/javascript/studio/#{name}.js", __dir__))
+  end.join("\n").freeze
+
   # ASSERT THE WIRING, NOT THE VOCABULARY — the lesson nav_offset_contract_test
   # was blocked for. Every regex below spans a property AND the expression
   # feeding it, and each names the mutation it exists to kill.
@@ -114,7 +123,7 @@ class NavCollapseContractTest < Minitest::Test
 
     assert_match(/scrollHeight/, guard, "room must start from the document height")
     assert_match(/innerHeight/, guard, "minus the viewport")
-    assert_match(/\+\s*ramp\s*\*\s*\w+\.p\b/, guard,
+    assert_match(/\+\s*ramp\s*\*\s*(?:\w+\.)?p\b/, guard,
                  "room must add back the shrink ALREADY applied, or the measurement chases itself as it collapses")
 
     # And the guard has to actually refuse, not merely compute.
@@ -132,7 +141,7 @@ class NavCollapseContractTest < Minitest::Test
     assert_match(/matchMedia\(\s*["']\(prefers-reduced-motion: reduce\)["']\s*\)/, html,
                  "the component must consult prefers-reduced-motion")
 
-    branch = html[/_reduce\.matches\s*\)\s*\{([\s\S]{0,240}?)\}/, 1].to_s
+    branch = html[/else if \(reduce\)\s*\{([\s\S]{0,240}?)\}/, 1].to_s
     refute_empty branch, "could not find the reduced-motion branch"
     assert_match(/\btarget\s*=\s*\([\s\S]*?\)\s*\?\s*1\s*:\s*0/, branch,
                  "reduced motion must snap progress to 0 or 1, never interpolate")
@@ -150,20 +159,24 @@ class NavCollapseContractTest < Minitest::Test
     # requestAnimationFrame and dropping the call inside it. The frame is
     # scheduled, nothing is published, and scroll tracking is dead with every
     # token intact.
-    assert_match(/requestAnimationFrame\(\s*apply\s*\)/, html,
+    assert_match(/requestAnimationFrame\(\s*this\._apply\s*\)/, html,
                  "the scheduled frame must call apply — a throttle that never applies is not a throttle")
 
     # A Turbo visit tears the header down and builds a new one; without an
     # explicit removal every visit stacks another listener on window.
-    assert_match(/destroy(?:\(\)|:\s*function\s*\(\))\s*\{[\s\S]{0,400}?removeEventListener\(\s*["']scroll["']/, html,
+    assert_match(/stop\(\)\s*\{[\s\S]{0,400}?removeEventListener\(\s*["']scroll["']/, html,
                  "destroy() must unbind the scroll listener, or Turbo visits stack them")
   end
 
   def test_the_navbar_derives_every_collapsing_dimension_from_nav_p
     nav = navbar_source
 
-    assert_includes nav, 'x-data="navCollapse()"',
-                    "the header must own the scroll-linked collapse component"
+    # On the HEADER, in the comment-stripped markup: the file's own prose names
+    # both the controller and the Alpine shim.
+    assert_match(/<header\b[\s\S]{0,200}?data-controller="studio--nav-collapse"/, navbar_markup,
+                 "the header must own the scroll-linked collapse controller")
+    assert_match(/data-studio--nav-collapse-scrolled-class="shadow-lg border-b border-subtle is-scrolled"/, navbar_markup,
+                 "the controller must toggle the shadow classes the Alpine :class used to")
     # ANCHORED ON THE ATTRIBUTE, not the bare name. `navbar_source` is File.read of
     # raw ERB, so the file's OWN COMMENTS count as source: with a bare
     # `assert_includes nav, "nav-shell"`, deleting nav-shell from the header's class
@@ -255,14 +268,14 @@ class NavCollapseContractTest < Minitest::Test
     # DERIVED, NOT TUNED PER BAND. engine.css sizes --nav-ramp at 3x the band's
     # collapse total, so a cap of N px/frame is 3*N/ramp in --nav-p units. A
     # hardcoded step would be right on one breakpoint and wrong on the other.
-    assert_match(/maxStep\s*=\s*\(\s*3\s*\*\s*self\._maxPx\s*\)\s*\/\s*ramp/, html,
+    assert_match(/maxStep\s*=\s*\(\s*3\s*\*\s*maxPx\s*\)\s*\/\s*ramp/, html,
                  "the step must derive from --nav-ramp's 3x relation to the collapse total")
 
     # Within one step take the target exactly — no crawl; beyond it advance by
     # exactly one step.
     assert_match(/Math\.abs\(delta\)\s*<=\s*maxStep/, html,
                  "inside one step the target must be taken exactly, or it converges asymptotically")
-    assert_match(/self\.p\s*\+\s*\(\s*delta\s*>\s*0\s*\?\s*maxStep\s*:\s*-maxStep\s*\)/, html,
+    assert_match(/\bp\s*\+\s*\(\s*delta\s*>\s*0\s*\?\s*maxStep\s*:\s*-maxStep\s*\)/, html,
                  "beyond one step it must advance by exactly one step")
   end
 
@@ -273,7 +286,9 @@ class NavCollapseContractTest < Minitest::Test
     # frame. Every assertion above still passes, and the collapse FREEZES
     # wherever the clamp left it the moment the finger lifts — because nothing
     # else schedules a frame once scroll events stop arriving.
-    assert_match(/if\s*\(\s*!snap\s*&&\s*p\s*!==\s*target\s*\)\s*\{[\s\S]{0,160}?requestAnimationFrame\(\s*apply\s*\)/, html,
+    assert_match(/settling:\s*!snap\s*&&\s*next\s*!==\s*target/, html,
+                 "an unfinished clamp must report itself as still settling")
+    assert_match(/if\s*\(\s*frame\.settling\s*\)\s*\{[\s\S]{0,160}?requestAnimationFrame\(\s*this\._apply\s*\)/, html,
                  "an unfinished clamp must schedule its own next frame — no scroll event will")
   end
 
@@ -285,7 +300,7 @@ class NavCollapseContractTest < Minitest::Test
     # would ease the navbar open on a page that must not collapse, and reduced
     # motion would get the interpolation it asked us to drop.
     assert_match(/snap\s*=\s*true/, html, "the guard and reduced-motion must mark themselves as snaps")
-    assert_match(/if\s*\(\s*snap\s*\)\s*\{[\s\S]{0,240}?p\s*=\s*target;/, html,
+    assert_match(/if\s*\(\s*snap\s*\)\s*\{[\s\S]{0,240}?next\s*=\s*target;/, html,
                  "a snap must take the target directly, skipping the clamp")
   end
 
@@ -394,7 +409,8 @@ class NavCollapseContractTest < Minitest::Test
     def view.csp_meta_tag = ""
     def view.studio_theme_css_tag = ""
     def view.javascript_importmap_tags = "<script></script>"
+    def view.javascript_import_module_tag(*) = ""
 
-    view.render(partial: "layouts/studio/head")
+    "#{view.render(partial: "layouts/studio/head")}\n#{MODULE_SOURCES}"
   end
 end

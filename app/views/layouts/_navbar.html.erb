@@ -40,20 +40,23 @@
   logo_path = Studio.logo_for("Navbar Logo")
 %>
 
-<%# nav-shell is the --nav-p scope: navCollapse() (layouts/studio/_head) writes
+<%# nav-shell is the --nav-p scope: the studio--nav-collapse controller (studio/nav_collapse) writes
     the collapse progress, 0 expanded .. 1 collapsed, on THIS element once per
     animation frame, and the band table below derives the row padding, logo size
     and title sizes from it with calc(). Nothing on the collapse path carries a
     time-based transition — the head's comment carries the measurements that
     bought that. transition-shadow stays: box-shadow paints, it never reflows,
     so it cannot move content under the reader.
-    Preview keeps nav-shell (the calc()s have to resolve) but no x-data — the
-    /navbar review page drives --nav-p from its own Scrolled toggle. %>
+    The controller toggles the scrolled classes (the shadow) when the scroll
+    passes its hysteresis.
+    Preview keeps nav-shell (the calc()s have to resolve) but no controller — the
+    /navbar review page drives --nav-p from its own Scrolled toggle, and its
+    :class reads that toggle's `scrolled`. %>
 <%# data-pin names this header as a layer of the pinned stack, so
     layouts/studio/_head publishes --pin-nav-h and --pin-nav-bottom for it and
     anything below can position off it in pure CSS. The legacy --nav-h /
     --nav-bottom keep publishing unchanged; this is additive. %>
-<header data-pin="nav" <%= 'x-data="navCollapse()"'.html_safe unless is_preview %>
+<header data-pin="nav" <%= 'data-controller="studio--nav-collapse" data-studio--nav-collapse-scrolled-class="shadow-lg border-b border-subtle is-scrolled"'.html_safe unless is_preview %>
         <%# top-0, a STATIC value, and never a custom property. Any bars render as
             this header's sibling in normal flow (studio/banners/_stack), so they
             already occupy their own height above it and there is nothing to
@@ -63,7 +66,7 @@
             during a view transition composited at two different tops. Only CSS
             can set this top now, so none of that is reachable. %>
         class="nav-shell <%= is_preview ? 'bg-page' : "#{'vt-pinned-header ' if pin_header}sticky top-0 z-50 bg-page transition-shadow duration-300" %>"
-        :class="scrolled && 'shadow-lg border-b border-subtle is-scrolled'">
+        <%= %(:class="scrolled && 'shadow-lg border-b border-subtle is-scrolled'").html_safe if is_preview %>>
   <style>
     /* THE PHONE STEP IS A SHARE OF THE VIEWPORT, NOT A CONSTANT, and that is the
        whole width fix. 14rem is 224px — 57% of a 390px screen — handed to a
@@ -109,7 +112,8 @@
        was left to hand-write its own — the way four independent copies happened
        in the first place. It ships from engine.css now (every consuming app
        imports it), so a forking app OPTS IN with `nav-shell` +
-       x-data="navCollapse()" and overrides only the endpoints that differ.
+       data-controller="studio--nav-collapse" (or x-data="navCollapse()",
+       the Alpine shim) and overrides only the endpoints that differ.
 
        THE OPT-IN IS NOT THE WHOLE JOB — this is the partial a forker actually
        reads, so the caveat belongs here too rather than only beside the band
