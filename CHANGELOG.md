@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.94.0 — 2026-10-07
+
 ### Added
 
 - **The engine boots its own Stimulus application** (`studio/application`),
