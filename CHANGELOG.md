@@ -50,6 +50,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **`window._navSpinnerShownAt` and `window._navSpinnerMinMs` are removed.**
   The spinner's state is private to `studio/head_chrome`; no consumer reads them.
 
+## 0.93.0 — 2026-10-07
+
 ## 0.92.2 — 2026-10-07
 
 ## 0.92.1 — 2026-10-07
