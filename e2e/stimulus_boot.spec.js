@@ -18,8 +18,11 @@ test("the engine navbar collapses under its Stimulus controller", async ({ page 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/lab/bar_stack");
 
-  const header = page.locator("header[data-controller~='studio--nav-collapse']");
+  const header = page.locator("header[data-studio-controller~='nav-collapse']");
   await expect(header).toHaveCount(1);
+  // The engine's controllers live on their own attribute, so a host's Stimulus
+  // application (and stimulus-loading's lazy loader) never meets them.
+  await expect(page.locator("header[data-controller]")).toHaveCount(0);
   await expect(header).not.toHaveClass(/is-scrolled/);
 
   await page.evaluate(() => window.scrollTo(0, 400));

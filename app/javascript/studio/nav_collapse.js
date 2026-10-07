@@ -14,7 +14,7 @@
 // lurch in the frame the class flipped, where a discrete text-3xl -> text-xl
 // swap collided with the stylesheet's own `transition: font-size`.
 //
-// ADOPTING IT: put `nav-shell` and `data-controller="studio--nav-collapse"` on
+// ADOPTING IT: put `nav-shell` and `data-studio-controller="nav-collapse"` on
 // the header (studio/controllers/nav_collapse_controller), give each breakpoint
 // band a `--nav-ramp`, and write the collapsing dimensions as calc()s off
 // --nav-p. A header that still says `x-data="navCollapse()"` gets the same

@@ -1,7 +1,8 @@
-// studio--nav-collapse: the scroll-linked navbar collapse on a <header>.
+// nav-collapse: the scroll-linked navbar collapse on a <header>, on the engine's
+// Stimulus application (studio/application, which reads data-studio-controller).
 //
-//   <header class="nav-shell ..." data-controller="studio--nav-collapse"
-//           data-studio--nav-collapse-scrolled-class="shadow-lg is-scrolled">
+//   <header class="nav-shell ..." data-studio-controller="nav-collapse"
+//           data-nav-collapse-scrolled-class="shadow-lg is-scrolled">
 //
 // The behaviour is studio/nav_collapse; this controller binds it to the
 // element's lifetime and toggles the `scrolled` classes when the shadow's

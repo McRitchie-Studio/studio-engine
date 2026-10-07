@@ -135,8 +135,10 @@ it may not reuse one of their names. `studio/local_path`, the browser twin of
 
 **The engine's boot.** `layouts/studio/_head` imports `studio/application` on
 every page with `javascript_import_module_tag`, which carries the request's CSP
-nonce. The boot starts the engine's own Stimulus application, so engine
-controllers are named `studio--<name>` and never collide with a host's. Stimulus
+nonce. The boot starts the engine's own Stimulus application on its own
+attributes (`data-studio-controller`, `data-studio-action`,
+`data-studio-target`), so a host's Stimulus application, and its lazy loader,
+never sees an engine controller. Stimulus
 is vendored (`studio/vendor/stimulus.js`, pinned as `@hotwired/stimulus`); a
 host that pins its own wins. The boot graph, every `studio/` module
 `studio/application` imports, is preloaded
@@ -152,7 +154,7 @@ components:
 
 | Behaviour | Module | Bound by | Shim kept for consumers |
 |---|---|---|---|
-| Navbar collapse | `studio/nav_collapse` | `studio--nav-collapse` | `x-data="navCollapse()"` |
+| Navbar collapse | `studio/nav_collapse` | `nav-collapse` | `x-data="navCollapse()"` |
 | Pinned stack (`--pin-*`, `--nav-h`, `--nav-bottom`) | `studio/pinned_stack` | the boot | none needed (CSS only) |
 | Theme, dev mode, nav spinner, success confetti | `studio/head_chrome` | the boot | `$store.theme`, `$store.devMode`, `showNavSpinner`, `hideNavSpinner`, `fireSuccessConfetti` |
 
@@ -171,7 +173,8 @@ Stimulus.
 
 **From script to module.** Move the pure logic into a module first and pin
 it with tests (the behaviour does not change). Then write the controller that
-calls it, swap the markup to `data-controller`, and delete the script tag.
+calls it, swap the markup to `data-controller` (`data-studio-controller` in the
+engine), and delete the script tag.
 
 ## Styling
 

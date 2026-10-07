@@ -9,13 +9,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **The engine boots its own Stimulus application** (`studio/application`),
   imported on every page by `layouts/studio/_head` through
   `javascript_import_module_tag`, which carries the request's CSP nonce. Engine
-  controllers are named `studio--<name>`. Stimulus 3.2.2 is vendored
+  application reads its own attributes (`data-studio-controller`,
+  `data-studio-action`, `data-studio-target`), so a host's Stimulus application
+  and its lazy loader never see an engine controller. Stimulus 3.2.2 is vendored
   (`studio/vendor/stimulus.js`) and pinned as `@hotwired/stimulus`; a host that
   pins its own wins. The boot's module graph is preloaded
   (`Studio::Engine.javascript_boot_graph`); every other engine pin is still
   fetched only when imported.
-- **`studio--nav-collapse`**, the navbar collapse as a Stimulus controller.
-  The engine navbar uses it; `data-studio--nav-collapse-scrolled-class` names the
+- **`nav-collapse`**, the navbar collapse as a Stimulus controller
+  (`data-studio-controller="nav-collapse"`). The engine navbar uses it;
+  `data-nav-collapse-scrolled-class` names the
   classes it toggles when the shadow's hysteresis flips.
 
 ### Changed
@@ -35,7 +38,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   module therefore evaluates before `window.Alpine` exists: register Alpine
   data and stores in an `alpine:init` listener (which now fires for host
   modules), not at module evaluation. Inline scripts in the page are unaffected.
-- **The engine navbar's header binds `data-controller="studio--nav-collapse"`**
+- **The engine navbar's header binds `data-studio-controller="nav-collapse"`**
   in place of `x-data="navCollapse()"`, and keeps a bare `x-data` as the Alpine
   scope its descendants bind through. A forked header may keep
   `x-data="navCollapse()"`.
