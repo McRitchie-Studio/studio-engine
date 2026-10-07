@@ -126,20 +126,43 @@ in an app's `script_src` (Turf Monster's policy carries it today).
 them with no edit: the engine's `config/importmap.rb` pins each module under
 `app/javascript/studio` as `studio/<name>`, and the `studio.importmap`
 initializer adds that file to importmap-rails' maps before the host's own, so a
-host that pins the same name wins. Engine pins are not preloaded. A module's
-logical asset path shares the `studio/` prefix with the classic scripts in
-`app/assets/javascripts/studio`, so it may not reuse one of their names. The
-first module is `studio/local_path`, the browser twin of
-`Studio::LocalPath.local?`. Its `node:test` file is in `test/javascript`, and
-`test/lib/studio/local_path_js_parity_test.rb` runs those files in the engine
-suite and holds the module to the Ruby rule.
+host that pins the same name wins. A module's logical asset path shares the
+`studio/` prefix with the classic scripts in `app/assets/javascripts/studio`, so
+it may not reuse one of their names. `studio/local_path`, the browser twin of
+`Studio::LocalPath.local?`, is held to the Ruby rule by
+`test/lib/studio/local_path_js_parity_test.rb`, which also runs every
+`node:test` file in `test/javascript` in the engine suite.
+
+**The engine's boot.** `layouts/studio/_head` imports `studio/application` on
+every page with `javascript_import_module_tag`, which carries the request's CSP
+nonce. The boot starts the engine's own Stimulus application, so engine
+controllers are named `studio--<name>` and never collide with a host's. Stimulus
+is vendored (`studio/vendor/stimulus.js`, pinned as `@hotwired/stimulus`); a
+host that pins its own wins. The boot graph, every `studio/` module
+`studio/application` imports, is preloaded
+(`Studio::Engine.javascript_boot_graph`); every other engine pin is fetched
+only when something imports it.
+
+Alpine loads after the module tags. Deferred classic scripts and module scripts
+run in document order, so by the time Alpine starts, the boot has installed the
+Alpine shims (`studio/alpine_shims`): the `window.*` globals and Alpine stores
+consumers still bind to, each a thin delegate to the module that owns the
+behaviour. A shim stays while a consumer binds to it. The engine's converted
+components:
+
+| Behaviour | Module | Bound by | Shim kept for consumers |
+|---|---|---|---|
+| Navbar collapse | `studio/nav_collapse` | `studio--nav-collapse` | `x-data="navCollapse()"` |
+| Pinned stack (`--pin-*`, `--nav-h`, `--nav-bottom`) | `studio/pinned_stack` | the boot | none needed (CSS only) |
+| Theme, dev mode, nav spinner, success confetti | `studio/head_chrome` | the boot | `$store.theme`, `$store.devMode`, `showNavSpinner`, `hideNavSpinner`, `fireSuccessConfetti` |
 
 **Today.** The engine ships behaviour as scripts inside partials. The board's
 Alpine factory, `window.studioBoard`, is 454 lines in `studio/_board_assets`;
 the hold button takes `guard:`, `on_success:` and `validate:` as JavaScript
-strings that `Alpine.evaluate` runs; the shared head carries inline scripts.
-The engine vendors Alpine and loads it with `javascript_include_tag`, and it
-has no Stimulus. Every app pins its modules with importmap.
+strings that `Alpine.evaluate` runs. The shared head carries one inline script,
+the nonced pre-paint theme; its behaviour is the modules above. The engine
+vendors Alpine and loads it with `javascript_include_tag`. Every app pins its
+modules with importmap.
 Cyvasse and Industries pin Stimulus; the hub has `stimulus-rails` in its
 Gemfile but no Stimulus pin and no controllers, four modules in
 `app/javascript`, and 35 inline script tags across 31 views, the largest being

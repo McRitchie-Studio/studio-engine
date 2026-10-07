@@ -416,8 +416,11 @@ Also not covered:
   A stand-in that delivers something the engine also delivers makes the engine's own
   delivery UNOBSERVABLE, and this lane shipped that bug for a while: the importmap
   stand-in served its own Alpine from `node_modules`, so specs stayed green with the
-  engine's Alpine removed entirely. It now delivers nothing. When adding to
-  `AssetDelivery`, serve only what a HOST would serve and the engine does not.
+  engine's Alpine removed entirely. It now renders what a host's
+  `javascript_importmap_tags` renders, less the entry point: the import map (the
+  engine's pins alone) and its modulepreload links. The head's own
+  `javascript_import_module_tag` then boots `studio/application` through it. When
+  adding to `AssetDelivery`, serve only what a HOST would serve and the engine does not.
 
 ## Cost
 
