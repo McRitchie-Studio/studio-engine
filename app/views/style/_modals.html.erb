@@ -212,9 +212,8 @@
         var SWAP_IN_MS    = 220;
 
         // THE LIVE REGISTRY IS window.ModalAnimations, NOT THIS TABLE. This is a
-        // fallback only, for the case where the guide renders without the shared
-        // host (studio/modals/_host) that publishes the registry — both consumer
-        // layouts mount it, so in practice the lookup below always finds it.
+        // fallback only, for the case where studio/modal_host, which publishes
+        // the registry on every page, failed to load.
         //
         // It used to be a hard-coded local copy, and that made the Enter/Leave
         // simulator below a LIAR: the simulator builds its controls from the live
@@ -1805,13 +1804,12 @@
         });
       }
 
-      // WHEN TO BUILD. window.ModalAnimations is published by the shared host's
-      // inline script, which a host layout may render AFTER this one — so the
-      // build waits for the rest of the body either way:
-      //   full load   — DOMContentLoaded, the host script has run by then;
+      // WHEN TO BUILD. window.ModalAnimations is published by studio/modal_host,
+      // a module, which runs after the document has parsed and before
+      // DOMContentLoaded, so the build waits for the rest of the load either way:
+      //   full load   — DOMContentLoaded, the module has run by then;
       //   Turbo visit — DOMContentLoaded already fired and never fires again, so
-      //                 fall through to a macrotask, which runs after the body
-      //                 swap finishes inserting its scripts.
+      //                 fall through to a macrotask; the registry is already up.
       // turbo:load covers the remaining visits; the build is idempotent, so the
       // overlap between these paths is redundant work and nothing worse.
       if (document.readyState === 'loading') {
