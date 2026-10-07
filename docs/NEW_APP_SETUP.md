@@ -183,8 +183,9 @@ an auto-submitting POST form to `/auth/google_oauth2`, not redirect with GET.
 ### Engine migrations — install these FIRST
 
 The engine ships its own migrations (the email outbox, `Studio::Link`,
-`Studio::Enumeral`, the geo settings table, and an `image_caches` column
-relaxation). Copy them in with
+`Studio::Enumeral`, the geo settings table, and the three tables the engine's
+models write in your database: `error_logs`, `theme_settings` and
+`image_caches`). Copy them in with
 the standard Rails engine task — note the task is `studio_engine:`, not
 `studio:`, and each copied file lands with a `.studio_engine.rb` suffix and a
 provenance comment naming the original timestamp:
@@ -199,6 +200,16 @@ Every engine migration is safe on every app: the ones that create tables add a
 table you may not use yet, and the one that ALTERS an app-owned table
 (`allow_null_image_cache_owner`) no-ops when that table is absent
 (studio-engine >= 0.30.1).
+
+`ensure_error_logs_table`, `ensure_theme_settings_table` and
+`ensure_image_caches_table` create each table when it is absent. On an app that
+already has one, they add any column the engine writes that the table lacks, as a
+nullable column, and change nothing else: no column is altered or dropped, and no
+index or NOT NULL is added. At boot the engine checks those columns
+(`Studio::HostSchema`): a missing one raises `Studio::HostSchemaError` in
+development and test, and is logged (and sent to Sentry) in production, where a
+raise would also stop the release-phase `db:migrate` that fixes it. Set
+`Studio.host_schema_check` to `:raise`, `:log` or `false` to override.
 
 Give the app its **site identity** (title, description and preview image;
 see [`LINK_PREVIEW.md`](LINK_PREVIEW.md)). Draft the title and description
@@ -262,53 +273,11 @@ Add `password_digest` only if the app deliberately enables password auth:
 add_column :users, :password_digest, :string, null: false, default: ""
 ```
 
-### Error Logs
+### Error Logs, Theme Settings and Image Caches
 
-```ruby
-class CreateErrorLogs < ActiveRecord::Migration[7.2]
-  def change
-    create_table :error_logs do |t|
-      t.string :slug
-      t.text :message
-      t.text :inspect
-      t.text :backtrace
-      t.string :target_type
-      t.bigint :target_id
-      t.string :target_name
-      t.string :parent_type
-      t.bigint :parent_id
-      t.string :parent_name
-
-      t.timestamps
-    end
-
-    add_index :error_logs, :slug, unique: true
-  end
-end
-```
-
-### Theme Settings
-
-```ruby
-class CreateThemeSettings < ActiveRecord::Migration[7.2]
-  def change
-    create_table :theme_settings do |t|
-      t.string :app_name
-      t.string :primary
-      t.string :dark
-      t.string :light
-      t.string :accent1
-      t.string :accent2
-      t.string :warning
-      t.string :danger
-
-      t.timestamps
-    end
-
-    add_index :theme_settings, :app_name, unique: true
-  end
-end
-```
+Do not write these by hand: the engine's migrations above create `error_logs`,
+`theme_settings` (with the `slug` column `ThemeSetting` writes on every save) and
+`image_caches`.
 
 ```bash
 bin/rails db:create db:migrate
