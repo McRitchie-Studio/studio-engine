@@ -70,9 +70,19 @@ function page({ fetch, authedFetch, zones = [], sortable } = {}) {
 const response = (status, body) => ({ ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) })
 
 // An Alpine scope: the factory's object with the two magics it reads.
+// A board's element: its own zones and count badges, and nothing of another board's.
+function boardElement({ zones = [], badges = [] } = {}) {
+  return {
+    dataset: {}, attrs: {},
+    getAttribute(name) { return this.attrs[name] ?? null },
+    setAttribute(name, value) { this.attrs[name] = value },
+    querySelectorAll: (selector) => (selector === "[data-board-count]" ? badges : zones)
+  }
+}
+
 function scope(opts, env, element) {
   const board = studioBoard(opts, env)
-  board.$el = element || { dataset: {}, attrs: {}, getAttribute(n) { return this.attrs[n] ?? null }, setAttribute(n, v) { this.attrs[n] = v } }
+  board.$el = element || boardElement()
   board.ticks = []
   board.$nextTick = (fn) => board.ticks.push(fn)
   return board
@@ -422,8 +432,8 @@ test("init names the controller on a hand-written board and announces the scope"
 test("wire makes each zone sortable, marks the board ready, and its return undoes both", () => {
   FakeSortable.created = []
   const zones = [zone("designed"), zone("building")]
-  const env = page({ zones })
-  const board = scope({ group: "tasks" }, env)
+  const env = page({ zones: [zone("another-boards-zone")] })
+  const board = scope({ group: "tasks" }, env, boardElement({ zones }))
 
   const unwire = board.wire(FakeSortable)
   assert.deepEqual(FakeSortable.created.map((sortable) => sortable.el), zones)
@@ -450,8 +460,8 @@ test("a board unwired before its tick never claims to be ready", () => {
 test("a live board watches its zones, and a board without SortableJS is still ready", () => {
   FakeSortable.created = []
   const zones = [zone("designed")]
-  const env = page({ zones })
-  const board = scope({ live: true }, env)
+  const env = page({ zones: [zone("another-boards-zone")] })
+  const board = scope({ live: true }, env, boardElement({ zones }))
 
   const unwire = board.wire(null)
   assert.equal(FakeSortable.created.length, 0)
@@ -459,9 +469,25 @@ test("a live board watches its zones, and a board without SortableJS is still re
   board.ticks.forEach((tick) => tick())
   assert.equal(board.$el.dataset.alpineReady, "true")
 
-  const still = scope({}, env)
-  assert.deepEqual(still.observeLive().map((observer) => observer.observed[0][0]), zones)
+  const observers = scope({}, env, boardElement({ zones })).observeLive()
+  assert.deepEqual(observers.map((observer) => observer.observed[0][0]), zones)
   unwire()
+})
+
+test("a board counts its own zones into its own badges", () => {
+  const badge = (key) => ({ key, textContent: "", getAttribute: () => key })
+  const lane = (key, count) => ({ ...zone(key, new Array(count).fill(card("c"))), id: "dropzone-" + key, empty: { style: {} },
+    querySelector() { return this.empty } })
+  const mine = { zones: [lane("designed", 2), lane("building", 0)], badges: [badge("designed"), badge("building"), badge("elsewhere")] }
+  // Another board on the page carries the same column keys.
+  const env = page({ zones: [lane("designed", 9)] })
+  const board = scope({ emptySelector: ".kanban-empty" }, env, boardElement(mine))
+
+  board.updateCounts()
+
+  assert.deepEqual(mine.badges.map((entry) => entry.textContent), [2, 0, ""])
+  assert.equal(mine.zones[0].empty.style.display, "none")
+  assert.equal(mine.zones[1].empty.style.display, "flex", "an empty zone shows its empty state")
 })
 
 // ---- chrome state and toasts -----------------------------------------------

@@ -275,6 +275,12 @@ export function studioBoard(opts, { win = window, doc = document } = {}) {
       }
     },
 
+    // This board's own zones. A page may hold several boards, and each wires,
+    // watches and counts only the zones inside its element.
+    zones() {
+      return Array.prototype.slice.call((this.$el || doc).querySelectorAll(this.zoneSelector))
+    },
+
     fx() { return this.fxName ? win[this.fxName] : null },
     cardId(el) { return el ? el.getAttribute("data-" + this.idAttr) : null },
     zoneKey(el) { return el ? el.getAttribute("data-" + this.zoneAttr) : null },
@@ -304,9 +310,7 @@ export function studioBoard(opts, { win = window, doc = document } = {}) {
           win.requestAnimationFrame(() => { win.__studioBoardDragging = false })
         }
       })
-      return Array.prototype.slice
-        .call(doc.querySelectorAll(this.zoneSelector))
-        .map((zone) => Sortable.create(zone, { ...options }))
+      return this.zones().map((zone) => Sortable.create(zone, { ...options }))
     },
 
     // A drop in another zone moves the card and then saves that zone's order. A
@@ -411,9 +415,12 @@ export function studioBoard(opts, { win = window, doc = document } = {}) {
     // A host may wrap this on its own scope (the hub's task board adds the
     // cards a capped column keeps off the page).
     updateCounts() {
-      doc.querySelectorAll("[data-board-count]").forEach((badge) => {
-        const key = badge.getAttribute("data-board-count")
-        const zone = doc.getElementById("dropzone-" + key)
+      const zones = {}
+      this.zones().forEach((zone) => { zones[zone.id] = zone })
+
+      const badges = (this.$el || doc).querySelectorAll("[data-board-count]")
+      badges.forEach((badge) => {
+        const zone = zones["dropzone-" + badge.getAttribute("data-board-count")]
         if (!zone) return
         const count = zone.querySelectorAll(this.cardSelector).length
         badge.textContent = count
@@ -441,7 +448,7 @@ export function studioBoard(opts, { win = window, doc = document } = {}) {
         })
         this.updateCounts()
       }
-      return Array.prototype.slice.call(doc.querySelectorAll(this.zoneSelector)).map((zone) => {
+      return this.zones().map((zone) => {
         const observer = new win.MutationObserver(onChange)
         observer.observe(zone, { childList: true })
         return observer
