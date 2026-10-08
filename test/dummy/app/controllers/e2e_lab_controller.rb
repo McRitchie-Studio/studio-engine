@@ -267,11 +267,15 @@ class E2eLabController < ActionController::Base
 
   # The hold-to-confirm button, both levels.
   #
-  # Renders studio/_hold_button by name. The button's browser half is an inline
-  # script in that partial and its look is computed style from engine-motion.css
-  # — neither is observable from the response bytes, which are identical whether
-  # the script runs or not.
+  # Renders studio/_hold_button by name. The button's browser half is the
+  # hold-button controller (studio/hold_button) and its look is computed style
+  # from engine-motion.css: neither is observable from the response bytes.
   def hold_button = render(:hold_button)
+
+  # The button answered through its hold-button:* events, the way a page written
+  # against the controller answers it, under Turbo so a spec can leave and come
+  # Back.
+  def hold_button_events = render(:hold_button_events, layout: "survey_turbo_lab")
 
   # The birthday / age-gate handoff. No locals to prepare: the lab page sets up
   # the two cards' locals itself and both run in demo mode, because the dummy has

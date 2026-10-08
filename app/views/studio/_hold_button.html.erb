@@ -32,9 +32,12 @@
     guard              - JS expression that must be truthy to allow hold (default: none = always allow)
     on_success         - JS expression executed on successful hold (default: none)
     validate           - JS expression returning Promise<boolean>, called at validate_at ms (default: none)
-    validate_at        - ms delay before running validation (default: 750)
+    validate_at        - ms into the hold at which validation runs: the validate
+                         string and the hold-button:validate event (default: 750)
     early_action       - JS expression executed early (for Web3 users) (default: none)
-    early_action_at    - ms delay before firing early action (default: 1500)
+    early_action_at    - ms into the hold at which the early action runs: the
+                         early_action string and the hold-button:early event
+                         (default: 1500)
     early_action_guard - JS expression that must be truthy for early action (default: none)
     on_hold_start      - JS expression executed the instant a hold BEGINS, after
                          the guard/submitting checks pass (default: none). Used to
@@ -122,8 +125,8 @@
         <% if guard              %>data-guard="<%= guard %>"<% end %>
         <% if on_hold_start      %>data-on-hold-start="<%= on_hold_start %>"<% end %>
         <% if on_success         %>data-on-success="<%= on_success %>"<% end %>
-        <% if validate           %>data-validate="<%= validate %>" data-validate-at="<%= validate_at %>"<% end %>
-        <% if early_action       %>data-early-action="<%= early_action %>" data-early-action-at="<%= early_action_at %>"<% end %>
+        <% if validate           %>data-validate="<%= validate %>" data-validate-at="<%= validate_at %>"<% elsif local_assigns.key?(:validate_at) %>data-validate-at="<%= validate_at %>"<% end %>
+        <% if early_action       %>data-early-action="<%= early_action %>" data-early-action-at="<%= early_action_at %>"<% elsif local_assigns.key?(:early_action_at) %>data-early-action-at="<%= early_action_at %>"<% end %>
         <% if early_action_guard %>data-early-action-guard="<%= early_action_guard %>"<% end %>
         style="--duration: <%= duration %>ms"
         data-studio-action="mousedown->hold-button#start mouseup->hold-button#end mouseleave->hold-button#end touchstart->hold-button#press touchend->hold-button#end touchcancel->hold-button#end">
