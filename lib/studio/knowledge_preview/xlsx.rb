@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
+require "English"
 require "nokogiri"
 require "set"
 require_relative "zip"
+require_relative "xml_guard"
 require_relative "number_format"
 
 module Studio
@@ -35,6 +37,13 @@ module Studio
     #                               (past the cap, in pieces) is still bounded.
     #                           Past any of the three the read ends as
     #                           TooLarge, and the page offers the download.
+    #   what the parser is fed  those three count what Ruby sees, between
+    #                           nodes. What libxml allocates inside one read
+    #                           is bounded BELOW it, on the byte stream, by
+    #                           XmlGuard: no DTD, UTF-8 only, and limits on a
+    #                           text node, on the start tags open at once, and
+    #                           on comments, so the parser is never handed
+    #                           input it would amplify.
     #   rows, columns, sheets   each sheet streams through a pull parser that
     #                           stops at the first row past max_rows.
     #   filled cells            max_cells across the workbook, checked per
@@ -77,6 +86,11 @@ module Studio
       ELEMENT     = Nokogiri::XML::Reader::TYPE_ELEMENT
       END_ELEMENT = Nokogiri::XML::Reader::TYPE_END_ELEMENT
       XML_OPTIONS = Nokogiri::XML::ParseOptions::NONET
+      XML_ENCODING = "UTF-8"
+      # A <sheet> element has four or five attributes. The relationship id is
+      # looked for by other names only on an element this small, so a tag is
+      # never turned into a hash of all its attributes to find one.
+      MAX_SCANNED_ATTRIBUTES = 16
 
       # Excel's last column is XFD: three letters. A fourth is past any sheet.
       MAX_COLUMN_LETTERS = 3
@@ -196,6 +210,10 @@ module Studio
       # The relationship attribute is r:id by convention, but the prefix is the
       # writer's choice; the local name is not.
       def relationship_id(node)
+        conventional = attribute(node, "r:id")
+        return conventional if conventional
+        return nil if node.attribute_count > MAX_SCANNED_ATTRIBUTES
+
         pair = node.attributes.find { |name, _| name == "id" || name.end_with?(":id") }
         pair && parsed(pair.last)
       end
@@ -597,15 +615,30 @@ module Studio
       # makes the deadline here a bound on the whole read: whatever a file
       # finds to make slow, it is slow one node at a time, and the clock is
       # looked at on every one.
+      #
+      # And it is the one place the parser is fed, so XmlGuard stands there:
+      # the parser never receives a DTD, or a token long enough for it to
+      # spend a gigabyte on before a single node comes out. The encoding is
+      # passed, not detected: told "UTF-8", libxml ignores whatever encoding
+      # the part declares, so the bytes the guard scans are the characters
+      # the parser reads.
       def each_node(path)
         @zip.open(path) do |io|
-          Nokogiri::XML::Reader.from_io(io, nil, nil, XML_OPTIONS).each do |node|
-            if @clock.call > @deadline
-              raise TooLarge, "it takes more than #{@deadline_seconds} seconds to read"
-            end
+          guard = XmlGuard.new(io)
+          begin
+            Nokogiri::XML::Reader.from_io(guard, nil, XML_ENCODING, XML_OPTIONS).each do |node|
+              if @clock.call > @deadline
+                raise TooLarge, "it takes more than #{@deadline_seconds} seconds to read"
+              end
 
-            yield node
+              yield node
+            end
+          rescue Nokogiri::XML::SyntaxError
+            # The parser's complaint about a stream the guard cut short is
+            # noise; the guard's reason is the error.
+            raise guard.failure || $ERROR_INFO
           end
+          raise guard.failure if guard.failure
         end
       end
     end

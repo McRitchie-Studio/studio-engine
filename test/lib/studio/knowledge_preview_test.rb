@@ -691,7 +691,7 @@ class KnowledgePreviewTest < Minitest::Test
     assert_nil reader.send(:small_number, "1e3")
     assert_nil reader.send(:small_number, nil)
 
-    rows = %(<row r="1"><c r="A1"><v>1</v></c></row><row r="#{'9' * 200_000}"><c r="A2"><v>2</v></c></row><row r="3"><c r="A3"><v>3</v></c></row>)
+    rows = %(<row r="1"><c r="A1"><v>1</v></c></row><row r="#{'9' * 60_000}"><c r="A2"><v>2</v></c></row><row r="3"><c r="A3"><v>3</v></c></row>)
     sheet = read(XlsxBuilder.workbook({ "S" => rows })).sheets.first
     assert_equal [["1"]], texts(sheet)
     assert sheet.truncated_rows
@@ -731,12 +731,407 @@ class KnowledgePreviewTest < Minitest::Test
     assert_empty no_column.rows, "a cell with no column letters is not a cell in column zero"
   end
 
-  def test_an_external_entity_is_not_expanded
-    # The entity points at a file of plain text, so that IF it were expanded
-    # the canary would land in the cell as ordinary characters. (Pointed at a
-    # file holding markup, an expansion fails to parse and the test passes
-    # for the wrong reason; with entity substitution switched on in the
-    # reader, this one fails.)
+  # --- below the parser ------------------------------------------------------------------
+  #
+  # libxml allocates inside one read, before any node reaches Ruby, and for a
+  # DTD or a huge attribute list it spends many times the bytes it was given.
+  # XmlGuard stands between the inflater and the parser so it never gets one.
+
+  Guard = Studio::KnowledgePreview::XmlGuard
+
+  # Feeds `bytes` through the guard the way the parser does, `ask` bytes at a
+  # time, from a source that itself yields `step` bytes at a time.
+  def guarded(bytes, ask: 4000, step: nil, **options)
+    source = StringIO.new(bytes.b)
+    source.define_singleton_method(:read) { |length = nil, *| super(step ? [length || step, step].min : length) } if step
+    guard = Guard.new(source, **options)
+    out = +"".b
+    while (chunk = guard.read(ask))
+      out << chunk
+    end
+    [out, guard.failure]
+  end
+
+  def test_the_guard_passes_an_ordinary_part_through_byte_for_byte
+    part = %(<?xml version="1.0" encoding="UTF-8"?>\n<worksheet><!-- a < note --><sheetData><row r="1"><c t="inlineStr"><is><t><![CDATA[a < b]]></t></is></c></row></sheetData></worksheet>)
+    [[4000, nil], [7, 3], [1, 1], [5, 2]].each do |ask, step|
+      out, failure = guarded(part, ask: ask, step: step)
+      assert_nil failure, "ask #{ask}, step #{step}"
+      assert_equal part.b, out
+    end
+    out, failure = guarded("\xEF\xBB\xBF".b + part, ask: 2, step: 1)
+    assert_nil failure
+    assert_equal part.bytesize + 3, out.bytesize
+  end
+
+  def test_the_guard_refuses_a_doctype_wherever_a_chunk_boundary_falls
+    part = %(<?xml version="1.0"?><!DOCTYPE a [<!ENTITY x "y">]><a>&x;</a>)
+    at = part.index("<!DOCTYPE")
+    (1..12).each do |step|
+      out, failure = guarded(part, ask: step, step: step)
+      assert_kind_of Preview::Unreadable, failure, "step #{step}"
+      assert_match(/document type declaration/, failure.message)
+      refute_includes out, "ENTITY", "nothing of the DTD's body reaches the parser (step #{step})"
+      assert_operator out.bytesize, :<, at + 9 + step
+    end
+  end
+
+  def test_the_guard_matches_doctype_exactly_as_the_parser_does
+    # libxml reads "<!doctype" as a malformed tag, not as a DTD, so it is not
+    # this guard's business; the parser's own syntax error answers it.
+    _out, failure = guarded(%(<?xml version="1.0"?><!doctype a [<!ENTITY x "y">]><a/>))
+    assert_nil failure
+    bytes = XlsxBuilder.workbook({ "S" => "" }, extra: { "xl/worksheets/sheet1.xml" => %(<?xml version="1.0"?><!doctype a []><worksheet/>) })
+    assert_match(/damaged/, assert_raises(Preview::Unreadable) { read(bytes) }.message)
+
+    # Inside a comment or a CDATA section the same bytes are only text.
+    quoted = %(<?xml version="1.0"?><a><!-- <!DOCTYPE x> --><![CDATA[<!DOCTYPE html>]]></a>)
+    [nil, 1, 4].each { |step| assert_nil guarded(quoted, ask: step || 4000, step: step).last, "step #{step.inspect}" }
+  end
+
+  def test_the_guard_measures_a_text_node_across_chunks
+    limit = 1000
+    fits = "<a>" + ("t" * limit) + "</a>"
+    over = "<a>" + ("t" * (limit + 1)) + "</a>"
+    [[4000, nil], [64, 64], [7, 3], [1, 1]].each do |ask, step|
+      assert_nil guarded(fits, ask: ask, step: step, max_token_bytes: limit).last, "text of exactly the limit passes (ask #{ask})"
+      out, failure = guarded(over, ask: ask, step: step, max_token_bytes: limit)
+      assert_kind_of Preview::TooLarge, failure, "one byte more does not (ask #{ask})"
+      assert_operator out.bytesize, :<=, limit + 3 + ask
+    end
+    many = "<a>" + ("<b>#{'t' * 900}</b>" * 50) + "</a>"
+    assert_nil guarded(many, ask: 50, max_token_bytes: limit).last, "many text nodes under the limit are not one over it"
+  end
+
+  def test_the_guard_measures_a_start_tag_across_chunks
+    limit = 1000
+    # The tag is counted from its "<" to its ">", both included.
+    fits = "<a " + ("b" * (limit - 5)) + "/><c/>"
+    over = "<a " + ("b" * (limit - 4)) + "/><c/>"
+    assert_equal limit, fits.index(">") + 1
+    [[4000, nil], [64, 64], [7, 3], [1, 1]].each do |ask, step|
+      assert_nil guarded(fits, ask: ask, step: step, max_open_tag_bytes: limit).last, "a tag of exactly the limit passes (ask #{ask})"
+      out, failure = guarded(over, ask: ask, step: step, max_open_tag_bytes: limit)
+      assert_kind_of Preview::TooLarge, failure, "one byte more does not (ask #{ask})"
+      assert_operator out.bytesize, :<=, limit + ask, "and the parser is not handed the whole of it"
+    end
+  end
+
+  def test_the_guard_counts_start_tags_across_every_element_open_at_once
+    limit = 1000
+    tag = ->(name) { "<#{name} #{'b' * 296}>" } # 300 bytes with a one-letter name
+    assert_equal 300, tag.("x").bytesize
+    three_open = tag.("x") * 3
+    four_open = tag.("x") * 4
+    [[4000, nil], [7, 3], [1, 1]].each do |ask, step|
+      assert_nil guarded(three_open, ask: ask, step: step, max_open_tag_bytes: limit).last, "900 bytes open at once fit (ask #{ask})"
+      assert_kind_of Preview::TooLarge, guarded(four_open, ask: ask, step: step, max_open_tag_bytes: limit).last,
+                     "1,200 do not, though no one tag is over the limit (ask #{ask})"
+    end
+
+    # The same tags one after another are never open together.
+    in_turn = "<r>" + ((tag.("x") + "</x>") * 40) + "</r>"
+    assert_nil guarded(in_turn, ask: 13, max_open_tag_bytes: limit).last, "an end tag gives its element's bytes back"
+    self_closing = "<r>" + ("<x #{'b' * 295}/>" * 40) + "</r>"
+    assert_nil guarded(self_closing, ask: 13, max_open_tag_bytes: limit).last, "a self-closing tag is never open"
+    # ...and what was given back can be spent again, but not twice at once.
+    again = "<r>" + (tag.("x") * 3) + ("</x>" * 3) + (tag.("x") * 3) + tag.("x")
+    assert_kind_of Preview::TooLarge, guarded(again, ask: 13, max_open_tag_bytes: limit).last
+  end
+
+  def test_the_guard_reads_a_tag_the_way_the_parser_does
+    limit = 200
+    # A ">" inside a quoted value does not end the tag, so the bytes after it
+    # are still the tag's, in either kind of quote and across any boundary.
+    [%(<a b=">#{'x' * 300}"/>), %(<a b='>#{'x' * 300}'/>), %(<a b="'>" c='">#{'x' * 300}'/>)].each do |hidden|
+      [[4000, nil], [1, 1], [5, 2]].each do |ask, step|
+        assert_kind_of Preview::TooLarge, guarded(hidden, ask: ask, step: step, max_open_tag_bytes: limit).last, hidden[0, 16]
+      end
+    end
+    # "/>" split across chunks is still self-closing; "/" inside a value is not.
+    split = "<r>" + ("<x #{'b' * 100}/>" * 30) + "</r>"
+    (1..9).each { |step| assert_nil guarded(split, ask: step, step: step, max_open_tag_bytes: limit).last, "step #{step}" }
+    slash_in_value = "<r>" + (%(<x b="#{'b' * 100}/">) * 2)
+    assert_kind_of Preview::TooLarge, guarded(slash_in_value, max_open_tag_bytes: limit).last
+  end
+
+  # Builds a random well-formed document and, alongside it, the two figures
+  # the guard is supposed to be measuring: the most start-tag bytes ever open
+  # at once, and the longest text or opaque token.
+  class RandomDocument
+    attr_reader :xml, :max_open, :max_token, :asides
+
+    def initialize(random)
+      @random = random
+      @max_open = 0
+      @max_token = 0
+      @asides = 0
+      @xml = +""
+      element(0, 0)
+    end
+
+    private
+
+    def word(max) = Array.new(@random.rand(1..max)) { ("a".."z").to_a.sample(random: @random) }.join
+
+    def value
+      body = Array.new(@random.rand(0..6)) { ["x", ">", "/", " ", "'", "xmlns", "&lt;", "]]>", "-->", "?>"].sample(random: @random) }.join
+      quote = ['"', "'"].sample(random: @random)
+      quote == "'" ? "'#{body.delete("'")}'" : "\"#{body}\""
+    end
+
+    def element(depth, open_above)
+      attributes = Array.new(@random.rand(0..4)) { |n| " #{word(3)}#{n}=#{value}" }.join
+      space = [" ", "", "\n"].sample(random: @random)
+      name = word(4)
+      if depth > 5 || @random.rand < 0.3
+        tag = "<#{name}#{attributes}#{space}/>"
+        @max_open = [@max_open, open_above + tag.bytesize].max
+        @xml << tag
+        return
+      end
+
+      tag = "<#{name}#{attributes}#{space}>"
+      open_here = open_above + tag.bytesize
+      @max_open = [@max_open, open_here].max
+      @xml << tag
+      last_was_text = false
+      @random.rand(0..5).times do
+        case @random.rand(5)
+        when 0
+          next if last_was_text
+
+          text = Array.new(@random.rand(1..40)) { ["t", " ", ">", "'", "\"", "&amp;", "/", "xmlns"].sample(random: @random) }.join
+          @max_token = [@max_token, text.bytesize].max
+          @xml << text
+          last_was_text = true
+          next
+        when 1 then aside("<!--", Array.new(@random.rand(0..30)) { ["<", ">", "c", "- ", "<!DOCTYPE", "\""].sample(random: @random) }.join, "-->")
+        when 2 then opaque("<![CDATA[", Array.new(@random.rand(0..30)) { ["<", ">", "] ", "d", "<!DOCTYPE", "'"].sample(random: @random) }.join, "]]>")
+        when 3 then aside("<?pi ", Array.new(@random.rand(0..30)) { ["<", ">", "p", "? ", "\""].sample(random: @random) }.join, "?>")
+        else element(depth + 1, open_here)
+        end
+        last_was_text = false
+      end
+      end_tag = "</#{name}#{space}>"
+      # An end tag is read while its own element is still open.
+      @max_open = [@max_open, open_here + end_tag.bytesize].max
+      @xml << end_tag
+    end
+
+    def opaque(open, body, close)
+      whole = open + body + close
+      @max_token = [@max_token, whole.bytesize].max
+      @xml << whole
+    end
+
+    # Comments and instructions are measured as one running total.
+    def aside(open, body, close)
+      whole = open + body + close
+      @asides += whole.bytesize
+      @xml << whole
+    end
+  end
+
+  def test_the_guard_measures_random_documents_exactly_at_every_chunking
+    random = Random.new(20_311_008)
+    120.times do |round|
+      document = RandomDocument.new(random)
+      xml = %(<?xml version="1.0"?>) + document.xml
+      # The parser is the referee for "well-formed": what the guard passes
+      # must be a document libxml reads to the end.
+      Nokogiri::XML::Reader.from_io(StringIO.new(xml), nil, "UTF-8", 2048).each { |_| nil }
+      asides = document.asides + 21 # the XML declaration is an instruction too
+      step = [nil, 1, 2, 3, 5, 8, 13].sample(random: random)
+      ask = step || 4000
+      label = "round #{round}, step #{step.inspect}"
+      limits = { max_open_tag_bytes: document.max_open, max_token_bytes: [document.max_token, 1].max, max_aside_bytes: asides }
+
+      out, failure = guarded(xml, ask: ask, step: step, **limits)
+      assert_nil failure, "#{label}: limits equal to the document's own figures must pass\n#{xml}"
+      assert_equal xml.b, out, label
+      assert_kind_of Preview::TooLarge, guarded(xml, ask: ask, step: step, **limits, max_open_tag_bytes: document.max_open - 1).last,
+                     "#{label}: one byte less of open-tag budget must refuse\n#{xml}"
+      assert_kind_of Preview::TooLarge, guarded(xml, ask: ask, step: step, **limits, max_aside_bytes: asides - 1).last,
+                     "#{label}: one byte less for comments and instructions must refuse\n#{xml}"
+      next unless document.max_token > 1
+
+      assert_kind_of Preview::TooLarge, guarded(xml, ask: ask, step: step, **limits, max_token_bytes: document.max_token - 1).last,
+                     "#{label}: one byte less of token budget must refuse\n#{xml}"
+    end
+  end
+
+  def test_the_guard_bounds_nesting_and_namespace_declarations
+    deep = "<a>" * (Guard::MAX_DEPTH + 1)
+    assert_kind_of Preview::TooLarge, guarded(deep).last
+    assert_nil guarded("<a>" * Guard::MAX_DEPTH).last
+
+    declared = "<r>" + (0...11).map { |n| %(<c xmlns:p#{n}="u"/>) }.join + "</r>"
+    [[4000, nil], [1, 1], [6, 6]].each do |ask, step|
+      assert_kind_of Preview::TooLarge, guarded(declared, ask: ask, step: step, max_namespace_declarations: 10).last, "ask #{ask}"
+      assert_nil guarded(declared, ask: ask, step: step, max_namespace_declarations: 11).last, "ask #{ask}"
+    end
+    in_text = %(<r>xmlns xmlns xmlns <c b="xmlns xmlns"/></r>)
+    assert_nil guarded(in_text, max_namespace_declarations: 1).last, "the word in text or in a value declares nothing"
+  end
+
+  def test_the_guard_measures_comments_cdata_and_instructions_which_may_hold_angle_brackets
+    limit = 1000
+    {
+      "comment" => ["<!--", "-->"], "cdata" => ["<![CDATA[", "]]>"], "instruction" => ["<?p ", "?>"]
+    }.each do |name, (open, close)|
+      over = "<a>#{open}#{'<' * 2000}#{close}</a>"
+      fits = "<a>#{open}#{'<' * 900}#{close}</a>"
+      [[4000, nil], [9, 4], [1, 1]].each do |ask, step|
+        assert_kind_of Preview::TooLarge, guarded(over, ask: ask, step: step, max_token_bytes: limit, max_aside_bytes: limit).last, "#{name}, ask #{ask}"
+        assert_nil guarded(fits, ask: ask, step: step, max_token_bytes: limit, max_aside_bytes: limit).last, "#{name}, ask #{ask}"
+      end
+      # After it closes, measuring starts again.
+      assert_nil guarded("<a>#{open}#{'<' * 900}#{close}#{'t' * 900}<b/></a>", max_token_bytes: limit, max_aside_bytes: limit).last, name
+    end
+  end
+
+  def test_comments_and_instructions_are_held_to_their_own_smaller_limit
+    # A CDATA section is cell text and gets the text limit; a comment or an
+    # instruction gets the aside limit, and going back to text restores the
+    # text limit.
+    body = "<" * 500
+    assert_nil guarded("<a><![CDATA[#{body}]]></a>", max_token_bytes: 1000, max_aside_bytes: 100).last
+    assert_kind_of Preview::TooLarge, guarded("<a><!--#{body}--></a>", max_token_bytes: 1000, max_aside_bytes: 100).last
+    assert_kind_of Preview::TooLarge, guarded("<a><?p #{body}?></a>", max_token_bytes: 1000, max_aside_bytes: 100).last
+    assert_nil guarded("<a><!--ok-->#{'t' * 500}<b/></a>", max_token_bytes: 1000, max_aside_bytes: 100).last
+    assert_kind_of Preview::TooLarge, guarded("<a><![CDATA[#{body}]]><!--#{'c' * 200}--></a>", max_token_bytes: 1000, max_aside_bytes: 100).last
+
+    # The aside limit is a total for the part: many small ones add up.
+    small = "<!--#{'c' * 13}-->" # 20 bytes
+    assert_nil guarded("<a>#{small * 5}</a>", max_aside_bytes: 100).last
+    assert_kind_of Preview::TooLarge, guarded("<a>#{small * 5}<?p?></a>", max_aside_bytes: 100).last
+    assert_kind_of Preview::TooLarge, guarded("<a>#{(small + '<b/>') * 6}</a>", ask: 3, step: 3, max_aside_bytes: 100).last
+  end
+
+  def test_the_guard_refuses_a_part_that_is_not_utf8_markup_from_its_first_byte
+    doc = %(<?xml version="1.0"?><!DOCTYPE a [<!ENTITY x "y">]><a>&x;</a>)
+    {
+      "UTF-16LE with a byte order mark" => "\xFF\xFE".b + doc.encode("UTF-16LE").b,
+      "UTF-16BE with a byte order mark" => "\xFE\xFF".b + doc.encode("UTF-16BE").b,
+      "UTF-16LE with none" => doc.encode("UTF-16LE").b,
+      "UTF-16BE with none" => doc.encode("UTF-16BE").b,
+      "UTF-32" => doc.encode("UTF-32LE").b,
+      "leading text" => "x" + doc,
+      "a byte order mark and then text" => "\xEF\xBB\xBFx<a/>".b
+    }.each do |name, bytes|
+      [[4000, nil], [1, 1]].each do |ask, step|
+        out, failure = guarded(bytes, ask: ask, step: step)
+        assert_kind_of Preview::Unreadable, failure, name
+        assert_equal "its XML is not UTF-8", failure.message
+        assert_operator out.bytesize, :<=, 1, "#{name}: at most the one '<' byte that looked like markup is handed over"
+      end
+    end
+    assert_kind_of Preview::Unreadable, guarded("<a>x\x00y</a>").last, "a NUL anywhere is not UTF-8 XML"
+  end
+
+  def sheet_workbook(sheet_xml)
+    XlsxBuilder.workbook({ "S" => "" }, extra: { "xl/worksheets/sheet1.xml" => sheet_xml })
+  end
+
+  NS = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+  ONE_CELL = '<sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData>'
+
+  def test_a_part_with_a_dtd_never_reaches_the_parser
+    declarations = (0...20_000).map { |n| "<!ATTLIST a#{n} b CDATA #IMPLIED><!ENTITY e#{n} \"x\">" }.join
+    bytes = sheet_workbook(%(<?xml version="1.0"?><!DOCTYPE worksheet [#{declarations}]><worksheet #{NS}>#{ONE_CELL}</worksheet>))
+
+    error = assert_raises(Preview::Unreadable) { Preview.read_spreadsheet(bytes) }
+    assert_equal "it carries a document type declaration, which no workbook has", error.message
+  end
+
+  def test_a_utf16_part_carrying_a_dtd_is_refused_not_parsed
+    doc = %(<?xml version="1.0" encoding="UTF-16"?><!DOCTYPE worksheet [<!ENTITY x "y">]><worksheet #{NS}>#{ONE_CELL}</worksheet>)
+    ["\xFF\xFE".b + doc.encode("UTF-16LE").b, doc.encode("UTF-16LE").b, doc.encode("UTF-16BE").b].each do |part|
+      error = assert_raises(Preview::Unreadable) { Preview.read_spreadsheet(sheet_workbook(part)) }
+      assert_equal "its XML is not UTF-8", error.message
+    end
+  end
+
+  def test_an_encoding_the_part_declares_for_itself_is_ignored
+    # ASCII bytes that claim to be UTF-16, UTF-7 or EBCDIC: read as the UTF-8
+    # they are, so what the guard scanned is what the parser parsed.
+    %w[UTF-16 UTF-7 IBM037].each do |claimed|
+      part = %(<?xml version="1.0" encoding="#{claimed}"?><worksheet #{NS}>#{ONE_CELL}</worksheet>)
+      assert_equal [["1"]], texts(Preview.read_spreadsheet(sheet_workbook(part)).sheets.first), claimed
+    end
+    # UTF-7 spelling of "<!DOCTYPE" stays the text it is.
+    hidden = %(<?xml version="1.0" encoding="UTF-7"?><worksheet #{NS}><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>+ADwAIQ-DOCTYPE</t></is></c></row></sheetData></worksheet>)
+    assert_equal [["+ADwAIQ-DOCTYPE"]], texts(Preview.read_spreadsheet(sheet_workbook(hidden)).sheets.first)
+    # And bytes that are NOT UTF-8 are refused, whatever they declare.
+    latin = %(<?xml version="1.0" encoding="ISO-8859-1"?><worksheet #{NS}><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>caf\xE9</t></is></c></row></sheetData></worksheet>).b
+    assert_raises(Preview::Unreadable) { Preview.read_spreadsheet(sheet_workbook(latin)) }
+  end
+
+  def test_a_start_tag_past_the_open_tag_limit_is_refused_wherever_it_is
+    attributes = (0...9_000).map { |n| %(z#{n.to_s(36)}="") }.join(" ")
+    assert_operator attributes.bytesize, :>, Guard::MAX_OPEN_TAG_BYTES
+
+    on_row = sheet_workbook(%(<?xml version="1.0"?><worksheet #{NS}><sheetData><row r="1" #{attributes}><c r="A1"><v>1</v></c></row></sheetData></worksheet>))
+    on_cell = sheet_workbook(%(<?xml version="1.0"?><worksheet #{NS}><sheetData><row r="1"><c r="A1" #{attributes}><v>1</v></c></row></sheetData></worksheet>))
+    book = %(<?xml version="1.0"?><workbook #{NS} xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="S" sheetId="1" r:id="rId1" #{attributes}/></sheets></workbook>)
+    on_sheet = XlsxBuilder.workbook({ "S" => XlsxBuilder.rows([[1]]) }, extra: { "xl/workbook.xml" => book })
+
+    [on_row, on_cell, on_sheet].each do |bytes|
+      error = assert_raises(Preview::TooLarge) { Preview.read_spreadsheet(bytes) }
+      assert_equal "its XML holds more in one place than a preview reads", error.message
+    end
+  end
+
+  def test_start_tags_nested_inside_one_another_are_refused_by_their_sum
+    # Each tag is a quarter of the limit, so each passes alone; left open
+    # inside one another, the fifth is past it. This is the input the parser
+    # pays most for: it keeps every open element's attributes alive.
+    attributes = (0...2_100).map { |n| %(z#{n.to_s(36)}="") }.join(" ")
+    tag = "<x #{attributes}>"
+    assert_in_delta Guard::MAX_OPEN_TAG_BYTES / 4, tag.bytesize, 2_000
+    nested = sheet_workbook(%(<?xml version="1.0"?><worksheet #{NS}><sheetData><row r="1">#{tag * 60}#{'</x>' * 60}</row></sheetData></worksheet>))
+    in_turn = sheet_workbook(%(<?xml version="1.0"?><worksheet #{NS}><sheetData><row r="1">#{(tag + '</x>') * 60}<c r="A1"><v>1</v></c></row></sheetData></worksheet>))
+
+    assert_raises(Preview::TooLarge) { Preview.read_spreadsheet(nested) }
+    assert_equal [["1"]], texts(Preview.read_spreadsheet(in_turn).sheets.first)
+  end
+
+  def test_a_text_node_past_the_token_limit_is_refused_before_the_parser_builds_it
+    # Past the last column, so nothing in Ruby would ever ask for this text.
+    row = %(<row r="1"><c r="ZZ1" t="inlineStr"><is><t>#{'q' * (Guard::MAX_TOKEN_BYTES + 10)}</t></is></c></row>)
+    error = assert_raises(Preview::TooLarge) { Preview.read_spreadsheet(sheet_workbook(%(<?xml version="1.0"?><worksheet #{NS}><sheetData>#{row}</sheetData></worksheet>))) }
+    assert_equal "its XML holds more in one place than a preview reads", error.message
+  end
+
+  def test_the_longest_cell_excel_allows_is_far_inside_the_token_limit
+    # 32,767 characters, each written as the longest numeric reference.
+    longest = "&#x1F600;" * Preview::MAX_CELL_CHARS
+    assert_operator longest.bytesize, :<, Guard::MAX_TOKEN_BYTES / 3
+    row = %(<row r="1"><c r="A1" t="inlineStr"><is><t>#{longest}</t></is></c></row>)
+    cell = Preview.read_spreadsheet(sheet_workbook(%(<?xml version="1.0"?><worksheet #{NS}><sheetData>#{row}</sheetData></worksheet>))).sheets.first.rows[0][0]
+    assert_equal Preview::MAX_CELL_CHARS, cell.text.length
+  end
+
+  def test_the_relationship_id_is_found_without_listing_a_big_tags_attributes
+    many = (0...40).map { |n| %(z#{n}="") }.join(" ")
+    conventional = %(<?xml version="1.0"?><workbook #{NS} xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="S" sheetId="1" r:id="rId1" #{many}/></sheets></workbook>)
+    other_prefix = %(<?xml version="1.0"?><workbook #{NS} xmlns:rel="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="S" sheetId="1" rel:id="rId1"/></sheets></workbook>)
+    crowded = other_prefix.sub('rel:id="rId1"', %(rel:id="rId1" #{many}))
+    rows = XlsxBuilder.rows([[1]])
+
+    assert_equal [["1"]], texts(read(XlsxBuilder.workbook({ "S" => rows }, extra: { "xl/workbook.xml" => conventional })).sheets.first)
+    assert_equal [["1"]], texts(read(XlsxBuilder.workbook({ "S" => rows }, extra: { "xl/workbook.xml" => other_prefix })).sheets.first)
+    error = assert_raises(Preview::Unreadable) { read(XlsxBuilder.workbook({ "S" => rows }, extra: { "xl/workbook.xml" => crowded })) }
+    assert_equal "it has no worksheets", error.message, "an unconventional prefix is honoured only on a tag small enough to list"
+  end
+
+  def test_an_external_entity_is_not_expanded_even_with_the_guard_out_of_the_way
+    # The guard refuses any DTD, which is the first defence. This is the
+    # second: with the guard replaced by a pass-through, the parser's own
+    # options still leave the entity unexpanded and the file unread. (The
+    # entity points at plain text, so an expansion would land in the cell;
+    # with entity substitution switched on in the reader, this fails.)
     canary = Tempfile.new(["knowledge-preview-canary", ".txt"])
     canary.write("canary-7f3a91")
     canary.close
@@ -748,8 +1143,19 @@ class KnowledgePreviewTest < Minitest::Test
       </worksheet>
     XML
     bytes = XlsxBuilder.workbook({ "S" => "" }, extra: { "xl/worksheets/sheet1.xml" => sheet_xml })
+    assert_raises(Preview::Unreadable) { Preview.read_spreadsheet(bytes) }
 
-    text = texts(Preview.read_spreadsheet(bytes).sheets.first).flatten.compact.join
+    pass_through = Struct.new(:io) do
+      def read(*args) = io.read(*args)
+      def failure = nil
+    end
+    original = Guard.method(:new)
+    Guard.define_singleton_method(:new) { |io, **| pass_through.new(io) }
+    text = begin
+      texts(Preview.read_spreadsheet(bytes).sheets.first).flatten.compact.join
+    ensure
+      Guard.define_singleton_method(:new, original)
+    end
     assert_equal "beforeafter", text, "the reference is dropped, and the file it names is never read"
   ensure
     canary&.unlink

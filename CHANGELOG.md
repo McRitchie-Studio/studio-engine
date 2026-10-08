@@ -44,6 +44,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
     over by the XML parser, kept or not (`MAX_PARSED_TEXT_BYTES`); and 10 seconds
     of wall-clock time (`SPREADSHEET_DEADLINE_SECONDS`). Past any of these the
     preview falls back to the download link.
+  - What the XML parser is given, enforced on the byte stream before it
+    (`Studio::KnowledgePreview::XmlGuard`): a part must be UTF-8 and open with
+    `<`; a part with a `<!DOCTYPE` is refused; a text node or CDATA section
+    stops at 1 MB; the start tags of all elements open at once stop at 64 KB
+    together; comments and processing instructions stop at 64 KB a part;
+    nesting stops at 256 and namespace declarations at 1,024. A workbook part in
+    UTF-16, or one carrying megabyte comments, falls back to the download link.
   - A workbook's tables: 4,096 relationships and 4,096 sheets (more is refused);
     4,096 custom number formats and 512 distinct formats in use (past either, a
     number renders as General). A number format longer than Excel's 255

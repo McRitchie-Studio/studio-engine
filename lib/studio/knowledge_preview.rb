@@ -23,6 +23,13 @@ module Studio
   #                          wall-clock time one workbook read may take.
   #   MAX_PARSED_TEXT_BYTES  text the XML parser may hand the reader across a
   #                          workbook, kept or not.
+  #   XmlGuard::MAX_TOKEN_BYTES, MAX_OPEN_TAG_BYTES, MAX_ASIDE_BYTES,
+  #   MAX_NAMESPACE_DECLARATIONS, MAX_DEPTH
+  #                          what the XML parser is ever GIVEN, enforced on the
+  #                          byte stream below it: no DTD, UTF-8 only, and no
+  #                          text node, set of open start tags, or pile of
+  #                          comments large enough for the parser to spend a
+  #                          gigabyte on before a single node comes out.
   #   MAX_ROWS, MAX_COLUMNS  what one sheet (or CSV) shows; the rest is named
   #                          in a notice, never silently dropped.
   #   MAX_SHEETS             tabs rendered; further sheets are counted.
