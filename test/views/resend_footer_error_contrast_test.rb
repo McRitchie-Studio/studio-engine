@@ -11,7 +11,7 @@ require "test_helper"
 # was ported from, and the one about to render it):
 #
 #                        dark card #3C3853      light card #ffffff
-#   text-danger-ink      4.50  PASS             5.76  PASS
+#   text-danger-ink      4.89  PASS             6.49  PASS
 #   text-red-400         3.86  FAIL             2.89  FAIL
 #
 # That red-400 is Tailwind v4's oklch(70.4% 0.191 22.216), about #FF6467, which
