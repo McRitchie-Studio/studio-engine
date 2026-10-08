@@ -255,6 +255,11 @@ module Studio
       def vet!(url, resolver)
         require "studio/image_cache"
         raise Refused, "URL is #{url.bytesize} bytes, over the #{MAX_URL_BYTES}-byte cap" if url.bytesize > MAX_URL_BYTES
+        # Asked of the text first so a URL that is not https costs no DNS
+        # lookup. The parsed scheme is checked again below; that one decides.
+        unless url[0, 8].to_s.casecmp?("https://")
+          raise Refused, "refused #{redact(url)}: a recording is fetched over https only"
+        end
 
         vetted =
           begin
