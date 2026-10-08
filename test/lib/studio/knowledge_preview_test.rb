@@ -21,7 +21,8 @@ class KnowledgePreviewTest < Minitest::Test
   FIXTURE = File.expand_path("../../fixtures/files/knowledge_preview_sample.xlsx", __dir__)
 
   def read(bytes, **caps)
-    Preview::Xlsx.read(bytes, **{ max_rows: 500, max_columns: 50, max_sheets: 20, max_cells: 50_000, inflate_cap: 8 * 1_048_576 }.merge(caps))
+    Preview::Xlsx.read(bytes, **{ max_rows: 500, max_columns: 50, max_sheets: 20, max_cells: 50_000, max_cell_chars: 32_767,
+                                max_text_bytes: 2 * 1_048_576, max_grid_cells: 100_000, inflate_cap: 8 * 1_048_576 }.merge(caps))
   end
 
   def texts(sheet)
@@ -281,7 +282,8 @@ class KnowledgePreviewTest < Minitest::Test
 
     error = assert_raises(Preview::TooLarge) { read(bytes, inflate_cap: 1_048_576) }
     assert_match(/expands past/, error.message)
-    assert_equal "x" * 100_000, texts(read(bytes, inflate_cap: 16 * 1_048_576).sheets.first)[0][0]
+    # Under a cap that admits the table, the wanted string reads (cut at the cell cap).
+    assert_equal ("x" * 32_767) + "…", texts(read(bytes, inflate_cap: 16 * 1_048_576).sheets.first)[0][0]
   end
 
   def test_rows_past_the_cap_are_never_inflated
@@ -294,6 +296,155 @@ class KnowledgePreviewTest < Minitest::Test
     sheet = read(bytes, max_rows: 5, inflate_cap: 200_000).sheets.first
     assert_equal 5, sheet.rows.size
     assert sheet.truncated_rows
+  end
+
+  # --- sizes, not only counts ----------------------------------------------------------
+  #
+  # Each of these is a file of a few kilobytes that a count cap alone lets
+  # through: the cost is in how BIG a kept thing is, or how long it takes to
+  # compute, not in how many there are.
+
+  def text_bytes(workbook)
+    workbook.sheets.sum { |sheet| sheet.rows.flatten.compact.sum { |cell| cell.text.bytesize } }
+  end
+
+  def test_one_huge_shared_string_referenced_by_every_cell_is_cut_per_cell_and_in_total
+    cells = (1..500).map { |r| %(<row r="#{r}">) + (0..49).map { |c| %(<c r="#{XlsxBuilder.column(c)}#{r}" t="s"><v>0</v></c>) }.join + "</row>" }.join
+    bytes = XlsxBuilder.workbook({ "S" => cells, "After" => XlsxBuilder.rows([["never reached"]]) }, shared: ["q" * 1_000_000])
+    assert_operator bytes.bytesize, :<, 200_000
+
+    workbook = Preview.read_spreadsheet(bytes)
+    sheet = workbook.sheets.first
+    longest = sheet.rows.flatten.compact.map { |cell| cell.text.length }.max
+    assert_equal Preview::MAX_CELL_CHARS + 1, longest, "a cell keeps Excel's own limit, plus the mark that says it was cut"
+    assert sheet.rows.first.first.text.end_with?("…")
+    assert_operator text_bytes(workbook), :<=, Preview::MAX_TEXT_BYTES
+    assert sheet.truncated_rows, "the sheet that spends the text budget says it was cut"
+    assert_equal sheet.rows.size, sheet.row_limit
+    assert_operator sheet.rows.size, :<, 500
+    assert_equal 1, workbook.sheets.size
+    assert_equal 1, workbook.omitted_sheets, "sheets after the budget ran out are counted, not rendered"
+  end
+
+  def test_huge_inline_strings_on_many_sheets_are_cut_as_they_are_read
+    big = "w" * 1_000_000
+    sheets = (1..20).to_h { |n| ["T#{n}", XlsxBuilder.rows((1..50).map { [big] })] }
+    workbook = Preview.read_spreadsheet(XlsxBuilder.workbook(sheets))
+
+    assert_operator text_bytes(workbook), :<=, Preview::MAX_TEXT_BYTES
+    assert_equal Preview::MAX_CELL_CHARS + 1, workbook.sheets.first.rows.first.first.text.length
+    assert_equal 20, workbook.sheets.size + workbook.omitted_sheets
+    assert_operator workbook.omitted_sheets, :>, 0
+    assert workbook.sheets.last.truncated_rows
+  end
+
+  def test_a_workbook_inside_the_text_budget_keeps_every_cell_whole
+    workbook = read(XlsxBuilder.workbook({ "A" => XlsxBuilder.rows([["x" * 100, "y" * 100]]), "B" => XlsxBuilder.rows([["z" * 100]]) }),
+                    max_text_bytes: 300)
+
+    assert_equal [["x" * 100, "y" * 100]], texts(workbook.sheets.first)
+    assert_equal [["z" * 100]], texts(workbook.sheets.last)
+    refute workbook.sheets.any?(&:truncated_rows)
+    assert_equal 0, workbook.omitted_sheets
+  end
+
+  def test_the_text_budget_cuts_at_the_row_that_would_overspend_it
+    rows = XlsxBuilder.rows((1..6).map { |n| ["#{n}" * 100] })
+    workbook = read(XlsxBuilder.workbook({ "A" => rows, "B" => rows }), max_text_bytes: 350)
+
+    sheet = workbook.sheets.first
+    assert_equal 3, sheet.rows.size
+    assert sheet.truncated_rows
+    assert_equal 3, sheet.row_limit
+    assert_equal 1, workbook.omitted_sheets
+  end
+
+  def test_a_shared_string_table_too_big_to_hold_cuts_the_sheet_instead_of_blanking_cells
+    shared = (1..40).map { |n| n.to_s.rjust(2, "0") * 50 }
+    rows = (1..40).map { |r| %(<row r="#{r}"><c r="A#{r}" t="s"><v>#{r - 1}</v></c></row>) }.join
+    sheet = read(XlsxBuilder.workbook({ "S" => rows }, shared: shared), max_text_bytes: 1000).sheets.first
+
+    assert_equal 10, sheet.rows.size
+    assert sheet.truncated_rows
+    assert sheet.rows.flatten.none?(&:nil?), "a string that was not kept ends the sheet; it never reads as an empty cell"
+  end
+
+  def test_thousands_of_styles_on_one_format_tokenize_it_once
+    code = '#,##0.00;[Red](#,##0.00)'
+    styles = <<~XML
+      <?xml version="1.0"?>
+      <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <numFmts count="1"><numFmt numFmtId="164" formatCode="#{XlsxBuilder.escape(code)}"/></numFmts>
+        <cellXfs count="5000">#{'<xf numFmtId="164"/>' * 5000}</cellXfs>
+      </styleSheet>
+    XML
+    rows = %(<row r="1"><c r="A1" s="4999"><v>-1234.5</v></c></row>)
+    bytes = XlsxBuilder.workbook({ "S" => rows }, extra: { "xl/styles.xml" => styles })
+
+    calls = 0
+    format = Preview::NumberFormat
+    original = format.method(:tokenize)
+    format.define_singleton_method(:tokenize) { |value| calls += 1; original.call(value) }
+    begin
+      assert_equal [["(1,234.50)"]], texts(read(bytes).sheets.first)
+    ensure
+      format.define_singleton_method(:tokenize, original)
+    end
+    assert_operator calls, :<=, 3, "one tokenize per distinct format, not one per style"
+  end
+
+  def test_a_format_code_longer_than_excel_allows_renders_as_a_plain_number
+    format = Preview::NumberFormat
+    assert_equal "1234.5", format.format(1234.5, "0" * 100_000)
+    assert_equal "1234.5", format.format(1234.5, "0" * (format::MAX_CODE_LENGTH + 1))
+    assert_equal 255, format.format(1.0, "0" * format::MAX_CODE_LENGTH).length, "a code at the limit still applies"
+
+    rows = %(<row r="1"><c r="A1" s="1"><v>1234.5</v></c></row>)
+    assert_equal [["1234.5"]], texts(read(XlsxBuilder.workbook({ "S" => rows }, formats: ["#" * 2000 + "0"])).sheets.first)
+  end
+
+  def test_a_numbers_rendered_width_is_bounded
+    format = Preview::NumberFormat
+    assert_equal "0." + ("3" * 15) + ("0" * 15), format.format(1.0 / 3, "0." + ("0" * 200)), "decimals stop at thirty"
+    assert_operator format.format(1e300, "#,##0.00").length, :<, 40, "a number too wide to be a figure renders compactly"
+    assert_equal "1e+300", format.format(1e300, "#,##0.00")
+  end
+
+  def test_a_cell_reference_with_more_than_three_letters_is_past_the_last_column
+    reader = Preview::Xlsx.allocate
+    reader.instance_variable_set(:@max_columns, 50)
+    assert_equal 16_384, reader.send(:column_index, "XFD1")
+    assert_equal 51, reader.send(:column_index, "XFDA1")
+    assert_equal 51, reader.send(:column_index, ("A" * 50_000) + "1")
+
+    rows = %(<row r="1"><c r="A1"><v>1</v></c><c r="#{'B' * 50_000}1"><v>2</v></c></row>)
+    sheet = read(XlsxBuilder.workbook({ "S" => rows })).sheets.first
+    assert_equal [["1"]], texts(sheet)
+    assert sheet.truncated_columns
+  end
+
+  def test_the_rendered_grid_is_budgeted_empty_cells_included
+    far = %(<row r="500"><c r="AX500"><v>1</v></c></row>)
+    workbook = Preview.read_spreadsheet(XlsxBuilder.workbook((1..20).to_h { |n| ["T#{n}", far] }))
+
+    rendered = workbook.sheets.sum { |sheet| sheet.rows.sum(&:size) }
+    assert_operator rendered, :<=, Preview::MAX_GRID_CELLS
+    assert_equal 4, workbook.sheets.size, "four full rectangles fit the grid budget"
+    assert_equal 16, workbook.omitted_sheets
+  end
+
+  def test_the_grid_budget_cuts_the_sheet_that_overspends_it
+    grid = XlsxBuilder.rows((1..10).map { |r| (1..4).map { |c| (r * 10) + c } })
+    workbook = read(XlsxBuilder.workbook({ "One" => grid, "Two" => grid, "Three" => grid }), max_grid_cells: 60)
+
+    one, two = workbook.sheets
+    assert_equal 2, workbook.sheets.size
+    assert_equal 10, one.rows.size
+    refute one.truncated_rows
+    assert_equal 5, two.rows.size
+    assert two.truncated_rows
+    assert_equal 5, two.row_limit
+    assert_equal 1, workbook.omitted_sheets
   end
 
   def test_an_external_entity_is_not_expanded

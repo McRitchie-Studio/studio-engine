@@ -37,6 +37,18 @@ module Studio
       MONTHS = %w[January February March April May June July August September October November December].freeze
       DAYS   = %w[Sunday Monday Tuesday Wednesday Thursday Friday Saturday].freeze
 
+      # Excel refuses a format code longer than this, and so does this module:
+      # a longer one renders as General. The cap is what bounds the cost of
+      # tokenizing a code and of every number rendered through it.
+      MAX_CODE_LENGTH = 255
+      # Excel shows at most thirty decimal places.
+      MAX_DECIMALS = 30
+      # A number with more integer digits than this is not a figure anyone
+      # reads digit by digit; it renders in General's compact form instead of
+      # as three hundred digits.
+      MAX_FIXED_MAGNITUDE = 1e30
+      GENERAL = [[[:general, "General"]]].freeze
+
       # Excel keeps 15 significant digits; rounding from that decimal reading
       # (not from the binary float) is what makes 1.005 show as 1.01.
       SIGNIFICANT_DIGITS = 15
@@ -98,6 +110,8 @@ module Studio
       end
 
       def tokenize(code)
+        return GENERAL if code.length > MAX_CODE_LENGTH
+
         sections = [[]]
         index = 0
         while index < code.length
@@ -206,12 +220,14 @@ module Studio
         value /= (1000.0**trailing) if trailing.positive?
         grouped = integer_tokens.each_cons(3).any? { |a, b, c| a[0] == :digit && b[0] == :comma && c[0] == :digit }
 
-        decimal_digits = decimal_tokens.count { |kind, _| kind == :digit }
+        return sign + prefix + general(value) + suffix if value.abs >= MAX_FIXED_MAGNITUDE
+
+        decimal_digits = [decimal_tokens.count { |kind, _| kind == :digit }, MAX_DECIMALS].min
         if kinds.include?(:exponent)
           return sign + prefix + Kernel.format("%.#{decimal_digits}E", value) + suffix
         end
 
-        minimum_decimals = decimal_tokens.count { |kind, mark| kind == :digit && mark == "0" }
+        minimum_decimals = [decimal_tokens.count { |kind, mark| kind == :digit && mark == "0" }, MAX_DECIMALS].min
         minimum_integers = integer_tokens.count { |kind, mark| kind == :digit && mark == "0" }
 
         rounded = BigDecimal(value, SIGNIFICANT_DIGITS).round(decimal_digits, BigDecimal::ROUND_HALF_UP)

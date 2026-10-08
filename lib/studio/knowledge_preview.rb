@@ -21,9 +21,20 @@ module Studio
   #   MAX_ROWS, MAX_COLUMNS  what one sheet (or CSV) shows; the rest is named
   #                          in a notice, never silently dropped.
   #   MAX_SHEETS             tabs rendered; further sheets are counted.
-  #   MAX_CELLS              filled cells across one workbook. The sheet that
-  #                          spends the last of it is cut there and says so;
-  #                          the sheets after it are counted, not rendered.
+  #   MAX_CELLS              filled cells across one workbook.
+  #   MAX_CELL_CHARS         text kept for one cell (Excel's own limit); a
+  #                          longer value is cut and marked.
+  #   MAX_TEXT_BYTES         cell text across one workbook, counted once per
+  #                          cell that shows it.
+  #   MAX_GRID_CELLS         cells rendered across one workbook, empty ones
+  #                          included.
+  #                          The sheet that spends the last of any of these
+  #                          three is cut there and says so; the sheets after
+  #                          it are counted, not rendered.
+  #   NumberFormat::MAX_CODE_LENGTH, MAX_DECIMALS
+  #                          a number format longer than Excel allows is
+  #                          ignored, and no number renders past thirty
+  #                          decimals.
   #   DELIMITED_HEAD_BYTES   a CSV is read only this far, so one of any size
   #                          previews its first rows.
   #   TEXT_HEAD_BYTES        likewise for text.
@@ -42,6 +53,9 @@ module Studio
     MAX_COLUMNS           = 50
     MAX_SHEETS            = 20
     MAX_CELLS             = 50_000
+    MAX_CELL_CHARS        = 32_767
+    MAX_TEXT_BYTES        = 2 * MEGABYTE
+    MAX_GRID_CELLS        = 100_000
     DELIMITED_HEAD_BYTES  = 1 * MEGABYTE
     TEXT_HEAD_BYTES       = 256 * 1024
     INLINE_MAX_BYTES      = 100 * MEGABYTE
@@ -155,7 +169,8 @@ module Studio
       def read_spreadsheet(bytes)
         require_relative "knowledge_preview/xlsx"
         Xlsx.read(bytes, max_rows: MAX_ROWS, max_columns: MAX_COLUMNS, max_sheets: MAX_SHEETS,
-                         max_cells: MAX_CELLS, inflate_cap: INFLATE_CAP)
+                         max_cells: MAX_CELLS, max_cell_chars: MAX_CELL_CHARS, max_text_bytes: MAX_TEXT_BYTES,
+                         max_grid_cells: MAX_GRID_CELLS, inflate_cap: INFLATE_CAP)
       rescue Error
         raise
       rescue StandardError => e
