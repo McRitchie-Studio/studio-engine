@@ -7,12 +7,12 @@ module Studio
   # operator goes to make a new banner with the app's own artwork. Each app
   # points it at its own generator, from config/initializers/studio.rb:
   #
-  #   config.email_image_generator_url = "https://example.com/email-art"
+  #   config.email_manager_generator_url = "https://example.com/email-art"
   #   # or, worked out per request:
-  #   config.email_image_generator_url = ->(request) { "#{request.base_url}/admin/email-art" }
+  #   config.email_manager_generator_url = ->(request) { "#{request.base_url}/admin/email-art" }
   #
-  #   config.email_image_generator_label       = "Header generator"   # optional
-  #   config.email_image_generator_description = "Open it, copy ..."  # optional
+  #   config.email_manager_generator_label       = "Header generator"   # optional
+  #   config.email_manager_generator_description = "Open it, copy ..."  # optional
   #
   # Unset, nil or blank means no link, and the page renders exactly as it did
   # before the setting existed.
@@ -66,7 +66,7 @@ module Studio
       return if web_url?(value)
 
       raise ArgumentError,
-            "Studio.email_image_generator_url must be an http(s) URL, a callable returning one, " \
+            "Studio.email_manager_generator_url must be an http(s) URL, a callable returning one, " \
             "or nil (got #{value.inspect})."
     end
 

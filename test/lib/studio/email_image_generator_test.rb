@@ -5,7 +5,7 @@ require_relative "../../../lib/studio/email_image_generator"
 
 # [unit] Studio::EmailImageGenerator: which URLs the /admin/emails generator
 # link may carry, how a callable is resolved, and the default wording. The
-# Studio.email_image_generator_* setters and the rendered page are in
+# Studio.email_manager_generator_* setters and the rendered page are in
 # test/integration/emails_page_generator_link_test.rb.
 class EmailImageGeneratorTest < Minitest::Test
   G = Studio::EmailImageGenerator
@@ -63,7 +63,7 @@ class EmailImageGeneratorTest < Minitest::Test
   def test_the_setter_refuses_a_non_web_url_loudly
     ["javascript:alert(1)", "/relative", "example.com", 42].each do |value|
       error = assert_raises(ArgumentError) { G.normalize_url(value) }
-      assert_includes error.message, "email_image_generator_url"
+      assert_includes error.message, "email_manager_generator_url"
     end
   end
 

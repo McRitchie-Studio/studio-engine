@@ -716,12 +716,12 @@ before the setting existed.
 
 ```ruby
 # config/initializers/studio.rb
-config.email_image_generator_url = "https://example.com/email-art"
+config.email_manager_generator_url = "https://example.com/email-art"
 # or worked out per request; the callable receives the request:
-config.email_image_generator_url = ->(request) { "#{request.base_url}/admin/email-art" }
+config.email_manager_generator_url = ->(request) { "#{request.base_url}/admin/email-art" }
 
-config.email_image_generator_label       = "Header generator"   # default "Email image generator"
-config.email_image_generator_description = "Open it, copy the prompt, paste it into Claude Code."
+config.email_manager_generator_label       = "Header generator"   # default "Email image generator"
+config.email_manager_generator_description = "Open it, copy the prompt, paste it into Claude Code."
 ```
 
 The default line reads "Make a new header with <app name>'s character model:

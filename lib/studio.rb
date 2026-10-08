@@ -392,23 +392,23 @@ module Studio
   # under it are optional; blank means the engine's generic wording.
   # See Studio::EmailImageGenerator.
   #
-  #   config.email_image_generator_url         = "https://example.com/email-art"
-  #   config.email_image_generator_label       = "Header generator"
-  #   config.email_image_generator_description = "Open it, copy the prompt, paste it into Claude Code."
-  mattr_reader :email_image_generator_url, default: nil
-  mattr_accessor :email_image_generator_label, default: nil
-  mattr_accessor :email_image_generator_description, default: nil
+  #   config.email_manager_generator_url         = "https://example.com/email-art"
+  #   config.email_manager_generator_label       = "Header generator"
+  #   config.email_manager_generator_description = "Open it, copy the prompt, paste it into Claude Code."
+  mattr_reader :email_manager_generator_url, default: nil
+  mattr_accessor :email_manager_generator_label, default: nil
+  mattr_accessor :email_manager_generator_description, default: nil
 
-  def self.email_image_generator_url=(value)
-    @@email_image_generator_url = EmailImageGenerator.normalize_url(value)
+  def self.email_manager_generator_url=(value)
+    @@email_manager_generator_url = EmailImageGenerator.normalize_url(value)
   end
 
   # The link /admin/emails renders for this request, or nil for none.
-  def self.email_image_generator_link(request = nil)
+  def self.email_manager_generator_link(request = nil)
     EmailImageGenerator.link(
-      url: email_image_generator_url,
-      label: email_image_generator_label,
-      description: email_image_generator_description,
+      url: email_manager_generator_url,
+      label: email_manager_generator_label,
+      description: email_manager_generator_description,
       app_name: app_name,
       request: request
     )

@@ -67,10 +67,10 @@
   </header>
 
   <%# The app's own banner generator, when it configured one
-      (config.email_image_generator_url; see Studio::EmailImageGenerator). Unset
+      (config.email_manager_generator_url; see Studio::EmailImageGenerator). Unset
       draws nothing. The URL is an http(s) URL by construction, and every value
       below is escaped by ERB output tags. %>
-  <% generator = Studio.email_image_generator_link(controller&.request) %>
+  <% generator = Studio.email_manager_generator_link(controller&.request) %>
   <% if generator %>
     <div class="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-subtle bg-inset px-4 py-3"
          data-email-image-generator>
