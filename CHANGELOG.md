@@ -4,6 +4,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **An "Email image generator" link at the top of `/admin/emails`, set per
+  app.** `config.email_image_generator_url` takes an http(s) URL or a callable
+  that receives the request; `email_image_generator_label` (default "Email image
+  generator") and `email_image_generator_description` override the wording.
+  Unset, nil or blank draws nothing, and the page renders byte-for-byte as
+  before. A non-http(s) String raises `ArgumentError` at boot; a callable
+  answering one draws no link. The link opens in a new tab with
+  `rel="noopener noreferrer"`. See README, *The image generator link*.
+
 ## 0.95.0 — 2026-10-07
 
 ### Security

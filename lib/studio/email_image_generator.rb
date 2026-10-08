@@ -33,10 +33,11 @@ module Studio
 
     SCHEMES = %w[http https].freeze
 
-    # Whitespace or a control character anywhere. URI's parser tolerates some of
-    # these, and a browser strips tab and newline from an href, so a URL that
-    # carries one is refused rather than reasoned about.
-    UNSAFE_CHARACTER = /[\x00-\x20\x7f]/
+    # Whitespace, a control character, a quote, an angle bracket or a backslash
+    # anywhere. URI's parser tolerates several of these, a browser strips tab and
+    # newline from an href and reads "\\" as "/", and the view escapes the rest
+    # anyway; a URL that carries one is refused rather than reasoned about.
+    UNSAFE_CHARACTER = /[\x00-\x20\x7f"'<>\\`]/
 
     # The link to render: url, label and description, all plain strings (the
     # view escapes them).
