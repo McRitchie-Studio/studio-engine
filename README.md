@@ -707,6 +707,29 @@ its helper names; drawing them there raises at route-load and kills every route
 in the app. The gate covers only the page — the registry and the inherited
 defaults are always on.
 
+### The image generator link
+
+An app can put a link to its own banner generator at the top of the page: a
+short line and a button that opens the generator in a new tab. Unset (the
+default), nil or blank draws nothing, and the page renders exactly as it did
+before the setting existed.
+
+```ruby
+# config/initializers/studio.rb
+config.email_manager_generator_url = "https://example.com/email-art"
+# or worked out per request; the callable receives the request:
+config.email_manager_generator_url = ->(request) { "#{request.base_url}/admin/email-art" }
+
+config.email_manager_generator_label       = "Header generator"   # default "Email image generator"
+config.email_manager_generator_description = "Open it, copy the prompt, paste it into Claude Code."
+```
+
+The default line reads "Make a new header with <app name>'s character model:
+open the generator, copy the prompt, paste it into Claude Code." The URL must be
+an absolute `http`/`https` URL with a host: any other String (a `javascript:`
+URL, a relative path) raises `ArgumentError` at boot, and a callable that
+answers one draws no link. Every value is escaped.
+
 ### The catalog
 
 A registered email carries a key, a label, a description, what **type** it is,
