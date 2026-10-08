@@ -62,13 +62,17 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
     assert_equal "studio/vendor/stimulus.js", pins["@hotwired/stimulus"].path
     assert_equal true, pins["@hotwired/stimulus"].preload
     assert_nil pins["studio/vendor/stimulus"], "a vendored library is pinned by its package name only"
+    assert_equal "studio/sortable.js", pins["sortablejs"].path
+    assert_equal false, pins["sortablejs"].preload, "SortableJS is fetched only by a page that drags"
   end
 
   test "the boot graph follows studio/application's static imports" do
-    assert_equal %w[studio/alpine_shims studio/alpine_stores studio/application studio/controllers/modal_host_controller
-                    studio/controllers/nav_collapse_controller studio/head_chrome studio/modal_host studio/nav_collapse
-                    studio/pinned_stack], boot_graph
+    assert_equal %w[studio/alpine_shims studio/alpine_stores studio/application studio/board
+                    studio/controllers/modal_host_controller studio/controllers/nav_collapse_controller
+                    studio/head_chrome studio/modal_host studio/nav_collapse studio/pinned_stack], boot_graph
     refute_includes boot_graph, "studio/local_path", "a module nothing in the boot imports is not preloaded"
+    refute_includes boot_graph, "studio/controllers/board_controller",
+                    "the board controller is registered lazily, so it is not preloaded on every page"
   end
 
   test "the rendered importmap tags carry the pins and preload only the boot graph" do

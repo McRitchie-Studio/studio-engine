@@ -27,7 +27,6 @@ export default class extends Controller {
       if (this.connection !== connection) return
       connection.unwire = scope.wire(Sortable)
     })
-
   }
 
   disconnect() {

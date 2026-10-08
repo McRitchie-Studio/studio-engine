@@ -10,6 +10,11 @@
 # "@hotwired/stimulus" is the engine's Stimulus. A host that pins its own
 # (stimulus-rails) wins, and the engine's controllers run on that copy.
 #
+# The vendored SortableJS is pinned the same way, as "sortablejs", and never
+# preloaded: studio/board imports it dynamically, on a page that drags. The file
+# is the classic build (app/assets/javascripts/studio/sortable.js), which assigns
+# window.Sortable when it is imported.
+#
 # `pin`, not `pin_all_from`, so a host can override one: importmap-rails expands
 # a pin_all_from directory AFTER every plain pin, so a directory pin would beat
 # the host's own `pin` of the same name. Plain pins are last-drawn-wins, and the
@@ -22,3 +27,4 @@ Studio::Engine.javascript_module_logical_paths.each do |logical_path|
   pin name, to: logical_path, preload: boot.include?(name)
 end
 pin "@hotwired/stimulus", to: "studio/vendor/stimulus.js", preload: true
+pin "sortablejs", to: "studio/sortable.js", preload: false
