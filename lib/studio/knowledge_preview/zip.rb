@@ -55,6 +55,7 @@ module Studio
           @cap = cap
           @produced = 0
           @buffer = +"".b
+          @offset = 0
           @inflater = Zlib::Inflate.new(-Zlib::MAX_WBITS)
           @finished = false
         end
@@ -63,15 +64,20 @@ module Studio
         # bytes, and nil once the stream is exhausted.
         def read(length = nil, _outbuf = nil)
           begin
-            fill while !@finished && (length.nil? || @buffer.bytesize < length)
+            fill while !@finished && (length.nil? || available < length)
           rescue Error => e
             fail_with(e)
           rescue Zlib::Error
             fail_with(Unreadable.new("its contents are damaged"))
           end
-          return nil if @buffer.empty? && !length.nil?
+          return nil if available.zero? && !length.nil?
 
-          length.nil? ? @buffer.slice!(0, @buffer.bytesize) : @buffer.slice!(0, length)
+          # Read by offset, not by cutting the front off the buffer: a highly
+          # compressed part can leave megabytes buffered, and the parser asks
+          # for a few kilobytes at a time.
+          taken = @buffer.byteslice(@offset, length || available)
+          @offset += taken.bytesize
+          taken
         end
 
         def close
@@ -80,10 +86,15 @@ module Studio
 
         private
 
+        def available
+          @buffer.bytesize - @offset
+        end
+
         def fail_with(error)
           @failure = error
           @finished = true
-          @buffer.clear
+          @buffer = +"".b
+          @offset = 0
         end
 
         def fill
@@ -98,7 +109,12 @@ module Studio
           @produced += out.bytesize
           raise TooLarge, "it expands past the #{@cap / 1_048_576} MB preview limit" if @produced > @cap
 
-          @buffer << out
+          if available.zero?
+            @buffer = out
+            @offset = 0
+          else
+            @buffer << out
+          end
           @finished = true if @inflater.finished?
         end
       end

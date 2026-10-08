@@ -18,7 +18,7 @@ class KnowledgePreviewTest < Minitest::Test
 
   def read(bytes, **caps)
     require_relative "../../../lib/studio/knowledge_preview/xlsx"
-    Preview::Xlsx.read(bytes, **{ max_rows: 500, max_columns: 50, max_sheets: 20, inflate_cap: 8 * 1_048_576 }.merge(caps))
+    Preview::Xlsx.read(bytes, **{ max_rows: 500, max_columns: 50, max_sheets: 20, max_cells: 50_000, inflate_cap: 8 * 1_048_576 }.merge(caps))
   end
 
   def texts(sheet)
@@ -179,6 +179,30 @@ class KnowledgePreviewTest < Minitest::Test
     assert_equal ["Tab 1", "Tab 2", "Tab 3"], workbook.sheets.map(&:name)
     assert_equal 2, workbook.omitted_sheets
     assert_equal [false, true, false], workbook.sheets.map(&:hidden)
+  end
+
+  def test_the_cell_budget_cuts_the_sheet_that_spends_it_and_counts_the_rest
+    grid = XlsxBuilder.rows((1..10).map { |r| (1..4).map { |c| (r * 10) + c } })
+    workbook = read(XlsxBuilder.workbook({ "One" => grid, "Two" => grid, "Three" => grid, "Four" => grid }), max_cells: 60)
+
+    assert_equal %w[One Two], workbook.sheets.map(&:name)
+    assert_equal 2, workbook.omitted_sheets
+    one, two = workbook.sheets
+    assert_equal 10, one.rows.size
+    refute one.truncated_rows
+    # 40 cells went to the first sheet; the last 20 are five whole rows.
+    assert_equal 5, two.rows.size
+    assert two.truncated_rows
+    assert_equal 5, two.row_limit, "the notice names the rows actually shown"
+  end
+
+  def test_a_workbook_inside_the_cell_budget_is_whole
+    grid = XlsxBuilder.rows((1..10).map { |r| (1..4).map { |c| (r * 10) + c } })
+    workbook = read(XlsxBuilder.workbook({ "One" => grid, "Two" => grid }), max_cells: 80)
+
+    assert_equal [10, 10], workbook.sheets.map { |sheet| sheet.rows.size }
+    assert_equal [false, false], workbook.sheets.map(&:truncated_rows)
+    assert_equal 0, workbook.omitted_sheets
   end
 
   def test_stored_entries_and_data_descriptors_read_like_deflated_ones

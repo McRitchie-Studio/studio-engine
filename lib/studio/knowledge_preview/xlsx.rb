@@ -44,16 +44,20 @@ module Studio
       # sheets are read.
       SharedRef = Struct.new(:index)
 
-      def self.read(bytes, max_rows:, max_columns:, max_sheets:, inflate_cap:)
+      def self.read(bytes, max_rows:, max_columns:, max_sheets:, max_cells:, inflate_cap:)
         new(bytes, max_rows: max_rows, max_columns: max_columns, max_sheets: max_sheets,
-                   inflate_cap: inflate_cap).read
+                   max_cells: max_cells, inflate_cap: inflate_cap).read
       end
 
-      def initialize(bytes, max_rows:, max_columns:, max_sheets:, inflate_cap:)
+      def initialize(bytes, max_rows:, max_columns:, max_sheets:, max_cells:, inflate_cap:)
         @zip = Zip.new(bytes, inflate_cap: inflate_cap)
         @max_rows = max_rows
         @max_columns = max_columns
         @max_sheets = max_sheets
+        # Filled cells still allowed across the WHOLE workbook: the page is one
+        # response, and twenty sheets each at the row and column caps would be
+        # half a million cells of it.
+        @cells_left = max_cells
         @shared_wanted = Set.new
       end
 
@@ -72,12 +76,17 @@ module Studio
         end
         raise Unreadable, "it has no worksheets" if worksheets.empty?
 
-        sheets = worksheets.first(@max_sheets).map { |sheet| read_sheet(sheet) }
+        sheets = []
+        worksheets.first(@max_sheets).each do |sheet|
+          break if @cells_left <= 0
+
+          sheets << read_sheet(sheet)
+        end
         resolve_shared_strings(
           sheets,
           relationships.values.find { |rel| rel[:type].match?(SHARED_STRINGS_TYPE) }&.fetch(:target) || "xl/sharedStrings.xml"
         )
-        Workbook.new(sheets: sheets, omitted_sheets: [worksheets.size - @max_sheets, 0].max)
+        Workbook.new(sheets: sheets, omitted_sheets: worksheets.size - sheets.size)
       rescue Nokogiri::XML::SyntaxError, Zlib::Error
         raise Unreadable, "its contents are damaged"
       end
@@ -151,6 +160,7 @@ module Studio
         rows = {}
         truncated_rows = false
         truncated_columns = false
+        row_limit = @max_rows
         row_number = 0
         column = 0
         cell = nil
@@ -162,10 +172,16 @@ module Studio
           when ELEMENT
             case node.local_name
             when "row"
+              previous = row_number
               row_number = node.attribute("r")&.to_i || (row_number + 1)
               column = 0
               if row_number > @max_rows
                 truncated_rows = true
+                break
+              elsif @cells_left <= 0
+                # The workbook's cell budget ran out on the row before this one.
+                truncated_rows = true
+                row_limit = previous
                 break
               end
             when "c"
@@ -187,6 +203,7 @@ module Studio
                   truncated_columns = true
                 elsif (value = cell_value(cell, text))
                   (rows[row_number] ||= {})[column] = value
+                  @cells_left -= 1
                 end
               end
               cell = nil
@@ -198,7 +215,7 @@ module Studio
         end
 
         Sheet.new(name: sheet[:name], rows: dense(rows), truncated_rows: truncated_rows,
-                  truncated_columns: truncated_columns, hidden: sheet[:hidden], row_limit: @max_rows)
+                  truncated_columns: truncated_columns, hidden: sheet[:hidden], row_limit: row_limit)
       end
 
       def cell_value(cell, text)

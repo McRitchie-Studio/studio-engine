@@ -21,6 +21,9 @@ module Studio
   #   MAX_ROWS, MAX_COLUMNS  what one sheet (or CSV) shows; the rest is named
   #                          in a notice, never silently dropped.
   #   MAX_SHEETS             tabs rendered; further sheets are counted.
+  #   MAX_CELLS              filled cells across one workbook. The sheet that
+  #                          spends the last of it is cut there and says so;
+  #                          the sheets after it are counted, not rendered.
   #   DELIMITED_HEAD_BYTES   a CSV is read only this far, so one of any size
   #                          previews its first rows.
   #   TEXT_HEAD_BYTES        likewise for text.
@@ -38,6 +41,7 @@ module Studio
     MAX_ROWS              = 500
     MAX_COLUMNS           = 50
     MAX_SHEETS            = 20
+    MAX_CELLS             = 50_000
     DELIMITED_HEAD_BYTES  = 1 * MEGABYTE
     TEXT_HEAD_BYTES       = 256 * 1024
     INLINE_MAX_BYTES      = 100 * MEGABYTE
@@ -151,7 +155,7 @@ module Studio
       def read_spreadsheet(bytes)
         require_relative "knowledge_preview/xlsx"
         Xlsx.read(bytes, max_rows: MAX_ROWS, max_columns: MAX_COLUMNS, max_sheets: MAX_SHEETS,
-                         inflate_cap: INFLATE_CAP)
+                         max_cells: MAX_CELLS, inflate_cap: INFLATE_CAP)
       rescue Error
         raise
       rescue StandardError => e

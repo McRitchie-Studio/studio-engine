@@ -26,7 +26,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `Studio.draw_knowledge_routes` opt-in; there is no migration and no new setting.
 
   The caps, all constants on `Studio::KnowledgePreview`: 500 rows and 50 columns
-  a sheet, 20 sheets a workbook, a 20 MB workbook, 64 MB for any one inflated
+  a sheet, 20 sheets and 50,000 filled cells a workbook, a 20 MB workbook, 64 MB for any one inflated
   part of it, the first 1 MB of a CSV, the first 256 KB of a text file, and
   100 MB for an inline PDF or image. A sheet or file cut by a cap says so and
   links the download.
