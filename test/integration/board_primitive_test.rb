@@ -187,6 +187,8 @@ class BoardPrimitiveTest < ActiveSupport::TestCase
     assert_equal "studio/sortable.js", pin.path, "the pin is the vendored build (no CDN)"
     assert_equal false, pin.preload, "a page that never drags never fetches it"
 
+    head = File.read("app/views/layouts/studio/_head.html.erb")
+    refute_match(/sortable/i, head, "the head loads SortableJS on no page")
     refute_includes Studio::Engine.javascript_boot_graph, "studio/controllers/board_controller",
       "the board controller is registered lazily"
   end
