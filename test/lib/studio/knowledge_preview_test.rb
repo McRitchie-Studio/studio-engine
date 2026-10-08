@@ -369,6 +369,43 @@ class KnowledgePreviewTest < Minitest::Test
     assert sheet.rows.flatten.none?(&:nil?), "a string that was not kept ends the sheet; it never reads as an empty cell"
   end
 
+  def reader_for(bytes, **caps)
+    Preview::Xlsx.new(bytes, **{ max_rows: 500, max_columns: 50, max_sheets: 20, max_cells: 50_000, max_cell_chars: 32_767,
+                                 max_text_bytes: 2 * 1_048_576, max_grid_cells: 100_000, inflate_cap: 8 * 1_048_576 }.merge(caps))
+  end
+
+  def test_a_cells_text_stops_growing_one_character_past_the_cap
+    # The clip a kept cell gets hides this from the outside, so it is asserted
+    # where it happens: a value arriving as many runs must not be gathered
+    # whole before it is cut.
+    reader = reader_for(XlsxBuilder.workbook({ "S" => "" }), max_cell_chars: 10)
+    text = +""
+    5.times { reader.send(:append, text, "abcdefg") }
+    assert_equal 11, text.length
+    assert_equal "abcdefgabc…", reader.send(:clipped, text)
+
+    runs = (1..400).map { "<r><t>#{'r' * 100}</t></r>" }.join
+    rows = %(<row r="1"><c r="A1" t="s"><v>0</v></c></row>)
+    cell = read(XlsxBuilder.workbook({ "S" => rows }, shared: [runs]), max_cell_chars: 250).sheets.first.rows[0][0]
+    assert_equal ("r" * 250) + "…", cell.text
+  end
+
+  def test_the_shared_string_table_holds_no_more_than_the_text_budget
+    # Sixty distinct strings of a thousand bytes, all wanted, under a budget
+    # of ten thousand: what is held is bounded by the budget, not by how many
+    # distinct strings the cells point at.
+    shared = (1..60).map { |n| n.to_s.rjust(2, "0") * 500 }
+    rows = (1..60).map { |r| %(<row r="#{r}"><c r="A#{r}" t="s"><v>#{r - 1}</v></c></row>) }.join
+    reader = reader_for(XlsxBuilder.workbook({ "S" => rows }, shared: shared), max_text_bytes: 10_000)
+    reader.instance_variable_set(:@shared_wanted, Set.new(0...60))
+
+    strings = reader.send(:read_shared_strings, "xl/sharedStrings.xml")
+    held = strings.values.grep(String)
+    assert_equal 10, held.size
+    assert_operator held.sum(&:bytesize), :<=, 10_000
+    assert_equal 50, strings.values.count { |value| value.equal?(Preview::Xlsx::OVER_BUDGET) }
+  end
+
   def test_thousands_of_styles_on_one_format_tokenize_it_once
     code = '#,##0.00;[Red](#,##0.00)'
     styles = <<~XML
@@ -378,7 +415,9 @@ class KnowledgePreviewTest < Minitest::Test
         <cellXfs count="5000">#{'<xf numFmtId="164"/>' * 5000}</cellXfs>
       </styleSheet>
     XML
-    rows = %(<row r="1"><c r="A1" s="4999"><v>-1234.5</v></c></row>)
+    # Two hundred cells, each on a different style, every style the same format.
+    cells = (0...200).map { |n| %(<c r="A#{n + 1}" s="#{n * 25}"><v>-1234.5</v></c>) }
+    rows = cells.each_with_index.map { |cell, n| %(<row r="#{n + 1}">#{cell}</row>) }.join
     bytes = XlsxBuilder.workbook({ "S" => rows }, extra: { "xl/styles.xml" => styles })
 
     calls = 0
@@ -386,11 +425,11 @@ class KnowledgePreviewTest < Minitest::Test
     original = format.method(:tokenize)
     format.define_singleton_method(:tokenize) { |value| calls += 1; original.call(value) }
     begin
-      assert_equal [["(1,234.50)"]], texts(read(bytes).sheets.first)
+      assert_equal [["(1,234.50)"]] * 200, texts(read(bytes).sheets.first)
     ensure
       format.define_singleton_method(:tokenize, original)
     end
-    assert_operator calls, :<=, 3, "one tokenize per distinct format, not one per style"
+    assert_equal 1, calls, "one tokenize per distinct format: not one per style, not one per cell"
   end
 
   def test_a_format_code_longer_than_excel_allows_renders_as_a_plain_number
@@ -406,6 +445,7 @@ class KnowledgePreviewTest < Minitest::Test
   def test_a_numbers_rendered_width_is_bounded
     format = Preview::NumberFormat
     assert_equal "0." + ("3" * 15) + ("0" * 15), format.format(1.0 / 3, "0." + ("0" * 200)), "decimals stop at thirty"
+    assert_equal "0", format.format(1e-40, "0." + ("#" * 200)), "optional decimals stop at thirty too"
     assert_operator format.format(1e300, "#,##0.00").length, :<, 40, "a number too wide to be a figure renders compactly"
     assert_equal "1e+300", format.format(1e300, "#,##0.00")
   end
