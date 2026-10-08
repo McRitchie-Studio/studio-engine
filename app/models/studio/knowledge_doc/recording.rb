@@ -92,35 +92,49 @@ module Studio
       # Order, and what each failure leaves behind:
       #   1. columns, link, file type and size, and the row's own validity are
       #      checked. Nothing has been written.
-      #   2. the new object is uploaded under a new key. A failure aborts the
-      #      multipart upload; the row is untouched.
-      #   3. the row is saved. A failure trashes the new object and re-raises.
+      #   2. the new object is uploaded under a new key. Any failure, a signal
+      #      included, aborts the multipart upload; the row is untouched.
+      #   3. the row is saved, under a row lock that also reads which recording
+      #      it replaces. Any failure, a signal included, trashes the new
+      #      object and re-raises.
       #   4. the recording this one replaced goes to trash (Studio::S3.delete,
       #      recoverable for three days). A failure here raises with the row
       #      already pointing at the new recording; the old object is the only
       #      thing left behind.
-      def attach_recording!(path, filename: nil, source_url: nil, strict_extension: true)
+      #
+      # A process KILLED between 2 and 3 leaves a complete object no row
+      # references, under `knowledge/<entity>/<path>/…-recording-…`.
+      #
+      # Two attaches to one document at once are safe for the row and the
+      # bucket: step 3 reads the key it replaces from the database, not from
+      # this instance, so whichever saves second trashes the first one's
+      # object. One recording wins; neither is orphaned.
+      def attach_recording!(path, filename: nil, source_url: nil)
         ensure_recording_columns!
         require "studio/knowledge_recording"
         require "studio/s3/multipart"
 
         link = checked_recording_link(source_url)
-        identified = Studio::KnowledgeRecording.identify!(path, filename: filename || File.basename(path.to_s),
-                                                                strict_extension: strict_extension)
+        name = filename || File.basename(path.to_s)
+        identified = Studio::KnowledgeRecording.identify!(path, filename: name)
         validate!
 
-        key = new_recording_key(filename || File.basename(path.to_s), identified.extension)
+        key = new_recording_key(name, identified.extension)
         uploaded = Studio::S3::Multipart.upload_file(key: key, path: path, content_type: identified.content_type,
                                                      max_bytes: Studio::KnowledgeRecording::MAX_BYTES)
-        replaced = self[:recording_key]
+        attributes = { recording_key: key, recording_mime_type: identified.content_type,
+                       recording_byte_size: uploaded.byte_size }
+        attributes[:recording_source_url] = link if link
+        replaced = nil
+        saved = false
         begin
-          attributes = { recording_key: key, recording_mime_type: identified.content_type,
-                         recording_byte_size: uploaded.byte_size }
-          attributes[:recording_source_url] = link if link
-          update!(attributes)
-        rescue StandardError
-          trash_unreferenced_recording(key)
-          raise
+          self.class.transaction do
+            replaced = self.class.lock.where(id: id).pick(:recording_key)
+            update!(attributes)
+          end
+          saved = true
+        ensure
+          trash_unreferenced_recording(key) unless saved
         end
 
         Studio::S3.delete(key: replaced) if replaced.present? && replaced != key
@@ -128,17 +142,22 @@ module Studio
       end
 
       # Fetches `url` to a temporary file and attaches it. The fetch is https
-      # only and goes through the engine's SSRF guard on every hop; see
-      # Studio::KnowledgeRecording.fetch. The download URL is NOT stored (it
-      # usually carries a credential); pass `source_url:` for the page to link.
-      def attach_recording_from_url!(url, source_url: nil, resolver: nil)
+      # only and goes through the engine's SSRF guard on every hop; a download
+      # that ends short of its declared length raises before anything is
+      # uploaded, so the recording already stored is untouched. See
+      # Studio::KnowledgeRecording.fetch.
+      #
+      # NOTHING OF THE DOWNLOAD URL IS STORED OR USED AS A NAME: its query and
+      # its path can both carry a credential. Pass `filename:` to name the
+      # object (default "recording") and `source_url:` for the page to link.
+      def attach_recording_from_url!(url, filename: nil, source_url: nil, resolver: nil)
         ensure_recording_columns!
         require "studio/knowledge_recording"
         checked_recording_link(source_url)
 
         options = resolver ? { resolver: resolver } : {}
-        Studio::KnowledgeRecording.fetch(url, **options) do |path, name|
-          attach_recording!(path, filename: name, source_url: source_url, strict_extension: false)
+        Studio::KnowledgeRecording.fetch(url, **options) do |path|
+          attach_recording!(path, filename: filename || "recording", source_url: source_url)
         end
       end
 

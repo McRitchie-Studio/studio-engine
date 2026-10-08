@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "delegate"
+
 module Studio
   # The rules for a knowledge document's RECORDING (the audio or video of a
   # meeting whose transcript is the document): what counts as one, how big it
@@ -26,16 +28,10 @@ module Studio
   # content type always comes from TYPES, so the bucket never serves a
   # recording as text/html or anything else a browser would run.
   #
-  # THE BOUNDS, each a constant below:
-  #   MAX_BYTES           4 GB a recording, local or fetched
-  #   MAX_URL_BYTES       8,192 bytes a URL, the first one and every redirect
-  #   MAX_REDIRECTS       3
-  #   MAX_ADDRESSES       4 vetted addresses tried for one host
-  #   FETCH_DEADLINE      3,600 s for a whole fetch, redirects included
-  #   connect / read      Studio::ImageCache::OPEN_TIMEOUT (10 s) and
-  #                       READ_TIMEOUT (30 s), set by its pinned_http
-  #   HEAD_BYTES          16 bytes read to identify a file
-  #   MAX_FILENAME_CHARS  80 characters of a file name kept in the object key
+  # THE BOUNDS. README, "Knowledge recordings", walks every phase of a fetch
+  # and of an upload with its time bound, its size bound and what is left
+  # behind if the process dies there. The constants are below; `fetch` and
+  # Meter say how each is enforced.
   module KnowledgeRecording
     class Error < StandardError; end
     # The source was refused before, or instead of, being stored.
@@ -55,10 +51,25 @@ module Studio
     MAX_URL_BYTES = 8_192
     MAX_REDIRECTS = 3
     MAX_ADDRESSES = 4
-    # One hour for the whole fetch. The read timeout bounds one silent gap; a
-    # server that sends a byte every 29 seconds would otherwise hold the dyno
-    # until the byte cap, which at that rate is never.
+    # One hour for the whole fetch: every connect, every response's headers,
+    # every redirect and the body. Enforced on every read and write of the
+    # socket (Meter), not only as body chunks arrive. The one thing that can
+    # run past it is a DNS lookup already in flight (ImageCache's
+    # RESOLVE_DEADLINE, 6 s).
     FETCH_DEADLINE = 3_600
+    # Seconds for one address to accept a connection and finish TLS.
+    CONNECT_DEADLINE = 20
+    # Seconds from sending a request to having its status line and headers,
+    # any 1xx responses included.
+    HEADER_DEADLINE = 30
+    # Bytes that may come off the socket without becoming body: the status
+    # line, headers and 1xx responses of one hop together, and after that the
+    # chunk-size lines and trailers between two pieces of body. Net::HTTP
+    # buffers these in memory with no limit of its own.
+    MAX_UNDELIVERED_BYTES = 64 * 1024
+    # The only port fetched from. A download link is https on 443; any other
+    # port would let the fetch be pointed at arbitrary services on public hosts.
+    PORT = 443
     HEAD_BYTES = 16
     MAX_FILENAME_CHARS = 80
     # Refused before any bytes are read when the declared type is something
@@ -120,11 +131,9 @@ module Studio
       # raises: NotARecording when the bytes are no container on the list or
       # the extension disagrees with them, TooLarge past MAX_BYTES.
       #
-      # `filename` is the name whose extension is judged (default: the path's).
-      # `strict_extension: false` is for a fetched URL, whose path is the
-      # server's to name: an extension off the list is then ignored instead of
-      # refused. One that names a DIFFERENT container is refused either way.
-      def identify!(path, filename: nil, strict_extension: true, max_bytes: MAX_BYTES)
+      # `filename` is the name whose extension is judged (default: the
+      # path's). A name with no extension is judged by its bytes alone.
+      def identify!(path, filename: nil, max_bytes: MAX_BYTES)
         path = path.to_s
         raise Refused, "no such file: #{path}" unless File.file?(path)
 
@@ -135,7 +144,7 @@ module Studio
         container = container_of(head) ||
           raise(NotARecording, "#{File.basename(path)} is not a recording: its first bytes are not MP4, MOV, M4A, " \
                                "WebM, MP3, WAV or Ogg")
-        extension = extension_for(container, head, filename || path, strict_extension)
+        extension = extension_for(container, head, filename || path)
         Identified.new(content_type: TYPES.fetch(extension), extension: extension, byte_size: size)
       end
 
@@ -148,14 +157,15 @@ module Studio
         "#{base}.#{extension}"
       end
 
-      # `url` as it may be printed or logged: scheme, host and path. The query
-      # is dropped because a download URL usually carries its credential there.
+      # `url` as it may be printed or logged: scheme and host, nothing else. A
+      # download URL carries its credential in the query or in the path, and
+      # every failure message reaches a log drain.
       def redact(url)
         require "uri"
         uri = URI.parse(url.to_s)
         return "(a URL with no host)" if uri.host.to_s.empty?
 
-        "#{uri.scheme}://#{uri.host}#{uri.path.to_s[0, 200]}#{'?…' if uri.query}"
+        "#{uri.scheme}://#{uri.host[0, 253]}/…"
       rescue URI::InvalidURIError
         "(an unparsable URL)"
       end
@@ -175,43 +185,55 @@ module Studio
         nil
       end
 
-      # Downloads `url` to a temporary file and yields its path and a file
-      # name taken from the final URL. The file is deleted when the block
-      # returns or raises.
+      # Downloads `url` to a temporary file and yields its path. The file is
+      # deleted when the block returns or raises (an interrupt included).
       #
       # THIS IS A SERVER-SIDE FETCH OF A CALLER-SUPPLIED URL, run with the
       # bucket's credentials in the process. Every hop, the first and each
       # redirect, goes through Studio::ImageCache.vet_source_url! (the engine's
       # one SSRF guard: public addresses only, however the host is written and
-      # wherever its name resolves), must be https, may carry no user:password,
-      # and is connected to an address that hop was vetted against
-      # (ImageCache.pinned_http), so the name cannot resolve somewhere else
-      # between the check and the connection. A host that vets to NO address
-      # (no resolver) is refused rather than connected to by name.
+      # wherever its name resolves), must be https on port 443, may carry no
+      # user:password, and is connected to an address that hop was vetted
+      # against (ImageCache.pinned_http), so the name cannot resolve somewhere
+      # else between the check and the connection. A host that vets to NO
+      # address (no resolver) is refused rather than connected to by name.
+      #
+      # WHAT IS YIELDED IS A COMPLETE BODY OR NOTHING. A response that declares
+      # a Content-Length and sends any other number of bytes raises FetchFailed
+      # before the block runs; so does a chunked body that ends before its last
+      # chunk. A body with NO declared length and no chunking ends when the
+      # server closes the connection, and a cut there cannot be told from the
+      # end: that one case is unchecked.
+      #
+      # Nothing of the URL's path is used to name the file: a path can carry
+      # the credential.
       #
       # `resolver:` is the callable names resolve with. The default is the
       # guard's own, or the system resolver where the guard's default is none
       # (a Rails test environment): this fetch never runs unresolved.
-      def fetch(url, max_bytes: MAX_BYTES, resolver: default_resolver, deadline: FETCH_DEADLINE)
+      def fetch(url, max_bytes: MAX_BYTES, resolver: default_resolver, deadline: FETCH_DEADLINE,
+                header_deadline: HEADER_DEADLINE)
         require "tempfile"
         stop_at = monotonic + deadline
         current = url.to_s
-        hop = nil
+        answer = nil
 
         Tempfile.create(["studio-knowledge-recording", ".part"]) do |sink|
           sink.binmode
           # Bounded: MAX_REDIRECTS + 1 requests at most.
           (MAX_REDIRECTS + 1).times do
-            vetted = vet!(current, resolver)
-            hop = request(vetted, sink, max_bytes, stop_at)
-            break unless hop.is_a?(String)
+            raise FetchFailed, "#{redact(url)} did not finish within #{deadline} seconds" if monotonic > stop_at
 
-            current = join_location(vetted.uri, hop)
+            vetted = vet!(current, resolver)
+            answer = request(vetted, sink, max_bytes, stop_at, header_deadline)
+            break unless answer.is_a?(String)
+
+            current = join_location(vetted.uri, answer)
           end
-          raise FetchFailed, "too many redirects (more than #{MAX_REDIRECTS}) from #{redact(url)}" if hop.is_a?(String)
+          raise FetchFailed, "too many redirects (more than #{MAX_REDIRECTS}) from #{redact(url)}" if answer.is_a?(String)
 
           sink.flush
-          return yield(sink.path, File.basename(URI.parse(current).path.to_s))
+          return yield(sink.path)
         end
       end
 
@@ -226,24 +248,20 @@ module Studio
         Studio::ImageCache.pinned_http(uri, address)
       end
 
-      private
-
       def monotonic
         Process.clock_gettime(Process::CLOCK_MONOTONIC)
       end
 
-      def extension_for(container, head, name, strict)
+      private
+
+      def extension_for(container, head, name)
         allowed = CONTAINERS.fetch(container)
         given = File.extname(name.to_s).delete_prefix(".").downcase
         return default_extension(container, head) if given.empty?
         return given if allowed.include?(given)
 
-        if TYPES.key?(given) || strict
-          raise NotARecording, "the name ends in .#{given[0, 16]} but the bytes are #{container} " \
-                               "(expected one of: #{allowed.map { |ext| ".#{ext}" }.join(', ')})"
-        end
-
-        default_extension(container, head)
+        raise NotARecording, "the name ends in .#{given[0, 16]} but the bytes are #{container} " \
+                             "(expected one of: #{allowed.map { |ext| ".#{ext}" }.join(', ')})"
       end
 
       def default_extension(container, head)
@@ -252,9 +270,9 @@ module Studio
         ISOBMFF_BRANDS.fetch(head.to_s.b.byteslice(8, 4).to_s, "mp4")
       end
 
-      # One hop through the guard, plus what this fetch adds to it: https
-      # only, no credentials in the URL, a length cap, and at least one vetted
-      # address to pin the connection to.
+      # One hop through the guard, plus what this fetch adds to it: https on
+      # port 443 only, no credentials in the URL, a length cap, and at least
+      # one vetted address to pin the connection to.
       def vet!(url, resolver)
         require "studio/image_cache"
         raise Refused, "URL is #{url.bytesize} bytes, over the #{MAX_URL_BYTES}-byte cap" if url.bytesize > MAX_URL_BYTES
@@ -274,6 +292,7 @@ module Studio
           end
 
         raise Refused, "refused #{redact(url)}: a recording is fetched over https only" unless vetted.uri.scheme == "https"
+        raise Refused, "refused #{redact(url)}: only port #{PORT} is fetched from" unless vetted.uri.port == PORT
         raise Refused, "refused #{redact(url)}: the URL carries a user or password" if vetted.uri.userinfo
         raise Refused, "refused #{redact(url)}: its host was vetted against no address" if vetted.addresses.empty?
 
@@ -290,50 +309,114 @@ module Studio
 
       # One GET to the first vetted address that accepts a connection, at most
       # MAX_ADDRESSES of them. Answers :stored, or the Location of a redirect.
-      def request(vetted, sink, max_bytes, stop_at)
-        require "net/http"
-        unreachable = [Errno::ECONNREFUSED, Errno::EHOSTUNREACH, Errno::ENETUNREACH, Errno::EADDRNOTAVAIL,
-                       Net::OpenTimeout, SocketError]
+      # Only a failure to CONNECT moves on to the next address; once a request
+      # has been sent, a failure is the fetch's failure.
+      def request(vetted, sink, max_bytes, stop_at, header_deadline)
         candidates = vetted.addresses.first(MAX_ADDRESSES)
 
         candidates.each_with_index do |address, index|
           sink.rewind
           sink.truncate(0)
-          return get(vetted.uri, address, sink, max_bytes, stop_at)
-        rescue *unreachable => error
+          return get(vetted.uri, address, sink, max_bytes, stop_at, header_deadline)
+        rescue Unreachable => error
           next unless index == candidates.size - 1
 
-          raise FetchFailed, "could not connect to #{vetted.host}: #{error.class}"
+          raise FetchFailed, "could not connect to #{vetted.host}: #{error.message}"
         end
+      end
+
+      # An address that would not take a connection in time.
+      Unreachable = Class.new(StandardError)
+      ConnectTimedOut = Class.new(StandardError)
+      private_constant :Unreachable, :ConnectTimedOut
+
+      # A connected, TLS-verified Net::HTTP for one address, or Unreachable.
+      #
+      # The Timeout here is the ONE place a timeout wrapper is used, and it
+      # covers only the connect and the TLS handshake: Net::HTTP bounds the TCP
+      # connect itself but gives each wait of the handshake its own
+      # open_timeout, so a peer that drips handshake bytes is otherwise bounded
+      # only by OpenSSL's size limits. It is safe here because nothing of ours
+      # exists yet to be left half-done: no request has been sent and the sink
+      # is empty, and Net::HTTP#connect closes the socket on any StandardError
+      # (ConnectTimedOut is one) before re-raising. After this, no timeout
+      # wrapper is used at all; time is bounded inside the reads (Meter).
+      def open!(uri, address, stop_at)
+        require "net/http"
+        require "timeout"
+        remaining = stop_at - monotonic
+        raise FetchFailed, "#{redact(uri.to_s)} did not finish in time" if remaining <= 0
+
+        http = connection(uri, address)
+        # Net::HTTP retries an idempotent request once on a read timeout or a
+        # reset, on a NEW socket, and calls the response block again: the body
+        # would be written to the sink twice and the retry would be unmetered.
+        http.max_retries = 0
+        Timeout.timeout([CONNECT_DEADLINE, remaining].min, ConnectTimedOut) { http.start }
+        http
+      rescue ConnectTimedOut, Errno::ECONNREFUSED, Errno::EHOSTUNREACH, Errno::ENETUNREACH, Errno::EADDRNOTAVAIL,
+             Net::OpenTimeout, SocketError => error
+        raise Unreachable, error.class.name
       end
 
       # THE RESPONSE BODY IS NEVER READ UNBOUNDED. Net::HTTP drains whatever a
       # block leaves unread, into memory, when the block returns; so a redirect
-      # or an error is left by `throw`, which unwinds past the drain and closes
-      # the socket with the body unread.
-      def get(uri, address, sink, max_bytes, stop_at)
-        catch(:answered) do
-          connection(uri, address).start do |http|
-            request = Net::HTTP::Get.new(uri.request_uri)
-            # identity: Net::HTTP would otherwise ask for gzip and inflate it,
-            # and the byte cap must count what arrives, not what it expands to.
-            request["Accept-Encoding"] = "identity"
-            request["User-Agent"] = "studio-engine knowledge recording fetch"
-            http.request(request) do |response|
-              status = response.code.to_i
-              if REDIRECT_STATUSES.include?(status) && !response["location"].to_s.empty?
-                throw :answered, response["location"].to_s
-              end
-              raise FetchFailed, "#{redact(uri.to_s)} answered #{status}" unless status == 200
+      # or an error is left by `throw`, which unwinds past the drain, and the
+      # connection is closed with the body unread.
+      #
+      # Every failure after the connection is made leaves here as FetchFailed
+      # (or a Refused), naming the host and never the rest of the URL.
+      def get(uri, address, sink, max_bytes, stop_at, header_deadline)
+        require "openssl"
+        http = open!(uri, address, stop_at)
+        meter = Meter.install!(http, [stop_at, monotonic + header_deadline].min)
 
-              check_headers!(response, uri, max_bytes)
-              store(response, sink, max_bytes, stop_at, uri)
-              throw :answered, :stored
+        catch(:answered) do
+          request = Net::HTTP::Get.new(uri.request_uri)
+          # identity: Net::HTTP would otherwise ask for gzip and inflate it,
+          # and the byte cap must count what arrives, not what it expands to.
+          request["Accept-Encoding"] = "identity"
+          request["User-Agent"] = "studio-engine knowledge recording fetch"
+          http.request(request) do |response|
+            status = response.code.to_i
+            if REDIRECT_STATUSES.include?(status) && !response["location"].to_s.empty?
+              throw :answered, response["location"].to_s
             end
+            raise FetchFailed, "#{redact(uri.to_s)} answered #{status}" unless status == 200
+
+            declared = check_headers!(response, uri, max_bytes)
+            # The headers are in: from here the clock is the whole fetch's.
+            meter.delivered!
+            meter.stop_at = stop_at
+            store(response, sink, max_bytes, meter, uri, declared)
+            throw :answered, :stored
           end
+          raise FetchFailed, "#{redact(uri.to_s)} gave no response"
         end
+      rescue Unreachable, Error
+        raise
+      rescue Meter::Expired
+        raise FetchFailed, "#{redact(uri.to_s)} did not finish in time (#{HEADER_DEADLINE} seconds for a " \
+                           "response's headers, #{FETCH_DEADLINE} for the whole fetch)"
+      rescue Meter::Overrun
+        raise FetchFailed, "#{redact(uri.to_s)} sent more than #{MAX_UNDELIVERED_BYTES} bytes of headers or framing"
+      rescue Net::ReadTimeout, Net::WriteTimeout, Net::OpenTimeout, Net::ProtocolError, Net::HTTPBadResponse,
+             Net::HTTPHeaderSyntaxError, EOFError, IOError, SystemCallError, SocketError, Timeout::Error,
+             OpenSSL::SSL::SSLError => error
+        detail = error.message.to_s[0, 160].gsub(/[^[:print:]]/, "?")
+        raise FetchFailed, "#{redact(uri.to_s)} failed mid-fetch: #{error.class}: #{detail}"
+      ensure
+        hang_up(http)
       end
 
+      def hang_up(http)
+        http.finish if http&.started?
+      rescue IOError, SystemCallError
+        nil
+      end
+
+      # Answers the declared Content-Length (an Integer), or nil when the body
+      # is chunked or declares none.
       def check_headers!(response, uri, max_bytes)
         encoding = response["content-encoding"].to_s.strip.downcase
         unless encoding.empty? || encoding == "identity"
@@ -345,24 +428,33 @@ module Studio
           raise NotARecording, "#{redact(uri.to_s)} answered #{declared[0, 64].inspect}, not audio or video"
         end
 
-        length = response["content-length"].to_s
-        return unless length.match?(/\A\d{1,20}\z/) && length.to_i > max_bytes
+        return nil if response.chunked?
 
-        raise TooLarge, "#{redact(uri.to_s)} declares #{length} bytes, over the #{max_bytes}-byte cap"
+        length = response["content-length"]
+        return nil if length.nil?
+        # Two Content-Length headers arrive joined by a comma; that, a sign or
+        # a blank is a response this fetch cannot measure, so it is refused.
+        raise Refused, "#{redact(uri.to_s)} sent a Content-Length that is not a number" unless length.match?(/\A\d{1,20}\z/)
+        raise TooLarge, "#{redact(uri.to_s)} declares #{length} bytes, over the #{max_bytes}-byte cap" if length.to_i > max_bytes
+
+        length.to_i
       end
 
       # Streams the body to `sink`. Each chunk is counted BEFORE it is written,
       # so the file on disk never passes max_bytes; the first HEAD_BYTES are
       # judged as soon as they arrive, so a page of HTML sent as octet-stream
-      # stops at its first chunk; and the clock is read on every chunk.
-      def store(response, sink, max_bytes, stop_at, uri)
+      # stops at its first chunk; and each chunk tells the meter that what came
+      # off the socket became body. When a length was declared, the body must
+      # be exactly that long: Net::HTTP itself reports no error for a body that
+      # ends early.
+      def store(response, sink, max_bytes, meter, uri, declared)
         written = 0
         head = +"".b
         judged = false
         response.read_body do |chunk|
+          meter.delivered!
           written += chunk.bytesize
           raise TooLarge, "#{redact(uri.to_s)} sent more than the #{max_bytes}-byte cap" if written > max_bytes
-          raise FetchFailed, "#{redact(uri.to_s)} did not finish within #{FETCH_DEADLINE} seconds" if monotonic > stop_at
 
           unless judged
             head << chunk.byteslice(0, HEAD_BYTES - head.bytesize)
@@ -373,7 +465,111 @@ module Studio
           end
           sink.write(chunk)
         end
+        if declared && written != declared
+          raise FetchFailed, "#{redact(uri.to_s)} sent #{written} bytes of #{declared} declared; the download was cut short"
+        end
         raise NotARecording, "#{redact(uri.to_s)} sent #{written} bytes, too few to be a recording" unless judged
+      end
+    end
+
+    # Sits between Net::HTTP's read buffer and the socket of ONE connection,
+    # and bounds what Net::HTTP itself does not: how long the connection may
+    # be read at all, and how many bytes may come off it without becoming body.
+    #
+    # WHY IT EXISTS. Net::HTTP reads the status line, headers, 1xx responses,
+    # chunk-size lines and trailers itself, into memory, with no size limit and
+    # only a per-read timeout. A server that sends header lines forever, one
+    # endless line, an endless chunk-size line, a header every half second or
+    # `100 Continue` forever was never stopped by a deadline or a byte cap
+    # that only the body's chunks could see (review round 1, measured at
+    # gigabytes of memory in seconds).
+    #
+    # HOW. Net::BufferedIO calls four things on its io: read_nonblock, to_io
+    # (to wait on), write_nonblock and close. This wraps the io it was given
+    # and overrides the first two:
+    #   read_nonblock  refuses once the deadline has passed, and counts the
+    #                  bytes read since `delivered!` was last called; past
+    #                  MAX_UNDELIVERED_BYTES it raises Overrun. `fetch` calls
+    #                  delivered! as each piece of body is handed to it.
+    #   to_io          answers a waiter whose waits are cut to the time left,
+    #                  so a silent socket is given up at the deadline, not a
+    #                  read timeout later.
+    # No thread is interrupted and nothing is raised asynchronously: every
+    # stop is an ordinary exception raised in the reading thread, between
+    # reads.
+    #
+    # It reaches into Net::HTTP for the buffer (the @socket and @io instance
+    # variables; net-http offers no hook). `install!` REFUSES THE FETCH when
+    # either is not what it expects, so a net-http this was not written for
+    # cannot run unmetered. Written against net-http 0.9.1 and net-protocol
+    # 0.2.2; the suite runs real Net::HTTP through it.
+    class Meter < SimpleDelegator
+      class Overrun < StandardError; end
+      class Expired < StandardError; end
+
+      Waiter = Struct.new(:io, :meter) do
+        def wait_readable(timeout = nil) = meter.wait(io, :wait_readable, timeout)
+        def wait_writable(timeout = nil) = meter.wait(io, :wait_writable, timeout)
+        def inspect = "#<metered socket>"
+      end
+
+      attr_writer :stop_at
+
+      def self.install!(http, stop_at)
+        buffered = http.instance_variable_get(:@socket)
+        raw = buffered.instance_variable_get(:@io) if buffered.is_a?(Net::BufferedIO)
+        unless raw.respond_to?(:read_nonblock) && raw.respond_to?(:to_io)
+          raise FetchFailed, "this net-http cannot be metered, so the fetch was not made (Studio::KnowledgeRecording::Meter)"
+        end
+
+        meter = new(raw, stop_at)
+        buffered.instance_variable_set(:@io, meter)
+        meter
+      end
+
+      def initialize(io, stop_at)
+        super(io)
+        @stop_at = stop_at
+        @undelivered = 0
+      end
+
+      # What has come off the socket so far has been handed on as body.
+      def delivered!
+        @undelivered = 0
+      end
+
+      def read_nonblock(length, buffer = nil, exception: true)
+        time_left(nil)
+        result = __getobj__.read_nonblock(length, buffer, exception: exception)
+        if result.is_a?(String)
+          @undelivered += result.bytesize
+          raise Overrun, "more than #{MAX_UNDELIVERED_BYTES} bytes" if @undelivered > MAX_UNDELIVERED_BYTES
+        end
+        result
+      end
+
+      def to_io
+        Waiter.new(__getobj__.to_io, self)
+      end
+
+      # One wait on the socket, cut to the time left. A wait that ran out
+      # because it was CUT is the deadline (Expired); one that ran out on its
+      # own is the caller's read timeout (nil, as IO#wait_readable answers).
+      def wait(io, direction, timeout)
+        allowed = time_left(timeout)
+        ready = io.public_send(direction, allowed)
+        raise Expired, "deadline passed" if ready.nil? && (timeout.nil? || allowed < timeout)
+
+        ready
+      end
+
+      # `timeout` cut to the seconds left before the deadline. Raises Expired
+      # when none are left.
+      def time_left(timeout)
+        remaining = @stop_at - KnowledgeRecording.monotonic
+        raise Expired, "deadline passed" if remaining <= 0
+
+        timeout.nil? ? remaining : [timeout, remaining].min
       end
     end
   end
