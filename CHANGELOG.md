@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.96.1 — 2026-10-08
+
 ### Fixed
 
 - **`bin/gem-drift-check` no longer counts a release candidate as a release.**
