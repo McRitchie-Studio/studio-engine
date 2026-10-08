@@ -12,10 +12,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
     audio or video file into the app's private bucket beside the document, in
     16 MB parts, never whole in memory, and saves the row. Replacing a
     recording moves the old object to `trash/` (`Studio::S3.delete`).
-  - `attach_recording_from_url!(url, source_url: nil)`: the same, from an https
-    download. Every hop goes through the engine's SSRF guard
-    (`Studio::ImageCache.vet_source_url!`) and connects to the address it was
-    vetted against. The download URL is never stored.
+  - `attach_recording_from_url!(url, filename: nil, source_url: nil)`: the same,
+    from an https download on port 443. Every hop goes through the engine's SSRF
+    guard (`Studio::ImageCache.vet_source_url!`) and connects to the address it
+    was vetted against. A download that ends short of its declared length, or
+    before a chunked body's last chunk, fails and stores nothing. Nothing of
+    the download URL is stored, printed or used as a name.
   - `recording?`, `recording_kind` (`:video` or `:audio`), `recording_link` (the
     external page, only when it is an http(s) link) and
     `recording_url(expires_in:)`, a presigned GET good for six hours by default
@@ -25,7 +27,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   file's first bytes; the stored content type comes from that check, never from
   a remote server's header. A recording may be up to 4 GB. An operator attaches
   one with `bin/rails studio:knowledge:attach_recording ID=<id> FILE=<path>` (or
-  `URL=<https url>`). See README, *Knowledge recordings*, for every bound.
+  `URL=<https url>`, or `URL=-` to read the URL from standard input and keep it
+  off the command line). README, *Knowledge recordings*, walks every phase of a
+  fetch and of an upload with its time bound, its size bound and what a failure
+  leaves behind.
 
   **Adopting it needs a migration:** `bin/rails studio_engine:install:migrations
   && bin/rails db:migrate` adds `recording_key`, `recording_mime_type`,
@@ -39,7 +44,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   (`require "studio/s3/multipart"`), a streaming multipart upload of a local
   file. It uses its own client with `request_checksum_calculation` and
   `response_checksum_validation` at `when_required` and sends a Content-MD5 with
-  each part; `Studio::S3.client` is unchanged.
+  each part; `Studio::S3.client` is unchanged. The upload is aborted on any
+  error or signal, and an object whose size cannot be confirmed is deleted.
 - `Studio::KnowledgeTranscript.parse(text)` (`require
   "studio/knowledge_transcript"`): transcript text to cues of `seconds`,
   `speaker` and `text`, for both layouts the layer holds (`0:02 - Speaker` with

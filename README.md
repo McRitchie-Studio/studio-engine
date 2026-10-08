@@ -1126,7 +1126,7 @@ before any byte moves).
 
 ```ruby
 doc.attach_recording!("/tmp/standup.mp4", source_url: "https://notes.example.com/calls/abc")
-doc.attach_recording_from_url!("https://files.example.com/standup.mp4")
+doc.attach_recording_from_url!("https://files.example.com/standup.mp4", filename: "standup.mp4")
 doc.recording?        # => true
 doc.recording_kind    # => :video (or :audio)
 doc.recording_url     # presigned GET, six hours
@@ -1137,20 +1137,32 @@ From a one-off dyno or a laptop:
 
 ```bash
 bin/rails studio:knowledge:attach_recording ID=42 FILE=/tmp/standup.mp4
-bin/rails studio:knowledge:attach_recording ID=42 URL=https://files.example.com/standup.mp4 SOURCE_URL=https://notes.example.com/calls/abc
+bin/rails studio:knowledge:attach_recording ID=42 URL=https://files.example.com/standup.mp4
+echo "$DOWNLOAD_URL" | bin/rails studio:knowledge:attach_recording ID=42 URL=-
 ```
 
-The task prints the bucket, key, type and size it stored. It never prints the
-download URL, which usually carries a credential, and the URL is never stored;
-`SOURCE_URL` is the page to link.
+`NAME=<file name>` names the object (a fetched recording is otherwise
+`recording.<ext>`) and `SOURCE_URL=<page>` sets the link.
+
+**Keep a download URL off the command line.** It carries a credential, and a
+command line is logged: by shell history, by `ps`, and by a platform's record of
+the command it started. `URL=-` reads the URL from standard input instead.
+Whether a given platform's one-off runner passes standard input through has not
+been tested here; check before relying on it.
+
+**What is printed and stored.** The task prints the document's id, the bucket,
+the key, the type and the size. It does not print the title or the link (a
+title is content of the layer, and the output goes to a log). The download URL
+is never stored, never printed, and no part of it names the object: a failure
+message names the URL's scheme and host only. `SOURCE_URL` is the one URL kept.
 
 **What is stored.** Audio and video only: MP4, M4V, MOV, M4A, WebM, MP3, WAV and
 Ogg. The file's first 16 bytes decide, and the stored content type comes from
 that check (`Studio::KnowledgeRecording::TYPES`), never from a header a remote
 server sent. A file name's extension picks within a container (`.m4a` is
-`audio/mp4`) and must agree with the bytes; for a local file an extension off
-the list is refused, and for a fetched URL it is ignored. An old QuickTime file
-with no `ftyp` box is refused; re-export it as MP4.
+`audio/mp4`) and must agree with the bytes; an extension off the list is
+refused, and a name with no extension is judged by its bytes alone. An old
+QuickTime file with no `ftyp` box is refused; re-export it as MP4.
 
 **The object.** `knowledge/<entity>/<path>/<timestamp>-<random>-recording-<name>`,
 beside the document's own object. Replacing a recording uploads the new object,
@@ -1161,31 +1173,78 @@ saves the row, then moves the old object to `trash/` for three days (see
 document link's fifteen minutes: a player makes a new request each time the
 viewer seeks, and each one is checked against the URL's expiry.
 
-**The fetch.** `attach_recording_from_url!` is a server-side fetch of a URL the
-caller supplied, run with the bucket's credentials in the process. Each hop, the
-first URL and every redirect, must be https, may carry no user or password, and
-goes through `Studio::ImageCache.vet_source_url!` (see
+### The fetch, phase by phase
+
+`attach_recording_from_url!` is a server-side fetch of a URL the caller
+supplied, run with the bucket's credentials in the process. Each hop, the first
+URL and every redirect, must be https on port 443, may carry no user or
+password, and goes through `Studio::ImageCache.vet_source_url!` (see
 [Remote image URLs](#remote-image-urls)); the connection is then made to an
 address that hop was vetted against. A host that vets to no address is refused.
 
-**The bounds.**
+The whole fetch has one deadline, `FETCH_DEADLINE` (3,600 seconds), and every
+time bound below is also cut to what is left of it. It is enforced on every
+read and write of the socket, by `Studio::KnowledgeRecording::Meter`, not only
+as body arrives.
 
-| Bound | Value | Constant |
-|-------|-------|----------|
-| A recording, local or fetched | 4 GB | `Studio::KnowledgeRecording::MAX_BYTES` |
-| Memory held while uploading | one 16 MB part | `Studio::S3::Multipart::PART_SIZE` |
-| Parts in one upload | 10,000 | `Studio::S3::Multipart::MAX_PARTS` |
-| A URL, and each redirect's Location | 8,192 bytes | `MAX_URL_BYTES` |
-| Redirects followed | 3 | `MAX_REDIRECTS` |
-| Vetted addresses tried per host | 4 | `MAX_ADDRESSES` |
-| A whole fetch | 3,600 seconds | `FETCH_DEADLINE` |
-| Connect, and each read | 10 and 30 seconds | `Studio::ImageCache::OPEN_TIMEOUT`, `READ_TIMEOUT` |
-| File name kept in the key | 80 characters | `MAX_FILENAME_CHARS` |
-| Playback URL lifetime | 6 hours default, 7 days at most | `RECORDING_URL_TTL`, `MAX_RECORDING_URL_TTL` |
+| Phase | Time bound | Size bound | Left if the process dies here |
+|-------|------------|------------|-------------------------------|
+| URL check and DNS, each hop | 6 s a lookup (`Studio::ImageCache::RESOLVE_DEADLINE`). **Not cut to the fetch's time left**: a lookup in flight can run the fetch up to 6 s over | URL 8,192 bytes (`MAX_URL_BYTES`) | an empty temporary file |
+| Connect and TLS, each address | 20 s (`CONNECT_DEADLINE`); at most 4 addresses a hop (`MAX_ADDRESSES`) | the TLS library's own handshake limits | an empty temporary file |
+| Sending the request | the fetch's time left | the URL | an empty temporary file |
+| Status line, `1xx` responses, headers | 30 s for all of them together (`HEADER_DEADLINE`) | 64 KB for all of them together (`MAX_UNDELIVERED_BYTES`) | an empty temporary file |
+| A redirect | counts as a hop: 3 followed (`MAX_REDIRECTS`), each vetted and bounded as above | Location 8,192 bytes; its body is never read | an empty temporary file |
+| Chunk-size lines and trailers | the fetch's time left; 30 s for any one silent wait | 64 KB between two pieces of body | a partial temporary file |
+| The body | the fetch's time left; 30 s for any one silent wait (`Studio::ImageCache::READ_TIMEOUT`) | 4 GB (`MAX_BYTES`), counted before each write; a declared `Content-Length` over it is refused before the body | a partial temporary file |
 
-The byte cap is enforced while the body streams, a declared `Content-Length`
-over it is refused before the body, a compressed body is refused, and a redirect
-or error response's body is never read.
+- **A complete body or nothing.** A response that declares a `Content-Length`
+  and sends any other number of bytes fails (`FetchFailed`) before anything is
+  uploaded, and so does a chunked body that ends before its last chunk. The
+  recording already stored is untouched. **A body with no `Content-Length` and
+  no chunking cannot be checked**: it ends when the server closes the
+  connection, and a download cut short there looks the same as one that
+  finished. Compare the printed size with the source's when a server sends such
+  a response.
+- **The temporary file** is in the system temporary directory, takes up to the
+  recording's size (4 GB at most) and is deleted on every way out, an interrupt
+  or `SIGTERM` included. After a `SIGKILL` it stays on that machine's disk; on a
+  one-off dyno that disk goes with the dyno.
+- A compressed body is refused, a redirect or error response's body is never
+  read, a failed request is not retried, and only a failure to connect moves on
+  to the host's next address.
+- Any port but 443 is refused, on the first URL and on every redirect.
+- The meter reads Net::HTTP's socket through two of its instance variables,
+  because net-http has no hook for it. On a net-http where they are not what it
+  expects, the fetch is refused instead of run unmetered. Written against
+  net-http 0.9.1 and net-protocol 0.2.2.
+
+### The upload, phase by phase
+
+`Studio::S3::Multipart.upload_file` sends the file in 16 MB parts, one in memory
+at a time (`PART_SIZE`), at most 10,000 of them (`MAX_PARTS`). The whole upload
+has a deadline, `UPLOAD_DEADLINE` (7,200 seconds), read before each part. One
+request to the store is bounded by the SDK client, not by that deadline: 15 s to
+connect, 60 s for any one silent read, 3 retries (the SDK's defaults, pinned by
+a test).
+
+| Phase | Time bound | Size bound | Left in the bucket if it fails here | Left after a `SIGKILL` here |
+|-------|------------|------------|--------------------------------------|------------------------------|
+| Create the upload | one SDK request | none | nothing | an upload with no parts |
+| Each part | `UPLOAD_DEADLINE` before it starts; one SDK request | 16 MB; the file's size at open; 4 GB | nothing: the upload is aborted on any error or signal | the parts sent so far |
+| Complete | one SDK request | none | nothing: aborted. If the store completed and the answer was lost, a whole object no row points at | the parts, or a whole object |
+| Confirm the stored size | one SDK request | none | nothing: the object is deleted on a wrong size, an error or a signal | a whole object no row points at |
+| Save the row | the database's own statement timeout; the engine sets none | none | nothing: the new object is moved to `trash/` on any error or signal | a whole object no row points at |
+| Trash the replaced recording | three SDK requests | 5 GiB a copy (`Studio::S3::Trash::MAX_COPY_BYTES`) | the row points at the new recording; the old object stays where it was | the same |
+
+- **Parts left by a killed process** are not visible in a bucket listing. The
+  bucket's abort-incomplete-multipart lifecycle rule removes them; R2's default
+  rule does so after 7 days. No process can clean up after its own `SIGKILL`.
+- **A whole object no row points at** sits under
+  `knowledge/<entity>/<path>/` with `-recording-` in its name. List that prefix
+  and compare against `recording_key` to find one.
+- **Two attaches to one document at the same time** leave one recording and no
+  orphan: the save reads the key it replaces from the database under a row
+  lock, so whichever saves second trashes the first one's object.
 
 **Checksums and R2.** `Studio::S3::Multipart` uploads through its own client,
 built from `Studio::S3.client_options` with `request_checksum_calculation` and
@@ -1193,9 +1252,10 @@ built from `Studio::S3.client_options` with `request_checksum_calculation` and
 each part. Newer `aws-sdk-s3` versions add a CRC32 by default, and R2 has refused
 some of the combinations that produces. The request shape is tested against a
 stubbed client; **a multipart upload to a live R2 bucket has not been verified.**
-A fetched recording needs local disk for the whole file while it uploads.
 
-**Transcripts.** `Studio::KnowledgeTranscript.parse(text)` (`require
+### Transcripts
+
+`Studio::KnowledgeTranscript.parse(text)` (`require
 "studio/knowledge_transcript"`) turns transcript text into cues of `seconds`,
 `speaker` and `text`. It reads two layouts, `0:02 - Speaker` with the text
 indented below and `Speaker • 0:02` with the text below, and `M:SS` or
