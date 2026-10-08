@@ -13,7 +13,7 @@
 // events and string locals the timeline asks are studio/hold_button_hooks.
 // Until this controller registers, a press does nothing.
 import { Controller } from "@hotwired/stimulus"
-import { Hold, mountPortal, unmountPortal } from "studio/hold_button"
+import { Hold, mountPortal } from "studio/hold_button"
 import { holdHooks } from "studio/hold_button_hooks"
 
 const NUDGES = ["hold-nudge", "hold-nudge-soft"]
@@ -37,8 +37,7 @@ export default class extends Controller {
     this.hold.stop()
     this.hold = null
     this.button.removeEventListener("animationend", this.clearNudge)
-    // A stack Turbo is about to cache has already put its box back.
-    unmountPortal(this.element._fizzPortal, false)
+    // The portal notices its stack leaving by itself (studio/hold_button).
   }
 
   start() {

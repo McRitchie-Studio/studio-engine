@@ -871,7 +871,15 @@
 # visit to one that has registers it, an anchor that arrives late registers it
 # through its controller, and the sidebar works when the boot fails to load.
 #   npx playwright test --list  -> 232 tests in 34 files
-total_specs: 232
+# 232 -> 245: e2e/hold_button_events.spec.js, 13 tests. The hold button is on its
+# lazily registered controller: its events fire in order and once, a release
+# before term completes nothing, a guard, a failed validation, an early
+# take-over and an owned success each do what they say, the string locals still
+# answer, a submitting scope refuses, a touch is not handed on, a press before
+# the controller loads does nothing, the controller is fetched only where a
+# button renders, it survives a Turbo visit and Back, and a failed boot.
+#   npx playwright test --list  -> 245 tests in 35 files
+total_specs: 245
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1018,8 +1026,8 @@ total_specs: 232
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 213
 # executed = total - devnet - allowed_skips = 213 - 0 - 0 = 213, so executed ==
 # total_specs and the equality assertion holds.
-#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 232
-executed: 232
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 245
+executed: 245
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

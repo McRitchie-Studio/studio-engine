@@ -54,22 +54,33 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "what stays inline is the pre-paint theme, the import map, the boot import and the four store imports" do
+  test "what stays inline is the pre-paint theme, the import map, the boot import and the five own-door imports" do
     inline = head_scripts("/lab/bar_stack").reject { |script| script["src"] }
 
-    assert_equal 7, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
+    assert_equal 8, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
     assert_includes inline[0].text, "classList.add('dark')", "the pre-paint theme script comes first"
     assert_equal "importmap", inline[1]["type"]
     assert_equal "module", inline[2]["type"]
     assert_equal %(import "studio/application"), inline[2].text.strip
-    assert_equal "module", inline[3]["type"]
-    assert_equal %(import "studio/alpine_stores"), inline[3].text.strip
-    assert_equal "module", inline[4]["type"]
-    assert_equal %(import "studio/modal_host"), inline[4].text.strip
-    assert_equal "module", inline[5]["type"]
-    assert_equal %(import "studio/toast"), inline[5].text.strip
-    assert_equal "module", inline[6]["type"]
-    assert_equal %(import "studio/link_sidebar"), inline[6].text.strip
+    assert_equal %w[studio/stimulus studio/alpine_stores studio/modal_host studio/toast studio/link_sidebar],
+                 inline[3..].map { |script| script.text.strip[/\Aimport "([^"]+)"\z/, 1] }
+    assert_equal %w[module] * 5, inline[3..].map { |script| script["type"] }
+  end
+
+  # The Stimulus application's own door: its lazy controllers (the hold button
+  # confirms real actions) must not depend on the rest of the boot's graph.
+  test "the Stimulus application loads by its own nonced module tag" do
+    scripts = head_scripts("/lab/bar_stack")
+    stimulus = scripts.index { |script| script.text.strip == %(import "studio/stimulus") }
+
+    refute_nil stimulus, "the head does not import studio/stimulus by its own tag"
+    assert_equal NONCE, scripts[stimulus]["nonce"]
+    assert_equal "module", scripts[stimulus]["type"]
+
+    source = File.read(File.expand_path("../../app/javascript/studio/stimulus.js", __dir__))
+    imports = source.scan(/^import\s.*?from\s+"([^"]+)"/).flatten
+    assert_equal %w[@hotwired/stimulus studio/lazy_controllers], imports,
+                 "anything more it imports is one more file whose failure takes the hold button down"
   end
 
   # The link sidebar's own door: components/_link_sidebar binds
