@@ -99,9 +99,9 @@ module Studio
 
         private
 
-        # Reads and sends one part at a time. Bounded three ways: the loop runs
-        # at most MAX_PARTS times, each read is at most part_size bytes, and the
-        # running total may not pass max_bytes.
+        # Reads and sends one part at a time. Bounded four ways: the loop runs
+        # at most MAX_PARTS times, each read is at most part_size bytes, the
+        # running total may not pass max_bytes, and the first short read ends it.
         def send_parts(client, target, upload_id, file, part_size, max_bytes)
           require "digest/md5"
           parts = []
@@ -116,6 +116,10 @@ module Studio
             part = client.upload_part(**target, upload_id: upload_id, part_number: number, body: chunk,
                                       content_md5: Digest::MD5.base64digest(chunk))
             parts << { etag: part.etag, part_number: number }
+            # A short read is the end of the file, and the last part. Reading
+            # on would chase a file that is still being appended to, and every
+            # part but the last must be part_size (R2 refuses otherwise).
+            return [parts, sent] if chunk.bytesize < part_size
           end
           raise Error, "file needs more than #{MAX_PARTS} parts of #{part_size} bytes" unless file.eof?
 

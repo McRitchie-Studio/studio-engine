@@ -32,6 +32,8 @@ unless Rake::Task.task_defined?("studio:knowledge:attach_recording")
     namespace :knowledge do
       desc "Attach a recording to knowledge document ID from FILE=<path> or URL=<https url> (SOURCE_URL=<page> optional)"
       task attach_recording: :environment do
+        # Loaded up front: the rescue below names its error classes.
+        require "studio/knowledge_recording"
         usage = "usage: studio:knowledge:attach_recording ID=<document id> (FILE=<path> | URL=<https url>) [SOURCE_URL=<page>]"
         id = ENV["ID"].to_s.strip
         file = ENV["FILE"].to_s.strip
