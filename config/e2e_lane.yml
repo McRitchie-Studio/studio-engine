@@ -856,7 +856,10 @@
 # stores exist first; a header bound with x-data="navCollapse()" collapses
 # through the shim; the theme store toggles and remembers.
 #   npx playwright test --list  -> 219 tests in 30 files
-total_specs: 221
+# 221 -> 222: e2e/modal_host_turbo_visit.spec.js, 1 test. A Turbo visit onto a
+# page with its own scoped modal host registers that store before Alpine reads it.
+#   npx playwright test --list  -> 222 tests in 32 files
+total_specs: 222
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1003,7 +1006,8 @@ total_specs: 221
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 213
 # executed = total - devnet - allowed_skips = 213 - 0 - 0 = 213, so executed ==
 # total_specs and the equality assertion holds.
-executed: 221
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 222
+executed: 222
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
