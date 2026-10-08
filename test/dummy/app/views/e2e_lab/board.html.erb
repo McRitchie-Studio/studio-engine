@@ -1,0 +1,16 @@
+<%# The living style guide's TASKS section, in a browser.
+
+    WHY THIS PAGE EXISTS. style/_tasks renders the board primitive three times:
+    a kanban, a kanban with chrome state and an archive column, and a depth
+    chart whose cards rank inside a lane and whose starters are locked. Every
+    one of them is inert in the response bytes. A card drags only after the
+    engine's Stimulus application has met data-studio-controller="board",
+    imported the controller, and the controller has imported SortableJS and
+    handed it to the board's Alpine scope. A String tier sees the same markup
+    whether any of that happened.
+
+    THE LAB RULE (see E2eLabController): a lab page sets up a partial's LOCALS
+    and nothing else. style/_tasks takes none. %>
+<main class="max-w-6xl mx-auto px-4 py-10">
+  <%= render "style/tasks" %>
+</main>
