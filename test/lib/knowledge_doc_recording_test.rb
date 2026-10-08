@@ -14,6 +14,7 @@ require "minitest/autorun"
 require "active_support/test_case"
 require "active_support/testing/time_helpers"
 require_relative "../support/knowledge_recording_fixture"
+require_relative "../support/knowledge_recording_listener"
 
 KnowledgeRecordingFixture.create_old_table!
 ActiveRecord::Schema.define do
@@ -26,6 +27,7 @@ end
 
 class KnowledgeDocRecordingTest < ActiveSupport::TestCase
   include KnowledgeRecordingFixture
+  include KnowledgeRecordingListener
   include ActiveSupport::Testing::TimeHelpers
 
   Doc = Studio::KnowledgeDoc
@@ -36,6 +38,7 @@ class KnowledgeDocRecordingTest < ActiveSupport::TestCase
     Doc.reset_column_information
     Doc.delete_all
     stub_storage!
+    remember_connection!
     # No real DNS: every name these tests fetch resolves to one made-up public address.
     @previous_resolver = Studio::ImageCache.instance_variable_get(:@resolver)
     Studio::ImageCache.resolver = ->(_host) { ["93.184.216.34"] }
@@ -43,6 +46,7 @@ class KnowledgeDocRecordingTest < ActiveSupport::TestCase
 
   teardown do
     unstub_storage!
+    restore_connection!
     Studio::ImageCache.resolver = @previous_resolver
   end
 
@@ -296,49 +300,59 @@ class KnowledgeDocRecordingTest < ActiveSupport::TestCase
 
   # --- from a URL -------------------------------------------------------------
 
-  def with_fetch(path, name)
+  def with_fetch(path)
     asked = []
     original = Studio::KnowledgeRecording.method(:fetch)
     Studio::KnowledgeRecording.define_singleton_method(:fetch) do |url, **options, &block|
       asked << [url, options]
-      block.call(path, name)
+      block.call(path)
     end
     yield asked
   ensure
     Studio::KnowledgeRecording.define_singleton_method(:fetch, original)
   end
 
-  test "attach_recording_from_url! attaches what the guarded fetch stored and never stores the download URL" do
+  test "attach_recording_from_url! attaches what the guarded fetch stored and keeps nothing of the download URL" do
     doc = doc!
-    with_fetch(recording_file(MP4, name: ["fetched", ".part"]), "download.php") do |asked|
-      doc.attach_recording_from_url!("https://files.example.com/download.php?token=SECRET",
+    with_fetch(recording_file(MP4, name: ["fetched", ".part"])) do |asked|
+      doc.attach_recording_from_url!("https://files.example.com/dl/PATH-SECRET/download.php?token=SECRET",
                                      source_url: "https://notes.example.com/calls/abc")
-      assert_equal [["https://files.example.com/download.php?token=SECRET", {}]], asked
+      assert_equal [["https://files.example.com/dl/PATH-SECRET/download.php?token=SECRET", {}]], asked
     end
     doc.reload
-    assert doc.recording_key.end_with?("-recording-download.mp4"), "the server's .php is ignored; the bytes are MP4"
+    assert doc.recording_key.end_with?("-recording-recording.mp4"), "the name is ours; the URL's path can carry a credential"
     assert_equal "video/mp4", doc.recording_mime_type
     assert_equal "https://notes.example.com/calls/abc", doc.recording_source_url
-    refute_match(/SECRET|files\.example\.com/, doc.attributes.values.join(" "))
+    refute_match(/SECRET|files\.example\.com|download|fetched/, doc.attributes.values.join(" "))
+  end
+
+  test "attach_recording_from_url! names the object from filename: when one is given" do
+    doc = doc!
+    with_fetch(recording_file) { doc.attach_recording_from_url!("https://files.example.com/x?token=SECRET", filename: "Standup Call.m4a") }
+    assert doc.reload.recording_key.end_with?("-recording-standup-call.m4a")
+    assert_equal "audio/mp4", doc.recording_mime_type
   end
 
   test "attach_recording_from_url! with no source_url stores no link" do
     doc = doc!
-    with_fetch(recording_file, "call.mp4") { doc.attach_recording_from_url!("https://files.example.com/call.mp4?token=SECRET") }
+    with_fetch(recording_file) { doc.attach_recording_from_url!("https://files.example.com/call.mp4?token=SECRET") }
     assert_nil doc.reload.recording_source_url
   end
 
-  test "a fetched file whose name contradicts its bytes is still refused" do
+  test "a filename that contradicts the fetched bytes is refused" do
     doc = doc!
-    with_fetch(recording_file, "call.mp3") do
-      assert_raises(Studio::KnowledgeRecording::NotARecording) { doc.attach_recording_from_url!("https://files.example.com/call.mp3") }
+    with_fetch(recording_file) do
+      assert_raises(Studio::KnowledgeRecording::NotARecording) do
+        doc.attach_recording_from_url!("https://files.example.com/call", filename: "call.mp3")
+      end
     end
     assert_empty operations
   end
 
   test "attach_recording_from_url! goes through the real guard: an internal URL never reaches storage" do
     doc = doc!
-    ["http://files.example.com/a.mp4", "https://127.0.0.1/a.mp4", "https://169.254.169.254/a.mp4", "https://localhost/a.mp4"].each do |url|
+    ["http://files.example.com/a.mp4", "https://127.0.0.1/a.mp4", "https://169.254.169.254/a.mp4", "https://localhost/a.mp4",
+     "https://files.example.com:8443/a.mp4"].each do |url|
       assert_raises(Studio::KnowledgeRecording::Refused, url) { doc.attach_recording_from_url!(url) }
     end
     assert_empty operations
@@ -348,9 +362,77 @@ class KnowledgeDocRecordingTest < ActiveSupport::TestCase
   test "a resolver handed in reaches the fetch" do
     doc = doc!
     resolver = ->(_host) { ["93.184.216.34"] }
-    with_fetch(recording_file, "call.mp4") do |asked|
+    with_fetch(recording_file) do |asked|
       doc.attach_recording_from_url!("https://files.example.com/call.mp4", resolver: resolver)
       assert_same resolver, asked.first.last[:resolver]
     end
+  end
+
+  # THE BLOCKER (review round 1), end to end through the real fetch and a real
+  # socket. A download that is cut short of its declared length was uploaded
+  # as the recording, the row saved, and the recording it replaced trashed.
+  test "a download cut short of its declared length uploads nothing and leaves the old recording in place" do
+    doc = doc!
+    doc.attach_recording!(recording_file)
+    first = doc.reload.recording_key
+    first_size = doc.recording_byte_size
+    @client.api_requests.clear
+
+    short = lambda do |socket|
+      socket.write("HTTP/1.1 200 X\r\nConnection: close\r\nContent-Type: video/mp4\r\nContent-Length: 1000000\r\n\r\n")
+      socket.write(MP4.byteslice(0, 2000))
+    end
+    with_listener("/call.mp4" => short) do |_heads|
+      error = assert_raises(Studio::KnowledgeRecording::FetchFailed) do
+        doc.attach_recording_from_url!("https://files.example.com/call.mp4", resolver: dns)
+      end
+      assert_match(/sent 2000 bytes of 1000000 declared/, error.message)
+    end
+
+    assert_empty operations, "nothing is uploaded, and the old recording is NOT trashed"
+    doc.reload
+    assert_equal first, doc.recording_key
+    assert_equal first_size, doc.recording_byte_size
+  end
+
+  test "a whole download through the real fetch replaces the recording" do
+    doc = doc!
+    doc.attach_recording!(recording_file)
+    first = doc.reload.recording_key
+    body = MP4 + "new"
+    with_listener("/call.mp4" => respond(200, { "Content-Type" => "video/mp4" }, body)) do |_heads|
+      doc.attach_recording_from_url!("https://files.example.com/call.mp4", resolver: dns)
+    end
+    doc.reload
+    refute_equal first, doc.recording_key
+    assert_equal body.bytesize, doc.recording_byte_size
+    assert_equal [first], requests(:delete_object).map { |delete| delete[:key] }
+  end
+
+  # --- interrupts and overlapping attaches ------------------------------------
+
+  test "a signal during the save still trashes the new object" do
+    doc = doc!
+    doc.define_singleton_method(:update!) { |*| raise Interrupt }
+    assert_raises(Interrupt) { doc.attach_recording!(recording_file) }
+    new_key = requests(:create_multipart_upload).first[:key]
+    assert_equal [new_key], requests(:delete_object).map { |delete| delete[:key] }
+    refute Doc.find(doc.id).recording?
+  end
+
+  # Two sessions attach to one document. The second to save reads the key it
+  # replaces from the DATABASE, so it trashes the first one's object instead
+  # of orphaning it.
+  test "an attach from a stale instance trashes the recording the row actually holds" do
+    doc = doc!
+    stale = Doc.find(doc.id)
+    doc.attach_recording!(recording_file)
+    between = doc.recording_key
+    @client.api_requests.clear
+
+    stale.attach_recording!(recording_file)
+    assert_nil stale.recording_key_before_last_save, "the stale instance never knew about the first recording"
+    assert_equal [between], requests(:delete_object).map { |delete| delete[:key] }
+    assert_equal stale.recording_key, Doc.find(doc.id).recording_key
   end
 end

@@ -752,8 +752,6 @@ class StudioKnowledgeRecordingTest < Minitest::Test
     writer.write("x" * 40_000)
     assert_raises(KR::Meter::Overrun) { meter.read_nonblock(40_000) }
 
-    meter.delivered!
-    assert_equal 40_000, meter.read_nonblock(40_000).bytesize
     assert_equal :wait_readable, meter.read_nonblock(10, exception: false)
     assert_nil meter.to_io.wait_readable(0.05), "a wait shorter than the time left runs out on its own: the caller's read timeout"
     started = KR.monotonic

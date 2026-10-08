@@ -174,6 +174,67 @@ class S3MultipartTest < Minitest::Test
     assert_raises(Aws::S3::Errors::SlowDown) { upload(file_of("abc")) }
   end
 
+  # A SIGTERM or Ctrl-C is not a StandardError. Parts left behind are
+  # privileged bytes no listing shows, kept until a lifecycle rule runs.
+  def test_a_signal_mid_upload_still_aborts_the_upload
+    [Interrupt, SignalException, NoMemoryError].each do |klass|
+      @client.api_requests.clear
+      @client.stub_responses(:upload_part, [{ etag: '"etag-1"' }, ->(_context) { raise klass, klass == SignalException ? "SIGTERM" : "stop" }])
+      assert_raises(klass) { upload(file_of("x" * (PART + 1))) }
+      assert_equal %i[create_multipart_upload upload_part upload_part abort_multipart_upload], operations, klass.name
+    end
+  end
+
+  def test_a_signal_during_completion_aborts_the_upload
+    @client.stub_responses(:complete_multipart_upload, ->(_context) { raise Interrupt })
+    assert_raises(Interrupt) { upload(file_of("abc")) }
+    assert_equal :abort_multipart_upload, operations.last
+  end
+
+  def test_a_completed_upload_is_not_aborted
+    stored!(3)
+    upload(file_of("abc"))
+    refute_includes operations, :abort_multipart_upload
+    refute_includes operations, :delete_object
+  end
+
+  # After completion there IS an object. Any way out of the size check that is
+  # not success removes it, so no whole recording is left with no row.
+  def test_a_head_object_that_raises_after_completion_removes_the_object
+    { "InternalError" => Aws::S3::Errors::InternalError, ->(_context) { raise Interrupt } => Interrupt,
+      ->(_context) { raise Seahorse::Client::NetworkingError.new(RuntimeError.new("reset")) } => Seahorse::Client::NetworkingError }.each do |stub, klass|
+      @client.api_requests.clear
+      @client.stub_responses(:head_object, stub)
+      assert_raises(klass) { upload(file_of("abc")) }
+      assert_equal %i[create_multipart_upload upload_part complete_multipart_upload head_object delete_object], operations, klass.name
+      assert_equal "knowledge/acme/call.mp4", requests(:delete_object).first[:key]
+    end
+  end
+
+  def test_a_failed_cleanup_does_not_hide_the_error_that_caused_it
+    @client.stub_responses(:head_object, "SlowDown")
+    @client.stub_responses(:delete_object, "InternalError")
+    assert_raises(Aws::S3::Errors::SlowDown) { upload(file_of("abc")) }
+  end
+
+  def test_the_upload_has_a_deadline_read_before_each_part
+    error = assert_raises(Studio::S3::Error) { upload(file_of("abc"), deadline: -1) }
+    assert_match(/passed its deadline after 0 part/, error.message)
+    assert_equal %i[create_multipart_upload abort_multipart_upload], operations
+    assert_equal 7_200, MP::UPLOAD_DEADLINE
+  end
+
+  # One request is bounded by the SDK client, not by the uploader. The module
+  # comment and the README quote these; this is where a change would show.
+  def test_the_sdk_timeouts_and_retries_the_bounds_table_quotes
+    Studio.s3_access_key_id = "id"
+    Studio.s3_secret_access_key = "secret"
+    config = MP.client.config
+    assert_equal 15, config.http_open_timeout
+    assert_equal 60, config.http_read_timeout
+    assert_equal 3, config.retry_limit
+  end
+
   def test_a_file_that_grows_under_the_upload_is_aborted
     path = file_of("a" * PART)
     grown = false

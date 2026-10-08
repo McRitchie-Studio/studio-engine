@@ -8,6 +8,7 @@ require_relative "../dummy/config/environment"
 require "minitest/autorun"
 require "active_support/test_case"
 require "rake"
+require "stringio"
 require_relative "../support/knowledge_recording_fixture"
 require_relative "../../db/migrate/20261008120000_add_recording_to_studio_knowledge_docs"
 
@@ -26,7 +27,7 @@ class KnowledgeRecordingMigrationTest < ActiveSupport::TestCase
   COLUMNS = { "recording_key" => :string, "recording_mime_type" => :string,
               "recording_byte_size" => :integer, "recording_source_url" => :text }.freeze
   RAKE_FILE = File.expand_path("../../lib/tasks/studio_knowledge.rake", __dir__)
-  ENV_KEYS = %w[ID FILE URL SOURCE_URL].freeze
+  ENV_KEYS = %w[ID FILE URL NAME SOURCE_URL].freeze
 
   def connection = ActiveRecord::Base.connection
 
@@ -131,21 +132,25 @@ class KnowledgeRecordingMigrationTest < ActiveSupport::TestCase
 
   # --- the rake task, on the migrated table ----------------------------------
 
-  test "the task attaches a recording from a path and prints what it stored" do
+  test "the task attaches a recording from a path and prints the id, bucket, key, type and size" do
     migrate(:up)
-    doc = Doc.create!(title: "Weekly standup", entity: "example-co", path: "calls")
-    out, = rake(ID: doc.id, FILE: recording_file, SOURCE_URL: "https://notes.example.com/calls/abc")
+    doc = Doc.create!(title: "Privileged Title Words", entity: "example-co", path: "calls")
+    out, err = rake(ID: doc.id, FILE: recording_file, SOURCE_URL: "https://notes.example.com/calls/abc", NAME: "Standup.mp4")
 
     doc.reload
     assert doc.recording?
     assert_equal %i[create_multipart_upload upload_part complete_multipart_upload head_object], operations
-    assert_includes out, "Attached a recording to knowledge document #{doc.id} (Weekly standup)"
-    assert_includes out, "bucket: example-app-dev"
-    assert_includes out, "key:    #{doc.recording_key}"
-    assert_includes out, "type:   video/mp4"
-    assert_includes out, "size:   #{KnowledgeRecordingFixture::MP4.bytesize} bytes"
-    assert_includes out, "link:   https://notes.example.com/calls/abc"
-    refute_includes out, "replaced"
+    assert_equal "https://notes.example.com/calls/abc", doc.recording_link
+    assert doc.recording_key.end_with?("-recording-standup.mp4")
+    assert_equal <<~OUT, out
+      Attached a recording to knowledge document #{doc.id}
+        bucket: example-app-dev
+        key:    #{doc.recording_key}
+        type:   video/mp4
+        size:   #{KnowledgeRecordingFixture::MP4.bytesize} bytes
+    OUT
+    # The output goes to a log: no title (content of the layer), no link.
+    refute_match(/Privileged|Title|notes\.example\.com/, out + err)
   end
 
   test "the task says what it replaced" do
@@ -167,26 +172,74 @@ class KnowledgeRecordingMigrationTest < ActiveSupport::TestCase
     refute doc.reload.recording?
   end
 
-  test "the task fetches a URL through the guard and never prints the download address" do
+  def with_stubbed_fetch(path)
+    seen = []
+    original = Studio::KnowledgeRecording.method(:fetch)
+    Studio::KnowledgeRecording.define_singleton_method(:fetch) do |url, **_options, &block|
+      seen << url
+      block.call(path)
+    end
+    yield seen
+  ensure
+    Studio::KnowledgeRecording.define_singleton_method(:fetch, original)
+  end
+
+  def with_stdin(text)
+    original = $stdin
+    $stdin = StringIO.new(text)
+    yield
+  ensure
+    $stdin = original
+  end
+
+  test "the task fetches a URL through the guard and never prints any of it" do
     migrate(:up)
     doc = Doc.create!(title: "Weekly standup", entity: "example-co", path: "calls")
-    path = recording_file
-    original = Studio::KnowledgeRecording.method(:fetch)
-    Studio::KnowledgeRecording.define_singleton_method(:fetch) { |_url, **_options, &block| block.call(path, "download") }
-    begin
-      out, err = rake(ID: doc.id, URL: "https://files.example.com/download?token=SECRET")
-    ensure
-      Studio::KnowledgeRecording.define_singleton_method(:fetch, original)
+    out = err = nil
+    with_stubbed_fetch(recording_file) do
+      out, err = rake(ID: doc.id, URL: "https://files.example.com/dl/PATH-SECRET?token=SECRET")
     end
     assert doc.reload.recording?
-    refute_match(/SECRET|files\.example\.com/, out + err)
+    refute_match(/SECRET|files\.example\.com|\/dl\//, out + err + doc.recording_key)
 
-    _out, err = rake_aborts(ID: doc.id, URL: "https://127.0.0.1/download?token=SECRET")
+    _out, err = rake_aborts(ID: doc.id, URL: "https://127.0.0.1/dl/PATH-SECRET?token=SECRET")
     assert_match(/Refused/, err)
     refute_match(/SECRET/, err)
-    _out, err = rake_aborts(ID: doc.id, URL: "http://files.example.com/download?token=SECRET")
+    _out, err = rake_aborts(ID: doc.id, URL: "http://files.example.com/dl/PATH-SECRET?token=SECRET")
     assert_match(/https only/, err)
     refute_match(/SECRET/, err)
+  end
+
+  # A command line is logged; standard input is not.
+  test "URL=- reads the download URL from standard input" do
+    migrate(:up)
+    doc = Doc.create!(title: "Weekly standup", entity: "example-co", path: "calls")
+    with_stubbed_fetch(recording_file) do |seen|
+      with_stdin("  https://files.example.com/dl/PATH-SECRET?token=SECRET  \nsecond line is ignored\n") { rake(ID: doc.id, URL: "-") }
+      assert_equal ["https://files.example.com/dl/PATH-SECRET?token=SECRET"], seen
+    end
+    assert doc.reload.recording?
+
+    with_stdin("") do
+      _out, err = rake_aborts(ID: doc.id, URL: "-")
+      assert_match(/standard input held no URL/, err)
+    end
+    with_stdin("https://files.example.com/#{'a' * 20_000}\n") do
+      _out, err = rake_aborts(ID: doc.id, URL: "-")
+      assert_match(/Refused/, err, "no more of standard input is read than a URL may be long")
+    end
+  end
+
+  # A storage or database error is reported like every other failure: its
+  # class and message, one line, no `rake aborted!` backtrace.
+  test "a storage failure aborts with one line naming the error" do
+    migrate(:up)
+    doc = Doc.create!(title: "Weekly standup", entity: "example-co", path: "calls")
+    @client.stub_responses(:upload_part, "InternalError")
+    _out, err = rake_aborts(ID: doc.id, FILE: recording_file)
+    assert_match(/\Astudio:knowledge:attach_recording: Aws::S3::Errors::InternalError: /, err)
+    assert_equal 1, err.lines.size
+    refute doc.reload.recording?
   end
 
   test "the task wants an id and exactly one source" do
