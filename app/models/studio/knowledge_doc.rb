@@ -35,6 +35,9 @@ module Studio
     ACCESS_LEVELS = %w[full aware none].freeze
     STATUSES      = %w[inbox filed superseded].freeze
 
+    # The meeting recording stored beside a transcript (knowledge_doc/recording.rb).
+    include Recording
+
     # The expectation this document fulfills (coverage view) — optional, set at
     # triage. Guarded: consumers that installed the docs table before the
     # expectations migration existed simply have no column yet.
