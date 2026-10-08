@@ -8,7 +8,7 @@ require_relative "component_gallery"
 # view_component is required first: its after_initialize, which decides whether
 # to draw its own preview routes, must run before Lookbook's, which turns
 # previews on for its own use. Studio::ComponentGallery.load_order_ok? records
-# the order this file saw.
+# the order this file saw; out of order, the gallery is not mounted.
 Studio::ComponentGallery.lookbook_loaded_before_engine = defined?(::Lookbook::Engine) ? true : false
 require "view_component"
 
@@ -148,10 +148,7 @@ module Studio
     initializer "studio.component_gallery", after: "lookbook.assets.serve" do
       next unless Studio::ComponentGallery.lookbook_loaded?
 
-      unless Studio::ComponentGallery.load_order_ok?
-        warn "studio-engine: lookbook was required before studio-engine; list it after " \
-             "studio-engine in the Gemfile so ViewComponent decides its preview routes first"
-      end
+      warn Studio::ComponentGallery::LOAD_ORDER_WARNING unless Studio::ComponentGallery.load_order_ok?
       Studio::ComponentGallery.configure_lookbook!(::Lookbook.config)
       config.app_middleware.delete(::Rack::Static)
     end

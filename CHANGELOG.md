@@ -52,6 +52,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   child columns. Filling a blank slug and writes that skip validations
   (`update_column`, `update_all`) are unaffected.
 
+### Fixed
+
+- **The component gallery is not mounted when lookbook loads before
+  studio-engine.** A host that lists `gem "lookbook"` above `gem "studio-engine"`
+  drew the gallery anyway; it now draws no gallery or asset route, and the boot
+  warning says so and names the fix: move `gem "lookbook"` below
+  `gem "studio-engine"` in the Gemfile and restart.
+
 ## 0.95.0 — 2026-10-07
 
 ### Security
