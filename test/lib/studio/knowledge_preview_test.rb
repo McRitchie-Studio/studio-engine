@@ -4,6 +4,10 @@ require_relative "../../test_helper"
 require "tempfile"
 require_relative "../../support/xlsx_builder"
 require_relative "../../../lib/studio/knowledge_preview"
+# The readers load lazily in an app (test_requiring_the_module_loads_no_reader
+# proves that in a process of its own). Here they are named directly, in an
+# order minitest shuffles, so they are loaded up front.
+require_relative "../../../lib/studio/knowledge_preview/xlsx"
 
 # [unit] Studio::KnowledgePreview: which files preview and as what, the
 # workbook reader (shared strings, formulas' cached values, number formats,
@@ -17,7 +21,6 @@ class KnowledgePreviewTest < Minitest::Test
   FIXTURE = File.expand_path("../../fixtures/files/knowledge_preview_sample.xlsx", __dir__)
 
   def read(bytes, **caps)
-    require_relative "../../../lib/studio/knowledge_preview/xlsx"
     Preview::Xlsx.read(bytes, **{ max_rows: 500, max_columns: 50, max_sheets: 20, max_cells: 50_000, inflate_cap: 8 * 1_048_576 }.merge(caps))
   end
 
