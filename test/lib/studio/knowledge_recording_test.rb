@@ -827,6 +827,21 @@ class StudioKnowledgeRecordingTest < Minitest::Test
     assert_match(/could not connect/, error.message)
   end
 
+  def test_a_connection_that_opened_as_the_connect_deadline_landed_is_closed
+    late = Object.new
+    def late.max_retries=(_); end
+    def late.started? = @started
+    def late.finish = (@finished = true)
+    def late.finished? = @finished
+    def late.start
+      @started = true
+      sleep 5
+    end
+    KR.define_singleton_method(:connection) { |_uri, _address| late }
+    assert_raises(KR::FetchFailed) { fetch("https://files.example.com/call.mp4", deadline: 0.3) { flunk } }
+    assert late.finished?
+  end
+
   # ─── what an error may print ────────────────────────────────────────────────
 
   # A download URL carries its credential in the query or in the path. No

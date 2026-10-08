@@ -356,6 +356,9 @@ module Studio
         http
       rescue ConnectTimedOut, Errno::ECONNREFUSED, Errno::EHOSTUNREACH, Errno::ENETUNREACH, Errno::EADDRNOTAVAIL,
              Net::OpenTimeout, SocketError => error
+        # The deadline can land just as the connection finishes; a socket
+        # that did open is closed, not left for the collector.
+        hang_up(http)
         raise Unreachable, error.class.name
       end
 
