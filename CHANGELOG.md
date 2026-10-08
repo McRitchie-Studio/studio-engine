@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.95.0 — 2026-10-07
+
 ### Security
 
 - **`Studio::ImageCache.validate_source_url!` judges the address, not the
