@@ -15,6 +15,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   answering one draws no link. The link opens in a new tab with
   `rel="noopener noreferrer"`. See README, *The image generator link*.
 
+### Breaking
+
+- **A direct write to a persisted `Sluggable` slug is invalid.** `update(slug:)`,
+  or assigning `slug` and saving, on a row that already has a slug fails
+  validation with `errors[:slug]` of kind `:readonly` ("changes only through
+  rename_slug!"); `update!` and `save!` raise `ActiveRecord::RecordInvalid`.
+  Change a slug with `rename_slug!` or `rename_slug`, which also cascade to the
+  child columns. Filling a blank slug and writes that skip validations
+  (`update_column`, `update_all`) are unaffected.
+
 ## 0.95.0 — 2026-10-07
 
 ### Security
