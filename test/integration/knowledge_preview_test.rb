@@ -394,6 +394,19 @@ class KnowledgePreviewRequestTest < ActionDispatch::IntegrationTest
     assert_empty reads
   end
 
+  test "a hostile workbook ends as a cut table, bounded, with the download link" do
+    cells = (1..500).map { |r| %(<row r="#{r}">) + (0..49).map { |c| %(<c r="#{XlsxBuilder.column(c)}#{r}" t="s"><v>0</v></c>) }.join + "</row>" }.join
+    doc = doc!("bomb.xlsx", XlsxBuilder.workbook({ "S" => cells }, shared: ["q" * 1_000_000]))
+    sign_in @admin
+    preview(doc)
+
+    assert_response :success
+    assert_operator response.body.bytesize, :<, 3 * Preview::MAX_TEXT_BYTES, "50,000 cells of a megabyte each never reach the page"
+    assert_includes response.body, "data-preview-truncated"
+    assert_includes response.body, %(href="/admin/knowledge/#{doc.id}/download")
+    assert_equal 0, ErrorLog.count
+  end
+
   test "an image is shown from a signed inline url" do
     doc = doc!("scan.png", "\x89PNG invented".b)
     sign_in @admin

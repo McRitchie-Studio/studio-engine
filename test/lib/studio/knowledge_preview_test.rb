@@ -692,6 +692,23 @@ class KnowledgePreviewTest < Minitest::Test
     assert_empty storage.calls
   end
 
+  def test_an_inline_kind_with_no_type_of_our_choosing_falls_back_and_signs_nothing
+    odd = doc("letter.pdf")
+    # No real file reaches this state today (every inline kind maps to a
+    # type); the guard is for the day the two tables drift apart.
+    original = Preview.method(:inline_content_type)
+    Preview.define_singleton_method(:inline_content_type) { |**| nil }
+    result = begin
+      Preview.for(odd)
+    ensure
+      Preview.define_singleton_method(:inline_content_type, original)
+    end
+
+    assert result.fallback?
+    assert_equal "This file could not be previewed: its type cannot be shown inline.", result.reason
+    assert_nil odd.signed, "no URL is signed for the stored type"
+  end
+
   def test_an_oversized_pdf_falls_back
     result = Preview.for(doc("letter.pdf", byte_size: Preview::INLINE_MAX_BYTES + 1))
     assert result.fallback?

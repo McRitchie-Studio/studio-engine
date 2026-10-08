@@ -190,6 +190,17 @@ class S3EndpointTest < Minitest::Test
     assert_equal "", Studio::S3.download(key: KEY, max_bytes: 1024)
   end
 
+  def test_download_refuses_a_max_bytes_that_is_not_a_positive_integer
+    Studio.s3_endpoint = ENDPOINT
+    stub = stub_client
+
+    [0, -1, 1.5, "1024"].each do |bad|
+      error = assert_raises(ArgumentError, bad.inspect) { Studio::S3.download(key: KEY, max_bytes: bad) }
+      assert_match(/positive Integer/, error.message)
+    end
+    assert_empty stub.api_requests, "a bad range is refused before any request is built"
+  end
+
   def test_download_does_not_swallow_other_errors
     Studio.s3_endpoint = ENDPOINT
     stub = stub_client

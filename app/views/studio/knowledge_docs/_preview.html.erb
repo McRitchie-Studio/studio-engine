@@ -50,6 +50,11 @@
     <% end %>
     <pre class="knowledge-preview-text" id="knowledge-preview-text"><%= preview.text %></pre>
   <% when :pdf %>
+    <%# No sandbox attribute, on purpose: a sandboxed frame does not get
+        Chromium's built-in PDF viewer, so the document would not show. What
+        guards this frame is that the bucket serves the object as
+        application/pdf whatever was stored (signed into the URL), from the
+        bucket's own origin, which holds no session of this app. %>
     <iframe class="knowledge-preview-pdf" id="knowledge-preview-pdf" src="<%= preview.url %>"
             title="<%= doc.title %>" referrerpolicy="no-referrer" loading="lazy"></iframe>
   <% when :image %>

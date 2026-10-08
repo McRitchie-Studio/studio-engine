@@ -964,11 +964,14 @@ endpoint and no `s3_public_url`, `Studio::S3.url` raises `NotConfigured` and
 `upload` writes but returns `nil`; serve private objects with `signed_url`.
 
 `signed_url` also takes `response_content_disposition:` and
-`response_content_type:`, which are signed into the URL and override the headers
-the object is served with. `"inline"` plus a content type the caller chose is how
-the knowledge layer shows a private PDF or image in the page
-(`Studio::KnowledgeDoc#signed_url(inline_as:)`). `download(key:, max_bytes:)`
-reads only the head of an object.
+`response_content_type:`, which are signed into the URL. On S3 they override the
+headers the object is served with, and Cloudflare documents the same for R2; the
+engine's tests cover the signing against an R2-style endpoint, and nobody has yet
+verified the served headers against a live R2 bucket. `"inline"` plus a content
+type the caller chose is how the knowledge layer shows a private PDF or image in
+the page (`Studio::KnowledgeDoc#signed_url(inline_as:)`).
+`download(key:, max_bytes:)` reads only the head of an object; `max_bytes` must
+be a positive Integer.
 
 `Studio::S3.delete` moves the object to `trash/` for three days rather than
 deleting it; see [Trash and restore](#trash-and-restore).

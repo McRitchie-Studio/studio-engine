@@ -34,10 +34,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `Studio.draw_knowledge_routes` opt-in; there is no migration and no new setting.
 
   The caps, all constants on `Studio::KnowledgePreview`: 500 rows and 50 columns
-  a sheet, 20 sheets and 50,000 filled cells a workbook, a 20 MB workbook, 64 MB for any one inflated
+  a sheet; 20 sheets, 50,000 filled cells, 100,000 rendered cells (empty ones
+  included) and 2 MB of cell text a workbook; 32,767 characters a cell (Excel's
+  own limit, cut with a mark past it); a 20 MB workbook, 64 MB for any one inflated
   part of it, the first 1 MB of a CSV, the first 256 KB of a text file, and
   100 MB for an inline PDF or image. A sheet or file cut by a cap says so and
-  links the download.
+  links the download. A number format longer than Excel's 255 characters is
+  ignored, and no number renders past thirty decimals.
 - `Studio::KnowledgePreview` (`lib/studio/knowledge_preview.rb`), loaded on
   first use and not by `require "studio"`: `kind_for(filename:, mime_type:)`,
   `for(doc)` returning a `Result`, `read_spreadsheet(bytes)` and
@@ -46,9 +49,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - `Studio::KnowledgeDoc#preview`, `#preview_kind` and `#filename`, and
   `#signed_url(inline_as: "application/pdf")`.
 - `Studio::S3.download(key:, max_bytes:)` reads only the head of an object (a
-  ranged GET), and `Studio::S3.signed_url` takes `response_content_disposition:`
-  and `response_content_type:`, signed into the URL. Both are optional; existing
-  calls are unchanged.
+  ranged GET; `max_bytes` must be a positive Integer), and `Studio::S3.signed_url`
+  takes `response_content_disposition:` and `response_content_type:`, signed into
+  the URL. Both are optional; existing calls are unchanged. The signing is tested
+  against an R2-style endpoint; that R2 serves the overridden headers is
+  documented by Cloudflare and not yet verified against a live bucket.
 
 ### Changed
 

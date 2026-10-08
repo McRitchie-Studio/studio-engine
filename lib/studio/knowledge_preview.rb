@@ -288,6 +288,10 @@ module Studio
       def inline(doc, kind)
         refuse_over!(doc, INLINE_MAX_BYTES)
         content_type = inline_content_type(filename: doc.filename, mime_type: doc.mime_type)
+        # Without a type of our choosing the URL would be signed to serve the
+        # STORED type, which is the one thing this path exists to prevent.
+        raise Unreadable, "its type cannot be shown inline" if content_type.nil?
+
         Result.new(kind: kind, url: doc.signed_url(inline_as: content_type))
       end
 
