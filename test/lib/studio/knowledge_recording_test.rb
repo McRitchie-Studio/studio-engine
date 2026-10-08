@@ -472,6 +472,22 @@ class StudioKnowledgeRecordingTest < Minitest::Test
     KR.define_singleton_method(:store, original)
   end
 
+  # THE BLOCKER (review round 1). Net::HTTP does not raise when a body with a
+  # declared length ends early, so a download cut off partway (a CDN timeout
+  # on a 1 GB file) was handed on as a complete recording.
+  def test_a_body_shorter_than_its_declared_length_fails_and_is_never_yielded
+    short = lambda do |socket|
+      socket.write("HTTP/1.1 200 X\r\nConnection: close\r\nContent-Type: video/mp4\r\nContent-Length: 1000000\r\n\r\n")
+      socket.write(MP4 + ("\x00" * 5000))
+    end
+    with_listener("/call.mp4" => short) do |heads|
+      error = assert_raises(KR::FetchFailed) { fetch("https://files.example.com/call.mp4") { flunk "a short body must not be yielded" } }
+      assert_match(/of 1000000 declared/, error.message)
+      heads.pop
+      assert heads.empty?, "one request, no retry"
+    end
+  end
+
   def test_a_body_exactly_at_the_cap_is_stored
     body = MP4 + ("\x00" * 1000)
     with_listener("/call.mp4" => respond(200, {}, body)) do |_heads|
