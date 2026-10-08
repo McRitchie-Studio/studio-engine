@@ -389,6 +389,29 @@ for (const [label, make] of [["shared", sharedStore], ["scoped", scopedStore]]) 
   })
 }
 
+// The shared store's timed re-mount seams. Each lands after the slide or the
+// exit, so focus is dropped once the push's own refocus has run and the seam
+// has to put it back. advance() has no browser spec; this is its only pin.
+for (const [seam, act] of [
+  ["a swap", (store) => store.swap("second")],
+  ["an advance", (store) => store.advance({ step: "two" })],
+  ["a close down to the card beneath", (store) => { store.open("top"); store.close() }]
+]) {
+  test(`the shared store refocuses the backdrop after ${seam}`, async () => {
+    const win = fakeWindow({ Alpine: fakeAlpine() })
+    const { store, doc } = sharedStore(win)
+    const backdrop = node(doc, "backdrop")
+    doc.attached.add(backdrop)
+    store.open("first")
+    store.captureFocus(backdrop)
+    act(store)
+    await sleep(20)
+    doc.activeElement = null // the inner template re-mounts and takes focus with it
+    await sleep(CLOSE_ANIM_MS + 40)
+    assert.equal(doc.activeElement, backdrop)
+  })
+}
+
 test("cycleFocus wraps both ways and skips hidden or untabbable nodes", () => {
   const { store, doc } = sharedStore()
   const a = node(doc, "a")
