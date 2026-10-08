@@ -16,11 +16,12 @@ require "active_support/test_case"
 class ModalDialogLabelTest < ActiveSupport::TestCase
   # Rails.root is the DUMMY app here, not the engine — the engine root is two up
   # from test/lib.
-  HOST = File.expand_path("../../app/views/studio/modals/_host.html.erb", __dir__)
+  # The focus trap both hosts share lives in studio/modal_host.
+  HOST = File.expand_path("../../app/javascript/studio/modal_host.js", __dir__)
 
   def label_for(entry)
     src = File.read(HOST)
-    body = src[/dialogLabel: function\(\) \{(.*?)\n        \},/m, 1]
+    body = src[/dialogLabel: function \(\) \{(.*?)\n    \},/m, 1]
     raise "dialogLabel not found in #{HOST}" unless body
 
     js = <<~JS

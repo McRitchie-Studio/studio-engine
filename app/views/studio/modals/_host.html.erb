@@ -2,33 +2,41 @@
   Modal host. Single shared shell for any modal that opens through
   Alpine.store('modals'). Owns the backdrop, scroll lock (via
   modal-open on body), escape key, click-outside, ARIA dialog role,
-  mount and unmount animations, the per-modal animation registry
-  (window.ModalAnimations), directional swap() and advance() slides
-  for multi-step flows, bfcache and Turbo Drive snapshot cleanup,
+  and the mount and unmount animations. The behaviour behind it (the
+  stack, directional swap() and advance() slides for multi-step flows,
+  the focus trap, the per-modal animation registry
+  window.ModalAnimations, bfcache and Turbo Drive snapshot cleanup,
   store registration, and the window.StudioModals.holdAtLeast(ms)
-  helper. The animation keyframes ship inline in the style block
-  below, so consumers need no extra CSS to get the full behavior.
-  A canonical copy of the SAME keyframes also lives in the shared
-  motion layer (app/assets/tailwind/studio_engine/engine-motion.css)
-  for pages that drive a modal host WITHOUT rendering this partial —
-  e.g. the living style guide's page-scoped dsModals host. The two are
-  byte-identical; keep them in sync if you retune a curve or duration.
+  helper) is studio/modal_host, bound to this host by the modal-host
+  Stimulus controller on its template. This partial renders no script.
+  The animation keyframes ship inline in the style block below, so
+  consumers need no extra CSS to get the full behavior. A canonical
+  copy of the SAME keyframes also lives in the shared motion layer
+  (app/assets/tailwind/studio_engine/engine-motion.css) for pages that
+  drive a modal host WITHOUT rendering this partial, e.g. the living
+  style guide's page-scoped dsModals host. The two are byte-identical;
+  keep them in sync if you retune a curve or duration.
 
   THREE CONSUMER EXTENSION POINTS, so an app never has to fork this file
   to change an animation, a width, or register an app-wide modal:
 
     window.ModalAnimations         per-modal enter/exit animation, merged
-                                   over the engine defaults (see below)
+                                   over the engine defaults
+                                   (studio/modal_host ANIMATION_DEFAULTS)
     window.StudioModals.CARD_WIDTHS  per-modal card width by modal id,
                                    merged the same way; DEFAULT_CARD_WIDTH
                                    covers every id it does not name
     app/views/modals/_host_extras  OPTIONAL app partial, rendered inside
                                    the card on every render path through
-                                   this host — for a modal that belongs to
+                                   this host, for a modal that belongs to
                                    the app rather than to one call site
 
+  An app defines either registry in a script anywhere in the page (the
+  module merges it once the document has parsed) and may change it later:
+  the store reads both at call time.
+
   Consumer integration example and API reference: the "Modal host"
-  section of the gem README — which also carries the two rules this host
+  section of the gem README, which also carries the two rules this host
   IMPOSES on the content partials registered in its block: a SINGLE ROOT
   element (a template x-if clones only the first one; later siblings are
   dropped) and NO double quote inside x-data (it closes the attribute and
@@ -39,7 +47,7 @@
   you re-read the markup.
 %>
 <style>
-  /* Scroll lock applied by $store.modals._sync() when the stack is non-empty.
+  /* Scroll lock applied by $store.modals._sync() (studio/modal_host) when the stack is non-empty.
      Combined with the fixed backdrop on the host below, this keeps the page
      beneath any modal from scrolling on wheel / touch / spacebar — a claim that
      was FALSE wherever this gem's link sidebar shipped, until the rule below
@@ -86,7 +94,7 @@
      clean fade (a bouncing backdrop reads as a bug, not polish).
 
      Durations: the modal-card-out keyframe stays at 220ms to match
-     CLOSE_ANIM_MS in the host's store — that's the timeout before the
+     CLOSE_ANIM_MS in studio/modal_host — that's the timeout before the
      entry is spliced off the stack. Bump CLOSE_ANIM_MS if you lengthen
      this.
 
@@ -125,7 +133,7 @@
   /* Named entrance animation: "shake" — a "not quite yet" nope. The card
      scales/fades in fast (first ~22%) then does a damped horizontal
      wobble that settles to center, reading as "you can't do that just
-     yet." Wired via the ModalAnimations registry below: open a modal
+     yet." Wired via the ModalAnimations registry (studio/modal_host): open a modal
      with { enterAnim: 'shake' } to use it. Duration here MUST match
      ModalAnimations.enter.shake.ms (600). */
   @keyframes modal-card-shake-in {
@@ -198,587 +206,15 @@
   }
 </style>
 
-<script>
-  (function() {
-    // === Modal animation registry ======================================
-    //
-    // The single place to define + tune named entrance / exit animations
-    // for the modal card. Each key maps to a CSS class (the defaults ship
-    // in the inline style block above) plus its duration in ms (the store
-    // waits this long before splicing a closing entry off the stack, so
-    // the exit keyframe plays to completion before the DOM unmounts).
-    //
-    // Pass a key into any open() call via props.enterAnim / props.exitAnim:
-    //
-    //   $store.modals.open('foo', { enterAnim: 'shake' })  // shake in, default pop out
-    //   $store.modals.open('bar', { exitAnim: 'slide' })   // default pop in, slide out
-    //
-    // Omitted → the modal uses 'pop' (spring bounce in / fall out).
-    //
-    // Consumer extension point: define window.ModalAnimations BEFORE this
-    // script runs (e.g. in a <script> above the host render) with extra
-    // keys per channel — app entries are merged OVER the engine defaults,
-    // so adding a custom animation never requires redefining pop/shake/
-    // slide. Each custom key needs one registry entry here + one CSS
-    // class in the app's stylesheet. To re-skin a modal's entrance, just
-    // change the enterAnim it's opened with — no host edits needed.
-    //
-    // NB: this is independent of the directional swap()/advance() slide,
-    // which is a separate in-flow transition mechanism (see below) and
-    // always uses the modal-card-swap-* classes regardless of these keys.
-    var animDefaults = {
-      enter: {
-        pop:   { cls: 'modal-card-mount',    ms: 320 },  // default — spring bounce in
-        shake: { cls: 'modal-card-shake-in', ms: 600 },  // "not quite yet" nope
-        slide: { cls: 'modal-card-swap-in',  ms: 220 }   // slide in from the left
-      },
-      exit: {
-        pop:   { cls: 'modal-card-unmount',  ms: 220 },  // default — anticipation + fall
-        slide: { cls: 'modal-card-swap-out', ms: 220 }   // slide out to the right
-      }
-    };
-    var animOverrides = window.ModalAnimations || {};
-    window.ModalAnimations = {
-      enter: Object.assign({}, animDefaults.enter, animOverrides.enter || {}),
-      exit:  Object.assign({}, animDefaults.exit,  animOverrides.exit  || {})
-    };
+<%# THE STORE IS NOT HERE. $store.modals, its focus trap, window.ModalAnimations,
+    window.StudioModals (CARD_WIDTHS, DEFAULT_CARD_WIDTH, MIN_LOAD_MS and
+    holdAtLeast) and the bfcache / Turbo snapshot cleanup are studio/modal_host,
+    bound to this host by the modal-host controller on the template below. The
+    store registers before Alpine starts; see that module's header. %>
 
-    // Per-modal CARD WIDTH — the second consumer extension point, deliberately
-    // shaped like the animation one above so a consumer learns the pattern once.
-    // Define window.StudioModals.CARD_WIDTHS BEFORE this script runs, keyed by
-    // modal id, and app entries merge OVER the engine defaults (empty: the
-    // engine ships no per-id width, only the default below).
-    //
-    //   window.StudioModals = window.StudioModals || {};
-    //   window.StudioModals.CARD_WIDTHS = { 'wallet-setup': 'max-w-md' };
-    //
-    // BY MODAL ID, NOT BY PROP, and that is the whole reason this is a registry.
-    // A card opened from several places would have to carry the prop at every
-    // opener, and ONE miss renders the same card at two widths depending on how
-    // the user got there. The originating case is turf-monster's wallet-setup,
-    // opened from three (the board's entry gate, the onboarding chain driver,
-    // and the post-Connect reopen).
-    //
-    // Resolved in cardClasses(), NEVER written as a static class on the card
-    // element: exactly one max-w-* may land on that div, and a static class
-    // alongside a bound one leaves the winner to stylesheet source order, which
-    // is not something this file gets to decide.
-    window.StudioModals = window.StudioModals || {};
-    var widthOverrides = window.StudioModals.CARD_WIDTHS || {};
-    window.StudioModals.CARD_WIDTHS = Object.assign({}, widthOverrides);
-    window.StudioModals.DEFAULT_CARD_WIDTH =
-      window.StudioModals.DEFAULT_CARD_WIDTH || 'max-w-sm';
-    // Late-binding guard: read window.ModalAnimations at CALL time, and
-    // never return undefined. A consumer script that loads after this one
-    // (e.g. an importmap module) may REPLACE the merged registry object
-    // wholesale; without the animDefaults fallback a lookup miss would
-    // make close() throw on .ms and leave the modal stuck open. Unknown
-    // keys and gutted registries fall back to the built-in 'pop'.
-    function modalAnim(channel, key) {
-      var table = (window.ModalAnimations && window.ModalAnimations[channel]) || {};
-      return table[key] || table.pop || animDefaults[channel].pop;
-    }
-
-    // Same late-binding guard as modalAnim, for the same reason and with one
-    // extra: a width that fails to resolve does not throw, it renders a
-    // FULL-BLEED card. A silent failure gets a literal floor, not a chance.
-    var DEFAULT_CARD_WIDTH = 'max-w-sm';
-    function modalCardWidth(id) {
-      var sm = window.StudioModals || {};
-      return (sm.CARD_WIDTHS && sm.CARD_WIDTHS[id]) ||
-             sm.DEFAULT_CARD_WIDTH ||
-             DEFAULT_CARD_WIDTH;
-    }
-
-    // Where focus returns when the last modal closes. A module-level closure, NOT a
-    // store property — see captureFocus below for why a DOM node must never live on
-    // a reactive store.
-    var _returnFocusTo = null;
-    // The backdrop node, kept in the SAME closure and for the same reason: a DOM
-    // node on a reactive store reads back as a proxy and every identity check
-    // against it is false forever. refocus() needs this node after a swap.
-    var _backdropEl = null;
-
-    // === Alpine.store('modals') — the stack ============================
-    //
-    // Idempotent registration (return early if already registered) so
-    // consumer apps can include the host more than once without
-    // double-init.
-    //
-    // CLOSE_ANIM_MS: keep in sync with the modal-card-unmount + modal-
-    // backdrop-unmount keyframes in the inline style block above. When
-    // close() is called, we set _closing on the entry so the host can
-    // swap in the unmount classes, then actually splice the stack after
-    // this many ms so the animation plays before the DOM unmounts. If
-    // you change the keyframe durations there, bump this to match.
-    var CLOSE_ANIM_MS = 220;
-    var SWAP_IN_MS    = 220;
-
-    document.addEventListener('alpine:init', function() {
-      if (Alpine.store('modals')) return;
-      Alpine.store('modals', {
-        stack: [],
-        // open(id, props, opts)
-        //   opts.replace: true  → swap the top entry with this one. When a
-        //     non-closing modal is currently visible, the swap is a directional
-        //     slide — current modal exits stage-right (modal-card-swap-out)
-        //     and the new one enters stage-left (modal-card-swap-in). Gives
-        //     a "forward progress" feel for wizards / multi-step flows.
-        //     Defaults to a plain mount animation when the stack is empty.
-        //   opts.replace: false (default) → push on top of the stack. Stacking
-        //     semantics — when the new one closes, the previous is revealed
-        //     underneath (e.g. crop-photo on top of profile).
-        // SWAP_IN_MS must match the modal-card-swap-in animation duration in
-        // the inline style block above; we clear the flag after that so a
-        // fresh open() doesn't re-trigger the slide.
-        // === focus management ==============================================
-        //
-        // THE RETURN TARGET LIVES IN A CLOSURE, NOT ON THE STORE. Alpine.store()
-        // wraps its object in a reactive Proxy, so a DOM node assigned to a store
-        // property reads back as a PROXY of that node. Calling .focus() through the
-        // proxy happens to work, but any identity check against it (=== , contains(),
-        // Set membership) is false forever — the exact defect that made the wallet
-        // watcher discard every account-change event it ever received. Focus code is
-        // full of identity checks, so the node is kept out of the reactive object
-        // entirely.
-        captureFocus: function(el) {
-          _returnFocusTo = document.activeElement;
-          _backdropEl = el;
-          // Focus the backdrop itself rather than the first control: landing on a
-          // button means a stray Enter fires it, and a destructive card should not
-          // be one keystroke from confirming.
-          if (el && el.focus) el.focus();
-        },
-
-        // RE-FOCUS THE BACKDROP AFTER THE TOP ENTRY CHANGES, without re-capturing
-        // the return target.
-        //
-        // THE DEFECT THIS CLOSES. captureFocus runs from x-init on the backdrop,
-        // and that backdrop lives inside <template x-if="current()">. swap() is
-        // open(id, props, { replace: true }) and advance() only patches props, so
-        // current() stays truthy and the OUTER template never re-mounts —
-        // captureFocus never runs again. The INNER content template DOES re-mount
-        // and unmounts whatever was focused; document.activeElement falls back to
-        // the document body, which is not a descendant of the backdrop, so the handler
-        // bound there stops seeing the key and native tabbing resumes. Measured
-        // in a browser: open -> swap -> Shift+Tab x3 walked out to the page behind.
-        //
-        // _returnFocusTo IS DELIBERATELY NOT TOUCHED. Re-capturing here would
-        // overwrite the opener with a node inside the dialog, so closing would
-        // return focus into a card that no longer exists.
-        //
-        // Deferred a tick: the re-mount that unfocuses the old node happens during
-        // Alpine's update, so focusing before it lands would be undone immediately.
-        refocus: function() {
-          var run = function() {
-            if (_backdropEl && _backdropEl.focus && document.contains(_backdropEl)) {
-              _backdropEl.focus();
-            }
-          };
-          if (window.Alpine && window.Alpine.nextTick) window.Alpine.nextTick(run);
-          else setTimeout(run, 0);
-        },
-
-        releaseFocus: function() {
-          var target = _returnFocusTo;
-          _returnFocusTo = null;
-          _backdropEl = null;
-          // Only restore if the element is still in the document — a Turbo visit can
-          // replace the page under an open modal, and focusing a detached node
-          // silently moves focus to the document body, which is worse than leaving it alone.
-          if (target && target.focus && document.contains(target)) target.focus();
-        },
-
-        // Every tabbable node inside the dialog, in document order. Deliberately
-        // recomputed per keypress: modal content is Alpine-rendered and a card can
-        // add or remove controls (a spinner replacing a button) while open, so a
-        // list captured at mount goes stale.
-        focusables: function(el) {
-          if (!el) return [];
-          var sel = 'a[href], button:not([disabled]), input:not([disabled]), ' +
-                    'select:not([disabled]), textarea:not([disabled]), [tabindex]';
-          return Array.prototype.slice.call(el.querySelectorAll(sel)).filter(function(n) {
-            return n.tabIndex >= 0 && n.offsetParent !== null;
-          });
-        },
-
-        // Tab is intercepted (.prevent on the binding) and re-dispatched here.
-        //
-        // THAT ONLY HOLDS WHILE FOCUS IS INSIDE THE BACKDROP, which is a real
-        // condition and not a formality. The binding lives ON the backdrop, so it
-        // sees the key only when activeElement is a descendant. If a re-mount
-        // drops focus to the document body — which is what a swap() or advance()
-        // does to the inner content template — this handler never fires, .prevent
-        // never runs, and native tabbing resumes straight out of the dialog. That
-        // is why refocus() exists and why both phase-2 seams call it. An earlier
-        // version of this comment claimed focus could never leave while open; it
-        // could, and it did.
-        cycleFocus: function(el, event) {
-          var items = this.focusables(el);
-          if (items.length === 0) { if (el && el.focus) el.focus(); return; }
-
-          var idx = items.indexOf(document.activeElement);
-          var next;
-          if (event && event.shiftKey) {
-            next = idx <= 0 ? items[items.length - 1] : items[idx - 1];
-          } else {
-            next = (idx === -1 || idx === items.length - 1) ? items[0] : items[idx + 1];
-          }
-          next.focus();
-        },
-
-        // A dialog with no accessible name announces as just "dialog". Props first
-        // so a card can name itself; the id is the honest fallback.
-        dialogLabel: function() {
-          var entry = this.current();
-          if (!entry) return 'Dialog';
-          var p = entry.props || {};
-          // TRIMMED, not merely truthy. `title: '   '` is a truthy string, so it used to
-          // pass straight through — and the accessible-name computation then trims it to
-          // empty and announces a bare "dialog", the exact outcome this fallback chain
-          // exists to prevent. An empty string already fell through (it is falsy); a
-          // whitespace-only one did not, which is the more likely typo of the two.
-          var named = function(v) {
-            return (typeof v === 'string' && v.trim() !== '') ? v : null;
-          };
-          return named(p.ariaLabel) || named(p.title) || String(entry.id).replace(/[-_]/g, ' ');
-        },
-
-        open: function(id, props, opts) {
-          props = props || {};
-          opts  = opts  || {};
-          var self = this;
-          // Set by any branch that re-mounts the INNER content template without
-          // re-mounting the OUTER one — see the push branch below. The replace
-          // branch returns early and calls refocus() from its own phase 2.
-          var remounted = false;
-
-          if (opts.replace && this.stack.length > 0) {
-            var current = this.current();
-            if (current && !current._closing) {
-              // Phase 1: mark leaving entry with _swappingOut + _closing so
-              // the :class binding swaps in the slide-out keyframe (instead
-              // of the default scale-pop modal-card-unmount) for CLOSE_ANIM_MS.
-              // _swapDir picks which slide direction (forward = exit right,
-              // back = exit left); the same flag carries onto the new entry
-              // below so slide-in mirrors slide-out.
-              var dir = (opts.direction === 'back') ? 'back' : 'forward';
-              current._swapDir = dir;
-              current._swappingOut = true;
-              current._closing = true;
-              setTimeout(function() {
-                // Phase 2: stack swap. New entry carries _swappingIn + the
-                // same _swapDir so the host's :class binding picks the
-                // matching slide-in keyframe. If the marked entry vanished
-                // during the slide-out window (another swap() hot-swapped
-                // it, or a close raced us), DROP this stale replacement —
-                // pushing it would resurrect a modal the user already
-                // navigated past (two swap() calls within CLOSE_ANIM_MS
-                // used to leave both on the stack). Mirrors close()'s
-                // stale-entry guard.
-                var idx = self.stack.indexOf(current);
-                if (idx < 0) return;
-                var newEntry = { id: id, props: props, _swappingIn: true, _swapDir: dir };
-                self.stack[idx] = newEntry;
-                self._sync();
-                // The content template just re-mounted; put focus back on the
-                // backdrop or the trap releases. See refocus().
-                self.refocus();
-                // Phase 3: clear the swap-in flag + direction after the
-                // slide finishes so a future close() runs the unmount
-                // keyframe cleanly. _settled latches so the host's
-                // :class binding doesn't snap modal-card-mount back on
-                // (which would re-fire the bounce-in keyframe from
-                // opacity:0 and look like a flash mid-settle).
-                setTimeout(function() {
-                  newEntry._swappingIn = false;
-                  newEntry._swapDir = null;
-                  newEntry._settled = true;
-                }, SWAP_IN_MS);
-              }, CLOSE_ANIM_MS);
-              return;
-            }
-            // Already mid-close — just hot-swap so we don't double up timers.
-            this.stack[this.stack.length - 1] = { id: id, props: props };
-            remounted = true;
-          } else {
-            // A push onto a NON-EMPTY stack is the third re-mount seam, and the one
-            // the trap missed longest. current() stays truthy, so the OUTER template
-            // never re-mounts and x-init never re-runs captureFocus — while the INNER
-            // content template DOES re-mount and unmounts whatever was focused.
-            // Focus lands on the document body, which is not a descendant of the backdrop, so the
-            // @keydown.tab handler bound there stops firing and native tabbing resumes.
-            // MEASURED on /lab/birthday_gate: open a card, Tab once, push a second
-            // card, then Shift+Tab three times and you walk onto three BACKGROUND-PAGE
-            // buttons behind a still-open dialog.
-            //
-            // Only the FIRST push is safe: current() goes falsy -> truthy, the outer
-            // template mounts, and x-init captures for us.
-            remounted = this.stack.length > 0;
-            this.stack.push({ id: id, props: props });
-          }
-          this._sync();
-          if (remounted) this.refocus();
-        },
-        // Sugar — `swap('foo', props)` ≡ `open('foo', props, { replace: true })`.
-        // Pass opts through so callers can request a back-direction slide
-        // on a cross-modal handoff if the new modal is semantically
-        // upstream of the current one (e.g. "return to home modal").
-        swap: function(id, props, opts) {
-          return this.open(id, props, Object.assign({ replace: true }, opts || {}));
-        },
-        // advance(propsPatch, opts) — patch the current entry's props
-        // WITH the same directional slide as swap(), but WITHOUT
-        // replacing the stack entry. Use this for in-flow step
-        // transitions inside one modal (e.g. picker → waiting →
-        // confirming) where the modal's outer x-data scope (form
-        // state, watchers, factories) needs to survive the transition.
-        // swap() drops a fresh entry into the stack which re-evaluates
-        // the registered <template x-if="id===...">  — fine for
-        // cross-modal handoffs, but heavy for "same modal, next step."
-        // advance() is the lightweight cousin.
-        //
-        // opts.direction: 'forward' (default — current exits right, next
-        //   enters from left; reads as "moving ahead in the flow")
-        //   or 'back' (mirrored — current exits left, next enters from
-        //   right; reads as "returning to the previous step"). Pair
-        //   forward calls with back calls on their inverse buttons so
-        //   the user's spatial model of the wizard stays consistent.
-        //
-        // Timing mirrors swap():
-        //   t=0      → flip _swappingOut, outer card slides off (CLOSE_ANIM_MS)
-        //   t=220ms  → patch props, flip _swappingIn, card slides in
-        //   t=440ms  → clear _swappingIn + _swapDir so the next open/
-        //              close uses default mount/unmount keyframes
-        //
-        // Guards: no-op if no current entry, or if the entry is already
-        // closing or mid-swap (prevents double-clicks from stacking timers).
-        advance: function(propsPatch, opts) {
-          opts = opts || {};
-          var cur = this.current();
-          if (!cur || cur._closing || cur._swappingOut) return;
-          var self = this;
-          cur._swapDir = (opts.direction === 'back') ? 'back' : 'forward';
-          cur._swappingOut = true;
-          setTimeout(function() {
-            // Re-resolve in case the stack mutated during the slide-out
-            // window. If our entry got popped (e.g. user hit Escape mid-
-            // animation), bail rather than splat props onto a stale ref.
-            if (self.stack.indexOf(cur) < 0) return;
-            if (propsPatch) Object.assign(cur.props, propsPatch);
-            cur._swappingOut = false;
-            cur._swappingIn = true;
-            // Same re-mount, same release. advance() patches props in place, so
-            // the outer template never re-runs x-init either.
-            self.refocus();
-            setTimeout(function() {
-              cur._swappingIn = false;
-              cur._swapDir = null;
-              cur._settled = true;
-            }, SWAP_IN_MS);
-          }, CLOSE_ANIM_MS);
-        },
-        close: function() {
-          var self = this;
-          var entry = this.current();
-          if (!entry || entry._closing) return;  // empty stack or already closing
-          // Flip _closing → Alpine reactivity adds the modal-card-unmount
-          // and modal-backdrop-unmount classes via the :class bindings on
-          // the host. Wait for the animation to play, then splice THIS
-          // specific entry from the stack (not pop() — the top might have
-          // changed if another open() ran during the close window). The
-          // splice delay tracks the entry's chosen exit animation
-          // (props.exitAnim → registry ms) so a longer custom exit
-          // keyframe plays fully before the DOM unmounts; defaults to
-          // the 'pop' fall (220ms).
-          entry._closing = true;
-          setTimeout(function() {
-            var idx = self.stack.indexOf(entry);
-            if (idx >= 0) {
-              self.stack.splice(idx, 1);
-              self._sync();
-            }
-            // Hand focus back only when the LAST modal leaves. A stacked flow
-            // (open → swap → close) unmounts one dialog and mounts the next, and
-            // restoring to the background page in between would yank focus out of
-            // a flow the user is still inside.
-            //
-            // BUT NOT RESTORING IS NOT THE SAME AS DOING NOTHING. Closing down to an
-            // underlying modal re-mounts the inner template, so focus falls to the document body
-            // with the dialog still open — the trap is off while the user is still
-            // inside it. releaseFocus() was correctly gated on an empty stack; the
-            // missing half was the else. MEASURED on both hosts.
-            if (self.stack.length === 0) self.releaseFocus();
-            else self.refocus();
-          }, modalAnim('exit', entry.props && entry.props.exitAnim).ms);
-        },
-        closeAll: function() {
-          // Turbo/bfcache teardown: the page is going away, so drop the return
-          // target rather than restoring into a document about to be replaced.
-          _returnFocusTo = null;
-          // No animation — used by Turbo before-cache + bfcache cleanup
-          // where the user is navigating away and we just need the DOM
-          // clean immediately.
-          this.stack = [];
-          this._sync();
-        },
-        // Drops every modal whose props don't explicitly opt out of dismissal
-        // (i.e. dismissible: false). Used by the bfcache + Turbo snapshot
-        // cleanup below so a modal guarding an in-flight operation (e.g. an
-        // on-chain TX) — which sets dismissible: false precisely to forbid
-        // losing its UI mid-flight — survives a back/forward navigation;
-        // the still-in-flight JS promise resolves against a non-empty
-        // stack. Celebratory modals (default dismissible: true) are still
-        // cleared so users don't return to a stale "Success!" card.
-        closeAllDismissible: function() {
-          this.stack = this.stack.filter(function(modal) {
-            return modal.props && modal.props.dismissible === false;
-          });
-          this._sync();
-          // Same re-mount, same release: a surviving non-dismissible card is still on
-          // screen, and the cards dropped from under it took focus with them. MEASURED:
-          // activeElement the document body behind a still-open non-dismissible dialog.
-          //
-          // Nothing is done when the stack empties. That is deliberate and different
-          // from close(): this runs on the Turbo/bfcache teardown path, where the page
-          // is going away and closeAll() already declines to restore into a document
-          // about to be replaced.
-          if (this.stack.length > 0) this.refocus();
-        },
-        // isOpen(id) — is a card with this id ON THE STACK, in any
-        // lifecycle state? A card mid-close still counts: close() flips
-        // _closing at once and splices only after the exit animation, so
-        // this answers TRUE for that whole exit window. Unchanged — callers
-        // asking "is the DOM node still mounted" depend on exactly this.
-        // If you mean "is it still up", you want isLive() below.
-        isOpen: function(id) {
-          for (var i = 0; i < this.stack.length; i++) {
-            if (this.stack[i].id === id) return true;
-          }
-          return false;
-        },
-        // isLive(id) / isLive([id, ...]) — is a card with this id on the
-        // stack and NOT on its way out? This is what a "don't open it
-        // twice" guard actually means, and it is the question isOpen
-        // cannot answer.
-        //
-        // The difference is a TIMING one, and the asymmetry is load-bearing:
-        //
-        //   close()               entry gets _closing, and is spliced
-        //                         CLOSE_ANIM_MS later. isOpen stays TRUE for
-        //                         that window; isLive is FALSE immediately.
-        //   swap() / open(...,    the LEAVING entry gets _swappingOut AND
-        //   { replace: true })    _closing — a different card is taking the
-        //                         screen, so it is not live either.
-        //   advance()             the entry gets _swappingOut and NOTHING
-        //                         else. Same card, same id, sliding between
-        //                         steps of its own flow. It stays LIVE.
-        //
-        // So this tests _closing ALONE and deliberately never consults
-        // _swappingOut. Conflating the two reports a card as gone in the
-        // middle of a step transition, which is how an in-flow hand-off
-        // starts looking to a caller like a dismissal.
-        //
-        // Accepts an array so a caller can ask about a SET of ids ("is any
-        // card belonging to this flow still up?") without reaching into
-        // .stack and re-deriving the lifecycle rule for itself.
-        isLive: function(id) {
-          var ids = Array.isArray(id) ? id : [id];
-          for (var i = 0; i < this.stack.length; i++) {
-            var entry = this.stack[i];
-            if (entry && !entry._closing && ids.indexOf(entry.id) !== -1) return true;
-          }
-          return false;
-        },
-        current: function() {
-          return this.stack.length ? this.stack[this.stack.length - 1] : null;
-        },
-        // cardClasses() — the animation class set for the visible card.
-        // Resolves the entry's enter/exit animation keys (props.enterAnim
-        // / props.exitAnim) through the ModalAnimations registry, while
-        // keeping the directional swap-* classes (the in-flow slide) as
-        // fixed names. Lifecycle → class:
-        //   fresh mount  → enter key class  (default 'pop' → modal-card-mount)
-        //   closing      → exit key class   (default 'pop' → modal-card-unmount)
-        //   swap/advance → modal-card-swap-{in,out}[-back]
-        // The mount class is gated on !_settled (so a completed swap doesn't
-        // re-fire the bounce) and !_closing (so close shows ONLY the exit
-        // keyframe, not both stacked).
-        cardClasses: function() {
-          var c = this.current();
-          if (!c) return {};
-          var o = {};
-          // The card element carries no static max-w-*; this is the only
-          // one it ever gets. Set FIRST so the animation keys below, which
-          // never collide with a max-w-* name, read as additions to it.
-          o[modalCardWidth(c.id)] = true;
-          if (!c._settled && !c._swappingIn && !c._swappingOut && !c._closing) {
-            o[modalAnim('enter', c.props && c.props.enterAnim).cls] = true;
-          }
-          if (c._closing && !c._swappingOut) {
-            o[modalAnim('exit', c.props && c.props.exitAnim).cls] = true;
-          }
-          // The registry's 'slide' entries resolve to the SAME class names
-          // as the fixed directional flags below (enter.slide is
-          // modal-card-swap-in, exit.slide is modal-card-swap-out). Never
-          // reassign a key the enter/exit resolution above already set —
-          // an unconditional assignment here clobbered those keys to
-          // false, so enterAnim/exitAnim 'slide' produced NO class and
-          // the exit sat motionless for the splice delay, then snapped.
-          var swapFlags = {
-            'modal-card-swap-in':       !!(c._swappingIn  && c._swapDir !== 'back'),
-            'modal-card-swap-out':      !!(c._swappingOut && c._swapDir !== 'back'),
-            'modal-card-swap-in-back':  !!(c._swappingIn  && c._swapDir === 'back'),
-            'modal-card-swap-out-back': !!(c._swappingOut && c._swapDir === 'back')
-          };
-          for (var flag in swapFlags) {
-            if (!(flag in o)) o[flag] = swapFlags[flag];
-          }
-          return o;
-        },
-        _sync: function() {
-          if (this.stack.length) {
-            document.body.classList.add('modal-open');
-          } else {
-            document.body.classList.remove('modal-open');
-          }
-        }
-      });
-    });
-
-    // === bfcache + Turbo snapshot cleanup ==============================
-    //
-    // Without this, a user who lands on a celebratory modal and then
-    // navigates away (or hits the browser's bfcache on back) sees the
-    // modal again on their next visit. closeAllDismissible() keeps
-    // dismissible: false modals (e.g. pending on-chain TX) so the
-    // user returning via bfcache doesn't silently lose the modal that
-    // a still-in-flight JS promise will resolve against.
-    function clearStaleModals() {
-      if (window.Alpine && Alpine.store) {
-        var m = Alpine.store('modals');
-        if (m && typeof m.closeAllDismissible === 'function') {
-          m.closeAllDismissible();
-        } else if (m && typeof m.closeAll === 'function') {
-          // Fallback for older engine versions that registered the store first.
-          m.closeAll();
-        }
-      }
-    }
-    window.addEventListener('pageshow', function(e) { if (e.persisted) clearStaleModals(); });
-    document.addEventListener('turbo:before-cache', clearStaleModals);
-  })();
-</script>
-
-<%# The minimum-visible-duration convention (window.StudioModals.holdAtLeast +
-    MIN_LOAD_MS) — the SINGLE source, shared with the /admin/style demo page.
-    Pair it with the _processing_card block so a load spinner never flashes past
-    the user. Rendered AFTER the store <script> above so the store stays the
-    host's first <script> (a Node behavior harness extracts that first script).
-    See studio/modals/_load_convention for the full contract. %>
-<%= render "studio/modals/load_convention" %>
-
-<template x-if="$store.modals.current()">
+<template x-if="$store.modals.current()"
+          data-studio-controller="modal-host"
+          data-modal-host-store-value="modals">
   <%# Backdrop + card use CSS keyframe animations (NOT Alpine
       x-transition), all shipped in the inline style block above. On
       mount, the .modal-backdrop-mount + card mount classes fire fade-in
@@ -833,7 +269,7 @@
         mobile browsers shrink the visual viewport when the URL bar is showing, and
         vh ignores that. %>
     <%# No max-w-* here — cardClasses() supplies exactly one, per modal id, from
-        the CARD_WIDTHS registry above. max-h/overflow are unrelated and stay. %>
+        the CARD_WIDTHS registry (studio/modal_host). max-h/overflow are unrelated and stay. %>
     <div class="bg-surface rounded-xl border border-subtle shadow-2xl p-6 w-full max-h-[85dvh] overflow-y-auto"
          :class="$store.modals.cardClasses()">
       <%# Consumer-provided content registrations. Each block typically

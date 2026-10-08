@@ -7,10 +7,9 @@
 
       resolveAt = max(min_duration, actual_completion)
 
-  This ships the convention on window.StudioModals, defined ONCE here and
-  rendered by BOTH the shared modal host (studio/modals/_host) and the living
-  style guide (style/_modals) — so every consumer app and the /admin/style demo
-  page share a single definition:
+  studio/modal_host publishes it on window.StudioModals on every page, merged
+  over anything an app defined first, so every consumer app and the
+  /admin/style demo page share a single definition:
 
     MIN_LOAD_MS  — the standard default minimum (1400 ms). A caller may pass its
                    own, but reach for this so every load modal feels consistent.
@@ -29,27 +28,7 @@
                      min_duration exactly:
                        StudioModals.holdAtLeast(StudioModals.MIN_LOAD_MS).then(advance);
 
-  Idempotent (|| guards): never clobber a definition an app already shipped, and
-  safe to render more than once on a page.
+  THIS PARTIAL RENDERS NOTHING. It carried the convention as an inline script
+  until the modal host moved to studio/modal_host; it stays, empty, so an app
+  that still renders it by name gets no missing-template error.
 %>
-<script>
-  (function () {
-    window.StudioModals = window.StudioModals || {};
-    // Standard minimum-visible duration for a load spinner, in ms. ~1200–1500
-    // reads as "processing → done"; below ~1s the spinner flashes and reads as a
-    // glitch. Callers may override per-modal, but default to this for consistency.
-    window.StudioModals.MIN_LOAD_MS = window.StudioModals.MIN_LOAD_MS || 1400;
-    // holdAtLeast(minMs).then(cb) — cb fires at max(minMs, elapsed-since-call).
-    // Stamp the moment a loading view becomes visible; the anti-flicker floor.
-    window.StudioModals.holdAtLeast = window.StudioModals.holdAtLeast || function (minMs) {
-      var startedAt = Date.now();
-      return {
-        then: function (callback) {
-          var remaining = Math.max(0, minMs - (Date.now() - startedAt));
-          if (remaining === 0) { callback(); return; }
-          setTimeout(callback, remaining);
-        }
-      };
-    };
-  })();
-</script>

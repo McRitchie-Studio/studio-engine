@@ -18,6 +18,7 @@
 // (Studio::Engine.javascript_boot_graph), so the boot costs one round trip.
 import { Application, defaultSchema } from "@hotwired/stimulus"
 import NavCollapseController from "studio/controllers/nav_collapse_controller"
+import ModalHostController from "studio/controllers/modal_host_controller"
 import { startPinnedStack } from "studio/pinned_stack"
 import { installAlpineShims } from "studio/alpine_shims"
 
@@ -33,5 +34,6 @@ export const schema = {
 
 const application = Application.start(document.documentElement, schema)
 application.register("nav-collapse", NavCollapseController)
+application.register("modal-host", ModalHostController)
 
 export { application }

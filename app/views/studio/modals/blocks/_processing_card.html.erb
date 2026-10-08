@@ -1,7 +1,7 @@
 <%#
   Reusable processing / loading card. Spinner + title + optional message.
 
-  Minimum-visible-duration convention (studio/modals/_load_convention):
+  Minimum-visible-duration convention (studio/modal_host, window.StudioModals):
   a load spinner must show for AT LEAST a floor, but longer if the real async
   runs longer — resolveAt = max(min_duration, actual_completion) — so it never
   flashes past the user ("did anything happen?") yet never cuts a slow op short.
