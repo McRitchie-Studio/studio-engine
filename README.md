@@ -35,7 +35,7 @@ resolved.
 - **Theme system**: Dynamic CSS custom properties generated from 7 role colors (primary, dark, light, success, accent, warning, danger). Dark/light mode toggle. Admin theme editor at `/admin/theme`.
 - **UI primitives**: Shared component partials and CSS primitives such as `components/emoji_swap` for nav/sidebar emoji hover transitions.
 - **Operator tooling**: Shared `studio/banners/environment` banner with Dev Mode + email connector controls and `studio/banners/impersonation`.
-- **Sluggable concern**: a human-readable slug written once at create (`to_param` returns it); `rename_slug!` changes it and cascades to every child column in one transaction, and a refused rename answers 422
+- **Sluggable concern**: a human-readable slug written once at create (`to_param` returns it); `rename_slug!` changes it and cascades to every child column in one transaction, any other write that changes a persisted slug is invalid, and a refused rename answers 422
 - **ThemeSetting model**: Per-app DB overrides with fallback to config defaults
 - **Geo**: `Studio::GeoDetection` places every visitor (IP → country + subdivision, session-cached), `Studio::GeoSetting` stores the operator's blocked countries and regions, `require_geo_allowed` locks whichever surfaces an app chooses, and the shared badge + `/admin/geo` manager ship with it. See [`docs/GEO.md`](docs/GEO.md).
 - **Site identity and link previews**: `Studio::SiteIdentity` holds the app's title, description and image, edited at `/admin/link_preview` beside a live unfurl card and read anywhere through `Studio.site_identity`. Every page unfurls with it unless it calls `link_preview image:, title:, description:`, and `Studio::LinkPreviewBots` serves preview fetchers a slim page under iMessage's 1 MiB limit. Adopt with `bin/rails g studio:site_identity`. See [`docs/LINK_PREVIEW.md`](docs/LINK_PREVIEW.md).
@@ -711,6 +711,29 @@ its helper names; drawing them there raises at route-load and kills every route
 in the app. The gate covers only the page — the registry and the inherited
 defaults are always on.
 
+### The image generator link
+
+An app can put a link to its own banner generator at the top of the page: a
+short line and a button that opens the generator in a new tab. Unset (the
+default), nil or blank draws nothing, and the page renders exactly as it did
+before the setting existed.
+
+```ruby
+# config/initializers/studio.rb
+config.email_manager_generator_url = "https://example.com/email-art"
+# or worked out per request; the callable receives the request:
+config.email_manager_generator_url = ->(request) { "#{request.base_url}/admin/email-art" }
+
+config.email_manager_generator_label       = "Header generator"   # default "Email image generator"
+config.email_manager_generator_description = "Open it, copy the prompt, paste it into Claude Code."
+```
+
+The default line reads "Make a new header with <app name>'s character model:
+open the generator, copy the prompt, paste it into Claude Code." The URL must be
+an absolute `http`/`https` URL with a host: any other String (a `javascript:`
+URL, a relative path) raises `ArgumentError` at boot, and a callable that
+answers one draws no link. Every value is escaped.
+
 ### The catalog
 
 A registered email carries a key, a label, a description, what **type** it is,
@@ -1089,6 +1112,64 @@ destroyed before the object was trashed, so the task prints the
 `ActiveStorage::Blob.create!(...)` to run, filled from the trash copy's metadata,
 and the record must be re-attached by hand. `filename` is known only when the
 upload carried a Content-Disposition; supply it otherwise.
+
+## Remote image URLs
+
+`Studio::ImageCache.validate_source_url!(url)` is the check to run before the
+server fetches a URL someone else supplied. It returns the parsed URI or raises
+`Studio::ImageCache::InvalidSourceURL`.
+
+It refuses anything but `http`/`https`, and any host that is not public:
+
+- **An address, however it is written.** Loopback, private (`10/8`,
+  `172.16/12`, `192.168/16`), link-local (`169.254/16`, `fe80::/10`),
+  unique-local (`fc00::/7`), carrier-grade NAT (`100.64/10`), unspecified,
+  multicast and reserved ranges. IPv4 inside IPv6 (`[::ffff:127.0.0.1]`) is
+  unwrapped. Numeric IPv4 is decoded as `inet_aton` decodes it (`127.1`,
+  `2130706433`, `0x7f.1`, `017700000001`), and a numeric host that is not a
+  plain dotted quad is refused whatever it decodes to.
+- **An internal name.** `localhost`, `*.localhost`, `*.local`, `*.internal`,
+  `*.lan`, with or without a trailing dot, in any case.
+- **A name that resolves to a non-public address.** The hosts file is read,
+  then every A and AAAA record; one non-public address refuses the URL. A name
+  that cannot be resolved raises `UnresolvedSourceHost` (a subclass).
+
+### The check and the fetch are two moments
+
+A name can resolve differently a moment after it was checked. What that means
+depends on who fetches:
+
+| Who fetches | What to call | The gap |
+|-------------|--------------|---------|
+| The engine | `Studio::ImageCache.cache!`, `fetch_remote` or `fetch_response` | None. Each hop, redirects included, is vetted and the connection goes to the vetted address |
+| Your own HTTP client | `vet_source_url!`, then `pinned_http` | None, when you connect through `pinned_http` and vet each redirect yourself |
+| Your own client, by name | `validate_source_url!`, then a fetch of the URL | Open. The socket resolves the name again |
+| A third party you hand the URL to | `validate_source_url!` | Open, and theirs to close. The check says where the name pointed for us |
+
+```ruby
+vetted = Studio::ImageCache.vet_source_url!(url)        # raises InvalidSourceURL
+http   = Studio::ImageCache.pinned_http(vetted.uri, vetted.addresses.first)
+http.start { |h| h.request(Net::HTTP::Get.new(vetted.uri.request_uri)) { |response| … } }
+```
+
+`pinned_http` keeps the name for the `Host` header and the TLS certificate, sets
+the timeouts, and uses no proxy. It does not follow redirects: vet the
+`Location` the same way before you request it.
+
+### Tests, and choosing the resolver
+
+Under `Rails.env.test?` the default is **no resolution**: names are judged on
+their text, so a suite that passes `https://cdn.example.com/a.png` through the
+guard needs no network and gets a stable answer. Addresses and internal names
+are judged the same in every environment. To test what a name resolves to,
+pass a resolver, a callable from a host to its addresses:
+
+```ruby
+Studio::ImageCache.validate_source_url!(url, resolver: ->(host) { ["10.0.0.5"] })   # raises
+Studio::ImageCache.resolver = ->(host) { my_lookup(host) }                           # app-wide
+```
+
+`resolver: nil` on a call checks the text only.
 
 ## Overriding Views
 

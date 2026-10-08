@@ -48,6 +48,7 @@ require "studio/link_resolution"
 require "studio/session_fingerprint"
 require "studio/session_state"
 require "studio/email"
+require "studio/email_image_generator"
 require "studio/email_smoke"
 require "studio/mail_transport"
 require "studio/redis"
@@ -382,6 +383,36 @@ module Studio
   # Gates only the PAGE. Studio::EmailImage's registry and its inherited-default
   # resolution are always on, so an app sends branded email either way.
   mattr_accessor :draw_admin_emails_routes, default: false
+
+  # The "Email image generator" link at the top of /admin/emails: where this
+  # app's operator makes a new banner. nil (the default) or blank draws no link,
+  # and the page renders as it always has. A String must be an absolute http(s)
+  # URL (anything else raises here, at boot); a callable receives the request and
+  # returns one, and an unusable answer draws no link. The label and the line
+  # under it are optional; blank means the engine's generic wording.
+  # See Studio::EmailImageGenerator.
+  #
+  #   config.email_manager_generator_url         = "https://example.com/email-art"
+  #   config.email_manager_generator_label       = "Header generator"
+  #   config.email_manager_generator_description = "Open it, copy the prompt, paste it into Claude Code."
+  mattr_reader :email_manager_generator_url, default: nil
+  mattr_accessor :email_manager_generator_label, default: nil
+  mattr_accessor :email_manager_generator_description, default: nil
+
+  def self.email_manager_generator_url=(value)
+    @@email_manager_generator_url = EmailImageGenerator.normalize_url(value)
+  end
+
+  # The link /admin/emails renders for this request, or nil for none.
+  def self.email_manager_generator_link(request = nil)
+    EmailImageGenerator.link(
+      url: email_manager_generator_url,
+      label: email_manager_generator_label,
+      description: email_manager_generator_description,
+      app_name: app_name,
+      request: request
+    )
+  end
 
   # Draw the shared first-name onboarding endpoints
   # (Studio::OnboardingController#first_name / #skip_first_name). OFF by default,
