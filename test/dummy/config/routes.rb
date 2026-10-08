@@ -68,6 +68,7 @@ Rails.application.routes.draw do
   get "lab/style_modals", to: "e2e_lab#style_modals"
   get "lab/session_drift", to: "e2e_lab#session_drift"
   get "lab/sidebar_panels", to: "e2e_lab#sidebar_panels"
+  get "lab/sidebar_panels_turbo", to: "e2e_lab#sidebar_panels_turbo"
   # One route per page, spelled out: test/integration/e2e_lab_isolation_test.rb
   # visits every /lab route by its literal path, which an optional segment is not.
   get "lab/site_footer", to: "e2e_lab#site_footer"

@@ -58,9 +58,8 @@ require "action_dispatch/testing/integration"
 class E2eLabIsolationTest < ActionDispatch::IntegrationTest
   # The trigger button `components/_link_sidebar_trigger` renders, and the two
   # panels `components/_link_sidebar` renders. Counted through the DOM rather than
-  # by scanning the body text: `components/_link_sidebar`'s own bridge script
-  # carries the string '[data-link-sidebar-trigger]' as a selector literal, so a
-  # substring count reads one higher than the number of buttons on the page.
+  # by scanning the body text, so a selector literal anywhere on the page cannot
+  # read as one more button.
   TRIGGER = "[data-link-sidebar-trigger]"
   PANELS = "#studio-link-sidebar, #studio-link-sidebar-mobile"
 

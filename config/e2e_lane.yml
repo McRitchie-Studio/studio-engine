@@ -865,7 +865,13 @@
 # arrives after load is seeded by its controller, a Turbo visit swaps the queue
 # and Back replays nothing, and both survive a boot that fails to load.
 #   npx playwright test --list  -> 228 tests in 33 files
-total_specs: 228
+# 228 -> 232: e2e/link_sidebar.spec.js, 4 tests. The link sidebar's flag is
+# studio/link_sidebar: the trigger toggles once per click and Escape and an
+# outside click close it, a page without the panel has no store and a Turbo
+# visit to one that has registers it, an anchor that arrives late registers it
+# through its controller, and the sidebar works when the boot fails to load.
+#   npx playwright test --list  -> 232 tests in 34 files
+total_specs: 232
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1012,8 +1018,8 @@ total_specs: 228
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 213
 # executed = total - devnet - allowed_skips = 213 - 0 - 0 = 213, so executed ==
 # total_specs and the equality assertion holds.
-#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 228
-executed: 228
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 232
+executed: 232
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

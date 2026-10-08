@@ -6,8 +6,9 @@ require "nokogiri"
 
 # Renders the link-sidebar family (components/_link_sidebar, _sidebar_panel,
 # _link_sidebar_trigger) through ActionView and pins the emitted contract:
-# dual desktop/mobile panels driven by the `sidebars` Alpine store, the
-# engine-owned store bridge, section/link rendering (admin chip, emoji swap,
+# dual desktop/mobile panels driven by the `sidebars` Alpine store, the anchor
+# for the link-sidebar controller (the store flag and the click handlers are
+# studio/link_sidebar), section/link rendering (admin chip, emoji swap,
 # descriptions), and the trigger's aria wiring.
 class LinkSidebarTest < Minitest::Test
   SECTIONS = [
@@ -20,7 +21,7 @@ class LinkSidebarTest < Minitest::Test
     ] }
   ].freeze
 
-  def test_renders_dual_panels_with_sections_and_the_store_bridge
+  def test_renders_dual_panels_with_sections_and_the_controller_anchor
     html = render_sidebar(sections: SECTIONS, admin: true)
     doc = Nokogiri::HTML5.fragment(html)
 
@@ -34,10 +35,10 @@ class LinkSidebarTest < Minitest::Test
     assert_equal "$store.sidebars.linkTreeOpen", desktop["x-show"]
     refute_nil desktop["x-cloak"], "panel must cloak until Alpine boots"
 
-    assert_includes html, "window.__studioLinkSidebarBridge"
-    assert_includes html, "Alpine.store('sidebars', { linkTreeOpen: false })"
-    assert_includes html, "turbo:before-cache"
-    assert_includes html, "pageshow"
+    anchors = doc.css('template[data-studio-controller="link-sidebar"]')
+    assert_equal 1, anchors.size, "one anchor for the link-sidebar controller"
+    refute_match(/<script/i, html, "the flag and the handlers are studio/link_sidebar, a nonced module")
+    assert_includes desktop["@turbo:before-cache.window"], "$store.sidebars.linkTreeOpen = false"
     assert_includes html, "html { overflow-x: clip; }"
   end
 
@@ -169,34 +170,30 @@ class LinkSidebarTest < Minitest::Test
     assert_equal "$store.sidebars.linkTreeOpen = false", row["@click"]
   end
 
-  # THE BRIDGE CLAIMS ONLY THE CLOSE BUTTONS IT RENDERED.
+  # THE SIDEBAR CLAIMS ONLY THE CLOSE BUTTONS IT RENDERED.
   #
-  # components/_sidebar_panel is SHARED and stamps `data-link-sidebar-close` on every
-  # panel's close button. This component's bridge claims that attribute on the DOCUMENT,
-  # in the capture phase, with stopImmediatePropagation — so an unscoped match swallowed
-  # the close click of every OTHER panel on the page and closed this sidebar instead.
-  # The host panel's × then did nothing at all, with no error anywhere (measured
-  # 2026-09-18 on the hub's /deployments sidebars).
+  # components/_sidebar_panel is shared and stamps `data-link-sidebar-close` on every
+  # panel's close button. studio/link_sidebar claims that attribute on the document, in
+  # the capture phase, so its claim is scoped to the two panels this partial renders:
+  # unscoped, it takes the close click of every other panel on the page.
   #
-  # The browser half — that the host panel's × now works and this sidebar's still does —
-  # is e2e/sidebar_panel_close.spec.js; only a browser can see which listener ran first.
-  # What this tier can see is the SCOPE, and that it is written once rather than spelled
-  # out per handler, so the selector cannot drift from the ids the panels are given.
-  def test_the_store_bridge_claims_only_its_own_panels_close_buttons
-    html = render_sidebar(sections: SECTIONS, admin: true)
+  # The behaviour is test/javascript/link_sidebar.test.mjs (click intent) and
+  # e2e/sidebar_panel_close.spec.js (which listener runs first). This tier holds the
+  # seam between the two files: the ids the module scopes to are the ids rendered here,
+  # each with the close button the module claims.
+  def test_the_module_scopes_its_close_claim_to_the_panels_rendered_here
+    source = File.read(File.expand_path("../../app/javascript/studio/link_sidebar.js", __dir__))
+    scope = source[/^export const LINK_SIDEBAR_PANELS = "([^"]+)"/, 1]
+    refute_nil scope, "studio/link_sidebar must declare LINK_SIDEBAR_PANELS once"
 
-    assert_includes html, "var LINK_SIDEBAR_PANELS = '#studio-link-sidebar, #studio-link-sidebar-mobile';"
-    assert_includes html, "closeTrigger.closest(LINK_SIDEBAR_PANELS)",
-                          "the close handler must be scoped to this component's own panels"
-    refute_match(/if \(closeTrigger\) \{/, html,
-                 "an unscoped close branch claims every shared panel's close button")
-    # The ids it scopes to are the panels this file renders — asserted together so the
-    # scope cannot outlive the markup.
-    doc = Nokogiri::HTML5.fragment(html)
-    %w[studio-link-sidebar studio-link-sidebar-mobile].each do |id|
-      refute_nil doc.at_css("##{id} [data-link-sidebar-close]"),
-                 "##{id} must render the close button the bridge claims"
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: SECTIONS, admin: true))
+    ids = scope.split(",").map(&:strip)
+    assert_equal %w[#studio-link-sidebar #studio-link-sidebar-mobile], ids
+    ids.each do |id|
+      refute_nil doc.at_css("#{id} [data-link-sidebar-close]"),
+                 "#{id} must render the close button the module claims"
     end
+    assert_equal ids.size, doc.css("aside").size, "every panel rendered here is in the module's scope"
   end
 
   private

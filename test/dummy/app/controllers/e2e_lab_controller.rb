@@ -577,6 +577,10 @@ class E2eLabController < ActionController::Base
   # click bridge can be caught claiming a close button it did not render.
   def sidebar_panels = render(:sidebar_panels)
 
+  # The same page under Turbo, so a spec can leave it with the sidebar open and
+  # come Back.
+  def sidebar_panels_turbo = render(:sidebar_panels, layout: "survey_turbo_lab")
+
   # ---- The site footer and the booking primitives (docs/SITE_FOOTER.md) ------
   #
   # The facts a host would declare in config.site_footer. test/dummy's

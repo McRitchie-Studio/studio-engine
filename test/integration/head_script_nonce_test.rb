@@ -54,10 +54,10 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "what stays inline is the pre-paint theme, the import map, the boot import and the three store imports" do
+  test "what stays inline is the pre-paint theme, the import map, the boot import and the four store imports" do
     inline = head_scripts("/lab/bar_stack").reject { |script| script["src"] }
 
-    assert_equal 6, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
+    assert_equal 7, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
     assert_includes inline[0].text, "classList.add('dark')", "the pre-paint theme script comes first"
     assert_equal "importmap", inline[1]["type"]
     assert_equal "module", inline[2]["type"]
@@ -68,6 +68,22 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     assert_equal %(import "studio/modal_host"), inline[4].text.strip
     assert_equal "module", inline[5]["type"]
     assert_equal %(import "studio/toast"), inline[5].text.strip
+    assert_equal "module", inline[6]["type"]
+    assert_equal %(import "studio/link_sidebar"), inline[6].text.strip
+  end
+
+  # The link sidebar's own door: components/_link_sidebar binds
+  # $store.sidebars.linkTreeOpen, so a failed boot must not take the flag or the
+  # click handlers with it.
+  test "the link sidebar's flag loads by its own nonced module tag, before Alpine" do
+    scripts = head_scripts("/lab/bar_stack")
+    sidebar = scripts.index { |script| script.text.strip == %(import "studio/link_sidebar") }
+    alpine = scripts.index { |script| script["src"].to_s.include?("studio/alpine") }
+
+    refute_nil sidebar, "the head does not import studio/link_sidebar by its own tag"
+    assert_equal NONCE, scripts[sidebar]["nonce"]
+    assert_equal "module", scripts[sidebar]["type"]
+    assert_operator sidebar, :<, alpine, "the flag's listener must be registered before Alpine starts"
   end
 
   # The toast queue's own door: layouts/studio/_flash binds $store.toasts, so a

@@ -187,6 +187,12 @@
     the flash layouts/studio/_flash renders, so a failed boot leaves a page its
     flash and its toasts. It imports nothing, and the toast controller imports it. %>
 <%= javascript_import_module_tag "studio/toast" %>
+<%# THE LINK SIDEBAR'S FLAG, BY ITS OWN DOOR, for the same reason.
+    components/_link_sidebar binds $store.sidebars.linkTreeOpen; studio/link_sidebar
+    registers it on alpine:init for a page that renders the panel, and installs
+    the document click and Escape handlers. It imports nothing, and the
+    link-sidebar controller imports it. %>
+<%= javascript_import_module_tag "studio/link_sidebar" %>
 <%# ALPINE LOADS AFTER THE MODULE TAGS, and the order is the contract. Deferred
     classic scripts and module scripts execute in document order, so by the time
     Alpine starts, studio/application has defined the shims it evaluates
