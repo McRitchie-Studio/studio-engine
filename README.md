@@ -1109,6 +1109,100 @@ destroyed before the object was trashed, so the task prints the
 and the record must be re-attached by hand. `filename` is known only when the
 upload carried a Content-Disposition; supply it otherwise.
 
+## Knowledge recordings
+
+A knowledge document (`Studio::KnowledgeDoc`) is usually a meeting's transcript.
+Its recording can be stored beside it, in the same private bucket, so the audio
+or video does not stay on a notetaker's servers. This is the backend; the
+document page does not show a player yet.
+
+**Adopting it needs a migration.** Run `bin/rails studio_engine:install:migrations
+&& bin/rails db:migrate`. It adds four nullable columns to
+`studio_knowledge_docs`: `recording_key`, `recording_mime_type`,
+`recording_byte_size` (bigint) and `recording_source_url`. An app that has not
+run it keeps working: `recording?` is false and `recording_link` is nil, and only
+the two attach methods raise (`Studio::KnowledgeDoc::Recording::MissingRecordingColumns`,
+before any byte moves).
+
+```ruby
+doc.attach_recording!("/tmp/standup.mp4", source_url: "https://notes.example.com/calls/abc")
+doc.attach_recording_from_url!("https://files.example.com/standup.mp4")
+doc.recording?        # => true
+doc.recording_kind    # => :video (or :audio)
+doc.recording_url     # presigned GET, six hours
+doc.recording_link    # the external page, when it is an http(s) link
+```
+
+From a one-off dyno or a laptop:
+
+```bash
+bin/rails studio:knowledge:attach_recording ID=42 FILE=/tmp/standup.mp4
+bin/rails studio:knowledge:attach_recording ID=42 URL=https://files.example.com/standup.mp4 SOURCE_URL=https://notes.example.com/calls/abc
+```
+
+The task prints the bucket, key, type and size it stored. It never prints the
+download URL, which usually carries a credential, and the URL is never stored;
+`SOURCE_URL` is the page to link.
+
+**What is stored.** Audio and video only: MP4, M4V, MOV, M4A, WebM, MP3, WAV and
+Ogg. The file's first 16 bytes decide, and the stored content type comes from
+that check (`Studio::KnowledgeRecording::TYPES`), never from a header a remote
+server sent. A file name's extension picks within a container (`.m4a` is
+`audio/mp4`) and must agree with the bytes; for a local file an extension off
+the list is refused, and for a fetched URL it is ignored. An old QuickTime file
+with no `ftyp` box is refused; re-export it as MP4.
+
+**The object.** `knowledge/<entity>/<path>/<timestamp>-<random>-recording-<name>`,
+beside the document's own object. Replacing a recording uploads the new object,
+saves the row, then moves the old object to `trash/` for three days (see
+[Trash and restore](#trash-and-restore)).
+
+**The playback URL** is good for six hours (`RECORDING_URL_TTL`), not the
+document link's fifteen minutes: a player makes a new request each time the
+viewer seeks, and each one is checked against the URL's expiry.
+
+**The fetch.** `attach_recording_from_url!` is a server-side fetch of a URL the
+caller supplied, run with the bucket's credentials in the process. Each hop, the
+first URL and every redirect, must be https, may carry no user or password, and
+goes through `Studio::ImageCache.vet_source_url!` (see
+[Remote image URLs](#remote-image-urls)); the connection is then made to an
+address that hop was vetted against. A host that vets to no address is refused.
+
+**The bounds.**
+
+| Bound | Value | Constant |
+|-------|-------|----------|
+| A recording, local or fetched | 4 GB | `Studio::KnowledgeRecording::MAX_BYTES` |
+| Memory held while uploading | one 16 MB part | `Studio::S3::Multipart::PART_SIZE` |
+| Parts in one upload | 10,000 | `Studio::S3::Multipart::MAX_PARTS` |
+| A URL, and each redirect's Location | 8,192 bytes | `MAX_URL_BYTES` |
+| Redirects followed | 3 | `MAX_REDIRECTS` |
+| Vetted addresses tried per host | 4 | `MAX_ADDRESSES` |
+| A whole fetch | 3,600 seconds | `FETCH_DEADLINE` |
+| Connect, and each read | 10 and 30 seconds | `Studio::ImageCache::OPEN_TIMEOUT`, `READ_TIMEOUT` |
+| File name kept in the key | 80 characters | `MAX_FILENAME_CHARS` |
+| Playback URL lifetime | 6 hours default, 7 days at most | `RECORDING_URL_TTL`, `MAX_RECORDING_URL_TTL` |
+
+The byte cap is enforced while the body streams, a declared `Content-Length`
+over it is refused before the body, a compressed body is refused, and a redirect
+or error response's body is never read.
+
+**Checksums and R2.** `Studio::S3::Multipart` uploads through its own client,
+built from `Studio::S3.client_options` with `request_checksum_calculation` and
+`response_checksum_validation` at `when_required`, and sends a Content-MD5 with
+each part. Newer `aws-sdk-s3` versions add a CRC32 by default, and R2 has refused
+some of the combinations that produces. The request shape is tested against a
+stubbed client; **a multipart upload to a live R2 bucket has not been verified.**
+A fetched recording needs local disk for the whole file while it uploads.
+
+**Transcripts.** `Studio::KnowledgeTranscript.parse(text)` (`require
+"studio/knowledge_transcript"`) turns transcript text into cues of `seconds`,
+`speaker` and `text`. It reads two layouts, `0:02 - Speaker` with the text
+indented below and `Speaker • 0:02` with the text below, and `M:SS` or
+`H:MM:SS` stamps. It reads at most 2 MB of text and 5,000 cues, keeps 8 KB of
+text per cue, never raises, and answers no cues for text that is not a
+transcript. `read(text)` answers the cues and whether a bound cut them short.
+
 ## Remote image URLs
 
 `Studio::ImageCache.validate_source_url!(url)` is the check to run before the

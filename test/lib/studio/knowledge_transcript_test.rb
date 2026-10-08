@@ -191,6 +191,11 @@ class StudioKnowledgeTranscriptTest < Minitest::Test
     assert_empty KT.parse("0:02 - #{long_speaker}\n")
     assert_empty KT.parse("#{long_speaker} • 0:02\n")
     assert_empty KT.parse("0:02 - #{'J' * (KT::MAX_SPEAKER_CHARS + 1)}\n"), "a 121-character speaker is text"
+    # The cap is on the LINE, so padding alone takes a line out of consideration:
+    # nothing is stripped, split or matched on a line longer than the cap.
+    assert_empty KT.parse("0:02 - Jordan Example#{' ' * KT::MAX_CUE_LINE_BYTES}\n")
+    assert_empty KT.parse("#{' ' * KT::MAX_CUE_LINE_BYTES}Jordan Example • 0:02\n")
+    assert_equal 1, KT.parse("0:02 - Jordan Example#{' ' * 100}\n").size
     assert_equal 1, KT.parse("0:02 - #{'J' * KT::MAX_SPEAKER_CHARS}\n").size
   end
 

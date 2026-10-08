@@ -6,6 +6,47 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **A knowledge document can hold its meeting's recording.** The backend only;
+  no page changes yet. `Studio::KnowledgeDoc` gains:
+  - `attach_recording!(path, filename: nil, source_url: nil)`: copies a local
+    audio or video file into the app's private bucket beside the document, in
+    16 MB parts, never whole in memory, and saves the row. Replacing a
+    recording moves the old object to `trash/` (`Studio::S3.delete`).
+  - `attach_recording_from_url!(url, source_url: nil)`: the same, from an https
+    download. Every hop goes through the engine's SSRF guard
+    (`Studio::ImageCache.vet_source_url!`) and connects to the address it was
+    vetted against. The download URL is never stored.
+  - `recording?`, `recording_kind` (`:video` or `:audio`), `recording_link` (the
+    external page, only when it is an http(s) link) and
+    `recording_url(expires_in:)`, a presigned GET good for six hours by default
+    (`RECORDING_URL_TTL`).
+
+  Only MP4, M4V, MOV, M4A, WebM, MP3, WAV and Ogg are stored, judged by the
+  file's first bytes; the stored content type comes from that check, never from
+  a remote server's header. A recording may be up to 4 GB. An operator attaches
+  one with `bin/rails studio:knowledge:attach_recording ID=<id> FILE=<path>` (or
+  `URL=<https url>`). See README, *Knowledge recordings*, for every bound.
+
+  **Adopting it needs a migration:** `bin/rails studio_engine:install:migrations
+  && bin/rails db:migrate` adds `recording_key`, `recording_mime_type`,
+  `recording_byte_size` and `recording_source_url` to `studio_knowledge_docs`.
+  An app that has not run it keeps working: `recording?` is false, and only the
+  two attach methods raise (`MissingRecordingColumns`, naming the fix).
+
+  The multipart upload is tested against a stubbed client only. That a live R2
+  bucket accepts it is not yet verified.
+- `Studio::S3::Multipart.upload_file(key:, path:, content_type:, max_bytes:)`
+  (`require "studio/s3/multipart"`), a streaming multipart upload of a local
+  file. It uses its own client with `request_checksum_calculation` and
+  `response_checksum_validation` at `when_required` and sends a Content-MD5 with
+  each part; `Studio::S3.client` is unchanged.
+- `Studio::KnowledgeTranscript.parse(text)` (`require
+  "studio/knowledge_transcript"`): transcript text to cues of `seconds`,
+  `speaker` and `text`, for both layouts the layer holds (`0:02 - Speaker` with
+  the text indented below, and `Speaker • 0:02` with the text below), with
+  `M:SS` and `H:MM:SS` stamps. It reads at most 2 MB and 5,000 cues, never
+  raises, and answers no cues for text that is not a transcript. `read(text)`
+  also says whether a bound cut the reading short.
 - **An "Email image generator" link at the top of `/admin/emails`, set per
   app.** `config.email_manager_generator_url` takes an http(s) URL or a callable
   that receives the request; `email_manager_generator_label` (default "Email image

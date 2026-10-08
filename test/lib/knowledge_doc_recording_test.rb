@@ -140,6 +140,15 @@ class KnowledgeDocRecordingTest < ActiveSupport::TestCase
     assert_equal first, requests(:delete_object).first[:key]
   end
 
+  test "recording? on a row loaded without the column is false, not MissingAttributeError" do
+    doc = doc!
+    doc.attach_recording!(recording_file)
+    partial = Doc.select(:id, :title).find(doc.id)
+    assert_equal false, partial.recording?
+    assert_nil partial.recording_kind
+    assert_nil partial.recording_link
+  end
+
   test "a first attach deletes nothing" do
     doc!.attach_recording!(recording_file)
     refute_includes operations, :copy_object
