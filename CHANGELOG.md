@@ -138,24 +138,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## 0.93.0 — 2026-10-07
 
-## 0.92.2 — 2026-10-07
-
-## 0.92.1 — 2026-10-07
-
 ### Added
 
-- **The engine owns `error_logs`, `theme_settings` and `image_caches`.** Three
-  migrations (`ensure_error_logs_table`, `ensure_theme_settings_table`,
-  `ensure_image_caches_table`) create each table when it is absent and, on an app
-  that already has it, add only the engine columns it lacks, as nullable columns;
-  nothing is altered or dropped and no index is added. Adopt with
-  `bin/rails studio_engine:install:migrations` and `bin/rails db:migrate`; the
-  release's lock bump does both. Hosts no longer copy these tables from
-  `docs/NEW_APP_SETUP.md`.
-- **A boot check names a missing engine column** (`Studio::HostSchema`). It
-  raises `Studio::HostSchemaError` in development and test, and logs (and reports
-  to Sentry) in production; `Studio.host_schema_check = :raise | :log | false`
-  overrides. Extra host columns are never reported, and rake tasks skip it.
 - **`Sluggable#rename_slug!` changes a slug on purpose and cascades.** It updates
   the row and every child column that holds the old slug in one transaction:
   each `has_many`/`has_one` declared with `primary_key: :slug`, plus the pairs a
@@ -176,6 +160,25 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   settled inside the create, so `user-<id>` no longer waits for a second save.
   Code that relied on a save moving the slug calls `rename_slug!(name_slug)`
   instead.
+
+## 0.92.2 — 2026-10-07
+
+## 0.92.1 — 2026-10-07
+
+### Added
+
+- **The engine owns `error_logs`, `theme_settings` and `image_caches`.** Three
+  migrations (`ensure_error_logs_table`, `ensure_theme_settings_table`,
+  `ensure_image_caches_table`) create each table when it is absent and, on an app
+  that already has it, add only the engine columns it lacks, as nullable columns;
+  nothing is altered or dropped and no index is added. Adopt with
+  `bin/rails studio_engine:install:migrations` and `bin/rails db:migrate`; the
+  release's lock bump does both. Hosts no longer copy these tables from
+  `docs/NEW_APP_SETUP.md`.
+- **A boot check names a missing engine column** (`Studio::HostSchema`). It
+  raises `Studio::HostSchemaError` in development and test, and logs (and reports
+  to Sentry) in production; `Studio.host_schema_check = :raise | :log | false`
+  overrides. Extra host columns are never reported, and rake tasks skip it.
 
 ### Fixed
 
