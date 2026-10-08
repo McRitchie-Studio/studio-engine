@@ -99,8 +99,15 @@ What actually happens when you run `bin/release prepare` from mcritchie-studio:
 2. It commits `lib/studio/version.rb` **with its `Gemfile.lock` and a rolled
    `CHANGELOG.md`** (one commit, `Release <version>`) onto **`origin/release`**
    (not `accepted`), before anything is published.
-3. It publishes to RubyGems and tags, producer-first, then bumps each consumer's
-   lock onto that consumer's `release`.
+3. It publishes a **release candidate** (`x.y.z.rcN`, a prerelease built from
+   this tree, tagged `rc-x.y.z.rcN`), producer-first, then bumps each consumer's
+   lock to it for QA. It never pushes `x.y.z`.
+
+`bin/release ship` publishes the final `x.y.z` after QA is green: built from the
+QA-frozen SHA, compared file by file with the candidate, pushed, tagged
+`v<version>`, and then locked by each consumer. The hub's `qa-release` and
+`production-deploy` SOPs carry the order and every recovery. While a candidate is
+locked, `Studio::VERSION` reads `x.y.z.rcN`.
 
 It narrates the decision, e.g.:
 
