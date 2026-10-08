@@ -859,15 +859,35 @@
 # 221 -> 222: e2e/modal_host_turbo_visit.spec.js, 1 test. A Turbo visit onto a
 # page with its own scoped modal host registers that store before Alpine reads it.
 #   npx playwright test --list  -> 222 tests in 32 files
-# 222 -> 228: e2e/board_drag.spec.js, 6 tests. The board primitive drags on the
+# 222 -> 228: e2e/toast_queue.spec.js, 6 tests. The toast queue is studio/toast
+# ($store.toasts): a page's flash enters as toasts, the `toast` event raises one
+# and a sixth drops the oldest, a toast leaves at its duration, a root that
+# arrives after load is seeded by its controller, a Turbo visit swaps the queue
+# and Back replays nothing, and both survive a boot that fails to load.
+#   npx playwright test --list  -> 228 tests in 33 files
+# 228 -> 232: e2e/link_sidebar.spec.js, 4 tests. The link sidebar's flag is
+# studio/link_sidebar: the trigger toggles once per click and Escape and an
+# outside click close it, a page without the panel has no store and a Turbo
+# visit to one that has registers it, an anchor that arrives late registers it
+# through its controller, and the sidebar works when the boot fails to load.
+#   npx playwright test --list  -> 232 tests in 34 files
+# 232 -> 245: e2e/hold_button_events.spec.js, 13 tests. The hold button is on its
+# lazily registered controller: its events fire in order and once, a release
+# before term completes nothing, a guard, a failed validation, an early
+# take-over and an owned success each do what they say, the string locals still
+# answer, a submitting scope refuses, a touch is not handed on, a press before
+# the controller loads does nothing, the controller is fetched only where a
+# button renders, it survives a Turbo visit and Back, and a failed boot.
+#   npx playwright test --list  -> 245 tests in 35 files
+# 245 -> 251: e2e/board_drag.spec.js, 6 tests. The board primitive drags on the
 # style guide's Tasks section: a card moves to another column, toasts and
 # recounts; a depth-chart card ranks inside its lane and does not leave it; a
 # locked card does not drag and none is dragged past it; a board's chrome state
 # works and its archive column takes a drop; SortableJS and the board controller
 # are fetched only by a page with a board; and a page script's Sortable.create
 # loads SortableJS and then creates the sortable.
-#   npx playwright test --list  -> 228 tests in 33 files
-total_specs: 228
+#   npx playwright test --list  -> 251 tests in 36 files
+total_specs: 251
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1014,8 +1034,8 @@ total_specs: 228
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 213
 # executed = total - devnet - allowed_skips = 213 - 0 - 0 = 213, so executed ==
 # total_specs and the equality assertion holds.
-#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 228
-executed: 228
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 251
+executed: 251
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

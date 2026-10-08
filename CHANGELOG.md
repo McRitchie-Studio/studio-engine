@@ -4,6 +4,69 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The toast queue, the link sidebar and the hold button move to ES modules and
+  Stimulus controllers.** `layouts/studio/_flash`, `components/_link_sidebar`
+  and `studio/_hold_button` render markup only; their inline scripts are gone.
+  Rendered markup and styling are unchanged apart from the attributes named
+  here.
+  - **Toast.** The queue is `studio/toast`, registered as `$store.toasts`. The
+    partial's root is a bare `x-data` carrying `data-studio-controller="toast"`
+    and the flash as `data-toast-initial-value`. The API is unchanged: dispatch
+    the `toast` window event. A page's Turbo snapshot no longer keeps its
+    flash, so Back does not replay it.
+  - **Link sidebar.** `$store.sidebars.linkTreeOpen` and the document click and
+    Escape handlers are `studio/link_sidebar`; the partial renders one
+    `<template data-studio-controller="link-sidebar">` anchor. The flag
+    registers only on a page that renders the panel, and a host's own
+    `sidebars` store keeps its keys.
+  - **Hold button.** The timeline, the idle nudge and the fizz portal are
+    `studio/hold_button`, on a `hold-button` controller that sits on the
+    `.hold-stack`; the button's presses are `data-studio-action`s. The idle
+    nudge runs only on a button the partial rendered, from the moment it
+    connects.
+  - `layouts/studio/_head` imports `studio/toast`, `studio/link_sidebar` and
+    `studio/stimulus` by their own nonced module tags, as it does
+    `studio/alpine_stores` and `studio/modal_host`, so a boot that fails to
+    load keeps a page its flash, its sidebar and its hold button.
+- **The engine's Stimulus application is `studio/stimulus`.**
+  `studio/application` still exports `application` and `schema`. A controller
+  for one kind of page is listed in `studio/stimulus`'s `LAZY` and registered by
+  `studio/lazy_controllers` the first time an element names it; the hold button
+  is the first.
+
+### Added
+
+- **The hold button dispatches `hold-button:guard`, `hold-button:start`,
+  `hold-button:validate`, `hold-button:early` and `hold-button:success`**, on
+  the button, bubbling, each with `detail.id` (the `hold_id`). `preventDefault()`
+  on `guard` refuses the hold, on `early` takes the action over, and on
+  `success` leaves the button's state to the listener;
+  `$event.detail.waitUntil(answer)` on `validate` takes a boolean or a promise,
+  and a false or failed answer aborts the hold. The string locals (`guard:`,
+  `on_hold_start:`, `validate:`, `early_action:`, `early_action_guard:`,
+  `on_success:`) still work and are heard beside the events; write new call
+  sites against the events. `validate_at:` and `early_action_at:` are honoured
+  without their string local.
+- **The hold button fails safe.** A `guard:` that throws, or that has no Alpine
+  scope to run in, refuses the hold (it used to let the hold through); a second
+  press without a release restarts the hold, so one hold confirms once; a
+  validation answer for a press that was released does not abort the next one;
+  nothing of the timeline runs after the hold completes.
+
+### Breaking
+
+- **`window.toastManager` is gone.** Nothing binds it: the flash partial reads
+  `$store.toasts`. A template that wrote `x-data="toastManager(...)"` of its own
+  renders `layouts/studio/flash` and dispatches the `toast` event instead.
+- **`window.holdBtnStart`, `window.holdBtnEnd` and `window._holdBtnInit` are
+  gone.** The button binds its own presses; a page that called either function
+  dispatches the pointer events on the button, or renders the partial.
+- **`window.__studioLinkSidebarBridge` is gone.** It was the inline script's
+  run-once flag; a test that looked for it in a page's HTML looks for
+  `data-studio-controller="link-sidebar"`.
+
 ## 0.96.1 — 2026-10-08
 
 ### Fixed

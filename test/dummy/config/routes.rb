@@ -59,15 +59,18 @@ Rails.application.routes.draw do
   get "lab/onboarding_first_name", to: "e2e_lab#onboarding_first_name"
   get "lab/js_attribute_locals", to: "e2e_lab#js_attribute_locals"
   get "lab/toast_over_banner", to: "e2e_lab#toast_over_banner"
+  get "lab/toast_flash", to: "e2e_lab#toast_flash"
   get "lab/profile", to: "e2e_lab#profile"
   get "lab/profile_edit", to: "e2e_lab#profile_edit"
   get "lab/hold_button", to: "e2e_lab#hold_button"
+  get "lab/hold_button_events", to: "e2e_lab#hold_button_events"
   get "lab/geo_settings", to: "e2e_lab#geo_settings"
   get "lab/site_identity", to: "e2e_lab#site_identity"
   get "lab/style_modals", to: "e2e_lab#style_modals"
   get "lab/board", to: "e2e_lab#board"
   get "lab/session_drift", to: "e2e_lab#session_drift"
   get "lab/sidebar_panels", to: "e2e_lab#sidebar_panels"
+  get "lab/sidebar_panels_turbo", to: "e2e_lab#sidebar_panels_turbo"
   # One route per page, spelled out: test/integration/e2e_lab_isolation_test.rb
   # visits every /lab route by its literal path, which an optional segment is not.
   get "lab/site_footer", to: "e2e_lab#site_footer"

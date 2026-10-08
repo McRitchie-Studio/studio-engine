@@ -1,0 +1,54 @@
+<%# studio/_hold_button answered through the events it dispatches. Every button
+    is the engine partial by name with a 600ms duration; the page supplies only
+    the Alpine listeners a host would write around it, and a log the spec reads.
+
+    events      every event logged, and a guard the checkbox disarms
+    refused     a validate listener that answers false
+    owned       a success listener that keeps the button's state for itself
+    taken       an early listener that takes the action over
+    string      the string locals a consumer still passes: guard and on_success
+    submitting  a scope whose submitting flag is up
+    portaled    fizz_portal, for the box a Turbo visit must not double %>
+<main class="p-8 space-y-6"
+      x-data="{ armed: true, submitting: false, log: [], note(name) { this.log.push(name); window.__holdEvents = this.log } }">
+  <label class="block"><input type="checkbox" x-model="armed" data-test="armed"> armed</label>
+
+  <div data-test="events"
+       @hold-button:guard="armed || $event.preventDefault()"
+       @hold-button:start="note('start:' + $event.detail.id)"
+       @hold-button:validate="note('validate'); $event.detail.waitUntil(true)"
+       @hold-button:early="note('early')"
+       @hold-button:success="note('success')">
+    <%= render "studio/hold_button", hold_id: "events", duration: 600, validate_at: 150, early_action_at: 400, fizz: false %>
+  </div>
+
+  <div data-test="refused"
+       @hold-button:validate="$event.detail.waitUntil(Promise.resolve(false))"
+       @hold-button:success="note('refused-success')">
+    <%= render "studio/hold_button", hold_id: "refused", duration: 600, validate_at: 150, fizz: false %>
+  </div>
+
+  <div data-test="owned" @hold-button:success="$event.preventDefault(); note('owned-success')">
+    <%= render "studio/hold_button", hold_id: "owned", duration: 600, fizz: false %>
+  </div>
+
+  <div data-test="taken"
+       @hold-button:early="$event.preventDefault(); note('taken')"
+       @hold-button:success="note('taken-success')">
+    <%= render "studio/hold_button", hold_id: "taken", duration: 600, early_action_at: 300, fizz: false %>
+  </div>
+
+  <div data-test="string">
+    <%= render "studio/hold_button", hold_id: "string", duration: 600, fizz: false,
+          guard: "d.armed",
+          on_success: "d.note('string-success')" %>
+  </div>
+
+  <section x-data="{ submitting: true }" data-test="submitting">
+    <%= render "studio/hold_button", hold_id: "submitting", duration: 600, fizz: false %>
+  </section>
+
+  <div class="relative overflow-hidden rounded-xl p-6" data-test="portaled">
+    <%= render "studio/hold_button", hold_id: "portaled", duration: 600, fizz_portal: true %>
+  </div>
+</main>

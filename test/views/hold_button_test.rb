@@ -95,20 +95,21 @@ class HoldButtonTest < ActiveSupport::TestCase
 
     stack = doc.at_css(".hold-stack")
     assert_nil stack["data-fizz-portal"], "no portal unless the caller opts in"
-    assert_nil stack["x-init"], "and no script hook on the stack"
+    assert_nil stack["x-init"], "and no Alpine hook on the stack"
     assert_nil doc.at_css(".hold-fizz-portal"), "no wrapper around the layers"
     assert_equal 2, doc.css(".hold-stack > .hold-fizz").size, "both layers sit directly in the stack"
     assert_equal render_button(hold_id: "desktop").to_html, render_button(hold_id: "desktop", fizz_portal: false).to_html,
       "fizz_portal: false renders exactly what the default renders"
   end
 
-  test "fizz_portal wraps the layers and marks the stack for the script to lift them out" do
+  test "fizz_portal wraps the layers and marks the stack for its controller to lift them out" do
     doc = render_button(hold_id: "phone", fizz_portal: true)
 
     stack = doc.at_css(".hold-stack")
     assert stack.key?("data-fizz-portal"), "the stack is marked"
-    assert_includes stack["x-init"], "studioFizzPortal.mount($el)",
-      "a stack mounted later (x-if, a modal) lifts its own layers"
+    assert_equal "hold-button", stack["data-studio-controller"],
+      "a stack mounted later (x-if, a modal) lifts its own layers when its controller connects"
+    assert_nil stack["x-init"], "the portal is the controller's, not an Alpine hook"
     portal = doc.at_css(".hold-stack > .hold-fizz-portal")
     assert portal, "one wrapper, in the stack until the script moves it"
     assert_equal "true", portal["aria-hidden"]
@@ -183,6 +184,47 @@ class HoldButtonTest < ActiveSupport::TestCase
     assert_equal "d.early()", button["data-early-action"]
     assert_equal "d.web3", button["data-early-action-guard"]
     assert_equal "d.warmUp()", button["data-on-hold-start"]
+  end
+
+  # ── F. the controller's wiring ──────────────────────────────
+
+  test "the stack carries the hold-button controller and the button its presses" do
+    doc = render_button(hold_id: "desktop")
+
+    assert_equal "hold-button", doc.at_css(".hold-stack")["data-studio-controller"]
+    assert_equal %w[mousedown->hold-button#start mouseup->hold-button#end mouseleave->hold-button#end
+                    touchstart->hold-button#press touchend->hold-button#end touchcancel->hold-button#end],
+                 doc.at_css("button.hold-btn")["data-studio-action"].split
+    button = doc.at_css("button.hold-btn")
+    assert_empty button.attribute_nodes.map(&:name).grep(/\A@|\Ax-on:/), "no Alpine listener on the button"
+  end
+
+  test "the partial emits no script" do
+    html = render_button(hold_id: "desktop", fizz_portal: true, guard: "true", on_success: "go()").to_html
+
+    refute_match(/<script/i, html, "the behaviour is studio/hold_button, a module")
+    refute_includes html, "holdBtnStart"
+  end
+
+  test "the timing attributes travel with their string local, or alone when passed alone" do
+    bare = render_button(hold_id: "desktop").at_css("button.hold-btn")
+    assert_nil bare["data-validate-at"]
+    assert_nil bare["data-early-action-at"]
+
+    timed = render_button(hold_id: "desktop", validate_at: 150, early_action_at: 400).at_css("button.hold-btn")
+    assert_equal "150", timed["data-validate-at"]
+    assert_equal "400", timed["data-early-action-at"]
+    assert_nil timed["data-validate"]
+    assert_nil timed["data-early-action"]
+
+    strings = render_button(hold_id: "desktop", validate: "check()", early_action: "sign()").at_css("button.hold-btn")
+    assert_equal %w[750 1500], [ strings["data-validate-at"], strings["data-early-action-at"] ]
+  end
+
+  test "the module's slot count is the helper's" do
+    source = File.read(File.join(ENGINE_ROOT, "app/javascript/studio/hold_button.js"))
+
+    assert_equal Studio::FizzHelper::SLOTS, source[/^export const FIZZ_SLOTS = (\d+)$/, 1].to_i
   end
 
   private

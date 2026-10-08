@@ -68,12 +68,15 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
 
   test "the boot graph follows studio/application's static imports" do
     assert_equal %w[studio/alpine_shims studio/alpine_stores studio/application studio/board
-                    studio/controllers/modal_host_controller studio/controllers/nav_collapse_controller
-                    studio/head_chrome studio/leveling_activity studio/modal_host studio/nav_collapse
-                    studio/pinned_stack], boot_graph
+                    studio/controllers/link_sidebar_controller studio/controllers/modal_host_controller
+                    studio/controllers/nav_collapse_controller studio/controllers/toast_controller studio/head_chrome
+                    studio/lazy_controllers studio/leveling_activity studio/link_sidebar studio/modal_host
+                    studio/nav_collapse studio/pinned_stack studio/stimulus studio/toast], boot_graph
     refute_includes boot_graph, "studio/local_path", "a module nothing in the boot imports is not preloaded"
-    refute_includes boot_graph, "studio/controllers/board_controller",
-                    "the board controller is registered lazily, so it is not preloaded on every page"
+    %w[studio/controllers/hold_button_controller studio/hold_button studio/hold_button_hooks
+       studio/controllers/board_controller].each do |lazy|
+      refute_includes boot_graph, lazy, "#{lazy} is registered lazily, so it is not preloaded on every page"
+    end
   end
 
   test "the rendered importmap tags carry the pins and preload only the boot graph" do
