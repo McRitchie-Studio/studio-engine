@@ -66,6 +66,20 @@
     </p>
   </header>
 
+  <%# The app's own banner generator, when it configured one
+      (config.email_image_generator_url; see Studio::EmailImageGenerator). Unset
+      draws nothing. The URL is an http(s) URL by construction, and every value
+      below is escaped by ERB output tags. %>
+  <% generator = Studio.email_image_generator_link(controller&.request) %>
+  <% if generator %>
+    <div class="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-subtle bg-inset px-4 py-3"
+         data-email-image-generator>
+      <p class="text-sm text-body flex-1 min-w-0"><%= generator.description %></p>
+      <a href="<%= generator.url %>" target="_blank" rel="noopener noreferrer"
+         class="btn btn-primary btn-sm shrink-0 self-start sm:self-auto"><%= generator.label %></a>
+    </div>
+  <% end %>
+
   <%# No flash block here on purpose — every host layout already renders the
       shared layouts/studio/flash partial, so the controller's notice/alert
       surfaces once rather than twice. %>
