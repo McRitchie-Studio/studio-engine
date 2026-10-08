@@ -164,10 +164,45 @@ module Studio
     end
 
     # 15-minute presigned GET — the only way a private object leaves the bucket.
-    def signed_url(expires_in: 900)
+    #
+    # inline_as: a content type. The URL then serves the object with
+    # Content-Disposition: inline and THAT type, whatever was stored, which is
+    # what lets the show page embed a PDF or an image (Studio::KnowledgePreview
+    # picks the type from the file's kind, never from mime_type).
+    def signed_url(expires_in: 900, inline_as: nil)
       raise Studio::S3::Error, "no file attached to #{title.inspect}" unless file?
 
-      Studio::S3.signed_url(key: s3_key, expires_in: expires_in)
+      if inline_as
+        Studio::S3.signed_url(key: s3_key, expires_in: expires_in,
+                              response_content_disposition: "inline", response_content_type: inline_as)
+      else
+        Studio::S3.signed_url(key: s3_key, expires_in: expires_in)
+      end
+    end
+
+    # The stored object's file name (the upload's name, sanitized, behind the
+    # key's timestamp prefix). There is no filename column; the key carries it.
+    def filename
+      File.basename(s3_key.to_s)
+    end
+
+    # --- preview ----------------------------------------------------------------
+
+    # :spreadsheet, :delimited, :pdf, :image, :text, or nil when the show page
+    # can only offer the download. Reads nothing from the bucket.
+    def preview_kind
+      return nil unless file?
+
+      require "studio/knowledge_preview"
+      Studio::KnowledgePreview.kind_for(filename: filename, mime_type: mime_type)
+    end
+
+    # The Studio::KnowledgePreview::Result for this document. Reads the
+    # bucket, so the show page loads it lazily (KnowledgeDocsController#preview)
+    # rather than calling it inline. Never raises.
+    def preview
+      require "studio/knowledge_preview"
+      Studio::KnowledgePreview.for(self)
     end
 
     # --- lifecycle ------------------------------------------------------------

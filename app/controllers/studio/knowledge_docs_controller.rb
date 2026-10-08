@@ -13,7 +13,7 @@ module Studio
   # deliberate second step, not a side effect of upload.
   class KnowledgeDocsController < ApplicationController
     before_action :require_admin
-    before_action :set_doc, only: [:show, :update, :download]
+    before_action :set_doc, only: [:show, :update, :download, :preview]
 
     VIEWS = %w[folders flat].freeze
 
@@ -112,7 +112,30 @@ module Studio
       redirect_to @doc.signed_url, allow_other_host: true
     end
 
+    # GET /admin/knowledge/:id/preview — the document read in the page. The
+    # show page loads this into a <turbo-frame>, so the bucket read and the
+    # parse happen here and never hold up the page itself.
+    #
+    # Always a 200: Studio::KnowledgePreview answers every failure (unknown
+    # type, over a cap, damaged, storage down) as a fallback Result carrying
+    # one sentence, rendered beside the download link. The response is
+    # no-store because it holds either the document's contents or a signed
+    # URL to them.
+    def preview
+      @preview = @doc.preview
+      log_preview_failure(@preview.error) if @preview.error
+      response.headers["Cache-Control"] = "no-store"
+    end
+
     private
+
+    # An unexpected failure behind a fallback is worth a record; a failure to
+    # record it is not worth the page.
+    def log_preview_failure(error)
+      create_error_log(error)
+    rescue StandardError => e
+      Rails.logger.warn "[knowledge preview] could not log #{error.class}: #{e.class}: #{e.message}"
+    end
 
     def expectation_params
       params.require(:knowledge_expectation)

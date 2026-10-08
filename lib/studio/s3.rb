@@ -18,8 +18,22 @@ module Studio
         public_url? ? url(key: key) : nil
       end
 
-      def download(key:)
-        client.get_object(bucket: bucket, key: full_key(key)).body.read
+      # max_bytes reads only the head of the object (a ranged GET), which is
+      # how a preview looks at the first megabyte of a file of any size and
+      # how a caller enforces a size cap without trusting a recorded length.
+      # A ranged read of an EMPTY object is a 416 on S3 and R2 alike; that is
+      # answered as the empty string it means.
+      def download(key:, max_bytes: nil)
+        # The client first: it is what loads the SDK, and the rescue below
+        # names an SDK constant that must exist by the time anything raises.
+        s3 = client
+        opts = { bucket: bucket, key: full_key(key) }
+        opts[:range] = "bytes=0-#{max_bytes.to_i - 1}" if max_bytes
+        s3.get_object(**opts).body.read
+      rescue Aws::S3::Errors::InvalidRange
+        raise unless max_bytes
+
+        "".b
       end
 
       # The PUBLIC URL of an object. On AWS (no endpoint) it is the bucket's
@@ -43,9 +57,17 @@ module Studio
         endpoint.nil? || !Studio.s3_public_url.to_s.empty?
       end
 
-      def signed_url(key:, expires_in: 3600)
+      # response_content_disposition and response_content_type are SIGNED into
+      # the URL and override the headers the object is served with (S3 and R2
+      # both honour them on a presigned GET). "inline" plus a content type the
+      # caller chose is how a private PDF or image is shown in the page
+      # without the stored content type deciding how the browser treats it.
+      def signed_url(key:, expires_in: 3600, response_content_disposition: nil, response_content_type: nil)
         require "aws-sdk-s3"
-        Aws::S3::Presigner.new(client: client).presigned_url(:get_object, bucket: bucket, key: full_key(key), expires_in: expires_in)
+        params = { bucket: bucket, key: full_key(key), expires_in: expires_in }
+        params[:response_content_disposition] = response_content_disposition if response_content_disposition
+        params[:response_content_type] = response_content_type if response_content_type
+        Aws::S3::Presigner.new(client: client).presigned_url(:get_object, **params)
       end
 
       def exists?(key:)
