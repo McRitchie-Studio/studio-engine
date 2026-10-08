@@ -4,6 +4,50 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **Knowledge documents preview in the page.** `/admin/knowledge/:id` gains a
+  Preview section, so reading a document no longer means downloading it:
+  - `.xlsx` and `.xlsm` workbooks render as tables, one tab per sheet. A formula
+    shows the value Excel last calculated for it, and numbers render through
+    their number format (dates, percentages, currency, accounting negatives).
+  - `.csv` and `.tsv` render as one table.
+  - PDFs and images (`png`, `jpg`, `gif`, `webp`) display inline, fetched by the
+    browser from a 15-minute signed URL.
+  - Text, markdown, JSON and caption files display as preformatted text. Stored
+    content is always escaped, never rendered as HTML.
+  - Anything else (`.xls`, `.docx`, SVG), anything over a cap, and any file that
+    will not parse shows one sentence saying why, beside the download link. The
+    page never fails on a bad file.
+
+  The section is a lazy `<turbo-frame>` over a new admin-only endpoint,
+  `GET /admin/knowledge/:id/preview` (`admin_knowledge_doc_preview_path`), so the
+  show page itself reads nothing from the bucket. It rides the existing
+  `Studio.draw_knowledge_routes` opt-in; there is no migration and no new setting.
+
+  The caps, all constants on `Studio::KnowledgePreview`: 500 rows and 50 columns
+  a sheet, 20 sheets a workbook, a 20 MB workbook, 64 MB for any one inflated
+  part of it, the first 1 MB of a CSV, the first 256 KB of a text file, and
+  100 MB for an inline PDF or image. A sheet or file cut by a cap says so and
+  links the download.
+- `Studio::KnowledgePreview` (`lib/studio/knowledge_preview.rb`), loaded on
+  first use and not by `require "studio"`: `kind_for(filename:, mime_type:)`,
+  `for(doc)` returning a `Result`, `read_spreadsheet(bytes)` and
+  `read_delimited(bytes)`. The workbook reader is the engine's own, on Zlib and
+  nokogiri; it adds no spreadsheet gem.
+- `Studio::KnowledgeDoc#preview`, `#preview_kind` and `#filename`, and
+  `#signed_url(inline_as: "application/pdf")`.
+- `Studio::S3.download(key:, max_bytes:)` reads only the head of an object (a
+  ranged GET), and `Studio::S3.signed_url` takes `response_content_disposition:`
+  and `response_content_type:`, signed into the URL. Both are optional; existing
+  calls are unchanged.
+
+### Changed
+
+- The gemspec declares `csv` (`>= 3.0`). It left Ruby's default gems in 3.4 and
+  the CSV preview requires it. Apps whose lockfile already names `csv` see no
+  change; the rest gain one pure-Ruby gem on their next engine bump.
+
 ## 0.95.0 — 2026-10-07
 
 ### Security

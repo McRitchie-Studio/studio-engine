@@ -940,6 +940,13 @@ set as a pair. R2 serves nothing anonymously from its S3 endpoint, so with an
 endpoint and no `s3_public_url`, `Studio::S3.url` raises `NotConfigured` and
 `upload` writes but returns `nil`; serve private objects with `signed_url`.
 
+`signed_url` also takes `response_content_disposition:` and
+`response_content_type:`, which are signed into the URL and override the headers
+the object is served with. `"inline"` plus a content type the caller chose is how
+the knowledge layer shows a private PDF or image in the page
+(`Studio::KnowledgeDoc#signed_url(inline_as:)`). `download(key:, max_bytes:)`
+reads only the head of an object.
+
 `Studio::S3.delete` moves the object to `trash/` for three days rather than
 deleting it; see [Trash and restore](#trash-and-restore).
 

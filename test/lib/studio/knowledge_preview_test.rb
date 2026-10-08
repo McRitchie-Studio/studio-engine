@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../../test_helper"
+require "tempfile"
 require_relative "../../support/xlsx_builder"
 require_relative "../../../lib/studio/knowledge_preview"
 
@@ -269,22 +270,27 @@ class KnowledgePreviewTest < Minitest::Test
   end
 
   def test_an_external_entity_is_not_expanded
-    target = File.expand_path(__FILE__)
+    # The entity points at a file of plain text, so that IF it were expanded
+    # the canary would land in the cell as ordinary characters. (Pointed at a
+    # file holding markup, an expansion fails to parse and the test passes
+    # for the wrong reason; with entity substitution switched on in the
+    # reader, this one fails.)
+    canary = Tempfile.new(["knowledge-preview-canary", ".txt"])
+    canary.write("canary-7f3a91")
+    canary.close
     sheet_xml = <<~XML
       <?xml version="1.0"?>
-      <!DOCTYPE worksheet [<!ENTITY leak SYSTEM "file://#{target}">]>
+      <!DOCTYPE worksheet [<!ENTITY leak SYSTEM "file://#{canary.path}">]>
       <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
         <sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>before&leak;after</t></is></c></row></sheetData>
       </worksheet>
     XML
     bytes = XlsxBuilder.workbook({ "S" => "" }, extra: { "xl/worksheets/sheet1.xml" => sheet_xml })
 
-    text = begin
-      texts(Preview.read_spreadsheet(bytes).sheets.first).flatten.compact.join
-    rescue Preview::Unreadable
-      ""
-    end
-    refute_includes text, "KnowledgePreviewTest", "the entity must not pull this file's contents into a cell"
+    text = texts(Preview.read_spreadsheet(bytes).sheets.first).flatten.compact.join
+    assert_equal "beforeafter", text, "the reference is dropped, and the file it names is never read"
+  ensure
+    canary&.unlink
   end
 
   # --- number formats --------------------------------------------------------------------
