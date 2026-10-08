@@ -34,7 +34,8 @@ export const schema = {
 // identifier -> its controller module. Dynamic imports, so none of these joins
 // the every-page boot graph (Studio::Engine.javascript_boot_graph).
 export const LAZY = {
-  "hold-button": () => import("studio/controllers/hold_button_controller")
+  "hold-button": () => import("studio/controllers/hold_button_controller"),
+  "board": () => import("studio/controllers/board_controller")
 }
 
 export const application = Application.start(document.documentElement, schema)
