@@ -43,7 +43,7 @@
     <% end %>
   <% when :text %>
     <% if preview.truncated %>
-      <p class="knowledge-preview-note knowledge-preview-truncated">
+      <p class="knowledge-preview-note" data-preview-truncated>
         Showing the start of this file;
         <%= link_to "download", admin_knowledge_doc_download_path(doc), data: { turbo: false } %> for the full file.
       </p>

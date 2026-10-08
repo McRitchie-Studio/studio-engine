@@ -4,7 +4,7 @@
     doc. Every cell is escaped text. %>
 <% width = sheet.rows.first.to_a.size %>
 <% if sheet.truncated_rows || sheet.truncated_columns %>
-  <p class="knowledge-preview-note knowledge-preview-truncated">
+  <p class="knowledge-preview-note" data-preview-truncated>
     Showing the first
     <%= [ ("#{number_with_delimiter(sheet.row_limit)} rows" if sheet.truncated_rows),
           ("#{width} columns" if sheet.truncated_columns) ].compact.to_sentence %>;
@@ -12,7 +12,7 @@
   </p>
 <% end %>
 <% if sheet.rows.empty? %>
-  <p class="knowledge-preview-note knowledge-preview-empty">This sheet is empty.</p>
+  <p class="knowledge-preview-note" data-preview-empty>This sheet is empty.</p>
 <% else %>
   <div class="knowledge-preview-scroll">
     <table class="knowledge-preview-table">

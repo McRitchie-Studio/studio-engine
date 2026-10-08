@@ -248,7 +248,7 @@ class KnowledgePreviewRequestTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(<td class="knowledge-cell-number">Feb 1, 2031</td>)
     refute_includes response.body, "SUM(", "a formula's text is never shown"
     assert_includes response.body, %(<th scope="col">B</th>)
-    refute_includes response.body, "knowledge-preview-truncated"
+    refute_includes response.body, "data-preview-truncated"
   end
 
   test "sheet names and cells are escaped, never rendered" do
@@ -269,7 +269,7 @@ class KnowledgePreviewRequestTest < ActionDispatch::IntegrationTest
     preview(doc)
 
     assert_response :success
-    notice = response.body[%r{<p class="knowledge-preview-note knowledge-preview-truncated">.*?</p>}m]
+    notice = response.body[%r{<p class="knowledge-preview-note" data-preview-truncated>.*?</p>}m]
     assert_match(/Showing the first\s+500 rows;/, notice)
     assert_includes notice, %(href="/admin/knowledge/#{doc.id}/download")
     assert_includes notice, "for the full file"
@@ -362,7 +362,7 @@ class KnowledgePreviewRequestTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "&lt;script&gt;alert(1)&lt;/script&gt; &amp; more"
     refute_includes response.body, "<script>alert(1)</script>"
     refute_includes response.body, "<h1>", "markdown is shown, not rendered"
-    refute_includes response.body, "knowledge-preview-truncated"
+    refute_includes response.body, "data-preview-truncated"
   end
 
   test "a long text file shows its start and says so" do
