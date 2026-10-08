@@ -189,6 +189,42 @@ class KnowledgeDocTest < ActiveSupport::TestCase
     assert_raises(Studio::S3::NotConfigured) { doc.signed_url }
   end
 
+  # --- preview ------------------------------------------------------------------
+
+  test "filename is the key's last segment and preview_kind reads it" do
+    doc = doc!(s3_key: "knowledge/welding/financials/20310131090000-ab12cd34-ledger.xlsx",
+               mime_type: "application/octet-stream")
+    assert_equal "20310131090000-ab12cd34-ledger.xlsx", doc.filename
+    assert_equal :spreadsheet, doc.preview_kind
+
+    assert_equal :pdf, doc!(s3_key: "knowledge/welding/x.pdf").preview_kind
+    assert_nil doc!(s3_key: "knowledge/welding/x.docx").preview_kind
+    assert_nil doc!.preview_kind, "a metadata-only row has nothing to preview"
+  end
+
+  test "preview answers a fallback, never an exception, on an app with no bucket" do
+    Studio::S3.reset!
+    sheet = doc!(s3_key: "knowledge/welding/ledger.xlsx").preview
+    assert sheet.fallback?
+    assert_equal "The preview could not be built.", sheet.reason
+    assert_kind_of Studio::S3::NotConfigured, sheet.error,
+                   "the real cause is handed back for the caller to log, not a NameError from a rescue clause"
+
+    letter = doc!(s3_key: "knowledge/welding/letter.pdf").preview
+    assert letter.fallback?
+    assert_kind_of Studio::S3::NotConfigured, letter.error
+
+    assert_equal "No file is attached.", doc!.preview.reason
+  end
+
+  test "signed_url inline_as still refuses without a file or a bucket" do
+    doc = doc!
+    assert_raises(Studio::S3::Error) { doc.signed_url(inline_as: "application/pdf") }
+
+    doc.update!(s3_key: "knowledge/welding/x.pdf")
+    assert_raises(Studio::S3::NotConfigured) { doc.signed_url(inline_as: "application/pdf") }
+  end
+
   test "intake! files metadata-only records and defaults the title from the file" do
     doc = Doc.intake!({ entity: "welding", title: "LOI" })
     assert doc.persisted?

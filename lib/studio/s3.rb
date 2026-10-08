@@ -24,16 +24,19 @@ module Studio
       # A ranged read of an EMPTY object is a 416 on S3 and R2 alike; that is
       # answered as the empty string it means.
       def download(key:, max_bytes: nil)
-        # The client first: it is what loads the SDK, and the rescue below
-        # names an SDK constant that must exist by the time anything raises.
-        s3 = client
         opts = { bucket: bucket, key: full_key(key) }
         opts[:range] = "bytes=0-#{max_bytes.to_i - 1}" if max_bytes
-        s3.get_object(**opts).body.read
-      rescue Aws::S3::Errors::InvalidRange
-        raise unless max_bytes
+        s3 = client
+        # The rescue names an SDK constant, so it wraps only what runs after
+        # the client (which loads the SDK) exists: an unconfigured app must
+        # raise NotConfigured from `bucket` above, not a NameError from here.
+        begin
+          s3.get_object(**opts).body.read
+        rescue Aws::S3::Errors::InvalidRange
+          raise unless max_bytes
 
-        "".b
+          "".b
+        end
       end
 
       # The PUBLIC URL of an object. On AWS (no endpoint) it is the bucket's

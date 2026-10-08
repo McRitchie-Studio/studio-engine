@@ -145,6 +145,59 @@ class S3EndpointTest < Minitest::Test
     assert_includes signed, "X-Amz-Signature="
   end
 
+  # --- 6. inline signed URLs and head reads, for the knowledge preview ------------
+
+  def test_signed_url_signs_an_inline_disposition_and_a_content_type_into_the_url
+    Studio.s3_endpoint = ENDPOINT
+    Studio.s3_region = "auto"
+    Studio.s3_access_key_id = "id-123"
+    Studio.s3_secret_access_key = "secret-456"
+
+    signed = Studio::S3.signed_url(key: KEY, expires_in: 900,
+                                   response_content_disposition: "inline", response_content_type: "application/pdf")
+    uri = URI(signed)
+    query = URI.decode_www_form(uri.query).to_h
+
+    assert_includes uri.host, "acct123.r2.cloudflarestorage.com"
+    assert_equal "inline", query["response-content-disposition"]
+    assert_equal "application/pdf", query["response-content-type"]
+    assert_equal "900", query["X-Amz-Expires"]
+    refute_empty query["X-Amz-Signature"].to_s
+
+    # The overrides are part of what is signed: the same key without them
+    # signs differently, so they cannot be appended to a plain link.
+    plain = URI.decode_www_form(URI(Studio::S3.signed_url(key: KEY, expires_in: 900)).query).to_h
+    refute plain.key?("response-content-disposition")
+    refute_equal plain["X-Amz-Signature"], query["X-Amz-Signature"]
+  end
+
+  def test_download_with_max_bytes_sends_a_range_and_without_it_sends_none
+    Studio.s3_endpoint = ENDPOINT
+    stub = stub_client
+    stub.stub_responses(:get_object, { body: "head" })
+
+    assert_equal "head", Studio::S3.download(key: KEY, max_bytes: 1024)
+    assert_equal "head", Studio::S3.download(key: KEY)
+    ranges = stub.api_requests.select { |r| r[:operation_name] == :get_object }.map { |r| r[:params][:range] }
+    assert_equal ["bytes=0-1023", nil], ranges
+  end
+
+  def test_a_ranged_read_of_an_empty_object_is_the_empty_string
+    Studio.s3_endpoint = ENDPOINT
+    stub = stub_client
+    stub.stub_responses(:get_object, "InvalidRange")
+
+    assert_equal "", Studio::S3.download(key: KEY, max_bytes: 1024)
+  end
+
+  def test_download_does_not_swallow_other_errors
+    Studio.s3_endpoint = ENDPOINT
+    stub = stub_client
+    stub.stub_responses(:get_object, "NoSuchKey")
+
+    assert_raises(Aws::S3::Errors::NoSuchKey) { Studio::S3.download(key: KEY, max_bytes: 1024) }
+  end
+
   private
 
   def stub_client
