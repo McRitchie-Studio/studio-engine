@@ -89,21 +89,25 @@
 <% messages = flash.select { |type, _| %w[notice alert].include?(type) } %>
 <% initial_json = messages.map { |type, msg| { type: type, message: msg } }.to_json %>
 
-<div x-data="toastManager(<%= initial_json %>)"
-     @toast.window="add($event.detail)">
+<%# The queue is studio/toast ($store.toasts): it listens for the `toast` window
+    event and seeds the flash below. The bare x-data is the Alpine scope the
+    bindings need; the toast controller binds the queue to this root's lifetime. %>
+<div x-data
+     data-studio-controller="toast"
+     data-toast-initial-value="<%= initial_json %>">
 
   <%# ── Page blur — half-ellipse backdrop blur behind toasts ── %>
   <div class="toast-page-blur"
-       :style="'opacity: ' + (hasVisible() ? '1' : '0')"></div>
+       :style="'opacity: ' + ($store.toasts.hasVisible() ? '1' : '0')"></div>
 
   <div id="toast-container"
        class="fixed top-0 left-1/2 flex flex-col items-center pointer-events-none"
        style="transform: translateX(-50%); padding: 1rem; width: 100%; max-width: 30rem;">
 
-  <template x-for="(toast, index) in toasts" :key="toast.id">
-    <div :style="toastStyle(index)"
+  <template x-for="(toast, index) in $store.toasts.toasts" :key="toast.id">
+    <div :style="$store.toasts.toastStyle(index)"
          class="toast-wrapper w-full"
-         @click="handlePeekClick(index)">
+         @click="$store.toasts.handlePeekClick(index)">
 
       <%# ── Blur glow (optional) — uses filter:blur on a colored div, not backdrop-filter ── %>
       <template x-if="toast.blurShadow">
@@ -112,7 +116,7 @@
 
       <%# ── Toast card — z-index above all blur backdrops ── %>
       <div class="relative pointer-events-auto bg-surface rounded-lg p-4 w-full flex gap-3 toast-card"
-           :class="toastShadowClass(index)"
+           :class="$store.toasts.toastShadowClass(index)"
            role="status">
 
         <%# ── Image or icon ── %>
@@ -135,7 +139,7 @@
           <div class="flex items-start justify-between gap-2">
             <span x-text="toast.title" class="text-heading font-semibold text-sm"></span>
             <template x-if="toast.dismissible">
-              <button @click.stop="dismiss(toast.id)"
+              <button @click.stop="$store.toasts.dismiss(toast.id)"
                       class="text-muted hover:text-heading shrink-0 cursor-pointer"
                       aria-label="Dismiss">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -150,7 +154,7 @@
           <template x-if="toast.buttons && toast.buttons.length > 0">
             <div class="flex gap-2" style="margin-top: 0.75rem;">
               <template x-for="btn in toast.buttons" :key="btn.label">
-                <button @click.stop="if (btn.onclick) btn.onclick(); dismiss(toast.id)"
+                <button @click.stop="if (btn.onclick) btn.onclick(); $store.toasts.dismiss(toast.id)"
                         class="btn btn-sm"
                         :class="btn.style === 'primary' ? 'btn-primary' : btn.style === 'danger' ? 'btn-danger' : 'btn-outline'">
                   <span x-text="btn.label"></span>
@@ -165,112 +169,3 @@
   </div>
 </div>
 
-<script>
-  if (!window.toastManager) {
-    window.toastManager = function(initial) {
-      return {
-        toasts: [],
-        _nextId: 0,
-        expanded: false,
-
-        init() {
-          if (initial && initial.length) {
-            initial.forEach((msg, i) => {
-              setTimeout(() => this.add(msg), i * 100 + 50);
-            });
-          }
-        },
-
-        add(detail) {
-          var id = ++this._nextId;
-          var type = detail.type || 'notice';
-          var buttons = detail.buttons || [];
-          this.toasts.unshift({
-            id: id,
-            type: type,
-            title: detail.title || (type === 'notice' ? 'Success' : 'Error'),
-            message: detail.message || '',
-            image: detail.image || null,
-            dismissible: detail.dismissible !== false,
-            blurShadow: detail.blurShadow || false,
-            buttons: buttons,
-            visible: false
-          });
-          // Cap at 5 toasts — dismiss oldest when exceeded
-          while (this.toasts.length > 5) {
-            this.toasts.pop();
-          }
-          this.expanded = false;
-          this.$nextTick(() => {
-            var t = this.toasts.find(function(t) { return t.id === id; });
-            if (t) t.visible = true;
-          });
-          var duration = detail.duration != null ? detail.duration : (buttons.length ? 0 : 4000);
-          if (duration > 0) {
-            var self = this;
-            setTimeout(function() { self.dismiss(id); }, duration);
-          }
-        },
-
-        dismiss(id) {
-          var toast = this.toasts.find(function(t) { return t.id === id; });
-          if (toast && toast.visible) {
-            toast.visible = false;
-            var self = this;
-            setTimeout(function() {
-              self.toasts = self.toasts.filter(function(t) { return t.id !== id; });
-              // Reset expanded when down to 1 or fewer toasts
-              if (self.toasts.filter(function(t) { return t.visible; }).length <= 1) {
-                self.expanded = false;
-              }
-            }, 400);
-          }
-        },
-
-        toastShadowClass(index) {
-          var visibleCount = this.toasts.filter(function(t) { return t.visible; }).length;
-          if (visibleCount <= 1) return 'toast-shadow-all';
-          if (index === 0) return 'toast-shadow-top';
-          return 'toast-shadow-bottom';
-        },
-
-        hasVisible() {
-          return this.toasts.some(function(t) { return t.visible; });
-        },
-
-        handlePeekClick(index) {
-          if (!this.expanded && index > 0 && this.toasts.length > 1) {
-            this.expanded = true;
-          }
-        },
-
-        toastStyle(index) {
-          var toast = this.toasts[index];
-
-          // Leaving — gentle shrink and fade
-          if (!toast.visible) {
-            return 'opacity: 0; transform: scale(0.7); max-height: 0; margin-top: 0; padding: 0; overflow: hidden;';
-          }
-
-          var visibleCount = this.toasts.filter(function(t) { return t.visible; }).length;
-          var isCollapsed = !this.expanded && visibleCount > 1;
-
-          // Full view — latest toast or expanded mode
-          if (!isCollapsed || index === 0) {
-            return 'opacity: 1; transform: scale(1) translateY(0); margin-top: ' + (index > 0 ? '0.35rem' : '0') + '; max-height: 20rem;';
-          }
-
-          // Collapsed peek — thin strip showing card edge
-          if (index <= 2) {
-            var scale = 1 - (index * 0.03);
-            var opacity = 0.7 - ((index - 1) * 0.15);
-            return 'display: flex; flex-direction: column; justify-content: flex-end; transform: scale(' + scale + ') translateY(0); max-height: 0.5rem; overflow: hidden; opacity: ' + opacity + '; margin-top: 0.15rem; pointer-events: auto; cursor: pointer;';
-          }
-
-          // Hidden — beyond visible stack
-          return 'max-height: 0; overflow: hidden; opacity: 0; margin-top: 0; pointer-events: none;';
-        }
-      };
-    };
-  }
-</script>

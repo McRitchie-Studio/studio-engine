@@ -182,6 +182,11 @@
     it. It imports nothing, and the modal-host controller imports it, so this
     resolves to the same preloaded module. %>
 <%= javascript_import_module_tag "studio/modal_host" %>
+<%# THE TOAST QUEUE, BY ITS OWN DOOR, for the same reason. studio/toast registers
+    $store.toasts on alpine:init, listens for the `toast` window event and seeds
+    the flash layouts/studio/_flash renders, so a failed boot leaves a page its
+    flash and its toasts. It imports nothing, and the toast controller imports it. %>
+<%= javascript_import_module_tag "studio/toast" %>
 <%# ALPINE LOADS AFTER THE MODULE TAGS, and the order is the contract. Deferred
     classic scripts and module scripts execute in document order, so by the time
     Alpine starts, studio/application has defined the shims it evaluates

@@ -301,6 +301,15 @@ class E2eLabController < ActionController::Base
   # engine behaviour, exactly as a consumer's layout assembles it.
   def toast_over_banner = render(:toast_over_banner)
 
+  # The toast root as a layout renders it, with the request's flash in it, under
+  # Turbo: ?notice= and ?alert= set the flash, so a spec can visit one page from
+  # another and come Back.
+  def toast_flash
+    flash.now[:notice] = params[:notice] if params[:notice].present?
+    flash.now[:alert] = params[:alert] if params[:alert].present?
+    render(:toast_flash, layout: "survey_turbo_lab")
+  end
+
   # The geo manager, rendered as a host renders it: the engine's own template plus
   # the badge a host puts in its navbar.
   #

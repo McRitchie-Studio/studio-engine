@@ -59,6 +59,7 @@ Rails.application.routes.draw do
   get "lab/onboarding_first_name", to: "e2e_lab#onboarding_first_name"
   get "lab/js_attribute_locals", to: "e2e_lab#js_attribute_locals"
   get "lab/toast_over_banner", to: "e2e_lab#toast_over_banner"
+  get "lab/toast_flash", to: "e2e_lab#toast_flash"
   get "lab/profile", to: "e2e_lab#profile"
   get "lab/profile_edit", to: "e2e_lab#profile_edit"
   get "lab/hold_button", to: "e2e_lab#hold_button"

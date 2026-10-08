@@ -859,7 +859,13 @@
 # 221 -> 222: e2e/modal_host_turbo_visit.spec.js, 1 test. A Turbo visit onto a
 # page with its own scoped modal host registers that store before Alpine reads it.
 #   npx playwright test --list  -> 222 tests in 32 files
-total_specs: 222
+# 222 -> 228: e2e/toast_queue.spec.js, 6 tests. The toast queue is studio/toast
+# ($store.toasts): a page's flash enters as toasts, the `toast` event raises one
+# and a sixth drops the oldest, a toast leaves at its duration, a root that
+# arrives after load is seeded by its controller, a Turbo visit swaps the queue
+# and Back replays nothing, and both survive a boot that fails to load.
+#   npx playwright test --list  -> 228 tests in 33 files
+total_specs: 228
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1006,8 +1012,8 @@ total_specs: 222
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 213
 # executed = total - devnet - allowed_skips = 213 - 0 - 0 = 213, so executed ==
 # total_specs and the equality assertion holds.
-#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 222
-executed: 222
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 228
+executed: 228
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

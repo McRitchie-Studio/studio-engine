@@ -54,10 +54,10 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "what stays inline is the pre-paint theme, the import map, the boot import and the two store imports" do
+  test "what stays inline is the pre-paint theme, the import map, the boot import and the three store imports" do
     inline = head_scripts("/lab/bar_stack").reject { |script| script["src"] }
 
-    assert_equal 5, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
+    assert_equal 6, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
     assert_includes inline[0].text, "classList.add('dark')", "the pre-paint theme script comes first"
     assert_equal "importmap", inline[1]["type"]
     assert_equal "module", inline[2]["type"]
@@ -66,6 +66,21 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     assert_equal %(import "studio/alpine_stores"), inline[3].text.strip
     assert_equal "module", inline[4]["type"]
     assert_equal %(import "studio/modal_host"), inline[4].text.strip
+    assert_equal "module", inline[5]["type"]
+    assert_equal %(import "studio/toast"), inline[5].text.strip
+  end
+
+  # The toast queue's own door: layouts/studio/_flash binds $store.toasts, so a
+  # failed boot must not take the store, the flash or the `toast` event with it.
+  test "the toast queue loads by its own nonced module tag, before Alpine" do
+    scripts = head_scripts("/lab/bar_stack")
+    toast = scripts.index { |script| script.text.strip == %(import "studio/toast") }
+    alpine = scripts.index { |script| script["src"].to_s.include?("studio/alpine") }
+
+    refute_nil toast, "the head does not import studio/toast by its own tag"
+    assert_equal NONCE, scripts[toast]["nonce"]
+    assert_equal "module", scripts[toast]["type"]
+    assert_operator toast, :<, alpine, "the toast store's listener must be registered before Alpine starts"
   end
 
   # The modal stack's own door, for the same reason as the stores': a host's

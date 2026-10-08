@@ -66,8 +66,8 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
 
   test "the boot graph follows studio/application's static imports" do
     assert_equal %w[studio/alpine_shims studio/alpine_stores studio/application studio/controllers/modal_host_controller
-                    studio/controllers/nav_collapse_controller studio/head_chrome studio/modal_host studio/nav_collapse
-                    studio/pinned_stack], boot_graph
+                    studio/controllers/nav_collapse_controller studio/controllers/toast_controller studio/head_chrome
+                    studio/modal_host studio/nav_collapse studio/pinned_stack studio/toast], boot_graph
     refute_includes boot_graph, "studio/local_path", "a module nothing in the boot imports is not preloaded"
   end
 

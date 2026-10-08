@@ -1,0 +1,7 @@
+<%# layouts/studio/flash as a host layout renders it: the partial by name, with
+    whatever flash the request carries. The link is a Turbo visit onto the same
+    page with a different flash. %>
+<main class="p-8" data-test="toast-flash-page">
+  <%= render "layouts/studio/flash" %>
+  <a href="/lab/toast_flash?notice=Second+page" data-test="next-page">Next page</a>
+</main>
