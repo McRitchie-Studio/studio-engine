@@ -16,6 +16,8 @@ module Studio
   #    engine never requires it; a host adds `gem "lookbook"` after
   #    studio-engine). Such an app draws it in development and test, and in
   #    production only if it also sets Studio.lookbook_in_production = true.
+  #    A host that lists lookbook BEFORE studio-engine draws nothing and is
+  #    told so at boot (LOAD_ORDER_WARNING).
   #    Everywhere else there is no route, no ViewComponent preview route, no
   #    /lookbook-assets middleware, and no Lookbook in memory.
   # 2. WHO SEES IT. An admin with a live session. Anyone else gets 404, not a
@@ -40,6 +42,11 @@ module Studio
     # preview's Ruby and template) and :params (live inputs from the URL).
     MAIN_PANELS = %i[preview output].freeze
     DRAWER_PANELS = %i[notes].freeze
+    # Printed at boot by a host whose bundle loads lookbook before the engine.
+    LOAD_ORDER_WARNING =
+      "studio-engine: lookbook was required before studio-engine, so the component gallery " \
+      "(#{MOUNT_PATH}) is NOT mounted. Move `gem \"lookbook\"` below `gem \"studio-engine\"` " \
+      "in the Gemfile and restart."
 
     module_function
 
@@ -48,10 +55,13 @@ module Studio
     # lib/studio/engine.rb).
     mattr_accessor :lookbook_loaded_before_engine, default: false
 
-    # Whether this app draws the gallery. Pure: the env, the flag and whether
-    # lookbook is loaded are passed in, so the rule unit-tests without Rails.
-    def mounted?(env:, in_production:, lookbook_loaded:)
+    # Whether this app draws the gallery. Pure: the env, the flag, whether
+    # lookbook is loaded and whether it loaded in order are passed in, so the
+    # rule unit-tests without Rails. Out of order it is not drawn: Lookbook
+    # turned previews on before ViewComponent decided its preview routes.
+    def mounted?(env:, in_production:, lookbook_loaded:, load_order_ok: true)
       return false unless lookbook_loaded
+      return false unless load_order_ok
 
       !env.to_s.casecmp?("production") || in_production == true
     end

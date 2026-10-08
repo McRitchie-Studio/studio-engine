@@ -34,8 +34,9 @@ class StudioComponentGalleryTest < Minitest::Test
     Studio::ComponentGallery.admin_request?(Request.new(session))
   end
 
-  def mounted?(env, in_production, lookbook_loaded: true)
-    Studio::ComponentGallery.mounted?(env: env, in_production: in_production, lookbook_loaded: lookbook_loaded)
+  def mounted?(env, in_production, lookbook_loaded: true, **order)
+    Studio::ComponentGallery.mounted?(env: env, in_production: in_production, lookbook_loaded: lookbook_loaded,
+                                      **order)
   end
 
   def test_drawn_in_development_and_test_whatever_the_flag
@@ -56,6 +57,22 @@ class StudioComponentGalleryTest < Minitest::Test
     %w[development test production].each do |env|
       refute mounted?(env, true, lookbook_loaded: false), env
     end
+  end
+
+  # Every case here is drawn in order (the control), so the order alone refuses.
+  def test_mounted_refuses_when_lookbook_loaded_before_engine
+    [["development", false], ["test", false], ["production", true]].each do |env, flag|
+      assert mounted?(env, flag, load_order_ok: true), "control: #{env} draws the gallery in order"
+      refute mounted?(env, flag, load_order_ok: false), "#{env} draws the gallery out of order"
+    end
+  end
+
+  def test_the_load_order_warning_names_the_fix_and_says_nothing_is_mounted
+    warning = Studio::ComponentGallery::LOAD_ORDER_WARNING
+
+    assert_includes warning, "NOT mounted"
+    assert_includes warning, Studio::ComponentGallery::MOUNT_PATH
+    assert_includes warning, 'Move `gem "lookbook"` below `gem "studio-engine"` in the Gemfile'
   end
 
   def test_the_load_order_is_ok_unless_lookbook_came_first

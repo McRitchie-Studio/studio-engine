@@ -52,6 +52,21 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   child columns. Filling a blank slug and writes that skip validations
   (`update_column`, `update_all`) are unaffected.
 
+### Fixed
+
+- **The component gallery is not mounted when lookbook loads before
+  studio-engine.** A host that lists `gem "lookbook"` above `gem "studio-engine"`
+  drew the gallery anyway; it now draws no gallery or asset route, and the boot
+  warning says so and names the fix: move `gem "lookbook"` below
+  `gem "studio-engine"` in the Gemfile and restart.
+- **`--color-danger-ink` clears AA on its own 10% tint.** It was derived
+  against the theme surfaces only, so `bg-danger/10 text-danger-ink` (the danger
+  badge and chip) measured 4.10:1 light and 4.18:1 dark; it now counts its tint
+  as the warning and success inks do, and measures 4.61:1 and 4.53:1. The default
+  ink moves from `#BA3535` to `#AC3131` (light) and `#F48484` to `#F58F8F`
+  (dark). A consumer test that pins either hex, or that expects danger-ink to
+  fail on a danger tint, needs updating.
+
 ## 0.95.0 — 2026-10-07
 
 ### Security

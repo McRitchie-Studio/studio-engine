@@ -16,8 +16,11 @@
 #                         lookbook is taken off the load path before anything
 #                         loads, so a require of it would fail exactly as it
 #                         does in a bundle without it.
+#   PROBE_LOOKBOOK_GEM=first  the host's Gemfile lists lookbook BEFORE
+#                         studio-engine, so it is required first.
 require "bundler/setup"
-LOOKBOOK_IN_BUNDLE = ENV["PROBE_LOOKBOOK_GEM"] == "1"
+LOOKBOOK_FIRST = ENV["PROBE_LOOKBOOK_GEM"] == "first"
+LOOKBOOK_IN_BUNDLE = LOOKBOOK_FIRST || ENV["PROBE_LOOKBOOK_GEM"] == "1"
 $LOAD_PATH.reject! { |path| path.include?("/lookbook-") } unless LOOKBOOK_IN_BUNDLE
 require "json"
 require "rails"
@@ -25,6 +28,7 @@ require "active_model/railtie"
 require "action_controller/railtie"
 require "action_view/railtie"
 require "importmap-rails"
+require "lookbook" if LOOKBOOK_FIRST
 require "studio"
 require "lookbook" if LOOKBOOK_IN_BUNDLE
 

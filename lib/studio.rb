@@ -736,7 +736,8 @@ module Studio
   # and this is development or test, or production with the flag.
   def self.lookbook_mounted?
     ComponentGallery.mounted?(env: Rails.env, in_production: lookbook_in_production,
-                              lookbook_loaded: ComponentGallery.lookbook_loaded?)
+                              lookbook_loaded: ComponentGallery.lookbook_loaded?,
+                              load_order_ok: ComponentGallery.load_order_ok?)
   end
 
   # WHERE THE APP'S OWN BOOKING PAGE LIVES, for an app that renders

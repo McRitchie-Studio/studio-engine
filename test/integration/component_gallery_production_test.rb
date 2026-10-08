@@ -17,7 +17,9 @@ require "rbconfig"
 #   - production with lookbook bundled but no flag draws none of them either;
 #   - production with lookbook and Studio.lookbook_in_production draws the
 #     gallery and its assets, and still no ViewComponent preview route;
-#   - development draws the gallery only when the bundle has lookbook.
+#   - development draws the gallery only when the bundle has lookbook;
+#   - a bundle that loads lookbook before studio-engine draws no gallery and
+#     prints what to change.
 # The engine's importmap pins reach the host in every case.
 class ComponentGalleryProductionTest < Minitest::Test
   PROBE = File.expand_path("../support/component_gallery_probe.rb", __dir__)
@@ -28,12 +30,12 @@ class ComponentGalleryProductionTest < Minitest::Test
       result = File.join(root, "result.json")
       vars = {
         "RAILS_ENV" => env, "PROBE_ROOT" => root, "PROBE_RESULT" => result,
-        "PROBE_LOOKBOOK" => flag ? "1" : "0", "PROBE_LOOKBOOK_GEM" => gem ? "1" : "0",
+        "PROBE_LOOKBOOK" => flag ? "1" : "0", "PROBE_LOOKBOOK_GEM" => { true => "1", false => "0" }.fetch(gem, gem.to_s),
         "PROBE_EAGER" => eager ? "1" : "0", "BUNDLE_GEMFILE" => File.join(ENGINE_ROOT, "Gemfile")
       }
       output = IO.popen(vars, [RbConfig.ruby, PROBE], err: %i[child out], &:read)
       assert $?.success?, "the #{env} probe failed to boot:\n#{output}"
-      JSON.parse(File.read(result))
+      JSON.parse(File.read(result)).merge("output" => output)
     end
   end
 
@@ -92,6 +94,17 @@ class ComponentGalleryProductionTest < Minitest::Test
     assert(result["preview_routes"].all? { |path| path.start_with?("/admin/style/previews") },
            "a preview route sits outside /admin/style: #{result['preview_routes'].inspect}")
     refute result["rack_static"]
+  end
+
+  # The same boot as the case above with the two requires swapped.
+  def test_lookbook_loaded_before_the_engine_draws_no_gallery_and_says_why
+    result = probe(env: "development", gem: :first)
+
+    assert result["lookbook_constant"], "the probe meant to load lookbook"
+    assert_no_gallery(result)
+    assert_includes result["output"], 'Move `gem "lookbook"` below `gem "studio-engine"` in the Gemfile'
+    assert_includes result["output"], "NOT mounted"
+    refute_includes probe(env: "development", gem: true)["output"], "NOT mounted", "control: in order, no warning"
   end
 
   # What Lookbook costs a production process that loads it. Reported, not

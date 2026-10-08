@@ -4,7 +4,7 @@ require "test_helper"
 require_relative "../support/engine_tailwind_build"
 
 # [unit] Every status ink (danger, warning, success) must clear WCAG AA on every
-# surface in both themes, and the warning and success inks on their own tint too.
+# surface in both themes, and on its own tint too.
 #
 # THE DEFECT THIS PINS. Engine views wrote text-warning, text-danger and
 # text-success, and the shared preset registered none of them, so each compiled
@@ -15,20 +15,17 @@ require_relative "../support/engine_tailwind_build"
 # of each role is an INK derived per theme by ThemeResolver, the contract
 # danger-ink already set (test/lib/danger_ink_contrast_test.rb).
 #
-# THE TINT. The warning and success inks are read INSIDE their own tint, in the
-# badge `bg-warning/10 text-warning-ink border-warning/30`. An ink tuned to the
-# bare surfaces alone measured 3.91:1 (warning, dark) there, so their search
-# counts the 10% tint over each surface as a surface too. Danger text is kept
-# OFF its tint instead (ThemeResolver#status_ink says why), so danger-ink is
-# held to the surfaces here and engine_class_vocabulary_test.rb refuses the
-# combination in views.
+# THE TINT. A status ink is read INSIDE its own tint, in the badge
+# `bg-warning/10 text-warning-ink border-warning/30`. An ink tuned to the bare
+# surfaces alone measured 3.91:1 (warning, dark) and 4.10:1 (danger, light)
+# there, so the search counts the 10% tint over each surface as a surface too.
 #
 # Like its danger sibling, this asserts the PROPERTY on the resolver's own
 # surfaces rather than pinning hexes, which would freeze one palette.
 class StatusInkContrastTest < ActiveSupport::TestCase
   AA     = 4.5
   ROLES  = %w[danger warning success].freeze
-  TINTED = %w[warning success].freeze
+  TINTED = %w[danger warning success].freeze
 
   def resolver(colors = {}) = Studio::ThemeResolver.new(colors)
 
@@ -97,6 +94,25 @@ class StatusInkContrastTest < ActiveSupport::TestCase
     worst = backgrounds("warning", vars["--color-warning"], surfaces).map { |bg| Studio::ColorScale.contrast_ratio(bare, bg) }.min
 
     assert_operator worst, :<, AA, "a bare-surface warning ink now clears its own tint; the tint term proves nothing"
+  end
+
+  # THE CONTROL for danger on its tint, in both modes: the surface-tuned ink
+  # clears every surface and still falls under AA on its own tint.
+  def test_danger_ink_tuned_to_surfaces_fails_on_its_tint
+    res = resolver
+    { dark: :lighten, light: :darken }.each do |mode, direction|
+      vars, surfaces = modes(res, {})[mode]
+      danger = vars["--color-danger"]
+      bare = res.send(:contrast_ink, danger, direction: direction, start: 0.0, target: AA, against: surfaces)
+      on_surfaces = surfaces.map { |bg| Studio::ColorScale.contrast_ratio(bare, bg) }.min
+      on_tints = (backgrounds("danger", danger, surfaces) - surfaces).map { |bg| Studio::ColorScale.contrast_ratio(bare, bg) }.min
+
+      assert_operator on_surfaces, :>=, AA, "#{mode}: the surface-tuned danger ink no longer clears its surfaces"
+      assert_operator on_tints, :<, AA,
+                      "#{mode}: a surface-tuned danger ink now clears its own tint at #{on_tints.round(2)}:1; " \
+                      "the tint term proves nothing for danger, so rewrite this control"
+      refute_equal bare, vars["--color-danger-ink"], "#{mode}: danger-ink is still the surface-tuned ink"
+    end
   end
 
   # A theme whose colour ALREADY passes keeps its exact brand hex.

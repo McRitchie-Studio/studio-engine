@@ -283,37 +283,6 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
     assert_operator tokens.length, :>=, 8, "only #{tokens.length} status-role tokens found — the scan went quiet"
   end
 
-  # Danger text sits on a theme surface, never on a danger tint. danger-ink is
-  # tuned to the bare surfaces and measures 4.10 to 4.18:1 on its own 10% tint,
-  # under AA; ThemeResolver#status_ink says why it stays that way for now. Read
-  # per LINE of raw source, because the combination usually hides in a Ruby
-  # ternary whose nested quotes defeat attribute parsing. The limit: a class
-  # list split across lines would slip past.
-  # Known and owned elsewhere: the badge's danger tone is the hub's status_tone
-  # danger chip (danger ink on a 10% danger tint, 4.17:1). Raising the ink is the
-  # task engine-status-ink-meets-aa, which fixes the chip and the badge together.
-  # Policed: the entry fails as stale once that file no longer pairs them.
-  DANGER_TINT_PENDING = {
-    "app/components/studio/badge_component.rb" => "engine-status-ink-meets-aa raises danger ink on its tint"
-  }.freeze
-
-  def test_no_view_puts_danger_ink_on_a_danger_tint
-    offenders = self.class.source_paths.flat_map do |path|
-      source = File.read(path).gsub(/<%#.*?%>/m) { |c| "\n" * c.count("\n") }
-      source.lines.each_with_index.filter_map do |line, i|
-        next unless line.match?(/(?<![\w-])bg-danger(?![\w-])/) && line.include?("text-danger-ink")
-
-        "#{self.class.relative(path)}:#{i + 1}"
-      end
-    end
-
-    pending, rest = offenders.partition { |where| DANGER_TINT_PENDING.key?(where.split(":").first) }
-
-    assert_empty rest, "danger-ink on a danger tint fails AA; put danger text on a theme surface"
-    stale = DANGER_TINT_PENDING.keys - pending.map { |where| where.split(":").first }
-    assert_empty stale, "#{stale.inspect} no longer pair danger ink with a danger tint; delete the entry"
-  end
-
   # ── the opt-in layer is a declared dependency ─────────────────────────────
 
   def test_every_view_that_depends_on_the_opt_in_motion_layer_is_declared
