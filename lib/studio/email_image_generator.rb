@@ -84,12 +84,25 @@ module Studio
     def resolve_url(configured, request = nil)
       value =
         if configured.respond_to?(:call)
-          arity = configured.respond_to?(:arity) ? configured.arity : 1
-          arity.zero? ? configured.call : configured.call(request)
+          call_configured(configured, request)
         else
           configured
         end
       web_url?(value) ? value.strip : nil
+    end
+
+    # A callable that raises draws no link rather than a 500 on /admin/emails;
+    # the exception goes to ErrorLog when the host has one (this file is pure Ruby).
+    def call_configured(callable, request)
+      arity = callable.respond_to?(:arity) ? callable.arity : 1
+      arity.zero? ? callable.call : callable.call(request)
+    rescue StandardError => e
+      begin
+        ::ErrorLog.capture!(e) if defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
+      rescue StandardError
+        nil
+      end
+      nil
     end
 
     # The Link to render, or nil when no link is configured.

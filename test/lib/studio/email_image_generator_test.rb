@@ -82,6 +82,11 @@ class EmailImageGeneratorTest < Minitest::Test
     assert_equal "https://example.com", G.resolve_url(-> { "https://example.com" }, Object.new)
   end
 
+  def test_a_callable_that_raises_draws_no_link_instead_of_a_500
+    assert_nil G.resolve_url(->(_r) { raise "boom" }, Object.new)
+    assert_nil G.link(url: ->(_a, _b) { "https://example.com" }), "a wrong-arity callable draws nothing"
+  end
+
   def test_a_callable_answering_nil_blank_or_unsafe_draws_no_link
     [nil, "", "javascript:alert(1)", "/relative", 42].each do |answer|
       assert_nil G.resolve_url(->(_r) { answer }), "a callable answering #{answer.inspect} must draw nothing"
