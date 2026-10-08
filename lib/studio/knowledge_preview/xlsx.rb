@@ -19,9 +19,32 @@ module Studio
     # it can ask for gigabytes, so every cap here is on a SIZE or a COST and
     # not only on a count:
     #
+    #   the read as a whole     three bounds no part of the file can step
+    #                           around, because every part is read through
+    #                           each_node and nothing else:
+    #                             - ONE inflate budget for the workbook, spent
+    #                               by every part opened (Zip::Budget), so a
+    #                               part read twenty times costs twenty times;
+    #                             - a wall-clock DEADLINE, checked on every XML
+    #                               node, on a monotonic clock;
+    #                             - a budget on the TEXT THE PARSER HANDS OVER
+    #                               (max_parsed_text_bytes): every text node
+    #                               and reference turned into a Ruby string is
+    #                               counted before anything looks at it, so
+    #                               text that no other budget would count
+    #                               (past the cap, in pieces) is still bounded.
+    #                           Past any of the three the read ends as
+    #                           TooLarge, and the page offers the download.
     #   rows, columns, sheets   each sheet streams through a pull parser that
     #                           stops at the first row past max_rows.
-    #   filled cells            max_cells across the workbook.
+    #   filled cells            max_cells across the workbook, checked per
+    #                           cell, so a row of duplicate cells is counted.
+    #   tables                  relationships, sheets, custom formats, styles
+    #                           and tokenized formats each stop at a fixed
+    #                           number of entries; a format past its cap
+    #                           renders as General.
+    #   numbers in attributes   a row, style or format id is read from at most
+    #                           eight characters; a row below 1 ends the sheet.
     #   text per cell           max_cell_chars, applied as the text is read, in
     #                           the sheet and in the shared string table alike.
     #   text in total           max_text_bytes across the workbook, spent once
@@ -61,7 +84,20 @@ module Studio
       # neither list is kept past a generous multiple of that.
       MAX_SHEET_NAME_CHARS = 255
       MAX_STYLES = 65_536
-      MAX_LISTED_SHEETS = 10_000
+      # A workbook has one relationship per sheet plus a handful; one with
+      # more parts or sheets than this is refused, not skimmed.
+      MAX_RELATIONSHIPS = 4_096
+      MAX_LISTED_SHEETS = 4_096
+      # An id or a target longer than this is not one a workbook writer made.
+      MAX_ATTRIBUTE_CHARS = 1_024
+      # Custom number formats held, and distinct formats tokenized. A real
+      # workbook uses tens; past either cap a number renders as General.
+      MAX_CUSTOM_FORMATS = 4_096
+      MAX_TOKENIZED_FORMATS = 512
+      # Excel's last row is 1,048,576 and its largest ids are five digits. A
+      # number in an attribute is read from this many characters at most, so
+      # no attribute is ever parsed as a two-million-digit integer.
+      MAX_NUMBER_CHARS = 8
       CUT_MARK = "…"
 
       # A cell pointing into the shared string table, resolved after the
@@ -76,9 +112,18 @@ module Studio
         new(bytes, **caps).read
       end
 
+      MONOTONIC = -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) }
+
+      # clock: answers seconds on a monotonic scale. Injectable so a test can
+      # run the deadline out without sleeping.
       def initialize(bytes, max_rows:, max_columns:, max_sheets:, max_cells:, max_cell_chars:,
-                     max_text_bytes:, max_grid_cells:, inflate_cap:)
-        @zip = Zip.new(bytes, inflate_cap: inflate_cap)
+                     max_text_bytes:, max_grid_cells:, max_parsed_text_bytes:, inflate_budget:,
+                     deadline_seconds:, clock: MONOTONIC)
+        @zip = Zip.new(bytes, inflate_budget: inflate_budget)
+        @clock = clock
+        @deadline_seconds = deadline_seconds
+        @deadline = clock.call + deadline_seconds
+        @parsed_left = max_parsed_text_bytes
         @max_rows = max_rows
         @max_columns = max_columns
         @max_sheets = max_sheets
@@ -136,13 +181,13 @@ module Studio
 
           case node.local_name
           when "workbookPr"
-            @date1904 = %w[1 true].include?(node.attribute("date1904").to_s)
+            @date1904 = %w[1 true].include?(attribute(node, "date1904").to_s)
           when "sheet"
-            break if sheets.size >= MAX_LISTED_SHEETS
+            raise Unreadable, "it has too many sheets" if sheets.size >= MAX_LISTED_SHEETS
 
-            sheets << { name: clip(node.attribute("name").to_s, MAX_SHEET_NAME_CHARS),
-                        rid: relationship_id(node),
-                        hidden: %w[hidden veryHidden].include?(node.attribute("state").to_s) }
+            sheets << { name: clip(attribute(node, "name").to_s, MAX_SHEET_NAME_CHARS),
+                        rid: short(relationship_id(node)),
+                        hidden: %w[hidden veryHidden].include?(attribute(node, "state").to_s) }
           end
         end
         sheets
@@ -151,7 +196,8 @@ module Studio
       # The relationship attribute is r:id by convention, but the prefix is the
       # writer's choice; the local name is not.
       def relationship_id(node)
-        node.attributes.find { |name, _| name == "id" || name.end_with?(":id") }&.last
+        pair = node.attributes.find { |name, _| name == "id" || name.end_with?(":id") }
+        pair && parsed(pair.last)
       end
 
       def read_relationships
@@ -159,9 +205,15 @@ module Studio
         each_node(WORKBOOK_RELS) do |node|
           next unless node.node_type == ELEMENT && node.local_name == "Relationship"
 
-          target = node.attribute("Target").to_s
+          raise Unreadable, "it has too many parts" if relationships.size >= MAX_RELATIONSHIPS
+
+          id = short(attribute(node, "Id"))
+          target = short(attribute(node, "Target"))
+          type = short(attribute(node, "Type"))
+          next unless id && target && type
+
           path = target.start_with?("/") ? target.delete_prefix("/") : "xl/#{target}"
-          relationships[node.attribute("Id").to_s] = { type: node.attribute("Type").to_s, target: path }
+          relationships[id] = { type: type, target: path }
         end
         relationships
       end
@@ -182,12 +234,18 @@ module Studio
           when ELEMENT
             case node.local_name
             when "numFmt"
-              code = node.attribute("formatCode").to_s
-              # A code NumberFormat would refuse is not worth holding either.
-              @custom_formats[node.attribute("numFmtId").to_i] = code if code.length <= NumberFormat::MAX_CODE_LENGTH
+              code = attribute(node, "formatCode").to_s
+              id = small_number(attribute(node, "numFmtId"))
+              # A code NumberFormat would refuse is not worth holding either,
+              # and past the table's cap a format is simply not known.
+              if id && code.length <= NumberFormat::MAX_CODE_LENGTH && @custom_formats.size < MAX_CUSTOM_FORMATS
+                @custom_formats[id] = code
+              end
             when "cellXfs" then in_cell_formats = !node.empty_element?
             when "xf"
-              @style_formats << node.attribute("numFmtId").to_i if in_cell_formats && @style_formats.size < MAX_STYLES
+              if in_cell_formats && @style_formats.size < MAX_STYLES
+                @style_formats << (small_number(attribute(node, "numFmtId")) || 0)
+              end
             end
           when END_ELEMENT
             in_cell_formats = false if node.local_name == "cellXfs"
@@ -196,8 +254,28 @@ module Studio
       end
 
       def sections_for(style)
-        id = (style && @style_formats[style.to_i]) || 0
-        @sections[id] ||= NumberFormat.tokenize(NumberFormat.code_for(id, @custom_formats))
+        index = small_number(style)
+        id = (index && @style_formats[index]) || 0
+        return @sections[id] if @sections.key?(id)
+        # The cache is the bound: a format it has no room for is not
+        # tokenized at all, and its numbers render as General.
+        return (@sections[0] ||= NumberFormat.tokenize("General")) if @sections.size >= MAX_TOKENIZED_FORMATS
+
+        @sections[id] = NumberFormat.tokenize(NumberFormat.code_for(id, @custom_formats))
+      end
+
+      # A non-negative integer from an attribute, or nil when it is absent,
+      # not a number, or longer than any number Excel writes there.
+      def small_number(value)
+        return nil if value.nil? || value.length > MAX_NUMBER_CHARS
+
+        number = Integer(value, 10, exception: false)
+        number && number >= 0 ? number : nil
+      end
+
+      # An attribute short enough to be a real id or path, else nil.
+      def short(value)
+        value && value.length <= MAX_ATTRIBUTE_CHARS ? value : nil
       end
 
       # --- one sheet --------------------------------------------------------------
@@ -216,21 +294,32 @@ module Studio
           when ELEMENT
             case node.local_name
             when "row"
-              previous = row_number
-              row_number = node.attribute("r")&.to_i || (row_number + 1)
+              reference = attribute(node, "r")
               column = 0
+              if reference.nil?
+                row_number += 1
+              elsif (number = small_number(reference)) && number >= 1
+                row_number = number
+              else
+                # A row below 1, not a number, or with more digits than any
+                # row Excel has (and never parsed to find that out): the sheet
+                # is malformed from here, and ends at the last row that was not.
+                draft.truncated_rows = true
+                draft.row_limit = [row_number, @max_rows].min
+                break
+              end
               if row_number > @max_rows
                 draft.truncated_rows = true
                 break
-              elsif @cells_left <= 0
-                # The workbook's cell budget ran out on the row before this one.
-                cut(draft, previous + 1)
-                break
               end
             when "c"
-              reference = node.attribute("r")
+              reference = attribute(node, "r")
               column = reference ? column_index(reference) : column + 1
-              cell = node.empty_element? ? nil : { type: node.attribute("t"), style: node.attribute("s") }
+              draft.truncated_columns = true if column > @max_columns
+              # A cell outside the grid is not read at all: its text is never
+              # asked of the parser, so it is never a string in this process.
+              outside = column < 1 || column > @max_columns
+              cell = node.empty_element? || outside ? nil : { type: attribute(node, "t"), style: attribute(node, "s") }
               text = +""
             when "v" then capture = :value unless node.empty_element?
             # <t> is the inline string's text; phonetic runs (<rPh>) are a
@@ -242,8 +331,11 @@ module Studio
             when "v", "t" then capture = nil
             when "c"
               if cell
-                if column > @max_columns
-                  draft.truncated_columns = true
+                if @cells_left <= 0
+                  # Checked per cell, not per row: one row can hold any number
+                  # of cells, duplicates of one reference included.
+                  cut(draft, row_number)
+                  break
                 elsif (value = cell_value(cell, text))
                   # Text read here is spent here; a shared string's size is
                   # not known yet and is spent in `finish`.
@@ -259,7 +351,7 @@ module Studio
             when "sheetData" then break
             end
           else
-            append(text, node.value) if capture && cell && TEXT_NODE_TYPES.include?(node.node_type)
+            take(text, node) if capture && cell && TEXT_NODE_TYPES.include?(node.node_type)
           end
         end
         draft
@@ -268,8 +360,8 @@ module Studio
       def cell_value(cell, text)
         case cell[:type]
         when "s"
-          index = Integer(text, exception: false)
-          return nil unless index && index >= 0
+          index = small_number(text.strip)
+          return nil unless index
 
           @shared_wanted << index
           SharedRef.new(index)
@@ -305,6 +397,32 @@ module Studio
       def append(text, more)
         room = @max_cell_chars + 1 - text.length
         text << more.to_s[0, room] if room.positive?
+      end
+
+      # Appends a text node to a cell's text. Once the cell is full the node's
+      # value is not asked for at all, so it never becomes a Ruby string.
+      def take(text, node)
+        return if text.length > @max_cell_chars
+
+        append(text, parsed(node.value))
+      end
+
+      # An attribute's value, counted like any other string the parser hands
+      # over. Every attribute read in this class goes through here.
+      def attribute(node, name)
+        parsed(node.attribute(name))
+      end
+
+      # Every string the parser hands this reader passes through here and is
+      # counted BEFORE anything else looks at it. This is the bound on text
+      # that no cell ends up keeping.
+      def parsed(string)
+        return string if string.nil?
+
+        @parsed_left -= string.bytesize
+        raise TooLarge, "it holds more text than a preview reads" if @parsed_left.negative?
+
+        string
       end
 
       # The text a cell keeps: whole, or cut at the cap with a mark saying so.
@@ -350,6 +468,7 @@ module Studio
         phonetic = 0
         text = +""
         held = 0
+        full = false
         last = @shared_wanted.max
 
         each_node(path) do |node|
@@ -362,6 +481,11 @@ module Studio
 
               wanted = @shared_wanted.include?(index)
               text = +""
+              if wanted && full
+                # Nothing more will be held, so nothing more is read.
+                strings[index] = OVER_BUDGET
+                wanted = false
+              end
               strings[index] = "" if wanted && node.empty_element?
             when "rPh" then phonetic += 1 unless node.empty_element?
             when "t" then capture = wanted && phonetic.zero? && !node.empty_element?
@@ -375,6 +499,7 @@ module Studio
                 string = clipped(text)
                 if held + string.bytesize > @max_text_bytes
                   strings[index] = OVER_BUDGET
+                  full = true
                 else
                   held += string.bytesize
                   strings[index] = string
@@ -382,7 +507,7 @@ module Studio
               end
             end
           else
-            append(text, node.value) if capture && TEXT_NODE_TYPES.include?(node.node_type)
+            take(text, node) if capture && TEXT_NODE_TYPES.include?(node.node_type)
           end
         end
         strings
@@ -467,9 +592,20 @@ module Studio
 
       # Streams one zip entry through the pull parser. A missing entry yields
       # nothing: styles and shared strings are both optional parts.
-      def each_node(path, &block)
+      #
+      # This is the ONE way any part of the workbook is read, which is what
+      # makes the deadline here a bound on the whole read: whatever a file
+      # finds to make slow, it is slow one node at a time, and the clock is
+      # looked at on every one.
+      def each_node(path)
         @zip.open(path) do |io|
-          Nokogiri::XML::Reader.from_io(io, nil, nil, XML_OPTIONS).each(&block)
+          Nokogiri::XML::Reader.from_io(io, nil, nil, XML_OPTIONS).each do |node|
+            if @clock.call > @deadline
+              raise TooLarge, "it takes more than #{@deadline_seconds} seconds to read"
+            end
+
+            yield node
+          end
         end
       end
     end

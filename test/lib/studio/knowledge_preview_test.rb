@@ -22,7 +22,8 @@ class KnowledgePreviewTest < Minitest::Test
 
   def read(bytes, **caps)
     Preview::Xlsx.read(bytes, **{ max_rows: 500, max_columns: 50, max_sheets: 20, max_cells: 50_000, max_cell_chars: 32_767,
-                                max_text_bytes: 2 * 1_048_576, max_grid_cells: 100_000, inflate_cap: 8 * 1_048_576 }.merge(caps))
+                                max_text_bytes: 2 * 1_048_576, max_grid_cells: 100_000, max_parsed_text_bytes: 16 * 1_048_576,
+                                inflate_budget: 8 * 1_048_576, deadline_seconds: 600 }.merge(caps))
   end
 
   def texts(sheet)
@@ -280,10 +281,10 @@ class KnowledgePreviewTest < Minitest::Test
     bytes = XlsxBuilder.workbook({ "S" => rows }, shared: shared)
     assert_operator bytes.bytesize, :<, 100_000
 
-    error = assert_raises(Preview::TooLarge) { read(bytes, inflate_cap: 1_048_576) }
+    error = assert_raises(Preview::TooLarge) { read(bytes, inflate_budget: 1_048_576) }
     assert_match(/expands past/, error.message)
     # Under a cap that admits the table, the wanted string reads (cut at the cell cap).
-    assert_equal ("x" * 32_767) + "…", texts(read(bytes, inflate_cap: 16 * 1_048_576).sheets.first)[0][0]
+    assert_equal ("x" * 32_767) + "…", texts(read(bytes, inflate_budget: 16 * 1_048_576).sheets.first)[0][0]
   end
 
   def test_rows_past_the_cap_are_never_inflated
@@ -292,8 +293,8 @@ class KnowledgePreviewTest < Minitest::Test
     values = (1..3000).map { |n| ["filler #{n} " + ("y" * 400), n] }
     bytes = XlsxBuilder.workbook({ "Big" => XlsxBuilder.rows(values) })
 
-    assert_raises(Preview::TooLarge) { read(bytes, max_rows: 3000, inflate_cap: 200_000) }
-    sheet = read(bytes, max_rows: 5, inflate_cap: 200_000).sheets.first
+    assert_raises(Preview::TooLarge) { read(bytes, max_rows: 3000, inflate_budget: 200_000) }
+    sheet = read(bytes, max_rows: 5, inflate_budget: 200_000).sheets.first
     assert_equal 5, sheet.rows.size
     assert sheet.truncated_rows
   end
@@ -326,16 +327,22 @@ class KnowledgePreviewTest < Minitest::Test
     assert_equal 1, workbook.omitted_sheets, "sheets after the budget ran out are counted, not rendered"
   end
 
-  def test_huge_inline_strings_on_many_sheets_are_cut_as_they_are_read
+  def test_huge_inline_strings_are_cut_as_they_are_read
+    big = "w" * 1_000_000
+    workbook = Preview.read_spreadsheet(XlsxBuilder.workbook({ "One" => XlsxBuilder.rows((1..5).map { [big] }), "Two" => XlsxBuilder.rows([["x"]]) }))
+
+    assert_equal Preview::MAX_CELL_CHARS + 1, workbook.sheets.first.rows.first.first.text.length
+    assert_equal 5, workbook.sheets.first.rows.size
+    assert_operator text_bytes(workbook), :<=, Preview::MAX_TEXT_BYTES
+  end
+
+  def test_megabyte_cells_on_many_sheets_end_the_read_before_they_fill_memory
+    # Each cell would be cut to the cell cap, but the parser still hands every
+    # megabyte over to be cut. The parsed-text budget ends the read first.
     big = "w" * 1_000_000
     sheets = (1..20).to_h { |n| ["T#{n}", XlsxBuilder.rows((1..50).map { [big] })] }
-    workbook = Preview.read_spreadsheet(XlsxBuilder.workbook(sheets))
-
-    assert_operator text_bytes(workbook), :<=, Preview::MAX_TEXT_BYTES
-    assert_equal Preview::MAX_CELL_CHARS + 1, workbook.sheets.first.rows.first.first.text.length
-    assert_equal 20, workbook.sheets.size + workbook.omitted_sheets
-    assert_operator workbook.omitted_sheets, :>, 0
-    assert workbook.sheets.last.truncated_rows
+    error = assert_raises(Preview::TooLarge) { Preview.read_spreadsheet(XlsxBuilder.workbook(sheets)) }
+    assert_match(/more text than a preview reads/, error.message)
   end
 
   def test_a_workbook_inside_the_text_budget_keeps_every_cell_whole
@@ -371,7 +378,8 @@ class KnowledgePreviewTest < Minitest::Test
 
   def reader_for(bytes, **caps)
     Preview::Xlsx.new(bytes, **{ max_rows: 500, max_columns: 50, max_sheets: 20, max_cells: 50_000, max_cell_chars: 32_767,
-                                 max_text_bytes: 2 * 1_048_576, max_grid_cells: 100_000, inflate_cap: 8 * 1_048_576 }.merge(caps))
+                                 max_text_bytes: 2 * 1_048_576, max_grid_cells: 100_000, max_parsed_text_bytes: 16 * 1_048_576,
+                                inflate_budget: 8 * 1_048_576, deadline_seconds: 600 }.merge(caps))
   end
 
   def test_a_cells_text_stops_growing_one_character_past_the_cap
@@ -404,6 +412,20 @@ class KnowledgePreviewTest < Minitest::Test
     assert_equal 10, held.size
     assert_operator held.sum(&:bytesize), :<=, 10_000
     assert_equal 50, strings.values.count { |value| value.equal?(Preview::Xlsx::OVER_BUDGET) }
+  end
+
+  def test_once_the_shared_table_is_full_nothing_more_is_read_into_it
+    # 600 bytes fit a budget of 1,000; the next 600 do not; and the 100 after
+    # that, which WOULD fit, are not read either: full is full, so a table of
+    # small strings behind a big one cannot keep the parser handing text over.
+    rows = (1..3).map { |r| %(<row r="#{r}"><c r="A#{r}" t="s"><v>#{r - 1}</v></c></row>) }.join
+    reader = reader_for(XlsxBuilder.workbook({ "S" => rows }, shared: ["a" * 600, "b" * 600, "c" * 100]), max_text_bytes: 1000)
+    reader.instance_variable_set(:@shared_wanted, Set.new(0..2))
+
+    strings = reader.send(:read_shared_strings, "xl/sharedStrings.xml")
+    assert_equal "a" * 600, strings[0]
+    assert strings[1].equal?(Preview::Xlsx::OVER_BUDGET)
+    assert strings[2].equal?(Preview::Xlsx::OVER_BUDGET)
   end
 
   def test_thousands_of_styles_on_one_format_tokenize_it_once
@@ -485,6 +507,228 @@ class KnowledgePreviewTest < Minitest::Test
     assert two.truncated_rows
     assert_equal 5, two.row_limit
     assert_equal 1, workbook.omitted_sheets
+  end
+
+  # --- the read as a whole ---------------------------------------------------------------
+  #
+  # The caps above each name one thing a file can make big. These bound the
+  # read itself, so that a thing nobody named is bounded too.
+
+  WORKSHEET_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
+
+  def rels(entries)
+    body = entries.map { |id, target| %(<Relationship Id="#{id}" Type="#{WORKSHEET_REL}" Target="#{target}"/>) }.join
+    %(<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">#{body}</Relationships>)
+  end
+
+  def sheet_part(rows)
+    %(<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>#{rows}</sheetData></worksheet>)
+  end
+
+  def test_the_inflate_budget_is_one_for_the_whole_workbook_not_one_per_part
+    # Six sheets that are all the same 150 KB part. Each read of it fits a
+    # 400 KB budget; six do not, and it is the sum that is refused.
+    part = sheet_part((1..300).map { |r| %(<row r="#{r}"><c r="A#{r}"><f>#{'A1+' * 160}1</f><v>#{r}</v></c></row>) }.join)
+    assert_in_delta 150_000, part.bytesize, 20_000
+    names = (1..6).map { |n| "T#{n}" }
+    aliased = XlsxBuilder.workbook(names.to_h { |name| [name, ""] },
+                                   extra: { "xl/worksheets/sheet1.xml" => part,
+                                            "xl/_rels/workbook.xml.rels" => rels((1..6).map { |n| ["rId#{n}", "worksheets/sheet1.xml"] }) })
+
+    error = assert_raises(Preview::TooLarge) { read(aliased, inflate_budget: 400_000) }
+    assert_match(/expands past/, error.message)
+    assert_equal 6, read(aliased, inflate_budget: 2_000_000).sheets.size
+
+    once = XlsxBuilder.workbook({ "T1" => "" }, extra: { "xl/worksheets/sheet1.xml" => part })
+    assert_equal 300, read(once, inflate_budget: 400_000).sheets.first.rows.size
+  end
+
+  def test_a_stored_part_spends_the_same_budget
+    part = sheet_part(XlsxBuilder.rows([["s" * 5000]]))
+    bytes = XlsxBuilder.workbook({ "A" => "", "B" => "", "C" => "" }, store: true,
+                                 extra: { "xl/worksheets/sheet1.xml" => part,
+                                          "xl/_rels/workbook.xml.rels" => rels((1..3).map { |n| ["rId#{n}", "worksheets/sheet1.xml"] }) })
+    assert_raises(Preview::TooLarge) { read(bytes, inflate_budget: 12_000) }
+    assert_equal 3, read(bytes, inflate_budget: 40_000).sheets.size
+  end
+
+  def test_the_deadline_ends_a_read_that_takes_too_long_on_an_injected_clock
+    bytes = XlsxBuilder.workbook({ "S" => XlsxBuilder.rows((1..200).map { |n| ["row #{n}", n] }) })
+    ticks = 0
+    clock = -> { ticks += 1 } # one "second" per look at the clock
+
+    error = assert_raises(Preview::TooLarge) { read(bytes, deadline_seconds: 50, clock: clock) }
+    assert_equal "it takes more than 50 seconds to read", error.message
+    assert_operator ticks, :<, 60, "the read stopped at the deadline; it did not run on and report late"
+
+    ticks = 0
+    assert_equal 200, read(bytes, deadline_seconds: 1_000_000, clock: clock).sheets.first.rows.size
+    assert_operator ticks, :>, 1000, "the clock is looked at on every node"
+  end
+
+  def test_the_deadline_reaches_the_page_as_a_fallback
+    bytes = XlsxBuilder.workbook({ "S" => XlsxBuilder.rows([["a", 1]]) })
+    ticks = 0
+    error = assert_raises(Preview::TooLarge) { Preview.read_spreadsheet(bytes, clock: -> { ticks += 100 }) }
+    assert_match(/takes more than #{Preview::SPREADSHEET_DEADLINE_SECONDS} seconds/, error.message)
+  end
+
+  def test_text_the_reader_would_never_keep_is_never_asked_of_the_parser
+    megabyte = "z" * 1_000_000
+    # Past the last column shown: twenty megabytes the parser is never asked for.
+    outside = (1..20).map { |r| %(<row r="#{r}"><c r="A#{r}"><v>#{r}</v></c><c r="AZ#{r}" t="inlineStr"><is><t>#{megabyte}</t></is></c></row>) }.join
+    sheet = read(XlsxBuilder.workbook({ "S" => outside }), max_parsed_text_bytes: 50_000, inflate_budget: 64 * 1_048_576).sheets.first
+    assert_equal 20, sheet.rows.size
+    assert sheet.truncated_columns
+
+    # One cell in a thousand rich-text runs: reading stops once the cell is full.
+    runs = "<r><t>#{'c' * 1000}</t></r>" * 1000
+    rows = %(<row r="1"><c r="A1" t="inlineStr"><is>#{runs}</is></c></row>)
+    cell = read(XlsxBuilder.workbook({ "S" => rows }), max_parsed_text_bytes: 100_000).sheets.first.rows[0][0]
+    assert_equal Preview::MAX_CELL_CHARS + 1, cell.text.length
+
+    # The same megabyte as adjacent CDATA sections reaches the reader as ONE
+    # node (the parser joins them), so there is no stopping partway: it is
+    # counted whole, and the parsed-text budget is what answers it.
+    pieces = "<![CDATA[#{'c' * 1000}]]>" * 1000
+    joined = %(<row r="1"><c r="A1" t="inlineStr"><is><t>#{pieces}</t></is></c></row>)
+    assert_raises(Preview::TooLarge) { read(XlsxBuilder.workbook({ "S" => joined }), max_parsed_text_bytes: 100_000) }
+  end
+
+  def test_the_parsed_text_budget_ends_the_read
+    rows = XlsxBuilder.rows((1..30).map { |n| ["#{n}" * 1000] })
+    error = assert_raises(Preview::TooLarge) { read(XlsxBuilder.workbook({ "S" => rows }), max_parsed_text_bytes: 10_000) }
+    assert_equal "it holds more text than a preview reads", error.message
+    assert_equal 30, read(XlsxBuilder.workbook({ "S" => rows }), max_parsed_text_bytes: 200_000).sheets.first.rows.size
+  end
+
+  def test_attributes_are_counted_as_parsed_text_too
+    # Text can hide in an attribute as easily as in a node: here, in format
+    # codes that the table would never keep.
+    formats = (0...300).map { |n| %(<numFmt numFmtId="#{164 + n}" formatCode="#{'0' * 250}"/>) }.join
+    styles = %(<?xml version="1.0"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts>#{formats}</numFmts><cellXfs><xf numFmtId="0"/></cellXfs></styleSheet>)
+    bytes = XlsxBuilder.workbook({ "S" => XlsxBuilder.rows([[1]]) }, extra: { "xl/styles.xml" => styles })
+
+    assert_raises(Preview::TooLarge) { read(bytes, max_parsed_text_bytes: 20_000) }
+    assert_equal [["1"]], texts(read(bytes, max_parsed_text_bytes: 200_000).sheets.first)
+  end
+
+  def test_a_row_of_duplicate_cells_spends_the_cell_budget_cell_by_cell
+    row = %(<row r="1">#{'<c r="A1"><v>7</v></c>' * 200}</row>)
+    workbook = read(XlsxBuilder.workbook({ "S" => row, "After" => XlsxBuilder.rows([["x"]]) }), max_cells: 50)
+
+    sheet = workbook.sheets.first
+    assert sheet.truncated_rows, "the budget ran out inside the row, and the sheet says it was cut"
+    assert_equal 0, sheet.row_limit
+    assert_empty sheet.rows
+    assert_equal 1, workbook.omitted_sheets
+
+    whole = read(XlsxBuilder.workbook({ "S" => %(<row r="1">#{'<c r="A1"><v>7</v></c>' * 50}</row>) }), max_cells: 50).sheets.first
+    assert_equal [["7"]], texts(whole)
+    refute whole.truncated_rows
+  end
+
+  def test_a_number_format_table_past_its_cap_renders_general
+    count = Preview::Xlsx::MAX_CUSTOM_FORMATS + 10
+    formats = (0...count).map { |n| %(<numFmt numFmtId="#{164 + n}" formatCode="0.00"/>) }.join
+    styles = %(<?xml version="1.0"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts>#{formats}</numFmts>) +
+             %(<cellXfs><xf numFmtId="164"/><xf numFmtId="#{164 + count - 1}"/></cellXfs></styleSheet>)
+    rows = %(<row r="1"><c r="A1" s="0"><v>1.5</v></c><c r="B1" s="1"><v>1.5</v></c></row>)
+    reader = reader_for(XlsxBuilder.workbook({ "S" => rows }, extra: { "xl/styles.xml" => styles }))
+
+    assert_equal [["1.50", "1.5"]], texts(reader.read.sheets.first), "a format past the table's cap is not known, so General"
+    assert_equal Preview::Xlsx::MAX_CUSTOM_FORMATS, reader.instance_variable_get(:@custom_formats).size
+  end
+
+  def test_distinct_formats_past_the_tokenize_cap_render_general
+    cap = Preview::Xlsx::MAX_TOKENIZED_FORMATS
+    count = cap + 40
+    formats = (0...count).map { |n| "0.00\"f#{n}\"" }
+    row = %(<row r="1">#{(0...count).map { |n| %(<c r="A1" s="#{n + 1}"><v>2.5</v></c>) }.join}</row>)
+    reader = reader_for(XlsxBuilder.workbook({ "S" => row }, formats: formats))
+    sheet = reader.read.sheets.first
+
+    assert_equal [["2.5"]], texts(sheet), "the last duplicate won, on a format the cache had no room for"
+    assert_operator reader.instance_variable_get(:@sections).size, :<=, cap + 1
+
+    few = read(XlsxBuilder.workbook({ "S" => %(<row r="1"><c r="A1" s="3"><v>2.5</v></c></row>) }, formats: formats.first(5))).sheets.first
+    assert_equal [["2.50f2"]], texts(few)
+  end
+
+  def test_too_many_parts_or_sheets_is_refused
+    cap = Preview::Xlsx::MAX_RELATIONSHIPS
+    many = rels((1..(cap + 1)).map { |n| ["rId#{n}", "worksheets/sheet1.xml"] })
+    error = assert_raises(Preview::Unreadable) do
+      read(XlsxBuilder.workbook({ "S" => XlsxBuilder.rows([[1]]) }, extra: { "xl/_rels/workbook.xml.rels" => many }))
+    end
+    assert_equal "it has too many parts", error.message
+
+    at_cap = rels((1..cap).map { |n| ["rId#{n}", "worksheets/sheet1.xml"] })
+    assert_equal [["1"]], texts(read(XlsxBuilder.workbook({ "S" => XlsxBuilder.rows([[1]]) }, extra: { "xl/_rels/workbook.xml.rels" => at_cap })).sheets.first)
+
+    sheets = (1..(Preview::Xlsx::MAX_LISTED_SHEETS + 1)).map { |n| %(<sheet name="s#{n}" sheetId="#{n}" r:id="rId1"/>) }.join
+    book = %(<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>#{sheets}</sheets></workbook>)
+    error = assert_raises(Preview::Unreadable) do
+      read(XlsxBuilder.workbook({ "S" => XlsxBuilder.rows([[1]]) }, extra: { "xl/workbook.xml" => book }))
+    end
+    assert_equal "it has too many sheets", error.message
+  end
+
+  def test_an_oversized_relationship_id_is_not_kept
+    long = "x" * (Preview::Xlsx::MAX_ATTRIBUTE_CHARS + 1)
+    reader = reader_for(XlsxBuilder.workbook({ "S" => XlsxBuilder.rows([[1]]) },
+                                             extra: { "xl/_rels/workbook.xml.rels" => rels([["rId1", "worksheets/sheet1.xml"], [long, "worksheets/sheet1.xml"]]) }))
+    assert_equal ["rId1"], reader.send(:read_relationships).keys
+  end
+
+  def test_a_row_reference_is_never_read_as_a_huge_number
+    reader = reader_for(XlsxBuilder.workbook({ "S" => "" }))
+    assert_equal 12, reader.send(:small_number, "12")
+    assert_equal 99_999_999, reader.send(:small_number, "99999999")
+    assert_nil reader.send(:small_number, "999999999"), "nine characters is already more than any number Excel writes"
+    assert_nil reader.send(:small_number, "9" * 2_000_000)
+    assert_nil reader.send(:small_number, "-4")
+    assert_nil reader.send(:small_number, "1e3")
+    assert_nil reader.send(:small_number, nil)
+
+    rows = %(<row r="1"><c r="A1"><v>1</v></c></row><row r="#{'9' * 200_000}"><c r="A2"><v>2</v></c></row><row r="3"><c r="A3"><v>3</v></c></row>)
+    sheet = read(XlsxBuilder.workbook({ "S" => rows })).sheets.first
+    assert_equal [["1"]], texts(sheet)
+    assert sheet.truncated_rows
+  end
+
+  def test_a_row_below_one_ends_the_sheet_and_cannot_buy_grid_budget
+    bad = %(<row r="2"><c r="A2"><v>1</v></c></row><row r="-5"><c r="A1"><v>9</v></c></row><row r="3"><c r="A3"><v>3</v></c></row>)
+    only_bad = %(<row r="-500"><c r="AX1"><v>9</v></c></row>)
+    far = %(<row r="10"><c r="D10"><v>1</v></c></row>)
+    workbook = read(XlsxBuilder.workbook({ "Bad" => bad, "OnlyBad" => only_bad, "Zero" => %(<row r="0"><c r="A1"><v>9</v></c></row>), "Far" => far }),
+                    max_grid_cells: 50)
+
+    first, second, third, fourth = workbook.sheets
+    assert_equal [[nil], ["1"]], texts(first)
+    assert first.truncated_rows
+    assert_equal 2, first.row_limit
+    assert_empty second.rows
+    assert second.truncated_rows
+    assert_empty third.rows
+    assert third.truncated_rows, "row 0 is not a row"
+    # 2 cells went to the first sheet; the malformed ones added nothing back,
+    # so the 40-cell rectangle of the last sheet still fits and no more would.
+    assert_equal 10, fourth.rows.size
+    assert_equal 8, reader_grid_left(workbook, 50)
+  end
+
+  def reader_grid_left(workbook, budget)
+    budget - workbook.sheets.sum { |sheet| sheet.rows.sum(&:size) }
+  end
+
+  def test_a_cell_with_no_column_or_a_wild_style_or_string_index_is_harmless
+    rows = %(<row r="1"><c r="1"><v>5</v></c><c r="B1" s="#{'9' * 5000}"><v>2.5</v></c><c r="C1" t="s"><v>#{'9' * 5000}</v></c><c r="D1" t="s"><v>-1</v></c></row>)
+    sheet = read(XlsxBuilder.workbook({ "S" => rows }, formats: ["0.00"], shared: ["only"])).sheets.first
+    assert_equal [[nil, "2.5"]], texts(sheet)
+
+    no_column = read(XlsxBuilder.workbook({ "S" => %(<row r="1"><c r="1"><v>5</v></c></row>) })).sheets.first
+    assert_empty no_column.rows, "a cell with no column letters is not a cell in column zero"
   end
 
   def test_an_external_entity_is_not_expanded

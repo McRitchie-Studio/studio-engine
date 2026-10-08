@@ -14,9 +14,10 @@ module Studio
     # carries it outside the test group, so a gemspec dependency would put a
     # new runtime gem in every app for one admin page. And a streaming reader
     # is the control a preview wants: an entry is inflated only as far as the
-    # caller reads it, and never past `inflate_cap`, so a small file that
-    # declares a huge sheet (or lies about its sizes) costs what was read, not
-    # what it claims.
+    # caller reads it, and every byte any entry yields is spent from ONE
+    # budget for the whole archive (`inflate_budget`). A small file that
+    # declares a huge sheet, lies about its sizes, or points twenty sheets at
+    # one part costs what was read, in total, and never more than the budget.
     #
     # Deliberately unsupported, each refused with Unreadable so the page falls
     # back to the download link: zip64, encrypted entries, and any compression
@@ -36,24 +37,44 @@ module Studio
 
       Entry = Struct.new(:name, :flags, :compression, :compressed_size, :local_offset)
 
-      # Reads a deflate stream a few kilobytes of compressed input at a time.
-      # The small step is the bomb defence: deflate tops out near 1000:1, so
-      # one step can add about four megabytes to the buffer and no more.
+      # What the whole archive may still expand to. Shared by every entry
+      # opened, so reading one part twenty times spends twenty times.
+      class Budget
+        def initialize(bytes)
+          @limit = bytes
+          @left = bytes
+        end
+
+        def spend(bytes)
+          @left -= bytes
+          raise TooLarge, "it expands past the #{megabytes} MB preview limit" if @left.negative?
+        end
+
+        private
+
+        def megabytes
+          (@limit / 1_048_576.0).round(1).to_s.delete_suffix(".0")
+        end
+      end
+
+      # Reads a deflate stream a kilobyte of compressed input at a time. The
+      # small step keeps the buffer small: deflate tops out near 1000:1, so
+      # one step can add about a megabyte to it and no more. What bounds the
+      # total is the archive's Budget.
       #
       # `failure` exists because the consumer is an XML parser reading through
       # a C callback: an exception raised inside #read does not reliably come
       # out the other side as itself. So a failed read ends the stream and
       # keeps the reason, and Zip#open raises it once the parser has let go.
       class InflateIO
-        STEP = 4096
+        STEP = 1024
 
         attr_reader :failure
 
-        def initialize(compressed, cap)
+        def initialize(compressed, budget)
           @compressed = compressed
           @position = 0
-          @cap = cap
-          @produced = 0
+          @budget = budget
           @buffer = +"".b
           @offset = 0
           @inflater = Zlib::Inflate.new(-Zlib::MAX_WBITS)
@@ -106,8 +127,7 @@ module Studio
 
           @position += chunk.bytesize
           out = @inflater.inflate(chunk)
-          @produced += out.bytesize
-          raise TooLarge, "it expands past the #{@cap / 1_048_576} MB preview limit" if @produced > @cap
+          @budget.spend(out.bytesize)
 
           if available.zero?
             @buffer = out
@@ -119,9 +139,9 @@ module Studio
         end
       end
 
-      def initialize(bytes, inflate_cap:)
+      def initialize(bytes, inflate_budget:)
         @bytes = bytes.b
-        @inflate_cap = inflate_cap
+        @budget = Budget.new(inflate_budget)
         @entries = read_central_directory
       end
 
@@ -209,10 +229,11 @@ module Studio
 
         case entry.compression
         when 0
-          raise TooLarge, "it expands past the #{@inflate_cap / 1_048_576} MB preview limit" if data.bytesize > @inflate_cap
-
+          # A stored entry is spent whole on opening it: it is already in
+          # memory, and opening it again is another copy.
+          @budget.spend(data.bytesize)
           StringIO.new(data)
-        when 8 then InflateIO.new(data, @inflate_cap)
+        when 8 then InflateIO.new(data, @budget)
         else raise Unreadable, "it uses a zip compression this preview cannot read"
         end
       end

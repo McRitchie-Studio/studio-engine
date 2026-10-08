@@ -33,14 +33,25 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   show page itself reads nothing from the bucket. It rides the existing
   `Studio.draw_knowledge_routes` opt-in; there is no migration and no new setting.
 
-  The caps, all constants on `Studio::KnowledgePreview`: 500 rows and 50 columns
-  a sheet; 20 sheets, 50,000 filled cells, 100,000 rendered cells (empty ones
-  included) and 2 MB of cell text a workbook; 32,767 characters a cell (Excel's
-  own limit, cut with a mark past it); a 20 MB workbook, 64 MB for any one inflated
-  part of it, the first 1 MB of a CSV, the first 256 KB of a text file, and
-  100 MB for an inline PDF or image. A sheet or file cut by a cap says so and
-  links the download. A number format longer than Excel's 255 characters is
-  ignored, and no number renders past thirty decimals.
+  The caps, all constants on `Studio::KnowledgePreview`:
+  - A sheet: 500 rows and 50 columns. A cell: 32,767 characters (Excel's own
+    limit; cut with a mark past it).
+  - A workbook: 20 sheets, 50,000 filled cells, 100,000 rendered cells (empty
+    ones included) and 2 MB of cell text. The sheet that spends the last of one
+    of these is cut there and says so; later sheets are counted in a notice.
+  - A workbook read as a whole: a 20 MB file; 64 MB inflated across every part
+    read (`INFLATE_BUDGET`, a part read twice counted twice); 16 MB of text handed
+    over by the XML parser, kept or not (`MAX_PARSED_TEXT_BYTES`); and 10 seconds
+    of wall-clock time (`SPREADSHEET_DEADLINE_SECONDS`). Past any of these the
+    preview falls back to the download link.
+  - A workbook's tables: 4,096 relationships and 4,096 sheets (more is refused);
+    4,096 custom number formats and 512 distinct formats in use (past either, a
+    number renders as General). A number format longer than Excel's 255
+    characters is ignored, and no number renders past thirty decimals.
+  - The first 1 MB of a CSV, the first 256 KB of a text file, and 100 MB for an
+    inline PDF or image.
+
+  A sheet or file cut by a cap says so and links the download.
 - `Studio::KnowledgePreview` (`lib/studio/knowledge_preview.rb`), loaded on
   first use and not by `require "studio"`: `kind_for(filename:, mime_type:)`,
   `for(doc)` returning a `Result`, `read_spreadsheet(bytes)` and

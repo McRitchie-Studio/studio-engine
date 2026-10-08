@@ -17,7 +17,12 @@ module Studio
   # THE CAPS, all in one place:
   #
   #   SPREADSHEET_MAX_BYTES  an .xlsx larger than this is not opened at all.
-  #   INFLATE_CAP            no single part of a workbook is inflated past this.
+  #   INFLATE_BUDGET         what a whole workbook may inflate to, every part
+  #                          read counted, a part read twice counted twice.
+  #   SPREADSHEET_DEADLINE_SECONDS
+  #                          wall-clock time one workbook read may take.
+  #   MAX_PARSED_TEXT_BYTES  text the XML parser may hand the reader across a
+  #                          workbook, kept or not.
   #   MAX_ROWS, MAX_COLUMNS  what one sheet (or CSV) shows; the rest is named
   #                          in a notice, never silently dropped.
   #   MAX_SHEETS             tabs rendered; further sheets are counted.
@@ -48,7 +53,9 @@ module Studio
 
     MEGABYTE = 1_048_576
     SPREADSHEET_MAX_BYTES = 20 * MEGABYTE
-    INFLATE_CAP           = 64 * MEGABYTE
+    INFLATE_BUDGET        = 64 * MEGABYTE
+    SPREADSHEET_DEADLINE_SECONDS = 10
+    MAX_PARSED_TEXT_BYTES = 16 * MEGABYTE
     MAX_ROWS              = 500
     MAX_COLUMNS           = 50
     MAX_SHEETS            = 20
@@ -166,11 +173,13 @@ module Studio
 
       # --- readers, usable without a document ---------------------------------
 
-      def read_spreadsheet(bytes)
+      def read_spreadsheet(bytes, **overrides)
         require_relative "knowledge_preview/xlsx"
         Xlsx.read(bytes, max_rows: MAX_ROWS, max_columns: MAX_COLUMNS, max_sheets: MAX_SHEETS,
                          max_cells: MAX_CELLS, max_cell_chars: MAX_CELL_CHARS, max_text_bytes: MAX_TEXT_BYTES,
-                         max_grid_cells: MAX_GRID_CELLS, inflate_cap: INFLATE_CAP)
+                         max_grid_cells: MAX_GRID_CELLS, max_parsed_text_bytes: MAX_PARSED_TEXT_BYTES,
+                         inflate_budget: INFLATE_BUDGET, deadline_seconds: SPREADSHEET_DEADLINE_SECONDS,
+                         **overrides)
       rescue Error
         raise
       rescue StandardError => e
