@@ -23,7 +23,8 @@ class StudioImageCacheUrlGuardTest < Minitest::Test
 
   # A resolver that must not be asked: a literal address or a blocked name is
   # judged before any lookup.
-  NEVER = ->(host) { raise "resolver was asked about #{host.inspect}" }
+  ResolverAsked = Class.new(Exception) # not a StandardError: the guard must not be able to rescue it into a refusal
+  NEVER = ->(host) { raise ResolverAsked, "resolver was asked about #{host.inspect}" }
 
   def resolver(map)
     ->(host) { map.fetch(host) }
@@ -397,6 +398,22 @@ class StudioImageCacheUrlGuardTest < Minitest::Test
               "https://img.example.net/c.png" => hop(200, body: "PNG")) do |asked|
       assert_equal "PNG", IC.fetch_remote("https://cdn.example.com/a.png", resolver: dns)
       assert_equal [[PUBLIC_V4], [PUBLIC_V4], ["8.8.8.8"]], asked.map(&:addresses)
+    end
+  end
+
+  # open-uri refused an https -> http redirect; the fetch that replaced it keeps
+  # the rule. http -> https is followed (the first hop of the test above it is
+  # not, so it is shown here).
+  def test_fetch_remote_refuses_an_https_to_http_downgrade_and_follows_an_upgrade
+    dns = resolver("cdn.example.com" => [PUBLIC_V4])
+    with_hops("https://cdn.example.com/a.png" => hop(302, location: "http://cdn.example.com/a.png")) do |asked|
+      error = assert_raises(IC::InvalidSourceURL) { IC.fetch_remote("https://cdn.example.com/a.png", resolver: dns) }
+      assert_match(/redirection forbidden/, error.message)
+      assert_equal 1, asked.size
+    end
+    with_hops("http://cdn.example.com/a.png" => hop(301, location: "https://cdn.example.com/a.png"),
+              "https://cdn.example.com/a.png" => hop(200, body: "PNG")) do
+      assert_equal "PNG", IC.fetch_remote("http://cdn.example.com/a.png", resolver: dns)
     end
   end
 
