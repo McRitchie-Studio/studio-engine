@@ -210,6 +210,17 @@ class StudioImageCacheUrlGuardTest < Minitest::Test
     refuse!("https://cdn.example.com/a.png", resolver: ->(_) { ["not-an-address"] }, match: /not-an-address/)
   end
 
+  # A lookup that failed may succeed on a retry; a private address will not. The
+  # two are told apart by class, and both are still an InvalidSourceURL.
+  def test_a_failed_lookup_is_its_own_class_of_refusal
+    assert_operator IC::UnresolvedSourceHost, :<, IC::InvalidSourceURL
+    assert_instance_of IC::UnresolvedSourceHost, refuse!("https://cdn.example.com/a.png", resolver: ->(_) { [] })
+    assert_instance_of IC::UnresolvedSourceHost,
+                       refuse!("https://cdn.example.com/a.png", resolver: ->(_) { raise SocketError, "getaddrinfo" })
+    assert_instance_of IC::InvalidSourceURL, refuse!("https://cdn.example.com/a.png", resolver: ->(_) { ["10.0.0.5"] })
+    assert_instance_of IC::InvalidSourceURL, refuse!("http://127.1/a.png")
+  end
+
   def test_the_name_is_resolved_without_its_trailing_dot_and_in_lower_case
     asked = []
     IC.validate_source_url!("https://CDN.Example.COM./a.png", resolver: ->(host) { asked << host; [PUBLIC_V4] })
@@ -391,6 +402,15 @@ class StudioImageCacheUrlGuardTest < Minitest::Test
     end
   end
 
+  def test_fetch_response_answers_the_final_hop_with_its_headers
+    dns = resolver("cdn.example.com" => [PUBLIC_V4])
+    final = IC::Hop.new(status: 200, reason: "OK", location: nil, body: "PNG", headers: { "content-type" => "image/png" })
+    with_hops("https://cdn.example.com/a.png" => hop(302, location: "/b.png"), "https://cdn.example.com/b.png" => final) do
+      response = IC.fetch_response("https://cdn.example.com/a.png", resolver: dns)
+      assert_equal ["PNG", 200, "image/png"], [response.body, response.status, response.headers["content-type"]]
+    end
+  end
+
   def test_fetch_remote_follows_a_public_redirect_and_vets_the_new_host
     dns = resolver("cdn.example.com" => [PUBLIC_V4], "img.example.net" => ["8.8.8.8"])
     with_hops("https://cdn.example.com/a.png" => hop(301, location: "/b.png"),
@@ -474,6 +494,7 @@ class StudioImageCacheUrlGuardTest < Minitest::Test
       result = IC.request_hop(vetted("http://cdn.pinned.invalid:#{port}/a.png?x=1", ["127.0.0.1"]))
       assert_equal 200, result.status
       assert_equal "PNG", result.body
+      assert_equal "image/png", result.headers["content-type"]
       head = heads.pop
       assert_match %r{\AGET /a\.png\?x=1 HTTP/1\.1\r\n}, head
       assert_match(/^Host: cdn\.pinned\.invalid:#{port}\r$/i, head, "the Host header still names the host")

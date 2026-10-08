@@ -19,6 +19,10 @@ module Studio
     MAX_REMOTE_BYTES = 50 * 1024 * 1024
 
     class InvalidSourceURL < ArgumentError; end
+    # The host is a well-formed name that could not be looked up, or has no
+    # address. Still a refusal, but possibly a passing one: DNS was down, or the
+    # name is gone. A caller that retries distinguishes it by class.
+    class UnresolvedSourceHost < InvalidSourceURL; end
     class UnsupportedContentType < ArgumentError; end
     class SourceTooLarge < StandardError; end
 
@@ -330,6 +334,12 @@ module Studio
     # A non-2xx answer raises OpenURI::HTTPError with the status on `io.status`,
     # as the open-uri fetch this replaced did.
     def self.fetch_remote(source_url, resolver: self.resolver)
+      fetch_response(source_url, resolver: resolver).body
+    end
+
+    # The same fetch, answering the final Hop: `body`, `status`, and `headers`
+    # (lower-case names, so `headers["content-type"]`).
+    def self.fetch_response(source_url, resolver: self.resolver)
       url = source_url.to_s
       previous = nil
       hop = nil
@@ -341,7 +351,7 @@ module Studio
         end
 
         hop = request_hop(vetted)
-        return hop.body if (200..299).cover?(hop.status)
+        return hop if (200..299).cover?(hop.status)
         raise http_error(hop, vetted.uri) unless [301, 302, 303, 307, 308].include?(hop.status) && !hop.location.to_s.empty?
 
         previous = vetted.uri
@@ -464,9 +474,9 @@ module Studio
         begin
           Array(resolver.call(host)).map(&:to_s)
         rescue StandardError => e
-          raise InvalidSourceURL, "URL host #{host.inspect} could not be resolved: #{e.class}: #{e.message}"
+          raise UnresolvedSourceHost, "URL host #{host.inspect} could not be resolved: #{e.class}: #{e.message}"
         end
-      raise InvalidSourceURL, "URL host #{host.inspect} did not resolve to any address" if answers.empty?
+      raise UnresolvedSourceHost, "URL host #{host.inspect} did not resolve to any address" if answers.empty?
 
       ips = answers.map do |answer|
         ip = parse_address(answer) ||

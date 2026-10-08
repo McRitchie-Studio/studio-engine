@@ -4,6 +4,64 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Security
+
+- **`Studio::ImageCache.validate_source_url!` judges the address, not the
+  spelling.** It read the URL's text only, so an internal address written any
+  way but a plain dotted quad went through. Now refused:
+  - IPv4 inside IPv6: mapped (`[::ffff:127.0.0.1]`), compatible
+    (`[::127.0.0.1]`), NAT64 (`[64:ff9b::7f00:1]`) and 6to4 (`[2002:7f00:1::]`).
+  - Numeric IPv4 as `inet_aton` reads it: short (`127.1`), integer
+    (`2130706433`), hex (`0x7f.1`) and octal (`017700000001`). Any numeric host
+    that is not a plain dotted quad is refused, public or not, because two
+    parsers can disagree about it.
+  - `localhost.` and every other name with a trailing dot, `*.localhost`, and a
+    host that is not a hostname at all (`%31%32%37.0.0.1`).
+  - More ranges: `0.0.0.0/8`, carrier-grade NAT `100.64.0.0/10`, multicast,
+    reserved `240.0.0.0/4`, the documentation and benchmarking blocks, and
+    IPv6 site-local, multicast and documentation.
+  - **A name that resolves to a non-public address.** Names are resolved (the
+    hosts file, then every A and AAAA record, 2 seconds an attempt) and one
+    non-public address refuses the URL. A name that does not resolve raises
+    `Studio::ImageCache::UnresolvedSourceHost`, a subclass of
+    `InvalidSourceURL`.
+- **`Studio::ImageCache.fetch_remote` vets every redirect and connects to the
+  address it vetted.** It was `URI.open(redirect: true)`: a public URL that
+  answered `302` to `http://127.0.0.1/` was followed unchecked, and the name
+  was resolved a second time by the socket. It now follows at most five
+  redirects itself, checks each one, and pins each connection to a vetted
+  address, so a name cannot point elsewhere between the check and the fetch.
+
+### Added
+
+- `Studio::ImageCache.vet_source_url!(url)` answers the parsed URI, the judged
+  host and the vetted `addresses`, and `Studio::ImageCache.pinned_http(uri,
+  address)` builds a `Net::HTTP` that connects to one of them. A caller that
+  fetches for itself uses the pair to close the gap `validate_source_url!`
+  alone leaves. `Studio::ImageCache.fetch_response(url)` is `fetch_remote`
+  with the status and headers. `Studio::ImageCache.public_address?(ip)` is the
+  range check on its own. README, *Remote image URLs*.
+- `Studio::ImageCache.resolver=` sets the callable names are resolved with, and
+  `validate_source_url!`, `vet_source_url!`, `fetch_remote` and
+  `fetch_response` take `resolver:`.
+
+### Changed
+
+- `validate_source_url!` keeps its return value (the parsed URI) and takes one
+  new optional keyword. What changes for a caller:
+  - **It makes DNS queries** outside a Rails test environment: one lookup per
+    call, and a URL whose name cannot be resolved is refused where it used to
+    pass.
+  - **Under `Rails.env.test?` names are not resolved by default**, so a suite
+    that passes `https://cdn.example.com/…` through the guard gets the answers
+    it got before and touches no network. Addresses and refused names are
+    judged the same in every environment. A test of resolution passes
+    `resolver:`.
+  - `fetch_remote` ignores `http_proxy`/`https_proxy`, refuses an
+    `https` to `http` redirect with `InvalidSourceURL` (open-uri raised a bare
+    `RuntimeError`), and still raises `OpenURI::HTTPError` carrying
+    `io.status` for a non-2xx answer or a redirect loop.
+
 ## 0.94.0 — 2026-10-07
 
 ### Added
