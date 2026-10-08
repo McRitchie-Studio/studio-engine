@@ -46,6 +46,9 @@ module Studio
 
     # 4 GB. Recordings run 100 MB to 1 GB; this leaves room for a long
     # meeting in high definition and still fits a dyno's ephemeral disk.
+    # It must stay at or under Studio::S3::Trash::MAX_COPY_BYTES (5 GiB): a
+    # replaced recording is trashed with one CopyObject, and a larger object
+    # could be stored but never replaced. The suite pins the two together.
     MAX_BYTES = 4 * 1024 * 1024 * 1024
     # Long enough for a presigned download URL, short enough that a redirect
     # cannot hand us a megabyte of Location header to parse.

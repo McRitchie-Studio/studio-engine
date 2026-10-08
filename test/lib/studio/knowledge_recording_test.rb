@@ -109,6 +109,13 @@ class StudioKnowledgeRecordingTest < Minitest::Test
     assert_equal KR::TYPES.keys.sort, KR::CONTAINERS.values.flatten.sort, "every extension belongs to one container"
   end
 
+  # Replacing a recording trashes the old object with ONE CopyObject, which
+  # moves at most 5 GiB. A cap above that would store what can never be replaced.
+  def test_the_byte_cap_fits_what_the_trash_can_move
+    require_relative "../../../lib/studio/s3"
+    assert_operator KR::MAX_BYTES, :<=, Studio::S3::Trash::MAX_COPY_BYTES
+  end
+
   def test_empty_missing_oversized_and_directory_sources_are_refused
     assert_raises(KR::NotARecording) { KR.identify!(file_of("")) }
     assert_raises(KR::Refused) { KR.identify!("/no/such/recording.mp4") }
