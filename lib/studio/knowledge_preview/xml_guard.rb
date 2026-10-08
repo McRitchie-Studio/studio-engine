@@ -85,6 +85,9 @@ module Studio
       TAG_STOP = /["'>]/n
       SLASH = 47
       CLOSE = 62
+      BANG = 33
+      QUERY = 63
+      EMPTY = "".b.freeze
 
       attr_reader :failure
 
@@ -113,7 +116,7 @@ module Studio
         @open = []         # the size of each open element's start tag
         @open_bytes = 0
         @namespaces = 0
-        @namespace_tail = +"".b
+        @namespace_tail = EMPTY
       end
 
       def read(length = nil, _outbuf = nil)
@@ -188,41 +191,45 @@ module Studio
 
         grow(found - position)
         return nil if @failure
-        # Not enough bytes yet to tell "<!--" from "<!DOCTYPE" from a tag.
-        return hold(data, found) if data.bytesize - found < LOOKAHEAD && !plain_tag?(data, found)
+
+        # By far the commonest case, so it is decided on one byte and
+        # allocates nothing: a "<" not followed by "!" or "?" is a tag.
+        following = data.getbyte(found + 1)
+        return hold(data, found) if following.nil?
+        return start_tag(found, following) unless following == BANG || following == QUERY
+        # Not enough bytes yet to tell "<!--" from "<!DOCTYPE" from "<![CDATA[".
+        return hold(data, found) if data.bytesize - found < LOOKAHEAD
 
         if data.byteslice(found, DOCTYPE.bytesize) == DOCTYPE
           return refuse(Unreadable.new("it carries a document type declaration, which no workbook has"))
         end
 
         opener, (terminator, kind) = OPAQUE.find { |open, _| data.byteslice(found, open.bytesize) == open }
+        # "<!" followed by anything else is not XML the parser will accept;
+        # it is passed on as a tag for the parser to refuse.
+        return start_tag(found, following) unless opener
+
         @token = 0
-        if opener
-          @state = :opaque
-          @terminator = terminator
-          @aside = kind == :aside
-          # An aside starts where the last one stopped: its limit is a total.
-          @token = @aside_bytes if @aside
-          @limit = @aside ? @max_aside : @max_token
-          grow(opener.bytesize)
-          found + opener.bytesize
-        else
-          @state = :tag
-          @tag = 0
-          @quote = nil
-          @namespace_tail = +"".b
-          @closing = data.getbyte(found + 1) == SLASH
-          @last = nil
-          spend_tag(1)
-          found + 1
-        end
+        @state = :opaque
+        @terminator = terminator
+        @aside = kind == :aside
+        # An aside starts where the last one stopped: its limit is a total.
+        @token = @aside_bytes if @aside
+        @limit = @aside ? @max_aside : @max_token
+        grow(opener.bytesize)
+        @failure ? nil : found + opener.bytesize
       end
 
-      # A "<" followed by a byte that starts none of the special constructs
-      # is an ordinary tag, however few bytes have arrived after it.
-      def plain_tag?(data, found)
-        following = data.byteslice(found + 1, 1).to_s
-        !following.empty? && following != "!" && following != "?"
+      def start_tag(found, following)
+        @token = 0
+        @state = :tag
+        @tag = 0
+        @quote = nil
+        @namespace_tail = EMPTY
+        @closing = following == SLASH
+        @last = nil
+        spend_tag(1)
+        @failure ? nil : found + 1
       end
 
       def grow(bytes)
@@ -245,8 +252,12 @@ module Studio
 
         found = data.index(TAG_STOP, position)
         finish = found || data.bytesize
-        count_namespaces(data.byteslice(position, finish - position), continues: found.nil?)
-        return nil if @failure
+        # A stretch too short to hold "xmlns" (most of them: "<c r=", "<t>")
+        # is not looked at, unless an earlier stretch left a tail to join.
+        if finish - position >= NAMESPACE.bytesize || !@namespace_tail.empty? || found.nil?
+          count_namespaces(data.byteslice(position, finish - position), continues: found.nil?)
+          return nil if @failure
+        end
         return leave_tag(data, position, data.bytesize) if found.nil?
 
         if data.getbyte(found) == CLOSE
@@ -283,7 +294,7 @@ module Studio
       def count_namespaces(segment, continues:)
         text = @namespace_tail + segment.to_s
         @namespaces += text.scan(NAMESPACE).size
-        @namespace_tail = continues ? (text.byteslice(-(NAMESPACE.bytesize - 1)..) || text) : +"".b
+        @namespace_tail = continues ? (text.byteslice(-(NAMESPACE.bytesize - 1)..) || text) : EMPTY
         too_large if @namespaces > @max_namespaces
       end
 
