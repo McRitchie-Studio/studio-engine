@@ -109,10 +109,22 @@ module Studio
         INLINE_TYPE_BY_EXTENSION.value?(mime) ? mime : nil
       end
 
+      # 0 -> "A", 25 -> "Z", 26 -> "AA": the heading a spreadsheet gives a column.
+      def column_letter(index)
+        letters = +""
+        number = index + 1
+        while number.positive?
+          number, remainder = (number - 1).divmod(26)
+          letters.prepend((65 + remainder).chr)
+        end
+        letters
+      end
+
       # The preview for a Studio::KnowledgeDoc. Reads the bucket (or, for a
       # PDF or image, only signs a URL), so call it off the page's own render
-      # path. `storage` answers download(key:, max_bytes:).
-      def for(doc, storage: Studio::S3)
+      # path. `storage` answers download(key:, max_bytes:) and defaults to
+      # Studio::S3, named only when a read is about to happen.
+      def for(doc, storage: nil)
         return fallback("No file is attached.") unless doc.file?
 
         kind = kind_for(filename: doc.filename, mime_type: doc.mime_type)
@@ -232,7 +244,7 @@ module Studio
         refuse_over!(doc, SPREADSHEET_MAX_BYTES)
         # One byte past the cap: the recorded byte_size can be absent or
         # stale, and this is the read that cannot be.
-        bytes = storage.download(key: doc.s3_key, max_bytes: SPREADSHEET_MAX_BYTES + 1)
+        bytes = (storage || Studio::S3).download(key: doc.s3_key, max_bytes: SPREADSHEET_MAX_BYTES + 1)
         raise TooLarge, "spreadsheet previews stop at #{megabytes(SPREADSHEET_MAX_BYTES)}" if bytes.bytesize > SPREADSHEET_MAX_BYTES
 
         workbook = read_spreadsheet(bytes)
@@ -240,7 +252,7 @@ module Studio
       end
 
       def delimited(doc, storage)
-        bytes = storage.download(key: doc.s3_key, max_bytes: DELIMITED_HEAD_BYTES + 1)
+        bytes = (storage || Studio::S3).download(key: doc.s3_key, max_bytes: DELIMITED_HEAD_BYTES + 1)
         partial = bytes.bytesize > DELIMITED_HEAD_BYTES
         tabbed = File.extname(doc.filename.to_s).casecmp?(".tsv") ||
                  doc.mime_type.to_s.start_with?("text/tab-separated-values")
@@ -249,7 +261,7 @@ module Studio
       end
 
       def text(doc, storage)
-        bytes = storage.download(key: doc.s3_key, max_bytes: TEXT_HEAD_BYTES + 1)
+        bytes = (storage || Studio::S3).download(key: doc.s3_key, max_bytes: TEXT_HEAD_BYTES + 1)
         partial = bytes.bytesize > TEXT_HEAD_BYTES
         Result.new(kind: :text, text: decode(bytes.byteslice(0, TEXT_HEAD_BYTES), partial: partial), truncated: partial)
       end

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "English"
 require "zlib"
 require "stringio"
 
@@ -38,8 +39,15 @@ module Studio
       # Reads a deflate stream a few kilobytes of compressed input at a time.
       # The small step is the bomb defence: deflate tops out near 1000:1, so
       # one step can add about four megabytes to the buffer and no more.
+      #
+      # `failure` exists because the consumer is an XML parser reading through
+      # a C callback: an exception raised inside #read does not reliably come
+      # out the other side as itself. So a failed read ends the stream and
+      # keeps the reason, and Zip#open raises it once the parser has let go.
       class InflateIO
         STEP = 4096
+
+        attr_reader :failure
 
         def initialize(compressed, cap)
           @compressed = compressed
@@ -54,7 +62,13 @@ module Studio
         # IO#read's contract as Nokogiri's reader uses it: up to `length`
         # bytes, and nil once the stream is exhausted.
         def read(length = nil, _outbuf = nil)
-          fill while !@finished && (length.nil? || @buffer.bytesize < length)
+          begin
+            fill while !@finished && (length.nil? || @buffer.bytesize < length)
+          rescue Error => e
+            fail_with(e)
+          rescue Zlib::Error
+            fail_with(Unreadable.new("its contents are damaged"))
+          end
           return nil if @buffer.empty? && !length.nil?
 
           length.nil? ? @buffer.slice!(0, @buffer.bytesize) : @buffer.slice!(0, length)
@@ -65,6 +79,12 @@ module Studio
         end
 
         private
+
+        def fail_with(error)
+          @failure = error
+          @finished = true
+          @buffer.clear
+        end
 
         def fill
           chunk = @compressed.byteslice(@position, STEP)
@@ -105,13 +125,24 @@ module Studio
 
         io = io_for(entry)
         begin
-          yield io
+          result = yield io
+        rescue StandardError
+          # Whatever the reader made of a stream that ended early, the reason
+          # it ended is the truer error.
+          raise failure_of(io) || $ERROR_INFO
         ensure
           io.close
         end
+        raise failure_of(io) if failure_of(io)
+
+        result
       end
 
       private
+
+      def failure_of(io)
+        io.failure if io.respond_to?(:failure)
+      end
 
       def normalize(name)
         name.to_s.delete_prefix("/")

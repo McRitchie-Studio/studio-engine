@@ -190,6 +190,9 @@ module Studio
         prefix = literals(section[0...first])
         suffix = literals(section[(last + 1)..])
         body = section[first..last]
+        # The exponent's own digits ("E+00") are not decimal places.
+        exponent = body.index { |kind, _| kind == :exponent }
+        body = body[0...exponent] if exponent
 
         value *= 100 if kinds.include?(:percent)
         point = body.index { |kind, _| kind == :point }

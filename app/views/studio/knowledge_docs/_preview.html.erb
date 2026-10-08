@@ -1,0 +1,61 @@
+<%# A document's inline preview, by kind. locals: preview (a
+    Studio::KnowledgePreview::Result), doc. Stored content is only ever
+    emitted as escaped text: a table cell, a <pre>, or (for a PDF or image)
+    not at all, the browser fetching it from a signed URL. %>
+<%= render "studio/knowledge_docs/preview_styles" %>
+<div id="knowledge-preview-body" data-preview-kind="<%= preview.kind %>">
+  <% case preview.kind %>
+  <% when :table %>
+    <% sheets = preview.sheets %>
+    <% if sheets.size > 1 || sheets.first.name.present? %>
+      <%# One radio per sheet, then the tabs, then the panels: all siblings,
+          so :checked can reach both the tab's look and the panel's display. %>
+      <style>
+        <% sheets.each_index do |index| %>
+          #knowledge-sheet-radio-<%= index %>:checked ~ .knowledge-sheet-tabs label[for="knowledge-sheet-radio-<%= index %>"] { opacity: 1; font-weight: 600; background: rgb(148 163 184 / .18); }
+          #knowledge-sheet-radio-<%= index %>:checked ~ .knowledge-sheet-panels #knowledge-sheet-panel-<%= index %> { display: block; }
+        <% end %>
+      </style>
+      <% sheets.each_index do |index| %>
+        <input type="radio" name="knowledge-sheet" class="knowledge-sheet-radio"
+               id="knowledge-sheet-radio-<%= index %>"<%= " checked".html_safe if index.zero? %>>
+      <% end %>
+      <div class="knowledge-sheet-tabs" id="knowledge-sheet-tabs">
+        <% sheets.each_with_index do |sheet, index| %>
+          <label class="knowledge-sheet-tab" for="knowledge-sheet-radio-<%= index %>"><%= sheet.name.presence || "Sheet #{index + 1}" %><%= " (hidden)" if sheet.hidden %></label>
+        <% end %>
+      </div>
+      <% if preview.omitted_sheets.to_i.positive? %>
+        <p class="knowledge-preview-note" id="knowledge-preview-omitted-sheets">
+          <%= pluralize(preview.omitted_sheets, "more sheet") %> not shown;
+          <%= link_to "download", admin_knowledge_doc_download_path(doc), data: { turbo: false } %> for the full file.
+        </p>
+      <% end %>
+      <div class="knowledge-sheet-panels">
+        <% sheets.each_with_index do |sheet, index| %>
+          <div class="knowledge-sheet-panel" id="knowledge-sheet-panel-<%= index %>">
+            <%= render "studio/knowledge_docs/preview_sheet", sheet: sheet, doc: doc %>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <%= render "studio/knowledge_docs/preview_sheet", sheet: sheets.first, doc: doc %>
+    <% end %>
+  <% when :text %>
+    <% if preview.truncated %>
+      <p class="knowledge-preview-note knowledge-preview-truncated">
+        Showing the start of this file;
+        <%= link_to "download", admin_knowledge_doc_download_path(doc), data: { turbo: false } %> for the full file.
+      </p>
+    <% end %>
+    <pre class="knowledge-preview-text" id="knowledge-preview-text"><%= preview.text %></pre>
+  <% when :pdf %>
+    <iframe class="knowledge-preview-pdf" id="knowledge-preview-pdf" src="<%= preview.url %>"
+            title="<%= doc.title %>" referrerpolicy="no-referrer" loading="lazy"></iframe>
+  <% when :image %>
+    <img class="knowledge-preview-image" id="knowledge-preview-image" src="<%= preview.url %>"
+         alt="<%= doc.title %>" referrerpolicy="no-referrer">
+  <% else %>
+    <%= render "studio/knowledge_docs/preview_fallback", reason: preview.reason, doc: doc %>
+  <% end %>
+</div>

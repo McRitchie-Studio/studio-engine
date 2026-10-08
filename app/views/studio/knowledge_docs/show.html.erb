@@ -1,5 +1,5 @@
-<%# /admin/knowledge/:id — one document: metadata, access, download, and the
-    triage form that files it out of the inbox. %>
+<%# /admin/knowledge/:id — one document: metadata, access, download, the
+    inline preview, and the triage form that files it out of the inbox. %>
 <%= render "studio/knowledge_docs/chip_styles" %>
 
 <div class="mb-4 text-sm">
@@ -31,6 +31,30 @@
   <div class="mb-6">
     <h2 class="font-semibold mb-1">Summary <span class="text-xs opacity-60">(what an "aware" agent may read)</span></h2>
     <p class="text-sm whitespace-pre-line"><%= @doc.summary %></p>
+  </div>
+<% end %>
+
+<% if @doc.file? %>
+  <div id="knowledge-preview-section" class="mb-6">
+    <h2 class="font-semibold mb-2">Preview</h2>
+    <% if @doc.preview_kind %>
+      <%# Lazy: the frame fetches the preview once it scrolls into view, so
+          this page never waits on a bucket read or a parse. Without Turbo
+          the link inside is the way in. %>
+      <turbo-frame id="knowledge-preview" loading="lazy" src="<%= admin_knowledge_doc_preview_path(@doc) %>">
+        <p class="text-sm opacity-70">
+          Loading the preview…
+          <%= link_to "Open it", admin_knowledge_doc_preview_path(@doc), id: "knowledge-preview-open" %>
+        </p>
+      </turbo-frame>
+    <% else %>
+      <%# A kind with no preview is known from the row alone: say so here
+          rather than spend a request to learn it. %>
+      <p id="knowledge-preview-fallback" class="text-sm opacity-70">
+        There is no inline preview for this kind of file.
+        <%= link_to "Download it instead (15-min link)", admin_knowledge_doc_download_path(@doc), id: "knowledge-preview-download" %>
+      </p>
+    <% end %>
   </div>
 <% end %>
 
