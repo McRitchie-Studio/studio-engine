@@ -164,9 +164,17 @@
   <%= stylesheet_link_tag "studio/sticky_table_header", "data-turbo-track": "reload" %>
 <% end %>
 <%= javascript_importmap_tags %>
-<%# THE ENGINE'S BROWSER BOOT (studio/application): its Stimulus application,
-    the pinned stack, and the Alpine shims. A module tag, so it carries the nonce. %>
+<%# THE ENGINE'S BROWSER BOOT (studio/application): its every-page Stimulus
+    controllers, the pinned stack, and the Alpine shims. A module tag, so it
+    carries the nonce. %>
 <%= javascript_import_module_tag "studio/application" %>
+<%# THE STIMULUS APPLICATION, BY ITS OWN DOOR. studio/stimulus starts the engine's
+    Stimulus application and registers a page-specific controller the first time
+    a page renders its element (the hold button). Its only imports are Stimulus
+    and studio/lazy_controllers, so a failure elsewhere in the boot's graph
+    leaves a page its hold button. The boot imports it, so this resolves to the
+    same preloaded module. %>
+<%= javascript_import_module_tag "studio/stimulus" %>
 <%# THE STORES, BY THEIR OWN DOOR. Every host's <body> binds $store.devMode and the
     theme toggle binds $store.theme, so a boot that fails to load (a missing digest,
     a network drop, a throw anywhere in its graph) must not take the stores with it.
