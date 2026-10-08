@@ -130,6 +130,19 @@ TRACKED.each do |gem_name|
       next
     end
 
+    # A RELEASE CANDIDATE IS NOT A RELEASE. While a solana-studio release is under
+    # QA the hub's `bin/release prepare` locks each consumer to its candidate
+    # (0.13.0.rc1), and the hub's ship moves this engine's lock to 0.13.0 once
+    # that is published. Until then there is no released version for the engine to
+    # be behind, and a prerelease ordering above the engine's lock would redden
+    # every engine PR for the length of QA. A consumer on a prerelease is
+    # therefore evidence of nothing, in either direction: it is named and skipped.
+    if consumer_version.prerelease?
+      puts "· #{label} locks #{gem_name} #{consumer_version}, a prerelease under QA and not a " \
+           "release — nothing to compare (engine #{engine_version})"
+      next
+    end
+
     checked += 1
     if engine_version < consumer_version
       behind << [gem_name, label, engine_version, consumer_version]

@@ -128,6 +128,34 @@ class GemDriftCheckTest < Minitest::Test
     assert_includes out, "engine 0.5.9 > turf_monster 0.5.7"
   end
 
+  # --- a release candidate under QA -----------------------------------------
+
+  # The hub locks consumers to solana-studio's candidate for the length of QA.
+  # 0.13.0.rc1 orders ABOVE the engine's 0.12.3, and nothing has been released.
+  def test_a_consumer_on_a_release_candidate_is_not_a_release_the_engine_trails
+    out, _err, code = run_check(lock(solana: "0.12.3"), { "turf_monster" => lock(solana: "0.13.0.rc1") })
+
+    assert_equal 0, code, "a candidate under QA must not redden engine PRs: #{out}"
+    assert_includes out, "turf_monster locks solana-studio 0.13.0.rc1, a prerelease under QA"
+    refute_includes out, "is behind"
+  end
+
+  # THE CONTROL: the same consumer on the RELEASED 0.13.0 is the drift this gate is for.
+  def test_the_released_version_of_that_candidate_still_fails
+    out, _err, code = run_check(lock(solana: "0.12.3"), { "turf_monster" => lock(solana: "0.13.0") })
+
+    assert_equal 1, code
+    assert_includes out, "engine 0.12.3 is behind the released 0.13.0"
+  end
+
+  # A candidate in one consumer excuses nothing in another.
+  def test_a_candidate_in_one_consumer_does_not_hide_a_release_in_another
+    _out, _err, code = run_check(lock(solana: "0.12.3"),
+                                 { "turf_monster" => lock(solana: "0.13.0.rc1"), "mcritchie_studio" => lock(solana: "0.12.4") })
+
+    assert_equal 1, code
+  end
+
   def test_one_consumer_behind_fails_even_when_another_is_level
     _out, err, code = run_check(
       lock(solana: "0.5.3"),

@@ -4,6 +4,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **`bin/gem-drift-check` no longer counts a release candidate as a release.**
+  While a solana-studio release is under QA, consumers lock its candidate
+  (`0.13.0.rc1`), which orders above the engine's lock and failed the drift
+  lane on every engine PR. A consumer on a prerelease is now named and skipped;
+  the released version still fails the check.
+
 ## 0.96.0 — 2026-10-08
 
 ### Added
