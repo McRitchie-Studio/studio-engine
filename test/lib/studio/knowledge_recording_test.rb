@@ -669,6 +669,21 @@ class StudioKnowledgeRecordingTest < Minitest::Test
     end
   end
 
+  # The header deadline is for the headers. Once they are in, a body may take
+  # as long as the whole fetch allows.
+  def test_a_body_may_outlast_the_header_deadline
+    slow = lambda do |socket|
+      socket.write("HTTP/1.1 200 X\r\nConnection: close\r\nContent-Length: #{MP4.bytesize + 4}\r\n\r\n#{MP4}")
+      4.times do
+        sleep 0.25
+        socket.write("z")
+      end
+    end
+    with_listener("/call.mp4" => slow) do |_heads|
+      assert_equal "#{MP4}zzzz".b, fetch("https://files.example.com/call.mp4", header_deadline: 0.4).first
+    end
+  end
+
   def test_a_deadline_already_passed_makes_no_connection
     with_listener("/call.mp4" => respond(200, {}, MP4)) do |heads|
       refuse_fetch(KR::FetchFailed, deadline: -1)
