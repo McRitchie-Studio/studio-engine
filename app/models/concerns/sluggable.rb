@@ -10,7 +10,8 @@
 #
 # The one way to change a persisted slug is `rename_slug!` (or `rename_slug`),
 # which updates the row and every child column that references it in one
-# transaction. The children are found two ways:
+# transaction. Any other write that changes a persisted slug makes the record
+# invalid, with the reason on `errors[:slug]`. The children are found two ways:
 #
 #   * every `has_many` / `has_one` on the model with `primary_key: :slug`;
 #   * every pair declared with `has_slug_children`, for a table that has no
@@ -48,6 +49,7 @@ module Sluggable
 
     before_save :set_slug, if: :sluggable_unwritten?
     after_create :sluggable_settle_derived_slug
+    validate :sluggable_slug_unchanged, on: :update
   end
 
   class_methods do
@@ -82,6 +84,7 @@ module Sluggable
   # held the old one, all or nothing. Returns { "table.column" => rows updated }.
   # Raises Sluggable::SlugRefused, with the reason on errors[:slug], when
   # the slug is blank, badly formed, or already taken.
+  # Its writes skip validations, so sluggable_slug_unchanged never sees them.
   def rename_slug!(new_slug)
     raise ActiveRecord::RecordNotSaved.new("a slug can be renamed only on a saved record", self) unless persisted?
 
@@ -127,6 +130,13 @@ module Sluggable
 
   def sluggable_unwritten?
     new_record? || slug.blank?
+  end
+
+  # Filling a blank slug is the first write; any other change is a rename.
+  def sluggable_slug_unchanged
+    return unless will_save_change_to_slug? && slug_in_database.present?
+
+    errors.add(:slug, :readonly, message: "changes only through rename_slug!")
   end
 
   # A model may override this; the override owns its slug, and the post-insert

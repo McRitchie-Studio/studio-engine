@@ -129,6 +129,36 @@ class SluggableSetOnceTest < ActiveSupport::TestCase
     assert_equal "explicit-kept", row.reload.slug
   end
 
+  # --- changed only through rename_slug! ---------------------------------------
+
+  test "update slug on persisted record is invalid" do
+    SluggableAthlete.create!(person_slug: "pat-passer")
+
+    refute @person.update(slug: "pat-direct")
+    assert_equal ["changes only through rename_slug!"], @person.errors[:slug]
+    assert @person.errors.of_kind?(:slug, :readonly)
+    assert_raises(ActiveRecord::RecordInvalid) { @person.update!(slug: "") }
+    assert_equal "pat-passer", SluggablePerson.find(@person.id).slug
+    assert_equal %w[pat-passer], column("athletes", "person_slug")
+  end
+
+  test "rename slug cascades with the guard on" do
+    SluggableAthlete.create!(person_slug: "pat-passer")
+
+    @person.rename_slug!("pat-the-passer")
+
+    assert_equal %w[pat-the-passer], column("athletes", "person_slug")
+    assert @person.update(name: "Pat Renamed"), "a save after a rename is not a slug change"
+    assert_equal "pat-the-passer", @person.reload.slug
+  end
+
+  test "blank database slug may be set" do
+    @person.update_column(:slug, nil)
+
+    assert @person.update(slug: "pat-chosen")
+    assert_equal "pat-chosen", @person.reload.slug
+  end
+
   # --- rename_slug! -------------------------------------------------------------
 
   test "slug_children lists the association and every declared pair once" do
