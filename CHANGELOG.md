@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.97.0 — 2026-10-09
+
 ### Changed
 
 - **The toast queue, the link sidebar and the hold button move to ES modules and
