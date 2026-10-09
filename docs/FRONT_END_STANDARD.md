@@ -214,7 +214,10 @@ Stimulus.
 **From script to module.** Move the pure logic into a module first and pin
 it with tests (the behaviour does not change). Then write the controller that
 calls it, swap the markup to `data-controller` (`data-studio-controller` in the
-engine), and delete the script tag.
+engine), and delete the script tag. In the engine,
+`test/views/no_inline_script_test.rb` lists every view that still carries an
+inline script, each beside the task that owns it; delete the view's line with
+its script.
 
 ## Styling
 

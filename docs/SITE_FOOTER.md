@@ -319,14 +319,19 @@ The frame, its crop, the popup, the `/schedule` page, an app's own booking page
 
 ## What it costs a page
 
-- The footer's CSS and scripts are inline, rendered once per page, and scoped
-  (`.ftr-*`, `.booking-*`). They read the theme's custom properties with a
+- The footer's CSS is inline, rendered once per page, and scoped (`.ftr-*`,
+  `.booking-*`). They read the theme's custom properties with a
   fallback beside each, so the footer lays out the same in an app whose Tailwind
   build has never seen these views. Do not restyle it with utilities that your
   build may not emit.
-- A page with no address never names Leaflet: the map's styles and its mount
-  script are rendered only with a map (`studio/site_footer/_map_assets`). A page
-  with no `booking_url` carries no booking script.
+- The map and the booking primitives run from ES modules (`studio/footer_map`,
+  `studio/booking`), each behind a controller the engine registers lazily: the
+  module is fetched only by a page that renders the element naming it
+  (`data-studio-controller="footer-map"` on the map, `"booking"` on the frame's
+  wrapper and the popup's dialog).
+- A page with no address never names Leaflet: the map's styles are rendered
+  only with a map (`studio/site_footer/_map_assets`), and nothing fetches its
+  module. A page with no `booking_url` fetches no booking module.
 - A facts callable that raises costs the footer, not the page: in production the
   error is logged once and the page renders without a footer. In development and
   test it raises.
@@ -370,18 +375,17 @@ origins (the booking frame's `frame-src` is in [`BOOKING.md`](BOOKING.md#content
 Leaflet itself is same-origin (`script-src 'self'`, `style-src 'self'`), since it
 is served from the app's own assets.
 
-The footer's own `<style>` and `<script>` blocks are
-inline and carry no nonce, like the rest of the engine's partials, and Leaflet
-positions its tiles with inline `style` attributes. A policy that forbids inline
-script or style needs `'unsafe-inline'` for them (or hashes), exactly as it does
-for the engine's head partial today.
+The footer carries no inline script: its behaviour is same-origin modules.
+Its own `<style>` blocks are inline and carry no nonce, and Leaflet positions
+its tiles with inline `style` attributes. A policy that forbids inline style
+needs `'unsafe-inline'` in `style-src` for them (or hashes).
 
 ## Coexisting with an app's own copy
 
 An app that still renders a local footer partial uses the same
-`data-footer-map` attribute. The engine's script keeps out of its way: its guard
+`data-footer-map` attribute. The engine's module keeps out of its way: its guard
 is an engine name (`__studioFooterMapsArmed`), and it acts only on
-engine-rendered maps, which carry `data-leaflet-js`. The booking scripts follow
+engine-rendered maps, which carry `data-leaflet-js`. The booking module follows
 the same rule ([`BOOKING.md`](BOOKING.md#coexisting-with-an-apps-own-copy)).
 
 ## Markup hooks

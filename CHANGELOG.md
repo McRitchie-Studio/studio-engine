@@ -39,6 +39,35 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   empty. A lazy load that fails is final for the document, as it is in a
   browser: the registry imports a controller once, reports a failure once, and
   marks each element naming it with `data-studio-controller-failed`.
+- **The admin pages, the email manager, booking, the footer map and the survey
+  stepper move to ES modules.** Their inline scripts are gone; rendered markup
+  and styling are unchanged apart from the `data-studio-controller` attributes
+  named here. Six controllers register lazily, each fetched only by a page that
+  names it:
+  - `geo-settings` on `/admin/geo`'s root (`studio/geo_settings`), and
+    `link-preview-card` on `/admin/link_preview`'s root
+    (`studio/link_preview_card`).
+  - `email-banner-scale` on the `<template>` anchor `studio/emails/_banner_scale`
+    renders (`studio/email_banner_scale`).
+  - `booking` on the frame's wrapper and the popup's dialog (`studio/booking`),
+    and `footer-map` on the map element (`studio/footer_map`). Both install
+    once per document under the same guards (`__studioBookingFramesArmed`,
+    `__studioBookingPopupArmed`, `__studioFooterMapsArmed`) and
+    `window.__studioBookingLoad` is still published. Until the booking
+    controller connects, a booking link is an ordinary link to the booking page.
+  - `survey` on the survey's root (`studio/survey`). Until it connects, and if
+    it never does, the page is the plain form.
+  - The theme editors and the email manager's editors stay Alpine factories:
+    `themeEditor` and `dsThemeEditor` are `studio/theme_editor`, and
+    `emailBannerEditor` and `emailRecipients` are `studio/email_banner`.
+    `studio/alpine_shims` publishes all four on every page, because an `x-data`
+    is evaluated the moment Alpine starts. `themeEditor` takes its colours as
+    an argument.
+- **`test/views/no_inline_script_test.rb` holds the views to it.** A view with
+  an inline script fails unless it is on the test's allow-list, where each entry
+  names the task that owns it; an entry whose script is gone fails too. Two are
+  left inline on purpose: `studio/_at_time_script`, whose first pass runs before
+  first paint, and `solana_sessions/phantom_callback`, the wallet's return leg.
 
 ### Added
 
@@ -70,6 +99,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **`window.__studioLinkSidebarBridge` is gone.** It was the inline script's
   run-once flag; a test that looked for it in a page's HTML looks for
   `data-studio-controller="link-sidebar"`.
+- **`studio/emails/_recipient_repaint` and `studio/surveys/_script` are gone.**
+  Each rendered only a script. The engine's own pages no longer render them; a
+  host template that did deletes the line.
+- **The footer's and the booking primitives' scripts are no longer in the
+  page's HTML.** A test that looked for `__studioFooterMapsArmed`,
+  `__studioBookingFramesArmed` or `__studioBookingPopupArmed` in a response body
+  looks for `data-studio-controller="footer-map"` on the map, or
+  `data-studio-controller="booking"` on the frame's wrapper and the dialog. The
+  globals themselves are still set, once the controller has connected.
+  `window.__studioSurveyBound` and `window.__studioSurveyTurboHook` are gone;
+  nothing outside the survey's script read them.
 
 ## 0.96.2 — 2026-10-08
 

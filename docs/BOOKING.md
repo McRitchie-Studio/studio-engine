@@ -297,11 +297,12 @@ An app that enforces a policy must allow the frame:
 |-----------|--------|-----|
 | `frame-src` | `https://calendar.google.com` | The booking frame and the popup |
 
-The primitives' own `<style>` and `<script>` blocks are inline and carry no
-nonce, like the rest of the engine's partials, and a cropped wrapper carries its
-numbers in an inline `style` attribute. A policy that forbids inline script or
-style needs `'unsafe-inline'` for them (or hashes), exactly as it does for the
-engine's head partial today.
+The primitives carry no inline script: their behaviour is the same-origin
+module `studio/booking`, started by the `booking` controller on the frame's
+wrapper and the popup's dialog. Their own `<style>` block is inline and carries
+no nonce, and a cropped wrapper carries its numbers in an inline `style`
+attribute. A policy that forbids inline style needs `'unsafe-inline'` in
+`style-src` for them (or hashes).
 
 ## Limits
 
