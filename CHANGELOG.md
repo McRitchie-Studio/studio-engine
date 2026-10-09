@@ -53,6 +53,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
     SortableJS has loaded; `data-alpine-ready` is set after that, so it still
     means "the board drags". A board written by hand with only the `x-data`
     names the controller on itself.
+  - **A board whose controller fails to load says so.** The board controller is
+    lazy, and a failed lazy load is final for the document. The board's section
+    then carries `data-studio-controller-failed="board"` and shows "This board
+    could not load its controls. Reload the page." above its cards, which stay
+    readable; the notice is revealed by a rule in `engine.css`, so an app sees
+    it once its Tailwind build includes this engine's `engine.css`.
   - **Leveling activity.** The factory is `studio/leveling_activity`, published
     as `window.levelingActionModal`. Its opts and JSON contract are unchanged.
 - **SortableJS loads only on a page that drags.** `layouts/studio/_head` no

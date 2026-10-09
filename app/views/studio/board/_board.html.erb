@@ -169,6 +169,15 @@
 <section class="studio-board" data-test="studio-board" data-studio-controller="board" x-data="studioBoard(<%= board_opts.to_json %>)">
   <% if live_channel.present? %><%= turbo_stream_from live_channel %><% end %>
 
+  <%# Shown only when the board controller's module failed to load: the registry
+      marks this section data-studio-controller-failed="board", and engine.css
+      reveals the notice on that attribute (its inline display: none is the
+      default, so a host whose CSS lacks the rule shows nothing). The board still renders and its
+      cards stay readable; they do not drag until the page is reloaded. %>
+  <p role="status" data-test="studio-board-failed"
+     class="studio-board-failed mb-4 rounded-lg border bg-surface px-4 py-2.5 text-sm font-medium"
+     style="display: none; border-color: var(--color-danger); color: var(--color-danger-ink, var(--color-danger))">This board could not load its controls. Reload the page.</p>
+
   <% if header_slot %><div class="studio-board-header mb-4"><%= header_slot %></div><% end %>
   <% if above_board_slot %><%= above_board_slot %><% end %>
 

@@ -143,6 +143,23 @@ class BoardPrimitiveTest < ActiveSupport::TestCase
     assert_match(/\AstudioBoard\(/, section["x-data"], "the cards and slots still bind the studioBoard scope")
   end
 
+  # The board is a lazy controller, and a failed lazy load is final for the
+  # document. The notice is in the markup, hidden by its own inline style, and
+  # engine.css reveals it on the attribute the registry sets.
+  test "the board carries a hidden notice for a controller that failed to load" do
+    html = render_board(DEFAULT_LOCALS.merge(columns: columns_fixture))
+    notice = Nokogiri::HTML.fragment(html).at_css("section[data-test='studio-board'] > p[data-test='studio-board-failed']")
+
+    refute_nil notice, "the notice is a direct child of the board section"
+    assert_equal "This board could not load its controls. Reload the page.", notice.text.strip
+    assert_equal "status", notice["role"]
+    assert_match(/\Adisplay: none;/, notice["style"], "hidden by default, with or without the engine's CSS")
+
+    css = File.read("app/assets/tailwind/studio_engine/engine.css")
+    assert_match(/\.studio-board\[data-studio-controller-failed~="board"\] > \.studio-board-failed \{\s*display: block !important;/, css)
+    assert_includes File.read("app/javascript/studio/lazy_controllers.js"), %(FAILED_ATTRIBUTE = "data-studio-controller-failed")
+  end
+
   test "the module exports the factory, and the shim publishes it before Alpine starts" do
     board = File.read("app/javascript/studio/board.js")
     assert_match(/^export function studioBoard\(/, board)

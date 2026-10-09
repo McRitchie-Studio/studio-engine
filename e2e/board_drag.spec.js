@@ -197,6 +197,58 @@ test("a board written by hand with only the x-data names its controller and drag
   expect(errors).toEqual([]);
 });
 
+// The contrast ratio of an element's text against its own background.
+const contrast = (locator) => locator.evaluate((element) => {
+  const channels = (value) => value.match(/[\d.]+/g).slice(0, 3).map(Number);
+  const luminance = (rgb) => {
+    const [r, g, b] = rgb.map((c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const style = getComputedStyle(element);
+  const [text, surface] = [luminance(channels(style.color)), luminance(channels(style.backgroundColor))];
+  return (Math.max(text, surface) + 0.05) / (Math.min(text, surface) + 0.05);
+});
+
+test("a board whose controller fails to load says so, in both themes, and its cards stay readable", async ({ page }) => {
+  const reports = [];
+  page.on("console", (message) => { if (message.type() === "error") reports.push(message.text()); });
+  let aborted = 0;
+  await page.route(/board_controller/, (route) => { aborted += 1; return route.abort(); });
+
+  await page.goto("/lab/board");
+  const failed = page.locator("section[data-test='studio-board'][data-studio-controller-failed~='board']");
+  await expect(failed).toHaveCount(3);
+  expect(aborted).toBe(1);
+  expect(reports.filter((text) => text.includes("the board controller failed to load"))).toHaveLength(1);
+  await expect(page.locator("section[data-test='studio-board'][data-alpine-ready]")).toHaveCount(0);
+
+  const notice = board(page, 0).locator("[data-test='studio-board-failed']");
+  const card = board(page, 0).locator("#card-engine-board-primitive");
+  for (const theme of ["dark", "light"]) {
+    // The lab is dark; the light palette needs the class taken off.
+    if (theme === "light") await page.evaluate(() => document.documentElement.classList.remove("dark"));
+    await expect(notice, theme).toBeVisible();
+    await expect(notice, theme).toHaveText("This board could not load its controls. Reload the page.");
+    expect((await notice.boundingBox()).height, theme).toBeGreaterThan(20);
+    expect(await contrast(notice), `${theme} notice contrast`).toBeGreaterThanOrEqual(4.5);
+    await expect(card, theme).toBeVisible();
+    await expect(card, theme).toContainText("Engine board primitive");
+    expect(Number(await card.evaluate((element) => getComputedStyle(element).opacity)), theme).toBe(1);
+  }
+  await expect(page.locator("[data-test='studio-board-failed']:visible")).toHaveCount(3);
+
+  // The chrome is Alpine's, so it still answers.
+  await board(page, 1).locator("[data-test='chrome-archived-toggle']").click();
+  await expect(board(page, 1).locator("#dropzone-archived")).toBeVisible();
+});
+
+test("a board that loads shows no notice", async ({ page }) => {
+  await page.goto("/lab/board");
+  await boardsAreReady(page);
+  await expect(page.locator("[data-test='studio-board-failed']")).toHaveCount(3);
+  await expect(page.locator("[data-test='studio-board-failed']:visible")).toHaveCount(0);
+});
+
 // Every script or module the page asked for whose URL names one of `names`.
 function watchRequests(page, names) {
   const seen = [];
