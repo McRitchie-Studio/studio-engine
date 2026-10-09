@@ -21,10 +21,14 @@
 
   WHEN THE BOOT IS OVER. The engine's modules are module scripts in the head, so
   DOMContentLoaded waits for them, however slow, and Stimulus connects its
-  controllers inside that event. A healthy page has therefore connected its
-  buttons before the first sweep's timer can run; the grace below is margin, not
-  a race. Later stacks (a Turbo visit, a modal's x-if) are swept shortly after
-  they arrive.
+  controllers as studio/stimulus runs, before that event. Measured in Chromium
+  on the e2e lab, the button connects ahead of DOMContentLoaded by 3 to 5 ms on
+  a cold load, by 110 to 230 ms at 20x CPU throttle, and by 1.1 s on a 400 ms,
+  400 kbit/s link at 6x CPU (where DOMContentLoaded itself lands at 11.5 s). A
+  healthy page has therefore connected its buttons before the grace starts; the
+  1.5 s below is margin for a host that boots its modules another way, not a
+  race the page has to win. Later stacks (a Turbo visit, a modal's x-if)
+  connect in the microtask after they arrive and are swept shortly after.
 
   Locals:
     nonce - the request's CSP nonce, or nil (layouts/studio/_head passes it)
