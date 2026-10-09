@@ -80,8 +80,6 @@
                title: doc.title, dom_id: "knowledge-preview-media" %>
   <% else %>
     <%# A document that is only a recording has no file to fall back from. %>
-    <% unless player && !doc.file? %>
-      <%= render "studio/knowledge_docs/preview_fallback", reason: preview.reason, doc: doc %>
-    <% end %>
+    <%= render "studio/knowledge_docs/preview_fallback", reason: preview.reason, doc: doc unless player && !doc.file? %>
   <% end %>
 </div>
