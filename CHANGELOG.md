@@ -67,6 +67,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   run-once flag; a test that looked for it in a page's HTML looks for
   `data-studio-controller="link-sidebar"`.
 
+## 0.96.1 — 2026-10-08
+
 ### Fixed
 
 - **`bin/gem-drift-check` no longer counts a release candidate as a release.**
