@@ -77,7 +77,7 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
   # The hold button confirms real actions. A lazy controller is one more request
   # that can fail, and a browser never refetches a failed module, so the button
   # is imported statically and preloaded with the page.
-  test "the hold button is in the boot graph, through studio/stimulus, and nothing is lazy yet" do
+  test "the hold button is in the boot graph, through studio/stimulus, and is never a dynamic import" do
     %w[studio/controllers/hold_button_controller studio/hold_button studio/hold_button_hooks].each do |name|
       assert_includes boot_graph, name, "#{name} is not preloaded, so a hold button waits on a later request"
     end
