@@ -163,6 +163,51 @@ test("the editor hides the logo, prefers an upload, and saves only when dirty", 
   assert.equal(editor.dirty(), false, "undoing the edit leaves nothing to save")
 })
 
+// THE DEFECT THIS PINS. studio/emails/_banner_preview isolates the banner in an
+// iframe by default, and the email's own page renders it that way. The editor
+// looked for the banner's nodes in its own document only, so on the real page
+// typing repainted nothing: the frame's document was never reached.
+function framedBanner({ loaded = true } = {}) {
+  const inside = banner()
+  const listeners = {}
+  const frame = {
+    dataset: {},
+    contentDocument: loaded ? { querySelector: (selector) => inside[selector] || null } : null,
+    addEventListener(name, fn) { listeners[name] = fn }
+  }
+  return { inside, frame, listeners, nodes: { "iframe[data-email-banner-preview]": frame } }
+}
+
+test("the editor paints a banner isolated in a frame", () => {
+  const framed = framedBanner()
+  const editor = emailBannerEditor(editorConfig())
+  const watchers = mount(editor, framed.nodes)
+
+  assert.equal(framed.inside["[data-banner-header]"].textContent, "Welcome Alex!")
+  assert.equal(framed.inside["[data-banner-scrim]"].style.backgroundColor, "rgba(24,16,64,0.4)")
+
+  editor.form.header = "Good to see you, {name}"
+  watchers.form()
+  assert.equal(framed.inside["[data-banner-header]"].textContent, "Good to see you, Alex")
+})
+
+test("the editor paints a framed banner that has not parsed yet when its frame loads, and binds once", () => {
+  const framed = framedBanner({ loaded: false })
+  const editor = emailBannerEditor(editorConfig())
+  mount(editor, framed.nodes)
+
+  assert.equal(framed.inside["[data-banner-header]"].textContent, undefined)
+  const first = framed.listeners.load
+  assert.equal(typeof first, "function")
+  editor.paint()
+  assert.equal(framed.listeners.load, first, "a second paint adds no second listener")
+
+  framed.frame.contentDocument = { querySelector: (selector) => framed.inside[selector] || null }
+  framed.listeners.load()
+  assert.equal(framed.inside["[data-banner-header]"].textContent, "Welcome Alex!")
+  assert.equal(framed.inside["[data-banner-logo]"].attrs.src, "/standard.png")
+})
+
 test("the editor paints a page that carries no banner without throwing", () => {
   assert.doesNotThrow(() => mount(emailBannerEditor(editorConfig({ targets: undefined, targetId: undefined }))))
 })

@@ -88,6 +88,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   validation answer for a press that was released does not abort the next one;
   nothing of the timeline runs after the hold completes.
 
+### Fixed
+
+- **The style guide's theme editor sends a save once.** The controller answers
+  a save with a 302 to `/admin/theme`, and a fetch that follows a 302 keeps a
+  PATCH a PATCH, so Save sent the theme twenty-one times and then toasted "Save
+  failed". The request no longer follows the redirect.
+- **The email manager's banner editor repaints the banner on the email's own
+  page.** `studio/emails/_banner_preview` isolates the banner in an iframe, and
+  the editor looked for its nodes in the page's own document only, so typing a
+  header, sub-text or tint changed nothing there. The editor now reaches into
+  the frame, as the emails list already did.
+
 ### Breaking
 
 - **`window.toastManager` is gone.** Nothing binds it: the flash partial reads

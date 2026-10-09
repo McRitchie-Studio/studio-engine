@@ -83,6 +83,31 @@ export function logoMode(hideLogo, uploadedLogo) {
   return "standard"
 }
 
+export const FRAMED_PREVIEW = "iframe[data-email-banner-preview]"
+
+// A node of the banner rendered inside `scope`. The banner lives in an IFRAME
+// wherever studio/emails/_banner_preview isolates it (its default): the email's
+// table is its own document, so it cannot nest rows inside the list. The frame
+// is a same-origin srcdoc, so its nodes are reachable; contentDocument is null
+// until the frame has parsed, which is why whenFrameLoads exists.
+export function bannerNodeIn(scope, selector) {
+  const frame = scope.querySelector(FRAMED_PREVIEW)
+  if (frame) {
+    try { return frame.contentDocument && frame.contentDocument.querySelector(selector) }
+    catch (_) { return null }
+  }
+  return scope.querySelector(selector)
+}
+
+// Runs `repaint` each time the banner's frame in `scope` loads. Bound once per
+// frame, however often it is asked.
+export function whenFrameLoads(scope, repaint) {
+  const frame = scope.querySelector(FRAMED_PREVIEW)
+  if (!frame || frame.dataset.repaintBound) return
+  frame.dataset.repaintBound = "1"
+  frame.addEventListener("load", repaint)
+}
+
 // x-data="emailBannerEditor({...})".
 //
 // TOUCHED VS DIRTY: different questions, and the button answers both. `touched`
@@ -150,10 +175,11 @@ export function emailBannerEditor(config) {
 
     paint() {
       const root = this.$root
-      const header = root.querySelector("[data-banner-header]")
-      const subtext = root.querySelector("[data-banner-subtext]")
-      const logo = root.querySelector("[data-banner-logo]")
-      const scrim = root.querySelector("[data-banner-scrim]")
+      const header = bannerNodeIn(root, "[data-banner-header]")
+      const subtext = bannerNodeIn(root, "[data-banner-subtext]")
+      const logo = bannerNodeIn(root, "[data-banner-logo]")
+      const scrim = bannerNodeIn(root, "[data-banner-scrim]")
+      whenFrameLoads(root, () => this.paint())
 
       if (header) header.textContent = this.headerText()
       if (subtext) subtext.textContent = this.form.subtext || ""
@@ -216,17 +242,8 @@ export function emailRecipients(config) {
       return resolveSubjectText(template, this.firstName(), config.appName)
     },
 
-    // A row's banner lives in an IFRAME: the email's table is its own document
-    // so it cannot nest rows inside the list. Same-origin srcdoc, so its nodes
-    // are reachable; contentDocument is null until the frame has parsed, which
-    // is why paint() wires the load listener as well as the immediate attempt.
     bannerNode(row, selector) {
-      const frame = row.querySelector("iframe[data-email-banner-preview]")
-      if (frame) {
-        try { return frame.contentDocument && frame.contentDocument.querySelector(selector) }
-        catch (_) { return null }
-      }
-      return row.querySelector(selector)
+      return bannerNodeIn(row, selector)
     },
 
     paintRow(row) {
@@ -241,11 +258,7 @@ export function emailRecipients(config) {
     paint() {
       this.$root.querySelectorAll("[data-email-row]").forEach((row) => {
         this.paintRow(row)
-        const frame = row.querySelector("iframe[data-email-banner-preview]")
-        if (frame && !frame.dataset.repaintBound) {
-          frame.dataset.repaintBound = "1"
-          frame.addEventListener("load", () => { this.paintRow(row) })
-        }
+        whenFrameLoads(row, () => { this.paintRow(row) })
       })
     },
 
