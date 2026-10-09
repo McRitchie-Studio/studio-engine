@@ -1,0 +1,163 @@
+<%#
+  THE HOLD BUTTON'S GUARD: says so when a hold button cannot work.
+
+  The hold button runs on five modules (studio/stimulus, studio/lazy_controllers,
+  studio/controllers/hold_button_controller, studio/hold_button and
+  studio/hold_button_hooks). A browser keeps a failed module request for the life
+  of the document, so one failure among them at page load leaves every hold
+  button rendered, enabled and deaf until a reload. This script is what speaks
+  then, so it is INLINE and imports nothing: it shares no request with the
+  modules whose failure it reports.
+
+  The hold-button controller writes data-hold-button-connected on its
+  .hold-stack when it connects. A stack that still lacks it once the page's
+  boot is over is marked
+
+    <span class="hold-stack" data-studio-controller-failed="hold-button">
+
+  its button aria-disabled, and its .hold-notice (role="status") filled;
+  engine-motion.css styles all three. A press on a marked button says the notice
+  again. The controller clears the mark the moment it connects, however late.
+
+  WHEN THE BOOT IS OVER. The engine's modules are module scripts in the head, so
+  DOMContentLoaded waits for them, however slow, and Stimulus connects its
+  controllers inside that event. A healthy page has therefore connected its
+  buttons before the first sweep's timer can run; the grace below is margin, not
+  a race. Later stacks (a Turbo visit, a modal's x-if) are swept shortly after
+  they arrive.
+
+  Locals:
+    nonce - the request's CSP nonce, or nil (layouts/studio/_head passes it)
+%>
+<%= tag.script(nonce: local_assigns[:nonce]) do %>
+  (function () {
+    if (window.studioHoldButtonGuard) return;
+
+    var STACK = '.hold-stack[data-studio-controller~="hold-button"]';
+    var CONNECTED = "data-hold-button-connected";
+    var FAILED = "data-studio-controller-failed";
+    var NOTICE = "This button could not load. Reload the page.";
+    var GRACE_MS = 1500;
+    var SETTLE_MS = 250;
+
+    var deadline = null;
+    var reported = false;
+    var serial = 0;
+    var lastPress = 0;
+
+    // What to do with one stack. `deadline` is null until the page's boot has
+    // an end, and nothing is marked before it.
+    function verdict(state) {
+      if (state.connected) return state.marked ? "clear" : "leave";
+      if (state.marked) return "leave";
+      if (state.deadline == null || state.now < state.deadline) return "wait";
+      return "mark";
+    }
+
+    function child(stack, name) {
+      for (var i = 0; i < stack.children.length; i++) {
+        if (stack.children[i].classList.contains(name)) return stack.children[i];
+      }
+      return null;
+    }
+
+    function mark(stack) {
+      var button = child(stack, "hold-btn");
+      var notice = child(stack, "hold-notice");
+      if (!notice) {
+        notice = document.createElement("span");
+        notice.className = "hold-notice";
+        notice.setAttribute("role", "status");
+        stack.appendChild(notice);
+      }
+      if (!notice.id) notice.id = "hold-notice-" + (++serial);
+      notice.textContent = NOTICE;
+      stack.setAttribute(FAILED, "hold-button");
+      if (button) {
+        button.setAttribute("aria-disabled", "true");
+        button.setAttribute("aria-describedby", notice.id);
+      }
+      if (!reported) {
+        reported = true;
+        console.error("[studio] the hold-button controller failed to load and stays unavailable until the page is reloaded");
+      }
+    }
+
+    function clear(stack) {
+      var button = child(stack, "hold-btn");
+      var notice = child(stack, "hold-notice");
+      if (!stack.hasAttribute(FAILED)) return;
+      stack.removeAttribute(FAILED);
+      stack.removeAttribute("data-hold-notice-pressed");
+      if (notice) notice.textContent = "";
+      if (button) {
+        button.removeAttribute("aria-disabled");
+        button.removeAttribute("aria-describedby");
+      }
+    }
+
+    function judge(stack) {
+      var answer = verdict({
+        connected: stack.hasAttribute(CONNECTED),
+        marked: stack.hasAttribute(FAILED),
+        now: Date.now(),
+        deadline: deadline
+      });
+      if (answer === "mark") mark(stack);
+      if (answer === "clear") clear(stack);
+      return answer;
+    }
+
+    function sweep() {
+      var stacks = document.querySelectorAll(STACK);
+      for (var i = 0; i < stacks.length; i++) judge(stacks[i]);
+    }
+
+    // A press on a marked button: the notice again, to the eye and to a screen
+    // reader. The text has to change to be announced, so a trailing no-break
+    // space comes and goes.
+    function say(stack) {
+      var notice = child(stack, "hold-notice");
+      if (notice) notice.textContent = notice.textContent === NOTICE ? NOTICE + " " : NOTICE;
+      stack.removeAttribute("data-hold-notice-pressed");
+      void stack.offsetWidth;
+      stack.setAttribute("data-hold-notice-pressed", "");
+    }
+
+    function pressed(event) {
+      var target = event.target;
+      var button = target && target.closest ? target.closest(".hold-btn") : null;
+      var stack = button ? button.closest(STACK) : null;
+      if (!stack) return;
+      // A touch is followed by the mouse events the browser makes up for it.
+      if (event.type === "mousedown" && Date.now() - lastPress < 700) return;
+      lastPress = Date.now();
+      judge(stack);
+      if (stack.hasAttribute(FAILED)) say(stack);
+    }
+
+    function holds(node) {
+      return node.nodeType === 1 && (node.matches(STACK) || node.querySelector(STACK) !== null);
+    }
+
+    function booted() {
+      deadline = Date.now() + GRACE_MS;
+      setTimeout(sweep, GRACE_MS);
+      new MutationObserver(function (records) {
+        for (var i = 0; i < records.length; i++) {
+          for (var j = 0; j < records[i].addedNodes.length; j++) {
+            if (holds(records[i].addedNodes[j])) return void setTimeout(sweep, SETTLE_MS);
+          }
+        }
+      }).observe(document.documentElement, { childList: true, subtree: true });
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", booted);
+    else booted();
+    document.addEventListener("turbo:load", function () { setTimeout(sweep, SETTLE_MS); });
+    document.addEventListener("mousedown", pressed, true);
+    document.addEventListener("touchstart", pressed, { capture: true, passive: true });
+
+    window.studioHoldButtonGuard = { verdict: verdict, clear: clear, sweep: sweep, graceMs: GRACE_MS };
+  })();
+<% end %>

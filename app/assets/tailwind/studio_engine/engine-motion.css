@@ -1733,6 +1733,64 @@ body.modal-open { overflow: visible; }
   z-index: 1;
 }
 
+/* THE BUTTON THAT COULD NOT LOAD. The guard in the head
+   (studio/_hold_button_guard) marks a stack whose controller never connected
+   data-studio-controller-failed="hold-button" and fills its .hold-notice. Until
+   then the notice is an empty live region held out of the layout, so a working
+   button measures exactly as it does without one. Marked, the button reads as
+   unavailable, the bubbles stop, and the notice sits under the button in the
+   danger ink, which the theme resolver holds to AA on every surface. */
+.hold-stack > .hold-notice {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.hold-stack[data-studio-controller-failed~="hold-button"] > .hold-btn {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+  cursor: not-allowed;
+}
+
+.hold-stack[data-studio-controller-failed~="hold-button"] > .hold-fizz,
+.hold-stack[data-studio-controller-failed~="hold-button"] > .hold-fizz-portal {
+  display: none;
+}
+
+.hold-stack[data-studio-controller-failed~="hold-button"] > .hold-notice {
+  position: static;
+  display: block;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  color: var(--color-danger-ink, var(--color-danger));
+}
+
+/* A press on the marked button: the notice answers it. */
+.hold-stack[data-hold-notice-pressed] > .hold-notice {
+  animation: hold-notice-pressed 0.45s ease-out;
+}
+
+@keyframes hold-notice-pressed {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hold-stack[data-hold-notice-pressed] > .hold-notice { animation: none; }
+}
+
 .hold-stack > .hold-fizz,
 .hold-stack > .hold-fizz-portal,
 .hold-fizz-portal > .hold-fizz {
