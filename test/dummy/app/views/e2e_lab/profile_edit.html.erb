@@ -44,8 +44,8 @@
 %>
 <div x-data="studioProfileForm(<%= { first_name: @user.first_name, last_name: @user.last_name, email: @user.email, birthday: bd }.to_json %>)">
   <div class="max-w-2xl mx-auto py-8">
-    <%# imageUploadHost is defined inside this partial, and editable_identity's
-        x-data calls it. The cropper library it also pulls in comes from a CDN,
+    <%# editable_identity's x-data calls imageUploadHost (studio/image_upload,
+        on every page). The cropper library this partial pulls in comes from a CDN,
         which the lane answers with an empty 200 (see blockOffsiteRequests) — so
         the CROPPING is not under test here, only that clicking the avatar
         reaches the picker.
@@ -98,4 +98,3 @@
   </div>
 </div>
 
-<%= render "studio/profiles/form_script" %>

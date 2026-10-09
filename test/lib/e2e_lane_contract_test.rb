@@ -261,7 +261,6 @@ class E2eLaneContractTest < Minitest::Test
       # reimplements a partial turns its spec into a test of the lab page.
       "profile.html.erb" => [
         "studio/profiles/identity", "studio/profiles/name_fields",
-        "studio/profiles/form_script",
         # The modal host is named here because the lane's sharpest finding lives
         # in how it is MOUNTED: it declares no x-data of its own, so a page that
         # renders it outside an Alpine scope gets a store that opens and a dialog
@@ -276,8 +275,7 @@ class E2eLaneContractTest < Minitest::Test
       # test.
       "profile_edit.html.erb" => [
         "studio/cropper_assets", "studio/profiles/editable_identity",
-        "studio/profiles/birthday_fields", "studio/profiles/name_fields",
-        "studio/profiles/form_script"
+        "studio/profiles/birthday_fields", "studio/profiles/name_fields"
       ],
       # THE SHARED HOST IS NAMED HERE FOR A REASON THAT IS EASY TO DELETE BY
       # ACCIDENT. window.ModalAnimations — the registry the guide's simulator

@@ -52,8 +52,12 @@
 
     ON BY DEFAULT rather than set only in the observer's callback, so the
     early return for a browser without IntersectionObserver — which leaves the
-    bar hidden forever — leaves it inert forever too. %>
+    bar hidden forever — leaves it inert forever too.
+
+    WHEN THE BAR SHOWS is studio/identity_mini, bound by the identity-mini
+    controller on this element. %>
 <div data-studio-identity-mini
+     data-studio-controller="identity-mini"
      class="studio-identity-mini"
      inert>
   <div class="px-4">
@@ -94,64 +98,3 @@
   </div>
 </div>
 
-<script>
-  (function () {
-    var CLASS = "is-visible";
-
-    function wire() {
-      var full = document.querySelector("[data-studio-identity-full]");
-      var mini = document.querySelector("[data-studio-identity-mini]");
-      if (!full || !mini) return;
-
-      // No IntersectionObserver: leave the bar hidden rather than showing a
-      // duplicate header permanently. The page is fully usable without it.
-      if (!("IntersectionObserver" in window)) return;
-
-      if (mini._studioObserver) mini._studioObserver.disconnect();
-
-      // HAND OVER PART-WAY, not once the card has gone. Waiting for the last
-      // pixel left a gap where neither header was on screen, which is the moment
-      // the bar exists to cover. It appears once most of the card has scrolled
-      // past, so the two overlap briefly instead.
-      //
-      // Ratio, not a pixel offset: the card's height changes with the name's
-      // wrap and with whether there is an email under it, so a fixed offset
-      // would mean something different on every account.
-      var SHOW_BELOW_RATIO = 0.6;
-
-      var observer = new IntersectionObserver(function (entries) {
-        var entry = entries[0];
-        // A card taller than the viewport can never reach ratio 1, so "not
-        // intersecting at all" has to count as gone in its own right.
-        var gone = !entry.isIntersecting || entry.intersectionRatio < SHOW_BELOW_RATIO;
-        mini.classList.toggle(CLASS, gone);
-        // The tab order and the accessibility tree follow the same decision the
-        // class does. opacity and pointer-events cannot express "not here".
-        mini.inert = !gone;
-      }, {
-        // The navbar covers the top of the viewport, so pixels behind it are not
-        // visible pixels — without this the card reads as on-screen while it is
-        // hidden under the nav.
-        rootMargin: "-72px 0px 0px 0px",
-        // A spread of thresholds, or the callback only fires at fully-in and
-        // fully-out and the ratio test above never gets a chance to run.
-        threshold: [0, 0.2, 0.4, 0.5, 0.6, 0.8, 1]
-      });
-
-      observer.observe(full);
-      mini._studioObserver = observer;
-    }
-
-    document.addEventListener("turbo:load", wire);
-    document.addEventListener("turbo:before-cache", function () {
-      var mini = document.querySelector("[data-studio-identity-mini]");
-      if (mini) {
-        mini.classList.remove(CLASS);
-        mini.inert = true;
-        if (mini._studioObserver) mini._studioObserver.disconnect();
-      }
-    });
-    if (document.readyState !== "loading") wire();
-    else document.addEventListener("DOMContentLoaded", wire);
-  })();
-</script>

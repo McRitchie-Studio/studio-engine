@@ -6,6 +6,7 @@
 //   x-data="avatarCropperHost()"                     studio/image_upload
 //   x-data="birthdayModal({ minAge, url })"          studio/birthday
 //   x-data="studioBirthdayFields('1991-01-31')"      studio/birthday
+//   x-data="studioProfileForm({ first_name: 'Pat' })" studio/profile_form
 //   submitFormWithProgress(form, opts)               studio/image_upload
 //
 // WHY THESE ARRIVE WITH THE PAGE AND ARE NOT LAZY. Alpine evaluates an x-data
@@ -28,6 +29,7 @@
 import { cropPhotoModal } from "studio/cropper"
 import { imageUploadHost, avatarCropperHost, submitFormWithProgress } from "studio/image_upload"
 import { birthdayModal, studioBirthdayFields } from "studio/birthday"
+import { studioProfileForm } from "studio/profile_form"
 
 // name -> the factory Alpine calls. Alpine passes the expression's own
 // arguments and nothing else.
@@ -36,7 +38,8 @@ export const SCOPES = {
   imageUploadHost: (opts) => imageUploadHost(opts),
   avatarCropperHost: () => avatarCropperHost(),
   birthdayModal: (opts) => birthdayModal(opts),
-  studioBirthdayFields: (initial) => studioBirthdayFields(initial)
+  studioBirthdayFields: (initial) => studioBirthdayFields(initial),
+  studioProfileForm: (initial) => studioProfileForm(initial)
 }
 
 // Plain functions a page calls by name.
