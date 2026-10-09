@@ -190,14 +190,9 @@
       in demo mode. %>
 
   <%# Cropper.js, so the Profile crop and upload modals open live on this page.
-      The cropPhotoModal and birthdayModal factories the specimens mount are on
-      every page (studio/alpine_scopes). %>
+      The cropPhotoModal, birthdayModal and levelingActionModal factories the
+      specimens mount are on every page (studio/alpine_scopes, studio/alpine_shims). %>
   <%= render "studio/cropper_assets" %>
-
-  <%# levelingActionModal factory — page level (never inside the overlay template,
-      where a cloned script would not run) so the change-username + join-newsletter
-      specimens open live. A consumer app renders this in its layout the same way. %>
-  <%= render "studio/leveling_activity_assets" %>
 
   <%# ---- The overlay: one backdrop + card; every specimen's real content is a
       single-root <template x-if> gated on the current modal id. Faithful to the

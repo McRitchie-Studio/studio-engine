@@ -892,7 +892,20 @@
 # again as the page changes, the browser re-rejects a direct import() of it
 # without a request, and a reload recovers.
 #   npx playwright test --list  -> 250 tests in 36 files
-# 250 -> 268: four files, 18 tests, for the modal blocks and profile scripts that
+# 250 -> 259: e2e/board_drag.spec.js, 9 tests. The board primitive drags on the
+# style guide's Tasks section: a card moves to another column, toasts and
+# recounts; a depth-chart card ranks inside its lane and does not leave it; a
+# locked card does not drag and none is dragged past it; a board's chrome state
+# works and its archive column takes a drop; a board written by hand with only
+# the x-data names its controller and drags; SortableJS and the board controller
+# are fetched only by a page with a board; and a page script's Sortable.create
+# loads SortableJS and then creates the sortable. And the board is the first
+# lazy controller with a page of its own: with its module's request aborted,
+# each board says "This board could not load its controls. Reload the page." at
+# AA contrast in both themes while its cards stay readable and its chrome still
+# answers; a board that loads shows no notice.
+#   npx playwright test --list  -> 259 tests in 37 files
+# 259 -> 277: four files, 18 tests, for the modal blocks and profile scripts that
 # moved to modules.
 # e2e/confirm_interstitial.spec.js, 4: the sign-in page posts its own form once;
 # with its module's request aborted, and answered 404, the fallback button shows
@@ -907,8 +920,8 @@
 # e2e/scopes_survive_boot_failure.spec.js, 4: with studio/application aborted,
 # every x-data factory is still on the page, the profile form saves and
 # discards, the birthday row works and the birthday gate submits.
-#   npx playwright test --list  -> 268 tests in 40 files
-total_specs: 268
+#   npx playwright test --list  -> 277 tests in 41 files
+total_specs: 277
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1061,13 +1074,14 @@ total_specs: 268
 #   npx playwright test --list                                             -> 250 tests, 36 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 250
-# And for the modal blocks and profile scripts, 18 more tests in four new files:
-#   npx playwright test --list                                             -> 268 tests, 40 files
-#   npx playwright test --list --grep "@devnet"                            -> 0
-#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 268
 # executed = total - devnet - allowed_skips = 250 - 0 - 0 = 250, so executed ==
 # total_specs and the equality assertion holds.
-executed: 268
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 259
+# And for the modal blocks and profile scripts, 18 more tests in four new files:
+#   npx playwright test --list                                             -> 277 tests, 41 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 277
+executed: 277
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

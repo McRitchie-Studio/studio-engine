@@ -150,9 +150,9 @@ modal host, toast, link sidebar) is imported statically by `studio/application`,
 which puts it in the preloaded boot graph. The hold button is imported
 statically too, by `studio/stimulus`: it confirms real actions, so it arrives
 with the page and no later request stands between a press and its hold. A
-page-specific controller is listed in `LAZY` in `studio/stimulus` as a dynamic
-import, and `studio/lazy_controllers` registers it the first time an element
-names it, so a page with no such element never fetches it. Until a lazy
+page-specific controller (the board) is listed in `LAZY` in `studio/stimulus` as
+a dynamic import, and `studio/lazy_controllers` registers it the first time an
+element names it, so a page with no such element never fetches it. Until a lazy
 controller registers, its element's actions do nothing.
 
 **A page's own module tag.** A page that must find its controller connected
@@ -169,18 +169,32 @@ across DOM changes and Turbo visits; only a full page load fetches it again. So
 `studio/lazy_controllers` imports a controller once, reports a failure once, and
 marks every element that names the failed controller, on the page and arriving
 later, with `data-studio-controller-failed="<identifier>"`. A lazy controller's
-page styles or announces that state. A control that must work whenever its page
-does is not lazy.
+page styles or announces that state: a board whose controller failed shows
+"This board could not load its controls. Reload the page." above its cards,
+which stay readable. A control that must work whenever its page does is not
+lazy.
 
-**An x-data factory is never lazy.** Alpine evaluates `x-data="birthdayModal(...)"`
-as it meets the element: at start for a page's own markup, at mount for a modal
-card. A factory that is not defined by then leaves the element dead, and no
-dynamic import can promise to have resolved. So the factories pages bind by
-name are `studio/alpine_scopes`, imported statically, preloaded on every page,
-and loaded by its own module tag as well, so a boot that fails to load keeps a
-page its photo upload, its birthday gate and its profile form. What a factory
-needs later (Cropper.js) may arrive late, and the factory says so when it never
-does: a control never takes a press that does nothing.
+**An Alpine factory cannot be lazy.** Alpine evaluates an `x-data` as it meets
+the element: at start for a page's own markup (`x-data="studioBoard(...)"`, and
+a host reads the scope's methods in its own first tick), at mount for a modal
+card (`x-data="birthdayModal(...)"`). A factory that is not defined by then
+leaves the element dead, and no dynamic import can promise to have resolved. So
+a factory a consumer still binds is a module imported statically, in the
+preloaded boot graph:
+
+- `studioBoard` and `levelingActionModal` are imported by `studio/alpine_shims`.
+  What is lazy is the controller beside the board and the library it loads:
+  only a page with a board fetches the board controller and SortableJS (the
+  `sortablejs` pin). `window.Sortable` is a shim until then, whose `create`
+  loads the library first.
+- The photo crop, the upload hosts, the birthday card and row and the profile
+  form are `studio/alpine_scopes`, which the head also loads by its own module
+  tag, so a boot that fails to load keeps a page its photo upload, its birthday
+  gate and its profile form.
+
+What a factory needs later (Cropper.js, SortableJS) may arrive late, and the
+page says so when it never does: a control never takes a press that does
+nothing.
 
 Alpine loads after the module tags. Deferred classic scripts and module scripts
 run in document order, so by the time Alpine starts, the boot has installed the
@@ -199,6 +213,8 @@ components:
 | Toast queue (`layouts/studio/_flash`) | `studio/toast` | `toast`, its own module tag | none needed: the API is the `toast` window event; the queue is `$store.toasts` |
 | Link sidebar flag | `studio/link_sidebar` | `link-sidebar`, its own module tag | `$store.sidebars.linkTreeOpen` |
 | Hold button | `studio/hold_button`, `studio/hold_button_hooks` | `hold-button`, registered by `studio/stimulus` | the `guard:`, `on_hold_start:`, `validate:`, `early_action:`, `early_action_guard:` and `on_success:` string locals, `window.studioFizzPortal` |
+| Board primitive (`studio/board/_board`) | `studio/board` | `board` (lazy), which loads SortableJS | `x-data="studioBoard({...})"`, `window.Sortable.create` until SortableJS loads |
+| Leveling activity modals | `studio/leveling_activity` | the Alpine scope alone | `x-data="levelingActionModal({...})"` |
 | Crop photo modal (`studio/modals/_crop_photo`) | `studio/cropper` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="cropPhotoModal({...})"` |
 | Image upload hosts, avatar cropper | `studio/image_upload` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="imageUploadHost({...})"`, `x-data="avatarCropperHost()"`, `submitFormWithProgress(form, opts)` |
 | Birthday card, profile birthday row | `studio/birthday` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="birthdayModal({...})"`, `x-data="studioBirthdayFields('...')"` |
@@ -225,10 +241,10 @@ import nothing.
 sites use the events. The string locals are evaluated by
 `studio/hold_button_hooks` and stay while a consumer passes them.
 
-**Today.** The engine still ships some behaviour as scripts inside partials.
-The board's Alpine factory, `window.studioBoard`, is 454 lines in
-`studio/_board_assets`; the hold button still accepts `guard:`, `on_success:`
-and `validate:` as JavaScript strings. The shared head carries one inline script,
+**Today.** The engine still ships some behaviour as scripts inside partials
+(the modal blocks, the profile pages, the admin pages). The hold button still
+accepts `guard:`, `on_success:` and `validate:` as JavaScript strings. The
+shared head carries one inline script,
 the nonced pre-paint theme; its behaviour is the modules above. The engine
 vendors Alpine and loads it with `javascript_include_tag`. Every app pins its
 modules with importmap.
@@ -294,9 +310,9 @@ Existing code moves in this order, one task each, highest traffic first:
    renders through three paths; it becomes one component with one
    constructor (piece 4c). The board effects move out of ERB into
    `app/javascript/board/` with Node tests (piece 4d).
-2. **The two kanban implementations.** The engine's `window.studioBoard` and
-   the hub's `kanbanBoard` in `tasks/_deploy_board` become one board
-   component with one controller.
+2. **The two kanban implementations.** The engine's board (`studio/board`,
+   on its `board` controller) and the hub's `kanbanBoard` in
+   `tasks/_deploy_board` become one board component with one controller.
 3. **The three toast systems.** The engine's `toast` window event (the
    `_flash` host), the toast list inside `studioBoard`, and the hub board's
    `showToast` become one toast API on the engine host (piece 4e).

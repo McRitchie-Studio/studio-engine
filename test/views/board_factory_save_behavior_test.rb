@@ -25,9 +25,9 @@ require "tempfile"
 # the fixed build from the broken one; a substring assertion cannot, because the
 # broken build contained the word "catch" too.
 #
-# So: the page-level partial's <script> is extracted and run under node with
-# minimal window/document/fetch stubs, and the save path's behavior is asserted by
-# invoking it.
+# So: the studio/board module is imported under node with minimal
+# window/document/fetch stubs, and the save path's behavior is asserted by
+# invoking it. test/javascript/board.test.mjs covers the rest of the module.
 class BoardFactorySaveBehaviorTest < Minitest::Test
   # A missing node runtime FAILS here; it must never `skip`. This is the only
   # coverage that observes the factory's failure handling, so a skip would read as
@@ -53,21 +53,22 @@ class BoardFactorySaveBehaviorTest < Minitest::Test
     @node_path ||= `which node 2>/dev/null`.strip
   end
 
-  def factory_script
-    html = ActionView::Base.with_empty_template_cache
-                           .with_view_paths(["app/views"])
-                           .render(partial: "studio/board_assets")
-    script = html[%r{<script>(.*?)</script>}m, 1]
-    refute_nil script, "expected studio/_board_assets to emit its factory <script>"
-    script
+  # The module's source, as a data: URL the harness imports. studio/board imports
+  # nothing, so it loads with no resolver.
+  def factory_module_url
+    source = File.read("app/javascript/studio/board.js")
+    refute_match(/^\s*import\s/, source, "studio/board grew a static import; the harness cannot resolve one")
+    "data:text/javascript;base64,#{[source].pack('m0')}"
   end
 
   def run_harness
     node = node_path
-    script = factory_script
     out = nil
-    Tempfile.create(["board_factory_harness", ".js"]) do |f|
-      f.write(HARNESS_PRELUDE, script, HARNESS_SCENARIOS)
+    Tempfile.create(["board_factory_harness", ".mjs"]) do |f|
+      f.write(HARNESS_PRELUDE,
+              "const { studioBoard } = await import(#{factory_module_url.to_json});\n",
+              "window.studioBoard = studioBoard;\n",
+              HARNESS_SCENARIOS)
       f.flush
       out = `#{node} #{f.path} 2>&1`
     end
@@ -82,7 +83,6 @@ class BoardFactorySaveBehaviorTest < Minitest::Test
   # SortableJS: init() is never called, so the factory is exercised as the plain
   # object it is.
   HARNESS_PRELUDE = <<~'JS'
-    'use strict';
     const dispatched = [];
     const alerted = [];
     const document = {
@@ -92,7 +92,9 @@ class BoardFactorySaveBehaviorTest < Minitest::Test
       querySelectorAll() { return []; },
       addEventListener() {}
     };
+    // The module reads window and document as globals, from its own scope.
     const window = globalThis;
+    globalThis.window = globalThis;
     globalThis.document = document;
     globalThis.CustomEvent = function (name, init) {
       this.type = name;
@@ -101,7 +103,7 @@ class BoardFactorySaveBehaviorTest < Minitest::Test
     globalThis.dispatchEvent = function (ev) { dispatched.push(ev); };
     globalThis.alert = function (msg) { alerted.push(msg); };
 
-    // ==== the factory's <script>, verbatim, follows ====
+    // ==== the import of studio/board follows ====
   JS
 
   HARNESS_SCENARIOS = <<~'JS'
@@ -188,7 +190,7 @@ class BoardFactorySaveBehaviorTest < Minitest::Test
     }
 
     (async function () {
-      assert(typeof window.studioBoard === 'function', 'the partial must define window.studioBoard');
+      assert(typeof window.studioBoard === 'function', 'studio/board must export the studioBoard factory');
 
       // ------------------------------------------------------------------
       // 1. THE DEFECT. A 422 carrying the server's own sentence reaches the

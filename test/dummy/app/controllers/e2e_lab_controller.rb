@@ -71,7 +71,9 @@ class E2eLabController < ActionController::Base
     # URLs on the map element), and e2e/boot.rb copies the engine's real files here.
     ENGINE_ASSET_PATHS = {
       "studio/leaflet.js" => "/e2e/js/studio/leaflet.js",
-      "studio/leaflet.css" => "/e2e/css/studio/leaflet.css"
+      "studio/leaflet.css" => "/e2e/css/studio/leaflet.css",
+      # The "sortablejs" pin: studio/board imports the vendored SortableJS by it.
+      "studio/sortable.js" => "/e2e/js/studio/sortable.js"
     }.freeze
 
     def asset_path(source, **options)
@@ -538,6 +540,15 @@ class E2eLabController < ActionController::Base
   # demos — are inline scripts in that engine partial, so the response bytes are
   # identical whether either one runs.
   def style_modals = render(:style_modals)
+
+  # The style guide's Tasks section: three live boards on the board primitive
+  # (a kanban, one with chrome state and an archive column, and a depth chart
+  # with locked cards), all in demo mode, so a drag sends nothing.
+  #
+  # No locals to prepare: style/_tasks builds its own columns, as style/index
+  # renders it. What is under test is in the browser: the board controller is
+  # registered lazily, it loads SortableJS, and only then does a card drag.
+  def board = render(:board)
 
   # HOST-SUPPLIED LOCALS THAT LAND INSIDE A JS STRING LITERAL, across the blocks
   # that take one — success/error card event names and the tx link's cluster query.
