@@ -1,0 +1,14 @@
+<%# One native player. locals: player (a Studio::KnowledgePreview::Player),
+    title, and optionally dom_id. The source is a signed URL the engine made;
+    nothing a document holds reaches an attribute here but its title. The
+    transcript controller finds the element by data-knowledge-player. %>
+<% dom_id = local_assigns[:dom_id] || "knowledge-player" %>
+<% if !player.playable? %>
+  <p class="knowledge-preview-note" id="knowledge-player-unavailable">The recording could not be loaded. Reload the page to try again.</p>
+<% elsif player.kind == :audio %>
+  <audio class="knowledge-player knowledge-player-audio" id="<%= dom_id %>" data-knowledge-player
+         controls preload="metadata" src="<%= player.url %>" aria-label="<%= title %>"></audio>
+<% else %>
+  <video class="knowledge-player knowledge-player-video" id="<%= dom_id %>" data-knowledge-player
+         controls playsinline preload="metadata" src="<%= player.url %>" aria-label="<%= title %>"></video>
+<% end %>

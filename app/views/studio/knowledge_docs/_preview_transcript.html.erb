@@ -1,0 +1,59 @@
+<%# A meeting transcript as cues: the time, who spoke, what they said.
+    locals: preview (kind :transcript), doc, player (or nil).
+
+    With a playable recording the wrapper names the knowledge-transcript
+    controller (studio/knowledge_transcript): a click on a cue seeks the
+    player, and the cue being spoken is marked and kept in view. Without one
+    there is no controller and each time is plain text.
+
+    Every cue's speaker and text came out of a stored file and is emitted
+    escaped. The only attribute a cue writes is its whole number of seconds.
+
+    One listener serves every cue (the controller listens on the list), so
+    the cues carry no action attribute of their own. %>
+<% playable = player&.playable? %>
+<div class="knowledge-transcript<%= " knowledge-transcript-with-player" if player %>" id="knowledge-transcript"<% if playable %> data-studio-controller="knowledge-transcript"<% end %>>
+  <% if player %>
+    <div class="knowledge-transcript-player" id="knowledge-transcript-player">
+      <%= render "studio/knowledge_docs/preview_player", player: player, title: doc.title %>
+      <% if playable %>
+        <p class="knowledge-preview-note knowledge-transcript-hint" id="knowledge-transcript-hint">Click a line to play from there.</p>
+        <p class="knowledge-preview-note knowledge-transcript-failed" id="knowledge-transcript-failed">Click-to-play could not load. The player still works; reload the page to try again.</p>
+      <% end %>
+    </div>
+  <% end %>
+  <div class="knowledge-transcript-lines">
+    <% if preview.cues_truncated %>
+      <p class="knowledge-preview-note" id="knowledge-transcript-truncated" data-transcript-truncated>
+        This transcript is longer than the page shows;
+        <%= link_to "download", admin_knowledge_doc_download_path(doc), data: { turbo: false } %> for the full file.
+      </p>
+    <% end %>
+    <ol class="knowledge-cues" id="knowledge-cues" data-knowledge-cues>
+      <% preview.cues.each do |cue| %>
+        <li class="knowledge-cue" data-seconds="<%= cue.seconds.to_i %>">
+          <% if playable %>
+            <button type="button" class="knowledge-cue-time"><%= Studio::KnowledgePreview.clock(cue.seconds) %></button>
+          <% else %>
+            <span class="knowledge-cue-time"><%= Studio::KnowledgePreview.clock(cue.seconds) %></span>
+          <% end %>
+          <span class="knowledge-cue-speaker"><%= cue.speaker %></span>
+          <p class="knowledge-cue-text"><%= cue.text %></p>
+        </li>
+      <% end %>
+    </ol>
+  </div>
+  <%# What the text preview shows for this file, kept one click away: a file
+      read as a transcript by mistake is still readable, and the lines above
+      the first cue (a title, a date) are still on the page. %>
+  <details class="knowledge-transcript-plain" id="knowledge-transcript-plain">
+    <summary>Plain text</summary>
+    <% if preview.truncated %>
+      <p class="knowledge-preview-note" data-preview-truncated>
+        Showing the start of this file;
+        <%= link_to "download", admin_knowledge_doc_download_path(doc), data: { turbo: false } %> for the full file.
+      </p>
+    <% end %>
+    <pre class="knowledge-preview-text" id="knowledge-preview-text"><%= preview.text %></pre>
+  </details>
+</div>

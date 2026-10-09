@@ -121,9 +121,14 @@ module Studio
     # one sentence, rendered beside the download link. The response is
     # no-store because it holds either the document's contents or a signed
     # URL to them.
+    #
+    # The recording's player is rendered here too, and only here: its source
+    # is a six-hour signed URL, which belongs in this no-store response and
+    # not in the show page. Signing reads nothing from the bucket.
     def preview
       @preview = @doc.preview
-      log_preview_failure(@preview.error) if @preview.error
+      @player = Studio::KnowledgePreview.player_for(@doc)
+      [@preview.error, @player&.error].compact.each { |error| log_preview_failure(error) }
       response.headers["Cache-Control"] = "no-store"
     end
 

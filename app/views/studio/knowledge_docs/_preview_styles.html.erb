@@ -2,7 +2,12 @@
     host's Tailwind build may not scan this gem's views. Colours are slate at
     low alpha over whatever the host paints, so one definition reads in a
     light theme and a dark one. The sheet tabs are radio buttons and sibling
-    selectors: no script, so no dependency on the host's Alpine or its CSP. %>
+    selectors: no script, so no dependency on the host's Alpine or its CSP.
+
+    The transcript is one grid: the player beside the cues from 64rem up, and
+    above them below that. The cue list is its own scroll box in both, so the
+    player stays where it is while the lines scroll. A cue looks clickable only
+    once the controller has connected (data-knowledge-transcript-ready). %>
 <style>
   .knowledge-preview-note { font-size: .8rem; opacity: .75; margin: 0 0 .5rem; }
   .knowledge-preview-scroll { overflow: auto; max-height: 70vh; border: 1px solid rgb(148 163 184 / .4); border-radius: .375rem; }
@@ -21,4 +26,35 @@
     border: 1px solid rgb(148 163 184 / .4); border-radius: .375rem; opacity: .7; }
   .knowledge-sheet-panel { display: none; }
   .knowledge-sheet-radio:focus-visible ~ .knowledge-sheet-tabs { outline: 2px solid rgb(59 130 246 / .7); outline-offset: 2px; }
+  .knowledge-recording { margin-bottom: .75rem; }
+  .knowledge-player { display: block; width: 100%; border-radius: .375rem; }
+  .knowledge-player-video { max-height: 70vh; background: #000; }
+  .knowledge-transcript { display: grid; gap: .75rem; grid-template-columns: minmax(0, 1fr); }
+  .knowledge-transcript-hint, .knowledge-transcript-failed { display: none; margin: .5rem 0 0; }
+  [data-knowledge-transcript-ready] .knowledge-transcript-hint { display: block; }
+  [data-studio-controller-failed~="knowledge-transcript"] .knowledge-transcript-failed { display: block; }
+  .knowledge-cues { list-style: none; margin: 0; padding: 0; overflow: auto; max-height: 70vh; overscroll-behavior: contain;
+    border: 1px solid rgb(148 163 184 / .4); border-radius: .375rem; }
+  .knowledge-cue { display: grid; grid-template-columns: 4.25rem minmax(0, 1fr); column-gap: .5rem; padding: .4rem .6rem;
+    font-size: .8rem; line-height: 1.45; border-top: 1px solid rgb(148 163 184 / .2); }
+  .knowledge-cue:first-child { border-top: 0; }
+  .knowledge-cue-time { grid-row: 1 / span 2; align-self: start; justify-self: start; padding: 0; border: 0; background: none;
+    color: inherit; font: inherit; font-variant-numeric: tabular-nums; opacity: .7; }
+  .knowledge-cue-speaker { font-weight: 600; overflow-wrap: anywhere; }
+  .knowledge-cue-text { grid-column: 2; margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+  .knowledge-cue-current { background: rgb(59 130 246 / .16); box-shadow: inset 3px 0 0 rgb(59 130 246 / .8); }
+  [data-knowledge-transcript-ready] .knowledge-cue { cursor: pointer; }
+  [data-knowledge-transcript-ready] .knowledge-cue:hover { background: rgb(148 163 184 / .14); }
+  [data-knowledge-transcript-ready] .knowledge-cue-current:hover { background: rgb(59 130 246 / .22); }
+  [data-knowledge-transcript-ready] button.knowledge-cue-time { cursor: pointer; opacity: 1; text-decoration: underline; }
+  .knowledge-transcript-plain { font-size: .8rem; }
+  .knowledge-transcript-plain > summary { cursor: pointer; opacity: .75; margin-bottom: .5rem; }
+  @media (max-width: 63.99rem) {
+    .knowledge-transcript-with-player .knowledge-player-video { max-height: 35vh; }
+    .knowledge-transcript-with-player .knowledge-cues { max-height: 50vh; }
+  }
+  @media (min-width: 64rem) {
+    .knowledge-transcript-with-player { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
+    .knowledge-transcript-with-player .knowledge-transcript-plain { grid-column: 1 / -1; }
+  }
 </style>

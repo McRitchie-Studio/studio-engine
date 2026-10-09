@@ -1,5 +1,6 @@
 <%# /admin/knowledge/:id — one document: metadata, access, download, the
-    inline preview, and the triage form that files it out of the inbox. %>
+    inline preview (with its recording and transcript), and the triage form
+    that files it out of the inbox. %>
 <%= render "studio/knowledge_docs/chip_styles" %>
 
 <div class="mb-4 text-sm">
@@ -34,10 +35,24 @@
   </div>
 <% end %>
 
-<% if @doc.file? %>
+<%# The recording is a second object beside the file. Both readers answer
+    "none" on a table without the recording columns, and this section then
+    renders exactly as it did before them. %>
+<% recording = @doc.recording? %>
+<% recording_link = recording ? nil : @doc.recording_link %>
+<% if @doc.file? || recording || recording_link %>
   <div id="knowledge-preview-section" class="mb-6">
-    <h2 class="font-semibold mb-2">Preview</h2>
-    <% if @doc.preview_kind %>
+    <h2 class="font-semibold mb-2"><%= @doc.file? ? "Preview" : "Recording" %></h2>
+    <% if recording_link %>
+      <%# No recording is stored, only where it lives. recording_link answers
+          http(s) links alone, so nothing else can reach this href. %>
+      <p id="knowledge-recording-link" class="text-sm mb-2">
+        The recording is not stored here.
+        <%= link_to "Open it where it was recorded", recording_link, id: "knowledge-recording-open",
+                    target: "_blank", rel: "noopener noreferrer", class: "underline" %>
+      </p>
+    <% end %>
+    <% if @doc.preview_kind || recording %>
       <%# Lazy: the frame fetches the preview once it scrolls into view, so
           this page never waits on a bucket read or a parse. Without Turbo
           the link inside is the way in. %>
@@ -47,7 +62,7 @@
           <%= link_to "Open it", admin_knowledge_doc_preview_path(@doc), id: "knowledge-preview-open" %>
         </p>
       </turbo-frame>
-    <% else %>
+    <% elsif @doc.file? %>
       <%# A kind with no preview is known from the row alone: say so here
           rather than spend a request to learn it. %>
       <p id="knowledge-preview-fallback" class="text-sm opacity-70">

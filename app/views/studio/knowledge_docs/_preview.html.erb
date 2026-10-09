@@ -1,10 +1,22 @@
 <%# A document's inline preview, by kind. locals: preview (a
-    Studio::KnowledgePreview::Result), doc. Stored content is only ever
-    emitted as escaped text: a table cell, a <pre>, or (for a PDF or image)
-    not at all, the browser fetching it from a signed URL. %>
+    Studio::KnowledgePreview::Result), doc, and optionally player (a
+    Studio::KnowledgePreview::Player for the document's recording). Stored
+    content is only ever emitted as escaped text: a table cell, a <pre>, a
+    transcript cue, or (for a PDF, image, audio or video file) not at all,
+    the browser fetching it from a signed URL. %>
+<% player = local_assigns[:player] %>
 <%= render "studio/knowledge_docs/preview_styles" %>
+<% if player && preview.kind != :transcript %>
+  <%# A recording beside a document that is not a transcript: the player
+      alone, above whatever the file shows. A transcript places its own. %>
+  <div class="knowledge-recording" id="knowledge-recording">
+    <%= render "studio/knowledge_docs/preview_player", player: player, title: doc.title %>
+  </div>
+<% end %>
 <div id="knowledge-preview-body" data-preview-kind="<%= preview.kind %>">
   <% case preview.kind %>
+  <% when :transcript %>
+    <%= render "studio/knowledge_docs/preview_transcript", preview: preview, doc: doc, player: player %>
   <% when :table %>
     <% sheets = preview.sheets %>
     <% if sheets.size > 1 || sheets.first.name.present? %>
@@ -60,7 +72,16 @@
   <% when :image %>
     <img class="knowledge-preview-image" id="knowledge-preview-image" src="<%= preview.url %>"
          alt="<%= doc.title %>" referrerpolicy="no-referrer">
+  <% when :video, :audio %>
+    <%# The document's own file is the media. Served as the type its name
+        earned (signed into the URL), never as the type that was stored. %>
+    <%= render "studio/knowledge_docs/preview_player",
+               player: Studio::KnowledgePreview::Player.new(kind: preview.kind, url: preview.url),
+               title: doc.title, dom_id: "knowledge-preview-media" %>
   <% else %>
-    <%= render "studio/knowledge_docs/preview_fallback", reason: preview.reason, doc: doc %>
+    <%# A document that is only a recording has no file to fall back from. %>
+    <% unless player && !doc.file? %>
+      <%= render "studio/knowledge_docs/preview_fallback", reason: preview.reason, doc: doc %>
+    <% end %>
   <% end %>
 </div>
