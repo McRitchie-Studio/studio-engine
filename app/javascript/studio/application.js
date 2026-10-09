@@ -2,9 +2,9 @@
 // layouts/studio/_head (javascript_import_module_tag, which carries the
 // request's CSP nonce).
 //
-// The Stimulus application itself, its attribute schema and the lazily
-// registered page-specific controllers are studio/stimulus. This file registers
-// the every-page controllers on it.
+// The Stimulus application itself, its attribute schema, the hold button and
+// the lazily registered page-specific controllers are studio/stimulus. This
+// file registers the every-page chrome on it.
 //
 // Everything this file imports statically is preloaded on every page
 // (Studio::Engine.javascript_boot_graph), so the boot costs one round trip.

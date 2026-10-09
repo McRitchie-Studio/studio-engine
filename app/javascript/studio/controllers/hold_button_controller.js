@@ -1,6 +1,6 @@
 // hold-button: one hold-to-confirm button, on the engine's Stimulus application
-// (studio/stimulus, which reads data-studio-controller and registers this
-// controller lazily, the first time a page renders the button). It sits on the
+// (studio/stimulus, which reads data-studio-controller and imports this
+// controller statically, so it arrives with the page). It sits on the
 // stack studio/_hold_button renders, and the button carries the presses:
 //
 //   <span class="hold-stack" data-studio-controller="hold-button">
@@ -11,7 +11,6 @@
 //
 // The timeline, the idle nudge and the fizz portal are studio/hold_button; the
 // events and string locals the timeline asks are studio/hold_button_hooks.
-// Until this controller registers, a press does nothing.
 import { Controller } from "@hotwired/stimulus"
 import { Hold, mountPortal } from "studio/hold_button"
 import { holdHooks } from "studio/hold_button_hooks"

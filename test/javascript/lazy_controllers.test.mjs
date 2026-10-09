@@ -1,27 +1,57 @@
-// [unit] studio/lazy_controllers: which lazy identifiers a page names, and the
-// watcher that loads and registers each one once, on first sight. Loaded from
-// source as a data: module.
+// [unit] studio/lazy_controllers: which lazy identifiers a page names, the
+// watcher that loads and registers each one once, on first sight, and what it
+// does when a load fails. Loaded from source as a data: module.
+//
+// THE FAILING LOADERS HERE BEHAVE AS A BROWSER DOES: a module that failed to
+// load fails on every later import() of it, with no new request
+// (e2e/lazy_controller_failure.spec.js measures that in Chromium). A fake
+// loader that fails once and then succeeds describes no browser, so no test
+// here uses one to claim a retry.
+//
+// CONTROLS, each run against this file:
+//   - put `pending.add(name)` back in the watcher's catch: "never loaded
+//     again" fails with 3 loads, and "reported once" with 3 reports.
+//   - drop the `mark()` call from the catch: the three marking tests fail.
+//   - drop `failed.size > 0` from the observer's condition: "an element that
+//     arrives after the failure" fails.
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/lazy_controllers.js", import.meta.url), "utf8")
-const { controllerNames, lazyNamesIn, watchLazyControllers } =
+const { controllerNames, lazyNamesIn, markFailed, watchLazyControllers, FAILED_ATTRIBUTE } =
   await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 const ATTRIBUTE = "data-studio-controller"
 
-const element = (value) => ({ getAttribute: (name) => (name === ATTRIBUTE ? value : null) })
+// An element that remembers the attributes written on it.
+const element = (value) => {
+  const attributes = { [ATTRIBUTE]: value }
+  return {
+    attributes,
+    writes: 0,
+    getAttribute: (name) => (name in attributes ? attributes[name] : null),
+    setAttribute(name, written) { attributes[name] = written; this.writes += 1 }
+  }
+}
 
-// A root whose descendants the test can change, as a page changes.
+// A root whose descendants the test can change, as a page changes. Each value
+// keeps one element across scans, so a mark written on it is still there.
 const fakeRoot = (values = [], own = null) => ({
   values,
+  elements: new Map(),
   getAttribute: (name) => (name === ATTRIBUTE ? own : null),
+  elementAt(index) {
+    if (!this.elements.has(index)) this.elements.set(index, element(this.values[index]))
+    return this.elements.get(index)
+  },
   querySelectorAll(selector) {
     assert.equal(selector, `[${ATTRIBUTE}]`)
-    return this.values.map(element)
+    return this.values.map((_, index) => this.elementAt(index))
   }
 })
+
+const failedMark = (root, index) => root.elementAt(index).getAttribute(FAILED_ATTRIBUTE)
 
 class FakeObserver {
   static instances = []
@@ -124,30 +154,139 @@ test("with two lazy controllers the watcher stops only when both have loaded", a
   assert.equal(observer.connected, false)
 })
 
-test("a loader that fails is reported and tried again on the next change", async () => {
-  let attempts = 0
-  const root = fakeRoot(["hold-button"])
-  const { handle, registered, reports, observer } = watch(root, {
-    "hold-button": () => {
-      attempts += 1
-      return attempts === 1 ? Promise.reject(new Error("offline")) : Promise.resolve({ default: "C" })
-    }
+// A module that failed to load, as a browser serves it: every import() of it
+// rejects, however many times it is asked.
+const brokenModule = (message = "offline") => {
+  const loader = () => { loader.attempts += 1; return Promise.reject(new Error(message)) }
+  loader.attempts = 0
+  return loader
+}
+
+test("a loader that fails is never loaded again, however the page changes", async () => {
+  const broken = brokenModule()
+  const root = fakeRoot(["board"])
+  const { handle, registered, observer } = watch(root, { board: broken })
+
+  await handle.started
+  assert.equal(broken.attempts, 1)
+  assert.deepEqual([...handle.pending], [], "a failed controller is not pending: nothing loads it again")
+  assert.deepEqual([...handle.failed.keys()], ["board"])
+  assert.equal(handle.failed.get("board").message, "offline")
+
+  for (let change = 0; change < 5; change += 1) {
+    root.values = [...root.values, "board"]
+    observer.callback()
+    await settle()
+  }
+  await handle.scan()
+
+  assert.equal(broken.attempts, 1, "one import for the document, as a browser makes one request")
+  assert.deepEqual(registered, [])
+})
+
+test("a failure is reported once, not once per change", async () => {
+  const root = fakeRoot(["board"])
+  const { handle, reports, observer } = watch(root, { board: brokenModule("404") })
+
+  await handle.started
+  observer.callback()
+  observer.callback()
+  await settle()
+
+  assert.deepEqual(reports, [["board", "404"]])
+})
+
+test("the default report names the controller and says a reload is needed", async () => {
+  const logged = []
+  const original = console.error
+  console.error = (...args) => logged.push(args)
+  try {
+    const { handle } = watch(fakeRoot(["board"]), { board: brokenModule() }, { report: undefined })
+    await handle.started
+  } finally {
+    console.error = original
+  }
+
+  assert.equal(logged.length, 1)
+  assert.match(logged[0][0], /the board controller failed to load/)
+  assert.match(logged[0][0], /until the page is reloaded/)
+  assert.equal(logged[0][1].message, "offline")
+})
+
+test("every element naming a failed controller is marked, and only those", async () => {
+  const root = fakeRoot(["board", "toast", "nav-collapse board", "board-extra"])
+  const { handle } = watch(root, { board: brokenModule() })
+
+  await handle.started
+  assert.equal(failedMark(root, 0), "board")
+  assert.equal(failedMark(root, 1), null, "a controller that did not fail is not marked")
+  assert.equal(failedMark(root, 2), "board", "the mark names the failed identifier, not its neighbours")
+  assert.equal(failedMark(root, 3), null, "only a whole identifier")
+})
+
+test("an element that arrives after the failure is marked, with no new load", async () => {
+  const broken = brokenModule()
+  const root = fakeRoot(["board"])
+  const { handle, observer } = watch(root, { board: broken })
+  await handle.started
+  assert.equal(observer.connected, true, "still watching, to mark what arrives later")
+
+  root.values = ["board", "board"]
+  observer.callback()
+  await settle()
+
+  assert.equal(failedMark(root, 1), "board")
+  assert.equal(broken.attempts, 1)
+  assert.equal(root.elementAt(0).writes, 1, "an element already marked is not written again")
+})
+
+test("a controller that loads leaves no mark, and one failure does not stop another's load", async () => {
+  const root = fakeRoot(["board", "profile"])
+  const { handle, registered, observer } = watch(root, {
+    board: brokenModule(),
+    profile: () => Promise.resolve({ default: "P" })
   })
 
   await handle.started
-  assert.deepEqual(reports, [["hold-button", "offline"]])
-  assert.deepEqual(registered, [])
-  assert.equal(observer.connected, true, "still watching, so the next change retries")
-
-  observer.callback()
-  await settle()
-  assert.deepEqual(registered, [["hold-button", "C"]])
+  assert.deepEqual(registered, [["profile", "P"]])
+  assert.equal(failedMark(root, 0), "board")
+  assert.equal(failedMark(root, 1), null)
+  assert.equal(observer.connected, true)
 })
 
-test("a loader that throws is reported like one that rejects", async () => {
-  const { handle, reports } = watch(fakeRoot(["hold-button"]), { "hold-button": () => { throw new Error("bad pin") } })
+test("with every controller registered and none failed, the watcher stops", async () => {
+  const { handle, observer } = watch(fakeRoot(["board"]), { board: () => ({ default: "B" }) })
   await handle.started
-  assert.deepEqual(reports, [["hold-button", "bad pin"]])
+  assert.equal(handle.failed.size, 0)
+  assert.equal(observer.connected, false)
+})
+
+test("a loader that throws, and a registration that throws, fail like a load that rejects", async () => {
+  const thrown = fakeRoot(["board"])
+  const first = watch(thrown, { board: () => { throw new Error("bad pin") } })
+  await first.handle.started
+  assert.deepEqual(first.reports, [["board", "bad pin"]])
+  assert.equal(failedMark(thrown, 0), "board")
+
+  const refused = fakeRoot(["board"])
+  const second = watch(refused, { board: () => ({ default: "B" }) }, { register: () => { throw new Error("not a controller") } })
+  await second.handle.started
+  assert.deepEqual(second.reports, [["board", "not a controller"]])
+  assert.equal(failedMark(refused, 0), "board")
+})
+
+test("markFailed writes the failed identifiers an element names, under the attribute it is given", () => {
+  const root = fakeRoot(["board profile toast", "toast"], "profile")
+  const own = []
+  root.setAttribute = (name, value) => own.push([name, value])
+
+  const marked = markFailed(root, ["board", "profile"], ATTRIBUTE, "data-lost")
+  assert.deepEqual(own, [["data-lost", "profile"]], "the root itself counts")
+  assert.equal(root.elementAt(0).getAttribute("data-lost"), "board profile")
+  assert.equal(root.elementAt(1).getAttribute("data-lost"), null)
+  assert.equal(marked.length, 2)
+  assert.deepEqual(markFailed(root, [], ATTRIBUTE), [], "nothing failed, nothing marked")
+  assert.equal(FAILED_ATTRIBUTE, "data-studio-controller-failed")
 })
 
 test("stop disconnects the observer", () => {
