@@ -139,7 +139,7 @@ export function themeEditor(seed) {
 //
 // THE REDIRECT IS NOT FOLLOWED. The controller answers a save with a 302 back
 // to /admin/theme, and a fetch that follows a 302 keeps a PATCH a PATCH: it
-// would send the save again on every hop until the browser gave up.
+// sends the save again on every hop until the browser gives up.
 export function formRequest(data) {
   const override = data.get("_method")
   if (override) data.delete("_method")

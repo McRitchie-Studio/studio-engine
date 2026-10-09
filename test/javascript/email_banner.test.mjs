@@ -163,10 +163,10 @@ test("the editor hides the logo, prefers an upload, and saves only when dirty", 
   assert.equal(editor.dirty(), false, "undoing the edit leaves nothing to save")
 })
 
-// THE DEFECT THIS PINS. studio/emails/_banner_preview isolates the banner in an
-// iframe by default, and the email's own page renders it that way. The editor
-// looked for the banner's nodes in its own document only, so on the real page
-// typing repainted nothing: the frame's document was never reached.
+// WHAT THIS PINS. studio/emails/_banner_preview isolates the banner in an
+// iframe by default, and the email's own page renders it that way. The
+// banner's nodes are then in the frame's document and not the page's, so an
+// editor that searches its own document only repaints nothing on the real page.
 function framedBanner({ loaded = true } = {}) {
   const inside = banner()
   const listeners = {}

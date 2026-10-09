@@ -173,11 +173,11 @@ test("dsThemeEditor: a save fetches once, in place, and toasts the outcome", asy
   assert.deepEqual(toasts.map((t) => [t.type, t.detail.type, t.detail.title]), [["toast", "notice", "Theme saved"]])
 })
 
-// THE DEFECT THIS PINS. The controller answers a save with a 302 to
-// /admin/theme. A fetch that follows a 302 keeps a PATCH a PATCH, so it sent
-// the save again, and again, until the browser gave up at twenty redirects and
-// the editor toasted "Save failed" over a theme it had saved twenty-one times.
-// So the redirect is not followed: it is the server's own word that it saved.
+// WHAT THIS PINS. The controller answers a save with a 302 to /admin/theme. A
+// fetch that follows a 302 keeps a PATCH a PATCH: followed, it sends the save
+// again on every hop until the browser gives up at twenty redirects, and the
+// editor toasts "Save failed" over a theme it has saved twenty-one times. So
+// the redirect is not followed: it is the server's own word that it saved.
 test("dsThemeEditor: the server's redirect is the success, and it is not followed", async () => {
   const { toasts, calls } = await save({ ok: false, status: 0, type: "opaqueredirect" })
 

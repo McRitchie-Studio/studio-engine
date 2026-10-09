@@ -5,13 +5,12 @@ const { blockOffsiteRequests } = require("./helpers");
 // real browser: each is fetched by the page that names it and by no other, and
 // one that fails to load leaves its element marked, never silently dead.
 //
-// These controllers carry what used to be inline scripts on their pages (the
-// geo preview, the link preview card, the email banner scale, the booking frame
-// and popup, the footer map, the survey stepper). A lazy controller is one more
-// request, and a browser never fetches a failed module again in the same
-// document (e2e/lazy_controller_failure.spec.js), so the failure has to be a
-// state the page shows: data-studio-controller-failed on the element, which the
-// stylesheet turns into a notice.
+// These controllers carry their pages' own behaviour (the geo preview, the link
+// preview card, the email banner scale, the booking frame and popup, the footer
+// map, the survey stepper). A lazy controller is one more request, and a
+// browser never fetches a failed module again in the same document
+// (e2e/lazy_controller_failure.spec.js), so the failure has to be a state the
+// page can show: data-studio-controller-failed on the element.
 //
 // CONTROLS, each run against this file:
 //   - remove "geo-settings" from LAZY in app/javascript/studio/stimulus.js: the
