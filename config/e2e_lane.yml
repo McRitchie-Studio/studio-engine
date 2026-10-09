@@ -892,7 +892,23 @@
 # again as the page changes, the browser re-rejects a direct import() of it
 # without a request, and a reload recovers.
 #   npx playwright test --list  -> 250 tests in 36 files
-total_specs: 250
+# 250 -> 268: four files, 18 tests, for the modal blocks and profile scripts that
+# moved to modules.
+# e2e/confirm_interstitial.spec.js, 4: the sign-in page posts its own form once;
+# with its module's request aborted, and answered 404, the fallback button shows
+# itself by CSS and signs in; the fallback takes no room until it shows.
+# e2e/crop_photo_modal.spec.js, 5: the crop card mounts Cropper.js at the asked
+# ratio, locks, and hands its opener a PNG with the owner; Cancel releases it;
+# the empty card is the picker; a file that is no image is refused; and a page
+# where Cropper.js never arrives says so and takes no dead press.
+# e2e/style_modal_actions.spec.js, 5: the style guide's demo buttons run through
+# their actions, each names a driver, the guide's store is the engine's stack,
+# and only the style guide fetches the section's modules.
+# e2e/scopes_survive_boot_failure.spec.js, 4: with studio/application aborted,
+# every x-data factory is still on the page, the profile form saves and
+# discards, the birthday row works and the birthday gate submits.
+#   npx playwright test --list  -> 268 tests in 40 files
+total_specs: 268
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1045,9 +1061,13 @@ total_specs: 250
 #   npx playwright test --list                                             -> 250 tests, 36 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 250
+# And for the modal blocks and profile scripts, 18 more tests in four new files:
+#   npx playwright test --list                                             -> 268 tests, 40 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 268
 # executed = total - devnet - allowed_skips = 250 - 0 - 0 = 250, so executed ==
 # total_specs and the equality assertion holds.
-executed: 250
+executed: 268
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

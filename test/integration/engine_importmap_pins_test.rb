@@ -65,13 +65,49 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
   end
 
   test "the boot graph follows studio/application's static imports" do
-    assert_equal %w[studio/alpine_shims studio/alpine_stores studio/application
-                    studio/controllers/hold_button_controller studio/controllers/link_sidebar_controller
+    assert_equal %w[studio/alpine_scopes studio/alpine_shims studio/alpine_stores studio/application
+                    studio/birthday
+                    studio/controllers/hold_button_controller studio/controllers/identity_mini_controller
+                    studio/controllers/link_sidebar_controller
                     studio/controllers/modal_host_controller studio/controllers/nav_collapse_controller
-                    studio/controllers/toast_controller studio/head_chrome studio/hold_button
-                    studio/hold_button_hooks studio/lazy_controllers studio/link_sidebar studio/modal_host
-                    studio/nav_collapse studio/pinned_stack studio/stimulus studio/toast], boot_graph
+                    studio/controllers/toast_controller studio/cropper studio/head_chrome studio/hold_button
+                    studio/hold_button_hooks studio/identity_mini studio/image_upload
+                    studio/lazy_controllers studio/link_sidebar studio/modal_host
+                    studio/nav_collapse studio/pinned_stack studio/profile_form studio/stimulus studio/toast], boot_graph
     refute_includes boot_graph, "studio/local_path", "a module nothing in the boot imports is not preloaded"
+  end
+
+  # The x-data factories a page binds by name are evaluated by Alpine as it
+  # meets each element, so a factory cannot wait on a later request: the photo
+  # crop, the uploads, the birthday gate and the profile form arrive with the
+  # page. The compact identity bar carries Save on the edit page, so its
+  # controller does too.
+  test "the factories a page binds are in the boot graph and never a dynamic import" do
+    %w[studio/alpine_scopes studio/cropper studio/image_upload studio/birthday studio/profile_form
+       studio/identity_mini studio/controllers/identity_mini_controller].each do |name|
+      assert_includes boot_graph, name, "#{name} is not preloaded, so its page waits on a later request"
+    end
+
+    scopes = File.read(File.expand_path("../../app/javascript/studio/alpine_scopes.js", __dir__))
+    imports = scopes.scan(Studio::Engine::JAVASCRIPT_STATIC_IMPORT).flatten
+    assert_equal %w[studio/cropper studio/image_upload studio/birthday studio/profile_form], imports,
+                 "studio/alpine_scopes imports only the modules that own a factory, so a failure " \
+                 "elsewhere in the boot does not take the factories with it"
+    imports.each do |name|
+      source = File.read(File.expand_path("../../app/javascript/#{name}.js", __dir__))
+      assert_empty source.scan(Studio::Engine::JAVASCRIPT_STATIC_IMPORT).flatten, "#{name} imports nothing"
+    end
+    refute_match(/\bimport\(/, scopes, "a factory is never a dynamic import")
+  end
+
+  # The style guide's controller and the sign-in page's auto-post are fetched
+  # only by the page that names them.
+  test "the style guide's modules and the interstitial's are outside the boot graph" do
+    %w[studio/style_guide studio/style_modals studio/controllers/style_modals_controller
+       studio/confirm_interstitial].each do |name|
+      refute_includes boot_graph, name, "#{name} is preloaded on every page"
+      assert_includes engine_modules, name, "#{name} is not pinned"
+    end
   end
 
   # The hold button confirms real actions. A lazy controller is one more request

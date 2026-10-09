@@ -4,7 +4,8 @@
 //
 // The Stimulus application itself, its attribute schema, the hold button and
 // the lazily registered page-specific controllers are studio/stimulus. This
-// file registers the every-page chrome on it.
+// file registers the every-page chrome on it, and the profile page's compact
+// identity bar, which carries Save once the full card has scrolled away.
 //
 // Everything this file imports statically is preloaded on every page
 // (Studio::Engine.javascript_boot_graph), so the boot costs one round trip.

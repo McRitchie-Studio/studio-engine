@@ -6,6 +6,47 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Changed
 
+- **The modal blocks and the profile scripts move to ES modules.** The crop
+  photo modal, the image upload hosts, the avatar cropper, the birthday card,
+  the profile form and its birthday row, the compact identity bar, the sign-in
+  interstitial and the style guide's modal demos render markup only; nine
+  inline scripts are gone. Rendered markup and styling are unchanged apart from
+  the attributes and the interstitial's fallback named here, and every `x-data`
+  a page writes still resolves.
+  - **The factories.** `cropPhotoModal` is `studio/cropper`; `imageUploadHost`,
+    `avatarCropperHost` and `submitFormWithProgress` are `studio/image_upload`;
+    `birthdayModal` and `studioBirthdayFields` are `studio/birthday`;
+    `studioProfileForm` is `studio/profile_form`. `studio/alpine_scopes`
+    publishes each on `window`, where a host has not defined the name first.
+    They are in the preloaded boot graph, not lazy: Alpine evaluates an `x-data`
+    as it meets the element, and a factory that is not there leaves a photo
+    upload, the birthday gate or the profile form dead. `layouts/studio/_head`
+    also imports `studio/alpine_scopes` by its own nonced module tag, so a boot
+    that fails to load keeps a page its factories.
+  - **Partials.** `studio/modals/_image_upload` and `studio/_birthday_assets`
+    render nothing and stay, so a layout that renders either by name keeps
+    working; the renders can be deleted. `studio/_cropper_assets` loads
+    Cropper.js (from cdnjs, as before) and nothing else.
+  - **Compact identity bar.** `studio/profiles/_identity_mini` carries
+    `data-studio-controller="identity-mini"`; when the bar shows is
+    `studio/identity_mini`. The controller is registered statically, because on
+    the edit page the bar carries Save and Discard.
+  - **Sign-in interstitial.** `studio/_confirm_interstitial` posts its form from
+    `studio/confirm_interstitial`, loaded by its own nonced module tag (the page
+    has no import map). The fallback button no longer waits on a script: it
+    shows itself four seconds in by CSS alone, so a page whose script never
+    arrives still has something to press. It is hidden by `max-height` and
+    `visibility` in place of `display: none`.
+  - **Style guide.** The Modals section's demo drivers, its enter/leave
+    simulator and the wallet stubs are `studio/style_modals`, on a
+    `style-modals` controller the section's own module tag registers
+    (`studio/style_guide`); its demo buttons carry `data-studio-action` in place
+    of `onclick`. `$store.dsModals` is the engine's own modal stack: the overlay
+    declares `data-studio-controller="modal-host"` and
+    `data-modal-host-store-value="dsModals"`, and the guide's copy of the stack
+    is deleted. The card therefore takes its width from
+    `StudioModals.CARD_WIDTHS` by id, as an app's cards do.
+
 - **The toast queue, the link sidebar and the hold button move to ES modules and
   Stimulus controllers.** `layouts/studio/_flash`, `components/_link_sidebar`
   and `studio/_hold_button` render markup only; their inline scripts are gone.
@@ -42,6 +83,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **The crop photo modal says when Cropper.js did not load.** It waits up to
+  three seconds for the library (the script is deferred, and on a Turbo visit
+  can land after the card opens), then shows "The photo cropper did not load.
+  Reload the page and try again." on its error line and leaves the modal
+  dismissible. It used to show the image with no cropper and a Crop & Save
+  button that did nothing.
+
 - **The hold button dispatches `hold-button:guard`, `hold-button:start`,
   `hold-button:validate`, `hold-button:early` and `hold-button:success`**, on
   the button, bubbling, each with `detail.id` (the `hold_id`). `preventDefault()`
@@ -60,6 +108,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   nothing of the timeline runs after the hold completes.
 
 ### Breaking
+
+- **`studio/profiles/_form_script` and `studio/profiles/_birthday_picker_script`
+  are deleted.** `studio/profiles/edit` and `studio/profiles/_birthday_fields`
+  no longer render them; an app that renders either by name deletes the render.
+- **The factories are no longer in a page's HTML.** A test that looked for
+  `window.birthdayModal = function`, `window.imageUploadHost`,
+  `window.studioProfileForm` or `cropPhotoModal` source in a rendered page
+  looks for the name in `app/javascript/studio/alpine_scopes.js` and for
+  `import "studio/alpine_scopes"` in the page's head.
+  `Alpine.data("cropPhotoModal")` is no longer registered; the `x-data` resolves
+  through `window.cropPhotoModal`.
+- **`window.dsModalDemos`, `window.dsWalletConnectDemo` and the stub
+  `window.walletProvider` exist only on the style guide, once its section's
+  controller has connected.** `registerDsModals` and
+  `window.__dsAnimControlsBound` are gone.
+- **`#magic-fallback` on the sign-in interstitial is no longer `display: none`.**
+  A host stylesheet or test that read its `display` reads `visibility`.
 
 - **`window.toastManager` is gone.** Nothing binds it: the flash partial reads
   `$store.toasts`. A template that wrote `x-data="toastManager(...)"` of its own

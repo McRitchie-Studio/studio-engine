@@ -155,6 +155,14 @@ import, and `studio/lazy_controllers` registers it the first time an element
 names it, so a page with no such element never fetches it. Until a lazy
 controller registers, its element's actions do nothing.
 
+**A page's own module tag.** A page that must find its controller connected
+the moment it has loaded registers it from its own nonced module tag: the style
+guide's Modals section imports `studio/style_guide`, which registers
+`style-modals` on the engine's application. The tag runs with the page, in
+document order, so only that page fetches the module and nothing waits on a
+dynamic import. The sign-in interstitial, a document with no layout and no
+import map, loads `studio/confirm_interstitial` the same way, by its asset path.
+
 **A lazy load that fails is final for the document.** A browser keeps a failed
 module fetch and rejects every later `import()` of it without a new request,
 across DOM changes and Turbo visits; only a full page load fetches it again. So
@@ -163,6 +171,16 @@ marks every element that names the failed controller, on the page and arriving
 later, with `data-studio-controller-failed="<identifier>"`. A lazy controller's
 page styles or announces that state. A control that must work whenever its page
 does is not lazy.
+
+**An x-data factory is never lazy.** Alpine evaluates `x-data="birthdayModal(...)"`
+as it meets the element: at start for a page's own markup, at mount for a modal
+card. A factory that is not defined by then leaves the element dead, and no
+dynamic import can promise to have resolved. So the factories pages bind by
+name are `studio/alpine_scopes`, imported statically, preloaded on every page,
+and loaded by its own module tag as well, so a boot that fails to load keeps a
+page its photo upload, its birthday gate and its profile form. What a factory
+needs later (Cropper.js) may arrive late, and the factory says so when it never
+does: a control never takes a press that does nothing.
 
 Alpine loads after the module tags. Deferred classic scripts and module scripts
 run in document order, so by the time Alpine starts, the boot has installed the
@@ -181,6 +199,13 @@ components:
 | Toast queue (`layouts/studio/_flash`) | `studio/toast` | `toast`, its own module tag | none needed: the API is the `toast` window event; the queue is `$store.toasts` |
 | Link sidebar flag | `studio/link_sidebar` | `link-sidebar`, its own module tag | `$store.sidebars.linkTreeOpen` |
 | Hold button | `studio/hold_button`, `studio/hold_button_hooks` | `hold-button`, registered by `studio/stimulus` | the `guard:`, `on_hold_start:`, `validate:`, `early_action:`, `early_action_guard:` and `on_success:` string locals, `window.studioFizzPortal` |
+| Crop photo modal (`studio/modals/_crop_photo`) | `studio/cropper` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="cropPhotoModal({...})"` |
+| Image upload hosts, avatar cropper | `studio/image_upload` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="imageUploadHost({...})"`, `x-data="avatarCropperHost()"`, `submitFormWithProgress(form, opts)` |
+| Birthday card, profile birthday row | `studio/birthday` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="birthdayModal({...})"`, `x-data="studioBirthdayFields('...')"` |
+| Profile form | `studio/profile_form` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="studioProfileForm({...})"` |
+| Compact identity bar (`studio/profiles/_identity_mini`) | `studio/identity_mini` | `identity-mini`, registered by `studio/application` | none needed |
+| Sign-in interstitial (`studio/_confirm_interstitial`) | `studio/confirm_interstitial` | its own module tag; the fallback button by CSS | none needed |
+| Style guide modal demos (`style/_modals`) | `studio/style_modals` | `style-modals`, registered by `studio/style_guide` from the section's own module tag; the store by `modal-host` | `$store.dsModals`, `window.dsModalDemos` on the style guide |
 
 The stores load by their own nonced module tag as well as the boot, because
 every host's `<body>` binds `$store.devMode`: a boot that fails to load must
@@ -189,7 +214,9 @@ registers a store only where Alpine has none of that name. `studio/modal_host`,
 `studio/toast` and `studio/link_sidebar` have their own tag for the same
 reason, and so does `studio/stimulus`, whose only imports are Stimulus,
 `studio/lazy_controllers` and the hold button's controller: a failure elsewhere
-in the boot's graph leaves a page its hold button.
+in the boot's graph leaves a page its hold button. `studio/alpine_scopes` has
+its own tag too; its imports are the modules that own a factory, and those
+import nothing.
 
 **The hold button's events.** The button dispatches `hold-button:guard`,
 `hold-button:start`, `hold-button:validate`, `hold-button:early` and
