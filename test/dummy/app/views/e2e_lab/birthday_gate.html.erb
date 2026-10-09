@@ -23,14 +23,12 @@
 <main class="p-8" x-data>
   <p data-test="lab-body">birthday gate lab</p>
 
-  <%# The factory, at PAGE level — not inside the host below. A <script> cloned
-      out of an Alpine <template> never runs, which is why the engine homes
-      birthdayModal in its own partial and asks every consumer to render it once
-      in the layout. Omitting it is silent: x-data="birthdayModal(...)" throws,
-      the component never mounts, and the card renders as an empty shell with no
-      DOB selects and no submit button. This lab page shipped without it for one
-      run, and the browser lane is what said so — every server-side assertion
-      about that same card was green at the time. %>
+  <%# The factory, birthdayModal, is studio/birthday, on every page through
+      studio/alpine_scopes. Without it x-data="birthdayModal(...)" throws, the
+      component never mounts, and the card renders as an empty shell with no DOB
+      selects and no submit button: a failure only the browser lane sees. The
+      render below is the one a consumer's layout still carries; it emits
+      nothing. %>
   <%= render "studio/birthday_assets" %>
 
   <div class="flex flex-wrap gap-3 mb-6">
