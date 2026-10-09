@@ -134,6 +134,11 @@ abort "e2e/boot: turbo.min.js missing from turbo-rails at #{turbo_source}" unles
 FileUtils.mkdir_p(File.join(PUBLIC_DIR, "js"))
 FileUtils.cp(turbo_source, File.join(PUBLIC_DIR, "js", "turbo.min.js"))
 
+# The lab's own lazy controller (/lab/lazy_controller): a module nothing pins or
+# preloads, which the page names by a dynamic import.
+FileUtils.cp(File.join(ROOT, "test", "dummy", "app", "javascript", "lab_lazy_controller.js"),
+             File.join(PUBLIC_DIR, "js", "lab_lazy_controller.js"))
+
 IMG_DIR = File.join(PUBLIC_DIR, "img")
 FileUtils.mkdir_p(IMG_DIR)
 {

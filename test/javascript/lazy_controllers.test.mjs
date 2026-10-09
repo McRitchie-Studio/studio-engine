@@ -9,9 +9,11 @@
 // here uses one to claim a retry.
 //
 // CONTROLS, each run against this file:
-//   - put `pending.add(name)` back in the watcher's catch: "never loaded
-//     again" fails with 3 loads, and "reported once" with 3 reports.
-//   - drop the `mark()` call from the catch: the three marking tests fail.
+//   - re-queue a failed controller in the watcher's catch (`pending.add(name)`
+//     in place of `failed.set(name, error)` and `mark()`): "never loaded
+//     again", "reported once" and the marking tests fail.
+//   - drop the `mark()` call from the catch: the tests that read a mark after
+//     the first failure fail.
 //   - drop `failed.size > 0` from the observer's condition: "an element that
 //     arrives after the failure" fails.
 import { test } from "node:test"

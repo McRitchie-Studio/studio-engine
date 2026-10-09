@@ -1,0 +1,22 @@
+<%# A lazily registered controller, for e2e/lazy_controller_failure.spec.js.
+
+    studio/stimulus's own LAZY list is empty until a page-specific controller
+    joins it, so this page runs the engine's registry (studio/lazy_controllers)
+    on the engine's Stimulus application with one loader of its own, written as
+    studio/stimulus writes them: a dynamic import of a module nothing preloads.
+    The handle is on window.__labLazy for the spec to read. %>
+<main class="p-8 space-y-4" data-test="lazy-lab">
+  <div data-test="first" data-studio-controller="lab-lazy">first</div>
+</main>
+
+<%= javascript_tag type: "module", nonce: true do %>
+  import { application, schema } from "studio/stimulus"
+  import { watchLazyControllers } from "studio/lazy_controllers"
+
+  window.__labLazy = watchLazyControllers({
+    root: document.documentElement,
+    attribute: schema.controllerAttribute,
+    loaders: { "lab-lazy": () => import("/e2e/js/lab_lazy_controller.js") },
+    register: (name, controller) => application.register(name, controller)
+  })
+<% end %>
