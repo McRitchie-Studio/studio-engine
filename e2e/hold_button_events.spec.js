@@ -243,11 +243,11 @@ test("the button's modules arrive with the page, so a later button fetches nothi
 // retired the digested file between the page load and that request, left a
 // button that rendered, took a press and did nothing, until a full reload.
 //
-// Each spec makes the three modules unreachable FOR REAL once the page has
-// loaded (the browser's requests are aborted, or answered 404), then inserts a
-// button the page did not have (an x-if, as a modal inserts its confirm
-// button), presses it, and leaves and returns by Turbo visit. The button
-// confirms, because nothing asks for a module again. The spec then requests one
+// Each spec loads a page that has NO hold button, then makes the three modules
+// unreachable FOR REAL (the browser's requests are aborted, or answered 404),
+// and only then meets its first button: by a Turbo visit, and by an x-if that
+// inserts one, as a modal inserts its confirm button. Both confirm, because
+// nothing asks for a module after the page loaded. The spec then requests one
 // itself, to show the route was live and the failure real.
 for (const [name, fail] of [
   ["the connection drops", (route) => route.abort()],
@@ -255,8 +255,12 @@ for (const [name, fail] of [
 ]) {
   test(`a button rendered after its modules can no longer be fetched still confirms: ${name}`, async ({ page }) => {
     const errors = watchPageErrors(page);
-    await open(page);
-    await expect(button(page, "late")).toHaveCount(0);
+    await blockOffsiteRequests(page);
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.goto("/lab/toast_flash");
+    await expect(page.locator("[data-test='toast-flash-page']")).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator(".hold-btn")).toHaveCount(0);
 
     const refused = [];
     await page.route((url) => HOLD_MODULES.test(url.pathname + url.search), (route) => {
@@ -264,18 +268,8 @@ for (const [name, fail] of [
       return fail(route);
     });
 
-    await page.locator("[data-test='reveal']").click();
-    await ready(page, "late");
-    await button(page, "late").hover();
-    await page.mouse.down();
-    await expect(button(page, "late")).toHaveClass(/\bsuccess\b/, { timeout: 3000 });
-    await page.mouse.up();
-    expect((await log(page)).filter((entry) => entry.startsWith("late"))).toEqual(["late-start", "late-success"]);
-
-    // Across a Turbo visit, in the same document, with the modules still gone.
+    // The document's first hold button, in the same document.
     await page.evaluate(() => { window.__sameDocument = true; });
-    await page.evaluate(() => window.Turbo.visit("/lab/toast_flash"));
-    await expect(page.locator("[data-test='toast-flash-page']")).toBeVisible();
     await page.evaluate(() => window.Turbo.visit("/lab/hold_button_events"));
     await ready(page, "events");
     expect(await page.evaluate(() => window.__sameDocument)).toBe(true);
@@ -283,6 +277,16 @@ for (const [name, fail] of [
     await page.mouse.down();
     await expect(button(page, "events")).toHaveClass(/\bsuccess\b/, { timeout: 3000 });
     await page.mouse.up();
+
+    // One the page inserts later.
+    await expect(button(page, "late")).toHaveCount(0);
+    await page.locator("[data-test='reveal']").click();
+    await ready(page, "late");
+    await button(page, "late").hover();
+    await page.mouse.down();
+    await expect(button(page, "late")).toHaveClass(/\bsuccess\b/, { timeout: 3000 });
+    await page.mouse.up();
+    expect((await log(page)).filter((entry) => entry.startsWith("late"))).toEqual(["late-start", "late-success"]);
 
     expect(refused, "the button asked for a module after the page loaded").toEqual([]);
     expect(errors).toEqual([]);
