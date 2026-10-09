@@ -40,6 +40,37 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   browser: the registry imports a controller once, reports a failure once, and
   marks each element naming it with `data-studio-controller-failed`.
 
+- **The board primitive and the leveling activity modals move to ES modules.**
+  `studio/_board_assets` and `studio/_leveling_activity_assets` render nothing;
+  their inline scripts are gone. A consumer's `render` of either keeps working
+  and can be deleted. Rendered markup is unchanged apart from
+  `data-studio-controller="board"` on the board's `<section>`.
+  - **Board.** The factory is `studio/board`. `x-data="studioBoard({...})"`
+    still resolves: `studio/alpine_shims` publishes `window.studioBoard` on
+    every page, and every name on the scope is unchanged (`state`, `toasts`,
+    `toast`, `updateCounts`, `animateCardExit`, the state helpers). The zones
+    are made draggable by a `board` controller, registered lazily, once
+    SortableJS has loaded; `data-alpine-ready` is set after that, so it still
+    means "the board drags". A board written by hand with only the `x-data`
+    names the controller on itself.
+  - **A board whose controller fails to load says so.** The board controller is
+    lazy, and a failed lazy load is final for the document. The board's section
+    then carries `data-studio-controller-failed="board"` and shows "This board
+    could not load its controls. Reload the page." above its cards, which stay
+    readable; the notice is revealed by a rule in `engine.css`, so an app sees
+    it once its Tailwind build includes this engine's `engine.css`.
+  - **Leveling activity.** The factory is `studio/leveling_activity`, published
+    as `window.levelingActionModal`. Its opts and JSON contract are unchanged.
+- **SortableJS loads only on a page that drags.** `layouts/studio/_head` no
+  longer loads `studio/sortable` on every page. The vendored build is pinned as
+  `sortablejs` and imported by `studio/board` on the first board a page
+  renders. `window.Sortable` is a shim until then: `Sortable.create(el, options)`
+  in a page script loads the library and then creates the sortable, so a host
+  that calls it (the hub's deploy board) needs no change. The shim's `create`
+  returns nothing; `await Sortable.load()` resolves with SortableJS for a
+  caller that needs the instance. canvas-confetti and `studio_confetti` stay in
+  the head: `fireSuccessConfetti` and consumer scripts call them on any page.
+
 ### Added
 
 - **The hold button dispatches `hold-button:guard`, `hold-button:start`,
@@ -70,6 +101,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **`window.__studioLinkSidebarBridge` is gone.** It was the inline script's
   run-once flag; a test that looked for it in a page's HTML looks for
   `data-studio-controller="link-sidebar"`.
+- **`window.Sortable` is not SortableJS until a page asks for it.** On a page
+  with no board it is the loading shim, which has `create` and `load` and
+  nothing else: `new Sortable(...)`, `Sortable.get` and the other statics fail
+  until the library has loaded. A page script that needs more than `create`
+  awaits `Sortable.load()` first. A page that loads its own SortableJS is
+  unaffected. A test that looked for `window.studioBoard =` or a
+  `studio/sortable` script tag in a page's HTML looks for
+  `data-studio-controller="board"` on the board.
+
+### Fixed
+
+- **Two boards on one page no longer drive each other's zones.** A board made
+  every `.kanban-dropzone` on the page sortable and counted cards by document
+  id, so the first board's group, filter and lock rule governed every board
+  after it: on `/admin/style` the depth-chart specimen's cards left their
+  lanes and its locked starters dragged. A board now wires, watches and counts
+  only the zones inside its own element.
 
 ### Fixed
 

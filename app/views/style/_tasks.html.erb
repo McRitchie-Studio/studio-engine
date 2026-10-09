@@ -3,7 +3,7 @@
      The shared board primitive, LIVE. Phase D lifted the columns / cards / drag +
      optimistic move / reorder that the three near-identical McRitchie Studio boards
      (tasks / news / content) each hand-rolled into one engine primitive
-     (studio/board/_board + the window.studioBoard factory + vendored SortableJS).
+     (studio/board/_board + the studio/board module + vendored SortableJS).
      The first block below renders that real primitive with `demo: true` — you can
      DRAG a card between columns and the move animates + toasts, but nothing POSTs.
      The blocks under it stay a static reference: the stage-* badge palette
@@ -32,10 +32,7 @@
   # the last expression of an ERB scriptlet trips Erubi, and literal ERB tags in the
   # body would close the tag. Plain render() calls read clearly for an agent.
   board_usage_snippet = [
-    "# once at layout level (a <script> in the board template never runs):",
-    'render "studio/board_assets"',
-    "",
-    "# then the board itself:",
+    "# the board; it needs nothing else on the page:",
     'render "studio/board/board",',
     "  columns: @columns,            # [{ key:, label:, cards:, badge_class: }]",
     '  card_partial: "tasks/task_card",',
@@ -80,9 +77,7 @@
   </div>
 
   <%# ---- The LIVE primitive (demo mode) --------------------------------- %>
-  <%# Render the factory once (a <script> in the board template would never run), then
-      the board. demo: true → drag animates + toasts locally, nothing POSTs. %>
-  <%= render "studio/board_assets" %>
+  <%# demo: true → drag animates + toasts locally, nothing POSTs. %>
   <div class="space-y-3">
     <div class="flex items-center gap-2">
       <span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">Live</span>

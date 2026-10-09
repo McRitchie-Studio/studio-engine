@@ -70,7 +70,6 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
     "geo-grid-states"      => "test hook: the states twin of geo-grid-countries",
     "is-scrolled"          => "state marker bound beside real utilities in layouts/_navbar (shadow-lg border-b ...)",
     "studio-avatar-badge"  => "structural wrapper; its child .studio-avatar-badge-icon carries the styling",
-    "studio-board"         => "board primitive namespace; layout comes from the utilities on the same element",
     "studio-board-column"  => "board primitive namespace",
     "studio-board-grid"    => "board primitive namespace",
     "studio-board-group"   => "board primitive namespace",

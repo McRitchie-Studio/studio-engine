@@ -3,10 +3,12 @@
   primitive (Phase D): the SortableJS drag-reorder, optimistic cross-column move →
   revert → toast, and count/live wiring that the three near-identical McRitchie
   Studio boards (tasks / news / content) and the depth chart each hand-rolled,
-  lifted into one place. Renders a horizontal row of columns, each a drop zone the
-  vendored SortableJS + window.studioBoard factory (studio/_board_assets, rendered
-  once at layout level — a <script> inside this component template would never run)
-  wires.
+  lifted into one place. Renders a horizontal row of columns, each a drop zone.
+  The section is two things at once: its x-data is the studioBoard scope
+  (studio/board, published as window.studioBoard by studio/alpine_shims), which
+  the cards and slots inside it bind to, and its data-studio-controller is the
+  board controller, registered lazily, which loads the vendored SortableJS and
+  makes the zones draggable. This partial carries no script.
 
   UI ONLY and NEUTRAL: no model, no routes, no domain. The app supplies its columns,
   its card partial, and its endpoints. Custom behavior attaches by LISTENING to the
@@ -164,8 +166,17 @@
     labels:         all_columns.each_with_object({}) { |c, h| h[c[:key].to_s] = (c[:label] || c[:key]).to_s if c[:key] }
   }
 %>
-<section class="studio-board" data-test="studio-board" x-data="studioBoard(<%= board_opts.to_json %>)">
+<section class="studio-board" data-test="studio-board" data-studio-controller="board" x-data="studioBoard(<%= board_opts.to_json %>)">
   <% if live_channel.present? %><%= turbo_stream_from live_channel %><% end %>
+
+  <%# Shown only when the board controller's module failed to load: the registry
+      marks this section data-studio-controller-failed="board", and engine.css
+      reveals the notice on that attribute (its inline display: none is the
+      default, so a host whose CSS lacks the rule shows nothing). The board still renders and its
+      cards stay readable; they do not drag until the page is reloaded. %>
+  <p role="status" data-test="studio-board-failed"
+     class="studio-board-failed mb-4 rounded-lg border bg-surface px-4 py-2.5 text-sm font-medium"
+     style="display: none; border-color: var(--color-danger); color: var(--color-danger-ink, var(--color-danger))">This board could not load its controls. Reload the page.</p>
 
   <% if header_slot %><div class="studio-board-header mb-4"><%= header_slot %></div><% end %>
   <% if above_board_slot %><%= above_board_slot %><% end %>

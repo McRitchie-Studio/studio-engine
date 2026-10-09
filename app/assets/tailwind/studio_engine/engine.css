@@ -565,3 +565,11 @@ body.modal-open .studio-app-banner {
       }
     }
 }
+
+/* A board whose controller failed to load (studio/lazy_controllers marks its
+   section data-studio-controller-failed="board") shows the notice
+   studio/board/_board renders with an inline display: none. !important is what
+   lets a stylesheet rule answer an inline style. */
+.studio-board[data-studio-controller-failed~="board"] > .studio-board-failed {
+  display: block !important;
+}

@@ -38,6 +38,8 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
   CHANGE_USERNAME_ERB   = File.join(ENGINE_ROOT, "app/views/studio/modals/blocks/_change_username.html.erb")
   LEVELING_ACTIVITY_ERB = File.join(ENGINE_ROOT, "app/views/studio/modals/blocks/_leveling_activity.html.erb")
   FACTORY_ERB           = File.join(ENGINE_ROOT, "app/views/studio/_leveling_activity_assets.html.erb")
+  FACTORY_JS            = File.join(ENGINE_ROOT, "app/javascript/studio/leveling_activity.js")
+  SHIMS_JS              = File.join(ENGINE_ROOT, "app/javascript/studio/alpine_shims.js")
 
   # Chain *code* tokens — if any of these appear in the primitive SOURCE (comments
   # included), real on-chain logic leaked across the seam. Descriptive prose about
@@ -73,8 +75,11 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
     view.render(partial: "studio/modals/blocks/leveling_activity", locals: locals)
   end
 
-  def render_factory
-    view.render(partial: "studio/leveling_activity_assets")
+  # The factory's source. Its behaviour is executed by
+  # test/javascript/leveling_activity.test.mjs; the tests here that read it hold
+  # the contract's vocabulary.
+  def factory_source
+    File.read(FACTORY_JS)
   end
 
   def render_index
@@ -149,7 +154,7 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
   end
 
   test "the factory resolves leveling at RUNTIME + opens at the celebrate state via props" do
-    js = render_factory
+    js = factory_source
     assert_includes js, "get leveling()",
       "leveling is a runtime getter, not a fixed value — one id flips live"
     assert_includes js, "props.leveling",
@@ -157,17 +162,17 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
     assert_includes js, "_levelingDefault",
       "the getter falls back to the render-time default (TM's live path is unaffected)"
     # Opening AT the updated state — the 'updated' cards open the same id pre-advanced.
-    assert_includes js, "init: function", "the factory has an init hook"
-    assert_includes js, "p.celebrate", "init reads props.celebrate to open directly at the updated state"
+    assert_match(/^    init\(\) \{/, js, "the factory has an init hook")
+    assert_includes js, "props.celebrate", "init reads props.celebrate to open directly at the updated state"
   end
 
   # A save must (a) TRANSFER the specimen glow from the input card to the updated
   # card — like the Auth glow follows props.step — and (b) NOT open a second modal.
   test "a save advances props.celebrate (glow follows) and a demo save fires no app event (no double modal)" do
-    js = render_factory
+    js = factory_source
     # (a) glow follows: _finishSaved mirrors celebrate onto the LIVE store props,
     # which is exactly the reactive source the specimen glow_when reads.
-    assert_includes js, "cur.props.celebrate",
+    assert_includes js, "props.celebrate = !!value",
       "_finishSaved mirrors celebrate onto the store props so the glow transfers input -> updated"
     # (b) no double modal: in demo mode the app-facing saved event is suppressed, so
     # a host follow-on (e.g. Turf Monster's quest-success on studio:username-saved)
@@ -186,21 +191,21 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
   # demo and standalone (default-event) callers still advance to celebrate.
 
   test "an app-driven save (non-demo + custom saved_event) closes instead of celebrating; demo/standalone still advance" do
-    js = render_factory
+    js = factory_source
 
     # The discriminator getter reads BOTH signals: demo short-circuits to false
     # (demo always celebrates), and a NON-default saved_event marks the caller
     # app-driven (it owns its own follow-on).
     assert_includes js, "get appDrivenFollowOn()",
       "the factory exposes the app-driven-follow-on discriminator"
-    assert_includes js, %(var DEFAULT_SAVED_EVENT = "studio:activity-saved"),
+    assert_includes js, %(export const DEFAULT_SAVED_EVENT = "studio:activity-saved"),
       "the default saved event is the single source of truth the discriminator compares against"
-    assert_match(/get appDrivenFollowOn\(\)\s*\{[^}]*if \(this\.demo\) return false;[^}]*this\.savedEvent !== DEFAULT_SAVED_EVENT/m, js,
+    assert_match(/get appDrivenFollowOn\(\)\s*\{[^}]*if \(this\.demo\) return false[^}]*this\.savedEvent !== DEFAULT_SAVED_EVENT/m, js,
       "appDrivenFollowOn is false for demo and true only for a non-default saved_event")
 
     # _finishSaved CLOSES on the app-driven path: the celebrate advance is GUARDED by
     # an early return on appDrivenFollowOn, so an app-driven save never sets celebrate.
-    finish = js[/_finishSaved: function[^{]*\{(.+?)\n        \},/m, 1]
+    finish = js[/^    _finishSaved\(payload\) \{(.+?)\n    \},/m, 1]
     assert finish, "the factory defines _finishSaved"
     guard_at   = finish.index("if (this.appDrivenFollowOn) return")
     advance_at = finish.index("this.celebrate = true")
@@ -242,7 +247,7 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
     # The consent checkbox renders and binds consent, which the factory gates on.
     assert_includes html, 'x-model="consent"', "the consent checkbox renders + binds consent"
     assert_includes html, "Email me sports news and contest updates.", "the consent label renders"
-    assert_includes render_factory, "this.hasConsent && !this.consent",
+    assert_includes factory_source, "if (hasConsent && !consent) return false",
       "the factory gates the action until consent is ticked"
   end
 
@@ -265,7 +270,7 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
   end
 
   test "the factory is UI-only + exposes the neutral app-callback contract" do
-    js = render_factory
+    js = factory_source
     down = js.downcase
     ONCHAIN_RENDERED_NEEDLES.each do |needle|
       refute_includes down, needle, "the factory JS must carry no on-chain vocabulary (#{needle})"
@@ -280,7 +285,7 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
   end
 
   test "no chain CODE token leaked into the primitive or factory source" do
-    [CHANGE_USERNAME_ERB, LEVELING_ACTIVITY_ERB, FACTORY_ERB].each do |path|
+    [CHANGE_USERNAME_ERB, LEVELING_ACTIVITY_ERB, FACTORY_ERB, FACTORY_JS].each do |path|
       src = File.read(path)
       ONCHAIN_CODE_TOKENS.each do |tok|
         refute_includes src, tok, "#{File.basename(path)} must not contain the chain code token #{tok}"
@@ -297,10 +302,15 @@ class LevelingActivityModalsTest < ActiveSupport::TestCase
 
   # --- C. the living style guide ships the Profile Leveling section ------------
 
-  test "the style page ships the levelingActionModal factory at page level" do
-    html = render_index
-    assert_includes html, "window.levelingActionModal",
-      "the factory must ship at page level so the modals open live"
+  test "the factory ships on every page through the shim, and the assets partial renders nothing" do
+    assert_equal "", view.render(partial: "studio/leveling_activity_assets").strip,
+      "studio/leveling_activity_assets renders nothing; a consumer's render of it is harmless"
+    refute_includes render_index, "window.levelingActionModal", "the style page carries no inline factory"
+
+    assert_match(/^export function levelingActionModal\(/, factory_source)
+    assert_match(/window\.levelingActionModal = /, File.read(SHIMS_JS),
+      "studio/alpine_shims publishes the factory before Alpine starts")
+    assert_includes Studio::Engine.javascript_boot_graph, "studio/leveling_activity"
   end
 
   test "the Profile Leveling section walks FOUR cards with PER-CARD toggles (no -plain twins, no quest counter)" do
