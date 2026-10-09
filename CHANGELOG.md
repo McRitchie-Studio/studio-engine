@@ -42,6 +42,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **Consumer CI runs moms-app's suite** against each engine change, beside the
+  hub, Turf Monster, McRitchie Industries and Cyvasse.
 - **The hold button dispatches `hold-button:guard`, `hold-button:start`,
   `hold-button:validate`, `hold-button:early` and `hold-button:success`**, on
   the button, bubbling, each with `detail.id` (the `hold_id`). `preventDefault()`
