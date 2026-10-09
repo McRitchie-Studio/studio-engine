@@ -1,8 +1,9 @@
 <%# /surveys/:slug — the survey (Studio::SurveysController#show, docs/SURVEYS.md).
 
     ONE FORM, TWO PRESENTATIONS. Without JavaScript every question renders in
-    order under the title and intro, and the Submit button posts the lot. The
-    script below adds .is-enhanced and turns the same markup into one question
+    order under the title and intro, and the Submit button posts the lot.
+    studio/survey (the survey controller on the root) adds .is-enhanced and
+    turns the same markup into one question
     per screen, opening on question 1 with no intro screen, with a progress
     bar, Back (from question 2 on) and Next, number-key and Enter shortcuts, and an
     autosave on each answer. Submit is still the same POST either way, so the
@@ -12,7 +13,7 @@
 <% content_for(:title, @survey.title) %>
 <%= render "studio/surveys/styles" %>
 
-<main class="studio-survey" data-studio-survey
+<main class="studio-survey" data-studio-survey data-studio-controller="survey"
       data-answer-base="<%= studio_survey_path(@survey.slug) %>/answers/"
       data-csrf="<%= form_authenticity_token %>"
       data-resume-index="<%= @resume_index %>"
@@ -61,5 +62,3 @@
     <% end %>
   </div>
 </main>
-
-<%= render "studio/surveys/script" %>

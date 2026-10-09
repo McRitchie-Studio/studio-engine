@@ -10,7 +10,7 @@ require "active_support/test_case"
 require "action_view"
 
 # [unit] The survey partials declare strict locals (studio/surveys/_question,
-# _script, _styles), so a caller that passes a local the partial does not take,
+# _styles), so a caller that passes a local the partial does not take,
 # or leaves out one it needs, fails loudly at render instead of painting a
 # question with a blank count or a silently ignored option.
 #
@@ -62,7 +62,7 @@ class SurveyPartialsLocalsTest < ActiveSupport::TestCase
     assert_match(/missing local: :total/, error.message)
   end
 
-  # ── _styles and _script ────────────────────────────────────
+  # ── _styles ────────────────────────────────────────────────
 
   test "_styles takes no locals" do
     assert_includes render_raw("studio/surveys/styles"), ".studio-survey__head--later"
@@ -73,13 +73,15 @@ class SurveyPartialsLocalsTest < ActiveSupport::TestCase
     assert_match(/no locals accepted/, error.message)
   end
 
-  test "_script takes no locals" do
-    assert_includes render_raw("studio/surveys/script"), "studio-survey__head--later"
+  # The stepper is studio/survey, bound by the survey controller the page's
+  # root names; test/javascript/survey.test.mjs runs it.
+  test "the stepper is a module, and the class it toggles is one the styles define" do
+    stepper = File.read(File.join(ENGINE_ROOT, "app/javascript/studio/survey.js"))
 
-    error = assert_raises(ActionView::Template::Error) do
-      render_raw("studio/surveys/script", survey: @survey)
-    end
-    assert_match(/no locals accepted/, error.message)
+    assert_includes stepper, "studio-survey__head--later"
+    assert_includes render_raw("studio/surveys/styles"), ".studio-survey__head--later"
+    refute File.exist?(File.join(ENGINE_ROOT, "app/views/studio/surveys/_script.html.erb")),
+           "the survey's script is a partial again"
   end
 
   # ── the accent fallback is the engine's default primary ────
@@ -98,8 +100,6 @@ class SurveyPartialsLocalsTest < ActiveSupport::TestCase
 
   def view
     view = ActionView::Base.with_empty_template_cache.with_view_paths([ File.join(ENGINE_ROOT, "app/views") ])
-    # javascript_tag(nonce: true) asks the request for its CSP nonce.
-    view.define_singleton_method(:content_security_policy_nonce) { "test-nonce" }
     view
   end
 
