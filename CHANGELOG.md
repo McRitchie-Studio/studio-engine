@@ -6,6 +6,38 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **A meeting plays beside its transcript on the knowledge document page.**
+  `/admin/knowledge/:id`, in its preview frame:
+  - A document with a recording gets a native `<video>` or `<audio>` player.
+    Its source is the six-hour presigned URL (`recording_url`), written only
+    into the admin-only, `no-store` preview response; the show page holds no
+    signed URL and the app reads none of the recording.
+  - A text document that holds at least two cue lines is shown as cues (time,
+    speaker, text) in place of the preformatted block, with the plain text kept
+    under them, closed. Any other text file previews exactly as before.
+  - With a recording, a click on a cue seeks the player there and plays, and
+    the cue being spoken is marked and kept in view inside the cue list. With
+    none, the cues still render with each time as plain text.
+  - With no stored recording, an http(s) `recording_link` shows as a link that
+    opens in a new tab (`rel="noopener noreferrer"`).
+  - A document whose own file is audio or video (`mp4`, `m4v`, `mov`, `webm`,
+    `ogv`, `mp3`, `m4a`, `wav`, `ogg`, `oga`, `weba`) plays in the same player,
+    served as the type its extension names.
+
+  A transcript longer than the 256 KB text head is read a second time, up to
+  the parser's 2 MB; one preview makes two ranged reads at most. All 5,000 cues
+  the parser allows are rendered, and a transcript cut by a cap says so and
+  links the download. Speaker names and cue text are escaped.
+
+  The script is `studio/knowledge_transcript` and a `knowledge-transcript`
+  controller that `studio/stimulus` registers lazily, so a page without a
+  recording fetches neither. No migration, no setting, no new route. An app
+  without the recording columns shows no player and no link. README, *The
+  document page*, has every bound and what was measured at the caps.
+- `Studio::KnowledgePreview.player_for(doc)` (a `Player` of `kind`, `url` and
+  `error`, or nil without a recording), `.clock(seconds)`, and two more kinds
+  from `kind_for`: `:video` and `:audio`. `Result` gains `cues` and
+  `cues_truncated`, and the kind `:transcript`.
 - **Knowledge documents preview in the page.** `/admin/knowledge/:id` gains a
   Preview section, so reading a document no longer means downloading it:
   - `.xlsx` and `.xlsm` workbooks render as tables, one tab per sheet. A formula
