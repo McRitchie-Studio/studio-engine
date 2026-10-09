@@ -42,8 +42,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
-- **Consumer CI runs moms-app's suite** against each engine change, beside the
-  hub, Turf Monster, McRitchie Industries and Cyvasse.
 - **The hold button dispatches `hold-button:guard`, `hold-button:start`,
   `hold-button:validate`, `hold-button:early` and `hold-button:success`**, on
   the button, bubbling, each with `detail.id` (the `hold_id`). `preventDefault()`
@@ -72,6 +70,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **`window.__studioLinkSidebarBridge` is gone.** It was the inline script's
   run-once flag; a test that looked for it in a page's HTML looks for
   `data-studio-controller="link-sidebar"`.
+
+## 0.96.2 — 2026-10-08
+
+### Added
+
+- **Consumer CI runs moms-app's suite** against each engine change, beside the
+  hub, Turf Monster, McRitchie Industries and Cyvasse.
 
 ## 0.96.1 — 2026-10-08
 
