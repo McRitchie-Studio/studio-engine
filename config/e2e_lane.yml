@@ -905,7 +905,14 @@
 # AA contrast in both themes while its cards stay readable and its chrome still
 # answers; a board that loads shows no notice.
 #   npx playwright test --list  -> 259 tests in 37 files
-total_specs: 259
+# 259 -> 261: e2e/lazy_page_controllers.spec.js, 2 tests. The page-specific
+# controllers that carry the admin pages, the email banner scale, booking, the
+# footer map and the survey stepper are each fetched by the page that names
+# them and by no page that names none; and one whose module request is aborted
+# leaves its element marked with data-studio-controller-failed, reports once,
+# leaves the page's own form working, and recovers on a reload.
+#   npx playwright test --list  -> 261 tests in 38 files
+total_specs: 261
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1061,7 +1068,13 @@ total_specs: 259
 # executed = total - devnet - allowed_skips = 250 - 0 - 0 = 250, so executed ==
 # total_specs and the equality assertion holds.
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 259
-executed: 259
+# And again for the lazily registered page controllers: 2 more tests, 1 new file:
+#   npx playwright test --list                                             -> 261 tests, 38 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 261
+# executed = total - devnet - allowed_skips = 261 - 0 - 0 = 261, so executed ==
+# total_specs and the equality assertion holds.
+executed: 261
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

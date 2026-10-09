@@ -51,7 +51,13 @@ export const schema = {
 // board whose controller failed still renders, counts and toasts, and says that
 // its cards do not drag (data-studio-controller-failed="board").
 export const LAZY = {
-  "board": () => import("studio/controllers/board_controller")
+  "board": () => import("studio/controllers/board_controller"),
+  "geo-settings": () => import("studio/controllers/geo_settings_controller"),
+  "link-preview-card": () => import("studio/controllers/link_preview_card_controller"),
+  "email-banner-scale": () => import("studio/controllers/email_banner_scale_controller"),
+  "booking": () => import("studio/controllers/booking_controller"),
+  "footer-map": () => import("studio/controllers/footer_map_controller"),
+  "survey": () => import("studio/controllers/survey_controller")
 }
 
 export const application = Application.start(document.documentElement, schema)

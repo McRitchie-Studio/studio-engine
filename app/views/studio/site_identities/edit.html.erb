@@ -59,7 +59,7 @@
     Alpine scope of its own, so without one here the crop modal's store opens
     and its dialog never appears in a host whose body carries no x-data
     (e2e/site_identity.spec.js). %>
-<div class="max-w-3xl mx-auto" x-data data-link-preview-page
+<div class="max-w-3xl mx-auto" x-data data-link-preview-page data-studio-controller="link-preview-card"
      data-fallback-title="<%= fallback_title %>"
      data-fallback-description="<%= fallback_desc %>">
   <h1 class="text-2xl font-extrabold text-heading mb-2">Link Preview</h1>
@@ -208,26 +208,3 @@
     <% end %>
   <% end %>
 </div>
-
-<script>
-  // LIVE CARD. Typing in the title or description repaints the card before
-  // anything is saved, falling back to what a blank field would really send.
-  (function () {
-    var page = document.querySelector("[data-link-preview-page]");
-    if (!page) return;
-    var fallbacks = {
-      title: page.dataset.fallbackTitle || "",
-      description: page.dataset.fallbackDescription || ""
-    };
-    function paint(input) {
-      var key = input.dataset.linkPreviewInput;
-      var target = page.querySelector("[data-link-preview-card-" + key + "]");
-      if (!target) return;
-      var value = input.value.trim();
-      target.textContent = value || fallbacks[key];
-    }
-    page.querySelectorAll("[data-link-preview-input]").forEach(function (input) {
-      input.addEventListener("input", function () { paint(input); });
-    });
-  })();
-</script>
