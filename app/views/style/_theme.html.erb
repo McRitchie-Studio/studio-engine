@@ -7,6 +7,8 @@
      itself on save), THIS section intercepts Save + Regenerate and submits them
      via fetch — the page never navigates away, the live preview stays put, and
      the outcome is a toast. The standalone page's own redirect is unchanged.
+     The editor is studio/theme_editor's dsThemeEditor factory, which
+     studio/alpine_shims publishes.
 
      Rendered in two contexts:
        * live in the host app (StyleController sets @theme_setting + @theme_defaults)
@@ -168,56 +170,4 @@
       </div>
     </div>
   </div>
-
-  <script>
-    // Live-preview editor for the Style-guide Theme section. Seeded from the
-    // server-resolved role colors; updates the themeable role vars on the
-    // document as you type so every specimen on the page restyles instantly.
-    // The <input name> fields still carry the real values.
-    //
-    // Save-in-place: Save + Regenerate submit via fetch and stay on THIS page —
-    // preventDefault stops the browser navigating to /admin/theme (which is what
-    // bounced the operator off this section), the live preview persists, and the
-    // outcome is a toast (the engine's shared _flash toast primitive). The
-    // <form> POST still degrades gracefully if Alpine never loads.
-    function dsThemeEditor(seed) {
-      return {
-        colors: Object.assign({ primary: '#000', dark: '#0f172a', light: '#ffffff',
-                                success: '#367E3A', warning: '#FF7C47', danger: '#EF4444',
-                                accent: '#6366F1' }, seed || {}),
-        saving: false,
-        updatePreview() {
-          var d = document.documentElement.style;
-          d.setProperty('--color-cta', this.colors.primary);
-          d.setProperty('--color-cta-fill', this.colors.primary);
-          if (this.colors.success) d.setProperty('--color-success', this.colors.success);
-          if (this.colors.warning) { d.setProperty('--color-warning', this.colors.warning); d.setProperty('--color-warning-fill', this.colors.warning); }
-          if (this.colors.danger)  { d.setProperty('--color-danger', this.colors.danger);   d.setProperty('--color-danger-fill', this.colors.danger); }
-        },
-        persist(form, label) {
-          if (this.saving) return;
-          this.saving = true;
-          // Send the form's REAL method (the editor carries _method=patch) so we
-          // never depend on Rack::MethodOverride parsing a multipart fetch body.
-          var data = new FormData(form);
-          var override = data.get('_method');
-          var method = override ? String(override).toUpperCase() : 'POST';
-          if (override) data.delete('_method');
-          fetch(form.action, { method: method, body: data })
-            .then(function (res) {
-              if (!res.ok) throw new Error('HTTP ' + res.status);
-              return res;
-            })
-            .then((function () { this.toast('notice', label, 'Saved in place — the page stayed put.'); }).bind(this))
-            .catch((function (err) { this.toast('alert', 'Save failed', String((err && err.message) || err)); }).bind(this))
-            .finally((function () { this.saving = false; }).bind(this));
-        },
-        toast(type, title, message) {
-          window.dispatchEvent(new CustomEvent('toast', { detail: { type: type, title: title, message: message } }));
-        },
-        saveTheme(e) { this.persist(e.target, 'Theme saved'); },
-        regenerate(e) { this.persist(e.target, 'Theme cache cleared'); }
-      };
-    }
-  </script>
 </section>

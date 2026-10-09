@@ -19,6 +19,7 @@ import { NavCollapse } from "studio/nav_collapse"
 import {
   showNavSpinner, hideNavSpinner, installSpinnerReset, fireSuccessConfetti
 } from "studio/head_chrome"
+import { themeEditor, dsThemeEditor } from "studio/theme_editor"
 
 // x-data="navCollapse()": the hub's own header. A host that defines its own
 // window.navCollapse (turf-monster does, inline, before this runs) keeps it.
@@ -41,5 +42,9 @@ export function installAlpineShims() {
   if (!window.showNavSpinner) window.showNavSpinner = showNavSpinner
   if (!window.hideNavSpinner) window.hideNavSpinner = hideNavSpinner
   if (!window.fireSuccessConfetti) window.fireSuccessConfetti = fireSuccessConfetti
+  // x-data="themeEditor({...})" (theme_settings/edit) and
+  // x-data="dsThemeEditor({...})" (style/_theme). Alpine passes the seed alone.
+  if (!window.themeEditor) window.themeEditor = (seed) => themeEditor(seed)
+  if (!window.dsThemeEditor) window.dsThemeEditor = (seed) => dsThemeEditor(seed)
   installSpinnerReset()
 }

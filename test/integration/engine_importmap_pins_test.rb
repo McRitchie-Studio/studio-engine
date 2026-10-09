@@ -70,7 +70,7 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
                     studio/controllers/modal_host_controller studio/controllers/nav_collapse_controller
                     studio/controllers/toast_controller studio/head_chrome studio/hold_button
                     studio/hold_button_hooks studio/lazy_controllers studio/link_sidebar studio/modal_host
-                    studio/nav_collapse studio/pinned_stack studio/stimulus studio/toast], boot_graph
+                    studio/nav_collapse studio/pinned_stack studio/stimulus studio/theme_editor studio/toast], boot_graph
     refute_includes boot_graph, "studio/local_path", "a module nothing in the boot imports is not preloaded"
   end
 

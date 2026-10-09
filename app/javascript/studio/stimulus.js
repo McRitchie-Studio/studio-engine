@@ -48,7 +48,10 @@ export const schema = {
 // the every-page boot graph (Studio::Engine.javascript_boot_graph). A control
 // that must work whenever its page does is not listed here: a failed load is
 // final for the document (studio/lazy_controllers).
-export const LAZY = {}
+export const LAZY = {
+  "geo-settings": () => import("studio/controllers/geo_settings_controller"),
+  "link-preview-card": () => import("studio/controllers/link_preview_card_controller")
+}
 
 export const application = Application.start(document.documentElement, schema)
 
