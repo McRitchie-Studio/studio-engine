@@ -56,11 +56,10 @@ class ConsumerCiRefPairingTest < Minitest::Test
   # The rungs of the shared ladder. A consumer checkout may pair with these and nothing else.
   LADDER = %w[main release accepted].freeze
 
-  # Every consumer this workflow checks out, and the rungs each one really has. VERIFIED with
-  # `git ls-remote --heads origin main release accepted` against all three repos on
-  # 2026-08-21: all nine branches exist. Kept as data so the integration tier can also drive
-  # the branch-is-MISSING path, which no live repo currently exercises.
-  CONSUMER_REPOS = %w[mcritchie-studio turf-monster mcritchie-industries cyvasse].freeze
+  # Every consumer this workflow checks out. Each one carries all three rungs
+  # (`git ls-remote --heads origin main release accepted` in each repo). Kept as data so the
+  # integration tier can also drive the branch-is-MISSING path, which no live repo exercises.
+  CONSUMER_REPOS = %w[mcritchie-studio turf-monster mcritchie-industries cyvasse moms-app].freeze
 
   # The resolution this lane promises, as a table. Left column is the engine trigger context
   # reduced to its candidate (`github.base_ref || github.ref_name`); right column is the

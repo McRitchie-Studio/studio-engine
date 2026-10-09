@@ -1,7 +1,7 @@
 # Consumer CI — runs the consumer Rails apps' test suites against THIS engine
-# commit, so a PR/merge that breaks `mcritchie_studio`, `turf_monster`, or
-# `mcritchie_industries` fails here instead of silently after a
-# `bundle update studio-engine` on the consumer side.
+# commit, so a PR/merge that breaks `mcritchie_studio`, `turf_monster`,
+# `mcritchie_industries`, `cyvasse` or `moms_app` fails here instead of silently
+# after a `bundle update studio-engine` on the consumer side.
 #
 # This workflow covers the CONSUMERS only. The engine's OWN suite runs in the
 # sibling `engine-ci.yml` lane (`bin/release-check`) — do not assume a green
@@ -29,7 +29,9 @@
 #   5. Generates any non-secret test-only env the consumer needs
 #   6. Runs the consumer's standard test suite
 #
-# Add a new consumer: append its repo and local label to the matrix.
+# Add a new consumer: append its repo and local label to the matrix, and its
+# repo to CONSUMER_REPOS in the consumer-refs job. test/lib/consumer_ci_ref_pairing_test.rb
+# holds the two lists to each other and to its own.
 
 name: Consumer CI
 
@@ -115,7 +117,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           CANDIDATE: ${{ github.base_ref || github.ref_name }}
-          CONSUMER_REPOS: mcritchie-studio turf-monster mcritchie-industries cyvasse
+          CONSUMER_REPOS: mcritchie-studio turf-monster mcritchie-industries cyvasse moms-app
         run: |
           set -euo pipefail
 
@@ -173,8 +175,8 @@ jobs:
           # `release` AND `accepted`, so no reachable pairing lands on a tree that cannot cut.
           #
           # FOUR EXPLICIT ENTRIES rather than a `shard` dimension: this is an `include:`-only
-          # matrix, so a second dimension would cross-product onto turf, industries and cyvasse, which
-          # have no bin/ci-shard and must keep running whole. GitHub Actions does not support
+          # matrix, so a second dimension would cross-product onto turf, industries, cyvasse and
+          # moms, which have no bin/ci-shard and must keep running whole. GitHub Actions does not support
           # YAML anchors, so the repetition is the honest cost of keeping the other lanes
           # untouched.
           - consumer: mcritchie_studio
@@ -235,6 +237,17 @@ jobs:
             needs_rails_credentials: false
             needs_solana_admin_key: false
             needs_tailwind_build: true
+          # moms-app runs whole, as its own ci.yml `test` job does: `rails test`
+          # with no path argument, which fires `test:prepare` and so builds the
+          # Tailwind stylesheet its pages link. No separate build step, no
+          # credentials, no Redis. Its BookStitcher shells out to ffmpeg, which
+          # the system-packages step installs. Its system tests stay in its own CI.
+          - consumer: moms_app
+            repo: moms-app
+            managed_wallet_encryption_key: ""
+            needs_rails_credentials: false
+            needs_solana_admin_key: false
+            needs_tailwind_build: false
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -460,7 +473,7 @@ jobs:
 
       # ALWAYS, not `if: failure()`. A FAILING test still RAN — the executed-set gate must
       # see the receipt to count it. `matrix.shard` scopes this to the sharded hub entries;
-      # turf, industries and cyvasse run whole and produce no receipt, which is why the gate below
+      # turf, industries, cyvasse and moms run whole and produce no receipt, which is why the gate below
       # expects exactly the hub's shards and not one per matrix entry.
       - name: Upload this shard's executed-set receipt
         if: always() && matrix.shard

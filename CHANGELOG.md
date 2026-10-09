@@ -4,6 +4,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **Consumer CI runs moms-app's suite** against each engine change, beside the
+  hub, Turf Monster, McRitchie Industries and Cyvasse.
+
 ## 0.96.1 — 2026-10-08
 
 ### Fixed
