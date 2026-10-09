@@ -50,9 +50,9 @@ export function installAlpineShims() {
   // and _change_username.
   if (!window.levelingActionModal) window.levelingActionModal = (opts) => levelingActionModal(opts)
   // Sortable.create(el, options) in a page script (the hub's deploy board):
-  // SortableJS is no longer on every page, so the call loads it. SortableJS
-  // replaces this object when it arrives; a page that loads its own copy
-  // (turf-monster's slate page) replaces it the same way.
+  // no page carries SortableJS until something asks for it, so the call loads
+  // it. SortableJS replaces this object when it arrives; a page that loads its
+  // own copy (turf-monster's slate page) replaces it the same way.
   if (!window.Sortable) window.Sortable = sortableShim(() => loadSortable())
   installSpinnerReset()
 }
