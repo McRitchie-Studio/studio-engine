@@ -37,7 +37,7 @@
 
 <%# Montserrat is VENDORED into the engine (studio/montserrat-latin.woff2 and
     studio/montserrat-latin-ext.woff2) and shipped through the asset pipeline, no CDN,
-    CSP-safe (same-origin :self), mirroring alpine, canvas_confetti and sortable below.
+    CSP-safe (same-origin :self), mirroring alpine and canvas_confetti below.
     PINNED AT Google Fonts v31.
 
     WHAT THIS REPLACED, and why it was never merely a third-party tidy-up:
@@ -113,12 +113,6 @@
     (studio/head_chrome) rides the same global. %>
 <%= javascript_include_tag "studio/canvas_confetti", "data-turbo-track": "reload" %>
 <%= javascript_include_tag "studio/studio_confetti", "data-turbo-track": "reload" %>
-<%# SortableJS is VENDORED into the engine (studio/sortable.js) and shipped through
-    the asset pipeline — no CDN, CSP-safe (same-origin :self). Defines the global
-    `Sortable`; the studio/board primitive (studio/_board_assets -> window.studioBoard)
-    drives it for drag-reorder kanban AND depth-chart boards. Loaded here (deferred)
-    so any board consumer has it with zero per-app wiring, mirroring canvas_confetti. %>
-<%= javascript_include_tag "studio/sortable", defer: true, "data-turbo-track": "reload" %>
 <%# The theme and devMode stores are studio/alpine_stores (its module tag is below).
     showNavSpinner / hideNavSpinner and fireSuccessConfetti are studio/head_chrome,
     installed by studio/alpine_shims. %>
@@ -208,8 +202,8 @@
     studio/modal_host the one that installs each modal host's store. Moved
     above the module tags, Alpine would evaluate those before they exist (e2e/stimulus_boot.spec.js). %>
 <%# Alpine is VENDORED into the engine (studio/alpine.js) and shipped through the
-    asset pipeline — no CDN, CSP-safe (same-origin :self), mirroring canvas_confetti
-    and sortable below. PINNED AT 3.16.1.
+    asset pipeline — no CDN, CSP-safe (same-origin :self), mirroring canvas_confetti.
+    PINNED AT 3.16.1.
 
     WHAT THIS REPLACED, and why it is worth the 47KB in the repo: the tag here was
 

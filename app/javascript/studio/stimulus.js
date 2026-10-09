@@ -47,8 +47,11 @@ export const schema = {
 // identifier -> its controller module. Dynamic imports, so none of these joins
 // the every-page boot graph (Studio::Engine.javascript_boot_graph). A control
 // that must work whenever its page does is not listed here: a failed load is
-// final for the document (studio/lazy_controllers).
+// final for the document (studio/lazy_controllers). The board is listed: a
+// board whose controller failed still renders, counts and toasts, and says that
+// its cards do not drag (data-studio-controller-failed="board").
 export const LAZY = {
+  "board": () => import("studio/controllers/board_controller"),
   "geo-settings": () => import("studio/controllers/geo_settings_controller"),
   "link-preview-card": () => import("studio/controllers/link_preview_card_controller"),
   "email-banner-scale": () => import("studio/controllers/email_banner_scale_controller"),

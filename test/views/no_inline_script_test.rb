@@ -57,14 +57,6 @@ class NoInlineScriptTest < Minitest::Test
            "turf-monster's tests read this template's source"
     },
 
-    # engine-board-to-stimulus
-    "studio/_board_assets.html.erb" => {
-      scripts: 1, owner: "engine-board-to-stimulus", why: "the board factory"
-    },
-    "studio/_leveling_activity_assets.html.erb" => {
-      scripts: 1, owner: "engine-board-to-stimulus", why: "the leveling activity modal factory"
-    },
-
     # engine-modal-blocks-profile-stimulus
     "studio/_confirm_interstitial.html.erb" => {
       scripts: 1, owner: "engine-modal-blocks-profile-stimulus", why: "the confirm interstitial"
