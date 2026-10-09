@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { watchPageErrors } = require("./helpers");
+const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 
 // [e2e] The scanner-safe sign-in page (studio/_confirm_interstitial): it posts
 // its own form, and it still has a way through when the script that posts
@@ -36,6 +36,7 @@ function countPosts(page) {
 }
 
 test("the page posts its own form, once, with no press", async ({ page }) => {
+  await blockOffsiteRequests(page);
   const errors = watchPageErrors(page);
   const posts = countPosts(page);
 

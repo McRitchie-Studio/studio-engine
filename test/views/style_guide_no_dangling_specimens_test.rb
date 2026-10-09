@@ -16,6 +16,7 @@ require "minitest/autorun"
 class StyleGuideNoDanglingSpecimensTest < Minitest::Test
   SECTION   = "app/views/style/_modals.html.erb"
   SPECIMENS = "app/views/style/modals"
+  DRIVERS   = "app/javascript/studio/style_modals.js"
 
   def setup
     @src = File.read(SECTION)
@@ -49,11 +50,13 @@ class StyleGuideNoDanglingSpecimensTest < Minitest::Test
   #      five template ids as registered-but-unreachable. They were reachable;
   #      the regex could not see them. The ids feeding that loop are collected
   #      from its array literal instead.
-  #   3. VIA A DECLARED CONSTANT (added 2026-09-09) — the stack-behaviour drivers
-  #      open one vehicle from a dozen places, so they declare it once
-  #      (`var VEHICLE = 'ds-stack-demo';`) and call `store().open(VEHICLE, …)`.
-  #      Same trap as form 2 with a different indirection: the id is in the file,
-  #      it is just not at the call site. Read the declaration.
+  #   3. VIA A DECLARED CONSTANT — the stack-behaviour drivers
+  #      (studio/style_modals, which the section's buttons run through the
+  #      style-modals controller) open one vehicle from a dozen places, so they
+  #      declare it once (`export const VEHICLE = "ds-stack-demo"`) and call
+  #      `store().open(VEHICLE, …)`. Same trap as form 2 with a different
+  #      indirection: the id is not at the call site. Read the declaration, and
+  #      count it only while the section still has a button that runs a driver.
   #
   # WHAT THIS DELIBERATELY DOES NOT DO is treat a swap() target as reachable.
   # A swap is one card handing off to another MID-FLOW, so it proves the second
@@ -69,9 +72,14 @@ class StyleGuideNoDanglingSpecimensTest < Minitest::Test
                    else
                      []
                    end
-    via_const = body.scan(/var\s+([A-Z_]+)\s*=\s*'([a-z0-9-]+)';/).filter_map { |name, id|
-      id if body.match?(/\.open\(\s*#{Regexp.escape(name)}\b/)
-    }
+    drivers = File.read(DRIVERS)
+    via_const = if body.include?(%(data-studio-action="click->style-modals#demo"))
+                  drivers.scan(/^export const ([A-Z_]+) = "([a-z0-9-]+)"$/).filter_map { |name, id|
+                    id if drivers.match?(/\.open\(\s*#{Regexp.escape(name)}\b/)
+                  }
+                else
+                  []
+                end
     (literal + interpolated + via_const).uniq
   end
 
