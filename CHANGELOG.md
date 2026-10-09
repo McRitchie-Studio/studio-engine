@@ -15,6 +15,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   store once. `clearStaleModalsIn(doc, win)` is exported beside
   `clearStaleModals(win, name)`. No markup changes.
 
+## 0.98.0 — 2026-10-09
+
 ### Changed
 
 - **The modal blocks and the profile scripts move to ES modules.** The crop
