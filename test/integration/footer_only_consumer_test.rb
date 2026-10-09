@@ -130,7 +130,7 @@ class FooterOnlyConsumerTest < Minitest::Test
 
   def assert_no_leaflet(html)
     refute_match(/leaflet/i, html, "a footer with no address must not name Leaflet")
-    refute_includes html, "__studioFooterMapsArmed", "a footer with no address must not ship the map script"
+    refute_includes html, 'data-studio-controller="footer-map"', "a footer with no address must not name the map's controller"
     refute_includes html, ".ftr-map", "a footer with no address must not ship the map's CSS"
   end
 

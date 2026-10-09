@@ -51,7 +51,9 @@ export const schema = {
 export const LAZY = {
   "geo-settings": () => import("studio/controllers/geo_settings_controller"),
   "link-preview-card": () => import("studio/controllers/link_preview_card_controller"),
-  "email-banner-scale": () => import("studio/controllers/email_banner_scale_controller")
+  "email-banner-scale": () => import("studio/controllers/email_banner_scale_controller"),
+  "booking": () => import("studio/controllers/booking_controller"),
+  "footer-map": () => import("studio/controllers/footer_map_controller")
 }
 
 export const application = Application.start(document.documentElement, schema)

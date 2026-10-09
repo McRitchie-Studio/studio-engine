@@ -305,25 +305,34 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
 
     assert_select "[data-footer-map]", 3, "the footer's map and two standalone maps"
     assert_equal 1, response.body.scan(".ftr-wrap {").size, "footer styles rendered more than once"
-    assert_equal 1, response.body.scan("window.__studioFooterMapsArmed = true").size
+    assert_no_match(/<script\b(?![^>]*type="(?:importmap|module)")[^>]*>[^<]*__studio/, response.body,
+                    "the footer's behaviour is in modules; no inline script carries it")
+    # Each map and each booking surface names the controller that starts its module.
+    assert_select "[data-footer-map][data-studio-controller='footer-map']", 3
+    assert_select "[data-booking-wrap][data-studio-controller='booking']", 3
+    assert_select "dialog[data-booking-dialog][data-studio-controller='booking']", 1
+    assert_equal 1, response.body.scan(".booking-popup::backdrop").size, "booking styles rendered more than once"
+
+    map = File.read(File.expand_path("../../app/javascript/studio/footer_map.js", __dir__))
+    booking = File.read(File.expand_path("../../app/javascript/studio/booking.js", __dir__))
+    assert_equal 1, map.scan("win.__studioFooterMapsArmed = true").size
     # Not the name, nor the bare selector, of an app's own local footer script:
     # sharing them lets one script stand the other down across a Turbo visit.
-    assert_no_match(/window\.__footerMapsArmed/, response.body)
-    assert_includes response.body, "querySelectorAll('[data-footer-map][data-leaflet-js]')"
-    assert_equal 1, response.body.scan(".booking-popup::backdrop").size, "booking styles rendered more than once"
-    assert_equal 1, response.body.scan("window.__studioBookingPopupArmed = true").size
-    assert_equal 1, response.body.scan("window.__studioBookingFramesArmed = true").size
+    assert_no_match(/\.__footerMapsArmed/, map)
+    assert_includes map, 'export const MAPS = "[data-footer-map][data-leaflet-js]"'
+    assert_equal 1, booking.scan("win.__studioBookingPopupArmed = true").size
+    assert_equal 1, booking.scan("win.__studioBookingFramesArmed = true").size
     # Not the names, nor the bare selectors, of an app's own local booking script:
     # sharing them lets one script stand the other down across a Turbo visit, or
     # act on the other's elements.
-    assert_no_match(/window\.__booking(Frames|Popup)Armed/, response.body)
-    assert_includes response.body, "querySelectorAll('iframe[data-booking-frame][data-studio-booking][data-src]')"
-    assert_includes response.body, "closest('a[data-booking-popup][data-studio-booking]')"
-    assert_includes response.body, "querySelector('dialog[data-booking-dialog][data-studio-booking]')"
-    script = response.body[/window\.__studioBookingFramesArmed = true.*\z/m]
-    assert_empty script.scan(/'(?:iframe|a|dialog)?\[data-booking-(?:frame|popup|dialog|wrap)\](?!\[data-studio-booking\])[^']*'/)
-                       .reject { |selector| selector.include?("data-studio-booking") },
-                 "a booking selector in the engine's script is not scoped to the engine's own elements"
+    assert_no_match(/\.__booking(Frames|Popup)Armed/, booking)
+    assert_includes booking, 'export const WAITING_FRAMES = "iframe[data-booking-frame][data-studio-booking][data-src]"'
+    assert_includes booking, 'export const POPUP_LINK = "a[data-booking-popup][data-studio-booking]"'
+    assert_includes booking, 'export const DIALOG = "dialog[data-booking-dialog][data-studio-booking]"'
+    code = booking.gsub(%r{^\s*//.*$}, "")
+    assert_empty code.scan(/"[^"\n]*\[data-booking-(?:frame|popup|dialog|wrap)\][^"\n]*"/)
+                     .reject { |selector| selector.include?("data-studio-booking") },
+                 "a booking selector in studio/booking is not scoped to the engine's own elements"
     # Every element those selectors need carries the marker.
     assert_select "[data-booking-wrap][data-studio-booking] iframe[data-booking-frame][data-studio-booking]", 3
     assert_select "dialog[data-booking-dialog][data-studio-booking]", 1
@@ -346,7 +355,7 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     # Nor Leaflet at all: the map's styles (.leaflet-* rules) and its mount
     # script ride studio/site_footer/_map_assets, which only a map renders.
     assert_no_match(/leaflet/i, response.body, "a page with no map must not name Leaflet")
-    assert_no_match(/__studioFooterMapsArmed/, response.body, "a page with no map must not ship the map script")
+    assert_no_match(/data-studio-controller="footer-map"/, response.body, "a page with no map must not name the map's controller")
     assert_no_match(/\.ftr-map/, response.body, "a page with no map must not ship the map's styles")
     assert_includes response.body, ".ftr-wrap {", "the footer's own styles still ship"
     assert_select "#{footer} .ftr-legal.ftr-legal-ruled", 1, "with no map above it the legal line carries the rule"
@@ -670,7 +679,7 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     assert_select "[data-booking-page] h1", "Schedule a call"
     assert_select "[data-booking-wrap]:not(.booking-frame-cropped) iframe[data-booking-frame]", 1 do |frames|
       assert_equal "#{BOOKING_URL}?gv=true", frames.first["data-src"]
-      assert_nil frames.first["src"], "the page's script assigns src after `load`"
+      assert_nil frames.first["src"], "studio/booking assigns src after `load`"
     end
     assert_select "a[href='#{BOOKING_URL}'][target='_blank']", "Open the booking page"
     assert_select footer, 1
@@ -681,7 +690,7 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
 
     get "/schedule"
 
-    noscript = response.body[%r{<div class="booking-frame[^>]*data-booking-wrap data-studio-booking>.*?<noscript>(.*?)</noscript>}m, 1]
+    noscript = response.body[%r{<div class="booking-frame[^>]*data-booking-wrap data-studio-booking data-studio-controller="booking">.*?<noscript>(.*?)</noscript>}m, 1]
     assert noscript, "the frame's wrapper must carry a <noscript>"
     assert_match(%r{<a href="#{Regexp.escape(BOOKING_URL)}"[^>]*>Open the booking page to pick a time</a>}, noscript)
     assert_match(/\.booking-frame iframe \{ display: none !important; \}/, noscript,
