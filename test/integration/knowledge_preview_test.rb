@@ -547,6 +547,30 @@ class KnowledgePreviewRequestTest < ActionDispatch::IntegrationTest
     assert_includes notice, %(href="/admin/knowledge/#{doc.id}/download")
   end
 
+  test "a transcript of nothing but markup characters is bounded by the parser's text cap" do
+    # The worst a stored file can do to the page: every byte one that escapes to
+    # six (a double quote), up to both caps. The page is at most six times the
+    # text the parser kept, six times the plain-text head, and the cue markup.
+    line = "  #{'"' * 400}\n"
+    body = (0...5_200).map { |i| "#{i / 60}:#{format('%02d', i % 60)} - Speaker\n#{line}" }.join
+    assert_operator body.bytesize, :>, Studio::KnowledgeTranscript::MAX_TEXT_BYTES
+    doc = doc!("standup.txt", body)
+    sign_in @admin
+    preview(doc)
+
+    assert_response :success
+    cues = response.body.scan('<li class="knowledge-cue"').size
+    assert_operator cues, :<=, Studio::KnowledgeTranscript::MAX_CUES
+    assert_operator cues, :>, 4_000, "the fixture did not reach the caps"
+    ceiling = 6 * (Studio::KnowledgeTranscript::MAX_TEXT_BYTES + Preview::TEXT_HEAD_BYTES) +
+              400 * Studio::KnowledgeTranscript::MAX_CUES + 16_384
+    assert_operator response.body.bytesize, :<=, ceiling
+    assert_operator response.body.bytesize, :>, 6 * Studio::KnowledgeTranscript::MAX_TEXT_BYTES * 0.9,
+                    "the fixture did not reach the escaping worst case"
+    assert_equal 2, reads.size
+    assert_includes response.body, "data-transcript-truncated"
+  end
+
   test "text with one accidental cue line is still shown as text" do
     doc = doc!("notes.md", "# Notes\n\nAgenda • 9:00\nProse follows.\n")
     sign_in @admin

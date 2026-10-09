@@ -956,7 +956,17 @@
 # studio/application aborted, a modal left open is closed after a Turbo visit
 # and Back; with the boot loaded, the visit sweeps the store once.
 #   npx playwright test --list  -> 320 tests in 45 files
-total_specs: 320
+# 320 -> 324: e2e/knowledge_transcript.spec.js, 4 tests. A meeting's recording
+# beside its transcript on the knowledge layer's document page. A click on a cue
+# moves a real player (a WAV e2e/boot.rb writes) and plays it, in markup that
+# arrived inside a lazy turbo-frame; the cue being spoken is followed inside the
+# cue list and never by scrolling the page, and not while the reader scrolls;
+# the player sits beside the cues at 1280 and above them at 375, both in one
+# screen; and with no recording the cues are text and the controller is never
+# fetched. Verified RED against four reintroduced defects (the spec's header
+# lists them). e2e/lazy_page_controllers.spec.js gains a page, not a test.
+#   npx playwright test --list  -> 324 tests in 46 files
+total_specs: 324
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1136,7 +1146,11 @@ total_specs: 320
 #   npx playwright test --list                                             -> 320 tests, 45 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 320
-executed: 320
+# And for the knowledge transcript: 4 more tests, 1 new file:
+#   npx playwright test --list                                             -> 324 tests, 46 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 324
+executed: 324
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

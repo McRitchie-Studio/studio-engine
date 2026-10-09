@@ -702,15 +702,17 @@ class E2eLabController < ActionController::Base
   LAB_SPEAKERS = ["Sam Sample (Example Co)", "Riley Example", "Jordan Example"].freeze
 
   # One cue every two seconds, for `count` cues: 60 fill the recording.
-  # ?cues= takes it to the parser's cap, which is how the page at 5,000 cues is
-  # measured (docs/E2E_LANE.md).
-  def self.lab_transcript(count)
+  # ?cues= and ?pad= (extra bytes of speech per cue) take the page to the
+  # parser's caps, which is how the page at 5,000 cues and 2 MB of text was
+  # measured (README, "The document page").
+  def self.lab_transcript(count, pad = 0)
+    filler = pad.positive? ? " #{('lorem ipsum ' * (pad / 12 + 1))[0, pad]}" : ""
     lines = ["Weekly widget sync", "VIEW RECORDING", ""]
     count.times do |index|
       at = index * 2
       stamp = at >= 3600 ? format("%d:%02d:%02d", at / 3600, (at % 3600) / 60, at % 60) : format("%d:%02d", at / 60, at % 60)
       lines << "#{stamp} - #{LAB_SPEAKERS[index % LAB_SPEAKERS.size]}"
-      lines << "  Line #{index + 1}: we reviewed the <b>widget</b> schedule & agreed the next step."
+      lines << "  Line #{index + 1}: we reviewed the <b>widget</b> schedule & agreed the next step.#{filler}"
     end
     lines.join("\n") << "\n"
   end
@@ -723,7 +725,8 @@ class E2eLabController < ActionController::Base
     count = params[:cues].to_i.clamp(0, Studio::KnowledgeTranscript::MAX_CUES + 100)
     count = 60 if params[:cues].blank? || count.zero?
     @doc = LabKnowledgeDoc.new(id: 1, title: "Weekly widget sync", s3_key: "knowledge/lab/standup.txt", mime_type: "text/plain")
-    @preview = Studio::KnowledgePreview.for(@doc, storage: LabKnowledgeStorage.new(self.class.lab_transcript(count)))
+    pad = params[:pad].to_i.clamp(0, 1_000)
+    @preview = Studio::KnowledgePreview.for(@doc, storage: LabKnowledgeStorage.new(self.class.lab_transcript(count, pad)))
     @player = params[:recording] == "0" ? nil : Studio::KnowledgePreview::Player.new(kind: :audio, url: LAB_RECORDING_URL)
     response.headers["Cache-Control"] = "no-store"
     render(:knowledge_transcript_frame)
