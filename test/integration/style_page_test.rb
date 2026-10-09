@@ -824,11 +824,12 @@ class StylePageTest < ActiveSupport::TestCase
   end
 
   # PROFILE — crop / upload ACTUALLY open: cropper_assets is rendered on the
-  # page (loading cropper.js + the factory) and the specimens open crop-photo.
+  # page (loading cropper.js; the factory is studio/cropper, on every page) and
+  # the specimens open crop-photo.
   test "the Profile crop/upload modals are wired to open live" do
     html = render_index
     assert_includes html, "cropPhotoModal",
-      "studio/cropper_assets is rendered so the crop factory is defined"
+      "the crop modal binds the crop factory"
     assert_includes html, "cropperjs",
       "cropper.js is loaded on the page"
     assert_includes html, "$store.dsModals.open('crop-photo', { imageUrl:",
@@ -852,9 +853,10 @@ class StylePageTest < ActiveSupport::TestCase
       "Image upload glows only when crop-photo is the empty picker"
     assert_includes html, "$store.dsModals.current().id === 'crop-photo' && !!$store.dsModals.current().props.cropReady",
       "Crop photo glows only when crop-photo has an image loaded"
-    # The crop factory reflects the sub-state onto the store so the glow can react.
-    factory = File.read("app/views/studio/modals/_image_upload.html.erb")
-    assert_includes factory, "cur.props.cropReady = true",
+    # The crop factory reflects the sub-state onto the store so the glow can react
+    # (test/javascript/cropper.test.mjs runs the mount and reads the entry).
+    factory = File.read("app/javascript/studio/cropper.js")
+    assert_includes factory, "entry.props.cropReady = true",
       "mountCropper sets cropReady on the store entry (picker -> cropper transition)"
   end
 

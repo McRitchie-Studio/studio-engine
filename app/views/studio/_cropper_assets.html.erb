@@ -1,11 +1,12 @@
-<%# Cropper.js + the image-upload factories for the shared crop-photo modal.
-    Render on pages that can open the cropper (an avatar field, a banner editor,
-    etc.) — this loads cropper.js (~40 KB) AND defines imageUploadHost /
-    cropPhotoModal / submitFormWithProgress inline, so both the library and the
-    behavior only load where an upload trigger exists rather than globally.
+<%# Cropper.js, for the shared crop-photo modal. Render on a page that can open
+    the cropper (an avatar field, a banner editor), so the library (~40 KB)
+    loads only where an upload trigger exists.
 
-    Pair with: the crop-photo + saving modal registrations in your modal-host
-    block (see the README / CHANGELOG), and x-data="imageUploadHost({...})". %>
+    The behaviour around it (cropPhotoModal, imageUploadHost,
+    submitFormWithProgress) is studio/cropper and studio/image_upload, on every
+    page through studio/alpine_scopes; this partial loads the library alone.
+
+    Pair with: the crop-photo and saving modal registrations in your modal-host
+    block (see the README and CHANGELOG), and x-data="imageUploadHost({...})". %>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-<%= render "studio/modals/image_upload" %>

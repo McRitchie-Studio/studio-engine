@@ -200,6 +200,12 @@
     the document click and Escape handlers. It imports nothing, and the
     link-sidebar controller imports it. %>
 <%= javascript_import_module_tag "studio/link_sidebar" %>
+<%# THE X-DATA FACTORIES, BY THEIR OWN DOOR, for the same reason.
+    studio/alpine_scopes publishes the factories a page binds by name
+    (cropPhotoModal, imageUploadHost, submitFormWithProgress), each from the
+    module that owns it. Its imports import nothing, and studio/alpine_shims
+    imports it, so a failed boot leaves a page its uploads. %>
+<%= javascript_import_module_tag "studio/alpine_scopes" %>
 <%# ALPINE LOADS AFTER THE MODULE TAGS, and the order is the contract. Deferred
     classic scripts and module scripts execute in document order, so by the time
     Alpine starts, studio/application has defined the shims it evaluates
