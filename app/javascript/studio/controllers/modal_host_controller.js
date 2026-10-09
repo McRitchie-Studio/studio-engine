@@ -14,27 +14,17 @@
 // The stack, the focus trap and the registries are studio/modal_host, which
 // registers each host's store on alpine:init (a full load, where a controller
 // connects too late) and before a Turbo render. connect() registers it too, for
-// a Turbo visit and for markup that arrived any other way, and binds the
-// bfcache and Turbo snapshot cleanup to this host while it is on the page.
-// Registered by studio/application.
+// a Turbo visit and for markup that arrived any other way. The bfcache and
+// Turbo snapshot cleanup is studio/modal_host's own binding, one per document,
+// so it holds when this controller never loads; binding it here as well would
+// sweep each store twice. Registered by studio/application.
 import { Controller } from "@hotwired/stimulus"
-import { registerModalStore, clearStaleModals } from "studio/modal_host"
+import { registerModalStore } from "studio/modal_host"
 
 export default class extends Controller {
   static values = { store: { type: String, default: "modals" }, scoped: Boolean }
 
   connect() {
-    const name = this.storeValue
-    registerModalStore(window.Alpine, { store: name, scoped: this.scopedValue }, { doc: document, win: window })
-
-    this.onPageShow = (event) => { if (event.persisted) clearStaleModals(window, name) }
-    this.onBeforeCache = () => clearStaleModals(window, name)
-    window.addEventListener("pageshow", this.onPageShow)
-    document.addEventListener("turbo:before-cache", this.onBeforeCache)
-  }
-
-  disconnect() {
-    window.removeEventListener("pageshow", this.onPageShow)
-    document.removeEventListener("turbo:before-cache", this.onBeforeCache)
+    registerModalStore(window.Alpine, { store: this.storeValue, scoped: this.scopedValue }, { doc: document, win: window })
   }
 }
