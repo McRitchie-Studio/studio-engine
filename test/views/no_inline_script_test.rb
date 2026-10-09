@@ -45,12 +45,12 @@ class NoInlineScriptTest < Minitest::Test
       why: "pre-paint theme: runs before the stylesheet paints"
     },
 
-    # The hold button's guard: it reports a hold button whose modules failed to
-    # load, so it can be no module and share no request with them. Nonced, and
-    # held to that below.
+    # hold-button-says-when-dead: inline on purpose, and nonced
+    # (test/integration/head_script_nonce_test.rb holds it to that).
     "studio/_hold_button_guard.html.erb" => {
-      scripts: 1, owner: PERMANENT,
-      why: "hold button guard: speaks when the modules it would be loaded with have failed"
+      scripts: 1, owner: "hold-button-says-when-dead",
+      why: "it reports a hold button whose modules failed to load, so it must run with no module " \
+           "in the boot graph loaded; e2e/hold_button_guard.spec.js fails each module and reads it"
     },
 
     # engine-admin-scripts-to-stimulus: left inline on purpose.
@@ -167,21 +167,15 @@ class NoInlineScriptTest < Minitest::Test
     end
   end
 
-  # The permanent entries are the pre-paint script and the hold button's guard,
-  # and each carries the request's CSP nonce. Nothing else is permanent.
-  def test_unit_the_only_permanent_scripts_are_the_nonced_pre_paint_tag_and_hold_button_guard
+  # The one permanent entry is the pre-paint script, and it carries the request's
+  # CSP nonce. Nothing else is permanent.
+  def test_unit_the_only_permanent_script_is_the_nonced_pre_paint_tag
     permanent = ALLOWED.select { |_path, entry| entry[:owner] == PERMANENT }.keys
-    assert_equal ["layouts/studio/_head.html.erb", "studio/_hold_button_guard.html.erb"], permanent
+    assert_equal ["layouts/studio/_head.html.erb"], permanent
 
     head = File.read(File.join(VIEW_ROOT, permanent.first)).gsub(ERB_COMMENT, "")
     assert_match(/<%= tag\.script\(nonce: studio_script_nonce\) do %>/, head,
                  "the pre-paint script lost its nonce, or is no longer rendered by tag.script")
-    assert_match(/<%= render "studio\/hold_button_guard", nonce: studio_script_nonce %>/, head,
-                 "the head no longer hands the hold button guard the request nonce")
-
-    guard = File.read(File.join(VIEW_ROOT, permanent.last)).gsub(ERB_COMMENT, "")
-    assert_match(/<%= tag\.script\(nonce: local_assigns\[:nonce\]\) do %>/, guard,
-                 "the hold button guard lost its nonce, or is no longer rendered by tag.script")
   end
 
   # ------------------------------------------------- GUARD THE GUARD: reading
