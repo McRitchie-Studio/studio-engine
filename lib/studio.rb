@@ -1453,8 +1453,8 @@ module Studio
       end
 
       # Knowledge layer — /admin/knowledge (Studio::KnowledgeDoc): folder/flat
-      # document browser, upload-to-inbox intake, per-agent access map, and
-      # 15-minute presigned downloads. Opt-in (default off) like every route
+      # document browser, upload-to-inbox intake, per-agent access map,
+      # 15-minute presigned downloads, and the inline document preview. Opt-in (default off) like every route
       # surface, so no app grows an admin page it never asked for.
       if Studio.draw_knowledge_routes
         get   "admin/knowledge",     to: "studio/knowledge_docs#index", as: :admin_knowledge
@@ -1471,6 +1471,9 @@ module Studio
         patch "admin/knowledge/:id", to: "studio/knowledge_docs#update"
         get   "admin/knowledge/:id/download", to: "studio/knowledge_docs#download",
               as: :admin_knowledge_doc_download
+        # The inline preview the show page lazy-loads (Studio::KnowledgePreview).
+        get   "admin/knowledge/:id/preview", to: "studio/knowledge_docs#preview",
+              as: :admin_knowledge_doc_preview
       end
 
       # Solana / Phantom wallet sign-in (nonce challenge + signature verify),

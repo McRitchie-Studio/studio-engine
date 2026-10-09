@@ -1,0 +1,9 @@
+<%# The preview that could not be shown: one plain sentence and the same
+    download link the page header carries. locals: reason, doc. %>
+<p id="knowledge-preview-fallback" class="knowledge-preview-note">
+  <%= reason %>
+  <% if doc.file? %>
+    <%= link_to "Download it instead (15-min link)", admin_knowledge_doc_download_path(doc),
+                id: "knowledge-preview-download", data: { turbo: false } %>
+  <% end %>
+</p>

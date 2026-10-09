@@ -40,6 +40,10 @@ Gem::Specification.new do |spec|
   spec.add_dependency "solid_queue", ">= 1.0", "< 2.0"
   spec.add_dependency "aws-sdk-s3", "~> 1.218"
   spec.add_dependency "mini_magick", "~> 5.0"
+  # The knowledge layer's CSV preview (Studio::KnowledgePreview) requires it,
+  # lazily. csv left Ruby's default gems in 3.4, and a bundled app can then
+  # load it only if its lockfile names it; not every consumer's does.
+  spec.add_dependency "csv", ">= 3.0"
   spec.add_dependency "resend", "~> 1.1"
   # Realtime: the redis cable/cache/Sidekiq adapter (Studio::Redis) + Turbo Streams
   # broadcasting (Studio::Cable). `redis` is the dependency whose ABSENCE

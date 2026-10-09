@@ -1,0 +1,43 @@
+<%# One sheet (or a whole CSV) as a grid: column letters across the top and
+    row numbers down the side, as the spreadsheet itself shows them, so a
+    figure can be named by its cell. locals: sheet (KnowledgePreview::Sheet),
+    doc. Every cell is escaped text. %>
+<% width = sheet.rows.first.to_a.size %>
+<% if sheet.truncated_rows || sheet.truncated_columns %>
+  <p class="knowledge-preview-note" data-preview-truncated>
+    Showing the first
+    <%= [ ("#{number_with_delimiter(sheet.row_limit)} rows" if sheet.truncated_rows),
+          ("#{width} columns" if sheet.truncated_columns) ].compact.to_sentence %>;
+    <%= link_to "download", admin_knowledge_doc_download_path(doc), data: { turbo: false } %> for the full file.
+  </p>
+<% end %>
+<% if sheet.rows.empty? %>
+  <p class="knowledge-preview-note" data-preview-empty>This sheet is empty.</p>
+<% else %>
+  <div class="knowledge-preview-scroll">
+    <table class="knowledge-preview-table">
+      <thead>
+        <tr>
+          <th></th>
+          <% width.times do |index| %>
+            <th scope="col"><%= Studio::KnowledgePreview.column_letter(index) %></th>
+          <% end %>
+        </tr>
+      </thead>
+      <tbody>
+        <% sheet.rows.each_with_index do |row, index| %>
+          <tr>
+            <th scope="row"><%= index + 1 %></th>
+            <% row.each do |cell| %>
+              <% if cell %>
+                <td<%= ' class="knowledge-cell-number"'.html_safe if cell.numeric %>><%= cell.text %></td>
+              <% else %>
+                <td></td>
+              <% end %>
+            <% end %>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

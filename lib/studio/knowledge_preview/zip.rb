@@ -1,0 +1,242 @@
+# frozen_string_literal: true
+
+require "English"
+require "zlib"
+require "stringio"
+
+module Studio
+  module KnowledgePreview
+    # The least of a zip reader an .xlsx needs: the central directory, and each
+    # entry as a STREAM that inflates on demand.
+    #
+    # Written on Zlib (stdlib) rather than on rubyzip for two reasons. The
+    # consumers lock different rubyzip majors (2.4 and 3.x), and none of them
+    # carries it outside the test group, so a gemspec dependency would put a
+    # new runtime gem in every app for one admin page. And a streaming reader
+    # is the control a preview wants: an entry is inflated only as far as the
+    # caller reads it, and every byte any entry yields is spent from ONE
+    # budget for the whole archive (`inflate_budget`). A small file that
+    # declares a huge sheet, lies about its sizes, or points twenty sheets at
+    # one part costs what was read, in total, and never more than the budget.
+    #
+    # Deliberately unsupported, each refused with Unreadable so the page falls
+    # back to the download link: zip64, encrypted entries, and any compression
+    # other than stored (0) and deflate (8). Sizes and offsets come from the
+    # central directory, so entries written with a trailing data descriptor
+    # read correctly.
+    class Zip
+      EOCD_SIGNATURE    = "PK\x05\x06".b
+      CENTRAL_SIGNATURE = "PK\x01\x02".b
+      LOCAL_SIGNATURE   = "PK\x03\x04".b
+      EOCD_MIN_SIZE     = 22
+      # An end-of-central-directory record may be followed by a comment of up
+      # to 65,535 bytes; it is never further from the end than this.
+      EOCD_SEARCH_WINDOW = EOCD_MIN_SIZE + 0xFFFF
+      MAX_ENTRIES = 5_000
+      ZIP64_MARKER = 0xFFFFFFFF
+
+      Entry = Struct.new(:name, :flags, :compression, :compressed_size, :local_offset)
+
+      # What the whole archive may still expand to. Shared by every entry
+      # opened, so reading one part twenty times spends twenty times.
+      class Budget
+        def initialize(bytes)
+          @limit = bytes
+          @left = bytes
+        end
+
+        def spend(bytes)
+          @left -= bytes
+          raise TooLarge, "it expands past the #{megabytes} MB preview limit" if @left.negative?
+        end
+
+        private
+
+        def megabytes
+          (@limit / 1_048_576.0).round(1).to_s.delete_suffix(".0")
+        end
+      end
+
+      # Reads a deflate stream a kilobyte of compressed input at a time. The
+      # small step keeps the buffer small: deflate tops out near 1000:1, so
+      # one step can add about a megabyte to it and no more. What bounds the
+      # total is the archive's Budget.
+      #
+      # `failure` exists because the consumer is an XML parser reading through
+      # a C callback: an exception raised inside #read does not reliably come
+      # out the other side as itself. So a failed read ends the stream and
+      # keeps the reason, and Zip#open raises it once the parser has let go.
+      class InflateIO
+        STEP = 1024
+
+        attr_reader :failure
+
+        def initialize(compressed, budget)
+          @compressed = compressed
+          @position = 0
+          @budget = budget
+          @buffer = +"".b
+          @offset = 0
+          @inflater = Zlib::Inflate.new(-Zlib::MAX_WBITS)
+          @finished = false
+        end
+
+        # IO#read's contract as Nokogiri's reader uses it: up to `length`
+        # bytes, and nil once the stream is exhausted.
+        def read(length = nil, _outbuf = nil)
+          begin
+            fill while !@finished && (length.nil? || available < length)
+          rescue Error => e
+            fail_with(e)
+          rescue Zlib::Error
+            fail_with(Unreadable.new("its contents are damaged"))
+          end
+          return nil if available.zero? && !length.nil?
+
+          # Read by offset, not by cutting the front off the buffer: a highly
+          # compressed part can leave megabytes buffered, and the parser asks
+          # for a few kilobytes at a time.
+          taken = @buffer.byteslice(@offset, length || available)
+          @offset += taken.bytesize
+          taken
+        end
+
+        def close
+          @inflater.close unless @inflater.closed?
+        end
+
+        private
+
+        def available
+          @buffer.bytesize - @offset
+        end
+
+        def fail_with(error)
+          @failure = error
+          @finished = true
+          @buffer = +"".b
+          @offset = 0
+        end
+
+        def fill
+          chunk = @compressed.byteslice(@position, STEP)
+          if chunk.nil? || chunk.empty?
+            @finished = true
+            return
+          end
+
+          @position += chunk.bytesize
+          out = @inflater.inflate(chunk)
+          @budget.spend(out.bytesize)
+
+          if available.zero?
+            @buffer = out
+            @offset = 0
+          else
+            @buffer << out
+          end
+          @finished = true if @inflater.finished?
+        end
+      end
+
+      def initialize(bytes, inflate_budget:)
+        @bytes = bytes.b
+        @budget = Budget.new(inflate_budget)
+        @entries = read_central_directory
+      end
+
+      def names
+        @entries.keys
+      end
+
+      def entry?(name)
+        @entries.key?(normalize(name))
+      end
+
+      # Yields an IO over the entry's uncompressed bytes, or returns nil when
+      # the archive has no such entry.
+      def open(name)
+        entry = @entries[normalize(name)]
+        return nil unless entry
+
+        io = io_for(entry)
+        begin
+          result = yield io
+        rescue StandardError
+          # Whatever the reader made of a stream that ended early, the reason
+          # it ended is the truer error.
+          raise failure_of(io) || $ERROR_INFO
+        ensure
+          io.close
+        end
+        raise failure_of(io) if failure_of(io)
+
+        result
+      end
+
+      private
+
+      def failure_of(io)
+        io.failure if io.respond_to?(:failure)
+      end
+
+      def normalize(name)
+        name.to_s.delete_prefix("/")
+      end
+
+      def read_central_directory
+        window_start = [@bytes.bytesize - EOCD_SEARCH_WINDOW, 0].max
+        eocd = @bytes.rindex(EOCD_SIGNATURE)
+        raise Unreadable, "it is not a zip archive" if eocd.nil? || eocd < window_start
+        raise Unreadable, "its zip directory is cut short" if eocd + EOCD_MIN_SIZE > @bytes.bytesize
+
+        count, _size, offset = @bytes.byteslice(eocd + 10, 10).unpack("vVV")
+        raise Unreadable, "it is a zip64 archive" if offset == ZIP64_MARKER || count == 0xFFFF
+        raise Unreadable, "it holds too many zip entries" if count > MAX_ENTRIES
+
+        entries = {}
+        position = offset
+        count.times do
+          header = @bytes.byteslice(position, 46)
+          unless header && header.bytesize == 46 && header.start_with?(CENTRAL_SIGNATURE)
+            raise Unreadable, "its zip directory is damaged"
+          end
+
+          flags, compression = header.byteslice(8, 4).unpack("vv")
+          compressed_size = header.byteslice(20, 4).unpack1("V")
+          name_length, extra_length, comment_length = header.byteslice(28, 6).unpack("vvv")
+          local_offset = header.byteslice(42, 4).unpack1("V")
+          name = @bytes.byteslice(position + 46, name_length).to_s.force_encoding(Encoding::UTF_8)
+          raise Unreadable, "it is a zip64 archive" if [compressed_size, local_offset].include?(ZIP64_MARKER)
+
+          entries[normalize(name)] = Entry.new(name, flags, compression, compressed_size, local_offset)
+          position += 46 + name_length + extra_length + comment_length
+        end
+        entries
+      end
+
+      def io_for(entry)
+        raise Unreadable, "it is password-protected" if entry.flags.anybits?(1)
+
+        local = @bytes.byteslice(entry.local_offset, 30)
+        unless local && local.bytesize == 30 && local.start_with?(LOCAL_SIGNATURE)
+          raise Unreadable, "its zip entries are damaged"
+        end
+
+        name_length, extra_length = local.byteslice(26, 4).unpack("vv")
+        data = @bytes.byteslice(entry.local_offset + 30 + name_length + extra_length, entry.compressed_size)
+        raise Unreadable, "its zip entries are cut short" if data.nil? || data.bytesize < entry.compressed_size
+
+        case entry.compression
+        when 0
+          # A stored entry is spent whole on opening it: it is already in
+          # memory, and opening it again is another copy.
+          @budget.spend(data.bytesize)
+          StringIO.new(data)
+        when 8 then InflateIO.new(data, @budget)
+        else raise Unreadable, "it uses a zip compression this preview cannot read"
+        end
+      end
+    end
+  end
+end

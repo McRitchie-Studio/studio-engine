@@ -18,8 +18,32 @@ module Studio
         public_url? ? url(key: key) : nil
       end
 
-      def download(key:)
-        client.get_object(bucket: bucket, key: full_key(key)).body.read
+      # max_bytes reads only the head of the object (a ranged GET), which is
+      # how a preview looks at the first megabyte of a file of any size and
+      # how a caller enforces a size cap without trusting a recorded length.
+      # A ranged read of an EMPTY object is a 416 (InvalidRange) on S3; that
+      # is answered as the empty string it means. Tested against a stubbed
+      # client only: no live store, R2 included, has been asked.
+      def download(key:, max_bytes: nil)
+        # 0 or a negative would build "bytes=0--1", which a store may read as
+        # no range at all and answer with the whole object.
+        unless max_bytes.nil? || (max_bytes.is_a?(Integer) && max_bytes.positive?)
+          raise ArgumentError, "max_bytes must be a positive Integer, got #{max_bytes.inspect}"
+        end
+
+        opts = { bucket: bucket, key: full_key(key) }
+        opts[:range] = "bytes=0-#{max_bytes - 1}" if max_bytes
+        s3 = client
+        # The rescue names an SDK constant, so it wraps only what runs after
+        # the client (which loads the SDK) exists: an unconfigured app must
+        # raise NotConfigured from `bucket` above, not a NameError from here.
+        begin
+          s3.get_object(**opts).body.read
+        rescue Aws::S3::Errors::InvalidRange
+          raise unless max_bytes
+
+          "".b
+        end
       end
 
       # The PUBLIC URL of an object. On AWS (no endpoint) it is the bucket's
@@ -43,9 +67,20 @@ module Studio
         endpoint.nil? || !Studio.s3_public_url.to_s.empty?
       end
 
-      def signed_url(key:, expires_in: 3600)
+      # response_content_disposition and response_content_type are SIGNED into
+      # the URL and override the headers the object is served with. That is
+      # S3's documented behaviour and part of the S3 compatibility Cloudflare
+      # documents for R2. What the tests here prove is the SIGNING, against an
+      # R2-style endpoint; that R2 serves the overridden headers has not been
+      # verified against a live bucket. "inline" plus a content type the
+      # caller chose is how a private PDF or image is shown in the page
+      # without the stored content type deciding how the browser treats it.
+      def signed_url(key:, expires_in: 3600, response_content_disposition: nil, response_content_type: nil)
         require "aws-sdk-s3"
-        Aws::S3::Presigner.new(client: client).presigned_url(:get_object, bucket: bucket, key: full_key(key), expires_in: expires_in)
+        params = { bucket: bucket, key: full_key(key), expires_in: expires_in }
+        params[:response_content_disposition] = response_content_disposition if response_content_disposition
+        params[:response_content_type] = response_content_type if response_content_type
+        Aws::S3::Presigner.new(client: client).presigned_url(:get_object, **params)
       end
 
       def exists?(key:)

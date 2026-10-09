@@ -1,0 +1,12 @@
+<%# /admin/knowledge/:id/preview — the body the show page's turbo-frame loads.
+    The frame tag is written by hand so the view needs no Turbo helper. Opened
+    directly (a browser without Turbo follows the frame's own link here), it
+    is a small page of its own with a way back. %>
+<% unless request.headers["Turbo-Frame"].present? %>
+  <div class="mb-4 text-sm">
+    <%= link_to "← #{@doc.title}", admin_knowledge_doc_path(@doc) %>
+  </div>
+<% end %>
+<turbo-frame id="knowledge-preview">
+  <%= render "studio/knowledge_docs/preview", preview: @preview, doc: @doc %>
+</turbo-frame>
