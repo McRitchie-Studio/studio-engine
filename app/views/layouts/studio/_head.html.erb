@@ -3,7 +3,8 @@
     nil when the host sets no nonce generator, and then no attribute renders. %>
 <% studio_script_nonce = (content_security_policy_nonce if respond_to?(:content_security_policy_nonce)) %>
 <%# PRE-PAINT THEME. Inline: it adds `dark` before the first paint, which no
-    deferred module can do. The toggle lives in studio/alpine_stores. %>
+    deferred module can do. The toggle
+    lives in studio/alpine_stores. %>
 <%= tag.script(nonce: studio_script_nonce) do %>
   (function(){
     if (localStorage.getItem('theme') !== 'light') {
