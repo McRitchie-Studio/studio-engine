@@ -126,7 +126,7 @@ class DesignSystemModalsTurboRegistrationTest < ActiveSupport::TestCase
     {
       const stores = {};
       const doc = makeDocument([hostNode()]);
-      const win = { setTimeout };
+      const win = { setTimeout, addEventListener() {} };
       installModalHost(doc, win);
       assert(!stores.dsModals, 'FIRST-LOAD: dsModals must not exist before Alpine boots');
       win.Alpine = makeAlpine(stores, false);
@@ -144,7 +144,7 @@ class DesignSystemModalsTurboRegistrationTest < ActiveSupport::TestCase
     {
       const stores = {};
       const doc = makeDocument([]);
-      const win = { setTimeout, Alpine: makeAlpine(stores, true) };
+      const win = { setTimeout, addEventListener() {}, Alpine: makeAlpine(stores, true) };
       installModalHost(doc, win);
       doc.fire('alpine:init');
       assert(!stores.dsModals, 'TURBO: a page with no guide registers no dsModals');
@@ -165,7 +165,7 @@ class DesignSystemModalsTurboRegistrationTest < ActiveSupport::TestCase
     {
       const stores = {};
       const doc = makeDocument([hostNode()]);
-      installModalHost(doc, { setTimeout, Alpine: makeAlpine(stores, true) });
+      installModalHost(doc, { setTimeout, addEventListener() {}, Alpine: makeAlpine(stores, true) });
       assert(stores.dsModals, 'LATE-MODULE: dsModals registers at once when Alpine is already up');
     }
 

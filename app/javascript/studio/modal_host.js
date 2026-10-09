@@ -12,7 +12,8 @@
 //   data-modal-host-store-value="modals"     (the scoped host: its own name)
 //   data-modal-host-scoped-value="true"      (the scoped host only)
 //
-// and studio/controllers/modal_host_controller binds the element's lifetime.
+// and studio/controllers/modal_host_controller registers the host's store when
+// the element connects.
 //
 // WHEN A STORE REGISTERS, AND WHY NOT IN connect(). Alpine evaluates
 // $store.<name>.current() as it starts, which is BEFORE Stimulus connects any
@@ -538,9 +539,9 @@ export function registerHostsIn(root, env) {
   for (var i = 0; i < hosts.length; i++) registerModalStore(env.win.Alpine, hosts[i], env)
 }
 
-// The bfcache and Turbo snapshot cleanup: a modal left open does not reappear
-// on the next visit, but a dismissible: false card survives (see
-// closeAllDismissible). Bound per host by the controller.
+// The bfcache and Turbo snapshot cleanup for one store: a modal left open does
+// not reappear on the next visit, but a dismissible: false card survives (see
+// closeAllDismissible).
 export function clearStaleModals(win, name) {
   if (!win.Alpine || !win.Alpine.store) return
   var store = win.Alpine.store(name)
@@ -548,7 +549,19 @@ export function clearStaleModals(win, name) {
   else if (store && typeof store.closeAll === 'function') store.closeAll()
 }
 
-// Installs the globals and the three registration paths, once per document.
+// Sweeps the store of every host on the page, each store once.
+export function clearStaleModalsIn(doc, win) {
+  var hosts = hostsIn(doc)
+  var swept = []
+  for (var i = 0; i < hosts.length; i++) {
+    if (swept.indexOf(hosts[i].store) !== -1) continue
+    swept.push(hosts[i].store)
+    clearStaleModals(win, hosts[i].store)
+  }
+}
+
+// Installs the globals, the three registration paths and the stale-modal
+// sweep, once per document.
 var installedOn = new WeakSet()
 
 export function installModalHost(doc, win) {
@@ -565,6 +578,13 @@ export function installModalHost(doc, win) {
   doc.addEventListener('turbo:before-frame-render', function (event) {
     if (event.detail) registerHostsIn(event.detail.newFrame, env)
   })
+  // THE SWEEP IS BOUND HERE, the one place, and not by the controller: this
+  // module loads by its own tag, so the sweep survives a boot that fails to
+  // load, and one binding per document sweeps each store once per event.
+  win.addEventListener('pageshow', function (event) {
+    if (event.persisted) clearStaleModalsIn(doc, win)
+  })
+  doc.addEventListener('turbo:before-cache', function () { clearStaleModalsIn(doc, win) })
   // Alpine already running (a host that loads it ahead of the module tags).
   if (win.Alpine && win.Alpine.version) registerHostsIn(doc, env)
 }

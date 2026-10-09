@@ -59,7 +59,16 @@ const fakeAlpine = () => {
   }
 }
 
-const fakeWindow = (extra = {}) => ({ setTimeout: (fn, ms) => setTimeout(fn, ms), ...extra })
+const fakeWindow = (extra = {}) => {
+  const listeners = {}
+  return {
+    listeners,
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    addEventListener(name, fn) { (listeners[name] = listeners[name] || []).push(fn) },
+    fire(name, event = {}) { (listeners[name] || []).forEach((fn) => fn(event)) },
+    ...extra
+  }
+}
 
 const sharedStore = (win = fakeWindow()) => {
   const doc = fakeDocument()
@@ -510,4 +519,107 @@ test("clearStaleModals sweeps the named store, and tolerates a missing one", () 
   assert.equal(Alpine.stores.modals.stack.length, 0)
   assert.doesNotThrow(() => clearStaleModals({ Alpine }, "missing"))
   assert.doesNotThrow(() => clearStaleModals({}, "modals"))
+})
+
+// ---- the stale-modal sweep -------------------------------------------------
+
+// A page with one shared and one scoped host, installed and past alpine:init.
+const installedPage = () => {
+  const doc = fakeDocument()
+  const Alpine = fakeAlpine()
+  const win = fakeWindow({ Alpine })
+  doc.querySelectorAll = () => [
+    hostElement({ "data-modal-host-store-value": "modals" }),
+    hostElement({ "data-modal-host-store-value": "pageModals", "data-modal-host-scoped-value": "true" })
+  ]
+  installModalHost(doc, win)
+  doc.fire("alpine:init")
+  return { doc, win, Alpine }
+}
+
+// Counts a store's sweeps, whichever method the sweep calls.
+const countSweeps = (store) => {
+  const counter = { count: 0 }
+  for (const method of ["closeAllDismissible", "closeAll"]) {
+    if (typeof store[method] !== "function") continue
+    const original = store[method]
+    store[method] = function (...args) { counter.count += 1; return original.apply(this, args) }
+  }
+  return counter
+}
+
+test("install closes a stale modal on a bfcache pageshow, with no controller", () => {
+  const { win, Alpine } = installedPage()
+  Alpine.stores.modals.open("celebrate")
+  Alpine.stores.modals.open("pending-tx", { dismissible: false })
+  Alpine.stores.pageModals.open("birthday")
+
+  win.fire("pageshow", { persisted: false })
+  assert.equal(Alpine.stores.modals.stack.length, 2, "a fresh load sweeps nothing")
+
+  win.fire("pageshow", { persisted: true })
+  assert.deepEqual(Alpine.stores.modals.stack.map((e) => e.id), ["pending-tx"], "a dismissible: false card survives")
+  assert.equal(Alpine.stores.pageModals.current(), null, "the scoped host is swept too")
+})
+
+test("install closes a stale modal before a Turbo snapshot, with no controller", () => {
+  const { doc, Alpine } = installedPage()
+  Alpine.stores.modals.open("celebrate")
+  Alpine.stores.pageModals.open("birthday")
+
+  doc.fire("turbo:before-cache")
+  assert.equal(Alpine.stores.modals.stack.length, 0)
+  assert.equal(Alpine.stores.pageModals.current(), null)
+})
+
+test("the sweep covers the hosts on the page, and each store once", () => {
+  const { doc, win, Alpine } = installedPage()
+  // A store whose host has left the page is not this page's to sweep.
+  registerModalStore(Alpine, { store: "goneModals", scoped: true }, { doc, win })
+  Alpine.stores.goneModals.open("birthday")
+  // A host rendered twice shares one store.
+  const twice = hostElement({ "data-modal-host-store-value": "modals" })
+  doc.querySelectorAll = () => [twice, twice]
+  const sweeps = countSweeps(Alpine.stores.modals)
+
+  doc.fire("turbo:before-cache")
+  assert.equal(sweeps.count, 1)
+  assert.notEqual(Alpine.stores.goneModals.current(), null)
+})
+
+// The controller as the browser runs it: its two imports resolved to a stub
+// Stimulus and to the module instance under test.
+const loadController = async () => {
+  const path = new URL("../../app/javascript/studio/controllers/modal_host_controller.js", import.meta.url)
+  const stimulus = `data:text/javascript,${encodeURIComponent("export class Controller {}")}`
+  const controllerSource = readFileSync(path, "utf8")
+    .replace('from "@hotwired/stimulus"', `from ${JSON.stringify(stimulus)}`)
+    .replace('from "studio/modal_host"', `from ${JSON.stringify(`data:text/javascript,${encodeURIComponent(source)}`)}`)
+  assert.doesNotMatch(controllerSource, /from "(@hotwired|studio)\//, "both imports were resolved")
+  return (await import(`data:text/javascript,${encodeURIComponent(controllerSource)}`)).default
+}
+
+test("with the controller connected too, each event sweeps a store once, not twice", async () => {
+  const ModalHostController = await loadController()
+  const { doc, win, Alpine } = installedPage()
+  const sweeps = countSweeps(Alpine.stores.modals)
+  const controller = Object.assign(new ModalHostController(), { storeValue: "modals", scopedValue: false })
+
+  globalThis.window = win
+  globalThis.document = doc
+  try {
+    controller.connect()
+    Alpine.stores.modals.open("celebrate")
+    win.fire("pageshow", { persisted: true })
+    assert.equal(sweeps.count, 1, "one sweep on a bfcache pageshow")
+    assert.equal(Alpine.stores.modals.stack.length, 0)
+
+    Alpine.stores.modals.open("celebrate")
+    doc.fire("turbo:before-cache")
+    assert.equal(sweeps.count, 2, "one sweep before a Turbo snapshot")
+    assert.equal(Alpine.stores.modals.stack.length, 0)
+  } finally {
+    delete globalThis.window
+    delete globalThis.document
+  }
 })

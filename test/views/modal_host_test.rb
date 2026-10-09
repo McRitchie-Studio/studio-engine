@@ -225,11 +225,13 @@ class ModalHostTest < Minitest::Test
   end
 
   def test_bfcache_and_turbo_cleanup_registered
-    controller = File.read(File.expand_path("../../app/javascript/studio/controllers/modal_host_controller.js", __dir__))
+    js = File.expand_path("../../app/javascript/studio", __dir__)
+    host = File.read(File.join(js, "modal_host.js"))
+    controller = File.read(File.join(js, "controllers/modal_host_controller.js"))
 
-    assert_includes controller, 'window.addEventListener("pageshow"'
-    assert_includes controller, 'document.addEventListener("turbo:before-cache"'
-    assert_includes controller, 'document.removeEventListener("turbo:before-cache"', "and unbinds on disconnect"
+    assert_includes host, "win.addEventListener('pageshow'"
+    assert_includes host, "doc.addEventListener('turbo:before-cache'"
+    refute_match(/addEventListener/, controller, "the module owns the sweep; a second binding sweeps twice")
   end
 
   # --- structure --------------------------------------------------------

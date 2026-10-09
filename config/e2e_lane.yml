@@ -952,7 +952,11 @@
 # fifth: with the post's answer held seven seconds, the module's own timer
 # shows the fallback button at four.
 #   npx playwright test --list  -> 318 tests in 44 files
-total_specs: 318
+# 318 -> 320: e2e/modal_sweep_survives_boot_failure.spec.js, 2 tests. With
+# studio/application aborted, a modal left open is closed after a Turbo visit
+# and Back; with the boot loaded, the visit sweeps the store once.
+#   npx playwright test --list  -> 320 tests in 45 files
+total_specs: 320
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1128,7 +1132,11 @@ total_specs: 318
 #   npx playwright test --list                                             -> 318 tests, 44 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 318
-executed: 318
+# And for the stale-modal sweep: 2 more tests, 1 new file:
+#   npx playwright test --list                                             -> 320 tests, 45 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 320
+executed: 320
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
