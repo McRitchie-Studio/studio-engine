@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs"
 const source = readFileSync(new URL("../../app/javascript/studio/theme_editor.js", import.meta.url), "utf8")
 const {
   ROLES, normalizeHex, lightenColor, seededColors, previewProperties, stylePreviewProperties,
-  formRequest, themeEditor, dsThemeEditor
+  formRequest, saved, themeEditor, dsThemeEditor
 } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 // The root's inline style, as the factories write it.
@@ -131,6 +131,14 @@ test("formRequest sends the form's real method and drops the _method override", 
   assert.equal(request.body.get("theme[primary]"), "#111111")
 
   assert.equal(formRequest(new Map([["x", "1"]])).method, "POST")
+  assert.equal(request.redirect, "manual")
+})
+
+test("saved: a 2xx or the server's own redirect; a 422 and a network-level failure are not", () => {
+  assert.equal(saved({ ok: true, status: 200, type: "basic" }), true)
+  assert.equal(saved({ ok: false, status: 0, type: "opaqueredirect" }), true)
+  assert.equal(saved({ ok: false, status: 422, type: "basic" }), false)
+  assert.equal(saved({ ok: false, status: 500, type: "basic" }), false)
 })
 
 // One save through persist(), with fetch answering `response` or rejecting.
@@ -163,6 +171,19 @@ test("dsThemeEditor: a save fetches once, in place, and toasts the outcome", asy
   assert.equal(calls[0].options.method, "PATCH")
   assert.equal(editor.saving, false)
   assert.deepEqual(toasts.map((t) => [t.type, t.detail.type, t.detail.title]), [["toast", "notice", "Theme saved"]])
+})
+
+// THE DEFECT THIS PINS. The controller answers a save with a 302 to
+// /admin/theme. A fetch that follows a 302 keeps a PATCH a PATCH, so it sent
+// the save again, and again, until the browser gave up at twenty redirects and
+// the editor toasted "Save failed" over a theme it had saved twenty-one times.
+// So the redirect is not followed: it is the server's own word that it saved.
+test("dsThemeEditor: the server's redirect is the success, and it is not followed", async () => {
+  const { toasts, calls } = await save({ ok: false, status: 0, type: "opaqueredirect" })
+
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].options.redirect, "manual", "a followed 302 re-sends the PATCH")
+  assert.deepEqual(toasts.map((t) => [t.detail.type, t.detail.title]), [["notice", "Theme saved"]])
 })
 
 test("dsThemeEditor: an HTTP error and a network failure both toast a failure and release the button", async () => {

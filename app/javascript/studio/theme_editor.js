@@ -136,10 +136,21 @@ export function themeEditor(seed) {
 // The method a form really sends, and its body without Rails' _method override.
 // The editor's form carries _method=patch, and sending the real method means
 // nothing depends on Rack::MethodOverride parsing a multipart fetch body.
+//
+// THE REDIRECT IS NOT FOLLOWED. The controller answers a save with a 302 back
+// to /admin/theme, and a fetch that follows a 302 keeps a PATCH a PATCH: it
+// would send the save again on every hop until the browser gave up.
 export function formRequest(data) {
   const override = data.get("_method")
   if (override) data.delete("_method")
-  return { method: override ? String(override).toUpperCase() : "POST", body: data }
+  return { method: override ? String(override).toUpperCase() : "POST", body: data, redirect: "manual" }
+}
+
+// Whether the server took the save: a 2xx, or its own redirect (which a fetch
+// told not to follow reports as an opaque redirect). A failed save is rendered
+// in place with a 422.
+export function saved(response) {
+  return response.ok || response.type === "opaqueredirect"
 }
 
 // x-data="dsThemeEditor({...})": style/_theme.
@@ -168,7 +179,7 @@ export function dsThemeEditor(seed) {
       const request = formRequest(new FormData(form))
       fetch(form.action, request)
         .then((res) => {
-          if (!res.ok) throw new Error("HTTP " + res.status)
+          if (!saved(res)) throw new Error("HTTP " + res.status)
           return res
         })
         .then(() => { this.toast("notice", label, "Saved in place — the page stayed put.") })
