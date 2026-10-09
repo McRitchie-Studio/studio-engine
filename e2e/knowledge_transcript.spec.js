@@ -107,12 +107,21 @@ test("the cue being spoken is followed inside the cue list, never by scrolling t
   expect(sizes.all, "the cue list does not overflow, so there is nothing to follow").toBeGreaterThan(sizes.view * 2);
   expect(await insideList(cueAt(page, "1:40"))).toBe(false);
 
-  // The player's own seek bar, which is not a click on any cue.
+  // The player's own seek bar, which is not a click on any cue. The page CAN
+  // scroll (the lab puts a screen and a half below the frame), so a page that
+  // stays put was left alone, not stuck.
+  // It is left part-way down, with the cue list half off the top of the
+  // window, so centring a cue in the WINDOW would have to move it.
+  expect(await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeGreaterThan(400);
+  await page.evaluate(() => window.scrollTo(0, 200));
   const pageScroll = await page.evaluate(() => window.scrollY);
+  expect(pageScroll).toBe(200);
   await player(page).evaluate((el) => { el.currentTime = 100.5; });
   await expect(cueAt(page, "1:40")).toHaveClass(/knowledge-cue-current/);
   await expect.poll(() => insideList(cueAt(page, "1:40")), "the current cue was not brought into view").toBe(true);
   expect(await page.evaluate(() => window.scrollY), "following scrolled the page, not the list").toBe(pageScroll);
+
+  await page.evaluate(() => window.scrollTo(0, 0));
 
   // The reader scrolls the list back to the top. The next cue is marked, and the
   // list stays where they put it.
