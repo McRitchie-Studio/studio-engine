@@ -52,7 +52,7 @@
 </style>
 
 <div class="max-w-3xl mx-auto"
-  data-geo-page
+  data-geo-page data-studio-controller="geo-settings"
   data-geo-home="<%= home_country %>"
   data-geo-country="<%= geo_country %>"
   data-geo-subdivision="<%= geo_state %>"
@@ -263,102 +263,6 @@
     </div>
   <% end %>
 </div>
-
-<script>
-  // LIVE PREVIEW. Tick your own region and the navbar badge (and the Blocked?
-  // tile) answer immediately, before anything is saved — so an operator can see
-  // what a rule will do to a real visitor rather than saving to find out.
-  //
-  // This mirrors Studio::Geo.blocked? on the client, deliberately and narrowly:
-  // same three rules, same order, same fail-closed narrowing. It decides nothing
-  // — the server re-decides on save and on every request afterwards — but a
-  // mirror can still drift, so turf-monster's browser lane asserts the painted
-  // result against a policy the server also enforces.
-  (function () {
-    var page = document.querySelector("[data-geo-page]");
-    if (!page) return;
-
-    var home = page.dataset.geoHome;
-    var country = page.dataset.geoCountry;
-    var subdivision = page.dataset.geoSubdivision;
-    var failClosed = page.dataset.geoFailClosed === "true";
-    var enabledBox = page.querySelector('input[type="checkbox"][name="geo_setting[enabled]"]');
-
-    function checkedValues(selector) {
-      return Array.prototype.map.call(page.querySelectorAll(selector + ":checked"), function (el) {
-        return el.value;
-      });
-    }
-
-    function blocked() {
-      if (!enabledBox || !enabledBox.checked) return false;
-
-      var countries = checkedValues('input[name="geo_setting[banned_countries][]"]');
-      if (country && countries.indexOf(country) !== -1) return true;
-
-      var subdivisions = checkedValues('input[name="geo_setting[banned_subdivisions][]"]');
-      if (subdivision && country === home && subdivisions.indexOf(subdivision) !== -1) return true;
-
-      // Fail closed, narrowed exactly as the server narrows it: only a
-      // home-country visitor with NO region, and only when region rules exist.
-      if (!failClosed) return false;
-      if (subdivision) return false;
-      if (country !== home) return false;
-      return subdivisions.length > 0;
-    }
-
-    // The summary chips are rebuilt from the editor's own squares, so they
-    // describe the policy you are ABOUT to save rather than the one on disk —
-    // and they are built from the square's own flag, so there is no second copy
-    // of the artwork to keep in step.
-    function refreshSummary(kind, selector) {
-      var row = page.querySelector('[data-geo-summary="' + kind + '"]');
-      var counts = page.querySelectorAll('[data-geo-summary-count="' + kind + '"]');
-      if (!row) return;
-
-      Array.prototype.forEach.call(row.querySelectorAll(".geo-chip"), function (chip) {
-        chip.remove();
-      });
-
-      var boxes = Array.prototype.filter.call(page.querySelectorAll(selector), function (box) {
-        return box.checked;
-      });
-      boxes.sort(function (a, b) { return a.value.localeCompare(b.value); });
-
-      boxes.forEach(function (box) {
-        var square = box.closest("label");
-        var chip = document.createElement("span");
-        chip.className = "geo-chip inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-mono";
-        var art = square && square.querySelector("img, span[role='img']");
-        if (art) chip.appendChild(art.cloneNode(true));
-        chip.appendChild(document.createTextNode(box.value));
-        row.insertBefore(chip, row.querySelector(".geo-summary-empty"));
-      });
-
-      // The tab label and the summary heading carry the same number; a page that
-      // showed two different counts for one list would be its own bug report.
-      Array.prototype.forEach.call(counts, function (el) { el.textContent = boxes.length; });
-    }
-
-    function paint() {
-      refreshSummary("states", 'input[name="geo_setting[banned_subdivisions][]"]');
-      refreshSummary("countries", 'input[name="geo_setting[banned_countries][]"]');
-
-      var value = blocked() ? "blocked" : "allowed";
-      document.documentElement.setAttribute("data-geo-preview", value);
-      Array.prototype.forEach.call(document.querySelectorAll("[data-geo-badge]"), function (badge) {
-        // Only the badge showing THIS visitor's location previews; a specimen
-        // badge rendered with other locals keeps whatever it was given.
-        if (badge.dataset.country === country && (badge.dataset.subdivision || "") === (subdivision || "")) {
-          badge.setAttribute("data-blocked", blocked() ? "true" : "false");
-        }
-      });
-    }
-
-    page.addEventListener("change", paint);
-    paint();
-  })();
-</script>
 
 <style>
   /* The verdict tile follows the same one attribute the badge does. */

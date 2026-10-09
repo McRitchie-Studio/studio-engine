@@ -88,6 +88,9 @@
           <%= render "studio/profiles/birthday_fields", user: @user %>
         </section>
       </div>
+
+      <%# The form's plain Save, as edit.html.erb renders it inside its form. %>
+      <%= render "studio/profiles/plain_save" %>
     </form>
 
     <%# Runway. 300vh rather than 120vh because the observer hands the header over

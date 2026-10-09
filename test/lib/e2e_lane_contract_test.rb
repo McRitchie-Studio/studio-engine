@@ -275,7 +275,8 @@ class E2eLaneContractTest < Minitest::Test
       # test.
       "profile_edit.html.erb" => [
         "studio/cropper_assets", "studio/profiles/editable_identity",
-        "studio/profiles/birthday_fields", "studio/profiles/name_fields"
+        "studio/profiles/birthday_fields", "studio/profiles/name_fields",
+        "studio/profiles/plain_save"
       ],
       # THE SHARED HOST IS NAMED HERE FOR A REASON THAT IS EASY TO DELETE BY
       # ACCIDENT. window.ModalAnimations — the registry the guide's simulator

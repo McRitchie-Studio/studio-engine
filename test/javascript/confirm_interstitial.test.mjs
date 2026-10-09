@@ -6,7 +6,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/confirm_interstitial.js", import.meta.url), "utf8")
-const { FORM_ID, autoSubmit } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+const { FORM_ID, FALLBACK_ID, SHOWN_CLASS, FALLBACK_AFTER_MS, autoSubmit, revealFallbackLater } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 const fakeForm = (extra = {}) => ({
   dataset: {},
@@ -45,4 +45,24 @@ test("a browser with no requestSubmit falls back to submit", () => {
 
 test("a page with no form does nothing", () => {
   assert.equal(autoSubmit(null), false)
+})
+
+test("the fallback is shown by a timer four seconds in, as well as by the page's CSS", () => {
+  const classes = new Set()
+  const fallback = { classList: { add: (name) => classes.add(name) } }
+  const timers = []
+  revealFallbackLater(fallback, (fn, ms) => { timers.push({ fn, ms }); return 7 })
+
+  assert.equal(FALLBACK_ID, "magic-fallback")
+  assert.deepEqual(timers.map((timer) => timer.ms), [FALLBACK_AFTER_MS])
+  assert.equal(FALLBACK_AFTER_MS, 4000)
+  assert.equal(classes.size, 0, "nothing shows before the timer")
+  timers[0].fn()
+  assert.deepEqual([...classes], [SHOWN_CLASS])
+})
+
+test("a page with no fallback block sets no timer", () => {
+  const timers = []
+  assert.equal(revealFallbackLater(null, (fn, ms) => timers.push(ms)), null)
+  assert.deepEqual(timers, [])
 })

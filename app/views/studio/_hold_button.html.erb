@@ -5,8 +5,11 @@
   Ported from turf-monster, where it confirms a contest entry.
 
   The behaviour is studio/hold_button, on the hold-button controller
-  (studio/controllers/hold_button_controller), which arrives with the page. A page answers a hold
-  through the events the button dispatches, which bubble:
+  (studio/controllers/hold_button_controller), which arrives with the page. When
+  it does not (a module request failed at page load), the guard in the head
+  (studio/_hold_button_guard) marks the stack, and the button reads as
+  unavailable beside "This button could not load. Reload the page." A page
+  answers a hold through the events the button dispatches, which bubble:
 
     hold-button:guard     at the press; preventDefault() refuses the hold
     hold-button:start     the hold began
@@ -148,5 +151,10 @@
     <span class="countdown-num"></span>
   </div>
 </button>
+  <%# Empty, and out of the layout, on a button that works. The guard
+      (studio/_hold_button_guard) fills it when the controller never connects,
+      and a live region has to be on the page before its text arrives to be
+      announced. %>
+  <span class="hold-notice" role="status"></span>
 </span>
 

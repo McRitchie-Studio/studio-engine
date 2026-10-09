@@ -25,6 +25,8 @@ import {
 } from "studio/head_chrome"
 import { studioBoard, loadSortable, sortableShim } from "studio/board"
 import { levelingActionModal } from "studio/leveling_activity"
+import { themeEditor, dsThemeEditor } from "studio/theme_editor"
+import { emailBannerEditor, emailRecipients } from "studio/email_banner"
 
 // x-data="navCollapse()": the hub's own header. A host that defines its own
 // window.navCollapse (turf-monster does, inline, before this runs) keeps it.
@@ -58,5 +60,13 @@ export function installAlpineShims() {
   // it. SortableJS replaces this object when it arrives; a page that loads its
   // own copy (turf-monster's slate page) replaces it the same way.
   if (!window.Sortable) window.Sortable = sortableShim(() => loadSortable())
+  // x-data="themeEditor({...})" (theme_settings/edit) and
+  // x-data="dsThemeEditor({...})" (style/_theme). Alpine passes the seed alone.
+  if (!window.themeEditor) window.themeEditor = (seed) => themeEditor(seed)
+  if (!window.dsThemeEditor) window.dsThemeEditor = (seed) => dsThemeEditor(seed)
+  // x-data="emailBannerEditor({...})" (studio/emails/show) and
+  // x-data="emailRecipients({...})" (studio/emails/index).
+  if (!window.emailBannerEditor) window.emailBannerEditor = (config) => emailBannerEditor(config)
+  if (!window.emailRecipients) window.emailRecipients = (config) => emailRecipients(config)
   installSpinnerReset()
 }

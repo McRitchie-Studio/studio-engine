@@ -196,6 +196,27 @@ What a factory needs later (Cropper.js, SortableJS) may arrive late, and the
 page says so when it never does: a control never takes a press that does
 nothing.
 
+A static module can fail too, and a browser keeps that failure for the life of
+the document: one failed request among `studio/alpine_scopes` and the four
+modules it imports leaves every factory it publishes undefined. The head
+therefore carries a second nonced inline guard beside the hold button's,
+`studio/_alpine_scopes_guard`, which imports nothing. Once the page's boot is
+over it marks each element whose `x-data` names a missing factory
+(`data-studio-scope-failed`), puts "This did not load. Reload the page." first
+inside it as a `role="status"` line, shows every `[data-studio-scope-fallback]`
+inside it (the profile form's plain Save) and puts the server's values back in
+the text fields Alpine emptied, so a form is never left with no way to submit.
+A factory added to `studio/alpine_scopes` is added to the guard's list;
+`test/javascript/alpine_scopes_guard.test.mjs` holds the two to each other.
+
+**The hold button says so when it cannot work.** It is imported statically, so
+the one way it fails is a module request that fails as the page loads. The head
+carries an inline, nonced guard (`studio/_hold_button_guard`) that imports
+nothing: a `.hold-stack` whose controller has not written
+`data-hold-button-connected` once the boot is over is marked
+`data-studio-controller-failed="hold-button"`, reads as unavailable, and shows
+"This button could not load. Reload the page." A late connect clears it.
+
 Alpine loads after the module tags. Deferred classic scripts and module scripts
 run in document order, so by the time Alpine starts, the boot has installed the
 Alpine shims (`studio/alpine_shims`): the `window.*` globals and Alpine stores
@@ -241,11 +262,10 @@ import nothing.
 sites use the events. The string locals are evaluated by
 `studio/hold_button_hooks` and stay while a consumer passes them.
 
-**Today.** The engine still ships some behaviour as scripts inside partials
-(the modal blocks, the profile pages, the admin pages). The hold button still
-accepts `guard:`, `on_success:` and `validate:` as JavaScript strings. The
-shared head carries one inline script,
-the nonced pre-paint theme; its behaviour is the modules above. The engine
+**Today.** The hold button still accepts `guard:`, `on_success:` and
+`validate:` as JavaScript strings. The shared head carries three inline
+scripts, all nonced: the pre-paint theme, the hold button's guard and the
+x-data factories' guard; its behaviour is the modules above. The engine
 vendors Alpine and loads it with `javascript_include_tag`. Every app pins its
 modules with importmap.
 Cyvasse and Industries pin Stimulus; the hub has `stimulus-rails` in its
@@ -257,7 +277,10 @@ Stimulus.
 **From script to module.** Move the pure logic into a module first and pin
 it with tests (the behaviour does not change). Then write the controller that
 calls it, swap the markup to `data-controller` (`data-studio-controller` in the
-engine), and delete the script tag.
+engine), and delete the script tag. In the engine,
+`test/views/no_inline_script_test.rb` lists every view that still carries an
+inline script, each beside the task that owns it; delete the view's line with
+its script.
 
 ## Styling
 

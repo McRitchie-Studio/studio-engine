@@ -905,7 +905,25 @@
 # AA contrast in both themes while its cards stay readable and its chrome still
 # answers; a board that loads shows no notice.
 #   npx playwright test --list  -> 259 tests in 37 files
-# 259 -> 277: four files, 18 tests, for the modal blocks and profile scripts that
+# 259 -> 261: e2e/lazy_page_controllers.spec.js, 2 tests. The page-specific
+# controllers that carry the admin pages, the email banner scale, booking, the
+# footer map and the survey stepper are each fetched by the page that names
+# them and by no page that names none; and one whose module request is aborted
+# leaves its element marked with data-studio-controller-failed, reports once,
+# leaves the page's own form working, and recovers on a reload.
+#   npx playwright test --list  -> 261 tests in 38 files
+# 261 -> 276: e2e/hold_button_guard.spec.js, 15 tests. The hold button's guard
+# (studio/_hold_button_guard) says so when a button cannot work. Ten make one
+# of the button's five modules fail for real AS THE PAGE LOADS (each aborted,
+# and each answered 404): the button is marked and reads its notice at AA in
+# both themes, a full hold sends and dispatches nothing, a press is answered, a
+# button an x-if inserts later is marked too, and a reload recovers. Five hold
+# the other side: a healthy cold load and a boot whose modules arrive two
+# seconds late are never marked, a later button on a healthy page takes its
+# first press, a controller that connects after the grace clears the mark, and
+# a Turbo visit onto a button after a failure marks it.
+#   npx playwright test --list  -> 276 tests in 39 files
+# 276 -> 294: four files, 18 tests, for the modal blocks and profile scripts that
 # moved to modules.
 # e2e/confirm_interstitial.spec.js, 4: the sign-in page posts its own form once;
 # with its module's request aborted, and answered 404, the fallback button shows
@@ -920,8 +938,21 @@
 # e2e/scopes_survive_boot_failure.spec.js, 4: with studio/application aborted,
 # every x-data factory is still on the page, the profile form saves and
 # discards, the birthday row works and the birthday gate submits.
-#   npx playwright test --list  -> 277 tests in 41 files
-total_specs: 277
+#   npx playwright test --list  -> 294 tests in 43 files
+# 294 -> 318: e2e/alpine_scopes_guard.spec.js, 23 tests, and one more in
+# e2e/confirm_interstitial.spec.js. The x-data factories' guard
+# (studio/_alpine_scopes_guard) says so when a page's factories did not load.
+# Twenty make one of the five modules behind them fail for real AS THE PAGE
+# LOADS (each aborted, and each answered 404): on the profile edit page every
+# scope reads its notice at AA in both themes, the form's plain Save shows and
+# sends the server's values, and a reload recovers; on the birthday gate's page
+# the card a modal mounts later says so as it arrives. Three hold the other
+# side: a healthy profile page and a healthy birthday card are never marked,
+# and nor is a boot whose modules arrive two seconds late. The interstitial's
+# fifth: with the post's answer held seven seconds, the module's own timer
+# shows the fallback button at four.
+#   npx playwright test --list  -> 318 tests in 44 files
+total_specs: 318
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1077,11 +1108,27 @@ total_specs: 277
 # executed = total - devnet - allowed_skips = 250 - 0 - 0 = 250, so executed ==
 # total_specs and the equality assertion holds.
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 259
-# And for the modal blocks and profile scripts, 18 more tests in four new files:
-#   npx playwright test --list                                             -> 277 tests, 41 files
+# And again for the lazily registered page controllers: 2 more tests, 1 new file:
+#   npx playwright test --list                                             -> 261 tests, 38 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
-#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 277
-executed: 277
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 261
+# executed = total - devnet - allowed_skips = 261 - 0 - 0 = 261, so executed ==
+# total_specs and the equality assertion holds.
+# And again for the hold button's guard: 15 more tests, 1 new file:
+#   npx playwright test --list                                             -> 276 tests, 39 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 276
+# executed = total - devnet - allowed_skips = 276 - 0 - 0 = 276, so executed ==
+# total_specs and the equality assertion holds.
+# And for the modal blocks and profile scripts, 18 more tests in four new files:
+#   npx playwright test --list                                             -> 294 tests, 43 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 294
+# And for the x-data factories' guard: 24 more tests, 1 new file:
+#   npx playwright test --list                                             -> 318 tests, 44 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 318
+executed: 318
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

@@ -179,11 +179,18 @@ class ButtonFillContrastTest < ActiveSupport::TestCase
 
   # Both live theme editors must set the -fill vars they preview, or a typed
   # warning/danger colour leaves btn-warning/btn-danger on the default fill.
+  # Both are factories in studio/theme_editor, each with its own list of the
+  # properties it writes; test/javascript/theme_editor.test.mjs runs them.
   test "both theme editor previews set the warning and danger fill vars" do
-    %w[app/views/style/_theme.html.erb app/views/theme_settings/edit.html.erb].each do |view|
-      source = File.read(File.join(ROOT, view))
-      assert_match(/--color-warning-fill|--color-\$\{role\}-fill/, source, "#{view} previews no warning fill")
-      assert_match(/--color-danger-fill|--color-\$\{role\}-fill/, source, "#{view} previews no danger fill")
-    end
+    source = File.read(File.join(ROOT, "app/javascript/studio/theme_editor.js"))
+    standalone = source[/^export function previewProperties\(colors\) \{.*?^\}/m]
+    style_guide = source[/^export function stylePreviewProperties\(colors\) \{.*?^\}/m]
+
+    refute_nil standalone, "studio/theme_editor exports no previewProperties"
+    refute_nil style_guide, "studio/theme_editor exports no stylePreviewProperties"
+    assert_match(/for \(const role of \["warning", "danger"\]\).*?--color-\$\{role\}-fill/m, standalone,
+                 "the standalone editor previews no warning or danger fill")
+    assert_includes style_guide, "--color-warning-fill", "the style guide's editor previews no warning fill"
+    assert_includes style_guide, "--color-danger-fill", "the style guide's editor previews no danger fill"
   end
 end

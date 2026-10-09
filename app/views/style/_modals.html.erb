@@ -208,7 +208,8 @@
          role="dialog" aria-modal="true"
          @keydown.escape.window="$store.dsModals.current() && $store.dsModals.current().props.dismissible !== false && $store.dsModals.close()"
          @click.self="$store.dsModals.current() && $store.dsModals.current().props.dismissible !== false && $store.dsModals.close()">
-      <div class="bg-surface rounded-xl border border-subtle shadow-2xl p-6 max-w-sm w-full"
+      <%# No max-w-* here: cardClasses() names exactly one, by modal id. %>
+      <div class="bg-surface rounded-xl border border-subtle shadow-2xl p-6 w-full"
            :class="$store.dsModals.cardClasses()">
 
         <%# --- Auth fragments --- %>

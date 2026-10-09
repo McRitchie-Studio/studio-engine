@@ -17,8 +17,16 @@ import { holdHooks } from "studio/hold_button_hooks"
 
 const NUDGES = ["hold-nudge", "hold-nudge-soft"]
 
+// What a connected stack carries. The guard in the head
+// (studio/_hold_button_guard) marks a stack that never gets it as unavailable,
+// and takes that mark back here when the controller connects late.
+const CONNECTED = "data-hold-button-connected"
+
 export default class extends Controller {
   connect() {
+    this.element.setAttribute(CONNECTED, "")
+    if (window.studioHoldButtonGuard) window.studioHoldButtonGuard.clear(this.element)
+
     this.button = this.element.querySelector(":scope > .hold-btn")
     if (!this.button) return
 
@@ -32,6 +40,7 @@ export default class extends Controller {
   }
 
   disconnect() {
+    this.element.removeAttribute(CONNECTED)
     if (!this.hold) return
     this.hold.stop()
     this.hold = null

@@ -930,7 +930,7 @@ class StylePageTest < ActiveSupport::TestCase
       "Save is intercepted in place"
     assert_includes html, "regenerate($event)",
       "Regenerate is intercepted in place"
-    assert_includes html, "fetch(form.action",
+    assert_includes File.read(File.expand_path("../../app/javascript/studio/theme_editor.js", __dir__)), "fetch(form.action",
       "the section submits via fetch and stays put"
   end
 

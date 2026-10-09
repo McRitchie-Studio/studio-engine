@@ -72,10 +72,11 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
                     studio/controllers/hold_button_controller studio/controllers/identity_mini_controller
                     studio/controllers/link_sidebar_controller
                     studio/controllers/modal_host_controller studio/controllers/nav_collapse_controller
-                    studio/controllers/toast_controller studio/cropper studio/head_chrome studio/hold_button
-                    studio/hold_button_hooks studio/identity_mini studio/image_upload
+                    studio/controllers/toast_controller studio/cropper studio/email_banner studio/head_chrome
+                    studio/hold_button studio/hold_button_hooks studio/identity_mini studio/image_upload
                     studio/lazy_controllers studio/leveling_activity studio/link_sidebar studio/modal_host
-                    studio/nav_collapse studio/pinned_stack studio/profile_form studio/stimulus studio/toast], boot_graph
+                    studio/nav_collapse studio/pinned_stack studio/profile_form studio/stimulus
+                    studio/theme_editor studio/toast], boot_graph
     refute_includes boot_graph, "studio/local_path", "a module nothing in the boot imports is not preloaded"
     refute_includes boot_graph, "studio/controllers/board_controller",
                     "the board controller is registered lazily, so it is not preloaded on every page"

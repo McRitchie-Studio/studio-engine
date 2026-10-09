@@ -1,9 +1,9 @@
-<%# The request's CSP nonce, for the one inline script left in this head and
+<%# The request's CSP nonce, for the three inline scripts left in this head and
     for javascript_import_module_tag below (importmap-rails nonces its own tags).
     nil when the host sets no nonce generator, and then no attribute renders. %>
 <% studio_script_nonce = (content_security_policy_nonce if respond_to?(:content_security_policy_nonce)) %>
-<%# PRE-PAINT THEME. Inline, and the only inline script this head keeps: it adds
-    `dark` before the first paint, which no deferred module can do. The toggle
+<%# PRE-PAINT THEME. Inline: it adds `dark` before the first paint, which no
+    deferred module can do. The toggle
     lives in studio/alpine_stores. %>
 <%= tag.script(nonce: studio_script_nonce) do %>
   (function(){
@@ -12,6 +12,14 @@
     }
   })();
 <% end %>
+<%# THE HOLD BUTTON'S GUARD. Inline, one of the two guards this head keeps:
+    it reports a hold button whose modules failed to load, so it can share no
+    request with them (studio/_hold_button_guard). %>
+<%= render "studio/hold_button_guard", nonce: studio_script_nonce %>
+<%# THE X-DATA FACTORIES' GUARD. Inline for the same reason: it reports a profile
+    form, a birthday card or an upload whose factory failed to load
+    (studio/_alpine_scopes_guard), and shows the form's plain Save. %>
+<%= render "studio/alpine_scopes_guard", nonce: studio_script_nonce %>
 
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <%# Studio.nav_spinner_min_ms, read by the nav spinner in studio/head_chrome. %>

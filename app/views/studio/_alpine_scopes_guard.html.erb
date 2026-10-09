@@ -1,0 +1,170 @@
+<%#
+  THE X-DATA FACTORIES' GUARD: says so when a page's factories did not load.
+
+  The photo crop, the upload hosts, the birthday card and row and the profile
+  form bind an x-data factory by name (cropPhotoModal, imageUploadHost,
+  avatarCropperHost, birthdayModal, studioBirthdayFields, studioProfileForm),
+  and all six are published by studio/alpine_scopes from four modules
+  (studio/cropper, studio/image_upload, studio/birthday, studio/profile_form).
+  A browser keeps a failed module request for the life of the document, so one
+  failure among the five at page load leaves every name undefined until a
+  reload: the profile page with no Save, the birthday card with nothing to
+  press. This script is what speaks then, so it is INLINE and imports nothing:
+  it shares no request with the modules whose failure it reports.
+
+  Once the page's boot is over, an element whose x-data names a factory that is
+  not on window is marked, and a line is put first inside it:
+
+    <div x-data="studioProfileForm({...})" data-studio-scope-failed="studioProfileForm">
+      <p class="studio-scope-notice" role="status">This did not load. Reload the page.</p>
+
+  engine-motion.css styles the line. A card a modal mounts later is marked when
+  it arrives. A factory that turns up afterwards takes the mark and the line
+  away again.
+
+  A FORM IS NOT LEFT WITH NO WAY TO SUBMIT. Inside a marked element:
+    - every [data-studio-scope-fallback] is shown (its x-cloak and hidden come
+      off): the profile form's plain Save button is one, so a person can still
+      save;
+    - a text field Alpine emptied goes back to the value the server rendered,
+      unless the person is in it, so that Save sends what was on file and not
+      blanks.
+  The birthday card has no plain path (its submit is a fetch the factory
+  makes), so its line is the whole of what it offers: reload.
+
+  WHEN THE BOOT IS OVER. The engine's modules are module scripts in the head,
+  so DOMContentLoaded waits for them, however slow, and each has run or failed
+  by then. The 1.5 s after it is margin for a host that defines a factory of
+  the same name from a script of its own, not a race the page has to win.
+
+  Locals:
+    nonce - the request's CSP nonce, or nil (layouts/studio/_head passes it)
+%>
+<%= tag.script(nonce: local_assigns[:nonce]) do %>
+  (function () {
+    if (window.studioScopesGuard) return;
+
+    var NAMES = ["cropPhotoModal", "imageUploadHost", "avatarCropperHost", "birthdayModal", "studioBirthdayFields", "studioProfileForm"];
+    var BOUND = "[x-data]";
+    var FAILED = "data-studio-scope-failed";
+    var FALLBACK = "data-studio-scope-fallback";
+    var NOTICE_CLASS = "studio-scope-notice";
+    var NOTICE = "This did not load. Reload the page.";
+    var CALL = /^\s*([A-Za-z_$][\w$]*)\s*\(/;
+    var GRACE_MS = 1500;
+    var SETTLE_MS = 250;
+
+    var deadline = null;
+    var reported = false;
+
+    // The factory an x-data expression calls, when it is one of ours.
+    function scopeName(expression) {
+      var match = CALL.exec(expression || "");
+      return match && NAMES.indexOf(match[1]) !== -1 ? match[1] : null;
+    }
+
+    // What to do with one element. `deadline` is null until the page's boot has
+    // an end, and nothing is marked before it.
+    function verdict(state) {
+      if (!state.name) return "leave";
+      if (state.defined) return state.marked ? "clear" : "leave";
+      if (state.marked) return "leave";
+      if (state.deadline == null || state.now < state.deadline) return "wait";
+      return "mark";
+    }
+
+    function notice(element) {
+      for (var i = 0; i < element.children.length; i++) {
+        if (element.children[i].classList.contains(NOTICE_CLASS)) return element.children[i];
+      }
+      return null;
+    }
+
+    function each(element, selector, visit) {
+      var found = element.querySelectorAll(selector);
+      for (var i = 0; i < found.length; i++) visit(found[i]);
+    }
+
+    function mark(element, name) {
+      element.setAttribute(FAILED, name);
+      if (!notice(element)) {
+        var line = document.createElement("p");
+        line.className = NOTICE_CLASS;
+        line.setAttribute("role", "status");
+        line.textContent = NOTICE;
+        element.insertBefore(line, element.firstChild);
+      }
+      each(element, "[" + FALLBACK + "]", function (fallback) {
+        fallback.removeAttribute("x-cloak");
+        fallback.hidden = false;
+        fallback.style.display = "";
+        fallback.setAttribute(FALLBACK, "shown");
+      });
+      each(element, "input, textarea", function (field) {
+        if (field === document.activeElement) return;
+        if (field.type === "file" || field.type === "password" || field.type === "hidden") return;
+        if (field.type === "checkbox" || field.type === "radio") return;
+        if (field.value === "" && field.defaultValue !== "") field.value = field.defaultValue;
+      });
+      if (!reported) {
+        reported = true;
+        console.error("[studio] the page's x-data factories failed to load and stay unavailable until the page is reloaded");
+      }
+    }
+
+    function clear(element) {
+      var line = notice(element);
+      element.removeAttribute(FAILED);
+      if (line) element.removeChild(line);
+      each(element, "[" + FALLBACK + '="shown"]', function (fallback) {
+        fallback.setAttribute(FALLBACK, "");
+        fallback.setAttribute("x-cloak", "");
+      });
+    }
+
+    function judge(element) {
+      var name = scopeName(element.getAttribute("x-data"));
+      var answer = verdict({
+        name: name,
+        defined: !!name && typeof window[name] === "function",
+        marked: element.hasAttribute(FAILED),
+        now: Date.now(),
+        deadline: deadline
+      });
+      if (answer === "mark") mark(element, name);
+      if (answer === "clear") clear(element);
+      return answer;
+    }
+
+    function sweep() {
+      var bound = document.querySelectorAll(BOUND);
+      for (var i = 0; i < bound.length; i++) judge(bound[i]);
+    }
+
+    function binds(node) {
+      return node.nodeType === 1 && (node.matches(BOUND) || node.querySelector(BOUND) !== null);
+    }
+
+    function booted() {
+      deadline = Date.now() + GRACE_MS;
+      setTimeout(sweep, GRACE_MS);
+      // Read off window under a local name: a host page that counts the
+      // observers its own inline scripts construct does not count this one.
+      var Observer = window.MutationObserver;
+      if (!Observer) return;
+      new Observer(function (records) {
+        for (var i = 0; i < records.length; i++) {
+          for (var j = 0; j < records[i].addedNodes.length; j++) {
+            if (binds(records[i].addedNodes[j])) return void setTimeout(sweep, SETTLE_MS);
+          }
+        }
+      }).observe(document.documentElement, { childList: true, subtree: true });
+    }
+
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", booted);
+    else booted();
+    document.addEventListener("turbo:load", function () { setTimeout(sweep, SETTLE_MS); });
+
+    window.studioScopesGuard = { names: NAMES, scopeName: scopeName, verdict: verdict, sweep: sweep, graceMs: GRACE_MS };
+  })();
+<% end %>

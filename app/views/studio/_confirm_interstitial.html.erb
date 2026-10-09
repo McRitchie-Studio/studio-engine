@@ -10,7 +10,7 @@
 
   Two ways through, and neither depends on the other: the page posts its own
   form (studio/confirm_interstitial), and the button below shows itself after
-  four seconds by CSS alone.
+  four seconds, by CSS alone and by the module's timer as well.
 %>
 <!DOCTYPE html>
 <html lang="en">
@@ -63,6 +63,15 @@
         animation: magic-fallback-in 1ms linear 4s forwards;
       }
 
+      /* The module's own timer, for an engine that holds the animation while
+         the post is pending. */
+      .magic-fallback.is-shown {
+        max-height: 20rem;
+        margin-top: 2rem;
+        visibility: visible;
+        animation: none;
+      }
+
       .magic-fallback p { margin: 0 0 1rem; font-size: 15px; }
 
       .magic-submit {
@@ -105,7 +114,6 @@
     <%# THE AUTO-POST is studio/confirm_interstitial, a module with no imports,
         loaded by its own tag: this document has no import map. The tag carries
         the request's CSP nonce when the host sets one. %>
-    <%= tag.script("".html_safe, type: "module", src: asset_path("studio/confirm_interstitial.js"),
-                   nonce: (content_security_policy_nonce if respond_to?(:content_security_policy_nonce))) %>
+    <script type="module" src="<%= asset_path("studio/confirm_interstitial.js") %>"<%= tag.attributes(nonce: (content_security_policy_nonce if respond_to?(:content_security_policy_nonce))) %>></script>
   </body>
 </html>

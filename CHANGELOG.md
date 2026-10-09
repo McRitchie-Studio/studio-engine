@@ -33,10 +33,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
     the edit page the bar carries Save and Discard.
   - **Sign-in interstitial.** `studio/_confirm_interstitial` posts its form from
     `studio/confirm_interstitial`, loaded by its own nonced module tag (the page
-    has no import map). The fallback button no longer waits on a script: it
-    shows itself four seconds in by CSS alone, so a page whose script never
-    arrives still has something to press. It is hidden by `max-height` and
-    `visibility` in place of `display: none`.
+    has no import map). The fallback button shows itself four seconds in two
+    ways: by CSS alone, so a page whose script never arrives still has something
+    to press, and by the module's own timer, for an engine that holds a CSS
+    animation while the post is pending (WebKit). It is hidden by `max-height`
+    and `visibility` in place of `display: none`.
   - **Style guide.** The Modals section's demo drivers, its enter/leave
     simulator and the wallet stubs are `studio/style_modals`, on a
     `style-modals` controller the section's own module tag registers
@@ -44,8 +45,55 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
     of `onclick`. `$store.dsModals` is the engine's own modal stack: the overlay
     declares `data-studio-controller="modal-host"` and
     `data-modal-host-store-value="dsModals"`, and the guide's copy of the stack
-    is deleted. The card therefore takes its width from
-    `StudioModals.CARD_WIDTHS` by id, as an app's cards do.
+    is deleted. The card carries no `max-w-*` of its own and takes its width
+    from `StudioModals.CARD_WIDTHS` by id, as an app's cards do.
+
+### Added
+
+- **A page whose x-data factories failed to load says so, and its profile form
+  can still be saved.** One failed request among `studio/alpine_scopes`,
+  `studio/cropper`, `studio/image_upload`, `studio/birthday` and
+  `studio/profile_form` leaves all six factories undefined until a reload. A
+  nonced inline guard in `layouts/studio/_head` (`studio/_alpine_scopes_guard`,
+  beside the hold button's) marks each element that binds one of them
+  `data-studio-scope-failed="<factory>"` once the page's boot is over and puts
+  `<p class="studio-scope-notice" role="status">This did not load. Reload the
+  page.</p>` first inside it, on a card a modal mounts later too. Inside a
+  marked element every `[data-studio-scope-fallback]` is shown and a text field
+  left blank goes back to the value the server rendered: the profile form's
+  plain Save (`studio/profiles/_plain_save`) is such a fallback, so a person can
+  still save. A healthy or slow page is never marked. A host needs nothing
+  beyond recompiling its Tailwind bundle for `.studio-scope-notice`
+  (`engine-motion.css`).
+- **The crop photo modal says when Cropper.js did not load.** It waits up to
+  three seconds for the library (the script is deferred, and on a Turbo visit
+  can land after the card opens), then shows "The photo cropper did not load.
+  Reload the page and try again." on its error line and leaves the modal
+  dismissible. It used to show the image with no cropper and a Crop & Save
+  button that did nothing.
+
+### Breaking
+
+- **`studio/profiles/_form_script` and `studio/profiles/_birthday_picker_script`
+  are deleted.** `studio/profiles/edit` and `studio/profiles/_birthday_fields`
+  no longer render them; an app that renders either by name deletes the render.
+- **The factories are no longer in a page's HTML.** A test that looked for
+  `window.birthdayModal = function`, `window.imageUploadHost`,
+  `window.studioProfileForm` or `cropPhotoModal` source in a rendered page
+  looks for the name in `app/javascript/studio/alpine_scopes.js` and for
+  `import "studio/alpine_scopes"` in the page's head.
+  `Alpine.data("cropPhotoModal")` is no longer registered; the `x-data` resolves
+  through `window.cropPhotoModal`.
+- **`window.dsModalDemos`, `window.dsWalletConnectDemo` and the stub
+  `window.walletProvider` exist only on the style guide, once its section's
+  controller has connected.** `registerDsModals` and
+  `window.__dsAnimControlsBound` are gone.
+- **`#magic-fallback` on the sign-in interstitial is no longer `display: none`.**
+  A host stylesheet or test that read its `display` reads `visibility`.
+
+## 0.97.0 — 2026-10-09
+
+### Changed
 
 - **The toast queue, the link sidebar and the hold button move to ES modules and
   Stimulus controllers.** `layouts/studio/_flash`, `components/_link_sidebar`
@@ -80,6 +128,35 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   empty. A lazy load that fails is final for the document, as it is in a
   browser: the registry imports a controller once, reports a failure once, and
   marks each element naming it with `data-studio-controller-failed`.
+- **The admin pages, the email manager, booking, the footer map and the survey
+  stepper move to ES modules.** Their inline scripts are gone; rendered markup
+  and styling are unchanged apart from the `data-studio-controller` attributes
+  named here. Six controllers register lazily, each fetched only by a page that
+  names it:
+  - `geo-settings` on `/admin/geo`'s root (`studio/geo_settings`), and
+    `link-preview-card` on `/admin/link_preview`'s root
+    (`studio/link_preview_card`).
+  - `email-banner-scale` on the `<template>` anchor `studio/emails/_banner_scale`
+    renders (`studio/email_banner_scale`).
+  - `booking` on the frame's wrapper and the popup's dialog (`studio/booking`),
+    and `footer-map` on the map element (`studio/footer_map`). Both install
+    once per document under the same guards (`__studioBookingFramesArmed`,
+    `__studioBookingPopupArmed`, `__studioFooterMapsArmed`) and
+    `window.__studioBookingLoad` is still published. Until the booking
+    controller connects, a booking link is an ordinary link to the booking page.
+  - `survey` on the survey's root (`studio/survey`). Until it connects, and if
+    it never does, the page is the plain form.
+  - The theme editors and the email manager's editors stay Alpine factories:
+    `themeEditor` and `dsThemeEditor` are `studio/theme_editor`, and
+    `emailBannerEditor` and `emailRecipients` are `studio/email_banner`.
+    `studio/alpine_shims` publishes all four on every page, because an `x-data`
+    is evaluated the moment Alpine starts. `themeEditor` takes its colours as
+    an argument.
+- **`test/views/no_inline_script_test.rb` holds the views to it.** A view with
+  an inline script fails unless it is on the test's allow-list, where each entry
+  names the task that owns it; an entry whose script is gone fails too. Two are
+  left inline on purpose: `studio/_at_time_script`, whose first pass runs before
+  first paint, and `solana_sessions/phantom_callback`, the wallet's return leg.
 
 - **The board primitive and the leveling activity modals move to ES modules.**
   `studio/_board_assets` and `studio/_leveling_activity_assets` render nothing;
@@ -114,13 +191,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
-- **The crop photo modal says when Cropper.js did not load.** It waits up to
-  three seconds for the library (the script is deferred, and on a Turbo visit
-  can land after the card opens), then shows "The photo cropper did not load.
-  Reload the page and try again." on its error line and leaves the modal
-  dismissible. It used to show the image with no cropper and a Crop & Save
-  button that did nothing.
-
 - **The hold button dispatches `hold-button:guard`, `hold-button:start`,
   `hold-button:validate`, `hold-button:early` and `hold-button:success`**, on
   the button, bubbling, each with `detail.id` (the `hold_id`). `preventDefault()`
@@ -138,24 +208,42 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   validation answer for a press that was released does not abort the next one;
   nothing of the timeline runs after the hold completes.
 
-### Breaking
+### Fixed
 
-- **`studio/profiles/_form_script` and `studio/profiles/_birthday_picker_script`
-  are deleted.** `studio/profiles/edit` and `studio/profiles/_birthday_fields`
-  no longer render them; an app that renders either by name deletes the render.
-- **The factories are no longer in a page's HTML.** A test that looked for
-  `window.birthdayModal = function`, `window.imageUploadHost`,
-  `window.studioProfileForm` or `cropPhotoModal` source in a rendered page
-  looks for the name in `app/javascript/studio/alpine_scopes.js` and for
-  `import "studio/alpine_scopes"` in the page's head.
-  `Alpine.data("cropPhotoModal")` is no longer registered; the `x-data` resolves
-  through `window.cropPhotoModal`.
-- **`window.dsModalDemos`, `window.dsWalletConnectDemo` and the stub
-  `window.walletProvider` exist only on the style guide, once its section's
-  controller has connected.** `registerDsModals` and
-  `window.__dsAnimControlsBound` are gone.
-- **`#magic-fallback` on the sign-in interstitial is no longer `display: none`.**
-  A host stylesheet or test that read its `display` reads `visibility`.
+- **The style guide's theme editor sends a save once.** The controller answers
+  a save with a 302 to `/admin/theme`, and a fetch that follows a 302 keeps a
+  PATCH a PATCH, so Save sent the theme twenty-one times and then toasted "Save
+  failed". The request no longer follows the redirect.
+- **The email manager's banner editor repaints the banner on the email's own
+  page.** `studio/emails/_banner_preview` isolates the banner in an iframe, and
+  the editor looked for its nodes in the page's own document only, so typing a
+  header, sub-text or tint changed nothing there. The editor now reaches into
+  the frame, as the emails list already did.
+- **Two boards on one page no longer drive each other's zones.** A board made
+  every `.kanban-dropzone` on the page sortable and counted cards by document
+  id, so the first board's group, filter and lock rule governed every board
+  after it: on `/admin/style` the depth-chart specimen's cards left their
+  lanes and its locked starters dragged. A board now wires, watches and counts
+  only the zones inside its own element.
+- **A hold button that cannot work says so.** The button runs on five modules,
+  and a browser keeps a failed module request for the life of the document, so
+  one failure among them at page load left the button rendered, enabled and
+  deaf: a full hold sent nothing and showed nothing until a reload. The head
+  now carries a small inline, nonced guard (`studio/_hold_button_guard`) that
+  imports nothing. A `.hold-stack` whose controller has not connected 1.5 s
+  after `DOMContentLoaded` (or shortly after it arrives later, by a Turbo visit
+  or a modal's `x-if`) is marked `data-studio-controller-failed="hold-button"`:
+  the button dims and is `aria-disabled`, the bubbles stop, and "This button
+  could not load. Reload the page." shows under it in a `role="status"`
+  region; a press says it again. The controller writes
+  `data-hold-button-connected` on its stack and clears the mark the moment it
+  connects, however late. `studio/_hold_button` renders one more element, an
+  empty `<span class="hold-notice" role="status">` held out of the layout, so
+  a working button measures as before. A host with a nonce-based
+  `script-src` needs nothing new; one that allow-lists inline scripts by hash
+  adds this script's.
+
+### Breaking
 
 - **`window.toastManager` is gone.** Nothing binds it: the flash partial reads
   `$store.toasts`. A template that wrote `x-data="toastManager(...)"` of its own
@@ -166,6 +254,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **`window.__studioLinkSidebarBridge` is gone.** It was the inline script's
   run-once flag; a test that looked for it in a page's HTML looks for
   `data-studio-controller="link-sidebar"`.
+- **`studio/emails/_recipient_repaint` and `studio/surveys/_script` are gone.**
+  Each rendered only a script. The engine's own pages no longer render them; a
+  host template that did deletes the line.
+- **The footer's and the booking primitives' scripts are no longer in the
+  page's HTML.** A test that looked for `__studioFooterMapsArmed`,
+  `__studioBookingFramesArmed` or `__studioBookingPopupArmed` in a response body
+  looks for `data-studio-controller="footer-map"` on the map, or
+  `data-studio-controller="booking"` on the frame's wrapper and the dialog. The
+  globals themselves are still set, once the controller has connected.
+  `window.__studioSurveyBound` and `window.__studioSurveyTurboHook` are gone;
+  nothing outside the survey's script read them.
 - **`window.Sortable` is not SortableJS until a page asks for it.** On a page
   with no board it is the loading shim, which has `create` and `load` and
   nothing else: `new Sortable(...)`, `Sortable.get` and the other statics fail
@@ -174,15 +273,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   unaffected. A test that looked for `window.studioBoard =` or a
   `studio/sortable` script tag in a page's HTML looks for
   `data-studio-controller="board"` on the board.
-
-### Fixed
-
-- **Two boards on one page no longer drive each other's zones.** A board made
-  every `.kanban-dropzone` on the page sortable and counted cards by document
-  id, so the first board's group, filter and lock rule governed every board
-  after it: on `/admin/style` the depth-chart specimen's cards left their
-  lanes and its locked starters dragged. A board now wires, watches and counts
-  only the zones inside its own element.
 
 ## 0.96.2 — 2026-10-08
 

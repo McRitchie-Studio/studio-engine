@@ -69,6 +69,7 @@ class VendoredLeafletTest < Minitest::Test
   end
 
   def test_tiles_come_from_the_keyless_openstreetmap_host
-    assert_includes File.read(ASSETS), "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    assert_includes File.read(File.join(ROOT, "app/javascript/studio/footer_map.js")),
+                    'export const TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"'
   end
 end

@@ -25,6 +25,13 @@
 // page its uploads, its birthday gate and its profile form. It installs itself
 // on evaluation, once.
 //
+// WHEN ONE OF THESE FILES FAILS TO LOAD, every name here is missing: a failed
+// static import stops this module, by either door, for the life of the
+// document. The inline guard in the head (studio/_alpine_scopes_guard) says so
+// on each element that binds one and shows the profile form's plain Save. A
+// factory added to SCOPES is added to that guard's list
+// (test/javascript/alpine_scopes_guard.test.mjs holds the two together).
+//
 // A name a host defined first is left alone.
 import { cropPhotoModal } from "studio/cropper"
 import { imageUploadHost, avatarCropperHost, submitFormWithProgress } from "studio/image_upload"

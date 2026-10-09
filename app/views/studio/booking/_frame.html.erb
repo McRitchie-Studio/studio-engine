@@ -22,13 +22,13 @@
     THE SRC IS DEFERRED, and not with loading="lazy". The frame is a third
     party, and a frame that starts loading before the window's `load` event
     holds that event open for as long as Google takes to answer. So the URL
-    waits in data-src and the script in studio/booking/_assets assigns it only
-    AFTER `load`, once the frame is near the viewport.
+    waits in data-src and studio/booking (the booking controller on the
+    wrapper) assigns it only AFTER `load`, once the frame is near the viewport.
 
     WITH SCRIPTS OFF nothing ever assigns the src, so the <noscript> hides the
     empty frame and puts a plain link to Google's booking page in its place. %>
 <%= studio_booking_assets %>
-<div class="booking-frame<%= " booking-frame-cropped" if crop %>" data-booking-wrap data-studio-booking<% if crop %> data-booking-crop style="<%= Studio::Booking.crop_style(crop) %>"<% end %>>
+<div class="booking-frame<%= " booking-frame-cropped" if crop %>" data-booking-wrap data-studio-booking data-studio-controller="booking"<% if crop %> data-booking-crop style="<%= Studio::Booking.crop_style(crop) %>"<% end %>>
   <iframe data-booking-frame data-studio-booking
           data-src="<%= studio_booking_embed_url %>"
           title="<%= title %>"
