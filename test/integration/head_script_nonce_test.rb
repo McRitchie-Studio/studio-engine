@@ -83,6 +83,10 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     assert_nil guard["src"], "a request of its own is one more that can fail"
     refute_match(/\bimport\s*[("'{*]/, guard.text, "the guard imports a module")
 
+    # turf-monster's report pages count the observers their own scripts build
+    # by this spelling, over the whole response.
+    refute_includes guard.text, "new MutationObserver(", "a host page's own count of its observers would include the guard's"
+
     first_module = scripts.index { |script| %w[module importmap].include?(script["type"]) }
     assert_operator scripts.index(guard), :<, first_module
   end

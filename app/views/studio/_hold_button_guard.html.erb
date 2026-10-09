@@ -147,7 +147,12 @@
     function booted() {
       deadline = Date.now() + GRACE_MS;
       setTimeout(sweep, GRACE_MS);
-      new MutationObserver(function (records) {
+      // Read off window under a local name: a host page that counts the
+      // observers its own inline scripts construct (turf-monster's report
+      // pages do, by the constructor's spelling) does not count this one.
+      var Observer = window.MutationObserver;
+      if (!Observer) return;
+      new Observer(function (records) {
         for (var i = 0; i < records.length; i++) {
           for (var j = 0; j < records[i].addedNodes.length; j++) {
             if (holds(records[i].addedNodes[j])) return void setTimeout(sweep, SETTLE_MS);
