@@ -80,45 +80,44 @@ class StyleGuideModalAnchorsTest < ActiveSupport::TestCase
   end
 
   # THE PROPERTY THE TASK EXISTS FOR: ids must not track heading text. Proven
-  # structurally — no anchor may be a slug of the heading inside its own section.
+  # structurally: an anchor may not be a slug of the heading inside its own
+  # section.
   #
-  # !! THIS GUARD IS CURRENTLY INERT — DO NOT TRUST A GREEN RUN OF IT. !!
-  #
-  # Nokogiri cannot nest these subsections. The guide is ERB, and the overlay's
-  # <template x-if> swallows every tag that follows it, so parsing the WHOLE file
-  # yields exactly ONE <section> (the outer id="modals") for a file that has ten.
-  # Every doc.at_css("section#...") below therefore returns nil, the `next if
-  # section.nil?` skips all of them, and `coupled` is empty no matter what the
-  # ids say. Measured 2026-09-06 while porting the simulator sections.
-  #
-  # WORSE, THE PROPERTY IT CLAIMS IS ALREADY VIOLATED. Slicing each section out
-  # first and parsing it alone (the technique in
-  # test/views/style_guide_modal_simulator_test.rb#section_dom) shows 7 of the 8
-  # published anchors ARE slugs of their own heading: modals-auth, modals-
-  # profile, modals-profile-leveling, modals-web3, modals-system-status,
-  # modals-templates and modals-rewards. Only modals-contest-entry was not.
-  #
-  # SO THIS IS NOT A ONE-LINE FIX, which is why it was left standing rather than
-  # quietly repaired. Making the guard read the sections would red the suite, and
-  # the remedy is to RENAME seven ids a consumer may anchor on — a deliberate,
-  # release-noted, consumer-breaking change that needs its own task. The two
-  # anchors added by the simulator port (modals-motion-registry, modals-stack-
-  # mechanics) name their subject and are NOT coupled, so the debt is not growing.
+  # SEVEN PUBLISHED ANCHORS ARE COUPLED, and are held here as a debt that may
+  # not grow. Each is the slug of its own heading, so a copy edit to that heading
+  # invites someone to "fix" the id to match. Renaming them is a deliberate,
+  # release-noted, consumer-breaking change with a task of its own; until then
+  # this list is exact in both directions, so a new coupled anchor fails here and
+  # so does a rename that forgets to take its id off the list.
+  COUPLED_ANCHORS = %w[
+    modals-auth
+    modals-profile
+    modals-profile-leveling
+    modals-web3
+    modals-system-status
+    modals-templates
+    modals-rewards
+  ].freeze
+
   def test_ids_do_not_track_heading_text
     doc = Nokogiri::HTML.fragment(source)
-    coupled = []
 
-    ANCHORS.each do |id|
-      section = doc.at_css("section##{id}")
-      next if section.nil?
+    # A guard that finds no section passes forever: every anchor's section has
+    # to be one this parse can read.
+    unread = ANCHORS.reject { |id| doc.at_css("section##{id}") }
+    assert_empty unread,
+                 "the parse found no <section> for #{unread.inspect}, so the coupling check " \
+                 "below would skip them and report nothing."
 
-      heading = section.at_css("h3")&.text.to_s.downcase.gsub(/[^a-z0-9]+/, "-").gsub(/\A-|-\z/, "")
-      coupled << id if heading.present? && id == "modals-#{heading}"
+    coupled = ANCHORS.select do |id|
+      heading = doc.at_css("section##{id}").at_css("h3")&.text.to_s.downcase.gsub(/[^a-z0-9]+/, "-").gsub(/\A-|-\z/, "")
+      heading.present? && id == "modals-#{heading}"
     end
 
-    assert_empty coupled,
-                 "these ids are slugs of their own heading: #{coupled.inspect}. That is the " \
-                 "coupling this task removed — a copy edit to the heading would silently " \
-                 "invalidate the anchor a consumer depends on."
+    assert_equal COUPLED_ANCHORS, coupled,
+                 "the anchors that are slugs of their own heading changed. A NEW one is the " \
+                 "coupling this guard exists to stop: name the subsection for its subject, not " \
+                 "its heading. One that LEFT was renamed: take it off COUPLED_ANCHORS and say so " \
+                 "in the release notes."
   end
 end

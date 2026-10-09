@@ -114,16 +114,11 @@
         </section>
       <% end %>
 
-      <%# The JS-less path. Hidden once Alpine boots, because with the bar up
-          there would be two Saves. %>
-      <div class="mt-6" x-show="!alpine" x-cloak>
-        <button type="submit" class="btn btn-primary">Save changes</button>
-      </div>
+      <%= render "studio/profiles/plain_save" %>
     <% end %>
   </div>
 </div>
 
-<%= render "studio/profiles/form_script" %>
 
 <% if avatar_editable %>
   <%# THE `x-data` IS LOAD-BEARING, and this page was missing it. Alpine 3 only

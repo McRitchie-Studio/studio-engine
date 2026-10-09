@@ -55,18 +55,38 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "what stays inline is the pre-paint theme, the hold button guard, the import map, the boot import and the five own-door imports" do
+  test "what stays inline is the pre-paint theme, the two guards, the import map, the boot import and the six own-door imports" do
     inline = head_scripts("/lab/bar_stack").reject { |script| script["src"] }
 
-    assert_equal 9, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
+    assert_equal 11, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
     assert_includes inline[0].text, "classList.add('dark')", "the pre-paint theme script comes first"
     assert_includes inline[1].text, "studioHoldButtonGuard", "the hold button's guard comes second"
-    assert_equal "importmap", inline[2]["type"]
-    assert_equal "module", inline[3]["type"]
-    assert_equal %(import "studio/application"), inline[3].text.strip
-    assert_equal %w[studio/stimulus studio/alpine_stores studio/modal_host studio/toast studio/link_sidebar],
-                 inline[4..].map { |script| script.text.strip[/\Aimport "([^"]+)"\z/, 1] }
-    assert_equal %w[module] * 5, inline[4..].map { |script| script["type"] }
+    assert_includes inline[2].text, "studioScopesGuard", "the x-data factories' guard comes third"
+    assert_equal "importmap", inline[3]["type"]
+    assert_equal "module", inline[4]["type"]
+    assert_equal %(import "studio/application"), inline[4].text.strip
+    assert_equal %w[studio/stimulus studio/alpine_stores studio/modal_host studio/toast studio/link_sidebar
+                    studio/alpine_scopes],
+                 inline[5..].map { |script| script.text.strip[/\Aimport "([^"]+)"\z/, 1] }
+    assert_equal %w[module] * 6, inline[5..].map { |script| script["type"] }
+  end
+
+  # The factories' guard reports a page whose x-data factories failed to load, so
+  # it is a classic inline script that imports nothing, like the hold button's.
+  test "the x-data factories' guard is a nonced classic inline script, before every module" do
+    scripts = head_scripts("/lab/bar_stack")
+    guards = scripts.select { |script| script.text.include?("studioScopesGuard") }
+
+    assert_equal 1, guards.size, "the head renders the guard once"
+    guard = guards.first
+    assert_equal NONCE, guard["nonce"]
+    assert_nil guard["type"], "a module script would wait behind the modules it reports on"
+    assert_nil guard["src"], "a request of its own is one more that can fail"
+    refute_match(/\bimport\s*[("'{*]/, guard.text, "the guard imports a module")
+    refute_includes guard.text, "new MutationObserver(", "a host page's own count of its observers would include the guard's"
+
+    first_module = scripts.index { |script| %w[module importmap].include?(script["type"]) }
+    assert_operator scripts.index(guard), :<, first_module
   end
 
   # The guard reports a hold button whose modules failed to load, so it is a
@@ -153,6 +173,22 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     assert_equal NONCE, scripts[modals]["nonce"]
     assert_equal "module", scripts[modals]["type"]
     assert_operator modals, :<, alpine, "the modal stores' listener must be registered before Alpine starts"
+  end
+
+  # The factories' own door: a page binds cropPhotoModal, imageUploadHost,
+  # birthdayModal and studioProfileForm by name, and Alpine evaluates each as it
+  # meets the element. Its own tag, so a boot that fails to load leaves a page
+  # its uploads, its birthday gate and its profile form; before Alpine, so the
+  # names exist when Alpine reads them.
+  test "the x-data factories load by their own nonced module tag, before Alpine" do
+    scripts = head_scripts("/lab/bar_stack")
+    scopes = scripts.index { |script| script.text.strip == %(import "studio/alpine_scopes") }
+    alpine = scripts.index { |script| script["src"].to_s.include?("studio/alpine") }
+
+    refute_nil scopes, "the head does not import studio/alpine_scopes by its own tag"
+    assert_equal NONCE, scripts[scopes]["nonce"]
+    assert_equal "module", scripts[scopes]["type"]
+    assert_operator scopes, :<, alpine, "the factories must be defined before Alpine starts"
   end
 
   # The stores' own door. Its own tag, not a line inside the boot import, so a

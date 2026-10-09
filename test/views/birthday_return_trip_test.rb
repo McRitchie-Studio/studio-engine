@@ -14,7 +14,7 @@ require "json"
 # starts blank both render three empty selects on the server, because the values
 # are chosen in a browser after mount. A String assertion on the swap target — the
 # obvious test to write here — passes with the defect fully intact. So the
-# rendered <script> and the rendered x-data are extracted and RUN under node,
+# factory (studio/birthday) and the rendered x-data are RUN under node,
 # against the same minimal Alpine stubs test/views/modal_host_store_behavior_test
 # uses, and the question is asked by CALLING back() and init().
 #
@@ -51,12 +51,12 @@ class BirthdayReturnTripTest < Minitest::Test
     assert_includes out, "ALL-RETURN-TRIP-SCENARIOS-PASS", out
   end
 
-  # The factory's <script> and the gate card's x-data are extracted from RENDERED
-  # output, not read out of the ERB source: what runs in a browser is the rendered
-  # form, and the store name in both is an ERB local.
-  def test_the_extracted_sources_are_the_rendered_ones
-    assert_includes factory_script, "window.birthdayModal = function (opts)",
-                    "the factory script must come out of the rendered partial"
+  # The gate card's x-data is extracted from RENDERED output, not read out of the
+  # ERB source: what runs in a browser is the rendered form, and the store name
+  # in it is an ERB local. The factory is the module the page loads.
+  def test_the_sources_are_the_ones_a_page_runs
+    assert_match(/^export function birthdayModal\(opts, env\)/, File.read(FACTORY_MODULE),
+                 "the factory must come out of studio/birthday")
     assert_includes gate_x_data, "$store.labModals.swap('birthday'",
                     "the gate's swap target and store are ERB locals — extract the RENDERED form"
   end
@@ -67,17 +67,10 @@ class BirthdayReturnTripTest < Minitest::Test
     @node_path ||= `which node 2>/dev/null`.strip
   end
 
+  FACTORY_MODULE = File.expand_path("../../app/javascript/studio/birthday.js", __dir__)
+
   def view
     ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
-  end
-
-  def factory_script
-    @factory_script ||= begin
-      html = view.render(partial: "studio/birthday_assets")
-      script = html[%r{<script>(.*?)</script>}m, 1]
-      refute_nil script, "expected studio/_birthday_assets to emit its factory <script>"
-      script
-    end
   end
 
   # The whole x-data attribute, verbatim. It is double-quoted and its body
@@ -98,8 +91,9 @@ class BirthdayReturnTripTest < Minitest::Test
     node = node_path
     out = nil
 
-    Tempfile.create(["birthday_return_trip", ".js"]) do |f|
-      f.write(HARNESS_PRELUDE, factory_script,
+    Tempfile.create(["birthday_return_trip", ".mjs"]) do |f|
+      f.write("import { birthdayModal } from #{"file://#{FACTORY_MODULE}".to_json};\n",
+              HARNESS_PRELUDE,
               "\nglobalThis.GATE_X_DATA = #{gate_x_data.to_json};\n",
               HARNESS_SCENARIOS)
       f.flush
@@ -110,13 +104,15 @@ class BirthdayReturnTripTest < Minitest::Test
     out
   end
 
-  # Minimal browser stubs. The factory reads window.birthdayModal, calls
-  # Alpine.store(name) for the modal store and the optional session store, and
-  # (outside demo mode, which none of these scenarios use) would reach document
-  # for the CSRF meta tag.
+  # Minimal browser stubs. The factory reads its window for Alpine.store(name)
+  # (the modal store and the optional session store), setTimeout, CustomEvent and
+  # dispatchEvent, and (outside demo mode, which none of these scenarios use)
+  # would reach document for the CSRF meta tag. The harness is an ES module that
+  # imports studio/birthday from the tree and publishes the factory the way
+  # studio/alpine_scopes does.
   HARNESS_PRELUDE = <<~'JS'
-    'use strict';
     const window = globalThis;
+    globalThis.window = globalThis;
     const alpineStores = {};
     const Alpine = {
       store(name, def) {
@@ -131,8 +127,7 @@ class BirthdayReturnTripTest < Minitest::Test
     }
     globalThis.dispatchEvent = () => {};
     globalThis.document = { querySelector: () => null };
-
-    // ==== studio/_birthday_assets' <script>, verbatim, follows ====
+    window.birthdayModal = (opts) => birthdayModal(opts);
   JS
 
   HARNESS_SCENARIOS = <<~'JS'

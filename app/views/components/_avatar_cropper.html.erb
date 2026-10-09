@@ -8,6 +8,9 @@
     Distinct from imageUploadHost (immediate-save): this STAGES the file and
     lets the enclosing form own the submit (signup / profile edit).
 
+    The scope, avatarCropperHost(), is studio/image_upload, published on every
+    page by studio/alpine_scopes.
+
     Locals: form_field_name (e.g. "user[avatar]"). %>
 
 <%= render "studio/cropper_assets" %>
@@ -41,41 +44,3 @@
   <input type="file" x-ref="filePicker" @change="onFileSelected($event)" accept="image/*" class="hidden">
 </div>
 
-<script>
-function avatarCropperHost() {
-  return {
-    croppedUrl: null,
-
-    onFileSelected(event) {
-      var file = event.target.files[0];
-      if (!file) return;
-      var self = this;
-      var reader = new FileReader();
-      reader.onload = function(e) {
-        // Hand the raw image to the shared modal host; the crop-photo modal
-        // owns the cropper UI and posts back via 'crop-photo-confirmed'.
-        Alpine.store('modals').open('crop-photo', { imageUrl: e.target.result });
-      };
-      reader.readAsDataURL(file);
-      event.target.value = '';  // allow re-selecting the same file
-    },
-
-    applyCrop(blob) {
-      if (!blob) return;
-      if (this.croppedUrl) URL.revokeObjectURL(this.croppedUrl);
-      this.croppedUrl = URL.createObjectURL(blob);
-      var file = new File([blob], 'avatar.png', { type: 'image/png' });
-      var dt = new DataTransfer();
-      dt.items.add(file);
-      this.$refs.hiddenFileInput.files = dt.files;
-    },
-
-    removePhoto() {
-      if (this.croppedUrl) URL.revokeObjectURL(this.croppedUrl);
-      this.croppedUrl = null;
-      var dt = new DataTransfer();
-      this.$refs.hiddenFileInput.files = dt.files;
-    }
-  };
-}
-</script>

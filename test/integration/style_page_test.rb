@@ -430,8 +430,8 @@ class StylePageTest < ActiveSupport::TestCase
   test "the Modals section wires live engine-block modals via the dsModals store" do
     html = render_index
     assert_includes html, 'id="modals"'
-    assert_includes html, "Alpine.store('dsModals'",
-      "the Modals section registers its own page-scoped modal store"
+    assert_match(/<template x-if="\$store\.dsModals\.current\(\)"\s+data-studio-controller="modal-host"\s+data-modal-host-store-value="dsModals">/,
+                 html, "the Modals section declares its own page-scoped modal store")
     %w[ds-processing ds-success ds-error ds-countdown].each do |id|
       assert_includes html, "$store.dsModals.open('#{id}')",
         "the gallery must wire an Open for the #{id} specimen"
@@ -443,16 +443,22 @@ class StylePageTest < ActiveSupport::TestCase
 
   # --- 6b. the ported Turf Monster modals register + open ---------------------
 
-  # The page-scoped host (dsModals) mirrors the shared host's full API — the
-  # in-modal step machine relies on advance() and the directional swap().
+  # The page-scoped host (dsModals) IS the shared host's stack, under the guide's
+  # own name: the overlay declares it, and studio/modal_host builds the store the
+  # in-modal step machine relies on (advance() and the directional swap()).
   test "the dsModals store exposes the full host API (open/swap/advance/close)" do
     html = render_index
-    %w[open: swap: advance: close: cardClasses: current:].each do |method|
-      assert_includes html, method,
-        "the page-scoped modal store must define #{method}"
+    assert_includes html, %(data-modal-host-store-value="dsModals"),
+      "the overlay declares the store studio/modal_host registers"
+    refute_includes html, "data-modal-host-scoped-value",
+      "the guide's store is the full stack, not the scoped host's plainer one"
+    stack = File.read("app/javascript/studio/modal_host.js")[/^export function createModalStore\(env\).*?^}/m]
+    %w[open swap advance close cardClasses].each do |method|
+      assert_match(/^  store\.#{method} = function/, stack,
+        "the stack the guide's store is built from must define #{method}")
     end
-    assert_includes html, "modal-card-mount",
-      "cardClasses drives the ported enter animation classes"
+    assert_includes html, ":class=\"$store.dsModals.cardClasses()\"",
+      "cardClasses drives the card's enter and exit animation classes"
     # A SECOND ASSERTION LIVED HERE and was RETIRED 2026-09-09: `assert_includes
     # html, "dsSolanaModal"`. That proxy existed only so style/modals/_onchain_tx,
     # a mirror of turf-monster's card, could keep its $store.dsSolanaModal reads;
@@ -583,8 +589,11 @@ class StylePageTest < ActiveSupport::TestCase
     # both cards the ENGINE owns. That matters more than the count: the group
     # that left was the only one whose witness was a copy of someone else's card,
     # so what is left is smaller and none of it can drift.
-    assert_includes html, "dsModalDemos.fastWithHold()",
+    assert_includes html, %(data-studio-action="click->style-modals#demo" data-style-modals-name-param="fastWithHold"),
       "the stack-mechanics section still demonstrates the floor against a fast op"
+    assert_match(/fastWithHold: function \(\) \{.*?win\.StudioModals\.holdAtLeast\(1500\)/m,
+                 File.read("app/javascript/studio/style_modals.js"),
+                 "the fast-op demo holds through the engine's own floor")
   end
 
   test "the Contest entry section states the honest web2/web3 map" do
@@ -824,11 +833,12 @@ class StylePageTest < ActiveSupport::TestCase
   end
 
   # PROFILE — crop / upload ACTUALLY open: cropper_assets is rendered on the
-  # page (loading cropper.js + the factory) and the specimens open crop-photo.
+  # page (loading cropper.js; the factory is studio/cropper, on every page) and
+  # the specimens open crop-photo.
   test "the Profile crop/upload modals are wired to open live" do
     html = render_index
     assert_includes html, "cropPhotoModal",
-      "studio/cropper_assets is rendered so the crop factory is defined"
+      "the crop modal binds the crop factory"
     assert_includes html, "cropperjs",
       "cropper.js is loaded on the page"
     assert_includes html, "$store.dsModals.open('crop-photo', { imageUrl:",
@@ -852,9 +862,10 @@ class StylePageTest < ActiveSupport::TestCase
       "Image upload glows only when crop-photo is the empty picker"
     assert_includes html, "$store.dsModals.current().id === 'crop-photo' && !!$store.dsModals.current().props.cropReady",
       "Crop photo glows only when crop-photo has an image loaded"
-    # The crop factory reflects the sub-state onto the store so the glow can react.
-    factory = File.read("app/views/studio/modals/_image_upload.html.erb")
-    assert_includes factory, "cur.props.cropReady = true",
+    # The crop factory reflects the sub-state onto the store so the glow can react
+    # (test/javascript/cropper.test.mjs runs the mount and reads the entry).
+    factory = File.read("app/javascript/studio/cropper.js")
+    assert_includes factory, "entry.props.cropReady = true",
       "mountCropper sets cropReady on the store entry (picker -> cropper transition)"
   end
 

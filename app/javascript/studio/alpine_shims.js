@@ -15,6 +15,10 @@
 // host's body binding survives a boot that failed to load. Importing it here
 // keeps it in the boot graph, preloaded; it installs itself on evaluation.
 import "studio/alpine_stores"
+// The x-data factories pages bind (cropPhotoModal, imageUploadHost, ...) are
+// studio/alpine_scopes, which the head also loads by its own module tag and
+// which installs itself the same way.
+import "studio/alpine_scopes"
 import { NavCollapse } from "studio/nav_collapse"
 import {
   showNavSpinner, hideNavSpinner, installSpinnerReset, fireSuccessConfetti

@@ -4,6 +4,93 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The modal blocks and the profile scripts move to ES modules.** The crop
+  photo modal, the image upload hosts, the avatar cropper, the birthday card,
+  the profile form and its birthday row, the compact identity bar, the sign-in
+  interstitial and the style guide's modal demos render markup only; nine
+  inline scripts are gone. Rendered markup and styling are unchanged apart from
+  the attributes and the interstitial's fallback named here, and every `x-data`
+  a page writes still resolves.
+  - **The factories.** `cropPhotoModal` is `studio/cropper`; `imageUploadHost`,
+    `avatarCropperHost` and `submitFormWithProgress` are `studio/image_upload`;
+    `birthdayModal` and `studioBirthdayFields` are `studio/birthday`;
+    `studioProfileForm` is `studio/profile_form`. `studio/alpine_scopes`
+    publishes each on `window`, where a host has not defined the name first.
+    They are in the preloaded boot graph, not lazy: Alpine evaluates an `x-data`
+    as it meets the element, and a factory that is not there leaves a photo
+    upload, the birthday gate or the profile form dead. `layouts/studio/_head`
+    also imports `studio/alpine_scopes` by its own nonced module tag, so a boot
+    that fails to load keeps a page its factories.
+  - **Partials.** `studio/modals/_image_upload` and `studio/_birthday_assets`
+    render nothing and stay, so a layout that renders either by name keeps
+    working; the renders can be deleted. `studio/_cropper_assets` loads
+    Cropper.js (from cdnjs, as before) and nothing else.
+  - **Compact identity bar.** `studio/profiles/_identity_mini` carries
+    `data-studio-controller="identity-mini"`; when the bar shows is
+    `studio/identity_mini`. The controller is registered statically, because on
+    the edit page the bar carries Save and Discard.
+  - **Sign-in interstitial.** `studio/_confirm_interstitial` posts its form from
+    `studio/confirm_interstitial`, loaded by its own nonced module tag (the page
+    has no import map). The fallback button shows itself four seconds in two
+    ways: by CSS alone, so a page whose script never arrives still has something
+    to press, and by the module's own timer, for an engine that holds a CSS
+    animation while the post is pending (WebKit). It is hidden by `max-height`
+    and `visibility` in place of `display: none`.
+  - **Style guide.** The Modals section's demo drivers, its enter/leave
+    simulator and the wallet stubs are `studio/style_modals`, on a
+    `style-modals` controller the section's own module tag registers
+    (`studio/style_guide`); its demo buttons carry `data-studio-action` in place
+    of `onclick`. `$store.dsModals` is the engine's own modal stack: the overlay
+    declares `data-studio-controller="modal-host"` and
+    `data-modal-host-store-value="dsModals"`, and the guide's copy of the stack
+    is deleted. The card carries no `max-w-*` of its own and takes its width
+    from `StudioModals.CARD_WIDTHS` by id, as an app's cards do.
+
+### Added
+
+- **A page whose x-data factories failed to load says so, and its profile form
+  can still be saved.** One failed request among `studio/alpine_scopes`,
+  `studio/cropper`, `studio/image_upload`, `studio/birthday` and
+  `studio/profile_form` leaves all six factories undefined until a reload. A
+  nonced inline guard in `layouts/studio/_head` (`studio/_alpine_scopes_guard`,
+  beside the hold button's) marks each element that binds one of them
+  `data-studio-scope-failed="<factory>"` once the page's boot is over and puts
+  `<p class="studio-scope-notice" role="status">This did not load. Reload the
+  page.</p>` first inside it, on a card a modal mounts later too. Inside a
+  marked element every `[data-studio-scope-fallback]` is shown and a text field
+  left blank goes back to the value the server rendered: the profile form's
+  plain Save (`studio/profiles/_plain_save`) is such a fallback, so a person can
+  still save. A healthy or slow page is never marked. The line carries its own
+  styles, so a host changes nothing; `.studio-scope-notice` is there to restyle
+  it.
+- **The crop photo modal says when Cropper.js did not load.** It waits up to
+  three seconds for the library (the script is deferred, and on a Turbo visit
+  can land after the card opens), then shows "The photo cropper did not load.
+  Reload the page and try again." on its error line and leaves the modal
+  dismissible. It used to show the image with no cropper and a Crop & Save
+  button that did nothing.
+
+### Breaking
+
+- **`studio/profiles/_form_script` and `studio/profiles/_birthday_picker_script`
+  are deleted.** `studio/profiles/edit` and `studio/profiles/_birthday_fields`
+  no longer render them; an app that renders either by name deletes the render.
+- **The factories are no longer in a page's HTML.** A test that looked for
+  `window.birthdayModal = function`, `window.imageUploadHost`,
+  `window.studioProfileForm` or `cropPhotoModal` source in a rendered page
+  looks for the name in `app/javascript/studio/alpine_scopes.js` and for
+  `import "studio/alpine_scopes"` in the page's head.
+  `Alpine.data("cropPhotoModal")` is no longer registered; the `x-data` resolves
+  through `window.cropPhotoModal`.
+- **`window.dsModalDemos`, `window.dsWalletConnectDemo` and the stub
+  `window.walletProvider` exist only on the style guide, once its section's
+  controller has connected.** `registerDsModals` and
+  `window.__dsAnimControlsBound` are gone.
+- **`#magic-fallback` on the sign-in interstitial is no longer `display: none`.**
+  A host stylesheet or test that read its `display` reads `visibility`.
+
 ## 0.97.0 — 2026-10-09
 
 ### Changed

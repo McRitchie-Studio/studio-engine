@@ -19,6 +19,10 @@
 // LAZY below and registered by studio/lazy_controllers the first time an
 // element names one.
 //
+// A page that must find its controller connected the moment it has loaded
+// registers it from its own module tag instead (studio/style_guide, for the
+// style guide's Modals section): the tag runs with the page, in document order.
+//
 // WHY THE HOLD BUTTON IS STATIC. A lazy controller is one more request, made
 // when its element first appears: for the token modal, minutes after the page
 // loaded. If that request fails once (a dropped connection, or a deploy that

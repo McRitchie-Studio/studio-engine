@@ -237,7 +237,10 @@ class ProfilePageRenderTest < Minitest::Test
 
     assert_includes html, "data-studio-identity-mini"
     assert_includes html, "data-studio-identity-full", "the observer needs a target"
-    assert_includes html, "IntersectionObserver"
+    mini = Nokogiri::HTML.fragment(html).at_css("[data-studio-identity-mini]")
+    assert_equal "identity-mini", mini["data-studio-controller"],
+                 "the bar names the controller that watches the card (studio/identity_mini)"
+    refute_includes html, "<script", "the watch is a module, not a script in the partial"
   end
 
   # FIXED, not sticky. A sticky bar stays in flow and would reserve its height

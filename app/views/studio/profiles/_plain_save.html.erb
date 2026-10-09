@@ -1,0 +1,11 @@
+<%# The profile form's plain Save: a submit button inside the form, with no
+    script behind it.
+
+    It is the JS-less path, hidden once Alpine boots the form's scope, because
+    with the save controls up there would be two Saves. It is also what a person
+    saves with when the form's factory failed to load: the guard in the head
+    (studio/_alpine_scopes_guard) shows every data-studio-scope-fallback inside
+    a scope that did not load. %>
+<div class="mt-6" x-show="!alpine" x-cloak data-studio-scope-fallback>
+  <button type="submit" class="btn btn-primary">Save changes</button>
+</div>

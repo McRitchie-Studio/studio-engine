@@ -59,9 +59,8 @@
                 resolve take the REFUSED branch, so the guide can show the
                 handoff without a backend. Ignored unless demo.
 
-  Requires window.birthdayModal — render studio/_birthday_assets once at
-  layout level (the factory can’t ship inside this template; a cloned script
-  never runs). Single root element (modal-host template mount rule).
+  The scope, birthdayModal(), is studio/birthday, published on every page by
+  studio/alpine_scopes. Single root element (modal-host template mount rule).
 %>
 <%
   # min_age is OPTIONAL now. Absent (or 0) means this app asks for a birthday and

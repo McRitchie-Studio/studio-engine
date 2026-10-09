@@ -60,15 +60,15 @@ class ScriptCommentLeakTest < ActiveSupport::TestCase
   SCRIPT_CLOSE = %r{</script>}i
   QUOTES = ['"', "'", "`"].freeze
 
-  # Anti-vacuous floors, at roughly 60% of what the views carry: 12 script
-  # blocks, 456 comments and 27_825 bytes of comment body over 184 view files.
+  # Anti-vacuous floors, at roughly 60% of what the views carry: 4 script
+  # blocks, 136 comments and 7_983 bytes of comment body over 185 view files.
   # A program that moves out to a module (app/javascript/studio) takes its
   # comments with it, so the floors leave room for that while a walker that
   # quietly stopped walking goes red. Re-measure when a move brings the tree
   # near a floor.
-  MIN_SCRIPT_BLOCKS = 7
-  MIN_COMMENTS = 270
-  MIN_COMMENT_BYTES = 16_500
+  MIN_SCRIPT_BLOCKS = 2
+  MIN_COMMENTS = 80
+  MIN_COMMENT_BYTES = 4_700
 
   # A `/` opens a REGEX only where a value may begin. Everywhere else it divides.
   # Getting this wrong reads `/["']\/\//` as a comment and reports code as prose.

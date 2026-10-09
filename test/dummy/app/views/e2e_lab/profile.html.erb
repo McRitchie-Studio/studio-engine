@@ -3,14 +3,16 @@
     Both are invisible to every tier this repo already runs, and invisible in the
     same way: the server emits identical bytes whether the program works or not.
 
-      1. studio/profiles/_identity_mini carries an IntersectionObserver that
-         reveals a compact header once the full card has mostly scrolled past. A
+      1. studio/profiles/_identity_mini names the identity-mini controller, whose
+         IntersectionObserver (studio/identity_mini) reveals a compact header
+         once the full card has mostly scrolled past. A
          String assertion sees the bar's markup on every page — it is always in
          the document — and can say nothing about whether it EVER appears, or
          whether it appears at the right moment. `is-visible` is toggled by an
          observer callback, and its effect is a computed opacity.
 
-      2. studio/profiles/_form_script's dirty check raises the save bar. The bar
+      2. studioProfileForm's dirty check (studio/profile_form, on every page
+         through studio/alpine_scopes) raises the save bar. The bar
          is likewise always in the markup, behind x-show, and a markup test
          asserting `x-show="dirty"` stays green while the component throws on
          init, computes `changed()` wrongly, or never boots at all.
@@ -73,4 +75,3 @@
   </div>
 <% end %>
 
-<%= render "studio/profiles/form_script" %>

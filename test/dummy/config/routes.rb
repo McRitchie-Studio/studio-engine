@@ -82,6 +82,10 @@ Rails.application.routes.draw do
   get "lab/site_footer/crops", to: "e2e_lab#site_footer", defaults: { variant: "crops" }
   get "lab/site_footer/columns/:n", to: "e2e_lab#site_footer", defaults: { variant: "columns" }
 
+  # The scanner-safe sign-in page, and the POST it makes.
+  get "lab/confirm_interstitial", to: "e2e_lab#confirm_interstitial"
+  post "lab/confirm_interstitial/consume", to: "e2e_lab#confirm_interstitial_consume"
+
   # A host app's own pages, one open and one geo-LOCKED, for the geo suite.
   get "lab/geo", to: "geo_lab#open"
   get "lab/geo_locked", to: "geo_lab#locked"

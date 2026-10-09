@@ -65,30 +65,17 @@ class NoInlineScriptTest < Minitest::Test
            "turf-monster's tests read this template's source"
     },
 
-    # engine-modal-blocks-profile-stimulus
-    "studio/_confirm_interstitial.html.erb" => {
-      scripts: 1, owner: "engine-modal-blocks-profile-stimulus", why: "the confirm interstitial"
-    },
-    "studio/_birthday_assets.html.erb" => {
-      scripts: 1, owner: "engine-modal-blocks-profile-stimulus", why: "the birthday gate"
-    },
-    "studio/modals/_image_upload.html.erb" => {
-      scripts: 1, owner: "engine-modal-blocks-profile-stimulus", why: "the image upload and cropper modal"
-    },
-    "studio/profiles/_birthday_picker_script.html.erb" => {
-      scripts: 1, owner: "engine-modal-blocks-profile-stimulus", why: "the birthday picker"
-    },
-    "studio/profiles/_identity_mini.html.erb" => {
-      scripts: 1, owner: "engine-modal-blocks-profile-stimulus", why: "the identity mini card"
-    },
-    "studio/profiles/_form_script.html.erb" => {
-      scripts: 1, owner: "engine-modal-blocks-profile-stimulus", why: "the profile form"
+    # engine-modal-blocks-profile-stimulus: inline on purpose, and nonced
+    # (test/integration/head_script_nonce_test.rb holds the guard to that).
+    "studio/_alpine_scopes_guard.html.erb" => {
+      scripts: 1, owner: "engine-modal-blocks-profile-stimulus",
+      why: "it reports a profile form, birthday card or upload whose x-data factory failed to load, so " \
+           "it must run with no module loaded; e2e/alpine_scopes_guard.spec.js fails each module and reads it"
     },
     "style/_modals.html.erb" => {
-      scripts: 2, owner: "engine-modal-blocks-profile-stimulus", why: "the style guide's modal demos"
-    },
-    "components/_avatar_cropper.html.erb" => {
-      scripts: 1, owner: "engine-modal-blocks-profile-stimulus", why: "the avatar cropper"
+      scripts: 1, owner: "engine-modal-blocks-profile-stimulus",
+      why: "the style guide's own nonced module import (studio/style_guide): a loader with no program, " \
+           "written with tag.script because the views are also rendered where importmap's helper is absent"
     }
   }.freeze
 
@@ -187,7 +174,7 @@ class NoInlineScriptTest < Minitest::Test
 
     found = inline_scripts(VIEW_ROOT)
     assert_equal [8], found["layouts/studio/_head.html.erb"], "the scan lost the pre-paint tag.script"
-    assert_equal 2, found.fetch("style/_modals.html.erb", []).length, "the scan lost a script tag in markup"
+    assert_equal 1, found.fetch("studio/_at_time_script.html.erb", []).length, "the scan lost a script tag in markup"
   end
 
   # ------------------------------------------------ GUARD THE GUARD: controls

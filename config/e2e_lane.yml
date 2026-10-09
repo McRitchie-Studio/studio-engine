@@ -923,7 +923,36 @@
 # first press, a controller that connects after the grace clears the mark, and
 # a Turbo visit onto a button after a failure marks it.
 #   npx playwright test --list  -> 276 tests in 39 files
-total_specs: 276
+# 276 -> 294: four files, 18 tests, for the modal blocks and profile scripts that
+# moved to modules.
+# e2e/confirm_interstitial.spec.js, 4: the sign-in page posts its own form once;
+# with its module's request aborted, and answered 404, the fallback button shows
+# itself by CSS and signs in; the fallback takes no room until it shows.
+# e2e/crop_photo_modal.spec.js, 5: the crop card mounts Cropper.js at the asked
+# ratio, locks, and hands its opener a PNG with the owner; Cancel releases it;
+# the empty card is the picker; a file that is no image is refused; and a page
+# where Cropper.js never arrives says so and takes no dead press.
+# e2e/style_modal_actions.spec.js, 5: the style guide's demo buttons run through
+# their actions, each names a driver, the guide's store is the engine's stack,
+# and only the style guide fetches the section's modules.
+# e2e/scopes_survive_boot_failure.spec.js, 4: with studio/application aborted,
+# every x-data factory is still on the page, the profile form saves and
+# discards, the birthday row works and the birthday gate submits.
+#   npx playwright test --list  -> 294 tests in 43 files
+# 294 -> 318: e2e/alpine_scopes_guard.spec.js, 23 tests, and one more in
+# e2e/confirm_interstitial.spec.js. The x-data factories' guard
+# (studio/_alpine_scopes_guard) says so when a page's factories did not load.
+# Twenty make one of the five modules behind them fail for real AS THE PAGE
+# LOADS (each aborted, and each answered 404): on the profile edit page every
+# scope reads its notice at AA in both themes, the form's plain Save shows and
+# sends the server's values, and a reload recovers; on the birthday gate's page
+# the card a modal mounts later says so as it arrives. Three hold the other
+# side: a healthy profile page and a healthy birthday card are never marked,
+# and nor is a boot whose modules arrive two seconds late. The interstitial's
+# fifth: with the post's answer held seven seconds, the module's own timer
+# shows the fallback button at four.
+#   npx playwright test --list  -> 318 tests in 44 files
+total_specs: 318
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1091,7 +1120,15 @@ total_specs: 276
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 276
 # executed = total - devnet - allowed_skips = 276 - 0 - 0 = 276, so executed ==
 # total_specs and the equality assertion holds.
-executed: 276
+# And for the modal blocks and profile scripts, 18 more tests in four new files:
+#   npx playwright test --list                                             -> 294 tests, 43 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 294
+# And for the x-data factories' guard: 24 more tests, 1 new file:
+#   npx playwright test --list                                             -> 318 tests, 44 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 318
+executed: 318
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

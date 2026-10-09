@@ -26,7 +26,7 @@ require "action_view"
 class AgeGateEntryTokenTest < ActiveSupport::TestCase
   ENGINE_ROOT     = File.expand_path("../..", __dir__)
   BIRTHDAY_ERB    = File.join(ENGINE_ROOT, "app/views/studio/modals/blocks/_birthday.html.erb")
-  BIRTHDAY_FACTORY_ERB = File.join(ENGINE_ROOT, "app/views/studio/_birthday_assets.html.erb")
+  BIRTHDAY_FACTORY = File.join(ENGINE_ROOT, "app/javascript/studio/birthday.js")
 
   # The jurisdictions TM's AgePolicy encodes. Their presence in an engine file (or
   # in the primitive rendered from neutral copy) means legal policy leaked across
@@ -103,7 +103,8 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
 
   test "the primitive + factory source hardcode no state table, no AgePolicy, no age default" do
     src     = File.read(BIRTHDAY_ERB)
-    factory = File.read(BIRTHDAY_FACTORY_ERB)
+    factory = File.read(BIRTHDAY_FACTORY)
+    assert_includes factory, "export function birthdayModal", "the factory source is studio/birthday"
 
     POLICY_STATE_CODES.each do |code|
       refute_match(/\b#{code}\b/, src,     "the age-gate primitive must not hardcode jurisdiction #{code}")
@@ -149,10 +150,13 @@ class AgeGateEntryTokenTest < ActiveSupport::TestCase
 
   # --- C. the age-gate specimen is capability-gated on :age_gate -------------
 
-  test "the style page ships the birthdayModal factory at page level" do
+  test "the style page mounts the birthday card on the published factory" do
     html = render_index
-    assert_includes html, "window.birthdayModal",
-      "the birthday factory must ship at page level so the modal opens live"
+    assert_includes html, "x-data=\"birthdayModal({",
+      "the birthday card binds the factory studio/alpine_scopes publishes"
+    assert_match(/^\s*birthdayModal: \(opts\) => birthdayModal\(opts\)/,
+                 File.read(File.join(ENGINE_ROOT, "app/javascript/studio/alpine_scopes.js")),
+                 "the factory must be published on every page so the modal opens live")
     assert_includes html, "$store.dsModals.current().id === 'birthday'",
       "the overlay registers the birthday modal"
     assert_includes html, "$store.dsModals.open('birthday', { validates: opts.validates })",
