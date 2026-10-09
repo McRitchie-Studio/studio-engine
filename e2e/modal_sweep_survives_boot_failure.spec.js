@@ -12,9 +12,9 @@ const { blockOffsiteRequests } = require("./helpers");
 // cookie), so Turbo is on the page; /lab/birthday_gate brings `labModals`.
 //
 // The CONTROL: remove the turbo:before-cache listener from installModalHost and
-// the first spec fails, with the dialog back on the page after Back. Bind the
-// sweep in the controller's connect() as well and the second fails on a count
-// of 2.
+// the first spec fails on the store still holding the card after the visit.
+// Bind the sweep in the controller's connect() as well and the second fails on
+// a count of 2.
 //
 // NOT COVERED: the bfcache half (pageshow with persisted: true). Playwright's
 // Chromium does not restore from bfcache; test/javascript/modal_host.test.mjs

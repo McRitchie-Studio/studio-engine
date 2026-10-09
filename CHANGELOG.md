@@ -4,6 +4,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **A modal left open no longer comes back on Back when `studio/application`
+  fails to load.** `studio/modal_host` binds the stale-modal sweep itself, on
+  a bfcache `pageshow` and on `turbo:before-cache`, once per document, for
+  every host on the page. The `modal-host` controller bound it before, so a
+  failed boot left the stores registered and the sweep unbound. The controller
+  now registers its host's store and nothing else, so each event sweeps a
+  store once. `clearStaleModalsIn(doc, win)` is exported beside
+  `clearStaleModals(win, name)`. No markup changes.
+
 ### Changed
 
 - **The modal blocks and the profile scripts move to ES modules.** The crop
