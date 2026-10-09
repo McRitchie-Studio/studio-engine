@@ -674,5 +674,68 @@ class E2eLabController < ActionController::Base
     render("site_footer_#{variant}", layout: "site_footer_lab")
   end
 
+  # ---- The knowledge layer's recording beside its transcript -------------------
+  #
+  # The real /admin/knowledge/:id needs an admin session, a documents table and a
+  # bucket, and none of those is what a browser adds. What only a browser can
+  # show is that a click on a cue moves the player, that the cue being spoken is
+  # marked and followed, and that all of it still happens when the markup arrives
+  # inside a lazy <turbo-frame> after the page has loaded.
+  #
+  # So the frame action renders the engine's own template
+  # (studio/knowledge_docs/preview) over a Result the engine's own reader built
+  # from the transcript below, and the page action wraps it in the frame tag the
+  # show page writes. The recording is a WAV of silence e2e/boot.rb generates:
+  # nothing here is a real meeting, and the names are invented.
+  LabKnowledgeDoc = Struct.new(:id, :title, :s3_key, :mime_type, :byte_size, keyword_init: true) do
+    def file? = true
+    def filename = File.basename(s3_key)
+  end
+
+  # Answers Studio::KnowledgePreview's one storage call from memory.
+  LabKnowledgeStorage = Struct.new(:bytes) do
+    def download(key:, max_bytes: nil) = max_bytes ? bytes.byteslice(0, max_bytes) : bytes
+  end
+
+  LAB_RECORDING_URL = "/e2e/media/meeting.wav"
+  LAB_RECORDING_SECONDS = 120
+  LAB_SPEAKERS = ["Sam Sample (Example Co)", "Riley Example", "Jordan Example"].freeze
+
+  # One cue every two seconds, for `count` cues: 60 fill the recording.
+  # ?cues= takes it to the parser's cap, which is how the page at 5,000 cues is
+  # measured (docs/E2E_LANE.md).
+  def self.lab_transcript(count)
+    lines = ["Weekly widget sync", "VIEW RECORDING", ""]
+    count.times do |index|
+      at = index * 2
+      stamp = at >= 3600 ? format("%d:%02d:%02d", at / 3600, (at % 3600) / 60, at % 60) : format("%d:%02d", at / 60, at % 60)
+      lines << "#{stamp} - #{LAB_SPEAKERS[index % LAB_SPEAKERS.size]}"
+      lines << "  Line #{index + 1}: we reviewed the <b>widget</b> schedule & agreed the next step."
+    end
+    lines.join("\n") << "\n"
+  end
+
+  # The frame's own URL, and the page a spec opens directly when Turbo is not
+  # what it is about. ?recording=0 is the document with no recording attached.
+  def knowledge_transcript_frame
+    require "studio/knowledge_preview"
+    require "studio/knowledge_transcript"
+    count = params[:cues].to_i.clamp(0, Studio::KnowledgeTranscript::MAX_CUES + 100)
+    count = 60 if params[:cues].blank? || count.zero?
+    @doc = LabKnowledgeDoc.new(id: 1, title: "Weekly widget sync", s3_key: "knowledge/lab/standup.txt", mime_type: "text/plain")
+    @preview = Studio::KnowledgePreview.for(@doc, storage: LabKnowledgeStorage.new(self.class.lab_transcript(count)))
+    @player = params[:recording] == "0" ? nil : Studio::KnowledgePreview::Player.new(kind: :audio, url: LAB_RECORDING_URL)
+    response.headers["Cache-Control"] = "no-store"
+    render(:knowledge_transcript_frame)
+  end
+
+  def knowledge_transcript = render(:knowledge_transcript, layout: "survey_turbo_lab")
+
+  # The dummy draws no knowledge routes (they need the host's admin gate), so
+  # the two links the engine's template writes point at the lab itself.
+  def admin_knowledge_doc_path(_doc) = "/lab/knowledge_transcript"
+  def admin_knowledge_doc_download_path(_doc) = "/lab/knowledge_transcript"
+  helper_method :admin_knowledge_doc_path, :admin_knowledge_doc_download_path
+
   def up = render(plain: "ok")
 end

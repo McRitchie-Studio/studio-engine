@@ -1,0 +1,18 @@
+<%# The document page's lazy frame, for e2e/knowledge_transcript.spec.js.
+
+    The frame tag is the one studio/knowledge_docs/show writes (same id, lazy,
+    a link inside for a browser with no Turbo), pointed at the lab's frame
+    action. It is written out here because the show page itself needs an admin
+    session and a document row; everything that arrives INSIDE the frame is the
+    engine's own template. The spacer above it is what makes "lazy" mean
+    something: the frame starts below the fold. %>
+<main class="p-8">
+  <p data-test="lab-body">knowledge transcript lab</p>
+  <div data-test="spacer" style="height: 120vh"></div>
+  <turbo-frame id="knowledge-preview" loading="lazy" src="/lab/knowledge_transcript/frame">
+    <p class="text-sm opacity-70">
+      Loading the preview…
+      <a href="/lab/knowledge_transcript/frame" id="knowledge-preview-open">Open it</a>
+    </p>
+  </turbo-frame>
+</main>

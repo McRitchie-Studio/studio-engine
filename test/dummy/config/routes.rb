@@ -72,6 +72,9 @@ Rails.application.routes.draw do
   get "lab/session_drift", to: "e2e_lab#session_drift"
   get "lab/sidebar_panels", to: "e2e_lab#sidebar_panels"
   get "lab/sidebar_panels_turbo", to: "e2e_lab#sidebar_panels_turbo"
+  # A recording beside its transcript: the page with the lazy frame, and the frame.
+  get "lab/knowledge_transcript", to: "e2e_lab#knowledge_transcript"
+  get "lab/knowledge_transcript/frame", to: "e2e_lab#knowledge_transcript_frame"
   # One route per page, spelled out: test/integration/e2e_lab_isolation_test.rb
   # visits every /lab route by its literal path, which an optional segment is not.
   get "lab/site_footer", to: "e2e_lab#site_footer"

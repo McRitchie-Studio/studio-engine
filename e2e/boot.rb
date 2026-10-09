@@ -139,6 +139,25 @@ FileUtils.cp(turbo_source, File.join(PUBLIC_DIR, "js", "turbo.min.js"))
 FileUtils.cp(File.join(ROOT, "test", "dummy", "app", "javascript", "lab_lazy_controller.js"),
              File.join(PUBLIC_DIR, "js", "lab_lazy_controller.js"))
 
+# ---- A recording, for the knowledge transcript page -----------------------------
+#
+# Two minutes of silence as an 8-bit mono WAV, written here and committed
+# nowhere: a player needs real media to load, seek and play, and a browser will
+# not report a currentTime for a file it cannot decode. It is served as a static
+# file, so the browser's ranged requests are answered as a bucket answers them.
+# Nothing in it is anyone's meeting.
+MEDIA_DIR = File.join(PUBLIC_DIR, "media")
+FileUtils.mkdir_p(MEDIA_DIR)
+wav_rate = 8_000
+wav_seconds = 120
+wav_samples = wav_rate * wav_seconds
+wav = +"RIFF".b
+wav << [36 + wav_samples].pack("V") << "WAVEfmt ".b
+wav << [16, 1, 1, wav_rate, wav_rate, 1, 8].pack("VvvVVvv")
+wav << "data".b << [wav_samples].pack("V") << ("\x80".b * wav_samples)
+File.binwrite(File.join(MEDIA_DIR, "meeting.wav"), wav)
+abort "e2e/boot: the lab recording was not written" unless File.size?(File.join(MEDIA_DIR, "meeting.wav")).to_i == 44 + wav_samples
+
 IMG_DIR = File.join(PUBLIC_DIR, "img")
 FileUtils.mkdir_p(IMG_DIR)
 {

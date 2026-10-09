@@ -1,0 +1,10 @@
+<%# The knowledge layer's preview frame, for e2e/knowledge_transcript.spec.js.
+
+    One render BY NAME and nothing else: the engine's own preview template,
+    which writes the <turbo-frame> and renders the player, the cues and their
+    styles. The controller set up its three instance variables as
+    Studio::KnowledgeDocsController#preview does. Anything hand-written here
+    would be the lab grading itself. %>
+<main class="p-8">
+  <%= render template: "studio/knowledge_docs/preview" %>
+</main>
