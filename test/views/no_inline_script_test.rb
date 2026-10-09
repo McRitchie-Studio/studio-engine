@@ -45,6 +45,14 @@ class NoInlineScriptTest < Minitest::Test
       why: "pre-paint theme: runs before the stylesheet paints"
     },
 
+    # hold-button-says-when-dead: inline on purpose, and nonced
+    # (test/integration/head_script_nonce_test.rb holds it to that).
+    "studio/_hold_button_guard.html.erb" => {
+      scripts: 1, owner: "hold-button-says-when-dead",
+      why: "it reports a hold button whose modules failed to load, so it must run with no module " \
+           "in the boot graph loaded; e2e/hold_button_guard.spec.js fails each module and reads it"
+    },
+
     # engine-admin-scripts-to-stimulus: left inline on purpose.
     "studio/_at_time_script.html.erb" => {
       scripts: 1, owner: "engine-admin-scripts-to-stimulus",

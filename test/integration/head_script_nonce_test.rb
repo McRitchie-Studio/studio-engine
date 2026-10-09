@@ -16,8 +16,9 @@ require "nokogiri"
 #
 # The head's behaviour lives in ES modules (app/javascript/studio), booted by
 # studio/application. What is left inline is the pre-paint theme script, the
-# import map, the module tag that imports the boot, and the one that imports the
-# Alpine stores on their own (so a failed boot keeps them); each carries the nonce,
+# hold button's guard (studio/_hold_button_guard), the import map, the module tag
+# that imports the boot, and the ones that import a module by its own door (so a
+# failed boot keeps the stores, the hold button and the rest); each carries the nonce,
 # so a host whose policy names a nonce (and so ignores 'unsafe-inline') still
 # runs all of them. A new inline <script> in the head without the nonce fails
 # here.
@@ -54,17 +55,48 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "what stays inline is the pre-paint theme, the import map, the boot import and the five own-door imports" do
+  test "what stays inline is the pre-paint theme, the hold button guard, the import map, the boot import and the five own-door imports" do
     inline = head_scripts("/lab/bar_stack").reject { |script| script["src"] }
 
-    assert_equal 8, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
+    assert_equal 9, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
     assert_includes inline[0].text, "classList.add('dark')", "the pre-paint theme script comes first"
-    assert_equal "importmap", inline[1]["type"]
-    assert_equal "module", inline[2]["type"]
-    assert_equal %(import "studio/application"), inline[2].text.strip
+    assert_includes inline[1].text, "studioHoldButtonGuard", "the hold button's guard comes second"
+    assert_equal "importmap", inline[2]["type"]
+    assert_equal "module", inline[3]["type"]
+    assert_equal %(import "studio/application"), inline[3].text.strip
     assert_equal %w[studio/stimulus studio/alpine_stores studio/modal_host studio/toast studio/link_sidebar],
-                 inline[3..].map { |script| script.text.strip[/\Aimport "([^"]+)"\z/, 1] }
-    assert_equal %w[module] * 5, inline[3..].map { |script| script["type"] }
+                 inline[4..].map { |script| script.text.strip[/\Aimport "([^"]+)"\z/, 1] }
+    assert_equal %w[module] * 5, inline[4..].map { |script| script["type"] }
+  end
+
+  # The guard reports a hold button whose modules failed to load, so it is a
+  # classic inline script that imports nothing: nonced, so a strict policy runs
+  # it, and ahead of every module tag, so no module's failure can precede it.
+  test "the hold button's guard is a nonced classic inline script, before every module" do
+    scripts = head_scripts("/lab/bar_stack")
+    guards = scripts.select { |script| script.text.include?("studioHoldButtonGuard") }
+
+    assert_equal 1, guards.size, "the head renders the guard once"
+    guard = guards.first
+    assert_equal NONCE, guard["nonce"]
+    assert_nil guard["type"], "a module script would wait behind the modules it reports on"
+    assert_nil guard["src"], "a request of its own is one more that can fail"
+    refute_match(/\bimport\s*[("'{*]/, guard.text, "the guard imports a module")
+
+    # turf-monster's report pages count the observers their own scripts build
+    # by this spelling, over the whole response.
+    refute_includes guard.text, "new MutationObserver(", "a host page's own count of its observers would include the guard's"
+
+    first_module = scripts.index { |script| %w[module importmap].include?(script["type"]) }
+    assert_operator scripts.index(guard), :<, first_module
+  end
+
+  test "with no nonce generator the guard renders without a nonce attribute" do
+    Rails.application.env_config[KEY] = nil
+    guard = head_scripts("/lab/bar_stack").find { |script| script.text.include?("studioHoldButtonGuard") }
+
+    refute_nil guard
+    refute guard.key?("nonce")
   end
 
   # The Stimulus application's own door: the hold button confirms real actions,

@@ -175,6 +175,14 @@ it loads: only a page with a board fetches the board controller and SortableJS
 (the `sortablejs` pin). `window.Sortable` is a shim until then, whose `create`
 loads the library first.
 
+**The hold button says so when it cannot work.** It is imported statically, so
+the one way it fails is a module request that fails as the page loads. The head
+carries an inline, nonced guard (`studio/_hold_button_guard`) that imports
+nothing: a `.hold-stack` whose controller has not written
+`data-hold-button-connected` once the boot is over is marked
+`data-studio-controller-failed="hold-button"`, reads as unavailable, and shows
+"This button could not load. Reload the page." A late connect clears it.
+
 Alpine loads after the module tags. Deferred classic scripts and module scripts
 run in document order, so by the time Alpine starts, the boot has installed the
 Alpine shims (`studio/alpine_shims`): the `window.*` globals and Alpine stores
@@ -214,8 +222,8 @@ sites use the events. The string locals are evaluated by
 **Today.** The engine still ships some behaviour as scripts inside partials
 (the modal blocks, the profile pages, the admin pages). The hold button still
 accepts `guard:`, `on_success:` and `validate:` as JavaScript strings. The
-shared head carries one inline script,
-the nonced pre-paint theme; its behaviour is the modules above. The engine
+shared head carries two inline scripts, the nonced pre-paint theme and the
+nonced hold button guard; its behaviour is the modules above. The engine
 vendors Alpine and loads it with `javascript_include_tag`. Every app pins its
 modules with importmap.
 Cyvasse and Industries pin Stimulus; the hub has `stimulus-rails` in its

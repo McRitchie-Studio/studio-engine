@@ -136,6 +136,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   after it: on `/admin/style` the depth-chart specimen's cards left their
   lanes and its locked starters dragged. A board now wires, watches and counts
   only the zones inside its own element.
+- **A hold button that cannot work says so.** The button runs on five modules,
+  and a browser keeps a failed module request for the life of the document, so
+  one failure among them at page load left the button rendered, enabled and
+  deaf: a full hold sent nothing and showed nothing until a reload. The head
+  now carries a small inline, nonced guard (`studio/_hold_button_guard`) that
+  imports nothing. A `.hold-stack` whose controller has not connected 1.5 s
+  after `DOMContentLoaded` (or shortly after it arrives later, by a Turbo visit
+  or a modal's `x-if`) is marked `data-studio-controller-failed="hold-button"`:
+  the button dims and is `aria-disabled`, the bubbles stop, and "This button
+  could not load. Reload the page." shows under it in a `role="status"`
+  region; a press says it again. The controller writes
+  `data-hold-button-connected` on its stack and clears the mark the moment it
+  connects, however late. `studio/_hold_button` renders one more element, an
+  empty `<span class="hold-notice" role="status">` held out of the layout, so
+  a working button measures as before. A host with a nonce-based
+  `script-src` needs nothing new; one that allow-lists inline scripts by hash
+  adds this script's.
 
 ### Breaking
 
