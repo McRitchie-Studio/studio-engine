@@ -287,6 +287,17 @@ class E2eLabController < ActionController::Base
   # no /age/verify and inventing one would put the spec on a fiction.
   def birthday_gate = render(:birthday_gate)
 
+  # The scanner-safe sign-in page (studio/_confirm_interstitial), a whole document
+  # with no layout, as Studio::LinksController#show renders it. Its POST lands on
+  # the action below, which answers with a line the spec can read; no token is
+  # burned, because what is under test is that the page posts at all.
+  def confirm_interstitial
+    render partial: "studio/confirm_interstitial",
+           locals: { consume_path: "/lab/confirm_interstitial/consume" }
+  end
+
+  def confirm_interstitial_consume = render(plain: "consumed by POST")
+
   # The GLOBAL modal host (`$store.modals`), which no other lab page mounts —
   # /lab/birthday_gate drives the SCOPED host instead. Two separate partials with
   # two separate copies of the focus trap; this page is what lets a browser grade
@@ -527,17 +538,6 @@ class E2eLabController < ActionController::Base
   # demos — are inline scripts in that engine partial, so the response bytes are
   # identical whether either one runs.
   def style_modals = render(:style_modals)
-
-  # The scanner-safe sign-in page (studio/_confirm_interstitial), a whole document
-  # with no layout, as Studio::LinksController#show renders it. Its POST lands on
-  # the action below, which answers with a line the spec can read; no token is
-  # burned, because what is under test is that the page posts at all.
-  def confirm_interstitial
-    render partial: "studio/confirm_interstitial",
-           locals: { consume_path: "/lab/confirm_interstitial/consume" }
-  end
-
-  def confirm_interstitial_consume = render(plain: "consumed by POST")
 
   # HOST-SUPPLIED LOCALS THAT LAND INSIDE A JS STRING LITERAL, across the blocks
   # that take one — success/error card event names and the tx link's cluster query.
