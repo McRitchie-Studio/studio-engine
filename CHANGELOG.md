@@ -62,9 +62,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   marked element every `[data-studio-scope-fallback]` is shown and a text field
   left blank goes back to the value the server rendered: the profile form's
   plain Save (`studio/profiles/_plain_save`) is such a fallback, so a person can
-  still save. A healthy or slow page is never marked. A host needs nothing
-  beyond recompiling its Tailwind bundle for `.studio-scope-notice`
-  (`engine-motion.css`).
+  still save. A healthy or slow page is never marked. The line carries its own
+  styles, so a host changes nothing; `.studio-scope-notice` is there to restyle
+  it.
 - **The crop photo modal says when Cropper.js did not load.** It waits up to
   three seconds for the library (the script is deferred, and on a Turbo visit
   can land after the card opens), then shows "The photo cropper did not load.

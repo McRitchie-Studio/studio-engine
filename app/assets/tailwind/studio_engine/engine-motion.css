@@ -1790,23 +1790,6 @@ body.modal-open { overflow: visible; }
   100% { transform: scale(1); }
 }
 
-/* THE SCOPE THAT COULD NOT LOAD. The guard in the head
-   (studio/_alpine_scopes_guard) puts this line first inside an element whose
-   x-data factory failed to load: a profile form, a birthday card, an upload.
-   In the danger ink, which the theme resolver holds to AA on every surface. */
-.studio-scope-notice {
-  display: block;
-  margin: 0 0 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid currentColor;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  line-height: 1.35;
-  text-align: center;
-  color: var(--color-danger-ink, var(--color-danger));
-}
-
 .hold-stack > .hold-fizz,
 .hold-stack > .hold-fizz-portal,
 .hold-fizz-portal > .hold-fizz {

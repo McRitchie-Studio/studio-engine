@@ -18,9 +18,11 @@
     <div x-data="studioProfileForm({...})" data-studio-scope-failed="studioProfileForm">
       <p class="studio-scope-notice" role="status">This did not load. Reload the page.</p>
 
-  engine-motion.css styles the line. A card a modal mounts later is marked when
-  it arrives. A factory that turns up afterwards takes the mark and the line
-  away again.
+  The line carries its own few styles (the danger ink, a border, weight), set
+  from here, so it reads as a notice in a host whose stylesheet has never heard
+  of it; .studio-scope-notice is there for a host that wants to restyle it. A
+  card a modal mounts later is marked when it arrives. A factory that turns up
+  afterwards takes the mark and the line away again.
 
   A FORM IS NOT LEFT WITH NO WAY TO SUBMIT. Inside a marked element:
     - every [data-studio-scope-fallback] is shown (its x-cloak and hidden come
@@ -50,6 +52,11 @@
     var FALLBACK = "data-studio-scope-fallback";
     var NOTICE_CLASS = "studio-scope-notice";
     var NOTICE = "This did not load. Reload the page.";
+    // The danger ink is the theme's, held to AA on every surface; a host with
+    // no such token keeps the text colour around the line.
+    var NOTICE_STYLE = "display:block;margin:0 0 0.75rem;padding:0.5rem 0.75rem;" +
+      "border:1px solid currentColor;border-radius:0.5rem;font-size:0.875rem;font-weight:600;" +
+      "line-height:1.35;text-align:center;color:var(--color-danger-ink, var(--color-danger, inherit))";
     var CALL = /^\s*([A-Za-z_$][\w$]*)\s*\(/;
     var GRACE_MS = 1500;
     var SETTLE_MS = 250;
@@ -91,6 +98,7 @@
         var line = document.createElement("p");
         line.className = NOTICE_CLASS;
         line.setAttribute("role", "status");
+        line.style.cssText = NOTICE_STYLE;
         line.textContent = NOTICE;
         element.insertBefore(line, element.firstChild);
       }
