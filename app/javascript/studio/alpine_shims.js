@@ -19,6 +19,8 @@ import { NavCollapse } from "studio/nav_collapse"
 import {
   showNavSpinner, hideNavSpinner, installSpinnerReset, fireSuccessConfetti
 } from "studio/head_chrome"
+import { studioBoard, loadSortable, sortableShim } from "studio/board"
+import { levelingActionModal } from "studio/leveling_activity"
 
 // x-data="navCollapse()": the hub's own header. A host that defines its own
 // window.navCollapse (turf-monster does, inline, before this runs) keeps it.
@@ -41,5 +43,16 @@ export function installAlpineShims() {
   if (!window.showNavSpinner) window.showNavSpinner = showNavSpinner
   if (!window.hideNavSpinner) window.hideNavSpinner = hideNavSpinner
   if (!window.fireSuccessConfetti) window.fireSuccessConfetti = fireSuccessConfetti
+  // x-data="studioBoard({...})": studio/board/_board, and any board a host
+  // writes by hand. Alpine passes the opts alone.
+  if (!window.studioBoard) window.studioBoard = (opts) => studioBoard(opts)
+  // x-data="levelingActionModal({...})": studio/modals/blocks/_leveling_activity
+  // and _change_username.
+  if (!window.levelingActionModal) window.levelingActionModal = (opts) => levelingActionModal(opts)
+  // Sortable.create(el, options) in a page script (the hub's deploy board):
+  // no page carries SortableJS until something asks for it, so the call loads
+  // it. SortableJS replaces this object when it arrives; a page that loads its
+  // own copy (turf-monster's slate page) replaces it the same way.
+  if (!window.Sortable) window.Sortable = sortableShim(() => loadSortable())
   installSpinnerReset()
 }

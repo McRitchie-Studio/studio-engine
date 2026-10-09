@@ -10,6 +10,7 @@ require "active_support/test_case"
 require "action_view"
 require "cgi"
 require "json"
+require "nokogiri"
 
 # [integration] Guard for the board primitive's MARKUP contract — the data-* identity
 # every board card + zone must emit so window.studioBoard can move/reorder it, and
@@ -124,29 +125,51 @@ class BoardPrimitiveTest < ActiveSupport::TestCase
     assert_includes html, "/tasks/:id.json", "the move template flows into the factory opts"
   end
 
-  # --- factory source-presence checks (NOT behavioral) -----------------------
-  # HONEST SCOPE: these are SOURCE-SUBSTRING assertions on the factory JS, not
-  # behavioral ones — the factory is never executed here. They guard that the
-  # load-bearing lines stay present (the same-zone-never-PATCH guard, the flake-fix
-  # init ordering, the event seam); they do NOT prove runtime behavior.
-  #
-  # THE HARNESS HAS LANDED for the factory's SAVE path:
-  # test/views/board_factory_save_behavior_test.rb extracts this same <script> and
-  # runs it under node, so saveOrder/applyMove/request are asserted by calling them.
-  # It exists because this section proved structurally blind to a real defect — a
-  # reorder that discarded the server's 422 in silence kept every assertion below
-  # green, since the broken build contained the word "catch" too. Move a check down
-  # here only when it cannot be executed; prefer growing that file.
-  test "the factory keeps the load-bearing guard lines present in source" do
-    factory = File.read("app/views/studio/_board_assets.html.erb")
-    assert_includes factory, "var moved = fromZone !== toZone",
-      "a move is decided by the DROPZONES, not the card"
-    assert_includes factory, "if (moved)",
-      "the zone PATCH runs only on a real cross-column move"
-    assert_includes factory, "data-alpine-ready",
-      "the $nextTick → data-alpine-ready init ordering (flake fix) is preserved"
-    assert_includes factory, 'window.dispatchEvent(new CustomEvent("studio:"',
-      "the primary extension seam is dispatched window events"
+  # --- where the behaviour lives ---------------------------------------------
+  # The board's behaviour is the studio/board module, and it is EXECUTED, not
+  # read: test/javascript/board.test.mjs calls the lane move, the rank, the exit
+  # fallback, the lock guard and the state helpers, and
+  # test/views/board_factory_save_behavior_test.rb calls the save path. What this
+  # tier can say is that the partials carry no script of their own and that the
+  # board names the controller that wires it.
+  test "the board partials carry no script and the board names its controller" do
+    assets = view.render(partial: "studio/board_assets")
+    assert_equal "", assets.strip, "studio/board_assets renders nothing; a consumer's render of it is harmless"
+
+    html = render_board(DEFAULT_LOCALS.merge(columns: columns_fixture))
+    refute_match(/<script/i, html, "the board renders no <script>")
+    section = Nokogiri::HTML.fragment(html).at_css("section[data-test='studio-board']")
+    assert_equal "board", section["data-studio-controller"], "the engine's Stimulus application wires the board"
+    assert_match(/\AstudioBoard\(/, section["x-data"], "the cards and slots still bind the studioBoard scope")
+  end
+
+  # The board is a lazy controller, and a failed lazy load is final for the
+  # document. The notice is in the markup, hidden by its own inline style, and
+  # engine.css reveals it on the attribute the registry sets.
+  test "the board carries a hidden notice for a controller that failed to load" do
+    html = render_board(DEFAULT_LOCALS.merge(columns: columns_fixture))
+    notice = Nokogiri::HTML.fragment(html).at_css("section[data-test='studio-board'] > p[data-test='studio-board-failed']")
+
+    refute_nil notice, "the notice is a direct child of the board section"
+    assert_equal "This board could not load its controls. Reload the page.", notice.text.strip
+    assert_equal "status", notice["role"]
+    assert_match(/\Adisplay: none;/, notice["style"], "hidden by default, with or without the engine's CSS")
+
+    css = File.read("app/assets/tailwind/studio_engine/engine.css")
+    assert_match(/\.studio-board\[data-studio-controller-failed~="board"\] > \.studio-board-failed \{\s*display: block !important;/, css)
+    assert_includes File.read("app/javascript/studio/lazy_controllers.js"), %(FAILED_ATTRIBUTE = "data-studio-controller-failed")
+  end
+
+  test "the module exports the factory, and the shim publishes it before Alpine starts" do
+    board = File.read("app/javascript/studio/board.js")
+    assert_match(/^export function studioBoard\(/, board)
+    refute_match(/^\s*import\s/, board, "studio/board imports nothing statically, so node loads it as a data: module")
+
+    shims = File.read("app/javascript/studio/alpine_shims.js")
+    assert_includes shims, 'from "studio/board"'
+    assert_match(/window\.studioBoard = /, shims)
+    assert_includes Studio::Engine.javascript_boot_graph, "studio/board",
+      "the factory is in the boot graph: Alpine evaluates x-data before a lazy module could arrive"
   end
 
   # --- the /admin/style Board specimen renders the REAL primitive (demo) -----
@@ -168,7 +191,7 @@ class BoardPrimitiveTest < ActiveSupport::TestCase
 
   # --- the vendored SortableJS ships and is wired ----------------------------
 
-  test "SortableJS is vendored and registered for precompile + loaded in the head" do
+  test "SortableJS is vendored, precompiled and pinned, and no page loads it by default" do
     vendored = File.read("app/assets/javascripts/studio/sortable.js")
     assert_includes vendored, "Sortable 1.15.6", "the pinned SortableJS version ships"
     assert_includes vendored, "VENDORED into studio-engine", "the house vendoring header is kept"
@@ -176,9 +199,15 @@ class BoardPrimitiveTest < ActiveSupport::TestCase
     engine = File.read("lib/studio/engine.rb")
     assert_includes engine, "studio/sortable.js", "sortable is added to config.assets.precompile"
 
+    pin = Rails.application.importmap.send(:expanded_packages_and_directories)["sortablejs"]
+    refute_nil pin, "studio/board imports SortableJS through the sortablejs pin"
+    assert_equal "studio/sortable.js", pin.path, "the pin is the vendored build (no CDN)"
+    assert_equal false, pin.preload, "a page that never drags never fetches it"
+
     head = File.read("app/views/layouts/studio/_head.html.erb")
-    assert_includes head, 'javascript_include_tag "studio/sortable"',
-      "the head loads the vendored sortable (no CDN)"
+    refute_match(/sortable/i, head, "the head loads SortableJS on no page")
+    refute_includes Studio::Engine.javascript_boot_graph, "studio/controllers/board_controller",
+      "the board controller is registered lazily"
   end
 
   # ==========================================================================
@@ -294,36 +323,6 @@ class BoardPrimitiveTest < ActiveSupport::TestCase
       "with no archive_zone the card is removed on exit (0.27.0)"
   end
 
-  # --- gaps 3 + 4 + 1: the factory JS carries the load-bearing exit/state lines
-  # SOURCE-substring scope (same honest limit as the guard-lines test above: the
-  # engine runs no JS harness, so the factory is never executed here). These guard
-  # that the re-parent branch, the exit marker, resetCardExit, and the state helpers
-  # stay present; the EFFECT that they are WIRED is proven by the opts tests above.
-
-  test "gap 4 — animateCardExit stamps the observable data-exit-action marker in source" do
-    factory = File.read("app/views/studio/_board_assets.html.erb")
-    assert_includes factory, "card.dataset.exitAction = kind",
-      "the exit path marks WHICH exit is running (observable; e2e asserts it)"
-  end
-
-  test "gap 3 — the fallback re-parents to the archive dropzone in source" do
-    factory = File.read("app/views/studio/_board_assets.html.erb")
-    assert_includes factory, 'document.getElementById("dropzone-" + self.archiveZone)',
-      "an archive exit resolves the archive column's dropzone"
-    assert_includes factory, "zone.insertBefore(card, anchor)",
-      "the card is re-parented into the archive column, not removed"
-    assert_includes factory, "resetCardExit",
-      "the re-parented card's exit animation is cleared so it is visible again"
-  end
-
-  test "gap 1 — the factory exposes the chrome-state helpers in source" do
-    factory = File.read("app/views/studio/_board_assets.html.erb")
-    assert_includes factory, "state: (opts.state", "the state bag is seeded from opts"
-    assert_includes factory, "toggleState:", "a boolean-flag toggle helper is exposed"
-    assert_includes factory, "toggleInState:", "a list-membership toggle helper is exposed"
-    assert_includes factory, "listHas:", "a list-membership read helper is exposed"
-  end
-
   # --- the /admin/style specimen demonstrates the enriched chrome LIVE --------
 
   test "the /admin/style Tasks section renders the enriched 0.28.0 chrome specimen" do
@@ -416,14 +415,6 @@ class BoardPrimitiveTest < ActiveSupport::TestCase
   test "DG4 backward-compat — no locked_selector ⇒ lockedSelector opt is null" do
     html = render_board(DEFAULT_LOCALS.merge(columns: columns_fixture))
     assert_nil board_opts_hash(html)["lockedSelector"], "every card stays draggable (0.28.0)"
-  end
-
-  test "DG4 — the factory keeps the lock filter + pin guard present in source" do
-    factory = File.read("app/views/studio/_board_assets.html.erb")
-    assert_includes factory, "self.lockedSelector ? (self.sortFilter",
-      "locked cards join the undraggable filter"
-    assert_includes factory, "cfg.onMove = function",
-      "a drag can't cross a locked sibling (the pin guard)"
   end
 
   # --- the /admin/style specimen demonstrates the depth-chart shape LIVE ------
