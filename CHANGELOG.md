@@ -25,7 +25,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
     `studio/hold_button`, on a `hold-button` controller that sits on the
     `.hold-stack`; the button's presses are `data-studio-action`s. The idle
     nudge runs only on a button the partial rendered, from the moment it
-    connects.
+    connects. `studio/stimulus` imports the controller statically, so it is
+    preloaded with the page and a button that renders later (a modal's) makes
+    no further request before its first press.
   - `layouts/studio/_head` imports `studio/toast`, `studio/link_sidebar` and
     `studio/stimulus` by their own nonced module tags, as it does
     `studio/alpine_stores` and `studio/modal_host`, so a boot that fails to
@@ -33,8 +35,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **The engine's Stimulus application is `studio/stimulus`.**
   `studio/application` still exports `application` and `schema`. A controller
   for one kind of page is listed in `studio/stimulus`'s `LAZY` and registered by
-  `studio/lazy_controllers` the first time an element names it; the hold button
-  is the first.
+  `studio/lazy_controllers` the first time an element names it; the list starts
+  empty. A lazy load that fails is final for the document, as it is in a
+  browser: the registry imports a controller once, reports a failure once, and
+  marks each element naming it with `data-studio-controller-failed`.
 
 - **The board primitive and the leveling activity modals move to ES modules.**
   `studio/_board_assets` and `studio/_leveling_activity_assets` render nothing;
@@ -108,6 +112,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   after it: on `/admin/style` the depth-chart specimen's cards left their
   lanes and its locked starters dragged. A board now wires, watches and counts
   only the zones inside its own element.
+
+## 0.96.2 — 2026-10-08
+
+### Added
+
+- **Consumer CI runs moms-app's suite** against each engine change, beside the
+  hub, Turf Monster, McRitchie Industries and Cyvasse.
 
 ## 0.96.1 — 2026-10-08
 

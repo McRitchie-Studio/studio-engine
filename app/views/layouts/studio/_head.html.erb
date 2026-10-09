@@ -163,11 +163,10 @@
     carries the nonce. %>
 <%= javascript_import_module_tag "studio/application" %>
 <%# THE STIMULUS APPLICATION, BY ITS OWN DOOR. studio/stimulus starts the engine's
-    Stimulus application and registers a page-specific controller the first time
-    a page renders its element (the hold button). Its only imports are Stimulus
-    and studio/lazy_controllers, so a failure elsewhere in the boot's graph
-    leaves a page its hold button. The boot imports it, so this resolves to the
-    same preloaded module. %>
+    Stimulus application and registers the hold button on it. Its only imports
+    are Stimulus, studio/lazy_controllers and the hold button's controller, so
+    a failure elsewhere in the boot's graph leaves a page its hold button. The
+    boot imports it, so this resolves to the same preloaded module. %>
 <%= javascript_import_module_tag "studio/stimulus" %>
 <%# THE STORES, BY THEIR OWN DOOR. Every host's <body> binds $store.devMode and the
     theme toggle binds $store.theme, so a boot that fails to load (a missing digest,

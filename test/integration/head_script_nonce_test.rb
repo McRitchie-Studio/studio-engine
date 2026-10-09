@@ -67,8 +67,8 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     assert_equal %w[module] * 5, inline[3..].map { |script| script["type"] }
   end
 
-  # The Stimulus application's own door: its lazy controllers (the hold button
-  # confirms real actions) must not depend on the rest of the boot's graph.
+  # The Stimulus application's own door: the hold button confirms real actions,
+  # so it is imported here and must not depend on the rest of the boot's graph.
   test "the Stimulus application loads by its own nonced module tag" do
     scripts = head_scripts("/lab/bar_stack")
     stimulus = scripts.index { |script| script.text.strip == %(import "studio/stimulus") }
@@ -79,7 +79,7 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
 
     source = File.read(File.expand_path("../../app/javascript/studio/stimulus.js", __dir__))
     imports = source.scan(/^import\s.*?from\s+"([^"]+)"/).flatten
-    assert_equal %w[@hotwired/stimulus studio/lazy_controllers], imports,
+    assert_equal %w[@hotwired/stimulus studio/lazy_controllers studio/controllers/hold_button_controller], imports,
                  "anything more it imports is one more file whose failure takes the hold button down"
   end
 

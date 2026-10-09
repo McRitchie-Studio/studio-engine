@@ -4,8 +4,8 @@
   A press-and-hold CTA for an action a host does not want taken by accident.
   Ported from turf-monster, where it confirms a contest entry.
 
-  The behaviour is studio/hold_button, on the lazily registered hold-button
-  controller (studio/controllers/hold_button_controller). A page answers a hold
+  The behaviour is studio/hold_button, on the hold-button controller
+  (studio/controllers/hold_button_controller), which arrives with the page. A page answers a hold
   through the events the button dispatches, which bubble:
 
     hold-button:guard     at the press; preventDefault() refuses the hold

@@ -279,6 +279,11 @@ class E2eLabController < ActionController::Base
   # Back.
   def hold_button_events = render(:hold_button_events, layout: "survey_turbo_lab")
 
+  # One lazily registered controller, loaded by the engine's registry
+  # (studio/lazy_controllers) through a loader the page supplies, so a spec can
+  # fail that module's request and read what the registry does about it.
+  def lazy_controller = render(:lazy_controller)
+
   # The birthday / age-gate handoff. No locals to prepare: the lab page sets up
   # the two cards' locals itself and both run in demo mode, because the dummy has
   # no /age/verify and inventing one would put the spec on a fiction.

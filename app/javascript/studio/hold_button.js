@@ -9,7 +9,7 @@
 //             data-studio-action="mousedown->hold-button#start ...">
 //
 // studio/controllers/hold_button_controller binds one Hold to the button and
-// answers its hooks; studio/stimulus registers that controller lazily.
+// answers its hooks; studio/stimulus imports and registers that controller.
 //
 // THE TIMELINE of one press, in ms from the press:
 //
