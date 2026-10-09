@@ -879,15 +879,16 @@
 # the controller loads does nothing, the controller is fetched only where a
 # button renders, it survives a Turbo visit and Back, and a failed boot.
 #   npx playwright test --list  -> 245 tests in 35 files
-# 245 -> 251: e2e/board_drag.spec.js, 6 tests. The board primitive drags on the
+# 245 -> 252: e2e/board_drag.spec.js, 7 tests. The board primitive drags on the
 # style guide's Tasks section: a card moves to another column, toasts and
 # recounts; a depth-chart card ranks inside its lane and does not leave it; a
 # locked card does not drag and none is dragged past it; a board's chrome state
-# works and its archive column takes a drop; SortableJS and the board controller
+# works and its archive column takes a drop; a board written by hand with only
+# the x-data names its controller and drags; SortableJS and the board controller
 # are fetched only by a page with a board; and a page script's Sortable.create
 # loads SortableJS and then creates the sortable.
-#   npx playwright test --list  -> 251 tests in 36 files
-total_specs: 251
+#   npx playwright test --list  -> 252 tests in 36 files
+total_specs: 252
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1034,8 +1035,8 @@ total_specs: 251
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 213
 # executed = total - devnet - allowed_skips = 213 - 0 - 0 = 213, so executed ==
 # total_specs and the equality assertion holds.
-#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 251
-executed: 251
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 252
+executed: 252
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

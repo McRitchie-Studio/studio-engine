@@ -167,6 +167,36 @@ test("a board's chrome state works on the scope, and its archive column is a dro
   expect(errors).toEqual([]);
 });
 
+test("a board written by hand with only the x-data names its controller and drags", async ({ page }) => {
+  const errors = watchPageErrors(page);
+  const fetched = watchRequests(page, ["board_controller"]);
+  await page.goto("/lab/bar_stack");
+  await page.waitForLoadState("networkidle");
+  expect(fetched).toEqual([]);
+
+  // What a host that binds the factory itself renders: no data-studio-controller.
+  await page.evaluate(() => {
+    const cards = ["one", "two", "three"].map((slug) =>
+      `<div id="card-${slug}" class="kanban-card" data-slug="${slug}" data-stage="lane" style="height:48px;margin:8px;background:#444">${slug}</div>`);
+    document.body.insertAdjacentHTML("afterbegin",
+      `<section id="hand-written" x-data="studioBoard({ demo: true, group: false })" style="position:relative;z-index:9999;width:320px">
+         <div id="dropzone-lane" class="kanban-dropzone" data-stage="lane">${cards.join("")}</div>
+       </section>`);
+  });
+
+  const section = page.locator("#hand-written");
+  await expect(section).toHaveAttribute("data-studio-controller", "board");
+  await expect(section).toHaveAttribute("data-alpine-ready", "true");
+  expect(fetched).toHaveLength(1);
+
+  // The last card is carried up the lane. Which slot it takes is SortableJS's
+  // call; that it moved up at all is the board's.
+  await drag(page, page.locator("#card-three"), page.locator("#card-one"), { dropAt: 0.2 });
+  await expect.poll(async () => (await idsIn(page.locator("#dropzone-lane"))).indexOf("card-three")).toBeLessThan(2);
+
+  expect(errors).toEqual([]);
+});
+
 // Every script or module the page asked for whose URL names one of `names`.
 function watchRequests(page, names) {
   const seen = [];
