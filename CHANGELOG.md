@@ -39,6 +39,35 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   empty. A lazy load that fails is final for the document, as it is in a
   browser: the registry imports a controller once, reports a failure once, and
   marks each element naming it with `data-studio-controller-failed`.
+- **The admin pages, the email manager, booking, the footer map and the survey
+  stepper move to ES modules.** Their inline scripts are gone; rendered markup
+  and styling are unchanged apart from the `data-studio-controller` attributes
+  named here. Six controllers register lazily, each fetched only by a page that
+  names it:
+  - `geo-settings` on `/admin/geo`'s root (`studio/geo_settings`), and
+    `link-preview-card` on `/admin/link_preview`'s root
+    (`studio/link_preview_card`).
+  - `email-banner-scale` on the `<template>` anchor `studio/emails/_banner_scale`
+    renders (`studio/email_banner_scale`).
+  - `booking` on the frame's wrapper and the popup's dialog (`studio/booking`),
+    and `footer-map` on the map element (`studio/footer_map`). Both install
+    once per document under the same guards (`__studioBookingFramesArmed`,
+    `__studioBookingPopupArmed`, `__studioFooterMapsArmed`) and
+    `window.__studioBookingLoad` is still published. Until the booking
+    controller connects, a booking link is an ordinary link to the booking page.
+  - `survey` on the survey's root (`studio/survey`). Until it connects, and if
+    it never does, the page is the plain form.
+  - The theme editors and the email manager's editors stay Alpine factories:
+    `themeEditor` and `dsThemeEditor` are `studio/theme_editor`, and
+    `emailBannerEditor` and `emailRecipients` are `studio/email_banner`.
+    `studio/alpine_shims` publishes all four on every page, because an `x-data`
+    is evaluated the moment Alpine starts. `themeEditor` takes its colours as
+    an argument.
+- **`test/views/no_inline_script_test.rb` holds the views to it.** A view with
+  an inline script fails unless it is on the test's allow-list, where each entry
+  names the task that owns it; an entry whose script is gone fails too. Two are
+  left inline on purpose: `studio/_at_time_script`, whose first pass runs before
+  first paint, and `solana_sessions/phantom_callback`, the wallet's return leg.
 
 - **The board primitive and the leveling activity modals move to ES modules.**
   `studio/_board_assets` and `studio/_leveling_activity_assets` render nothing;
@@ -90,37 +119,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   validation answer for a press that was released does not abort the next one;
   nothing of the timeline runs after the hold completes.
 
-### Breaking
-
-- **`window.toastManager` is gone.** Nothing binds it: the flash partial reads
-  `$store.toasts`. A template that wrote `x-data="toastManager(...)"` of its own
-  renders `layouts/studio/flash` and dispatches the `toast` event instead.
-- **`window.holdBtnStart`, `window.holdBtnEnd` and `window._holdBtnInit` are
-  gone.** The button binds its own presses; a page that called either function
-  dispatches the pointer events on the button, or renders the partial.
-- **`window.__studioLinkSidebarBridge` is gone.** It was the inline script's
-  run-once flag; a test that looked for it in a page's HTML looks for
-  `data-studio-controller="link-sidebar"`.
-- **`window.Sortable` is not SortableJS until a page asks for it.** On a page
-  with no board it is the loading shim, which has `create` and `load` and
-  nothing else: `new Sortable(...)`, `Sortable.get` and the other statics fail
-  until the library has loaded. A page script that needs more than `create`
-  awaits `Sortable.load()` first. A page that loads its own SortableJS is
-  unaffected. A test that looked for `window.studioBoard =` or a
-  `studio/sortable` script tag in a page's HTML looks for
-  `data-studio-controller="board"` on the board.
-
 ### Fixed
 
+- **The style guide's theme editor sends a save once.** The controller answers
+  a save with a 302 to `/admin/theme`, and a fetch that follows a 302 keeps a
+  PATCH a PATCH, so Save sent the theme twenty-one times and then toasted "Save
+  failed". The request no longer follows the redirect.
+- **The email manager's banner editor repaints the banner on the email's own
+  page.** `studio/emails/_banner_preview` isolates the banner in an iframe, and
+  the editor looked for its nodes in the page's own document only, so typing a
+  header, sub-text or tint changed nothing there. The editor now reaches into
+  the frame, as the emails list already did.
 - **Two boards on one page no longer drive each other's zones.** A board made
   every `.kanban-dropzone` on the page sortable and counted cards by document
   id, so the first board's group, filter and lock rule governed every board
   after it: on `/admin/style` the depth-chart specimen's cards left their
   lanes and its locked starters dragged. A board now wires, watches and counts
   only the zones inside its own element.
-
-### Fixed
-
 - **A hold button that cannot work says so.** The button runs on five modules,
   and a browser keeps a failed module request for the life of the document, so
   one failure among them at page load left the button rendered, enabled and
@@ -138,6 +153,37 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   a working button measures as before. A host with a nonce-based
   `script-src` needs nothing new; one that allow-lists inline scripts by hash
   adds this script's.
+
+### Breaking
+
+- **`window.toastManager` is gone.** Nothing binds it: the flash partial reads
+  `$store.toasts`. A template that wrote `x-data="toastManager(...)"` of its own
+  renders `layouts/studio/flash` and dispatches the `toast` event instead.
+- **`window.holdBtnStart`, `window.holdBtnEnd` and `window._holdBtnInit` are
+  gone.** The button binds its own presses; a page that called either function
+  dispatches the pointer events on the button, or renders the partial.
+- **`window.__studioLinkSidebarBridge` is gone.** It was the inline script's
+  run-once flag; a test that looked for it in a page's HTML looks for
+  `data-studio-controller="link-sidebar"`.
+- **`studio/emails/_recipient_repaint` and `studio/surveys/_script` are gone.**
+  Each rendered only a script. The engine's own pages no longer render them; a
+  host template that did deletes the line.
+- **The footer's and the booking primitives' scripts are no longer in the
+  page's HTML.** A test that looked for `__studioFooterMapsArmed`,
+  `__studioBookingFramesArmed` or `__studioBookingPopupArmed` in a response body
+  looks for `data-studio-controller="footer-map"` on the map, or
+  `data-studio-controller="booking"` on the frame's wrapper and the dialog. The
+  globals themselves are still set, once the controller has connected.
+  `window.__studioSurveyBound` and `window.__studioSurveyTurboHook` are gone;
+  nothing outside the survey's script read them.
+- **`window.Sortable` is not SortableJS until a page asks for it.** On a page
+  with no board it is the loading shim, which has `create` and `load` and
+  nothing else: `new Sortable(...)`, `Sortable.get` and the other statics fail
+  until the library has loaded. A page script that needs more than `create`
+  awaits `Sortable.load()` first. A page that loads its own SortableJS is
+  unaffected. A test that looked for `window.studioBoard =` or a
+  `studio/sortable` script tag in a page's HTML looks for
+  `data-studio-controller="board"` on the board.
 
 ## 0.96.2 — 2026-10-08
 

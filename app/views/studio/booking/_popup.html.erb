@@ -1,7 +1,7 @@
 <%# The booking popup: Google's appointment page in a dialog, opened by any
-    a[data-booking-popup] link on the page (studio/booking/_assets carries the
-    script). Rendered once per page by `studio_booking_popup`; the site footer
-    calls it.
+    a[data-booking-popup] link on the page (studio/booking, started by the
+    booking controller on the dialog). Rendered once per page by
+    `studio_booking_popup`; the site footer calls it.
 
     It does what Google's own scheduling-button script does, without loading
     that script, its stylesheet and its icon font on every public page: the
@@ -23,7 +23,7 @@
     reaches the dialog. The Close button and a click on the backdrop always
     work, which is why the button is a solid one. %>
 <%= studio_booking_assets %>
-<dialog class="booking-popup" data-booking-dialog data-studio-booking aria-label="<%= label %>">
+<dialog class="booking-popup" data-booking-dialog data-studio-booking data-studio-controller="booking" aria-label="<%= label %>">
   <form method="dialog" class="booking-popup-bar">
     <span class="booking-popup-title"><%= label %></span>
     <button type="submit" class="booking-popup-close" data-booking-close>Close ✕</button>

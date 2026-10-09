@@ -1,4 +1,6 @@
-<div class="max-w-5xl mx-auto px-4 py-8" x-data="themeEditor()">
+<%# The editor is studio/theme_editor's themeEditor factory, seeded with the
+    server-resolved role colours. studio/alpine_shims publishes it. %>
+<div class="max-w-5xl mx-auto px-4 py-8" x-data="themeEditor(<%= @theme_setting.resolved_colors.to_json %>)">
   <div class="flex items-center justify-between mb-8">
     <h1 class="text-2xl font-bold text-heading">Theme</h1>
     <div class="flex gap-3">
@@ -300,84 +302,3 @@
 
   </div>
 </div>
-
-<script>
-  function themeEditor() {
-    return {
-      colors: {
-        primary: '<%= @theme_setting.resolved_colors[:primary] %>',
-        success: '<%= @theme_setting.resolved_colors[:success] %>',
-        accent:  '<%= @theme_setting.resolved_colors[:accent] %>',
-        warning: '<%= @theme_setting.resolved_colors[:warning] %>',
-        danger:  '<%= @theme_setting.resolved_colors[:danger] %>',
-        dark:    '<%= @theme_setting.resolved_colors[:dark] %>',
-        light:   '<%= @theme_setting.resolved_colors[:light] %>'
-      },
-
-      resetColor(role, defaultVal) {
-        this.colors[role] = defaultVal;
-        this.updatePreview();
-      },
-
-      normalizeHex(role) {
-        let val = this.colors[role].trim();
-        if (!val.startsWith('#')) val = '#' + val;
-        if (/^#[0-9a-fA-F]{3}$/.test(val)) {
-          val = '#' + val[1] + val[1] + val[2] + val[2] + val[3] + val[3];
-        }
-        if (/^#[0-9a-fA-F]{6}$/.test(val)) {
-          this.colors[role] = val;
-        }
-        this.updatePreview();
-      },
-
-      updatePreview() {
-        // Update live CSS vars on the document for immediate feedback
-        document.documentElement.style.setProperty('--color-cta', this.colors.primary);
-        document.documentElement.style.setProperty('--color-success', this.colors.success);
-        document.documentElement.style.setProperty('--color-warning', this.colors.warning || '#FF7C47');
-        document.documentElement.style.setProperty('--color-danger', this.colors.danger || '#EF4444');
-        // btn-warning/btn-danger paint --color-<role>-fill first (the resolver
-        // emits it for the engine defaults), so a typed colour must set it too
-        // or the specimens keep the default fill. Cleared: drop the override.
-        ['warning', 'danger'].forEach((role) => {
-          if (this.colors[role]) document.documentElement.style.setProperty(`--color-${role}-fill`, this.colors[role]);
-          else document.documentElement.style.removeProperty(`--color-${role}-fill`);
-        });
-      },
-
-      darkPreviewStyle() {
-        return { backgroundColor: this.colors.dark, borderRadius: '0' };
-      },
-
-      darkSurfaceStyle() {
-        return {
-          backgroundColor: this.lightenColor(this.colors.dark, 0.3),
-          border: '1px solid rgba(255,255,255,0.1)'
-        };
-      },
-
-      lightPreviewStyle() {
-        return { backgroundColor: this.colors.light, borderRadius: '0' };
-      },
-
-      lightSurfaceStyle() {
-        return {
-          backgroundColor: '#ffffff',
-          border: '1px solid #e2e8f0'
-        };
-      },
-
-      lightenColor(hex, amount) {
-        hex = hex.replace('#', '');
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-        const nr = Math.round(r + (255 - r) * amount);
-        const ng = Math.round(g + (255 - g) * amount);
-        const nb = Math.round(b + (255 - b) * amount);
-        return '#' + [nr, ng, nb].map(c => c.toString(16).padStart(2, '0')).join('');
-      }
-    };
-  }
-</script>
