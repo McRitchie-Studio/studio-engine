@@ -267,11 +267,20 @@ class E2eLabController < ActionController::Base
 
   # The hold-to-confirm button, both levels.
   #
-  # Renders studio/_hold_button by name. The button's browser half is an inline
-  # script in that partial and its look is computed style from engine-motion.css
-  # — neither is observable from the response bytes, which are identical whether
-  # the script runs or not.
+  # Renders studio/_hold_button by name. The button's browser half is the
+  # hold-button controller (studio/hold_button) and its look is computed style
+  # from engine-motion.css: neither is observable from the response bytes.
   def hold_button = render(:hold_button)
+
+  # The button answered through its hold-button:* events, the way a page written
+  # against the controller answers it, under Turbo so a spec can leave and come
+  # Back.
+  def hold_button_events = render(:hold_button_events, layout: "survey_turbo_lab")
+
+  # One lazily registered controller, loaded by the engine's registry
+  # (studio/lazy_controllers) through a loader the page supplies, so a spec can
+  # fail that module's request and read what the registry does about it.
+  def lazy_controller = render(:lazy_controller)
 
   # The birthday / age-gate handoff. No locals to prepare: the lab page sets up
   # the two cards' locals itself and both run in demo mode, because the dummy has
@@ -300,6 +309,15 @@ class E2eLabController < ActionController::Base
   # engine's own store — so the page under test is assembled entirely out of
   # engine behaviour, exactly as a consumer's layout assembles it.
   def toast_over_banner = render(:toast_over_banner)
+
+  # The toast root as a layout renders it, with the request's flash in it, under
+  # Turbo: ?notice= and ?alert= set the flash, so a spec can visit one page from
+  # another and come Back.
+  def toast_flash
+    flash.now[:notice] = params[:notice] if params[:notice].present?
+    flash.now[:alert] = params[:alert] if params[:alert].present?
+    render(:toast_flash, layout: "survey_turbo_lab")
+  end
 
   # The geo manager, rendered as a host renders it: the engine's own template plus
   # the badge a host puts in its navbar.
@@ -567,6 +585,10 @@ class E2eLabController < ActionController::Base
   # on the shared components/_sidebar_panel. The only page where the link sidebar's
   # click bridge can be caught claiming a close button it did not render.
   def sidebar_panels = render(:sidebar_panels)
+
+  # The same page under Turbo, so a spec can leave it with the sidebar open and
+  # come Back.
+  def sidebar_panels_turbo = render(:sidebar_panels, layout: "survey_turbo_lab")
 
   # ---- The site footer and the booking primitives (docs/SITE_FOOTER.md) ------
   #

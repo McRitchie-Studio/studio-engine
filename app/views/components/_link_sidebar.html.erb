@@ -1,7 +1,6 @@
 <%# The link sidebar — the engine's out-of-the-box navigation panel (lifted
     from the mcritchie-studio hub). Renders the host's Studio.sidebar_sections
-    as a slide-out link tree in dual desktop/mobile panels, and carries its
-    own store bridge so a single render is self-sufficient. Render it once,
+    as a slide-out link tree in dual desktop/mobile panels. Render it once,
     outside any sticky/backdrop-filter header (a fixed panel inside one
     positions against the header, not the viewport); the engine navbar does
     this automatically when sections are declared. %>
@@ -17,104 +16,10 @@
   html { overflow-x: clip; }
 </style>
 
-<script>
-  // Store bridge (engine-owned): registers the Alpine `sidebars` store and
-  // keeps it healthy across Turbo navigations and bfcache restores. The
-  // panel's open/closed state is driven ENTIRELY by the store flag via
-  // x-show + x-transition — this bridge only flips the flag, never `display`
-  // directly, because an imperative display:none bakes an inline style that
-  // makes Alpine skip its enter transition (the panel pops instead of
-  // sliding). On turbo:before-cache / bfcache the flag drops so a restored
-  // page is closed. The document-level capture handlers make the trigger
-  // work even for clicks that land before Alpine initializes.
-  (function () {
-    // The panels this component renders — the scope for every handler below that
-    // claims a click. Declared once so the selector cannot drift from the ids.
-    var LINK_SIDEBAR_PANELS = '#studio-link-sidebar, #studio-link-sidebar-mobile';
-
-    function ensureLinkSidebarStore() {
-      if (!window.Alpine) return null;
-
-      var sidebars = Alpine.store('sidebars');
-      if (!sidebars) {
-        Alpine.store('sidebars', { linkTreeOpen: false });
-        return Alpine.store('sidebars');
-      }
-
-      if (typeof sidebars.linkTreeOpen === 'undefined') {
-        sidebars.linkTreeOpen = false;
-      }
-
-      return sidebars;
-    }
-
-    function setLinkSidebarOpen(open) {
-      var sidebars = ensureLinkSidebarStore();
-      if (sidebars) sidebars.linkTreeOpen = open;
-    }
-
-    function closeLinkSidebar() {
-      setLinkSidebarOpen(false);
-    }
-
-    function handleLinkSidebarClick(event) {
-      // SCOPED TO THIS COMPONENT'S OWN PANELS, and that scope is the whole of it.
-      // components/_sidebar_panel is SHARED: every panel built on it stamps its close
-      // button data-link-sidebar-close, so an unscoped match here claimed the close
-      // click of EVERY other panel on the page — stopImmediatePropagation in the
-      // capture phase, before that panel's own @click could run — and closed this
-      // sidebar instead. The other panel's × then did nothing at all: no error, no
-      // console line. Measured 2026-09-18 on the hub's /deployments summary sidebars,
-      // where the click never reached a document-level listener and the panel stayed
-      // open (mcritchie-studio worked around it with a close button of its own).
-      // The two ids are the panels this file renders, below.
-      var closeTrigger = event.target.closest('[data-link-sidebar-close]');
-      if (closeTrigger && closeTrigger.closest(LINK_SIDEBAR_PANELS)) {
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-        closeLinkSidebar();
-        return;
-      }
-
-      var trigger = event.target.closest('[data-link-sidebar-trigger], [data-username-display], [data-profile-image-toggle]');
-      if (trigger && trigger.matches('[aria-controls~="studio-link-sidebar"]')) {
-        var sidebars = ensureLinkSidebarStore();
-        if (!sidebars) return;
-
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-        sidebars.linkTreeOpen = !sidebars.linkTreeOpen;
-        return;
-      }
-
-      var sidebars = ensureLinkSidebarStore();
-      if (!sidebars || !sidebars.linkTreeOpen) return;
-      if (event.target.closest(LINK_SIDEBAR_PANELS)) return;
-
-      closeLinkSidebar();
-    }
-
-    function handleLinkSidebarKeydown(event) {
-      if (event.key === 'Escape') closeLinkSidebar();
-    }
-
-    if (!window.__studioLinkSidebarBridge) {
-      window.__studioLinkSidebarBridge = true;
-      document.addEventListener('alpine:init', ensureLinkSidebarStore);
-      document.addEventListener('turbo:load', ensureLinkSidebarStore);
-      document.addEventListener('turbo:before-cache', closeLinkSidebar);
-      window.addEventListener('pageshow', function (event) {
-        if (event.persisted) closeLinkSidebar();
-      });
-      document.addEventListener('click', handleLinkSidebarClick, true);
-      document.addEventListener('keydown', handleLinkSidebarKeydown, true);
-    }
-
-    ensureLinkSidebarStore();
-  })();
-</script>
+<%# The open flag ($store.sidebars.linkTreeOpen) and the document handlers that
+    flip it are studio/link_sidebar, a nonced module the head loads. This anchor
+    is the link-sidebar controller's element. %>
+<template data-studio-controller="link-sidebar"></template>
 
 <% body_html = capture do %>
   <nav class="flex-1 min-h-0 overflow-y-auto py-2" aria-label="Studio links">

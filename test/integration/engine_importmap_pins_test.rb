@@ -65,10 +65,27 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
   end
 
   test "the boot graph follows studio/application's static imports" do
-    assert_equal %w[studio/alpine_shims studio/alpine_stores studio/application studio/controllers/modal_host_controller
-                    studio/controllers/nav_collapse_controller studio/head_chrome studio/modal_host studio/nav_collapse
-                    studio/pinned_stack], boot_graph
+    assert_equal %w[studio/alpine_shims studio/alpine_stores studio/application
+                    studio/controllers/hold_button_controller studio/controllers/link_sidebar_controller
+                    studio/controllers/modal_host_controller studio/controllers/nav_collapse_controller
+                    studio/controllers/toast_controller studio/head_chrome studio/hold_button
+                    studio/hold_button_hooks studio/lazy_controllers studio/link_sidebar studio/modal_host
+                    studio/nav_collapse studio/pinned_stack studio/stimulus studio/toast], boot_graph
     refute_includes boot_graph, "studio/local_path", "a module nothing in the boot imports is not preloaded"
+  end
+
+  # The hold button confirms real actions. A lazy controller is one more request
+  # that can fail, and a browser never refetches a failed module, so the button
+  # is imported statically and preloaded with the page.
+  test "the hold button is in the boot graph, through studio/stimulus, and is never a dynamic import" do
+    %w[studio/controllers/hold_button_controller studio/hold_button studio/hold_button_hooks].each do |name|
+      assert_includes boot_graph, name, "#{name} is not preloaded, so a hold button waits on a later request"
+    end
+
+    source = File.read(File.expand_path("../../app/javascript/studio/stimulus.js", __dir__))
+    assert_match(/^import HoldButtonController from "studio\/controllers\/hold_button_controller"$/, source)
+    assert_match(/^application\.register\("hold-button", HoldButtonController\)$/, source)
+    refute_match(/import\(\s*["']studio\/[^"']*hold_button/, source, "the hold button is imported dynamically again")
   end
 
   test "the rendered importmap tags carry the pins and preload only the boot graph" do

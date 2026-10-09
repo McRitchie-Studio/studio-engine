@@ -77,7 +77,7 @@ class SidebarNavbarRenderTest < ActiveSupport::TestCase
     assert_includes html, "data-link-sidebar-trigger"
     assert_includes html, %(id="studio-link-sidebar")
     assert_includes html, %(id="studio-link-sidebar-mobile")
-    assert_includes html, "window.__studioLinkSidebarBridge"
+    assert_includes html, %(data-studio-controller="link-sidebar")
     assert_includes html, "Home"
   end
 
@@ -118,7 +118,7 @@ class SidebarNavbarRenderTest < ActiveSupport::TestCase
 
     refute_includes html, "data-link-sidebar-trigger"
     refute_includes html, "studio-link-sidebar"
-    refute_includes html, "__studioLinkSidebarBridge"
+    refute_includes html, %(data-studio-controller="link-sidebar")
   end
 
   test "sidebar with an admin section replaces the admin dropdown" do

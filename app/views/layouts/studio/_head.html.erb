@@ -164,9 +164,16 @@
   <%= stylesheet_link_tag "studio/sticky_table_header", "data-turbo-track": "reload" %>
 <% end %>
 <%= javascript_importmap_tags %>
-<%# THE ENGINE'S BROWSER BOOT (studio/application): its Stimulus application,
-    the pinned stack, and the Alpine shims. A module tag, so it carries the nonce. %>
+<%# THE ENGINE'S BROWSER BOOT (studio/application): its every-page Stimulus
+    controllers, the pinned stack, and the Alpine shims. A module tag, so it
+    carries the nonce. %>
 <%= javascript_import_module_tag "studio/application" %>
+<%# THE STIMULUS APPLICATION, BY ITS OWN DOOR. studio/stimulus starts the engine's
+    Stimulus application and registers the hold button on it. Its only imports
+    are Stimulus, studio/lazy_controllers and the hold button's controller, so
+    a failure elsewhere in the boot's graph leaves a page its hold button. The
+    boot imports it, so this resolves to the same preloaded module. %>
+<%= javascript_import_module_tag "studio/stimulus" %>
 <%# THE STORES, BY THEIR OWN DOOR. Every host's <body> binds $store.devMode and the
     theme toggle binds $store.theme, so a boot that fails to load (a missing digest,
     a network drop, a throw anywhere in its graph) must not take the stores with it.
@@ -182,6 +189,17 @@
     it. It imports nothing, and the modal-host controller imports it, so this
     resolves to the same preloaded module. %>
 <%= javascript_import_module_tag "studio/modal_host" %>
+<%# THE TOAST QUEUE, BY ITS OWN DOOR, for the same reason. studio/toast registers
+    $store.toasts on alpine:init, listens for the `toast` window event and seeds
+    the flash layouts/studio/_flash renders, so a failed boot leaves a page its
+    flash and its toasts. It imports nothing, and the toast controller imports it. %>
+<%= javascript_import_module_tag "studio/toast" %>
+<%# THE LINK SIDEBAR'S FLAG, BY ITS OWN DOOR, for the same reason.
+    components/_link_sidebar binds $store.sidebars.linkTreeOpen; studio/link_sidebar
+    registers it on alpine:init for a page that renders the panel, and installs
+    the document click and Escape handlers. It imports nothing, and the
+    link-sidebar controller imports it. %>
+<%= javascript_import_module_tag "studio/link_sidebar" %>
 <%# ALPINE LOADS AFTER THE MODULE TAGS, and the order is the contract. Deferred
     classic scripts and module scripts execute in document order, so by the time
     Alpine starts, studio/application has defined the shims it evaluates

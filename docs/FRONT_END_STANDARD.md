@@ -135,8 +135,8 @@ it may not reuse one of their names. `studio/local_path`, the browser twin of
 
 **The engine's boot.** `layouts/studio/_head` imports `studio/application` on
 every page with `javascript_import_module_tag`, which carries the request's CSP
-nonce. The boot starts the engine's own Stimulus application on its own
-attributes (`data-studio-controller`, `data-studio-action`,
+nonce. The engine runs its own Stimulus application (`studio/stimulus`) on its
+own attributes (`data-studio-controller`, `data-studio-action`,
 `data-studio-target`), so a host's Stimulus application, and its lazy loader,
 never sees an engine controller. Stimulus
 is vendored (`studio/vendor/stimulus.js`, pinned as `@hotwired/stimulus`); a
@@ -144,6 +144,25 @@ host that pins its own wins. The boot graph, every `studio/` module
 `studio/application` imports, is preloaded
 (`Studio::Engine.javascript_boot_graph`); every other engine pin is fetched
 only when something imports it.
+
+**Two ways a controller registers.** A controller on every page (nav collapse,
+modal host, toast, link sidebar) is imported statically by `studio/application`,
+which puts it in the preloaded boot graph. The hold button is imported
+statically too, by `studio/stimulus`: it confirms real actions, so it arrives
+with the page and no later request stands between a press and its hold. A
+page-specific controller is listed in `LAZY` in `studio/stimulus` as a dynamic
+import, and `studio/lazy_controllers` registers it the first time an element
+names it, so a page with no such element never fetches it. Until a lazy
+controller registers, its element's actions do nothing.
+
+**A lazy load that fails is final for the document.** A browser keeps a failed
+module fetch and rejects every later `import()` of it without a new request,
+across DOM changes and Turbo visits; only a full page load fetches it again. So
+`studio/lazy_controllers` imports a controller once, reports a failure once, and
+marks every element that names the failed controller, on the page and arriving
+later, with `data-studio-controller-failed="<identifier>"`. A lazy controller's
+page styles or announces that state. A control that must work whenever its page
+does is not lazy.
 
 Alpine loads after the module tags. Deferred classic scripts and module scripts
 run in document order, so by the time Alpine starts, the boot has installed the
@@ -158,16 +177,31 @@ components:
 | Pinned stack (`--pin-*`, `--nav-h`, `--nav-bottom`) | `studio/pinned_stack` | the boot | none needed (CSS only) |
 | Theme and dev mode | `studio/alpine_stores` | its own module tag, and the boot | `$store.theme`, `$store.devMode` |
 | Nav spinner, success confetti | `studio/head_chrome` | the boot | `showNavSpinner`, `hideNavSpinner`, `fireSuccessConfetti` |
+| Modal host, scoped host | `studio/modal_host` | `modal-host`, its own module tag | `$store.modals`, each scoped `$store.<name>`, `window.ModalAnimations`, `window.StudioModals` |
+| Toast queue (`layouts/studio/_flash`) | `studio/toast` | `toast`, its own module tag | none needed: the API is the `toast` window event; the queue is `$store.toasts` |
+| Link sidebar flag | `studio/link_sidebar` | `link-sidebar`, its own module tag | `$store.sidebars.linkTreeOpen` |
+| Hold button | `studio/hold_button`, `studio/hold_button_hooks` | `hold-button`, registered by `studio/stimulus` | the `guard:`, `on_hold_start:`, `validate:`, `early_action:`, `early_action_guard:` and `on_success:` string locals, `window.studioFizzPortal` |
 
 The stores load by their own nonced module tag as well as the boot, because
 every host's `<body>` binds `$store.devMode`: a boot that fails to load must
 not make that binding throw. `studio/alpine_stores` imports nothing, and
-registers a store only where Alpine has none of that name.
+registers a store only where Alpine has none of that name. `studio/modal_host`,
+`studio/toast` and `studio/link_sidebar` have their own tag for the same
+reason, and so does `studio/stimulus`, whose only imports are Stimulus,
+`studio/lazy_controllers` and the hold button's controller: a failure elsewhere
+in the boot's graph leaves a page its hold button.
 
-**Today.** The engine ships behaviour as scripts inside partials. The board's
-Alpine factory, `window.studioBoard`, is 454 lines in `studio/_board_assets`;
-the hold button takes `guard:`, `on_success:` and `validate:` as JavaScript
-strings that `Alpine.evaluate` runs. The shared head carries one inline script,
+**The hold button's events.** The button dispatches `hold-button:guard`,
+`hold-button:start`, `hold-button:validate`, `hold-button:early` and
+`hold-button:success`, which bubble; a page answers with `preventDefault()` or
+`$event.detail.waitUntil(answer)` (the partial's header lists each). New call
+sites use the events. The string locals are evaluated by
+`studio/hold_button_hooks` and stay while a consumer passes them.
+
+**Today.** The engine still ships some behaviour as scripts inside partials.
+The board's Alpine factory, `window.studioBoard`, is 454 lines in
+`studio/_board_assets`; the hold button still accepts `guard:`, `on_success:`
+and `validate:` as JavaScript strings. The shared head carries one inline script,
 the nonced pre-paint theme; its behaviour is the modules above. The engine
 vendors Alpine and loads it with `javascript_include_tag`. Every app pins its
 modules with importmap.
