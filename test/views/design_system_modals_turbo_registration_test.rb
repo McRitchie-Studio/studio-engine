@@ -9,34 +9,35 @@ require "minitest/autorun"
 require "active_support/test_case"
 require "action_view"
 require "tempfile"
+require "nokogiri"
+require "json"
 
-# [component] Regression guard for the /admin/style page-scoped modal store
-# (dsModals) surviving Turbo Drive navigation.
+# [component] The /admin/style page-scoped modal store (dsModals) is there
+# before Alpine reads it, on a first load and on a Turbo Drive visit alike.
 #
-# THE BUG (fixed 0.26.1): the dsModals store — and, until 2026-09-09, a second
-# dsSolanaModal proxy beside it — was registered
-# ONLY inside a `document.addEventListener('alpine:init', ...)` handler in the
-# page body. Alpine loads via a deferred CDN <script> in the engine head and
-# fires alpine:init exactly ONCE — on the first full-document load. A Turbo Drive
-# advance visit (the admin sidebar "Design System" link) swaps <body> without
-# reloading that head script, so alpine:init never fires again; the body script
-# re-runs but only re-attaches a listener that will not fire. Result: on a Turbo
-# visit $store.dsModals was undefined, every specimen card's @click / :style /
-# <template x-if> that reads it threw, modals would not open, and the throwing
-# :style wiped each card's static --studio-team-glow-opacity: 0 so every glow lit.
+# THE FAILURE THIS GUARDS. Alpine fires alpine:init exactly ONCE, on the first
+# full-document load. A Turbo Drive advance visit (the admin sidebar's "Design
+# System" link) swaps <body> without it firing again, so a store registered only
+# on alpine:init is undefined after the visit: every specimen card's @click,
+# :style and <template x-if> that reads $store.dsModals throws, modals do not
+# open, and the throwing :style wipes each card's static
+# --studio-team-glow-opacity: 0 so every glow lights.
 #
-# We do NOT assert on the emitted source string — a string match is structurally
-# blind to the actual failure (an alpine:init-only registration and a dual-guard
-# both contain "dsModals"). Instead the rendered <script> is EXECUTED under node
-# with minimal window/document/Alpine stubs, in BOTH nav paths, and the store's
-# registration is asserted by observing whether it lands — the property the bug
-# violated. Revert to alpine:init-only and the Turbo scenario fails loudly.
+# HOW THE STORE REGISTERS. The guide's overlay declares itself a modal host
+# (data-studio-controller="modal-host", data-modal-host-store-value="dsModals"),
+# and studio/modal_host registers every declared host's store: on alpine:init,
+# and before a Turbo render from the incoming body.
+#
+# A string match cannot see this failure, so the declaration is read out of the
+# RENDERED page and handed to studio/modal_host, which is executed under node
+# with minimal window/document/Alpine stubs in both navigation paths. The
+# store's registration is asserted by observing whether it lands.
 class DesignSystemModalsTurboRegistrationTest < ActiveSupport::TestCase
+  MODAL_HOST = File.expand_path("../../app/javascript/studio/modal_host.js", __dir__)
+
   # A missing node runtime FAILS here; it must never `skip`. This is the only
-  # coverage that observes the store's real registration behavior, so a skip would
-  # read as a pass on exactly the mechanism this test exists to protect. CI
-  # installs node in the engine-suite lane (.github/workflows/engine-ci.yml);
-  # locally it comes from mise (`mise install node@20`).
+  # coverage that observes the guide's store registering from its rendered
+  # declaration, so a skip would read as a pass on the mechanism it protects.
   def test_node_runtime_is_available
     refute_empty node_path,
                  "node runtime NOT FOUND on PATH. The dsModals Turbo-registration suite " \
@@ -44,20 +45,22 @@ class DesignSystemModalsTurboRegistrationTest < ActiveSupport::TestCase
                  "with zero coverage. Install node (mise install node@20) and re-run."
   end
 
+  def test_the_overlay_declares_the_full_stack_under_the_guides_name
+    host = ds_modals_host
+    assert_equal "modal-host", host["data-studio-controller"]
+    assert_equal "dsModals", host["data-modal-host-store-value"]
+    assert_nil host["data-modal-host-scoped-value"],
+               "the guide's store is the full stack (advance, the animation registry), not the scoped one"
+  end
+
   def test_dsmodals_registers_on_turbo_visit_and_on_first_load
-    node = node_path
-
-    script = ds_modals_script
-    refute_nil script, "expected /admin/style to emit the dsModals registration <script>"
-    assert_includes script, "registerDsModals",
-      "the dsModals store must be registered through a named function the dual-guard can call " \
-      "directly on a Turbo visit (not an alpine:init-only callback)"
-
     out = nil
-    Tempfile.create(["ds_modals_turbo_harness", ".js"]) do |f|
-      f.write(HARNESS_PRELUDE, "\nfunction runScript() {\n", script, "\n}\n", HARNESS_SCENARIOS)
+    Tempfile.create(["ds_modals_turbo_harness", ".mjs"]) do |f|
+      f.write("import { installModalHost, HOST_SELECTOR } from #{"file://#{MODAL_HOST}".to_json};\n",
+              "const HOST_ATTRIBUTES = #{ds_modals_host.to_json};\n",
+              HARNESS)
       f.flush
-      out = `#{node} #{f.path} 2>&1`
+      out = `#{node_path} #{f.path} 2>&1`
     end
 
     assert $?.success?, "node harness failed:\n#{out}"
@@ -70,102 +73,101 @@ class DesignSystemModalsTurboRegistrationTest < ActiveSupport::TestCase
     @node_path ||= `which node 2>/dev/null`.strip
   end
 
-  # Render the real /admin/style page (same path style_page_test.rb exercises)
-  # and extract the ONE <script> block that registers the page-scoped dsModals
-  # store — identified by the registration function, not a bare id match.
-  def ds_modals_script
-    # A host renders these views through ApplicationController, which has EVERY
-    # engine helper mixed in (no isolate_namespace). A bare test view has none, so
-    # give it the whole set rather than the one module today's specimens happen to
-    # call — otherwise the next helper-backed specimen breaks all five harnesses.
-    view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
-    view.extend(Studio::Engine.helpers)
-    html = view.render(template: "style/index")
-    html.scan(%r{<script[^>]*>(.*?)</script>}m)
-        .map(&:first)
-        .find { |s| s.include?("registerDsModals") && s.include?("Alpine.store('dsModals'") }
+  # The attributes of the overlay's outer <template>, out of the real
+  # /admin/style page (the path style_page_test.rb renders).
+  def ds_modals_host
+    @ds_modals_host ||= begin
+      # A host renders these views through ApplicationController, which has EVERY
+      # engine helper mixed in (no isolate_namespace). A bare test view has none,
+      # so give it the whole set.
+      view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+      view.extend(Studio::Engine.helpers)
+      html = view.render(template: "style/index")
+      template = Nokogiri::HTML5.fragment(html).css("template").find { |t| t["x-if"] == "$store.dsModals.current()" }
+      refute_nil template, "expected /admin/style to render the dsModals overlay template"
+      template.attributes.transform_values(&:value)
+    end
   end
 
-  # Minimal browser stubs. The dsModals script assigns the credential stubs onto
-  # window, defines registerDsModals(), then dual-guards its invocation on
-  # window.Alpine. document.addEventListener queues listeners so a first-load
-  # alpine:init can be fired on demand; Alpine.store(name[, def]) is the single
-  # global registry both a "started" and a "late" Alpine share.
-  HARNESS_PRELUDE = <<~'JS'
-    'use strict';
-    const pendingEvents = {};
-    const document = {
-      addEventListener(ev, fn) { (pendingEvents[ev] = pendingEvents[ev] || []).push(fn); },
-      body: { classList: { add() {}, remove() {} } }
-    };
-    const window = globalThis;
-    globalThis.addEventListener = () => {};
-    const alpineStores = {};
-    function makeAlpine() {
-      return {
-        store(name, def) {
-          if (def === undefined) return alpineStores[name];
-          alpineStores[name] = def;
-        }
-      };
-    }
-    // ==== the page's dsModals <script>, wrapped as runScript(), follows ====
-  JS
-
-  HARNESS_SCENARIOS = <<~'JS'
-    // ==== scenarios ====
+  # A document that finds the rendered host by studio/modal_host's own selector,
+  # and an Alpine whose store registry both a started and a late Alpine share.
+  HARNESS = <<~'JS'
     function assert(cond, msg) {
       if (!cond) { console.error('FAIL: ' + msg); process.exit(1); }
     }
-    function reset() {
-      for (const k in pendingEvents) delete pendingEvents[k];
-      for (const k in alpineStores) delete alpineStores[k];
-      globalThis.Alpine = undefined;
+    const hostNode = () => ({ getAttribute: (name) => (name in HOST_ATTRIBUTES ? HOST_ATTRIBUTES[name] : null) });
+    function makeRoot(hosts) {
+      return { querySelectorAll: (selector) => (selector === HOST_SELECTOR ? hosts : []) };
     }
-    function fire(ev) { (pendingEvents[ev] || []).slice().forEach((fn) => fn()); }
+    function makeDocument(hosts) {
+      const listeners = {};
+      return Object.assign(makeRoot(hosts), {
+        listeners,
+        addEventListener(name, fn) { (listeners[name] = listeners[name] || []).push(fn); },
+        fire(name, event) { (listeners[name] || []).slice().forEach((fn) => fn(event || {})); },
+        body: { classList: { add() {}, remove() {} } },
+        contains: () => false,
+        activeElement: null
+      });
+    }
+    function makeAlpine(stores, started) {
+      const alpine = {
+        store(name, def) {
+          if (def === undefined) return stores[name];
+          stores[name] = def;
+        }
+      };
+      if (started) alpine.version = '3.16.1';
+      return alpine;
+    }
 
-    // Scenario A — Turbo Drive advance visit: Alpine has ALREADY started before
-    // the body script re-runs. The store MUST register immediately, without any
-    // alpine:init (which never fires again on a Turbo visit). This is the exact
-    // property the bug violated.
-    reset();
-    globalThis.Alpine = makeAlpine();
-    runScript();
-    assert(alpineStores['dsModals'],
-      'TURBO: dsModals must register immediately when Alpine is already started (no alpine:init)');
-    // A SECOND STORE WAS ASSERTED HERE, dsSolanaModal, until 2026-09-09. It was a
-    // proxy for style/modals/_onchain_tx — a mirror of turf-monster's card — and
-    // went when that partial did. It never widened this test: both stores were
-    // registered by the same function on the same path, so the second assertion
-    // could only ever fail alongside the first.
-    assert((pendingEvents['alpine:init'] || []).length === 0,
-      'TURBO: registration must NOT depend on an alpine:init listener when Alpine is already up');
+    // Scenario A — first full-document load. The module runs before Alpine, so
+    // nothing registers until alpine:init, and then the store is there.
+    {
+      const stores = {};
+      const doc = makeDocument([hostNode()]);
+      const win = { setTimeout };
+      installModalHost(doc, win);
+      assert(!stores.dsModals, 'FIRST-LOAD: dsModals must not exist before Alpine boots');
+      win.Alpine = makeAlpine(stores, false);
+      doc.fire('alpine:init');
+      assert(stores.dsModals, 'FIRST-LOAD: dsModals registers when alpine:init fires');
+      assert(typeof stores.dsModals.advance === 'function', 'FIRST-LOAD: the guide gets the full stack, with advance()');
+      assert(typeof stores.dsModals.cardClasses === 'function' && typeof stores.dsModals.swap === 'function',
+        'FIRST-LOAD: the store carries the API the specimens call');
+    }
 
-    // Scenario B — first full-document load: Alpine is not booted when the body
-    // script runs, so registration correctly defers to alpine:init.
-    reset();
-    runScript();
-    assert(!alpineStores['dsModals'],
-      'FIRST-LOAD: dsModals must not exist before Alpine boots');
-    assert((pendingEvents['alpine:init'] || []).length > 0,
-      'FIRST-LOAD: registration must defer to alpine:init when Alpine has not started');
-    globalThis.Alpine = makeAlpine();
-    fire('alpine:init');
-    assert(alpineStores['dsModals'],
-      'FIRST-LOAD: dsModals registers when alpine:init fires');
+    // Scenario B — Turbo Drive advance visit. Alpine started on a page with no
+    // guide on it; alpine:init never fires again. The store MUST register from
+    // the incoming body, before Alpine sees it. This is the property the
+    // failure violates.
+    {
+      const stores = {};
+      const doc = makeDocument([]);
+      const win = { setTimeout, Alpine: makeAlpine(stores, true) };
+      installModalHost(doc, win);
+      doc.fire('alpine:init');
+      assert(!stores.dsModals, 'TURBO: a page with no guide registers no dsModals');
+      doc.fire('turbo:before-render', { detail: { newBody: makeRoot([hostNode()]) } });
+      assert(stores.dsModals,
+        'TURBO: dsModals must register from the incoming body, with no alpine:init');
 
-    // Scenario C — idempotent: a second render (another Turbo visit) plus a later
-    // alpine:init must keep the ORIGINAL store instance (the in-function guard
-    // `if (Alpine.store('dsModals')) return;` short-circuits), never throw or
-    // clobber live modal state.
-    reset();
-    globalThis.Alpine = makeAlpine();
-    runScript();
-    const firstRef = alpineStores['dsModals'];
-    runScript();
-    fire('alpine:init');
-    assert(alpineStores['dsModals'] === firstRef,
-      'IDEMPOTENT: re-registration keeps the original store (guard returns early)');
+      // Scenario C — idempotent. Another visit to the guide keeps the ORIGINAL
+      // store, so live modal state is never clobbered.
+      const first = stores.dsModals;
+      doc.fire('turbo:before-render', { detail: { newBody: makeRoot([hostNode()]) } });
+      doc.fire('alpine:init');
+      assert(stores.dsModals === first, 'IDEMPOTENT: re-registration keeps the original store');
+    }
+
+    // Scenario D — Alpine already running when the module arrives (a host that
+    // loads it ahead of the module tags): the store registers at once.
+    {
+      const stores = {};
+      const doc = makeDocument([hostNode()]);
+      installModalHost(doc, { setTimeout, Alpine: makeAlpine(stores, true) });
+      assert(stores.dsModals, 'LATE-MODULE: dsModals registers at once when Alpine is already up');
+    }
 
     console.log('ALL-DSMODALS-TURBO-SCENARIOS-PASS');
   JS

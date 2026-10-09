@@ -28,8 +28,14 @@ require "nokogiri"
 # _do_not_reference_the_legacy_turf_store is the guard against that.
 class StyleGuideModalSimulatorTest < ActiveSupport::TestCase
   GUIDE = File.expand_path("../../app/views/style/_modals.html.erb", __dir__)
+  # The demo drivers and the simulator's control build (the style-modals
+  # controller binds them to the guide's section).
+  DRIVERS = File.expand_path("../../app/javascript/studio/style_modals.js", __dir__)
+  # The stack the guide's dsModals store is.
+  MODAL_HOST = File.expand_path("../../app/javascript/studio/modal_host.js", __dir__)
 
   def source = File.read(GUIDE)
+  def drivers = File.read(DRIVERS)
 
   # --- The markup renders -------------------------------------------------
 
@@ -91,32 +97,38 @@ class StyleGuideModalSimulatorTest < ActiveSupport::TestCase
                  "beside it and nothing would report the gap."
   end
 
-  # Second: the script actually READS the registry to build them. An empty
-  # container plus a script that enumerates a local literal would pass the
-  # assertion above while losing the property entirely.
+  # Second: the build actually READS the registry. An empty container plus a
+  # build that enumerates a local literal would pass the assertion above while
+  # losing the property entirely. (test/javascript/style_modals.test.mjs runs
+  # the build against a registry and counts the controls.)
   def test_simulator_builds_its_controls_by_enumerating_the_live_registry
-    script = simulator_script
-
-    assert_match(/Object\.keys\(reg\.enter/, script,
+    assert_match(/Object\.keys\(registry\.enter\)/, drivers,
                  "the simulator no longer enumerates the ENTER side of the registry. Controls " \
                  "built from anything but window.ModalAnimations stop tracking it.")
-    assert_match(/Object\.keys\(reg\.exit/, script,
+    assert_match(/Object\.keys\(registry\.exit\)/, drivers,
                  "the simulator no longer enumerates the EXIT side of the registry.")
-    assert_match(/var reg = window\.ModalAnimations/, script,
+    assert_match(/const registry = win\.ModalAnimations/, drivers,
                  "the simulator's control build no longer reads window.ModalAnimations, so its " \
                  "controls have stopped tracking the live registry.")
   end
 
   # The store must resolve animation keys through the LIVE registry too. This is
   # the half that makes the simulator honest rather than merely well-populated:
-  # the guide's page-scoped store once carried a hard-coded copy of the animation
-  # table, so a newly registered key grew a button (from the registry) that
-  # resolved to 'pop' (from the stale copy). The control said one thing and the
-  # card did another, with nothing reporting the difference.
+  # with a copied animation table in the store, a newly registered key grows a
+  # button (from the registry) that resolves to 'pop' (from the copy). The guide's
+  # store is the engine's own stack, declared on the overlay, and that stack reads
+  # the registry at call time.
   def test_page_store_resolves_animations_through_the_live_registry
-    assert_match(/function modalAnim\(channel, key\) \{\s*var table = \(window\.ModalAnimations/m,
+    assert_match(/<template x-if="\$store\.dsModals\.current\(\)"\s+data-studio-controller="modal-host"\s+data-modal-host-store-value="dsModals">/,
                  source,
-                 "the guide's modalAnim no longer reads window.ModalAnimations at call time. A " \
+                 "the guide's overlay no longer declares itself a modal host, so nothing " \
+                 "registers $store.dsModals and every specimen throws.")
+    refute_match(/data-modal-host-scoped-value/, source,
+                 "the guide's store must be the full stack (advance, the animation registry), " \
+                 "not the scoped host's plainer one.")
+    assert_match(/export function modalAnim\(win, channel, key\) \{\s*var table = \(win\.ModalAnimations/m,
+                 File.read(MODAL_HOST),
+                 "the stack's modalAnim no longer reads window.ModalAnimations at call time. A " \
                  "local animation table makes the generated controls lie: the button appears " \
                  "from the registry and the card falls back to 'pop'.")
   end
@@ -141,7 +153,7 @@ class StyleGuideModalSimulatorTest < ActiveSupport::TestCase
   ].freeze
 
   def test_stack_demos_do_not_reference_the_legacy_turf_store
-    offenders = LEGACY_STORE_PATTERNS.flat_map { |re| source.scan(re) }
+    offenders = LEGACY_STORE_PATTERNS.flat_map { |re| source.scan(re) + drivers.scan(re) }
 
     assert_empty offenders,
                  "the guide references Alpine.store('solanaModal'), turf-monster's legacy " \
@@ -150,53 +162,50 @@ class StyleGuideModalSimulatorTest < ActiveSupport::TestCase
                  "and the guide's own ds-stack-demo vehicle directly."
   end
 
-  # The guard above only bites if it is reading the demo code at all. If the
-  # drivers are moved to another file, it would pass forever on a guide that no
-  # longer contains them.
+  # The guard above only bites if it is reading the demo code at all: the
+  # drivers live in the module, and the guide's section names the controller
+  # that binds them.
   def test_the_legacy_store_guard_reads_the_demo_drivers
-    assert_match(/window\.dsModalDemos = /, source,
-                 "the stack-behaviour demo drivers are no longer defined in this file, so " \
-                 "test_stack_demos_do_not_reference_the_legacy_turf_store is now scanning a " \
-                 "file that could not contain the reference it forbids.")
+    assert_match(/^export function createModalDemos\(env\)/, drivers,
+                 "the stack-behaviour demo drivers are no longer defined in studio/style_modals, " \
+                 "so test_stack_demos_do_not_reference_the_legacy_turf_store is scanning a file " \
+                 "that could not contain the reference it forbids.")
+    assert_match(/<section id="modals"[^>]*data-studio-controller="style-modals"/m, source,
+                 "the guide's section no longer names the controller that binds the drivers.")
+    assert_includes source, %(import "studio/style_guide"),
+                    "the guide no longer loads the module that registers its controller"
   end
 
   # And the demos must actually drive the page-scoped store, which is the
   # positive half of the same property.
   def test_stack_demos_drive_the_page_scoped_store
-    drivers = demo_driver_script
-
-    assert_match(/Alpine\.store\(['"]dsModals['"]\)/, drivers,
-                 "the demo drivers no longer reach $store.dsModals — the page-scoped store the " \
-                 "whole guide is built on.")
-    # THE VEHICLE, NOT THE CARD. This pinned 'onchain-tx' until 2026-09-09 —
-    # a mirror of turf-monster's card, which meant six engine mechanics demos
-    # depended on a consumer's markup and this assertion had to change when it
-    # went. It now names style/modals/_ds_stack_demo, which exists only to be
-    # driven here. Read the id from the shared constant the drivers declare, so a
-    # future re-vehicle is one edit in the guide rather than two.
-    assert_match(/var VEHICLE = ['"]ds-stack-demo['"]/, drivers,
+    assert_match(/const storeName = env\.store \|\| "dsModals"/, drivers,
+                 "the demo drivers no longer default to $store.dsModals, the page-scoped store " \
+                 "the whole guide is built on.")
+    assert_match(/const store = \(\) => win\.Alpine\.store\(storeName\)/, drivers,
+                 "the demo drivers no longer reach their store through Alpine.")
+    # THE VEHICLE, NOT THE CARD: style/modals/_ds_stack_demo exists only to be
+    # driven here. The id is one shared constant the drivers declare, so a
+    # re-vehicle is one edit rather than two.
+    assert_match(/export const VEHICLE = "ds-stack-demo"/, drivers,
                  "the stack demos no longer declare their vehicle id, so the demos and this " \
                  "guard can drift apart silently.")
     assert_match(/store\(\)\.open\(VEHICLE\b/, drivers,
                  "the stack demos no longer open their vehicle through the page-scoped store.")
   end
 
-  private
+  # Every demo a button names is one the drivers define: a misspelt param is a
+  # button that does nothing, with no error anywhere.
+  def test_every_demo_button_names_a_driver
+    named = source.scan(/data-studio-action="click->style-modals#demo" data-style-modals-name-param="(\w+)"/).flatten
+    assert_operator named.length, :>=, 12, "the guide's demo buttons are gone"
 
-  # The <script> element carrying the demo drivers + the simulator build. Isolated
-  # so the assertions above read the ported code specifically rather than the
-  # whole 2000-line guide, where an unrelated match elsewhere could satisfy them.
-  def demo_driver_script
-    marker = "window.dsModalDemos = "
-    start  = source.index(marker)
-    refute_nil start, "no script in the guide defines window.dsModalDemos"
-
-    finish = source.index("</script>", start)
-    refute_nil finish, "the script defining window.dsModalDemos is never closed"
-
-    source[start...finish]
+    missing = named.uniq.reject { |name| drivers.match?(/^    #{name}: function \(\)/) }
+    assert_empty missing, "these demo buttons name no driver in studio/style_modals: #{missing.inspect}"
+    refute_match(/onclick=/, source, "a demo button is wired by its action, not an inline handler")
   end
-  alias simulator_script demo_driver_script
+
+  private
 
   # The source of ONE guide subsection, parsed on its own.
   #

@@ -151,6 +151,7 @@
     to the app-supplied submit_url. Kept on the section (always mounted) so it
     fires even as the age-gate card closes. %>
 <section id="modals" class="space-y-10" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)"
+         data-studio-controller="style-modals"
          x-data="{}" @ds-modal-close.window="$store.dsModals.close()"
          @age-verified.window="$store.dsModals.open('entry-confirmed', { txSignature: null, lobbyUrl: null, seedsEarned: 0 })">
   <div class="space-y-1">
@@ -166,199 +167,21 @@
     </p>
   </div>
 
-  <%# ---- Page-scoped modal host (dsModals) --------------------------------
-      The full store API — open(id, props, opts) LIFO stack, swap() directional
-      slide, advance(patch, opts) in-modal step change, close / closeAll,
-      current(), cardClasses() driving the enter/exit animation registry, and
-      body.modal-open scroll lock. Plus the walletProvider stub — required by
-      solana-studio's picker — so the wallet specimens run without a real
-      extension. Defined in a plain
-      inline script (no importmap dependency) so Alpine's defer finds it. %>
-  <script>
-    (function () {
-      // === Credential stubs — never clobber a real one an app already ships. ==
-      // postMagicLink and solanaWalletConnect were retired here on 2026-09-09
-      // with style/modals/_auth, the mirror of turf-monster's sign-in card that
-      // was their only caller. What remains is what solana-studio's own picker
-      // requires, which is why walletProvider stays and they did not.
-      // Connect stub for the wallet picker (solana-studio
-      // solana_studio/modals/_wallet_connect, configured by
-      // style/modals/_wallet_connect). Performs NO connect: it
-      // resolves success after a beat so the picker's connecting state is
-      // visible and its onConnected hook can continue the demo walk.
-      window.dsWalletConnectDemo = window.dsWalletConnectDemo || function () {
-        return new Promise(function (resolve) {
-          setTimeout(function () { resolve({ success: true }); }, 1100);
-        });
-      };
-      window.walletProvider = window.walletProvider || {
-        available: function () { return [{ name: 'Phantom' }, { name: 'Solflare' }]; },
-        isMobile: function () { return false; },
-        isAvailable: function () { return false; }
-      };
+  <%# ---- The section's own modal host (dsModals) --------------------------
+      $store.dsModals is the engine's modal stack under the guide's own name:
+      the overlay below declares itself a modal host, and studio/modal_host
+      registers the store from that declaration before Alpine reads it, on a
+      full load and on a Turbo visit alike. So the store the specimens open on
+      is the store an app runs: open / swap / advance / close / closeAll,
+      current(), cardClasses() reading the live animation registry, and the
+      body.modal-open scroll lock.
 
-      // Register the page-scoped dsModals store. Named (not an
-      // inline alpine:init callback) so the dual-guard at the end can invoke it
-      // directly on a Turbo visit, when alpine:init will not fire again.
-      function registerDsModals() {
-        if (Alpine.store('dsModals')) return;
-
-        // Enter/exit animation registry — keys map to a CSS class (engine-
-        // motion.css) plus its duration in ms. Open a modal with
-        // { enterAnim: 'shake' } / { exitAnim: 'slide' } to pick one; omitted
-        // uses 'pop' (the spring bounce). The directional swap()/advance()
-        // slide uses the modal-card-swap-* classes regardless of these keys.
-        var CLOSE_ANIM_MS = 220;
-        var SWAP_IN_MS    = 220;
-
-        // THE LIVE REGISTRY IS window.ModalAnimations, NOT THIS TABLE. This is a
-        // fallback only, for the case where studio/modal_host, which publishes
-        // the registry on every page, failed to load.
-        //
-        // It used to be a hard-coded local copy, and that made the Enter/Leave
-        // simulator below a LIAR: the simulator builds its controls from the live
-        // registry, so a newly registered animation grew a button here while the
-        // store silently resolved the unknown key back to 'pop'. The control said
-        // "shake", the card popped, and nothing reported the gap. Reading the
-        // registry at CALL time is what makes a registered animation actually
-        // playable on this page.
-        var ANIM_FALLBACK = {
-          enter: {
-            pop:   { cls: 'modal-card-mount',    ms: 320 },
-            shake: { cls: 'modal-card-shake-in', ms: 600 },
-            slide: { cls: 'modal-card-swap-in',  ms: 220 }
-          },
-          exit: {
-            pop:   { cls: 'modal-card-unmount',  ms: 220 },
-            slide: { cls: 'modal-card-swap-out', ms: 220 }
-          }
-        };
-        // Same late-binding guard, and for the same reason, as the host's own
-        // modalAnim: never return undefined. A miss would throw on .ms in close()
-        // and strand the modal open, so an unknown key falls back to 'pop'.
-        function modalAnim(channel, key) {
-          var table = (window.ModalAnimations && window.ModalAnimations[channel]) ||
-                      ANIM_FALLBACK[channel];
-          return table[key] || table.pop || ANIM_FALLBACK[channel].pop;
-        }
-
-        Alpine.store('dsModals', {
-          stack: [],
-          current: function () { return this.stack.length ? this.stack[this.stack.length - 1] : null; },
-          isOpen: function (id) {
-            for (var i = 0; i < this.stack.length; i++) { if (this.stack[i].id === id) return true; }
-            return false;
-          },
-          // open(id, props, opts) — opts.replace swaps the top entry with a
-          // directional slide (forward = exit right / enter left); otherwise
-          // push (stacking — closing reveals the entry underneath).
-          open: function (id, props, opts) {
-            props = props || {}; opts = opts || {};
-            var self = this;
-            if (opts.replace && this.stack.length > 0) {
-              var current = this.current();
-              if (current && !current._closing) {
-                var dir = (opts.direction === 'back') ? 'back' : 'forward';
-                current._swapDir = dir;
-                current._swappingOut = true;
-                current._closing = true;
-                setTimeout(function () {
-                  var idx = self.stack.indexOf(current);
-                  var newEntry = { id: id, props: props, _swappingIn: true, _swapDir: dir };
-                  if (idx >= 0) { self.stack[idx] = newEntry; } else { self.stack.push(newEntry); }
-                  self._sync();
-                  setTimeout(function () {
-                    newEntry._swappingIn = false; newEntry._swapDir = null; newEntry._settled = true;
-                  }, SWAP_IN_MS);
-                }, CLOSE_ANIM_MS);
-                return;
-              }
-              this.stack[this.stack.length - 1] = { id: id, props: props };
-            } else {
-              this.stack.push({ id: id, props: props });
-            }
-            this._sync();
-          },
-          // swap(id, props, opts) ≡ open with { replace: true }.
-          swap: function (id, props, opts) {
-            return this.open(id, props, Object.assign({ replace: true }, opts || {}));
-          },
-          // advance(patch, opts) — in-flow step change: same directional slide as
-          // swap() but WITHOUT replacing the stack entry, so the modal's outer
-          // x-data scope survives (the auth step machine relies on this).
-          advance: function (propsPatch, opts) {
-            opts = opts || {};
-            var cur = this.current();
-            if (!cur || cur._closing || cur._swappingOut) return;
-            var self = this;
-            cur._swapDir = (opts.direction === 'back') ? 'back' : 'forward';
-            cur._swappingOut = true;
-            setTimeout(function () {
-              if (self.stack.indexOf(cur) < 0) return;
-              if (propsPatch) Object.assign(cur.props, propsPatch);
-              cur._swappingOut = false;
-              cur._swappingIn = true;
-              setTimeout(function () {
-                cur._swappingIn = false; cur._swapDir = null; cur._settled = true;
-              }, SWAP_IN_MS);
-            }, CLOSE_ANIM_MS);
-          },
-          close: function () {
-            var self = this;
-            var entry = this.current();
-            if (!entry || entry._closing) return;
-            entry._closing = true;
-            setTimeout(function () {
-              var idx = self.stack.indexOf(entry);
-              if (idx >= 0) { self.stack.splice(idx, 1); self._sync(); }
-            }, modalAnim('exit', entry.props && entry.props.exitAnim).ms);
-          },
-          closeAll: function () { this.stack = []; this._sync(); },
-          cardClasses: function () {
-            var c = this.current();
-            if (!c) return {};
-            var o = {};
-            if (!c._settled && !c._swappingIn && !c._swappingOut && !c._closing) {
-              o[modalAnim('enter', c.props && c.props.enterAnim).cls] = true;
-            }
-            if (c._closing && !c._swappingOut) {
-              o[modalAnim('exit', c.props && c.props.exitAnim).cls] = true;
-            }
-            o['modal-card-swap-in']       = !!(c._swappingIn  && c._swapDir !== 'back');
-            o['modal-card-swap-out']      = !!(c._swappingOut && c._swapDir !== 'back');
-            o['modal-card-swap-in-back']  = !!(c._swappingIn  && c._swapDir === 'back');
-            o['modal-card-swap-out-back'] = !!(c._swappingOut && c._swapDir === 'back');
-            return o;
-          },
-          _sync: function () {
-            if (this.stack.length) { document.body.classList.add('modal-open'); }
-            else { document.body.classList.remove('modal-open'); }
-          }
-        });
-
-        // A SECOND STORE USED TO BE REGISTERED HERE: dsSolanaModal, a stateless
-        // proxy that re-read the current 'onchain-tx' entry's props so
-        // style/modals/_onchain_tx could keep its
-        // $store.dsSolanaModal.{state,title,txSignature,…} reads. That partial
-        // was a mirror of turf-monster's card and was retired on 2026-09-09,
-        // leaving the proxy with no reader, so it went with it. A store with no
-        // reader still registers, still looks load-bearing, and still has to be
-        // reasoned about by everyone who reads this file.
-      }
-
-      // Alpine's deferred CDN <script> fires alpine:init exactly ONCE, on the
-      // first full-document load. Turbo Drive advance visits swap the document
-      // body without reloading that head script, so alpine:init never fires
-      // again — and
-      // because this dsModals registration lives ONLY in the /admin/style body,
-      // it was absent during that one alpine:init. Registering here on the
-      // Turbo-visit path (Alpine already started) keeps $store.dsModals defined,
-      // so the specimen cards' @click / :style / <template x-if> don't throw.
-      // Mirrors studio/modals/_image_upload's cropPhotoModal guard.
-      if (window.Alpine) { registerDsModals(); }
-      else { document.addEventListener('alpine:init', registerDsModals); }
-    })();
-  </script>
+      The demo drivers, the enter/leave simulator and the walletProvider stub
+      solana-studio's picker needs are studio/style_modals, bound to the
+      section by the style-modals controller. studio/style_guide registers that
+      controller; the tag below is the only page that loads it. %>
+  <%= tag.script('import "studio/style_guide"'.html_safe, type: "module",
+                 nonce: (content_security_policy_nonce if respond_to?(:content_security_policy_nonce))) %>
 
   <%# The minimum-visible-duration convention (window.StudioModals.holdAtLeast +
       MIN_LOAD_MS) is studio/modal_host's, published on every page, so the demo
@@ -366,15 +189,10 @@
       resolveAt = max(min_duration, actual) and auto-resolve after min_duration
       in demo mode. %>
 
-  <%# Cropper.js + the cropPhotoModal factory — makes the Profile crop / upload
-      modals openable on this page (loads cropper.js via <script defer> and
-      defines the factory inline; no importmap change). %>
+  <%# Cropper.js, so the Profile crop and upload modals open live on this page.
+      The cropPhotoModal and birthdayModal factories the specimens mount are on
+      every page (studio/alpine_scopes). %>
   <%= render "studio/cropper_assets" %>
-
-  <%# birthdayModal factory — rendered here at page level (never inside the
-      overlay template, where a cloned script would not run) so the age-gate
-      specimen opens live. A consumer app renders this in its layout the same way. %>
-  <%= render "studio/birthday_assets" %>
 
   <%# levelingActionModal factory — page level (never inside the overlay template,
       where a cloned script would not run) so the change-username + join-newsletter
@@ -386,7 +204,9 @@
       shared host — backdrop fade, scroll lock, escape + click-self dismissal
       gated on props.dismissible (never @click.outside, so a hold modal can't
       close itself on the button release). %>
-  <template x-if="$store.dsModals.current()">
+  <template x-if="$store.dsModals.current()"
+            data-studio-controller="modal-host"
+            data-modal-host-store-value="dsModals">
     <div class="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 modal-backdrop-mount"
          :class="$store.dsModals.current()?._closing && 'modal-backdrop-unmount'"
          style="background: rgba(0,0,0,0.6)"
@@ -1565,9 +1385,9 @@
                     class="block mt-1 text-sm bg-inset border border-subtle rounded px-2 py-1 text-heading"></select>
           </label>
           <button type="button" class="btn btn-primary btn-sm"
-                  onclick="dsModalDemos.animOpenSelected()">Open</button>
+                  data-studio-action="click->style-modals#demo" data-style-modals-name-param="animOpenSelected">Open</button>
           <button type="button" class="btn btn-outline btn-sm"
-                  onclick="dsModalDemos.animRoundTripSelected()">Open, then auto-close</button>
+                  data-studio-action="click->style-modals#demo" data-style-modals-name-param="animRoundTripSelected">Open, then auto-close</button>
           <button type="button" class="btn btn-outline btn-sm"
                   @click="$store.dsModals.close()">Close</button>
         </div>
@@ -1612,15 +1432,15 @@
         </p>
         <div class="flex flex-wrap gap-2">
           <button type="button" class="btn btn-outline btn-sm"
-                  onclick="dsModalDemos.processing()">Processing</button>
+                  data-studio-action="click->style-modals#demo" data-style-modals-name-param="processing">Processing</button>
           <button type="button" class="btn btn-outline btn-sm"
-                  onclick="dsModalDemos.success()">Success</button>
+                  data-studio-action="click->style-modals#demo" data-style-modals-name-param="success">Success</button>
           <button type="button" class="btn btn-outline btn-sm"
-                  onclick="dsModalDemos.error()">Error</button>
+                  data-studio-action="click->style-modals#demo" data-style-modals-name-param="error">Error</button>
           <button type="button" class="btn btn-primary btn-sm"
-                  onclick="dsModalDemos.processThenSuccess()">Processing to success (3s)</button>
+                  data-studio-action="click->style-modals#demo" data-style-modals-name-param="processThenSuccess">Processing to success (3s)</button>
           <button type="button" class="btn btn-primary btn-sm"
-                  onclick="dsModalDemos.processThenError()">Processing to error (3s)</button>
+                  data-studio-action="click->style-modals#demo" data-style-modals-name-param="processThenError">Processing to error (3s)</button>
         </div>
       </div>
 
@@ -1634,9 +1454,9 @@
         </p>
         <div class="flex flex-wrap gap-2">
           <button type="button" class="btn btn-outline btn-sm"
-                  onclick="dsModalDemos.processing()">Try Escape (locked)</button>
+                  data-studio-action="click->style-modals#demo" data-style-modals-name-param="processing">Try Escape (locked)</button>
           <button type="button" class="btn btn-outline btn-sm"
-                  onclick="dsModalDemos.dismissible()">Dismissible processing</button>
+                  data-studio-action="click->style-modals#demo" data-style-modals-name-param="dismissible">Dismissible processing</button>
         </div>
       </div>
 
@@ -1649,9 +1469,9 @@
         </p>
         <div class="flex flex-wrap gap-2">
           <button type="button" class="btn btn-primary btn-sm"
-                  onclick="dsModalDemos.fastWithHold()">Fast op, hold 1500ms</button>
+                  data-studio-action="click->style-modals#demo" data-style-modals-name-param="fastWithHold">Fast op, hold 1500ms</button>
           <button type="button" class="btn btn-outline btn-sm"
-                  onclick="dsModalDemos.fastNoHold()">Fast op, no hold (flashes)</button>
+                  data-studio-action="click->style-modals#demo" data-style-modals-name-param="fastNoHold">Fast op, no hold (flashes)</button>
         </div>
       </div>
 
@@ -1664,212 +1484,12 @@
         </p>
         <div class="flex flex-wrap gap-2">
           <button type="button" class="btn btn-primary btn-sm"
-                  onclick="dsModalDemos.stackTwo()">Open two</button>
+                  data-studio-action="click->style-modals#demo" data-style-modals-name-param="stackTwo">Open two</button>
           <button type="button" class="btn btn-outline btn-sm"
                   @click="$store.dsModals.closeAll()">closeAll()</button>
         </div>
       </div>
     </div>
   </section>
-
-  <%# ---- Demo drivers for the two sections above -------------------------
-      Deliberately NOT an Alpine component: these are multi-step sequences with
-      timers, and an x-data scope would be cloned per specimen card. One global
-      namespace, defined after the markup it drives so the control containers
-      exist when the registry build runs.
-
-      THE STORE IS dsModals. turf-monster's version of this page drove roughly
-      half of these through its legacy solana-modal compatibility proxy, a store
-      this engine does not ship; every demo here goes through the page-scoped
-      store and the ds-stack-demo vehicle directly instead. The exact spelling of
-      that legacy store name is deliberately absent from this file, because
-      style_guide_modal_simulator_test scans the source for it. %>
-  <script>
-    window.dsModalDemos = (function () {
-      var VEHICLE = 'ds-stack-demo';
-
-      function store() { return Alpine.store('dsModals'); }
-
-      // Open the stack-mechanics vehicle. The defaults model a real pending
-      // operation, INCLUDING dismissible: false — the demos that want an
-      // escapable card override it explicitly.
-      //
-      // THE VEHICLE IS DELIBERATELY GENERIC. These demos ran on the onchain-tx
-      // specimen until 2026-09-09, which made every one of them depend on a copy
-      // of turf-monster's card; retiring that copy would have taken the whole
-      // section with it. style/modals/_ds_stack_demo belongs to this page and to
-      // nothing that ships.
-      function openDemo(props) {
-        store().open(VEHICLE, Object.assign({
-          state: 'processing',
-          title: 'Submitting entry',
-          message: 'Awaiting confirmation',
-          dismissible: false
-        }, props || {}));
-      }
-
-      // In-flow state change on the card that is already open. advance() patches
-      // props WITHOUT replacing the stack entry, so the vehicle's x-data scope
-      // survives the transition. Guarded to a still-open vehicle card: a timer
-      // that fires after the user closed it must do nothing rather than patch
-      // whatever card happens to be on top now.
-      function advanceDemo(patch) {
-        var cur = store().current();
-        if (!cur || cur.id !== VEHICLE || cur._closing) return;
-        store().advance(patch);
-      }
-
-      var SUCCESS = {
-        state: 'success',
-        title: 'Entry confirmed',
-        message: 'Resolved in place — this is the same stack entry you opened.',
-        dismissible: true
-      };
-      var FAILURE = {
-        state: 'error',
-        title: 'Submission failed',
-        message: 'The error face of that same entry, patched in by advance().',
-        dismissible: true
-      };
-
-      // === Enter / leave simulator =====================================
-      // The demo vehicle is the always-registered email-change-pending card, so
-      // only the motion varies between runs.
-      var ANIM_DEMO_ID    = 'email-change-pending';
-      var ANIM_DEMO_PROPS = { currentEmail: 'you@example.com', newEmail: 'new@example.com' };
-
-      function animOpen(enterAnim, exitAnim) {
-        store().open(ANIM_DEMO_ID, Object.assign({}, ANIM_DEMO_PROPS, {
-          enterAnim: enterAnim, exitAnim: exitAnim
-        }));
-      }
-
-      // Open, let the entrance settle, then close so the chosen EXIT keyframe is
-      // what you watch. The hold is the entrance's own registry duration plus a
-      // beat, read from the live registry rather than assumed.
-      function animRoundTrip(enterAnim, exitAnim) {
-        animOpen(enterAnim, exitAnim);
-        var reg = window.ModalAnimations || { enter: {}, exit: {} };
-        var enterMs = ((reg.enter[enterAnim] || {}).ms) || 320;
-        setTimeout(function () { store().close(); }, enterMs + 700);
-      }
-
-      function el(id) { return document.getElementById(id); }
-
-      // Build the quick buttons and the dropdown options FROM THE LIVE REGISTRY.
-      // This is the property the section exists to demonstrate: a newly
-      // registered animation key grows a control here with no edit to this file.
-      // Idempotent — it clears each container first, so re-running on a Turbo
-      // visit cannot double the controls.
-      function buildAnimControls() {
-        var reg = window.ModalAnimations || { enter: {}, exit: {} };
-
-        var label = function (key) {
-          return key.charAt(0).toUpperCase() + key.slice(1) + (key === 'pop' ? ' (default)' : '');
-        };
-        var addOption = function (sel, key) {
-          if (!sel) return;
-          var o = document.createElement('option');
-          o.value = key;
-          o.textContent = label(key);
-          if (key === 'pop') o.selected = true;
-          sel.appendChild(o);
-        };
-        var addButton = function (container, key, onClick, suffix) {
-          if (!container) return;
-          var b = document.createElement('button');
-          b.type = 'button';
-          b.className = 'btn btn-outline btn-sm';
-          b.textContent = label(key) + (suffix || '');
-          b.onclick = onClick;
-          container.appendChild(b);
-        };
-
-        var enterBtns = el('modal-anim-enter-buttons');
-        var exitBtns  = el('modal-anim-exit-buttons');
-        var enterSel  = el('modal-anim-enter-select');
-        var exitSel   = el('modal-anim-exit-select');
-
-        [enterBtns, exitBtns, enterSel, exitSel].forEach(function (node) {
-          if (node) node.innerHTML = '';
-        });
-
-        Object.keys(reg.enter || {}).forEach(function (key) {
-          addButton(enterBtns, key, function () { animOpen(key, 'pop'); }, ' ↗');
-          addOption(enterSel, key);
-        });
-        Object.keys(reg.exit || {}).forEach(function (key) {
-          addButton(exitBtns, key, function () { animRoundTrip('pop', key); });
-          addOption(exitSel, key);
-        });
-      }
-
-      // WHEN TO BUILD. window.ModalAnimations is published by studio/modal_host,
-      // a module, which runs after the document has parsed and before
-      // DOMContentLoaded, so the build waits for the rest of the load either way:
-      //   full load   — DOMContentLoaded, the module has run by then;
-      //   Turbo visit — DOMContentLoaded already fired and never fires again, so
-      //                 fall through to a macrotask; the registry is already up.
-      // turbo:load covers the remaining visits; the build is idempotent, so the
-      // overlap between these paths is redundant work and nothing worse.
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', buildAnimControls);
-      } else {
-        setTimeout(buildAnimControls, 0);
-      }
-      if (!window.__dsAnimControlsBound) {
-        window.__dsAnimControlsBound = true;
-        document.addEventListener('turbo:load', buildAnimControls);
-      }
-
-      return {
-        // Stack behaviour
-        processing: function () { openDemo({}); },
-        success:    function () { openDemo(SUCCESS); },
-        error:      function () { openDemo(FAILURE); },
-        processThenSuccess: function () {
-          openDemo({ message: 'Awaiting RPC confirmation' });
-          setTimeout(function () { advanceDemo(SUCCESS); }, 3000);
-        },
-        processThenError: function () {
-          openDemo({ message: 'Awaiting RPC confirmation' });
-          setTimeout(function () { advanceDemo(FAILURE); }, 3000);
-        },
-        dismissible: function () {
-          openDemo({
-            dismissible: true,
-            title: 'Dismissible processing',
-            message: 'Escape and click-outside both close this one.'
-          });
-        },
-        fastWithHold: function () {
-          openDemo({ title: 'Fast operation', message: 'Holding the spinner for at least 1500ms' });
-          window.StudioModals.holdAtLeast(1500).then(function () { advanceDemo(SUCCESS); });
-        },
-        fastNoHold: function () {
-          openDemo({ title: 'Fast operation', message: 'No hold, so this flashes past' });
-          setTimeout(function () { advanceDemo(SUCCESS); }, 50);
-        },
-        stackTwo: function () {
-          openDemo({
-            dismissible: true,
-            title: 'Bottom of the stack',
-            message: 'A second card is about to push in front of this one.'
-          });
-          setTimeout(function () {
-            store().open(ANIM_DEMO_ID, ANIM_DEMO_PROPS);
-          }, 700);
-        },
-
-        // Enter / leave simulator
-        animOpenSelected: function () {
-          animOpen(el('modal-anim-enter-select').value, el('modal-anim-exit-select').value);
-        },
-        animRoundTripSelected: function () {
-          animRoundTrip(el('modal-anim-enter-select').value, el('modal-anim-exit-select').value);
-        }
-      };
-    })();
-  </script>
 
 </section>
