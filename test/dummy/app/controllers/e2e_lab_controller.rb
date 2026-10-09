@@ -528,6 +528,17 @@ class E2eLabController < ActionController::Base
   # identical whether either one runs.
   def style_modals = render(:style_modals)
 
+  # The scanner-safe sign-in page (studio/_confirm_interstitial), a whole document
+  # with no layout, as Studio::LinksController#show renders it. Its POST lands on
+  # the action below, which answers with a line the spec can read; no token is
+  # burned, because what is under test is that the page posts at all.
+  def confirm_interstitial
+    render partial: "studio/confirm_interstitial",
+           locals: { consume_path: "/lab/confirm_interstitial/consume" }
+  end
+
+  def confirm_interstitial_consume = render(plain: "consumed by POST")
+
   # HOST-SUPPLIED LOCALS THAT LAND INSIDE A JS STRING LITERAL, across the blocks
   # that take one — success/error card event names and the tx link's cluster query.
   #

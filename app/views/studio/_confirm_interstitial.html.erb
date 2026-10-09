@@ -7,6 +7,10 @@
   (full document).
 
   Local: consume_path — the POST target that burns the token + signs in.
+
+  Two ways through, and neither depends on the other: the page posts its own
+  form (studio/confirm_interstitial), and the button below shows itself after
+  four seconds by CSS alone.
 %>
 <!DOCTYPE html>
 <html lang="en">
@@ -42,10 +46,21 @@
         animation: magic-spin 0.8s linear infinite;
       }
 
+      /* THE FALLBACK SHOWS ITSELF, four seconds in, with no script: the button
+         is the way through when the auto-post stalls, and also when the script
+         that posts never arrives. Held at no height until then, so the spinner
+         sits where it would with the block absent. */
+      @keyframes magic-fallback-in {
+        to { max-height: 20rem; margin-top: 2rem; visibility: visible; }
+      }
+
       .magic-fallback {
-        display: none;
-        margin-top: 2rem;
+        max-height: 0;
+        margin-top: 0;
+        overflow: hidden;
+        visibility: hidden;
         color: rgba(248, 250, 252, 0.8);
+        animation: magic-fallback-in 1ms linear 4s forwards;
       }
 
       .magic-fallback p { margin: 0 0 1rem; font-size: 15px; }
@@ -82,25 +97,15 @@
 
     <noscript>
       <style>
-        #magic-fallback { display: block !important; }
+        #magic-fallback { animation: none; max-height: none; margin-top: 2rem; visibility: visible; }
         .magic-spinner { display: none; }
       </style>
     </noscript>
 
-    <script>
-      (function () {
-        var form = document.getElementById("magic-consume-form");
-        if (form && !form.dataset.autoSubmitted) {
-          form.dataset.autoSubmitted = "1";
-          if (typeof form.requestSubmit === "function") form.requestSubmit();
-          else form.submit();
-        }
-
-        setTimeout(function () {
-          var fallback = document.getElementById("magic-fallback");
-          if (fallback) fallback.style.display = "block";
-        }, 4000);
-      })();
-    </script>
+    <%# THE AUTO-POST is studio/confirm_interstitial, a module with no imports,
+        loaded by its own tag: this document has no import map. The tag carries
+        the request's CSP nonce when the host sets one. %>
+    <%= tag.script("".html_safe, type: "module", src: asset_path("studio/confirm_interstitial.js"),
+                   nonce: (content_security_policy_nonce if respond_to?(:content_security_policy_nonce))) %>
   </body>
 </html>
