@@ -75,49 +75,53 @@ test("a lazy controller that loads registers, connects, and leaves no mark", asy
   expect(thrown).toEqual([]);
 });
 
-for (const [name, fail] of [
-  ["the request is aborted", (route) => route.abort()],
-  ["the file is gone (404)", (route) => route.fulfill({ status: 404, contentType: "text/plain", body: "Not Found" })],
-]) {
-  test(`a lazy controller that fails to load is marked, reported once and never imported again: ${name}`, async ({ page }) => {
-    await blockOffsiteRequests(page);
-    const { requests, reports, thrown } = watch(page);
-    const failing = (url) => LAZY_MODULE.test(url.pathname + url.search);
-    await page.route(failing, fail);
+async function failsVisiblyAndForGood(page, fail) {
+  await blockOffsiteRequests(page);
+  const { requests, reports, thrown } = watch(page);
+  const failing = (url) => LAZY_MODULE.test(url.pathname + url.search);
+  await page.route(failing, fail);
 
-    await page.goto("/lab/lazy_controller");
-    await settled(page);
+  await page.goto("/lab/lazy_controller");
+  await settled(page);
 
-    // The state is on the element, where a page can style or announce it.
-    await expect(first(page)).toHaveAttribute("data-studio-controller-failed", "lab-lazy");
-    await expect(first(page)).not.toHaveAttribute("data-lab-lazy", /.*/);
-    expect(await page.evaluate(() => [...window.__labLazy.failed.keys()])).toEqual(["lab-lazy"]);
+  // The state is on the element, where a page can style or announce it.
+  await expect(first(page)).toHaveAttribute("data-studio-controller-failed", "lab-lazy");
+  await expect(first(page)).not.toHaveAttribute("data-lab-lazy", /.*/);
+  expect(await page.evaluate(() => [...window.__labLazy.failed.keys()])).toEqual(["lab-lazy"]);
 
-    // The page changes, as a page does: each new element is marked, and
-    // nothing is imported or reported again.
-    for (const later of ["second", "third", "fourth"]) {
-      await addElement(page, later);
-      await expect(page.locator(`[data-test='${later}']`)).toHaveAttribute("data-studio-controller-failed", "lab-lazy");
-    }
-    expect(requests, "the registry imported a failed module again").toHaveLength(1);
-    expect(reports, "one report for the document, not one per change").toHaveLength(1);
-    expect(reports[0]).toContain("until the page is reloaded");
-    expect(thrown).toEqual([]);
+  // The page changes, as a page does: each new element is marked, and
+  // nothing is imported or reported again.
+  for (const later of ["second", "third", "fourth"]) {
+    await addElement(page, later);
+    await expect(page.locator(`[data-test='${later}']`)).toHaveAttribute("data-studio-controller-failed", "lab-lazy");
+  }
+  expect(requests, "the registry imported a failed module again").toHaveLength(1);
+  expect(reports, "one report for the document, not one per change").toHaveLength(1);
+  expect(reports[0]).toContain("until the page is reloaded");
+  expect(thrown).toEqual([]);
 
-    // WHY the registry does not retry: the browser would not. The route is
-    // lifted, so the module is reachable again, and the document still rejects
-    // an import of it without asking the network.
-    await page.unroute(failing);
-    const again = await page.evaluate(() => import("/e2e/js/lab_lazy_controller.js").then(() => "loaded", () => "rejected"));
-    expect(again).toBe("rejected");
-    expect(requests, "the browser fetched a failed module again").toHaveLength(1);
+  // WHY the registry does not retry: the browser would not. The route is
+  // lifted, so the module is reachable again, and the document still rejects
+  // an import of it without asking the network.
+  await page.unroute(failing);
+  const again = await page.evaluate(() => import("/e2e/js/lab_lazy_controller.js").then(() => "loaded", () => "rejected"));
+  expect(again).toBe("rejected");
+  expect(requests, "the browser fetched a failed module again").toHaveLength(1);
 
-    // A full page load is the recovery.
-    await page.reload();
-    await settled(page);
-    await expect(first(page)).toHaveAttribute("data-lab-lazy", "connected");
-    await expect(first(page)).not.toHaveAttribute("data-studio-controller-failed", /.*/);
-    expect(requests).toHaveLength(2);
-    expect(reports).toHaveLength(1);
-  });
+  // A full page load is the recovery.
+  await page.reload();
+  await settled(page);
+  await expect(first(page)).toHaveAttribute("data-lab-lazy", "connected");
+  await expect(first(page)).not.toHaveAttribute("data-studio-controller-failed", /.*/);
+  expect(requests).toHaveLength(2);
+  expect(reports).toHaveLength(1);
 }
+
+// Written out one by one: the lane's static count reads each `test(` in this file.
+test("a lazy controller that fails to load is marked, reported once and never imported again: the request is aborted", async ({ page }) => {
+  await failsVisiblyAndForGood(page, (route) => route.abort());
+});
+
+test("a lazy controller that fails to load is marked, reported once and never imported again: the file is gone (404)", async ({ page }) => {
+  await failsVisiblyAndForGood(page, (route) => route.fulfill({ status: 404, contentType: "text/plain", body: "Not Found" }));
+});

@@ -20,8 +20,8 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 //     every spec fails.
 //   - register the button lazily again (a dynamic import in LAZY in
 //     studio/stimulus, no static import): the "arrive with the page" spec and
-//     both "can no longer be fetched" specs fail, the last two with a button
-//     that takes a press and does nothing.
+//     both "can no longer be fetched" specs fail, the last two at a button
+//     whose controller never arrives.
 //   - drop `javascript_import_module_tag "studio/stimulus"` from the head: the
 //     failed-boot spec fails.
 
@@ -249,61 +249,65 @@ test("the button's modules arrive with the page, so a later button fetches nothi
 // inserts one, as a modal inserts its confirm button. Both confirm, because
 // nothing asks for a module after the page loaded. The spec then requests one
 // itself, to show the route was live and the failure real.
-for (const [name, fail] of [
-  ["the connection drops", (route) => route.abort()],
-  ["a deploy retired the files (404)", (route) => route.fulfill({ status: 404, contentType: "text/plain", body: "Not Found" })],
-]) {
-  test(`a button rendered after its modules can no longer be fetched still confirms: ${name}`, async ({ page }) => {
-    const errors = watchPageErrors(page);
-    await blockOffsiteRequests(page);
-    await page.emulateMedia({ reducedMotion: "no-preference" });
-    await page.goto("/lab/toast_flash");
-    await expect(page.locator("[data-test='toast-flash-page']")).toBeVisible();
-    await page.waitForLoadState("networkidle");
-    await expect(page.locator(".hold-btn")).toHaveCount(0);
+async function confirmsWithItsModulesGone(page, fail) {
+  const errors = watchPageErrors(page);
+  await blockOffsiteRequests(page);
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/lab/toast_flash");
+  await expect(page.locator("[data-test='toast-flash-page']")).toBeVisible();
+  await page.waitForLoadState("networkidle");
+  await expect(page.locator(".hold-btn")).toHaveCount(0);
 
-    const refused = [];
-    await page.route((url) => HOLD_MODULES.test(url.pathname + url.search), (route) => {
-      refused.push(route.request().url());
-      return fail(route);
-    });
-
-    // The document's first hold button, in the same document.
-    await page.evaluate(() => { window.__sameDocument = true; });
-    await page.evaluate(() => window.Turbo.visit("/lab/hold_button_events"));
-    await ready(page, "events");
-    expect(await page.evaluate(() => window.__sameDocument)).toBe(true);
-    await button(page, "events").hover();
-    await page.mouse.down();
-    await expect(button(page, "events")).toHaveClass(/\bsuccess\b/, { timeout: 3000 });
-    await page.mouse.up();
-
-    // One the page inserts later.
-    await expect(button(page, "late")).toHaveCount(0);
-    await page.locator("[data-test='reveal']").click();
-    await ready(page, "late");
-    await button(page, "late").hover();
-    await page.mouse.down();
-    await expect(button(page, "late")).toHaveClass(/\bsuccess\b/, { timeout: 3000 });
-    await page.mouse.up();
-    expect((await log(page)).filter((entry) => entry.startsWith("late"))).toEqual(["late-start", "late-success"]);
-
-    expect(refused, "the button asked for a module after the page loaded").toEqual([]);
-    expect(errors).toEqual([]);
-
-    // The modules really are unreachable: a request for one, made now, fails.
-    const reached = await page.evaluate(async () => {
-      const imports = JSON.parse(document.querySelector("script[type=importmap]").textContent).imports;
-      try {
-        return (await fetch(imports["studio/controllers/hold_button_controller"], { cache: "reload" })).status;
-      } catch (error) {
-        return "failed";
-      }
-    });
-    expect(["failed", 404]).toContain(reached);
-    expect(refused).toHaveLength(1);
+  const refused = [];
+  await page.route((url) => HOLD_MODULES.test(url.pathname + url.search), (route) => {
+    refused.push(route.request().url());
+    return fail(route);
   });
+
+  // The document's first hold button, in the same document.
+  await page.evaluate(() => { window.__sameDocument = true; });
+  await page.evaluate(() => window.Turbo.visit("/lab/hold_button_events"));
+  await ready(page, "events");
+  expect(await page.evaluate(() => window.__sameDocument)).toBe(true);
+  await button(page, "events").hover();
+  await page.mouse.down();
+  await expect(button(page, "events")).toHaveClass(/\bsuccess\b/, { timeout: 3000 });
+  await page.mouse.up();
+
+  // One the page inserts later.
+  await expect(button(page, "late")).toHaveCount(0);
+  await page.locator("[data-test='reveal']").click();
+  await ready(page, "late");
+  await button(page, "late").hover();
+  await page.mouse.down();
+  await expect(button(page, "late")).toHaveClass(/\bsuccess\b/, { timeout: 3000 });
+  await page.mouse.up();
+  expect((await log(page)).filter((entry) => entry.startsWith("late"))).toEqual(["late-start", "late-success"]);
+
+  expect(refused, "the button asked for a module after the page loaded").toEqual([]);
+  expect(errors).toEqual([]);
+
+  // The modules really are unreachable: a request for one, made now, fails.
+  const reached = await page.evaluate(async () => {
+    const imports = JSON.parse(document.querySelector("script[type=importmap]").textContent).imports;
+    try {
+      return (await fetch(imports["studio/controllers/hold_button_controller"], { cache: "reload" })).status;
+    } catch (error) {
+      return "failed";
+    }
+  });
+  expect(["failed", 404]).toContain(reached);
+  expect(refused).toHaveLength(1);
 }
+
+// Written out one by one: the lane's static count reads each `test(` in this file.
+test("a button rendered after its modules can no longer be fetched still confirms: the connection drops", async ({ page }) => {
+  await confirmsWithItsModulesGone(page, (route) => route.abort());
+});
+
+test("a button rendered after its modules can no longer be fetched still confirms: a deploy retired the files (404)", async ({ page }) => {
+  await confirmsWithItsModulesGone(page, (route) => route.fulfill({ status: 404, contentType: "text/plain", body: "Not Found" }));
+});
 
 test("after a Turbo visit and Back the button still confirms, with one portal box", async ({ page }) => {
   const errors = watchPageErrors(page);

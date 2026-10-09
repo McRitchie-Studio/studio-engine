@@ -879,7 +879,20 @@
 # the controller loads does nothing, the controller is fetched only where a
 # button renders, it survives a Turbo visit and Back, and a failed boot.
 #   npx playwright test --list  -> 245 tests in 35 files
-total_specs: 245
+# 245 -> 250, the review rework of the hold button's registration.
+# e2e/hold_button_events.spec.js, 13 -> 15: the button is imported statically by
+# studio/stimulus, so "fetched only where a button renders" became "its modules
+# arrive with the page, and a later button fetches nothing", and two specs make
+# the three modules unreachable for real after the page loaded (requests
+# aborted, and answered 404) and then meet the document's first button by Turbo
+# visit and by x-if: both confirm, with no request. e2e/lazy_controller_failure.spec.js,
+# 3 tests, on /lab/lazy_controller: a lazy controller that loads registers and
+# leaves no mark; one whose module request is aborted, or answered 404, is
+# marked with data-studio-controller-failed, reported once, and never imported
+# again as the page changes, the browser re-rejects a direct import() of it
+# without a request, and a reload recovers.
+#   npx playwright test --list  -> 250 tests in 36 files
+total_specs: 250
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1027,7 +1040,14 @@ total_specs: 245
 # executed = total - devnet - allowed_skips = 213 - 0 - 0 = 213, so executed ==
 # total_specs and the equality assertion holds.
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 245
-executed: 245
+# And again for the hold button's static registration and the lazy registry's
+# failure state: 5 more tests, 1 new file:
+#   npx playwright test --list                                             -> 250 tests, 36 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 250
+# executed = total - devnet - allowed_skips = 250 - 0 - 0 = 250, so executed ==
+# total_specs and the equality assertion holds.
+executed: 250
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
