@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.96.2 — 2026-10-08
+
 ### Added
 
 - **Consumer CI runs moms-app's suite** against each engine change, beside the
