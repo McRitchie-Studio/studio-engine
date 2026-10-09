@@ -24,9 +24,10 @@ const { blockOffsiteRequests } = require("./helpers");
 //     buttons marked.
 //   - drop the guard's `clear` call from the controller's connect: the
 //     late-connect spec fails, its button working under a notice.
-//   - drop the MutationObserver from the guard: "a button inserted later on a
-//     page whose module failed" is covered by each failed-module spec's late
-//     button, which fails.
+//   - drop the guard's sweep after an insertion (the MutationObserver's
+//     `setTimeout(sweep, SETTLE_MS)`): each failed-module spec fails at its
+//     late button, the one an x-if inserts on a page whose module failed. The
+//     Turbo visit spec still passes, on the turbo:load sweep.
 
 const MODULES = {
   "studio/stimulus": /\/studio\/stimulus(?:-[0-9a-f]+)?\.js(?:\?|$)/,

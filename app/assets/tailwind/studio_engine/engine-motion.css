@@ -1776,19 +1776,18 @@ body.modal-open { overflow: visible; }
   color: var(--color-danger-ink, var(--color-danger));
 }
 
-/* A press on the marked button: the notice answers it. */
-.hold-stack[data-hold-notice-pressed] > .hold-notice {
-  animation: hold-notice-pressed 0.45s ease-out;
+/* A press on the marked button: the notice answers it, with a pulse only for
+   a reader who has not asked for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .hold-stack[data-hold-notice-pressed] > .hold-notice {
+    animation: hold-notice-pressed 0.45s ease-out;
+  }
 }
 
 @keyframes hold-notice-pressed {
   0%   { transform: scale(1); }
   35%  { transform: scale(1.06); }
   100% { transform: scale(1); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hold-stack[data-hold-notice-pressed] > .hold-notice { animation: none; }
 }
 
 .hold-stack > .hold-fizz,
