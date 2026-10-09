@@ -892,7 +892,18 @@
 # again as the page changes, the browser re-rejects a direct import() of it
 # without a request, and a reload recovers.
 #   npx playwright test --list  -> 250 tests in 36 files
-total_specs: 250
+# 250 -> 265: e2e/hold_button_guard.spec.js, 15 tests. The hold button's guard
+# (studio/_hold_button_guard) says so when a button cannot work. Ten make one
+# of the button's five modules fail for real AS THE PAGE LOADS (each aborted,
+# and each answered 404): the button is marked and reads its notice at AA in
+# both themes, a full hold sends and dispatches nothing, a press is answered, a
+# button an x-if inserts later is marked too, and a reload recovers. Five hold
+# the other side: a healthy cold load and a boot whose modules arrive two
+# seconds late are never marked, a later button on a healthy page takes its
+# first press, a controller that connects after the grace clears the mark, and
+# a Turbo visit onto a button after a failure marks it.
+#   npx playwright test --list  -> 265 tests in 37 files
+total_specs: 265
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1047,7 +1058,13 @@ total_specs: 250
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 250
 # executed = total - devnet - allowed_skips = 250 - 0 - 0 = 250, so executed ==
 # total_specs and the equality assertion holds.
-executed: 250
+# And again for the hold button's guard: 15 more tests, 1 new file:
+#   npx playwright test --list                                             -> 265 tests, 37 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 265
+# executed = total - devnet - allowed_skips = 265 - 0 - 0 = 265, so executed ==
+# total_specs and the equality assertion holds.
+executed: 265
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
