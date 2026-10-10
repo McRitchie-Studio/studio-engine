@@ -90,11 +90,21 @@ The navbar uses `Studio.logo_for("Navbar Logo")`, auth views use `Studio.logo_fo
 - "Turf Monster" → "Turf **Monster**"
 - "McRitchie Studio" → "McRitchie **Studio**"
 
+## Brand Heading
+
+The brand title is the page's `<h1>` by default. On a page that carries its own
+h1, pass `brand_heading: false` and the brand is drawn as a `<div>` with the same
+classes and contents, so the page's title is the outline's only h1:
+
+```erb
+<%= render "layouts/navbar", brand_heading: false %>
+```
+
 ## CSS Class Hooks
 
 These classes are available for preview CSS targeting:
 - `.nav-logo` — the logo image
-- `.nav-title` — the brand title h1
+- `.nav-title` — the brand title (an h1, or a div when `brand_heading: false`)
 - `.nav-logo-link` — the link wrapping logo + title
 - `.user-nav-col` — the right-side user nav column (fixed width, seats a balance)
 - `.user-nav-fit` — the same column when no `balance_html` is passed: shrink-to-fit, with media-stepped `max-width` clamps (14/15/20rem) mirroring `.user-nav-col`
