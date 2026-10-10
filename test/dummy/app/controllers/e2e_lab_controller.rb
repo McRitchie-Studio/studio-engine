@@ -559,13 +559,14 @@ class E2eLabController < ActionController::Base
   def board = render(:board)
 
   # Every chip the badge component draws, on each of the four theme surfaces.
-  # `?palette=<name>` repaints the page in one consuming app's configured
-  # colours (test/support/consumer_palettes.rb) through the resolver's own CSS,
-  # as a style tag of this request: Studio.theme_* is one slot per process.
+  # `?palette=<name>` paints the page in one named palette
+  # (test/support/consumer_palettes.rb) through the resolver's own CSS, as a
+  # style tag of this request: Studio.theme_* is one slot per process, and the
+  # head's theme is whatever the lab's ThemeSetting row last saved.
   def chips
     require_relative "../../../support/consumer_palettes"
     palette = ConsumerPalettes::ALL[params[:palette].to_s]
-    @palette_css = Studio::ThemeResolver.new(palette).to_css if palette&.any?
+    @palette_css = Studio::ThemeResolver.new(palette).to_css if palette
     render(:chips)
   end
 

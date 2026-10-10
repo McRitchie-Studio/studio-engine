@@ -113,7 +113,9 @@ async function inTheme(page, theme) {
 }
 
 async function openLab(page, palette) {
-  await page.goto(palette === "engine-default" ? "/lab/chips" : `/lab/chips?palette=${palette}`);
+  // Always a named palette: the lab's own theme row is whatever
+  // style_theme_save.spec.js last wrote, and survives a local server restart.
+  await page.goto(`/lab/chips?palette=${palette}`);
   await expect(page.locator("[data-chip-surface]")).toHaveCount(4);
 }
 
