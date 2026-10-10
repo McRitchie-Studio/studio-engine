@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.99.0 — 2026-10-09
+
 ### Fixed
 
 - **A modal left open no longer comes back on Back when `studio/application`
