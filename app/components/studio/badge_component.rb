@@ -20,7 +20,8 @@ module Studio
   # rest of the page uses for that status. Tokens only, so it reads in both themes.
   #
   # scheme: is the palette the components/badge partial took (SCHEMES), including
-  # the stage-* pipeline ladder, and renders exactly what that partial rendered.
+  # the stage-* pipeline ladder. Its "primary" draws the primary ink; the rest
+  # render exactly what that partial rendered.
   # An unknown scheme renders FALLBACK, as the partial did.
   #
   # Pass tone: or scheme:, not both. Neither renders the neutral scheme.

@@ -19,8 +19,8 @@ const { test, expect } = require("@playwright/test");
 //     primary hue" fails in every palette.
 //   - the preset's `primary-ink` text colour removed: the same spec fails, the
 //     chip inherits the body colour.
-//   - status_ink searching the bare surfaces only: the palette specs fail,
-//     naming the chip, the surface and the ratio.
+//   - status_ink tuned to a 0.10 tint alone: the moms-app spec fails, its
+//     primary chip at 4.48:1 on the dark surface.
 
 const AA = 4.5;
 const PALETTES = ["engine-default", "turf-monster", "cyvasse", "mcritchie-industries", "moms-app"];

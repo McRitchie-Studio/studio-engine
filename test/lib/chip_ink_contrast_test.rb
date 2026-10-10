@@ -77,9 +77,10 @@ class ChipInkContrastTest < ActiveSupport::TestCase
       modes(palette).each do |mode, (vars, _surfaces)|
         ink = vars.fetch("--color-primary-ink")
         primary = vars.fetch("--color-primary")
+        refute_equal vars.fetch("--color-text").downcase, ink.downcase, "#{name} #{mode}: the primary ink is the heading colour"
+        assert hue(ink), "#{name} #{mode}: the primary ink #{ink} is a grey"
         apart = (hue(ink) - hue(primary)).abs
 
-        refute_equal vars.fetch("--color-text").downcase, ink.downcase, "#{name} #{mode}: the primary ink is the heading colour"
         assert_operator [apart, 360 - apart].min, :<=, 8, "#{name} #{mode}: ink #{ink} has left the hue of #{primary}"
       end
     end

@@ -4,6 +4,29 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`--color-primary-ink` and `text-primary-ink`: the primary colour as chip
+  text.** The theme resolver derives it per theme the way it derives the
+  danger, warning and success inks: the configured primary, shaded until it
+  clears WCAG AA 4.5:1 on every surface and on its own 10% tint. `text-primary`
+  and `--color-primary` stay the brand colour.
+
+### Changed
+
+- **Primary chips are painted in the primary colour and clear AA in both
+  themes.** `Studio::BadgeComponent`'s `tone: :primary` drew heading-coloured
+  text (white in dark, near-black in light), and its `scheme: "primary"`, the
+  Marketing chip on `/admin/emails` and the sidebar's ADMIN chip drew the raw
+  primary, 2.2:1 to 3.6:1 on its tint. All of them now draw `text-primary-ink`.
+  A host that copies the tone's class string (the hub's `status_tone`) changes
+  when it adopts the class.
+- **Status inks are derived against the tint a browser paints.** Chromium
+  composites a 10% fill at 26/255, slightly stronger than 0.10, so an ink tuned
+  to 0.10 could land just under AA on screen (4.48:1 measured). The search now
+  counts both. On the default theme one ink moves one step: light success
+  `#2E6C32` becomes `#2D6A31`.
+
 ## 0.101.0 — 2026-10-10
 
 ### Breaking
