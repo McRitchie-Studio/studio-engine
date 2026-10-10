@@ -39,6 +39,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   from `kind_for`: `:video` and `:audio`. `Result` gains `cues` and
   `cues_truncated`, and the kind `:transcript`.
 
+### Fixed
+
+- **The style guide's Save and Regenerate toast success only when the server
+  wrote.** `studio/theme_editor` asks `/admin/theme` for JSON and counts a 2xx
+  from that request alone as saved; `ThemeSettingsController` answers the fetch
+  `204` after the write and `422` with the reason when it refuses. A redirect,
+  which the fetch does not follow, and a `401` toast "Save failed" with a
+  prompt to sign in: an ended session bounced the save to sign-in before and
+  the editor toasted "Theme saved" over nothing written. A save still sends one
+  request. A form post to `/admin/theme` keeps its redirect and flash.
+
 ## 0.99.0 — 2026-10-09
 
 ### Added

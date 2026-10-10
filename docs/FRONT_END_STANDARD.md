@@ -46,7 +46,7 @@ drawn by `Studio.routes` (`Studio::ComponentGallery`):
   (so ViewComponent loads first):
   `gem "lookbook", group: [:development, :test]` for a development gallery, or
   ungrouped plus `Studio.lookbook_in_production = true` for a live one. The hub
-  is meant to be the one live gallery; no app sets the flag yet.
+  is the one live gallery: it bundles lookbook ungrouped and sets the flag.
 - An app without lookbook in its bundle draws no gallery route, serves no
   Lookbook asset, and loads no Lookbook code. A production app without the flag
   draws none of it either, and no app draws ViewComponent's preview routes in

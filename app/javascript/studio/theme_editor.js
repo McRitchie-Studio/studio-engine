@@ -137,20 +137,33 @@ export function themeEditor(seed) {
 // The editor's form carries _method=patch, and sending the real method means
 // nothing depends on Rack::MethodOverride parsing a multipart fetch body.
 //
-// THE REDIRECT IS NOT FOLLOWED. The controller answers a save with a 302 back
-// to /admin/theme, and a fetch that follows a 302 keeps a PATCH a PATCH: it
-// sends the save again on every hop until the browser gives up.
+// It asks for JSON, which the controller answers with a 204 once it has
+// written. NO REDIRECT IS FOLLOWED: a fetch that follows a 302 keeps a PATCH a
+// PATCH and sends the save again on every hop.
 export function formRequest(data) {
   const override = data.get("_method")
   if (override) data.delete("_method")
-  return { method: override ? String(override).toUpperCase() : "POST", body: data, redirect: "manual" }
+  return {
+    method: override ? String(override).toUpperCase() : "POST",
+    body: data,
+    headers: { Accept: "application/json" },
+    redirect: "manual"
+  }
 }
 
-// Whether the server took the save: a 2xx, or its own redirect (which a fetch
-// told not to follow reports as an opaque redirect). A failed save is rendered
-// in place with a 422.
+// Whether the server took the save: a 2xx from the request itself. A redirect
+// (opaque, because none is followed) is the admin gate turning the request
+// away, and a refused save is a 422.
 export function saved(response) {
-  return response.ok || response.type === "opaqueredirect"
+  return response.ok === true
+}
+
+export const SIGNED_OUT = "Not signed in as an admin. Sign in and save again."
+
+// Why a response that is not a save failed, for the toast.
+export function failureReason(response) {
+  if (response.type === "opaqueredirect" || response.status === 401) return SIGNED_OUT
+  return "HTTP " + response.status
 }
 
 // x-data="dsThemeEditor({...})": style/_theme.
@@ -179,7 +192,7 @@ export function dsThemeEditor(seed) {
       const request = formRequest(new FormData(form))
       fetch(form.action, request)
         .then((res) => {
-          if (!saved(res)) throw new Error("HTTP " + res.status)
+          if (!saved(res)) throw new Error(failureReason(res))
           return res
         })
         .then(() => { this.toast("notice", label, "Saved in place — the page stayed put.") })

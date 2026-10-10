@@ -262,6 +262,8 @@ require_relative "../db/migrate/20260818120000_create_studio_geo_settings"
 # model, which needs its real table.
 require_relative "../db/migrate/20260930120000_create_studio_site_identities"
 require_relative "../db/migrate/20261005120000_create_studio_survey_responses"
+# The Theme section (/lab/style_theme) saves through the real /admin/theme.
+require_relative "../db/migrate/20261006120002_ensure_theme_settings_table"
 
 lab_db = File.join(ROOT, "tmp", "e2e-lab.sqlite3")
 FileUtils.mkdir_p(File.dirname(lab_db))
@@ -271,6 +273,7 @@ ActiveRecord::Migration.suppress_messages do
   CreateStudioGeoSettings.new.migrate(:up)
   CreateStudioSiteIdentities.new.migrate(:up)
   CreateStudioSurveyResponses.new.migrate(:up)
+  EnsureThemeSettingsTable.new.migrate(:up)
   # The host's users table, as far as the survey pages read it.
   ActiveRecord::Base.connection.create_table(:users) do |t|
     t.string :email
@@ -296,6 +299,10 @@ abort "e2e/boot: survey definition not loaded from test/dummy/config/surveys" un
 # The HOST's base controller, which the engine's survey controllers inherit.
 # Shaped like every consumer's: Studio::ErrorHandling (current_user, the admin
 # gate, require_authentication) in the lab's real layout and asset delivery.
+# Studio::ErrorHandling#require_authentication answers turbo_stream, which a
+# host registers through turbo-rails and the dummy does not load.
+Mime::Type.register "text/vnd.turbo-stream.html", :turbo_stream unless Mime[:turbo_stream]
+
 class ApplicationController < ActionController::Base
   include Studio::ErrorHandling
 

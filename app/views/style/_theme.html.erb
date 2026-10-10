@@ -6,7 +6,8 @@
      Save-in-place: unlike the standalone /admin/theme page (which redirects to
      itself on save), THIS section intercepts Save + Regenerate and submits them
      via fetch — the page never navigates away, the live preview stays put, and
-     the outcome is a toast. The standalone page's own redirect is unchanged.
+     the outcome is a toast. The fetch asks for JSON and the controller answers
+     it 204 once it has written; the standalone page's redirect is unchanged.
      The editor is studio/theme_editor's dsThemeEditor factory, which
      studio/alpine_shims publishes.
 
