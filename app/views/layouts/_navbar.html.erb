@@ -5,6 +5,9 @@
       balance_html    — raw HTML for balance display (passed through to _user_nav)
       extra_icons_html — raw HTML for extra icon buttons (passed through to _user_nav)
       show_logout_link — boolean, show "Log out" link in user nav (passed through to _user_nav)
+      brand_heading   — boolean, draw the brand title as the page's h1 (default: true).
+                        Pass false on a page that carries its own h1: the brand is
+                        drawn as a div with the same classes and contents.
 %>
 <% show_user = local_assigns.fetch(:show_logged_in, logged_in?) %>
 <% is_preview = local_assigns.fetch(:preview, false) %>
@@ -19,6 +22,7 @@
 <% balance_html = local_assigns.fetch(:balance_html, nil) %>
 <% extra_icons_html = local_assigns.fetch(:extra_icons_html, nil) %>
 <% show_logout_link = local_assigns.fetch(:show_logout_link, false) %>
+<% brand_tag = local_assigns.fetch(:brand_heading, true) ? "h1" : "div" %>
 <%# Out-of-the-box navigation (engine 0.30): when the host declares
     Studio.sidebar_sections, the navbar mounts the link-sidebar trigger in its
     icon rails and renders the slide-out panels after the header. With no
@@ -150,7 +154,7 @@
               overflow that has to be clipped belongs to each word's own box —
               `truncate` on the h1 would clip the flex CONTAINER and leave the
               spans drawing outside it, which is the bug rather than the fix. %>
-          <h1 class="nav-title font-extrabold text-heading tracking-tight min-w-0"><span class="truncate"><%= prefix %></span><span class="text-primary truncate"><%= last_word %></span></h1>
+          <<%= brand_tag %> class="nav-title font-extrabold text-heading tracking-tight min-w-0"><span class="truncate"><%= prefix %></span><span class="text-primary truncate"><%= last_word %></span></<%= brand_tag %>>
         <% end %>
         <%# Desktop nav — Studio.navbar_links %>
         <nav class="hidden md:flex items-center gap-4"<%= ' aria-label="Main"'.html_safe if navbar_links.any? %>>

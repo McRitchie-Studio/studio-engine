@@ -4,6 +4,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **The navbar takes a `brand_heading` local.** `layouts/_navbar` draws the
+  brand title as the page's `<h1>` by default, exactly as before. Pass
+  `brand_heading: false` on a page that carries its own h1 and the brand is drawn
+  as a `<div>` with the same classes and contents; no other byte of the navbar
+  changes. Styling keys on `.nav-title`, never on the element name.
+
 ## 0.100.0 — 2026-10-10
 
 ### Added
