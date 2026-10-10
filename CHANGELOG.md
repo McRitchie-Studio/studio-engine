@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.101.0 — 2026-10-10
+
 ### Breaking
 
 - **The hold button takes no JavaScript-string locals.** `studio/_hold_button`
