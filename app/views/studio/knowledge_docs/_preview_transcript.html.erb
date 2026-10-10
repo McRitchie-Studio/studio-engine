@@ -14,7 +14,7 @@
 <% playable = player&.playable? %>
 <div class="knowledge-transcript<%= " knowledge-transcript-with-player" if player %>" id="knowledge-transcript"<% if playable %> data-studio-controller="knowledge-transcript"<% end %>>
   <% if player %>
-    <div class="knowledge-transcript-player" id="knowledge-transcript-player">
+    <div id="knowledge-transcript-player">
       <%= render "studio/knowledge_docs/preview_player", player: player, title: doc.title %>
       <% if playable %>
         <p class="knowledge-preview-note knowledge-transcript-hint" id="knowledge-transcript-hint">Click a line to play from there.</p>
@@ -22,7 +22,7 @@
       <% end %>
     </div>
   <% end %>
-  <div class="knowledge-transcript-lines">
+  <div id="knowledge-transcript-lines">
     <% if preview.cues_truncated %>
       <p class="knowledge-preview-note" id="knowledge-transcript-truncated" data-transcript-truncated>
         This transcript is longer than the page shows;

@@ -6,7 +6,7 @@
 <% if !player.playable? %>
   <p class="knowledge-preview-note" id="knowledge-player-unavailable">The recording could not be loaded. Reload the page to try again.</p>
 <% elsif player.kind == :audio %>
-  <audio class="knowledge-player knowledge-player-audio" id="<%= dom_id %>" data-knowledge-player
+  <audio class="knowledge-player" id="<%= dom_id %>" data-knowledge-player
          controls preload="metadata" src="<%= player.url %>" aria-label="<%= title %>"></audio>
 <% else %>
   <video class="knowledge-player knowledge-player-video" id="<%= dom_id %>" data-knowledge-player
