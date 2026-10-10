@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs"
 const source = readFileSync(new URL("../../app/javascript/studio/theme_editor.js", import.meta.url), "utf8")
 const {
   ROLES, normalizeHex, lightenColor, seededColors, previewProperties, stylePreviewProperties,
-  formRequest, saved, themeEditor, dsThemeEditor
+  formRequest, saved, failureReason, SIGNED_OUT, themeEditor, dsThemeEditor
 } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 // The root's inline style, as the factories write it.
@@ -123,7 +123,7 @@ test("dsThemeEditor: the seed overrides the defaults one role at a time", () => 
   assert.equal(dsThemeEditor().colors.primary, "#000")
 })
 
-test("formRequest sends the form's real method and drops the _method override", () => {
+test("formRequest sends the form's real method, asks for JSON, and follows no redirect", () => {
   const patch = new Map([["_method", "patch"], ["theme[primary]", "#111111"]])
   const request = formRequest(patch)
   assert.equal(request.method, "PATCH")
@@ -132,17 +132,26 @@ test("formRequest sends the form's real method and drops the _method override", 
 
   assert.equal(formRequest(new Map([["x", "1"]])).method, "POST")
   assert.equal(request.redirect, "manual")
+  assert.deepEqual(request.headers, { Accept: "application/json" })
 })
 
-test("saved: a 2xx or the server's own redirect; a 422 and a network-level failure are not", () => {
+test("saved: only a 2xx from the request itself; a redirect, a 4xx and a 5xx are not", () => {
+  assert.equal(saved({ ok: true, status: 204, type: "basic" }), true)
   assert.equal(saved({ ok: true, status: 200, type: "basic" }), true)
-  assert.equal(saved({ ok: false, status: 0, type: "opaqueredirect" }), true)
+  assert.equal(saved({ ok: false, status: 0, type: "opaqueredirect" }), false)
+  assert.equal(saved({ ok: false, status: 401, type: "basic" }), false)
   assert.equal(saved({ ok: false, status: 422, type: "basic" }), false)
   assert.equal(saved({ ok: false, status: 500, type: "basic" }), false)
 })
 
+test("failureReason: a redirect or a 401 is the sign-in bounce; anything else names its status", () => {
+  assert.equal(failureReason({ ok: false, status: 0, type: "opaqueredirect" }), SIGNED_OUT)
+  assert.equal(failureReason({ ok: false, status: 401, type: "basic" }), SIGNED_OUT)
+  assert.equal(failureReason({ ok: false, status: 422, type: "basic" }), "HTTP 422")
+})
+
 // One save through persist(), with fetch answering `response` or rejecting.
-async function save(response) {
+async function save(response, action = "saveTheme") {
   const toasts = []
   const calls = []
   const globals = {
@@ -154,16 +163,16 @@ async function save(response) {
   const editor = dsThemeEditor()
   let during
   await withGlobals(globals, async () => {
-    editor.saveTheme({ target: { action: "/admin/theme" } })
+    editor[action]({ target: { action: "/admin/theme" } })
     during = editor.saving
-    editor.saveTheme({ target: { action: "/admin/theme" } })
+    editor[action]({ target: { action: "/admin/theme" } })
     await new Promise((resolve) => setTimeout(resolve, 0))
   })
   return { editor, toasts, calls, during }
 }
 
 test("dsThemeEditor: a save fetches once, in place, and toasts the outcome", async () => {
-  const { editor, toasts, calls, during } = await save({ ok: true })
+  const { editor, toasts, calls, during } = await save({ ok: true, status: 204 })
 
   assert.equal(during, true, "saving is set while the request is out")
   assert.equal(calls.length, 1, "a second submit while saving is ignored")
@@ -173,17 +182,25 @@ test("dsThemeEditor: a save fetches once, in place, and toasts the outcome", asy
   assert.deepEqual(toasts.map((t) => [t.type, t.detail.type, t.detail.title]), [["toast", "notice", "Theme saved"]])
 })
 
-// WHAT THIS PINS. The controller answers a save with a 302 to /admin/theme. A
-// fetch that follows a 302 keeps a PATCH a PATCH: followed, it sends the save
-// again on every hop until the browser gives up at twenty redirects, and the
-// editor toasts "Save failed" over a theme it has saved twenty-one times. So
-// the redirect is not followed: it is the server's own word that it saved.
-test("dsThemeEditor: the server's redirect is the success, and it is not followed", async () => {
-  const { toasts, calls } = await save({ ok: false, status: 0, type: "opaqueredirect" })
+// A save that an ended session bounces to sign-in arrives as an opaque
+// redirect, because the fetch follows none. Nothing was written, so it is a
+// failure, and the one PATCH is not sent again.
+test("dsThemeEditor: an opaque redirect that is the sign-in bounce is not a save", async () => {
+  const { editor, toasts, calls } = await save({ ok: false, status: 0, type: "opaqueredirect" })
 
-  assert.equal(calls.length, 1)
+  assert.equal(calls.length, 1, "one PATCH, never re-sent")
   assert.equal(calls[0].options.redirect, "manual", "a followed 302 re-sends the PATCH")
-  assert.deepEqual(toasts.map((t) => [t.detail.type, t.detail.title]), [["notice", "Theme saved"]])
+  assert.deepEqual(toasts.map((t) => [t.detail.type, t.detail.title, t.detail.message]), [["alert", "Save failed", SIGNED_OUT]])
+  assert.equal(editor.saving, false)
+})
+
+test("dsThemeEditor: Regenerate claims the cache cleared only on a 2xx", async () => {
+  const cleared = await save({ ok: true, status: 204 }, "regenerate")
+  assert.deepEqual(cleared.toasts.map((t) => [t.detail.type, t.detail.title]), [["notice", "Theme cache cleared"]])
+
+  const bounced = await save({ ok: false, status: 0, type: "opaqueredirect" }, "regenerate")
+  assert.equal(bounced.calls.length, 1)
+  assert.deepEqual(bounced.toasts.map((t) => [t.detail.type, t.detail.title]), [["alert", "Save failed"]])
 })
 
 test("dsThemeEditor: an HTTP error and a network failure both toast a failure and release the button", async () => {
