@@ -19,19 +19,15 @@ module Studio
         end
 
         selected = env["MAIL_TRANSPORT"].to_s.downcase
-        ses_ready = selected == "ses" && present?(env["SES_SMTP_USERNAME"]) && present?(env["SES_SMTP_PASSWORD"])
 
-        if selected == "ses" && !ses_ready
-          log(logger, :warn, "[mail] MAIL_TRANSPORT=ses but SES_SMTP_USERNAME/PASSWORD missing - keeping fallback transport")
-        elsif present?(selected) && !%w[ses resend].include?(selected)
+        # SES was retired with AWS on 2026-10-10 (no IAM users, no SES
+        # identities), so MAIL_TRANSPORT=ses no longer selects anything. It
+        # warns and falls through to Resend exactly like an unset value, so a
+        # stale config var never stops mail.
+        if selected == "ses"
+          log(logger, :warn, "[mail] MAIL_TRANSPORT=ses is no longer supported (SES retired) - using Resend when RESEND_API_KEY is set")
+        elsif present?(selected) && selected != "resend"
           log(logger, :warn, "[mail] unknown MAIL_TRANSPORT=#{selected.inspect} - keeping fallback transport")
-        end
-
-        if ses_ready
-          configure_ses!(env: env, action_mailer: action_mailer)
-          region = env.fetch("SES_REGION", "us-east-2")
-          log(logger, :info, "[mail] transport=SES region=#{region} from=#{mailer_from}")
-          return Result.new(transport: :ses, delivery_method: action_mailer.delivery_method, message: "SES SMTP active")
         end
 
         if present?(env["RESEND_API_KEY"])
@@ -43,19 +39,6 @@ module Studio
         end
 
         Result.new(transport: :default, delivery_method: action_mailer.delivery_method, message: "no transactional transport configured")
-      end
-
-      def configure_ses!(env:, action_mailer:)
-        region = env.fetch("SES_REGION", "us-east-2")
-        action_mailer.delivery_method = :smtp
-        action_mailer.smtp_settings = {
-          address: env.fetch("SES_SMTP_HOST", "email-smtp.#{region}.amazonaws.com"),
-          port: env.fetch("SES_SMTP_PORT", 587).to_i,
-          user_name: env["SES_SMTP_USERNAME"],
-          password: env["SES_SMTP_PASSWORD"],
-          authentication: :login,
-          enable_starttls_auto: true
-        }
       end
 
       def load_resend!

@@ -21,7 +21,9 @@ module Studio
     # THE ORDER IS THE SAFETY. Copy first, delete second, and a copy that fails
     # RAISES before the delete is ever sent. A failure anywhere leaves the
     # original where it was: a leaked object costs storage, a lost one costs a
-    # user's photo.
+    # user's photo. A failed copy is also recorded to the host's ErrorLog
+    # (CopyFailed, naming the object) before the original error is re-raised,
+    # so a leak is visible on /error_logs rather than only in a log line.
     #
     # Everything here works on REAL object keys (any Studio.s3_key_prefix
     # already applied) and an explicit client + bucket, so Studio::S3 and the
@@ -52,6 +54,11 @@ module Studio
       class ProductionBucketRefused < Studio::S3::Error; end
       class NotTrash < Studio::S3::Error; end
       class RestoreConflict < Studio::S3::Error; end
+      # What a failed trash copy records to the host's ErrorLog: the S3 error
+      # alone names no object, so this carries bucket, key and trash key, with
+      # the failing copy's backtrace. It is RECORDED, never raised; trash!
+      # re-raises the original error so callers rescue what they always did.
+      class CopyFailed < Studio::S3::Error; end
 
       TRASH_KEY = %r{\Atrash/(\d{4}-\d{2}-\d{2})/(\d+)/(.+)\z}m
 
@@ -71,14 +78,19 @@ module Studio
           end
 
           trash_key = key_for(key, now: now)
-          client.copy_object(
-            bucket: bucket,
-            copy_source: copy_source(bucket, key),
-            key: trash_key,
-            metadata_directive: "REPLACE",
-            metadata: trash_metadata(head, key: key, env: env, now: now),
-            **carried_headers(head)
-          )
+          begin
+            client.copy_object(
+              bucket: bucket,
+              copy_source: copy_source(bucket, key),
+              key: trash_key,
+              metadata_directive: "REPLACE",
+              metadata: trash_metadata(head, key: key, env: env, now: now),
+              **carried_headers(head)
+            )
+          rescue StandardError => error
+            record_copy_failure(error, bucket: bucket, key: key, trash_key: trash_key)
+            raise
+          end
           # Reached only when the copy returned. A raise above never deletes.
           client.delete_object(bucket: bucket, key: key)
           trash_key
@@ -180,6 +192,23 @@ module Studio
         end
 
         private
+
+        # Record a failed copy through the host's ErrorLog (the engine's
+        # non-request error primitive) when it has one. Best-effort: ErrorLog
+        # writes to the database and can itself raise, and that must never
+        # replace the copy error trash! is about to re-raise.
+        def record_copy_failure(error, bucket:, key:, trash_key:)
+          return unless defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
+
+          record = CopyFailed.new(
+            "trash copy of #{bucket}/#{key} to #{trash_key} failed, object left in place: " \
+            "#{error.class}: #{error.message}"
+          )
+          record.set_backtrace(error.backtrace || caller)
+          ::ErrorLog.capture!(record)
+        rescue StandardError, ScriptError
+          nil
+        end
 
         def head(client, bucket, key)
           client.head_object(bucket: bucket, key: key)

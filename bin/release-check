@@ -52,7 +52,6 @@ for file in \
   app/models/studio/email_delivery.rb \
   app/jobs/studio/email_delivery_job.rb \
   lib/tasks/studio_email.rake \
-  lib/tasks/studio_ses.rake \
   lib/tasks/studio_trash.rake \
   lib/studio/s3.rb \
   lib/studio/s3/trash.rb \

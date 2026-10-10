@@ -4,8 +4,11 @@
 apps. It keeps McRitchie Studio, Turf Monster, and future apps on one
 ActionMailer transport contract.
 
-Cross-app sender inventory, SES rollout policy, local inbox proof rules, and
-rollback/decommission criteria live in
+Resend is the only provider. The SES transport was removed when AWS was
+retired on 2026-10-10 (no IAM users or SES identities remain), so
+`MAIL_TRANSPORT=ses` no longer selects anything.
+
+Cross-app sender inventory, local inbox proof rules, and operating criteria live in
 `mcritchie-studio/docs/agents/modules/email-operations.md`.
 
 `Studio::Email.deliver(...)` is the shared delivery entry point. It records a
@@ -25,27 +28,31 @@ Studio::MailTransport.configure!
 ```
 
 The app still owns `Studio.mailer_from` in `config/initializers/studio.rb`.
-Use the provider-aware helper so SES uses the app's verified domain while
-Resend fallback can use a single shared verified sender:
+Use the sender helper, which answers `RESEND_MAILER_FROM`, then `resend_from:`,
+then `Studio.resend_mailer_from`:
 
 ```ruby
 Studio.configure do |config|
   config.mailer_from = Studio.mailer_from_for_transport(
-    ses_from: "My App <team@example.com>"
+    resend_from: "My App <team@example.com>" # optional; must be on a Resend-verified domain
   )
 end
 ```
 
-`MAILER_FROM` must belong to a domain verified in SES. `RESEND_MAILER_FROM`
-must belong to the shared domain verified in Resend.
+`Studio.marketing_from_for_transport` answers `RESEND_MARKETING_FROM`, then
+`RESEND_MAILER_FROM`, then `resend_from:`, then `Studio.resend_mailer_from`.
+Both still ACCEPT a `ses_from:` keyword so older initializers keep booting, and
+both IGNORE it; drop it when you next touch the initializer. `MAILER_FROM` and
+`MARKETING_MAILER_FROM` are no longer read by these helpers. A sender must
+belong to a domain verified in Resend.
 
 ## Selection Rules
 
 | Env | Delivery method | Notes |
 |-----|-----------------|-------|
-| `MAIL_TRANSPORT=ses` plus `SES_SMTP_USERNAME` and `SES_SMTP_PASSWORD` | `:smtp` | Target transport. Uses AWS SES SMTP. |
-| `MAIL_TRANSPORT=ses` without SES SMTP credentials | fallback | Logs a warning and continues to fallback. |
-| `RESEND_API_KEY` with SES inactive | `:resend` | Rollback transport. |
+| `RESEND_API_KEY` | `:resend` | The production transport. |
+| `MAIL_TRANSPORT=ses` | as if unset | Logs a "no longer supported" warning, then follows the rows above and below. |
+| `MAIL_TRANSPORT` set to anything but `resend` or `ses` | as if unset | Logs an "unknown" warning. |
 | no transport env | existing default | Useful in dev/test shells that do not send real mail. |
 
 Tests are intentionally skipped so app test suites can keep `:test` delivery.
@@ -53,37 +60,13 @@ Tests are intentionally skipped so app test suites can keep `:test` delivery.
 ## Required Env
 
 ```env
-MAIL_TRANSPORT=ses
-SES_REGION=us-east-2
-SES_SMTP_USERNAME=...
-SES_SMTP_PASSWORD=...
-SES_SMTP_HOST=                 # optional, defaults from SES_REGION
-SES_SMTP_PORT=587
-SES_AWS_ACCESS_KEY_ID=...      # SES API checks only; optional fallback to AWS_ACCESS_KEY_ID
-SES_AWS_SECRET_ACCESS_KEY=...  # SES API checks only; optional fallback to AWS_SECRET_ACCESS_KEY
-RESEND_API_KEY=...             # rollback only
-MAILER_FROM="My App <team@example.com>"
-MARKETING_MAILER_FROM="Alex from My App <alex@example.com>"
+RESEND_API_KEY=...
 RESEND_MAILER_FROM="McRitchie Studio <team@mcritchie.studio>"
+RESEND_MARKETING_FROM="Alex from My App <alex@example.com>"   # optional
 ```
 
-## SES Tasks
-
-Consumer apps get shared SES helper tasks through the engine:
-
-```bash
-bin/rails ses:check
-bin/rails "ses:verify_domain[example.com]"
-```
-
-The tasks use `SES_AWS_ACCESS_KEY_ID`, `SES_AWS_SECRET_ACCESS_KEY`, and
-`SES_REGION` to query SES account status and print DKIM records. They fall back
-to `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` only for older apps. Prefer the
-`SES_AWS_*` names in production so an app's S3/ImageCache IAM user is never
-mistaken for the SES verification user.
-
-These are SES API credentials, not runtime SMTP credentials. Runtime delivery
-still needs `SES_SMTP_USERNAME` and `SES_SMTP_PASSWORD`.
+`MAIL_TRANSPORT` may stay unset, or be `resend`. The `SES_*` variables and the
+engine's `ses:check` / `ses:verify_domain` rake tasks are gone.
 
 ## Provider Smoke Test
 
@@ -99,7 +82,7 @@ or process manager makes bracket arguments awkward.
 
 The task sends one direct ActionMailer message, bypassing app-specific mailers,
 outbox workers, and auth flows. It prints the app name, recipient, sender,
-transport (`resend`, `ses`, `capture`, or the ActionMailer delivery method),
+transport (`resend`, `capture`, or the ActionMailer delivery method),
 `perform_deliveries`, external-send status, and message id.
 
 By default it refuses to proceed when mail would be captured, written to file,

@@ -56,9 +56,7 @@ Studio.configure do |config|
   config.welcome_message = ->(user) { "Welcome, #{user.display_name}!" }
   config.auth_methods = %i[magic_link google]
   config.registration_params = [:name, :email]
-  config.mailer_from = Studio.mailer_from_for_transport(
-    ses_from: "My App <team@example.com>"
-  )
+  config.mailer_from = Studio.mailer_from_for_transport # RESEND_MAILER_FROM, else the shared sender
   config.theme_primary = "#4BAF50"   # Override default violet
   config.theme_logos = ["logo.svg"]
 
@@ -123,8 +121,9 @@ Transactional mail transport is shared through `Studio::MailTransport`:
 Studio::MailTransport.configure!
 ```
 
-It selects SES SMTP when `MAIL_TRANSPORT=ses` and SES SMTP credentials are
-present, otherwise falls back to Resend when `RESEND_API_KEY` is present.
+It selects Resend when `RESEND_API_KEY` is present. The SES transport was
+removed with AWS on 2026-10-10; `MAIL_TRANSPORT=ses` now only logs a warning
+([`docs/EMAIL_TRANSPORT.md`](docs/EMAIL_TRANSPORT.md)).
 
 ## Routes
 
@@ -162,7 +161,7 @@ The environment banner includes:
 
 - a Dev Mode toggle button backed by `Alpine.store("devMode")`
 - an Email status button that links to `/_studio/local_emails`
-- a send/capture signal plus SES/Resend/unknown connector icon
+- a send/capture signal plus Resend/unknown connector icon
 
 Apps with admin Act As / impersonation state can render the matching banner
 with their own users and return route:
@@ -1005,7 +1004,10 @@ avatars/abc.png  ->  trash/2026-10-01/1759302000123/avatars/abc.png
 ```
 
 The copy goes first and the delete second. A copy that fails raises and the
-delete is never sent, so a failure leaves the original in place. The trash copy
+delete is never sent, so a failure leaves the original in place; the failed
+copy is also recorded through the host's `ErrorLog.capture!` as a
+`Studio::S3::Trash::CopyFailed` naming the bucket and key, before the original
+error is re-raised. The trash copy
 keeps the object's content type, cache headers and metadata, and adds
 `original-key`, `deleted-at`, `deleted-env`, and what an Active Storage blob row
 needs to be rebuilt (`blob-content-type`, `blob-byte-size`, `blob-checksum`

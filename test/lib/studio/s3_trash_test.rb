@@ -76,6 +76,25 @@ class S3TrashTest < Minitest::Test
     Studio::S3.instance_variable_set(:@client, @client)
   end
 
+  # A stand-in for the host's ErrorLog (the engine's app/models/error_log.rb is
+  # an ActiveRecord model this unit env does not load). Returns what it captured.
+  def with_error_log(raises: false)
+    captured = []
+    log = Class.new do
+      define_singleton_method(:capture!) do |error|
+        captured << error
+        raise "database is down" if raises
+
+        :row
+      end
+    end
+    Object.const_set(:ErrorLog, log)
+    yield
+    captured
+  ensure
+    Object.send(:remove_const, :ErrorLog) if defined?(::ErrorLog)
+  end
+
   # --- Trash.trash! ---------------------------------------------------------
 
   def test_trash_copies_then_deletes_in_that_order
@@ -115,6 +134,58 @@ class S3TrashTest < Minitest::Test
       Studio::S3::Trash.trash!(client: @client, bucket: BUCKET, key: KEY, env: "production", now: NOW)
     end
     refute_includes operations, :delete_object, "a copy that failed must leave the original in place"
+  end
+
+  # A failed copy reaches the host's ErrorLog, naming the object, and the
+  # ORIGINAL error still propagates with no delete sent.
+  def test_a_failed_copy_records_an_error_log_then_re_raises
+    @client.stub_responses(:copy_object, "AccessDenied")
+    captured = with_error_log do
+      assert_raises(Aws::S3::Errors::AccessDenied) do
+        Studio::S3::Trash.trash!(client: @client, bucket: BUCKET, key: KEY, env: "production", now: NOW)
+      end
+    end
+
+    refute_includes operations, :delete_object, "a copy that failed must leave the original in place"
+    assert_equal 1, captured.size, "exactly one ErrorLog row per failed copy"
+    recorded = captured.first
+    assert_kind_of Studio::S3::Trash::CopyFailed, recorded
+    assert_includes recorded.message, "#{BUCKET}/#{KEY}"
+    assert_includes recorded.message, "object left in place"
+    assert_includes recorded.message, "Aws::S3::Errors::AccessDenied"
+    refute_empty Array(recorded.backtrace), "the record carries the failing copy's backtrace"
+  end
+
+  # The recorder must never mask the copy failure: an ErrorLog that itself
+  # raises (database down) still lets the S3 error through, and no delete.
+  def test_an_error_log_that_raises_never_masks_the_copy_failure
+    @client.stub_responses(:copy_object, "AccessDenied")
+    with_error_log(raises: true) do
+      assert_raises(Aws::S3::Errors::AccessDenied) do
+        Studio::S3::Trash.trash!(client: @client, bucket: BUCKET, key: KEY, env: "production", now: NOW)
+      end
+    end
+
+    refute_includes operations, :delete_object
+  end
+
+  def test_a_successful_trash_records_nothing
+    captured = with_error_log do
+      Studio::S3::Trash.trash!(client: @client, bucket: BUCKET, key: KEY, env: "production", now: NOW)
+    end
+
+    assert_empty captured
+    assert_equal %i[head_object copy_object delete_object], operations
+  end
+
+  def test_a_failed_copy_without_an_error_log_still_raises_and_never_deletes
+    refute defined?(::ErrorLog), "this unit env defines no ErrorLog of its own"
+    @client.stub_responses(:copy_object, "AccessDenied")
+
+    assert_raises(Aws::S3::Errors::AccessDenied) do
+      Studio::S3::Trash.trash!(client: @client, bucket: BUCKET, key: KEY, env: "production", now: NOW)
+    end
+    refute_includes operations, :delete_object
   end
 
   def test_an_object_already_gone_is_a_quiet_no_op
