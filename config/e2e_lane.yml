@@ -966,7 +966,7 @@
 # fetched. Verified RED against four reintroduced defects (the spec's header
 # lists them). e2e/lazy_page_controllers.spec.js gains a page, not a test.
 #   npx playwright test --list  -> 324 tests in 46 files
-total_specs: 324
+total_specs: 327
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1150,7 +1150,7 @@ total_specs: 324
 #   npx playwright test --list                                             -> 324 tests, 46 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 324
-executed: 324
+executed: 327
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

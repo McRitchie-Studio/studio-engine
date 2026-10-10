@@ -68,6 +68,7 @@ Rails.application.routes.draw do
   get "lab/geo_settings", to: "e2e_lab#geo_settings"
   get "lab/site_identity", to: "e2e_lab#site_identity"
   get "lab/style_modals", to: "e2e_lab#style_modals"
+  get "lab/style_theme", to: "e2e_lab#style_theme"
   get "lab/board", to: "e2e_lab#board"
   get "lab/session_drift", to: "e2e_lab#session_drift"
   get "lab/sidebar_panels", to: "e2e_lab#sidebar_panels"

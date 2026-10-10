@@ -1,0 +1,11 @@
+<%# The living style guide's THEME section, in a browser, with the toast root a
+    host layout mounts. Save and Regenerate submit by fetch to the real
+    /admin/theme, and the outcome is a toast: the response bytes are the same
+    whether the save was written or turned away.
+
+    THE LAB RULE (see E2eLabController): a lab page sets up a partial's LOCALS
+    and nothing else. style/_theme reads @theme_setting, which the action sets. %>
+<main class="max-w-5xl mx-auto px-4 py-10">
+  <%= render "layouts/studio/flash" %>
+  <%= render "style/theme" %>
+</main>

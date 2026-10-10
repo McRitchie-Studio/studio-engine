@@ -541,6 +541,14 @@ class E2eLabController < ActionController::Base
   # identical whether either one runs.
   def style_modals = render(:style_modals)
 
+  # The style guide's Theme section, whose Save and Regenerate submit by fetch
+  # to the real /admin/theme. The saved theme is the partial's one input, as
+  # StyleController sets it; without the table the partial uses the defaults.
+  def style_theme
+    @theme_setting = ThemeSetting.current if ThemeSetting.table_exists?
+    render(:style_theme)
+  end
+
   # The style guide's Tasks section: three live boards on the board primitive
   # (a kanban, one with chrome state and an archive column, and a depth chart
   # with locked cards), all in demo mode, so a drag sends nothing.
