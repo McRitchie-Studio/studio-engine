@@ -167,23 +167,50 @@ class HoldButtonTest < ActiveSupport::TestCase
     refute_includes style, "--fizz-c-#{Studio::FizzHelper::SLOTS + 1}:"
   end
 
-  # ── callbacks travel as data-*, not baked into a global ──────
+  # ── no JavaScript travels in a local ────────────────────────
 
-  test "per-instance callbacks travel with the button" do
-    doc = render_button(hold_id: "board", guard: "d.ready", on_success: "d.confirm()",
-                        validate: "d.check()", validate_at: 900,
-                        early_action: "d.early()", early_action_guard: "d.web3",
-                        on_hold_start: "d.warmUp()")
+  test "every removed string local raises, naming itself and the event that answers" do
+    Studio::HoldButton::REMOVED_LOCALS.each do |local, event|
+      error = assert_raises(ActionView::Template::Error, "#{local}: rendered") { render_button(hold_id: "board", local => "d.go()") }
 
-    button = doc.at_css("button.hold-btn")
-    assert_equal "board", button["data-hold-id"]
-    assert_equal "d.ready", button["data-guard"]
-    assert_equal "d.confirm()", button["data-on-success"]
-    assert_equal "d.check()", button["data-validate"]
-    assert_equal "900", button["data-validate-at"]
-    assert_equal "d.early()", button["data-early-action"]
-    assert_equal "d.web3", button["data-early-action-guard"]
-    assert_equal "d.warmUp()", button["data-on-hold-start"]
+      assert_kind_of ArgumentError, error.cause
+      assert_includes error.message, "#{local}: (answer #{event})"
+      assert_includes error.message, "no longer evaluates JavaScript-string locals"
+    end
+  end
+
+  test "an empty string local raises too, and every one passed is named" do
+    error = assert_raises(ActionView::Template::Error) { render_button(guard: "", on_success: "go()", validate_at: 150) }
+
+    assert_includes error.message, "guard: (answer hold-button:guard), on_success: (answer hold-button:success)"
+  end
+
+  test "a removed local passed as nil renders the button" do
+    doc = render_button(hold_id: "board", **Studio::HoldButton::REMOVED_LOCALS.keys.index_with { nil })
+
+    assert doc.at_css("button.hold-btn")
+  end
+
+  test "the removed locals are the six, and the refusal runs in every environment" do
+    assert_equal %i[guard on_hold_start validate early_action early_action_guard on_success],
+                 Studio::HoldButton::REMOVED_LOCALS.keys
+    source = File.read(File.join(ENGINE_ROOT, "lib/studio/hold_button.rb"))
+    refute_match(/Rails\.env|ENV\[/, source)
+  end
+
+  # The browser refuses the attribute each local wrote: one table, two files.
+  test "the hooks module refuses the attribute of every removed local" do
+    source = File.read(File.join(ENGINE_ROOT, "app/javascript/studio/hold_button_hooks.js"))
+    rows = source[/^export const REMOVED_HOOKS = \{\n(.*?)^\}/m, 1].scan(/"(data-[a-z-]+)": \["(\w+)", "([a-z:-]+)"\]/)
+
+    assert_equal Studio::HoldButton::REMOVED_LOCALS.map { |local, event| [ "data-#{local.to_s.dasherize}", local.to_s, event ] }, rows
+  end
+
+  test "no button carries an attribute the hooks module refuses" do
+    button = render_button(hold_id: "board", validate_at: 900, early_action_at: 1200, fizz_portal: true).at_css("button.hold-btn")
+
+    assert_equal %w[class data-duration data-early-action-at data-hold-id data-studio-action data-validate-at style],
+                 button.attribute_nodes.map(&:name).sort
   end
 
   # ── F. the controller's wiring ──────────────────────────────
@@ -200,13 +227,13 @@ class HoldButtonTest < ActiveSupport::TestCase
   end
 
   test "the partial emits no script" do
-    html = render_button(hold_id: "desktop", fizz_portal: true, guard: "true", on_success: "go()").to_html
+    html = render_button(hold_id: "desktop", fizz_portal: true).to_html
 
     refute_match(/<script/i, html, "the behaviour is studio/hold_button, a module")
     refute_includes html, "holdBtnStart"
   end
 
-  test "the timing attributes travel with their string local, or alone when passed alone" do
+  test "the timing attributes travel only when passed" do
     bare = render_button(hold_id: "desktop").at_css("button.hold-btn")
     assert_nil bare["data-validate-at"]
     assert_nil bare["data-early-action-at"]
@@ -214,11 +241,6 @@ class HoldButtonTest < ActiveSupport::TestCase
     timed = render_button(hold_id: "desktop", validate_at: 150, early_action_at: 400).at_css("button.hold-btn")
     assert_equal "150", timed["data-validate-at"]
     assert_equal "400", timed["data-early-action-at"]
-    assert_nil timed["data-validate"]
-    assert_nil timed["data-early-action"]
-
-    strings = render_button(hold_id: "desktop", validate: "check()", early_action: "sign()").at_css("button.hold-btn")
-    assert_equal %w[750 1500], [ strings["data-validate-at"], strings["data-early-action-at"] ]
   end
 
   test "the module's slot count is the helper's" do

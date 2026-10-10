@@ -6,7 +6,7 @@
     refused     a validate listener that answers false
     owned       a success listener that keeps the button's state for itself
     taken       an early listener that takes the action over
-    string      the string locals a consumer still passes: guard and on_success
+    plain       no listener around it: what the button does by itself
     submitting  a scope whose submitting flag is up
     portaled    fizz_portal, for the box a Turbo visit must not double
     late        a button that is not on the page until "reveal" is clicked: an
@@ -40,10 +40,8 @@
     <%= render "studio/hold_button", hold_id: "taken", duration: 600, early_action_at: 300, fizz: false %>
   </div>
 
-  <div data-test="string">
-    <%= render "studio/hold_button", hold_id: "string", duration: 600, fizz: false,
-          guard: "d.armed",
-          on_success: "d.note('string-success')" %>
+  <div data-test="plain">
+    <%= render "studio/hold_button", hold_id: "plain", duration: 600, fizz: false %>
   </div>
 
   <section x-data="{ submitting: true }" data-test="submitting">

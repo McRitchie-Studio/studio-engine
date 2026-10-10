@@ -10,7 +10,7 @@
 //                                 touchend->hold-button#end touchcancel->hold-button#end">
 //
 // The timeline, the idle nudge and the fizz portal are studio/hold_button; the
-// events and string locals the timeline asks are studio/hold_button_hooks.
+// events the timeline asks through are studio/hold_button_hooks.
 import { Controller } from "@hotwired/stimulus"
 import { Hold, mountPortal } from "studio/hold_button"
 import { holdHooks } from "studio/hold_button_hooks"

@@ -3,8 +3,8 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 
 // [e2e] The hold button on its controller (studio/hold_button, imported and
 // registered by studio/stimulus): the hold-button:* events a page answers it
-// through, the string locals a consumer still passes, and what happens at the
-// edges. The button confirms real actions, so each spec pins one way it must
+// through, the refusal of a button that carries a removed JavaScript-string
+// hook, and what happens at the edges. The button confirms real actions, so each spec pins one way it must
 // fail safe: never confirm early, never confirm twice, never lose a hold that
 // was held, and never wait on a request made after the page loaded.
 //
@@ -15,6 +15,10 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 //   - drop `fire("success")` in studio/hold_button_hooks: the events and owned
 //     specs fail.
 //   - make Hold#start skip its guard: the disarmed and submitting specs fail.
+//   - fire success twice, or compile a string in completed() (the AsyncFunction
+//     constructor, or Alpine.evaluate): "exactly once and compiles no string"
+//     fails.
+//   - make the hooks' guard ignore REMOVED_HOOKS: the removed-hook spec fails.
 //   - fire completion at the press: "a release before term" fails.
 //   - drop `application.register("hold-button", ...)` from studio/stimulus:
 //     every spec fails.
@@ -133,29 +137,100 @@ test("an early listener that prevents the default takes the action over: no succ
   expect(await log(page)).toEqual(["taken"]);
 });
 
-test("the string locals still answer: on_success once after a full hold, guard refuses", async ({ page }) => {
+// Records, in the page, every hold-button:* event and every string the page
+// compiles (eval, Function, and the async and generator function constructors,
+// which is how Alpine.evaluate compiles too). A press schedules the verdict
+// 1500 ms later, so no call from the spec lands inside the window it reads.
+async function watchHold(page) {
+  await page.addInitScript(() => {
+    const compiled = [];
+    const events = [];
+    const note = (kind) => compiled.push({ kind, at: performance.now() });
+    const wrap = (original, kind) => new Proxy(original, {
+      construct(target, args, newTarget) { note(kind); return Reflect.construct(target, args, newTarget); },
+      apply(target, self, args) { note(kind); return Reflect.apply(target, self, args); }
+    });
+    const samples = { Function: function () {}, AsyncFunction: async function () {},
+                      GeneratorFunction: function* () {}, AsyncGeneratorFunction: async function* () {} };
+    for (const [kind, sample] of Object.entries(samples)) {
+      const prototype = Object.getPrototypeOf(sample);
+      Object.defineProperty(prototype, "constructor", { value: wrap(prototype.constructor, kind), configurable: true, writable: true });
+    }
+    window.Function = Function.prototype.constructor;
+    window.eval = wrap(window.eval, "eval");
+
+    for (const name of ["guard", "start", "validate", "early", "success"]) {
+      document.addEventListener(`hold-button:${name}`, (event) => events.push(`${name}:${event.detail.id}`));
+    }
+    document.addEventListener("mousedown", (event) => {
+      if (!event.target.closest(".hold-btn")) return;
+      const pressedAt = performance.now();
+      events.length = 0;
+      window.__holdVerdict = null;
+      setTimeout(() => {
+        window.__holdVerdict = {
+          events: events.slice(),
+          compiled: compiled.filter((entry) => entry.at >= pressedAt).map((entry) => entry.kind)
+        };
+      }, 1500);
+    }, true);
+  });
+}
+
+const verdict = async (page) => {
+  await expect.poll(() => page.evaluate(() => window.__holdVerdict), { timeout: 5000 }).not.toBeNull();
+  return page.evaluate(() => window.__holdVerdict);
+};
+
+test("a completed hold dispatches each event exactly once and compiles no string", async ({ page }) => {
   const errors = watchPageErrors(page);
+  await watchHold(page);
   await open(page);
-  await ready(page, "string");
+  await ready(page, "plain");
 
-  // Released early: on_success must not run, even after its half-second settle.
-  await holdFor(page, "string", 150);
-  await page.waitForTimeout(1300);
-  expect(await log(page)).toEqual([]);
-
-  await button(page, "string").hover();
+  await button(page, "plain").hover();
   await page.mouse.down();
-  await expect.poll(() => log(page), { timeout: 4000 }).toEqual(["string-success"]);
+  await page.waitForTimeout(1700);
   await page.mouse.up();
-  await page.waitForTimeout(1300);
-  expect(await log(page), "one hold confirms once").toEqual(["string-success"]);
 
-  // The guard string reads the same scope.
-  await page.locator('[data-test="armed"]').uncheck();
-  await holdFor(page, "string", 900);
-  await page.waitForTimeout(700);
-  expect(await log(page)).toEqual(["string-success"]);
+  expect(await verdict(page)).toEqual({
+    events: ["guard:plain", "start:plain", "validate:plain", "early:plain", "success:plain"],
+    compiled: []
+  });
+  await expect(button(page, "plain")).toHaveClass(/\bsuccess\b/);
   expect(errors).toEqual([]);
+});
+
+test("a button carrying a removed string hook refuses the hold, says so and runs none of it", async ({ page }) => {
+  const HOOKS = ["data-guard", "data-on-hold-start", "data-validate", "data-early-action", "data-early-action-guard", "data-on-success"];
+  const errors = watchPageErrors(page);
+  await watchHold(page);
+  await open(page);
+  await ready(page, "plain");
+  await button(page, "plain").evaluate((el, names) => {
+    for (const name of names) el.setAttribute(name, "window.__holdEvaluated = true");
+  }, HOOKS);
+
+  await button(page, "plain").hover();
+  await page.mouse.down();
+  await page.waitForTimeout(1700);
+  await page.mouse.up();
+
+  expect(await verdict(page)).toEqual({ events: [], compiled: [] });
+  await expect(button(page, "plain")).not.toHaveClass(/\b(success|process)\b/);
+  expect(await page.evaluate(() => window.__holdEvaluated)).toBeUndefined();
+  expect(errors).toHaveLength(HOOKS.length);
+  for (const name of HOOKS) {
+    expect(errors.filter((line) => line.includes(`[hold:plain] ${name} `) && line.includes("The hold is refused."))).toHaveLength(1);
+  }
+
+  // Without the attributes the same button confirms.
+  await button(page, "plain").evaluate((el, names) => names.forEach((name) => el.removeAttribute(name)), HOOKS);
+  await button(page, "plain").hover();
+  await page.mouse.down();
+  await expect(button(page, "plain")).toHaveClass(/\bsuccess\b/, { timeout: 3000 });
+  await page.mouse.up();
+  expect((await verdict(page)).events).toContain("success:plain");
 });
 
 test("a scope that is submitting refuses a second hold", async ({ page }) => {

@@ -6,9 +6,8 @@
     styles inside engine-motion.css, so a lab page that hand-rolled either would
     grade itself.
 
-    The x-data wrapper is what a real caller supplies: the button evaluates its
-    guard / on_success expressions against the surrounding Alpine scope, and
-    `submitting` is the flag it refuses to start a second hold on. `duration` is
+    The x-data wrapper is what a real caller supplies: `submitting` is the flag
+    the button refuses to start a second hold on. `duration` is
     short so a spec can hold the button for its whole life without the lane
     paying two seconds per press.
 
@@ -61,21 +60,21 @@
     </div>
   </div>
 
-  <%# THE TIMERS. Each hook writes when it ran, relative to the press, so a
-      spec can read the order and the gaps: on_hold_start at once, validate at
-      validate_at, the early action at early_action_at, and on_success never,
-      because an early action that fires cancels the hold's own timer. %>
+  <%# THE TIMERS. Each listener writes when it ran, relative to the press, so a
+      spec can read the order and the gaps: start at once, validate at
+      validate_at, early at early_action_at, and success never, because an early
+      listener that takes the action over cancels the hold's own timer. %>
   <div style="max-width: 20rem; margin-top: 3rem"
-       x-data="{ submitting: false, log: [], at(name) { this.log.push([name, Math.round(performance.now() - window.__holdT0)]); window.__holdLog = this.log; } }">
+       x-data="{ submitting: false, log: [], at(name) { this.log.push([name, Math.round(performance.now() - window.__holdT0)]); window.__holdLog = this.log; } }"
+       @hold-button:start="window.__holdT0 = performance.now(); log.splice(0); at('start')"
+       @hold-button:validate="at('validate'); $event.detail.waitUntil(true)"
+       @hold-button:early="at('early'); $event.preventDefault()"
+       @hold-button:success="at('success')">
     <%= render "studio/hold_button",
           hold_id: "timed",
           duration: 600,
           default_text: "Hold to Confirm",
-          on_hold_start: "window.__holdT0 = performance.now(); d.log.splice(0); d.at('start')",
-          validate: "(d.at('validate'), true)",
           validate_at: 150,
-          early_action: "d.at('early')",
-          early_action_at: 400,
-          on_success: "d.at('success')" %>
+          early_action_at: 400 %>
   </div>
 </main>
