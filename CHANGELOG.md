@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.100.0 — 2026-10-10
+
 ### Added
 
 - **A meeting plays beside its transcript on the knowledge document page.**
