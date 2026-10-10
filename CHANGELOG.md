@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.102.0 — 2026-10-10
+
 ### Removed
 
 - **The SES mail transport.** AWS was retired on 2026-10-10 (no IAM users, no
