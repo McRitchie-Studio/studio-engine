@@ -78,6 +78,26 @@ class StudioTrashS3ServiceTest < Minitest::Test
     assert_match(/trash of turf-monster-production\/k3y failed, object left in place/, err)
   end
 
+  # Blob#purge -> delete(key) with a failing copy: one ErrorLog row naming the
+  # object, the original error re-raised, and no delete sent.
+  def test_a_failed_trash_copy_records_an_error_log_and_still_raises
+    service
+    @client.stub_responses(:copy_object, "InternalError")
+    captured = []
+    Object.const_set(:ErrorLog, Class.new { define_singleton_method(:capture!) { |error| captured << error } })
+
+    capture_io do
+      assert_raises(Aws::S3::Errors::InternalError) { @service.delete("k3y") }
+    end
+
+    refute_includes operations, :delete_object
+    assert_equal 1, captured.size
+    assert_kind_of Studio::S3::Trash::CopyFailed, captured.first
+    assert_includes captured.first.message, "turf-monster-production/k3y"
+  ensure
+    Object.send(:remove_const, :ErrorLog) if defined?(::ErrorLog)
+  end
+
   def test_delete_prefixed_stays_a_hard_delete
     service
     @client.stub_responses(:list_objects, { contents: [{ key: "variants/k3y/a" }, { key: "variants/k3y/b" }] })

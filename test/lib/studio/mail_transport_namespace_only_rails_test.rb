@@ -80,8 +80,8 @@ class MailTransportNamespaceOnlyRailsTest < Minitest::Test
   # ISOLATES THE `logger:` DEFAULT (lib/studio/mail_transport.rb:11) by passing
   # `rails_env:` explicitly, so the env default cannot fire first.
   #
-  # DRIVES A PATH THAT ACTUALLY LOGS. `MAIL_TRANSPORT=ses` with no credentials
-  # takes the `ses_ready == false` branch and calls `log(logger, :warn, ...)`, so
+  # DRIVES A PATH THAT ACTUALLY LOGS. `MAIL_TRANSPORT=ses` (retired 2026-10-10)
+  # takes the "no longer supported" branch and calls `log(logger, :warn, ...)`, so
   # the defaulted logger is USED rather than merely computed — a default that
   # resolved to something unloggable would surface here rather than in a host.
   def test_a_namespace_only_rails_falls_back_to_a_nil_logger

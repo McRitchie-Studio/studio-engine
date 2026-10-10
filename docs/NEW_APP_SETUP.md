@@ -104,9 +104,7 @@ Studio.configure do |config|
   config.welcome_message = ->(user) { "Welcome to X App, #{user.display_name}!" }
   config.auth_methods = %i[magic_link google]  # add :wallet or :password only when needed
   config.registration_params = [:name, :email]
-  config.mailer_from = Studio.mailer_from_for_transport(
-    ses_from: "X App <team@example.com>"
-  )
+  config.mailer_from = Studio.mailer_from_for_transport # RESEND_MAILER_FROM, else the shared sender
   config.configure_sso_user = ->(user) { user.role = "viewer" }
   # Optional: defaults check wallet_address, then solana_address.
   # Set this if your User exposes a different wallet column/helper.
@@ -142,12 +140,10 @@ end
 Studio::MailTransport.configure!
 ```
 
-This shared transport selects SES SMTP when `MAIL_TRANSPORT=ses` and
-`SES_SMTP_USERNAME` / `SES_SMTP_PASSWORD` are present. Resend remains the
-rollback path when `RESEND_API_KEY` is present and SES is not active. During
-Resend rollback, `Studio.mailer_from_for_transport` uses `RESEND_MAILER_FROM`
-so new apps can send through the shared `McRitchie Studio
-<team@mcritchie.studio>` sender before their SES production setup is complete.
+This shared transport selects Resend when `RESEND_API_KEY` is present, and
+`Studio.mailer_from_for_transport` answers `RESEND_MAILER_FROM`, else the shared
+`McRitchie Studio <team@mcritchie.studio>` sender. SES was retired on 2026-10-10;
+do not set `MAIL_TRANSPORT=ses` (see [`EMAIL_TRANSPORT.md`](EMAIL_TRANSPORT.md)).
 
 ### `config/initializers/session_store.rb`
 

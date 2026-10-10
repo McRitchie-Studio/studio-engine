@@ -33,16 +33,10 @@ The engine reads these values only through consumer apps.
 | `SECRET_KEY_BASE` or `RAILS_MASTER_KEY` | Rails session/cookie encryption | Apps that participate in shared SSO need compatible session secrets. Turf Monster intentionally isolates its money-app cookie. |
 | `GOOGLE_CLIENT_ID` | Google OAuth consumers | Register each app callback URL in Google Cloud Console. |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth consumers | Keep per environment; never commit. |
-| `MAIL_TRANSPORT` | Apps that send mail | `ses` is the target default; Resend remains rollback. |
-| `SES_REGION` | SES transport | Defaults by app/provider convention if absent. |
-| `SES_SMTP_USERNAME` | SES transport | From AWS SES SMTP credentials. |
-| `SES_SMTP_PASSWORD` | SES transport | Pair for `SES_SMTP_USERNAME`. |
-| `SES_AWS_ACCESS_KEY_ID` | SES helper tasks | SES-scoped IAM access key for `ses:check` and `ses:verify_domain`; keep separate from S3 `AWS_ACCESS_KEY_ID`. |
-| `SES_AWS_SECRET_ACCESS_KEY` | SES helper tasks | Pair for `SES_AWS_ACCESS_KEY_ID`; never print the value. |
-| `RESEND_API_KEY` | Resend rollback | Used only when SES is inactive or unavailable. |
-| `MAILER_FROM` | Apps that send mail | App/domain sender used when SES is active. |
-| `MARKETING_MAILER_FROM` | Apps with newsletters/broadcasts | App/domain marketing sender used when SES is active. |
-| `RESEND_MAILER_FROM` | Resend rollback | Shared verified Resend sender; default convention is `McRitchie Studio <team@mcritchie.studio>`. |
+| `MAIL_TRANSPORT` | Apps that send mail | Optional; unset or `resend`. `ses` is no longer supported (SES retired 2026-10-10) and only logs a warning. |
+| `RESEND_API_KEY` | Apps that send mail | Selects the Resend transport. |
+| `RESEND_MAILER_FROM` | Apps that send mail | Transactional sender on a Resend-verified domain; default convention is `McRitchie Studio <team@mcritchie.studio>`. |
+| `RESEND_MARKETING_FROM` | Apps with newsletters/broadcasts | Optional marketing sender; falls back to `RESEND_MAILER_FROM`. |
 
 App-specific variables such as `SOLANA_ADMIN_KEY`, RPC URLs, AWS bucket names,
 or product API keys belong in the owning app's docs and McRitchie Studio's
@@ -56,15 +50,7 @@ RAILS_MASTER_KEY=...
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 
-MAIL_TRANSPORT=ses
-SES_REGION=us-east-2
-SES_SMTP_USERNAME=...
-SES_SMTP_PASSWORD=...
-SES_AWS_ACCESS_KEY_ID=...     # SES API checks only
-SES_AWS_SECRET_ACCESS_KEY=... # SES API checks only
-RESEND_API_KEY=... # rollback only
-MAILER_FROM="My App <team@example.com>"
-MARKETING_MAILER_FROM="Alex from My App <alex@example.com>"
+RESEND_API_KEY=...
 RESEND_MAILER_FROM="McRitchie Studio <team@mcritchie.studio>"
 ```
 
@@ -79,13 +65,7 @@ Set config vars per deployed app. Do not assume all apps share every credential.
 ```bash
 heroku config:set GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... --app mcritchie-studio
 heroku config:set GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... --app turf-monster-mainnet
-heroku config:set MAIL_TRANSPORT=ses SES_REGION=us-east-2 --app mcritchie-studio
-heroku config:set MAIL_TRANSPORT=ses SES_REGION=us-east-2 --app turf-monster-mainnet
 ```
-
-Do not reuse an app's S3/ImageCache `AWS_ACCESS_KEY_ID` for SES verification
-unless that credential was deliberately granted SES permissions. Prefer
-`SES_AWS_ACCESS_KEY_ID` / `SES_AWS_SECRET_ACCESS_KEY` for SES helper tasks.
 
 Use McRitchie Studio's recovery scripts to hydrate local env files from Heroku
 and 1Password during a fresh-machine rebuild.
@@ -99,8 +79,7 @@ Consumer apps should call:
 Studio::MailTransport.configure!
 ```
 
-See [`EMAIL_TRANSPORT.md`](EMAIL_TRANSPORT.md) for SES/Resend selection rules
-and SES helper tasks.
+See [`EMAIL_TRANSPORT.md`](EMAIL_TRANSPORT.md) for the transport selection rules.
 
 ## Security Notes
 

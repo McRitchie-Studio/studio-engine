@@ -355,15 +355,12 @@ Then run the consumer smoke checks:
 ```bash
 # McRitchie Studio
 cd /Users/alex/projects/mcritchie-studio
-bin/rails -T ses
-MAIL_TRANSPORT=ses SES_SMTP_USERNAME=user SES_SMTP_PASSWORD=pass SES_REGION=us-east-2 \
-  bin/rails runner 'puts({delivery: ActionMailer::Base.delivery_method, host: ActionMailer::Base.smtp_settings[:address]}.inspect)'
+RESEND_API_KEY=re_dummy bin/rails runner 'puts ActionMailer::Base.delivery_method.inspect'   # => :resend
 
 # Turf Monster
 cd /Users/alex/projects/turf-monster
-bin/rails -T ses
-SOLANA_SKIP_NETWORK_CHECK=true MAIL_TRANSPORT=ses SES_SMTP_USERNAME=user SES_SMTP_PASSWORD=pass SES_REGION=us-east-2 \
-  bin/rails runner 'puts({delivery: ActionMailer::Base.delivery_method, host: ActionMailer::Base.smtp_settings[:address]}.inspect)'
+SOLANA_SKIP_NETWORK_CHECK=true RESEND_API_KEY=re_dummy \
+  bin/rails runner 'puts ActionMailer::Base.delivery_method.inspect'                       # => :resend
 ```
 
 Finally, prove the local apps still boot:
@@ -378,7 +375,8 @@ Consumer-side fallbacks from the SES/Resend transport migration. **Verified
 2026-08-19** rather than assumed:
 
 - `lib/tasks/ses.rake` — **already removed** from mcritchie-studio and
-  turf-monster. `bin/rails -T ses` now shows the engine-provided tasks.
+  turf-monster. The engine's own `ses:*` tasks were removed with the SES
+  transport on 2026-10-10.
 - `config/initializers/studio_mail_transport.rb` — **still present** in both
   apps. Read it before deleting: only the local COMPATIBILITY BRANCH is the
   cleanup candidate, and each app may have grown its own configuration around it

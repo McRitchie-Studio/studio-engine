@@ -30,7 +30,7 @@ class EmailSmokeTest < Minitest::Test
     assert_includes mailer.sent.fetch(:body), "Transport: resend"
   end
 
-  def test_result_labels_ses_when_ses_env_is_ready
+  def test_result_labels_the_delivery_method_even_with_a_stale_ses_env
     mailer = FakeActionMailer.new(delivery_method: :smtp, perform_deliveries: true)
     env = {
       "MAIL_TRANSPORT" => "ses",
@@ -47,7 +47,7 @@ class EmailSmokeTest < Minitest::Test
       env: env
     )
 
-    assert_equal "ses", result.transport
+    assert_equal "smtp", result.transport, "SES is retired; the label is the real delivery method"
     assert_equal true, result.external_delivery
   end
 

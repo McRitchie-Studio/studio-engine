@@ -38,7 +38,8 @@ module ActiveStorage
       rescue StandardError => error
         # Logged, then RE-RAISED. Blob#purge has already destroyed the row, so a
         # raise here leaks the object rather than losing it: the failure that
-        # costs storage, never the one that costs a user's file.
+        # costs storage, never the one that costs a user's file. A failed COPY
+        # has already been recorded to ErrorLog by Studio::S3::Trash.trash!.
         log_trash_failure(key, error)
         raise
       end

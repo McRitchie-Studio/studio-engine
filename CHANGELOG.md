@@ -27,6 +27,46 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   counts both. On the default theme one ink moves one step: light success
   `#2E6C32` becomes `#2D6A31`.
 
+## 0.102.0 — 2026-10-10
+
+### Removed
+
+- **The SES mail transport.** AWS was retired on 2026-10-10 (no IAM users, no
+  SES identities), so the engine no longer configures SES SMTP. Removed:
+  `Studio::MailTransport.configure_ses!`, `Studio.ses_transport_ready?`, the
+  `ses:check` and `ses:verify_domain` rake tasks, the banner's SES connector
+  and `ses-favicon.png`. The engine reads no `SES_*` variable and no
+  `AWS_ACCESS_KEY_ID` fallback for mail. Resend and every other transport are
+  unchanged.
+
+  **Consumer note: `MAIL_TRANSPORT=ses` is no longer supported.** It now logs
+  `MAIL_TRANSPORT=ses is no longer supported` and falls through as if unset:
+  Resend when `RESEND_API_KEY` is set, else the existing delivery method. No
+  app in the fleet sets it (verified 2026-10-10: the two QA apps set
+  `MAIL_TRANSPORT=resend`, no Heroku app holds an `SES_*` or `AWS_*` variable).
+  Remove any `MAIL_TRANSPORT=ses` and `SES_*` lines from `.env.example` and docs
+  when you next touch them.
+
+### Changed
+
+- **`ses_from:` is optional and ignored.** `Studio.mailer_from_for_transport`
+  and `Studio.marketing_from_for_transport` still accept it, so every existing
+  initializer keeps booting, but they always answer the Resend sender
+  (`RESEND_MAILER_FROM` / `RESEND_MARKETING_FROM`, then `resend_from:`, then
+  `Studio.resend_mailer_from`). That was already the answer on every app,
+  because none had SES selected. Drop the keyword when convenient.
+
+### Added
+
+- **A failed trash copy is recorded to ErrorLog.** When
+  `Studio::S3::Trash.trash!` (behind `Studio::S3.delete` and the
+  `StudioTrashS3` Active Storage service) cannot copy an object under
+  `trash/`, it now records a `Studio::S3::Trash::CopyFailed` through the host's
+  `ErrorLog.capture!`, naming the bucket, key and trash key, before re-raising
+  the original S3 error. The delete is still never sent after a failed copy.
+  Recording is best-effort: an `ErrorLog` that raises, or a host without one,
+  never masks the copy error.
+
 ## 0.101.0 — 2026-10-10
 
 ### Breaking
