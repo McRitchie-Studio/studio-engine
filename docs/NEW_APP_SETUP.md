@@ -104,9 +104,7 @@ Studio.configure do |config|
   config.welcome_message = ->(user) { "Welcome to X App, #{user.display_name}!" }
   config.auth_methods = %i[magic_link google]  # add :wallet or :password only when needed
   config.registration_params = [:name, :email]
-  config.mailer_from = Studio.mailer_from_for_transport(
-    ses_from: "X App <team@example.com>"
-  )
+  config.mailer_from = Studio.mailer_from_for_transport # RESEND_MAILER_FROM, else the shared sender
   config.configure_sso_user = ->(user) { user.role = "viewer" }
   # Optional: defaults check wallet_address, then solana_address.
   # Set this if your User exposes a different wallet column/helper.

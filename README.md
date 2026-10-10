@@ -1004,7 +1004,10 @@ avatars/abc.png  ->  trash/2026-10-01/1759302000123/avatars/abc.png
 ```
 
 The copy goes first and the delete second. A copy that fails raises and the
-delete is never sent, so a failure leaves the original in place. The trash copy
+delete is never sent, so a failure leaves the original in place; the failed
+copy is also recorded through the host's `ErrorLog.capture!` as a
+`Studio::S3::Trash::CopyFailed` naming the bucket and key, before the original
+error is re-raised. The trash copy
 keeps the object's content type, cache headers and metadata, and adds
 `original-key`, `deleted-at`, `deleted-env`, and what an Active Storage blob row
 needs to be rebuilt (`blob-content-type`, `blob-byte-size`, `blob-checksum`
