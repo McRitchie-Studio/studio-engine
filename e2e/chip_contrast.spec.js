@@ -19,8 +19,8 @@ const { test, expect } = require("@playwright/test");
 //     primary hue" fails in every palette.
 //   - the preset's `primary-ink` text colour removed: the same spec fails, the
 //     chip inherits the body colour.
-//   - status_ink tuned to a 0.10 tint alone: the moms-app spec fails, its
-//     primary chip at 4.48:1 on the dark surface.
+//   - status_ink tuned to a 0.10 tint alone: the first spec fails, naming
+//     moms-app's primary chip at 4.48:1 on the dark surface.
 
 const AA = 4.5;
 const PALETTES = ["engine-default", "turf-monster", "cyvasse", "mcritchie-industries", "moms-app"];
@@ -119,29 +119,37 @@ async function openLab(page, palette) {
 
 const hueDistance = (a, b) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
 
-for (const palette of PALETTES) {
-  test(`${palette}: every graded chip clears AA on its tint in dark and in light`, async ({ page }) => {
+// One test over every palette, written out as one declaration: the lane's
+// contract counts declarations in source (config/e2e_lane.yml).
+test("every graded chip clears AA on its painted tint, in dark and light, in every palette", async ({ page }) => {
+  const failing = [];
+
+  for (const palette of PALETTES) {
     await openLab(page, palette);
     const backgrounds = [];
 
     for (const theme of ["dark", "light"]) {
       const { rows, pageBackground } = await inTheme(page, theme);
+      const where = `${palette} ${theme}`;
       backgrounds.push(pageBackground);
 
-      expect(rows.filter((row) => row.missing || row.ungraded), `${theme}: chips not rendered or not gradable`).toEqual([]);
-      expect(rows).toHaveLength(4 * GRADED.length);
+      expect(rows.filter((row) => row.missing || row.ungraded), `${where}: chips not rendered or not gradable`).toEqual([]);
+      expect(rows, where).toHaveLength(4 * GRADED.length);
       // A role chip paints a tint over its surface; one that matches the bare
       // surface is an uncompiled class, or a sample that missed the chip.
       const untinted = rows.filter((row) => row.chip !== "tone-muted" && !row.tinted);
-      expect(untinted, `${theme}: role chips painting no tint`).toEqual([]);
+      expect(untinted, `${where}: role chips painting no tint`).toEqual([]);
 
-      const failing = rows.filter((row) => row.ratio < AA);
-      expect(failing, `${palette} ${theme}: chips under ${AA}:1`).toEqual([]);
+      for (const row of rows.filter((r) => r.ratio < AA)) {
+        failing.push(`${where}: ${row.chip} on ${row.surface} is ${row.ratio}:1 (${row.ink} on ${row.on})`);
+      }
     }
 
-    expect(backgrounds[0], "the light pass measured the dark page again").not.toBe(backgrounds[1]);
-  });
-}
+    expect(backgrounds[0], `${palette}: the light pass measured the dark page again`).not.toBe(backgrounds[1]);
+  }
+
+  expect(failing, `chips under ${AA}:1`).toEqual([]);
+});
 
 test("a primary chip is painted in the primary hue, not the heading colour, in both themes", async ({ page }) => {
   for (const palette of PALETTES) {

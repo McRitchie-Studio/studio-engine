@@ -973,15 +973,15 @@
 # button that carries a removed string hook refuses the hold, says so on the
 # console and runs none of it.
 #   npx playwright test --list  -> 328 tests in 47 files
-# 328 -> 334: e2e/chip_contrast.spec.js, a NEW file on a NEW lab page (/lab/chips).
+# 328 -> 330: e2e/chip_contrast.spec.js, a NEW file on a NEW lab page (/lab/chips).
 # A chip's ink is a custom property read through a preset utility over a tint the
 # browser composites, so the spec reads the painted pixel under each chip and the
 # computed text colour: every status tone and the primary scheme clears 4.5:1 on
 # the four surfaces, in dark and light, in the default palette and each consuming
 # app's; and a primary chip is in the primary hue. Verified RED against three
 # reintroduced defects (the spec's header lists them).
-#   npx playwright test --list  -> 334 tests in 48 files
-total_specs: 334
+#   npx playwright test --list  -> 330 tests in 48 files
+total_specs: 330
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1169,11 +1169,11 @@ total_specs: 334
 #   npx playwright test --list                                             -> 328 tests, 47 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 328
-# And for chip contrast as painted: 6 more tests, 1 new file:
-#   npx playwright test --list                                             -> 334 tests, 48 files
+# And for chip contrast as painted: 2 more tests, 1 new file:
+#   npx playwright test --list                                             -> 330 tests, 48 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
-#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 334
-executed: 334
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 330
+executed: 330
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
