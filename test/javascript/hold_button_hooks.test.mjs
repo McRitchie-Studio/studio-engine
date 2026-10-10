@@ -63,7 +63,7 @@ test("the module imports nothing", () => {
 test("the module compiles and evaluates no string", () => {
   const code = source.split("\n").filter((line) => !line.trimStart().startsWith("//")).join("\n")
 
-  for (const banned of ["AsyncFunction", "Alpine.evaluate", ".evaluate(", "new Function", "eval("]) {
+  for (const banned of ["AsyncFunction", "Alpine.evaluate", ".evaluate(", ".constructor", "Function(", "eval("]) {
     assert.equal(code.includes(banned), false, `${banned} is in the module's code`)
   }
   assert.doesNotMatch(source, /AsyncFunction|Alpine\.evaluate/, "nor in its comments")

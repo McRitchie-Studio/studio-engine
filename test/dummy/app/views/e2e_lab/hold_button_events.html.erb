@@ -41,7 +41,7 @@
   </div>
 
   <div data-test="plain">
-    <%= render "studio/hold_button", hold_id: "plain", duration: 600, fizz: false %>
+    <%= render "studio/hold_button", hold_id: "plain", duration: 600, validate_at: 150, early_action_at: 400, fizz: false %>
   </div>
 
   <section x-data="{ submitting: true }" data-test="submitting">

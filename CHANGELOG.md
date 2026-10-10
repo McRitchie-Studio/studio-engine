@@ -4,6 +4,38 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Breaking
+
+- **The hold button takes no JavaScript-string locals.** `studio/_hold_button`
+  no longer writes them to `data-*` attributes and `studio/hold_button_hooks`
+  no longer evaluates them, so the button needs no `unsafe-eval`. Each removed
+  local has an event the button dispatches (they bubble, and every
+  `event.detail` carries `{ id }`, the button's `hold_id`):
+
+  | Removed local | Attribute it wrote | Answer this event |
+  |---|---|---|
+  | `guard:` | `data-guard` | `hold-button:guard`: `preventDefault()` refuses the hold |
+  | `on_hold_start:` | `data-on-hold-start` | `hold-button:start` |
+  | `validate:` | `data-validate` | `hold-button:validate`: `event.detail.waitUntil(answer)`, a boolean or a promise of one |
+  | `early_action:` | `data-early-action` | `hold-button:early`: `preventDefault()` takes the action over |
+  | `early_action_guard:` | `data-early-action-guard` | `hold-button:early`: decide in the listener, and call `preventDefault()` only when the action runs |
+  | `on_success:` | `data-on-success` | `hold-button:success`: `preventDefault()` keeps the button's state for the listener |
+
+  `validate_at:` and `early_action_at:` stay, and time the events.
+
+  A call site that still passes one fails loudly:
+  - `render "studio/hold_button"` with a removed local that is not `nil` raises
+    `ArgumentError` naming each local and its event, in every environment
+    (`Studio::HoldButton.refuse_removed_locals!`).
+  - A `.hold-btn` that carries one of the attributes by hand refuses every
+    press, dispatches nothing, and logs a console error naming the attribute
+    and its event.
+
+  `SUCCESS_SETTLE_MS` is no longer exported by `studio/hold_button_hooks`:
+  `hold-button:success` is dispatched at the full duration, with no half-second
+  delay. The module no longer reads `button.dataset`, so a consumer test that
+  scans it for the attribute names it evaluates finds none.
+
 ### Added
 
 - **The navbar takes a `brand_heading` local.** `layouts/_navbar` draws the
