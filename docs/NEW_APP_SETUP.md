@@ -142,12 +142,10 @@ end
 Studio::MailTransport.configure!
 ```
 
-This shared transport selects SES SMTP when `MAIL_TRANSPORT=ses` and
-`SES_SMTP_USERNAME` / `SES_SMTP_PASSWORD` are present. Resend remains the
-rollback path when `RESEND_API_KEY` is present and SES is not active. During
-Resend rollback, `Studio.mailer_from_for_transport` uses `RESEND_MAILER_FROM`
-so new apps can send through the shared `McRitchie Studio
-<team@mcritchie.studio>` sender before their SES production setup is complete.
+This shared transport selects Resend when `RESEND_API_KEY` is present, and
+`Studio.mailer_from_for_transport` answers `RESEND_MAILER_FROM`, else the shared
+`McRitchie Studio <team@mcritchie.studio>` sender. SES was retired on 2026-10-10;
+do not set `MAIL_TRANSPORT=ses` (see [`EMAIL_TRANSPORT.md`](EMAIL_TRANSPORT.md)).
 
 ### `config/initializers/session_store.rb`
 
