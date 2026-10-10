@@ -85,7 +85,7 @@
     <%= link_to entry.label, admin_email_path(entry.key),
           class: "font-semibold text-heading hover:text-primary underline-offset-2 hover:underline" %>
     <% if entry.marketing? %>
-      <span class="badge bg-primary/10 text-primary border-primary/30 ml-1.5 whitespace-nowrap">Marketing</span>
+      <span class="badge bg-primary/10 text-primary-ink border-primary/30 ml-1.5 whitespace-nowrap">Marketing</span>
     <% end %>
     <% if entry.description.present? %>
       <p class="text-sm text-body mt-0.5 max-w-md"><%= entry.description %></p>

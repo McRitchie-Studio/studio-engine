@@ -1,0 +1,29 @@
+<%# Every chip Studio::BadgeComponent draws, on each of the four theme surfaces.
+
+    WHY THIS PAGE EXISTS. A chip's ink is a CSS custom property the theme
+    resolver derives, read through a Tailwind utility the shared preset mints,
+    over a tint the browser composites. The resolver's unit test measures hexes;
+    only a browser can say what colour the text is painted and on what.
+
+    THE LAB RULE (see E2eLabController): a lab page sets up a component's inputs
+    and nothing else. The four boxes are the four surface tokens a chip lands on. %>
+<% if @palette_css %>
+  <%= tag.style(@palette_css.html_safe, nonce: content_security_policy_nonce) %>
+<% end %>
+<main class="max-w-5xl mx-auto px-4 py-10 space-y-4" data-chip-lab>
+  <% { "page" => "bg-page", "surface" => "bg-surface", "surface-alt" => "bg-surface-alt", "inset" => "bg-inset" }.each do |name, surface| %>
+    <section class="<%= surface %> border border-subtle rounded-xl p-4 space-y-3" data-chip-surface="<%= name %>">
+      <p class="text-xs text-muted"><%= name %></p>
+      <div class="flex flex-wrap gap-2" data-chip-group="tones">
+        <% Studio::BadgeComponent::TONES.each_key do |tone| %>
+          <span data-chip="tone-<%= tone %>"><%= render Studio::BadgeComponent.new(text: tone.to_s, tone: tone) %></span>
+        <% end %>
+      </div>
+      <div class="flex flex-wrap gap-2" data-chip-group="schemes">
+        <% Studio::BadgeComponent::SCHEMES.each_key do |scheme| %>
+          <span data-chip="scheme-<%= scheme %>"><%= render Studio::BadgeComponent.new(text: scheme, scheme: scheme) %></span>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+</main>

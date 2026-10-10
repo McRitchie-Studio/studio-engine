@@ -34,7 +34,7 @@ module Studio
       success: "bg-success/10 text-success-ink border-success/40",
       warning: "bg-warning/10 text-warning-ink border-warning/40",
       danger: "bg-danger/10 text-danger-ink border-danger/40",
-      primary: "bg-primary/10 text-heading border-primary/40",
+      primary: "bg-primary/10 text-primary-ink border-primary/40",
       muted: "bg-surface-alt text-muted border-subtle"
     }.freeze
 
@@ -44,7 +44,7 @@ module Studio
       "warning" => "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
       "info" => "bg-blue-500/10 text-blue-500 border-blue-500/30",
       "violet" => "bg-violet/10 text-violet border-violet/30",
-      "primary" => "bg-primary/10 text-primary border-primary/30",
+      "primary" => "bg-primary/10 text-primary-ink border-primary/30",
       "orange" => "bg-orange-500/10 text-orange-500 border-orange-500/30",
       "emerald" => "bg-emerald-500/10 text-emerald-500 border-emerald-500/30",
       "gray" => "bg-gray-500/10 text-gray-400 border-gray-500/30",

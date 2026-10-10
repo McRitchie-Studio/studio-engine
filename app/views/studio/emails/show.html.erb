@@ -103,7 +103,7 @@
     </div>
 
     <div class="flex flex-wrap items-center gap-2 mt-3">
-      <span class="badge <%= @entry.marketing? ? "bg-primary/10 text-primary border-primary/30" : "bg-inset text-muted border-subtle" %> whitespace-nowrap">
+      <span class="badge <%= @entry.marketing? ? "bg-primary/10 text-primary-ink border-primary/30" : "bg-inset text-muted border-subtle" %> whitespace-nowrap">
         <%= @entry.type.to_s.titleize %>
       </span>
       <span class="<%= badge_class %> whitespace-nowrap"><%= badge_label %></span>

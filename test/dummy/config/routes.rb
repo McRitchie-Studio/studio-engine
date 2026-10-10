@@ -70,6 +70,7 @@ Rails.application.routes.draw do
   get "lab/style_modals", to: "e2e_lab#style_modals"
   get "lab/style_theme", to: "e2e_lab#style_theme"
   get "lab/board", to: "e2e_lab#board"
+  get "lab/chips", to: "e2e_lab#chips"
   get "lab/session_drift", to: "e2e_lab#session_drift"
   get "lab/sidebar_panels", to: "e2e_lab#sidebar_panels"
   get "lab/sidebar_panels_turbo", to: "e2e_lab#sidebar_panels_turbo"

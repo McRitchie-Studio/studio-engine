@@ -27,7 +27,7 @@
       <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
         <span><%= section[:title] %></span>
         <% if section[:admin] %>
-          <span class="rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-mono text-primary">ADMIN</span>
+          <span class="rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-mono text-primary-ink">ADMIN</span>
         <% end %>
       </div>
 
@@ -92,7 +92,7 @@
     <% if sidebar_admin && sections.any? { |section| section[:admin] } %>
       <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
         <span>Geo</span>
-        <span class="rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-mono text-primary">ADMIN</span>
+        <span class="rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-mono text-primary-ink">ADMIN</span>
       </div>
       <%= render "components/geo_signpost", variant: :sidebar, close_action: close_action %>
     <% end %>

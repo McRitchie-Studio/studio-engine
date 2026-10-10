@@ -117,6 +117,10 @@ module Studio
         "--color-danger-ink"     => status_ink(danger, surfaces, direction: :lighten),
         "--color-warning-ink"    => status_ink(warning, surfaces, direction: :lighten),
         "--color-success-ink"    => status_ink(success, surfaces, direction: :lighten),
+        # The primary role as chip TEXT (`bg-primary/10 text-primary-ink`): the
+        # brand hue, shaded per theme until it clears AA on the surfaces and on
+        # its own tint. --color-primary itself stays the brand colour.
+        "--color-primary-ink"    => status_ink(primary, surfaces, direction: :lighten),
         "--color-accent"         => colors[:accent] || "#F72585"
       }.merge(fill_vars(primary, warning, danger))
     end
@@ -165,6 +169,8 @@ module Studio
     # How strong a status role's tint is where its ink is read on it: the
     # `bg-<role>/10 text-<role>-ink` badge and flash-panel pattern.
     STATUS_TINT = 0.10
+    # The same tint as written, and as an 8-bit alpha channel holds it.
+    TINT_ALPHAS = [STATUS_TINT, (STATUS_TINT * 255).round / 255.0].freeze
 
     # A status ink lands on the page surfaces AND on its own role's tint over
     # each of them (the `bg-warning/10 text-warning-ink` badge). The tint is
@@ -172,8 +178,13 @@ module Studio
     # to the bare surfaces alone comes out below AA inside its own badge
     # (default theme: warning 3.91:1 dark, success 4.00:1 dark, danger 4.10:1
     # light and 4.18:1 dark). Counting the tints as surfaces closes that.
+    #
+    # The tint is counted at both strengths a browser paints it. Chromium
+    # composites a 10% fill at 26/255, a little stronger than 0.10, and an ink
+    # tuned to 0.10 alone measured 4.48:1 on the painted pixels (danger, dark,
+    # on a #141516 base).
     def status_ink(role, surfaces, direction:)
-      tints = surfaces.map { |bg| ColorScale.blend(role, bg, STATUS_TINT) }
+      tints = TINT_ALPHAS.flat_map { |alpha| surfaces.map { |bg| ColorScale.blend(role, bg, alpha) } }
       contrast_ink(role, direction: direction, start: 0.0, target: 4.5, against: surfaces + tints)
     end
 
@@ -307,6 +318,7 @@ module Studio
         "--color-danger-ink"     => status_ink(danger, surfaces, direction: :darken),
         "--color-warning-ink"    => status_ink(warning, surfaces, direction: :darken),
         "--color-success-ink"    => status_ink(success, surfaces, direction: :darken),
+        "--color-primary-ink"    => status_ink(primary, surfaces, direction: :darken),
         "--color-accent"         => colors[:accent] || "#F72585"
       }.merge(fill_vars(primary, warning, danger))
     end

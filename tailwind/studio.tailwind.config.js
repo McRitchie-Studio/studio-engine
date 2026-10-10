@@ -103,6 +103,9 @@ module.exports = {
         'danger-ink':  'var(--color-danger-ink)',
         'warning-ink': 'var(--color-warning-ink)',
         'success-ink': 'var(--color-success-ink)',
+        // The primary role as chip text, derived the same way. text-primary
+        // stays the brand colour for links, icons and large text.
+        'primary-ink': 'var(--color-primary-ink)',
       },
       // The status-role FILLS: badge tints, flash panels, borders. Registered
       // for backgrounds and borders ONLY (not `colors`), so that registering
