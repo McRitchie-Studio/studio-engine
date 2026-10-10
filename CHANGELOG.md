@@ -4,7 +4,109 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **A meeting plays beside its transcript on the knowledge document page.**
+  `/admin/knowledge/:id`, in its preview frame:
+  - A document with a recording gets a native `<video>` or `<audio>` player.
+    Its source is the six-hour presigned URL (`recording_url`), written only
+    into the admin-only, `no-store` preview response; the show page holds no
+    signed URL and the app reads none of the recording.
+  - A text document that holds at least two cue lines is shown as cues (time,
+    speaker, text) in place of the preformatted block, with the plain text kept
+    under them, closed. Any other text file previews exactly as before.
+  - With a recording, a click on a cue seeks the player there and plays, and
+    the cue being spoken is marked and kept in view inside the cue list. With
+    none, the cues still render with each time as plain text.
+  - With no stored recording, an http(s) `recording_link` shows as a link that
+    opens in a new tab (`rel="noopener noreferrer"`).
+  - A document whose own file is audio or video (`mp4`, `m4v`, `mov`, `webm`,
+    `ogv`, `mp3`, `m4a`, `wav`, `ogg`, `oga`, `weba`) plays in the same player,
+    served as the type its extension names.
+
+  A transcript longer than the 256 KB text head is read a second time, up to
+  the parser's 2 MB; one preview makes two ranged reads at most. All 5,000 cues
+  the parser allows are rendered, and a transcript cut by a cap says so and
+  links the download. Speaker names and cue text are escaped.
+
+  The script is `studio/knowledge_transcript` and a `knowledge-transcript`
+  controller that `studio/stimulus` registers lazily, so a page without a
+  recording fetches neither. No migration, no setting, no new route. An app
+  without the recording columns shows no player and no link. README, *The
+  document page*, has every bound and what was measured at the caps.
+- `Studio::KnowledgePreview.player_for(doc)` (a `Player` of `kind`, `url` and
+  `error`, or nil without a recording), `.clock(seconds)`, and two more kinds
+  from `kind_for`: `:video` and `:audio`. `Result` gains `cues` and
+  `cues_truncated`, and the kind `:transcript`.
+
 ## 0.99.0 — 2026-10-09
+
+### Added
+
+- **Knowledge documents preview in the page.** `/admin/knowledge/:id` gains a
+  Preview section, so reading a document no longer means downloading it:
+  - `.xlsx` and `.xlsm` workbooks render as tables, one tab per sheet. A formula
+    shows the value Excel last calculated for it, and numbers render through
+    their number format (dates, percentages, currency, accounting negatives).
+  - `.csv` and `.tsv` render as one table.
+  - PDFs and images (`png`, `jpg`, `gif`, `webp`) display inline, fetched by the
+    browser from a 15-minute signed URL.
+  - Text, markdown, JSON and caption files display as preformatted text. Stored
+    content is always escaped, never rendered as HTML.
+  - Anything else (`.xls`, `.docx`, SVG), anything over a cap, and any file that
+    will not parse shows one sentence saying why, beside the download link. The
+    page never fails on a bad file.
+
+  The section is a lazy `<turbo-frame>` over a new admin-only endpoint,
+  `GET /admin/knowledge/:id/preview` (`admin_knowledge_doc_preview_path`), so the
+  show page itself reads nothing from the bucket. It rides the existing
+  `Studio.draw_knowledge_routes` opt-in; there is no migration and no new setting.
+
+  The caps, all constants on `Studio::KnowledgePreview`:
+  - A sheet: 500 rows and 50 columns. A cell: 32,767 characters (Excel's own
+    limit; cut with a mark past it).
+  - A workbook: 20 sheets, 50,000 filled cells, 100,000 rendered cells (empty
+    ones included) and 2 MB of cell text. The sheet that spends the last of one
+    of these is cut there and says so; later sheets are counted in a notice.
+  - A workbook read as a whole: a 20 MB file; 64 MB inflated across every part
+    read (`INFLATE_BUDGET`, a part read twice counted twice); 16 MB of text handed
+    over by the XML parser, kept or not (`MAX_PARSED_TEXT_BYTES`); and 10 seconds
+    of wall-clock time (`SPREADSHEET_DEADLINE_SECONDS`). Past any of these the
+    preview falls back to the download link.
+  - What the XML parser is given, enforced on the byte stream before it
+    (`Studio::KnowledgePreview::XmlGuard`): a part must be UTF-8 and open with
+    `<`; a part with a `<!DOCTYPE` is refused; a text node or CDATA section
+    stops at 1 MB; the start tags of all elements open at once stop at 64 KB
+    together; comments and processing instructions stop at 64 KB a part;
+    nesting stops at 256 and namespace declarations at 1,024. A workbook part in
+    UTF-16, or one carrying megabyte comments, falls back to the download link.
+  - A workbook's tables: 4,096 relationships and 4,096 sheets (more is refused);
+    4,096 custom number formats and 512 distinct formats in use (past either, a
+    number renders as General). A number format longer than Excel's 255
+    characters is ignored, and no number renders past thirty decimals.
+  - The first 1 MB of a CSV, the first 256 KB of a text file, and 100 MB for an
+    inline PDF or image.
+
+  A sheet or file cut by a cap says so and links the download.
+- `Studio::KnowledgePreview` (`lib/studio/knowledge_preview.rb`), loaded on
+  first use and not by `require "studio"`: `kind_for(filename:, mime_type:)`,
+  `for(doc)` returning a `Result`, `read_spreadsheet(bytes)` and
+  `read_delimited(bytes)`. The workbook reader is the engine's own, on Zlib and
+  nokogiri; it adds no spreadsheet gem.
+- `Studio::KnowledgeDoc#preview`, `#preview_kind` and `#filename`, and
+  `#signed_url(inline_as: "application/pdf")`.
+- `Studio::S3.download(key:, max_bytes:)` reads only the head of an object (a
+  ranged GET; `max_bytes` must be a positive Integer), and `Studio::S3.signed_url`
+  takes `response_content_disposition:` and `response_content_type:`, signed into
+  the URL. Both are optional; existing calls are unchanged. The signing is tested
+  against an R2-style endpoint; that R2 serves the overridden headers is
+  documented by Cloudflare and not yet verified against a live bucket.
+
+### Changed
+
+- The gemspec declares `csv` (`>= 3.0`). It left Ruby's default gems in 3.4 and
+  the CSV preview requires it. Apps whose lockfile already names `csv` see no
+  change; the rest gain one pure-Ruby gem on their next engine bump.
 
 ### Fixed
 
@@ -365,70 +467,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   before. A non-http(s) String raises `ArgumentError` at boot; a callable
   answering one draws no link. The link opens in a new tab with
   `rel="noopener noreferrer"`. See README, *The image generator link*.
-- **Knowledge documents preview in the page.** `/admin/knowledge/:id` gains a
-  Preview section, so reading a document no longer means downloading it:
-  - `.xlsx` and `.xlsm` workbooks render as tables, one tab per sheet. A formula
-    shows the value Excel last calculated for it, and numbers render through
-    their number format (dates, percentages, currency, accounting negatives).
-  - `.csv` and `.tsv` render as one table.
-  - PDFs and images (`png`, `jpg`, `gif`, `webp`) display inline, fetched by the
-    browser from a 15-minute signed URL.
-  - Text, markdown, JSON and caption files display as preformatted text. Stored
-    content is always escaped, never rendered as HTML.
-  - Anything else (`.xls`, `.docx`, SVG), anything over a cap, and any file that
-    will not parse shows one sentence saying why, beside the download link. The
-    page never fails on a bad file.
-
-  The section is a lazy `<turbo-frame>` over a new admin-only endpoint,
-  `GET /admin/knowledge/:id/preview` (`admin_knowledge_doc_preview_path`), so the
-  show page itself reads nothing from the bucket. It rides the existing
-  `Studio.draw_knowledge_routes` opt-in; there is no migration and no new setting.
-
-  The caps, all constants on `Studio::KnowledgePreview`:
-  - A sheet: 500 rows and 50 columns. A cell: 32,767 characters (Excel's own
-    limit; cut with a mark past it).
-  - A workbook: 20 sheets, 50,000 filled cells, 100,000 rendered cells (empty
-    ones included) and 2 MB of cell text. The sheet that spends the last of one
-    of these is cut there and says so; later sheets are counted in a notice.
-  - A workbook read as a whole: a 20 MB file; 64 MB inflated across every part
-    read (`INFLATE_BUDGET`, a part read twice counted twice); 16 MB of text handed
-    over by the XML parser, kept or not (`MAX_PARSED_TEXT_BYTES`); and 10 seconds
-    of wall-clock time (`SPREADSHEET_DEADLINE_SECONDS`). Past any of these the
-    preview falls back to the download link.
-  - What the XML parser is given, enforced on the byte stream before it
-    (`Studio::KnowledgePreview::XmlGuard`): a part must be UTF-8 and open with
-    `<`; a part with a `<!DOCTYPE` is refused; a text node or CDATA section
-    stops at 1 MB; the start tags of all elements open at once stop at 64 KB
-    together; comments and processing instructions stop at 64 KB a part;
-    nesting stops at 256 and namespace declarations at 1,024. A workbook part in
-    UTF-16, or one carrying megabyte comments, falls back to the download link.
-  - A workbook's tables: 4,096 relationships and 4,096 sheets (more is refused);
-    4,096 custom number formats and 512 distinct formats in use (past either, a
-    number renders as General). A number format longer than Excel's 255
-    characters is ignored, and no number renders past thirty decimals.
-  - The first 1 MB of a CSV, the first 256 KB of a text file, and 100 MB for an
-    inline PDF or image.
-
-  A sheet or file cut by a cap says so and links the download.
-- `Studio::KnowledgePreview` (`lib/studio/knowledge_preview.rb`), loaded on
-  first use and not by `require "studio"`: `kind_for(filename:, mime_type:)`,
-  `for(doc)` returning a `Result`, `read_spreadsheet(bytes)` and
-  `read_delimited(bytes)`. The workbook reader is the engine's own, on Zlib and
-  nokogiri; it adds no spreadsheet gem.
-- `Studio::KnowledgeDoc#preview`, `#preview_kind` and `#filename`, and
-  `#signed_url(inline_as: "application/pdf")`.
-- `Studio::S3.download(key:, max_bytes:)` reads only the head of an object (a
-  ranged GET; `max_bytes` must be a positive Integer), and `Studio::S3.signed_url`
-  takes `response_content_disposition:` and `response_content_type:`, signed into
-  the URL. Both are optional; existing calls are unchanged. The signing is tested
-  against an R2-style endpoint; that R2 serves the overridden headers is
-  documented by Cloudflare and not yet verified against a live bucket.
-
-### Changed
-
-- The gemspec declares `csv` (`>= 3.0`). It left Ruby's default gems in 3.4 and
-  the CSV preview requires it. Apps whose lockfile already names `csv` see no
-  change; the rest gain one pure-Ruby gem on their next engine bump.
 
 ### Changed
 

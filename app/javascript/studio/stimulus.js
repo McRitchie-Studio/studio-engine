@@ -53,7 +53,9 @@ export const schema = {
 // that must work whenever its page does is not listed here: a failed load is
 // final for the document (studio/lazy_controllers). The board is listed: a
 // board whose controller failed still renders, counts and toasts, and says that
-// its cards do not drag (data-studio-controller-failed="board").
+// its cards do not drag (data-studio-controller-failed="board"). So is the
+// knowledge transcript: a recording whose controller failed still plays from
+// its own controls, and its page says that click-to-play did not load.
 export const LAZY = {
   "board": () => import("studio/controllers/board_controller"),
   "geo-settings": () => import("studio/controllers/geo_settings_controller"),
@@ -61,7 +63,8 @@ export const LAZY = {
   "email-banner-scale": () => import("studio/controllers/email_banner_scale_controller"),
   "booking": () => import("studio/controllers/booking_controller"),
   "footer-map": () => import("studio/controllers/footer_map_controller"),
-  "survey": () => import("studio/controllers/survey_controller")
+  "survey": () => import("studio/controllers/survey_controller"),
+  "knowledge-transcript": () => import("studio/controllers/knowledge_transcript_controller")
 }
 
 export const application = Application.start(document.documentElement, schema)

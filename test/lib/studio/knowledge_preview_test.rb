@@ -8,11 +8,15 @@ require_relative "../../../lib/studio/knowledge_preview"
 # proves that in a process of its own). Here they are named directly, in an
 # order minitest shuffles, so they are loaded up front.
 require_relative "../../../lib/studio/knowledge_preview/xlsx"
+# Likewise the transcript parser, whose caps the tests below name.
+require_relative "../../../lib/studio/knowledge_transcript"
 
 # [unit] Studio::KnowledgePreview: which files preview and as what, the
 # workbook reader (shared strings, formulas' cached values, number formats,
 # the row, column and sheet caps, damaged and hostile files), the CSV reader,
-# and the Result a document gets, including every fallback.
+# and the Result a document gets, including every fallback: a transcript's
+# cues and what each read of it is capped at, an audio or video file's signed
+# URL, and the Player for a document's recording.
 #
 # All data is invented. Workbooks are built by XlsxBuilder, a writer that
 # shares no code with the reader, and one fixture was written by openpyxl.
@@ -1265,8 +1269,11 @@ class KnowledgePreviewTest < Minitest::Test
     def file? = !s3_key.to_s.empty?
     def filename = File.basename(s3_key.to_s)
 
-    def signed_url(inline_as: nil)
+    attr_reader :signed_for
+
+    def signed_url(expires_in: 900, inline_as: nil)
       self.signed = inline_as
+      @signed_for = expires_in
       "https://bucket.example.test/signed?type=#{inline_as}"
     end
   end
@@ -1422,13 +1429,232 @@ class KnowledgePreviewTest < Minitest::Test
     refute_includes result.reason, "bucket unreachable", "the operator's sentence carries no internals"
   end
 
+  # --- transcripts ---------------------------------------------------------------------
+
+  # Layout A: the stamp, a dash, the speaker; the text indented below.
+  def cue_lines(count, text: "We reviewed the widget schedule.", from: 0)
+    (from...(from + count)).map { |i| "#{i / 60}:#{format('%02d', i % 60)} - Speaker #{i % 3}\n  #{text}\n" }.join
+  end
+
+  def test_a_text_file_of_cues_previews_as_a_transcript_from_one_read
+    body = "Weekly sync\nVIEW RECORDING\n\n" + cue_lines(3)
+    storage = Storage.new(body)
+    result = Preview.for(doc("standup.txt"), storage: storage)
+
+    assert_equal :transcript, result.kind
+    assert_equal [0, 1, 2], result.cues.map(&:seconds)
+    assert_equal "Speaker 1", result.cues[1].speaker
+    assert_equal "We reviewed the widget schedule.", result.cues[1].text
+    refute result.cues_truncated
+    assert_equal body, result.text, "the plain text is kept whole, title lines included"
+    refute result.truncated
+    assert_equal [{ key: "knowledge/acme/standup.txt", max_bytes: Preview::TEXT_HEAD_BYTES + 1 }], storage.calls,
+                 "a transcript that fits the text head costs the one read a text file costs"
+  end
+
+  def test_the_other_layout_and_a_markdown_name_read_the_same
+    result = Preview.for(doc("standup.md"), storage: Storage.new("Sam Sample • 0:02\nMorning.\nRiley Example • 1:15\nHello.\n"))
+    assert_equal :transcript, result.kind
+    assert_equal [[2, "Sam Sample", "Morning."], [75, "Riley Example", "Hello."]], result.cues.map(&:to_a)
+  end
+
+  def test_text_with_fewer_cue_lines_than_the_minimum_stays_text
+    assert_equal 2, Preview::TRANSCRIPT_MIN_CUES
+    one = "Notes from Tuesday\n\nAgenda • 9:00\nEverything else is prose.\n"
+    result = Preview.for(doc("notes.txt"), storage: Storage.new(one))
+    assert_equal :text, result.kind
+    assert_equal one, result.text
+    assert_nil result.cues
+
+    none = Preview.for(doc("notes.txt"), storage: Storage.new("  10:30 - we agreed to meet\nplain prose\n"))
+    assert_equal :text, none.kind
+  end
+
+  def test_a_long_text_file_that_is_not_a_transcript_is_still_read_once
+    storage = Storage.new("line\n" * 100_000)
+    result = Preview.for(doc("server.log"), storage: storage)
+    assert_equal :text, result.kind
+    assert_equal [Preview::TEXT_HEAD_BYTES + 1], storage.calls.map { |call| call[:max_bytes] }
+  end
+
+  def test_a_transcript_longer_than_the_text_head_is_read_again_up_to_the_parsers_cap
+    body = cue_lines(4_000, text: "x" * 150)
+    assert_operator body.bytesize, :>, Preview::TEXT_HEAD_BYTES
+    assert_operator body.bytesize, :<, Studio::KnowledgeTranscript::MAX_TEXT_BYTES
+    storage = Storage.new(body)
+    result = Preview.for(doc("standup.txt"), storage: storage)
+
+    assert_equal :transcript, result.kind
+    assert_equal 4_000, result.cues.size, "every cue, not only those in the first 256 KB"
+    refute result.cues_truncated
+    assert result.truncated, "the plain text is still only the head"
+    assert_equal Preview::TEXT_HEAD_BYTES, result.text.bytesize
+    assert_equal [Preview::TEXT_HEAD_BYTES + 1, Studio::KnowledgeTranscript::MAX_TEXT_BYTES + 1],
+                 storage.calls.map { |call| call[:max_bytes] },
+                 "two reads, the second capped one byte past the parser's own limit"
+  end
+
+  def test_a_transcript_past_the_parsers_text_cap_is_cut_there_and_says_so
+    body = cue_lines(4_000, text: "y" * 1_000)
+    assert_operator body.bytesize, :>, Studio::KnowledgeTranscript::MAX_TEXT_BYTES
+    storage = Storage.new(body)
+    result = Preview.for(doc("standup.txt"), storage: storage)
+
+    assert_equal :transcript, result.kind
+    assert result.cues_truncated
+    assert_operator result.cues.size, :<, 4_000
+    assert_operator result.cues.sum { |cue| cue.text.bytesize }, :<=, Studio::KnowledgeTranscript::MAX_TEXT_BYTES
+    assert_operator storage.calls.sum { |call| call[:max_bytes] }, :<=,
+                    Preview::TEXT_HEAD_BYTES + Studio::KnowledgeTranscript::MAX_TEXT_BYTES + 2,
+                    "no preview reads more than the head plus the parser's cap"
+  end
+
+  def test_a_transcript_past_the_cue_cap_stops_at_it_and_says_so
+    body = cue_lines(Studio::KnowledgeTranscript::MAX_CUES + 50, text: "ok")
+    result = Preview.for(doc("standup.txt"), storage: Storage.new(body))
+
+    assert_equal Studio::KnowledgeTranscript::MAX_CUES, result.cues.size
+    assert result.cues_truncated
+  end
+
+  def test_one_cue_longer_than_its_cap_is_cut_and_says_so
+    body = "0:01 - Speaker 0\n" + ("  #{'z' * 100}\n" * 200) + "0:09 - Speaker 1\n  done\n"
+    result = Preview.for(doc("standup.txt"), storage: Storage.new(body))
+
+    assert_equal Studio::KnowledgeTranscript::MAX_CUE_TEXT_BYTES, result.cues.first.text.bytesize
+    assert result.cues_truncated
+  end
+
+  def test_a_transcript_in_another_encoding_is_decoded_like_any_text
+    utf16 = "\xFF\xFE".b + "0:01 - Zoë\n  Café.\n0:05 - Sam\n  Yes.\n".encode("UTF-16LE").b
+    result = Preview.for(doc("standup.txt"), storage: Storage.new(utf16))
+    assert_equal :transcript, result.kind
+    assert_equal %w[Zoë Sam], result.cues.map(&:speaker)
+    assert_equal "Café.", result.cues.first.text
+  end
+
+  def test_a_storage_failure_on_the_second_read_falls_back_and_hands_back_the_error
+    body = cue_lines(4_000, text: "x" * 150)
+    reads = 0
+    storage = Object.new
+    storage.define_singleton_method(:download) do |key:, max_bytes: nil|
+      reads += 1
+      raise IOError, "bucket unreachable" if reads == 2
+
+      body.byteslice(0, max_bytes)
+    end
+    result = Preview.for(doc("standup.txt"), storage: storage)
+    assert result.fallback?
+    assert_kind_of IOError, result.error
+  end
+
+  def test_clock_reads_seconds_as_a_stamp
+    assert_equal %w[0:00 0:05 1:02 59:59 1:00:00 1:02:05 100:00:00],
+                 [0, 5, 62, 3599, 3600, 3725, 360_000].map { |seconds| Preview.clock(seconds) }
+    assert_equal "0:00", Preview.clock(-4)
+    assert_equal "0:00", Preview.clock(nil)
+  end
+
+  # --- audio and video -------------------------------------------------------------------
+
+  def test_audio_and_video_files_are_kinds_by_name_and_by_mime_for_a_name_that_says_nothing
+    { "call.mp4" => :video, "call.M4V" => :video, "call.mov" => :video, "call.webm" => :video, "call.ogv" => :video,
+      "call.mp3" => :audio, "call.m4a" => :audio, "call.wav" => :audio, "call.ogg" => :audio, "call.oga" => :audio,
+      "call.weba" => :audio }.each do |name, kind|
+      assert_equal kind, Preview.kind_for(filename: name), name
+    end
+    assert_equal :video, Preview.kind_for(filename: "document", mime_type: "video/mp4")
+    assert_equal :audio, Preview.kind_for(filename: "document", mime_type: "audio/mpeg")
+    assert_nil Preview.kind_for(filename: "call.avi", mime_type: "video/x-msvideo"), "a container no browser plays has no player"
+    assert_equal :pdf, Preview.kind_for(filename: "letter.pdf", mime_type: "video/mp4"), "the name still wins"
+  end
+
+  def test_every_media_kind_has_a_type_to_be_served_as
+    Preview::KIND_BY_EXTENSION.each do |extension, kind|
+      next unless Preview::MEDIA_KINDS.include?(kind)
+
+      type = Preview.inline_content_type(filename: "call#{extension}", mime_type: "text/html")
+      assert_match(/\A#{kind}\//, type.to_s, "#{extension} is served as #{type.inspect}")
+    end
+    Preview::KIND_BY_MIME.each do |mime, kind|
+      next unless Preview::MEDIA_KINDS.include?(kind)
+
+      assert_equal mime, Preview.inline_content_type(filename: "document", mime_type: mime)
+    end
+  end
+
+  def test_a_media_document_gets_a_long_signed_url_of_our_type_and_reads_nothing
+    storage = Storage.new("unused")
+    call = doc("call.mp4", mime_type: "text/html", byte_size: 3 * 1024 * Preview::MEGABYTE)
+    result = Preview.for(call, storage: storage)
+
+    assert_equal :video, result.kind
+    assert_equal "video/mp4", call.signed, "served as video whatever mime type was stored"
+    assert_equal Preview::MEDIA_URL_TTL, call.signed_for, "a player seeks for a whole sitting"
+    assert_equal 6 * 60 * 60, Preview::MEDIA_URL_TTL
+    assert_empty storage.calls, "a 3 GB file is streamed by the browser, never read here"
+
+    voice = doc("memo.mp3")
+    assert_equal :audio, Preview.for(voice, storage: storage).kind
+    assert_equal "audio/mpeg", voice.signed
+  end
+
+  def test_a_pdf_keeps_its_short_link_and_its_size_cap
+    letter = doc("letter.pdf")
+    Preview.for(letter)
+    assert_equal 900, letter.signed_for
+  end
+
+  # --- the recording's player --------------------------------------------------------------
+
+  Recorded = Struct.new(:kind, :url, :failure, keyword_init: true) do
+    def recording? = true
+    def recording_kind = kind
+
+    def recording_url
+      raise failure if failure
+
+      url
+    end
+  end
+
+  def test_a_document_with_no_recording_has_no_player
+    none = Struct.new(:asked) { def recording? = false }.new
+    assert_nil Preview.player_for(none)
+    assert_nil Preview.player_for(Object.new), "something that is not a document has none either"
+  end
+
+  def test_a_recording_gets_a_player_of_its_kind
+    video = Preview.player_for(Recorded.new(kind: :video, url: "https://bucket.example.test/call.mp4?sig=1"))
+    assert video.playable?
+    assert_equal [:video, "https://bucket.example.test/call.mp4?sig=1", nil], video.to_a
+    assert_equal :audio, Preview.player_for(Recorded.new(kind: :audio, url: "http://localhost:9000/call.mp3")).kind
+    assert_equal :video, Preview.player_for(Recorded.new(kind: nil, url: "https://bucket.example.test/x")).kind
+  end
+
+  def test_a_url_that_is_not_http_never_becomes_a_source
+    ["javascript:alert(1)", "data:text/html,<script>alert(1)</script>", "//bucket.example.test/x", "", nil,
+     "ftp://bucket.example.test/x", " https://bucket.example.test/x", "x\nhttps://bucket.example.test/x"].each do |url|
+      player = Preview.player_for(Recorded.new(kind: :video, url: url))
+      refute player.playable?, url.inspect
+      assert_nil player.url
+      assert_kind_of Preview::Error, player.error
+    end
+  end
+
+  def test_a_recording_that_cannot_be_signed_is_a_player_that_is_not_playable_never_an_exception
+    player = Preview.player_for(Recorded.new(kind: :video, failure: IOError.new("no credentials")))
+    refute player.playable?
+    assert_kind_of IOError, player.error
+  end
+
   # --- laziness --------------------------------------------------------------------------
 
   def test_requiring_the_module_loads_no_reader
     script = <<~RUBY
       require "bundler/setup"
       require "studio/knowledge_preview"
-      loaded = $LOADED_FEATURES.grep(/nokogiri|csv\\.rb|knowledge_preview\\/(xlsx|zip|number_format)/)
+      loaded = $LOADED_FEATURES.grep(/nokogiri|csv\\.rb|knowledge_preview\\/(xlsx|zip|number_format)|knowledge_transcript/)
       abort "loaded early: \#{loaded.first(3).inspect}" unless loaded.empty?
       Studio::KnowledgePreview.kind_for(filename: "a.xlsx")
       print "lazy"

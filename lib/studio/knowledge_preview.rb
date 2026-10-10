@@ -2,7 +2,8 @@
 
 module Studio
   # What /admin/knowledge/:id shows of a document without a download: a
-  # workbook or CSV as tables, a PDF or image inline, text as text.
+  # workbook or CSV as tables, a PDF or image inline, text as text, a meeting
+  # transcript as timestamped cues, and an audio or video file in a player.
   #
   # NOT required by lib/studio.rb. Studio::KnowledgeDoc requires it on first
   # use, and the spreadsheet reader (nokogiri, zlib) and `csv` load later
@@ -51,6 +52,27 @@ module Studio
   #                          previews its first rows.
   #   TEXT_HEAD_BYTES        likewise for text.
   #   INLINE_MAX_BYTES       a PDF or image past this is not embedded.
+  #
+  # THE TRANSCRIPT PATH. A text file is read as today (one ranged GET of
+  # TEXT_HEAD_BYTES + 1). Only when that head was cut short AND already holds
+  # TRANSCRIPT_MIN_CUES cues is the object read a second time, up to the
+  # transcript parser's own cap:
+  #
+  #   bucket reads           at most two GETs for one preview: 256 KB + 1, then
+  #                          Studio::KnowledgeTranscript::MAX_TEXT_BYTES + 1
+  #                          (2 MB + 1). 2,359,298 bytes in all.
+  #   text parsed            the parser stops at MAX_TEXT_BYTES whatever it is
+  #                          handed; it runs once on the head and once on the
+  #                          longer read.
+  #   cues                   KnowledgeTranscript::MAX_CUES (5,000), every one
+  #                          rendered; their text is part of the 2 MB parsed,
+  #                          so it totals 2 MB at most, 8 KB a cue, and a
+  #                          speaker is 120 characters at most.
+  #   plain text kept        the same TEXT_HEAD_BYTES head a text file shows,
+  #                          rendered collapsed under the cues.
+  #
+  # An audio or video file is never read here: the browser streams it from a
+  # signed URL by range, so no size cap applies to it.
   module KnowledgePreview
     class Error < StandardError; end
     # The file is not what its name says, or is damaged. The message completes
@@ -73,6 +95,14 @@ module Studio
     DELIMITED_HEAD_BYTES  = 1 * MEGABYTE
     TEXT_HEAD_BYTES       = 256 * 1024
     INLINE_MAX_BYTES      = 100 * MEGABYTE
+    # Cue lines a text file's head must hold before it is shown as a
+    # transcript. One line that happens to read "Agenda • 9:00" is not one.
+    TRANSCRIPT_MIN_CUES   = 2
+    # How long a signed URL for an audio or video file is good for. The same
+    # six hours, for the same reason, as a recording's
+    # (Studio::KnowledgeDoc::Recording::RECORDING_URL_TTL): the player makes a
+    # new ranged request on every seek, so the URL must outlive the sitting.
+    MEDIA_URL_TTL         = 6 * 60 * 60
 
     XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -82,7 +112,10 @@ module Studio
       ".pdf" => :pdf,
       ".png" => :image, ".jpg" => :image, ".jpeg" => :image, ".gif" => :image, ".webp" => :image,
       ".txt" => :text, ".md" => :text, ".markdown" => :text, ".log" => :text,
-      ".json" => :text, ".vtt" => :text, ".srt" => :text
+      ".json" => :text, ".vtt" => :text, ".srt" => :text,
+      ".mp4" => :video, ".m4v" => :video, ".mov" => :video, ".webm" => :video, ".ogv" => :video,
+      ".mp3" => :audio, ".m4a" => :audio, ".wav" => :audio, ".ogg" => :audio, ".oga" => :audio,
+      ".weba" => :audio
     }.freeze
 
     KIND_BY_MIME = {
@@ -90,7 +123,10 @@ module Studio
       "text/csv" => :delimited, "text/tab-separated-values" => :delimited,
       "application/pdf" => :pdf,
       "image/png" => :image, "image/jpeg" => :image, "image/gif" => :image, "image/webp" => :image,
-      "application/json" => :text
+      "application/json" => :text,
+      "video/mp4" => :video, "video/quicktime" => :video, "video/webm" => :video, "video/ogg" => :video,
+      "audio/mpeg" => :audio, "audio/mp4" => :audio, "audio/wav" => :audio, "audio/ogg" => :audio,
+      "audio/webm" => :audio
     }.freeze
 
     # The content type an inline object is SERVED as. Chosen here, from the
@@ -101,8 +137,14 @@ module Studio
     INLINE_TYPE_BY_EXTENSION = {
       ".pdf" => "application/pdf",
       ".png" => "image/png", ".jpg" => "image/jpeg", ".jpeg" => "image/jpeg",
-      ".gif" => "image/gif", ".webp" => "image/webp"
+      ".gif" => "image/gif", ".webp" => "image/webp",
+      ".mp4" => "video/mp4", ".m4v" => "video/mp4", ".mov" => "video/quicktime",
+      ".webm" => "video/webm", ".ogv" => "video/ogg",
+      ".mp3" => "audio/mpeg", ".m4a" => "audio/mp4", ".wav" => "audio/wav",
+      ".ogg" => "audio/ogg", ".oga" => "audio/ogg", ".weba" => "audio/webm"
     }.freeze
+    # The kinds a browser streams by range from a signed URL.
+    MEDIA_KINDS = %i[video audio].freeze
 
     Cell  = Struct.new(:text, :numeric)
     # rows is a rectangle of Cell-or-nil. row_limit is the row count the
@@ -110,13 +152,26 @@ module Studio
     Sheet = Struct.new(:name, :rows, :truncated_rows, :truncated_columns, :hidden, :row_limit,
                        keyword_init: true)
 
-    # kind: :table, :pdf, :image, :text or :fallback.
+    # kind: :table, :pdf, :image, :video, :audio, :text, :transcript or
+    # :fallback.
+    # A :transcript carries `cues` (Studio::KnowledgeTranscript::Cue, frozen)
+    # and `cues_truncated` (a bound cut the cues short), plus the same `text`
+    # head and `truncated` flag a :text result has.
     # error: the unexpected exception behind a fallback, for the caller to
     # log; nil when the fallback is an ordinary refusal.
     Result = Struct.new(:kind, :sheets, :omitted_sheets, :text, :truncated, :url, :reason, :error,
-                        keyword_init: true) do
+                        :cues, :cues_truncated, keyword_init: true) do
       def fallback? = kind == :fallback
     end
+
+    # What the page needs to play a document's recording: kind is :video or
+    # :audio and url a signed http(s) URL. When the URL could not be signed
+    # both are nil and `error` holds why, for the caller to log.
+    Player = Struct.new(:kind, :url, :error, keyword_init: true) do
+      def playable? = !url.nil?
+    end
+
+    WEB_URL = %r{\Ahttps?://}i
 
     NUMERIC_TEXT = /\A\(?[-+$€£]?\s?\d[\d,]*(\.\d+)?%?\)?\z/
 
@@ -164,7 +219,7 @@ module Studio
         when :spreadsheet then spreadsheet(doc, storage)
         when :delimited   then delimited(doc, storage)
         when :text        then text(doc, storage)
-        when :pdf, :image then inline(doc, kind)
+        when :pdf, :image, :video, :audio then inline(doc, kind)
         else fallback(no_preview_reason(doc))
         end
       rescue TooLarge => e
@@ -176,6 +231,31 @@ module Studio
         # the host's bundle lacks. The page must still render; the caller logs
         # what happened.
         fallback("The preview could not be built.", error: e)
+      end
+
+      # The Player for a document's recording, or nil when it has none (and
+      # on a table without the recording columns). Signs a URL and reads
+      # nothing. Never raises: a URL that cannot be signed is a Player that is
+      # not playable.
+      def player_for(doc)
+        return nil unless doc.respond_to?(:recording?) && doc.recording?
+
+        url = doc.recording_url.to_s
+        # The signer only ever answers http(s). This is the last check before
+        # the value becomes a src attribute.
+        raise Error, "the recording's signed URL is not an http(s) URL" unless url.match?(WEB_URL)
+
+        Player.new(kind: doc.recording_kind == :audio ? :audio : :video, url: url)
+      rescue StandardError, LoadError => e
+        Player.new(error: e)
+      end
+
+      # 62 -> "1:02", 3725 -> "1:02:05": how a cue's time reads on the page.
+      def clock(seconds)
+        total = [seconds.to_i, 0].max
+        hours, rest = total.divmod(3600)
+        minutes, secs = rest.divmod(60)
+        hours.positive? ? format("%d:%02d:%02d", hours, minutes, secs) : format("%d:%02d", minutes, secs)
       end
 
       # --- readers, usable without a document ---------------------------------
@@ -296,19 +376,46 @@ module Studio
       end
 
       def text(doc, storage)
-        bytes = (storage || Studio::S3).download(key: doc.s3_key, max_bytes: TEXT_HEAD_BYTES + 1)
+        store = storage || Studio::S3
+        bytes = store.download(key: doc.s3_key, max_bytes: TEXT_HEAD_BYTES + 1)
         partial = bytes.bytesize > TEXT_HEAD_BYTES
-        Result.new(kind: :text, text: decode(bytes.byteslice(0, TEXT_HEAD_BYTES), partial: partial), truncated: partial)
+        head = decode(bytes.byteslice(0, TEXT_HEAD_BYTES), partial: partial)
+        transcript(doc, store, head, partial) || Result.new(kind: :text, text: head, truncated: partial)
+      end
+
+      # The :transcript Result when `head` reads as one, else nil. `head` is
+      # the text preview's own read. A head that was the whole file is all
+      # there is to parse; a head that was cut is read again, once, up to the
+      # parser's cap, because a meeting's transcript is often longer than the
+      # 256 KB a text preview shows.
+      def transcript(doc, store, head, partial)
+        require "studio/knowledge_transcript"
+        reading = Studio::KnowledgeTranscript.read(head)
+        return nil if reading.cues.size < TRANSCRIPT_MIN_CUES
+
+        cut = false
+        if partial
+          cap = Studio::KnowledgeTranscript::MAX_TEXT_BYTES
+          bytes = store.download(key: doc.s3_key, max_bytes: cap + 1)
+          cut = bytes.bytesize > cap
+          reading = Studio::KnowledgeTranscript.read(decode(bytes.byteslice(0, cap), partial: cut))
+        end
+        Result.new(kind: :transcript, cues: reading.cues, cues_truncated: cut || reading.truncated?,
+                   text: head, truncated: partial)
       end
 
       def inline(doc, kind)
-        refuse_over!(doc, INLINE_MAX_BYTES)
+        media = MEDIA_KINDS.include?(kind)
+        # A player streams by range, so an audio or video file has no size at
+        # which showing it costs more.
+        refuse_over!(doc, INLINE_MAX_BYTES) unless media
         content_type = inline_content_type(filename: doc.filename, mime_type: doc.mime_type)
         # Without a type of our choosing the URL would be signed to serve the
         # STORED type, which is the one thing this path exists to prevent.
         raise Unreadable, "its type cannot be shown inline" if content_type.nil?
 
-        Result.new(kind: kind, url: doc.signed_url(inline_as: content_type))
+        url = media ? doc.signed_url(expires_in: MEDIA_URL_TTL, inline_as: content_type) : doc.signed_url(inline_as: content_type)
+        Result.new(kind: kind, url: url)
       end
 
       def refuse_over!(doc, cap)

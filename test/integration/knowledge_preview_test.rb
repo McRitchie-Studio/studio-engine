@@ -456,6 +456,184 @@ class KnowledgePreviewRequestTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(href="/admin/knowledge/#{doc.id}">)
   end
 
+  # --- transcripts, and a table with no recording columns --------------------------
+  #
+  # This file's table is the one a consumer has BEFORE the recording migration:
+  # no recording_* column. The page with recordings is
+  # knowledge_recording_page_test.rb, in a process of its own.
+
+  TRANSCRIPT = <<~TEXT
+    Weekly widget sync
+    VIEW RECORDING
+
+    0:02 - Sam Sample (Example Co)
+      Good morning, everyone.
+    1:15 - Riley <b>Example</b>
+      We ship the <script>alert(1)</script> widgets & the "gears" on Tuesday.
+      Second line.
+    1:02:05 - Sam Sample (Example Co)
+      Agreed.
+  TEXT
+
+  test "this table has no recording column" do
+    assert_empty Doc.column_names.grep(/recording/)
+  end
+
+  test "a transcript shows its cues as plain timestamped lines when there is no recording" do
+    doc = doc!("standup.txt", TRANSCRIPT)
+    sign_in @admin
+    preview(doc)
+
+    assert_response :success
+    assert_includes response.body, %(data-preview-kind="transcript")
+    assert_equal %w[2 75 3725], response.body.scan(/<li class="knowledge-cue" data-seconds="(\d+)">/).flatten
+    assert_equal %w[0:02 1:15 1:02:05], response.body.scan(%r{<span class="knowledge-cue-time">([^<]+)</span>}).flatten
+    assert_includes response.body, %(<span class="knowledge-cue-speaker">Sam Sample (Example Co)</span>)
+    assert_includes response.body, %(<p class="knowledge-cue-text">Good morning, everyone.</p>)
+    refute_includes response.body, "<button", "with nothing to seek, a time is text"
+    refute_includes response.body, %(data-studio-controller="), "and no script is asked for"
+    refute_includes response.body, "data-knowledge-player"
+    refute_includes response.body, %(class="knowledge-transcript knowledge-transcript-with-player")
+    refute_includes response.body, "data-transcript-truncated"
+    assert_equal 1, reads.size, "one read, the text preview's own"
+  end
+
+  test "a cue's speaker and text are escaped, never rendered" do
+    doc = doc!("standup.txt", TRANSCRIPT)
+    sign_in @admin
+    preview(doc)
+
+    assert_includes response.body, %(<span class="knowledge-cue-speaker">Riley &lt;b&gt;Example&lt;/b&gt;</span>)
+    assert_includes response.body, "We ship the &lt;script&gt;alert(1)&lt;/script&gt; widgets &amp; the &quot;gears&quot; on Tuesday.\nSecond line."
+    refute_includes response.body, "<script>alert(1)</script>"
+    refute_includes response.body, "<b>Example</b>"
+  end
+
+  test "the plain text stays one click away, title lines included" do
+    doc = doc!("standup.txt", TRANSCRIPT)
+    sign_in @admin
+    preview(doc)
+
+    plain = response.body[%r{<details class="knowledge-transcript-plain".*?</details>}m]
+    assert plain, "the plain text is on the page, collapsed"
+    refute_match(/<details[^>]*\sopen/, plain)
+    assert_includes plain, %(<pre class="knowledge-preview-text" id="knowledge-preview-text">Weekly widget sync\nVIEW RECORDING)
+    assert_includes plain, "&lt;script&gt;alert(1)&lt;/script&gt;"
+  end
+
+  test "a transcript longer than the text head shows every cue from a second, capped read" do
+    body = (0...3_000).map { |i| "#{i / 60}:#{format('%02d', i % 60)} - Speaker #{i % 4}\n  #{'word ' * 30}\n" }.join
+    assert_operator body.bytesize, :>, Preview::TEXT_HEAD_BYTES
+    doc = doc!("standup.txt", body)
+    sign_in @admin
+    preview(doc)
+
+    assert_equal 3_000, response.body.scan('<li class="knowledge-cue"').size
+    assert_equal ["bytes=0-#{Preview::TEXT_HEAD_BYTES}", "bytes=0-#{Studio::KnowledgeTranscript::MAX_TEXT_BYTES}"],
+                 reads.map { |read| read[:range] }
+    refute_includes response.body, "data-transcript-truncated", "all of it was read"
+    assert_includes response.body, "Showing the start of this file;", "the plain text is still only the head"
+  end
+
+  test "a transcript past the parser's caps is cut, says so, and links the download" do
+    body = (0...6_000).map { |i| "#{i / 60}:#{format('%02d', i % 60)} - Speaker\n  ok\n" }.join
+    doc = doc!("standup.txt", body)
+    sign_in @admin
+    preview(doc)
+
+    assert_equal Studio::KnowledgeTranscript::MAX_CUES, response.body.scan('<li class="knowledge-cue"').size
+    notice = response.body[%r{<p class="knowledge-preview-note" id="knowledge-transcript-truncated".*?</p>}m]
+    assert_includes notice, "This transcript is longer than the page shows;"
+    assert_includes notice, %(href="/admin/knowledge/#{doc.id}/download")
+  end
+
+  test "a transcript of nothing but markup characters is bounded by the parser's text cap" do
+    # The worst a stored file can do to the page: every byte one that escapes to
+    # six (a double quote), up to both caps. The page is at most six times the
+    # text the parser kept, six times the plain-text head, and the cue markup.
+    line = "  #{'"' * 400}\n"
+    body = (0...5_200).map { |i| "#{i / 60}:#{format('%02d', i % 60)} - Speaker\n#{line}" }.join
+    assert_operator body.bytesize, :>, Studio::KnowledgeTranscript::MAX_TEXT_BYTES
+    doc = doc!("standup.txt", body)
+    sign_in @admin
+    preview(doc)
+
+    assert_response :success
+    cues = response.body.scan('<li class="knowledge-cue"').size
+    assert_operator cues, :<=, Studio::KnowledgeTranscript::MAX_CUES
+    assert_operator cues, :>, 4_000, "the fixture did not reach the caps"
+    ceiling = 6 * (Studio::KnowledgeTranscript::MAX_TEXT_BYTES + Preview::TEXT_HEAD_BYTES) +
+              400 * Studio::KnowledgeTranscript::MAX_CUES + 16_384
+    assert_operator response.body.bytesize, :<=, ceiling
+    assert_operator response.body.bytesize, :>, 6 * Studio::KnowledgeTranscript::MAX_TEXT_BYTES * 0.9,
+                    "the fixture did not reach the escaping worst case"
+    assert_equal 2, reads.size
+    assert_includes response.body, "data-transcript-truncated"
+  end
+
+  test "text with one accidental cue line is still shown as text" do
+    doc = doc!("notes.md", "# Notes\n\nAgenda • 9:00\nProse follows.\n")
+    sign_in @admin
+    preview(doc)
+
+    assert_includes response.body, %(data-preview-kind="text")
+    refute_includes response.body, %(class="knowledge-cue")
+    refute_includes response.body, "<details"
+  end
+
+  test "without the recording columns the show page draws no recording and no link" do
+    doc = doc!("standup.txt", TRANSCRIPT)
+    sign_in @admin
+    get "/admin/knowledge/#{doc.id}"
+
+    assert_response :success
+    assert_includes response.body, %(<h2 class="font-semibold mb-2">Preview</h2>)
+    refute_includes response.body, "knowledge-recording"
+    refute_includes response.body, "Recording"
+    assert_empty @s3.api_requests, "and signs nothing"
+
+    preview(doc)
+    assert_response :success
+    refute_includes response.body, "<video"
+    refute_includes response.body, "<audio"
+    refute_includes response.body, %(id="knowledge-recording")
+    assert_equal 0, ErrorLog.count
+  end
+
+  # --- a document whose own file is audio or video ---------------------------------
+
+  test "a video file plays from a six-hour signed url, served as video, and is never read here" do
+    doc = doc!("call.mp4", "not really a video", mime_type: "text/html", byte_size: 3_000_000_000)
+    sign_in @admin
+    get "/admin/knowledge/#{doc.id}"
+    assert_includes response.body, %(<turbo-frame id="knowledge-preview" loading="lazy")
+
+    preview(doc)
+    assert_response :success
+    tag = response.body[/<video[^>]*>/m]
+    assert_includes tag, %(id="knowledge-preview-media")
+    assert_includes tag, "controls"
+    assert_includes tag, %(preload="metadata")
+    query = URI.decode_www_form(URI(CGI.unescapeHTML(tag[/src="([^"]+)"/, 1])).query).to_h
+    assert_equal "video/mp4", query["response-content-type"], "served as video whatever was stored"
+    assert_equal "inline", query["response-content-disposition"]
+    assert_equal "21600", query["X-Amz-Expires"]
+    assert query["X-Amz-Signature"].present?
+    assert_empty reads, "three gigabytes are the browser's to stream"
+    refute_includes response.body, %(data-studio-controller="), "a player alone needs no script"
+  end
+
+  test "an audio file gets an audio player" do
+    doc = doc!("memo.mp3", "ID3 invented")
+    sign_in @admin
+    preview(doc)
+
+    tag = response.body[/<audio[^>]*>/m]
+    assert_includes tag, %(id="knowledge-preview-media")
+    assert_equal "audio/mpeg", URI.decode_www_form(URI(CGI.unescapeHTML(tag[/src="([^"]+)"/, 1])).query).to_h["response-content-type"]
+    refute_includes response.body, "<video"
+  end
+
   test "an unknown document is not found, not a preview" do
     sign_in @admin
     assert_raises(ActiveRecord::RecordNotFound) { get "/admin/knowledge/999999/preview" }

@@ -1,0 +1,16 @@
+<%# The knowledge layer's preview frame, for e2e/knowledge_transcript.spec.js.
+
+    One render BY NAME and nothing else: the engine's own preview template,
+    which writes the <turbo-frame> and renders the player, the cues and their
+    styles. The controller set up its three instance variables as
+    Studio::KnowledgeDocsController#preview does. Anything hand-written here
+    would be the lab grading itself.
+
+    The spacer below gives the PAGE somewhere to scroll to, as the real page
+    has (the triage form sits under the preview). Without it a spec could not
+    tell following that scrolls the cue list from following that scrolls the
+    page: there would be no page scroll to observe. %>
+<main class="p-8">
+  <%= render template: "studio/knowledge_docs/preview" %>
+  <div data-test="spacer" style="height: 150vh"></div>
+</main>

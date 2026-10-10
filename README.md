@@ -1127,8 +1127,8 @@ upload carried a Content-Disposition; supply it otherwise.
 
 A knowledge document (`Studio::KnowledgeDoc`) is usually a meeting's transcript.
 Its recording can be stored beside it, in the same private bucket, so the audio
-or video does not stay on a notetaker's servers. This is the backend; the
-document page does not show a player yet.
+or video does not stay on a notetaker's servers. The document page plays it
+beside the transcript: see [The document page](#the-document-page) below.
 
 **Adopting it needs a migration.** Run `bin/rails studio_engine:install:migrations
 && bin/rails db:migrate`. It adds four nullable columns to
@@ -1276,6 +1276,91 @@ indented below and `Speaker • 0:02` with the text below, and `M:SS` or
 `H:MM:SS` stamps. It reads at most 2 MB of text and 5,000 cues, keeps 8 KB of
 text per cue, never raises, and answers no cues for text that is not a
 transcript. `read(text)` answers the cues and whether a bound cut them short.
+
+### The document page
+
+`/admin/knowledge/:id` shows a meeting as its recording beside its transcript.
+Everything below is in the page's preview frame (`GET /admin/knowledge/:id/preview`,
+admin only, `Cache-Control: no-store`); the show page itself reads nothing from
+the bucket and holds no signed URL.
+
+- **The player.** A document with a recording (`recording?`) gets a native
+  `<video controls preload="metadata">`, or `<audio controls>` when the
+  recording is audio (`recording_kind`).
+- **The transcript.** A text document whose first 256 KB holds at least two cue
+  lines (`Studio::KnowledgePreview::TRANSCRIPT_MIN_CUES`) is shown as cues: the
+  time, the speaker and what was said. The same text is kept under them, closed,
+  as "Plain text", so a file read as a transcript by mistake is still readable
+  and the lines above the first cue are still on the page. Any other text file
+  previews exactly as before.
+- **Click to play.** With a recording, a click on a cue's time or its line sets
+  the player to that cue and plays. While it plays, the cue being spoken is
+  marked and kept in view inside the cue list. Only the list is ever scrolled,
+  never the page, and not for five seconds after the reader last scrolled the
+  list. Without a recording the cues still render, with each time as plain text.
+- **The external link.** A document with no stored recording whose
+  `recording_link` is an http(s) link shows "Open it where it was recorded", in
+  a new tab with `rel="noopener noreferrer"`. A stored recording is played, not
+  linked.
+- **Audio and video files.** A document whose own file is `mp4`, `m4v`, `mov`,
+  `webm`, `ogv`, `mp3`, `m4a`, `wav`, `ogg`, `oga` or `weba` plays in the same
+  player. It is served as the type its extension names (signed into the URL),
+  never as the type that was stored.
+- **Layout.** From 64rem wide the player sits beside the cues; below that it sits
+  above them. The cue list scrolls inside itself in both, so the player stays in
+  view while the lines scroll.
+
+**How the player gets its source.** The preview frame writes a presigned GET
+(`recording_url`, six hours) into the player's `src`. The alternative, an
+admin-only endpoint that redirects each request to a fresh URL, was not taken.
+It would keep the URL out of the frame's source, but not shorten its life: a
+browser that sends its later ranged requests straight to the redirected URL
+needs that URL to outlive the sitting all the same. And how each browser's
+player behaves through a cross-origin redirect is not something this gem's
+browser lane, which is Chromium only, could establish. The frame already
+writes a signed URL into a `src` for a PDF and an image; this is the same
+move with a longer life. The recording's bytes are reachable only through that
+URL, which is written only into an admin-only, `no-store` response. A page
+left open past six hours needs a reload before it will seek again.
+
+**Stored content is text.** A cue's speaker and words are escaped. The only
+attribute a cue writes is its whole number of seconds. A player's `src` is a
+URL the engine signed and checked to be http(s); the external link is
+`recording_link`, which answers http(s) links only.
+
+**The script.** `studio/knowledge_transcript` (logic, with `node:test` tests) and
+the `knowledge-transcript` controller, registered lazily by `studio/stimulus`
+like the geo manager's: a page with no recording never fetches either. The
+markup arrives inside a lazy `<turbo-frame>` and the controller connects when it
+does. If the module fails to load, the player keeps its own controls, the cues
+stay readable, and the page says click-to-play did not load.
+
+**An app without the recording columns** renders the page as before: no player,
+no link, nothing signed. A transcript still shows as cues there, since that
+needs no column.
+
+**The bounds.**
+
+| What | Bound |
+|------|-------|
+| Bucket reads for one text preview | Two ranged GETs at most: 256 KB + 1 byte, then, only when that head was cut and already holds two cues, 2 MB + 1 byte (`Studio::KnowledgeTranscript::MAX_TEXT_BYTES`). 2,359,298 bytes in all |
+| Recording bytes read by the app | None. The URL is signed locally; the browser streams by range |
+| Text parsed | 2 MB a pass, two passes (the head, then the longer read) |
+| Cues rendered | 5,000 (`MAX_CUES`), all of them; past it, or past 2 MB, a notice says the transcript is longer than shown and links the download |
+| One cue | 8 KB of text, a 120-character speaker |
+| Plain text under the cues | The first 256 KB, as a text preview shows |
+| Page size | Six times the text kept (HTML escaping at its worst) plus about 250 bytes of markup a cue. 3.6 MB for 4,951 cues of ordinary speech at the 2 MB cap; 14.7 MB for 5,000 cues of nothing but quote characters, under a 16.2 MB ceiling the suite pins |
+| Script, on connect | One pass over the cues and one sort |
+| Script, per `timeupdate` | One binary search: 13 comparisons at 5,000 cues. The page is written only when the current cue changes (two class changes and one scroll of the list) |
+
+Measured in headless Chromium on a development Mac, at 4,951 cues and 2 MB of
+text: 19,891 elements, the page loaded in 0.76 s and click-to-play was ready at
+0.90 s; a `timeupdate` inside one cue took 4 microseconds, and one that changed
+the cue 0.23 ms. Not measured: Safari, Firefox, or a phone.
+
+**Not verified against a live bucket:** that R2 answers the player's ranged
+requests on a six-hour presigned URL, and that it serves a document's own audio
+or video file with the overridden content type.
 
 ## Remote image URLs
 

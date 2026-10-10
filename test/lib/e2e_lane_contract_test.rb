@@ -326,6 +326,28 @@ class E2eLaneContractTest < Minitest::Test
     end
   end
 
+  # The knowledge transcript's lab pages. The frame page renders the engine's own
+  # preview TEMPLATE (the turbo-frame, the player, the cues, their styles), which
+  # is `render template:` and so not in the partial table above. The page around
+  # the lazy frame may hold the frame tag and nothing that behaves.
+  def test_integration_the_knowledge_transcript_lab_renders_the_engine_template
+    lab = File.join(ROOT, "test", "dummy", "app", "views", "e2e_lab")
+    frame = File.read(File.join(lab, "knowledge_transcript_frame.html.erb"))
+    page = File.read(File.join(lab, "knowledge_transcript.html.erb"))
+
+    assert_match(/<%=\s*render template: "studio\/knowledge_docs\/preview"\s*%>/, frame,
+                 "knowledge_transcript_frame.html.erb must render the engine's preview template BY NAME")
+    [frame, page].each do |source|
+      body = source.gsub(/<%#.*?%>/m, "")
+      refute_match(/<script|data-studio-controller|data-knowledge-|<video|<audio|knowledge-cue/, body,
+                   "the lab page writes part of the transcript itself; all of it must come from the engine")
+    end
+    assert_match(%r{<turbo-frame id="knowledge-preview" loading="lazy" src="/lab/knowledge_transcript/frame">}, page)
+    show = File.read(File.join(ROOT, "app", "views", "studio", "knowledge_docs", "show.html.erb"))
+    assert_match(/<turbo-frame id="knowledge-preview" loading="lazy" src=/, show,
+                 "the show page's frame tag changed; the lab page copies it and must change with it")
+  end
+
   # The site footer pages get the footer from their LAYOUT, in one line, exactly as
   # a host does. The layout's only script is Turbo itself (the map's remount after
   # a Turbo visit is under test); the footer's own program must still come from the
