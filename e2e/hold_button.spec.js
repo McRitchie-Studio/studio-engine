@@ -293,11 +293,11 @@ test("the portal follows the button's state and palette", async ({ page }) => {
 
 // ── The timers ──────────────────────────────────────────────────────────────
 //
-// on_hold_start fires at the press, validate at validate_at, the early action
-// at early_action_at, and an early action that fires cancels on_success. The
-// turf-monster confirm runs these at 0 / 750 / 1500 against a 2000 ms hold; the
-// lab runs them at 0 / 150 / 400 against 600 so the lane stays quick, and the
-// order and the gaps are what is asserted.
+// hold-button:start fires at the press, validate at validate_at, early at
+// early_action_at, and an early listener that takes the action over cancels
+// success. The turf-monster confirm runs these at 0 / 750 / 1500 against a
+// 2000 ms hold; the lab runs them at 0 / 150 / 400 against 600 so the lane stays
+// quick, and the order and the gaps are what is asserted.
 
 test("the hold's hooks fire in order, each at its own time", async ({ page }) => {
   await page.goto("/lab/hold_button");
@@ -308,8 +308,8 @@ test("the hold's hooks fire in order, each at its own time", async ({ page }) =>
   // never earlier, so the floors below hold however loaded the machine is.
   await expect.poll(() => page.evaluate(() => (window.__holdLog || []).map(([name]) => name)),
     { timeout: 10000 }).toContain("early");
-  // on_success would fire 600 + 500 ms after the press; give it that long and
-  // more to prove the early action cancelled it.
+  // success would fire 600 ms after the press; give it that long and more to
+  // prove the early listener cancelled it.
   await page.waitForTimeout(1500);
   await page.mouse.up();
 

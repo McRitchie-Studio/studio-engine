@@ -966,7 +966,14 @@
 # fetched. Verified RED against four reintroduced defects (the spec's header
 # lists them). e2e/lazy_page_controllers.spec.js gains a page, not a test.
 #   npx playwright test --list  -> 324 tests in 46 files
-total_specs: 327
+# 327 -> 328: e2e/hold_button_events.spec.js, 15 -> 16. The hold button evaluates
+# no string. Out: "the string locals still answer". In: a completed hold
+# dispatches each event exactly once and compiles no string, counted in the page
+# across eval, Function and the async and generator function constructors; and a
+# button that carries a removed string hook refuses the hold, says so on the
+# console and runs none of it.
+#   npx playwright test --list  -> 328 tests in 47 files
+total_specs: 328
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1150,7 +1157,11 @@ total_specs: 327
 #   npx playwright test --list                                             -> 324 tests, 46 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 324
-executed: 327
+# And for the hold button's removed string hooks: 1 more test, no new file:
+#   npx playwright test --list                                             -> 328 tests, 47 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 328
+executed: 328
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

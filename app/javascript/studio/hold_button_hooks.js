@@ -1,70 +1,50 @@
 // studio/hold_button_hooks: how one hold button asks its page the timeline's
-// questions (studio/hold_button). Two voices, both heard on every press:
+// questions (studio/hold_button). It dispatches events on the button, which
+// bubble:
 //
-// 1. EVENTS, dispatched on the button and bubbling. This is the API:
+//   hold-button:guard     at the press. preventDefault() refuses the hold.
+//   hold-button:start     the hold began.
+//   hold-button:validate  at validate_at. event.detail.waitUntil(answer)
+//                         takes a boolean or a promise of one; a false or
+//                         failed answer aborts the hold.
+//   hold-button:early     at early_action_at. preventDefault() takes the
+//                         action over: the hold never completes.
+//   hold-button:success   at the full duration. preventDefault() keeps the
+//                         button in its holding state for the listener to
+//                         resolve; otherwise it shows its success face.
 //
-//      hold-button:guard     at the press. preventDefault() refuses the hold.
-//      hold-button:start     the hold began.
-//      hold-button:validate  at validate_at. event.detail.waitUntil(answer)
-//                            takes a boolean or a promise of one; a false or
-//                            failed answer aborts the hold.
-//      hold-button:early     at early_action_at. preventDefault() takes the
-//                            action over: the hold never completes.
-//      hold-button:success   at the full duration. preventDefault() keeps the
-//                            button in its holding state for the listener to
-//                            resolve; otherwise it shows its success face.
+// Every event's detail carries { id }, the button's hold_id.
 //
-//    Every event's detail carries { id }, the button's hold_id.
+//   <div @hold-button:guard="ready || $event.preventDefault()"
+//        @hold-button:success="submit()">
+//     <%= render "studio/hold_button", hold_id: "confirm" %>
+//   </div>
 //
-//      <div @hold-button:guard="ready || $event.preventDefault()"
-//           @hold-button:success="submit()">
-//        <%= render "studio/hold_button", hold_id: "confirm" %>
-//      </div>
+// It evaluates nothing. A button that carries one of REMOVED_HOOKS' attributes
+// was written for the JavaScript-string locals this module no longer runs: every
+// press on it is refused and says so on the console.
 //
-// 2. STRING LOCALS, the partial's guard:, on_hold_start:, validate:,
-//    early_action:, early_action_guard: and on_success:, which arrive as
-//    data-* attributes and are evaluated against the nearest [x-data] scope
-//    with `d` and `data` aliased to its data. They stay while a consumer
-//    passes them (turf-monster does), and go when none does.
-//
-// Either voice can refuse: a hold needs every guard to pass. With an [x-data]
-// ancestor a press is also refused while that scope's `submitting` is true, so
-// a second hold cannot double-submit.
+// With an [x-data] ancestor a press is also refused while that scope's
+// `submitting` is true, so a second hold cannot double-submit.
 //
 // It imports nothing; test/javascript/hold_button_hooks.test.mjs loads it as a
 // data: module.
 
-// How long the button stays in its holding state before a string on_success
-// runs.
-export const SUCCESS_SETTLE_MS = 500
-
-const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
-
-// An expression against an Alpine scope, synchronously.
-function evaluate(Alpine, scope, expression) {
-  const data = Alpine.$data(scope)
-  return Alpine.evaluate(scope, expression, { scope: { d: data, data } })
-}
-
-// The same for an expression that may return a promise. Alpine.evaluate
-// returns before an async expression settles, so this compiles its own
-// function with the names an expression may use.
-function evaluateAsync(Alpine, win, scope, expression) {
-  const data = Alpine.$data(scope)
-  try {
-    const fn = new AsyncFunction("d", "data", "Alpine", "window", '"use strict"; return (' + expression + ");")
-    return fn(data, data, Alpine, win)
-  } catch (error) {
-    return Promise.reject(error)
-  }
+// Attribute => [the removed local that wrote it, the event that answers now].
+// Studio::HoldButton::REMOVED_LOCALS is the same table for the partial.
+export const REMOVED_HOOKS = {
+  "data-guard": ["guard", "hold-button:guard"],
+  "data-on-hold-start": ["on_hold_start", "hold-button:start"],
+  "data-validate": ["validate", "hold-button:validate"],
+  "data-early-action": ["early_action", "hold-button:early"],
+  "data-early-action-guard": ["early_action_guard", "hold-button:early"],
+  "data-on-success": ["on_success", "hold-button:success"]
 }
 
 // The hooks a Hold takes, for one button.
 export function holdHooks(button, { win } = {}) {
   const host = win || globalThis
-  const id = () => button.dataset.holdId || "hold"
-  const warn = (what, error) => host.console.warn(`[hold:${id()}] ${what}`, error || "")
-  const fail = (what, error) => host.console.error(`[hold:${id()}] ${what}`, error)
+  const id = () => button.getAttribute("data-hold-id") || "hold"
 
   const fire = (name, detail = {}) => {
     const event = new host.CustomEvent(`hold-button:${name}`, {
@@ -74,89 +54,50 @@ export function holdHooks(button, { win } = {}) {
     return event
   }
 
-  const scope = () => button.closest("[x-data]")
-  // A string local with nothing to evaluate it against cannot answer.
-  const scopeFor = (name) => {
-    const found = host.Alpine ? scope() : null
-    if (!found) warn(`${name}: no Alpine scope to evaluate it in`)
-    return found
+  // True, and reported, when the button carries a removed hook.
+  const stale = () => {
+    const found = Object.keys(REMOVED_HOOKS).filter((attribute) => button.hasAttribute(attribute))
+    for (const attribute of found) {
+      const [local, event] = REMOVED_HOOKS[attribute]
+      host.console.error(`[hold:${id()}] ${attribute} (the ${local}: local) is no longer evaluated; ` +
+                         `answer ${event} instead. The hold is refused.`)
+    }
+    return found.length > 0
   }
 
   return {
-    // Refused by the scope's `submitting`, by the guard string, or by a
-    // hold-button:guard listener. A guard string that cannot be evaluated
-    // refuses: the caller asked for a check that did not run.
+    // Refused by a removed hook, by the scope's `submitting`, or by a
+    // hold-button:guard listener.
     guard() {
-      const found = host.Alpine ? scope() : null
+      if (stale()) return false
+      const found = host.Alpine ? button.closest("[x-data]") : null
       if (found) {
         const data = host.Alpine.$data(found)
         if (data && data.submitting) return false
-      }
-      const expression = button.dataset.guard
-      if (expression) {
-        if (!found) { warn("guard: no Alpine scope to evaluate it in; the hold is refused"); return false }
-        if (!evaluate(host.Alpine, found, expression)) return false
       }
       return !fire("guard").defaultPrevented
     },
 
     started() {
-      const expression = button.dataset.onHoldStart
-      const found = expression ? scopeFor("on_hold_start") : null
-      if (found) {
-        try { evaluate(host.Alpine, found, expression) } catch (error) { fail("on_hold_start threw", error) }
-      }
       fire("start")
     },
 
-    // True unless the validate string or a hold-button:validate listener says
-    // no. Rejects when either fails, which aborts the hold.
+    // True unless a hold-button:validate listener says no. Rejects when one
+    // fails, which aborts the hold.
     validate() {
       const answers = []
-      const expression = button.dataset.validate
-      if (expression) {
-        const found = scopeFor("validate")
-        if (found) answers.push(evaluateAsync(host.Alpine, host, found, expression))
-      }
       fire("validate", { waitUntil: (answer) => { answers.push(answer) } })
       return Promise.all(answers).then((all) => all.every(Boolean))
     },
 
-    // True when the early action ran, or a hold-button:early listener took
-    // the action over.
+    // True when a hold-button:early listener took the action over.
     early() {
-      let taken = false
-      const expression = button.dataset.earlyAction
-      const found = expression ? scopeFor("early_action") : null
-      if (found) {
-        const guard = button.dataset.earlyActionGuard
-        if (!guard || evaluate(host.Alpine, found, guard)) {
-          taken = true
-          try { evaluate(host.Alpine, found, expression) } catch (error) { fail("early_action threw", error) }
-        }
-      }
-      return fire("early").defaultPrevented || taken
+      return fire("early").defaultPrevented
     },
 
-    // True when a caller owns the button's state from here. A string
-    // on_success runs SUCCESS_SETTLE_MS later, with the button still in its
-    // holding state; if it throws, the button shows its success face.
+    // True when a listener owns the button's state from here.
     completed() {
-      const event = fire("success")
-      const expression = button.dataset.onSuccess
-      if (!expression) return event.defaultPrevented
-
-      host.setTimeout(() => {
-        try {
-          const found = scopeFor("on_success")
-          if (found) evaluate(host.Alpine, found, expression)
-        } catch (error) {
-          fail("on_success threw", error)
-          button.classList.remove("process")
-          button.classList.add("success")
-        }
-      }, SUCCESS_SETTLE_MS)
-      return true
+      return fire("success").defaultPrevented
     }
   }
 }

@@ -233,7 +233,7 @@ components:
 | Modal host, scoped host | `studio/modal_host` | `modal-host`, its own module tag | `$store.modals`, each scoped `$store.<name>`, `window.ModalAnimations`, `window.StudioModals` |
 | Toast queue (`layouts/studio/_flash`) | `studio/toast` | `toast`, its own module tag | none needed: the API is the `toast` window event; the queue is `$store.toasts` |
 | Link sidebar flag | `studio/link_sidebar` | `link-sidebar`, its own module tag | `$store.sidebars.linkTreeOpen` |
-| Hold button | `studio/hold_button`, `studio/hold_button_hooks` | `hold-button`, registered by `studio/stimulus` | the `guard:`, `on_hold_start:`, `validate:`, `early_action:`, `early_action_guard:` and `on_success:` string locals, `window.studioFizzPortal` |
+| Hold button | `studio/hold_button`, `studio/hold_button_hooks` | `hold-button`, registered by `studio/stimulus` | `window.studioFizzPortal` |
 | Board primitive (`studio/board/_board`) | `studio/board` | `board` (lazy), which loads SortableJS | `x-data="studioBoard({...})"`, `window.Sortable.create` until SortableJS loads |
 | Leveling activity modals | `studio/leveling_activity` | the Alpine scope alone | `x-data="levelingActionModal({...})"` |
 | Crop photo modal (`studio/modals/_crop_photo`) | `studio/cropper` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="cropPhotoModal({...})"` |
@@ -258,12 +258,17 @@ import nothing.
 **The hold button's events.** The button dispatches `hold-button:guard`,
 `hold-button:start`, `hold-button:validate`, `hold-button:early` and
 `hold-button:success`, which bubble; a page answers with `preventDefault()` or
-`$event.detail.waitUntil(answer)` (the partial's header lists each). New call
-sites use the events. The string locals are evaluated by
-`studio/hold_button_hooks` and stay while a consumer passes them.
+`$event.detail.waitUntil(answer)` (the partial's header lists each). The
+events are the whole API: the button takes no JavaScript and
+`studio/hold_button_hooks` evaluates none. The `guard:`, `on_hold_start:`,
+`validate:`, `early_action:`, `early_action_guard:` and `on_success:` locals
+are removed. `studio/_hold_button` raises `ArgumentError` when one is passed
+(`Studio::HoldButton`), and a button that carries one of their attributes by
+hand (`data-guard`, `data-on-hold-start`, `data-validate`, `data-early-action`,
+`data-early-action-guard`, `data-on-success`) refuses every press with a
+console error naming the attribute and its event.
 
-**Today.** The hold button still accepts `guard:`, `on_success:` and
-`validate:` as JavaScript strings. The shared head carries three inline
+**Today.** The shared head carries three inline
 scripts, all nonced: the pre-paint theme, the hold button's guard and the
 x-data factories' guard; its behaviour is the modules above. The engine
 vendors Alpine and loads it with `javascript_include_tag`. Every app pins its

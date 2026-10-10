@@ -20,11 +20,9 @@
     hold-button:success   at the full duration; preventDefault() leaves the
                           button's state to the listener
 
-  The JS-expression locals below (guard, on_success, validate, early_action,
-  early_action_guard, on_hold_start) still work: they travel as data-*
-  attributes and are evaluated against the surrounding x-data scope, with `d`
-  and `data` aliased to its data. They stay while a consumer passes them;
-  write new call sites against the events.
+  It takes no JavaScript: the guard, on_hold_start, validate, early_action,
+  early_action_guard and on_success locals are removed, and passing one raises
+  (Studio::HoldButton). Answer the event instead.
 
   Locals:
     default_text       - Button label in idle state (default: "Hold to Confirm")
@@ -32,21 +30,10 @@
     success_text       - Text shown on completion (default: "Confirmed!")
     duration           - Hold duration in ms (default: 2000)
     hold_id            - Unique ID for this button instance (default: "hold")
-    guard              - JS expression that must be truthy to allow hold (default: none = always allow)
-    on_success         - JS expression executed on successful hold (default: none)
-    validate           - JS expression returning Promise<boolean>, called at validate_at ms (default: none)
-    validate_at        - ms into the hold at which validation runs: the validate
-                         string and the hold-button:validate event (default: 750)
-    early_action       - JS expression executed early (for Web3 users) (default: none)
-    early_action_at    - ms into the hold at which the early action runs: the
-                         early_action string and the hold-button:early event
-                         (default: 1500)
-    early_action_guard - JS expression that must be truthy for early action (default: none)
-    on_hold_start      - JS expression executed the instant a hold BEGINS, after
-                         the guard/submitting checks pass (default: none). Used to
-                         kick off work that should run in parallel with the hold
-                         (e.g. the board's authoritative funding pre-check fetch,
-                         resolved by the time the hold completes ~2s later).
+    validate_at        - ms into the hold at which hold-button:validate is
+                         dispatched (default: 750)
+    early_action_at    - ms into the hold at which hold-button:early is
+                         dispatched (default: 1500)
     fizz               - Render the fizz particle layer (default: true). Pass
                          false for a flat button. Specimens: /admin/style.
     fizz_level         - :lively (default) or :calm. Lively rests at a full
@@ -69,20 +56,15 @@
                          the six picked teams' light / dark / alt colors onto
                          --fizz-c-1..18, three per zone in pick order.
 %>
+<% Studio::HoldButton.refuse_removed_locals!(local_assigns) %>
 <% default_text       ||= "Hold to Confirm" %>
 <% hold_text          ||= "Almost there..." %>
 <% success_text       ||= "Confirmed!" %>
 <% error_text         ||= "Entry Blocked" %>
 <% duration           ||= 2000 %>
 <% hold_id            ||= "hold" %>
-<% guard              ||= nil %>
-<% on_success         ||= nil %>
-<% validate           ||= nil %>
 <% validate_at        ||= 750 %>
-<% early_action       ||= nil %>
 <% early_action_at    ||= 1500 %>
-<% early_action_guard ||= nil %>
-<% on_hold_start      ||= nil %>
 <%# `fizz ||= true` would coerce an explicit `fizz: false` back to true, so
     read the key instead of the value. %>
 <% fizz = local_assigns.key?(:fizz) ? local_assigns[:fizz] : true %>
@@ -125,12 +107,8 @@
 <button class="hold-btn"
         data-hold-id="<%= hold_id %>"
         data-duration="<%= duration %>"
-        <% if guard              %>data-guard="<%= guard %>"<% end %>
-        <% if on_hold_start      %>data-on-hold-start="<%= on_hold_start %>"<% end %>
-        <% if on_success         %>data-on-success="<%= on_success %>"<% end %>
-        <% if validate           %>data-validate="<%= validate %>" data-validate-at="<%= validate_at %>"<% elsif local_assigns.key?(:validate_at) %>data-validate-at="<%= validate_at %>"<% end %>
-        <% if early_action       %>data-early-action="<%= early_action %>" data-early-action-at="<%= early_action_at %>"<% elsif local_assigns.key?(:early_action_at) %>data-early-action-at="<%= early_action_at %>"<% end %>
-        <% if early_action_guard %>data-early-action-guard="<%= early_action_guard %>"<% end %>
+        <% if local_assigns.key?(:validate_at)     %>data-validate-at="<%= validate_at %>"<% end %>
+        <% if local_assigns.key?(:early_action_at) %>data-early-action-at="<%= early_action_at %>"<% end %>
         style="--duration: <%= duration %>ms"
         data-studio-action="mousedown->hold-button#start mouseup->hold-button#end mouseleave->hold-button#end touchstart->hold-button#press touchend->hold-button#end touchcancel->hold-button#end">
   <div class="hold-icon">
