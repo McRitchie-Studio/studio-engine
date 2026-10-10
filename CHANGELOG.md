@@ -38,6 +38,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `error`, or nil without a recording), `.clock(seconds)`, and two more kinds
   from `kind_for`: `:video` and `:audio`. `Result` gains `cues` and
   `cues_truncated`, and the kind `:transcript`.
+
+## 0.99.0 — 2026-10-09
+
+### Added
+
 - **Knowledge documents preview in the page.** `/admin/knowledge/:id` gains a
   Preview section, so reading a document no longer means downloading it:
   - `.xlsx` and `.xlsm` workbooks render as tables, one tab per sheet. A formula
