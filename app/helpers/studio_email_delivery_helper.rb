@@ -30,7 +30,6 @@ module StudioEmailDeliveryHelper
   def email_delivery_transport_label(delivery_method = studio_email_delivery_method,
                                      capture_enabled = Studio.local_email_capture?)
     return "capture" if capture_enabled
-    return "ses" if Studio.ses_transport_ready?
     return "resend" if delivery_method == "resend"
 
     delivery_method.to_s.strip.empty? ? "unknown" : delivery_method
@@ -39,16 +38,13 @@ module StudioEmailDeliveryHelper
   private
 
   def email_delivery_connector(delivery_method, transport)
-    return "ses" if Studio.ses_transport_ready?
-    return "resend" if delivery_method == "resend"
-    return transport if %w[ses resend].include?(transport)
+    return "resend" if delivery_method == "resend" || transport == "resend"
 
     nil
   end
 
   def email_delivery_connector_label(connector)
     case connector
-    when "ses" then "SES"
     when "resend" then "Resend"
     else "Unknown"
     end
@@ -56,7 +52,6 @@ module StudioEmailDeliveryHelper
 
   def email_delivery_provider_icon(connector)
     case connector
-    when "ses" then "ses-favicon.png"
     when "resend" then "resend-favicon.png"
     end
   end

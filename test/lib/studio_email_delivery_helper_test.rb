@@ -44,15 +44,17 @@ class StudioEmailDeliveryHelperTest < Minitest::Test
     }, email_delivery_banner_details)
   end
 
-  def test_reports_ses_when_ses_transport_is_ready
+  # SES was retired 2026-10-10: a stale MAIL_TRANSPORT=ses with the old SMTP
+  # pair no longer labels the banner SES; it reports the real delivery method.
+  def test_a_stale_ses_env_reports_the_real_delivery_method
     install_action_mailer(:smtp, true)
     ENV["MAIL_TRANSPORT"] = "ses"
     ENV["SES_SMTP_USERNAME"] = "user"
     ENV["SES_SMTP_PASSWORD"] = "pass"
 
-    assert_equal "EMAIL SEND true · ses", email_delivery_banner_status
-    assert_equal "ses-favicon.png", email_delivery_banner_details.fetch(:provider_icon)
-    assert_equal "Connector: SES · Emails: Sending", email_delivery_banner_details.fetch(:tooltip)
+    assert_equal "EMAIL SEND true · smtp", email_delivery_banner_status
+    assert_nil email_delivery_banner_details.fetch(:provider_icon)
+    assert_equal "Connector: Unknown · Emails: Sending", email_delivery_banner_details.fetch(:tooltip)
   end
 
   def test_reports_capture_when_local_capture_is_enabled

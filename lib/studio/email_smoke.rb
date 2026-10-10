@@ -112,7 +112,6 @@ module Studio
 
       def transport_label(action_mailer:, env: ENV)
         return "capture" if studio_local_email_capture?
-        return "ses" if studio_ses_transport_ready?(env)
 
         delivery_method = action_mailer.delivery_method.to_s
         return "resend" if delivery_method == "resend"
@@ -156,16 +155,6 @@ module Studio
 
         value = Studio.public_send(method)
         value if value && !value.to_s.strip.empty?
-      end
-
-      def studio_ses_transport_ready?(env)
-        if defined?(Studio) && Studio.respond_to?(:ses_transport_ready?)
-          Studio.ses_transport_ready?(env)
-        else
-          env["MAIL_TRANSPORT"].to_s.downcase == "ses" &&
-            env_value(env, "SES_SMTP_USERNAME") &&
-            env_value(env, "SES_SMTP_PASSWORD")
-        end
       end
 
       def studio_local_email_capture?

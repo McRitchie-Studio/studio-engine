@@ -14,7 +14,7 @@
 #
 # Logic lives in Studio::S3::Trash (unit-tested); these tasks only resolve the
 # bucket and print.
-# Guarded like studio_email.rake and studio_ses.rake: an app that also loads
+# Guarded like studio_email.rake: an app that also loads
 # this file must not register a second copy of each action.
 unless Rake::Task.task_defined?("studio:trash:restore")
   namespace :studio do

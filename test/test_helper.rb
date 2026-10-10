@@ -201,29 +201,15 @@ module Studio
     ProfileSections.resolve(profile_sections, view, page: page)
   end
 
-  def self.mailer_from_for_transport(env: ENV, ses_from:, resend_from: nil)
-    if ses_transport_ready?(env)
-      env_value(env, "MAILER_FROM") || ses_from
-    else
-      env_value(env, "RESEND_MAILER_FROM") || resend_from || resend_mailer_from
-    end
+  def self.mailer_from_for_transport(env: ENV, ses_from: nil, resend_from: nil)
+    env_value(env, "RESEND_MAILER_FROM") || resend_from || resend_mailer_from
   end
 
-  def self.marketing_from_for_transport(env: ENV, ses_from:, resend_from: nil)
-    if ses_transport_ready?(env)
-      env_value(env, "MARKETING_MAILER_FROM") || ses_from
-    else
-      env_value(env, "RESEND_MARKETING_FROM") ||
-        env_value(env, "RESEND_MAILER_FROM") ||
-        resend_from ||
-        resend_mailer_from
-    end
-  end
-
-  def self.ses_transport_ready?(env = ENV)
-    env["MAIL_TRANSPORT"].to_s.downcase == "ses" &&
-      env_value(env, "SES_SMTP_USERNAME") &&
-      env_value(env, "SES_SMTP_PASSWORD")
+  def self.marketing_from_for_transport(env: ENV, ses_from: nil, resend_from: nil)
+    env_value(env, "RESEND_MARKETING_FROM") ||
+      env_value(env, "RESEND_MAILER_FROM") ||
+      resend_from ||
+      resend_mailer_from
   end
 
   def self.env_value(env, key)

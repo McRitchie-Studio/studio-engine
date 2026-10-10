@@ -29,8 +29,6 @@ class StudioTest < Minitest::Test
     ENV.delete("MARKETING_MAILER_FROM")
     ENV.delete("RESEND_MAILER_FROM")
     ENV.delete("RESEND_MARKETING_FROM")
-    ENV.delete("SES_SMTP_USERNAME")
-    ENV.delete("SES_SMTP_PASSWORD")
   end
 
   # ── configure ───────────────────────────────────────────────
@@ -175,54 +173,38 @@ class StudioTest < Minitest::Test
     Studio.local_email_capture = nil
   end
 
-  def test_mailer_from_for_transport_uses_ses_sender_when_ses_is_ready
+  # SES was retired 2026-10-10. ses_from: is still accepted (every consumer
+  # initializer passes it) and ignored, even with a stale SES env.
+  def test_mailer_from_for_transport_ignores_ses_from_and_a_stale_ses_env
     env = {
       "MAIL_TRANSPORT" => "ses",
       "SES_SMTP_USERNAME" => "user",
       "SES_SMTP_PASSWORD" => "pass",
-      "MAILER_FROM" => "Turf Monster <team@turfmonster.media>"
-    }
-
-    assert_equal "Turf Monster <team@turfmonster.media>",
-                 Studio.mailer_from_for_transport(env: env, ses_from: "App <team@example.com>")
-  end
-
-  def test_mailer_from_for_transport_uses_resend_sender_when_ses_is_not_ready
-    env = {
-      "MAIL_TRANSPORT" => "ses",
       "MAILER_FROM" => "Turf Monster <team@turfmonster.media>",
       "RESEND_MAILER_FROM" => "McRitchie Studio <team@mcritchie.studio>"
     }
 
     assert_equal "McRitchie Studio <team@mcritchie.studio>",
-                 Studio.mailer_from_for_transport(env: env, ses_from: "Turf Monster <team@turfmonster.media>")
+                 Studio.mailer_from_for_transport(env: env, ses_from: "App <team@example.com>")
   end
 
   def test_mailer_from_for_transport_defaults_to_shared_resend_sender
     assert_equal "McRitchie Studio <team@mcritchie.studio>",
                  Studio.mailer_from_for_transport(env: {}, ses_from: "App <team@example.com>")
+    assert_equal "McRitchie Studio <team@mcritchie.studio>", Studio.mailer_from_for_transport(env: {})
   end
 
-  def test_marketing_from_for_transport_uses_marketing_sender_when_ses_is_ready
+  def test_marketing_from_for_transport_ignores_ses_from_and_a_stale_ses_env
     env = {
       "MAIL_TRANSPORT" => "ses",
       "SES_SMTP_USERNAME" => "user",
       "SES_SMTP_PASSWORD" => "pass",
-      "MARKETING_MAILER_FROM" => "Alex from Turf Monster <alex@turfmonster.media>"
-    }
-
-    assert_equal "Alex from Turf Monster <alex@turfmonster.media>",
-                 Studio.marketing_from_for_transport(env: env, ses_from: "Alex <alex@example.com>")
-  end
-
-  def test_marketing_from_for_transport_uses_shared_resend_sender_for_fallback
-    env = {
-      "RESEND_MAILER_FROM" => "McRitchie Studio <team@mcritchie.studio>",
-      "MARKETING_MAILER_FROM" => "Alex from Turf Monster <alex@turfmonster.media>"
+      "MARKETING_MAILER_FROM" => "Alex from Turf Monster <alex@turfmonster.media>",
+      "RESEND_MAILER_FROM" => "McRitchie Studio <team@mcritchie.studio>"
     }
 
     assert_equal "McRitchie Studio <team@mcritchie.studio>",
-                 Studio.marketing_from_for_transport(env: env, ses_from: "Alex from Turf Monster <alex@turfmonster.media>")
+                 Studio.marketing_from_for_transport(env: env, ses_from: "Alex <alex@example.com>")
   end
 
   def test_user_wallet_address_uses_wallet_address_by_default
