@@ -48,12 +48,14 @@ class Studio::BadgeComponentTest < ViewComponent::TestCase
   # The hub's status_tone chip for each role, minus the `border` width .badge
   # already sets. Written out here, not read from the hub, so a change on
   # either side shows up as a diff someone has to agree to.
+  # The hub's primary chip moves to text-primary-ink when it locks the engine
+  # that ships the token.
   test "the tones are the hub's status_tone chips" do
     hub_chips = {
       success: "bg-success/10 text-success-ink border border-success/40",
       warning: "bg-warning/10 text-warning-ink border border-warning/40",
       danger: "bg-danger/10 text-danger-ink border border-danger/40",
-      primary: "bg-primary/10 text-heading border border-primary/40",
+      primary: "bg-primary/10 text-primary-ink border border-primary/40",
       muted: "bg-surface-alt text-muted border border-subtle"
     }
     assert_equal hub_chips.keys, Studio::BadgeComponent::TONES.keys
