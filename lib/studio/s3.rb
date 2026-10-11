@@ -25,13 +25,18 @@ module Studio
       # is answered as the empty string it means. Tested against a stubbed
       # client only: no live store, R2 included, has been asked.
       def download(key:, max_bytes: nil)
+        read_object(bucket, key, max_bytes)
+      end
+
+      # The GET behind download and production_download.
+      def read_object(target, key, max_bytes)
         # 0 or a negative would build "bytes=0--1", which a store may read as
         # no range at all and answer with the whole object.
         unless max_bytes.nil? || (max_bytes.is_a?(Integer) && max_bytes.positive?)
           raise ArgumentError, "max_bytes must be a positive Integer, got #{max_bytes.inspect}"
         end
 
-        opts = { bucket: bucket, key: full_key(key) }
+        opts = { bucket: target, key: full_key(key) }
         opts[:range] = "bytes=0-#{max_bytes - 1}" if max_bytes
         s3 = client
         # The rescue names an SDK constant, so it wraps only what runs after
@@ -84,10 +89,70 @@ module Studio
       end
 
       def exists?(key:)
-        client.head_object(bucket: bucket, key: full_key(key))
-        true
-      rescue Aws::S3::Errors::NotFound, Aws::S3::Errors::NoSuchKey
-        false
+        !head(bucket, key).nil?
+      end
+
+      # ── PRODUCTION REFERENCES (read-only) ─────────────────────────────────
+      #
+      # Seed assets live in the PRODUCTION bucket, and a non-production process
+      # references them there instead of uploading its own copy (ImageCache's
+      # stored_in = "production"). Everything below READS production and
+      # nothing writes it: there is no upload, copy or delete that takes the
+      # production bucket, and delete/purge! still refuse a "*-production"
+      # bucket off production (guard_production_bucket!). The dev R2 tokens
+      # hold Item Read on production and Item Write on dev only, so the store
+      # refuses a write even if code here ever tried.
+
+      # The bucket production writes: "#{s3_bucket_prefix}-production" in every
+      # environment. In real production it is `bucket`.
+      def production_bucket
+        prefix = Studio.s3_bucket_prefix
+        raise NotConfigured, "Studio.s3_bucket_prefix not set in config/initializers/studio.rb" if prefix.nil? || prefix.empty?
+
+        "#{prefix}-production"
+      end
+
+      # Whether this process may record a production reference: it is not
+      # production itself (production's own uploads already ARE production's)
+      # and it knows production's public host (Studio.s3_production_public_url).
+      def production_references?
+        !production_environment? && !Studio.s3_production_public_url.to_s.empty?
+      end
+
+      # The public URL of production's copy of `key`. In production it is
+      # exactly url(key:). Elsewhere it is s3_production_public_url plus the
+      # key, under the same s3_key_prefix (the namespace is per app, not per
+      # environment); without that base it RAISES rather than answer with this
+      # environment's host, where the object does not exist.
+      def production_url(key:)
+        return url(key: key) if production_environment?
+
+        base = Studio.s3_production_public_url.to_s
+        if base.empty?
+          raise NotConfigured,
+                "Studio.s3_production_public_url not set: cannot resolve production's copy of #{key.inspect} " \
+                "from a #{environment} process"
+        end
+
+        "#{base.chomp("/")}/#{full_key(key)}"
+      end
+
+      # A read-only HEAD against the production bucket: the object's metadata
+      # (content_length, content_type) when production holds `key`, nil when it
+      # does not. Any other answer (403 from a token without Item Read on
+      # production, a network error) RAISES: a seeder that cannot ask must not
+      # read the silence as "absent" and quietly upload a copy.
+      def production_head(key:)
+        head(production_bucket, key)
+      end
+
+      def production_exists?(key:)
+        !production_head(key: key).nil?
+      end
+
+      # A read-only GET of production's copy, with download's max_bytes rules.
+      def production_download(key:, max_bytes: nil)
+        read_object(production_bucket, key, max_bytes)
       end
 
       # A RECOVERABLE delete: the object moves under trash/ in the same bucket
@@ -235,7 +300,21 @@ module Studio
         @client = nil
       end
 
+      private :read_object
+
       private
+
+      # HEAD of `key` in `target`: the response, or nil when the object is
+      # absent. `target` is resolved by the caller, so an unconfigured app
+      # raises NotConfigured before the rescue below names an SDK constant.
+      def head(target, key)
+        s3 = client
+        begin
+          s3.head_object(bucket: target, key: full_key(key))
+        rescue Aws::S3::Errors::NotFound, Aws::S3::Errors::NoSuchKey
+          nil
+        end
+      end
 
       # WHICH BUCKET HALF THIS APP OWNS. Rails.env alone cannot answer it: no QA app
       # sets RAILS_ENV, so every QA app boots as `production` exactly like real
