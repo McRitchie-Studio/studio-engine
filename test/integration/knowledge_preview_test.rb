@@ -24,6 +24,9 @@ require_relative "../support/xlsx_builder"
 # the test names its constants, so the test loads it.
 abort "Studio::KnowledgePreview loaded at boot: the preview is meant to be lazy" if defined?(Studio::KnowledgePreview)
 require "studio/knowledge_preview"
+# The preview requires the transcript parser on its first transcript; a test
+# that names its cap can run before any request does.
+require "studio/knowledge_transcript"
 
 ActionDispatch::IntegrationTest.app = Rails.application
 Mime::Type.register "text/vnd.turbo-stream.html", :turbo_stream unless Mime[:turbo_stream]

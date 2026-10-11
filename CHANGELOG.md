@@ -4,6 +4,45 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`--color-primary-ink` and `text-primary-ink`: the primary colour as chip
+  text.** The theme resolver derives it per theme the way it derives the
+  danger, warning and success inks: the configured primary, shaded until it
+  clears WCAG AA 4.5:1 on every surface and on its own 10%, 15% and 20% tints.
+  `text-primary` and `--color-primary` stay the brand colour.
+
+### Changed
+
+- **Primary chips are painted in the primary colour and clear AA in both
+  themes.** `Studio::BadgeComponent`'s `tone: :primary` drew heading-coloured
+  text (white in dark, near-black in light), and its `scheme: "primary"`, the
+  Marketing chip on `/admin/emails` and the sidebar's ADMIN chip drew the raw
+  primary, 2.2:1 to 3.6:1 on its tint. All of them now draw `text-primary-ink`.
+  A host that copies the tone's class string (the hub's `status_tone`) changes
+  when it adopts the class.
+- **Every role ink clears AA on its 10%, 15% and 20% tints, as a browser
+  paints them.** The apps put the inks on the stronger tints too (turf's
+  "Entered" badge is `bg-primary/15`; the hub's workflow and verdict chips are
+  `bg-success/20 text-success-ink` and `bg-warning/20 text-warning-ink`), where
+  an ink tuned to the 10% chip read as low as 3.83:1 (default warning, dark, on
+  20%). The search now counts 0.10, 26/255 (how Chromium composites a 10%
+  fill), 0.15 and 0.20, each also one unit off in every channel, because 8-bit
+  compositing rounds (Chromium painted a 20% danger tint one unit lighter than
+  the blend, taking a 4.51:1 ink to 4.47:1). The inks darken in light and
+  lighten in dark. Default theme, 0.102.0 to this release:
+
+  | Ink | Dark | Light |
+  |---|---|---|
+  | primary (new) | `#BDB7FE` | `#58519D` |
+  | success | `#8EB791` to `#96BC99` | `#2E6C32` to `#2A622D` |
+  | warning | `#FF966C` to `#FFAE8D` | `#994A2B` to `#8F4528` |
+  | danger | `#F58F8F` to `#F79E9E` | `#AC3131` to `#9E2D2D` |
+
+  A configured role colour moves the same way; a configured colour that
+  already clears every tint (mcritchie-industries' yellow warning) keeps its
+  exact hex.
+
 ## 0.103.0 — 2026-10-10
 
 ### Added
