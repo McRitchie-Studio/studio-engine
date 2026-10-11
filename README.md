@@ -979,6 +979,33 @@ be a positive Integer.
 `Studio::S3.delete` moves the object to `trash/` for three days rather than
 deleting it; see [Trash and restore](#trash-and-restore).
 
+### Seed assets reference production
+
+Seed assets (NFL headshots, Pokémon sprites) live in the **production** bucket.
+A laptop, desk or QA app points at production's copy instead of uploading a
+duplicate into the dev bucket, and uploads only what production lacks. Set
+production's public host in every environment (it is not a secret):
+
+```ruby
+config.s3_production_public_url = "https://assets.turfmonster.media"
+```
+
+and have seeders call `Studio::ImageCache.reference_or_cache!` (same arguments
+and answer as `cache!`). Off production it HEADs each missing variant in
+`<prefix>-production` (read-only; the dev R2 token holds Item Read there).
+Found: an `ImageCache` row with `stored_in = "production"`, whose `#url`
+resolves on `s3_production_public_url`. Absent: an ordinary upload to the own
+bucket. A HEAD failing for any reason but not-found raises. In production, or
+with the setting unset, it is exactly `cache!`.
+
+`stored_in` arrives by the engine migration `AddStoredInToImageCaches`
+(nullable; nil and `"own"` mean the own bucket, so existing rows keep their
+URLs). Read an object's bytes with `ImageCache#download` and remove it with
+`ImageCache#delete_object!`, never `Studio::S3.download/delete(key: row.s3_key)`:
+those read and delete the OWN bucket. Off production, `delete_object!` on a
+production reference deletes nothing, and `Studio::S3` has no write, copy or
+delete that targets the production bucket.
+
 An app with **no** bucket configured does not error — `/admin/emails` renders
 read-only, showing the inherited defaults it is genuinely sending and naming the
 one setting that turns uploads on.

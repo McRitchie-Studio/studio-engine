@@ -46,6 +46,91 @@ module Studio
     # Idempotent: variants already present in ImageCache are skipped. If
     # nothing is missing, the source is never read.
     def self.cache!(owner:, purpose:, key_prefix:, widths:, source_url: nil, source_path: nil, content_type: "image/png")
+      ext, requested = prepare!(source_url: source_url, source_path: source_path, content_type: content_type, widths: widths)
+
+      existing = ::ImageCache.where(owner: owner, purpose: purpose).index_by(&:variant)
+      missing  = requested - existing.keys
+      return existing if missing.empty?
+
+      upload_variants!(existing, missing, owner: owner, purpose: purpose, key_prefix: key_prefix, ext: ext,
+                                          source_url: source_url, source_path: source_path, content_type: content_type)
+    end
+
+    # ── SEED ASSETS: REFERENCE PRODUCTION, UPLOAD ONLY WHAT IS NEW ────────────
+    #
+    # cache!'s signature and answer, for SEEDERS. Seed assets live in the
+    # production bucket; a laptop, desk or QA app should point at production's
+    # copy rather than upload a duplicate into the dev bucket. So, outside
+    # production, with Studio.s3_production_public_url set, each missing variant
+    # is first looked for in production by a read-only HEAD
+    # (Studio::S3.production_head) under the key cache! would write:
+    #
+    #   found     an ImageCache row with stored_in "production" is recorded. Its
+    #             #url resolves on the production host. Nothing is uploaded.
+    #   absent    the variant is uploaded to this process's OWN bucket exactly as
+    #             cache! does (stored_in nil = own). A key production lacks
+    #             (kenneth-walker-iii, 2026-10-10) still gets an image.
+    #
+    # The source is fetched only when at least one variant has to be uploaded.
+    # A HEAD that fails for any reason but "not found" raises: a token without
+    # read on production must not quietly turn into a dev-bucket copy of
+    # everything.
+    #
+    # In production, or with s3_production_public_url unset, this IS cache!.
+    # Production never reads the knob, so production apps behave as before.
+    #
+    # Nothing here writes, copies or deletes in the production bucket.
+    def self.reference_or_cache!(owner:, purpose:, key_prefix:, widths:, source_url: nil, source_path: nil,
+                                 content_type: "image/png")
+      unless Studio::S3.production_references?
+        return cache!(owner: owner, purpose: purpose, key_prefix: key_prefix, widths: widths,
+                      source_url: source_url, source_path: source_path, content_type: content_type)
+      end
+
+      unless ::ImageCache.stored_in_column?
+        raise MissingStoredInColumn,
+              "image_caches.stored_in is missing: run `bin/rails studio_engine:install:migrations db:migrate` " \
+              "before referencing production seed assets"
+      end
+
+      ext, requested = prepare!(source_url: source_url, source_path: source_path, content_type: content_type, widths: widths)
+
+      existing = ::ImageCache.where(owner: owner, purpose: purpose).index_by(&:variant)
+      missing  = requested - existing.keys
+      return existing if missing.empty?
+
+      to_upload = missing.reject do |variant|
+        s3_key = variant_key(key_prefix, variant, ext)
+        head = Studio::S3.production_head(key: s3_key)
+        next false if head.nil?
+
+        existing[variant] = ::ImageCache.create!(
+          owner: owner,
+          purpose: purpose,
+          variant: variant,
+          s3_key: s3_key,
+          stored_in: ::ImageCache::PRODUCTION,
+          source_url: source_url,
+          bytes: head.content_length,
+          content_type: head.content_type.to_s.empty? ? content_type : head.content_type
+        )
+        true
+      end
+      return existing if to_upload.empty?
+
+      upload_variants!(existing, to_upload, owner: owner, purpose: purpose, key_prefix: key_prefix, ext: ext,
+                                            source_url: source_url, source_path: source_path, content_type: content_type)
+    end
+
+    class MissingStoredInColumn < StandardError; end
+
+    # The key every variant is written under, by cache! and looked up under by
+    # reference_or_cache!. One definition, so the two can never disagree.
+    def self.variant_key(key_prefix, variant, ext)
+      "#{key_prefix}/#{variant}.#{ext}"
+    end
+
+    def self.prepare!(source_url:, source_path:, content_type:, widths:)
       raise ArgumentError, "either source_url or source_path is required" if source_url.nil? && source_path.nil?
 
       unless ALLOWED_CONTENT_TYPES.include?(content_type)
@@ -54,13 +139,14 @@ module Studio
 
       validate_source_url!(source_url) if source_url
 
-      ext = EXT_BY_TYPE[content_type]
-      requested = ["original", *widths.map(&:to_s)]
+      [EXT_BY_TYPE[content_type], ["original", *widths.map(&:to_s)]]
+    end
+    private_class_method :prepare!
 
-      existing = ::ImageCache.where(owner: owner, purpose: purpose).index_by(&:variant)
-      missing  = requested - existing.keys
-      return existing if missing.empty?
-
+    # Reads the source once and uploads each of `missing` to this process's own
+    # bucket, recording a row per variant into `existing`, which it returns.
+    def self.upload_variants!(existing, missing, owner:, purpose:, key_prefix:, ext:, source_url:, source_path:,
+                              content_type:)
       require "mini_magick"
 
       body = if source_path
@@ -72,7 +158,6 @@ module Studio
       missing.each do |variant|
         if variant == "original"
           payload = body
-          s3_key  = "#{key_prefix}/original.#{ext}"
         else
           img = MiniMagick::Image.read(body)
           # Cap ImageMagick resources per-invocation to prevent decompression-bomb DoS.
@@ -84,8 +169,8 @@ module Studio
             c.resize "#{variant}x"
           end
           payload = img.to_blob
-          s3_key  = "#{key_prefix}/#{variant}.#{ext}"
         end
+        s3_key = variant_key(key_prefix, variant, ext)
 
         Studio::S3.upload(
           key: s3_key,
@@ -107,6 +192,7 @@ module Studio
 
       existing
     end
+    private_class_method :upload_variants!
 
     # ── THE SSRF GUARD ────────────────────────────────────────────────────────
     #

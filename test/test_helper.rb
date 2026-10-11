@@ -156,6 +156,7 @@ module Studio
   mattr_accessor :s3_access_key_id,     default: nil
   mattr_accessor :s3_secret_access_key, default: nil
   mattr_accessor :s3_public_url,        default: nil
+  mattr_accessor :s3_production_public_url, default: nil
 
   def self.configure
     yield self
