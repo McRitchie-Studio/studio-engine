@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.104.0 — 2026-10-11
+
 ### Added
 
 - **`--color-primary-ink` and `text-primary-ink`: the primary colour as chip
