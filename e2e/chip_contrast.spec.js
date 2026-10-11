@@ -11,8 +11,10 @@ const { test, expect } = require("@playwright/test");
 // so each spec reads the painted colours.
 //
 // Measured: the five status tones and the `primary` scheme, on the four surface
-// tokens. The other legacy schemes paint fixed Tailwind palette colours, which
-// no theme token derives; they are not graded here.
+// tokens, and each role ink on its role's 15% and 20% tint (the lab's "tints"
+// group: turf's bg-primary/15 "Entered" badge, the hub's bg-success/20 chips).
+// The other legacy schemes paint fixed Tailwind palette colours, which no theme
+// token derives; they are not graded here.
 //
 // CONTROLS, each run against this file:
 //   - BadgeComponent's primary tone back on text-heading: "is painted in the
@@ -21,10 +23,13 @@ const { test, expect } = require("@playwright/test");
 //     chip inherits the body colour.
 //   - status_ink tuned to a 0.10 tint alone: the first spec fails, naming
 //     moms-app's primary chip at 4.48:1 on the dark surface.
+//   - ThemeResolver::TINT_ALPHAS back to the 10% chip alone: the first spec
+//     fails on the 15% and 20% tint chips in every palette.
 
 const AA = 4.5;
 const PALETTES = ["engine-default", "turf-monster", "cyvasse", "mcritchie-industries", "moms-app"];
-const GRADED = ["tone-success", "tone-warning", "tone-danger", "tone-primary", "tone-muted", "scheme-primary"];
+const TINTS = ["primary", "success", "warning", "danger"].flatMap((role) => [`tint-${role}-15`, `tint-${role}-20`]);
+const GRADED = ["tone-success", "tone-warning", "tone-danger", "tone-primary", "tone-muted", "scheme-primary", ...TINTS];
 
 // Runs in the page, over a screenshot of it. For every graded chip: the text
 // colour the browser computed, and the pixel it painted inside the chip's left

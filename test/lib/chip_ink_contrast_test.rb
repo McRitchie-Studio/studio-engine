@@ -23,6 +23,10 @@ require_relative "../support/consumer_palettes"
 #     palette fails on a 15% or 20% tint (turf dark primary 4.25:1 and light
 #     4.02:1 on 20%, default dark warning 3.89:1 on 20%).
 #   - status_ink searching STATUS_TINT alone: the same, and the 26/255 cases.
+#   - status_ink without the one-unit rounding neighbours: the consumer
+#     palettes fail by a hair on a painted neighbour (default dark warning
+#     4.46:1; e2e/chip_contrast.spec.js read default dark danger at 4.47:1 on
+#     the 20% chip on screen).
 #   - status_ink searching the bare surfaces: every case fails.
 #   - --color-primary-ink set to --color-text: the hue test fails.
 class ChipInkContrastTest < ActiveSupport::TestCase
@@ -51,11 +55,20 @@ class ChipInkContrastTest < ActiveSupport::TestCase
       ROLES.each do |role, colour_var|
         ink = vars.fetch("--color-#{role}-ink") { flunk "#{mode} emits no --color-#{role}-ink" }
         tints = PAINTED_TINTS.flat_map do |alpha|
-          surfaces.map { |bg| Studio::ColorScale.blend(vars.fetch(colour_var), bg, alpha) }
+          surfaces.flat_map { |bg| painted(Studio::ColorScale.blend(vars.fetch(colour_var), bg, alpha)) }
         end
         worst[[mode, role]] = tints.map { |bg| Studio::ColorScale.contrast_ratio(ink, bg) }.min
       end
     end
+  end
+
+  # A tint as a browser may paint it: the exact blend, or one unit off in every
+  # channel (8-bit compositing rounds the fill's share and the surface's share
+  # separately; Chromium paints the default danger at 20% over #3C3853 as
+  # #603B50, not the #5F3A50 blend).
+  def painted(tint)
+    rgb = Studio::ColorScale.hex_to_rgb(tint)
+    [tint, *[1, -1].map { |d| Studio::ColorScale.rgb_to_hex(*rgb.map { |c| c + d }) }]
   end
 
   def assert_chips_clear_aa(name, palette)

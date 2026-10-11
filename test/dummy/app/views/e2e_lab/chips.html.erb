@@ -24,6 +24,21 @@
           <span data-chip="scheme-<%= scheme %>"><%= render Studio::BadgeComponent.new(text: scheme, scheme: scheme) %></span>
         <% end %>
       </div>
+      <%# The stronger tints the apps put a role ink on (turf's bg-primary/15
+          "Entered" badge, the hub's bg-success/20 workflow chips). The class
+          strings are written out whole so Tailwind's scan of this view sees them. %>
+      <div class="flex flex-wrap gap-2" data-chip-group="tints">
+        <% { "primary-15" => "bg-primary/15 text-primary-ink border-primary/40",
+             "primary-20" => "bg-primary/20 text-primary-ink border-primary/40",
+             "success-15" => "bg-success/15 text-success-ink border-success/40",
+             "success-20" => "bg-success/20 text-success-ink border-success/40",
+             "warning-15" => "bg-warning/15 text-warning-ink border-warning/40",
+             "warning-20" => "bg-warning/20 text-warning-ink border-warning/40",
+             "danger-15" => "bg-danger/15 text-danger-ink border-danger/40",
+             "danger-20" => "bg-danger/20 text-danger-ink border-danger/40" }.each do |name, classes| %>
+          <span data-chip="tint-<%= name %>"><span class="badge <%= classes %>"><%= name %></span></span>
+        <% end %>
+      </div>
     </section>
   <% end %>
 </main>

@@ -191,9 +191,23 @@ module Studio
     # a 10% fill at 26/255, a little stronger than 0.10, and an ink tuned to
     # 0.10 alone measured 4.48:1 on the painted pixels (danger, dark, on a
     # #141516 base).
+    #
+    # Each tint is also counted one unit lighter and one unit darker in every
+    # channel. A browser composites in 8 bits and rounds the fill's share and
+    # the surface's share separately, so a painted tint can sit one unit off
+    # the exact blend: the default danger at 20% over #3C3853 blends to
+    # #5F3A50 and Chromium paints #603B50, which took an ink graded 4.51:1 here
+    # to 4.47:1 on screen. Contrast moves with luminance, and luminance with
+    # each channel, so the two all-channel neighbours bound every rounding.
     def status_ink(role, surfaces, direction:)
       tints = TINT_ALPHAS.flat_map { |alpha| surfaces.map { |bg| ColorScale.blend(role, bg, alpha) } }
-      contrast_ink(role, direction: direction, start: 0.0, target: 4.5, against: surfaces + tints)
+      painted = tints.flat_map { |tint| [tint, nudge(tint, 1), nudge(tint, -1)] }
+      contrast_ink(role, direction: direction, start: 0.0, target: 4.5, against: surfaces + painted)
+    end
+
+    # `hex` with every channel moved `units` (clamped to 0..255).
+    def nudge(hex, units)
+      ColorScale.rgb_to_hex(*ColorScale.hex_to_rgb(hex).map { |c| c + units })
     end
 
     # The lightest shade of `color` that carries a white label at AA: the
