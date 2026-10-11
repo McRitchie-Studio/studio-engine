@@ -28,7 +28,10 @@
   <% end %>
 </div>
 
-<script>
+<%# The request's CSP nonce, or nil (no attribute) when the host sets no
+    nonce generator. %>
+<% callback_nonce = (content_security_policy_nonce if respond_to?(:content_security_policy_nonce)) %>
+<script<% if callback_nonce %> nonce="<%= callback_nonce %>"<% end %>>
 (function() {
   var logEl = document.getElementById('phantom-log');
   // The sink is absent on a real production deploy (see the ERB guard above), and that

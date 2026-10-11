@@ -14,6 +14,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Changed
 
+- **The Phantom callback's script carries the request's CSP nonce, and a
+  banner chip has no inline handler.** `solana_sessions/phantom_callback`
+  renders `nonce=` from `content_security_policy_nonce`, and no attribute for a
+  host with no nonce generator. `studio/banners/_button` drops its
+  `onmouseover`, `onmouseout`, `onfocus` and `onblur` handlers: the chip sets
+  `--studio-banner-hover-bg`, `-border` and `-color` inline and carries
+  `data-studio-banner-button`, and a rule in `layouts/studio/_head` paints its
+  hover, keyboard focus (`:focus-visible`) and tooltip. Both pages now run under a script-src with no
+  `'unsafe-inline'` (turf-monster's signing pages). A host that renders a banner
+  without the engine head keeps the resting look on hover.
 - **Primary chips are painted in the primary colour and clear AA in both
   themes.** `Studio::BadgeComponent`'s `tone: :primary` drew heading-coloured
   text (white in dark, near-black in light), and its `scheme: "primary"`, the
