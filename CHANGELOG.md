@@ -43,6 +43,57 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   already clears every tint (mcritchie-industries' yellow warning) keeps its
   exact hex.
 
+## 0.103.0 — 2026-10-10
+
+### Added
+
+- **Seed assets reference production.** A non-production process (laptop,
+  desk, QA app) can record an `ImageCache` row that REFERENCES an object
+  already in the production bucket instead of uploading a copy into the dev
+  bucket. New:
+  - `Studio.s3_production_public_url`: production's public host, set in
+    every environment (e.g. `https://assets.turfmonster.media`). Default nil
+    turns references off.
+  - `image_caches.stored_in` (migration `AddStoredInToImageCaches`):
+    nullable string. nil or `"own"` is the own bucket, `"production"` a
+    reference. `ImageCache#url` resolves a reference on the production host
+    off production. In production both kinds resolve on the own host, which
+    is production's.
+  - `Studio::ImageCache.reference_or_cache!`: `cache!`'s arguments and
+    answer. Off production, with the setting, it HEADs each missing variant
+    in `<prefix>-production` (read-only) and records a reference when found,
+    else uploads to the own bucket as `cache!` does. A HEAD failing for any
+    reason but not-found raises. In production, or without the setting, it
+    is `cache!`.
+  - `Studio::S3.production_bucket`, `production_references?`,
+    `production_url`, `production_head`, `production_exists?` and
+    `production_download`: reads only. `ImageCache#download` and
+    `#delete_object!` act on the bucket that holds the row's object;
+    off production `delete_object!` deletes nothing for a reference.
+
+  **Design.** A per-row marker plus one configured host, because a row must
+  say whose object it is: 11 of 12 sampled Turf headshot keys were on
+  production and one (`kenneth-walker-iii`) was only on dev, so no app-wide
+  switch is right for every row. Rejected: storing absolute URLs in `s3_key`
+  (breaks every reader that treats it as a key, the uniqueness index and the
+  key namespace); an AR enum (raises at load on a host that has not migrated);
+  an HTTP HEAD on the public host (a CDN answer is not the bucket's, and the
+  dev token's Item Read on production makes the S3 HEAD available and
+  stubbable); requiring the column in `Studio::HostSchema` (would fail boot on
+  every consumer before it installs the migration). The existing guard
+  (`guard_production_bucket!`) still refuses any delete from a `*-production`
+  bucket off production, and the dev R2 tokens cannot write production.
+
+  **Consumer adoption.** Nothing changes until an app opts in, and production
+  behaves as before. To adopt: (1) `bin/rails studio_engine:install:migrations
+  db:migrate` and commit the copy and `db/schema.rb`; (2) set
+  `config.s3_production_public_url` to the production asset host in
+  `config/initializers/studio.rb`; (3) switch seeders from
+  `Studio::ImageCache.cache!` to `reference_or_cache!`; (4) replace any
+  `Studio::S3.download(key: row.s3_key)` or `Studio::S3.delete(key:
+  row.s3_key)` on an `ImageCache` row with `row.download` /
+  `row.delete_object!`.
+
 ## 0.102.0 — 2026-10-10
 
 ### Removed

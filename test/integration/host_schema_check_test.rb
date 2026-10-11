@@ -65,7 +65,7 @@ class HostSchemaCheckTest < ActiveSupport::TestCase
     TABLES.each { |t| assert_not connection.table_exists?(t), "precondition: #{t} absent" }
     assert_not_empty Studio::HostSchema.missing_columns(connection), "control: the check fails before migrating"
 
-    assert_equal %w[20260620000002 20261006120001 20261006120002 20261006120003],
+    assert_equal %w[20260620000002 20261006120001 20261006120002 20261006120003 20261010120000],
                  host_table_migrations.map { |p| File.basename(p)[0, 14] }.sort,
                  "the engine migrations that own these tables"
     context = migrate_fresh!
@@ -73,6 +73,8 @@ class HostSchemaCheckTest < ActiveSupport::TestCase
     assert_empty context.migrations.map(&:version) - context.get_all_versions,
                  "every engine migration ran"
     TABLES.each { |t| assert connection.table_exists?(t), "#{t} built by the engine" }
+    assert_includes connection.columns(:image_caches).map(&:name), "stored_in",
+                    "a fresh install carries the production-reference marker"
     assert_equal({}, Studio::HostSchema.check!(connection: connection, mode: :raise))
 
     ThemeSetting.reset_column_information

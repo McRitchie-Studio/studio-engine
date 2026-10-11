@@ -1079,6 +1079,19 @@ module Studio
   mattr_accessor :s3_secret_access_key, default: nil
   mattr_accessor :s3_public_url,        default: nil
 
+  # SEED ASSETS LIVE IN PRODUCTION. The public base of THIS app's PRODUCTION
+  # bucket (https://assets.turfmonster.media), set in every environment. A
+  # non-production process (a laptop, a desk, a QA app) whose seeders call
+  # Studio::ImageCache.reference_or_cache! records an ImageCache row that
+  # REFERENCES production's copy of an object instead of uploading its own, and
+  # that row's #url resolves on this host. Not a secret, so a literal in
+  # config/initializers/studio.rb is the expected form.
+  #
+  # nil (the default) turns references off: reference_or_cache! is then exactly
+  # cache!, and every row resolves on s3_public_url as it always has. A real
+  # production process ignores it, because its own bucket IS production.
+  mattr_accessor :s3_production_public_url, default: nil
+
   # Knowledge layer — the S3-backed document store + /admin/knowledge browser
   # (Studio::KnowledgeDoc). Routes are opt-in like every route surface.
   # knowledge_agents is the roster of agent slugs the intake UI offers
