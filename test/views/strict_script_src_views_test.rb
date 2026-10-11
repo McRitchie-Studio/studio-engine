@@ -57,11 +57,11 @@ class StrictScriptSrcViewsTest < ActiveSupport::TestCase
     end
   end
 
-  test "the head styles a banner chip's hover and focus, tooltip included" do
+  test "the head styles a banner chip's hover and keyboard focus, tooltip included" do
     head = Studio::Engine.root.join("app/views/layouts/studio/_head.html.erb").read
 
-    assert_includes head, "[data-studio-banner-button]:hover, [data-studio-banner-button]:focus {"
+    assert_includes head, "[data-studio-banner-button]:hover, [data-studio-banner-button]:focus-visible {"
     assert_includes head, "background: var(--studio-banner-hover-bg) !important;"
-    assert_includes head, "[data-studio-banner-button]:focus [data-studio-banner-tooltip] { opacity: 1 !important; }"
+    assert_includes head, "[data-studio-banner-button]:focus-visible [data-studio-banner-tooltip] { opacity: 1 !important; }"
   end
 end

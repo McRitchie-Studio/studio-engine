@@ -21,7 +21,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `onmouseover`, `onmouseout`, `onfocus` and `onblur` handlers: the chip sets
   `--studio-banner-hover-bg`, `-border` and `-color` inline and carries
   `data-studio-banner-button`, and a rule in `layouts/studio/_head` paints its
-  hover, focus and tooltip. Both pages now run under a script-src with no
+  hover, keyboard focus (`:focus-visible`) and tooltip. Both pages now run under a script-src with no
   `'unsafe-inline'` (turf-monster's signing pages). A host that renders a banner
   without the engine head keeps the resting look on hover.
 - **Primary chips are painted in the primary colour and clear AA in both
