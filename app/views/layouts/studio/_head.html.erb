@@ -126,6 +126,19 @@
     installed by studio/alpine_shims. %>
 
 <style>
+  /* studio-engine: a banner chip's hover and focus look (studio/banners/_button
+     sets the three properties inline). !important because the chip's resting
+     look is inline too. */
+  [data-studio-banner-button]:hover, [data-studio-banner-button]:focus {
+    background: var(--studio-banner-hover-bg) !important;
+    border-color: var(--studio-banner-hover-border) !important;
+    color: var(--studio-banner-hover-color) !important;
+  }
+  [data-studio-banner-button]:hover [data-studio-banner-tooltip],
+  [data-studio-banner-button]:focus [data-studio-banner-tooltip] { opacity: 1 !important; }
+</style>
+
+<style>
   /* studio-engine: a sticky navbar that shrinks on scroll changes layout
      above the fold — Chrome/Firefox scroll-anchoring then compensates by
      moving scrollY, which re-crosses the collapse threshold and bounces.

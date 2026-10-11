@@ -14,9 +14,6 @@
   base_class = "group relative inline-flex items-center font-semibold rounded px-3 py-1 whitespace-nowrap gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/90"
   classes = [base_class, local_assigns[:class]].compact.join(" ")
 
-  tooltip_show = tooltip.present? ? "var t=this.querySelector('[data-studio-banner-tooltip]'); if(t){t.style.opacity='1';}" : ""
-  tooltip_hide = tooltip.present? ? "var t=this.querySelector('[data-studio-banner-tooltip]'); if(t){t.style.opacity='0';}" : ""
-
   if variant == :solid
     default_background = local_assigns.fetch(:background, "#ffffff")
     default_border = local_assigns.fetch(:border_color, "#ffffff")
@@ -43,21 +40,21 @@
     "font-weight:700",
     "text-decoration:none",
     "position:relative",
-    "transition:background-color 150ms ease, color 150ms ease, border-color 150ms ease"
+    "transition:background-color 150ms ease, color 150ms ease, border-color 150ms ease",
+    # The hover and focus look, read by the [data-studio-banner-button] rule in
+    # layouts/studio/_head. CSS, not inline handlers, so a host whose
+    # script-src drops 'unsafe-inline' still styles the chip.
+    "--studio-banner-hover-bg:#{hover_background}",
+    "--studio-banner-hover-border:#{hover_border}",
+    "--studio-banner-hover-color:#{hover_color}"
   ].join("; ")
-
-  show_styles = "this.style.background='#{hover_background}'; this.style.borderColor='#{hover_border}'; this.style.color='#{hover_color}';#{tooltip_show}"
-  hide_styles = "this.style.background='#{default_background}'; this.style.borderColor='#{default_border}'; this.style.color='#{default_color}';#{tooltip_hide}"
 
   attrs = {
     class: classes,
     style: base_style,
     title: tooltip,
     "aria-label": aria_label.presence,
-    onmouseover: show_styles,
-    onmouseout: hide_styles,
-    onfocus: show_styles,
-    onblur: hide_styles
+    "data-studio-banner-button": ""
   }.compact
 
   attrs[:"@click"] = local_assigns[:alpine_click] if local_assigns[:alpine_click].present?

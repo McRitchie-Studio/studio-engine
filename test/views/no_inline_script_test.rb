@@ -62,7 +62,7 @@ class NoInlineScriptTest < Minitest::Test
     "solana_sessions/phantom_callback.html.erb" => {
       scripts: 1, owner: "engine-admin-scripts-to-stimulus",
       why: "the wallet's return leg: it runs as the page parses, ahead of every deferred module, and " \
-           "turf-monster's tests read this template's source"
+           "turf-monster's tests read this template's source; nonced (test/views/strict_script_src_views_test.rb)"
     },
 
     # engine-modal-blocks-profile-stimulus: inline on purpose, and nonced
