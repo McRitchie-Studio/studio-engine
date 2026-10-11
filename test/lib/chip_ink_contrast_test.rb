@@ -9,17 +9,26 @@ require_relative "../support/consumer_palettes"
 # spread of colours an operator could pick. A primary chip's ink is a shade of
 # the primary colour.
 #
-# The chip is `bg-<role>/10 text-<role>-ink`. The tint is graded at both
-# strengths a browser paints it (ThemeResolver::TINT_ALPHAS): e2e/chip_contrast.spec.js
-# reads the painted pixels, and this is the same claim over every palette.
+# The chip is `bg-<role>/10 text-<role>-ink`, and the apps also put an ink on
+# its role's 15% and 20% tints (turf's "Entered" badge is `bg-primary/15`, the
+# hub's workflow chips `bg-success/20 text-success-ink`). The tint is graded at
+# PAINTED_TINTS, a list this file owns: the 10% chip as written and as Chromium
+# composites it (26/255), and the 15% and 20% tints. It is not read from
+# ThemeResolver::TINT_ALPHAS, so a resolver that stops counting a strength goes
+# red here instead of grading itself. e2e/chip_contrast.spec.js reads the painted
+# pixels; this is the same claim over every palette.
 #
 # CONTROLS, each run against this file:
-#   - status_ink searching STATUS_TINT alone: the consumer and default cases
-#     fail (default light success 4.49:1, mcritchie-industries dark danger 4.49:1).
+#   - TINT_ALPHAS back to the 10% chip alone ([0.10, 26/255]): every consumer
+#     palette fails on a 15% or 20% tint (turf dark primary 4.25:1 and light
+#     4.02:1 on 20%, default dark warning 3.89:1 on 20%).
+#   - status_ink searching STATUS_TINT alone: the same, and the 26/255 cases.
 #   - status_ink searching the bare surfaces: every case fails.
 #   - --color-primary-ink set to --color-text: the hue test fails.
 class ChipInkContrastTest < ActiveSupport::TestCase
   AA    = 4.5
+  # Every tint strength a chip's ink is read on, as the browser paints it.
+  PAINTED_TINTS = [0.10, 26 / 255.0, 0.15, 0.20].freeze
   ROLES = { "success" => "--color-success", "warning" => "--color-warning",
             "danger" => "--color-danger", "primary" => "--color-primary" }.freeze
 
@@ -36,12 +45,12 @@ class ChipInkContrastTest < ActiveSupport::TestCase
   end
 
   # The lowest contrast of each role's ink on its tint, over every surface and
-  # both painted tint strengths: { [mode, role] => ratio }.
+  # every painted tint strength: { [mode, role] => ratio }.
   def worst_on_tint(palette)
     modes(palette).each_with_object({}) do |(mode, (vars, surfaces)), worst|
       ROLES.each do |role, colour_var|
         ink = vars.fetch("--color-#{role}-ink") { flunk "#{mode} emits no --color-#{role}-ink" }
-        tints = Studio::ThemeResolver::TINT_ALPHAS.flat_map do |alpha|
+        tints = PAINTED_TINTS.flat_map do |alpha|
           surfaces.map { |bg| Studio::ColorScale.blend(vars.fetch(colour_var), bg, alpha) }
         end
         worst[[mode, role]] = tints.map { |bg| Studio::ColorScale.contrast_ratio(ink, bg) }.min
@@ -119,8 +128,23 @@ class ChipInkContrastTest < ActiveSupport::TestCase
     assert_operator Studio::ColorScale.contrast_ratio("#000000", darkest), :<, AA
   end
 
-  test "the tint is graded at the alpha an 8-bit channel paints" do
-    assert_equal [0.10, 26 / 255.0], Studio::ThemeResolver::TINT_ALPHAS
+  test "the resolver counts every tint strength a chip is painted at" do
+    assert_equal PAINTED_TINTS, Studio::ThemeResolver::TINT_ALPHAS
+  end
+
+  # The 15% and 20% tints are not redundant with the 10% chip: an ink tuned to
+  # the 10% chip alone fails on them, in turf's palette and the default.
+  test "an ink tuned to the 10 percent chip alone fails on the 20 percent tint" do
+    { "turf-monster" => ConsumerPalettes::ALL.fetch("turf-monster"), "engine-default" => {} }.each do |name, palette|
+      resolver = Studio::ThemeResolver.new(palette)
+      surfaces = resolver.dark_surfaces(palette[:dark] || "#1A1535")
+      primary = resolver.primary_palette_vars.fetch("--color-primary")
+      chip_only = surfaces + PAINTED_TINTS.first(2).flat_map { |a| surfaces.map { |bg| Studio::ColorScale.blend(primary, bg, a) } }
+      ink = resolver.send(:contrast_ink, primary, direction: :lighten, start: 0.0, target: AA, against: chip_only)
+      worst = surfaces.map { |bg| Studio::ColorScale.contrast_ratio(ink, Studio::ColorScale.blend(primary, bg, 0.20)) }.min
+
+      assert_operator worst, :<, AA, "#{name} dark: an ink tuned to 10% now clears 20% too; this control proves nothing"
+    end
   end
 
   test "the preset mints text-primary-ink and the theme stylesheet declares it in both blocks" do

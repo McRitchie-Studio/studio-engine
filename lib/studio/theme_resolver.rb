@@ -169,8 +169,16 @@ module Studio
     # How strong a status role's tint is where its ink is read on it: the
     # `bg-<role>/10 text-<role>-ink` badge and flash-panel pattern.
     STATUS_TINT = 0.10
-    # The same tint as written, and as an 8-bit alpha channel holds it.
-    TINT_ALPHAS = [STATUS_TINT, (STATUS_TINT * 255).round / 255.0].freeze
+    # Every tint strength a role's ink is read on. The 10% chip, as written and
+    # as an 8-bit alpha channel holds it (26/255, a little stronger), and the
+    # 15% and 20% tints the apps also put an ink on: a selected or "Entered"
+    # badge (`bg-primary/15`), the hub's workflow and verdict chips
+    # (`bg-success/20 text-success-ink`, `bg-warning/20 text-warning-ink`),
+    # turf's signer roster (`bg-danger/15 text-danger-ink`). A stronger tint
+    # sits closer to the ink, so an ink tuned to the 10% chip alone read 3.89:1
+    # on a 20% one (default warning, dark). 0.15 and 0.20 are the stronger of
+    # each written alpha and its 8-bit value (38/255 is weaker, 51/255 equal).
+    TINT_ALPHAS = [STATUS_TINT, (STATUS_TINT * 255).round / 255.0, 0.15, 0.20].freeze
 
     # A status ink lands on the page surfaces AND on its own role's tint over
     # each of them (the `bg-warning/10 text-warning-ink` badge). The tint is
@@ -179,10 +187,10 @@ module Studio
     # (default theme: warning 3.91:1 dark, success 4.00:1 dark, danger 4.10:1
     # light and 4.18:1 dark). Counting the tints as surfaces closes that.
     #
-    # The tint is counted at both strengths a browser paints it. Chromium
-    # composites a 10% fill at 26/255, a little stronger than 0.10, and an ink
-    # tuned to 0.10 alone measured 4.48:1 on the painted pixels (danger, dark,
-    # on a #141516 base).
+    # The tint is counted at every strength in TINT_ALPHAS. Chromium composites
+    # a 10% fill at 26/255, a little stronger than 0.10, and an ink tuned to
+    # 0.10 alone measured 4.48:1 on the painted pixels (danger, dark, on a
+    # #141516 base).
     def status_ink(role, surfaces, direction:)
       tints = TINT_ALPHAS.flat_map { |alpha| surfaces.map { |bg| ColorScale.blend(role, bg, alpha) } }
       contrast_ink(role, direction: direction, start: 0.0, target: 4.5, against: surfaces + tints)

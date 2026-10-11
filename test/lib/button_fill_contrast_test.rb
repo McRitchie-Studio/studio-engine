@@ -147,7 +147,8 @@ class ButtonFillContrastTest < ActiveSupport::TestCase
   # Text keeps reading the -ink variants, derived from the unchanged role
   # colours, not from the fills.
   test "the default warning and danger text inks are derived from the role colours" do
-    inks = { dark: %w[#FF966C #F58F8F], light: %w[#994A2B #AC3131] }
+    # Derived against the 10%, 15% and 20% tints (ThemeResolver::TINT_ALPHAS).
+    inks = { dark: %w[#FFAB89 #F69A9A], light: %w[#8F4528 #9E2D2D] }
     modes.each do |mode, vars|
       assert_equal inks[mode], [vars["--color-warning-ink"], vars["--color-danger-ink"]], mode
     end
