@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.103.0 — 2026-10-10
+
 ### Added
 
 - **Seed assets reference production.** A non-production process (laptop,
