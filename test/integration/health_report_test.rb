@@ -206,6 +206,7 @@ class HealthReportTest < ActiveSupport::TestCase
     assert_equal "Dummy health: all clear", mail.subject
     assert_includes body_text(mail), "All clear: no signups or errors in the last day."
     assert_includes mail.text_part.body.to_s, "All clear: no signups or errors in the last day."
+    assert_includes body_text(mail), "Your daily report from McRitchie Studio."
   end
 
   test "[integration] the job sends one report to the configured recipient" do
