@@ -58,7 +58,8 @@ module Studio
     # sends, and says that this one part could not be read.
     Section = Struct.new(:title, :count, :items, :failure, keyword_init: true) do
       def failed? = !failure.nil?
-      def more = [count.to_i - items.size, 0].max
+      # Rows counted but not listed. A count-only section lists none and owes no tail.
+      def more = items.empty? ? 0 : [count.to_i - items.size, 0].max
     end
 
     # One distinct error: its class, its message, how often, first and last.

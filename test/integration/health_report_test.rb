@@ -196,6 +196,8 @@ class HealthReportTest < ActiveSupport::TestCase
     assert_includes text, "lead@example.test"
     refute_includes text, "All clear"
     assert_includes mail.text_part.body.to_s, "2x Net::ReadTimeout: ESPN feed"
+    # A count-only section (errors list groups, not rows) has no "and N more" tail.
+    refute_includes mail.text_part.body.to_s, "more"
   end
 
   test "[integration] a quiet day sends one short all-clear line, never an empty email" do
