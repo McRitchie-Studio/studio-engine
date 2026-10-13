@@ -80,6 +80,9 @@ module Studio
         "#{app_name} health: #{parts.join(', ')}"
       end
 
+      # A time on the report's own clock: "Oct 13, 6:42 AM".
+      def stamp(time) = time ? time.in_time_zone(window.end.time_zone).strftime("%b %-d, %-l:%M %p") : "unknown"
+
       # "Oct 12, 7:00 AM to Oct 13, 7:00 AM MDT"
       def window_label
         from, to = window.begin, window.end
