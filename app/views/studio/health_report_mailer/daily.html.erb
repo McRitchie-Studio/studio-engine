@@ -17,7 +17,7 @@
       <tr>
         <td style="padding:20px 24px;font-size:15px;">
           <strong style="color:#166534;">All clear:</strong>
-          no <%= @report.sections.map { |s| s.title.downcase }.to_sentence %> in the last day.
+          no <%= @report.sections.map { |s| s.title.downcase }.to_sentence(two_words_connector: " or ", last_word_connector: ", or ") %> in the last day.
         </td>
       </tr>
     <% else %>

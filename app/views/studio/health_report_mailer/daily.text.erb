@@ -2,7 +2,7 @@
 <%= @report.window_label %>
 
 <% if @report.quiet? -%>
-All clear: no <%= @report.sections.map { |s| s.title.downcase }.to_sentence %> in the last day.
+All clear: no <%= @report.sections.map { |s| s.title.downcase }.to_sentence(two_words_connector: " or ", last_word_connector: ", or ") %> in the last day.
 <% else -%>
 <% @report.sections.each do |section| -%>
 <%= section.title %>: <%= section.failed? ? "could not be read (#{section.failure})" : section.count %>
