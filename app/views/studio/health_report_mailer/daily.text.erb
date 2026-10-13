@@ -1,0 +1,26 @@
+<%= @report.app_name %> health report
+<%= @report.window_label %>
+
+<% if @report.quiet? -%>
+All clear: no <%= @report.sections.map { |s| s.title.downcase }.to_sentence(two_words_connector: " or ", last_word_connector: ", or ") %> in the last day.
+<% else -%>
+<% @report.sections.each do |section| -%>
+<%= section.title %>: <%= section.failed? ? "could not be read (#{section.failure})" : section.count %>
+<% section.items.each do |item| -%>
+  - <%= item %>
+<% end -%>
+<% if section.more.positive? -%>
+  ... and <%= section.more %> more
+<% end -%>
+<% if section.title == "Errors" -%>
+<% @report.error_groups.each do |group| -%>
+  <%= group.count %>x <%= group.error_class %>: <%= group.message.squish.truncate(160) %>
+     first <%= @report.stamp(group.first_seen) %>, last <%= @report.stamp(group.last_seen) %>
+<% end -%>
+<% if @report.error_kinds > @report.error_groups.size -%>
+  ... and <%= @report.error_kinds - @report.error_groups.size %> more kinds
+<% end -%>
+<% end -%>
+
+<% end -%>
+<% end -%>

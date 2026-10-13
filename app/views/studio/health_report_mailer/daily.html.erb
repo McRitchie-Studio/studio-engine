@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= @report.subject %></title>
+</head>
+<body style="margin:0;padding:24px 12px;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#18181b;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e4e4e7;border-radius:8px;">
+    <tr>
+      <td style="padding:20px 24px;border-bottom:1px solid #e4e4e7;">
+        <div style="font-size:18px;font-weight:700;"><%= @report.app_name %> health report</div>
+        <div style="font-size:13px;color:#52525b;margin-top:4px;"><%= @report.window_label %></div>
+      </td>
+    </tr>
+    <% if @report.quiet? %>
+      <tr>
+        <td style="padding:20px 24px;font-size:15px;">
+          <strong style="color:#166534;">All clear:</strong>
+          no <%= @report.sections.map { |s| s.title.downcase }.to_sentence(two_words_connector: " or ", last_word_connector: ", or ") %> in the last day.
+        </td>
+      </tr>
+    <% else %>
+      <% @report.sections.each do |section| %>
+        <tr>
+          <td style="padding:16px 24px;border-bottom:1px solid #f4f4f5;">
+            <div style="font-size:15px;font-weight:600;">
+              <%= section.title %>:
+              <% if section.failed? %>
+                <span style="color:#b91c1c;">could not be read (<%= section.failure %>)</span>
+              <% else %>
+                <span style="color:<%= section.title == "Errors" && section.count.positive? ? "#b91c1c" : "#18181b" %>;"><%= section.count %></span>
+              <% end %>
+            </div>
+            <% if section.items.any? %>
+              <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#3f3f46;overflow-wrap:anywhere;">
+                <% section.items.each do |item| %>
+                  <li style="margin:2px 0;"><%= item %></li>
+                <% end %>
+                <% if section.more.positive? %>
+                  <li style="margin:2px 0;color:#71717a;">and <%= section.more %> more</li>
+                <% end %>
+              </ul>
+            <% end %>
+            <% if section.title == "Errors" && @report.error_groups.any? %>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;font-size:13px;border-collapse:collapse;">
+                <% @report.error_groups.each do |group| %>
+                  <tr>
+                    <td style="padding:6px 8px 6px 0;vertical-align:top;font-weight:700;white-space:nowrap;color:#b91c1c;"><%= group.count %>&times;</td>
+                    <td style="padding:6px 0;vertical-align:top;border-top:1px solid #f4f4f5;">
+                      <div style="font-family:Menlo,Consolas,monospace;font-weight:600;word-break:break-all;overflow-wrap:anywhere;"><%= group.error_class %></div>
+                      <div style="color:#3f3f46;word-break:break-word;"><%= group.message.squish.truncate(200) %></div>
+                      <div style="color:#71717a;font-size:12px;">first <%= @report.stamp(group.first_seen) %> &middot; last <%= @report.stamp(group.last_seen) %></div>
+                    </td>
+                  </tr>
+                <% end %>
+              </table>
+              <% if @report.error_kinds > @report.error_groups.size %>
+                <div style="font-size:13px;color:#71717a;margin-top:6px;">and <%= @report.error_kinds - @report.error_groups.size %> more kinds</div>
+              <% end %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    <% end %>
+    <tr>
+      <td style="padding:12px 24px;font-size:12px;color:#71717a;">Your daily report from McRitchie Studio.</td>
+    </tr>
+  </table>
+</body>
+</html>

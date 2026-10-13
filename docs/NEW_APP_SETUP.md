@@ -829,6 +829,10 @@ bin/rails server -p {PORT}
 - [ ] `/error_logs` loads
 - [ ] SSO from McRitchie Studio works, if enabled
 
+Optional: a daily health report email (signups, errors, contact messages) is
+one schedule entry and one recipient away; see
+[`HEALTH_REPORT.md`](HEALTH_REPORT.md).
+
 ---
 
 ## Optional: Solana Integration

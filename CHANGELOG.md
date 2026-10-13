@@ -4,6 +4,21 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`Studio::HealthReportJob`: a daily application health report, off by
+  default.** One email at 07:00 in the app's zone listing the last day's
+  signups, `ErrorLog` errors grouped by class and message with counts and first
+  and last seen, and contact-form submissions when the app names a source; a
+  quiet day sends a one-line all-clear. The day runs 07:00 to 07:00 on the
+  wall clock, so a daylight-saving change makes it 23 or 25 hours, and a late
+  run reports the same day. Nothing sends until a host schedules the job AND
+  names a recipient (`config.health_report_to` or `STUDIO_HEALTH_REPORT_TO`);
+  QA never sends. New settings: `health_report_to`, `health_report_zone`
+  (default `America/Denver`), `health_report_hour` (default `7`),
+  `health_report_signups` (default: the host's `User` by `created_at`) and
+  `health_report_contacts` (default: none). See `docs/HEALTH_REPORT.md`.
+
 ## 0.104.0 — 2026-10-11
 
 ### Added
