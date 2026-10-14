@@ -100,12 +100,34 @@ classes and contents, so the page's title is the outline's only h1:
 <%= render "layouts/navbar", brand_heading: false %>
 ```
 
+## Brand Wordmark (optional)
+
+An app with a brand lockup (its icon and words drawn as one artwork) can show it
+in place of the "Navbar Logo" image and the `app_name` text:
+
+```ruby
+config.navbar_wordmark = { light: "/brand/navbar-light.svg",
+                           dark:  "/brand/navbar-dark.svg" }
+```
+
+`light` is the file for a light page and `dark` the file for a dark page (the
+root's `dark` class). Both render; engine.css shows the matching one, so the
+theme toggle swaps them with no script. The lockup keeps the root link and the
+brand h1 (`brand_heading: false` still makes it a div), with `alt` set to
+`Studio.app_name`. It is height-led: its height is the logo's collapse size
+(48px expanded, 32px collapsed on desktop, 40px on a phone) and its width is the
+artwork's own, scaled down inside the left column on a narrow phone. Crop the
+artwork tight to the lockup, with no padding, so it fills that height. `nil`, the
+default, leaves the navbar byte-identical; anything other than a Hash with both
+paths raises at boot.
+
 ## CSS Class Hooks
 
 These classes are available for preview CSS targeting:
 - `.nav-logo` — the logo image
 - `.nav-title` — the brand title (an h1, or a div when `brand_heading: false`)
 - `.nav-logo-link` — the link wrapping logo + title
+- `.nav-wordmark-brand`, `.nav-wordmark`, `.nav-wordmark-light`, `.nav-wordmark-dark` — the brand lockup when `config.navbar_wordmark` is set
 - `.user-nav-col` — the right-side user nav column (fixed width, seats a balance)
 - `.user-nav-fit` — the same column when no `balance_html` is passed: shrink-to-fit, with media-stepped `max-width` clamps (14/15/20rem) mirroring `.user-nav-col`
 
