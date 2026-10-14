@@ -78,8 +78,10 @@
         defaults to min-width auto, and without it this column refuses to
         shrink below balance + icons. On a 320px phone with a balance the
         reserved column is 147px, and a column that will not give pushed the
-        avatar 17px past the screen edge (e2e/header_phone_width.spec.js). %>
-    <div class="flex-1 min-w-0">
+        avatar 17px past the screen edge (e2e/header_phone_width.spec.js).
+        It is a centred flex column, so with no second row the icons sit level
+        with the name and avatar rather than at the top of the bar. %>
+    <div class="flex-1 min-w-0 flex flex-col justify-center" data-nav-tools>
       <%# Div 1 (Bigger): balance + icons. %>
       <div class="flex items-center gap-2 leading-none" :style="'padding: 0 6px;' + ($store.devMode ? 'background: cornflowerblue;' : '')">
         <%= studio_nav_slot.call(balance_slot, balance_html) %>
@@ -207,8 +209,22 @@
         column beside it is what gives way. So the name cannot truncate by
         flex shrinking: from md up its box carries a max width instead, and
         the name ellipsizes inside it. The avatar is aria-hidden: the name is
-        the link's accessible name. %>
+        the link's accessible name.
+
+        A host whose link sidebar heads with the profile can make the link open
+        the sidebar instead, by defining studio_account_opens_sidebar? as true
+        (a view helper; the engine defines none, so every other host keeps the
+        link). The link then carries the sidebar's toggle attributes and
+        studio/link_sidebar claims its click; the href stays, so a click before
+        that script loads still reaches the account page. %>
     <% account_classes = "group flex items-center gap-2 flex-shrink-0" %>
+    <% account_toggle =
+         if studio_nav_destination && respond_to?(:studio_account_opens_sidebar?) && studio_account_opens_sidebar?
+           { "data-profile-image-toggle": "", "aria-controls": "studio-link-sidebar studio-link-sidebar-mobile",
+             "aria-haspopup": "dialog", ":aria-expanded": "$store.sidebars && $store.sidebars.linkTreeOpen ? 'true' : 'false'" }
+         else
+           {}
+         end %>
     <% account_inner = capture do %>
       <span class="sr-only md:not-sr-only md:max-w-40"><span class="block truncate text-right text-heading font-semibold text-base leading-none transition<%= " group-hover:text-primary" if studio_nav_destination %>" data-nav-name><%= Studio.navbar_user_name_for(current_user, self) %></span></span>
       <span class="flex-shrink-0 flex items-center" aria-hidden="true">
@@ -216,7 +232,7 @@
       </span>
     <% end %>
     <% if studio_nav_destination %>
-      <%= link_to account_inner, studio_nav_destination, class: "#{account_classes} hover:opacity-80 transition", "data-nav-account": "", "x-bind:style": "$store.devMode && 'background: lightgreen'" %>
+      <%= link_to account_inner, studio_nav_destination, class: "#{account_classes} hover:opacity-80 transition", "data-nav-account": "", "x-bind:style": "$store.devMode && 'background: lightgreen'", **account_toggle %>
     <% else %>
       <span class="<%= account_classes %>" data-nav-account x-bind:style="$store.devMode && 'background: lightgreen'"><%= account_inner %></span>
     <% end %>
