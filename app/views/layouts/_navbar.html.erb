@@ -42,6 +42,7 @@
   last_word = words.pop
   prefix = words.join(" ")
   logo_path = Studio.logo_for("Navbar Logo")
+  wordmark = Studio.navbar_wordmark
 %>
 
 <%# nav-shell is the --nav-p scope: the engine's nav-collapse controller (studio/nav_collapse) writes
@@ -143,6 +144,20 @@
     <div class="flex-1 min-w-0 px-4">
       <div class="flex items-center gap-6 min-w-0">
         <%= link_to root_path, class: "nav-logo-link inline-flex items-center gap-3 group min-w-0" do %>
+          <% if wordmark %>
+          <%# Studio.navbar_wordmark: the brand lockup (icon + words as one
+              artwork) replaces the logo AND the title text. Both theme files
+              render; engine.css (.nav-wordmark-light / -dark) shows the one
+              matching the root's `dark` class, so a toggle needs no script.
+              The brand_tag still wraps it, so the page keeps its h1 and the
+              h1's accessible name is the alt text. Height follows
+              --nav-logo-size; width is the artwork's own, shrinking with the
+              column (min-w-0 chain above) rather than spilling. %>
+          <<%= brand_tag %> class="nav-wordmark-brand min-w-0">
+            <img src="<%= wordmark[:light] %>" alt="<%= Studio.app_name %>" class="nav-wordmark nav-wordmark-light">
+            <img src="<%= wordmark[:dark] %>" alt="<%= Studio.app_name %>" class="nav-wordmark nav-wordmark-dark">
+          </<%= brand_tag %>>
+          <% else %>
           <% if logo_path %>
             <%# No w-*/h-* utility here: .nav-shell .nav-logo sizes it off --nav-p.
                 transition-transform, NOT transition-all — the hover lift still
@@ -155,6 +170,7 @@
               `truncate` on the h1 would clip the flex CONTAINER and leave the
               spans drawing outside it, which is the bug rather than the fix. %>
           <<%= brand_tag %> class="nav-title font-extrabold text-heading tracking-tight min-w-0"><span class="truncate"><%= prefix %></span><span class="text-primary truncate"><%= last_word %></span></<%= brand_tag %>>
+          <% end %>
         <% end %>
         <%# Desktop nav — Studio.navbar_links %>
         <nav class="hidden md:flex items-center gap-4"<%= ' aria-label="Main"'.html_safe if navbar_links.any? %>>

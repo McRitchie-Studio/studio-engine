@@ -540,6 +540,22 @@ body.modal-open .studio-app-banner {
     .nav-shell .nav-title { font-size: var(--nav-title-size); line-height: var(--nav-title-lead); }
     .nav-shell .nav-title span:last-child { font-size: var(--nav-title-lead-size); }
 
+    /* Studio.navbar_wordmark: a brand lockup image in place of the logo and
+       title. HEIGHT-LED: it rides --nav-logo-size, so it collapses exactly as
+       the logo does in every band, and its width is the artwork's own. On a
+       phone the left column is what is left beside the user column's
+       min(14rem, 46vw) cap; the brand box and the image both carry min-width 0
+       and the image max-width 100%, so a wide lockup scales down inside that
+       column (object-fit keeps its aspect, pinned left) instead of painting
+       over the user nav. Both theme files render and the root's `dark` class
+       picks one: the light file on a light page, the dark file on a dark page. */
+    .nav-wordmark-brand { display: flex; align-items: center; min-width: 0; margin: 0; }
+    .nav-wordmark { display: block; width: auto; max-width: 100%; min-width: 0; object-fit: contain; object-position: left center; }
+    .nav-shell .nav-wordmark { height: var(--nav-logo-size); }
+    .nav-wordmark-dark { display: none; }
+    .dark .nav-wordmark-light { display: none; }
+    .dark .nav-wordmark-dark { display: block; }
+
     @media (max-width: 767px) {
       .nav-title { flex-direction: column; gap: 0; }
       .nav-title span:first-child { margin-bottom: -4px; }
