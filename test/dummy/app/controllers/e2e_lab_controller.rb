@@ -227,6 +227,17 @@ class E2eLabController < ActionController::Base
     def truncated_solana = "7xKX…gAsU"
   end
 
+  # THE ONE-ROW HEADER'S FIXTURE: the same person with no level and no wallet,
+  # which is every app but Turf Monster. With no second row the account takes
+  # the 40px avatar and the rule-of-3 name (engine.css, THE ACCOUNT ROW).
+  class LabOneRowUser
+    def first_name = "Alexandra"
+    def display_name = "Alexandra Mcritchie"
+    def avatar = @avatar ||= Class.new { def attached? = false }.new
+    def avatar_color = "#6366f1"
+    def avatar_initials = "AM"
+  end
+
   # ADMIN, because an admin viewer is the one who gets the extra cog in the icon
   # rail — and an admin is exactly who is looking at a development banner.
   def admin? = @lab_admin.present?
@@ -236,10 +247,11 @@ class E2eLabController < ActionController::Base
     # signed-out page cannot show at all. `devnet` adds the DEVNET chip to the
     # environment bar, and `admin` the cog. `balance` is the one local that
     # swaps the right column from `user-nav-fit` (max-width) to `user-nav-col`
-    # (a hard width), which is the widest shape the partial has.
-    if params[:signed_in].present?
+    # (a hard width), which is the widest shape the partial has. `one_row`
+    # signs in the user with no second row.
+    if params[:signed_in].present? || params[:one_row].present?
       @lab_signed_in = true
-      @user = LabHeaderUser.new
+      @user = params[:one_row].present? ? LabOneRowUser.new : LabHeaderUser.new
     end
     @lab_devnet = params[:devnet].present?
     @lab_admin = params[:admin].present?

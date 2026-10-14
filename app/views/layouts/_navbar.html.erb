@@ -4,7 +4,6 @@
       preview         — if true, disables scroll handler and sticky positioning
       balance_html    — raw HTML for balance display (passed through to _user_nav)
       extra_icons_html — raw HTML for extra icon buttons (passed through to _user_nav)
-      show_logout_link — boolean, show "Log out" link in user nav (passed through to _user_nav)
       brand_heading   — boolean, draw the brand title as the page's h1 (default: true).
                         Pass false on a page that carries its own h1: the brand is
                         drawn as a div with the same classes and contents.
@@ -21,7 +20,6 @@
 <% pin_header = Studio.smooth_load && !is_preview %>
 <% balance_html = local_assigns.fetch(:balance_html, nil) %>
 <% extra_icons_html = local_assigns.fetch(:extra_icons_html, nil) %>
-<% show_logout_link = local_assigns.fetch(:show_logout_link, false) %>
 <% brand_tag = local_assigns.fetch(:brand_heading, true) ? "h1" : "div" %>
 <%# Out-of-the-box navigation (engine 0.30): when the host declares
     Studio.sidebar_sections, the navbar mounts the link-sidebar trigger in its
@@ -186,7 +184,7 @@
         to fit. %>
     <div class="<%= balance_html.present? ? 'user-nav-col' : 'user-nav-fit' %> flex-shrink-0 pl-0 pr-4 md:px-4">
       <% if show_user %>
-        <%= render "components/user_nav", balance_html: balance_html, extra_icons_html: extra_icons_html, show_logout_link: show_logout_link %>
+        <%= render "components/user_nav", balance_html: balance_html, extra_icons_html: extra_icons_html %>
       <% else %>
         <div class="flex items-center justify-end gap-3">
           <%= sidebar_trigger_desktop if sidebar_active %>

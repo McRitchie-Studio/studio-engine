@@ -981,7 +981,7 @@
 # app's; and a primary chip is in the primary hue. Verified RED against three
 # reintroduced defects (the spec's header lists them).
 #   npx playwright test --list  -> 330 tests in 48 files
-total_specs: 330
+total_specs: 335
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1173,7 +1173,7 @@ total_specs: 330
 #   npx playwright test --list                                             -> 330 tests, 48 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 330
-executed: 330
+executed: 335
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

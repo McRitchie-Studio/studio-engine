@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require_relative "../../app/helpers/studio_sidebar_helper"
 
 # Resolution rules for Studio.sidebar_sections (lib/studio/sidebar_sections.rb):
 # static arrays pass through symbolized, callables receive the view context,
@@ -130,5 +131,26 @@ class SidebarStandardSectionTest < Minitest::Test
   # the consequence is deliberate rather than discovered.
   def test_a_host_declaring_nothing_still_gets_a_sidebar
     refute_empty resolve(ProfileView.new("pat"), [])
+  end
+end
+
+# --- the navbar's account control ---------------------------------------------
+#
+# The sidebar heads with the profile, so wherever it renders the navbar's name
+# and avatar open it (components/_user_nav). The default follows studio_sidebar?
+# exactly; an app with no sidebar keeps the account link.
+class StudioAccountOpensSidebarTest < Minitest::Test
+  class View
+    include StudioSidebarHelper
+
+    def initialize(sections) = @studio_sidebar_sections = sections
+  end
+
+  def test_the_account_opens_the_sidebar_where_one_renders
+    assert View.new([{ title: "You", links: [] }]).studio_account_opens_sidebar?
+  end
+
+  def test_the_account_keeps_its_link_without_a_sidebar
+    refute View.new([]).studio_account_opens_sidebar?
   end
 end

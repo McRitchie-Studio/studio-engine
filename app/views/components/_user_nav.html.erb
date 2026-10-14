@@ -15,10 +15,6 @@
     (default display_name) and the signed-out button reads
     Studio.sign_in_label (default "Log in"); lib/studio/navbar_identity.rb.
 
-    Other locals:
-      show_logout_link — boolean, show explicit "Log out" link in the
-                         second row (Studio uses this)
-
     Legacy string locals (deprecated): balance_html, extra_icons_html,
     div2_html — pre-rendered HTML injected via raw. Still honored when
     the matching slot local is absent, so existing call sites render
@@ -30,7 +26,6 @@
 <% div2_slot        ||= nil %>
 <% balance_html     ||= nil %>
 <% extra_icons_html ||= nil %>
-<% show_logout_link ||= false %>
 <% div2_html        ||= nil %>
 <%# Slot resolution: the slot local wins when both a slot and its legacy
     string are passed. Returns nil when neither is present. %>
@@ -44,7 +39,9 @@
      end
    end %>
 
-<%# Where the account link (the username and the avatar, one link) points.
+<%# Where the account control (the username and the avatar, one control) points
+    when it is a link: an app with no link sidebar. Where the sidebar renders,
+    the control opens it instead (Div 3 below).
 
     A HOST'S OWN account_path WINS: an app that already has an account page keeps
     it rather than being repointed at a thinner /profile by a routine dependency
@@ -80,34 +77,39 @@
         reserved column is 147px, and a column that will not give pushed the
         avatar 17px past the screen edge (e2e/header_phone_width.spec.js).
         It is a centred flex column, so with no second row the icons sit level
-        with the name and avatar rather than at the top of the bar. %>
-    <div class="flex-1 min-w-0 flex flex-col justify-center" data-nav-tools>
+        with the name and avatar rather than at the top of the bar.
+        data-nav-rows says which navbar this is: "1" when no second row renders,
+        and then engine.css sizes the account on the rule of 3 (THE ACCOUNT
+        ROW there). A two-row nav keeps the engine's 2rem avatar under its row. %>
+    <% div2_content = studio_nav_slot.call(div2_slot, div2_html) %>
+    <% server_level = current_user.respond_to?(:level) && current_user.level.present? ? current_user.level : nil %>
+    <% wallet_connected = current_user.respond_to?(:truncated_solana) && current_user.try(:solana_connected?) %>
+    <% nav_rows = div2_content.present? || server_level || wallet_connected ? 2 : 1 %>
+    <div class="flex-1 min-w-0 flex flex-col justify-center" data-nav-tools data-nav-rows="<%= nav_rows %>">
       <%# Div 1 (Bigger): balance + icons. %>
       <div class="flex items-center gap-2 leading-none" :style="'padding: 0 6px;' + ($store.devMode ? 'background: cornflowerblue;' : '')">
         <%= studio_nav_slot.call(balance_slot, balance_html) %>
         <div class="flex items-center gap-2 ml-auto self-end">
+          <%# The theme toggle leads the rail, then the app's icons, then the
+              gear. Desktop only: below md the engine navbar's phone row draws
+              the theme toggle, so a second one here put two on every phone. The
+              signed-out bar has always done it this way (layouts/_navbar). %>
+          <span class="hidden md:flex" data-nav-theme-toggle="desktop"><%= render "components/theme_toggle_morph" %></span>
           <%= studio_nav_slot.call(extra_icons_slot, extra_icons_html) %>
           <%# Skipped when the link sidebar carries the admin menu — two cog
               glyphs side by side read as a double gear. Desktop only, like
               the theme toggle: below md the navbar's phone row draws the cog,
               so a second one here put two on an admin's phone. %>
           <%= render "components/admin_dropdown", display_class: "hidden md:block" unless respond_to?(:studio_sidebar_replaces_admin_menu?) && studio_sidebar_replaces_admin_menu? %>
-          <%# Desktop only. Below md the engine navbar's phone row draws the
-              theme toggle, so a second one here put two on every phone. The
-              signed-out bar has always done it this way (layouts/_navbar). %>
-          <span class="hidden md:flex" data-nav-theme-toggle="desktop"><%= render "components/theme_toggle_morph" %></span>
         </div>
       </div>
-      <% div2_content = studio_nav_slot.call(div2_slot, div2_html) %>
-      <% server_level = current_user.respond_to?(:level) && current_user.level.present? ? current_user.level : nil %>
-      <% wallet_connected = current_user.respond_to?(:truncated_solana) && current_user.try(:solana_connected?) %>
       <% if div2_content.present? %>
         <%# Div 2 replaced by the consumer's slot (div2_slot or legacy div2_html). %>
         <%= div2_content %>
-      <% elsif server_level || wallet_connected || show_logout_link %>
+      <% elsif server_level || wallet_connected %>
         <%# Div 2 (Smaller): wallet address (left) + level (right) with progress
             bar. Renders only when it has something to show — an off-chain,
-            level-less user without a logout link gets NO second row, so the
+            level-less user gets NO second row, so the
             nav collapses to one line instead of an empty progress strip. %>
         <div x-data="{
                barWidth: 0,
@@ -167,8 +169,6 @@
             </span>
             <% if server_level %>
               <span :class="leveledUp && 'nav-level-pop'" x-text="'Level ' + displayLevel">Level <%= server_level %></span>
-            <% elsif show_logout_link %>
-              <%= link_to "Log out", logout_path, class: "font-mono text-muted no-underline nav-bar-text" %>
             <% end %>
           </div>
           <%# Text layer 2: white (clip-path reveals where bar covers) %>
@@ -180,8 +180,6 @@
             </span>
             <% if server_level %>
               <span :class="leveledUp && 'nav-level-pop'" x-text="'Level ' + displayLevel">Level <%= server_level %></span>
-            <% elsif show_logout_link %>
-              <%= link_to "Log out", logout_path, class: "font-mono text-white no-underline nav-bar-text" %>
             <% end %>
           </div>
         </div>
@@ -199,40 +197,41 @@
         </style>
       <% end %>
     </div>
-    <%# Div 3 (Account): the name and the avatar are ONE link to the account
-        page, one tab stop — they used to be two links to the same place.
+    <%# Div 3 (Account): the name and the avatar are ONE control, one tab
+        stop — they used to be two links to the same place.
         Below md the name is screen-reader text and the avatar stands alone,
         so a phone never shows the name truncated to "Guest 55…"; from md up
         it shows beside the avatar and truncates when the row is tight.
 
-        The link never shrinks (the avatar must stay on screen); the icon
+        The control never shrinks (the avatar must stay on screen); the icon
         column beside it is what gives way. So the name cannot truncate by
         flex shrinking: from md up its box carries a max width instead, and
         the name ellipsizes inside it. The avatar is aria-hidden: the name is
-        the link's accessible name.
+        the control's accessible name.
 
-        A host whose link sidebar heads with the profile can make the link open
-        the sidebar instead, by defining studio_account_opens_sidebar? as true
-        (a view helper; the engine defines none, so every other host keeps the
-        link). The link then carries the sidebar's toggle attributes and
-        studio/link_sidebar claims its click; the href stays, so a click before
-        that script loads still reaches the account page. %>
+        WHERE THE LINK SIDEBAR RENDERS, THE ACCOUNT OPENS IT. The sidebar
+        heads with the engine's "You > Profile" section, so the name and avatar open it as the gear does
+        (studio_account_opens_sidebar?, which StudioSidebarHelper answers with
+        studio_sidebar?; a host may define its own). It is then a BUTTON, not a
+        link: it does not navigate, and a screen reader announces "Alex, button,
+        dialog" rather than a link that goes nowhere it says. studio/link_sidebar
+        claims its click from the document, before Alpine binds, as it does the
+        gear's. An app with no sidebar keeps the link to the account page. %>
+    <% account_opens_sidebar = respond_to?(:studio_account_opens_sidebar?) && studio_account_opens_sidebar? %>
     <% account_classes = "group flex items-center gap-2 flex-shrink-0" %>
-    <% account_toggle =
-         if studio_nav_destination && respond_to?(:studio_account_opens_sidebar?) && studio_account_opens_sidebar?
-           { "data-profile-image-toggle": "", "aria-controls": "studio-link-sidebar studio-link-sidebar-mobile",
-             "aria-haspopup": "dialog", ":aria-expanded": "$store.sidebars && $store.sidebars.linkTreeOpen ? 'true' : 'false'" }
-         else
-           {}
-         end %>
     <% account_inner = capture do %>
-      <span class="sr-only md:not-sr-only md:max-w-40"><span class="block truncate text-right text-heading font-semibold text-base leading-none transition<%= " group-hover:text-primary" if studio_nav_destination %>" data-nav-name><%= Studio.navbar_user_name_for(current_user, self) %></span></span>
+      <span class="sr-only md:not-sr-only md:max-w-40"><span class="block truncate text-right text-heading font-semibold text-base leading-none transition<%= " group-hover:text-primary" if account_opens_sidebar || studio_nav_destination %>" data-nav-name><%= Studio.navbar_user_name_for(current_user, self) %></span></span>
       <span class="flex-shrink-0 flex items-center" aria-hidden="true">
         <%= render "components/avatar", user: current_user, size: "nav" %>
       </span>
     <% end %>
-    <% if studio_nav_destination %>
-      <%= link_to account_inner, studio_nav_destination, class: "#{account_classes} hover:opacity-80 transition", "data-nav-account": "", "x-bind:style": "$store.devMode && 'background: lightgreen'", **account_toggle %>
+    <% if account_opens_sidebar %>
+      <button type="button" class="<%= account_classes %> cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" data-nav-account data-profile-image-toggle
+              aria-controls="studio-link-sidebar studio-link-sidebar-mobile" aria-haspopup="dialog"
+              :aria-expanded="$store.sidebars && $store.sidebars.linkTreeOpen ? 'true' : 'false'"
+              x-bind:style="$store.devMode && 'background: lightgreen'"><%= account_inner %></button>
+    <% elsif studio_nav_destination %>
+      <%= link_to account_inner, studio_nav_destination, class: account_classes, "data-nav-account": "", "x-bind:style": "$store.devMode && 'background: lightgreen'" %>
     <% else %>
       <span class="<%= account_classes %>" data-nav-account x-bind:style="$store.devMode && 'background: lightgreen'"><%= account_inner %></span>
     <% end %>

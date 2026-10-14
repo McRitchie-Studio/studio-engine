@@ -35,14 +35,15 @@ class UserNavTest < Minitest::Test
     refute_includes html, "seedsNavbar", "default level bar should be replaced"
   end
 
-  def test_hub_style_call_renders_unchanged
-    # The hub's call until task navbar-first-name-only dropped its Log out link;
-    # no consumer passes show_logout_link now, but the local is still honoured.
+  # show_logout_link is retired (task universal-navbar-account-primitive): Log
+  # out lives in the link sidebar. A stale caller still renders, with no Log
+  # out and no second row held open for it.
+  def test_retired_show_logout_link_renders_no_log_out
     html = render_nav(show_logout_link: true)
 
-    assert_includes html, "Log out"
-    assert_includes html, "/logout"
-    assert_includes html, "seedsNavbar", "default level bar renders when no div2 slot given"
+    refute_includes html, "Log out"
+    refute_includes html, "/logout"
+    refute_includes html, "seedsNavbar", "the second row was held open only by Log out"
     assert_includes html, "Pat Studio"
   end
 
@@ -307,24 +308,54 @@ class UserNavTest < Minitest::Test
     refute_includes html, "navbar-replay-level"
   end
 
-  def test_show_logout_link_keeps_the_second_row_for_offchain_users
-    html = render_nav(show_logout_link: true)
+  # data-nav-rows tells engine.css which navbar this is: only a one-row nav
+  # takes the 40px avatar and the rule-of-3 name.
+  def test_rows_count_marks_a_one_row_nav
+    one = Nokogiri::HTML.fragment(render_nav).at_css("[data-nav-tools]")
+    two = Nokogiri::HTML.fragment(render_nav(div2_slot: "user_nav_fixtures/div2")).at_css("[data-nav-tools]")
 
-    assert_includes html, "seedsNavbar"
-    assert_includes html, "Log out"
+    assert_equal "1", one["data-nav-rows"]
+    assert_equal "2", two["data-nav-rows"]
   end
 
-  # studio_account_opens_sidebar? is the host's switch: true turns the name and
-  # avatar link into the link sidebar's toggle (studio/link_sidebar claims any
-  # [data-profile-image-toggle] whose aria-controls names the panel), keeping
-  # the href for a click before that script loads.
-  def test_account_link_opens_the_sidebar_when_the_host_asks
-    account = Nokogiri::HTML.fragment(render_nav(opens_sidebar: true)).at_css("a[data-nav-account]")
+  # The theme toggle leads the rail, then the app's icons, then the gear.
+  def test_theme_toggle_leads_the_icon_rail
+    html = render_nav(admin: true, extra_icons_slot: "user_nav_fixtures/icons")
+    moon = html.index(%(data-nav-theme-toggle="desktop"))
+    icons = html.index("SLOT-ICONS")
+    gear = html.index("data-nav-admin-gear")
 
-    assert_equal "/profile", account["href"]
+    refute_nil gear, "expected the admin gear for an admin"
+    assert moon < icons, "the theme toggle must come before the app's icons"
+    assert icons < gear, "the app's icons must come before the gear"
+  end
+
+  # studio_account_opens_sidebar? (StudioSidebarHelper answers studio_sidebar?)
+  # turns the name and avatar into the link sidebar's toggle: a button, since
+  # it opens a dialog rather than navigating, which studio/link_sidebar claims
+  # as any [data-profile-image-toggle] whose aria-controls names the panel.
+  def test_account_opens_the_sidebar_as_a_button
+    fragment = Nokogiri::HTML.fragment(render_nav(opens_sidebar: true))
+    account = fragment.at_css("[data-nav-account]")
+
+    assert_equal "button", account.name
+    assert_equal "button", account["type"]
+    assert_nil account["href"]
     assert account.key?("data-profile-image-toggle")
     assert_equal "studio-link-sidebar studio-link-sidebar-mobile", account["aria-controls"]
     assert_equal "dialog", account["aria-haspopup"]
+    assert_equal "Pat Studio", account.at_css("[data-nav-name]").text, "the name is the button's accessible name"
+    assert_includes account.at_css("[data-nav-name]")["class"], "group-hover:text-primary"
+  end
+
+  # The engine dimmed the whole account on hover, which turned the name's
+  # primary into a duller purple than the brand's; the name's colour is the cue.
+  def test_account_does_not_dim_on_hover
+    [true, nil].each do |opens_sidebar|
+      account = Nokogiri::HTML.fragment(render_nav(opens_sidebar: opens_sidebar)).at_css("[data-nav-account]")
+
+      refute_includes account["class"], "opacity", "opens_sidebar=#{opens_sidebar.inspect}"
+    end
   end
 
   def test_account_link_is_a_plain_link_otherwise
@@ -339,7 +370,7 @@ class UserNavTest < Minitest::Test
 
   # Minimal user double covering everything the partial (and the nested
   # avatar partial) reads. No :level and no :truncated_solana, so the
-  # default second row takes the show_logout_link branch like the hub.
+  # nav has one row unless a slot fills the second.
   class StubUser
     def display_name = "Pat Studio"
     def avatar = @avatar ||= Class.new { def attached? = false }.new
