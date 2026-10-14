@@ -49,6 +49,29 @@ class NavbarIdentityTest < Minitest::Test
     assert_equal "Pat Studio", resolve_name(nil)
   end
 
+  NamedUser = Struct.new(:first_name, :name, :display_name)
+
+  def test_nil_config_prints_the_first_name_column
+    assert_equal "Alex", resolve_name(nil, NamedUser.new("Alex", "Alex McRitchie", "Alex McRitchie"))
+  end
+
+  def test_nil_config_without_a_first_name_takes_the_first_word_of_name
+    assert_equal "Alex", resolve_name(nil, NamedUser.new(nil, "  Alex McRitchie ", "Alex McRitchie"))
+    assert_equal "Alex", resolve_name(nil, NamedUser.new("  ", "Alex McRitchie", "Alex McRitchie"))
+  end
+
+  def test_nil_config_with_no_name_at_all_prints_display_name_whole
+    assert_equal "Pat_99 Guest", resolve_name(nil, NamedUser.new(nil, nil, "Pat_99 Guest"))
+    assert_equal "Pat_99 Guest", resolve_name(nil, NamedUser.new("", "", "Pat_99 Guest"))
+  end
+
+  def test_the_first_name_is_plain_text_so_erb_escapes_it
+    result = resolve_name(nil, NamedUser.new("<b>x</b>".html_safe, nil, "Pat"))
+
+    assert_equal "<b>x</b>", result
+    refute result.html_safe?
+  end
+
   def test_a_symbol_calls_that_method_on_the_user
     assert_equal "Guest_4821", resolve_name(:player_name)
   end

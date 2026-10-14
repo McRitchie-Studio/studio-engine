@@ -624,13 +624,13 @@ end
 
 ### Navbar identity — `Studio.navbar_user_name` and `Studio.sign_in_label`
 
-Two words the navbar says about the viewer. Both defaults render the navbar
-byte-identical to before, so an app that sets neither sees no change. Rules:
-`lib/studio/navbar_identity.rb`.
+Two words the navbar says about the viewer. The name defaults to the user's
+first name: the `first_name` column, else the first word of `name`, else
+`display_name` whole. Rules: `lib/studio/navbar_identity.rb`.
 
 ```ruby
 Studio.configure do |config|
-  # The signed-in name in components/_user_nav. nil (the default) is display_name.
+  # The signed-in name in components/_user_nav. nil (the default) is the first name.
   config.navbar_user_name = :player_name                        # a method on the user
   # config.navbar_user_name = ->(user, view) { user.player_name } # or a callable
 

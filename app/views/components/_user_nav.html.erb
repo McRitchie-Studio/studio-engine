@@ -78,8 +78,10 @@
         defaults to min-width auto, and without it this column refuses to
         shrink below balance + icons. On a 320px phone with a balance the
         reserved column is 147px, and a column that will not give pushed the
-        avatar 17px past the screen edge (e2e/header_phone_width.spec.js). %>
-    <div class="flex-1 min-w-0">
+        avatar 17px past the screen edge (e2e/header_phone_width.spec.js).
+        It is a centred flex column, so with no second row the icons sit level
+        with the name and avatar rather than at the top of the bar. %>
+    <div class="flex-1 min-w-0 flex flex-col justify-center" data-nav-tools>
       <%# Div 1 (Bigger): balance + icons. %>
       <div class="flex items-center gap-2 leading-none" :style="'padding: 0 6px;' + ($store.devMode ? 'background: cornflowerblue;' : '')">
         <%= studio_nav_slot.call(balance_slot, balance_html) %>

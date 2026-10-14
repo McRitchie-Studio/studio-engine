@@ -223,7 +223,7 @@ module Studio
 
   # ---- Navbar identity ----
   # The name the signed-in user nav prints, and the signed-out button's label.
-  # Both defaults render the navbar byte-identical to before. The engine has no
+  # The name defaults to the user's first name. The engine has no
   # I18n catalogue, so the label is plain config rather than a locale key.
   # The label also words the engine's auth pages (lib/studio/auth_labels.rb).
   # Rules: lib/studio/navbar_identity.rb.
@@ -232,7 +232,8 @@ module Studio
   #   config.navbar_user_name = ->(user, view) { user.player_name }   # or a callable
   #   config.sign_in_label    = "Sign in"
   #
-  # nil means user.display_name. A method or callable that raises, or answers
+  # nil means the first name (first_name, else the first word of name), else
+  # user.display_name. A method or callable that raises, or answers
   # blank, falls back to display_name; a raise is reported once, never a 500.
   mattr_reader :navbar_user_name, default: nil
 

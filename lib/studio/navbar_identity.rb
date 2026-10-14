@@ -7,7 +7,8 @@
 #
 # Studio.navbar_user_name is one of:
 #
-#   nil                     the default: user.display_name, as before
+#   nil                     the default: the user's first name (first_name, else
+#                           the first word of name), else user.display_name
 #   :player_name            a method called on the user ("player_name" works too)
 #   ->(user, view) { ... }  a callable; a one-argument callable gets the user only
 #
@@ -32,7 +33,7 @@ module Studio
 
     def user_name(user, view = nil, config: Studio.navbar_user_name)
       fallback = user.display_name # outside the rescue: the default path is not ours to swallow
-      return fallback if config.nil?
+      return first_name(user) || fallback if config.nil?
 
       begin
         text = plain_text(configured_name(config, user, view))
@@ -60,6 +61,16 @@ module Studio
     # Forget what was reported, so a reconfigured name reports its own failure.
     def reset_reported!
       @reported_lock.synchronize { @reported.clear }
+    end
+
+    # The default name: the first_name column, else the first word of name; nil
+    # when the host has neither, and the caller prints display_name. display_name
+    # itself is never split: a host may build it from a username or an email.
+    def first_name(user)
+      given = plain_text(user.first_name) if user.respond_to?(:first_name)
+      return given unless given.to_s.empty?
+
+      plain_text(user.name).split.first if user.respond_to?(:name)
     end
 
     def configured_name(config, user, view)

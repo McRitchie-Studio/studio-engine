@@ -36,7 +36,8 @@ class UserNavTest < Minitest::Test
   end
 
   def test_hub_style_call_renders_unchanged
-    # The hub's exact call: render "components/user_nav", show_logout_link: true
+    # The hub's call until task navbar-first-name-only dropped its Log out link;
+    # no consumer passes show_logout_link now, but the local is still honoured.
     html = render_nav(show_logout_link: true)
 
     assert_includes html, "Log out"

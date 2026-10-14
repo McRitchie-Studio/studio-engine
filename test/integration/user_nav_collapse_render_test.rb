@@ -55,6 +55,15 @@ class UserNavCollapseRenderTest < ActiveSupport::TestCase
     assert_match(/min-width: 768px.*\.user-nav-fit \{ max-width: 20rem; \}/, html)
   end
 
+  # With no second row the icon column is as tall as the avatar link beside it,
+  # so it must centre its one row: top-aligned, the gear and theme toggle sat
+  # above the name.
+  test "the one-row icon column centres the icons on the name's row" do
+    html = OffchainNavHostController.render(inline: %(<%= render "layouts/navbar" %>))
+
+    assert_includes html, %(<div class="flex-1 min-w-0 flex flex-col justify-center" data-nav-tools>)
+  end
+
   test "a balance keeps the fixed-width column" do
     html = OffchainNavHostController.render(
       inline: %(<%= render "layouts/navbar", balance_html: "<span>$5</span>" %>)
