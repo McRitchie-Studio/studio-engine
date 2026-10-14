@@ -13,6 +13,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   the setting is unchanged. A user nav with no second row now centres its icon
   column, so the gear and theme toggle sit level with the name rather than at
   the top of the bar.
+- **A host can make the name and avatar open the link sidebar.** Define the
+  view helper `studio_account_opens_sidebar?` as true and the account link
+  carries the sidebar's toggle attributes (`data-profile-image-toggle`,
+  `aria-controls`), so `studio/link_sidebar` opens the sidebar on click; the
+  link keeps its href for a click before that script loads. Without the helper
+  the link is unchanged.
 
 ## 0.105.0 — 2026-10-13
 

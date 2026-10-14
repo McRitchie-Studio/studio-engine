@@ -314,6 +314,29 @@ class UserNavTest < Minitest::Test
     assert_includes html, "Log out"
   end
 
+  # studio_account_opens_sidebar? is the host's switch: true turns the name and
+  # avatar link into the link sidebar's toggle (studio/link_sidebar claims any
+  # [data-profile-image-toggle] whose aria-controls names the panel), keeping
+  # the href for a click before that script loads.
+  def test_account_link_opens_the_sidebar_when_the_host_asks
+    account = Nokogiri::HTML.fragment(render_nav(opens_sidebar: true)).at_css("a[data-nav-account]")
+
+    assert_equal "/profile", account["href"]
+    assert account.key?("data-profile-image-toggle")
+    assert_equal "studio-link-sidebar studio-link-sidebar-mobile", account["aria-controls"]
+    assert_equal "dialog", account["aria-haspopup"]
+  end
+
+  def test_account_link_is_a_plain_link_otherwise
+    [nil, false].each do |opens_sidebar|
+      account = Nokogiri::HTML.fragment(render_nav(opens_sidebar: opens_sidebar)).at_css("a[data-nav-account]")
+
+      assert_equal "/profile", account["href"]
+      refute account.key?("data-profile-image-toggle"), "opens_sidebar=#{opens_sidebar.inspect}"
+      refute account.key?("aria-controls")
+    end
+  end
+
   # Minimal user double covering everything the partial (and the nested
   # avatar partial) reads. No :level and no :truncated_solana, so the
   # default second row takes the show_logout_link branch like the hub.
@@ -327,7 +350,7 @@ class UserNavTest < Minitest::Test
   # `profile_path` / `account_path` are passed as nil to model a host that does
   # NOT draw that route — `defined?` is false there, exactly as in a real app
   # whose router never named the helper.
-  def render_nav(logged_in: true, profile_path: "/profile", account_path: nil, admin: false, **locals)
+  def render_nav(logged_in: true, profile_path: "/profile", account_path: nil, admin: false, opens_sidebar: nil, **locals)
     view = ActionView::Base.with_empty_template_cache.with_view_paths(
       ["app/views", "test/views/fixtures"]
     )
@@ -340,6 +363,7 @@ class UserNavTest < Minitest::Test
     view.define_singleton_method(:signup_path) { "/signup" }
     view.define_singleton_method(:profile_path) { profile_path } if profile_path
     view.define_singleton_method(:account_path) { account_path } if account_path
+    view.define_singleton_method(:studio_account_opens_sidebar?) { opens_sidebar } unless opens_sidebar.nil?
 
     view.render(partial: "components/user_nav", locals: locals)
   end
