@@ -580,6 +580,61 @@ body.modal-open .studio-app-banner {
         --nav-title-lead-size: calc(1.3rem - 0.3rem * var(--nav-p, 0)); /* 20.8px -> 16px   */
       }
     }
+
+    /* THE ACCOUNT ROW (components/_user_nav), from 768px. Every app whose
+       navbar renders the engine's user nav gets this; Turf Monster forks the
+       partial, carries none of these hooks, and keeps its own two-row nav.
+
+       ICONS. The theme toggle leads the rail (the partial renders it first) and
+       both icons sit a size down: the moon at 14px, the gear's 16px glyph in a
+       24px box, whether the gear is the sidebar trigger or the admin dropdown.
+
+       ONE GAP. Moon to gear, gear to name and name to avatar are the same
+       --nav-gap, measured ink to ink. Each box gap gives back what its edges
+       already hold: the moon's and gear's blank margins inside their 24-unit
+       artwork, the gear's 4px inset in its box, and the name's side bearing
+       (8.6px between moon and gear, 6.3px between gear and name, measured in
+       Chrome). The partial's inline 6px padding on the icon row is zeroed on a
+       one-row nav so the row's edge is the gear's; a two-row nav keeps it, as
+       its second row lines up under that padding.
+
+       ONE-ROW NAVS (data-nav-rows="1"): the avatar is 40px at rest and shrinks
+       to 32px on the scroll ramp (--nav-p, as the logo and title do), and the
+       name sits on the rule of 3 against it: its capitals are a third of the
+       avatar's height and centred on it. Montserrat's cap height is 0.7em, so
+       the size is a third of the avatar over 0.7. On the partial's
+       leading-none, Montserrat's capitals sit 0.01em below the line box's
+       middle, so no trim is needed (text-box would cut the ink, since the name
+       truncates with overflow hidden). A two-row nav keeps the 2rem avatar its
+       second row is laid out against. Below 768px the avatar stays 2rem. */
+    @media (min-width: 768px) {
+      .nav-shell {
+        --nav-avatar: calc(2.5rem - 0.5rem * var(--nav-p, 0));        /* 40px -> 32px */
+        --nav-gap: 0.75rem;
+      }
+      .nav-shell [data-nav-tools] [data-nav-theme-toggle="desktop"] { transform: scale(0.875); }
+      .nav-shell [data-nav-tools] [data-link-sidebar-trigger],
+      .nav-shell [data-nav-tools] [data-nav-admin-gear] {
+        width: 1.5rem;
+        height: 1.5rem;
+        align-items: center;
+        justify-content: center;
+      }
+      .nav-shell [data-nav-tools] [data-link-sidebar-trigger] svg,
+      .nav-shell [data-nav-tools] [data-nav-admin-gear] svg { width: 1rem; height: 1rem; }
+      .nav-shell [data-nav-tools] :has(> [data-nav-theme-toggle="desktop"]) { gap: calc(var(--nav-gap) - 8.6px); }
+      .nav-shell :has(> [data-nav-tools]) { gap: calc(var(--nav-gap) - 6.3px); }
+      .nav-shell [data-nav-account] { gap: var(--nav-gap); }
+      .nav-shell [data-nav-tools][data-nav-rows="1"] > div:first-child { padding-inline: 0 !important; }
+      .nav-shell [data-nav-rows="1"] + [data-nav-account] > [aria-hidden] > * {
+        width: var(--nav-avatar);
+        height: var(--nav-avatar);
+        font-size: 0.875rem;
+      }
+      .nav-shell [data-nav-rows="1"] + [data-nav-account] [data-nav-name] {
+        font-size: calc(var(--nav-avatar) / 3 / 0.7);
+      }
+    }
 }
 
 /* A board whose controller failed to load (studio/lazy_controllers marks its

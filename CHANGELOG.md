@@ -4,6 +4,30 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The engine navbar's account row is Studio's, for every app.** From 768px
+  the theme toggle leads the gear, both a size down (moon 14px, gear 16px in a
+  24px box), and the moon, gear, name and avatar sit one 0.75rem gap apart,
+  measured ink to ink. A user nav with no second row (`data-nav-rows="1"`) gets
+  a 40px avatar that shrinks to 32px on the scroll ramp and the name on the rule
+  of 3 against it; a two-row nav keeps its 2rem avatar. The account no longer
+  dims on hover. Rules: `engine.css`, *THE ACCOUNT ROW*. Turf Monster forks the
+  partial and is untouched.
+- **The name and avatar open the link sidebar wherever it renders.**
+  `StudioSidebarHelper#studio_account_opens_sidebar?` now answers
+  `studio_sidebar?`, so the account is a `<button>` carrying the sidebar's
+  toggle attributes, announced as a button that opens a dialog rather than a
+  link to `/profile`. An app with no sidebar keeps the link; a host may define
+  the helper to decide otherwise. Selectors and tests that pinned
+  `a[data-nav-account]` should match `[data-nav-account]`.
+
+### Removed
+
+- **`show_logout_link`.** The user nav and `layouts/_navbar` no longer draw a
+  Log out link (the link sidebar carries it), and a call that still passes the
+  local renders without it and without the second row it held open.
+
 ### Added
 
 - **`config.navbar_wordmark`: a brand lockup image in the engine navbar, off by

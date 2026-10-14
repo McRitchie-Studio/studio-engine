@@ -67,15 +67,20 @@ class NavbarPhoneDesktopVariantsRenderTest < ActiveSupport::TestCase
     refute_nil toggles.first.ancestors("[data-nav-theme-toggle]").first
   end
 
-  test "the name and avatar are one account link at both widths" do
+  # The sidebar renders here (it heads with Profile), so the account opens it
+  # rather than linking to /profile (task universal-navbar-account-primitive).
+  test "the name and avatar are one account control at both widths" do
     header = render_header
-    links = header.css("a[href='/profile']").reject { |a| a.ancestors("#studio-link-sidebar, #studio-link-sidebar-mobile").any? }
+    outside_sidebar = ->(el) { el.ancestors("#studio-link-sidebar, #studio-link-sidebar-mobile").none? }
+    controls = header.css("[data-nav-account]").select(&outside_sidebar)
 
-    assert_equal 1, links.size, "one account link, one tab stop"
-    account = links.first
-    assert account.key?("data-nav-account")
-    assert_includes account.text, "Guest 55 Long Name", "the name stays the link's accessible text"
-    assert_includes account.to_html, "GL", "the avatar is in the same link"
+    assert_equal 1, controls.size, "one account control, one tab stop"
+    account = controls.first
+    assert_equal "button", account.name, "it opens the sidebar, so it is a button"
+    assert account.key?("data-profile-image-toggle")
+    assert_empty header.css("a[href='/profile']").select(&outside_sidebar), "the bar keeps no second way to /profile"
+    assert_includes account.text, "Guest 55 Long Name", "the name stays the control's accessible text"
+    assert_includes account.to_html, "GL", "the avatar is in the same control"
   end
 
   test "a phone shows the avatar alone; a desktop shows the name beside it" do

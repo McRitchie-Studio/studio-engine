@@ -16,6 +16,13 @@ module StudioSidebarHelper
   # admin-flagged entry, the sidebar IS the admin menu (its title says so) and
   # the engine components skip the dropdown. Declaring only public sections
   # keeps the dropdown, so admins never lose Theme/Navbar/Error Logs.
+  # The navbar's name and avatar open the sidebar wherever it renders: the
+  # sidebar heads with the profile, so it is where the account control leads
+  # (components/_user_nav). A host may define its own to say otherwise.
+  def studio_account_opens_sidebar?
+    studio_sidebar?
+  end
+
   def studio_sidebar_replaces_admin_menu?
     studio_sidebar_sections.any? { |section| section[:admin] }
   end

@@ -42,7 +42,6 @@ Start by copying the engine's version and customizing:
 | `show_logged_in` | boolean | `logged_in?` | Override session-based login check |
 | `balance_html` | string | `nil` | Raw HTML for balance display (passed to `_user_nav`) |
 | `extra_icons_html` | string | `nil` | Raw HTML for extra icon buttons (passed to `_user_nav`) |
-| `show_logout_link` | boolean | `false` | Show "Log out" link in user nav bar |
 
 ## Adding Nav Links
 

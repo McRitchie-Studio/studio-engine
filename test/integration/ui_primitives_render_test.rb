@@ -125,8 +125,7 @@ class UiPrimitivesRenderTest < ActiveSupport::TestCase
     )
 
     assert_includes html, "Dummy User"
-    assert_includes html, "Log out"
-    assert_includes html, "/logout", "expected the real logout route from Studio.routes"
+    refute_includes html, "Log out", "show_logout_link is retired; Log out lives in the link sidebar"
   end
 
   test "user nav renders partial slots against real engine partials" do

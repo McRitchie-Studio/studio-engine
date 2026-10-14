@@ -1,10 +1,9 @@
 # frozen_string_literal: true
 
 # Renders the engine navbar through the real dummy Rails app and pins the
-# off-chain collapse: a user with no wallet, no level, and no logout link
-# gets a single-row nav in a shrink-to-fit column, while a balance-bearing
-# call keeps the fixed-width column and a level/wallet/logout row keeps the
-# second row (the turf-monster shape is untouched).
+# off-chain collapse: a user with no wallet and no level gets a single-row
+# nav in a shrink-to-fit column, while a balance-bearing call keeps the
+# fixed-width column and a level or wallet row keeps the second row (the turf-monster shape is untouched).
 
 require "bundler/setup"
 
@@ -13,6 +12,7 @@ require_relative "../dummy/config/environment"
 
 require "minitest/autorun"
 require "active_support/test_case"
+require "nokogiri"
 
 class OffchainNavHostController < ActionController::Base
   helper_method :logged_in?, :current_user, :root_path
@@ -61,7 +61,7 @@ class UserNavCollapseRenderTest < ActiveSupport::TestCase
   test "the one-row icon column centres the icons on the name's row" do
     html = OffchainNavHostController.render(inline: %(<%= render "layouts/navbar" %>))
 
-    assert_includes html, %(<div class="flex-1 min-w-0 flex flex-col justify-center" data-nav-tools>)
+    assert_includes html, %(<div class="flex-1 min-w-0 flex flex-col justify-center" data-nav-tools data-nav-rows="1">)
   end
 
   test "a balance keeps the fixed-width column" do
@@ -73,11 +73,19 @@ class UserNavCollapseRenderTest < ActiveSupport::TestCase
     refute_match(/class="user-nav-fit /, html)
   end
 
-  test "show_logout_link keeps the second row through the navbar" do
+  # show_logout_link is retired: Log out lives in the link sidebar, and a stale
+  # caller gets the one-row nav rather than a second row held open for it.
+  test "a retired show_logout_link adds no Log out and no second row" do
     html = OffchainNavHostController.render(
       inline: %(<%= render "layouts/navbar", show_logout_link: true %>)
     )
 
-    assert_includes html, "seedsNavbar"
+    # The link sidebar the navbar mounts carries its own Log out; the user nav
+    # must not.
+    user_nav = Nokogiri::HTML.fragment(html).at_css("[data-nav-tools]").parent
+
+    refute_includes user_nav.to_html, "Log out"
+    refute_includes html, "seedsNavbar"
+    assert_equal "1", user_nav.at_css("[data-nav-tools]")["data-nav-rows"]
   end
 end

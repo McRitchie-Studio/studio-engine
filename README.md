@@ -678,7 +678,7 @@ Apps customize it through partial slots — each an optional local naming a
 partial (String path, or `{ partial:, locals: }`):
 
 - `balance_slot` — balance display at the start of the top row
-- `extra_icons_slot` — app icon buttons before the admin gear + theme toggle
+- `extra_icons_slot` — app icon buttons between the theme toggle and the gear
 - `div2_slot` — replaces the default second row (wallet address + level bar)
 
 ```erb
@@ -690,6 +690,24 @@ partial (String path, or `{ partial:, locals: }`):
 The legacy string locals (`balance_html`, `extra_icons_html`, `div2_html` —
 pre-rendered HTML injected via `raw`) are deprecated but still honored when the
 matching slot is absent, so existing call sites render unchanged.
+
+### The account row
+
+From 768px the user nav's right end reads theme toggle, gear, name, avatar,
+one gap apart (0.75rem, measured ink to ink), with the moon at 14px and the
+gear's 16px glyph in a 24px box. A nav with no second row (no level, no
+wallet, no `div2_slot`; `data-nav-rows="1"`) takes a 40px avatar that shrinks
+to 32px on the navbar's scroll ramp, and the name on the rule of 3 against it:
+its capitals a third of the avatar's height. A two-row nav keeps the 2rem
+avatar. The rules are `engine.css`, *THE ACCOUNT ROW*, layered like the
+collapse band table, so an app's own `@layer utilities` can override them.
+
+Wherever the link sidebar renders (`studio_sidebar?`, which is every signed-in
+app with `/profile`), the name and avatar are one button that opens it, as the
+gear does: the sidebar heads with the profile. A host can define the view
+helper `studio_account_opens_sidebar?` to decide otherwise; with no sidebar
+the account stays a link to the account page. Log out lives in the sidebar,
+never the bar.
 
 ## Transactional emails
 
