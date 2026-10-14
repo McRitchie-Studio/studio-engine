@@ -152,8 +152,9 @@
               The brand_tag still wraps it, so the page keeps its h1 and the
               h1's accessible name is the alt text. Height follows
               --nav-logo-size; width is the artwork's own, shrinking with the
-              column (min-w-0 chain above) rather than spilling. %>
-          <<%= brand_tag %> class="nav-wordmark-brand min-w-0">
+              column (the min-w-0 chain above; the brand box's own min-width 0
+              is in engine.css) rather than spilling. %>
+          <<%= brand_tag %> class="nav-wordmark-brand">
             <img src="<%= wordmark[:light] %>" alt="<%= Studio.app_name %>" class="nav-wordmark nav-wordmark-light">
             <img src="<%= wordmark[:dark] %>" alt="<%= Studio.app_name %>" class="nav-wordmark nav-wordmark-dark">
           </<%= brand_tag %>>
