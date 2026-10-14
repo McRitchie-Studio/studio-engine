@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.107.0 — 2026-10-14
+
 ### Changed
 
 - **The engine navbar's account row is Studio's, for every app.** From 768px
