@@ -24,6 +24,7 @@ require_relative "../lib/studio/site_footer"
 require_relative "../lib/studio/booking"
 require_relative "../lib/studio/navbar_links"
 require_relative "../lib/studio/navbar_identity"
+require_relative "../lib/studio/navbar_wordmark"
 require_relative "../lib/studio/auth_labels"
 require_relative "../lib/studio/profile_sections"
 require_relative "../lib/studio/profile_image"
@@ -76,6 +77,7 @@ module Studio
   # Mirrors lib/studio.rb (whose writers validate; the mirror does not).
   mattr_accessor :navbar_user_name,     default: nil
   mattr_accessor :sign_in_label,        default: Studio::NavbarIdentity::DEFAULT_SIGN_IN_LABEL
+  mattr_accessor :navbar_wordmark,      default: nil
   # nil, NOT [] — nil means "the engine's standard profile page". The unit suite
   # asserts that distinction (test/lib/studio/profile_sections_test.rb), so this
   # mirror has to carry the real default rather than a convenient one.
