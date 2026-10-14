@@ -33,6 +33,7 @@ require "studio/site_footer"
 require "studio/booking"
 require "studio/navbar_links"
 require "studio/navbar_identity"
+require "studio/navbar_wordmark"
 require "studio/auth_labels"
 require "studio/profile_sections"
 require "studio/profile_image"
@@ -244,6 +245,21 @@ module Studio
   end
 
   mattr_reader :sign_in_label, default: NavbarIdentity::DEFAULT_SIGN_IN_LABEL
+
+  # ---- Navbar wordmark ----
+  # A brand lockup image (icon plus words as one artwork) drawn in place of the
+  # "Navbar Logo" and the app_name text. nil, the default, renders the navbar
+  # byte-identical to before. light is the file for a light page, dark the file
+  # for a dark page; both render and engine.css shows the one matching the
+  # root's `dark` class. Rules: lib/studio/navbar_wordmark.rb.
+  #
+  #   config.navbar_wordmark = { light: "/brand/navbar-light.svg",
+  #                              dark:  "/brand/navbar-dark.svg" }
+  mattr_reader :navbar_wordmark, default: nil
+
+  def self.navbar_wordmark=(config)
+    @@navbar_wordmark = NavbarWordmark.normalize(config)
+  end
 
   def self.sign_in_label=(label)
     NavbarIdentity.validate_label!(label)

@@ -4,6 +4,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`config.navbar_wordmark`: a brand lockup image in the engine navbar, off by
+  default.** Set it to `{ light: "/brand/navbar-light.svg", dark:
+  "/brand/navbar-dark.svg" }` and `layouts/_navbar` draws the lockup in place of
+  the "Navbar Logo" image and the `app_name` text, inside the same root link and
+  brand h1, with `alt` set to `app_name`. Both files render and engine.css shows
+  the one matching the root's `dark` class. Its height follows the logo's
+  collapse size and it scales down inside the phone column. Unset, the navbar is
+  byte-identical. See `docs/NAVBAR_SETUP.md`.
+
 ## 0.106.0 — 2026-10-14
 
 ### Changed
