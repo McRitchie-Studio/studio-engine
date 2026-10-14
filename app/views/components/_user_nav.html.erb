@@ -39,7 +39,9 @@
      end
    end %>
 
-<%# Where the account link (the username and the avatar, one link) points.
+<%# Where the account control (the username and the avatar, one control) points
+    when it is a link: an app with no link sidebar. Where the sidebar renders,
+    the control opens it instead (Div 3 below).
 
     A HOST'S OWN account_path WINS: an app that already has an account page keeps
     it rather than being repointed at a thinner /profile by a routine dependency
@@ -208,7 +210,7 @@
         the control's accessible name.
 
         WHERE THE LINK SIDEBAR RENDERS, THE ACCOUNT OPENS IT. The sidebar
-        heads with the profile, so the name and avatar open it as the gear does
+        heads with the engine's "You > Profile" section, so the name and avatar open it as the gear does
         (studio_account_opens_sidebar?, which StudioSidebarHelper answers with
         studio_sidebar?; a host may define its own). It is then a BUTTON, not a
         link: it does not navigate, and a screen reader announces "Alex, button,
@@ -224,7 +226,7 @@
       </span>
     <% end %>
     <% if account_opens_sidebar %>
-      <button type="button" class="<%= account_classes %> rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" data-nav-account data-profile-image-toggle
+      <button type="button" class="<%= account_classes %> cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" data-nav-account data-profile-image-toggle
               aria-controls="studio-link-sidebar studio-link-sidebar-mobile" aria-haspopup="dialog"
               :aria-expanded="$store.sidebars && $store.sidebars.linkTreeOpen ? 'true' : 'false'"
               x-bind:style="$store.devMode && 'background: lightgreen'"><%= account_inner %></button>

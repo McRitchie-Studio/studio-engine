@@ -79,6 +79,13 @@ class NavbarPhoneDesktopVariantsRenderTest < ActiveSupport::TestCase
     assert_equal "button", account.name, "it opens the sidebar, so it is a button"
     assert account.key?("data-profile-image-toggle")
     assert_empty header.css("a[href='/profile']").select(&outside_sidebar), "the bar keeps no second way to /profile"
+    # The panel mounts after the header (layouts/_navbar), so read the page.
+    page = Nokogiri::HTML5(NavbarVariantsHostController.render(inline: %(<%= render "layouts/navbar" %>)))
+    panel = page.at_css("#studio-link-sidebar")
+    refute_nil panel, "the sidebar the account opens renders with it"
+    assert_includes account["aria-controls"].split, "studio-link-sidebar"
+    assert_equal "/profile", panel.css("a[href]").first["href"],
+      "the account page is the first link in the sidebar the account opens"
     assert_includes account.text, "Guest 55 Long Name", "the name stays the control's accessible text"
     assert_includes account.to_html, "GL", "the avatar is in the same control"
   end
