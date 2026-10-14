@@ -15,6 +15,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   collapse size and it scales down inside the phone column. Unset, the navbar is
   byte-identical. See `docs/NAVBAR_SETUP.md`.
 
+## 0.106.0 — 2026-10-14
+
 ### Changed
 
 - **The navbar names the signed-in user by first name.** With
