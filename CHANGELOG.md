@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.106.0 — 2026-10-14
+
 ### Changed
 
 - **The navbar names the signed-in user by first name.** With
