@@ -14,6 +14,7 @@ require "active_support/core_ext/object/blank"
 # Load the Studio module and pure-Ruby lib classes.
 # We skip requiring "studio/engine" since that needs a full Rails app.
 require_relative "../lib/studio/version"
+require_relative "../lib/studio/public_file_version"
 require_relative "../lib/studio/color_scale"
 require_relative "../lib/studio/log_rotation"
 require_relative "../lib/studio/geo"

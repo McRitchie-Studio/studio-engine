@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "test_helper"
-require_relative "../../../lib/studio/public_file_version"
 require "tmpdir"
 
 # [unit] Studio::PublicFileVersion: a public file's link carries its content
