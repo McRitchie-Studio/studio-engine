@@ -291,6 +291,9 @@ class E2eLaneContractTest < Minitest::Test
       # The guide's own Tasks section, so the boards under test are the ones
       # /admin/style renders: the primitive, by way of its three specimens.
       "board.html.erb" => ["style/tasks"],
+      # The guide's own Tints and shades group, so the scrims graded are the
+      # ones /admin/style renders.
+      "scrims.html.erb" => ["style/scrims"],
       # The empty-field error is a JS string INSIDE the partial's x-data, so the
       # partial IS the browser program under test. Naming it here is what stops
       # that spec from quietly becoming a test of three hand-written cards — and

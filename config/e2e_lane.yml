@@ -981,7 +981,15 @@
 # app's; and a primary chip is in the primary hue. Verified RED against three
 # reintroduced defects (the spec's header lists them).
 #   npx playwright test --list  -> 330 tests in 48 files
-total_specs: 342
+# 342 -> 346: e2e/scrim_tones.spec.js, a NEW file on a NEW lab page (/lab/scrims)
+# rendering the style guide's Tints and shades group. A scrim's tone is a custom
+# property inherited from :root, .dark or a tone class on an ancestor, so the spec
+# reads the computed gradient stops and ink: the theme-aware .scrim is the tint in
+# light and the old navy in dark, forced tones hold in either theme, strengths step
+# from the tone's default, and a custom base reaches both tones. Verified RED
+# against three reintroduced defects (the spec's header lists them).
+#   npx playwright test --list  -> 346 tests in 50 files
+total_specs: 346
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1173,7 +1181,11 @@ total_specs: 342
 #   npx playwright test --list                                             -> 330 tests, 48 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 330
-executed: 342
+# And for tints and shades: 4 more tests, 1 new file:
+#   npx playwright test --list                                             -> 346 tests, 50 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 346
+executed: 346
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

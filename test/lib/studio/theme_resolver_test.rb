@@ -408,6 +408,80 @@ class ThemeResolverInkContrastTest < Minitest::Test
     end
   end
 
+  # ── tone_vars: the shade and the tint (scrim primitive) ─────
+  #
+  # The shade is the dark base and the tint is the light base, emitted in BOTH
+  # theme blocks with the SAME value, so `.scrim-shade` and `.scrim-tint` paint
+  # identically whichever theme is on. A token that followed the theme would
+  # make a forced tone flip with it, which is the bug the forced classes exist
+  # to avoid.
+
+  def test_tone_vars_default_shade_and_tint_are_the_engine_bases
+    vars = Studio::ThemeResolver.new({}).tone_vars
+    assert_equal "#1A1535", vars["--color-shade"]
+    assert_equal "#f8fafc", vars["--color-tint"]
+  end
+
+  def test_tone_vars_follow_custom_theme_bases
+    vars = Studio::ThemeResolver.new(dark: "#101820", light: "#fdf6e3").tone_vars
+    assert_equal "#101820", vars["--color-shade"]
+    assert_equal "#fdf6e3", vars["--color-tint"]
+  end
+
+  def test_tone_vars_shade_is_the_dark_page_and_tint_the_light_page
+    resolver = Studio::ThemeResolver.new(dark: "#101820", light: "#fdf6e3")
+    vars = resolver.tone_vars
+    assert_equal resolver.dark_mode_vars["--color-page"], vars["--color-shade"]
+    assert_equal resolver.light_mode_vars["--color-page"], vars["--color-tint"]
+  end
+
+  def test_tone_inks_pair_light_ink_with_shade_and_dark_ink_with_tint
+    resolver = Studio::ThemeResolver.new(dark: "#101820", light: "#fdf6e3")
+    vars = resolver.tone_vars
+    assert_equal resolver.dark_mode_vars["--color-text"], vars["--color-shade-ink"]
+    assert_equal resolver.dark_mode_vars["--color-text-secondary"], vars["--color-shade-ink-muted"]
+    assert_equal resolver.light_mode_vars["--color-text"], vars["--color-tint-ink"]
+    # Muted ink on a tint is the BODY ink (set at 600 by .scrim-ink-muted), not
+    # the secondary grey: Alex approved that treatment on the hub hero, where
+    # the secondary grey washed into the photo behind a pale tint.
+    assert_equal resolver.light_mode_vars["--color-text-body"], vars["--color-tint-ink-muted"]
+  end
+
+  def test_tone_inks_clear_aa_on_their_own_base_for_custom_bases
+    [ { dark: "#1A1535", light: "#f8fafc" },
+      { dark: "#2b2f3a", light: "#e8e4d8" },
+      { dark: "#0b3d2e", light: "#ffffff" } ].each do |colors|
+      vars = Studio::ThemeResolver.new(colors).tone_vars
+      %w[--color-shade-ink --color-shade-ink-muted].each do |ink|
+        assert_operator contrast(vars[ink], vars["--color-shade"]), :>=, 4.5, "#{ink} on shade #{colors[:dark]}"
+      end
+      %w[--color-tint-ink --color-tint-ink-muted].each do |ink|
+        assert_operator contrast(vars[ink], vars["--color-tint"]), :>=, 4.5, "#{ink} on tint #{colors[:light]}"
+      end
+    end
+  end
+
+  def test_to_css_emits_identical_tone_vars_in_both_theme_blocks
+    css = Studio::ThemeResolver.new(dark: "#101820", light: "#fdf6e3").to_css
+    dark_block  = css[/:root, \.dark \{(.*?)\n\}/m, 1]
+    light_block = css[/html:not\(\.dark\) \{(.*?)\n\}/m, 1]
+    refute_nil dark_block
+    refute_nil light_block
+    {
+      "--color-shade" => "#101820",
+      "--color-tint"  => "#fdf6e3"
+    }.each do |name, value|
+      assert_includes dark_block,  "#{name}: #{value};", "#{name} missing from the dark block"
+      assert_includes light_block, "#{name}: #{value};", "#{name} missing from the light block"
+    end
+    %w[--color-shade-ink --color-shade-ink-muted --color-tint-ink --color-tint-ink-muted].each do |name|
+      dark_value  = dark_block[/#{Regexp.escape(name)}: ([^;]+);/, 1]
+      light_value = light_block[/#{Regexp.escape(name)}: ([^;]+);/, 1]
+      refute_nil dark_value, "#{name} missing from the dark block"
+      assert_equal dark_value, light_value, "#{name} must not change with the theme"
+    end
+  end
+
   private
 
   def contrast(hex_a, hex_b)

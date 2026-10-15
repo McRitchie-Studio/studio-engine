@@ -209,6 +209,69 @@ flag — it cannot know where the reader is sitting, so only the reader's machin
 may assert one. A host that omits the script still gets working stamps, just
 frozen in the app's timezone. Specimen: `/admin/style` → Tricks → Time stamps.
 
+### Tints and shades — `.scrim`
+
+Text laid over media on a PAGE (a hero photo, a video, a banner) reads through
+a **scrim**, a wash between the two. (The transactional email banner's scrim,
+below, is a separate inline shade built for mail clients.) A scrim comes in one of two tones, and the tone is the
+design decision:
+
+| Tone | What it lays over the media | Ink that reads on it | Token |
+|------|-----------------------------|----------------------|-------|
+| **Shade** | the dark base; it darkens the media | light | `--color-shade` |
+| **Tint** | the light base; it lightens the media | dark | `--color-tint` |
+
+The shade is the dark theme's natural scrim and the tint the light theme's, so
+`.scrim` on its own picks by theme. Force a tone when the media needs it, not
+the theme: a pale photo that only a shade can carry, or a brand moment that
+wants dark ink in both themes.
+
+```erb
+<section class="relative overflow-hidden">
+  <img src="/hero.avif" alt="" class="absolute inset-0 w-full h-full object-cover">
+  <div class="scrim absolute inset-0"></div>
+  <div class="relative z-10 text-center">
+    <h1 class="scrim-ink text-5xl font-extrabold">Solutions For Business</h1>
+    <p class="scrim-ink-muted">An acquisition entrepreneur ...</p>
+  </div>
+</section>
+
+<%# Forced: a shade in both themes. The tone goes on the shared PARENT. %>
+<section class="scrim-shade relative overflow-hidden"> ... </section>
+```
+
+| Class | Effect |
+|-------|--------|
+| `.scrim` | Paints the wash: a 135deg gradient, heavier at both corners than in the middle. Theme-aware with no tone class: a tint in light mode, a shade in dark. |
+| `.scrim-tint` · `.scrim-shade` | Force the tone, in either theme. |
+| `.scrim-soft` · `.scrim-strong` | Step the strength: 15 points lighter, or 10 heavier, from the tone's default. |
+| `.scrim-ink` | The strong ink for the tone (headlines): the dark text colour on a tint, white on a shade. |
+| `.scrim-ink-muted` | The quieter ink (subtitles): the body ink at weight 600 on a tint, the secondary ink at 400 on a shade. |
+
+- **Put the tone on the shared parent.** The tone classes set custom
+  properties, which inherit. The wash and the text are usually siblings (an
+  `absolute inset-0` scrim, then a `relative z-10` content box), so a tone on the
+  wash alone leaves the text on the theme's ink.
+- **Default strengths.** A tint is 75% at the corners and 58% in the middle (the
+  hub hero's approved light treatment); a shade is 85% and 70%, which on the
+  default theme is the old hero navy, `rgba(26,21,53,.85/.7/.85)`, exactly. For an
+  exact value set `--scrim-edge` and `--scrim-mid` on the scrim element.
+- **Muted ink on a tint is bolder, not greyer.** The secondary grey washes into
+  the media behind a pale tint, so the tint's muted ink is the body colour at
+  semibold. `.scrim-ink-muted` sets that weight; do not add a `font-*` beside it.
+- **Tokens.** `Studio::ThemeResolver` emits `--color-shade` (the dark base) and
+  `--color-tint` (the light base) with the SAME value in both theme blocks, plus
+  their ink pairs `--color-{shade,tint}-ink` and `--color-{shade,tint}-ink-muted`.
+  They follow a custom theme's `dark` and `light` colours. Each ink clears WCAG AA
+  on its own base; contrast over a busy photo depends on the photo, so pick
+  `.scrim-strong` for small or long text.
+- A scrim needs no theme switch of its own: there is no `dark:` variant, because
+  the tone is read from `:root` and the root `.dark` class.
+
+Specimen: `/admin/style` → Tricks → Tints & shades. Definitions and the
+reasoning: `engine.css` (Scrims: tints and shades). Browser proof:
+`e2e/scrim_tones.spec.js`.
+
 ### Smooth-load header pin — `.vt-pinned-header`
 
 When `Studio.smooth_load` is on, put `vt-pinned-header` on the app's sticky
@@ -875,7 +938,9 @@ generated at send time.
 **The scrim** is a wash between artwork and type, on by default at 0.40.
 Background art is chosen to look good, not to guarantee contrast, and white text
 over a pale sky cannot be read. Pass `scrim: 0` for artwork dark enough to carry
-the type itself.
+the type itself. This email scrim is its own fixed shade (`24,16,64`, inline for
+mail clients); it is not the page primitive in [Tints and shades](#tints-and-shades--scrim),
+which mail clients could not render.
 
 **The markup is deliberately old-fashioned.** Outlook on Windows renders through
 Word and ignores `background-image`, so the picture is carried by the `<td
