@@ -312,23 +312,28 @@ test("1280px: parked mid-ramp, the header holds halfway", async ({ page }) => {
   await expectHalfwayHolds(page, { width: 1280, ramp: 144 });
 });
 
-// BACK RESTORES A HELD HEADER, IT DOES NOT STACK A SECOND HOLD.
+// A RESTORED HEADER DOES NOT STACK A SECOND HOLD.
 //
 // Turbo copies the page into its snapshot cache BEFORE the controller
-// disconnects, so the cached header still carries the hold's inline margin.
-// On Back, a controller that read that margin as the header's own base counted
+// disconnects, so a page restored on Back carries a header still wearing this
+// controller's hold: the inline margin, --nav-hold, --nav-p and the scrolled
+// classes. A controller that read that margin as the header's own base counted
 // the old hold twice: a permanent 39-43px band under the header (found in
-// review on turf-monster's contest page, 5642 -> 5681px). Restored, the page
-// must sit exactly where a fresh load puts it.
-test("Back to a page left scrolled restores the header's footprint exactly", async ({ page }) => {
+// review on turf-monster's contest page, 5642 -> 5681px).
+//
+// WHY A CLONE AND NOT BACK. What a restore hands the controller is a COPY of
+// the header as it was left, connected afresh at the scroll it was left at. The
+// first version of this spec drove the real Back, and Back came home as a full
+// load instead of a restore often enough to redden accepted (scrollY 0 in 3 of
+// 60 runs after a snapshot-cache wait, 10 in 20 under load before it). Swapping
+// the scrolled header for its own clone is that same hand-off with no history
+// timing in it, and it is the shape review used to reproduce the 43px band.
+// e2e/pinned_stack.spec.js still drives a real Turbo visit for the cache.
+test("a header restored as it was left keeps the page where a fresh load puts it", async ({ page }) => {
   await blockOffsiteRequests(page);
   const errors = watchPageErrors(page);
   await page.setViewportSize({ width: 1280, height: 800 });
-  // Entered by a Turbo visit, so Back is a Turbo RESTORE from the snapshot
-  // cache (a page entered by a full load comes back as a full load).
-  await page.goto("/lab/toast_flash");
-  await page.evaluate(() => window.Turbo.visit("/lab/bar_stack_turbo"));
-  await expect(page.locator("[data-test='lab-body']")).toBeVisible();
+  await page.goto("/lab/bar_stack?one_row=1");
   await expectStickyChromeIsLive(page, expect);
 
   const fresh = await page.evaluate(docTop);
@@ -336,22 +341,30 @@ test("Back to a page left scrolled restores the header's footprint exactly", asy
   await expect.poll(() => page.evaluate(() => document.querySelector("header").style.getPropertyValue("--nav-p"))).toBe("1.0000");
   await page.waitForTimeout(300);
 
-  // Away and Back inside Turbo: both pages load it, so Back restores the
-  // cached clone with its scroll position.
-  await page.evaluate(() => window.Turbo.visit("/lab/toast_flash"));
-  await expect(page).toHaveURL(/toast_flash/);
-  await expect(page.locator("[data-test='toast-flash-page']")).toBeVisible();
-  // Back before Turbo has filed the page it left in its snapshot cache came
-  // back at scrollY 0 (2 in 12 runs idle, 10 in 20 under load); waiting for
-  // the cache entry held it at 45 in 45. So wait for the entry.
-  await expect.poll(() => page.evaluate(() => !!window.Turbo.session.view.snapshotCache.get(new URL("/lab/bar_stack_turbo", location.href))), { message: "the page left is in Turbo's snapshot cache" }).toBe(true);
-  await page.goBack();
-  await expect(page.locator("[data-test='lab-body']")).toBeVisible();
-  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  // The copy carries everything the controller wrote, as a snapshot does.
+  const carried = await page.evaluate(() => {
+    const header = document.querySelector("header");
+    const copy = header.cloneNode(true);
+    const state = {
+      margin: copy.style.marginBottom,
+      hold: copy.style.getPropertyValue("--nav-hold"),
+      p: copy.style.getPropertyValue("--nav-p"),
+      scrolled: copy.classList.contains("is-scrolled"),
+    };
+    header.replaceWith(copy);
+    return state;
+  });
+  expect(carried.margin, "the copy carries the hold's margin").toContain("--nav-hold");
+  expect(parseFloat(carried.hold)).toBeGreaterThan(20);
+  expect(carried.p).toBe("1.0000");
+  expect(carried.scrolled).toBe(true);
 
-  // A Turbo restore puts the scroll back where it was left.
-  await expect.poll(() => page.evaluate(() => window.scrollY), { message: "Back was a Turbo restore" }).toBeGreaterThan(300);
+  // The controller connects on the copy; let it start and settle.
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.querySelector("header")).marginBottom)).not.toBe("");
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r)))));
   await page.waitForTimeout(200);
+
+  expect(await page.evaluate(() => window.scrollY)).toBe(600);
   const restored = await page.evaluate(docTop);
   expect(Math.abs(restored - fresh), `fresh ${fresh}, restored ${restored}`).toBeLessThanOrEqual(0.5);
   expect(errors).toEqual([]);
