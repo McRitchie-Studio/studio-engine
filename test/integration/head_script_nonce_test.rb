@@ -10,6 +10,7 @@ require "active_support/test_case"
 require "action_dispatch"
 require "action_dispatch/testing/integration"
 require "nokogiri"
+require "tmpdir"
 
 # [integration] Every inline script the engine's head renders carries the
 # request's CSP nonce.
@@ -214,5 +215,26 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     refute_nil alpine, "the head does not load Alpine"
     assert_operator boot, :<, alpine, "Alpine must come after the module tags"
     assert scripts[alpine].key?("defer"), "Alpine must stay deferred, or it runs before the modules"
+  end
+
+  # The favicon link carries the file's content version (Studio::PublicFileVersion),
+  # and a host with no public/favicon.png keeps the bare link it always had.
+  test "the favicon link carries the current file's digest, and is bare without the file" do
+    get "/lab/bar_stack"
+    assert_includes response.body, %(<link rel="icon" type="image/png" href="/favicon.png">)
+
+    Dir.mktmpdir do |root|
+      File.binwrite(File.join(root, "favicon.png"), "a favicon")
+      original = Studio::PublicFileVersion.method(:default_root)
+      Studio::PublicFileVersion.define_singleton_method(:default_root) { root }
+      begin
+        get "/lab/bar_stack"
+        digest = Digest::SHA256.hexdigest("a favicon")[0, 8]
+        assert_equal "/favicon.png?v=#{digest}", Nokogiri::HTML(response.body).at_css("head link[rel=icon]")["href"]
+      ensure
+        Studio::PublicFileVersion.singleton_class.send(:remove_method, :default_root)
+        Studio::PublicFileVersion.define_singleton_method(:default_root, original) unless Studio::PublicFileVersion.respond_to?(:default_root)
+      end
+    end
   end
 end

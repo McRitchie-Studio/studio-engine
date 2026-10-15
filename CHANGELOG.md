@@ -50,6 +50,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   session, cookie or redirect touches it. See `docs/HEALTH_REPORT.md`, *The
   hub endpoint*.
 
+### Changed
+
+- **The favicon link carries its content version.** The head writes
+  `<link rel="icon" href="/favicon.png?v=<8 hex>">`, the first 8 characters of
+  the file's SHA-256 (`Studio::PublicFileVersion.path`), so a redrawn favicon
+  is a new URL: browsers cache a favicon per origin and a hard reload does not
+  reliably clear it, on a reused localhost port or for a returning visitor.
+  The digest is read once per file contents (cached by path, size and mtime).
+  A host with no `public/favicon.png` keeps the bare link, byte for byte.
+
 ## 0.108.0 — 2026-10-15
 
 ### Changed
