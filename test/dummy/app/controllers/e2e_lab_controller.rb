@@ -583,6 +583,16 @@ class E2eLabController < ActionController::Base
     render(:chips)
   end
 
+  # The style guide's Tints and shades group (style/_scrims). `?palette=<name>`
+  # paints the page in one consumer palette through the resolver's own CSS, as
+  # #chips does, so a custom dark or light base reaches --color-shade/-tint.
+  def scrims
+    require_relative "../../../support/consumer_palettes"
+    palette = ConsumerPalettes::ALL[params[:palette].to_s]
+    @palette_css = Studio::ThemeResolver.new(palette).to_css if palette
+    render(:scrims)
+  end
+
   # HOST-SUPPLIED LOCALS THAT LAND INSIDE A JS STRING LITERAL, across the blocks
   # that take one — success/error card event names and the tx link's cluster query.
   #

@@ -6,6 +6,20 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **Tints and shades: the `.scrim` primitive.** A scrim is the wash laid over
+  media so text reads on it. A **shade** lays the dark base over the media and
+  takes light ink; a **tint** lays the light base over it and takes dark ink.
+  `.scrim` picks by theme (a tint in light mode, a shade in dark),
+  `.scrim-tint` / `.scrim-shade` force a tone in either theme, `.scrim-soft` /
+  `.scrim-strong` step the strength from the tone's default (tint 75/58, shade
+  85/70; the default dark shade is the old navy `rgba(26,21,53,.85/.7/.85)`
+  exactly), and `.scrim-ink` / `.scrim-ink-muted` pick the ink for the tone.
+  The tone classes set inherited custom properties, so a tone on the parent
+  reaches both the wash and its sibling text. `Studio::ThemeResolver` now emits
+  the theme-independent `--color-shade`, `--color-tint` and their ink pairs
+  (`--color-{shade,tint}-ink`, `--color-{shade,tint}-ink-muted`) in both theme
+  blocks, following a custom `dark` / `light` colour. Specimen at
+  `/admin/style` → Tricks → Tints & shades; README "Tints and shades".
 - **`GET /_studio/health_report`: the daily health report as JSON, for the
   hub's central pull.** McRitchie Studio runs one 07:00 America/Denver job that
   pulls every app's report and posts it to Discord, so a satellite needs no

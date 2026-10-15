@@ -28,21 +28,58 @@ module Studio
     end
 
     def to_css
-      dark_vars  = dark_mode_vars.map { |k, v| "  #{k}: #{v};" }.join("\n")
-      light_vars = light_mode_vars.map { |k, v| "  #{k}: #{v};" }.join("\n")
+      dark  = dark_mode_vars
+      light = light_mode_vars
+      dark_vars  = dark.map { |k, v| "  #{k}: #{v};" }.join("\n")
+      light_vars = light.map { |k, v| "  #{k}: #{v};" }.join("\n")
       palette_vars = primary_palette_vars.map { |k, v| "  #{k}: #{v};" }.join("\n")
+      tone_css     = tone_vars(dark, light).map { |k, v| "  #{k}: #{v};" }.join("\n")
 
       <<~CSS
         :root, .dark {
         #{dark_vars}
         #{palette_vars}
+        #{tone_css}
         }
 
         html:not(.dark) {
         #{light_vars}
         #{palette_vars}
+        #{tone_css}
         }
       CSS
+    end
+
+    # THE SHADE AND THE TINT — the two tones the scrim primitive lays over
+    # media (engine.css `.scrim`, README "Tints and shades").
+    #
+    # A SHADE is the dark base over a photo: it darkens it, and light ink reads
+    # on it. A TINT is the light base over a photo: it lightens it, and dark
+    # ink reads on it. They are the same pair as the two themes' page colours,
+    # but these tokens are THEME-INDEPENDENT: emitted with one value in both
+    # blocks, so a forced `.scrim-shade` is the dark base in light mode too.
+    # --color-page cannot serve, because it flips with the theme.
+    #
+    # Each tone carries its ink pair, also theme-independent, because text on a
+    # forced tone in the opposite theme cannot use --color-text (it would be
+    # light ink on a tint). The pairs are the two themes' own inks, chosen so
+    # the theme-aware `.scrim` matches the page's text exactly:
+    #   shade: --color-text (#fff) and the dark --color-text-secondary;
+    #   tint:  --color-text (#0f172a) and the light --color-text-BODY, which
+    #          `.scrim-ink-muted` sets at 600. Not the light secondary grey:
+    #          on the hub hero it washed into the skyline behind the tint, and
+    #          the body ink at semibold is the treatment Alex approved.
+    # Takes the two mode hashes when the caller already built them (to_css),
+    # so the contrast searches behind them run once per render, not twice.
+    def tone_vars(dark = dark_mode_vars, light = light_mode_vars)
+      {
+        "--color-shade"           => dark["--color-page"],
+        "--color-shade-ink"       => dark["--color-text"],
+        "--color-shade-ink-muted" => dark["--color-text-secondary"],
+        "--color-tint"            => light["--color-page"],
+        "--color-tint-ink"        => light["--color-text"],
+        "--color-tint-ink-muted"  => light["--color-text-body"]
+      }
     end
 
     def dark_mode_vars
