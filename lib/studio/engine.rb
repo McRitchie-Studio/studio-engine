@@ -42,6 +42,28 @@ module Studio
     # silently assigns the OrderedOptions and rotation then dies inside a
     # rescued comparison. The behavioral test caught that; a config read-back
     # would have called it green.
+    # STORAGE, PART 1: THE ACTIVE STORAGE SERVICES (Studio::Storage). Active
+    # Storage builds its service registry in an on_load(:active_storage_blob)
+    # hook its "active_storage.services" initializer registers, reading
+    # config.active_storage.service_configurations, or config/storage.yml when
+    # that is nil. Hooks run in registration order, so this one, registered
+    # BEFORE that initializer, runs first and hands it the app's own services
+    # with the engine's `amazon` / `amazon_dev` merged under them (an app's
+    # service of the same name wins). Lazy like Active Storage's own read: it
+    # runs when Blob first loads, after every host initializer, so it sees the
+    # host's s3_bucket_prefix. Declared first in this class so Railtie's
+    # implicit `after: <previous initializer>` chaining ties it to nothing.
+    initializer "studio.storage.services", before: "active_storage.services" do |app|
+      ActiveSupport.on_load(:active_storage_blob) do
+        next unless Studio::Storage.enabled?
+
+        storage = app.config.active_storage
+        storage.service_configurations = Studio::Storage.merge_services(
+          storage.service_configurations || Studio::Storage.storage_file_configurations(Rails.root, Rails.env)
+        )
+      end
+    end
+
     initializer "studio.logger", before: :initialize_logger, after: :load_environment_hook do |app|
       cap = Studio::LogRotation.cap_for(
         env: Rails.env,
@@ -252,6 +274,23 @@ module Studio
       Studio::Engine.active_record_dependent_roots.each do |path|
         Rails.autoloaders.main.do_not_eager_load(path)
       end
+    end
+
+    # STORAGE, PART 2: THE BOOT CHECK and Studio::S3 on R2 (Studio::Storage),
+    # for an app that names its bucket. After the host's config/initializers,
+    # where s3_bucket_prefix and storage_public_url_required are set, and before
+    # anything serves. Raising here fails a release phase's db:migrate instead of
+    # crash-looping web and worker afterwards. Both switches are always checked;
+    # the connection is checked and applied only when the host left s3_endpoint
+    # unset, so an app still carrying its own StorageBackend keeps its own rules.
+    # Declared LAST among this class's initializers: Railtie chains each
+    # initializer `after:` the one declared before it, so anything declared
+    # below this would be dragged after the host's initializers too.
+    initializer "studio.storage", after: :load_config_initializers do
+      next unless Studio::Storage.enabled?
+
+      Studio::Storage.validate!(check_connection: false)
+      Studio::Storage.apply_studio_s3_settings!
     end
 
     # `studio_engine:install:migrations` with no ActiveRecord. Rails defines it

@@ -44,6 +44,7 @@ require "studio/username_generator"
 require "studio/public_user"
 require "studio/name_parts"
 require "studio/s3"
+require "studio/storage"
 require "studio/image_cache"
 require "studio/host_schema"
 require "studio/link_token"
@@ -1109,6 +1110,17 @@ module Studio
   # cache!, and every row resolves on s3_public_url as it always has. A real
   # production process ignores it, because its own bucket IS production.
   mattr_accessor :s3_production_public_url, default: nil
+
+  # STORAGE IS MANAGED BY DEFAULT (Studio::Storage, docs/STORAGE.md). An app that
+  # names its bucket (s3_bucket_prefix) gets the R2 boot check, Studio::S3 on R2
+  # and the `amazon` / `amazon_dev` StudioTrashS3 services with no initializer of
+  # its own. false opts out entirely.
+  mattr_accessor :manage_storage, default: true
+
+  # Whether R2_PUBLIC_URL is as required as the keys: true for an app that hands
+  # public object URLs to strangers (og:images, email banners, headshots). An app
+  # whose objects are private and served by signed URL leaves it false.
+  mattr_accessor :storage_public_url_required, default: false
 
   # Knowledge layer — the S3-backed document store + /admin/knowledge browser
   # (Studio::KnowledgeDoc). Routes are opt-in like every route surface.
