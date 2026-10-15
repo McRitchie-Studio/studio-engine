@@ -35,12 +35,17 @@
 //   finger moved it, and only the header itself changes size. A header that
 //   is not in flow (fixed or absolute) is left alone: it never moved the page.
 //
-//   (Held, the two guards below exist only for an UNHELD header. The document
-//   no longer shortens, so the short-page flap cannot happen, and the per-frame
-//   cap, which slowed the header so the page it dragged would not jump, now
-//   only makes the header lag the scroll. Worse, a lagging header opens a gap
-//   above the content on a fast scroll back to the top. Held, the progress is
-//   the scroll position, every frame.)
+//   (Held, the short-page guard below is off: the document no longer
+//   shortens, so the flap it prevents cannot happen. The per-frame CAP stays
+//   on. It was written to stop a flick dragging the page, and the hold already
+//   does that; what it buys a held header is the header's own motion. With the
+//   cap off, a flick that crossed the ramp in one frame snapped the header
+//   from full to compact in one frame, which read as a jerk on the hub's
+//   /deployments (2026-10-15). Capped, the header eases over a few frames, and
+//   the page under it still holds, because the hold keeps the document's
+//   height whatever --nav-p is. Easing open after a flick to the top leaves
+//   page background between the header and the content for those frames, the
+//   space the header is growing back into.)
 //
 //   passive + rAF: the listener never blocks the compositor and coalesces a
 //   burst of scroll events (iOS momentum fires far above 60Hz) into one write
@@ -85,7 +90,7 @@ export const DEFAULT_MAX_STEP = 5;
 //   innerHeight   window.innerHeight
 //   reduce        prefers-reduced-motion matches
 //   held          the header holds its footprint (see the hold above): no
-//                 short-page guard, no per-frame cap
+//                 short-page guard; the per-frame cap still eases the header
 //
 // Answers { p, settling }: the progress to publish, and whether the frame
 // clamp left it short of where the scroll position wants it (so the caller
@@ -107,8 +112,6 @@ export function collapseFrame({ y, p, ramp, maxPx, scrollHeight, innerHeight, re
   } else {
     var t = Math.min(1, y / ramp);
     target = t * t * (3 - 2 * t);
-    // Held, the progress IS the scroll position: nothing to cap.
-    if (held) snap = true;
   }
 
   // THE RATE LIMIT: how far the collapse may travel in ONE frame.
@@ -139,7 +142,7 @@ export function collapseFrame({ y, p, ramp, maxPx, scrollHeight, innerHeight, re
   if (snap) {
     // A guard refusal and a reduced-motion state are DECISIONS, not
     // motion; ramping them would animate the very thing each exists to
-    // avoid. A held header follows the scroll exactly.
+    // avoid.
     next = target;
   } else {
     var maxStep = (3 * maxPx) / ramp;

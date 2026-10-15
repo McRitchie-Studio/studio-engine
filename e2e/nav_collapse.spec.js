@@ -217,6 +217,7 @@ async function flickAndWatch(page, steps) {
       await frame();
       after.push(window.scrollY);
       tops.push(docTop());
+      heights.push(h());
       docHeights.push(document.documentElement.scrollHeight);
     }
     return { tops, heights, docHeights, stoppedAt, after };
@@ -246,6 +247,10 @@ async function expectFlickHoldsThePage(page, viewport) {
       expect(drift, `the body moved in the document: ${JSON.stringify(run.tops)}`).toBeLessThanOrEqual(0.5);
       expect(new Set(run.docHeights).size, `document heights ${JSON.stringify([...new Set(run.docHeights)])}`).toBe(1);
       expect(run.after.every((y) => y === run.stoppedAt), `scrollY after the flick: ${JSON.stringify(run.after)}`).toBe(true);
+      // The header eases at the cap, through the frames after the scroll stops.
+      let worst = 0;
+      for (let i = 1; i < run.heights.length; i++) worst = Math.max(worst, Math.abs(run.heights[i] - run.heights[i - 1]));
+      expect(worst, `header heights per frame: ${JSON.stringify(run.heights)}`).toBeLessThanOrEqual(6);
     }
     expect(errors).toEqual([]);
 }
@@ -367,5 +372,47 @@ test("a header restored as it was left keeps the page where a fresh load puts it
   expect(await page.evaluate(() => window.scrollY)).toBe(600);
   const restored = await page.evaluate(docTop);
   expect(Math.abs(restored - fresh), `fresh ${fresh}, restored ${restored}`).toBeLessThanOrEqual(0.5);
+  expect(errors).toEqual([]);
+});
+
+// A FLICK EASES THE HEADER (task eased-navbar-collapse-rate). Held, the page
+// cannot move, so the cap is free to shape the header's own motion: a flick
+// that crosses the whole ramp in one frame plays as a short animation, never a
+// one-frame jump from full to compact (the jerk Alex recorded on the hub's
+// /deployments). The page holds throughout, which is the hold's claim, checked
+// again here under the cap.
+test("a flick eases the header at the capped rate while the page holds", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/lab/bar_stack?one_row=1");
+  await expectStickyChromeIsLive(page, expect);
+
+  const run = await page.evaluate(async ({ docTopSrc }) => {
+    const docTop = eval(`(${docTopSrc})`);
+    const header = document.querySelector("header");
+    const h = () => header.getBoundingClientRect().height;
+    const frame = () => new Promise((r) => requestAnimationFrame(r));
+    const heights = [h()], tops = [docTop()];
+    // Down past the ramp in two frames, then back to the top in two.
+    for (const s of [120, 120, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -120, -120, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]) {
+      if (s) window.scrollBy(0, s);
+      await frame();
+      heights.push(h());
+      tops.push(docTop());
+    }
+    let worst = 0;
+    for (let i = 1; i < heights.length; i++) worst = Math.max(worst, Math.abs(heights[i] - heights[i - 1]));
+    return { worst, heights: heights.map((x) => Math.round(x * 10) / 10), drift: Math.max(...tops) - Math.min(...tops) };
+  }, { docTopSrc: docTop.toString() });
+
+  // IT MOVED: the header collapsed and opened again.
+  expect(Math.max(...run.heights) - Math.min(...run.heights)).toBeGreaterThan(20);
+  // NEVER FASTER THAN THE CAP: --nav-max-step is 5px; a pixel of rounding on top.
+  expect(run.worst, `header heights per frame: ${JSON.stringify(run.heights)}`).toBeLessThanOrEqual(6);
+  // AND IT LANDED: back at the top, the header is fully open again.
+  expect(run.heights[run.heights.length - 1]).toBe(run.heights[0]);
+  // The page never moved.
+  expect(run.drift, "the body moved in the document").toBeLessThanOrEqual(0.5);
   expect(errors).toEqual([]);
 });
