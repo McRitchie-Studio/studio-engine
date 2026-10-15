@@ -24,8 +24,16 @@ class SiteFooterLockupCssTest < Minitest::Test
 
   def test_a_lockup_centres_the_brand_block_and_its_social_row
     assert_match(/^\s*\.ftr-brand-lockup \{ text-align: center; \}/, CSS)
-    assert_match(/^\s*\.ftr-brand-lockup \.ftr-home \{ display: flex; justify-content: center; \}/, CSS)
+    assert_match(/^\s*\.ftr-brand-lockup \.ftr-home \{ display: inline-flex; justify-content: center; vertical-align: top; \}/, CSS)
     assert_match(/^\s*\.ftr-brand-lockup \.ftr-socials \{ justify-content: center; \}/, CSS)
+  end
+
+  # The home link hugs the lockup (inline-flex, never a column-wide flex box), so
+  # its keyboard focus ring sits around the artwork, offset clear of it, instead
+  # of crossing the name (Shannon, review of PR 468).
+  def test_the_focus_ring_rings_the_lockup_not_the_column
+    refute_match(/\.ftr-brand-lockup \.ftr-home \{[^}]*display: flex/, CSS)
+    assert_match(/^\s*\.ftr-brand-lockup \.ftr-home:focus-visible \{ outline-offset: 4px; \}/, CSS)
   end
 
   def test_light_page_shows_the_light_file_and_dark_page_the_dark_file

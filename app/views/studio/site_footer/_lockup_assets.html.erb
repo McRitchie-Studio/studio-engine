@@ -10,7 +10,10 @@
     CENTRED. A lockup centres the brand block (.ftr-brand-lockup): the lockup,
     the tagline, the email and the social row. A stacked lockup is symmetric
     about its own centre, so it reads as the column's heading only when
-    centred under it. The link columns keep their alignment.
+    centred under it. The link columns keep their alignment. The home link is
+    inline-flex, so it hugs the artwork (centred by the block's text-align)
+    and its focus ring, offset 4px, rings the lockup instead of running
+    across the column through the name.
 
     THEME SWAP. Light shows on a light page, dark under the root's `dark`
     class. The hide rule comes after the display rule, so it wins on order. %>
@@ -18,7 +21,8 @@
   .ftr-lockup { display: block; width: auto; height: var(--ftr-lockup-height, 7rem); max-width: 100%;
     object-fit: contain; object-position: center; }
   .ftr-brand-lockup { text-align: center; }
-  .ftr-brand-lockup .ftr-home { display: flex; justify-content: center; }
+  .ftr-brand-lockup .ftr-home { display: inline-flex; justify-content: center; vertical-align: top; }
+  .ftr-brand-lockup .ftr-home:focus-visible { outline-offset: 4px; }
   .ftr-brand-lockup .ftr-socials { justify-content: center; }
   .ftr-lockup-dark { display: none; }
   .dark .ftr-lockup-light { display: none; }

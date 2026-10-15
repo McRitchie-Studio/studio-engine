@@ -4,21 +4,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
-### Changed
-
-- **A held navbar eases its collapse again.** 0.108.0 held the header's
-  footprint so the page never moves, and with it let the header follow the
-  scroll position exactly. On a hard flick that crossed the whole ramp in a
-  frame or two, the header then snapped full to compact (or back) in one frame,
-  which read as a jerk on the hub's `/deployments`. The `--nav-max-step` cap
-  (5px of header travel per frame) now applies to held headers too, so a flick
-  plays as a short animation of about 8-9 frames. The page still never moves:
-  the hold keeps the document's height whatever `--nav-p` is. After a hard
-  flick to the top, page background shows between the header and the content
-  for those frames while the header grows back. A slow scroll is unchanged.
-
-## 0.109.0 — 2026-10-15
-
 ### Added
 
 - **The site footer can draw a brand lockup in place of its logo and
@@ -34,6 +19,31 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   stacked lockup is symmetric; the link columns keep their alignment. A footer that declares no lockup is byte-identical: the lockup's
   styles render only with it (`studio/site_footer/_lockup_assets`), and an
   older engine ignores the key. See `docs/SITE_FOOTER.md`, *A lockup*.
+
+### Changed
+
+- **The favicon link carries its content version.** The head writes
+  `<link rel="icon" href="/favicon.png?v=<8 hex>">`, the first 8 characters of
+  the file's SHA-256 (`Studio::PublicFileVersion.path`), so a redrawn favicon
+  is a new URL: browsers cache a favicon per origin and a hard reload does not
+  reliably clear it, on a reused localhost port or for a returning visitor.
+  The digest is read once per file contents (cached by path, size and mtime).
+  A host with no `public/favicon.png` keeps the bare link, byte for byte.
+
+- **A held navbar eases its collapse again.** 0.108.0 held the header's
+  footprint so the page never moves, and with it let the header follow the
+  scroll position exactly. On a hard flick that crossed the whole ramp in a
+  frame or two, the header then snapped full to compact (or back) in one frame,
+  which read as a jerk on the hub's `/deployments`. The `--nav-max-step` cap
+  (5px of header travel per frame) now applies to held headers too, so a flick
+  plays as a short animation of about 8-9 frames. The page still never moves:
+  the hold keeps the document's height whatever `--nav-p` is. After a hard
+  flick to the top, page background shows between the header and the content
+  for those frames while the header grows back. A slow scroll is unchanged.
+
+## 0.109.0 — 2026-10-15
+
+### Added
 
 - **Tints and shades: the `.scrim` primitive.** A scrim is the wash laid over
   media so text reads on it. A **shade** lays the dark base over the media and
@@ -64,16 +74,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   app, and an email address quoted in an error message is sent as `[email]`. It runs on `ActionController::API`, so no host `before_action`,
   session, cookie or redirect touches it. See `docs/HEALTH_REPORT.md`, *The
   hub endpoint*.
-
-### Changed
-
-- **The favicon link carries its content version.** The head writes
-  `<link rel="icon" href="/favicon.png?v=<8 hex>">`, the first 8 characters of
-  the file's SHA-256 (`Studio::PublicFileVersion.path`), so a redrawn favicon
-  is a new URL: browsers cache a favicon per origin and a hard reload does not
-  reliably clear it, on a reused localhost port or for a returning visitor.
-  The digest is read once per file contents (cached by path, size and mtime).
-  A host with no `public/favicon.png` keeps the bare link, byte for byte.
 
 ## 0.108.0 — 2026-10-15
 
