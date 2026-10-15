@@ -191,6 +191,7 @@ Every key is optional. A missing key removes its part of the footer.
 | `wordmark` | Two parts, the second in the primary colour: `%w[Example Co]` | `name`, split before its last word |
 | `logo` | An image beside the wordmark: an asset name or a path | The app's "Footer Logo" in `config.theme_logos`, else its navbar logo. `logo: false` shows none |
 | `logo_invert` | `true` inverts a dark mark in light mode | Shown as drawn |
+| `lockup` | One brand artwork in place of the logo AND the wordmark, one file per theme: `{ light: "/brand/stacked-light.svg", dark: "/brand/stacked-dark.svg", width: 942, height: 885 }`. See [A lockup](#a-lockup) | The logo and the wordmark |
 | `home_path` | Where the logo and wordmark link | `/` |
 | `tagline` | A line under the wordmark | No line |
 | `email` | A `mailto:` link under the tagline | No line. (To list the email in a column instead, write it as a column link.) |
@@ -281,6 +282,36 @@ list), so it works on Heroku with no extra step in either a Sprockets or a
 Propshaft app. The engine's copy of the stylesheet drops Leaflet's default marker
 image and its layers-control image, which are not shipped: mark a point with
 `L.divIcon`, as the footer does.
+
+
+### A lockup
+
+A kit's stacked logo, say, draws the icon and the name as one piece of
+artwork. Declare it as `lockup:` and the footer draws it in place of the logo
+and the wordmark; the tagline, email and social row stay below it.
+
+```ruby
+config.site_footer = ->(view) {
+  { name: "Example Co",
+    lockup: { light: "/brand/stacked-light.svg", dark: "/brand/stacked-dark.svg",
+              width: 942, height: 885 },
+    tagline: "Everything, by example" }
+}
+```
+
+- `light` is drawn on a light page and `dark` under the root's `dark` class.
+  Both images render and CSS hides the one that does not match, so a theme
+  toggle swaps them with no script (as `Studio.navbar_wordmark` does). With no
+  `dark`, `light` serves both. With no `light`, there is no lockup.
+- `width` and `height` are the artwork's own size, an SVG's `viewBox` rounded.
+  Both are written onto each image so the browser holds the box before the
+  file loads and nothing below it moves. Give both or neither.
+- It is drawn `7rem` tall, its width following the artwork and never wider
+  than its column. Set `--ftr-lockup-height` on `.ftr` to change that.
+- Both images carry the site name as `alt`, inside the home link.
+- A footer that declares no lockup renders exactly as before: its styles ride
+  only with a lockup (`studio/site_footer/_lockup_assets`). An engine older
+  than the fact ignores the key, so a host can declare it before it upgrades.
 
 ## Where it shows
 
@@ -409,6 +440,7 @@ These class names are stable, and an app may style against them:
 | `.ftr-location`, `.ftr-location-title`, `.ftr-address` | The Location band |
 | `.ftr-legal`, `.ftr-copyright` | The legal line and the © line |
 | `.ftr-map` | The map |
+| `.ftr-lockup`, `.ftr-lockup-light`, `.ftr-lockup-dark` | The lockup's images; `--ftr-lockup-height` on `.ftr` is its height |
 
 The rest (`.ftr-wrap`, `.ftr-home`, the social and pin classes) may change.
 
@@ -435,6 +467,8 @@ link. Those rules are more specific than the engine's and still apply.
 
 - `test/lib/studio/site_footer_test.rb`: the facts' rules, the default facts, the
   address setting's precedence, and the visibility rule.
+- `test/views/site_footer_lockup_css_test.rb`: the lockup's size and theme swap,
+  and that the stylesheet every footer renders carries none of it.
 - `test/lib/vendored_leaflet_test.rb`: Leaflet is vendored, precompiled, and
   addressed through the asset pipeline.
 - `test/integration/site_footer_test.rb`: what a host renders, with and without

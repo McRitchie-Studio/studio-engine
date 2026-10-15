@@ -6,6 +6,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **The site footer can draw a brand lockup in place of its logo and
+  wordmark.** A new `lockup:` fact in `config.site_footer` names one file per
+  theme, plus the artwork's own size: `lockup: { light:
+  "/brand/stacked-light.svg", dark: "/brand/stacked-dark.svg", width: 942,
+  height: 885 }`. Both images render with the site name as `alt` and that
+  `width`/`height`, inside the home link; CSS shows the light file on a light
+  page and the dark file under `.dark`, so a theme toggle swaps them with no
+  script. It is drawn `7rem` tall (`--ftr-lockup-height` on `.ftr` changes it)
+  and never wider than its column. The tagline, email and social row are
+  unchanged. A footer that declares no lockup is byte-identical: the lockup's
+  styles render only with it (`studio/site_footer/_lockup_assets`), and an
+  older engine ignores the key. See `docs/SITE_FOOTER.md`, *A lockup*.
+
 - **`GET /_studio/health_report`: the daily health report as JSON, for the
   hub's central pull.** McRitchie Studio runs one 07:00 America/Denver job that
   pulls every app's report and posts it to Discord, so a satellite needs no
