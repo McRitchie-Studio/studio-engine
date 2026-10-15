@@ -537,7 +537,7 @@ Every key, the rules a row can carry, and where the footer shows are in
 ## 11. Public Assets
 
 Place in `public/`:
-- `favicon.png` — browser tab icon
+- `favicon.png` — browser tab icon. The head links it as `/favicon.png?v=<8 hex of its SHA-256>` (`Studio::PublicFileVersion`), so a redrawn favicon is a new URL no browser has cached
 - `logo.png` — navbar + auth page logo
 - `studio-logo.svg` — optional, only if the app participates in one-way SSO
 

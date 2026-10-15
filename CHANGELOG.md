@@ -4,7 +4,31 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **The site footer can draw a brand lockup in place of its logo and
+  wordmark.** A new `lockup:` fact in `config.site_footer` names one file per
+  theme, plus the artwork's own size: `lockup: { light:
+  "/brand/stacked-light.svg", dark: "/brand/stacked-dark.svg", width: 942,
+  height: 885 }`. Both images render with the site name as `alt` and that
+  `width`/`height`, inside the home link; CSS shows the light file on a light
+  page and the dark file under `.dark`, so a theme toggle swaps them with no
+  script. It is drawn `7rem` tall (`--ftr-lockup-height` on `.ftr` changes it)
+  and never wider than its column. A lockup centres the brand block
+  (`.ftr-brand-lockup`: the lockup, tagline, email and social row), since a
+  stacked lockup is symmetric; the link columns keep their alignment. A footer that declares no lockup is byte-identical: the lockup's
+  styles render only with it (`studio/site_footer/_lockup_assets`), and an
+  older engine ignores the key. See `docs/SITE_FOOTER.md`, *A lockup*.
+
 ### Changed
+
+- **The favicon link carries its content version.** The head writes
+  `<link rel="icon" href="/favicon.png?v=<8 hex>">`, the first 8 characters of
+  the file's SHA-256 (`Studio::PublicFileVersion.path`), so a redrawn favicon
+  is a new URL: browsers cache a favicon per origin and a hard reload does not
+  reliably clear it, on a reused localhost port or for a returning visitor.
+  The digest is read once per file contents (cached by path, size and mtime).
+  A host with no `public/favicon.png` keeps the bare link, byte for byte.
 
 - **A held navbar eases its collapse again.** 0.108.0 held the header's
   footprint so the page never moves, and with it let the header follow the

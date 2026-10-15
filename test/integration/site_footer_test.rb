@@ -207,6 +207,60 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     assert_select "#{footer} .ftr-wordmark-accent", "Title"
   end
 
+  # ---- the lockup: one artwork in place of the logo and the wordmark ----------
+
+  LOCKUP = { light: "/brand/stacked-light.svg", dark: "/brand/stacked-dark.svg", width: 942, height: 885 }.freeze
+
+  # The brand link exactly as the footer drew it before the lockup fact existed.
+  PRE_LOCKUP_BRAND = %(<a href="/" class="ftr-home" aria-label="Example Co">\n) +
+                     %(              <img class="ftr-logo" alt="" src="/mark.svg" />\n) +
+                     %(              <span class="ftr-wordmark"><span>Example</span><span class="ftr-wordmark-accent">Co</span></span>\n) +
+                     %(          </a>)
+
+  test "with no lockup the brand is the pre-lockup logo and wordmark, and no lockup style is on the page" do
+    Studio.site_footer = FACTS.merge(logo: "/mark.svg")
+    get "/footer_host/landing"
+
+    assert_includes response.body, PRE_LOCKUP_BRAND
+    refute_includes response.body, "ftr-lockup"
+    refute_includes response.body, "ftr-brand-lockup"
+    assert_select "#{footer} div.ftr-brand[class='ftr-brand']", 1
+    without = response.body
+
+    [nil, false, {}, { dark: "/d.svg" }, "/x.svg"].each do |inert|
+      Studio.site_footer = FACTS.merge(logo: "/mark.svg", lockup: inert)
+      get "/footer_host/landing"
+      assert_equal without.gsub(/nonce="[^"]*"/, ""), response.body.gsub(/nonce="[^"]*"/, ""),
+                   "lockup: #{inert.inspect} must leave the page byte-identical"
+    end
+  end
+
+  test "a lockup draws both theme files, sized and named, in place of the logo and wordmark" do
+    Studio.site_footer = FACTS.merge(logo: "/mark.svg", lockup: LOCKUP)
+    get "/footer_host/landing"
+
+    assert_select "#{footer} div.ftr-brand.ftr-brand-lockup", 1, "a lockup centres the brand block"
+    assert_select "#{footer} a.ftr-home[href='/'][aria-label='Example Co']", 1 do
+      assert_select "img", 2
+      assert_select "img.ftr-lockup.ftr-lockup-light[src='/brand/stacked-light.svg'][alt='Example Co'][width='942'][height='885']", 1
+      assert_select "img.ftr-lockup.ftr-lockup-dark[src='/brand/stacked-dark.svg'][alt='Example Co'][width='942'][height='885']", 1
+    end
+    assert_select "#{footer} img.ftr-logo", 0
+    assert_select "#{footer} .ftr-wordmark", 0
+    assert_select "#{footer} .ftr-tagline", "Everything, by example"
+    assert_select "#{footer} .ftr-socials a", 2
+    assert_equal 1, response.body.scan(".dark .ftr-lockup-dark { display: block; }").size, "the swap styles ride with the lockup, once"
+  end
+
+  test "a lockup with no dark file uses its light file for both, and no size writes no size" do
+    Studio.site_footer = FACTS.merge(lockup: { light: "/brand/one.svg" })
+    get "/footer_host/landing"
+
+    assert_select "#{footer} img.ftr-lockup[src='/brand/one.svg']", 2
+    assert_select "#{footer} img.ftr-lockup[width]", 0
+    assert_select "#{footer} img.ftr-lockup[height]", 0
+  end
+
   test "an href that is not a path, http, https, mailto or tel is never written into the page" do
     saved = Studio::SiteFooter.reporter
     reports = []

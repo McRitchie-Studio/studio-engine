@@ -15,8 +15,20 @@
   <div class="ftr-wrap">
     <% tracks = Studio::SiteFooter.tracks(columns) %>
     <div class="ftr-cols<%= " ftr-cols-many" if columns.size > Studio::SiteFooter::MAX_ROW_COLUMNS %>"<% if tracks %> style="--ftr-tracks: <%= tracks %>"<% end %>>
-      <div class="ftr-brand">
-        <% if facts[:logo] || facts[:wordmark] %>
+      <div class="ftr-brand<%= " ftr-brand-lockup" if facts[:lockup] %>">
+        <% if (lockup = facts[:lockup]) %>
+          <%# The lockup replaces the logo and the wordmark, and centres the
+              brand block (.ftr-brand-lockup). Both theme files render;
+              studio/site_footer/_lockup_assets shows the one that matches the
+              page, so a theme toggle swaps them with no script. %>
+          <%= render "studio/site_footer/lockup_assets" %>
+          <a href="<%= facts[:home_path] %>" class="ftr-home" aria-label="<%= facts[:name] %>">
+            <% [ [ :light, lockup[:light] ], [ :dark, lockup[:dark] ] ].each do |theme, src| %>
+              <%= image_tag src, class: "ftr-lockup ftr-lockup-#{theme}", alt: facts[:name].to_s,
+                    width: lockup[:width], height: lockup[:height] %>
+            <% end %>
+          </a>
+        <% elsif facts[:logo] || facts[:wordmark] %>
           <a href="<%= facts[:home_path] %>" class="ftr-home" aria-label="<%= facts[:name] %>">
             <% if facts[:logo] %>
               <%= image_tag facts[:logo], class: [ "ftr-logo", ("ftr-logo-invert" if facts[:logo_invert]) ].compact.join(" "), alt: "" %>
