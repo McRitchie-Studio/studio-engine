@@ -179,11 +179,18 @@ export function startPinnedStack() {
   var lastScrollAt = -Infinity;
   var settleTimer = null;
   var selectors = null;
+  // The scan is redone when the document's stylesheets change (a Turbo visit
+  // into a page with its own), keyed on their hrefs and count.
+  var scannedSheets = null;
   var followed = [];
   var followedProps = [];
 
   function followers() {
-    if (!selectors) selectors = followerSelectors(document.styleSheets);
+    var key = [].map.call(document.styleSheets, function (sheet) { return sheet.href || 'inline'; }).join('|');
+    if (!selectors || key !== scannedSheets) {
+      selectors = followerSelectors(document.styleSheets);
+      scannedSheets = key;
+    }
     var out = [];
     for (var i = 0; i < selectors.length; i++) {
       var nodes;
@@ -417,7 +424,7 @@ export function startPinnedStack() {
     window.requestAnimationFrame(function () { queued = false; publishAll(); });
   }
 
-  function invalidate() { forceWrite = true; selectors = null; publishAll(); }
+  function invalidate() { forceWrite = true; publishAll(); }
   document.addEventListener('DOMContentLoaded', invalidate);
   document.addEventListener('turbo:load', invalidate);
   // A Turbo Stream replaces nodes WITHOUT a turbo:load. The registry is derived
