@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.109.0 — 2026-10-15
+
 ### Added
 
 - **Tints and shades: the `.scrim` primitive.** A scrim is the wash laid over
