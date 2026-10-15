@@ -829,9 +829,10 @@ bin/rails server -p {PORT}
 - [ ] `/error_logs` loads
 - [ ] SSO from McRitchie Studio works, if enabled
 
-Optional: a daily health report email (signups, errors, contact messages) is
-one schedule entry and one recipient away; see
-[`HEALTH_REPORT.md`](HEALTH_REPORT.md).
+Optional: the daily health report (signups, errors, contact messages). The
+McRitchie Studio hub pulls it from every app at 07:00 and posts it to Discord
+once the app sets `STUDIO_HEALTH_TOKEN`; an email copy is one schedule entry and
+one recipient away. See [`HEALTH_REPORT.md`](HEALTH_REPORT.md).
 
 ---
 

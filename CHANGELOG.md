@@ -4,6 +4,24 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`GET /_studio/health_report`: the daily health report as JSON, for the
+  hub's central pull.** McRitchie Studio runs one 07:00 America/Denver job that
+  pulls every app's report and posts it to Discord, so a satellite needs no
+  worker or schedule of its own. Drawn by `Studio.routes` in every environment,
+  production included, and inert until the app names a token:
+  `config.health_report_token` or `STUDIO_HEALTH_TOKEN` (new). With none it
+  answers a bare 404; a request without `Authorization: Bearer <token>`
+  (compared in constant time) gets 401; `?ending=<ISO 8601>` picks the day
+  that ends there (a bad value is 400), else the day the job would report now.
+  The body is the same `Studio::HealthReport.build` the email uses, counts only
+  (`schema`, `app`, `engine_version`, `window`, `quiet`, `sections`,
+  `error_kinds`, `error_groups`): no section's names or emails ever leave the
+  app. It runs on `ActionController::API`, so no host `before_action`,
+  session, cookie or redirect touches it. See `docs/HEALTH_REPORT.md`, *The
+  hub endpoint*.
+
 ## 0.108.0 — 2026-10-15
 
 ### Changed
