@@ -287,6 +287,20 @@ class StudioStorageTest < Minitest::Test
     assert_equal "https://own.example", config.s3_endpoint
   end
 
+  def test_ownership_follows_whether_the_app_configured_the_connection
+    S.reset_ownership!
+    assert S.owns_connection?(FakeConfig.new("x", nil)), "before boot: s3_endpoint unset means the engine owns it"
+    refute S.owns_connection?(FakeConfig.new("x", "https://own.example"))
+
+    S.apply_studio_s3_settings!(FakeConfig.new("x", "https://own.example"), {}, strict: false, public_url_required: false)
+    refute S.owns_connection?(FakeConfig.new("x", nil)), "after boot the boot's answer stands"
+
+    S.apply_studio_s3_settings!(FakeConfig.new("x", nil), {}, strict: false, public_url_required: false)
+    assert S.owns_connection?(FakeConfig.new("x", "https://filled.by.engine"))
+  ensure
+    S.reset_ownership!
+  end
+
   def test_apply_keeps_a_public_url_the_app_set
     config = FakeConfig.new("turf-monster", nil, "us-east-2", nil, nil, "https://assets-dev.example")
 

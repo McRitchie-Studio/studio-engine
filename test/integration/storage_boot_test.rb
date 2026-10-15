@@ -157,6 +157,14 @@ class StorageBootTest < Minitest::Test
     assert_nil result["s3_endpoint"]
   end
 
+  def test_an_app_that_owns_its_connection_and_defines_no_remote_service_gets_none
+    result = probe(studio: "config.s3_bucket_prefix = \"probe-app\"\n  config.s3_endpoint = \"https://own.example\"")
+
+    assert_booted(result)
+    assert_nil result.dig("services", "amazon")
+    assert_nil result.dig("services", "amazon_dev")
+  end
+
   def test_an_app_that_opts_out_gets_nothing
     result = probe(studio: "config.s3_bucket_prefix = \"probe-app\"\n  config.manage_storage = false")
 
@@ -166,8 +174,9 @@ class StorageBootTest < Minitest::Test
   end
 
   # The pre-adoption state of all three apps: their own StorageBackend renders
-  # `amazon` in storage.yml and configures Studio::S3 itself. The engine leaves
-  # both alone and fills only the name the app does not define.
+  # `amazon` in storage.yml (or, keyless on turf-monster, nothing at all) and
+  # configures Studio::S3 itself. The engine adds no service and touches no
+  # connection: turf's suite pins that a keyless boot defines only local/test.
   def test_an_apps_own_amazon_service_and_studio_s3_connection_win
     storage = TEST_ONLY_STORAGE + <<~YAML
       amazon:
@@ -183,7 +192,7 @@ class StorageBootTest < Minitest::Test
 
     assert_booted(result)
     assert_trash_service(result, "amazon", "the-apps-own-bucket")
-    assert_trash_service(result, "amazon_dev", "probe-app-dev")
+    assert_nil result.dig("services", "amazon_dev"), "the engine added a service to an app that owns its connection"
     assert_equal "https://own.example", result["s3_endpoint"]
     assert_equal "us-east-2", result["s3_region"], "the engine touched a connection the app configured"
   end

@@ -51,11 +51,13 @@ module Studio
     # with the engine's `amazon` / `amazon_dev` merged under them (an app's
     # service of the same name wins). Lazy like Active Storage's own read: it
     # runs when Blob first loads, after every host initializer, so it sees the
-    # host's s3_bucket_prefix. Declared first in this class so Railtie's
+    # host's s3_bucket_prefix. An app still configuring Studio::S3 itself
+    # (Studio::Storage.owns_connection? false) keeps its services as they are.
+    # Declared first in this class so Railtie's
     # implicit `after: <previous initializer>` chaining ties it to nothing.
     initializer "studio.storage.services", before: "active_storage.services" do |app|
       ActiveSupport.on_load(:active_storage_blob) do
-        next unless Studio::Storage.enabled?
+        next unless Studio::Storage.enabled? && Studio::Storage.owns_connection?
 
         storage = app.config.active_storage
         storage.service_configurations = Studio::Storage.merge_services(

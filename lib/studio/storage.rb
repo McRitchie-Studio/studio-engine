@@ -249,16 +249,34 @@ module Studio
 
     # Point Studio::S3 at R2, unless the app configured the connection itself
     # (s3_endpoint already set). A public URL the app set is never overwritten.
-    # Returns whether it wrote anything.
+    # Returns whether it wrote anything, and remembers the answer for
+    # #owns_connection?.
     def apply_studio_s3_settings!(config = Studio, env = ENV, strict: strict?,
                                   public_url_required: public_url_required_setting)
-      return false unless config.s3_endpoint.to_s.strip.empty?
+      @owns_connection = config.s3_endpoint.to_s.strip.empty?
+      return false unless @owns_connection
 
       settings = studio_s3_settings(env, strict: strict, public_url_required: public_url_required,
                                          prefix: config.s3_bucket_prefix)
       settings.delete(:s3_public_url) unless config.s3_public_url.to_s.strip.empty?
       settings.each { |name, setting| config.public_send("#{name}=", setting) }
       true
+    end
+
+    # Whether the engine owns this app's R2 connection: the app left s3_endpoint
+    # unset. An app that configured it is still carrying its own StorageBackend,
+    # which also decides its own Active Storage services (turf-monster defines
+    # NONE in a keyless process, and its suite pins that), so the engine adds no
+    # service to it either. Answered by the boot initializer once it has run;
+    # before that (a host initializer loading Blob early), by s3_endpoint itself.
+    def owns_connection?(config = Studio)
+      return @owns_connection unless @owns_connection.nil?
+
+      config.s3_endpoint.to_s.strip.empty?
+    end
+
+    def reset_ownership!
+      @owns_connection = nil
     end
 
     # THE BOOT CHECK. Both switches, always. The connection, when the engine
