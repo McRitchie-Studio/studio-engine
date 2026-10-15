@@ -22,7 +22,25 @@
 // sizing opinion, so an app whose navbar collapses to different endpoints than
 // the engine's adopts the mechanism without touching its markup.
 //
-// Four details are load-bearing:
+// Five details are load-bearing:
+//
+//   the hold: the header keeps its EXPANDED footprint in the page's flow. As it
+//   shrinks, the controller gives the difference back as margin below it, so
+//   the document never changes height and nothing under the header moves on
+//   its own. Before the hold, the collapse reflowed the whole page every frame:
+//   content ran ahead of the finger while collapsing, a flick back to the top
+//   pushed the page DOWN for ~10 frames after the scroll had stopped, and near
+//   the bottom of a page the browser clamped scrollY back 4px a frame as the
+//   document shrank under it. Held, the page scrolls exactly as far as the
+//   finger moved it, and only the header itself changes size. A header that
+//   is not in flow (fixed or absolute) is left alone: it never moved the page.
+//
+//   (Held, the two guards below exist only for an UNHELD header. The document
+//   no longer shortens, so the short-page flap cannot happen, and the per-frame
+//   cap, which slowed the header so the page it dragged would not jump, now
+//   only makes the header lag the scroll. Worse, a lagging header opens a gap
+//   above the content on a fast scroll back to the top. Held, the progress is
+//   the scroll position, every frame.)
 //
 //   passive + rAF: the listener never blocks the compositor and coalesces a
 //   burst of scroll events (iOS momentum fires far above 60Hz) into one write
@@ -31,7 +49,9 @@
 //   frame, and it would leak the live page's scroll progress into the preview
 //   headers on /navbar.
 //
-//   the smoothstep: collapsing a sticky, IN-FLOW header pulls the page up,
+//   the smoothstep (written for an UNHELD header; held, the page does not
+//   move, and the smoothstep only shapes how the header itself shrinks):
+//   collapsing a sticky, IN-FLOW header pulls the page up,
 //   so during the collapse content moves by the scroll AND by the shrink:
 //   faster than the finger, always. That is inherent; reclaiming the vertical
 //   space is the point. What is tunable is the shape of the burst. --nav-ramp
@@ -64,11 +84,13 @@ export const DEFAULT_MAX_STEP = 5;
 //   scrollHeight  document.documentElement.scrollHeight
 //   innerHeight   window.innerHeight
 //   reduce        prefers-reduced-motion matches
+//   held          the header holds its footprint (see the hold above): no
+//                 short-page guard, no per-frame cap
 //
 // Answers { p, settling }: the progress to publish, and whether the frame
 // clamp left it short of where the scroll position wants it (so the caller
 // must schedule another frame).
-export function collapseFrame({ y, p, ramp, maxPx, scrollHeight, innerHeight, reduce }) {
+export function collapseFrame({ y, p, ramp, maxPx, scrollHeight, innerHeight, reduce, held }) {
   // The height the document WOULD have with the navbar expanded. The
   // add-back is the whole trick; see the guard note above.
   var roomExpanded = scrollHeight - innerHeight + ramp * p;
@@ -76,7 +98,7 @@ export function collapseFrame({ y, p, ramp, maxPx, scrollHeight, innerHeight, re
   // WHERE THE COLLAPSE WANTS TO BE, from scroll position alone.
   var target;
   var snap = false;
-  if (roomExpanded < ramp + 24) {
+  if (!held && roomExpanded < ramp + 24) {
     target = 0;
     snap = true;
   } else if (reduce) {
@@ -85,6 +107,8 @@ export function collapseFrame({ y, p, ramp, maxPx, scrollHeight, innerHeight, re
   } else {
     var t = Math.min(1, y / ramp);
     target = t * t * (3 - 2 * t);
+    // Held, the progress IS the scroll position: nothing to cap.
+    if (held) snap = true;
   }
 
   // THE RATE LIMIT: how far the collapse may travel in ONE frame.
@@ -115,7 +139,7 @@ export function collapseFrame({ y, p, ramp, maxPx, scrollHeight, innerHeight, re
   if (snap) {
     // A guard refusal and a reduced-motion state are DECISIONS, not
     // motion; ramping them would animate the very thing each exists to
-    // avoid.
+    // avoid. A held header follows the scroll exactly.
     next = target;
   } else {
     var maxStep = (3 * maxPx) / ramp;
@@ -133,6 +157,30 @@ export function collapseFrame({ y, p, ramp, maxPx, scrollHeight, innerHeight, re
 // Hysteresis keeps it from strobing at the boundary.
 export function shadowLit(lit, y) {
   return lit ? y > 5 : y > 60;
+}
+
+// THE HOLD, in two parts.
+//
+// THE LINEAR PART IS CSS. The header carries
+//   margin-bottom: calc(base + var(--nav-hold) * var(--nav-p) + var(--nav-hold-fix))
+// where --nav-hold is its rest height minus its collapsed height. That margin
+// grows in the SAME style recalc that shrinks the header, so the document
+// never shortens, not even for one layout. (Setting the margin from script
+// after the shrink was the first version of this, and it lost: the shrink's
+// own layout shortened the document, and on a short page the browser clamped
+// scrollY before the margin came back. Measured: 211 -> 167.)
+//
+// THE RESIDUE IS SCRIPT. A collapse need not be exactly linear in --nav-p
+// (the tallest thing in the row can change mid-ramp), and the scrolled state
+// may add a border. holdFix answers what the linear part missed, so the
+// footprint is the rest height exactly: rest - (height + hold * p).
+export function holdFix({ rest, height, hold, p }) {
+  return rest - height - hold * p;
+}
+
+// Only a header in the page's flow moves the page as it shrinks.
+export function inFlow(position) {
+  return position !== 'fixed' && position !== 'absolute';
 }
 
 // --nav-ramp and --nav-max-step off the header's computed style, each with
@@ -162,12 +210,49 @@ export class NavCollapse {
     this._onScroll = this.onScroll.bind(this);
     this._onResize = this.onResize.bind(this);
     this._apply = this.apply.bind(this);
+    this.held = false;
+    this.rest = 0;
+    this.hold = 0;
+    this.fix = 0;
+    this.lastHeight = null;
+    this._observer = null;
+    this._remeasure = this.remeasure.bind(this);
   }
 
   start() {
     this.stopped = false;
     this._reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
-    this.tuning = readTuning(getComputedStyle(this.el));
+    var style = getComputedStyle(this.el);
+    this.tuning = readTuning(style);
+    this.held = inFlow(style.position);
+    if (this.held) {
+      var base = parseFloat(style.marginBottom) || 0;
+      this.el.style.marginBottom =
+        'calc(' + base + 'px + var(--nav-hold, 0px) * var(--nav-p, 0) + var(--nav-hold-fix, 0px))';
+      this.measure();
+      // The header's height also moves for reasons that are not --nav-p: the
+      // scrolled state's bottom border (1px), a webfont landing, a
+      // Turbo-streamed badge. The observer re-applies the hold for any of
+      // them, in the frame they land. Only a header AT REST (unscrolled,
+      // expanded) redefines the rest height, because that is the one state
+      // whose height the footprint must equal: scrolled, a change is
+      // something the header is doing, not what it rests at.
+      if (typeof ResizeObserver === 'function') {
+        var self = this;
+        this._observer = new ResizeObserver(function () {
+          if (self.stopped) return;
+          var h = self.el.getBoundingClientRect().height;
+          if (self.lastHeight !== null && Math.abs(h - self.lastHeight) <= 0.1) return;
+          self.lastHeight = h;
+          // At rest the header's height IS its rest height, and a change
+          // there is new content: measure both endpoints again.
+          if (self.atRest() && Math.abs(h - self.rest) > 0.1) self.measure();
+          else self.correct(h);
+        });
+        this._observer.observe(this.el);
+      }
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(this._remeasure);
+    }
     this.apply();
 
     window.addEventListener('scroll', this._onScroll, { passive: true });
@@ -181,6 +266,13 @@ export class NavCollapse {
     this.stopped = true;
     window.removeEventListener('scroll', this._onScroll);
     window.removeEventListener('resize', this._onResize);
+    if (this._observer) this._observer.disconnect();
+    this._observer = null;
+    if (this.held) {
+      this.el.style.marginBottom = '';
+      this.el.style.removeProperty('--nav-hold');
+      this.el.style.removeProperty('--nav-hold-fix');
+    }
     if (this._reduce && this._reduce.removeEventListener) {
       this._reduce.removeEventListener('change', this._apply);
     }
@@ -194,7 +286,61 @@ export class NavCollapse {
 
   onResize() {
     this.tuning = readTuning(getComputedStyle(this.el));
+    if (this.held) this.measure();
     this.onScroll();
+  }
+
+  atRest() {
+    return this.p === 0 && window.scrollY <= 0;
+  }
+
+  // The header's height at a given --nav-p, read by putting it there for the
+  // length of one synchronous layout. Nothing paints in between, so the
+  // reader never sees it. The margin is pinned to the rest height while it
+  // reads, so the document only ever GROWS during the read: growing cannot
+  // clamp the scroll position, shrinking can.
+  heightAt(p) {
+    var style = this.el.style;
+    var was = style.getPropertyValue('--nav-p');
+    style.setProperty('--nav-p', String(p));
+    var h = this.el.getBoundingClientRect().height;
+    if (was) style.setProperty('--nav-p', was); else style.removeProperty('--nav-p');
+    return h;
+  }
+
+  // Both endpoints, then the linear hold between them and the residue at the
+  // current progress.
+  measure() {
+    var style = this.el.style;
+    style.setProperty('--nav-hold-fix', '0px');
+    style.setProperty('--nav-hold', '0px');
+    var pinned = style.marginBottom;
+    style.marginBottom = '0px';
+    var rest = this.heightAt(0);
+    style.marginBottom = rest + 'px';
+    var collapsed = this.heightAt(1);
+    style.marginBottom = pinned;
+    this.rest = rest;
+    this.hold = Math.max(0, rest - collapsed);
+    style.setProperty('--nav-hold', this.hold + 'px');
+    this.correct(this.el.getBoundingClientRect().height);
+  }
+
+  remeasure() {
+    if (this.stopped || !this.held) return;
+    this.measure();
+  }
+
+  // Write the residue the linear hold missed, when it moved by more than a
+  // rounding error. The observer calls this in the frame the height changed,
+  // before paint.
+  correct(height) {
+    this.lastHeight = height;
+    var fix = holdFix({ rest: this.rest, height: height, hold: this.hold, p: this.p });
+    if (Math.abs(fix - this.fix) > 0.1) {
+      this.fix = fix;
+      this.el.style.setProperty('--nav-hold-fix', fix.toFixed(2) + 'px');
+    }
   }
 
   apply() {
@@ -210,7 +356,8 @@ export class NavCollapse {
       maxPx: this.tuning.maxPx,
       scrollHeight: document.documentElement.scrollHeight,
       innerHeight: window.innerHeight,
-      reduce: this._reduce.matches
+      reduce: this._reduce.matches,
+      held: this.held
     });
 
     if (frame.p !== this.p) {

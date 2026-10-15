@@ -256,6 +256,7 @@ class E2eLabController < ActionController::Base
     @lab_devnet = params[:devnet].present?
     @lab_admin = params[:admin].present?
     @lab_balance = params[:balance].present?
+    @lab_short = params[:short].present?
     render(:bar_stack)
   end
 

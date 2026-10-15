@@ -175,49 +175,139 @@ test("the collapse endpoints are unchanged at every band boundary", async ({ pag
 // here was green.
 //
 // So this walks a FLICK, and asserts the per-frame cap the clamp promises.
-test("a flick collapses at the capped rate, not all in one frame", async ({ page }) => {
-  await blockOffsiteRequests(page);
-  const errors = watchPageErrors(page);
+// THE HOLD: SCROLLING NEVER MOVES THE PAGE BY ITSELF.
+//
+// The header used to sit in the page's flow and shrink there, so every frame of
+// the collapse reflowed the page: content ran ahead of the finger, a flick back
+// to the top pushed the page down for ~10 frames after the scroll had stopped,
+// and near the bottom of a page the browser clamped scrollY back 4px a frame as
+// the document shrank (measured on the hub's /links: 344 -> 305 with nobody
+// touching it). Held, the header gives its lost height back as margin, so:
+//
+//   1. the body's position IN THE DOCUMENT never changes, whatever --nav-p is;
+//   2. once the scroll stops, scrollY stays where the finger left it;
+//   3. the document never changes height.
+//
+// Paired, like the stop-dead spec above: each run also asserts the collapse
+// HAPPENED, or a navbar that never collapses would pass all three.
+const docTop = () => {
+  const el = document.querySelector("[data-test='lab-body']");
+  return Math.round((el.getBoundingClientRect().top + window.scrollY) * 10) / 10;
+};
 
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/lab/bar_stack");
+async function flickAndWatch(page, steps) {
+  return page.evaluate(async ({ steps, docTopSrc }) => {
+    const docTop = eval(`(${docTopSrc})`);
+    const header = document.querySelector("header");
+    const h = () => Math.round(header.getBoundingClientRect().height * 10) / 10;
+    const frame = () => new Promise((r) => requestAnimationFrame(r));
+    const tops = [docTop()];
+    const heights = [h()];
+    const docHeights = [document.documentElement.scrollHeight];
+    for (const s of steps) {
+      window.scrollBy(0, s);
+      await frame();
+      tops.push(docTop());
+      heights.push(h());
+      docHeights.push(document.documentElement.scrollHeight);
+    }
+    const stoppedAt = window.scrollY;
+    const after = [];
+    for (let i = 0; i < 30; i++) {
+      await frame();
+      after.push(window.scrollY);
+      tops.push(docTop());
+      docHeights.push(document.documentElement.scrollHeight);
+    }
+    return { tops, heights, docHeights, stoppedAt, after };
+  }, { steps, docTopSrc: docTop.toString() });
+}
+
+const DOWN = [90, 78, 66, 55, 45, 36, 28, 21, 15, 10, 6, 3];
+const UP = DOWN.map((s) => -s);
+
+// Written out per width rather than looped: config/e2e_lane.yml's count reads
+// the test() calls in the source.
+async function expectFlickHoldsThePage(page, viewport) {
+    await blockOffsiteRequests(page);
+    const errors = watchPageErrors(page);
+    await page.setViewportSize(viewport);
+    await page.goto("/lab/bar_stack");
+    await expectStickyChromeIsLive(page, expect);
+
+    for (const steps of [DOWN, UP]) {
+      const run = await flickAndWatch(page, steps);
+
+      // IT COLLAPSED (or expanded): the header changed size during the flick.
+      const span = Math.max(...run.heights) - Math.min(...run.heights);
+      expect(span, `header heights ${JSON.stringify(run.heights)}`).toBeGreaterThan(20);
+
+      const drift = Math.max(...run.tops) - Math.min(...run.tops);
+      expect(drift, `the body moved in the document: ${JSON.stringify(run.tops)}`).toBeLessThanOrEqual(0.5);
+      expect(new Set(run.docHeights).size, `document heights ${JSON.stringify([...new Set(run.docHeights)])}`).toBe(1);
+      expect(run.after.every((y) => y === run.stoppedAt), `scrollY after the flick: ${JSON.stringify(run.after)}`).toBe(true);
+    }
+    expect(errors).toEqual([]);
+}
+
+test("390px: a flick down and back up never moves the page by itself", async ({ page }) => {
+  await expectFlickHoldsThePage(page, { width: 390, height: 844 });
+});
+
+test("1280px: a flick down and back up never moves the page by itself", async ({ page }) => {
+  await expectFlickHoldsThePage(page, { width: 1280, height: 800 });
+});
+
+// A short page: barely more scroll room than the ramp. Scrolled to its end,
+// the browser has nothing to clamp, because the document never shortened.
+test("at the bottom of a short page the scroll stays where it was put", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/lab/bar_stack?short=1");
   await expectStickyChromeIsLive(page, expect);
 
-  const walk = async (steps) =>
-    page.evaluate(async (steps) => {
-      const header = document.querySelector("header");
-      const h = () => Math.round(header.getBoundingClientRect().height * 10) / 10;
-      window.scrollTo(0, 0);
-      await new Promise((r) => setTimeout(r, 300));
-      const seen = [h()];
-      for (const s of steps) {
-        window.scrollBy(0, s);
-        await new Promise((r) => requestAnimationFrame(r));
-        seen.push(h());
-      }
-      // Let the clamp finish catching up once the "finger" is off.
-      for (let i = 0; i < 24; i++) {
-        await new Promise((r) => requestAnimationFrame(r));
-        seen.push(h());
-      }
-      let worst = 0;
-      for (let i = 1; i < seen.length; i++) worst = Math.max(worst, Math.abs(seen[i] - seen[i - 1]));
-      return { worst, first: seen[0], last: seen[seen.length - 1] };
-    }, steps);
+  // The browser's own answer for "the end": scroll far past it and read back.
+  const max = await page.evaluate(() => { window.scrollTo(0, 1e6); const m = window.scrollY; window.scrollTo(0, 0); return m; });
+  // This page's whole scroll room is barely more than the ramp.
+  expect(max).toBeLessThan(260);
+  await page.evaluate(() => new Promise((r) => setTimeout(r, 200)));
 
-  // A momentum flick: the profile that used to move the whole range in one frame.
-  const flick = await walk([90, 78, 66, 55, 45, 36, 28, 21, 15, 10, 6, 3]);
+  const run = await flickAndWatch(page, [400, 400]);
+  expect(run.stoppedAt).toBe(max);
+  expect(run.heights[run.heights.length - 1], "the header collapsed").toBeLessThan(run.heights[0] - 20);
+  expect(run.after.every((y) => y === max), `scrollY after reaching the end: ${JSON.stringify(run.after)}`).toBe(true);
+  expect(new Set(run.docHeights).size).toBe(1);
+});
 
-  // IT STILL COLLAPSES. Without this, a navbar that ignored scroll entirely
-  // would satisfy the cap trivially.
-  expect(flick.last).toBeLessThan(flick.first - 20);
+// STILL CONTINUOUS. The hold changes how the page makes room, not the collapse:
+// halfway through the ramp the header is halfway between its endpoints, and it
+// stays there while the scroll does.
+async function expectHalfwayHolds(page, band) {
+    await blockOffsiteRequests(page);
+    await page.setViewportSize({ width: band.width, height: 800 });
+    await page.goto("/lab/bar_stack");
+    await expectStickyChromeIsLive(page, expect);
 
-  // AND NEVER FASTER THAN THE CAP. --nav-max-step is 5px; allow a pixel of
-  // rounding on top rather than pinning the exact constant from another file.
-  expect(
-    flick.worst,
-    `a flick moved the header ${flick.worst}px in one frame (${flick.first} -> ${flick.last})`
-  ).toBeLessThanOrEqual(6);
+    const height = () => Math.round(document.querySelector("header").getBoundingClientRect().height * 10) / 10;
+    const expanded = await page.evaluate(height);
+    await page.evaluate((y) => window.scrollTo(0, y), band.ramp * 10);
+    await expect.poll(() => page.evaluate(() => document.querySelector("header").style.getPropertyValue("--nav-p"))).toBe("1.0000");
+    const collapsed = await page.evaluate(height);
 
-  expect(errors).toEqual([]);
+    await page.evaluate((y) => window.scrollTo(0, y), band.ramp / 2);
+    // smoothstep(0.5) is 0.5: halfway along the ramp is halfway collapsed.
+    await expect.poll(() => page.evaluate(() => document.querySelector("header").style.getPropertyValue("--nav-p"))).toBe("0.5000");
+    const mid = await page.evaluate(height);
+    expect(Math.abs(mid - (expanded + collapsed) / 2), `${expanded} / ${mid} / ${collapsed}`).toBeLessThanOrEqual(2);
+
+    const held = await sampleAcrossFrames(page, { perturb: () => {}, read: () => document.querySelector("header").getBoundingClientRect().height, frames: 20 });
+    expect(Math.max(...held) - Math.min(...held)).toBeLessThanOrEqual(0.5);
+}
+
+test("390px: parked mid-ramp, the header holds halfway", async ({ page }) => {
+  await expectHalfwayHolds(page, { width: 390, ramp: 120 });
+});
+
+test("1280px: parked mid-ramp, the header holds halfway", async ({ page }) => {
+  await expectHalfwayHolds(page, { width: 1280, ramp: 144 });
 });

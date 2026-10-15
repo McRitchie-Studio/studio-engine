@@ -85,6 +85,69 @@ export function composed(pins) {
 
 var started = false
 
+// THE READERS OF THE STACK, found rather than declared.
+//
+// Every value this publisher writes is an inherited custom property on
+// documentElement, so every write restyles the WHOLE document, whether or not
+// an element reads it. On a scroll frame that is the hot path: the header's
+// bottom edge moves every frame while an ambient bar scrolls away and while
+// the navbar collapses. Measured on turf-monster's contest page (about 2,000
+// elements): one root write cost 8.7ms of style recalc against 0.2ms for the
+// same write on the header, and the collapse dropped every second or third
+// frame on a 120Hz screen. The hub's 478-element /links paid 1ms.
+//
+// Only a handful of elements read these values. So while a scroll is in
+// motion the publisher writes them onto those elements alone, and writes the
+// root once the scroll settles. A reader is any element that
+//   · carries [data-pin-follow], the explicit opt-in;
+//   · uses one in its inline style (studio/_sidebar_panel does); or
+//   · matches a stylesheet rule that uses one (scanned once per document).
+// The document's root and body are never followers: a rule there (a custom
+// property derived from --nav-h on :root) is served by the settled write.
+//
+// A reader follows LIVE only when it uses a value for something that paints.
+// scroll-margin and scroll-padding matter only at the moment of an anchor
+// jump, and the settled root serves them: turf-monster's contest board carries
+// `scroll-margin-top: var(--nav-h)` on a 1,200-element subtree, and following
+// it live cost the whole page's restyle back.
+export var READS_THE_STACK = /var\(\s*--(pin-|nav-bottom|nav-h\b)/;
+
+export function readsLive(cssText) {
+  var decls = String(cssText || '').split(';');
+  for (var i = 0; i < decls.length; i++) {
+    var at = decls[i].indexOf(':');
+    if (at < 0) continue;
+    var name = decls[i].slice(0, at).trim().toLowerCase();
+    if (/^scroll-(margin|padding)/.test(name)) continue;
+    if (READS_THE_STACK.test(decls[i].slice(at + 1))) return true;
+  }
+  return false;
+}
+
+export function followerSelectors(sheets) {
+  var found = ['[data-pin-follow]', '[style*="var(--pin-"]', '[style*="var(--nav-bottom"]', '[style*="var(--nav-h"]'];
+  function walk(rules) {
+    for (var i = 0; rules && i < rules.length; i++) {
+      var rule = rules[i];
+      if (rule.selectorText && rule.style && readsLive(rule.style.cssText)) {
+        var parts = rule.selectorText.split(',');
+        for (var j = 0; j < parts.length; j++) {
+          var sel = parts[j].trim();
+          if (sel && found.indexOf(sel) === -1) found.push(sel);
+        }
+      }
+      if (rule.cssRules) walk(rule.cssRules);
+    }
+  }
+  for (var k = 0; k < sheets.length; k++) {
+    var rules = null;
+    // A cross-origin sheet refuses cssRules; it cannot hold this app's readers.
+    try { rules = sheets[k].cssRules; } catch (e) { rules = null; }
+    walk(rules);
+  }
+  return found;
+}
+
 export function startPinnedStack() {
   if (started || !window.ResizeObserver) return;
   started = true;
@@ -108,6 +171,60 @@ export function startPinnedStack() {
   // The nodes currently under observation, held only to know what to unobserve
   // when one departs. The REGISTRY ITSELF is never cached; see readPins().
   var observed = [];
+
+  // THE MOTION WRITE (see READS_THE_STACK above). lastScrollAt marks the
+  // gesture; within SETTLE_MS of it a publish writes the followers, and a
+  // timer writes the root once the scroll has been still that long.
+  var SETTLE_MS = 160;
+  var lastScrollAt = -Infinity;
+  var settleTimer = null;
+  var selectors = null;
+  var followed = [];
+  var followedProps = [];
+
+  function followers() {
+    if (!selectors) selectors = followerSelectors(document.styleSheets);
+    var out = [];
+    for (var i = 0; i < selectors.length; i++) {
+      var nodes;
+      // A selector the scan lifted may not be queryable (a pseudo-element).
+      try { nodes = document.querySelectorAll(selectors[i]); } catch (e) { continue; }
+      for (var j = 0; j < nodes.length; j++) {
+        var n = nodes[j];
+        if (n === document.documentElement || n === document.body || n === document.head) continue;
+        // The inline matches are substring guesses; the declarations decide.
+        if (selectors[i].charAt(0) === '[' && selectors[i] !== '[data-pin-follow]' && !readsLive(n.getAttribute('style'))) continue;
+        if (out.indexOf(n) === -1) out.push(n);
+      }
+    }
+    return out;
+  }
+
+  function writeFollowers(props) {
+    var targets = followers();
+    for (var i = 0; i < targets.length; i++) {
+      for (var k = 0; k < props.length; k++) {
+        if (targets[i].style.getPropertyValue(props[k][0]) !== props[k][1]) targets[i].style.setProperty(props[k][0], props[k][1]);
+      }
+    }
+    followed = targets;
+    followedProps = props;
+  }
+
+  // Once the root holds the settled values, the followers inherit them again.
+  function releaseFollowers() {
+    for (var i = 0; i < followed.length; i++) {
+      for (var k = 0; k < followedProps.length; k++) followed[i].style.removeProperty(followedProps[k][0]);
+    }
+    followed = [];
+    followedProps = [];
+  }
+
+  function settle() {
+    settleTimer = null;
+    publishAll();
+    releaseFollowers();
+  }
 
   // THE REGISTRY IS DERIVED, NEVER CACHED — and that is a correctness rule.
   //
@@ -173,6 +290,22 @@ export function startPinnedStack() {
     forceWrite = false;
     if (!force) {
       for (i = 0; i < pins.length; i++) { if (!last.hasOwnProperty(pins[i].name)) { force = true; break; } }
+    }
+
+    // IN MOTION, THE FOLLOWERS ONLY. A structural change still writes the
+    // root at once: it is rare, and a layer arriving must reach every reader.
+    if (!force && performance.now() - lastScrollAt < SETTLE_MS) {
+      var props = [];
+      for (i = 0; i < pins.length; i++) {
+        p = pins[i];
+        props.push(['--pin-' + p.name + '-h', p.h + 'px'], ['--pin-' + p.name + '-bottom', p.bottom + 'px'], ['--pin-' + p.name + '-top', p.top + 'px']);
+        if (p.legacy) props.push(['--nav-h', p.h + 'px'], ['--nav-bottom', p.bottom + 'px']);
+      }
+      props.push(['--pin-stack-bottom', stack + 'px']);
+      writeFollowers(props);
+      if (settleTimer) clearTimeout(settleTimer);
+      settleTimer = setTimeout(settle, SETTLE_MS);
+      return;
     }
     for (i = 0; i < pins.length; i++) {
       p = pins[i];
@@ -284,7 +417,7 @@ export function startPinnedStack() {
     window.requestAnimationFrame(function () { queued = false; publishAll(); });
   }
 
-  function invalidate() { forceWrite = true; publishAll(); }
+  function invalidate() { forceWrite = true; selectors = null; publishAll(); }
   document.addEventListener('DOMContentLoaded', invalidate);
   document.addEventListener('turbo:load', invalidate);
   // A Turbo Stream replaces nodes WITHOUT a turbo:load. The registry is derived
@@ -297,6 +430,8 @@ export function startPinnedStack() {
   // Registered ONCE at start, not inside a re-scan, so a Turbo nav
   // re-publishes instead of stacking another listener per visit.
   window.addEventListener('scroll', schedule, { passive: true });
+  // The gesture's clock for the motion write (see READS_THE_STACK).
+  window.addEventListener('scroll', function () { lastScrollAt = performance.now(); }, { passive: true });
   window.addEventListener('resize', schedule, { passive: true });
 
   // A deferred module runs after the body is parsed, so the layers are already

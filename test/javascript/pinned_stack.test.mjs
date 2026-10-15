@@ -5,7 +5,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/pinned_stack.js", import.meta.url), "utf8")
-const { composed, order } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+const { composed, order, readsLive, followerSelectors } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 // A reading as measure() returns it, with an element that answers only the
 // one attribute composed() reads.
@@ -55,4 +55,43 @@ test("order reads a plain number and refuses anything else", () => {
   assert.equal(order(pin("a", 0, "1.5")), 1.5)
   assert.equal(order(pin("a", 0)), null)
   assert.equal(order(pin("a", 0, "top")), null)
+})
+
+// --- the motion write (task smooth-navbar-collapse) --------------------------
+//
+// While a scroll is in motion the publisher writes the stack onto the elements
+// that read it live, not documentElement, whose every write restyles the whole
+// document. Which elements read it live is decided here.
+
+test("a declaration that positions off the stack reads it live", () => {
+  assert.equal(readsLive("top: var(--nav-bottom, var(--nav-h, 6rem)); height: calc(100% - var(--nav-bottom))"), true)
+  assert.equal(readsLive("top: var(--pin-stack-bottom, 0px)"), true)
+  assert.equal(readsLive("--sheet-top: calc(var(--nav-h) + 1px)"), true)
+})
+
+test("scroll-margin and scroll-padding are served by the settled root", () => {
+  assert.equal(readsLive("scroll-margin-top: var(--nav-h, 64px)"), false)
+  assert.equal(readsLive("scroll-padding-top: calc(var(--nav-bottom) + 1rem)"), false)
+})
+
+test("--nav-hold is not --nav-h", () => {
+  assert.equal(readsLive("margin-bottom: calc(0px + var(--nav-hold, 0px) * var(--nav-p, 0))"), false)
+})
+
+test("the stylesheet scan lifts the selectors of live rules, nested ones included", () => {
+  const rule = (selectorText, cssText) => ({ selectorText, style: { cssText } })
+  const sheets = [
+    { cssRules: [
+      rule(".pkg-matrix thead th", "top: var(--pin-stack-bottom, 0px);"),
+      rule(".anchor", "scroll-margin-top: var(--nav-h);"),
+      { cssRules: [rule(".lane-head, .strip", "top: var(--pin-apps-top);")] }
+    ] },
+    { get cssRules() { throw new Error("cross-origin") } }
+  ]
+  const found = followerSelectors(sheets)
+  assert.ok(found.includes(".pkg-matrix thead th"))
+  assert.ok(found.includes(".lane-head"))
+  assert.ok(found.includes(".strip"))
+  assert.ok(!found.includes(".anchor"))
+  assert.ok(found.includes("[data-pin-follow]"))
 })
