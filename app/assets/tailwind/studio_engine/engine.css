@@ -178,6 +178,118 @@ body.modal-open .studio-app-banner {
   @apply bg-inset rounded-xl border border-subtle p-4 overflow-x-auto;
 }
 
+/* -- Scrims: tints and shades ----------------------------------------------
+   A scrim is the wash laid over media (a photo, a video) so text reads on it.
+   It comes in two TONES, and the tone is a design decision, not a colour pick:
+
+     SHADE  the dark base (--color-shade) over the media. It DARKENS it, and
+            LIGHT ink reads on it. The dark theme's natural scrim.
+     TINT   the light base (--color-tint) over the media. It LIGHTENS it, and
+            DARK ink reads on it. The light theme's natural scrim.
+
+   Both tokens are theme-INDEPENDENT (Studio::ThemeResolver#tone_vars emits
+   each with one value in both theme blocks), so a forced tone paints the same
+   in either theme. They follow the theme's own bases, so a custom dark or
+   light colour carries through.
+
+   THE CLASSES
+     .scrim                 paints the wash. With no tone class it is
+                            theme-aware: a tint in light mode, a shade in dark.
+     .scrim-tint            forces a tint, in either theme.
+     .scrim-shade           forces a shade, in either theme.
+     .scrim-soft            a lighter wash (-15 points on both stops).
+     .scrim-strong          a heavier wash (+10 points on both stops).
+     .scrim-ink             the strong ink for text on the tone (headlines).
+     .scrim-ink-muted       the quieter ink (subtitles): on a tint, the body
+                            ink at 600, because the secondary grey washes into
+                            the media; on a shade, the secondary ink at 400.
+
+   THE TONE IS INHERITED CONTEXT, NOT A PROPERTY OF THE WASH. The usual layout
+   puts the scrim and the text as SIBLINGS (an `absolute inset-0` scrim, then
+   a `relative z-10` content box), so the text cannot read anything off the
+   scrim element itself. The tone classes therefore only set custom
+   properties, and those inherit: put `.scrim-shade` on the section and both
+   the wash and every `.scrim-ink` inside it take the shade. With no tone
+   class anywhere, :root and .dark supply the theme-aware default.
+
+   STRENGTH. Each tone carries its own default stops (--scrim-tone-edge /
+   --scrim-tone-mid): a tint 75% / 58% (approved on the hub's landing hero),
+   a shade 85% / 70%. The gradient reads --scrim-edge / --scrim-mid first, so
+   a caller sets either inline for an exact value, and .scrim-soft /
+   .scrim-strong derive them from the tone's own default. Put a strength class
+   on the scrim element itself: --scrim-edge inherits like any custom property.
+
+   THE GRADIENT runs corner to corner (135deg), heavier at both ends than in
+   the middle, so the media shows through where the eye lands least. The
+   default shade is exactly rgba(26,21,53, .85 / .70 / .85) on the default
+   theme: color-mix against `transparent` keeps the colour and scales alpha.
+
+   Every token carries the engine default as a fallback, so an app that sets
+   its own theme vars without studio_theme_css_tag still gets a working wash. */
+:root {
+  --scrim-color:            var(--color-tint, #f8fafc);
+  --scrim-tone-edge:        75%;
+  --scrim-tone-mid:         58%;
+  --scrim-ink:              var(--color-tint-ink, #0f172a);
+  --scrim-ink-muted:        var(--color-tint-ink-muted, #334155);
+  --scrim-ink-muted-weight: 600;
+}
+
+.dark {
+  --scrim-color:            var(--color-shade, #1A1535);
+  --scrim-tone-edge:        85%;
+  --scrim-tone-mid:         70%;
+  --scrim-ink:              var(--color-shade-ink, #ffffff);
+  --scrim-ink-muted:        var(--color-shade-ink-muted, #BAB9C2);
+  --scrim-ink-muted-weight: 400;
+}
+
+@utility scrim {
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--scrim-color) var(--scrim-edge, var(--scrim-tone-edge)), transparent) 0%,
+    color-mix(in srgb, var(--scrim-color) var(--scrim-mid, var(--scrim-tone-mid)), transparent) 50%,
+    color-mix(in srgb, var(--scrim-color) var(--scrim-edge, var(--scrim-tone-edge)), transparent) 100%
+  );
+}
+
+@utility scrim-tint {
+  --scrim-color:            var(--color-tint, #f8fafc);
+  --scrim-tone-edge:        75%;
+  --scrim-tone-mid:         58%;
+  --scrim-ink:              var(--color-tint-ink, #0f172a);
+  --scrim-ink-muted:        var(--color-tint-ink-muted, #334155);
+  --scrim-ink-muted-weight: 600;
+}
+
+@utility scrim-shade {
+  --scrim-color:            var(--color-shade, #1A1535);
+  --scrim-tone-edge:        85%;
+  --scrim-tone-mid:         70%;
+  --scrim-ink:              var(--color-shade-ink, #ffffff);
+  --scrim-ink-muted:        var(--color-shade-ink-muted, #BAB9C2);
+  --scrim-ink-muted-weight: 400;
+}
+
+@utility scrim-soft {
+  --scrim-edge: calc(var(--scrim-tone-edge) - 15%);
+  --scrim-mid:  calc(var(--scrim-tone-mid) - 15%);
+}
+
+@utility scrim-strong {
+  --scrim-edge: calc(var(--scrim-tone-edge) + 10%);
+  --scrim-mid:  calc(var(--scrim-tone-mid) + 10%);
+}
+
+@utility scrim-ink {
+  color: var(--scrim-ink);
+}
+
+@utility scrim-ink-muted {
+  color: var(--scrim-ink-muted);
+  font-weight: var(--scrim-ink-muted-weight);
+}
+
 /* -- Text + form ----------------------------------------------------------- */
 
 @utility badge {

@@ -1,0 +1,66 @@
+<%#  Tints and shades: the scrim primitive's group on the living style guide's
+     Tricks board (admin/style). Rendered by style/_tricks, and by the e2e lab
+     page e2e_lab/scrims, which grades the painted wash and ink in a browser.
+
+     A SHADE lays the dark base over media and light ink reads on it; a TINT
+     lays the light base over media and dark ink reads on it. .scrim alone is
+     theme-aware (a tint in light mode, a shade in dark); .scrim-tint and
+     .scrim-shade force a tone in either theme. The tone classes only set
+     custom properties, which inherit, so each specimen puts its tone on the
+     STAGE and the wash and the text, which are siblings, both take it.
+
+     The striped panel stands in for a photo: vivid, busy and the same in both
+     themes, so what changes between specimens is the scrim alone. The
+     definitions and the strength numbers live in engine.css (Scrims: tints
+     and shades) and the README section of the same name. %>
+<%
+  media_style = "background-image: repeating-linear-gradient(135deg, #f72585 0 18px, #4cc9f0 18px 36px, #ffd166 36px 54px, #06d6a0 54px 72px)"
+
+  specimens = [
+    { key: "theme",  tone: nil,           scrim: "scrim",
+      klass: ".scrim",
+      note:  "Theme-aware: a tint in light mode, a shade in dark." },
+    { key: "tint",   tone: "scrim-tint",  scrim: "scrim",
+      klass: ".scrim-tint .scrim",
+      note:  "Forced tint, in either theme. Dark ink." },
+    { key: "shade",  tone: "scrim-shade", scrim: "scrim",
+      klass: ".scrim-shade .scrim",
+      note:  "Forced shade, in either theme. Light ink." },
+    { key: "soft",   tone: nil,           scrim: "scrim scrim-soft",
+      klass: ".scrim .scrim-soft",
+      note:  "A lighter wash: more of the media shows." },
+    { key: "strong", tone: nil,           scrim: "scrim scrim-strong",
+      klass: ".scrim .scrim-strong",
+      note:  "A heavier wash, for long or small text." }
+  ]
+%>
+<section id="scrims" class="space-y-5" data-scrim-group>
+  <div class="space-y-1">
+    <h3 class="text-xl font-bold text-heading">Tints &amp; shades</h3>
+    <p class="text-muted text-sm max-w-2xl">
+      A <strong>shade</strong> lays the dark base over media and light ink reads on it; a
+      <strong>tint</strong> lays the light base over media and dark ink reads on it.
+      <code class="font-mono text-2xs">.scrim</code> picks by theme;
+      <code class="font-mono text-2xs">.scrim-tint</code> / <code class="font-mono text-2xs">.scrim-shade</code>
+      force one. Put the tone on the shared parent so the wash and the
+      <code class="font-mono text-2xs">.scrim-ink</code> text both take it.
+    </p>
+  </div>
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <% specimens.each do |s| %>
+      <% tone_attr = s[:tone] ? %( class="#{s[:tone]} relative ...") : %( class="relative ...") %>
+      <%= render layout: "style/specimen",
+            locals: { klass: s[:klass],
+                      usage: %(<section#{tone_attr}>\n  <img class="absolute inset-0 ..." src="...">\n  <div class="#{s[:scrim]} absolute inset-0"></div>\n  <div class="relative z-10">\n    <h2 class="scrim-ink">Headline</h2>\n    <p class="scrim-ink-muted">Subtitle</p>\n  </div>\n</section>) } do %>
+        <div class="relative w-full max-w-xs h-36 rounded-lg overflow-hidden <%= s[:tone] %>" data-scrim-specimen="<%= s[:key] %>">
+          <div class="absolute inset-0" style="<%= media_style %>" aria-hidden="true"></div>
+          <div class="<%= s[:scrim] %> absolute inset-0" data-scrim-wash></div>
+          <div class="relative z-10 h-full flex flex-col items-center justify-center gap-1 px-4 text-center">
+            <p class="scrim-ink text-lg font-extrabold" data-scrim-ink>Solutions For Business</p>
+            <p class="scrim-ink-muted text-sm" data-scrim-ink-muted><%= s[:note] %></p>
+          </div>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+</section>

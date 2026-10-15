@@ -34,8 +34,8 @@
     <p class="text-muted text-sm max-w-2xl">
       A board of style tricks you can see and hand to an agent to use out of the box.
       Each specimen surfaces the rendered primitive, its <strong>class name (one-click
-      copy)</strong>, and a copyable usage snippet - the button, surface, motion, effect,
-      and leveling primitives. The color tokens live in <a href="#theme" class="underline">Theme</a>.
+      copy)</strong>, and a copyable usage snippet - the button, surface, scrim, motion,
+      effect, and leveling primitives. The color tokens live in <a href="#theme" class="underline">Theme</a>.
     </p>
   </div>
 
@@ -112,6 +112,9 @@
       <% end %>
     </div>
   </section>
+
+  <!-- Tints and shades: the scrim primitive -->
+  <%= render "style/scrims" %>
 
   <!-- Time stamps: the "at" format -->
   <section class="space-y-5">
