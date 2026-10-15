@@ -183,6 +183,7 @@ module Studio
         wordmark: wordmark(facts[:wordmark], site_name),
         logo: facts.key?(:logo) ? text(facts[:logo]) : text(logo),
         logo_invert: facts[:logo_invert] ? true : false,
+        lockup: lockup(facts[:lockup]),
         home_path: safe_href(facts[:home_path], "home_path") || "/",
         tagline: text(facts[:tagline]),
         email: text(facts[:email]),
@@ -251,6 +252,44 @@ module Studio
       return nil if words.empty?
 
       [words[0..-2].join(" "), words.last]
+    end
+
+    # THE LOCKUP: one piece of brand artwork (an icon and the name drawn
+    # together, such as a kit's stacked logo) that the footer draws in place of
+    # the logo and the wordmark. One file per theme, as Studio.navbar_wordmark
+    # takes them:
+    #
+    #   lockup: { light: "/brand/stacked-light.svg", dark: "/brand/stacked-dark.svg",
+    #             width: 942, height: 885 }
+    #
+    # `light` is drawn on a light page, `dark` on a dark one; a lockup with no
+    # `dark` uses its `light` file for both. `width` and `height` are the
+    # artwork's own size (an SVG's viewBox): written onto both images, they
+    # give the browser the shape before the file arrives, so nothing moves
+    # when it does. Either one missing or not a positive number, neither is
+    # written. No `light`: no lockup, and the logo and wordmark are drawn.
+    def lockup(declared)
+      return nil unless declared.respond_to?(:to_h) && !declared.is_a?(Array)
+
+      source = symbolize(declared)
+      light = text(source[:light])
+      return nil if light.nil?
+
+      width = dimension(source[:width])
+      height = dimension(source[:height])
+      sized = !width.nil? && !height.nil?
+      { light: light, dark: text(source[:dark]) || light,
+        width: (width if sized), height: (height if sized) }
+    end
+
+    # A positive, finite number, rounded to a whole pixel; anything else is nil.
+    def dimension(value)
+      return nil unless value.is_a?(Numeric) || value.to_s.match?(/\A\s*\d+(\.\d+)?\s*\z/)
+
+      number = Float(value)
+      number.finite? && number.positive? ? [number.round, 1].max : nil
+    rescue ArgumentError, TypeError, FloatDomainError
+      nil
     end
 
     # The address may be nested under :address or written flat (street:,

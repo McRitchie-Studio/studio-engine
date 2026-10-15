@@ -1,0 +1,18 @@
+<%# The footer lockup's styles (the `lockup:` fact; docs/SITE_FOOTER.md). Only
+    a footer that declares a lockup renders this, so a footer without one is
+    byte for byte what it was before the fact existed.
+
+    HEIGHT-LED. The lockup is drawn at --ftr-lockup-height (default 7rem, about
+    the icon-and-name block's height plus the room a stacked logo's second line
+    needs) and its width follows the artwork, never wider than its column. The
+    width and height attributes give the box its shape before the file loads.
+
+    THEME SWAP. Light shows on a light page, dark under the root's `dark`
+    class. The hide rule comes after the display rule, so it wins on order. %>
+<style>
+  .ftr-lockup { display: block; width: auto; height: var(--ftr-lockup-height, 7rem); max-width: 100%;
+    object-fit: contain; object-position: left center; }
+  .ftr-lockup-dark { display: none; }
+  .dark .ftr-lockup-light { display: none; }
+  .dark .ftr-lockup-dark { display: block; }
+</style>
