@@ -1111,7 +1111,7 @@ module Studio
   # production process ignores it, because its own bucket IS production.
   mattr_accessor :s3_production_public_url, default: nil
 
-  # STORAGE IS MANAGED BY DEFAULT (Studio::Storage, docs/STORAGE.md). An app that
+  # STORAGE IS MANAGED BY DEFAULT (Studio::Storage; README.md, "Managed storage"). An app that
   # names its bucket (s3_bucket_prefix) gets the R2 boot check, Studio::S3 on R2
   # and the `amazon` / `amazon_dev` StudioTrashS3 services with no initializer of
   # its own. false opts out entirely.

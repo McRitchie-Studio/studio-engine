@@ -6,7 +6,7 @@ module Studio
   # OBJECT STORAGE IS CLOUDFLARE R2, AND ONLY R2. One copy of the rules the hub,
   # turf-monster and mcritchie-industries each carried as a hand-written
   # `StorageBackend` module (AWS S3 was retired on 2026-10-10, so there is no S3
-  # stage and no mirror stage left to select). docs/STORAGE.md is the guide.
+  # stage and no mirror stage left to select). README.md, "Managed storage".
   #
   # ON BY DEFAULT for every app that names its bucket (`config.s3_bucket_prefix`).
   # Such an app gets, with no initializer of its own:
