@@ -7,11 +7,19 @@
     needs) and its width follows the artwork, never wider than its column. The
     width and height attributes give the box its shape before the file loads.
 
+    CENTRED. A lockup centres the brand block (.ftr-brand-lockup): the lockup,
+    the tagline, the email and the social row. A stacked lockup is symmetric
+    about its own centre, so it reads as the column's heading only when
+    centred under it. The link columns keep their alignment.
+
     THEME SWAP. Light shows on a light page, dark under the root's `dark`
     class. The hide rule comes after the display rule, so it wins on order. %>
 <style>
   .ftr-lockup { display: block; width: auto; height: var(--ftr-lockup-height, 7rem); max-width: 100%;
-    object-fit: contain; object-position: left center; }
+    object-fit: contain; object-position: center; }
+  .ftr-brand-lockup { text-align: center; }
+  .ftr-brand-lockup .ftr-home { display: flex; justify-content: center; }
+  .ftr-brand-lockup .ftr-socials { justify-content: center; }
   .ftr-lockup-dark { display: none; }
   .dark .ftr-lockup-light { display: none; }
   .dark .ftr-lockup-dark { display: block; }

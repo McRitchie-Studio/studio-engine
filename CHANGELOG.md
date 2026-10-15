@@ -14,8 +14,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `width`/`height`, inside the home link; CSS shows the light file on a light
   page and the dark file under `.dark`, so a theme toggle swaps them with no
   script. It is drawn `7rem` tall (`--ftr-lockup-height` on `.ftr` changes it)
-  and never wider than its column. The tagline, email and social row are
-  unchanged. A footer that declares no lockup is byte-identical: the lockup's
+  and never wider than its column. A lockup centres the brand block
+  (`.ftr-brand-lockup`: the lockup, tagline, email and social row), since a
+  stacked lockup is symmetric; the link columns keep their alignment. A footer that declares no lockup is byte-identical: the lockup's
   styles render only with it (`studio/site_footer/_lockup_assets`), and an
   older engine ignores the key. See `docs/SITE_FOOTER.md`, *A lockup*.
 

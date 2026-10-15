@@ -19,6 +19,13 @@ class SiteFooterLockupCssTest < Minitest::Test
     assert_includes rule, "width: auto"
     assert_includes rule, "max-width: 100%"
     assert_includes rule, "object-fit: contain"
+    assert_includes rule, "object-position: center"
+  end
+
+  def test_a_lockup_centres_the_brand_block_and_its_social_row
+    assert_match(/^\s*\.ftr-brand-lockup \{ text-align: center; \}/, CSS)
+    assert_match(/^\s*\.ftr-brand-lockup \.ftr-home \{ display: flex; justify-content: center; \}/, CSS)
+    assert_match(/^\s*\.ftr-brand-lockup \.ftr-socials \{ justify-content: center; \}/, CSS)
   end
 
   def test_light_page_shows_the_light_file_and_dark_page_the_dark_file

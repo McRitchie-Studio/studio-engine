@@ -15,11 +15,12 @@
   <div class="ftr-wrap">
     <% tracks = Studio::SiteFooter.tracks(columns) %>
     <div class="ftr-cols<%= " ftr-cols-many" if columns.size > Studio::SiteFooter::MAX_ROW_COLUMNS %>"<% if tracks %> style="--ftr-tracks: <%= tracks %>"<% end %>>
-      <div class="ftr-brand">
+      <div class="ftr-brand<%= " ftr-brand-lockup" if facts[:lockup] %>">
         <% if (lockup = facts[:lockup]) %>
-          <%# The lockup replaces the logo and the wordmark. Both theme files
-              render; studio/site_footer/_lockup_assets shows the one that
-              matches the page, so a theme toggle swaps them with no script. %>
+          <%# The lockup replaces the logo and the wordmark, and centres the
+              brand block (.ftr-brand-lockup). Both theme files render;
+              studio/site_footer/_lockup_assets shows the one that matches the
+              page, so a theme toggle swaps them with no script. %>
           <%= render "studio/site_footer/lockup_assets" %>
           <a href="<%= facts[:home_path] %>" class="ftr-home" aria-label="<%= facts[:name] %>">
             <% [ [ :light, lockup[:light] ], [ :dark, lockup[:dark] ] ].each do |theme, src| %>

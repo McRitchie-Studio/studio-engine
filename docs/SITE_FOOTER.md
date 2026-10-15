@@ -308,6 +308,10 @@ config.site_footer = ->(view) {
   file loads and nothing below it moves. Give both or neither.
 - It is drawn `7rem` tall, its width following the artwork and never wider
   than its column. Set `--ftr-lockup-height` on `.ftr` to change that.
+- It centres the brand block (`.ftr-brand-lockup`): the lockup, the tagline,
+  the email and the social row, at every width. A stacked lockup is symmetric
+  about its centre, so it is centred rather than given an alignment option; the
+  link columns keep theirs.
 - Both images carry the site name as `alt`, inside the home link.
 - A footer that declares no lockup renders exactly as before: its styles ride
   only with a lockup (`studio/site_footer/_lockup_assets`). An engine older
@@ -433,7 +437,7 @@ These class names are stable, and an app may style against them:
 |-------|---------|
 | `.ftr` | The footer |
 | `.ftr-cols` | The grid of brand and link columns; `--ftr-tracks` is its link-column tracks. `.ftr-cols-many` with more than four |
-| `.ftr-brand` | The brand block |
+| `.ftr-brand` | The brand block; `.ftr-brand-lockup` when it holds a lockup (centred) |
 | `.ftr-col` | One link column (a `nav`) |
 | `.ftr-heading`, `.ftr-list` | A column's heading and its list |
 | `.ftr-link`, `.ftr-link-solid`, `.ftr-link-disabled` | A link; an address kept on one line; a "coming soon" label. `--ftr-link-ink` on `.ftr` is the link colour |
@@ -467,7 +471,7 @@ link. Those rules are more specific than the engine's and still apply.
 
 - `test/lib/studio/site_footer_test.rb`: the facts' rules, the default facts, the
   address setting's precedence, and the visibility rule.
-- `test/views/site_footer_lockup_css_test.rb`: the lockup's size and theme swap,
+- `test/views/site_footer_lockup_css_test.rb`: the lockup's size, centring and theme swap,
   and that the stylesheet every footer renders carries none of it.
 - `test/lib/vendored_leaflet_test.rb`: Leaflet is vendored, precompiled, and
   addressed through the asset pipeline.

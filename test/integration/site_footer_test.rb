@@ -223,6 +223,8 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
 
     assert_includes response.body, PRE_LOCKUP_BRAND
     refute_includes response.body, "ftr-lockup"
+    refute_includes response.body, "ftr-brand-lockup"
+    assert_select "#{footer} div.ftr-brand[class='ftr-brand']", 1
     without = response.body
 
     [nil, false, {}, { dark: "/d.svg" }, "/x.svg"].each do |inert|
@@ -237,6 +239,7 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     Studio.site_footer = FACTS.merge(logo: "/mark.svg", lockup: LOCKUP)
     get "/footer_host/landing"
 
+    assert_select "#{footer} div.ftr-brand.ftr-brand-lockup", 1, "a lockup centres the brand block"
     assert_select "#{footer} a.ftr-home[href='/'][aria-label='Example Co']", 1 do
       assert_select "img", 2
       assert_select "img.ftr-lockup.ftr-lockup-light[src='/brand/stacked-light.svg'][alt='Example Co'][width='942'][height='885']", 1
