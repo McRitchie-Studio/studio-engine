@@ -1,0 +1,37 @@
+# frozen_string_literal: true
+
+require "test_helper"
+
+# [unit] The stylesheet half of the footer's `lockup:` fact
+# (studio/site_footer/_lockup_assets). The footer renders BOTH theme files;
+# these rules are the only thing that shows one and hides the other, and the
+# only thing that sizes the lockup. Each assertion spans a selector AND its
+# declaration, so a rule moved onto the wrong selector fails here.
+class SiteFooterLockupCssTest < Minitest::Test
+  CSS = File.read(File.expand_path("../../app/views/studio/site_footer/_lockup_assets.html.erb", __dir__)).freeze
+  FOOTER_CSS = File.read(File.expand_path("../../app/views/studio/site_footer/_assets.html.erb", __dir__)).freeze
+
+  def test_the_lockup_is_height_led_and_never_wider_than_its_column
+    rule = CSS[/\.ftr-lockup \{[^}]*\}/]
+
+    refute_nil rule, "no .ftr-lockup rule"
+    assert_includes rule, "height: var(--ftr-lockup-height, 7rem)"
+    assert_includes rule, "width: auto"
+    assert_includes rule, "max-width: 100%"
+    assert_includes rule, "object-fit: contain"
+  end
+
+  def test_light_page_shows_the_light_file_and_dark_page_the_dark_file
+    assert_match(/^\s*\.ftr-lockup-dark \{ display: none; \}/, CSS)
+    assert_match(/^\s*\.dark \.ftr-lockup-light \{ display: none; \}/, CSS)
+    assert_match(/^\s*\.dark \.ftr-lockup-dark \{ display: block; \}/, CSS)
+  end
+
+  def test_the_bare_dark_hide_comes_after_the_base_display_so_it_wins_on_order
+    assert_operator CSS.index(".ftr-lockup { display: block"), :<, CSS.index(".ftr-lockup-dark { display: none")
+  end
+
+  def test_the_footer_stylesheet_every_footer_renders_carries_no_lockup_rule
+    refute_includes FOOTER_CSS, "ftr-lockup", "a footer without a lockup must stay byte-identical"
+  end
+end

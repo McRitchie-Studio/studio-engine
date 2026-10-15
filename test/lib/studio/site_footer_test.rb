@@ -197,6 +197,45 @@ class SiteFooterTest < Minitest::Test
     assert_equal ["Big Blue", "Co"], resolve({ wordmark: "Big Blue Co" })[:wordmark]
   end
 
+  # ---- the lockup -------------------------------------------------------------
+
+  def test_no_lockup_is_the_default_and_leaves_logo_and_wordmark_alone
+    facts = resolve({ name: "Acme Co", logo: "mark.svg" })
+
+    assert_nil facts[:lockup]
+    assert_equal "mark.svg", facts[:logo]
+    assert_equal %w[Acme Co], facts[:wordmark]
+    assert_nil resolve({}, name: "Site", logo: "/nav.png")[:lockup], "the default footer has none"
+  end
+
+  def test_a_lockup_resolves_both_theme_files_and_its_size
+    lockup = resolve({ lockup: { light: " /brand/stacked-light.svg ", dark: "/brand/stacked-dark.svg",
+                                 width: 941.71, height: "885" } })[:lockup]
+
+    assert_equal({ light: "/brand/stacked-light.svg", dark: "/brand/stacked-dark.svg", width: 942, height: 885 }, lockup)
+  end
+
+  def test_a_lockup_takes_string_keys_and_a_missing_dark_falls_back_to_light
+    lockup = resolve({ "lockup" => { "light" => "/one.svg" } })[:lockup]
+
+    assert_equal({ light: "/one.svg", dark: "/one.svg", width: nil, height: nil }, lockup)
+  end
+
+  def test_a_lockup_without_a_light_file_is_no_lockup
+    [nil, false, "", "/x.svg", [], {}, { dark: "/d.svg" }, { light: "  " }].each do |declared|
+      assert_nil resolve({ lockup: declared })[:lockup], "lockup: #{declared.inspect}"
+    end
+  end
+
+  def test_a_size_is_written_only_when_both_halves_are_positive_numbers
+    [[nil, 885], [942, nil], [0, 885], [-1, 885], ["wide", 885], [Float::NAN, 885], [Float::INFINITY, 885]].each do |width, height|
+      lockup = resolve({ lockup: { light: "/l.svg", width: width, height: height } })[:lockup]
+
+      assert_nil lockup[:width], "width: #{width.inspect}, height: #{height.inspect}"
+      assert_nil lockup[:height], "width: #{width.inspect}, height: #{height.inspect}"
+    end
+  end
+
   # ---- address ----------------------------------------------------------------
 
   def test_no_address_means_no_address
