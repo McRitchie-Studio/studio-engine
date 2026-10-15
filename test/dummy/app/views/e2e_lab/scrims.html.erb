@@ -1,0 +1,18 @@
+<%# The style guide's Tints and shades group: the scrim primitive, as the
+    guide renders it, so the browser grades the wash and the ink a consumer gets.
+
+    WHY THIS PAGE EXISTS. A scrim's tone is a custom property that INHERITS
+    from :root, .dark or a tone class on an ancestor, and the wash is a
+    color-mix over it. Whether a forced tone wins over the theme default, and
+    whether the sibling text takes the same tone as the wash, is a cascade and
+    inheritance question that only a browser answers.
+
+    THE LAB RULE (see E2eLabController): a lab page sets up a partial's inputs
+    and nothing else. `?palette=<name>` paints the page in one consumer palette
+    through the resolver's own CSS, as the chips page does. %>
+<% if @palette_css %>
+  <%= tag.style(@palette_css.html_safe, nonce: content_security_policy_nonce) %>
+<% end %>
+<main class="max-w-5xl mx-auto px-4 py-10" data-scrim-lab>
+  <%= render "style/scrims" %>
+</main>
