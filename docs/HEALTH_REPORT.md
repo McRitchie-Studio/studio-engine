@@ -18,6 +18,11 @@ With no recipient the job returns before it reads a row. QA apps
 (`QA_ENV=true`) never send. A failure is an `ErrorLog` row, and so a line in the
 next report, never a retry.
 
+Most apps need neither. The McRitchie Studio hub pulls the same report as JSON
+from every app at 07:00 America/Denver and posts it to Discord, so an app with no
+production worker is covered by setting one token; see
+[The hub endpoint](#the-hub-endpoint).
+
 ## Turn it on
 
 ### 1. Schedule it
@@ -94,6 +99,74 @@ end
 
 A source that raises does not stop the report: its section reads "could not be
 read", the error is logged, and the other sections send.
+
+## The hub endpoint
+
+`GET /_studio/health_report` answers the report as JSON. The McRitchie Studio
+hub runs one 07:00 America/Denver job that pulls it from every app and posts to
+Discord; that central pull, not a per-app schedule, is how the platform reads
+its apps, since most satellites run no worker in production.
+
+`Studio.routes` draws it in every environment, production included. It is
+**inert until the app names a token**:
+
+```bash
+STUDIO_HEALTH_TOKEN="<a long random secret>"   # the hub holds the same value for this app
+```
+
+or `config.health_report_token = "..."` in `config/initializers/studio.rb`,
+which wins over the env var. Generate one with
+`ruby -rsecurerandom -e 'puts SecureRandom.hex(32)'`, file it in 1Password
+beside the app's other secrets, and give the hub the same value.
+
+| Request | Answer |
+|---|---|
+| No token configured | `404`, empty body: the endpoint does not admit it exists |
+| Missing or wrong `Authorization: Bearer <token>` | `401` `{"error":"unauthorized"}` |
+| `?ending=` not ISO 8601 | `400` |
+| The right token | `200`, the report below, `Cache-Control: no-store` |
+
+`?ending=<ISO 8601 time>` reports the day that ends there (the same
+`Studio::HealthReport.window_ending` the job uses); without it, the day the job
+would report now. URL-encode it: a raw `+` in an offset arrives as a space and
+answers 400 (`Z` or a `-` offset needs no encoding). The token is compared in constant time. The controller runs
+on `ActionController::API`, so the host's `before_action`s (sign-in, geo,
+`allow_browser`) never run: no session, no cookie, no redirect.
+
+```bash
+curl -s -H "Authorization: Bearer $STUDIO_HEALTH_TOKEN" \
+  "https://app.example.com/_studio/health_report?ending=2026-10-13T07:00:00-06:00"
+```
+
+```json
+{
+  "schema": 1,
+  "app": "Turf Monster",
+  "engine_version": "0.109.0",
+  "window": { "begin": "2026-10-12T07:00:00-06:00", "end": "2026-10-13T07:00:00-06:00",
+              "label": "Oct 12, 7:00 AM to Oct 13, 7:00 AM MDT" },
+  "quiet": false,
+  "sections": [
+    { "key": "signups", "title": "Signups", "count": 2, "failure": null },
+    { "key": "errors", "title": "Errors", "count": 3, "failure": null }
+  ],
+  "error_kinds": 1,
+  "error_groups": [
+    { "error_class": "KeyError", "message": "key not found: :x", "count": 3,
+      "first_seen": "2026-10-12T20:00:00Z", "last_seen": "2026-10-13T01:00:00Z" }
+  ]
+}
+```
+
+**Counts only, by construction.** A section carries its key (`signups`,
+`errors`, `contacts`, each present only when the app has that section), its
+title, its count, and its `failure` (the error class when its source raised,
+else `null`). The names and emails the email lists never enter the JSON, so no
+signup or contact detail leaves the app. `error_groups` holds at most 15
+distinct errors, messages truncated to 300 characters and with any email
+address replaced by `[email]`. A request the report cannot answer at all is an
+`ErrorLog` row and a `500` `{"error":"health report failed"}`. `schema` changes
+only on a breaking change to these keys.
 
 ## Preview it
 

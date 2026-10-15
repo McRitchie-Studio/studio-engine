@@ -1447,6 +1447,14 @@ module Studio
       get  "auth/:provider/callback", to: "omniauth_callbacks#create"
       get  "auth/failure", to: "omniauth_callbacks#failure"
 
+      # The daily health report as JSON, for the hub's central 07:00 pull
+      # (Studio::HealthReportsController). Drawn in EVERY environment, production
+      # included: the controller is the gate, answering 404 until the app names
+      # a token (Studio.health_report_token / STUDIO_HEALTH_TOKEN) and 401 to a
+      # request that does not present it.
+      get "_studio/health_report", to: "studio/health_reports#show", as: :studio_health_report,
+          defaults: { format: :json }
+
       # Developer-desk tools. Drawn outside production, and each controller
       # re-checks Studio.local_tool_enabled? per request (loopback only) — the
       # route being absent is the outer gate, not the only one.
