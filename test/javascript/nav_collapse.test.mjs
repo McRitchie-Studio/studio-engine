@@ -91,23 +91,48 @@ test("tuning reads the band's CSS and falls back to the defaults", () => {
 // --- the hold (task smooth-navbar-collapse) ---------------------------------
 //
 // A held header keeps its expanded footprint in the page, so the document
-// never shortens: the progress IS the scroll position, every frame.
+// never shortens. The cap still eases the header itself (task
+// eased-navbar-collapse-rate): uncapped, a flick snapped it full to compact in
+// one frame.
 
-test("held, a flick lands on the scroll position in one frame, with nothing to settle", () => {
-  const frame = collapseFrame({ ...page, held: true, y: 90, p: 0 })
-  assert.equal(frame.p, smoothstep(90 / 120))
+test("held, a flick eases at the capped step and keeps scheduling until it lands", () => {
+  const maxStep = (3 * 5) / 120
+  const first = collapseFrame({ ...page, held: true, y: 120, p: 0 })
+  assert.equal(first.p, maxStep)
+  assert.equal(first.settling, true)
+
+  let frame = first
+  let frames = 1
+  while (frame.settling) {
+    frame = collapseFrame({ ...page, held: true, y: 120, p: frame.p })
+    frames++
+    assert.ok(frames <= 20, "the collapse never settled")
+  }
+  assert.equal(frame.p, 1)
+  assert.equal(frames, Math.ceil(1 / maxStep))
+})
+
+test("held, the way back up eases too", () => {
+  const frame = collapseFrame({ ...page, held: true, y: 0, p: 1 })
+  assert.equal(frame.p, 1 - (3 * 5) / 120)
+  assert.equal(frame.settling, true)
+})
+
+test("held, a slow scroll under the cap lands exactly on the scroll position", () => {
+  const frame = collapseFrame({ ...page, held: true, y: 8, p: 0 })
+  assert.equal(frame.p, smoothstep(8 / 120))
   assert.equal(frame.settling, false)
 })
 
-test("held, the way back up lands exactly too, so no gap opens above the content", () => {
-  const frame = collapseFrame({ ...page, held: true, y: 0, p: 1 })
-  assert.deepEqual(frame, { p: 0, settling: false })
-})
-
 test("held, a short page collapses with its scroll instead of snapping open", () => {
+  // The unheld guard would answer p 0 here and stop. Held, it moves toward
+  // the scroll position, eased.
   const short = { ...page, held: true, scrollHeight: 900, innerHeight: 844 }
   const frame = collapseFrame({ ...short, y: 56, p: 0 })
-  assert.equal(frame.p, smoothstep(56 / 120))
+  assert.equal(frame.p, (3 * 5) / 120)
+  assert.equal(frame.settling, true)
+  const unheld = collapseFrame({ ...short, held: false, y: 56, p: 0 })
+  assert.equal(unheld.p, 0)
 })
 
 test("held, reduced motion still snaps on its hysteresis", () => {
