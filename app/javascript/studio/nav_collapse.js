@@ -222,6 +222,17 @@ export class NavCollapse {
   start() {
     this.stopped = false;
     this._reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+    // A HEADER RESTORED FROM TURBO'S SNAPSHOT CACHE arrives as it was left:
+    // its scrolled classes on, and this controller's own hold still inline
+    // (Turbo copies the page before the old controller disconnects). Read as
+    // the header's own, that hold was counted twice on Back: a permanent band
+    // under the header, 39-43px on turf-monster's contest page. So the
+    // controller clears what it owns before it reads anything.
+    this.onScrolled(false);
+    this.el.style.marginBottom = '';
+    this.el.style.removeProperty('--nav-hold');
+    this.el.style.removeProperty('--nav-hold-fix');
+    this.el.style.removeProperty('--nav-p');
     var style = getComputedStyle(this.el);
     this.tuning = readTuning(style);
     this.held = inFlow(style.position);
@@ -309,10 +320,15 @@ export class NavCollapse {
   }
 
   // Both endpoints, then the linear hold between them and the residue at the
-  // current progress.
+  // current progress. Both are read UNSCROLLED: the rest height is the
+  // header's height at the top of the page, where the scrolled state (and any
+  // border it carries) is off. The residue absorbs that state while it is on.
   measure() {
     var style = this.el.style;
+    var lit = this.scrolled;
+    if (lit) this.onScrolled(false);
     style.setProperty('--nav-hold-fix', '0px');
+    this.fix = 0;
     style.setProperty('--nav-hold', '0px');
     var pinned = style.marginBottom;
     style.marginBottom = '0px';
@@ -320,6 +336,7 @@ export class NavCollapse {
     style.marginBottom = rest + 'px';
     var collapsed = this.heightAt(1);
     style.marginBottom = pinned;
+    if (lit) this.onScrolled(true);
     this.rest = rest;
     this.hold = Math.max(0, rest - collapsed);
     style.setProperty('--nav-hold', this.hold + 'px');

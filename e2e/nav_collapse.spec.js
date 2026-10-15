@@ -311,3 +311,44 @@ test("390px: parked mid-ramp, the header holds halfway", async ({ page }) => {
 test("1280px: parked mid-ramp, the header holds halfway", async ({ page }) => {
   await expectHalfwayHolds(page, { width: 1280, ramp: 144 });
 });
+
+// BACK RESTORES A HELD HEADER, IT DOES NOT STACK A SECOND HOLD.
+//
+// Turbo copies the page into its snapshot cache BEFORE the controller
+// disconnects, so the cached header still carries the hold's inline margin.
+// On Back, a controller that read that margin as the header's own base counted
+// the old hold twice: a permanent 39-43px band under the header (found in
+// review on turf-monster's contest page, 5642 -> 5681px). Restored, the page
+// must sit exactly where a fresh load puts it.
+test("Back to a page left scrolled restores the header's footprint exactly", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  // Entered by a Turbo visit, so Back is a Turbo RESTORE from the snapshot
+  // cache (a page entered by a full load comes back as a full load).
+  await page.goto("/lab/toast_flash");
+  await page.evaluate(() => window.Turbo.visit("/lab/bar_stack_turbo"));
+  await expect(page.locator("[data-test='lab-body']")).toBeVisible();
+  await expectStickyChromeIsLive(page, expect);
+
+  const fresh = await page.evaluate(docTop);
+  await page.evaluate(() => window.scrollTo(0, 600));
+  await expect.poll(() => page.evaluate(() => document.querySelector("header").style.getPropertyValue("--nav-p"))).toBe("1.0000");
+  await page.waitForTimeout(300);
+
+  // Away and Back inside Turbo: both pages load it, so Back restores the
+  // cached clone with its scroll position.
+  await page.evaluate(() => window.Turbo.visit("/lab/toast_flash"));
+  await expect(page).toHaveURL(/toast_flash/);
+  await expect(page.locator("[data-test='toast-flash-page']")).toBeVisible();
+  await page.goBack();
+  await expect(page.locator("[data-test='lab-body']")).toBeVisible();
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+
+  // A Turbo restore puts the scroll back where it was left.
+  await expect.poll(() => page.evaluate(() => window.scrollY), { message: "Back was a Turbo restore" }).toBeGreaterThan(300);
+  await page.waitForTimeout(200);
+  const restored = await page.evaluate(docTop);
+  expect(Math.abs(restored - fresh), `fresh ${fresh}, restored ${restored}`).toBeLessThanOrEqual(0.5);
+  expect(errors).toEqual([]);
+});

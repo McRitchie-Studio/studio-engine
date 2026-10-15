@@ -31,7 +31,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   scroll has been still for 160ms. Restyling during the collapse on that page
   fell from 226ms to 25ms over 27 frames. `scroll-margin`/`scroll-padding`
   readers are served by the settled write; structural changes (a layer arriving
-  or leaving) still write `<html>` at once.
+  or leaving) still write `<html>` at once. A SCRIPT that reads these values
+  off `<html>` (`getComputedStyle(document.documentElement)`) sees them up to
+  160ms late during a scroll; read them off the element that positions by them
+  instead. Known readers: turf-monster's contest chat panel and cyvasse's game
+  controller, both of which read at an event, not per frame. Followers release
+  their copies before Turbo caches the page, and the collapse controller clears
+  its own state when a header is restored from that cache, so Back never stacks
+  a second hold.
 
 ## 0.107.0 — 2026-10-14
 

@@ -209,6 +209,12 @@ export function startPinnedStack() {
 
   function writeFollowers(props) {
     var targets = followers();
+    // An element that stopped reading the stack (or left the page) gives its
+    // copies back, so it inherits the root again.
+    for (var f = 0; f < followed.length; f++) {
+      if (targets.indexOf(followed[f]) !== -1) continue;
+      for (var g = 0; g < followedProps.length; g++) followed[f].style.removeProperty(followedProps[g][0]);
+    }
     for (var i = 0; i < targets.length; i++) {
       for (var k = 0; k < props.length; k++) {
         if (targets[i].style.getPropertyValue(props[k][0]) !== props[k][1]) targets[i].style.setProperty(props[k][0], props[k][1]);
@@ -427,6 +433,12 @@ export function startPinnedStack() {
   function invalidate() { forceWrite = true; publishAll(); }
   document.addEventListener('DOMContentLoaded', invalidate);
   document.addEventListener('turbo:load', invalidate);
+  // Turbo copies the page into its snapshot cache before it leaves: give the
+  // followers' copies back first, so a restored page carries none of them.
+  document.addEventListener('turbo:before-cache', function () {
+    if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
+    releaseFollowers();
+  });
   // A Turbo Stream replaces nodes WITHOUT a turbo:load. The registry is derived
   // per publish, so a stale reference is no longer possible either way — but the
   // OBSERVER still has to be moved onto the incoming node, and the stack has to

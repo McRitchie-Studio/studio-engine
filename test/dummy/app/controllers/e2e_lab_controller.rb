@@ -645,6 +645,15 @@ class E2eLabController < ActionController::Base
   # come Back.
   def sidebar_panels_turbo = render(:sidebar_panels, layout: "survey_turbo_lab")
 
+  # The navbar under Turbo, so a spec can leave it scrolled and come Back: Turbo
+  # restores a CLONE of the page from its snapshot cache, header and all.
+  def bar_stack_turbo
+    @lab_signed_in = true
+    @user = LabOneRowUser.new
+    @lab_sidebar_sections = LAB_SIDEBAR_SECTIONS
+    render(:bar_stack, layout: "survey_turbo_lab")
+  end
+
   # ---- The site footer and the booking primitives (docs/SITE_FOOTER.md) ------
   #
   # The facts a host would declare in config.site_footer. test/dummy's

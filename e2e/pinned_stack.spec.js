@@ -314,3 +314,34 @@ test("in motion the stack reaches its readers without writing the root, and sett
   expect(Math.abs(parseFloat(run.settledRoot) - run.headerBottom)).toBeLessThanOrEqual(1);
   expect(run.settledPanel).toBe("");
 });
+
+// Leaving MID-SCROLL, while the followers still hold their copies: Turbo
+// caches the page, and a restored page must carry none of them, or a reader
+// would keep a stale copy over the root's live value.
+test("a page left mid-scroll is cached with no follower copies", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/lab/toast_flash");
+  await page.evaluate(() => window.Turbo.visit("/lab/bar_stack_turbo"));
+  await expect(page.locator("[data-test='lab-body']")).toBeVisible();
+  await expectStickyChromeIsLive(page, expect);
+
+  const seen = await page.evaluate(async () => {
+    const panel = () => document.querySelector("#studio-link-sidebar");
+    // Registered after the publisher's, so it reads what Turbo is about to
+    // copy into its snapshot cache.
+    window.__cached = null;
+    document.addEventListener("turbo:before-cache", () => {
+      window.__cached = panel().style.getPropertyValue("--nav-bottom");
+    }, { once: true });
+    const frame = () => new Promise((r) => requestAnimationFrame(r));
+    for (const s of [10, 14, 18, 14, 10]) { window.scrollBy(0, s); await frame(); }
+    const midScroll = panel().style.getPropertyValue("--nav-bottom");
+    window.Turbo.visit("/lab/toast_flash");
+    return midScroll;
+  });
+  expect(seen, "mid-scroll, the sidebar panel held a copy").not.toBe("");
+
+  await expect(page.locator("[data-test='toast-flash-page']")).toBeVisible();
+  expect(await page.evaluate(() => window.__cached), "the snapshot carried a follower copy").toBe("");
+});
