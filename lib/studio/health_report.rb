@@ -6,6 +6,10 @@ require "active_support/core_ext/module/attribute_accessors"
 require "active_support/core_ext/object/blank"
 require "active_support/core_ext/object/try"
 require "active_support/core_ext/string/filters"
+require "active_support/security_utils"
+require "digest"
+require "time"
+require_relative "version"
 
 # The daily application health report: signups, errors and (optionally) contact
 # messages from the last day, emailed at 07:00 in the app's zone. The full
@@ -48,8 +52,20 @@ module Studio
   #   config.health_report_contacts = ->(window) { ContactSubmission.where(created_at: window) }
   mattr_accessor :health_report_contacts, default: nil
 
+  # The bearer token the hub presents to GET /_studio/health_report, the JSON
+  # copy of this report that McRitchie Studio pulls from every app at 07:00 and
+  # posts to Discord. nil or blank falls through to ENV["STUDIO_HEALTH_TOKEN"],
+  # read on every request; blank there too means the endpoint answers 404.
+  mattr_writer :health_report_token, default: nil
+
+  def self.health_report_token
+    class_variable_get(:@@health_report_token).presence || ENV.fetch(HealthReport::TOKEN_ENV_KEY, nil).presence
+  end
+
   module HealthReport
     ENV_KEY = "STUDIO_HEALTH_REPORT_TO"
+    TOKEN_ENV_KEY = "STUDIO_HEALTH_TOKEN"
+    SCHEMA = 1         # the JSON contract's version; bump on a breaking change
     LISTED = 10        # names shown under a count; the count is always whole
     ERROR_GROUPS = 15  # distinct errors shown; the rest are counted as "more"
 
@@ -130,6 +146,59 @@ module Studio
     def pluralize(count, noun)
       "#{count} #{count == 1 ? noun : "#{noun}s"}"
     end
+
+    # ---- the JSON endpoint (Studio::HealthReportsController) ---------------
+
+    # Does this Authorization header carry the configured token? false when no
+    # token is configured. Both sides are digested before the constant-time
+    # compare, so neither the token's bytes nor its length leak through timing.
+    def authorized?(authorization, token: Studio.health_report_token)
+      return false if token.blank?
+
+      presented = authorization.to_s[/\ABearer[ ]+(\S+)\s*\z/i, 1]
+      return false if presented.nil?
+
+      ActiveSupport::SecurityUtils.secure_compare(Digest::SHA256.hexdigest(presented),
+                                                  Digest::SHA256.hexdigest(token.to_s))
+    end
+
+    # The window the endpoint reports: the day ENDING at `ending` (an ISO 8601
+    # time), else the day the job would report now. Raises ArgumentError on a
+    # value that is not ISO 8601, which the controller answers with a 400.
+    def window_for(ending, now: Time.now)
+      return window(now) if ending.nil?
+
+      window_ending(Time.iso8601(ending.to_s))
+    end
+
+    SECTION_KEYS = %i[signups errors contacts].freeze
+
+    # The report as the hub reads it. COUNTS ONLY, by construction: a Section's
+    # `items` (names and emails) never reach this hash, so no signup or contact
+    # detail leaves the app. Error groups carry the class and the truncated
+    # message the email already shows.
+    def payload(report)
+      {
+        schema: SCHEMA,
+        app: report.app_name.to_s,
+        engine_version: Studio::VERSION,
+        window: { begin: iso(report.window.begin), end: iso(report.window.end), label: report.window_label },
+        quiet: report.quiet?,
+        sections: SECTION_KEYS.filter_map do |key|
+          section = report.public_send(key)
+          next unless section
+
+          { key: key.to_s, title: section.title, count: section.count.to_i, failure: section.failure }
+        end,
+        error_kinds: report.error_kinds.to_i,
+        error_groups: Array(report.error_groups).map do |group|
+          { error_class: group.error_class, message: group.message, count: group.count.to_i,
+            first_seen: iso(group.first_seen), last_seen: iso(group.last_seen) }
+        end
+      }
+    end
+
+    def iso(time) = time&.iso8601
 
     # ---- gathering (needs the host's database) ------------------------------
 
