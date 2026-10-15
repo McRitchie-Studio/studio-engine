@@ -294,7 +294,9 @@ its script.
 - Colour comes from the semantic tokens `Studio::ThemeResolver` emits and
   `tailwind/studio.tailwind.config.js` maps: `page`, `surface`,
   `surface-alt`, `inset`, `primary-50..900`, the text and border ladders, and
-  `success`, `warning`, `danger` with their `-ink` and `-fill` variants. In CSS,
+  `success`, `warning`, `danger` with their `-ink` and `-fill` variants. The
+  resolver also emits the theme-independent `--color-shade` and `--color-tint`
+  with their `-ink` and `-ink-muted`, which the scrim classes read. In CSS,
   `var(--color-*)`; for alpha, `rgb(var(--color-primary-rgb) / 0.4)`.
 - Status colour (a stage, a grade, a run result) comes from one status tone
   helper, `status_tone(:success)` and its siblings, never from hand-picked
@@ -303,7 +305,7 @@ its script.
   `Studio::BadgeComponent` does.
 - Buttons, cards, badges and inputs use the engine utilities in
   `engine.css`: `btn` and its variants, `card`, `badge`, `input-field`,
-  `label-upper`, `empty-state`.
+  `label-upper`, `empty-state`, and `scrim` with its tones, strengths and inks.
 - Stacking uses the `--z-*` scale; type uses the Tailwind scale plus
   `text-2xs` and `text-3xs`.
 - Text over media (a photo, a video, a banner) sits on a scrim, never on a

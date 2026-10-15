@@ -209,8 +209,9 @@ frozen in the app's timezone. Specimen: `/admin/style` → Tricks → Time stamp
 
 ### Tints and shades — `.scrim`
 
-Text laid over media (a hero photo, a video, a banner) reads through a **scrim**,
-a wash between the two. A scrim comes in one of two tones, and the tone is the
+Text laid over media on a PAGE (a hero photo, a video, a banner) reads through
+a **scrim**, a wash between the two. (The transactional email banner's scrim,
+below, is a separate inline shade built for mail clients.) A scrim comes in one of two tones, and the tone is the
 design decision:
 
 | Tone | What it lays over the media | Ink that reads on it | Token |
@@ -935,7 +936,9 @@ generated at send time.
 **The scrim** is a wash between artwork and type, on by default at 0.40.
 Background art is chosen to look good, not to guarantee contrast, and white text
 over a pale sky cannot be read. Pass `scrim: 0` for artwork dark enough to carry
-the type itself.
+the type itself. This email scrim is its own fixed shade (`24,16,64`, inline for
+mail clients); it is not the page primitive in [Tints and shades](#tints-and-shades--scrim),
+which mail clients could not render.
 
 **The markup is deliberately old-fashioned.** Outlook on Windows renders through
 Word and ignores `background-image`, so the picture is carried by the `<td
