@@ -18,7 +18,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   The body is the same `Studio::HealthReport.build` the email uses, counts only
   (`schema`, `app`, `engine_version`, `window`, `quiet`, `sections`,
   `error_kinds`, `error_groups`): no section's names or emails ever leave the
-  app. It runs on `ActionController::API`, so no host `before_action`,
+  app, and an email address quoted in an error message is sent as `[email]`. It runs on `ActionController::API`, so no host `before_action`,
   session, cookie or redirect touches it. See `docs/HEALTH_REPORT.md`, *The
   hub endpoint*.
 

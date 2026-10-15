@@ -162,6 +162,14 @@ class StudioHealthReportEndpointTest < Minitest::Test
     assert_equal true, body[:quiet]
   end
 
+  def test_error_messages_lose_email_addresses
+    group = HR::ErrorGroup.new(error_class: "ActiveRecord::RecordNotFound", count: 1,
+                               message: "no account for Ann.Lee+x@mail.example.co (retry ann@b.io)")
+    body = HR.payload(report(groups: [group], kinds: 1))
+
+    assert_equal "no account for [email] (retry [email])", body[:error_groups].sole[:message]
+  end
+
   def test_error_groups_serialize_with_iso_times
     first = Time.utc(2026, 10, 12, 20)
     group = HR::ErrorGroup.new(error_class: "KeyError", message: "key not found: :x", count: 4,

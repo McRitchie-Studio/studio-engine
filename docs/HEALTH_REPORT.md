@@ -163,7 +163,9 @@ curl -s -H "Authorization: Bearer $STUDIO_HEALTH_TOKEN" \
 title, its count, and its `failure` (the error class when its source raised,
 else `null`). The names and emails the email lists never enter the JSON, so no
 signup or contact detail leaves the app. `error_groups` holds at most 15
-distinct errors, messages already truncated to 300 characters. `schema` changes
+distinct errors, messages truncated to 300 characters and with any email
+address replaced by `[email]`. A request the report cannot answer at all is an
+`ErrorLog` row and a `500` `{"error":"health report failed"}`. `schema` changes
 only on a breaking change to these keys.
 
 ## Preview it

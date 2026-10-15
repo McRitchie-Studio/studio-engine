@@ -37,6 +37,11 @@ module Studio
       end
 
       render json: Studio::HealthReport.payload(Studio::HealthReport.build(window: window))
+    rescue StandardError => e
+      # build already turns a failing SOURCE into a section's `failure`; this is
+      # anything else. Logged as an ErrorLog row, answered as JSON, never HTML.
+      Studio::HealthReport.capture(e)
+      render json: { error: "health report failed" }, status: :internal_server_error
     end
   end
 end

@@ -177,6 +177,31 @@ class HealthReportEndpointTest < ActionDispatch::IntegrationTest
     %w[ann@example.com bob@example.com Ann Bob].each { |pii| refute_includes response.body, pii }
   end
 
+  test "an email quoted in an error message never leaves the app" do
+    Studio.health_report_token = TOKEN
+    ErrorLog.create!(message: "x", inspect: "#<RuntimeError: no account for lead@weld.example>", created_at: INSIDE)
+
+    pull
+    assert_response :ok
+    assert_equal "no account for [email]", body["error_groups"].sole["message"]
+    refute_includes response.body, "lead@weld.example"
+  end
+
+  test "a report that cannot be built answers 500 JSON and is logged" do
+    Studio.health_report_token = TOKEN
+    original = Studio::HealthReport.method(:build)
+    Studio::HealthReport.define_singleton_method(:build) { |**| raise KeyError, "boom" }
+    begin
+      pull
+    ensure
+      Studio::HealthReport.define_singleton_method(:build, original)
+    end
+
+    assert_response :internal_server_error
+    assert_equal({ "error" => "health report failed" }, body)
+    assert_equal 1, ErrorLog.count, "the failure is an ErrorLog row"
+  end
+
   test "no ending reports the job's own window, ending at the last 07:00" do
     Studio.health_report_token = TOKEN
     travel_to(Time.utc(2026, 10, 13, 15)) do # 09:00 MDT

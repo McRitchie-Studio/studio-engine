@@ -192,13 +192,19 @@ module Studio
         end,
         error_kinds: report.error_kinds.to_i,
         error_groups: Array(report.error_groups).map do |group|
-          { error_class: group.error_class, message: group.message, count: group.count.to_i,
+          { error_class: group.error_class, message: scrub(group.message), count: group.count.to_i,
             first_seen: iso(group.first_seen), last_seen: iso(group.last_seen) }
         end
       }
     end
 
     def iso(time) = time&.iso8601
+
+    EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/
+
+    # An exception message can quote the address it choked on ("no account for
+    # ann@example.com"). The email may show it; the JSON leaving the app may not.
+    def scrub(message) = message.to_s.gsub(EMAIL, "[email]")
 
     # ---- gathering (needs the host's database) ------------------------------
 
