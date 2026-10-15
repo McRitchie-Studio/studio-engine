@@ -148,6 +148,8 @@ Set `Studio.draw_survey_routes = true` to add the public survey pages (`/surveys
 
 In non-production local requests, this also draws `/_studio/local_emails`, a local email inbox for agent/worktree proof flows. Set `LOCAL_EMAIL_CAPTURE=1` or run with `AGENT_WORKTREE=1` to record outbox rows without sending real email.
 
+In every environment, production included, it also draws `/_studio/health_report`: the daily health report as counts-only JSON, which the McRitchie Studio hub pulls at 07:00 and posts to Discord. It answers 404 until the app sets `STUDIO_HEALTH_TOKEN` (or `config.health_report_token`), and 401 to a request without that bearer token ([`docs/HEALTH_REPORT.md`](docs/HEALTH_REPORT.md#the-hub-endpoint)).
+
 ## Non-Production Banners
 
 Consumer layouts can render the shared environment banner inside their sticky

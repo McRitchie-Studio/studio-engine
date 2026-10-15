@@ -38,6 +38,7 @@ The engine reads these values only through consumer apps.
 | `RESEND_MAILER_FROM` | Apps that send mail | Transactional sender on a Resend-verified domain; default convention is `McRitchie Studio <team@mcritchie.studio>`. |
 | `RESEND_MARKETING_FROM` | Apps with newsletters/broadcasts | Optional marketing sender; falls back to `RESEND_MAILER_FROM`. |
 | `STUDIO_HEALTH_REPORT_TO` | `Studio::HealthReportJob` | Optional; who gets the daily health report (comma-separated). Unset means no report. `config.health_report_to` wins over it. See [`HEALTH_REPORT.md`](HEALTH_REPORT.md). |
+| `STUDIO_HEALTH_TOKEN` | `GET /_studio/health_report` | Optional; the bearer token the McRitchie Studio hub presents to pull the daily health report as JSON. Unset means the endpoint answers 404. `config.health_report_token` wins over it. See [`HEALTH_REPORT.md`](HEALTH_REPORT.md#the-hub-endpoint). |
 
 App-specific variables such as `SOLANA_ADMIN_KEY`, RPC URLs, AWS bucket names,
 or product API keys belong in the owning app's docs and McRitchie Studio's
