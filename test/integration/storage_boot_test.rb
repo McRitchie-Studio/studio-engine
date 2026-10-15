@@ -38,7 +38,7 @@ class StorageBootTest < Minitest::Test
 
   # Every variable the primitive reads, cleared unless the case sets it, so the
   # shell this suite runs in cannot decide a case.
-  CLEARED = (R2.keys + %w[ACTIVE_STORAGE_BACKEND STUDIO_S3_BACKEND QA_ENV DATABASE_URL]).to_h { |name| [name, nil] }
+  CLEARED = (R2.keys + %w[ACTIVE_STORAGE_BACKEND STUDIO_S3_BACKEND QA_ENV DATABASE_URL SECRET_KEY_BASE_DUMMY]).to_h { |name| [name, nil] }
 
   def probe(env: "test", vars: {}, studio: 'config.s3_bucket_prefix = "probe-app"', storage: TEST_ONLY_STORAGE,
             service: env == "production" ? "amazon" : "test")
@@ -119,6 +119,15 @@ class StorageBootTest < Minitest::Test
     assert_equal "ArgumentError", result["error_class"]
     assert_match(/\AR2_SECRET_ACCESS_KEY must be set/, result["error"])
     assert_includes result["error"], "r2.probe-app"
+  end
+
+  # A Dockerfile's `SECRET_KEY_BASE_DUMMY=1 bin/rails assets:precompile` boots
+  # production keyless on purpose; it must not be refused.
+  def test_a_keyless_precompile_boot_in_production_is_not_refused
+    result = probe(env: "production", vars: { "SECRET_KEY_BASE_DUMMY" => "1" })
+
+    assert_booted(result)
+    assert_equal "https://r2-not-configured.invalid", result["s3_endpoint"]
   end
 
   def test_production_requires_the_public_url_only_when_the_app_does

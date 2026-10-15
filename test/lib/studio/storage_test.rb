@@ -180,6 +180,18 @@ class StudioStorageTest < Minitest::Test
     in_env("development") { refute S.strict? }
   end
 
+  # moms-app's rule: `SECRET_KEY_BASE_DUMMY=1 bin/rails assets:precompile` boots
+  # production with no secrets on purpose. It boots on placeholders; the bucket
+  # is still production's.
+  def test_the_precompile_flag_relaxes_strictness_but_not_the_bucket
+    in_env("production") do
+      refute S.strict?({ "SECRET_KEY_BASE_DUMMY" => "1" })
+      assert S.strict?({ "SECRET_KEY_BASE_DUMMY" => " " })
+      assert S.validate!({ "SECRET_KEY_BASE_DUMMY" => "1" }, strict: S.strict?({ "SECRET_KEY_BASE_DUMMY" => "1" }))
+      assert S.production_environment?({ "SECRET_KEY_BASE_DUMMY" => "1" })
+    end
+  end
+
   # ---- bucket names per environment -----------------------------------------
 
   def test_bucket_names_per_environment

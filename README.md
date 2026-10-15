@@ -1165,17 +1165,25 @@ Name every `assets.<domain>` host the bucket answers on. If the bucket has the
 
 ### Adopt it in an app
 
-Active Storage: change the R2 service in `config/storage.yml` from `service: S3`
-to `service: StudioTrashS3`. Every other key stays as it is:
+Active Storage: name your bucket and the engine supplies the trash services.
+With `config.s3_bucket_prefix` set, `amazon` and `amazon_dev` are
+`service: StudioTrashS3` on R2 with no storage.yml entry of your own
+([Managed storage](#managed-storage--studiostorage-on-by-default)); select one in
+`config/environments/*.rb` as usual (`config.active_storage.service = :amazon`).
+
+A service under another name, or an app with `manage_storage = false`, names the
+service itself in `config/storage.yml`:
 
 ```yaml
-r2:
+archive:
   service: StudioTrashS3
-  bucket: my-app-production
+  bucket: my-app-archive
   endpoint: <%= ENV["R2_ENDPOINT"] %>
   region: auto
   access_key_id: <%= ENV["R2_ACCESS_KEY_ID"] %>
   secret_access_key: <%= ENV["R2_SECRET_ACCESS_KEY"] %>
+  request_checksum_calculation: when_required
+  response_checksum_validation: when_required
 ```
 
 An app with its own S3 service subclass (turf-monster's

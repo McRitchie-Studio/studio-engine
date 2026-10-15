@@ -86,8 +86,15 @@ module Studio
     end
 
     # Whether a missing R2 variable refuses the boot. Production and QA both run
-    # RAILS_ENV=production.
-    def strict?
+    # RAILS_ENV=production. The one exception is Rails' own build-time flag:
+    # `SECRET_KEY_BASE_DUMMY=1 bin/rails assets:precompile` (a Dockerfile) boots
+    # production with no secrets on purpose and never touches storage, so it
+    # boots on the placeholder connection instead (moms-app's rule).
+    def strict?(env = ENV)
+      rails_production? && env["SECRET_KEY_BASE_DUMMY"].to_s.strip.empty?
+    end
+
+    def rails_production?
       defined?(Rails) && Rails.respond_to?(:env) && Rails.env.respond_to?(:production?) && Rails.env.production? ? true : false
     end
 
@@ -191,7 +198,7 @@ module Studio
 
     # Real production: Rails production and not a QA app.
     def production_environment?(env = ENV)
-      strict? && !EnvironmentBanner.qa_environment?(env)
+      rails_production? && !EnvironmentBanner.qa_environment?(env)
     end
 
     # One Active Storage service config on R2. Checksums only when required:
