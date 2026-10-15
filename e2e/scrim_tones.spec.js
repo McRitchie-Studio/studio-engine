@@ -16,13 +16,12 @@ const { test, expect } = require("@playwright/test");
 // which renders the style guide's own style/_scrims group.
 //
 // CONTROLS, each run against this file:
-//   - `.dark { ... }` removed from engine.css: the theme-aware spec fails in
-//     dark mode (the wash stays the tint, the ink stays dark).
+//   - `.dark { ... }` removed from engine.css: the theme-aware, strength and
+//     custom-palette specs fail in dark mode (the wash stays the tint).
 //   - the tone class moved from the specimen stage onto the wash alone: the
-//     forced spec fails on the ink, which no longer inherits the tone.
-//   - ThemeResolver#tone_vars emitting the theme's own --color-page as the
-//     shade: the custom-palette spec fails, the forced shade turns pale in
-//     light mode.
+//     forced spec fails on "dark .scrim-tint: ink", which no longer inherits.
+//   - ThemeResolver#to_css dropping the tone vars from the light block: the
+//     custom-palette spec fails, light mode falling back to the engine shade.
 
 const DEFAULT_SHADE = "#1a1535";
 const DEFAULT_TINT = "#f8fafc";
