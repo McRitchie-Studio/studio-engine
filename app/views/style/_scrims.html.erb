@@ -9,12 +9,13 @@
      custom properties, which inherit, so each specimen puts its tone on the
      STAGE and the wash and the text, which are siblings, both take it.
 
-     The striped panel stands in for a photo: vivid, busy and the same in both
-     themes, so what changes between specimens is the scrim alone. The
+     The striped panel stands in for a photo: vivid and busy, drawn in the role
+     colours, which are the same in both themes, so what changes between
+     specimens is the scrim alone. The
      definitions and the strength numbers live in engine.css (Scrims: tints
      and shades) and the README section of the same name. %>
 <%
-  media_style = "background-image: repeating-linear-gradient(135deg, #f72585 0 18px, #4cc9f0 18px 36px, #ffd166 36px 54px, #06d6a0 54px 72px)"
+  media_style = "background-image: repeating-linear-gradient(135deg, var(--color-primary) 0 18px, var(--color-accent) 18px 36px, var(--color-warning) 36px 54px, var(--color-success) 54px 72px)"
 
   specimens = [
     { key: "theme",  tone: nil,           scrim: "scrim",

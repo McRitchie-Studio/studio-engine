@@ -306,6 +306,13 @@ its script.
   `label-upper`, `empty-state`.
 - Stacking uses the `--z-*` scale; type uses the Tailwind scale plus
   `text-2xs` and `text-3xs`.
+- Text over media (a photo, a video, a banner) sits on a scrim, never on a
+  hand-mixed `rgba` overlay. A **shade** lays the dark base over the media and
+  takes light ink; a **tint** lays the light base over it and takes dark ink.
+  `.scrim` picks by theme (tint in light, shade in dark); `.scrim-tint` and
+  `.scrim-shade` force a tone when the media, not the theme, decides; the text
+  takes `.scrim-ink` and `.scrim-ink-muted`. The tone goes on the parent that
+  holds both the wash and the text. Detail: the README's "Tints and shades".
 
 **Forbidden:** a raw hex in a view; a `dark:` variant (the resolver writes
 both themes' values into the same tokens, so a token is already right in
