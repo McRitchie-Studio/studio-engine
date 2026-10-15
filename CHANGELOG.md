@@ -17,6 +17,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   flick to the top, page background shows between the header and the content
   for those frames while the header grows back. A slow scroll is unchanged.
 
+## 0.109.0 — 2026-10-15
+
 ### Added
 
 - **Tints and shades: the `.scrim` primitive.** A scrim is the wash laid over
