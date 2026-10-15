@@ -341,6 +341,10 @@ test("Back to a page left scrolled restores the header's footprint exactly", asy
   await page.evaluate(() => window.Turbo.visit("/lab/toast_flash"));
   await expect(page).toHaveURL(/toast_flash/);
   await expect(page.locator("[data-test='toast-flash-page']")).toBeVisible();
+  // Back before Turbo has filed the page it left in its snapshot cache came
+  // back at scrollY 0 (2 in 12 runs idle, 10 in 20 under load); waiting for
+  // the cache entry held it at 45 in 45. So wait for the entry.
+  await expect.poll(() => page.evaluate(() => !!window.Turbo.session.view.snapshotCache.get(new URL("/lab/bar_stack_turbo", location.href))), { message: "the page left is in Turbo's snapshot cache" }).toBe(true);
   await page.goBack();
   await expect(page.locator("[data-test='lab-body']")).toBeVisible();
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
