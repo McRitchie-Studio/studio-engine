@@ -40,6 +40,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   its own state when a header is restored from that cache, so Back never stacks
   a second hold.
 
+### Added
+
+- **`Studio::Storage`: object storage on Cloudflare R2, on by default for an app
+  that names its bucket.** One copy of the `StorageBackend` module the hub,
+  turf-monster and mcritchie-industries each hand-wrote. An app with
+  `config.s3_bucket_prefix` set now gets, with no initializer of its own: a boot
+  check (a retired `ACTIVE_STORAGE_BACKEND` / `STUDIO_S3_BACKEND` value raises in
+  every environment; a missing R2 variable raises in production and QA, naming
+  each), `Studio::S3` pointed at R2 when the app left `s3_endpoint` unset, and
+  Active Storage services `amazon` and `amazon_dev` on `StudioTrashS3`, merged
+  under the app's own `config/storage.yml` (an app's service of the same name
+  wins). New config: `manage_storage` (default true; false opts out) and
+  `storage_public_url_required` (default false; true makes `R2_PUBLIC_URL`
+  required). An app still carrying its own `StorageBackend` keeps its own
+  connection and services; only the switch check is new to it. README.md,
+  *Managed storage*.
+
 ## 0.107.0 — 2026-10-14
 
 ### Changed

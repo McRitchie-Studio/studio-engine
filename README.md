@@ -966,6 +966,49 @@ config.s3_key_prefix    = "mcritchie-industries/"
 logical keys and never see it. Unset (the default) leaves keys byte-identical to
 what every already-shipped app wrote.
 
+### Managed storage — `Studio::Storage` (on by default)
+
+Object storage is Cloudflare R2, and only R2: AWS S3 was retired on 2026-10-10.
+An app that names its bucket (`config.s3_bucket_prefix`) gets all of this from
+the engine, with no initializer of its own:
+
+- **A boot check** (`studio.storage`, after the host's initializers). Both
+  switches, `ACTIVE_STORAGE_BACKEND` and `STUDIO_S3_BACKEND`, may be unset or
+  `r2`; a retired value (`s3`, `mirror_to_r2`, `mirror_to_s3`) or any other
+  value refuses the boot in every environment. In production (QA boots
+  `RAILS_ENV=production` too) a missing `R2_ENDPOINT`, `R2_ACCESS_KEY_ID` or
+  `R2_SECRET_ACCESS_KEY` refuses the boot, naming every missing variable and the
+  1Password item `r2.<prefix>`. Elsewhere, none set boots on a placeholder
+  connection (`https://r2-not-configured.invalid`, which never resolves, and
+  placeholder keys), and some set raises: half a configuration is a mistake.
+- **`Studio::S3` on R2**: endpoint, region `auto`, keys and public URL, filled in
+  only when the app left `s3_endpoint` unset. A public URL the app set is kept.
+- **Active Storage services** `amazon` (this environment's bucket) and
+  `amazon_dev` (always the dev bucket), both `service: StudioTrashS3` on R2 with
+  `request_checksum_calculation` / `response_checksum_validation` set to
+  `when_required`. The bucket is `<prefix>-production` on real production only;
+  QA (`QA_ENV`), development, test and CI resolve `<prefix>-dev`, the same
+  resolution `Studio::S3` uses. They are merged UNDER the app's own
+  `config/storage.yml`: a service of the same name there wins, and an app with
+  no storage file still gets both.
+
+```ruby
+# config/initializers/studio.rb: the whole adoption
+config.s3_bucket_prefix = "turf-monster"
+config.storage_public_url_required = true # only an app that serves public object URLs
+```
+
+`storage_public_url_required` makes `R2_PUBLIC_URL` as required as the keys
+(a keyless process then gets the placeholder host as its public URL). Leave it
+false for an app whose objects are private and served by signed URL.
+`config.manage_storage = false` opts out entirely.
+
+For app code: `Studio::Storage.configured?` (every required variable set, so
+false on placeholders), `.remote_in_development?` (any R2 variable set),
+`.credential_hint`, `.bucket` / `.dev_bucket`, and `.connection`. Every method
+takes the environment hash and `strict:` as arguments, so each rule can be
+tested without booting.
+
 ### S3-compatible storage (Cloudflare R2)
 
 `Studio::S3` talks to any S3-compatible endpoint. The McRitchie fleet is moving
@@ -979,8 +1022,10 @@ config.s3_secret_access_key = ENV["R2_SECRET_ACCESS_KEY"]
 config.s3_public_url        = ENV["R2_PUBLIC_URL"] # custom domain on this env's bucket
 ```
 
-All four are nil by default, and nil is AWS exactly as before. The keys must be
-set as a pair. R2 serves nothing anonymously from its S3 endpoint, so with an
+All four are nil by default. For an app that names its bucket, the engine fills
+them from the R2 variables at boot ([Managed storage](#managed-storage--studiostorage-on-by-default));
+setting `s3_endpoint` yourself keeps the connection yours. With managed storage
+off, nil is AWS exactly as before. The keys must be set as a pair. R2 serves nothing anonymously from its S3 endpoint, so with an
 endpoint and no `s3_public_url`, `Studio::S3.url` raises `NotConfigured` and
 `upload` writes but returns `nil`; serve private objects with `signed_url`.
 
@@ -1120,17 +1165,25 @@ Name every `assets.<domain>` host the bucket answers on. If the bucket has the
 
 ### Adopt it in an app
 
-Active Storage: change the R2 service in `config/storage.yml` from `service: S3`
-to `service: StudioTrashS3`. Every other key stays as it is:
+Active Storage: name your bucket and the engine supplies the trash services.
+With `config.s3_bucket_prefix` set, `amazon` and `amazon_dev` are
+`service: StudioTrashS3` on R2 with no storage.yml entry of your own
+([Managed storage](#managed-storage--studiostorage-on-by-default)); select one in
+`config/environments/*.rb` as usual (`config.active_storage.service = :amazon`).
+
+A service under another name, or an app with `manage_storage = false`, names the
+service itself in `config/storage.yml`:
 
 ```yaml
-r2:
+archive:
   service: StudioTrashS3
-  bucket: my-app-production
+  bucket: my-app-archive
   endpoint: <%= ENV["R2_ENDPOINT"] %>
   region: auto
   access_key_id: <%= ENV["R2_ACCESS_KEY_ID"] %>
   secret_access_key: <%= ENV["R2_SECRET_ACCESS_KEY"] %>
+  request_checksum_calculation: when_required
+  response_checksum_validation: when_required
 ```
 
 An app with its own S3 service subclass (turf-monster's

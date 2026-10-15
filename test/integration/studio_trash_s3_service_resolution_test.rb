@@ -34,6 +34,26 @@ class StudioTrashS3ServiceResolutionTest < ActiveSupport::TestCase
     assert_equal "trash", service.name.to_s
   end
 
+  # Studio::Storage's services, merged under the dummy's own, through Active
+  # Storage's own Registry: `amazon` / `amazon_dev` are the trash service and the
+  # dummy's Disk services are untouched. The default-on boot path (the engine's
+  # initializers in a host that names its bucket) is
+  # test/integration/storage_boot_test.rb, which boots a host per case.
+  test "Studio::Storage's services resolve to the trash service beside the dummy's own" do
+    configs = Studio::Storage.merge_services(
+      Rails.application.config.active_storage.service_configurations, {},
+      prefix: "studio-engine-dummy", strict: false, production: false
+    )
+    registry = ActiveStorage::Service::Registry.new(configs)
+
+    %i[amazon amazon_dev].each do |name|
+      service = registry.fetch(name)
+      assert_instance_of ActiveStorage::Service::StudioTrashS3Service, service
+      assert_equal "studio-engine-dummy-dev", service.bucket.name
+    end
+    assert_equal "ActiveStorage::Service::DiskService", registry.fetch(:test).class.name
+  end
+
   test "the configured service trashes a delete" do
     service = configure("turf-monster-dev")
     client = service.client.client
