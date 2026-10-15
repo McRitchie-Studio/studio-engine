@@ -267,3 +267,81 @@ test("a layer appearing or disappearing moves the stack in the SAME frame", asyn
 
   expect(errors).toEqual([]);
 });
+
+// THE MOTION WRITE (task smooth-navbar-collapse). Every stack value is an
+// inherited custom property on documentElement, so a root write restyles the
+// whole document; on turf-monster's 2,000-element contest page that was 8.7ms a
+// write, every frame the header's bottom edge moved, and the collapse dropped
+// frames on a 120Hz screen. While a scroll is in motion the publisher writes
+// only the elements that read the stack live (here the link sidebar panel,
+// whose inline style positions off --nav-bottom), and writes the root once the
+// scroll has settled.
+test("in motion the stack reaches its readers without writing the root, and settles onto the root", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/lab/bar_stack?one_row=1&sidebar=1");
+  await expectStickyChromeIsLive(page, expect);
+
+  const run = await page.evaluate(async () => {
+    const root = document.documentElement;
+    const panel = document.querySelector("#studio-link-sidebar");
+    const header = document.querySelector("header");
+    let rootWrites = 0;
+    new MutationObserver(() => rootWrites++).observe(root, { attributes: true, attributeFilter: ["style"] });
+    const frame = () => new Promise((r) => requestAnimationFrame(r));
+    const tracked = [];
+    for (const s of [8, 12, 16, 20, 20, 16, 12, 8]) {
+      window.scrollBy(0, s);
+      await frame();
+      await frame();
+      tracked.push({ panel: panel.style.getPropertyValue("--nav-bottom"), header: Math.max(0, header.getBoundingClientRect().bottom) });
+    }
+    const inMotion = rootWrites;
+    await new Promise((r) => setTimeout(r, 400));
+    return {
+      inMotion,
+      tracked,
+      settledRoot: root.style.getPropertyValue("--nav-bottom"),
+      settledPanel: panel.style.getPropertyValue("--nav-bottom"),
+      headerBottom: Math.max(0, header.getBoundingClientRect().bottom),
+    };
+  });
+
+  expect(run.inMotion, "the root was written while the scroll was in motion").toBe(0);
+  // The reader tracked the header's bottom edge, frame by frame.
+  for (const t of run.tracked) expect(Math.abs(parseFloat(t.panel) - t.header), JSON.stringify(run.tracked)).toBeLessThanOrEqual(1);
+  // Settled: the root holds the value and the reader inherits it again.
+  expect(Math.abs(parseFloat(run.settledRoot) - run.headerBottom)).toBeLessThanOrEqual(1);
+  expect(run.settledPanel).toBe("");
+});
+
+// Leaving MID-SCROLL, while the followers still hold their copies: Turbo
+// caches the page, and a restored page must carry none of them, or a reader
+// would keep a stale copy over the root's live value.
+test("a page left mid-scroll is cached with no follower copies", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/lab/toast_flash");
+  await page.evaluate(() => window.Turbo.visit("/lab/bar_stack_turbo"));
+  await expect(page.locator("[data-test='lab-body']")).toBeVisible();
+  await expectStickyChromeIsLive(page, expect);
+
+  const seen = await page.evaluate(async () => {
+    const panel = () => document.querySelector("#studio-link-sidebar");
+    // Registered after the publisher's, so it reads what Turbo is about to
+    // copy into its snapshot cache.
+    window.__cached = null;
+    document.addEventListener("turbo:before-cache", () => {
+      window.__cached = panel().style.getPropertyValue("--nav-bottom");
+    }, { once: true });
+    const frame = () => new Promise((r) => requestAnimationFrame(r));
+    for (const s of [10, 14, 18, 14, 10]) { window.scrollBy(0, s); await frame(); }
+    const midScroll = panel().style.getPropertyValue("--nav-bottom");
+    window.Turbo.visit("/lab/toast_flash");
+    return midScroll;
+  });
+  expect(seen, "mid-scroll, the sidebar panel held a copy").not.toBe("");
+
+  await expect(page.locator("[data-test='toast-flash-page']")).toBeVisible();
+  expect(await page.evaluate(() => window.__cached), "the snapshot carried a follower copy").toBe("");
+});

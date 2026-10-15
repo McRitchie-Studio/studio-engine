@@ -256,6 +256,7 @@ class E2eLabController < ActionController::Base
     @lab_devnet = params[:devnet].present?
     @lab_admin = params[:admin].present?
     @lab_balance = params[:balance].present?
+    @lab_short = params[:short].present?
     render(:bar_stack)
   end
 
@@ -643,6 +644,15 @@ class E2eLabController < ActionController::Base
   # The same page under Turbo, so a spec can leave it with the sidebar open and
   # come Back.
   def sidebar_panels_turbo = render(:sidebar_panels, layout: "survey_turbo_lab")
+
+  # The navbar under Turbo, so a spec can leave it scrolled and come Back: Turbo
+  # restores a CLONE of the page from its snapshot cache, header and all.
+  def bar_stack_turbo
+    @lab_signed_in = true
+    @user = LabOneRowUser.new
+    @lab_sidebar_sections = LAB_SIDEBAR_SECTIONS
+    render(:bar_stack, layout: "survey_turbo_lab")
+  end
 
   # ---- The site footer and the booking primitives (docs/SITE_FOOTER.md) ------
   #

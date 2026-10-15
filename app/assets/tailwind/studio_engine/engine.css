@@ -518,7 +518,9 @@ body.modal-open .studio-app-banner {
          single frame on a flick — measured 39px in turf-monster, the full
          178 -> 139. navCollapse() converts this to --nav-p units off
          --nav-ramp's 3x relation to the collapse total, so one number covers
-         every band. */
+         every band. It binds only a header OUT of the page's flow: a header
+         in flow is held (studio/nav_collapse, the hold), so the page cannot
+         move, and its progress follows the scroll exactly. */
       --nav-max-step: 5px;
       --nav-pad: calc(1.5rem - 1rem * var(--nav-p, 0));                 /* py-6 -> py-2 */
       --nav-logo-size: calc(3rem - 1rem * var(--nav-p, 0));             /* 48px -> 32px */

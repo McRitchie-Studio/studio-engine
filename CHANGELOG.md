@@ -4,6 +4,42 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The navbar collapse no longer moves the page.** `studio/nav_collapse`
+  holds a header that sits in the page's flow at its expanded footprint: the
+  header carries `margin-bottom: calc(var(--nav-hold) * var(--nav-p) +
+  var(--nav-hold-fix))`, which grows in the same style recalc that shrinks it,
+  so the document never changes height. Before, every frame of the collapse
+  reflowed the page: content ran ahead of the finger, a quick scroll back to the
+  top pushed the page down for ~10 frames after the scroll stopped, and near the
+  bottom of a page the browser clamped the scroll back (measured on the hub's
+  `/links`: 344 to 305 with nobody touching it). Held, the progress follows the
+  scroll position exactly: the 5px-per-frame cap and the short-page guard apply
+  only to a header out of flow (fixed or absolute), which never moved the page.
+  The collapse stays continuous; endpoints and the ramp are unchanged. No markup
+  change: every header on the controller (the engine navbar, and forks through
+  the `navCollapse()` shim) gets it.
+- **The pinned stack stops restyling the whole page while you scroll.**
+  `studio/pinned_stack` publishes the header's live geometry as inherited
+  custom properties on `<html>`, and every write there restyles the entire
+  document: 8.7ms a write on turf-monster's 2,000-element contest page, every
+  frame the header's bottom edge moved, which dropped frames on a 120Hz screen.
+  While a scroll is in motion it now writes the values only onto the elements
+  that read them live (an inline style or a stylesheet rule that positions off
+  them, found by a scan, or `[data-pin-follow]`), and writes `<html>` once the
+  scroll has been still for 160ms. Restyling during the collapse on that page
+  fell from 226ms to 25ms over 27 frames. `scroll-margin`/`scroll-padding`
+  readers are served by the settled write; structural changes (a layer arriving
+  or leaving) still write `<html>` at once. A SCRIPT that reads these values
+  off `<html>` (`getComputedStyle(document.documentElement)`) sees them up to
+  160ms late during a scroll; read them off the element that positions by them
+  instead. Known readers: turf-monster's contest chat panel and cyvasse's game
+  controller, both of which read at an event, not per frame. Followers release
+  their copies before Turbo caches the page, and the collapse controller clears
+  its own state when a header is restored from that cache, so Back never stacks
+  a second hold.
+
 ### Added
 
 - **`Studio::Storage`: object storage on Cloudflare R2, on by default for an app

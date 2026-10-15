@@ -5,7 +5,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/nav_collapse.js", import.meta.url), "utf8")
-const { collapseFrame, shadowLit, readTuning, DEFAULT_RAMP, DEFAULT_MAX_STEP } =
+const { collapseFrame, shadowLit, readTuning, holdFix, inFlow, DEFAULT_RAMP, DEFAULT_MAX_STEP } =
   await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 // A long page on a phone band: ramp 120, cap 5px of header travel per frame.
@@ -86,4 +86,48 @@ test("tuning reads the band's CSS and falls back to the defaults", () => {
   assert.deepEqual(readTuning(style({ "--nav-ramp": "120px", "--nav-max-step": "4px" })), { ramp: 120, maxPx: 4 })
   assert.deepEqual(readTuning(style({})), { ramp: DEFAULT_RAMP, maxPx: DEFAULT_MAX_STEP })
   assert.deepEqual(readTuning(style({ "--nav-ramp": "0px", "--nav-max-step": "-1px" })), { ramp: 144, maxPx: 5 })
+})
+
+// --- the hold (task smooth-navbar-collapse) ---------------------------------
+//
+// A held header keeps its expanded footprint in the page, so the document
+// never shortens: the progress IS the scroll position, every frame.
+
+test("held, a flick lands on the scroll position in one frame, with nothing to settle", () => {
+  const frame = collapseFrame({ ...page, held: true, y: 90, p: 0 })
+  assert.equal(frame.p, smoothstep(90 / 120))
+  assert.equal(frame.settling, false)
+})
+
+test("held, the way back up lands exactly too, so no gap opens above the content", () => {
+  const frame = collapseFrame({ ...page, held: true, y: 0, p: 1 })
+  assert.deepEqual(frame, { p: 0, settling: false })
+})
+
+test("held, a short page collapses with its scroll instead of snapping open", () => {
+  const short = { ...page, held: true, scrollHeight: 900, innerHeight: 844 }
+  const frame = collapseFrame({ ...short, y: 56, p: 0 })
+  assert.equal(frame.p, smoothstep(56 / 120))
+})
+
+test("held, reduced motion still snaps on its hysteresis", () => {
+  assert.equal(collapseFrame({ ...page, held: true, reduce: true, y: 61, p: 0 }).p, 1)
+  assert.equal(collapseFrame({ ...page, held: true, reduce: true, y: 4, p: 1 }).p, 0)
+})
+
+test("the residue is what the linear hold missed", () => {
+  // Linear collapse: the CSS margin already holds it exactly.
+  assert.equal(holdFix({ rest: 96, height: 74.5, hold: 43, p: 0.5 }), 0)
+  // The scrolled state's 1px border: one pixel less margin.
+  assert.equal(holdFix({ rest: 96, height: 54, hold: 43, p: 1 }), -1)
+  // A collapse that runs ahead of linear mid-ramp: the residue adds the rest.
+  assert.equal(holdFix({ rest: 96, height: 70, hold: 43, p: 0.5 }), 4.5)
+})
+
+test("only a header in the page's flow is held", () => {
+  assert.equal(inFlow("sticky"), true)
+  assert.equal(inFlow("relative"), true)
+  assert.equal(inFlow("static"), true)
+  assert.equal(inFlow("fixed"), false)
+  assert.equal(inFlow("absolute"), false)
 })
