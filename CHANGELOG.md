@@ -4,6 +4,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **A held navbar eases its collapse again.** 0.108.0 held the header's
+  footprint so the page never moves, and with it let the header follow the
+  scroll position exactly. On a hard flick that crossed the whole ramp in a
+  frame or two, the header then snapped full to compact (or back) in one frame,
+  which read as a jerk on the hub's `/deployments`. The `--nav-max-step` cap
+  (5px of header travel per frame) now applies to held headers too, so a flick
+  plays as a short animation of about 8-9 frames. The page still never moves:
+  the hold keeps the document's height whatever `--nav-p` is. After a hard
+  flick to the top, page background shows between the header and the content
+  for those frames while the header grows back. A slow scroll is unchanged.
+
 ## 0.109.0 — 2026-10-15
 
 ### Added

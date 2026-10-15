@@ -989,7 +989,7 @@
 # from the tone's default, and a custom base reaches both tones. Verified RED
 # against three reintroduced defects (the spec's header lists them).
 #   npx playwright test --list  -> 346 tests in 50 files
-total_specs: 346
+total_specs: 347
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1185,7 +1185,7 @@ total_specs: 346
 #   npx playwright test --list                                             -> 346 tests, 50 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 346
-executed: 346
+executed: 347
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
