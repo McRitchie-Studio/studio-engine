@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.111.0 — 2026-10-16
+
 ### Added
 
 - **The navbar can collapse on the browser's scroll timeline** (opt-in:
