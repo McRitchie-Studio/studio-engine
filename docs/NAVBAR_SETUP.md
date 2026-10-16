@@ -42,6 +42,7 @@ Start by copying the engine's version and customizing:
 | `show_logged_in` | boolean | `logged_in?` | Override session-based login check |
 | `balance_html` | string | `nil` | Raw HTML for balance display (passed to `_user_nav`) |
 | `extra_icons_html` | string | `nil` | Raw HTML for extra icon buttons (passed to `_user_nav`) |
+| `scroll_timeline` | boolean | `config.navbar_scroll_timeline` | Opts this render into the scroll-driven collapse (below) |
 
 ## Adding Nav Links
 
@@ -119,6 +120,27 @@ artwork's own, scaled down inside the left column on a narrow phone. Crop the
 artwork tight to the lockup, with no padding, so it fills that height. `nil`, the
 default, leaves the navbar byte-identical; anything other than a Hash with both
 paths raises at boot.
+
+## Scroll-Driven Collapse (optional)
+
+```ruby
+config.navbar_scroll_timeline = true
+```
+
+From 768px, in a browser with scroll-driven animations, the header collapses
+on the page's scroll timeline instead of from script. It keeps one height and
+is sticky at minus its band (its expanded height less its collapsed height), so
+the band scrolls away with the page and the compact bar sticks. The logo,
+title, avatar and name shrink by transforms, and the icon rail slides so the
+gaps stay even. The compositor runs it with the scroll, so a busy page cannot
+make the header stutter. The sizes are the band table's own endpoints: the
+`nav-collapse` controller measures them once (on connect, resize, font load
+and a bar resize), so an app that overrides the endpoints needs nothing more.
+
+Phones and browsers without scroll timelines (Firefox today) keep the `--nav-p`
+collapse; crossing 768px swaps modes. On the timeline `--nav-h` is the compact
+bar's height. `false`, the default, leaves the navbar byte-identical. The
+`scroll_timeline:` local overrides the setting for one render.
 
 ## CSS Class Hooks
 

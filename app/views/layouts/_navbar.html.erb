@@ -63,7 +63,11 @@
     through ($store.devMode on the user nav, the sidebar trigger's @click):
     Alpine initializes directives only inside a component, and the header was
     that component while navCollapse() lived on it. %>
-<header data-pin="nav"<% unless is_preview %> x-data data-studio-controller="nav-collapse" data-nav-collapse-scrolled-class="shadow-lg border-b border-subtle is-scrolled"<% end %>
+<%# data-nav-timeline opts into the scroll-driven collapse (Studio.navbar_scroll_timeline,
+    or a scroll_timeline: local for one render; engine.css, THE SCROLL-DRIVEN
+    COLLAPSE). Never on a preview: the /navbar page drives --nav-p itself. %>
+<% scroll_timeline = local_assigns.fetch(:scroll_timeline, Studio.navbar_scroll_timeline) %>
+<header data-pin="nav"<% unless is_preview %> x-data data-studio-controller="nav-collapse" data-nav-collapse-scrolled-class="shadow-lg border-b border-subtle is-scrolled"<%= " data-nav-timeline" if scroll_timeline %><% end %>
         <%# top-0, a STATIC value, and never a custom property. Any bars render as
             this header's sibling in normal flow (studio/banners/_stack), so they
             already occupy their own height above it and there is nothing to

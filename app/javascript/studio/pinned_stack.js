@@ -288,7 +288,11 @@ export function startPinnedStack() {
     // own. That is what lets a layer come and go without anyone declaring a
     // stacking order, and it is load-bearing rather than incidental.
     var r = el.getBoundingClientRect();
-    return { el: el, name: name, legacy: legacy, h: el.offsetHeight, bottom: Math.max(0, r.bottom) };
+    // A header on the scroll timeline (studio/nav_collapse) keeps its expanded
+    // box, and its top band scrolls away above the window; what pins is the
+    // compact bar, so that is its height here. An inline read, no layout.
+    var band = el.hasAttribute('data-nav-timeline-on') ? parseFloat(el.style.getPropertyValue('--nav-band')) || 0 : 0;
+    return { el: el, name: name, legacy: legacy, h: el.offsetHeight - band, bottom: Math.max(0, r.bottom) };
   }
 
 

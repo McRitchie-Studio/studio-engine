@@ -4,6 +4,26 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **The navbar can collapse on the browser's scroll timeline** (opt-in:
+  `config.navbar_scroll_timeline = true`, or `scroll_timeline: true` on one
+  render of `layouts/_navbar`). From 768px, in a browser with scroll-driven
+  animations, the header keeps one height and is sticky at minus its band (its
+  expanded height less its collapsed height), so the band scrolls away with the
+  page and the compact bar sticks. The logo, title, avatar and name shrink by
+  transforms on the page's scroll timeline, and the icon rail slides so the
+  gaps stay even. The compositor runs all of it with the scroll: no script per
+  frame, no relayout, so a busy page cannot make the header stutter. The
+  scrolled line and shadow are drawn by `::after` on the same timeline.
+  `studio/nav_collapse` gains a timeline mode for the header: it measures the
+  band and the scales once (on connect, resize, font load and a bar resize)
+  and keeps the `is-scrolled` marker; phones (under 768px) and browsers without
+  scroll timelines (Firefox today) keep the `--nav-p` collapse, and crossing
+  768px swaps modes. On the timeline, `--nav-h` is the compact bar's height,
+  so an anchor's `scroll-margin-top` clears what is pinned. Off by default: a
+  header without the opt-in renders and behaves byte-identical to before.
+
 ## 0.110.0 — 2026-10-15
 
 ### Added

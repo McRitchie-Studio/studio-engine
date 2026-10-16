@@ -752,6 +752,100 @@ body.modal-open .studio-app-banner {
     }
 }
 
+/* THE SCROLL-DRIVEN COLLAPSE (opt-in: config.navbar_scroll_timeline, which puts
+   data-nav-timeline on layouts/_navbar's header).
+
+   The band table above interpolates real sizes off --nav-p, which
+   studio/nav_collapse writes from script once per frame. Every one of those
+   frames is a style-and-layout pass on the main thread, so the header can only
+   be as smooth as the page around it: on a busy page (the hub's /deployments,
+   2026-10-15) a flick dropped frames and the header stepped.
+
+   Here nothing changes size, so nothing reflows and no script runs per frame:
+
+     THE BOX IS FIXED at its expanded height, and sticky at minus the BAND (its
+     expanded height less its collapsed height, measured by the controller and
+     published as --nav-band). So the band scrolls away with the page by the
+     browser's own scrolling, and the compact bar is what sticks. The document
+     never changes height; the page cannot move by itself.
+
+     THE SHRINK IS A SCROLL TIMELINE on transforms: the row slides down half the
+     band so it stays centred on the visible bar, the brand scales from its left
+     edge, the avatar and name from the right (the name by the avatar's ratio,
+     the rule of 3), and the icon rail slides right by what the account gave up
+     so the gaps stay even. The compositor runs these with the scroll itself.
+
+     THE SCROLLED LINE AND SHADOW are drawn by ::after on the same timeline,
+     not by border-b (which would add a pixel of height and reflow).
+
+   --nav-start is where the header meets the top of the window: the height of
+   the bars above it in flow (studio/banners/_stack). Both it and the scales
+   are measured once (on connect, resize, font load, a bar resize), never per
+   frame; studio/nav_collapse's timeline mode owns them.
+
+   Only from 768px, and only where the browser has scroll timelines (Firefox
+   does not yet): the controller tests the same two conditions and runs the
+   --nav-p collapse otherwise, so the two can never both drive the header. */
+@layer utilities {
+  @supports (animation-timeline: scroll()) {
+    @media (min-width: 768px) {
+      .nav-shell[data-nav-timeline] {
+        --nav-band: 40px;
+        top: calc(-1 * var(--nav-band));
+      }
+      .nav-shell[data-nav-timeline]::after {
+        content: "";
+        position: absolute;
+        inset: auto 0 0 0;
+        height: 1px;
+        background: var(--color-border);
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        pointer-events: none;
+        opacity: 0;
+        animation: nav-tl-lit linear both;
+        animation-timeline: scroll(root block);
+        animation-range: calc(var(--nav-start, 0px) + var(--nav-band) - 8px) calc(var(--nav-start, 0px) + var(--nav-band) + 16px);
+      }
+      /* The row slides down half the band to stay centred on the bar, so its
+         bottom padding (empty, transparent) overhangs the header by that much,
+         and an overhang still takes the pointer: it ate clicks on the top 20px
+         of the hub's pinned board lane headers. The row lets the pointer
+         through; its contents, which sit inside the bar, still take it. */
+      .nav-shell[data-nav-timeline] > .nav-row { pointer-events: none; }
+      .nav-shell[data-nav-timeline] > .nav-row > * { pointer-events: auto; }
+      .nav-shell[data-nav-timeline] > .nav-row {
+        animation: nav-tl-row linear both;
+        animation-timeline: scroll(root block);
+        animation-range: var(--nav-start, 0px) calc(var(--nav-start, 0px) + var(--nav-band));
+      }
+      .nav-shell[data-nav-timeline] .nav-logo-link,
+      .nav-shell[data-nav-timeline] [data-nav-account] > [aria-hidden],
+      .nav-shell[data-nav-timeline] [data-nav-account] > span:first-child,
+      .nav-shell[data-nav-timeline] [data-nav-tools] {
+        animation-timing-function: ease-in-out;
+        animation-fill-mode: both;
+        animation-timeline: scroll(root block);
+        animation-range: var(--nav-start, 0px) calc(var(--nav-start, 0px) + var(--nav-ramp));
+      }
+      .nav-shell[data-nav-timeline] .nav-logo-link { transform-origin: left center; animation-name: nav-tl-brand; }
+      .nav-shell[data-nav-timeline] [data-nav-account] > [aria-hidden] { transform-origin: right center; animation-name: nav-tl-avatar; }
+      .nav-shell[data-nav-timeline] [data-nav-account] > span:first-child { transform-origin: right center; animation-name: nav-tl-name; }
+      .nav-shell[data-nav-timeline] [data-nav-tools] { animation-name: nav-tl-tools; }
+    }
+    /* Reduced motion: the shrink snaps at the first pixel, as --nav-p's 0/1
+       snap does on the script path. */
+    @media (min-width: 768px) and (prefers-reduced-motion: reduce) {
+      .nav-shell[data-nav-timeline] { --nav-ramp: 1px; }
+    }
+  }
+}
+@keyframes nav-tl-row { to { transform: translateY(calc(var(--nav-band) / 2)); } }
+@keyframes nav-tl-brand { to { transform: scale(var(--nav-brand-scale, 1)); } }
+@keyframes nav-tl-avatar { to { transform: scale(var(--nav-avatar-scale, 1)); } }
+@keyframes nav-tl-name { to { transform: translateX(var(--nav-avatar-shrink, 0px)) scale(var(--nav-avatar-scale, 1)); } }
+@keyframes nav-tl-tools { to { transform: translateX(var(--nav-tools-shift, 0px)); } }
+@keyframes nav-tl-lit { to { opacity: 1; } }
+
 /* A board whose controller failed to load (studio/lazy_controllers marks its
    section data-studio-controller-failed="board") shows the notice
    studio/board/_board renders with an inline display: none. !important is what

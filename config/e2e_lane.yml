@@ -989,7 +989,14 @@
 # from the tone's default, and a custom base reaches both tones. Verified RED
 # against three reintroduced defects (the spec's header lists them).
 #   npx playwright test --list  -> 346 tests in 50 files
-total_specs: 347
+# 347 -> 351: e2e/navbar_scroll_timeline.spec.js, a NEW file on the existing
+# /lab/bar_stack page with ?timeline=1 (the scroll-driven collapse). The collapse
+# is computed style on a scroll timeline, so the spec reads frames through a
+# flick (box, document, content, inline writes), the pointer under the bar, the
+# collapsed sizes and ink gaps, and the 768px mode swap. Verified RED without the
+# opt-in, and without the row's pointer-events fix.
+#   npx playwright test --list  -> 351 tests in 51 files
+total_specs: 351
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1185,7 +1192,11 @@ total_specs: 347
 #   npx playwright test --list                                             -> 346 tests, 50 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 346
-executed: 347
+# And for the scroll-driven navbar: 4 more tests (347 -> 351), 1 new file:
+#   npx playwright test --list                                             -> 351 tests, 51 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 351
+executed: 351
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
