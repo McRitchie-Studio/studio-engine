@@ -158,7 +158,7 @@ test("only a header in the page's flow is held", () => {
 })
 
 // [unit] the scroll-driven mode: what the timeline is told, measured once.
-const { timelineVars, timelineOn, TIMELINE_QUERY } =
+const { timelineVars, timelineOn, TIMELINE_QUERY, clearTimeline } =
   await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 // The hub's header at 1440: 88 -> 48, wordmark 32 -> 20, avatar 40 -> 32.
@@ -206,4 +206,12 @@ test("the timeline needs the opt-in, the wide query and browser support, all thr
     globalThis.CSS = had
   }
   assert.equal(TIMELINE_QUERY, "(min-width: 768px)")
+})
+
+test("a header restored below 768px sheds what the timeline left inline", () => {
+  const props = new Map([["--nav-band", "40px"], ["--nav-start", "0px"], ["--nav-tools-shift", "18px"], ["--nav-hold", "4px"]])
+  const attrs = new Set(["data-nav-timeline", "data-nav-timeline-on"])
+  clearTimeline({ style: { removeProperty: (n) => props.delete(n) }, removeAttribute: (n) => attrs.delete(n) })
+  assert.deepEqual([...props.keys()], ["--nav-hold"])
+  assert.deepEqual([...attrs], ["data-nav-timeline"])
 })

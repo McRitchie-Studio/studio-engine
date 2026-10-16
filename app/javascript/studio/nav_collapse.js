@@ -241,6 +241,15 @@ export function timelineVars({ rest, collapsed, brand0, brand1, avatar0, avatar1
 var TIMELINE_PROPS = ['--nav-band', '--nav-start', '--nav-brand-scale', '--nav-avatar-scale',
   '--nav-avatar-shrink', '--nav-tools-shift'];
 
+// What the timeline mode leaves on the header. stopTimeline() clears it, and
+// so does the --nav-p path's start(): a Turbo snapshot taken wide and restored
+// below 768px (a phone rotated, then Back) arrives still carrying it, and
+// pinned_stack would subtract the stale band from --nav-h.
+export function clearTimeline(el) {
+  TIMELINE_PROPS.forEach(function (name) { el.style.removeProperty(name); });
+  el.removeAttribute('data-nav-timeline-on');
+}
+
 function round(n) {
   return Math.round(n * 1000) / 1000;
 }
@@ -292,6 +301,7 @@ export class NavCollapse {
     // under the header, 39-43px on turf-monster's contest page. So the
     // controller clears what it owns before it reads anything.
     this.onScrolled(false);
+    clearTimeline(this.el);
     this.el.style.marginBottom = '';
     this.el.style.removeProperty('--nav-hold');
     this.el.style.removeProperty('--nav-hold-fix');
@@ -397,9 +407,7 @@ export class NavCollapse {
     window.removeEventListener('resize', this._onTimelineResize);
     if (this._bars) this._bars.disconnect();
     this._bars = null;
-    var style = this.el.style;
-    TIMELINE_PROPS.forEach(function (name) { style.removeProperty(name); });
-    this.el.removeAttribute('data-nav-timeline-on');
+    clearTimeline(this.el);
   }
 
   // Reads the header at both ends of the band table and publishes what the
