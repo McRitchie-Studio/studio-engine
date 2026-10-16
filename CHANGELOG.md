@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.110.0 — 2026-10-15
+
 ### Added
 
 - **The site footer can draw a brand lockup in place of its logo and
