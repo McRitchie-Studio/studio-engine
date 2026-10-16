@@ -156,3 +156,62 @@ test("only a header in the page's flow is held", () => {
   assert.equal(inFlow("fixed"), false)
   assert.equal(inFlow("absolute"), false)
 })
+
+// [unit] the scroll-driven mode: what the timeline is told, measured once.
+const { timelineVars, timelineOn, TIMELINE_QUERY, clearTimeline } =
+  await import(`data:text/javascript,${encodeURIComponent(source)}`)
+
+// The hub's header at 1440: 88 -> 48, wordmark 32 -> 20, avatar 40 -> 32.
+const hub = { rest: 88, collapsed: 48, brand0: 32, brand1: 20, avatar0: 40, avatar1: 32, nameW: 50 }
+
+test("the band is what the header loses, and the brand scales by its own ratio", () => {
+  const vars = timelineVars(hub)
+  assert.equal(vars.band, 40)
+  assert.equal(vars.brandScale, 0.625)
+})
+
+test("the name scales with the avatar, and the icon rail slides by what the account gives up", () => {
+  const vars = timelineVars(hub)
+  assert.equal(vars.avatarScale, 0.8)
+  assert.equal(vars.avatarShrink, 8)
+  // 50px of name at 0.8 gives back 10px, plus the avatar's 8px.
+  assert.ok(Math.abs(vars.toolsShift - 18) < 1e-9)
+})
+
+test("signed out, with no avatar, nothing on the right moves", () => {
+  const vars = timelineVars({ ...hub, avatar0: 0, avatar1: 0, nameW: 0 })
+  assert.deepEqual([vars.avatarScale, vars.avatarShrink, vars.toolsShift], [1, 0, 0])
+})
+
+test("a two-row nav whose avatar keeps its size moves no account", () => {
+  const vars = timelineVars({ ...hub, avatar0: 32, avatar1: 32 })
+  assert.deepEqual([vars.avatarScale, vars.avatarShrink, vars.toolsShift], [1, 0, 0])
+})
+
+test("a header that grows never publishes a negative band", () => {
+  assert.equal(timelineVars({ ...hub, collapsed: 90 }).band, 0)
+})
+
+test("the timeline needs the opt-in, the wide query and browser support, all three", () => {
+  const header = (opted) => ({ hasAttribute: (name) => opted && name === "data-nav-timeline" })
+  const had = globalThis.CSS
+  try {
+    globalThis.CSS = { supports: () => true }
+    assert.equal(timelineOn(header(true), true), true)
+    assert.equal(timelineOn(header(false), true), false)
+    assert.equal(timelineOn(header(true), false), false)
+    globalThis.CSS = { supports: () => false }
+    assert.equal(timelineOn(header(true), true), false)
+  } finally {
+    globalThis.CSS = had
+  }
+  assert.equal(TIMELINE_QUERY, "(min-width: 768px)")
+})
+
+test("a header restored below 768px sheds what the timeline left inline", () => {
+  const props = new Map([["--nav-band", "40px"], ["--nav-start", "0px"], ["--nav-tools-shift", "18px"], ["--nav-hold", "4px"]])
+  const attrs = new Set(["data-nav-timeline", "data-nav-timeline-on"])
+  clearTimeline({ style: { removeProperty: (n) => props.delete(n) }, removeAttribute: (n) => attrs.delete(n) })
+  assert.deepEqual([...props.keys()], ["--nav-hold"])
+  assert.deepEqual([...attrs], ["data-nav-timeline"])
+})

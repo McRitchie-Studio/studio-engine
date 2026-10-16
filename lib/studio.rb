@@ -248,6 +248,17 @@ module Studio
 
   mattr_reader :sign_in_label, default: NavbarIdentity::DEFAULT_SIGN_IN_LABEL
 
+  # ---- Navbar scroll timeline ----
+  # true opts layouts/_navbar's header into the scroll-driven collapse
+  # (engine.css, THE SCROLL-DRIVEN COLLAPSE): from 768px, in a browser with
+  # scroll timelines, the header keeps one height, its top band scrolls away,
+  # and the shrink runs as compositor transforms with no script per frame.
+  # Phones and other browsers keep the --nav-p collapse. false, the default,
+  # renders the header byte-identical to before.
+  #
+  #   config.navbar_scroll_timeline = true
+  mattr_accessor :navbar_scroll_timeline, default: false
+
   # ---- Navbar wordmark ----
   # A brand lockup image (icon plus words as one artwork) drawn in place of the
   # "Navbar Logo" and the app_name text. nil, the default, renders the navbar

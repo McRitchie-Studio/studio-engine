@@ -197,6 +197,63 @@ export function readTuning(style) {
   };
 }
 
+// THE SCROLL-DRIVEN MODE (engine.css, THE SCROLL-DRIVEN COLLAPSE). A header
+// carrying data-nav-timeline, from 768px, in a browser with scroll timelines,
+// collapses in CSS on the compositor, and this controller stops driving --nav-p.
+// What CSS cannot know it is told once, not per frame: the band that scrolls
+// away, the scales, and where the header meets the window. The query is the
+// stylesheet's own; the two must agree, or both would drive the header.
+export var TIMELINE_QUERY = '(min-width: 768px)';
+
+export function timelineSupported() {
+  return typeof CSS !== 'undefined' && !!CSS.supports && CSS.supports('animation-timeline: scroll()');
+}
+
+export function timelineOn(el, wide) {
+  return el.hasAttribute('data-nav-timeline') && wide && timelineSupported();
+}
+
+// The timeline's custom properties, from the header measured at both ends of
+// the band table (--nav-p 0 and 1). Layout sizes only (offsetHeight and
+// offsetWidth), which a transform does not change, so the reading is the same
+// at any scroll position.
+//
+//   rest, collapsed   the header's height expanded and collapsed
+//   brand0, brand1    the brand link's height expanded and collapsed
+//   avatar0, avatar1  the avatar's height expanded and collapsed (0: none)
+//   nameW             the account name's width
+//
+// The name scales by the avatar's ratio (the rule of 3), and the icon rail
+// slides right by what the name and avatar give up, so the gaps stay even.
+// Without an avatar (signed out) nothing on the right moves.
+export function timelineVars({ rest, collapsed, brand0, brand1, avatar0, avatar1, nameW }) {
+  var avatarScale = avatar0 > 0 ? avatar1 / avatar0 : 1;
+  var avatarShrink = avatar0 > 0 ? Math.max(0, avatar0 - avatar1) : 0;
+  return {
+    band: Math.max(0, rest - collapsed),
+    brandScale: brand0 > 0 ? brand1 / brand0 : 1,
+    avatarScale: avatarScale,
+    avatarShrink: avatarShrink,
+    toolsShift: avatar0 > 0 ? nameW * (1 - avatarScale) + avatarShrink : 0
+  };
+}
+
+var TIMELINE_PROPS = ['--nav-band', '--nav-start', '--nav-brand-scale', '--nav-avatar-scale',
+  '--nav-avatar-shrink', '--nav-tools-shift'];
+
+// What the timeline mode leaves on the header. stopTimeline() clears it, and
+// so does the --nav-p path's start(): a Turbo snapshot taken wide and restored
+// below 768px (a phone rotated, then Back) arrives still carrying it, and
+// pinned_stack would subtract the stale band from --nav-h.
+export function clearTimeline(el) {
+  TIMELINE_PROPS.forEach(function (name) { el.style.removeProperty(name); });
+  el.removeAttribute('data-nav-timeline-on');
+}
+
+function round(n) {
+  return Math.round(n * 1000) / 1000;
+}
+
 // THE BINDING: one header, its listeners, and the frame loop. The Stimulus
 // controller and the Alpine shim both drive this, so the two cannot drift.
 // onScrolled(lit) fires when the shadow's hysteresis flips.
@@ -220,10 +277,22 @@ export class NavCollapse {
     this.lastHeight = null;
     this._observer = null;
     this._remeasure = this.remeasure.bind(this);
+    this.timeline = false;
+    this._wide = null;
+    this._onWide = this.onWide.bind(this);
+    this._onTimelineScroll = this.onTimelineScroll.bind(this);
+    this._onTimelineResize = this.measureTimeline.bind(this);
+    this._bars = null;
   }
 
   start() {
     this.stopped = false;
+    this._wide = window.matchMedia(TIMELINE_QUERY);
+    if (this._wide.addEventListener) this._wide.addEventListener('change', this._onWide);
+    if (timelineOn(this.el, this._wide.matches)) {
+      this.startTimeline();
+      return;
+    }
     this._reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
     // A HEADER RESTORED FROM TURBO'S SNAPSHOT CACHE arrives as it was left:
     // its scrolled classes on, and this controller's own hold still inline
@@ -232,6 +301,7 @@ export class NavCollapse {
     // under the header, 39-43px on turf-monster's contest page. So the
     // controller clears what it owns before it reads anything.
     this.onScrolled(false);
+    clearTimeline(this.el);
     this.el.style.marginBottom = '';
     this.el.style.removeProperty('--nav-hold');
     this.el.style.removeProperty('--nav-hold-fix');
@@ -278,6 +348,12 @@ export class NavCollapse {
   // every visit would stack another listener on window.
   stop() {
     this.stopped = true;
+    if (this._wide && this._wide.removeEventListener) this._wide.removeEventListener('change', this._onWide);
+    this._wide = null;
+    if (this.timeline) {
+      this.stopTimeline();
+      return;
+    }
     window.removeEventListener('scroll', this._onScroll);
     window.removeEventListener('resize', this._onResize);
     if (this._observer) this._observer.disconnect();
@@ -289,6 +365,103 @@ export class NavCollapse {
     }
     if (this._reduce && this._reduce.removeEventListener) {
       this._reduce.removeEventListener('change', this._apply);
+    }
+  }
+
+  // Crossing 768px swaps modes: undo the one running, start the one that
+  // now applies.
+  onWide() {
+    if (this.stopped) return;
+    this.stop();
+    this.start();
+  }
+
+  startTimeline() {
+    this.timeline = true;
+    this.held = false;
+    this.p = 0;
+    // A header restored from Turbo's cache, or crossing 768px, can carry
+    // what the --nav-p path left inline; it goes.
+    this.el.style.marginBottom = '';
+    this.el.style.removeProperty('--nav-hold');
+    this.el.style.removeProperty('--nav-hold-fix');
+    this.el.style.removeProperty('--nav-p');
+    this.el.setAttribute('data-nav-timeline-on', '');
+    this.scrolled = false;
+    this.onScrolled(false);
+    this.measureTimeline();
+    this.onTimelineScroll();
+    window.addEventListener('scroll', this._onTimelineScroll, { passive: true });
+    window.addEventListener('resize', this._onTimelineResize, { passive: true });
+    var bars = document.querySelector('[data-studio-bar-stack]');
+    if (bars && typeof ResizeObserver === 'function') {
+      this._bars = new ResizeObserver(this._onTimelineResize);
+      this._bars.observe(bars);
+    }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(this._onTimelineResize);
+  }
+
+  stopTimeline() {
+    this.timeline = false;
+    window.removeEventListener('scroll', this._onTimelineScroll);
+    window.removeEventListener('resize', this._onTimelineResize);
+    if (this._bars) this._bars.disconnect();
+    this._bars = null;
+    clearTimeline(this.el);
+  }
+
+  // Reads the header at both ends of the band table and publishes what the
+  // timeline needs. Runs on start, resize, font load and a bar resize; a
+  // scroll never calls it. Writes only a value that changed.
+  measureTimeline() {
+    if (this.stopped || !this.timeline) return;
+    var el = this.el;
+    var brand = el.querySelector('.nav-logo-link');
+    var avatar = el.querySelector('[data-nav-account] > [aria-hidden]');
+    var name = el.querySelector('[data-nav-account] > span:first-child');
+    var read = function () {
+      return {
+        h: el.offsetHeight,
+        brand: brand ? brand.offsetHeight : 0,
+        avatar: avatar ? avatar.offsetHeight : 0
+      };
+    };
+    el.style.removeProperty('--nav-p');
+    var open = read();
+    el.style.setProperty('--nav-p', '1');
+    var shut = read();
+    el.style.removeProperty('--nav-p');
+    var vars = timelineVars({
+      rest: open.h, collapsed: shut.h,
+      brand0: open.brand, brand1: shut.brand,
+      avatar0: open.avatar, avatar1: shut.avatar,
+      nameW: name ? name.offsetWidth : 0
+    });
+    // Where the header meets the top of the window: the bars above it in flow.
+    var bars = document.querySelector('[data-studio-bar-stack]');
+    var start = bars && (bars.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)
+      ? bars.offsetHeight : 0;
+    var props = {
+      '--nav-band': round(vars.band) + 'px',
+      '--nav-start': start + 'px',
+      '--nav-brand-scale': String(round(vars.brandScale)),
+      '--nav-avatar-scale': String(round(vars.avatarScale)),
+      '--nav-avatar-shrink': round(vars.avatarShrink) + 'px',
+      '--nav-tools-shift': round(vars.toolsShift) + 'px'
+    };
+    for (var key in props) {
+      if (el.style.getPropertyValue(key) !== props[key]) el.style.setProperty(key, props[key]);
+    }
+  }
+
+  // The scrolled marker on the controller's own hysteresis, written only when
+  // it flips. No frame is scheduled: the collapse itself is the stylesheet's.
+  onTimelineScroll() {
+    if (this.stopped || !this.timeline) return;
+    var lit = shadowLit(this.scrolled, Math.max(0, window.scrollY));
+    if (lit !== this.scrolled) {
+      this.scrolled = lit;
+      this.onScrolled(lit);
     }
   }
 

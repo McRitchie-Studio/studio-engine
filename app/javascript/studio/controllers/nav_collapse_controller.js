@@ -16,7 +16,13 @@ export default class extends Controller {
   connect() {
     this.collapse = new NavCollapse(this.element, (lit) => {
       if (!this.hasScrolledClass) return
-      for (const name of this.scrolledClasses) this.element.classList.toggle(name, lit)
+      // On the scroll timeline the line and shadow are the stylesheet's
+      // (::after, so no border adds a pixel of height); only the marker
+      // toggles, and the rest stay off.
+      const timeline = this.collapse && this.collapse.timeline
+      for (const name of this.scrolledClasses) {
+        this.element.classList.toggle(name, lit && (!timeline || name === "is-scrolled"))
+      }
     })
     this.collapse.start()
   }
