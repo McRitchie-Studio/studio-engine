@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.111.1 — 2026-10-16
+
 ### Added
 
 - **A live read of the pinned stack for scripts.** `studio/pinned_stack`
