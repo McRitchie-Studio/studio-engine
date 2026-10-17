@@ -238,3 +238,152 @@ test("the refresh event is the one studio/pinned_stack listens for", () => {
   const stack = readFileSync(new URL("../../app/javascript/studio/pinned_stack.js", import.meta.url), "utf8")
   assert.match(stack, new RegExp(`REFRESH_EVENT = '${PINNED_STACK_REFRESH}'`))
 })
+
+// [unit] crossing 768px while scrolled (task timeline-header-resize-collapse).
+// The resize that crosses the query fires the --nav-p path's resize listener,
+// which queues a frame, and the query's change then swaps to the timeline
+// before that frame runs. The binding is driven here with a hand-run frame
+// queue, so the test decides exactly when the queued frame lands.
+const { NavCollapse } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+
+function harness({ wide, scrollY }) {
+  const frames = new Map()
+  let nextId = 1
+  const listeners = { scroll: new Set(), resize: new Set() }
+  const queries = new Map()
+  const media = (q) => {
+    if (!queries.has(q)) {
+      const mq = { matches: q === "(min-width: 768px)" ? wide : false, handlers: new Set(),
+        addEventListener: (_, f) => mq.handlers.add(f), removeEventListener: (_, f) => mq.handlers.delete(f) }
+      queries.set(q, mq)
+    }
+    return queries.get(q)
+  }
+  const props = new Map()
+  const attrs = new Set(["data-nav-timeline"])
+  const el = {
+    style: {
+      marginBottom: "",
+      setProperty: (n, v) => props.set(n, String(v)),
+      removeProperty: (n) => props.delete(n),
+      getPropertyValue: (n) => props.get(n) || ""
+    },
+    // 88 expanded, 48 collapsed, linear in --nav-p.
+    get offsetHeight() { return 88 - 40 * parseFloat(props.get("--nav-p") || "0") },
+    getBoundingClientRect() { return { height: this.offsetHeight } },
+    hasAttribute: (n) => attrs.has(n),
+    setAttribute: (n) => attrs.add(n),
+    removeAttribute: (n) => attrs.delete(n),
+    querySelector: () => null
+  }
+  const win = {
+    scrollY, innerHeight: 800,
+    matchMedia: media,
+    addEventListener: (t, f) => listeners[t] && listeners[t].add(f),
+    removeEventListener: (t, f) => listeners[t] && listeners[t].delete(f)
+  }
+  const globals = {
+    window: win,
+    CSS: { supports: () => true },
+    requestAnimationFrame: (f) => { const id = nextId++; frames.set(id, f); return id },
+    cancelAnimationFrame: (id) => frames.delete(id),
+    getComputedStyle: () => ({ position: "sticky", marginBottom: "0px", getPropertyValue: () => "" }),
+    document: { documentElement: { scrollHeight: 5000 }, querySelector: () => null, dispatchEvent: () => {} },
+    CustomEvent: class { constructor(type) { this.type = type } },
+    ResizeObserver: undefined
+  }
+  const saved = {}
+  for (const k in globals) { saved[k] = globalThis[k]; globalThis[k] = globals[k] }
+  return {
+    el, props, attrs, frames, listeners,
+    flush() {
+      for (let i = 0; i < 100 && frames.size; i++) {
+        const [id, f] = frames.entries().next().value
+        frames.delete(id)
+        f()
+      }
+    },
+    // A window resize across 768px: the resize event first, then the query's change.
+    resizeTo(isWide) {
+      ;[...listeners.resize].forEach((f) => f())
+      const mq = media("(min-width: 768px)")
+      mq.matches = isWide;
+      ;[...mq.handlers].forEach((f) => f())
+    },
+    restore() { for (const k in saved) globalThis[k] = saved[k] }
+  }
+}
+
+test("widening while scrolled: the frame the resize queued writes no --nav-p on the timeline header", () => {
+  const h = harness({ wide: false, scrollY: 1200 })
+  try {
+    const nav = new NavCollapse(h.el)
+    nav.start()
+    h.flush()
+    assert.equal(h.props.get("--nav-p"), "1.0000", "narrow and scrolled, the --nav-p path collapses")
+
+    h.resizeTo(true)
+    assert.equal(nav.timeline, true)
+    assert.ok(h.attrs.has("data-nav-timeline-on"))
+    // The swap cancels the frame the old mode queued...
+    assert.equal(h.frames.size, 0, "a frame from the --nav-p path is still queued")
+    // ...and a frame that runs anyway (one already dispatched) writes nothing.
+    nav.apply()
+    h.flush()
+    assert.equal(h.props.has("--nav-p"), false, `--nav-p left inline: ${h.props.get("--nav-p")}`)
+    assert.equal(h.props.has("--nav-hold"), false)
+    assert.equal(h.el.style.marginBottom, "")
+    nav.stop()
+  } finally {
+    h.restore()
+  }
+})
+
+test("narrowing while scrolled: the --nav-p path takes the header back and keeps scheduling frames", () => {
+  const h = harness({ wide: true, scrollY: 1200 })
+  try {
+    const nav = new NavCollapse(h.el)
+    nav.start()
+    assert.equal(nav.timeline, true)
+    assert.equal(h.props.has("--nav-p"), false)
+
+    h.resizeTo(false)
+    assert.equal(nav.timeline, false)
+    assert.equal(h.attrs.has("data-nav-timeline-on"), false)
+    assert.equal(h.props.has("--nav-band"), false, "the timeline's band is cleared")
+    h.flush()
+    assert.equal(h.props.get("--nav-p"), "1.0000")
+    assert.equal(h.props.get("--nav-hold"), "40px")
+
+    // Live: a scroll back to the top is heard and opens the header again.
+    globalThis.window.scrollY = 0
+    ;[...h.listeners.scroll].forEach((f) => f())
+    assert.equal(h.frames.size, 1, "the scroll scheduled a frame")
+    h.flush()
+    assert.equal(h.props.get("--nav-p"), "0.0000")
+    nav.stop()
+  } finally {
+    h.restore()
+  }
+})
+
+test("a swap with a frame queued leaves the --nav-p path able to schedule again", () => {
+  const h = harness({ wide: false, scrollY: 1200 })
+  try {
+    const nav = new NavCollapse(h.el)
+    nav.start()
+    h.flush()
+    // Narrow -> wide with a frame queued, then straight back.
+    h.resizeTo(true)
+    h.resizeTo(false)
+    h.flush()
+    assert.equal(nav.queued, false)
+    globalThis.window.scrollY = 0
+    ;[...h.listeners.scroll].forEach((f) => f())
+    h.flush()
+    assert.equal(h.props.get("--nav-p"), "0.0000")
+    nav.stop()
+  } finally {
+    h.restore()
+  }
+})

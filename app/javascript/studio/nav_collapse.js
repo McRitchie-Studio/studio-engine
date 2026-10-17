@@ -276,6 +276,7 @@ export class NavCollapse {
     this.p = 0;
     this.scrolled = false;
     this.queued = false;
+    this._frame = 0;
     this.stopped = false;
     this.tuning = { ramp: DEFAULT_RAMP, maxPx: DEFAULT_MAX_STEP };
     this._reduce = null;
@@ -360,6 +361,16 @@ export class NavCollapse {
   // every visit would stack another listener on window.
   stop() {
     this.stopped = true;
+    // A frame the --nav-p path queued (a resize, a scroll, the settle loop)
+    // must not land after the swap. Crossing 768px fires this path's resize
+    // listener BEFORE the query's change, so the frame is queued, the swap
+    // runs, start() clears `stopped`, and the frame then wrote --nav-p onto
+    // the timeline header and eased it to 1: a 48px box translated up by the
+    // band, above the window (task timeline-header-resize-collapse). Cancel
+    // it, and clear `queued` so the next mode can schedule its own.
+    if (this._frame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this._frame);
+    this._frame = 0;
+    this.queued = false;
     if (this._wide && this._wide.removeEventListener) this._wide.removeEventListener('change', this._onWide);
     this._wide = null;
     if (this.timeline) {
@@ -482,7 +493,7 @@ export class NavCollapse {
   onScroll() {
     if (this.queued) return;
     this.queued = true;
-    requestAnimationFrame(this._apply);
+    this._frame = requestAnimationFrame(this._apply);
   }
 
   onResize() {
@@ -552,7 +563,10 @@ export class NavCollapse {
 
   apply() {
     this.queued = false;
-    if (this.stopped) return;
+    this._frame = 0;
+    // Timeline mode owns the header: --nav-p is the stylesheet's there, and
+    // this path writes nothing, whatever frame is still in flight.
+    if (this.stopped || this.timeline) return;
     // Clamped: rubber-band overscroll reports a NEGATIVE scrollY, and a
     // negative progress inflates the navbar past its expanded size.
     var y = Math.max(0, window.scrollY);
@@ -580,7 +594,7 @@ export class NavCollapse {
     // 144, from a hard flick.
     if (frame.settling) {
       this.queued = true;
-      requestAnimationFrame(this._apply);
+      this._frame = requestAnimationFrame(this._apply);
     }
 
     var lit = shadowLit(this.scrolled, y);
