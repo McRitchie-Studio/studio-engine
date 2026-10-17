@@ -243,6 +243,12 @@ test("on the timeline the fixed sidebar panel meets the header's edge at the top
     panel: document.querySelector("#studio-link-sidebar").getBoundingClientRect().top,
     panelBottom: document.querySelector("#studio-link-sidebar").getBoundingClientRect().bottom,
   }));
+  // Polled: a scroll-driven animation attaches to its timeline on the next
+  // frame after the panel is shown, not in the same task (CI's runner read the
+  // un-animated top once). The panel slides in over 300ms, so that frame never
+  // shows.
+  await expect.poll(async () => { const e = await edges(); return Math.abs(e.panel - e.header) <= 1; },
+    { message: "at the top the panel starts at the expanded header's edge" }).toBe(true);
   const atTop = await edges();
   expect(Math.abs(atTop.panel - atTop.header), `at the top ${JSON.stringify(atTop)}`).toBeLessThanOrEqual(1);
   expect(Math.abs(atTop.panelBottom - DESKTOP.height), "the panel reaches the bottom of the window").toBeLessThanOrEqual(1);
