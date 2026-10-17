@@ -1003,7 +1003,13 @@
 # pinned (data-pin-edge). e2e/pinned_stack.spec.js's motion test gains the live
 # read's assertions in place.
 #   npx playwright test --list  -> 353 tests in 51 files
-total_specs: 353
+# 353 -> 355: two tests on e2e/navbar_scroll_timeline.spec.js for crossing 768px
+# while scrolled (task timeline-header-resize-collapse): widening leaves the
+# timeline header no inline --nav-p, hold or margin and the compact bar on
+# screen; narrowing hands the header back to a live --nav-p path. The widening
+# test verified RED on the unfixed controller (--nav-p "1.0000" left inline).
+#   npx playwright test --list  -> 355 tests in 51 files
+total_specs: 355
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1207,7 +1213,11 @@ total_specs: 353
 #   npx playwright test --list                                             -> 353 tests, 51 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 353
-executed: 353
+# And for crossing 768px while scrolled: 2 more tests (353 -> 355), no new file:
+#   npx playwright test --list                                             -> 355 tests, 51 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 355
+executed: 355
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
