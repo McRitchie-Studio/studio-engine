@@ -35,8 +35,10 @@
   other — so pinning the bars is what cost the offset variable. The navbar keeps
   its pin; the bars are ambient labels, seen on every page load because a Turbo
   visit lands at the top. An overlay that must clear the chrome should position
-  off --nav-bottom (published in layouts/studio/_head), which already reports the
-  header's live bottom edge and accounts for chrome above it.
+  off --nav-bottom (published in layouts/studio/_head), which reports the
+  header's bottom edge and accounts for chrome above it. On a scroll-timeline
+  header that is the PINNED edge, so a fixed overlay also carries data-pin-edge
+  (engine.css, THE PINNED EDGE ON THE SCROLL TIMELINE).
 
   Locals (all optional):
     preview      — true inside a navbar-preview render; renders nothing, so a

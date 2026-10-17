@@ -151,8 +151,10 @@
    navbar, before it — not inside <header>. A pinned header carrying a z-index
    is a stacking context, and a descendant's z-index is clamped inside it, so a
    bar nested in the header composites at the HEADER's level no matter what it
-   asks for. --nav-bottom already reports the header's live bottom edge for
-   anything that needs to sit under chrome stacked above it. */
+   asks for. --nav-bottom reports the header's bottom edge for anything that
+   needs to sit under chrome stacked above it: its live edge, or on a
+   scroll-timeline header its PINNED edge, which a fixed reader closes with
+   data-pin-edge (THE PINNED EDGE ON THE SCROLL TIMELINE, below). */
 body.modal-open .studio-bar-stack,
 body.modal-open .studio-app-banner {
   position: sticky;
