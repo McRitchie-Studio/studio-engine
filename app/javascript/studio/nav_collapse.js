@@ -361,16 +361,7 @@ export class NavCollapse {
   // every visit would stack another listener on window.
   stop() {
     this.stopped = true;
-    // A frame the --nav-p path queued (a resize, a scroll, the settle loop)
-    // must not land after the swap. Crossing 768px fires this path's resize
-    // listener BEFORE the query's change, so the frame is queued, the swap
-    // runs, start() clears `stopped`, and the frame then wrote --nav-p onto
-    // the timeline header and eased it to 1: a 48px box translated up by the
-    // band, above the window (task timeline-header-resize-collapse). Cancel
-    // it, and clear `queued` so the next mode can schedule its own.
-    if (this._frame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this._frame);
-    this._frame = 0;
-    this.queued = false;
+    this.cancelFrame();
     if (this._wide && this._wide.removeEventListener) this._wide.removeEventListener('change', this._onWide);
     this._wide = null;
     if (this.timeline) {
@@ -389,6 +380,19 @@ export class NavCollapse {
     if (this._reduce && this._reduce.removeEventListener) {
       this._reduce.removeEventListener('change', this._apply);
     }
+  }
+
+  // A frame the --nav-p path queued (a resize, a scroll, the settle loop)
+  // must not land after a stop. Crossing 768px fires this path's resize
+  // listener BEFORE the query's change, so the frame is queued, the swap
+  // runs, start() clears `stopped`, and the frame then wrote --nav-p onto
+  // the timeline header and eased it to 1: a 48px box translated up by the
+  // band, above the window (task timeline-header-resize-collapse). Cancel
+  // it, and clear `queued` so the next mode can schedule its own.
+  cancelFrame() {
+    if (this._frame && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this._frame);
+    this._frame = 0;
+    this.queued = false;
   }
 
   // Crossing 768px swaps modes: undo the one running, start the one that
