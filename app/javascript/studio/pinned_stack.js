@@ -17,6 +17,10 @@
 //   --nav-h / --nav-bottom  the <header>'s height and bottom edge, under their
 //                       legacy names, from the same measurement.
 //
+// THOSE ARE FOR CSS. A SCRIPT reads window.studioPinnedStack.bottom() (or the
+// stackBottom export), measured on call: the root's values can lag a scroll by
+// up to SETTLE_MS (see THE LIVE READ below).
+//
 // DO NOT COMPOSE THE STACK IN A CONSUMER. `top: max(var(--pin-nav-bottom),
 // var(--pin-apps-bottom))` is what this replaced, and it fails twice: it does
 // not scale, because a fourth layer means editing every consumer that ever
@@ -82,6 +86,151 @@ export function composed(pins) {
   }
   return stack;
 }
+
+// THE STACK ON A SCROLL-TIMELINE HEADER (studio/nav_collapse's timeline mode,
+// data-nav-timeline-on). That header keeps its expanded box and is sticky at
+// minus its band, so what pins is the compact bar, and its height never changes
+// while the page scrolls. Every layer of the stack is chrome that pins at the
+// bottom of the layers above it, so on such a page the stack is a fact of
+// HEIGHTS, not of where the window happens to be: each visible layer sits at
+// its composed top and ends one height below it. That is where a sticky reader
+// (a board's lane headers) lands the moment it pins, and it does not move per
+// scroll frame, so nothing is written per scroll frame either: the publisher
+// writes on resize and on a roster change, and the follower path goes unused.
+//
+// A hidden layer (height 0) still drops out at 0. Settles in one pass per
+// layer of depth; bounded by the layer count so a contradictory data-pin-order
+// cannot spin.
+export function pinnedAt(pins) {
+  var i, pass, stack = 0;
+  for (i = 0; i < pins.length; i++) pins[i].bottom = 0;
+  for (pass = 0; pass <= pins.length; pass++) {
+    stack = composed(pins);
+    var moved = false;
+    for (i = 0; i < pins.length; i++) {
+      var bottom = pins[i].h > 0 ? pins[i].top + pins[i].h : 0;
+      if (bottom !== pins[i].bottom) { pins[i].bottom = bottom; moved = true; }
+    }
+    if (!moved) break;
+  }
+  return stack;
+}
+
+export function onTimeline(header) {
+  return !!header && header.hasAttribute('data-nav-timeline-on');
+}
+
+// ONE READ PER ELEMENT PER PUBLISH, and every read before every write.
+// A read after a write to the root forces a fresh layout, which is the
+// thrash this publisher exists without. Measured by review at 6x CPU
+// throttle over 175 frames: frames past 20ms 62 vs 42, median 17.7 vs
+// 14.9ms, p90 34.2 vs 26.0ms; at 10x, 84/180 vs 4/180.
+export function measurePin(el, name, legacy, timeline) {
+  // A header on the scroll timeline keeps its expanded box, and its top band
+  // scrolls away above the window; what pins is the compact bar, so that is
+  // its height here. An inline read, no layout.
+  var band = el.hasAttribute('data-nav-timeline-on') ? parseFloat(el.style.getPropertyValue('--nav-band')) || 0 : 0;
+  // On the timeline the bottom comes from the heights (pinnedAt), so the rect
+  // is not read at all.
+  if (timeline) return { el: el, name: name, legacy: legacy, h: el.offsetHeight - band, bottom: 0 };
+  // A hidden layer needs no special case: display:none gives offsetHeight 0
+  // and an all-zero rect, so it measures 0 and drops out of the stack on its
+  // own. That is what lets a layer come and go without anyone declaring a
+  // stacking order, and it is load-bearing rather than incidental.
+  var r = el.getBoundingClientRect();
+  return { el: el, name: name, legacy: legacy, h: el.offsetHeight - band, bottom: Math.max(0, r.bottom) };
+}
+
+// THE REGISTRY IS DERIVED, NEVER CACHED — and that is a correctness rule.
+//
+// This used to build a `pins` array once and hold each element by reference
+// until something re-registered it. A Turbo Stream replaces a pinned layer's
+// node WITHOUT a turbo:load, so between the patch and the re-scan the held
+// reference pointed at the DETACHED predecessor — and a detached node's rect
+// is all zeros, which is indistinguishable from a layer that is legitimately
+// hidden. Measured on mcritchie-studio's /deployments: --pin-apps-bottom
+// published 0px while the live strip stood at display:block, bottom 152px,
+// and the board's lane headers slammed 99px up and back on every broadcast.
+//
+// Re-querying costs one querySelectorAll over a handful of nodes per publish.
+// That is cheaper than the class of bug it removes, because it makes a stale
+// reference IMPOSSIBLE rather than merely unlikely: there is no window between
+// a DOM patch and a re-scan in which this can be pointed at the wrong node.
+//
+// Returns { pins, stack, timeline }: every layer measured and composed, the
+// stack's bottom, and whether the header is on the scroll timeline.
+export function readStack() {
+  var header = document.querySelector('header');
+  var timeline = onTimeline(header);
+  var nodes = document.querySelectorAll('[data-pin]');
+  var list = [];
+  var headerPinned = false;
+  for (var i = 0; i < nodes.length; i++) {
+    var name = nodes[i].getAttribute('data-pin');
+    // An unnamed pin would write `--pin--h`, a valid property name and a
+    // silent nonsense one. Skip it rather than publish it.
+    if (!name) continue;
+    if (nodes[i] === header) headerPinned = true;
+    list.push(measurePin(nodes[i], name, nodes[i] === header, timeline));
+  }
+  // THE HOST-OWNED HEADER, and the back-compat promise that depends on it.
+  // A header that does not carry [data-pin] is not in the registry, so the
+  // legacy --nav-h / --nav-bottom — which studio/_sidebar_panel, turf's
+  // contest board and mcritchie-studio's heartbeat CSS all read — would
+  // never publish at all. Both live consumers own their header, so it is
+  // adopted as a pin even when it does not ask to be.
+  if (header && !headerPinned) list.push(measurePin(header, 'nav', true, timeline));
+  return {
+    pins: list,
+    stack: timeline ? pinnedAt(list) : composed(list),
+    timeline: timeline,
+    travel: timeline ? timelineTravel(header) : 0
+  };
+}
+
+// HOW FAR THE PAGE SCROLLS BEFORE THE TIMELINE HEADER PINS: the bars above it
+// in flow (--nav-start) plus the band that scrolls away (--nav-band), both
+// written inline by studio/nav_collapse. Inline reads, no layout. A FIXED
+// reader (data-pin-edge) starts this far below the stack's bottom at the top
+// of the page and closes the gap on the scroll timeline, in CSS (engine.css,
+// THE PINNED EDGE ON THE SCROLL TIMELINE).
+export function timelineTravel(header) {
+  var px = function (name) { return parseFloat(header.style.getPropertyValue(name)) || 0; };
+  return Math.max(0, px('--nav-start') + px('--nav-band'));
+}
+
+// THE LIVE READ, for SCRIPT readers. The custom properties are for CSS; a
+// script that reads --pin-stack-bottom off documentElement can be up to
+// SETTLE_MS late, because in motion the publisher writes only the elements
+// that read the stack in CSS and writes the root once the scroll settles.
+// Cyvasse's phone dock read the root mid-scroll and sat 30px off. This
+// measures on call, from the same reading the publisher would make now, so it
+// is never stale and never writes anything.
+//
+//   import { stackBottom } from "studio/pinned_stack"
+//   window.studioPinnedStack.bottom()   // the same, for a script with no import
+//   window.studioPinnedStack.read()     // { bottom, timeline, layers: { nav: { h, top, bottom } } }
+export function stackBottom() {
+  return readStack().stack;
+}
+
+export function stackReading() {
+  var r = readStack();
+  var layers = {};
+  for (var i = 0; i < r.pins.length; i++) {
+    layers[r.pins[i].name] = { h: r.pins[i].h, top: r.pins[i].top, bottom: r.pins[i].bottom };
+  }
+  return { bottom: r.stack, timeline: r.timeline, travel: r.travel, layers: layers };
+}
+
+if (typeof window !== 'undefined') {
+  window.studioPinnedStack = { bottom: stackBottom, read: stackReading };
+}
+
+// What studio/nav_collapse fires on the document when its timeline mode
+// starts, re-measures its band, or stops: the header's pinned height changed
+// without its box resizing, which the ResizeObserver cannot see.
+export var REFRESH_EVENT = 'studio:pinned-stack-refresh';
 
 var started = false
 
@@ -239,64 +388,11 @@ export function startPinnedStack() {
     releaseFollowers();
   }
 
-  // THE REGISTRY IS DERIVED, NEVER CACHED — and that is a correctness rule.
-  //
-  // This used to build a `pins` array once and hold each element by reference
-  // until something re-registered it. A Turbo Stream replaces a pinned layer's
-  // node WITHOUT a turbo:load, so between the patch and the re-scan the held
-  // reference pointed at the DETACHED predecessor — and a detached node's rect
-  // is all zeros, which is indistinguishable from a layer that is legitimately
-  // hidden. Measured on mcritchie-studio's /deployments: --pin-apps-bottom
-  // published 0px while the live strip stood at display:block, bottom 152px,
-  // and the board's lane headers slammed 99px up and back on every broadcast.
-  //
-  // Re-querying costs one querySelectorAll over a handful of nodes per publish.
-  // That is cheaper than the class of bug it removes, because it makes a stale
-  // reference IMPOSSIBLE rather than merely unlikely: there is no window between
-  // a DOM patch and a re-scan in which this can be pointed at the wrong node.
-  function readPins() {
-    var header = document.querySelector('header');
-    var nodes = document.querySelectorAll('[data-pin]');
-    var list = [];
-    var headerPinned = false;
-    for (var i = 0; i < nodes.length; i++) {
-      var name = nodes[i].getAttribute('data-pin');
-      // An unnamed pin would write `--pin--h`, a valid property name and a
-      // silent nonsense one. Skip it rather than publish it.
-      if (!name) continue;
-      if (nodes[i] === header) headerPinned = true;
-      list.push(measure(nodes[i], name, nodes[i] === header));
-    }
-    // THE HOST-OWNED HEADER, and the back-compat promise that depends on it.
-    // A header that does not carry [data-pin] is not in the registry, so the
-    // legacy --nav-h / --nav-bottom — which studio/_sidebar_panel, turf's
-    // contest board and mcritchie-studio's heartbeat CSS all read — would
-    // never publish at all. Both live consumers own their header, so it is
-    // adopted as a pin even when it does not ask to be.
-    if (header && !headerPinned) list.push(measure(header, 'nav', true));
-    return list;
-  }
+  // The registry and the measurement are module-level (readStack, measurePin
+  // above) so the live read and the publisher make the same reading.
 
-  // ONE READ PER ELEMENT PER PUBLISH, and every read before every write.
-  // A read after a write to the root forces a fresh layout, which is the
-  // thrash this publisher exists without. Measured by review at 6x CPU
-  // throttle over 175 frames: frames past 20ms 62 vs 42, median 17.7 vs
-  // 14.9ms, p90 34.2 vs 26.0ms; at 10x, 84/180 vs 4/180.
-  function measure(el, name, legacy) {
-    // A hidden layer needs no special case: display:none gives offsetHeight 0
-    // and an all-zero rect, so it measures 0 and drops out of the stack on its
-    // own. That is what lets a layer come and go without anyone declaring a
-    // stacking order, and it is load-bearing rather than incidental.
-    var r = el.getBoundingClientRect();
-    // A header on the scroll timeline (studio/nav_collapse) keeps its expanded
-    // box, and its top band scrolls away above the window; what pins is the
-    // compact bar, so that is its height here. An inline read, no layout.
-    var band = el.hasAttribute('data-nav-timeline-on') ? parseFloat(el.style.getPropertyValue('--nav-band')) || 0 : 0;
-    return { el: el, name: name, legacy: legacy, h: el.offsetHeight - band, bottom: Math.max(0, r.bottom) };
-  }
-
-
-  function write(pins, stack) {
+  var lastTravel = null;
+  function write(pins, stack, timeline, travel) {
     var style = document.documentElement.style;
     var seen = {};
     var i, p, prev;
@@ -309,9 +405,30 @@ export function startPinnedStack() {
       for (i = 0; i < pins.length; i++) { if (!last.hasOwnProperty(pins[i].name)) { force = true; break; } }
     }
 
+    // ON THE SCROLL TIMELINE the stack does not move with the scroll (see
+    // pinnedAt), so a scroll frame finds nothing changed and the root path
+    // below writes nothing. The follower path is for values that DO move per
+    // frame; it goes unused here, and any copies a --nav-p frame left go back.
+    if (timeline) {
+      if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; }
+      if (followed.length) releaseFollowers();
+    }
+    // The fixed readers' scroll-timeline path (data-pin-edge, engine.css) is
+    // switched on by this attribute and sized by --pin-stack-travel. Both are
+    // written only when they change: on a resize or a mode swap.
+    var root = document.documentElement;
+    if (timeline) {
+      if (force || travel !== lastTravel) { style.setProperty('--pin-stack-travel', travel + 'px'); lastTravel = travel; }
+      if (!root.hasAttribute('data-pin-timeline')) root.setAttribute('data-pin-timeline', '');
+    } else if (lastTravel !== null || root.hasAttribute('data-pin-timeline')) {
+      style.removeProperty('--pin-stack-travel');
+      root.removeAttribute('data-pin-timeline');
+      lastTravel = null;
+    }
+
     // IN MOTION, THE FOLLOWERS ONLY. A structural change still writes the
     // root at once: it is rare, and a layer arriving must reach every reader.
-    if (!force && performance.now() - lastScrollAt < SETTLE_MS) {
+    if (!force && !timeline && performance.now() - lastScrollAt < SETTLE_MS) {
       var props = [];
       for (i = 0; i < pins.length; i++) {
         p = pins[i];
@@ -361,8 +478,9 @@ export function startPinnedStack() {
   }
 
   function publishAll() {
-    var pins = readPins();
-    write(pins, composed(pins));
+    var reading = readStack();
+    var pins = reading.pins;
+    write(pins, reading.stack, reading.timeline, reading.travel);
     syncObserver(pins);
   }
 
@@ -450,6 +568,9 @@ export function startPinnedStack() {
   document.addEventListener('turbo:before-stream-render', function () {
     window.requestAnimationFrame(invalidate);
   });
+  // The timeline header's pinned height moves when its band is measured,
+  // which changes no box size, so the observer never hears of it.
+  document.addEventListener(REFRESH_EVENT, publishAll);
   // Registered ONCE at start, not inside a re-scan, so a Turbo nav
   // re-publishes instead of stacking another listener per visit.
   window.addEventListener('scroll', schedule, { passive: true });

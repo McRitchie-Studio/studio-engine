@@ -150,7 +150,10 @@
 </style>
 <%# THE PINNED STACK: studio/pinned_stack publishes --pin-<name>-h, -bottom and
     -top for every [data-pin] layer, --pin-stack-bottom, and the legacy --nav-h /
-    --nav-bottom. Started by studio/application. %>
+    --nav-bottom. Started by studio/application. Those are for CSS: a script
+    reads window.studioPinnedStack.bottom(), measured on call, because the root
+    values lag a scroll in motion by up to 160ms (docs/NAVBAR_SETUP.md, Reading
+    the Pinned Stack). %>
 
 <style>
   /* studio-engine: --nav-p, the sticky header's COLLAPSE PROGRESS, 0 (expanded)

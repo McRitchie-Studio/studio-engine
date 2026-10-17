@@ -156,6 +156,46 @@ class SidebarNavbarRenderTest < ActiveSupport::TestCase
 
   private
 
+  # THE PINNED EDGE ON THE SCROLL TIMELINE (task pinned-stack-live-reads). On a
+  # timeline header the pinned stack publishes the PINNED bar and writes nothing
+  # per scroll frame, so a fixed panel at --nav-bottom would cover the expanded
+  # header at the top of the page. Both mounted panels opt into engine.css's
+  # scroll-timeline edge, and the rule they opt into is the one the publisher
+  # switches on. The pixels are e2e/navbar_scroll_timeline.spec.js's.
+  test "both mounted sidebar panels follow the header's edge on the scroll timeline" do
+    Studio.sidebar_sections = SECTIONS
+
+    html = render_navbar
+    panels = html.scan(/<aside\b[^>]*>/m)
+
+    assert_equal 2, panels.size, "the navbar mounts a desktop and a mobile panel"
+    panels.each { |tag| assert_match(/\sdata-pin-edge(\s|>|=)/, tag, "every mounted panel opts into the pinned edge") }
+
+    css = File.read(File.expand_path("../../app/assets/tailwind/studio_engine/engine.css", __dir__))
+    stack = File.read(File.expand_path("../../app/javascript/studio/pinned_stack.js", __dir__))
+    assert_includes css, "html[data-pin-timeline] [data-pin-edge]"
+    assert_includes css, "animation-range: 0px var(--pin-stack-travel, 0px)"
+    assert_includes stack, "root.setAttribute('data-pin-timeline', '')"
+    assert_includes stack, "style.setProperty('--pin-stack-travel', travel + 'px')"
+  end
+
+  # THE LIVE READ IS EXPORTED AND DOCUMENTED. A script that reads the root's
+  # --pin-stack-bottom can be up to SETTLE_MS late mid-scroll (Cyvasse's phone
+  # dock was); the engine gives scripts a read measured on call, and the docs
+  # send them to it.
+  test "script readers of the pinned stack get an exported live read, and the docs name it" do
+    stack = File.read(File.expand_path("../../app/javascript/studio/pinned_stack.js", __dir__))
+    assert_match(/^export function stackBottom\(\)/, stack)
+    assert_match(/^export function stackReading\(\)/, stack)
+    assert_match(/window\.studioPinnedStack = \{ bottom: stackBottom, read: stackReading \}/, stack)
+
+    docs = File.read(File.expand_path("../../docs/NAVBAR_SETUP.md", __dir__))
+    assert_includes docs, "window.studioPinnedStack.bottom()"
+    assert_includes docs, "import { stackBottom } from \"studio/pinned_stack\""
+    assert_match(/never read .--pin-stack-bottom. off the root/i, docs)
+    assert_includes docs, "data-pin-edge"
+  end
+
   def render_navbar(controller: SidebarNavbarRenderHostController)
     controller.render(inline: %(<%= render "layouts/navbar" %>))
   end

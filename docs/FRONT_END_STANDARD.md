@@ -227,7 +227,7 @@ components:
 | Behaviour | Module | Bound by | Shim kept for consumers |
 |---|---|---|---|
 | Navbar collapse | `studio/nav_collapse` | `nav-collapse` | `x-data="navCollapse()"` |
-| Pinned stack (`--pin-*`, `--nav-h`, `--nav-bottom`) | `studio/pinned_stack` | the boot | none needed (CSS only) |
+| Pinned stack (`--pin-*`, `--nav-h`, `--nav-bottom`) | `studio/pinned_stack` | the boot | none needed in CSS; a script reads `window.studioPinnedStack.bottom()`, never the root |
 | Theme and dev mode | `studio/alpine_stores` | its own module tag, and the boot | `$store.theme`, `$store.devMode` |
 | Nav spinner, success confetti | `studio/head_chrome` | the boot | `showNavSpinner`, `hideNavSpinner`, `fireSuccessConfetti` |
 | Modal host, scoped host | `studio/modal_host` | `modal-host`, its own module tag | `$store.modals`, each scoped `$store.<name>`, `window.ModalAnimations`, `window.StudioModals` |

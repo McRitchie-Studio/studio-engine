@@ -294,7 +294,13 @@ test("in motion the stack reaches its readers without writing the root, and sett
       window.scrollBy(0, s);
       await frame();
       await frame();
-      tracked.push({ panel: panel.style.getPropertyValue("--nav-bottom"), header: Math.max(0, header.getBoundingClientRect().bottom) });
+      tracked.push({
+        panel: panel.style.getPropertyValue("--nav-bottom"),
+        header: Math.max(0, header.getBoundingClientRect().bottom),
+        // The script reader's live read, and what it used to read: the root.
+        live: window.studioPinnedStack.bottom(),
+        root: parseFloat(getComputedStyle(root).getPropertyValue("--pin-stack-bottom")),
+      });
     }
     const inMotion = rootWrites;
     await new Promise((r) => setTimeout(r, 400));
@@ -310,6 +316,11 @@ test("in motion the stack reaches its readers without writing the root, and sett
   expect(run.inMotion, "the root was written while the scroll was in motion").toBe(0);
   // The reader tracked the header's bottom edge, frame by frame.
   for (const t of run.tracked) expect(Math.abs(parseFloat(t.panel) - t.header), JSON.stringify(run.tracked)).toBeLessThanOrEqual(1);
+  // A SCRIPT reader gets the same edge from the live read, on call, every
+  // frame. The root lags it while the scroll is in motion, which is why a
+  // script must not read the root (Cyvasse's phone dock did).
+  for (const t of run.tracked) expect(Math.abs(t.live - t.header), JSON.stringify(run.tracked)).toBeLessThanOrEqual(1);
+  expect(run.tracked.some((t) => Math.abs(t.root - t.header) > 1), `the root lagged in motion ${JSON.stringify(run.tracked)}`).toBe(true);
   // Settled: the root holds the value and the reader inherits it again.
   expect(Math.abs(parseFloat(run.settledRoot) - run.headerBottom)).toBeLessThanOrEqual(1);
   expect(run.settledPanel).toBe("");

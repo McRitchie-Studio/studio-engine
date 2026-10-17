@@ -246,8 +246,20 @@ var TIMELINE_PROPS = ['--nav-band', '--nav-start', '--nav-brand-scale', '--nav-a
 // below 768px (a phone rotated, then Back) arrives still carrying it, and
 // pinned_stack would subtract the stale band from --nav-h.
 export function clearTimeline(el) {
+  var was = el.hasAttribute('data-nav-timeline-on');
   TIMELINE_PROPS.forEach(function (name) { el.style.removeProperty(name); });
   el.removeAttribute('data-nav-timeline-on');
+  if (was) refreshPinnedStack();
+}
+
+// studio/pinned_stack's REFRESH_EVENT. The header's PINNED height (its box
+// less the band) and the stack's travel change when timeline mode starts,
+// re-measures or stops, and none of that resizes the box, so the stack's
+// ResizeObserver cannot hear it. Named here rather than imported so neither
+// module has to load the other.
+export var PINNED_STACK_REFRESH = 'studio:pinned-stack-refresh';
+function refreshPinnedStack() {
+  if (typeof document !== 'undefined') document.dispatchEvent(new CustomEvent(PINNED_STACK_REFRESH));
 }
 
 function round(n) {
@@ -449,9 +461,11 @@ export class NavCollapse {
       '--nav-avatar-shrink': round(vars.avatarShrink) + 'px',
       '--nav-tools-shift': round(vars.toolsShift) + 'px'
     };
+    var changed = false;
     for (var key in props) {
-      if (el.style.getPropertyValue(key) !== props[key]) el.style.setProperty(key, props[key]);
+      if (el.style.getPropertyValue(key) !== props[key]) { el.style.setProperty(key, props[key]); changed = true; }
     }
+    if (changed) refreshPinnedStack();
   }
 
   // The scrolled marker on the controller's own hysteresis, written only when

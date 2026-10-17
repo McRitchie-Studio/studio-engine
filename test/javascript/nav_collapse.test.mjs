@@ -158,7 +158,7 @@ test("only a header in the page's flow is held", () => {
 })
 
 // [unit] the scroll-driven mode: what the timeline is told, measured once.
-const { timelineVars, timelineOn, TIMELINE_QUERY, clearTimeline } =
+const { timelineVars, timelineOn, TIMELINE_QUERY, clearTimeline, PINNED_STACK_REFRESH } =
   await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 // The hub's header at 1440: 88 -> 48, wordmark 32 -> 20, avatar 40 -> 32.
@@ -211,7 +211,30 @@ test("the timeline needs the opt-in, the wide query and browser support, all thr
 test("a header restored below 768px sheds what the timeline left inline", () => {
   const props = new Map([["--nav-band", "40px"], ["--nav-start", "0px"], ["--nav-tools-shift", "18px"], ["--nav-hold", "4px"]])
   const attrs = new Set(["data-nav-timeline", "data-nav-timeline-on"])
-  clearTimeline({ style: { removeProperty: (n) => props.delete(n) }, removeAttribute: (n) => attrs.delete(n) })
-  assert.deepEqual([...props.keys()], ["--nav-hold"])
-  assert.deepEqual([...attrs], ["data-nav-timeline"])
+  const fired = []
+  const hadDocument = globalThis.document
+  globalThis.document = { dispatchEvent: (e) => fired.push(e.type) }
+  const header = {
+    style: { removeProperty: (n) => props.delete(n) },
+    hasAttribute: (n) => attrs.has(n),
+    removeAttribute: (n) => attrs.delete(n)
+  }
+  try {
+    clearTimeline(header)
+    assert.deepEqual([...props.keys()], ["--nav-hold"])
+    assert.deepEqual([...attrs], ["data-nav-timeline"])
+    // The header's pinned height just grew by the band without its box
+    // resizing: the pinned stack is told, once.
+    assert.deepEqual(fired, [PINNED_STACK_REFRESH])
+    // Clearing a header that was not on the timeline tells nobody.
+    clearTimeline(header)
+    assert.deepEqual(fired, [PINNED_STACK_REFRESH])
+  } finally {
+    globalThis.document = hadDocument
+  }
+})
+
+test("the refresh event is the one studio/pinned_stack listens for", () => {
+  const stack = readFileSync(new URL("../../app/javascript/studio/pinned_stack.js", import.meta.url), "utf8")
+  assert.match(stack, new RegExp(`REFRESH_EVENT = '${PINNED_STACK_REFRESH}'`))
 })

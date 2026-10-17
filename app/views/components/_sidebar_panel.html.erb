@@ -12,7 +12,12 @@
     It is reachable only when a host OVERRIDES layouts/studio/_head, in which
     case --nav-bottom is never published and this degrades to the previous,
     BUGGY geometry. That is a deliberate floor, not a safe default: it keeps an
-    overriding host at today's behaviour instead of collapsing to 6rem. %>
+    overriding host at today's behaviour instead of collapsing to 6rem.
+
+    data-pin-edge: on a header on the scroll timeline the stack publishes the
+    PINNED bar and nothing per frame, so at the top of the page this fixed panel
+    would cover the expanded header. engine.css (THE PINNED EDGE ON THE SCROLL
+    TIMELINE) moves it with the header on the scroll timeline instead. %>
 <% id             = local_assigns.fetch(:id, nil) %>
 <% title          = local_assigns.fetch(:title, nil) %>
 <% open           = local_assigns.fetch(:open) %>
@@ -55,6 +60,7 @@
   x-transition:leave-end="translate-x-full"
   class="<%= display_class %> fixed right-0 <%= width_class %> bg-surface border-l border-subtle shadow-2xl <%= z_class %> flex-col <%= panel_class %>"
   style="top:var(--nav-bottom, var(--nav-h, 6rem));height:calc(100% - var(--nav-bottom, var(--nav-h, 6rem)))"
+  data-pin-edge
   role="<%= role %>"
   <% if labelledby %>aria-labelledby="<%= labelledby %>"<% elsif aria_label.present? %>aria-label="<%= aria_label %>"<% end %>>
   <div class="flex flex-col h-full">

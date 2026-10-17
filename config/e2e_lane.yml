@@ -996,7 +996,14 @@
 # collapsed sizes and ink gaps, and the 768px mode swap. Verified RED without the
 # opt-in, and without the row's pointer-events fix.
 #   npx playwright test --list  -> 351 tests in 51 files
-total_specs: 351
+# 351 -> 353: two tests on e2e/navbar_scroll_timeline.spec.js for the pinned
+# stack on a timeline header (task pinned-stack-live-reads): zero inline style
+# writes anywhere through a flick with a sticky reader pinning at the compact
+# bar, and the fixed sidebar panel meeting the header's edge at the top and
+# pinned (data-pin-edge). e2e/pinned_stack.spec.js's motion test gains the live
+# read's assertions in place.
+#   npx playwright test --list  -> 353 tests in 51 files
+total_specs: 353
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1196,7 +1203,11 @@ total_specs: 351
 #   npx playwright test --list                                             -> 351 tests, 51 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 351
-executed: 351
+# And for the pinned stack on the timeline: 2 more tests (351 -> 353), no new file:
+#   npx playwright test --list                                             -> 353 tests, 51 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 353
+executed: 353
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

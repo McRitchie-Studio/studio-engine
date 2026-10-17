@@ -63,9 +63,9 @@ class NavOffsetContractTest < Minitest::Test
     # named "nav" that ALSO writes the legacy pair, from the same reading, so it
     # is never measured twice per frame. measure() takes both measurements;
     # write() writes them.
-    read = html[/function measure\(el, name, legacy\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
-    write = html[/function write\(pins, stack\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
-    refute_empty read, "could not isolate measure()"
+    read = html[/function measurePin\(el, name, legacy, timeline\)\s*\{([\s\S]*?)\n\}/, 1].to_s
+    write = html[/function write\(pins, stack, timeline, travel\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
+    refute_empty read, "could not isolate measurePin()"
     refute_empty write, "could not isolate write()"
 
     h_field = read[/(\w+):\s*el\.offsetHeight/, 1]
@@ -108,7 +108,7 @@ class NavOffsetContractTest < Minitest::Test
     body = html[/function publishAll\(\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     refute_empty body, "could not isolate publishAll()"
 
-    last_read = body.index("readPins")
+    last_read = body.index("readStack")
     first_write = body.index("write(")
     refute_nil last_read, "publishAll must collect readings"
     refute_nil first_write, "publishAll must write them"
@@ -217,8 +217,8 @@ class NavOffsetContractTest < Minitest::Test
     # bottom from the CLAMPED rect. A hidden layer must measure 0 so it drops
     # out of the stack — that is what removes the need for a declared stacking
     # order, and an unclamped rect bottom could go negative and win.
-    pin = html[/function measure\(el, name, legacy\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
-    refute_empty pin, "could not isolate measure()"
+    pin = html[/function measurePin\(el, name, legacy, timeline\)\s*\{([\s\S]*?)\n\}/, 1].to_s
+    refute_empty pin, "could not isolate measurePin()"
     assert_match(/el\.offsetHeight/, pin, "pin height comes from offsetHeight")
     assert_match(/Math\.max\(\s*0\s*,\s*r\.bottom\s*\)/, pin,
                  "pin bottom comes from the CLAMPED rect bottom, so a hidden layer measures 0")
@@ -226,7 +226,7 @@ class NavOffsetContractTest < Minitest::Test
     # No-op writes still skipped: these are INHERITED properties on
     # documentElement, so an unchanged write still invalidates the document, and
     # a scroll frame reaches this four times per layer.
-    write = html[/function write\(pins, stack\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
+    write = html[/function write\(pins, stack, timeline, travel\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     assert_match(/if\s*\(force \|\| p\.h !== prev\.h\)/, write,
                  "an unchanged height must skip its write unless a structural change forced it")
     assert_match(/if\s*\(force \|\| p\.bottom !== prev\.bottom\)/, write,
@@ -252,8 +252,8 @@ class NavOffsetContractTest < Minitest::Test
     # The registry is DERIVED PER PUBLISH now, which is stronger than
     # re-registering on an event: there is no window between a DOM patch and a
     # re-scan in which anything can be pointed at the wrong node.
-    reads = html[/function readPins\(\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
-    refute_empty reads, "could not isolate readPins()"
+    reads = html[/function readStack\(\)\s*\{([\s\S]*?)\n\}/, 1].to_s
+    refute_empty reads, "could not isolate readStack()"
     assert_match(/querySelectorAll\(\s*['"]\[data-pin\]['"]\s*\)/, reads,
                  "readPins must rebuild from the DOCUMENT on every publish")
     assert_match(/if\s*\(!name\)\s*continue/, reads,
@@ -264,7 +264,7 @@ class NavOffsetContractTest < Minitest::Test
     # is the cached registry wearing the call as a disguise — that mutation
     # survived a first version of this line. Pin the whole statement.
     pub = html[/function publishAll\(\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
-    assert_match(/^\s*var pins = readPins\(\);$/, pub,
+    assert_match(/^\s*var reading = readStack\(\);\n\s*var pins = reading\.pins;$/, pub,
                  "every publish must re-derive the registry OUTRIGHT, never behind a cache or a guard")
     refute_match(/\|\||&&|\?/, pub,
                  "a conditional in publishAll is a cache or a bail-out; the registry must be rebuilt every time")
@@ -296,7 +296,7 @@ class NavOffsetContractTest < Minitest::Test
   # of this primitive's headline promise.
   def test_a_departed_pin_has_its_properties_removed
     html = render_head
-    w = html[/function write\(pins, stack\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
+    w = html[/function write\(pins, stack, timeline, travel\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     refute_empty w, "could not isolate write()"
 
     assert_match(/removeProperty\(\s*'--pin-'\s*\+\s*\w+\s*\+\s*'-h'\s*\)/, w,
@@ -340,14 +340,14 @@ class NavOffsetContractTest < Minitest::Test
   # on their next bundle update with no floor bump.
   def test_a_header_without_data_pin_still_publishes_the_legacy_properties
     html = render_head
-    reads = html[/function readPins\(\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
-    refute_empty reads, "could not isolate readPins()"
+    reads = html[/function readStack\(\)\s*\{([\s\S]*?)\n\}/, 1].to_s
+    refute_empty reads, "could not isolate readStack()"
 
     # It must NOTICE that the header was absent from the scan...
     assert_match(/headerPinned/, reads,
                  "readPins must track whether the header was among the data-pin nodes")
     # ...and adopt it anyway, as the legacy pin.
-    assert_match(/if\s*\(header\s*&&\s*!headerPinned\)[\s\S]{0,200}?measure\(header,\s*'nav',\s*true\)/, reads,
+    assert_match(/if\s*\(header\s*&&\s*!headerPinned\)[\s\S]{0,200}?measurePin\(header,\s*'nav',\s*true,\s*timeline\)/, reads,
                  "a header that does not carry data-pin must still be adopted, or --nav-h never publishes")
 
     # AND IT MUST BE OBSERVED. The observer is synced from the SAME list this
@@ -455,7 +455,7 @@ class NavOffsetContractTest < Minitest::Test
 
     # A ROSTER CHANGE counts too, and it is not always announced by an event —
     # an x-show that adds a node fires no stream render.
-    w = html[/function write\(pins, stack\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
+    w = html[/function write\(pins, stack, timeline, travel\)\s*\{([\s\S]*?)\n  \}/, 1].to_s
     assert_match(/if\s*\(!last\.hasOwnProperty\(pins\[i\]\.name\)\)\s*\{\s*force = true/, w,
                  "a layer that was not in the last publish must force a full write")
 
