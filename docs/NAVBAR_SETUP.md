@@ -142,6 +142,38 @@ collapse; crossing 768px swaps modes. On the timeline `--nav-h` is the compact
 bar's height. `false`, the default, leaves the navbar byte-identical. The
 `scroll_timeline:` local overrides the setting for one render.
 
+On the timeline the pinned stack (below) publishes where the stack sits once
+it has pinned, the compact bar, and writes nothing per scroll frame: it
+publishes on a resize, a band re-measure and a change of layers only. A sticky
+reader (a board's lane headers) needs nothing more. A `fixed` reader is on
+screen at the top of the page too, where the expanded header still reaches
+further down; give it `data-pin-edge` and engine.css moves its `top` and
+`height` off `--nav-bottom` with the header, on the same scroll timeline, in
+CSS. `components/_sidebar_panel` carries it already.
+
+## Reading the Pinned Stack
+
+`studio/pinned_stack` publishes the pinned chrome's geometry as custom
+properties on the root: `--pin-stack-bottom` (the bottom of all pinned chrome),
+`--pin-<name>-top`, `-h` and `-bottom` per `data-pin` layer, and the legacy
+`--nav-h` and `--nav-bottom`. CSS positions off those.
+
+A **script** must never read `--pin-stack-bottom` off the root. While a scroll
+is in motion the publisher writes only the elements that read the stack in CSS
+and writes the root once the scroll has been still for 160ms, so the root can
+be that late. Read it live instead, measured on call:
+
+```js
+import { stackBottom } from "studio/pinned_stack"
+stackBottom()                          // px, the stack's bottom right now
+
+window.studioPinnedStack.bottom()      // the same, for a script with no import
+window.studioPinnedStack.read()        // { bottom, timeline, travel, layers: { nav: { h, top, bottom } } }
+```
+
+Neither writes anything. On a scroll-timeline header the read is the pinned
+compact bar, the same value CSS readers get.
+
 ## CSS Class Hooks
 
 These classes are available for preview CSS targeting:

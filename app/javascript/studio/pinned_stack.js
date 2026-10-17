@@ -17,6 +17,10 @@
 //   --nav-h / --nav-bottom  the <header>'s height and bottom edge, under their
 //                       legacy names, from the same measurement.
 //
+// THOSE ARE FOR CSS. A SCRIPT reads window.studioPinnedStack.bottom() (or the
+// stackBottom export), measured on call: the root's values can lag a scroll by
+// up to SETTLE_MS (see THE LIVE READ below).
+//
 // DO NOT COMPOSE THE STACK IN A CONSUMER. `top: max(var(--pin-nav-bottom),
 // var(--pin-apps-bottom))` is what this replaced, and it fails twice: it does
 // not scale, because a fourth layer means editing every consumer that ever
@@ -126,16 +130,15 @@ export function measurePin(el, name, legacy, timeline) {
   // scrolls away above the window; what pins is the compact bar, so that is
   // its height here. An inline read, no layout.
   var band = el.hasAttribute('data-nav-timeline-on') ? parseFloat(el.style.getPropertyValue('--nav-band')) || 0 : 0;
-  var h = el.offsetHeight - band;
   // On the timeline the bottom comes from the heights (pinnedAt), so the rect
   // is not read at all.
-  if (timeline) return { el: el, name: name, legacy: legacy, h: h, bottom: 0 };
+  if (timeline) return { el: el, name: name, legacy: legacy, h: el.offsetHeight - band, bottom: 0 };
   // A hidden layer needs no special case: display:none gives offsetHeight 0
   // and an all-zero rect, so it measures 0 and drops out of the stack on its
   // own. That is what lets a layer come and go without anyone declaring a
   // stacking order, and it is load-bearing rather than incidental.
   var r = el.getBoundingClientRect();
-  return { el: el, name: name, legacy: legacy, h: h, bottom: Math.max(0, r.bottom) };
+  return { el: el, name: name, legacy: legacy, h: el.offsetHeight - band, bottom: Math.max(0, r.bottom) };
 }
 
 // THE REGISTRY IS DERIVED, NEVER CACHED — and that is a correctness rule.
@@ -476,8 +479,9 @@ export function startPinnedStack() {
 
   function publishAll() {
     var reading = readStack();
-    write(reading.pins, reading.stack, reading.timeline, reading.travel);
-    syncObserver(reading.pins);
+    var pins = reading.pins;
+    write(pins, reading.stack, reading.timeline, reading.travel);
+    syncObserver(pins);
   }
 
   // Observe whatever is pinned RIGHT NOW. observe() on an already-observed node

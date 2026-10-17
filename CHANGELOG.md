@@ -4,6 +4,28 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **A live read of the pinned stack for scripts.** `studio/pinned_stack`
+  exports `stackBottom()` and `stackReading()`, and sets
+  `window.studioPinnedStack` (`bottom()`, `read()`), measured on call from the
+  same reading the publisher makes. The root's `--pin-stack-bottom` can lag a
+  scroll by up to 160ms (in motion only CSS readers are written), so a script
+  reading it mid-scroll got a stale edge; Cyvasse's phone dock did.
+  `docs/NAVBAR_SETUP.md`, *Reading the Pinned Stack*.
+- **`data-pin-edge`**: a fixed reader of the stack follows the header's edge on
+  the scroll timeline, in CSS. `components/_sidebar_panel` carries it.
+
+### Changed
+
+- **On a scroll-timeline header the pinned stack writes nothing per scroll
+  frame.** The compact bar does not move while the page scrolls, so the stack
+  publishes where its layers sit once pinned, and writes on a resize, a band
+  re-measure (`studio/nav_collapse` fires `studio:pinned-stack-refresh`) or a
+  change of layers only. Sticky readers sit at the compact bar; the follower
+  write path goes unused there. The publisher marks the root
+  `data-pin-timeline` and publishes `--pin-stack-travel` while it is on.
+
 ## 0.111.0 — 2026-10-16
 
 ### Added
