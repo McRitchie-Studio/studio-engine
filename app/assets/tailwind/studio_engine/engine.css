@@ -839,6 +839,36 @@ body.modal-open .studio-app-banner {
     }
   }
 }
+/* THE PINNED EDGE ON THE SCROLL TIMELINE (studio/pinned_stack).
+   On a timeline header the pinned stack publishes where the stack sits once it
+   has PINNED (the compact bar), and writes nothing per scroll frame. A sticky
+   reader needs nothing more: it pins at that value. A FIXED reader is on screen
+   at the top of the page too, where the expanded header (and any bars above it)
+   still reach --pin-stack-travel further down. It opts in with data-pin-edge
+   and closes that gap here, on the same scroll timeline the header collapses
+   on, with no script per frame. The publisher puts data-pin-timeline on the
+   root, and the travel beside it, only while the header is on the timeline, so
+   off it this rule matches nothing and the reader's own style stands.
+   components/_sidebar_panel opts in; it positions off --nav-bottom. */
+@layer utilities {
+  @supports (animation-timeline: scroll()) {
+    html[data-pin-timeline] [data-pin-edge] {
+      animation: studio-pin-edge linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0px var(--pin-stack-travel, 0px);
+    }
+  }
+}
+@keyframes studio-pin-edge {
+  from {
+    top: calc(var(--nav-bottom, 0px) + var(--pin-stack-travel, 0px));
+    height: calc(100% - var(--nav-bottom, 0px) - var(--pin-stack-travel, 0px));
+  }
+  to {
+    top: var(--nav-bottom, 0px);
+    height: calc(100% - var(--nav-bottom, 0px));
+  }
+}
 @keyframes nav-tl-row { to { transform: translateY(calc(var(--nav-band) / 2)); } }
 @keyframes nav-tl-brand { to { transform: scale(var(--nav-brand-scale, 1)); } }
 @keyframes nav-tl-avatar { to { transform: scale(var(--nav-avatar-scale, 1)); } }
