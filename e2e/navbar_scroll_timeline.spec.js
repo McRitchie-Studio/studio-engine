@@ -163,3 +163,95 @@ test("without the opt-in the header is on the --nav-p collapse, as before", asyn
   await page.evaluate(() => window.scrollTo(0, 1200));
   await expect.poll(() => header.evaluate((h) => h.style.getPropertyValue("--nav-p"))).toBe("1.0000");
 });
+
+// THE PINNED STACK ON THE TIMELINE (task pinned-stack-live-reads). The compact
+// bar never moves while the page scrolls, so the stack publishes where it sits
+// once pinned and writes nothing per frame: not the root, not a follower. A
+// sticky reader pins at the compact bar, and a script's live read says the same.
+test("on the timeline the pinned stack writes nothing through a flick, and a sticky reader pins at the compact bar", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+  await page.setViewportSize(DESKTOP);
+  await page.goto(TIMELINE);
+  await page.evaluate(() => document.fonts.ready);
+  const header = page.locator("header.nav-shell");
+  await expect(header).toHaveAttribute("data-nav-timeline-on", "");
+  await expect.poll(() => page.evaluate(() => document.documentElement.hasAttribute("data-pin-timeline"))).toBe(true);
+
+  const run = await page.evaluate(async () => {
+    const h = document.querySelector("header.nav-shell");
+    // A reader of the stack, as a lane header is: sticky at the stack's bottom.
+    const reader = document.createElement("div");
+    reader.setAttribute("data-test", "stack-reader");
+    reader.style.cssText = "position:sticky;top:var(--pin-stack-bottom, 0px);height:12px";
+    document.querySelector("main").prepend(reader);
+    const frame = () => new Promise((r) => requestAnimationFrame(r));
+    await frame(); await frame();
+    // Every inline style write anywhere in the document, the root included.
+    const writes = [];
+    new MutationObserver((ms) => ms.forEach((m) => writes.push(m.target === document.documentElement ? "root" : (m.target.getAttribute("data-test") || m.target.tagName))))
+      .observe(document.documentElement, { attributes: true, attributeFilter: ["style"], subtree: true });
+    const compact = h.offsetHeight - parseFloat(h.style.getPropertyValue("--nav-band"));
+    const live = [];
+    for (const s of [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 600]) {
+      window.scrollBy(0, s); await frame(); live.push(window.studioPinnedStack.bottom());
+    }
+    const stuck = { header: h.getBoundingClientRect().bottom, reader: reader.getBoundingClientRect().top };
+    window.scrollBy(0, -2000); await frame(); await frame();
+    await new Promise((r) => setTimeout(r, 300));
+    return {
+      writes, compact, live, stuck,
+      root: parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--pin-stack-bottom")),
+    };
+  });
+
+  expect(run.writes, "inline style writes during the flick").toEqual([]);
+  expect(new Set(run.live).size, `the live read never moves ${JSON.stringify(run.live)}`).toBe(1);
+  expect(Math.abs(run.live[0] - run.compact)).toBeLessThanOrEqual(1);
+  expect(Math.abs(run.root - run.compact)).toBeLessThanOrEqual(1);
+  // Stuck, the reader sits exactly under the compact bar.
+  expect(Math.abs(run.stuck.reader - run.stuck.header), JSON.stringify(run.stuck)).toBeLessThanOrEqual(1);
+  expect(errors).toEqual([]);
+});
+
+// A FIXED reader is on screen at the top of the page too, where the expanded
+// header still reaches further down than the compact bar. The link sidebar
+// panel (components/_sidebar_panel, data-pin-edge) follows the header's edge on
+// the scroll timeline in CSS, so it never covers the header.
+test("on the timeline the fixed sidebar panel meets the header's edge at the top and at the compact bar", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+  await page.setViewportSize(DESKTOP);
+  await page.goto(TIMELINE);
+  await page.evaluate(() => document.fonts.ready);
+  const header = page.locator("header.nav-shell");
+  await expect(header).toHaveAttribute("data-nav-timeline-on", "");
+  // Shown directly: this lab page renders the navbar's link sidebar outside any
+  // Alpine scope (a host layout supplies one), so its trigger cannot open it
+  // here. What is under test is where the panel sits, not how it opens.
+  await page.evaluate(() => {
+    const p = document.querySelector("#studio-link-sidebar");
+    p.removeAttribute("x-cloak");
+    p.style.display = "flex";
+  });
+  const panel = page.locator("#studio-link-sidebar");
+  await expect(panel).toBeVisible();
+  await expect(panel).toHaveAttribute("data-pin-edge", "");
+
+  const edges = () => page.evaluate(() => ({
+    header: document.querySelector("header.nav-shell").getBoundingClientRect().bottom,
+    panel: document.querySelector("#studio-link-sidebar").getBoundingClientRect().top,
+    panelBottom: document.querySelector("#studio-link-sidebar").getBoundingClientRect().bottom,
+  }));
+  const atTop = await edges();
+  expect(Math.abs(atTop.panel - atTop.header), `at the top ${JSON.stringify(atTop)}`).toBeLessThanOrEqual(1);
+  expect(Math.abs(atTop.panelBottom - DESKTOP.height), "the panel reaches the bottom of the window").toBeLessThanOrEqual(1);
+
+  await page.evaluate(() => window.scrollTo(0, 20));
+  await expect.poll(async () => { const e = await edges(); return Math.abs(e.panel - e.header) <= 1; }).toBe(true);
+
+  await page.evaluate(() => window.scrollTo(0, 1200));
+  await expect(header).toHaveClass(/is-scrolled/);
+  await expect.poll(async () => { const e = await edges(); return Math.abs(e.panel - e.header) <= 1; }).toBe(true);
+  expect(errors).toEqual([]);
+});
