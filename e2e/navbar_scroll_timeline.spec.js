@@ -261,3 +261,73 @@ test("on the timeline the fixed sidebar panel meets the header's edge at the top
   await expect.poll(async () => { const e = await edges(); return Math.abs(e.panel - e.header) <= 1; }).toBe(true);
   expect(errors).toEqual([]);
 });
+
+// CROSSING 768px WHILE SCROLLED (task timeline-header-resize-collapse). The
+// resize that crosses the query also fires the --nav-p path's own resize
+// listener, which queues a frame; the media query's change then swaps to the
+// timeline before that frame runs. Unguarded, the frame wrote --nav-p back onto
+// the timeline header and kept easing it to 1.0000: a 48px box translated up by
+// the band, stuck above the window. Read after several frames, so a frame the
+// old mode queued has had every chance to land.
+const settle = (page) => page.evaluate(async () => {
+  for (let i = 0; i < 20; i++) await new Promise((r) => requestAnimationFrame(r));
+});
+
+test("widening past 768px while scrolled leaves the timeline header nothing of the --nav-p path", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+  await page.setViewportSize({ width: 600, height: 800 });
+  await page.goto(TIMELINE);
+  await page.evaluate(() => document.fonts.ready);
+  const header = page.locator("header.nav-shell");
+  await expect(header).not.toHaveAttribute("data-nav-timeline-on", /.*/);
+  await page.evaluate(() => window.scrollTo(0, 1200));
+  await expect.poll(() => header.evaluate((h) => h.style.getPropertyValue("--nav-p"))).toBe("1.0000");
+
+  await page.setViewportSize(DESKTOP);
+  await expect(header).toHaveAttribute("data-nav-timeline-on", "");
+  await settle(page);
+
+  const read = await header.evaluate((h) => {
+    const inline = ["--nav-p", "--nav-hold", "--nav-hold-fix", "margin-bottom"].map((p) => h.style.getPropertyValue(p));
+    const r = h.getBoundingClientRect();
+    return { inline, scrollY: window.scrollY, top: r.top, bottom: r.bottom, box: r.height,
+      compact: h.offsetHeight - parseFloat(h.style.getPropertyValue("--nav-band")) };
+  });
+  expect(read.inline, "the --nav-p path's inline state on the timeline header").toEqual(["", "", "", ""]);
+  expect(read.scrollY, "still scrolled").toBeGreaterThan(0);
+  // The expanded box, translated up by the band: the compact bar is what shows.
+  expect(read.compact).toBeGreaterThan(0);
+  expect(Math.abs(read.bottom - read.compact), JSON.stringify(read)).toBeLessThanOrEqual(1);
+  expect(read.box, JSON.stringify(read)).toBeGreaterThan(read.compact);
+  await expect(header).toBeInViewport();
+  expect(errors).toEqual([]);
+});
+
+test("narrowing below 768px while scrolled hands the header back to the --nav-p path, which keeps tracking the scroll", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+  await page.setViewportSize(DESKTOP);
+  await page.goto(TIMELINE);
+  await page.evaluate(() => document.fonts.ready);
+  const header = page.locator("header.nav-shell");
+  await expect(header).toHaveAttribute("data-nav-timeline-on", "");
+  await page.evaluate(() => window.scrollTo(0, 1200));
+  await expect(header).toHaveClass(/is-scrolled/);
+
+  await page.setViewportSize({ width: 600, height: 800 });
+  await expect(header).not.toHaveAttribute("data-nav-timeline-on", /.*/);
+  const band = await header.evaluate((h) => h.style.getPropertyValue("--nav-band"));
+  expect(band, "the timeline's band is cleared").toBe("");
+  // Still scrolled: the --nav-p path collapses the header and holds its footprint.
+  await expect.poll(() => header.evaluate((h) => h.style.getPropertyValue("--nav-p"))).toBe("1.0000");
+  expect(await header.evaluate((h) => h.style.getPropertyValue("--nav-hold"))).not.toBe("");
+  await expect(header).toBeInViewport();
+
+  // And the path is live: back at the top it opens again, and scrolled it shuts.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(() => header.evaluate((h) => h.style.getPropertyValue("--nav-p"))).toBe("0.0000");
+  await page.evaluate(() => window.scrollTo(0, 1200));
+  await expect.poll(() => header.evaluate((h) => h.style.getPropertyValue("--nav-p"))).toBe("1.0000");
+  expect(errors).toEqual([]);
+});

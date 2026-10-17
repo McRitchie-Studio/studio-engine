@@ -26,6 +26,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   write path goes unused there. The publisher marks the root
   `data-pin-timeline` and publishes `--pin-stack-travel` while it is on.
 
+### Fixed
+
+- **A timeline header resized across 768px while scrolled no longer collapses
+  above the window.** The resize queued a frame on the `--nav-p` path, the
+  query's change then swapped to the scroll timeline, and the frame wrote
+  `--nav-p` onto the timeline header and eased it to 1: a 48px box translated
+  up by the band. `studio/nav_collapse` now cancels that frame on the swap, and
+  its frame writes nothing in timeline mode. Narrowing while scrolled hands the
+  header back to a live `--nav-p` path.
+
 ## 0.111.0 — 2026-10-16
 
 ### Added
