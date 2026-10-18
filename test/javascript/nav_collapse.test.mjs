@@ -170,6 +170,15 @@ test("the band is what the header loses, and the brand scales by its own ratio",
   assert.equal(vars.brandScale, 0.625)
 })
 
+test("the links beside the brand slide by the width the scaled brand gives up", () => {
+  // A 240px brand at 0.625 gives back 90px.
+  assert.equal(timelineVars({ ...hub, brandW: 240 }).brandShrink, 90)
+  // No brand measured, or one that does not shrink: the links stay put.
+  assert.equal(timelineVars(hub).brandShrink, 0)
+  assert.equal(timelineVars({ ...hub, brand1: 32, brandW: 240 }).brandShrink, 0)
+  assert.equal(timelineVars({ ...hub, brand0: 0, brandW: 240 }).brandShrink, 0)
+})
+
 test("the name scales with the avatar, and the icon rail slides by what the account gives up", () => {
   const vars = timelineVars(hub)
   assert.equal(vars.avatarScale, 0.8)
@@ -209,7 +218,7 @@ test("the timeline needs the opt-in, the wide query and browser support, all thr
 })
 
 test("a header restored below 768px sheds what the timeline left inline", () => {
-  const props = new Map([["--nav-band", "40px"], ["--nav-start", "0px"], ["--nav-tools-shift", "18px"], ["--nav-hold", "4px"]])
+  const props = new Map([["--nav-band", "40px"], ["--nav-start", "0px"], ["--nav-brand-shrink", "90px"], ["--nav-tools-shift", "18px"], ["--nav-hold", "4px"]])
   const attrs = new Set(["data-nav-timeline", "data-nav-timeline-on"])
   const fired = []
   const hadDocument = globalThis.document

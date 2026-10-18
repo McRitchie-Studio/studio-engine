@@ -4,6 +4,22 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **The desktop navbar links keep their gap to the brand on the scroll
+  timeline.** From 768px on `data-nav-timeline`, the brand shrinks by a
+  transform from its left edge, and a transform keeps its layout box, so the
+  links beside it stayed put and the gap widened as the page scrolled (24px at
+  the top to 148px collapsed on the lab header). `studio/nav_collapse` now also
+  publishes `--nav-brand-shrink`, the brand's expanded width times
+  `1 - --nav-brand-scale`, measured once like the other timeline values, and
+  `[data-nav-links]` slides left by it on the brand's own timeline, range and
+  easing (reduced motion snaps it with the brand). The engine navbar's desktop
+  `<nav>` carries the hook only when the header is on the timeline, so an
+  opted-out navbar stays byte-identical; a forked header opts in by putting `data-nav-links`
+  on its links, as with `data-nav-account` and `data-nav-tools`. Off the
+  timeline (phones, Firefox, previews) nothing changes.
+
 ## 0.111.2 — 2026-10-18
 
 ### Fixed

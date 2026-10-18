@@ -220,26 +220,32 @@ export function timelineOn(el, wide) {
 //
 //   rest, collapsed   the header's height expanded and collapsed
 //   brand0, brand1    the brand link's height expanded and collapsed
+//   brandW            the brand link's width expanded (0: none)
 //   avatar0, avatar1  the avatar's height expanded and collapsed (0: none)
 //   nameW             the account name's width
 //
 // The name scales by the avatar's ratio (the rule of 3), and the icon rail
 // slides right by what the name and avatar give up, so the gaps stay even.
-// Without an avatar (signed out) nothing on the right moves.
-export function timelineVars({ rest, collapsed, brand0, brand1, avatar0, avatar1, nameW }) {
+// Without an avatar (signed out) nothing on the right moves. The brand scales
+// from its left edge, but a transform keeps its layout box, so the links beside
+// it ([data-nav-links]) slide left by the width it gives up (brandShrink) and
+// keep their gap to it.
+export function timelineVars({ rest, collapsed, brand0, brand1, brandW, avatar0, avatar1, nameW }) {
+  var brandScale = brand0 > 0 ? brand1 / brand0 : 1;
   var avatarScale = avatar0 > 0 ? avatar1 / avatar0 : 1;
   var avatarShrink = avatar0 > 0 ? Math.max(0, avatar0 - avatar1) : 0;
   return {
     band: Math.max(0, rest - collapsed),
-    brandScale: brand0 > 0 ? brand1 / brand0 : 1,
+    brandScale: brandScale,
+    brandShrink: brandW > 0 ? Math.max(0, brandW * (1 - brandScale)) : 0,
     avatarScale: avatarScale,
     avatarShrink: avatarShrink,
     toolsShift: avatar0 > 0 ? nameW * (1 - avatarScale) + avatarShrink : 0
   };
 }
 
-var TIMELINE_PROPS = ['--nav-band', '--nav-start', '--nav-brand-scale', '--nav-avatar-scale',
-  '--nav-avatar-shrink', '--nav-tools-shift'];
+var TIMELINE_PROPS = ['--nav-band', '--nav-start', '--nav-brand-scale', '--nav-brand-shrink',
+  '--nav-avatar-scale', '--nav-avatar-shrink', '--nav-tools-shift'];
 
 // What the timeline mode leaves on the header. stopTimeline() clears it, and
 // so does the --nav-p path's start(): a Turbo snapshot taken wide and restored
@@ -450,6 +456,7 @@ export class NavCollapse {
       return {
         h: el.offsetHeight,
         brand: brand ? brand.offsetHeight : 0,
+        brandW: brand ? brand.offsetWidth : 0,
         avatar: avatar ? avatar.offsetHeight : 0
       };
     };
@@ -460,7 +467,7 @@ export class NavCollapse {
     el.style.removeProperty('--nav-p');
     var vars = timelineVars({
       rest: open.h, collapsed: shut.h,
-      brand0: open.brand, brand1: shut.brand,
+      brand0: open.brand, brand1: shut.brand, brandW: open.brandW,
       avatar0: open.avatar, avatar1: shut.avatar,
       nameW: name ? name.offsetWidth : 0
     });
@@ -472,6 +479,7 @@ export class NavCollapse {
       '--nav-band': round(vars.band) + 'px',
       '--nav-start': start + 'px',
       '--nav-brand-scale': String(round(vars.brandScale)),
+      '--nav-brand-shrink': round(vars.brandShrink) + 'px',
       '--nav-avatar-scale': String(round(vars.avatarScale)),
       '--nav-avatar-shrink': round(vars.avatarShrink) + 'px',
       '--nav-tools-shift': round(vars.toolsShift) + 'px'

@@ -33,6 +33,7 @@ class NavbarScrollTimelineRenderTest < ActiveSupport::TestCase
 
     assert_nil header["data-nav-timeline"]
     assert_equal "nav-collapse", header["data-studio-controller"]
+    assert_empty header.css("[data-nav-links]"), "no links hook off the timeline"
   end
 
   test "the setting puts the opt-in on the header and keeps its controller" do
@@ -40,6 +41,10 @@ class NavbarScrollTimelineRenderTest < ActiveSupport::TestCase
     header = render_header
 
     assert header.key?("data-nav-timeline"), "the opt-in attribute"
+    # The desktop links follow the shrinking brand; the phone row does not.
+    links = header.css("[data-nav-links]")
+    assert_equal ["nav"], links.map(&:name)
+    assert_includes links.first["class"], "md:flex"
     # The controller stays: it runs the timeline mode from 768px and the
     # --nav-p collapse below it.
     assert_equal "nav-collapse", header["data-studio-controller"]
@@ -58,6 +63,7 @@ class NavbarScrollTimelineRenderTest < ActiveSupport::TestCase
     header = render_header(preview: true)
 
     assert_nil header["data-nav-timeline"]
+    assert_empty header.css("[data-nav-links]")
     assert_nil header["data-studio-controller"]
   end
 
