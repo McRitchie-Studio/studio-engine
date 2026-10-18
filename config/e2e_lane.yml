@@ -1009,7 +1009,16 @@
 # screen; narrowing hands the header back to a live --nav-p path. The widening
 # test verified RED on the unfixed controller (--nav-p "1.0000" left inline).
 #   npx playwright test --list  -> 355 tests in 51 files
-total_specs: 355
+# 355 -> 360: e2e/sticky_table_header.spec.js, 5 tests, 1 new file (task
+# sticky-table-header-restack). The sticky table header's clone must sit on the
+# pinned bar's bottom within 1px: reload at a restored scroll with the
+# nav-collapse controller held back 1.2s, a timeline slow scroll and flick, a
+# phone's script-mode collapse through a flick, crossing 768px while scrolled,
+# and a plain script-mode reload. Verified RED on the unfixed script: the reload
+# test (clone 96 vs compact bar 48) and the phone collapse (clone 145 held while
+# the bar moved).
+#   npx playwright test --list  -> 360 tests in 52 files
+total_specs: 360
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1217,7 +1226,11 @@ total_specs: 355
 #   npx playwright test --list                                             -> 355 tests, 51 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 355
-executed: 355
+# And for the sticky table header on the pinned stack: 5 more tests (355 -> 360), 1 new file:
+#   npx playwright test --list                                             -> 360 tests, 52 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 360
+executed: 360
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
