@@ -25,7 +25,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>studio-engine e2e lab</title>
-    <%= render "layouts/studio/head" %>
+    <%# sticky_table_headers: nil on every page but /lab/sticky_table, and nil
+        defers to Studio.sticky_table_headers. %>
+    <%= render "layouts/studio/head", sticky_table_headers: @lab_sticky_table_headers %>
   </head>
   <body class="bg-page text-body">
     <%= yield %>

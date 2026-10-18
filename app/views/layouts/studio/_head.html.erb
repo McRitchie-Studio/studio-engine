@@ -180,7 +180,10 @@
 
 <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
 <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
-<% if Studio.sticky_table_headers %>
+<%# config.sticky_table_headers, unless the caller answers for this render with
+    the sticky_table_headers local (true or false; nil defers to the config). %>
+<% sticky_table_headers = local_assigns[:sticky_table_headers].nil? ? Studio.sticky_table_headers : local_assigns[:sticky_table_headers] %>
+<% if sticky_table_headers %>
   <%= stylesheet_link_tag "studio/sticky_table_header", "data-turbo-track": "reload" %>
 <% end %>
 <%= javascript_importmap_tags %>
@@ -253,6 +256,6 @@
     day, 2026-08-15). This removes a real source of run-to-run variance; it does NOT
     claim to be that flake's cause, and the remaining suspect there is untouched. %>
 <%= javascript_include_tag "studio/alpine", defer: true, "data-turbo-track": "reload" %>
-<% if Studio.sticky_table_headers %>
+<% if sticky_table_headers %>
   <%= javascript_include_tag "studio/sticky_table_header", defer: true, "data-turbo-track": "reload" %>
 <% end %>

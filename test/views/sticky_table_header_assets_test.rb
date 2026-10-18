@@ -25,9 +25,23 @@ class StickyTableHeaderAssetsTest < Minitest::Test
     assert_includes html, "script"
   end
 
+  # The local answers for one render, either way; nil defers to the config.
+  def test_head_local_turns_the_assets_on_for_one_render
+    assert_includes render_head(sticky_table_headers: true), "studio/sticky_table_header"
+    refute Studio.sticky_table_headers, "the local never writes the config"
+    refute_includes render_head(sticky_table_headers: nil), "studio/sticky_table_header"
+  end
+
+  def test_head_local_false_turns_the_assets_off_over_the_config
+    Studio.sticky_table_headers = true
+
+    refute_includes render_head(sticky_table_headers: false), "studio/sticky_table_header"
+    assert_includes render_head(sticky_table_headers: nil), "studio/sticky_table_header"
+  end
+
   private
 
-  def render_head
+  def render_head(**locals)
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
     def view.csrf_meta_tags = ""
     def view.csp_meta_tag = ""
@@ -35,6 +49,6 @@ class StickyTableHeaderAssetsTest < Minitest::Test
     def view.javascript_importmap_tags = "<script></script>"
     def view.javascript_import_module_tag(*) = ""
 
-    view.render(partial: "layouts/studio/head")
+    view.render(partial: "layouts/studio/head", locals: locals)
   end
 end

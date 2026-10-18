@@ -66,13 +66,16 @@
     </p>
   </header>
 
-  <%# Section nav — sticky under the host navbar (--nav-h, 0 fallback). A pill per
+  <%# Section nav — sticky under the whole pinned stack (--pin-stack-bottom; then
+      --nav-bottom and --nav-h for a host on an older publisher; then 0). Not --nav-h first: that
+      is the header's HEIGHT, and chrome stacked above the header would sit over
+      the nav by its own height. A pill per
       section; the row scrolls horizontally on narrow screens, its edges softened
       by the .fade-edge-x primitive. Order leads with Theme (the color foundation).
       It sits at --z-sticky, above --z-raised, so the live hold button's portal
       bubbles scroll under it rather than over it. %>
   <nav class="sticky -mx-4 px-4 py-3 bg-surface border-y border-subtle"
-       style="top: var(--nav-h, 0px); z-index: var(--z-sticky, 30)" aria-label="Style guide sections">
+       style="top: var(--pin-stack-bottom, var(--nav-bottom, var(--nav-h, 0px))); z-index: var(--z-sticky, 30)" aria-label="Style guide sections">
     <div class="fade-edge-x overflow-x-auto">
       <div class="flex items-center gap-2 min-w-max">
         <% sections.each do |anchor, label| %>

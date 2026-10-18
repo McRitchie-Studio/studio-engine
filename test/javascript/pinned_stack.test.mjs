@@ -5,7 +5,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/pinned_stack.js", import.meta.url), "utf8")
-const { composed, order, readsLive, followerSelectors, pinnedAt, measurePin, stackBottom, stackReading } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+const { composed, order, readsLive, followerSelectors, pinnedAt, measurePin, stackBottom, stackReading, publishedKey, PUBLISHED_EVENT } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 // A reading as measure() returns it, with an element that answers only the
 // one attribute composed() reads.
@@ -273,4 +273,13 @@ test("a resize on the timeline still publishes, once, through the refresh event"
   assert.ok(run.rootWrites.includes("--pin-stack-bottom"))
   assert.ok(run.rootWrites.includes("--pin-stack-travel"))
   assert.equal(run.doc.documentElement.style.props.get("--pin-stack-bottom"), "56px")
+})
+
+test("a publish is announced only when the stack moved: its bottom, its mode or its travel", () => {
+  const base = { stack: 50, timeline: true, travel: 46 }
+  assert.equal(publishedKey(base), publishedKey({ ...base, pins: [] }), "the layers alone do not count")
+  assert.notEqual(publishedKey(base), publishedKey({ ...base, stack: 96 }))
+  assert.notEqual(publishedKey(base), publishedKey({ ...base, timeline: false }))
+  assert.notEqual(publishedKey(base), publishedKey({ ...base, travel: 0 }))
+  assert.equal(PUBLISHED_EVENT, "studio:pinned-stack-published")
 })

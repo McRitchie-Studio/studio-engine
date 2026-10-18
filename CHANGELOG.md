@@ -4,6 +4,35 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **The sticky table header's clone sits on the pinned bar.** It placed its
+  `position: fixed` header row at `--nav-h`, re-read only on a scroll, a resize
+  or a header resize. On a scroll-timeline header the compact height is
+  published only once the nav-collapse controller starts, which resizes
+  nothing, so a page loaded at a restored scroll position kept the clone at the
+  expanded height (Turf Monster `/contests`: 96px under a 50px bar, rows showing
+  in the gap) until the first scroll. On a phone the root's `--nav-h` also
+  lagged the collapse, so the clone sat off the bar through a flick. The clone
+  now reads the stack's live bottom (`window.studioPinnedStack.read()`, closing
+  the expanded header's travel on the timeline as `data-pin-edge` does), falls
+  back to `--pin-stack-bottom`, and never reads `--nav-h`. It re-places on
+  `studio:pinned-stack-refresh`, on every stack publish, and synchronously when
+  any `data-pin` layer resizes.
+- **The style guide's section nav sticks under the whole pinned stack**
+  (`--pin-stack-bottom`), not at the header's height, which put it under any
+  chrome stacked above the header.
+
+### Added
+
+- **`studio:pinned-stack-published`.** `studio/pinned_stack` fires it on the
+  document after a publish that moved the stack, with the reading it just made
+  (`{ bottom, timeline, travel }`) as `detail`, so a script that positions off
+  the stack re-places in the same frame. `docs/NAVBAR_SETUP.md`, *Reading the
+  Pinned Stack*.
+- **`layouts/studio/_head` takes a `sticky_table_headers:` local** that answers
+  for one render (nil defers to `config.sticky_table_headers`).
+
 ## 0.111.1 — 2026-10-16
 
 ### Added

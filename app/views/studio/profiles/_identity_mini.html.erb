@@ -9,10 +9,10 @@
     push every row down by 56px whether or not it is showing. Fixed takes it out
     of flow: nothing moves, and the bar simply is not there until it is.
 
-    Pinned to `var(--nav-h, 0px)` — the height the host navbar publishes, which
-    /admin/style already uses to stick its section nav. The 0px fallback means an
-    app that publishes nothing gets a bar at the top of the viewport rather than
-    a broken one.
+    Pinned to the header's bottom edge, `var(--nav-bottom, var(--nav-h, 0px))`
+    (studio/profiles/_identity_styles says why the edge and not the height). The
+    0px fallback means an app that publishes nothing gets a bar at the top of the
+    viewport rather than a broken one.
 
     THE IDENTITY HALF IS aria-hidden, and only that half. It duplicates content
     that is already on the page and already reachable: the full card above is the
