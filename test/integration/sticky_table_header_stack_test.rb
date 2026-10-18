@@ -54,6 +54,16 @@ class StickyTableHeaderStackTest < ActionDispatch::IntegrationTest
     assert_includes code, '"studio:pinned-stack-published"'
   end
 
+  # No engine SCRIPT reads --nav-h off the root to place anything: it is a height,
+  # and a root snapshot lags a scroll. Scripts read window.studioPinnedStack.
+  def test_integration_no_engine_script_reads_nav_h_off_the_root
+    offenders = Dir.glob(File.join(ROOT, "app/{assets/javascripts,javascript}/**/*.js")).select do |path|
+      File.read(path).match?(/getPropertyValue\(\s*["']--nav-h["']/)
+    end
+
+    assert_empty offenders.map { |path| path.delete_prefix("#{ROOT}/") }
+  end
+
   # A pinned `top:` that reads --nav-h FIRST is the same class of bug: a height
   # where an edge belongs. A fallback after the stack's own value is fine.
   def test_integration_no_engine_view_pins_top_to_the_header_height_first
