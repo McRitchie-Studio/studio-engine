@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.111.2 — 2026-10-18
+
 ### Fixed
 
 - **The sticky table header's clone sits on the pinned bar.** It placed its
