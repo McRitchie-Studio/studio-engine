@@ -4,18 +4,69 @@
   const MANUAL_TABLE_SELECTOR = "table[data-sticky-table-header]";
   const AUTO_TABLE_SELECTOR = "table";
   const SKIP_CONTAINER_SELECTOR = "[data-sticky-table-skip]";
+  // What studio/nav_collapse fires when a scroll-timeline header starts,
+  // re-measures its band, or stops: the header's PINNED height changed without
+  // its box resizing, so no ResizeObserver and no scroll hears of it.
+  const PINNED_STACK_REFRESH = "studio:pinned-stack-refresh";
+  // What studio/pinned_stack fires after every publish that moved the stack.
+  const PINNED_STACK_PUBLISHED = "studio:pinned-stack-published";
 
   let stickyTables = [];
   let scheduled = false;
   let bootScheduled = false;
-  let navResizeObserver = null;
+  let pinResizeObserver = null;
   let tableMutationObserver = null;
 
-  window.StudioStickyTableHeaders = { loaded: true };
+  // WHERE THE CLONE STARTS: THE PINNED STACK'S BOTTOM EDGE, read live.
+  //
+  // This used to read --nav-h off the root, and that was wrong twice. --nav-h
+  // is the header's HEIGHT, not its bottom edge, so chrome stacked above the
+  // header put the clone that much too high. And a root custom property is a
+  // SNAPSHOT this script re-read only on scroll, resize or a header resize: on
+  // a scroll-timeline header the compact height is published only once the
+  // nav-collapse controller starts, which resizes nothing, so a page loaded at
+  // a restored scroll position kept the clone at the expanded height (Turf
+  // Monster /contests: 96px against a 50px bar, rows showing in the gap) until
+  // the first scroll.
+  //
+  // window.studioPinnedStack.read() measures on call, the same reading the
+  // publisher makes. On a scroll-timeline header it reports where the stack
+  // sits once PINNED; at the top of the page the expanded header still reaches
+  // `travel` further down, and closes that gap as the page scrolls, exactly as
+  // engine.css's data-pin-edge does for a fixed reader in CSS. A host that never
+  // started the publisher falls back to --pin-stack-bottom, then to 0: a clone
+  // at the top of the viewport rather than none.
+  function pinnedEdge(reading) {
+    const r = reading || window.studioPinnedStack?.read?.();
+    if (!r) {
+      const raw = getComputedStyle(document.documentElement).getPropertyValue("--pin-stack-bottom");
+      return Number.parseFloat(raw) || 0;
+    }
+    const bottom = Number(r.bottom) || 0;
+    if (!r.timeline) return bottom;
+    return bottom + Math.max(0, (Number(r.travel) || 0) - Math.max(0, window.scrollY));
+  }
 
-  function navOffset() {
-    const raw = getComputedStyle(document.documentElement).getPropertyValue("--nav-h");
-    return Number.parseFloat(raw) || 0;
+  // Where the clone goes for one table, as a pure function of what was measured:
+  // shown once the real header has scrolled up to the edge, and pushed up by the
+  // table's own bottom so it leaves with the table.
+  function placement({ edge, headerTop, tableBottom, cloneHeight }) {
+    const active = headerTop <= edge && tableBottom > edge;
+    return { active, top: active ? Math.min(edge, tableBottom - cloneHeight) : null };
+  }
+
+  window.StudioStickyTableHeaders = { loaded: true, pinnedEdge, placement };
+
+  // One pass over every table, reading the edge ONCE. Called from a frame
+  // callback (scroll, resize, a stack event) and SYNCHRONOUSLY from the
+  // ResizeObserver, which runs after layout and before paint: a script-mode
+  // header changes height every frame of its collapse (studio/nav_collapse
+  // writes --nav-p from its own frame callback, after ours), and a frame-late
+  // clone shows rows through the gap for that frame.
+  function updateAll(reading) {
+    if (!stickyTables.length) return;
+    const edge = pinnedEdge(reading);
+    stickyTables.slice().forEach((stickyTable) => stickyTable.update(edge));
   }
 
   function scheduleUpdate() {
@@ -23,7 +74,7 @@
     scheduled = true;
     requestAnimationFrame(() => {
       scheduled = false;
-      stickyTables.forEach((stickyTable) => stickyTable.update());
+      updateAll();
     });
   }
 
@@ -80,19 +131,20 @@
       });
     }
 
-    update() {
+    update(edge = pinnedEdge()) {
       if (!document.body.contains(this.table) || !this.table.tHead || !this.scroller) {
         this.destroy();
         stickyTables = stickyTables.filter((stickyTable) => stickyTable !== this);
         return;
       }
 
-      const offset = navOffset();
       const headerRect = this.table.tHead.getBoundingClientRect();
       const tableRect = this.table.getBoundingClientRect();
       const scrollerRect = this.scroller.getBoundingClientRect();
       const cloneHeight = headerRect.height || this.cloneShell.getBoundingClientRect().height;
-      const active = headerRect.top <= offset && tableRect.bottom > offset;
+      const { active, top } = placement({
+        edge, headerTop: headerRect.top, tableBottom: tableRect.bottom, cloneHeight
+      });
 
       if (!active) {
         this.cloneShell.style.display = "none";
@@ -102,7 +154,6 @@
 
       this.syncColumnWidths();
 
-      const top = Math.min(offset, tableRect.bottom - cloneHeight);
       const translateX = tableRect.left - scrollerRect.left;
 
       this.cloneShell.style.display = "block";
@@ -119,12 +170,17 @@
   function bootStickyTables() {
     startTableObserver();
 
-    if (navResizeObserver) navResizeObserver.disconnect();
+    // EVERY LAYER OF THE PINNED STACK, not the header alone: a bar above the
+    // header that grows or goes moves the edge too. Re-observed on every boot.
+    if (pinResizeObserver) pinResizeObserver.disconnect();
+    pinResizeObserver = null;
     if (window.ResizeObserver) {
+      const layers = new Set(document.querySelectorAll("[data-pin]"));
       const header = document.querySelector("header");
-      if (header) {
-        navResizeObserver = new ResizeObserver(scheduleUpdate);
-        navResizeObserver.observe(header);
+      if (header) layers.add(header);
+      if (layers.size) {
+        pinResizeObserver = new ResizeObserver(() => updateAll());
+        layers.forEach((layer) => pinResizeObserver.observe(layer));
       }
     }
 
@@ -187,13 +243,19 @@
   document.addEventListener("turbo:load", bootStickyTables);
   document.addEventListener("DOMContentLoaded", bootStickyTables);
   document.addEventListener("turbo:before-cache", () => {
-    if (navResizeObserver) navResizeObserver.disconnect();
+    if (pinResizeObserver) pinResizeObserver.disconnect();
     if (tableMutationObserver) tableMutationObserver.disconnect();
-    navResizeObserver = null;
+    pinResizeObserver = null;
     tableMutationObserver = null;
     stickyTables.forEach((stickyTable) => stickyTable.destroy());
     stickyTables = [];
   });
+  // A STACK REPUBLISH RE-PLACES THE CLONE. The refresh is the timeline header
+  // changing its pinned height (on start, which is the restored-scroll case);
+  // the publish carries the reading the publisher just made, so the clone moves
+  // in the same frame and with the same number.
+  document.addEventListener(PINNED_STACK_REFRESH, scheduleUpdate);
+  document.addEventListener(PINNED_STACK_PUBLISHED, (event) => updateAll(event.detail || undefined));
   window.addEventListener("scroll", scheduleUpdate, { passive: true });
   window.addEventListener("resize", scheduleUpdate, { passive: true });
 })();

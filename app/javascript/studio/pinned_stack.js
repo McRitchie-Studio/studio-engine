@@ -232,6 +232,23 @@ if (typeof window !== 'undefined') {
 // without its box resizing, which the ResizeObserver cannot see.
 export var REFRESH_EVENT = 'studio:pinned-stack-refresh';
 
+// What this publisher fires on the document after a publish that MOVED the
+// stack: its bottom, whether the header is on the scroll timeline, or its
+// travel. The detail is the reading it just made, { bottom, timeline, travel },
+// the same shape window.studioPinnedStack.read() gives. It is for a SCRIPT that
+// positions off the stack (studio/sticky_table_header's clone): a value written
+// to the root reaches CSS on its own, but a script has to be told, and without
+// this it heard only of a scroll, a resize or a box it observed itself.
+// Fired synchronously from inside the publish, so a listener that places
+// something lands it in the same frame. Not fired when nothing moved, so a
+// scroll frame on the timeline (where the stack never moves) fires nothing.
+export var PUBLISHED_EVENT = 'studio:pinned-stack-published';
+
+// The key a publish is compared on, so an unchanged stack fires nothing.
+export function publishedKey(reading) {
+  return reading.stack + '|' + (reading.timeline ? 1 : 0) + '|' + reading.travel;
+}
+
 var started = false
 
 // THE READERS OF THE STACK, found rather than declared.
@@ -477,11 +494,19 @@ export function startPinnedStack() {
     }
   }
 
+  var lastPublished = null;
   function publishAll() {
     var reading = readStack();
     var pins = reading.pins;
     write(pins, reading.stack, reading.timeline, reading.travel);
     syncObserver(pins);
+    var key = publishedKey(reading);
+    if (key !== lastPublished) {
+      lastPublished = key;
+      document.dispatchEvent(new CustomEvent(PUBLISHED_EVENT, {
+        detail: { bottom: reading.stack, timeline: reading.timeline, travel: reading.travel }
+      }));
+    }
   }
 
   // Observe whatever is pinned RIGHT NOW. observe() on an already-observed node
