@@ -50,6 +50,7 @@ Rails.application.routes.draw do
   # file whose name collides.
   get "up", to: "e2e_lab#up"
   get "lab/bar_stack", to: "e2e_lab#bar_stack"
+  get "lab/sticky_table", to: "e2e_lab#sticky_table"
   get "lab/at_time", to: "e2e_lab#at_time"
   get "lab/engine_modules", to: "e2e_lab#engine_modules"
   get "lab/email_banner_frames", to: "e2e_lab#email_banner_frames"

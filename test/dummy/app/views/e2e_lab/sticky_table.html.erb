@@ -1,0 +1,30 @@
+<%# The sticky table header's lab page (config.sticky_table_headers;
+    app/assets/javascripts/studio/sticky_table_header.js).
+
+    The chrome is #bar_stack's: the bar stack and the navbar, ENGINE partials
+    rendered by name, with ?timeline=1 putting the header on the scroll-driven
+    collapse. Under them, a plain host table, long enough that its header row
+    scrolls up under the pinned bar and the engine's clone takes its place. The
+    table is HOST content on purpose: the primitive enhances whatever table a
+    host renders, so the lab renders the kind of table a host does, and nothing
+    of the clone itself. %>
+<%= render "studio/banners/stack", devnet: @lab_devnet %>
+<%= render "layouts/navbar", balance_html: nil, scroll_timeline: params[:timeline].present? %>
+
+<main class="p-8">
+  <p data-test="lab-body">sticky table lab</p>
+  <div style="height: 240px"></div>
+  <div data-test="table-scroller">
+    <table data-test="lab-table" class="w-full text-left">
+      <thead>
+        <tr><th class="px-3 py-2">Rank</th><th class="px-3 py-2">Entry</th><th class="px-3 py-2">Points</th></tr>
+      </thead>
+      <tbody>
+        <% 120.times do |i| %>
+          <tr><td class="px-3 py-2"><%= i + 1 %></td><td class="px-3 py-2">Entry <%= i + 1 %></td><td class="px-3 py-2"><%= 500 - i %></td></tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+  <div style="height: 1200px"></div>
+</main>

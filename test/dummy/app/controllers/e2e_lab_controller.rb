@@ -243,6 +243,11 @@ class E2eLabController < ActionController::Base
   def admin? = @lab_admin.present?
 
   def bar_stack
+    bar_stack_locals
+    render(:bar_stack)
+  end
+
+  private def bar_stack_locals
     # `signed_in` renders the right-hand user column — the half of this header a
     # signed-out page cannot show at all. `devnet` adds the DEVNET chip to the
     # environment bar, and `admin` the cog. `balance` is the one local that
@@ -257,7 +262,18 @@ class E2eLabController < ActionController::Base
     @lab_admin = params[:admin].present?
     @lab_balance = params[:balance].present?
     @lab_short = params[:short].present?
-    render(:bar_stack)
+  end
+
+  # The sticky table header (config.sticky_table_headers) under the bar stack's
+  # header: the same chrome as #bar_stack and the same params (?timeline=1 for the
+  # scroll-driven collapse), over a table long enough to pin its header row. The
+  # assets switch on for THIS request alone, as a local of the head partial, never
+  # by writing Studio.sticky_table_headers: that is one slot for the whole process
+  # (see declare_lab_sidebar_sections below for what that costs).
+  def sticky_table
+    @lab_sticky_table_headers = true
+    bar_stack_locals
+    render(:sticky_table)
   end
 
   # What a consuming app declares in config/initializers/studio.rb.
