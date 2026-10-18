@@ -132,7 +132,10 @@ on the page's scroll timeline instead of from script. It keeps one height and
 is sticky at minus its band (its expanded height less its collapsed height), so
 the band scrolls away with the page and the compact bar sticks. The logo,
 title, avatar and name shrink by transforms, and the icon rail slides so the
-gaps stay even. The compositor runs it with the scroll, so a busy page cannot
+gaps stay even. The desktop links beside the brand (`[data-nav-links]`) slide
+left by the width the brand gives up (`--nav-brand-shrink`), so their gap to
+the brand holds; a forked header opts its own links in with `data-nav-links`,
+as it does its account row with `data-nav-account` and `data-nav-tools`. The compositor runs it with the scroll, so a busy page cannot
 make the header stutter. The sizes are the band table's own endpoints: the
 `nav-collapse` controller measures them once (on connect, resize, font load
 and a bar resize), so an app that overrides the endpoints needs nothing more.
