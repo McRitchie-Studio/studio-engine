@@ -175,10 +175,11 @@
           <<%= brand_tag %> class="nav-title font-extrabold text-heading tracking-tight min-w-0"><span class="truncate"><%= prefix %></span><span class="text-primary truncate"><%= last_word %></span></<%= brand_tag %>>
           <% end %>
         <% end %>
-        <%# Desktop nav — Studio.navbar_links. data-nav-links: on the scroll
-            timeline it slides left by what the scaled brand gives up
+        <%# Desktop nav — Studio.navbar_links. data-nav-links, only where the
+            header is on the scroll timeline (so an opted-out header stays
+            byte-identical): it slides left by what the scaled brand gives up
             (engine.css, THE SCROLL-DRIVEN COLLAPSE). %>
-        <nav data-nav-links class="hidden md:flex items-center gap-4"<%= ' aria-label="Main"'.html_safe if navbar_links.any? %>>
+        <nav <%= "data-nav-links " if scroll_timeline && !is_preview %>class="hidden md:flex items-center gap-4"<%= ' aria-label="Main"'.html_safe if navbar_links.any? %>>
           <% navbar_links.each do |link| %>
           <%= studio_navbar_link_tag(link, size: "text-sm") %>
           <% end %>

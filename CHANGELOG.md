@@ -15,7 +15,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `1 - --nav-brand-scale`, measured once like the other timeline values, and
   `[data-nav-links]` slides left by it on the brand's own timeline, range and
   easing (reduced motion snaps it with the brand). The engine navbar's desktop
-  `<nav>` carries the hook; a forked header opts in by putting `data-nav-links`
+  `<nav>` carries the hook only when the header is on the timeline, so an
+  opted-out navbar stays byte-identical; a forked header opts in by putting `data-nav-links`
   on its links, as with `data-nav-account` and `data-nav-tools`. Off the
   timeline (phones, Firefox, previews) nothing changes.
 
