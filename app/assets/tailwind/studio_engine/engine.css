@@ -775,7 +775,14 @@ body.modal-open .studio-app-banner {
      band so it stays centred on the visible bar, the brand scales from its left
      edge, the avatar and name from the right (the name by the avatar's ratio,
      the rule of 3), and the icon rail slides right by what the account gave up
-     so the gaps stay even. The compositor runs these with the scroll itself.
+     so the gaps stay even. A transform keeps the brand's layout box, so the
+     links beside it ([data-nav-links], the navbar's desktop <nav>) slide left
+     by the width the brand gives up (--nav-brand-shrink) and keep their gap
+     to it. The compositor runs these with the scroll itself.
+
+     FORKED HEADERS opt in by hook, as with data-nav-account and data-nav-tools:
+     data-nav-links on the element holding the links beside the brand. Without
+     it those links stay put while the brand shrinks, and the gap widens.
 
      THE SCROLLED LINE AND SHADOW are drawn by ::after on the same timeline,
      not by border-b (which would add a pixel of height and reflow).
@@ -823,7 +830,8 @@ body.modal-open .studio-app-banner {
       .nav-shell[data-nav-timeline] .nav-logo-link,
       .nav-shell[data-nav-timeline] [data-nav-account] > [aria-hidden],
       .nav-shell[data-nav-timeline] [data-nav-account] > span:first-child,
-      .nav-shell[data-nav-timeline] [data-nav-tools] {
+      .nav-shell[data-nav-timeline] [data-nav-tools],
+      .nav-shell[data-nav-timeline] [data-nav-links] {
         animation-timing-function: ease-in-out;
         animation-fill-mode: both;
         animation-timeline: scroll(root block);
@@ -833,6 +841,7 @@ body.modal-open .studio-app-banner {
       .nav-shell[data-nav-timeline] [data-nav-account] > [aria-hidden] { transform-origin: right center; animation-name: nav-tl-avatar; }
       .nav-shell[data-nav-timeline] [data-nav-account] > span:first-child { transform-origin: right center; animation-name: nav-tl-name; }
       .nav-shell[data-nav-timeline] [data-nav-tools] { animation-name: nav-tl-tools; }
+      .nav-shell[data-nav-timeline] [data-nav-links] { animation-name: nav-tl-links; }
     }
     /* Reduced motion: the shrink snaps at the first pixel, as --nav-p's 0/1
        snap does on the script path. */
@@ -876,6 +885,7 @@ body.modal-open .studio-app-banner {
 @keyframes nav-tl-avatar { to { transform: scale(var(--nav-avatar-scale, 1)); } }
 @keyframes nav-tl-name { to { transform: translateX(var(--nav-avatar-shrink, 0px)) scale(var(--nav-avatar-scale, 1)); } }
 @keyframes nav-tl-tools { to { transform: translateX(var(--nav-tools-shift, 0px)); } }
+@keyframes nav-tl-links { to { transform: translateX(calc(-1 * var(--nav-brand-shrink, 0px))); } }
 @keyframes nav-tl-lit { to { opacity: 1; } }
 
 /* A board whose controller failed to load (studio/lazy_controllers marks its

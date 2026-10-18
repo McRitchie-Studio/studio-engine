@@ -163,7 +163,7 @@ class E2eLabIsolationTest < ActionDispatch::IntegrationTest
   # inside a branch only a query parameter reaches, which is exactly where this one
   # lived (`params[:sidebar].present? ? … : …`), so a bare sweep would have walked
   # straight past it.
-  KNOBS = "signed_in=1&admin=1&devnet=1&sidebar=1&balance=1&subscribed=1" \
+  KNOBS = "signed_in=1&admin=1&devnet=1&sidebar=1&balance=1&subscribed=1&links=1" \
           "&identity=long&birthday=stored&tab=countries&state=authenticated&fp=x&issued=1"
 
   test "no lab request writes any Studio process global" do

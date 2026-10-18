@@ -262,7 +262,17 @@ class E2eLabController < ActionController::Base
     @lab_admin = params[:admin].present?
     @lab_balance = params[:balance].present?
     @lab_short = params[:short].present?
+    # `links` gives the header's desktop <nav> links beside the brand, for this
+    # request alone: the ivar studio_navbar_links memoizes, never a write to
+    # Studio.navbar_links (one slot for the whole process).
+    @studio_navbar_links = Studio::NavbarLinks.resolve(LAB_NAVBAR_LINKS, view_context) if params[:links].present?
   end
+
+  LAB_NAVBAR_LINKS = [
+    { label: "Contests", href: "/lab/contests" },
+    { label: "Leaderboard", href: "/lab/leaderboard" },
+    { label: "Rules", href: "/lab/rules" }
+  ].freeze
 
   # The sticky table header (config.sticky_table_headers) under the bar stack's
   # header: the same chrome as #bar_stack and the same params (?timeline=1 for the

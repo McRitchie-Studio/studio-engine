@@ -331,3 +331,80 @@ test("narrowing below 768px while scrolled hands the header back to the --nav-p 
   await expect.poll(() => header.evaluate((h) => h.style.getPropertyValue("--nav-p"))).toBe("1.0000");
   expect(errors).toEqual([]);
 });
+
+// THE LINKS FOLLOW THE BRAND (task nav-links-follow-brand). The brand scales
+// from its left edge, and a transform keeps its layout box, so the desktop
+// links beside it sat still and the gap between them widened as the page
+// scrolled. The links ([data-nav-links]) slide left by what the brand gives up
+// (--nav-brand-shrink) on the brand's own timeline, so the gap from the brand's
+// PAINTED right edge (getBoundingClientRect includes the transform) to the
+// first link holds at the top, mid-ramp and collapsed. The control run strips
+// the hook and shows the gap widening, so the assertion can tell the two apart.
+const gapsThroughTheRamp = (page) => page.evaluate(async () => {
+  const h = document.querySelector("header.nav-shell");
+  const frame = () => new Promise((r) => requestAnimationFrame(r));
+  const start = parseFloat(h.style.getPropertyValue("--nav-start")) || 0;
+  const ramp = parseFloat(getComputedStyle(h).getPropertyValue("--nav-ramp"));
+  const gap = () => {
+    const brand = h.querySelector(".nav-logo-link").getBoundingClientRect();
+    const link = h.querySelector("[data-nav-links] a").getBoundingClientRect();
+    return link.left - brand.right;
+  };
+  const out = {};
+  for (const [name, y] of [["top", 0], ["mid", start + ramp / 2], ["collapsed", start + ramp + 400]]) {
+    window.scrollTo(0, y); await frame(); await frame();
+    out[name] = gap();
+  }
+  window.scrollTo(0, 0); await frame(); await frame();
+  return out;
+});
+
+test("on the timeline the desktop links keep their gap to the shrinking brand", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+  await page.setViewportSize(DESKTOP);
+  await page.goto(`${TIMELINE}&links=1`);
+  await page.evaluate(() => document.fonts.ready);
+  const header = page.locator("header.nav-shell");
+  await expect(header).toHaveAttribute("data-nav-timeline-on", "");
+  await expect(page.locator("header [data-nav-links] a")).toHaveCount(3);
+  expect(parseFloat(await header.evaluate((h) => h.style.getPropertyValue("--nav-brand-shrink")))).toBeGreaterThan(0);
+
+  const held = await gapsThroughTheRamp(page);
+  const spread = Math.max(held.top, held.mid, held.collapsed) - Math.min(held.top, held.mid, held.collapsed);
+  expect(spread, `gap brand -> first link ${JSON.stringify(held)}`).toBeLessThanOrEqual(1);
+  // The links still take the pointer, collapsed.
+  await page.evaluate(() => window.scrollTo(0, 1200));
+  const hit = await page.evaluate(() => {
+    const a = document.querySelector("header [data-nav-links] a");
+    const r = a.getBoundingClientRect();
+    return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest("a") === a;
+  });
+  expect(hit, "the first link takes the pointer, collapsed").toBe(true);
+  await page.evaluate(() => window.scrollTo(0, 0));
+
+  // Control: without the hook the links stay put and the gap widens. The
+  // spec reads links by data-nav-links-control from here.
+  await page.evaluate(() => {
+    const nav = document.querySelector("header [data-nav-links]");
+    nav.removeAttribute("data-nav-links");
+    nav.setAttribute("data-nav-links-control", "");
+  });
+  const drift = await page.evaluate(async () => {
+    const h = document.querySelector("header.nav-shell");
+    const frame = () => new Promise((r) => requestAnimationFrame(r));
+    const start = parseFloat(h.style.getPropertyValue("--nav-start")) || 0;
+    const ramp = parseFloat(getComputedStyle(h).getPropertyValue("--nav-ramp"));
+    const gap = () => h.querySelector("[data-nav-links-control] a").getBoundingClientRect().left -
+      h.querySelector(".nav-logo-link").getBoundingClientRect().right;
+    const out = {};
+    for (const [name, y] of [["top", 0], ["mid", start + ramp / 2], ["collapsed", start + ramp + 400]]) {
+      window.scrollTo(0, y); await frame(); await frame();
+      out[name] = gap();
+    }
+    return out;
+  });
+  expect(drift.collapsed - drift.top, `unhooked ${JSON.stringify(drift)}`).toBeGreaterThan(10);
+  console.log(`nav-links-follow-brand gaps: hooked ${JSON.stringify(held)} unhooked ${JSON.stringify(drift)}`);
+  expect(errors).toEqual([]);
+});
