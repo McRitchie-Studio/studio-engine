@@ -1018,7 +1018,13 @@
 # test (clone 96 vs compact bar 48) and the phone collapse (clone 145 held while
 # the bar moved).
 #   npx playwright test --list  -> 360 tests in 52 files
-total_specs: 360
+# 360 -> 361: e2e/navbar_scroll_timeline.spec.js, 1 test, no new file (task
+# nav-links-follow-brand). On the timeline the gap from the brand's painted
+# right edge to the first desktop link holds within 1px at the top, mid-ramp
+# and collapsed (24 / 23.97 / 23.94px); its control strips data-nav-links and
+# sees the gap widen (24 / 86.1 / 148.3px), the unfixed behaviour.
+#   npx playwright test --list  -> 361 tests in 52 files
+total_specs: 361
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1230,7 +1236,11 @@ total_specs: 360
 #   npx playwright test --list                                             -> 360 tests, 52 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 360
-executed: 360
+# And for the links following the brand: 1 more test (360 -> 361), no new file:
+#   npx playwright test --list                                             -> 361 tests, 52 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 361
+executed: 361
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
