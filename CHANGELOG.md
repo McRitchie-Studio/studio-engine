@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.111.3 — 2026-10-18
+
 ### Fixed
 
 - **The desktop navbar links keep their gap to the brand on the scroll
