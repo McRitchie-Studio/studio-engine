@@ -33,6 +33,7 @@ require "studio/sidebar_sections"
 require "studio/site_footer"
 require "studio/booking"
 require "studio/navbar_links"
+require "studio/navbar_signed_out_cta"
 require "studio/navbar_identity"
 require "studio/navbar_wordmark"
 require "studio/auth_labels"
@@ -277,6 +278,25 @@ module Studio
   def self.sign_in_label=(label)
     NavbarIdentity.validate_label!(label)
     @@sign_in_label = label
+  end
+
+  # ---- Navbar signed-out CTA ----
+  # What the signed-out navbar's primary button does. nil, the default, keeps
+  # the sign-in button (sign_in_label -> login_path) byte-identical to before.
+  # Set, the button carries this label and path and a quiet sign-in text link
+  # (sign_in_label -> login_path) sits beside it on desktop and in the phone row
+  # under it. A Hash, or a callable receiving the view (nil keeps the default).
+  # Separate from sign_in_label, which also words the engine's auth pages.
+  # Rules: lib/studio/navbar_signed_out_cta.rb.
+  #
+  #   config.navbar_signed_out_cta = { label: "Build App", path: "/build" }
+  #   config.navbar_signed_out_cta = ->(view) { { label: "Play", path: view.contests_path } }
+  mattr_reader :navbar_signed_out_cta, default: nil
+
+  def self.navbar_signed_out_cta=(config)
+    NavbarSignedOutCta.validate!(config)
+    NavbarSignedOutCta.reset_reported!
+    @@navbar_signed_out_cta = config
   end
 
   # ---- The shared profile page (/profile) ----
@@ -1412,6 +1432,12 @@ module Studio
   # Navbar links resolved for a view context (lib/studio/navbar_links.rb).
   def self.navbar_links_for(view)
     NavbarLinks.resolve(navbar_links, view)
+  end
+
+  # The signed-out CTA for a view, or nil for the sign-in button
+  # (lib/studio/navbar_signed_out_cta.rb).
+  def self.navbar_signed_out_cta_for(view)
+    NavbarSignedOutCta.resolve(navbar_signed_out_cta, view)
   end
 
   # The signed-in user's navbar name for a view (lib/studio/navbar_identity.rb).

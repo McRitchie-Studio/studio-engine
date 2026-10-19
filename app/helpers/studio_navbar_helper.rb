@@ -11,6 +11,15 @@ module StudioNavbarHelper
     @studio_navbar_links ||= Studio.navbar_links_for(self)
   end
 
+  # The signed-out CTA ({ label:, path: }) or nil for the sign-in button.
+  # Resolved once per render pass: the desktop button and the phone row's
+  # sign-in link both ask, and a host callable may read the request.
+  def studio_navbar_signed_out_cta
+    return @studio_navbar_signed_out_cta if defined?(@studio_navbar_signed_out_cta)
+
+    @studio_navbar_signed_out_cta = Studio.navbar_signed_out_cta_for(self)
+  end
+
   # One resolved link. size is the text utility: text-sm on desktop, text-xs
   # in the phone row, matching the links apps hand-wrote in forked navbars.
   def studio_navbar_link_tag(link, size:)
