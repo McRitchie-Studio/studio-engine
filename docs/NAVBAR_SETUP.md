@@ -14,7 +14,11 @@ If your app doesn't create its own `app/views/layouts/_navbar.html.erb`, the eng
 - Logo from `Studio.logo_for("Navbar Logo")`
 - Brand title from `Studio.app_name` (last word in primary color)
 - Empty desktop nav section (no links)
-- User nav (when logged in) or theme toggle + login button (when logged out)
+- User nav (when logged in) or theme toggle + login button (when logged out).
+  `Studio.navbar_signed_out_cta = { label:, path: }` turns the signed-out
+  button into a call to action and moves sign-in to a quiet text link beside it
+  (from `md`) and in the mobile sub-navbar (below `md`); unset, nothing changes.
+  See the README, *Signed-out call to action*.
 - Mobile sub-navbar with admin dropdown + theme toggle
 - **Link sidebar** (when `Studio.sidebar_sections` is declared — see
   `NEW_APP_SETUP.md` section 4): a trigger button in the desktop icon rail and

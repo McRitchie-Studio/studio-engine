@@ -4,6 +4,20 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`Studio.navbar_signed_out_cta`: a call to action on the signed-out navbar.**
+  Set it to `{ label: "Build App", path: "/build" }` (or a callable receiving
+  the view) and the signed-out primary button carries that label and path,
+  while sign-in stays one tap away as a quiet `Studio.sign_in_label` link to
+  `login_path`: beside the button from `md`, and in the mobile sub-navbar below
+  `md`, where the top row has no room for both. It is separate from
+  `Studio.sign_in_label`, which also words the engine's auth pages. Unset (the
+  default) the navbar renders byte-identical to before; signed in it changes
+  nothing. A bad Hash raises `Studio::NavbarSignedOutCta::InvalidConfig` at
+  assignment; a raising callable falls back to the sign-in button and is
+  reported once. README, *Signed-out call to action*.
+
 ## 0.111.3 — 2026-10-18
 
 ### Fixed
