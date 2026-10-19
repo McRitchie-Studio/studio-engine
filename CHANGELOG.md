@@ -16,7 +16,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   default) the navbar renders byte-identical to before; signed in it changes
   nothing. A bad Hash raises `Studio::NavbarSignedOutCta::InvalidConfig` at
   assignment; a raising callable falls back to the sign-in button and is
-  reported once. README, *Signed-out call to action*.
+  reported once. `components/_user_nav`'s own signed-out branch (a sign-in
+  link and Sign up, reached through `show_logged_in: true`) is unchanged.
+  README, *Signed-out call to action*.
 
 ## 0.111.3 — 2026-10-18
 
