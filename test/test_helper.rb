@@ -24,6 +24,7 @@ require_relative "../lib/studio/sidebar_sections"
 require_relative "../lib/studio/site_footer"
 require_relative "../lib/studio/booking"
 require_relative "../lib/studio/navbar_links"
+require_relative "../lib/studio/navbar_signed_out_cta"
 require_relative "../lib/studio/navbar_identity"
 require_relative "../lib/studio/navbar_wordmark"
 require_relative "../lib/studio/auth_labels"
@@ -79,6 +80,7 @@ module Studio
   mattr_accessor :navbar_user_name,     default: nil
   mattr_accessor :sign_in_label,        default: Studio::NavbarIdentity::DEFAULT_SIGN_IN_LABEL
   mattr_accessor :navbar_wordmark,      default: nil
+  mattr_accessor :navbar_signed_out_cta, default: nil
   # nil, NOT [] — nil means "the engine's standard profile page". The unit suite
   # asserts that distinction (test/lib/studio/profile_sections_test.rb), so this
   # mirror has to carry the real default rather than a convenient one.
@@ -171,6 +173,10 @@ module Studio
 
   def self.navbar_links_for(view)
     NavbarLinks.resolve(navbar_links, view)
+  end
+
+  def self.navbar_signed_out_cta_for(view)
+    NavbarSignedOutCta.resolve(navbar_signed_out_cta, view)
   end
 
   def self.navbar_user_name_for(user, view = nil)

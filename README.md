@@ -736,6 +736,36 @@ end
   *log-on link*. The "Sign in with Google" and "Sign up" buttons are not
   sign-in labels and do not change.
 
+### Signed-out call to action — `Studio.navbar_signed_out_cta`
+
+What the signed-out navbar's primary button does. Unset (`nil`, the default),
+it is the sign-in button, `Studio.sign_in_label` to `login_path`, and the navbar
+renders the same bytes as before the setting. Rules:
+`lib/studio/navbar_signed_out_cta.rb`.
+
+```ruby
+Studio.configure do |config|
+  config.navbar_signed_out_cta = { label: "Build App", path: "/build" }
+  # or a callable receiving the view; nil keeps the sign-in button for that render
+  # config.navbar_signed_out_cta = ->(view) { { label: "Play", path: view.contests_path } }
+end
+```
+
+- Set, the primary button carries `label:` to `path:`, and sign-in stays one tap
+  away as a quiet text link (`Studio.sign_in_label` to `login_path`): beside the
+  button from `md`, and in the phone row under the header below `md`, where the
+  top row has no room for two controls beside the brand. Both sign-in links
+  carry `data-nav-sign-in`; the button carries `data-nav-signed-out-cta`.
+- It is a separate setting from `sign_in_label` on purpose: that label also
+  words the engine's auth pages, so it cannot double as a marketing CTA.
+- Signed in, the setting changes nothing.
+- `label:` and `path:` are required non-blank text, both escaped. A bad Hash
+  raises `Studio::NavbarSignedOutCta::InvalidConfig` at assignment, a callable's
+  bad answer at render. A callable that raises falls back to the sign-in button
+  and is reported once per process per error class, never a 500.
+- A host on an older engine can set it safely with
+  `Studio.navbar_signed_out_cta = … if Studio.respond_to?(:navbar_signed_out_cta=)`.
+
 ### User nav slots
 
 `components/_user_nav.html.erb` renders the right-side navbar user section.
