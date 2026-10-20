@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.112.0 — 2026-10-19
+
 ### Added
 
 - **`Studio.navbar_signed_out_cta`: a call to action on the signed-out navbar.**
