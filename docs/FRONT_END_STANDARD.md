@@ -386,10 +386,10 @@ Decided by Alex:
 - The engine supplies its modules through its own importmap pins; no app lists
   them.
 - The Stimulus migration proceeds, engine behaviour first.
+- One Node version, 22. The engine's `package.json` pins `22.x`, its CI sets
+  up Node 22 in both lanes, and every app pins `22.x`.
 
 Still open, recorded on the task `front-end-standard-page`:
 
 1. **The CSP target.** Once inline scripts are gone, does every app drop
    `unsafe_inline` from `script_src`?
-2. **One Node version.** The engine's `package.json` pins Node 20; the hub
-   pins 22.

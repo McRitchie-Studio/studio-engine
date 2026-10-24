@@ -109,14 +109,14 @@ jobs:
           ruby-version: 3.3.11
           bundler-cache: true
 
-      # Node 20 matches the ecosystem's mise-managed local runtime (v20.20.2),
-      # which is what the store behavior harness was written and verified
-      # against. Keep this MAJOR in step with `mise install node@20` so a
-      # passing local run and a passing CI run mean the same thing.
+      # Node 22 is the ecosystem's one Node version: every app's package.json
+      # pins 22.x and the engine's does too (docs/FRONT_END_STANDARD.md,
+      # decided 2026-10-09). Keep this MAJOR in step with `mise install
+      # node@22` so a passing local run and a passing CI run mean the same thing.
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Run the engine suite
         run: bin/release-check
@@ -177,7 +177,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install JS dependencies

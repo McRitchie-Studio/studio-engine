@@ -4,6 +4,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The engine's development and CI Node is 22, the ecosystem's one Node
+  version.** `package.json` pins `engines.node` to `22.x` and both CI lanes set
+  up Node 22, matching every app. Nothing in the published gem changes.
+
 ## 0.112.0 — 2026-10-19
 
 ### Added

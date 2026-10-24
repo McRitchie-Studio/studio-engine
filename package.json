@@ -2,7 +2,7 @@
   "name": "studio-engine",
   "private": true,
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "scripts": {
     "test:e2e": "npx playwright test",
