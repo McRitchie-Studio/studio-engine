@@ -235,6 +235,19 @@
     <% else %>
       <span class="<%= account_classes %>" data-nav-account x-bind:style="$store.devMode && 'background: lightgreen'"><%= account_inner %></span>
     <% end %>
+    <%# Studio.navbar_avatar_badge: one partial over the avatar's upper-left
+        corner, the way a notification dot rides a profile picture. Its seat
+        is a SIBLING of the account control, never inside it: the control stays
+        one tab stop, and the badge may carry its own button (a button inside a
+        link or button is invalid and reaches a screen reader as nothing).
+        The seat comes right after the control, and engine.css (THE AVATAR
+        BADGE) places it out of flow over the avatar, which ends the row, so the
+        row gives it no width. nil (the default) renders the same bytes as
+        before. %>
+    <% avatar_badge = respond_to?(:studio_navbar_avatar_badge) ? studio_navbar_avatar_badge : nil %>
+    <% if avatar_badge %>
+    <div data-nav-avatar-badge><%= studio_navbar_slot_tag(avatar_badge) %></div>
+    <% end %>
   <% else %>
     <%= render "components/admin_dropdown", display_class: "hidden md:block" unless respond_to?(:studio_sidebar_replaces_admin_menu?) && studio_sidebar_replaces_admin_menu? %>
     <%# Desktop only, as above: the phone row carries the toggle below md. %>
