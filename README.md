@@ -793,6 +793,8 @@ end
   naming its index; a callable's bad answer raises it at render. A callable
   that raises renders no items and is reported once per process per error
   class, never a 500.
+- A host on an older engine can set it safely with
+  `Studio.navbar_items = … if Studio.respond_to?(:navbar_items=)`.
 
 ### Avatar badge — `Studio.navbar_avatar_badge`
 
@@ -817,6 +819,8 @@ end
   the pointer; the rest of the avatar still opens the account.
 - Signed out it never renders. Validation and the raising-callable fallback
   are `navbar_items`'s.
+- A host on an older engine can set it safely with
+  `Studio.navbar_avatar_badge = … if Studio.respond_to?(:navbar_avatar_badge=)`.
 
 ### User nav slots
 

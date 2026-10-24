@@ -13,12 +13,21 @@ The Studio engine provides a feature-rich base navbar that each app can copy and
 If your app doesn't create its own `app/views/layouts/_navbar.html.erb`, the engine's base navbar renders with:
 - Logo from `Studio.logo_for("Navbar Logo")`
 - Brand title from `Studio.app_name` (last word in primary color)
-- Empty desktop nav section (no links)
+- Empty desktop nav section (no links). `Studio.navbar_links` fills it and the
+  mobile sub-navbar; `Studio.navbar_items` adds partials after the links in
+  both (a geo badge, a wallet signal). Each item renders once per row, and the
+  `/admin/navbar` preview renders the whole partial several times, so an item
+  partial must carry no page-unique `id`. See the README, *Navbar items*.
 - User nav (when logged in) or theme toggle + login button (when logged out).
   `Studio.navbar_signed_out_cta = { label:, path: }` turns the signed-out
   button into a call to action and moves sign-in to a quiet text link beside it
   (from `md`) and in the mobile sub-navbar (below `md`); unset, nothing changes.
   See the README, *Signed-out call to action*.
+- `Studio.navbar_avatar_badge` draws one partial over the signed-in avatar's
+  upper-left corner, out of flow, beside the account control rather than in
+  it, so the control stays one tab stop. The `/admin/navbar` preview repeats
+  it too, so it carries no page-unique `id` either. Unset, nothing changes. See
+  the README, *Avatar badge*.
 - Mobile sub-navbar with admin dropdown + theme toggle
 - **Link sidebar** (when `Studio.sidebar_sections` is declared — see
   `NEW_APP_SETUP.md` section 4): a trigger button in the desktop icon rail and
