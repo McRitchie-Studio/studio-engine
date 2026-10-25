@@ -4,6 +4,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **`studio/cropper_assets` pins Cropper.js with Subresource Integrity.** The
+  cdnjs `cropper.min.css` and `cropper.min.js` (1.6.2) tags now carry sha384
+  `integrity` and `crossorigin="anonymous"`, so a changed file on the CDN fails
+  to load instead of running on the page. The URLs are unchanged, so a CSP that
+  names the script by file (Turf Monster's) keeps matching. The hashes were
+  computed over the fetched files and their bytes checked against cdnjs's
+  published SRI. Byte-exact copies live in `test/fixtures/files/cropperjs-1.6.2`:
+  the suite hashes them offline, and the browser lane serves them for the two
+  cdnjs URLs so the tags load as shipped. `bin/cropper-sri-live` re-checks the
+  pins against the live CDN.
+
 ## 0.113.0 — 2026-10-24
 
 ### Added

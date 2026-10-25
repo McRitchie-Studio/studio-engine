@@ -1,0 +1,58 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Re-checks the Cropper.js pins against the live CDN. It needs the network, so
+# it is a script rather than a test: the suite may not skip, and it may not
+# depend on cdnjs being up. Run it whenever the pinned version or hashes change.
+#
+#   bin/cropper-sri-live
+#
+# For each tag in app/views/studio/_cropper_assets.html.erb it fetches the URL
+# and checks three things: the sha384 of the live bytes equals the pinned
+# integrity, the sha512 equals the SRI cdnjs publishes, and the bytes equal the
+# copy in test/fixtures/files/cropperjs-<version> that the browser lane serves.
+# Exit 0 when all hold, 1 otherwise.
+
+require "net/http"
+require "openssl"
+require "base64"
+require "json"
+
+ROOT = File.expand_path("..", __dir__)
+PARTIAL = File.join(ROOT, "app/views/studio/_cropper_assets.html.erb")
+
+def get(url, limit = 3)
+  response = Net::HTTP.get_response(URI(url))
+  return get(response["location"], limit - 1) if response.is_a?(Net::HTTPRedirection) && limit.positive?
+  abort "GET #{url}: #{response.code}" unless response.is_a?(Net::HTTPSuccess)
+  response.body.b
+end
+
+def digest(algorithm, body)
+  "#{algorithm.downcase}-#{Base64.strict_encode64(OpenSSL::Digest.digest(algorithm, body))}"
+end
+
+source = File.read(PARTIAL)
+tags = source.scan(%r{(?:href|src)="(https://cdnjs\.cloudflare\.com/ajax/libs/cropperjs/([\d.]+)/([^"]+))"\s+integrity="([^"]+)"})
+abort "expected 2 pinned cropper tags in #{PARTIAL}, found #{tags.size}" unless tags.size == 2
+
+failures = 0
+tags.group_by { |(_, version)| version }.each do |version, group|
+  published = JSON.parse(get("https://api.cdnjs.com/libraries/cropperjs/#{version}?fields=sri")).fetch("sri")
+  group.each do |url, _, file, integrity|
+    body = get(url)
+    fixture = File.join(ROOT, "test/fixtures/files/cropperjs-#{version}", file)
+    checks = {
+      "sha384 equals pinned integrity" => digest("SHA384", body) == integrity,
+      "sha512 equals cdnjs published SRI" => digest("SHA512", body) == published[file],
+      "bytes equal #{fixture.delete_prefix("#{ROOT}/")}" => File.exist?(fixture) && File.binread(fixture) == body,
+    }
+    checks.each do |label, ok|
+      puts "#{ok ? "ok  " : "FAIL"} #{file}: #{label}"
+      failures += 1 unless ok
+    end
+  end
+end
+
+puts(failures.zero? ? "cropper SRI: all checks passed" : "cropper SRI: #{failures} check(s) failed")
+exit(failures.zero? ? 0 : 1)

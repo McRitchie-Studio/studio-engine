@@ -134,7 +134,7 @@ test("clicking the avatar reaches the file picker", async ({ page }) => {
   // THE WIRING, observed rather than assumed. A native file dialog cannot be
   // driven from a spec, so this listens for the click the button forwards to the
   // hidden input — which is the whole of what the button is responsible for. The
-  // cropper beyond it is a CDN script this lane deliberately does not load.
+  // cropper beyond it opens only once a file is chosen.
   await page.evaluate(() => {
     window.__pickerClicked = false;
     const picker = document.querySelector('input[type="file"]:not([name])');
