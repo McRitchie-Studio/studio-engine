@@ -1,0 +1,114 @@
+<%# The modal blocks' consumer locals, on the GLOBAL host ($store.modals), the way
+    turf-monster mounts them (engine-modal-blocks-carry-consumer).
+
+    Each block twice where it matters: once with the new locals, once without, so
+    the page shows both and a spec can tell "the new local works" from "the
+    block works". The lab sets up LOCALS and openers and nothing else: every card
+    is an engine partial rendered by name, and the programs under test (the
+    countdown, the close actions, the JSON submit) come from the engine.
+
+    The openers pass the HOST CALLBACKS a consumer passes (onSuccess, onSubmit),
+    and each writes what it heard onto its own button, where a spec can read it.
+    The window event lands on <main> the same way. %>
+<main class="max-w-3xl mx-auto px-4 py-10" x-data
+      @lab-newsletter-changed.window="$el.dataset.changed = String($event.detail.subscribed) + ':' + ($event.detail.email || '')">
+  <h1 class="text-2xl font-bold mb-6">Modal blocks (consumer locals)</h1>
+
+  <div class="flex flex-wrap gap-3 mb-6">
+    <button type="button" data-test="open-rate-limit" class="btn btn-outline"
+            @click="$store.modals.open('lab-rate-limit', { secondsLeft: 2, message: 'You are going a bit fast.' })">Rate limit</button>
+    <button type="button" data-test="open-rate-limit-long" class="btn btn-outline"
+            @click="$store.modals.open('lab-rate-limit', { secondsLeft: 600, message: 'Slow down.' })">Rate limit (long)</button>
+    <button type="button" data-test="open-error-plain" class="btn btn-outline"
+            @click="$store.modals.open('lab-error-plain')">Error (plain)</button>
+    <button type="button" data-test="open-email-pending" class="btn btn-outline"
+            @click="$store.modals.open('lab-email-pending', { currentEmail: 'old@example.com', newEmail: 'new@example.com' })">Email pending</button>
+    <button type="button" data-test="open-success-plain" class="btn btn-outline"
+            @click="$store.modals.open('lab-success-plain')">Success (plain)</button>
+    <button type="button" data-test="open-birthday-pill" class="btn btn-outline"
+            @click="$store.modals.open('lab-birthday-pill')">Birthday (pill)</button>
+    <button type="button" data-test="open-username-locked" class="btn btn-outline"
+            @click="$store.modals.open('lab-username-locked')">Username (locked)</button>
+    <button type="button" data-test="open-newsletter-subscribe" class="btn btn-outline"
+            @click="$store.modals.open('newsletter-subscribe', { onSuccess: (r) => { $el.dataset.hooked = String(r.seeds_earned) } })">Newsletter subscribe</button>
+    <button type="button" data-test="open-newsletter-email" class="btn btn-outline"
+            @click="$store.modals.open('newsletter-email', { onSubmit: (e) => { $el.dataset.handed = e } })">Newsletter email (hand-off)</button>
+    <button type="button" data-test="open-newsletter-unsubscribe" class="btn btn-outline"
+            @click="$store.modals.open('unsubscribe-confirm')">Newsletter unsubscribe</button>
+    <button type="button" data-test="open-newsletter-form" class="btn btn-outline"
+            @click="$store.profileModals.open('newsletter-unsubscribe')">Newsletter (form mode)</button>
+  </div>
+
+  <%= render "studio/modals/host" do %>
+    <%# blocks/_error_card: the Retry-After wait, closing its own store at zero. %>
+    <template x-if="$store.modals.current().id === 'lab-rate-limit'">
+      <div data-test="card-rate-limit"><%= render "studio/modals/blocks/error_card",
+            title:           "Easy there",
+            icon_emoji:      "✋",
+            message_key:     "$store.modals.current().props.message",
+            countdown_key:   "$store.modals.current().props.secondsLeft",
+            secondary_label: "Dismiss",
+            secondary_close: true %></div>
+    </template>
+
+    <template x-if="$store.modals.current().id === 'lab-error-plain'">
+      <div data-test="card-error-plain"><%= render "studio/modals/blocks/error_card",
+            title:      "Still processing",
+            message:    "Give it a moment.",
+            cta_event:  "lab-error-retry",
+            cta_label:  "Retry" %></div>
+    </template>
+
+    <%# blocks/_success_card: a rich message in the message's place, and a CTA
+        that closes the store. %>
+    <template x-if="$store.modals.current().id === 'lab-email-pending'">
+      <div data-test="card-email-pending"><%= render layout: "studio/modals/blocks/success_card",
+            locals: { title: "Confirm your email change", icon_emoji: "📬", slot_position: :message,
+                      cta_label: "Got it", cta_close: true } do %>
+        We sent a confirmation link to
+        <span class="text-heading font-medium" data-test="current-email" x-text="$store.modals.current().props.currentEmail"></span>.
+        Click it to change your email to
+        <span class="text-heading font-medium" data-test="new-email" x-text="$store.modals.current().props.newEmail"></span>.
+      <% end %></div>
+    </template>
+
+    <template x-if="$store.modals.current().id === 'lab-success-plain'">
+      <div data-test="card-success-plain"><%= render "studio/modals/blocks/success_card",
+            title: "Done", message: "All set.", cta_label: "Continue", cta_event: "lab-success-continue" %></div>
+    </template>
+
+    <%# blocks/_birthday: step 2 of a 3-step chain. %>
+    <template x-if="$store.modals.current().id === 'lab-birthday-pill'">
+      <div data-test="card-birthday-pill"><%= render "studio/modals/blocks/birthday",
+            submit_url: "#lab-birthday", demo: true, progress_pill: { current: 2, total: 3 } %></div>
+    </template>
+
+    <%# blocks/_change_username: the app says the rename is not open yet. %>
+    <template x-if="$store.modals.current().id === 'lab-username-locked'">
+      <div data-test="card-username-locked"><%= render "studio/modals/blocks/change_username",
+            current_username: "pat", submit_url: "#lab-username",
+            locked: { title: "Enter Contest First", subtitle: "Play one contest to unlock your username.",
+                      cta_label: "Browse Contests", cta_href: "#lab-contests" } %></div>
+    </template>
+
+    <%# The newsletter cards in JSON mode, on this store, posting to the lab's
+        JSON routes, with turf-monster's ids for the confirm and goodbye beats. %>
+    <%= render "studio/profiles/newsletter_modals",
+          user:               @user,
+          modal_store:        "modals",
+          submit_mode:        :json,
+          subscribe_url:      "/lab/modal_blocks/newsletter",
+          unsubscribe_url:    "/lab/modal_blocks/newsletter/leave",
+          unsubscribe_method: "POST",
+          changed_event:      "lab-newsletter-changed",
+          unsubscribe_card:   { id: "unsubscribe-confirm" },
+          subscribe_card:     { consent: "Subscribe to the lab newsletter" },
+          success_card:       true,
+          goodbye_card:       { id: "unsubscribe-goodbye" } %>
+  <% end %>
+
+  <%# The same partial with every new local unset: its own store, its own form. %>
+  <%= render "studio/modals/scoped_host", store: "profileModals" do %>
+    <%= render "studio/profiles/newsletter_modals", user: @user %>
+  <% end %>
+</main>

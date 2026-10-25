@@ -303,6 +303,12 @@ class E2eLaneContractTest < Minitest::Test
       # the page renders it three times, once per mode, because the modes are
       # locals and locals are all a lab page is allowed to set up.
       "onboarding_first_name.html.erb" => ["studio/modals/onboarding/first_name"],
+      # The modal blocks' consumer locals: the countdown, the close actions and the
+      # JSON submit are the engine's programs, so every card is the engine block.
+      "modal_blocks.html.erb" => [
+        "studio/modals/host", "studio/modals/blocks/error_card", "studio/modals/blocks/birthday",
+        "studio/modals/blocks/change_username", "studio/profiles/newsletter_modals"
+      ],
       # BOTH panels come from the engine, and that is the whole point of the page: the
       # bug was the link sidebar's bridge claiming a close button rendered by the SHARED
       # panel partial. A lab page that hand-rolled either side would prove nothing.
