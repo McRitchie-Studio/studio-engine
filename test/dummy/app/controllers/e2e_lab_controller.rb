@@ -369,6 +369,19 @@ class E2eLabController < ActionController::Base
 
   def modal_blocks_newsletter_leave = render(json: { success: true })
 
+  # The newsletter cards in JSON mode with the fetcher: local set, so a press
+  # goes through the host's own wrapper, an export of the importmap module
+  # studio/host_fetchers (engine-adoption-loose-ends). The dummy host pins
+  # nothing of its own (test/integration/engine_importmap_pins_test.rb holds
+  # that), so the spec stands in the host's pin by serving its own module for
+  # that module's URL; with no stand-in the engine's empty seam loads, and a
+  # named export it lacks fails the press. ?fetcher= names the export.
+  def newsletter_fetcher
+    @user = LabUser.new
+    @fetcher = params[:fetcher].presence || "labFetch"
+    render(:newsletter_fetcher)
+  end
+
   # THE TOAST / BANNER COLLISION — three engine partials that only misbehave
   # together.
   #

@@ -1036,7 +1036,16 @@
 # fail.
 #   npx playwright test --list  -> 372 tests in 54 files (on top of the
 #   in-header bars' 361 -> 364, e2e/navbar_header_bars.spec.js)
-total_specs: 372
+#
+# 372 -> 375: e2e/newsletter_host_fetcher.spec.js (engine-adoption-loose-ends).
+# The newsletter cards' fetcher: local names an export of the importmap module
+# studio/host_fetchers; the dynamic import, the send through the host's fetcher,
+# a null answer and a missing export are a run's, not the markup's. The spec
+# stands in the host's pin at the network (the dummy host pins nothing). Verified
+# RED three ways: the fetcher ignored (test 1 fails), the null answer read as a
+# response (test 2), and a missing export falling back to plain fetch (test 3).
+#   npx playwright test --list  -> 375 tests in 55 files
+total_specs: 375
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1260,7 +1269,11 @@ total_specs: 372
 #   npx playwright test --list                                             -> 372 tests, 54 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 372
-executed: 372
+# And for the newsletter cards' host fetcher: 3 more tests (372 -> 375), 1 new file:
+#   npx playwright test --list                                             -> 375 tests, 55 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 375
+executed: 375
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

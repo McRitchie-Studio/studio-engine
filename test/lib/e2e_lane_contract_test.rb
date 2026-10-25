@@ -309,6 +309,9 @@ class E2eLaneContractTest < Minitest::Test
         "studio/modals/host", "studio/modals/blocks/error_card", "studio/modals/blocks/birthday",
         "studio/modals/blocks/change_username", "studio/profiles/newsletter_modals"
       ],
+      # The newsletter cards with fetcher: set: the dynamic import of the host's
+      # seam and the send through it are the engine's program.
+      "newsletter_fetcher.html.erb" => ["studio/modals/host", "studio/profiles/newsletter_modals"],
       # BOTH panels come from the engine, and that is the whole point of the page: the
       # bug was the link sidebar's bridge claiming a close button rendered by the SHARED
       # panel partial. A lab page that hand-rolled either side would prove nothing.
