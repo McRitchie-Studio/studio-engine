@@ -242,7 +242,7 @@
         fades at its edge when it overflows (engine.css, THE PHONE NAME). %>
     <% phone_name = Studio.navbar_phone_name %>
     <% account_inner = capture do %>
-      <span class="<%= phone_name ? "min-w-0 max-w-[4.5rem] min-[400px]:max-w-[6rem] md:max-w-40" : "sr-only md:not-sr-only md:max-w-40" %>"<%= " data-nav-name-phone".html_safe if phone_name %>><span class="block truncate text-right text-heading font-semibold text-base leading-none transition<%= " group-hover:text-primary" if account_sidebar || account_opens_sidebar || studio_nav_destination %>" data-nav-name><%= Studio.navbar_user_name_for(current_user, self) %></span></span>
+      <% if phone_name %><span class="min-w-0 max-w-[4.5rem] min-[400px]:max-w-[6rem] md:max-w-40" data-nav-name-phone><% else %><span class="sr-only md:not-sr-only md:max-w-40"><% end %><span class="block truncate text-right text-heading font-semibold text-base leading-none transition<%= " group-hover:text-primary" if account_sidebar || account_opens_sidebar || studio_nav_destination %>" data-nav-name><%= Studio.navbar_user_name_for(current_user, self) %></span></span>
       <span class="flex-shrink-0 flex items-center" aria-hidden="true">
         <%= render "components/avatar", user: current_user, size: "nav" %>
       </span>
