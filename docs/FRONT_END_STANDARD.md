@@ -242,7 +242,7 @@ components:
 | Birthday card, profile birthday row | `studio/birthday` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="birthdayModal({...})"`, `x-data="studioBirthdayFields('...')"` |
 | Profile form | `studio/profile_form` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="studioProfileForm({...})"` |
 | Error card countdown (`blocks/_error_card` with `countdown_key:`) | `studio/modal_countdown` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="studioModalCountdown({...})"` |
-| Newsletter cards, JSON mode (`studio/profiles/_newsletter_modals` with `submit_mode: :json`) | `studio/newsletter_modal` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="studioNewsletterModal({...})"` |
+| Newsletter cards, JSON mode (`studio/profiles/_newsletter_modals` with `submit_mode: :json`) | `studio/newsletter_modal`; a `fetcher:` names an export of `studio/host_fetchers`, an empty engine pin the host pins to its own file, imported on first press | the Alpine scope, published by `studio/alpine_scopes` | `x-data="studioNewsletterModal({...})"` |
 | Compact identity bar (`studio/profiles/_identity_mini`) | `studio/identity_mini` | `identity-mini`, registered by `studio/application` | none needed |
 | Sign-in interstitial (`studio/_confirm_interstitial`) | `studio/confirm_interstitial` | its own module tag; the fallback button by CSS | none needed |
 | Style guide modal demos (`style/_modals`) | `studio/style_modals` | `style-modals`, registered by `studio/style_guide` from the section's own module tag; the store by `modal-host` | `$store.dsModals`, `window.dsModalDemos` on the style guide |

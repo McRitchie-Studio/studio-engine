@@ -26,13 +26,15 @@ module StudioNavbarHelper
   # here from validated data (a plain id and JSON props), never taken from the
   # host as a string. It opens the modal only where the engine's modal host
   # has registered $store.modals, and only then cancels the link, so the href
-  # is the fallback without script or without a host.
+  # is the fallback without script or without a host. aria-haspopup="dialog"
+  # tells a screen reader, before the press, that the link opens a dialog.
   def studio_navbar_cta_modal_options(cta)
     modal = cta && cta[:modal]
     return {} unless modal
 
     open = "$store.modals.open(#{modal[:id].to_json}, #{modal[:props].to_json})"
-    { "data-nav-cta-modal": modal[:id], "@click": "$store.modals && ($event.preventDefault(), #{open})" }
+    { "data-nav-cta-modal": modal[:id], "aria-haspopup": "dialog",
+      "@click": "$store.modals && ($event.preventDefault(), #{open})" }
   end
 
   # Studio.navbar_items as partial specs ({ partial:, locals: }), [] for none.

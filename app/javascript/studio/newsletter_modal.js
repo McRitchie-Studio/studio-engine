@@ -19,7 +19,9 @@
 //   4. Otherwise POSTs JSON to the host's url (DELETE or another verb by
 //      opts.method) with the page's CSRF token, and reads the answer: a 2xx, not by redirect, whose
 //      body does not say success: false is a success; anything else shows
-//      body.error, or a plain line, on the card.
+//      body.error, or a plain line, on the card. The request goes through
+//      plain fetch, or through the host's own fetcher when opts.fetcher names
+//      one (THE HOST'S FETCHER, below).
 //   5. On success: dispatches opts.event on window with
 //      { subscribed, email, response }, calls props.onSuccess(response) when the
 //      opener passed one, then swaps to opts.nextId (the success or goodbye card)
@@ -27,14 +29,52 @@
 //
 // No page reload anywhere: the host's listener updates whatever the page shows.
 //
+// THE HOST'S FETCHER. A host whose requests go through its own wrapper (Turf
+// Monster's authedFetch: a 401 opens the sign-in card, a 429 the rate-limit
+// card) names it with opts.fetcher, a JS identifier. The card resolves it as a
+// named export of the importmap module "studio/host_fetchers": the engine pins
+// that name to an empty module, and a host that pins the same name to its own
+// file wins (FRONT_END_STANDARD.md, "The engine's modules"). Never a window
+// global: the standard forbids a window.* API between files. The host's module
+// is imported on the first press that needs it, not at boot.
+//
+//   # the host's config/importmap.rb
+//   pin "studio/host_fetchers", to: "newsletter_fetchers.js"
+//   // app/javascript/newsletter_fetchers.js
+//   export { authedFetch } from "solana_utils"
+//
+// The fetcher takes fetch's arguments and returns a Response, or null when it
+// has answered the request itself (authedFetch opens its own card and returns
+// null): the card then stops its spinner and says nothing more. A name the
+// module does not export as a function, or a module that does not load, fails
+// the press with the card's plain line and one console error; it never falls
+// back to plain fetch, which would quietly drop the host's 401 handling.
+//
 // studio/alpine_scopes publishes the factory on window, statically: Alpine
-// evaluates the x-data as the modal host mounts the card. It imports nothing;
+// evaluates the x-data as the modal host mounts the card. It imports nothing
+// statically (the host's fetcher module is a dynamic import);
 // test/javascript/newsletter_modal.test.mjs loads it as a data: module.
 
 export const INVALID_EMAIL = "Enter a valid email address."
 export const SUBSCRIBE_FAILED = "Could not join the newsletter."
 export const UNSUBSCRIBE_FAILED = "Could not unsubscribe."
 export const CHANGED_EVENT = "studio:newsletter-changed"
+export const HOST_FETCHERS = "studio/host_fetchers"
+export const FETCHER_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/
+
+// The host's fetcher named +name+, as a function, or null when the module does
+// not load or does not export a function by that name. +importer+ loads
+// studio/host_fetchers (the tests pass their own).
+export async function resolveFetcher(name, importer) {
+  if (!FETCHER_NAME.test(String(name || ""))) return null
+  try {
+    const mod = await importer()
+    const fn = mod && mod[name]
+    return typeof fn === "function" ? fn : null
+  } catch (_) {
+    return null
+  }
+}
 
 // The address trimmed, or "" when it cannot be one: an "@" with nothing before
 // it, or none at all. The server is the real check; this only saves a round trip
@@ -75,12 +115,15 @@ export function csrfToken(doc) {
 //   requiresConsent  the card carries a consent box (ticked to start).
 //   nextId           the card a success swaps to; blank closes instead.
 //   event            the window event a success dispatches (CHANGED_EVENT).
+//   fetcher          the host's fetcher, by its export name in
+//                    studio/host_fetchers; blank sends through plain fetch.
 //
-// env: { win } for the tests.
+// env: { win, importer } for the tests.
 export function studioNewsletterModal(opts, env) {
   opts = opts || {}
   const win = (env && env.win) || (typeof window !== "undefined" ? window : {})
   const action = opts.action === "unsubscribe" ? "unsubscribe" : "subscribe"
+  const importer = (env && env.importer) || (() => import("studio/host_fetchers"))
 
   return {
     email: "",
@@ -95,6 +138,7 @@ export function studioNewsletterModal(opts, env) {
     requiresConsent: !!opts.requiresConsent,
     nextId: opts.nextId || "",
     event: opts.event || CHANGED_EVENT,
+    fetcher: opts.fetcher || "",
 
     _store() {
       try { return win.Alpine.store(this.store) } catch (_) { return null }
@@ -145,10 +189,20 @@ export function studioNewsletterModal(opts, env) {
           }
         }
         if (action === "subscribe") init.body = JSON.stringify({ email: address })
-        const response = await win.fetch(this.url, init)
-        let body = {}
-        try { body = await response.json() } catch (_) {}
-        outcome = outcomeOf(response, body, fallback)
+        const send = await this._sender()
+        if (!send) {
+          outcome = { ok: false, body: {}, error: fallback }
+        } else {
+          const response = await send(this.url, init)
+          if (response == null && this.fetcher) {
+            // The host's fetcher answered it (its own sign-in or wait card).
+            this.saving = false
+            return
+          }
+          let body = {}
+          try { body = await response.json() } catch (_) {}
+          outcome = outcomeOf(response, body, fallback)
+        }
       } catch (_) {
         outcome = { ok: false, body: {}, error: fallback }
       }
@@ -159,6 +213,19 @@ export function studioNewsletterModal(opts, env) {
         return
       }
       this._succeed(outcome.body, address, props)
+    },
+
+    // What sends the request: plain fetch, or the host's named fetcher; null
+    // when a named one cannot be found.
+    async _sender() {
+      if (!this.fetcher) return (url, init) => win.fetch(url, init)
+      const fn = await resolveFetcher(this.fetcher, importer)
+      if (!fn) {
+        try {
+          win.console.error(`studio/newsletter_modal: ${HOST_FETCHERS} exports no function named ${this.fetcher}`)
+        } catch (_) {}
+      }
+      return fn
     },
 
     _succeed(body, address, props) {

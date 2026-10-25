@@ -772,7 +772,7 @@ end
     fallback with no script or no modal host. The engine builds the expression
     from this data: the id must be a plain name and the props JSON, so no host
     JavaScript reaches the page as a string. The button carries
-    `data-nav-cta-modal="<id>"`.
+    `data-nav-cta-modal="<id>"` and `aria-haspopup="dialog"`.
   - `sign_in_link: false` drops the quiet sign-in link in both rows, for an app
     whose CTA is its sign-in (one Sign in, not two).
   - `sign_in_path:` points the quiet sign-in link somewhere other than
@@ -803,6 +803,13 @@ config.navbar_header_bars = ->(view) { view.impersonating? ? ["shared/impersonat
   by the band, so they hold at the top of the window while the compact bar
   sticks under them.
 - Validation and the raising-callable fallback are `navbar_items`'s.
+- **A callable that raises, the navbar renders no header bars** for that render
+  (all of them, not just the one that failed), and the error is reported once
+  per process per error class. A bar that carries an OPSEC control (Turf
+  Monster's impersonation bar and its "Return to <admin>" button, OPSEC-046)
+  would vanish without a trace on the page, so the callable must not raise:
+  guard each lookup it makes (`view.impersonating?` on a page whose controller
+  lacks the helper, say) and answer `[]` for none.
 
 ### Navbar items — `Studio.navbar_items`
 
@@ -905,14 +912,23 @@ config.navbar_account_sidebar = { flag: "gearOpen", controls: %w[gear-sidebar ge
 - `navbar_menu_trigger` is one partial spec (or a callable) rendered in the
   admin dropdown's seat: the icon rail from `md` (in
   `[data-nav-menu-trigger]`), and the phone row. Rules:
-  `lib/studio/navbar_slots.rb`.
+  `lib/studio/navbar_slots.rb`. **It renders the partial twice**, once in each
+  seat, and both are in the page at every width, so the partial carries no
+  `id` (nor anything keyed to one, such as a `<label for>`): a second copy of
+  an id is invalid, and `getElementById` and `aria-controls` find only the
+  first. Point at the panel by its own id from the trigger, never the reverse.
 - `navbar_account_sidebar` makes the account control a button that toggles
   `$store.<store>.<flag>` (`store:` defaults to `"sidebars"`), with
   `aria-controls` naming the panels, `aria-haspopup="dialog"` and a bound
   `aria-expanded`. It wins over the link sidebar and the account link. The
   engine builds the toggle from the names, which must be plain identifiers. It
   carries `data-profile-image-toggle`, so a host handler that claims its
-  triggers in the capture phase, before Alpine binds, claims it too. Rules:
+  triggers in the capture phase, before Alpine binds, claims it too. Its
+  `controls:` may not name the engine's own link sidebar
+  (`studio-link-sidebar`, `studio-link-sidebar-mobile`): `studio/link_sidebar`
+  claims a click on any trigger whose `aria-controls` names it, so the button
+  would open the engine's panel instead of the host's. That is refused with
+  `InvalidConfig` at assignment (a callable's answer, when it resolves). Rules:
   `lib/studio/navbar_account_sidebar.rb`.
 
 ### Sidebar panel lead and close hook
@@ -936,8 +952,9 @@ as before:
 4.5rem (6rem from 400px), and fades it out over its right half when it does not
 fit. The fade is CSS only (`engine.css`, *THE PHONE NAME*): it runs on the
 name's own scroll timeline, which is inactive while the name fits, so a short
-name never fades. A browser without scroll timelines clips the name. `false`,
-the default, keeps the name screen-reader text below `md`.
+name never fades. A browser without scroll timelines (Firefox today) ends a long
+name in an ellipsis instead. `false`, the default, keeps the name
+screen-reader text below `md`.
 
 ### Brand, root hook and layer tier — `Studio.navbar_brand`, `Studio.navbar_root_hook`, `Studio.navbar_z_tier`
 
@@ -953,6 +970,15 @@ config.navbar_z_tier = true      # the live header at z-[var(--z-nav)], not z-50
   its alt, and `words:` replaces the `app_name` split: each word its own
   truncating span with the host's class and nothing else. `navbar_wordmark`
   wins when both are set. Rules: `lib/studio/navbar_brand.rb`.
+- **The word classes live in the host's initializer**
+  (`config/initializers/studio.rb`), which a host's Tailwind scan does not
+  read by default (Turf Monster's `content:` lists `app/views`,
+  `app/helpers`, `app/javascript` and the engine's views). A utility named
+  only there, `text-heading` say, compiles only if some view also uses it.
+  Add the initializer to the scan (`content:`, or `@source` under Tailwind 4),
+  or give the word a class the host's CSS defines (`tm-wordmark`). The same
+  rule as the engine's views glob:
+  [NEW_APP_SETUP.md, section 14](docs/NEW_APP_SETUP.md#14-css-component-classes).
 - `navbar_root_hook` and `navbar_z_tier` are booleans, `false` by default.
 
 ### The account row

@@ -1,0 +1,25 @@
+<%# The newsletter cards in JSON mode with fetcher: set (engine-adoption-loose-ends):
+    the unsubscribe card's press goes through the export @fetcher names in
+    studio/host_fetchers rather than plain fetch. Every card is the engine
+    partial; the lab sets locals and one opener, nothing else. %>
+<main class="max-w-3xl mx-auto px-4 py-10" x-data
+      @lab-newsletter-changed.window="$el.dataset.changed = String($event.detail.subscribed)">
+  <h1 class="text-2xl font-bold mb-6">Newsletter host fetcher</h1>
+
+  <button type="button" data-test="open-newsletter-unsubscribe" class="btn btn-outline"
+          @click="$store.modals.open('unsubscribe-confirm')">Newsletter unsubscribe</button>
+
+  <%= render "studio/modals/host" do %>
+    <%= render "studio/profiles/newsletter_modals",
+          user:               @user,
+          modal_store:        "modals",
+          submit_mode:        :json,
+          subscribe_url:      "/lab/modal_blocks/newsletter",
+          unsubscribe_url:    "/lab/modal_blocks/newsletter/leave",
+          unsubscribe_method: "POST",
+          changed_event:      "lab-newsletter-changed",
+          fetcher:            @fetcher,
+          unsubscribe_card:   { id: "unsubscribe-confirm" },
+          goodbye_card:       { id: "unsubscribe-goodbye" } %>
+  <% end %>
+</main>

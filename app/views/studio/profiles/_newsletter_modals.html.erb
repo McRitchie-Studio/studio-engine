@@ -39,6 +39,14 @@
       changed_event     :json only. The window event a success dispatches,
                         with { subscribed, email, response }. Default
                         "studio:newsletter-changed".
+      fetcher           :json only. The host's own request wrapper, by its
+                        export name in the importmap module
+                        "studio/host_fetchers", which the host pins to a file
+                        of its own (Turf Monster: authedFetch, so a 401 opens
+                        sign-in and a 429 the rate-limit card). Validated as a
+                        JS identifier; refused under :form, where nothing
+                        would call it. Unset, the cards send plain fetch.
+                        The contract is in studio/newsletter_modal.js.
 
     THE CARDS. Each is a Hash of its copy, or off. The two above are on by
     default (false turns one off); the other three are off by default (a Hash,
@@ -71,6 +79,18 @@
     raise ArgumentError, "studio/profiles/_newsletter_modals submit_mode: :form or :json, got #{newsletter_mode.inspect}"
   end
   newsletter_json = newsletter_mode == :json
+
+  # The host's fetcher, by name (studio/host_fetchers). A name, so it is
+  # refused rather than escaped; under :form nothing would ever call it.
+  newsletter_fetcher = local_assigns[:fetcher].presence&.to_s
+  if newsletter_fetcher
+    unless newsletter_json
+      raise ArgumentError, "studio/profiles/_newsletter_modals fetcher: needs submit_mode: :json; the form cards send no request of their own"
+    end
+    unless newsletter_fetcher.match?(Studio::JsIdentifier::PATTERN)
+      raise ArgumentError, "studio/profiles/_newsletter_modals fetcher: must be a JS identifier (an export name in studio/host_fetchers); got #{local_assigns[:fetcher].inspect}"
+    end
+  end
 
   # Each card's defaults; a host's Hash is merged over them. The two cards that
   # shipped first keep their copy and their header exactly.
@@ -132,7 +152,9 @@
   # The x-data for one JSON card (studio/newsletter_modal). Every value lands in
   # a JS string, escaped; tag.attributes encodes the double quote.
   newsletter_scope = lambda do |**opts|
-    pairs = { store: newsletter_modal_store }.merge(opts).map do |key, value|
+    named = { store: newsletter_modal_store }
+    named[:fetcher] = newsletter_fetcher if newsletter_fetcher && opts.any?
+    pairs = named.merge(opts).map do |key, value|
       literal = (value == true || value == false) ? value.to_s : "'#{Studio::JsLiteral.in_attribute(value.to_s)}'"
       "#{key}: #{literal}"
     end

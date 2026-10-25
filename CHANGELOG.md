@@ -70,8 +70,43 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
     `ArgumentError`); a raising callable falls back to the default and is
     reported once.
 
+- **`studio/profiles/_newsletter_modals` takes `fetcher:`, the host's own
+  request wrapper, in `submit_mode: :json`.** It names an export of the
+  importmap module `studio/host_fetchers`, which the engine pins to an empty
+  module and a host pins to a file of its own (Turf Monster:
+  `export { authedFetch } from "solana_utils"`, so a 401 opens sign-in and a
+  429 the rate-limit card). It is the standard's sanctioned seam: a host pin
+  of an engine name wins, and a `window.*` global is forbidden as an API
+  between files. Validated as a JS identifier and refused under `:form`. A
+  fetcher that returns null has answered the request itself; a name the module
+  does not export fails the press with the plain line and one console error,
+  and never falls back to plain fetch. Unset, the cards send plain fetch, as
+  before.
+
 ### Fixed
 
+- **The README warns of three navbar adoption traps** (pinned by
+  `test/docs/navbar_readme_warnings_test.rb`): `navbar_menu_trigger` renders
+  its partial twice, in the rail and the phone row, so it carries no ids; a
+  `navbar_header_bars` callable that raises drops every bar for that render
+  (reported once), so one that carries an OPSEC control (Turf Monster's
+  impersonation bar, OPSEC-046) must not raise; and `navbar_brand`'s word
+  classes live in the host's initializer, which the host's Tailwind scan must
+  include.
+- **`Studio.navbar_account_sidebar` refuses `controls:` that name the engine's
+  link sidebar** (`studio-link-sidebar`, `studio-link-sidebar-mobile`) with
+  `InvalidConfig` at assignment, and a callable's answer when it resolves.
+  `studio/link_sidebar` claims any trigger whose `aria-controls` names that
+  panel, so the account button would have opened the engine's link sidebar
+  instead of the host's.
+- **`Studio.navbar_signed_out_cta` with `modal:` marks its button
+  `aria-haspopup="dialog"`,** so a screen reader announces the dialog before
+  the press. A CTA without `modal:` renders as before.
+- **`Studio.navbar_phone_name` ends a long name in an ellipsis where scroll
+  timelines are unsupported.** The `text-overflow: clip` that makes room for
+  the fade now sits inside the `@supports (animation-timeline: scroll())`
+  block with the fade, so Firefox, which has no fade, keeps `truncate`'s
+  ellipsis instead of cutting the name mid-letter.
 - **`studio/cropper_assets` pins Cropper.js with Subresource Integrity.** The
   cdnjs `cropper.min.css` and `cropper.min.js` (1.6.2) tags now carry sha384
   `integrity` and `crossorigin="anonymous"`, so a changed file on the CDN fails

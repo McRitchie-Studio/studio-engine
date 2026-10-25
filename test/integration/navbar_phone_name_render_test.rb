@@ -17,6 +17,8 @@ require "nokogiri"
 
 class NavbarPhoneNameRenderTest < ActiveSupport::TestCase
   CSS = File.read(File.expand_path("../../app/assets/tailwind/studio_engine/engine.css", __dir__))
+  # The phone name's below-md block: the first 767px media block that names it.
+  PHONE_BLOCK = CSS[/@media \(max-width: 767px\) \{\n(?:(?!\n\}\n).)*?\[data-nav-name-phone\].*?\n\}\n/m]
 
   setup { @prior = Studio.navbar_phone_name }
   teardown { Studio.navbar_phone_name = @prior }
@@ -47,13 +49,26 @@ class NavbarPhoneNameRenderTest < ActiveSupport::TestCase
   end
 
   test "engine.css fades the phone name on its own scroll timeline, below md only" do
-    block = CSS[/@media \(max-width: 767px\) \{\n  \[data-nav-name-phone\].*?\n\}\n/m]
+    block = PHONE_BLOCK
 
     refute_nil block
-    assert_includes block, "text-overflow: clip"
-    assert_includes block, "animation: nav-name-fade linear both"
-    assert_includes block, "animation-timeline: scroll(self inline)"
+    supported = block[/@supports \(animation-timeline: scroll\(\)\) \{\n.*?\n  \}\n/m]
+    refute_nil supported, "the fade sits behind the scroll-timeline check"
+    assert_includes supported, "text-overflow: clip"
+    assert_includes supported, "animation: nav-name-fade linear both"
+    assert_includes supported, "animation-timeline: scroll(self inline)"
     assert_match(/@keyframes nav-name-fade \{\n  from, to \{[^}]*mask-image: linear-gradient\(to right, black 50%, transparent\);/m, CSS)
+  end
+
+  # Shannon's Firefox screenshot: with no scroll timelines there is no fade, so
+  # a clip there cut a long name mid-letter. The clip is the fade's partner and
+  # lives only where the fade does; elsewhere truncate's ellipsis stands.
+  test "a browser without scroll timelines keeps truncate's ellipsis on the phone name" do
+    block = PHONE_BLOCK
+    refute_nil block
+    outside = block.sub(/@supports \(animation-timeline: scroll\(\)\) \{\n.*?\n  \}\n/m, "")
+    refute_includes outside, "text-overflow", "a clip outside the @supports block cuts the name mid-letter"
+    assert_includes block, "text-overflow: clip", "the control: the clip still exists, inside the check"
   end
 
   private

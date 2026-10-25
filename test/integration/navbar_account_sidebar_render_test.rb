@@ -100,6 +100,23 @@ class NavbarAccountSidebarRenderTest < ActiveSupport::TestCase
     assert_raises(Studio::NavbarSlots::InvalidConfig) { Studio.navbar_menu_trigger = ["navbar_slot_fixtures/trigger"] }
   end
 
+  # studio/link_sidebar claims a click on a trigger whose aria-controls names
+  # the engine's link sidebar, so this control would open the engine's panel.
+  test "controls naming the engine's link sidebar are refused when assigned, and not kept" do
+    Studio.navbar_account_sidebar = GEAR
+    error = assert_raises(Studio::NavbarAccountSidebar::InvalidConfig) do
+      Studio.navbar_account_sidebar = { flag: "gearOpen", controls: "studio-link-sidebar studio-link-sidebar-mobile" }
+    end
+    assert_match(/engine's link sidebar/, error.message)
+    assert_equal GEAR, Studio.navbar_account_sidebar, "the refused value is not kept"
+
+    Studio.navbar_account_sidebar = ->(_view) { { flag: "gearOpen", controls: "studio-link-sidebar" } }
+    raised = assert_raises(ActionView::Template::Error, "a callable's answer is checked when it resolves") do
+      render(signed_in: true)
+    end
+    assert_instance_of Studio::NavbarAccountSidebar::InvalidConfig, raised.cause
+  end
+
   private
 
   def render(signed_in:, admin: false) = NavbarRenderHost.render_navbar(signed_in: signed_in, admin: admin)

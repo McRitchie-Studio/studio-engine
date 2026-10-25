@@ -44,7 +44,29 @@ class NavbarAccountSidebarTest < Minitest::Test
     end
   end
 
-  def test_bad_shapes_are_refused
+  # studio/link_sidebar claims a click on any trigger whose aria-controls names
+  # the engine's link sidebar, so a host sidebar control naming it would open
+  # the engine's panel instead of the host's.
+  def test_controls_naming_the_engine_link_sidebar_are_refused
+    [["studio-link-sidebar"], "studio-link-sidebar-mobile", "gear-sidebar studio-link-sidebar",
+     [:"studio-link-sidebar-mobile", "gear"]].each do |controls|
+      error = assert_raises(A::InvalidConfig, controls.inspect) { A.normalize({ flag: "f", controls: controls }) }
+      assert_match(/studio-link-sidebar/, error.message)
+      assert_match(/engine's link sidebar/, error.message)
+    end
+    assert_equal "studio-link-sidebarx my-studio-link-sidebar",
+                 A.normalize({ flag: "f", controls: "studio-link-sidebarx my-studio-link-sidebar" })[:controls],
+                 "the control: only the engine's two ids are refused, not names that contain them"
+  end
+
+  def test_the_refused_ids_are_the_link_sidebar_panels_the_javascript_claims
+    js = File.read(File.expand_path("../../app/javascript/studio/link_sidebar.js", __dir__))
+    panels = js[/export const LINK_SIDEBAR_PANELS = "([^"]+)"/, 1]
+    refute_nil panels, "link_sidebar.js no longer names its panels"
+    assert_equal panels.split(",").map { |sel| sel.strip.delete_prefix("#") }, A::ENGINE_LINK_SIDEBAR_IDS
+  end
+
+    def test_bad_shapes_are_refused
     assert_raises(A::InvalidConfig) { A.validate!("gearOpen") }
     error = assert_raises(A::InvalidConfig) { A.validate!({ flag: "f", controls: "p", toggle: "x" }) }
     assert_match(/unknown key :toggle/, error.message)

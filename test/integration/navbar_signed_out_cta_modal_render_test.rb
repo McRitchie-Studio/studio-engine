@@ -45,6 +45,25 @@ class NavbarSignedOutCtaModalRenderTest < ActiveSupport::TestCase
     assert_equal expected, button["@click"]
   end
 
+  # The button opens a dialog, so it says so before it is pressed; a CTA that
+  # only navigates is a plain link and claims no popup.
+  test "modal: marks the button aria-haspopup=dialog, and a plain CTA carries none" do
+    Studio.navbar_signed_out_cta = TURF
+    assert_equal "dialog", doc.at_css("[data-nav-signed-out-cta]")["aria-haspopup"]
+
+    Studio.navbar_signed_out_cta = { label: "Build App", path: "/build" }
+    refute doc.at_css("[data-nav-signed-out-cta]").key?("aria-haspopup")
+    refute_includes render, "aria-haspopup", "no other signed-out control claims a popup either"
+  end
+
+  test "[unit] the helper adds aria-haspopup only with a modal" do
+    helper = Object.new.extend(StudioNavbarHelper)
+    with_modal = helper.studio_navbar_cta_modal_options({ label: "x", path: "/x", modal: { id: "auth", props: {} } })
+    assert_equal "dialog", with_modal[:"aria-haspopup"]
+    assert_equal({}, helper.studio_navbar_cta_modal_options({ label: "x", path: "/x" }))
+    assert_equal({}, helper.studio_navbar_cta_modal_options(nil))
+  end
+
   test "the props reach the expression as the JSON they were configured as" do
     Studio.navbar_signed_out_cta = TURF.merge(modal: { id: "auth", props: { note: %(it's "quoted" </script>) } })
     expr = doc.at_css("[data-nav-signed-out-cta]")["@click"]
