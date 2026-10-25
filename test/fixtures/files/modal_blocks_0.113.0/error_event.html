@@ -1,0 +1,12 @@
+<div role="alert" class="text-center py-6">
+  <div class="text-5xl mb-4 leading-none">⏳</div>
+  <p class="text-sm text-heading font-semibold mb-2">Oops</p>
+
+
+    <button @click="$dispatch('retry')" class="btn btn-outline btn-sm">Retry</button>
+
+    <button @click="$dispatch('close-it')"
+            class="block mx-auto mt-3 text-xs text-secondary hover:text-heading underline underline-offset-2">
+      Close
+    </button>
+</div>
