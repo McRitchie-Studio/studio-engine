@@ -17,9 +17,23 @@
     data-pin-edge: on a header on the scroll timeline the stack publishes the
     PINNED bar and nothing per frame, so at the top of the page this fixed panel
     would cover the expanded header. engine.css (THE PINNED EDGE ON THE SCROLL
-    TIMELINE) moves it with the header on the scroll timeline instead. %>
+    TIMELINE) moves it with the header on the scroll timeline instead.
+
+    Two opt-in locals (unset, the panel renders as it did in 0.113.0):
+      title_html  the header's LEAD SLOT: HTML in the title's place, for a panel
+                  whose lead is a live status line rather than a label. It is
+                  content, NOT a name: it never feeds aria-labelledby or
+                  aria-label, so a caller that passes it instead of `title` must
+                  pass aria_label, or the panel has no accessible name. `title`
+                  wins when both are passed. Escaped unless html_safe.
+      close_hook  true stamps the close button data-sidebar-panel-close="<id>"
+                  too, so a host's own document handler can match the button
+                  to its panel by id. Needs `id`; without one it adds nothing.
+                  data-link-sidebar-close stays, and studio/link_sidebar counts
+                  it only inside its own panels. %>
 <% id             = local_assigns.fetch(:id, nil) %>
 <% title          = local_assigns.fetch(:title, nil) %>
+<% title_html     = local_assigns.fetch(:title_html, nil) %>
 <% open           = local_assigns.fetch(:open) %>
 <% actions_html   = local_assigns.fetch(:actions_html, nil) %>
 <% body_html      = local_assigns.fetch(:body_html, nil) %>
@@ -34,6 +48,7 @@
 <% role           = local_assigns.fetch(:role, "complementary") %>
 <% aria_label     = local_assigns.fetch(:aria_label, title) %>
 <% labelledby     = id.present? && title.present? ? "#{id}-title" : nil %>
+<% close_hook     = local_assigns.fetch(:close_hook, false) && id.present? %>
 
 <aside
   <% if id.present? %>id="<%= id %>"<% end %>
@@ -64,10 +79,14 @@
   role="<%= role %>"
   <% if labelledby %>aria-labelledby="<%= labelledby %>"<% elsif aria_label.present? %>aria-label="<%= aria_label %>"<% end %>>
   <div class="flex flex-col h-full">
-    <% if title.present? || actions_html.present? || close_action.present? %>
+    <% if title.present? || title_html.present? || actions_html.present? || close_action.present? %>
       <div class="flex items-center justify-between p-4 border-b border-subtle">
         <% if title.present? %>
           <h3 <% if labelledby %>id="<%= labelledby %>"<% end %> class="text-lg font-bold text-heading"><%= title %></h3>
+        <% elsif title_html.present? %>
+          <%# min-w-0 so a long status line truncates in its own box instead of
+              pushing the close button off the panel's edge on a phone. %>
+          <div class="min-w-0 flex-1" data-sidebar-panel-lead><%= title_html %></div>
         <% end %>
         <div class="flex items-center gap-2 ml-auto">
           <%= actions_html if actions_html.present? %>
@@ -76,7 +95,7 @@
                     @click="<%= close_action %>"
                     class="flex items-center justify-center w-8 h-8 rounded-full text-secondary hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition"
                     aria-label="Close sidebar"
-                    data-link-sidebar-close="true">
+                    data-link-sidebar-close="true"<% if close_hook %> data-sidebar-panel-close="<%= id %>"<% end %>>
               <span class="text-xl leading-none">&times;</span>
             </button>
           <% end %>

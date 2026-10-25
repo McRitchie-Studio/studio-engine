@@ -4,6 +4,40 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **The engine navbar carries what a forking consumer needed.** Measured
+  against Turf Monster's forks of `layouts/_navbar`, `components/_user_nav` and
+  `components/_sidebar_panel`. Every setting is opt-in, and unset the navbar,
+  user nav and sidebar panel render byte-identical to 0.113.0, signed in and
+  out, live and preview. README, *Signed-out call to action* through *Brand,
+  root hook and layer tier*.
+  - `layouts/_navbar` forwards the user nav's slot locals (`balance_slot`,
+    `extra_icons_slot`, `div2_slot`, `div2_html`).
+  - `Studio.navbar_header_bars`: partials rendered inside the pinned header,
+    above its row, in `[data-nav-header-bars]`, so a control bar (an
+    impersonation escape) never scrolls away; `engine.css` (*THE IN-HEADER
+    BARS*) holds them on the scroll timeline. Never on a preview.
+  - `Studio.navbar_signed_out_cta` takes `modal:` (an id, or an id and JSON
+    props; the engine builds the `$store.modals.open` expression, and `path:`
+    is the fallback `href`), `sign_in_link: false` (no second sign-in link),
+    and `sign_in_path:`.
+  - `Studio.navbar_account_sidebar`: the account control becomes a button that
+    toggles a host store flag, `aria-controls` naming its panels.
+    `Studio.navbar_menu_trigger`: a host partial in the admin dropdown's seat,
+    in the icon rail and the phone row.
+  - `Studio.navbar_phone_name`: the name shows below `md`, capped, and fades
+    when it overflows, in CSS only (`engine.css`, *THE PHONE NAME*).
+  - `Studio.navbar_brand` (logo, size, alt, split title words),
+    `Studio.navbar_root_hook` (`data-navbar-root`) and `Studio.navbar_z_tier`
+    (the live header at `z-[var(--z-nav)]` in place of `z-50`).
+  - `components/_sidebar_panel` takes `title_html` (a lead slot in the title's
+    place that never names the panel) and `close_hook: true`
+    (`data-sidebar-panel-close="<id>"` on the close button).
+  - Bad static config raises at assignment (`InvalidConfig` or
+    `ArgumentError`); a raising callable falls back to the default and is
+    reported once.
+
 ### Fixed
 
 - **`studio/cropper_assets` pins Cropper.js with Subresource Integrity.** The

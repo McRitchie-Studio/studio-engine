@@ -7,6 +7,11 @@
 #                               the desktop bar AND the phone row
 #   Studio.navbar_avatar_badge  one partial rendered over the signed-in avatar's
 #                               upper-left corner (components/_user_nav, Div 3)
+#   Studio.navbar_header_bars   partials rendered INSIDE the pinned header, above
+#                               its row, so they never scroll away (a control
+#                               bar such as an impersonation escape)
+#   Studio.navbar_menu_trigger  one partial the icon rail and the phone row
+#                               render in place of the admin dropdown
 #
 # A partial spec is one of:
 #
@@ -14,7 +19,8 @@
 #   { partial: "shared/wallet_signal",              a path with locals
 #     locals: { tone: "muted" } }
 #
-# navbar_items is an Array of specs, navbar_avatar_badge one spec or nil, and
+# navbar_items and navbar_header_bars are Arrays of specs, navbar_avatar_badge
+# and navbar_menu_trigger one spec or nil, and
 # either may instead be a callable receiving the view that answers the same
 # (nil meaning nothing for that render). Both defaults render nothing, so the
 # navbar stays byte-identical until an app opts in.
@@ -31,6 +37,8 @@ module Studio
     SPEC_KEYS = %i[partial locals].freeze
     ITEMS = "Studio.navbar_items"
     BADGE = "Studio.navbar_avatar_badge"
+    HEADER_BARS = "Studio.navbar_header_bars"
+    MENU_TRIGGER = "Studio.navbar_menu_trigger"
 
     @reported = {}
     @reported_lock = Mutex.new
@@ -38,37 +46,50 @@ module Studio
     module_function
 
     # The item specs for one render, in order; [] renders nothing.
-    def resolve_items(config, view)
-      answer = call(config, view, ITEMS) { return [] }
-      items(answer)
+    def resolve_items(config, view, setting = ITEMS)
+      answer = call(config, view, setting) { return [] }
+      items(answer, setting)
     end
 
     # The badge spec for one render, or nil for no badge.
-    def resolve_badge(config, view)
-      answer = call(config, view, BADGE) { return nil }
-      answer.nil? ? nil : spec(answer, BADGE)
+    def resolve_badge(config, view, setting = BADGE)
+      answer = call(config, view, setting) { return nil }
+      answer.nil? ? nil : spec(answer, setting)
+    end
+
+    # The header bar specs for one render, in order; [] renders nothing.
+    def resolve_header_bars(config, view)
+      resolve_items(config, view, HEADER_BARS)
+    end
+
+    # The menu trigger spec for one render, or nil for the admin dropdown.
+    def resolve_menu_trigger(config, view)
+      resolve_badge(config, view, MENU_TRIGGER)
     end
 
     # Shape checks without a view: a static setting fails at boot, not on the
     # first page render. A callable is checked when it resolves.
-    def validate_items!(config)
-      items(config) unless config.respond_to?(:call)
+    def validate_items!(config, setting = ITEMS)
+      items(config, setting) unless config.respond_to?(:call)
       nil
     end
 
-    def validate_badge!(config)
-      spec(config, BADGE) unless config.nil? || config.respond_to?(:call)
+    def validate_badge!(config, setting = BADGE)
+      spec(config, setting) unless config.nil? || config.respond_to?(:call)
       nil
     end
 
-    def items(list)
+    def validate_header_bars!(config) = validate_items!(config, HEADER_BARS)
+    def validate_menu_trigger!(config) = validate_badge!(config, MENU_TRIGGER)
+
+    def items(list, setting = ITEMS)
       return [] if list.nil?
       unless list.is_a?(Array)
-        raise InvalidConfig, "#{ITEMS} must be an Array of partial specs or a callable returning one " \
+        raise InvalidConfig, "#{setting} must be an Array of partial specs or a callable returning one " \
                              "(got #{list.class})"
       end
 
-      list.each_with_index.map { |entry, index| spec(entry, "#{ITEMS}[#{index}]") }
+      list.each_with_index.map { |entry, index| spec(entry, "#{setting}[#{index}]") }
     end
 
     # One spec, as { partial: String, locals: Hash }.

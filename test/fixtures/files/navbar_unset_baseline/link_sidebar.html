@@ -1,0 +1,144 @@
+
+<style>
+  /* Clip horizontal overflow so the off-canvas start/end frame of the slide
+     never flashes a scrollbar. `clip` (not `hidden`) does not create a scroll
+     container, so sticky headers keep working. Scoped here — not engine.css —
+     so apps that declare no sections get zero global CSS change. */
+  html { overflow-x: clip; }
+</style>
+
+<template data-studio-controller="link-sidebar"></template>
+
+
+
+
+<aside
+  id="studio-link-sidebar"
+  x-cloak
+  x-show="$store.sidebars.linkTreeOpen"
+  @click.outside="$store.sidebars.linkTreeOpen = false"
+  @keydown.escape.window="$store.sidebars.linkTreeOpen = false"
+  @turbo:before-cache.window="$store.sidebars.linkTreeOpen = false"
+  x-transition:enter="transition ease-out duration-300"
+  x-transition:enter-start="translate-x-full"
+  x-transition:enter-end="translate-x-0"
+  x-transition:leave="transition ease-in duration-200"
+  x-transition:leave-start="translate-x-0"
+  x-transition:leave-end="translate-x-full"
+  class="hidden md:flex fixed right-0 w-80 max-w-full bg-surface border-l border-subtle shadow-2xl studio-link-sidebar-layer flex-col "
+  style="top:var(--nav-bottom, var(--nav-h, 6rem));height:calc(100% - var(--nav-bottom, var(--nav-h, 6rem)))"
+  data-pin-edge
+  role="navigation"
+  aria-labelledby="studio-link-sidebar-title">
+  <div class="flex flex-col h-full">
+      <div class="flex items-center justify-between p-4 border-b border-subtle">
+          <h3 id="studio-link-sidebar-title" class="text-lg font-bold text-heading">Links</h3>
+        <div class="flex items-center gap-2 ml-auto">
+          
+            <button type="button"
+                    @click="$store.sidebars.linkTreeOpen = false"
+                    class="flex items-center justify-center w-8 h-8 rounded-full text-secondary hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition"
+                    aria-label="Close sidebar"
+                    data-link-sidebar-close="true">
+              <span class="text-xl leading-none">&times;</span>
+            </button>
+        </div>
+      </div>
+
+      <nav class="flex-1 min-h-0 overflow-y-auto py-2" aria-label="Studio links">
+      <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
+        <span>You</span>
+      </div>
+
+        <a class="group flex items-start gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition" @click="$store.sidebars.linkTreeOpen = false" href="/profile">
+            <span class="text-lg leading-none flex-shrink-0">👤</span>
+          <span class="min-w-0">
+            <span class="block font-medium truncate">Profile</span>
+              <span class="block text-xs text-muted leading-snug mt-0.5">Your name, email and photo</span>
+          </span>
+</a>      <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
+        <span>Site</span>
+      </div>
+
+        <a class="group flex items-start gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition" @click="$store.sidebars.linkTreeOpen = false" href="/">
+            <span class="text-lg leading-none flex-shrink-0">*</span>
+          <span class="min-w-0">
+            <span class="block font-medium truncate">Home</span>
+          </span>
+</a>
+  </nav>
+
+        <div class="border-t border-subtle p-2">
+      <a class="flex items-center gap-3 rounded-md px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition" @click="$store.sidebars.linkTreeOpen = false" href="/logout">
+        <span>👋</span><span>Log out</span>
+</a>    </div>
+
+  </div>
+</aside>
+
+
+
+<aside
+  id="studio-link-sidebar-mobile"
+  x-cloak
+  x-show="$store.sidebars.linkTreeOpen"
+  @click.outside="$store.sidebars.linkTreeOpen = false"
+  @keydown.escape.window="$store.sidebars.linkTreeOpen = false"
+  @turbo:before-cache.window="$store.sidebars.linkTreeOpen = false"
+  x-transition:enter="transition ease-out duration-300"
+  x-transition:enter-start="translate-x-full"
+  x-transition:enter-end="translate-x-0"
+  x-transition:leave="transition ease-in duration-200"
+  x-transition:leave-start="translate-x-0"
+  x-transition:leave-end="translate-x-full"
+  class="flex md:hidden fixed right-0 w-full bg-surface border-l border-subtle shadow-2xl studio-link-sidebar-layer flex-col "
+  style="top:var(--nav-bottom, var(--nav-h, 6rem));height:calc(100% - var(--nav-bottom, var(--nav-h, 6rem)))"
+  data-pin-edge
+  role="navigation"
+  aria-labelledby="studio-link-sidebar-mobile-title">
+  <div class="flex flex-col h-full">
+      <div class="flex items-center justify-between p-4 border-b border-subtle">
+          <h3 id="studio-link-sidebar-mobile-title" class="text-lg font-bold text-heading">Links</h3>
+        <div class="flex items-center gap-2 ml-auto">
+          
+            <button type="button"
+                    @click="$store.sidebars.linkTreeOpen = false"
+                    class="flex items-center justify-center w-8 h-8 rounded-full text-secondary hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition"
+                    aria-label="Close sidebar"
+                    data-link-sidebar-close="true">
+              <span class="text-xl leading-none">&times;</span>
+            </button>
+        </div>
+      </div>
+
+      <nav class="flex-1 min-h-0 overflow-y-auto py-2" aria-label="Studio links">
+      <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
+        <span>You</span>
+      </div>
+
+        <a class="group flex items-start gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition" @click="$store.sidebars.linkTreeOpen = false" href="/profile">
+            <span class="text-lg leading-none flex-shrink-0">👤</span>
+          <span class="min-w-0">
+            <span class="block font-medium truncate">Profile</span>
+              <span class="block text-xs text-muted leading-snug mt-0.5">Your name, email and photo</span>
+          </span>
+</a>      <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
+        <span>Site</span>
+      </div>
+
+        <a class="group flex items-start gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition" @click="$store.sidebars.linkTreeOpen = false" href="/">
+            <span class="text-lg leading-none flex-shrink-0">*</span>
+          <span class="min-w-0">
+            <span class="block font-medium truncate">Home</span>
+          </span>
+</a>
+  </nav>
+
+        <div class="border-t border-subtle p-2">
+      <a class="flex items-center gap-3 rounded-md px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition" @click="$store.sidebars.linkTreeOpen = false" href="/logout">
+        <span>👋</span><span>Log out</span>
+</a>    </div>
+
+  </div>
+</aside>
+

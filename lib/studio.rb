@@ -35,8 +35,10 @@ require "studio/booking"
 require "studio/navbar_links"
 require "studio/navbar_signed_out_cta"
 require "studio/navbar_slots"
+require "studio/navbar_account_sidebar"
 require "studio/navbar_identity"
 require "studio/navbar_wordmark"
+require "studio/navbar_brand"
 require "studio/auth_labels"
 require "studio/profile_sections"
 require "studio/profile_image"
@@ -334,6 +336,117 @@ module Studio
     NavbarSlots.reset_reported!
     @@navbar_avatar_badge = config
   end
+
+  # ---- Navbar header bars ----
+  # Partials the engine navbar renders INSIDE its pinned header, above the row,
+  # so they stay on screen while the page scrolls: a control an admin must not
+  # lose, such as an impersonation bar's "Return to <admin>" button. The bar
+  # stack (studio/banners/_stack) is the place for an ambient label; it renders
+  # above the header and scrolls away. Skipped on a preview render. The default
+  # [] renders byte-identical to before. An Array, or a callable receiving the
+  # view, of partial specs. Rules: lib/studio/navbar_slots.rb.
+  #
+  #   config.navbar_header_bars = ->(view) { view.impersonating? ? ["shared/impersonation_banner"] : [] }
+  mattr_reader :navbar_header_bars, default: []
+
+  def self.navbar_header_bars=(config)
+    NavbarSlots.validate_header_bars!(config)
+    NavbarSlots.reset_reported!
+    @@navbar_header_bars = config
+  end
+
+  # ---- Navbar menu trigger ----
+  # One partial the signed-in user nav's icon rail (from md) and the navbar's
+  # phone row render in place of the admin dropdown: the control that opens a
+  # host's own menu, such as Turf Monster's gear sidebar trigger. nil, the
+  # default, keeps the admin dropdown, byte-identical to before. A partial spec,
+  # or a callable receiving the view. Rules: lib/studio/navbar_slots.rb.
+  #
+  #   config.navbar_menu_trigger = "components/gear_sidebar_trigger"
+  mattr_reader :navbar_menu_trigger, default: nil
+
+  def self.navbar_menu_trigger=(config)
+    NavbarSlots.validate_menu_trigger!(config)
+    NavbarSlots.reset_reported!
+    @@navbar_menu_trigger = config
+  end
+
+  # ---- Navbar account sidebar ----
+  # The host sidebar the signed-in user nav's account control (name and
+  # avatar, one control) opens: a button toggling $store.<store>.<flag>, its
+  # aria-controls naming the panels. nil, the default, keeps the account link
+  # (or the link sidebar), byte-identical to before. A Hash, or a callable
+  # receiving the view. Pair it with Studio.navbar_menu_trigger for the gear.
+  # Rules: lib/studio/navbar_account_sidebar.rb.
+  #
+  #   config.navbar_account_sidebar = { flag: "gearOpen", controls: %w[gear-sidebar gear-sidebar-mobile] }
+  mattr_reader :navbar_account_sidebar, default: nil
+
+  def self.navbar_account_sidebar=(config)
+    NavbarAccountSidebar.validate!(config)
+    NavbarAccountSidebar.reset_reported!
+    @@navbar_account_sidebar = config
+  end
+
+  # ---- Navbar phone name ----
+  # true shows the signed-in name beside the avatar below md too, capped at
+  # 4.5rem (6rem from 400px) and fading out at its right edge when it does not
+  # fit, instead of hiding it as screen-reader text. The fade is CSS only
+  # (engine.css, THE PHONE NAME): it runs on the name's own scroll timeline,
+  # which is inactive when the name fits, so a short name never fades. A
+  # browser without scroll timelines clips the name. false, the default,
+  # renders byte-identical to before.
+  #
+  #   config.navbar_phone_name = true
+  mattr_reader :navbar_phone_name, default: false
+
+  def self.navbar_phone_name=(value)
+    @@navbar_phone_name = navbar_boolean!(:navbar_phone_name, value)
+  end
+
+  # ---- Navbar brand ----
+  # The navbar's logo image and title words, for an app whose brand is not the
+  # "Navbar Logo" image plus app_name with its last word in text-primary: a
+  # logo path and size, its alt, and the title as words, each its own span
+  # with the host's class (a split wordmark). nil, the default, renders
+  # byte-identical to before; every key is optional. navbar_wordmark wins when
+  # both are set. Rules: lib/studio/navbar_brand.rb.
+  #
+  #   config.navbar_brand = { logo: "/icon-192.png", logo_size: 48,
+  #                           words: [{ text: "Turf" }, { text: "Monster", class: "tm-wordmark" }] }
+  mattr_reader :navbar_brand, default: nil
+
+  def self.navbar_brand=(config)
+    @@navbar_brand = NavbarBrand.normalize(config)
+  end
+
+  # ---- Navbar root hook and layer tier ----
+  # navbar_root_hook: true puts data-navbar-root on the header (live and
+  # preview), the hook a host's tests and scripts find the navbar by.
+  # navbar_z_tier: true layers the live header on the shared layer scale,
+  # z-[var(--z-nav)] (engine.css), in place of z-50, so a modal (--z-modal)
+  # covers it and the tiers stay one table. Both false by default, which
+  # renders byte-identical to before.
+  #
+  #   config.navbar_root_hook = true
+  #   config.navbar_z_tier = true
+  mattr_reader :navbar_root_hook, default: false
+  mattr_reader :navbar_z_tier, default: false
+
+  def self.navbar_root_hook=(value)
+    @@navbar_root_hook = navbar_boolean!(:navbar_root_hook, value)
+  end
+
+  def self.navbar_z_tier=(value)
+    @@navbar_z_tier = navbar_boolean!(:navbar_z_tier, value)
+  end
+
+  def self.navbar_boolean!(name, value)
+    return value if [true, false].include?(value)
+
+    raise ArgumentError, "Studio.#{name} must be true or false (got #{value.inspect})"
+  end
+  private_class_method :navbar_boolean!
 
   # ---- The shared profile page (/profile) ----
   # The rows that make up /profile. `nil` — the default — means "the engine's
@@ -1484,6 +1597,22 @@ module Studio
   # The avatar badge partial spec for a view, or nil (lib/studio/navbar_slots.rb).
   def self.navbar_avatar_badge_for(view)
     NavbarSlots.resolve_badge(navbar_avatar_badge, view)
+  end
+
+  # The in-header bar partial specs for a view (lib/studio/navbar_slots.rb).
+  def self.navbar_header_bars_for(view)
+    NavbarSlots.resolve_header_bars(navbar_header_bars, view)
+  end
+
+  # The menu trigger partial spec for a view, or nil (lib/studio/navbar_slots.rb).
+  def self.navbar_menu_trigger_for(view)
+    NavbarSlots.resolve_menu_trigger(navbar_menu_trigger, view)
+  end
+
+  # The account control's host sidebar for a view, or nil
+  # (lib/studio/navbar_account_sidebar.rb).
+  def self.navbar_account_sidebar_for(view)
+    NavbarAccountSidebar.resolve(navbar_account_sidebar, view)
   end
 
   # The signed-in user's navbar name for a view (lib/studio/navbar_identity.rb).

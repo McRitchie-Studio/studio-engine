@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-# The navbar's view seams: links, items, the avatar badge and the signed-out
-# CTA. Each resolves once per render pass, since a host lambda may read
+# The navbar's view seams: links, items, the avatar badge, the header bars,
+# the menu trigger, the account sidebar and the signed-out CTA. Each resolves once per render pass, since a host lambda may read
 # current_user or the database.
 module StudioNavbarHelper
   NAVBAR_LINK_CLASS = "inline-flex items-center gap-1.5 whitespace-nowrap font-medium transition"
@@ -21,6 +21,20 @@ module StudioNavbarHelper
     @studio_navbar_signed_out_cta = Studio.navbar_signed_out_cta_for(self)
   end
 
+  # The signed-out CTA's modal opener, as link_to options: {} when the CTA
+  # names no modal, so the button renders as before. The expression is built
+  # here from validated data (a plain id and JSON props), never taken from the
+  # host as a string. It opens the modal only where the engine's modal host
+  # has registered $store.modals, and only then cancels the link, so the href
+  # is the fallback without script or without a host.
+  def studio_navbar_cta_modal_options(cta)
+    modal = cta && cta[:modal]
+    return {} unless modal
+
+    open = "$store.modals.open(#{modal[:id].to_json}, #{modal[:props].to_json})"
+    { "data-nav-cta-modal": modal[:id], "@click": "$store.modals && ($event.preventDefault(), #{open})" }
+  end
+
   # Studio.navbar_items as partial specs ({ partial:, locals: }), [] for none.
   # Resolved once per render pass: the desktop bar and the phone row both ask.
   def studio_navbar_items
@@ -32,6 +46,35 @@ module StudioNavbarHelper
     return @studio_navbar_avatar_badge if defined?(@studio_navbar_avatar_badge)
 
     @studio_navbar_avatar_badge = Studio.navbar_avatar_badge_for(self)
+  end
+
+  # Studio.navbar_header_bars as partial specs, [] for none.
+  def studio_navbar_header_bars
+    @studio_navbar_header_bars ||= Studio.navbar_header_bars_for(self)
+  end
+
+  # Studio.navbar_menu_trigger as one partial spec, or nil for the admin
+  # dropdown. Resolved once per render pass: the rail and the phone row both ask.
+  def studio_navbar_menu_trigger
+    return @studio_navbar_menu_trigger if defined?(@studio_navbar_menu_trigger)
+
+    @studio_navbar_menu_trigger = Studio.navbar_menu_trigger_for(self)
+  end
+
+  # Studio.navbar_account_sidebar as { store:, flag:, controls: }, or nil.
+  def studio_navbar_account_sidebar
+    return @studio_navbar_account_sidebar if defined?(@studio_navbar_account_sidebar)
+
+    @studio_navbar_account_sidebar = Studio.navbar_account_sidebar_for(self)
+  end
+
+  # The account control's toggle and aria-expanded expressions for a resolved
+  # account sidebar, built from its validated names. The toggle is guarded, so
+  # a page without the store does nothing rather than throw.
+  def studio_navbar_account_sidebar_expressions(sidebar)
+    ref = "$store.#{sidebar[:store]}"
+    { toggle: "#{ref} && (#{ref}.#{sidebar[:flag]} = !#{ref}.#{sidebar[:flag]})",
+      expanded: "#{ref} && #{ref}.#{sidebar[:flag]} ? 'true' : 'false'" }
   end
 
   # One resolved partial spec, rendered through the normal partial pipeline.

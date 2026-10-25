@@ -266,7 +266,13 @@ class E2eLabController < ActionController::Base
     # request alone: the ivar studio_navbar_links memoizes, never a write to
     # Studio.navbar_links (one slot for the whole process).
     @studio_navbar_links = Studio::NavbarLinks.resolve(LAB_NAVBAR_LINKS, view_context) if params[:links].present?
+    # `header_bars` puts a control bar INSIDE the pinned header
+    # (Studio.navbar_header_bars), for this request alone, the same way: the
+    # ivar studio_navbar_header_bars memoizes, never a write to the setting.
+    @studio_navbar_header_bars = Studio::NavbarSlots.resolve_header_bars(LAB_HEADER_BARS, view_context) if params[:header_bars].present?
   end
+
+  LAB_HEADER_BARS = ["e2e_lab/header_bar"].freeze
 
   LAB_NAVBAR_LINKS = [
     { label: "Contests", href: "/lab/contests" },
