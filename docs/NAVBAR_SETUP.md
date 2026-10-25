@@ -29,6 +29,16 @@ If your app doesn't create its own `app/views/layouts/_navbar.html.erb`, the eng
   it too, so it carries no page-unique `id` either. Unset, nothing changes. See
   the README, *Avatar badge*.
 - Mobile sub-navbar with admin dropdown + theme toggle
+- Opt-in settings for an app that used to fork the navbar (each unset renders
+  as before; README, *Header bars* through *Brand, root hook and layer tier*):
+  `Studio.navbar_header_bars` (control bars inside the pinned header, never on
+  a preview), `Studio.navbar_menu_trigger` (a host partial in the admin
+  dropdown's seat, rail and phone row), `Studio.navbar_account_sidebar` (the
+  account control opens a host sidebar), `Studio.navbar_phone_name` (the name
+  below `md`, faded when it overflows), `Studio.navbar_brand` (logo, size, alt,
+  split title words), `Studio.navbar_root_hook` (`data-navbar-root`) and
+  `Studio.navbar_z_tier` (the live header at `--z-nav`). The signed-out CTA
+  also takes `modal:`, `sign_in_link: false` and `sign_in_path:`.
 - **Link sidebar** (when `Studio.sidebar_sections` is declared — see
   `NEW_APP_SETUP.md` section 4): a trigger button in the desktop icon rail and
   the mobile sub-navbar, plus the slide-out panels rendered after the header.
@@ -55,6 +65,10 @@ Start by copying the engine's version and customizing:
 | `show_logged_in` | boolean | `logged_in?` | Override session-based login check |
 | `balance_html` | string | `nil` | Raw HTML for balance display (passed to `_user_nav`) |
 | `extra_icons_html` | string | `nil` | Raw HTML for extra icon buttons (passed to `_user_nav`) |
+| `balance_slot` | partial spec | `nil` | Balance partial, forwarded to `_user_nav`; reserves the balance column like `balance_html` |
+| `extra_icons_slot` | partial spec | `nil` | Icon partial, rendered here so the link sidebar's trigger still follows it; wins over `extra_icons_html` |
+| `div2_slot` | partial spec | `nil` | Replaces the user nav's second row, forwarded to `_user_nav` |
+| `div2_html` | string | `nil` | Legacy raw HTML for the second row, forwarded to `_user_nav` (the slot wins) |
 | `scroll_timeline` | boolean | `config.navbar_scroll_timeline` | Opts this render into the scroll-driven collapse (below) |
 
 ## Adding Nav Links

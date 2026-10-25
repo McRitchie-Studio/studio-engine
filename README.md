@@ -915,6 +915,21 @@ config.navbar_account_sidebar = { flag: "gearOpen", controls: %w[gear-sidebar ge
   triggers in the capture phase, before Alpine binds, claims it too. Rules:
   `lib/studio/navbar_account_sidebar.rb`.
 
+### Sidebar panel lead and close hook
+
+`components/_sidebar_panel` takes two opt-in locals; unset, the panel renders
+as before:
+
+- `title_html:` HTML in the title's place, for a panel whose header leads with
+  a live status line. It is content, not a name: it never feeds
+  `aria-labelledby` or `aria-label`, so a caller that passes it instead of
+  `title:` passes `aria_label:`. `title:` wins when both are passed.
+- `close_hook: true` (with an `id:`) adds `data-sidebar-panel-close="<id>"` to
+  the close button, beside `data-link-sidebar-close`. The contract is the
+  host's: its own document handler matches the button to its panel by id
+  (Turf Monster's gear sidebar does). `studio/link_sidebar` reads only
+  `data-link-sidebar-close`, and only inside its own panels.
+
 ### Phone name — `Studio.navbar_phone_name`
 
 `true` shows the signed-in name beside the avatar below `md` too, capped at
