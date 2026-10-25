@@ -936,8 +936,9 @@ as before:
 4.5rem (6rem from 400px), and fades it out over its right half when it does not
 fit. The fade is CSS only (`engine.css`, *THE PHONE NAME*): it runs on the
 name's own scroll timeline, which is inactive while the name fits, so a short
-name never fades. A browser without scroll timelines clips the name. `false`,
-the default, keeps the name screen-reader text below `md`.
+name never fades. A browser without scroll timelines (Firefox today) ends a long
+name in an ellipsis instead. `false`, the default, keeps the name
+screen-reader text below `md`.
 
 ### Brand, root hook and layer tier — `Studio.navbar_brand`, `Studio.navbar_root_hook`, `Studio.navbar_z_tier`
 

@@ -889,12 +889,14 @@ body.modal-open .studio-app-banner {
    of ending in an ellipsis. The fade needs no script: the name's box clips
    (truncate), which makes it a scroll container, and a scroll timeline on a
    container with nothing to scroll is inactive, so the animation, and its
-   mask, applies only while the name overflows. A browser without scroll
-   timelines clips the name. From 768px the name truncates as before. */
+   mask, applies only while the name overflows. The clip that drops the
+   ellipsis lives inside the same check: a browser without scroll timelines
+   has no fade, so it keeps truncate's ellipsis rather than cutting the name
+   mid-letter. From 768px the name truncates as before. */
 @media (max-width: 767px) {
-  [data-nav-name-phone] > [data-nav-name] { text-overflow: clip; }
   @supports (animation-timeline: scroll()) {
     [data-nav-name-phone] > [data-nav-name] {
+      text-overflow: clip;
       animation: nav-name-fade linear both;
       animation-timeline: scroll(self inline);
     }

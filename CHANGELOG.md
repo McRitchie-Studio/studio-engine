@@ -85,6 +85,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **`Studio.navbar_phone_name` ends a long name in an ellipsis where scroll
+  timelines are unsupported.** The `text-overflow: clip` that makes room for
+  the fade now sits inside the `@supports (animation-timeline: scroll())`
+  block with the fade, so Firefox, which has no fade, keeps `truncate`'s
+  ellipsis instead of cutting the name mid-letter.
 - **`studio/cropper_assets` pins Cropper.js with Subresource Integrity.** The
   cdnjs `cropper.min.css` and `cropper.min.js` (1.6.2) tags now carry sha384
   `integrity` and `crossorigin="anonymous"`, so a changed file on the CDN fails
