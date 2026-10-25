@@ -1,0 +1,36 @@
+<div x-data="{ _remaining: 5, _total: 5, _redirectTimer: null, _confettiTimer: null, startCountdown(url) { if (!url) return; var self = this; if (self._redirectTimer) clearInterval(self._redirectTimer); self._redirectTimer = setInterval(function() { self._remaining--; if (self._remaining <= 0) { clearInterval(self._redirectTimer); self._redirectTimer = null; window.location.href = url; } }, 1000); }, fireConfetti() { var self = this; if (self._confettiTimer) clearTimeout(self._confettiTimer); self._confettiTimer = setTimeout(function() { self._confettiTimer = null; try { if (window.fireSuccessConfetti) window.fireSuccessConfetti(); } catch (_) {} }, 100); }, destroy() { if (this._redirectTimer) { clearInterval(this._redirectTimer); this._redirectTimer = null; } if (this._confettiTimer) { clearTimeout(this._confettiTimer); this._confettiTimer = null; } } }"
+     x-init="startCountdown(props.url)"
+     class="text-center py-6">
+
+    <div class="mx-auto w-14 h-14 rounded-full bg-primary/15 flex items-center justify-center mb-4">
+      <svg class="w-7 h-7 text-primary" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+      </svg>
+    </div>
+
+    <p class="text-lg font-bold text-heading mb-1">Done</p>
+
+
+      <div x-show="props.tx" class="mb-5">
+        <a :href="'https://explorer.solana.com/tx/' + (props.tx) + (typeof clusterParam !== 'undefined' ? clusterParam : '')"
+           target="_blank" rel="noopener"
+           class="inline-flex items-center gap-1.5 text-xs font-mono text-secondary hover:text-primary underline underline-offset-2">
+          <span x-text="(props.tx) ? ((props.tx).slice(0, 8) + '…' + (props.tx).slice(-4)) : ''"></span>
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+          </svg>
+        </a>
+      </div>
+
+    <div class="w-full rounded-full overflow-hidden mb-2" style="height:6px;background:rgba(128,128,128,0.2)">
+      <div :style="'height:100%;border-radius:9999px;background:var(--color-cta);transition:width 1s linear;width:' + (_remaining / _total * 100) + '%'"></div>
+    </div>
+    <p class="text-secondary text-xs mb-4">
+      Redirecting in <span class="text-primary font-mono font-bold" x-text="_remaining"></span>s…
+    </p>
+
+
+      <button @click="$dispatch('go')" class="btn btn-primary btn-lg w-full">Go</button>
+
+
+</div>

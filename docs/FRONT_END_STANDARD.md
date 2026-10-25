@@ -187,17 +187,18 @@ preloaded boot graph:
   only a page with a board fetches the board controller and SortableJS (the
   `sortablejs` pin). `window.Sortable` is a shim until then, whose `create`
   loads the library first.
-- The photo crop, the upload hosts, the birthday card and row and the profile
-  form are `studio/alpine_scopes`, which the head also loads by its own module
-  tag, so a boot that fails to load keeps a page its photo upload, its birthday
-  gate and its profile form.
+- The photo crop, the upload hosts, the birthday card and row, the profile
+  form, the error card's countdown and the newsletter cards are
+  `studio/alpine_scopes`, which the head also loads by its own module tag, so a
+  boot that fails to load keeps a page its photo upload, its birthday gate and
+  its profile form.
 
 What a factory needs later (Cropper.js, SortableJS) may arrive late, and the
 page says so when it never does: a control never takes a press that does
 nothing.
 
 A static module can fail too, and a browser keeps that failure for the life of
-the document: one failed request among `studio/alpine_scopes` and the four
+the document: one failed request among `studio/alpine_scopes` and the six
 modules it imports leaves every factory it publishes undefined. The head
 therefore carries a second nonced inline guard beside the hold button's,
 `studio/_alpine_scopes_guard`, which imports nothing. Once the page's boot is
@@ -240,6 +241,8 @@ components:
 | Image upload hosts, avatar cropper | `studio/image_upload` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="imageUploadHost({...})"`, `x-data="avatarCropperHost()"`, `submitFormWithProgress(form, opts)` |
 | Birthday card, profile birthday row | `studio/birthday` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="birthdayModal({...})"`, `x-data="studioBirthdayFields('...')"` |
 | Profile form | `studio/profile_form` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="studioProfileForm({...})"` |
+| Error card countdown (`blocks/_error_card` with `countdown_key:`) | `studio/modal_countdown` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="studioModalCountdown({...})"` |
+| Newsletter cards, JSON mode (`studio/profiles/_newsletter_modals` with `submit_mode: :json`) | `studio/newsletter_modal` | the Alpine scope, published by `studio/alpine_scopes` | `x-data="studioNewsletterModal({...})"` |
 | Compact identity bar (`studio/profiles/_identity_mini`) | `studio/identity_mini` | `identity-mini`, registered by `studio/application` | none needed |
 | Sign-in interstitial (`studio/_confirm_interstitial`) | `studio/confirm_interstitial` | its own module tag; the fallback button by CSS | none needed |
 | Style guide modal demos (`style/_modals`) | `studio/style_modals` | `style-modals`, registered by `studio/style_guide` from the section's own module tag; the store by `modal-host` | `$store.dsModals`, `window.dsModalDemos` on the style guide |

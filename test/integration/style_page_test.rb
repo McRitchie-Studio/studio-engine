@@ -1524,6 +1524,30 @@ class StylePageTest < ActiveSupport::TestCase
     end
   end
 
+  # --- 15b. the modal blocks' consumer locals -----------------------------------
+
+  CONSUMER_LOCAL_SPECIMENS = {
+    "ds-error-countdown" => "Error countdown",
+    "ds-success-close"   => "Success, closes",
+    "ds-username-locked" => "Username locked"
+  }.freeze
+
+  test "the consumer-local specimens are carded, registered, and close the guide's own store" do
+    html  = render_index
+    cards = html.scan(/aria-label="Open the (.+?) modal"/).flatten
+    ids   = registered_modal_ids(html)
+
+    CONSUMER_LOCAL_SPECIMENS.each do |modal_id, label|
+      assert_includes cards, label, "no specimen card for #{modal_id}"
+      assert_includes ids, modal_id, "#{modal_id} has a card but NO host registration"
+    end
+    counted = Nokogiri::HTML5(html).css("template").filter_map do |t|
+      Nokogiri::HTML5.fragment(t.inner_html).at_css("[x-data^='studioModalCountdown']")
+    end
+    assert_equal ["studioModalCountdown({ seconds: ($store.dsModals.current().props.secondsLeft), store: 'dsModals', autoClose: true })"],
+                 counted.map { |el| el["x-data"] }.uniq
+  end
+
   test "the rail-row specimen ranks exactly one rail" do
     # The arrangement IS the demo. Three equally-weighted rails would show the
     # primitive while teaching the opposite of what it is for — a hub that asks

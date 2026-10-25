@@ -351,6 +351,24 @@ class E2eLabController < ActionController::Base
   # the global one.
   def modal_host = render(:modal_host)
 
+  # The modal blocks' consumer locals (engine-modal-blocks-carry-consumer), each
+  # rendered with and without them on the GLOBAL host, as turf-monster mounts
+  # them. @user has no address, so the newsletter cards ask for one.
+  def modal_blocks
+    @user = LabUserWithoutEmail.new
+    render(:modal_blocks)
+  end
+
+  # The host's JSON routes the newsletter cards post to in submit_mode: :json,
+  # answering as turf-monster's do. The address, when one came, is echoed back
+  # so a spec can see the request carried it.
+  def modal_blocks_newsletter
+    email = params[:email].presence
+    render json: { success: true, seeds_earned: 25, email: email }
+  end
+
+  def modal_blocks_newsletter_leave = render(json: { success: true })
+
   # THE TOAST / BANNER COLLISION — three engine partials that only misbehave
   # together.
   #
@@ -506,6 +524,11 @@ class E2eLabController < ActionController::Base
   # state whose control opens the confirmation.
   class LabSubscriber < LabUser
     def joined_email_list_at = Time.at(1_700_000_000)
+  end
+
+  # A wallet-only account: the newsletter cards ask it for an address.
+  class LabUserWithoutEmail < LabUser
+    def email = nil
   end
 
   # THE EDIT PAGE'S user needs one thing more: an `avatar` that answers

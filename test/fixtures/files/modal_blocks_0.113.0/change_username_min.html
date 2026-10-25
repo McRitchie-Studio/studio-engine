@@ -1,0 +1,183 @@
+<div x-data="levelingActionModal({
+       hasInput: true,
+       initialValue: 'pat',
+       minLength: 3,
+       submitUrl: '/u',
+       finalizeUrl: '',
+       finalizeHook: '',
+       savedEvent: 'studio:username-saved',
+       store: 'modals',
+       leveling: false,
+       hasConsent: false,
+       demo: false,
+       seedsPerLevel: 100,
+       demoSeedsEarned: null,
+       demoSeedsTotal: null
+     })">
+
+  <template x-if="!celebrate">
+    <div>
+      <div>
+    <div class="flex items-start justify-between gap-3 -mt-2 -mr-2 mb-3">
+        <h3 class="text-heading font-bold text-lg leading-tight pt-1">Change Username</h3>
+        <button type="button" @click="$store.modals.close()"
+                class="text-secondary hover:text-heading text-xl leading-none flex-shrink-0"
+                aria-label="Close">&times;</button>
+    </div>
+
+  
+          <p class="text-sm text-muted mb-4">Pick a name that&#39;s right for you.</p>
+
+        <template x-if="error">
+          <p role="alert" class="text-red-400 text-sm mb-3" x-text="error"></p>
+        </template>
+
+        <form @submit.prevent="save()" class="space-y-4">
+            <input type="text" x-model="value" class="input-field w-full"
+                   placeholder="username"
+                   minlength="3"
+                   maxlength="30"
+                   pattern="[a-zA-Z0-9_-]+"
+                   title="3-30 characters — letters, numbers, hyphens, and underscores"
+                   autofocus>
+          <button type="submit" class="btn btn-primary btn-lg w-full" :disabled="saving || !changed">
+            <span x-show="!saving" x-text="changed ? 'Save' : 'Saved'">Save</span>
+            <span x-show="saving" class="inline-flex items-center justify-center gap-2" style="display: none;">
+              <span class="spinner" aria-hidden="true" style="--spinner-track: currentColor; --spinner-color: transparent; opacity: 0.85"></span>
+              <span x-text="progressLabel || 'Saving…'">Saving…</span>
+            </span>
+          </button>
+        </form>
+
+</div>
+    </div>
+  </template>
+
+  <template x-if="celebrate && leveling">
+    <div>
+      <div class="text-center">
+    <div class="text-5xl mb-4 leading-none">🌱</div>
+
+    <h3 class="text-3xl font-bold text-heading mb-2">Great Username</h3>
+
+    <p class="text-sm text-secondary mb-4">Nice — you earned 25 seeds by completing a quest. Complete more quests to earn a Free Entry Token.</p>
+</div>
+
+
+      <div class="mb-5">
+        <div x-data="{
+       displaySeeds: 0,
+       displayLevel: 1,
+       levelingUp: false,
+       showFreeEntryBadge: false,
+       _timers: [],
+       init() {
+         var self = this;
+         var perLevel = 100;
+         var total = (seedsTotal) || 0;
+         var earned = (seedsEarned) || 0;
+         var oldSeeds = Math.max(0, total - earned);
+         var oldLevel = Math.floor(oldSeeds / perLevel) + 1;
+         var newLevel = Math.floor(total / perLevel) + 1;
+         var oldToward = oldSeeds % perLevel;
+         var newToward = total % perLevel;
+         self.displaySeeds = oldToward;
+         self.displayLevel = oldLevel;
+         var schedule = function (fn, ms) { self._timers.push(setTimeout(fn, ms)); };
+         schedule(function () {
+           if (newLevel > oldLevel) {
+             self.levelingUp = true;
+             self.displaySeeds = perLevel;
+             schedule(function () {
+               self.displayLevel = newLevel;
+               self.showFreeEntryBadge = true;
+             }, 1900);
+             schedule(function () { self.displaySeeds = 0; }, 3400);
+             schedule(function () {
+               self.displaySeeds = newToward;
+               self.levelingUp = false;
+             }, 3600);
+           } else {
+             self.displaySeeds = newToward;
+           }
+         }, 2000);
+       },
+       destroy() {
+         this._timers.forEach(clearTimeout);
+         this._timers = [];
+       }
+     }"
+     class="mx-auto mb-1" style="max-width: 100%;">
+
+  <template x-if="!showFreeEntryBadge">
+    <div class="relative" style="--seeds-fill-dur: 1.9s;">
+      <div class="seeds-bar-continuous flex gap-1.5"
+           style="height: 22px;"
+           :style="{ '--bar-progress': (displaySeeds / 100 * 100) }">
+        <template x-for="i in 5" :key="i">
+          <div class="flex-1 relative overflow-hidden rounded-md"
+               style="background: rgb(var(--color-primary-500-rgb) / 0.06); border: 1.5px solid rgb(var(--color-primary-500-rgb) / 0.2);">
+            <div class="absolute inset-0 pointer-events-none"
+                 :style="{
+                   backgroundPosition: ((i - 1) * 25) + '% 0',
+                   clipPath: 'inset(0 calc(100% - clamp(0%, calc((var(--bar-progress) - ' + ((i - 1) * 20) + ') * 5%), 100%)) 0 0)'
+                 }"
+                 style="background-image: linear-gradient(90deg, color-mix(in srgb, var(--color-cta) 30%, transparent), color-mix(in srgb, var(--color-cta) 60%, transparent)); background-size: 500% 100%; background-repeat: no-repeat;"></div>
+            <div class="seeds-shimmer absolute top-0 bottom-0 pointer-events-none"
+                 :style="{ left: -(i - 1) * 100 + '%', width: '500%' }"
+                 style="background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 50%, transparent 100%);"></div>
+          </div>
+        </template>
+      </div>
+      <div class="absolute inset-y-0 right-2 flex items-center pointer-events-none">
+        <span class="inline-flex items-baseline gap-1 font-mono font-bold text-sm" style="color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.7);">
+          <span style="display:inline-block;overflow:hidden;height:1.25em;line-height:1.25em;width:3.2ch;text-align:right;">
+  <span class="block seeds-reel-track" :style="{ transform: 'translateY(-' + (displaySeeds * 1.25) + 'em)' }">
+    <span class="block" style="height:1.25em;line-height:1.25em;">0</span><span class="block" style="height:1.25em;line-height:1.25em;">1</span><span class="block" style="height:1.25em;line-height:1.25em;">2</span><span class="block" style="height:1.25em;line-height:1.25em;">3</span><span class="block" style="height:1.25em;line-height:1.25em;">4</span><span class="block" style="height:1.25em;line-height:1.25em;">5</span><span class="block" style="height:1.25em;line-height:1.25em;">6</span><span class="block" style="height:1.25em;line-height:1.25em;">7</span><span class="block" style="height:1.25em;line-height:1.25em;">8</span><span class="block" style="height:1.25em;line-height:1.25em;">9</span><span class="block" style="height:1.25em;line-height:1.25em;">10</span><span class="block" style="height:1.25em;line-height:1.25em;">11</span><span class="block" style="height:1.25em;line-height:1.25em;">12</span><span class="block" style="height:1.25em;line-height:1.25em;">13</span><span class="block" style="height:1.25em;line-height:1.25em;">14</span><span class="block" style="height:1.25em;line-height:1.25em;">15</span><span class="block" style="height:1.25em;line-height:1.25em;">16</span><span class="block" style="height:1.25em;line-height:1.25em;">17</span><span class="block" style="height:1.25em;line-height:1.25em;">18</span><span class="block" style="height:1.25em;line-height:1.25em;">19</span><span class="block" style="height:1.25em;line-height:1.25em;">20</span><span class="block" style="height:1.25em;line-height:1.25em;">21</span><span class="block" style="height:1.25em;line-height:1.25em;">22</span><span class="block" style="height:1.25em;line-height:1.25em;">23</span><span class="block" style="height:1.25em;line-height:1.25em;">24</span><span class="block" style="height:1.25em;line-height:1.25em;">25</span><span class="block" style="height:1.25em;line-height:1.25em;">26</span><span class="block" style="height:1.25em;line-height:1.25em;">27</span><span class="block" style="height:1.25em;line-height:1.25em;">28</span><span class="block" style="height:1.25em;line-height:1.25em;">29</span><span class="block" style="height:1.25em;line-height:1.25em;">30</span><span class="block" style="height:1.25em;line-height:1.25em;">31</span><span class="block" style="height:1.25em;line-height:1.25em;">32</span><span class="block" style="height:1.25em;line-height:1.25em;">33</span><span class="block" style="height:1.25em;line-height:1.25em;">34</span><span class="block" style="height:1.25em;line-height:1.25em;">35</span><span class="block" style="height:1.25em;line-height:1.25em;">36</span><span class="block" style="height:1.25em;line-height:1.25em;">37</span><span class="block" style="height:1.25em;line-height:1.25em;">38</span><span class="block" style="height:1.25em;line-height:1.25em;">39</span><span class="block" style="height:1.25em;line-height:1.25em;">40</span><span class="block" style="height:1.25em;line-height:1.25em;">41</span><span class="block" style="height:1.25em;line-height:1.25em;">42</span><span class="block" style="height:1.25em;line-height:1.25em;">43</span><span class="block" style="height:1.25em;line-height:1.25em;">44</span><span class="block" style="height:1.25em;line-height:1.25em;">45</span><span class="block" style="height:1.25em;line-height:1.25em;">46</span><span class="block" style="height:1.25em;line-height:1.25em;">47</span><span class="block" style="height:1.25em;line-height:1.25em;">48</span><span class="block" style="height:1.25em;line-height:1.25em;">49</span><span class="block" style="height:1.25em;line-height:1.25em;">50</span><span class="block" style="height:1.25em;line-height:1.25em;">51</span><span class="block" style="height:1.25em;line-height:1.25em;">52</span><span class="block" style="height:1.25em;line-height:1.25em;">53</span><span class="block" style="height:1.25em;line-height:1.25em;">54</span><span class="block" style="height:1.25em;line-height:1.25em;">55</span><span class="block" style="height:1.25em;line-height:1.25em;">56</span><span class="block" style="height:1.25em;line-height:1.25em;">57</span><span class="block" style="height:1.25em;line-height:1.25em;">58</span><span class="block" style="height:1.25em;line-height:1.25em;">59</span><span class="block" style="height:1.25em;line-height:1.25em;">60</span><span class="block" style="height:1.25em;line-height:1.25em;">61</span><span class="block" style="height:1.25em;line-height:1.25em;">62</span><span class="block" style="height:1.25em;line-height:1.25em;">63</span><span class="block" style="height:1.25em;line-height:1.25em;">64</span><span class="block" style="height:1.25em;line-height:1.25em;">65</span><span class="block" style="height:1.25em;line-height:1.25em;">66</span><span class="block" style="height:1.25em;line-height:1.25em;">67</span><span class="block" style="height:1.25em;line-height:1.25em;">68</span><span class="block" style="height:1.25em;line-height:1.25em;">69</span><span class="block" style="height:1.25em;line-height:1.25em;">70</span><span class="block" style="height:1.25em;line-height:1.25em;">71</span><span class="block" style="height:1.25em;line-height:1.25em;">72</span><span class="block" style="height:1.25em;line-height:1.25em;">73</span><span class="block" style="height:1.25em;line-height:1.25em;">74</span><span class="block" style="height:1.25em;line-height:1.25em;">75</span><span class="block" style="height:1.25em;line-height:1.25em;">76</span><span class="block" style="height:1.25em;line-height:1.25em;">77</span><span class="block" style="height:1.25em;line-height:1.25em;">78</span><span class="block" style="height:1.25em;line-height:1.25em;">79</span><span class="block" style="height:1.25em;line-height:1.25em;">80</span><span class="block" style="height:1.25em;line-height:1.25em;">81</span><span class="block" style="height:1.25em;line-height:1.25em;">82</span><span class="block" style="height:1.25em;line-height:1.25em;">83</span><span class="block" style="height:1.25em;line-height:1.25em;">84</span><span class="block" style="height:1.25em;line-height:1.25em;">85</span><span class="block" style="height:1.25em;line-height:1.25em;">86</span><span class="block" style="height:1.25em;line-height:1.25em;">87</span><span class="block" style="height:1.25em;line-height:1.25em;">88</span><span class="block" style="height:1.25em;line-height:1.25em;">89</span><span class="block" style="height:1.25em;line-height:1.25em;">90</span><span class="block" style="height:1.25em;line-height:1.25em;">91</span><span class="block" style="height:1.25em;line-height:1.25em;">92</span><span class="block" style="height:1.25em;line-height:1.25em;">93</span><span class="block" style="height:1.25em;line-height:1.25em;">94</span><span class="block" style="height:1.25em;line-height:1.25em;">95</span><span class="block" style="height:1.25em;line-height:1.25em;">96</span><span class="block" style="height:1.25em;line-height:1.25em;">97</span><span class="block" style="height:1.25em;line-height:1.25em;">98</span><span class="block" style="height:1.25em;line-height:1.25em;">99</span><span class="block" style="height:1.25em;line-height:1.25em;">100</span>
+  </span>
+</span>
+
+          <span class="text-[10px] font-normal opacity-90">seeds</span>
+        </span>
+      </div>
+    </div>
+  </template>
+
+  <template x-if="showFreeEntryBadge">
+    <div class="level-up-pop flex items-center justify-center w-full font-bold text-sm"
+         style="height: 22px; color: var(--color-cta);">
+      <span>Free Entry Earned 🎟️</span>
+    </div>
+  </template>
+</div>
+
+      </div>
+
+      <button type="button" @click="$store.modals.close()"
+              class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+        Close
+      </button>
+    </div>
+  </template>
+
+  <template x-if="celebrate && !leveling">
+    <div>
+      <div class="text-center">
+    <div class="mx-auto w-14 h-14 rounded-full bg-success/15 flex items-center justify-center mb-4">
+      <svg class="w-7 h-7 text-success" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+      </svg>
+    </div>
+
+    <h3 class="text-3xl font-bold text-heading mb-2">Saved</h3>
+
+</div>
+
+      <button type="button" @click="$store.modals.close()"
+              class="btn btn-primary btn-lg w-full">
+        Done
+      </button>
+    </div>
+  </template>
+</div>
+

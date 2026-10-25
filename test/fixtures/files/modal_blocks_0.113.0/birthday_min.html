@@ -1,0 +1,68 @@
+<div x-data="birthdayModal({ minAge: 0, state: '', url: '/age', store: 'modals', demo: false, demoUnderage: false, gateId: 'age-gate' })">
+  <div>
+    <div class="flex items-start justify-between gap-3 -mt-2 -mr-2 mb-3">
+        <h3 class="text-heading font-bold text-lg leading-tight pt-1">Your birthday</h3>
+        <button type="button" @click="$store.modals.close()"
+                class="text-secondary hover:text-heading text-xl leading-none flex-shrink-0"
+                aria-label="Close">&times;</button>
+    </div>
+
+  
+    <p class="text-sm text-muted mb-4">
+      Enter your date of birth — we only ask once.
+    </p>
+
+    <div class="mb-4">
+      <div class="grid grid-cols-3 gap-2">
+  <div>
+    <label class="label-upper block mb-1">Month</label>
+    <select x-model="month" @change="onMonthChange()"
+            class="input-field !px-3 !py-2.5 text-sm appearance-none cursor-pointer">
+      <option value="" disabled>Month</option>
+      <template x-for="m in months" :key="m.n">
+        <option :value="m.n" x-text="m.label"></option>
+      </template>
+    </select>
+  </div>
+  <div>
+    <label class="label-upper block mb-1">Day</label>
+    <select x-model="day" @change="onMonthChange()"
+            class="input-field !px-3 !py-2.5 text-sm appearance-none cursor-pointer">
+      <option value="" disabled>Day</option>
+      <template x-for="d in dayOptions" :key="d">
+        <option :value="d" x-text="d"></option>
+      </template>
+    </select>
+  </div>
+  <div>
+    <label class="label-upper block mb-1">Year</label>
+    <select x-model="year" @change="onMonthChange()"
+            class="input-field !px-3 !py-2.5 text-sm appearance-none cursor-pointer">
+      <option value="" disabled>Year</option>
+      <template x-for="y in years" :key="y">
+        <option :value="y" x-text="y"></option>
+      </template>
+    </select>
+  </div>
+</div>
+
+    </div>
+
+    <template x-if="error">
+      <p role="alert" class="text-red-400 text-sm mb-3" x-text="error"></p>
+    </template>
+
+    <button type="button" @click="submit()"
+            class="btn btn-primary btn-lg w-full"
+            :disabled="!complete || submitting">
+      <span x-show="!submitting">Confirm &amp; Continue</span>
+      <span x-show="submitting" class="inline-flex items-center justify-center gap-2" style="display: none;">
+        <span class="spinner" aria-hidden="true" style="--spinner-track: currentColor; --spinner-color: transparent; opacity: 0.85"></span>
+        Verifying…
+      </span>
+    </button>
+
+    <p class="text-[11px] text-muted text-center mt-3 leading-snug">We use your date of birth only to know when to wish you a happy birthday.</p>
+
+</div>
+</div>

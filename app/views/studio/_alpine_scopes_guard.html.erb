@@ -1,13 +1,15 @@
 <%#
   THE X-DATA FACTORIES' GUARD: says so when a page's factories did not load.
 
-  The photo crop, the upload hosts, the birthday card and row and the profile
-  form bind an x-data factory by name (cropPhotoModal, imageUploadHost,
-  avatarCropperHost, birthdayModal, studioBirthdayFields, studioProfileForm),
-  and all six are published by studio/alpine_scopes from four modules
-  (studio/cropper, studio/image_upload, studio/birthday, studio/profile_form).
+  The photo crop, the upload hosts, the birthday card and row, the profile
+  form, the error card's countdown and the newsletter cards bind an x-data
+  factory by name (cropPhotoModal, imageUploadHost, avatarCropperHost,
+  birthdayModal, studioBirthdayFields, studioProfileForm, studioModalCountdown,
+  studioNewsletterModal), and all eight are published by studio/alpine_scopes
+  from six modules (studio/cropper, studio/image_upload, studio/birthday,
+  studio/profile_form, studio/modal_countdown, studio/newsletter_modal).
   A browser keeps a failed module request for the life of the document, so one
-  failure among the five at page load leaves every name undefined until a
+  failure among the seven at page load leaves every name undefined until a
   reload: the profile page with no Save, the birthday card with nothing to
   press. This script is what speaks then, so it is INLINE and imports nothing:
   it shares no request with the modules whose failure it reports.
@@ -46,7 +48,7 @@
   (function () {
     if (window.studioScopesGuard) return;
 
-    var NAMES = ["cropPhotoModal", "imageUploadHost", "avatarCropperHost", "birthdayModal", "studioBirthdayFields", "studioProfileForm"];
+    var NAMES = ["cropPhotoModal", "imageUploadHost", "avatarCropperHost", "birthdayModal", "studioBirthdayFields", "studioProfileForm", "studioModalCountdown", "studioNewsletterModal"];
     var BOUND = "[x-data]";
     var FAILED = "data-studio-scope-failed";
     var FALLBACK = "data-studio-scope-fallback";

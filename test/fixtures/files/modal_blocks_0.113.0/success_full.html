@@ -1,0 +1,21 @@
+<div x-data="{ _remaining: 5, _total: 5, _redirectTimer: null, _confettiTimer: null, startCountdown(url) { if (!url) return; var self = this; if (self._redirectTimer) clearInterval(self._redirectTimer); self._redirectTimer = setInterval(function() { self._remaining--; if (self._remaining <= 0) { clearInterval(self._redirectTimer); self._redirectTimer = null; window.location.href = url; } }, 1000); }, fireConfetti() { var self = this; if (self._confettiTimer) clearTimeout(self._confettiTimer); self._confettiTimer = setTimeout(function() { self._confettiTimer = null; try { if (window.fireSuccessConfetti) window.fireSuccessConfetti(); } catch (_) {} }, 100); }, destroy() { if (this._redirectTimer) { clearInterval(this._redirectTimer); this._redirectTimer = null; } if (this._confettiTimer) { clearTimeout(this._confettiTimer); this._confettiTimer = null; } } }"
+     x-init="fireConfetti()"
+     class="text-center py-6">
+
+    <div class="text-5xl mb-4 leading-none">🎉</div>
+
+    <p class="text-3xl font-bold text-heading mb-2">Done</p>
+
+    <p class="text-sm text-secondary mb-4">All set</p>
+
+
+
+
+      <button @click="$dispatch('go')" class="btn btn-primary btn-lg w-full">Go</button>
+
+    <button @click="$dispatch('later')"
+            class="block mx-auto mt-3 text-xs text-secondary hover:text-heading underline underline-offset-2">
+      Later
+    </button>
+
+</div>

@@ -1,0 +1,22 @@
+<div x-data="{ _remaining: 5, _total: 5, _redirectTimer: null, _confettiTimer: null, startCountdown(url) { if (!url) return; var self = this; if (self._redirectTimer) clearInterval(self._redirectTimer); self._redirectTimer = setInterval(function() { self._remaining--; if (self._remaining <= 0) { clearInterval(self._redirectTimer); self._redirectTimer = null; window.location.href = url; } }, 1000); }, fireConfetti() { var self = this; if (self._confettiTimer) clearTimeout(self._confettiTimer); self._confettiTimer = setTimeout(function() { self._confettiTimer = null; try { if (window.fireSuccessConfetti) window.fireSuccessConfetti(); } catch (_) {} }, 100); }, destroy() { if (this._redirectTimer) { clearInterval(this._redirectTimer); this._redirectTimer = null; } if (this._confettiTimer) { clearTimeout(this._confettiTimer); this._confettiTimer = null; } } }"
+     
+     class="text-center py-6">
+
+    <div class="mx-auto w-14 h-14 rounded-full bg-primary/15 flex items-center justify-center mb-4">
+      <svg class="w-7 h-7 text-primary" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+      </svg>
+    </div>
+
+    <p class="text-lg font-bold text-heading mb-1">Done</p>
+
+    <p class="text-sm text-secondary mb-4">All set</p>
+
+
+
+    <div class="mb-4"><b>SLOT</b></div>
+
+      <button @click="$dispatch('go')" class="btn btn-primary btn-lg w-full">Go</button>
+
+
+</div>

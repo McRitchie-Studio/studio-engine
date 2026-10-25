@@ -1,4 +1,4 @@
-<%# The newsletter row's two modals, registered into the page's scoped host.
+<%# The newsletter row's modals, registered into the page's scoped host.
 
     Locals: user (required).
 
@@ -14,48 +14,288 @@
     has no address, and a newsletter needs somewhere to send. It is written as the
     account email but NOT marked verified — see the controller for why that
     distinction is load-bearing.
+
+    FOR A HOST THAT MOUNTS THESE ITSELF (turf-monster, on its own $store.modals
+    and its own JSON routes). Every local below is optional, and with all of them
+    unset the two cards above render byte for byte as they did before the locals
+    existed (test/views/newsletter_modals_test.rb holds that).
+
+      modal_store       the Alpine store the cards answer to. Default
+                        "profileModals"; validated as a JS identifier, since
+                        it is spliced as a name ($store.<name>.close()).
+      submit_mode       :form (default) — each card posts the engine form to
+                        profile_newsletter_path with Turbo off, a full reload.
+                        :json — each card posts JSON to the host's route
+                        (studio/newsletter_modal), stays on the page, shows a
+                        spinner and an inline error line, dispatches
+                        changed_event and steps to the next card. A card whose
+                        opener passed props.onSubmit hands it the address and
+                        posts nothing: the opener's own request takes over.
+      subscribe_url     :json only, and required there by every card that
+                        subscribes (email, subscribe). The host's endpoint.
+      unsubscribe_url   :json only, and required there by the unsubscribe card.
+      unsubscribe_method :json only. The verb the unsubscribe card sends.
+                        Default "DELETE", the engine route's.
+      changed_event     :json only. The window event a success dispatches,
+                        with { subscribed, email, response }. Default
+                        "studio:newsletter-changed".
+
+    THE CARDS. Each is a Hash of its copy, or off. The two above are on by
+    default (false turns one off); the other three are off by default (a Hash,
+    or true for the engine's copy, turns one on). Every card takes id:, title:,
+    subtitle: and header: (more blocks/_card_header locals: size, icon,
+    icon_emoji, icon_color), plus the keys listed. An unknown key raises.
+
+      unsubscribe_card  'newsletter-unsubscribe'. button:, cancel:, saving:.
+                        :json steps to goodbye_card when it is on.
+      email_card        'newsletter-email'. button:, cancel:, saving:.
+                        :json steps to success_card when it is on.
+      subscribe_card    'newsletter-subscribe'. The join, with a consent box
+                        (ticked to start; Subscribe waits for it) and, for an
+                        account with no address, the address field. consent:,
+                        button:, cancel:, saving:. :json steps to success_card.
+      success_card      'newsletter-success'. The "Subscribed!" beat. partial:
+                        and locals: render the host's slot under the header (a
+                        seeds bar, a next-step button); the card's props, the
+                        host's JSON answer, are in scope there as `props`. With
+                        no slot the card ends in a Close button; with one, a
+                        Close link (cancel:).
+      goodbye_card      'newsletter-goodbye'. The beat after an unsubscribe.
+                        button:.
+%>
+<%
+  newsletter_modal_store = Studio::JsIdentifier.validate!(
+    local_assigns.fetch(:modal_store, "profileModals"), local: :modal_store)
+  newsletter_mode = local_assigns.fetch(:submit_mode, :form).to_sym
+  unless %i[form json].include?(newsletter_mode)
+    raise ArgumentError, "studio/profiles/_newsletter_modals submit_mode: :form or :json, got #{newsletter_mode.inspect}"
+  end
+  newsletter_json = newsletter_mode == :json
+
+  # Each card's defaults; a host's Hash is merged over them. The two cards that
+  # shipped first keep their copy and their header exactly.
+  newsletter_card_defaults = {
+    unsubscribe_card: { on: true, id: "newsletter-unsubscribe",
+                        title: "Unsubscribe?",
+                        subtitle: "You'll stop receiving updates. You can join again from this page any time.",
+                        header: { size: :lg, icon: :error },
+                        button: "Unsubscribe", cancel: "Cancel", saving: "Unsubscribing…" },
+    email_card:       { on: true, id: "newsletter-email",
+                        title: "Where should we send it?",
+                        subtitle: "There's no email on this account yet. We'll use this for the newsletter.",
+                        header: { size: :lg, icon_color: :primary },
+                        button: "Subscribe", cancel: "Cancel", saving: "Subscribing…" },
+    subscribe_card:   { on: false, id: "newsletter-subscribe",
+                        title: "Join the newsletter",
+                        subtitle: "News and updates, now and then. Leave any time.",
+                        header: { size: :md, icon_emoji: "📬" },
+                        consent: "Send me the newsletter",
+                        button: "Subscribe", cancel: "Close", saving: "Subscribing…" },
+    success_card:     { on: false, id: "newsletter-success",
+                        title: "Subscribed!",
+                        subtitle: "You're on the list.",
+                        header: { size: :lg, icon_emoji: "🎉" },
+                        partial: nil, locals: {},
+                        button: "Close", cancel: "Close" },
+    goodbye_card:     { on: false, id: "newsletter-goodbye",
+                        title: "See you later",
+                        subtitle: "You're off the list. You can join again any time.",
+                        header: { size: :lg, icon_emoji: "👋" },
+                        button: "Close" }
+  }
+
+  newsletter_cards = newsletter_card_defaults.to_h do |name, defaults|
+    given = local_assigns.fetch(name) { defaults[:on] }
+    card = case given
+           when false, nil then nil
+           when true then defaults
+           when Hash
+             unknown = given.keys - (defaults.keys - [:on])
+             if unknown.any?
+               raise ArgumentError, "studio/profiles/_newsletter_modals #{name}: unknown key #{unknown.map(&:inspect).join(', ')}"
+             end
+             defaults.merge(given).merge(header: defaults[:header].merge(given[:header] || {}))
+           else
+             raise ArgumentError, "studio/profiles/_newsletter_modals #{name}: a Hash, true or false, got #{given.inspect}"
+           end
+    [name, card]
+  end
+
+  # The URL each JSON card posts to, refused at render when missing: a card with
+  # no endpoint renders perfectly and fails on the one press that matters.
+  newsletter_url = lambda do |key|
+    url = local_assigns[key].presence
+    raise ArgumentError, "studio/profiles/_newsletter_modals: submit_mode: :json needs #{key}" unless url
+    url
+  end
+
+  # The x-data for one JSON card (studio/newsletter_modal). Every value lands in
+  # a JS string, escaped; tag.attributes encodes the double quote.
+  newsletter_scope = lambda do |**opts|
+    pairs = { store: newsletter_modal_store }.merge(opts).map do |key, value|
+      literal = (value == true || value == false) ? value.to_s : "'#{Studio::JsLiteral.in_attribute(value.to_s)}'"
+      "#{key}: #{literal}"
+    end
+    "studioNewsletterModal({ #{pairs.join(', ')} })".html_safe
+  end
+
+  newsletter_needs_email = Studio::Newsletter.needs_email?(user)
+  newsletter_success_id  = newsletter_cards[:success_card]&.dig(:id).to_s
+  newsletter_goodbye_id  = newsletter_cards[:goodbye_card]&.dig(:id).to_s
+  newsletter_changed     = local_assigns.fetch(:changed_event, "studio:newsletter-changed")
 %>
 
 <%# --- leaving asks --------------------------------------------------------- %>
-<template x-if="$store.profileModals.current()?.id === 'newsletter-unsubscribe'">
-  <div>
+<% if (card = newsletter_cards[:unsubscribe_card]) %>
+<template x-if="$store.<%= newsletter_modal_store %>.current()?.id === '<%= Studio::JsLiteral.in_attribute(card[:id]) %>'">
+  <div<% if newsletter_json %> <%= tag.attributes("x-data": newsletter_scope.call(action: "unsubscribe", url: newsletter_url.call(:unsubscribe_url), method: local_assigns.fetch(:unsubscribe_method, "DELETE"), nextId: newsletter_goodbye_id, event: newsletter_changed)) %><% end %>>
     <%= render "studio/modals/blocks/card_header",
-          size: :lg,
-          icon: :error,
-          title: "Unsubscribe?",
-          subtitle: "You'll stop receiving updates. You can join again from this page any time." %>
+          **card[:header], title: card[:title], subtitle: card[:subtitle] %>
 
+<% if newsletter_json %>
+    <p x-show="error" x-cloak role="alert" aria-live="assertive" aria-atomic="true"
+       x-text="error" class="text-xs mb-3 text-center text-danger-ink"></p>
+    <button type="button" @click="submit()" :disabled="!ready"
+            class="btn btn-danger btn-lg w-full disabled:opacity-50 disabled:cursor-not-allowed">
+      <span x-show="!saving"><%= card[:button] %></span>
+      <span x-show="saving" x-cloak class="inline-flex items-center justify-center gap-2">
+        <span class="spinner" aria-hidden="true" style="--spinner-track: currentColor; --spinner-color: transparent; opacity: 0.85"></span><%= card[:saving] %>
+      </span>
+    </button>
+<% else %>
     <%= form_with url: profile_newsletter_path, method: :delete, data: { turbo: false } do %>
-      <button type="submit" class="btn btn-danger btn-lg w-full">Unsubscribe</button>
+      <button type="submit" class="btn btn-danger btn-lg w-full"><%= card[:button] %></button>
     <% end %>
+<% end %>
 
-    <button type="button" @click="$store.profileModals.close()"
+    <button type="button" @click="$store.<%= newsletter_modal_store %>.close()"
             class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
-      Cancel
+      <%= card[:cancel] %>
     </button>
   </div>
 </template>
+<% end %>
 
 <%# --- joining without an address on file ----------------------------------- %>
-<template x-if="$store.profileModals.current()?.id === 'newsletter-email'">
-  <div>
+<% if (card = newsletter_cards[:email_card]) %>
+<template x-if="$store.<%= newsletter_modal_store %>.current()?.id === '<%= Studio::JsLiteral.in_attribute(card[:id]) %>'">
+  <div<% if newsletter_json %> <%= tag.attributes("x-data": newsletter_scope.call(action: "subscribe", url: newsletter_url.call(:subscribe_url), needsEmail: true, nextId: newsletter_success_id, event: newsletter_changed)) %><% end %>>
     <%= render "studio/modals/blocks/card_header",
-          size: :lg,
-          icon_color: :primary,
-          title: "Where should we send it?",
-          subtitle: "There's no email on this account yet. We'll use this for the newsletter." %>
+          **card[:header], title: card[:title], subtitle: card[:subtitle] %>
 
+<% if newsletter_json %>
+    <input type="email" x-model="email" @keydown.enter.prevent="submit()" required autocomplete="email"
+           placeholder="you@example.com" class="input-field w-full mb-3">
+    <p x-show="error" x-cloak role="alert" aria-live="assertive" aria-atomic="true"
+       x-text="error" class="text-xs mb-3 text-danger-ink"></p>
+    <button type="button" @click="submit()" :disabled="!ready"
+            class="btn btn-primary btn-lg w-full disabled:opacity-50 disabled:cursor-not-allowed">
+      <span x-show="!saving"><%= card[:button] %></span>
+      <span x-show="saving" x-cloak class="inline-flex items-center justify-center gap-2">
+        <span class="spinner" aria-hidden="true" style="--spinner-track: currentColor; --spinner-color: transparent; opacity: 0.85"></span><%= card[:saving] %>
+      </span>
+    </button>
+<% else %>
     <%= form_with url: profile_newsletter_path, method: :post, scope: :profile,
                   data: { turbo: false } do |f| %>
       <%= f.email_field :email, required: true, autocomplete: "email",
                         placeholder: "you@example.com",
                         class: "input-field w-full mb-3" %>
-      <button type="submit" class="btn btn-primary btn-lg w-full">Subscribe</button>
+      <button type="submit" class="btn btn-primary btn-lg w-full"><%= card[:button] %></button>
     <% end %>
+<% end %>
 
-    <button type="button" @click="$store.profileModals.close()"
+    <button type="button" @click="$store.<%= newsletter_modal_store %>.close()"
             class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
-      Cancel
+      <%= card[:cancel] %>
     </button>
   </div>
 </template>
+<% end %>
+<%# --- joining, with consent (optional) ------------------------------------ %>
+<% if (card = newsletter_cards[:subscribe_card]) %>
+
+<template x-if="$store.<%= newsletter_modal_store %>.current()?.id === '<%= Studio::JsLiteral.in_attribute(card[:id]) %>'">
+  <div <%= tag.attributes("x-data": newsletter_scope.call(**(newsletter_json ? { action: "subscribe", url: newsletter_url.call(:subscribe_url), needsEmail: newsletter_needs_email, requiresConsent: true, nextId: newsletter_success_id, event: newsletter_changed } : {}))) %>>
+    <%= render "studio/modals/blocks/card_header",
+          **card[:header], title: card[:title], subtitle: card[:subtitle] %>
+
+<% if newsletter_json %>
+    <% if newsletter_needs_email %>
+    <input type="email" x-model="email" @keydown.enter.prevent="submit()" required autocomplete="email"
+           placeholder="you@example.com" class="input-field w-full mb-3">
+    <% end %>
+    <label class="flex items-center gap-2 text-xs text-secondary mb-3 select-none cursor-pointer">
+      <input type="checkbox" x-model="consent" class="rounded border-subtle text-primary cursor-pointer">
+      <%= card[:consent] %>
+    </label>
+    <p x-show="error" x-cloak role="alert" aria-live="assertive" aria-atomic="true"
+       x-text="error" class="text-xs mb-3 text-danger-ink"></p>
+    <button type="button" @click="submit()" :disabled="!ready"
+            class="btn btn-primary btn-lg w-full disabled:opacity-50 disabled:cursor-not-allowed">
+      <span x-show="!saving"><%= card[:button] %></span>
+      <span x-show="saving" x-cloak class="inline-flex items-center justify-center gap-2">
+        <span class="spinner" aria-hidden="true" style="--spinner-track: currentColor; --spinner-color: transparent; opacity: 0.85"></span><%= card[:saving] %>
+      </span>
+    </button>
+<% else %>
+    <%# The plain path: the browser holds the submit until the box is ticked. %>
+    <%= form_with url: profile_newsletter_path, method: :post, scope: :profile,
+                  data: { turbo: false } do |f| %>
+      <% if newsletter_needs_email %>
+      <%= f.email_field :email, required: true, autocomplete: "email",
+                        placeholder: "you@example.com",
+                        class: "input-field w-full mb-3" %>
+      <% end %>
+      <label class="flex items-center gap-2 text-xs text-secondary mb-3 select-none cursor-pointer">
+        <input type="checkbox" required checked class="rounded border-subtle text-primary cursor-pointer">
+        <%= card[:consent] %>
+      </label>
+      <button type="submit" class="btn btn-primary btn-lg w-full"><%= card[:button] %></button>
+    <% end %>
+<% end %>
+
+    <button type="button" @click="$store.<%= newsletter_modal_store %>.close()"
+            class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+      <%= card[:cancel] %>
+    </button>
+  </div>
+</template>
+<% end %>
+<%# --- the "Subscribed!" beat (optional) ------------------------------------ %>
+<% if (card = newsletter_cards[:success_card]) %>
+
+<template x-if="$store.<%= newsletter_modal_store %>.current()?.id === '<%= Studio::JsLiteral.in_attribute(card[:id]) %>'">
+  <div <%= tag.attributes("x-data": newsletter_scope.call) %>>
+    <%= render "studio/modals/blocks/card_header",
+          **card[:header], title: card[:title], subtitle: card[:subtitle] %>
+
+<% if card[:partial] %>
+    <%= render card[:partial], **(card[:locals] || {}) %>
+
+    <button type="button" @click="$store.<%= newsletter_modal_store %>.close()"
+            class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+      <%= card[:cancel] %>
+    </button>
+<% else %>
+    <button type="button" @click="$store.<%= newsletter_modal_store %>.close()" class="btn btn-primary btn-lg w-full">
+      <%= card[:button] %>
+    </button>
+<% end %>
+  </div>
+</template>
+<% end %>
+<%# --- the goodbye beat (optional) ----------------------------------------- %>
+<% if (card = newsletter_cards[:goodbye_card]) %>
+
+<template x-if="$store.<%= newsletter_modal_store %>.current()?.id === '<%= Studio::JsLiteral.in_attribute(card[:id]) %>'">
+  <div <%= tag.attributes("x-data": newsletter_scope.call) %>>
+    <%= render "studio/modals/blocks/card_header",
+          **card[:header], title: card[:title], subtitle: card[:subtitle] %>
+
+    <button type="button" @click="$store.<%= newsletter_modal_store %>.close()" class="btn btn-primary btn-lg w-full">
+      <%= card[:button] %>
+    </button>
+  </div>
+</template>
+<% end %>

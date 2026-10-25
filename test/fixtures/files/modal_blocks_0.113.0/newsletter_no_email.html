@@ -1,0 +1,51 @@
+
+<template x-if="$store.profileModals.current()?.id === 'newsletter-unsubscribe'">
+  <div>
+    <div class="text-center">
+    <div class="mx-auto w-14 h-14 rounded-full bg-red-500/15 flex items-center justify-center mb-4">
+      <svg class="w-7 h-7 text-red-400" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </div>
+
+    <h3 class="text-3xl font-bold text-heading mb-2">Unsubscribe?</h3>
+
+    <p class="text-sm text-secondary mb-4">You&#39;ll stop receiving updates. You can join again from this page any time.</p>
+</div>
+
+
+    <form data-turbo="false" action="/profile/newsletter" accept-charset="UTF-8" method="post"><input type="hidden" name="_method" value="delete" />
+      <button type="submit" class="btn btn-danger btn-lg w-full">Unsubscribe</button>
+</form>
+    <button type="button" @click="$store.profileModals.close()"
+            class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+      Cancel
+    </button>
+  </div>
+</template>
+
+<template x-if="$store.profileModals.current()?.id === 'newsletter-email'">
+  <div>
+    <div class="text-center">
+    <div class="mx-auto w-14 h-14 rounded-full bg-primary/15 flex items-center justify-center mb-4">
+      <svg class="w-7 h-7 text-primary" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+      </svg>
+    </div>
+
+    <h3 class="text-3xl font-bold text-heading mb-2">Where should we send it?</h3>
+
+    <p class="text-sm text-secondary mb-4">There&#39;s no email on this account yet. We&#39;ll use this for the newsletter.</p>
+</div>
+
+
+    <form data-turbo="false" action="/profile/newsletter" accept-charset="UTF-8" method="post">
+      <input required="required" autocomplete="email" placeholder="you@example.com" class="input-field w-full mb-3" type="email" name="profile[email]" id="profile_email" />
+      <button type="submit" class="btn btn-primary btn-lg w-full">Subscribe</button>
+</form>
+    <button type="button" @click="$store.profileModals.close()"
+            class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition">
+      Cancel
+    </button>
+  </div>
+</template>
