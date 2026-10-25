@@ -17,7 +17,7 @@
 //      this is how a page that already knows how to subscribe asks only for the
 //      address.
 //   4. Otherwise POSTs JSON to the host's url (DELETE or another verb by
-//      opts.method) with the page's CSRF token, and reads the answer: a 2xx whose
+//      opts.method) with the page's CSRF token, and reads the answer: a 2xx, not by redirect, whose
 //      body does not say success: false is a success; anything else shows
 //      body.error, or a plain line, on the card.
 //   5. On success: dispatches opts.event on window with
@@ -45,10 +45,12 @@ export function cleanEmail(value) {
 }
 
 // What the host's answer means. ok: a 2xx whose body does not say
-// success: false. error: the body's own words, else the fallback.
+// success: false, and that fetch did not reach by a redirect (an expired session
+// redirected to an HTML sign-in page answers 200, and joined nobody). error:
+// the body's own words, else the fallback.
 export function outcomeOf(response, body, fallback) {
   body = body && typeof body === "object" ? body : {}
-  const ok = !!(response && response.ok) && body.success !== false
+  const ok = !!(response && response.ok && !response.redirected) && body.success !== false
   return ok ? { ok: true, body: body } : { ok: false, body: body, error: body.error || fallback }
 }
 

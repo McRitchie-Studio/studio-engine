@@ -63,6 +63,7 @@ test("a 2xx is a success unless its body says success: false", () => {
   assert.equal(outcomeOf({ ok: true }, { success: true }, "x").ok, true)
   assert.equal(outcomeOf({ ok: true }, {}, "x").ok, true, "a host that sends no success key still succeeded")
   assert.equal(outcomeOf({ ok: true }, null, "x").ok, true)
+  assert.equal(outcomeOf({ ok: true, redirected: true }, {}, "Fallback.").error, "Fallback.", "a 200 reached by a redirect (a sign-in page) is not a join")
 
   const said = outcomeOf({ ok: true }, { success: false, error: "Already on it." }, "x")
   assert.deepEqual([said.ok, said.error], [false, "Already on it."])
