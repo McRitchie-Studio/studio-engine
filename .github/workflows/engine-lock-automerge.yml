@@ -86,7 +86,7 @@ permissions:
 jobs:
   auto-merge:
     name: Auto-merge a green solana-studio lock bump
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned, not the floating latest label: that moves to images Playwright cannot install chromium on (guard: test/lib/ci_runner_image_pin_test.rb)
     # A wall-clock bound, per test/lib/ci_job_timeout_test.rb: without one this
     # job inherits GitHub's six-hour default, where a hang never fails and an
     # incomplete run cannot be re-run. This lane makes three API reads and at
