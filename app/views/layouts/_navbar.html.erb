@@ -100,7 +100,7 @@
 <%# Studio.navbar_root_hook puts data-navbar-root on the header, live and
     preview; Studio.navbar_z_tier layers the live header at --z-nav on the
     shared scale (engine.css) instead of z-50. Both off renders as before. %>
-<header <%= "data-navbar-root ".html_safe if Studio.navbar_root_hook %>data-pin="nav"<% unless is_preview %> x-data data-studio-controller="nav-collapse" data-nav-collapse-scrolled-class="shadow-lg border-b border-subtle is-scrolled"<%= " data-nav-timeline" if scroll_timeline %><% end %>
+<header data-pin="nav"<%= " data-navbar-root".html_safe if Studio.navbar_root_hook %><% unless is_preview %> x-data data-studio-controller="nav-collapse" data-nav-collapse-scrolled-class="shadow-lg border-b border-subtle is-scrolled"<%= " data-nav-timeline" if scroll_timeline %><% end %>
         <%# top-0, a STATIC value, and never a custom property. Any bars render as
             this header's sibling in normal flow (studio/banners/_stack), so they
             already occupy their own height above it and there is nothing to
