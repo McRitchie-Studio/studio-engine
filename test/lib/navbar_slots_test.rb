@@ -136,6 +136,52 @@ class NavbarSlotsTest < Minitest::Test
     assert_equal 2, reports.size
   end
 
+  # ---- Studio.navbar_header_bars ----
+
+  def test_header_bars_resolve_like_items_and_name_their_own_setting
+    assert_equal [], S.resolve_header_bars([], Object.new)
+    assert_equal [{ partial: "shared/impersonation_banner", locals: {} }],
+                 S.resolve_header_bars(->(_view) { ["shared/impersonation_banner"] }, Object.new)
+
+    error = assert_raises(S::InvalidConfig) { S.validate_header_bars!("shared/impersonation_banner") }
+    assert_match(/\AStudio\.navbar_header_bars must be an Array/, error.message)
+    error = assert_raises(S::InvalidConfig) { S.validate_header_bars!([{ locals: {} }]) }
+    assert_match(/Studio\.navbar_header_bars\[0\] needs a non-blank :partial/, error.message)
+    assert_nil S.validate_header_bars!(->(_view) { 42 })
+  end
+
+  def test_a_raising_header_bars_callable_renders_none_and_reports_once
+    reports = capture_reports do
+      2.times { assert_equal [], S.resolve_header_bars(->(_view) { raise KeyError, "x" }, Object.new) }
+    end
+
+    assert_equal 1, reports.size
+  end
+
+  # ---- Studio.navbar_menu_trigger ----
+
+  def test_menu_trigger_resolves_like_the_badge_and_names_its_own_setting
+    assert_nil S.resolve_menu_trigger(nil, Object.new)
+    assert_equal({ partial: "components/gear_sidebar_trigger", locals: {} },
+                 S.resolve_menu_trigger("components/gear_sidebar_trigger", Object.new))
+    assert_nil S.resolve_menu_trigger(->(_view) { raise "x" }, Object.new)
+
+    error = assert_raises(S::InvalidConfig) { S.validate_menu_trigger!(["components/gear_sidebar_trigger"]) }
+    assert_match(/\AStudio\.navbar_menu_trigger must be a partial path/, error.message)
+    assert_nil S.validate_menu_trigger!(nil)
+  end
+
+  def test_every_setting_reports_its_own_first_failure
+    reports = capture_reports do
+      S.resolve_items(->(_view) { raise "x" }, Object.new)
+      S.resolve_badge(->(_view) { raise "x" }, Object.new)
+      S.resolve_header_bars(->(_view) { raise "x" }, Object.new)
+      S.resolve_menu_trigger(->(_view) { raise "x" }, Object.new)
+    end
+
+    assert_equal 4, reports.size
+  end
+
   private
 
   # Stands in for ErrorLog so the report-once rule is observable.

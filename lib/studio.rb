@@ -335,6 +335,40 @@ module Studio
     @@navbar_avatar_badge = config
   end
 
+  # ---- Navbar header bars ----
+  # Partials the engine navbar renders INSIDE its pinned header, above the row,
+  # so they stay on screen while the page scrolls: a control an admin must not
+  # lose, such as an impersonation bar's "Return to <admin>" button. The bar
+  # stack (studio/banners/_stack) is the place for an ambient label; it renders
+  # above the header and scrolls away. Skipped on a preview render. The default
+  # [] renders byte-identical to before. An Array, or a callable receiving the
+  # view, of partial specs. Rules: lib/studio/navbar_slots.rb.
+  #
+  #   config.navbar_header_bars = ->(view) { view.impersonating? ? ["shared/impersonation_banner"] : [] }
+  mattr_reader :navbar_header_bars, default: []
+
+  def self.navbar_header_bars=(config)
+    NavbarSlots.validate_header_bars!(config)
+    NavbarSlots.reset_reported!
+    @@navbar_header_bars = config
+  end
+
+  # ---- Navbar menu trigger ----
+  # One partial the signed-in user nav's icon rail (from md) and the navbar's
+  # phone row render in place of the admin dropdown: the control that opens a
+  # host's own menu, such as Turf Monster's gear sidebar trigger. nil, the
+  # default, keeps the admin dropdown, byte-identical to before. A partial spec,
+  # or a callable receiving the view. Rules: lib/studio/navbar_slots.rb.
+  #
+  #   config.navbar_menu_trigger = "components/gear_sidebar_trigger"
+  mattr_reader :navbar_menu_trigger, default: nil
+
+  def self.navbar_menu_trigger=(config)
+    NavbarSlots.validate_menu_trigger!(config)
+    NavbarSlots.reset_reported!
+    @@navbar_menu_trigger = config
+  end
+
   # ---- The shared profile page (/profile) ----
   # The rows that make up /profile. `nil` — the default — means "the engine's
   # standard page", NOT "no rows": a brand-new app with an empty initializer gets
@@ -1484,6 +1518,16 @@ module Studio
   # The avatar badge partial spec for a view, or nil (lib/studio/navbar_slots.rb).
   def self.navbar_avatar_badge_for(view)
     NavbarSlots.resolve_badge(navbar_avatar_badge, view)
+  end
+
+  # The in-header bar partial specs for a view (lib/studio/navbar_slots.rb).
+  def self.navbar_header_bars_for(view)
+    NavbarSlots.resolve_header_bars(navbar_header_bars, view)
+  end
+
+  # The menu trigger partial spec for a view, or nil (lib/studio/navbar_slots.rb).
+  def self.navbar_menu_trigger_for(view)
+    NavbarSlots.resolve_menu_trigger(navbar_menu_trigger, view)
   end
 
   # The signed-in user's navbar name for a view (lib/studio/navbar_identity.rb).

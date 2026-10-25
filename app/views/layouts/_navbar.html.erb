@@ -158,6 +158,18 @@
        title swap matters most: it is DISCRETE, which is the 1px reverse lurch
        the primitive exists to delete. Full accounting in engine.css. */
   </style>
+  <%# Studio.navbar_header_bars: bars INSIDE the pinned header, above its row,
+      so they never scroll away: a control an admin must not lose (an
+      impersonation bar's JS-free "Return to <admin>" button). An ambient
+      label belongs in the bar stack above the header, which scrolls. Being in
+      the header costs one thing, stated: the header is a stacking context, so
+      these never rise over an open modal. On the scroll timeline engine.css
+      (THE IN-HEADER BARS) carries them down by the band so they hold at the
+      window's top. Never on a preview, and [] (the default) renders nothing. %>
+  <% header_bars = !is_preview && respond_to?(:studio_navbar_header_bars) ? studio_navbar_header_bars : [] %>
+  <% if header_bars.any? %>
+  <div data-nav-header-bars><% header_bars.each do |bar| %><%= studio_navbar_slot_tag(bar) %><% end %></div>
+  <% end %>
   <div class="nav-row flex items-center">
     <%# Left side: logo + nav %>
     <%# min-w-0 THREE TIMES, on every flex item between the row and the title.
