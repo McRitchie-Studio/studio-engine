@@ -7,12 +7,21 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 // when Cropper.js never arrives instead of taking a press that does nothing.
 //
 // /lab/style_modals renders the style guide's Modals section, whose page-scoped
-// host mounts the real crop card on $store.dsModals. No lab page loads
-// Cropper.js itself: it comes from cdnjs, and the lane answers every off-site
-// request with an empty 200. So "the library never arrived" is this lane's
-// natural state, and the specs that need a cropper answer that one request with
-// a stand-in that records how it was constructed and exports a real canvas.
-// What is under test is the engine's scope around the library, not the library.
+// host mounts the real crop card on $store.dsModals. Cropper.js comes from
+// cdnjs, pinned with sha384 integrity, and blockOffsiteRequests answers those
+// two URLs with byte-exact copies of the real 1.6.2 files, so the shipped tag
+// loads as it would in production. The specs that drive a crop still want a
+// stand-in that records how it was constructed and exports a real canvas, and
+// a substitute BODY can no longer be served (it fails the digest). So the
+// stand-in is defined before any script runs, as a window.Cropper accessor
+// that ignores the library's own `Cropper = ...` assignment when the real file
+// lands. What is under test is the engine's scope around the library, not the
+// library.
+//
+// The missing-library spec answers the script with a body that is NOT the
+// pinned file, which is how a tampered CDN file looks to the page: the
+// browser refuses it on its integrity, window.Cropper stays undefined, and
+// the card has to say so. That spec fails if the tag ever loses its integrity.
 //
 // CONTROLS, each run against this file:
 //   - construct Cropper with `aspectRatio: 1 / settings.aspectRatio`
@@ -46,7 +55,12 @@ const STAND_IN = `
 
 async function withCropper(page) {
   await blockOffsiteRequests(page);
-  await page.route(CROPPER_JS, (route) => route.fulfill({ status: 200, contentType: "application/javascript", body: STAND_IN }));
+  await page.addInitScript(`
+    (() => {
+      ${STAND_IN.replace("window.Cropper = class", "const StandIn = class")}
+      Object.defineProperty(window, "Cropper", { configurable: true, get: () => StandIn, set: () => {} });
+    })();
+  `);
 }
 
 // Records every crop-photo-confirmed the page hears, as plain data.
@@ -147,9 +161,16 @@ test("a file that is no image is refused on the card's own line", async ({ page 
 
 test("when Cropper.js never arrives the card says so, stays dismissible and confirms nothing", async ({ page }) => {
   await blockOffsiteRequests(page);
+  // A body that is not the pinned file: integrity refuses it, so it never runs.
+  await page.route(CROPPER_JS, (route) =>
+    route.fulfill({ status: 200, contentType: "application/javascript", headers: { "access-control-allow-origin": "*" }, body: STAND_IN })
+  );
   await page.goto("/lab/style_modals");
   await hearConfirms(page);
-  expect(await page.evaluate(() => typeof window.Cropper), "this lane loaded a real Cropper.js").toBe("undefined");
+  expect(
+    await page.evaluate(() => typeof window.Cropper),
+    "a substitute cropper.min.js ran: the script tag lost its integrity"
+  ).toBe("undefined");
 
   await page.evaluate((imageUrl) => Alpine.store("dsModals").open("crop-photo", { imageUrl }), DATA_URL);
   await expect(page.locator(SAVE)).toHaveText("Crop & Save");

@@ -1,5 +1,8 @@
 // Shared helpers for the engine's browser lane.
 
+const fs = require("fs");
+const path = require("path");
+
 // Collect everything the page THREW or logged as an error.
 //
 // This is not garnish. The phantom-element defect (propagate-at-format-gem) threw a
@@ -143,10 +146,41 @@ async function sampleAcrossFrames(page, { perturb, read, frames = 30 }) {
 // it is no longer blocked — it arrives from the asset pipeline like any engine asset,
 // and text measurements are fair game. e2e/vendored_montserrat.spec.js is the first
 // spec to take one, and it could not have been written before.
+//
+// THE ONE EXCEPTION: AN OFF-ORIGIN FILE PINNED WITH INTEGRITY. studio/_cropper_assets
+// loads Cropper.js 1.6.2 from cdnjs with sha384 Subresource Integrity, so an empty
+// body no longer reads as "nothing happened": the digest fails, Chromium refuses the
+// file and logs `Failed to find a valid digest`, which watchPageErrors counts. Those
+// two URLs are answered with byte-exact copies of the real files
+// (test/fixtures/files/cropperjs-1.6.2, the same bytes whose sha512 equals cdnjs's
+// published SRI), so the hash matches, nothing logs, and the page exercises the tag
+// exactly as shipped. test/integration/cropper_assets_sri_test.rb holds the copies
+// to the pinned hashes, so a hash bump without new copies fails the unit suite
+// before it fails here. A spec that needs Cropper.js absent or refused registers
+// its own route after this one (the route registered last answers first).
+const PINNED_OFFSITE = {
+  "https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js": ["cropperjs-1.6.2/cropper.min.js", "application/javascript"],
+  "https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css": ["cropperjs-1.6.2/cropper.min.css", "text/css"],
+};
+const PINNED_FIXTURES = path.join(__dirname, "..", "test", "fixtures", "files");
+
 async function blockOffsiteRequests(page) {
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url());
     if (url.hostname === "127.0.0.1" || url.hostname === "localhost") return route.continue();
+
+    const pinned = PINNED_OFFSITE[url.href];
+    if (pinned) {
+      const [file, contentType] = pinned;
+      return route.fulfill({
+        status: 200,
+        contentType,
+        // CORS mode (crossorigin="anonymous") needs the header, or the browser
+        // refuses the response before it checks the digest.
+        headers: { "access-control-allow-origin": "*" },
+        body: fs.readFileSync(path.join(PINNED_FIXTURES, file)),
+      });
+    }
 
     return route.fulfill({ status: 200, body: "" });
   });

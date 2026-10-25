@@ -31,8 +31,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   to load instead of running on the page. The URLs are unchanged, so a CSP that
   names the script by file (Turf Monster's) keeps matching. The hashes were
   computed over the fetched files and their bytes checked against cdnjs's
-  published SRI; `CDN_SRI_LIVE=1 ruby -Itest
-  test/integration/cropper_assets_sri_live_test.rb` repeats that check.
+  published SRI. Byte-exact copies live in `test/fixtures/files/cropperjs-1.6.2`:
+  the suite hashes them offline, and the browser lane serves them for the two
+  cdnjs URLs so the tags load as shipped. `bin/cropper-sri-live` re-checks the
+  pins against the live CDN.
 
 ## 0.112.0 — 2026-10-19
 

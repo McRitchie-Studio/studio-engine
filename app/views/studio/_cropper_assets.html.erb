@@ -12,7 +12,13 @@
     Both tags are pinned with Subresource Integrity, so a changed file on the CDN
     fails to load rather than running. The hashes are sha384 over the exact
     1.6.2 files; a version bump recomputes both (openssl dgst -sha384 -binary
-    FILE | openssl base64 -A) and checks the bytes against cdnjs's published
-    SRI. Keep the URLs exact: consumer CSPs name the script by file. %>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" integrity="sha384-6LFfkTKLRlzFtgx8xsWyBdKGpcMMQTkv+dB7rAbugeJAu1Ym2q1Aji1cjHBG12Xh" crossorigin="anonymous" referrerpolicy="no-referrer">
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js" integrity="sha384-jrOgQzBlDeUNdmQn3rUt/PZD+pdcRBdWd/HWRqRo+n2OR2QtGyjSaJC0GiCeH+ir" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    FILE | openssl base64 -A), replaces the byte-exact copies in
+    test/fixtures/files/cropperjs-<version> that the browser lane serves, and
+    runs bin/cropper-sri-live. Keep the URLs exact: consumer CSPs name the
+    script by file. %>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css"
+      integrity="sha384-6LFfkTKLRlzFtgx8xsWyBdKGpcMMQTkv+dB7rAbugeJAu1Ym2q1Aji1cjHBG12Xh"
+      crossorigin="anonymous">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"
+        integrity="sha384-jrOgQzBlDeUNdmQn3rUt/PZD+pdcRBdWd/HWRqRo+n2OR2QtGyjSaJC0GiCeH+ir"
+        crossorigin="anonymous"></script>
