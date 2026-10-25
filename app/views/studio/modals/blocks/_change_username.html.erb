@@ -21,11 +21,34 @@
 
   Everything else (finalize_url, finalize_hook, saved_event, quest_label,
   leveling, modal_store, demo, celebration copy) passes straight through.
+
+  locked (Hash, optional) — the rename is not open to this person yet, and the
+           card says why instead of offering the input. The APP decides (a
+           frozen account, a first contest not yet entered); the engine only
+           draws the answer:
+             title:     required, e.g. "Username locked".
+             subtitle:  the reason.
+             cta_label: with cta_href, a primary link to where the rename
+             cta_href:  unlocks (it closes the modal on the way), and a Dismiss
+                        link under it. Without them, one Dismiss button.
+             dismiss:   the dismiss label. Default "Dismiss".
+           Any other key raises. Absent (the default), the card renders exactly
+           as it did before the local existed.
 %>
 <%
   current_username = local_assigns.fetch(:current_username)
 
-  username_locals = local_assigns.except(:current_username).reverse_merge(
+  # A Hash or nothing; a misspelt key would otherwise drop the CTA silently.
+  locked = local_assigns[:locked]
+  unless locked.nil?
+    unless locked.is_a?(Hash) && locked[:title].present? && (locked.keys - %i[title subtitle cta_label cta_href dismiss]).empty?
+      raise ArgumentError, "blocks/_change_username locked: takes { title:, subtitle:, cta_label:, cta_href:, dismiss: } with a title, got #{locked.inspect}"
+    end
+    # IDENTIFIER position ($store.<name>.close()) — VALIDATED, never escaped.
+    locked_store = Studio::JsIdentifier.validate!(local_assigns.fetch(:modal_store, "modals"), local: :modal_store)
+  end
+
+  username_locals = local_assigns.except(:current_username, :locked).reverse_merge(
     title:              "Change Username",
     description:        "Pick a name that's right for you.",
     input:              true,
@@ -43,4 +66,19 @@
     celebrate_subtitle: "Nice — you earned 25 seeds by completing a quest. Complete more quests to earn a Free Entry Token."
   )
 %>
+<% if locked %>
+<div data-username-locked>
+  <%= render "studio/modals/blocks/card_header",
+        size: :lg, icon: :error, title: locked[:title], subtitle: locked[:subtitle] %>
+  <% if locked[:cta_label] && locked[:cta_href] %>
+  <%= link_to locked[:cta_label], locked[:cta_href],
+              class: "btn btn-primary btn-lg w-full", "@click": "$store.#{locked_store}.close()" %>
+  <button type="button" @click="$store.<%= locked_store %>.close()"
+          class="block mx-auto mt-3 text-sm text-secondary hover:text-heading transition"><%= locked.fetch(:dismiss, "Dismiss") %></button>
+  <% else %>
+  <button type="button" @click="$store.<%= locked_store %>.close()" class="btn btn-outline btn-lg w-full"><%= locked.fetch(:dismiss, "Dismiss") %></button>
+  <% end %>
+</div>
+<% else %>
 <%= render "studio/modals/blocks/leveling_activity", username_locals %>
+<% end %>
