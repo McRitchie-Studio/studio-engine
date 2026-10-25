@@ -15,7 +15,10 @@
     (default display_name) and the signed-out button reads
     Studio.sign_in_label (default "Log in"); lib/studio/navbar_identity.rb.
     Studio.navbar_avatar_badge (default nil) draws one partial over the
-    avatar; lib/studio/navbar_slots.rb.
+    avatar, and Studio.navbar_menu_trigger (default nil) replaces the admin
+    dropdown in the icon rail; lib/studio/navbar_slots.rb.
+    Studio.navbar_account_sidebar (default nil) makes the account control
+    open a host sidebar; lib/studio/navbar_account_sidebar.rb.
 
     Legacy string locals (deprecated): balance_html, extra_icons_html,
     div2_html — pre-rendered HTML injected via raw. Still honored when
@@ -63,6 +66,9 @@
     of it. A link that goes nowhere looks identical to one that works until it is
     clicked, which is why nobody reported it.
 %>
+<%# Studio.navbar_menu_trigger: the host's menu control in the admin
+    dropdown's seat (the icon rail from md, and the signed-out rail). %>
+<% menu_trigger = respond_to?(:studio_navbar_menu_trigger) ? studio_navbar_menu_trigger : nil %>
 <% studio_nav_destination =
      if defined?(account_path)
        account_path
@@ -102,7 +108,11 @@
               glyphs side by side read as a double gear. Desktop only, like
               the theme toggle: below md the navbar's phone row draws the cog,
               so a second one here put two on an admin's phone. %>
+          <% if menu_trigger %>
+          <span class="hidden md:block" data-nav-menu-trigger><%= studio_navbar_slot_tag(menu_trigger) %></span>
+          <% else %>
           <%= render "components/admin_dropdown", display_class: "hidden md:block" unless respond_to?(:studio_sidebar_replaces_admin_menu?) && studio_sidebar_replaces_admin_menu? %>
+          <% end %>
         </div>
       </div>
       <% if div2_content.present? %>
@@ -219,15 +229,29 @@
         dialog" rather than a link that goes nowhere it says. studio/link_sidebar
         claims its click from the document, before Alpine binds, as it does the
         gear's. An app with no sidebar keeps the link to the account page. %>
-    <% account_opens_sidebar = respond_to?(:studio_account_opens_sidebar?) && studio_account_opens_sidebar? %>
+    <%# Studio.navbar_account_sidebar: a HOST sidebar the control opens
+        instead (a button toggling the host's store flag, built by the engine
+        from validated names). It wins over the link sidebar and the account
+        link. It carries data-profile-image-toggle, so a host handler that
+        claims its triggers in the capture phase, before Alpine binds, claims
+        this one; the guarded @click is the path when nothing claims it. %>
+    <% account_sidebar = respond_to?(:studio_navbar_account_sidebar) ? studio_navbar_account_sidebar : nil %>
+    <% account_opens_sidebar = !account_sidebar && respond_to?(:studio_account_opens_sidebar?) && studio_account_opens_sidebar? %>
     <% account_classes = "group flex items-center gap-2 flex-shrink-0" %>
     <% account_inner = capture do %>
-      <span class="sr-only md:not-sr-only md:max-w-40"><span class="block truncate text-right text-heading font-semibold text-base leading-none transition<%= " group-hover:text-primary" if account_opens_sidebar || studio_nav_destination %>" data-nav-name><%= Studio.navbar_user_name_for(current_user, self) %></span></span>
+      <span class="sr-only md:not-sr-only md:max-w-40"><span class="block truncate text-right text-heading font-semibold text-base leading-none transition<%= " group-hover:text-primary" if account_sidebar || account_opens_sidebar || studio_nav_destination %>" data-nav-name><%= Studio.navbar_user_name_for(current_user, self) %></span></span>
       <span class="flex-shrink-0 flex items-center" aria-hidden="true">
         <%= render "components/avatar", user: current_user, size: "nav" %>
       </span>
     <% end %>
-    <% if account_opens_sidebar %>
+    <% if account_sidebar %>
+      <% account_js = studio_navbar_account_sidebar_expressions(account_sidebar) %>
+      <%= tag.button type: "button", class: "#{account_classes} cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                     data: { nav_account: "", profile_image_toggle: "" },
+                     aria: { controls: account_sidebar[:controls], haspopup: "dialog" },
+                     ":aria-expanded": account_js[:expanded], "@click.stop": account_js[:toggle],
+                     "x-bind:style": "$store.devMode && 'background: lightgreen'" do %><%= account_inner %><% end %>
+    <% elsif account_opens_sidebar %>
       <button type="button" class="<%= account_classes %> cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" data-nav-account data-profile-image-toggle
               aria-controls="studio-link-sidebar studio-link-sidebar-mobile" aria-haspopup="dialog"
               :aria-expanded="$store.sidebars && $store.sidebars.linkTreeOpen ? 'true' : 'false'"
@@ -251,7 +275,11 @@
     <div data-nav-avatar-badge><%= studio_navbar_slot_tag(avatar_badge) %></div>
     <% end %>
   <% else %>
+    <% if menu_trigger %>
+    <span class="hidden md:block" data-nav-menu-trigger><%= studio_navbar_slot_tag(menu_trigger) %></span>
+    <% else %>
     <%= render "components/admin_dropdown", display_class: "hidden md:block" unless respond_to?(:studio_sidebar_replaces_admin_menu?) && studio_sidebar_replaces_admin_menu? %>
+    <% end %>
     <%# Desktop only, as above: the phone row carries the toggle below md. %>
     <span class="hidden md:flex" data-nav-theme-toggle="desktop"><%= render "components/theme_toggle_morph" %></span>
     <div class="flex items-center gap-3 ml-auto">

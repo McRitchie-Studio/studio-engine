@@ -61,6 +61,22 @@ module StudioNavbarHelper
     @studio_navbar_menu_trigger = Studio.navbar_menu_trigger_for(self)
   end
 
+  # Studio.navbar_account_sidebar as { store:, flag:, controls: }, or nil.
+  def studio_navbar_account_sidebar
+    return @studio_navbar_account_sidebar if defined?(@studio_navbar_account_sidebar)
+
+    @studio_navbar_account_sidebar = Studio.navbar_account_sidebar_for(self)
+  end
+
+  # The account control's toggle and aria-expanded expressions for a resolved
+  # account sidebar, built from its validated names. The toggle is guarded, so
+  # a page without the store does nothing rather than throw.
+  def studio_navbar_account_sidebar_expressions(sidebar)
+    ref = "$store.#{sidebar[:store]}"
+    { toggle: "#{ref} && (#{ref}.#{sidebar[:flag]} = !#{ref}.#{sidebar[:flag]})",
+      expanded: "#{ref} && #{ref}.#{sidebar[:flag]} ? 'true' : 'false'" }
+  end
+
   # One resolved partial spec, rendered through the normal partial pipeline.
   def studio_navbar_slot_tag(spec)
     render partial: spec[:partial], locals: spec[:locals]

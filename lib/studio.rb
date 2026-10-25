@@ -35,6 +35,7 @@ require "studio/booking"
 require "studio/navbar_links"
 require "studio/navbar_signed_out_cta"
 require "studio/navbar_slots"
+require "studio/navbar_account_sidebar"
 require "studio/navbar_identity"
 require "studio/navbar_wordmark"
 require "studio/auth_labels"
@@ -367,6 +368,23 @@ module Studio
     NavbarSlots.validate_menu_trigger!(config)
     NavbarSlots.reset_reported!
     @@navbar_menu_trigger = config
+  end
+
+  # ---- Navbar account sidebar ----
+  # The host sidebar the signed-in user nav's account control (name and
+  # avatar, one control) opens: a button toggling $store.<store>.<flag>, its
+  # aria-controls naming the panels. nil, the default, keeps the account link
+  # (or the link sidebar), byte-identical to before. A Hash, or a callable
+  # receiving the view. Pair it with Studio.navbar_menu_trigger for the gear.
+  # Rules: lib/studio/navbar_account_sidebar.rb.
+  #
+  #   config.navbar_account_sidebar = { flag: "gearOpen", controls: %w[gear-sidebar gear-sidebar-mobile] }
+  mattr_reader :navbar_account_sidebar, default: nil
+
+  def self.navbar_account_sidebar=(config)
+    NavbarAccountSidebar.validate!(config)
+    NavbarAccountSidebar.reset_reported!
+    @@navbar_account_sidebar = config
   end
 
   # ---- The shared profile page (/profile) ----
@@ -1528,6 +1546,12 @@ module Studio
   # The menu trigger partial spec for a view, or nil (lib/studio/navbar_slots.rb).
   def self.navbar_menu_trigger_for(view)
     NavbarSlots.resolve_menu_trigger(navbar_menu_trigger, view)
+  end
+
+  # The account control's host sidebar for a view, or nil
+  # (lib/studio/navbar_account_sidebar.rb).
+  def self.navbar_account_sidebar_for(view)
+    NavbarAccountSidebar.resolve(navbar_account_sidebar, view)
   end
 
   # The signed-in user's navbar name for a view (lib/studio/navbar_identity.rb).

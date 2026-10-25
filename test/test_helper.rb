@@ -26,6 +26,7 @@ require_relative "../lib/studio/booking"
 require_relative "../lib/studio/navbar_links"
 require_relative "../lib/studio/navbar_signed_out_cta"
 require_relative "../lib/studio/navbar_slots"
+require_relative "../lib/studio/navbar_account_sidebar"
 require_relative "../lib/studio/navbar_identity"
 require_relative "../lib/studio/navbar_wordmark"
 require_relative "../lib/studio/auth_labels"
@@ -84,6 +85,9 @@ module Studio
   mattr_accessor :navbar_signed_out_cta, default: nil
   mattr_accessor :navbar_items,         default: []
   mattr_accessor :navbar_avatar_badge,  default: nil
+  mattr_accessor :navbar_header_bars,   default: []
+  mattr_accessor :navbar_menu_trigger,  default: nil
+  mattr_accessor :navbar_account_sidebar, default: nil
   # nil, NOT [] — nil means "the engine's standard profile page". The unit suite
   # asserts that distinction (test/lib/studio/profile_sections_test.rb), so this
   # mirror has to carry the real default rather than a convenient one.

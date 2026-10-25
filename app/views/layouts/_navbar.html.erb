@@ -266,7 +266,13 @@
       <%= link_to Studio.sign_in_label, signed_out_cta[:sign_in_path] || login_path, class: "text-xs font-semibold text-secondary hover:text-primary whitespace-nowrap transition", data: { nav_sign_in: "" } %>
       <% end %>
       <%= render "components/link_sidebar_trigger" if sidebar_active %>
+      <%# Studio.navbar_menu_trigger takes the admin dropdown's seat here too. %>
+      <% menu_trigger = respond_to?(:studio_navbar_menu_trigger) ? studio_navbar_menu_trigger : nil %>
+      <% if menu_trigger %>
+      <%= studio_navbar_slot_tag(menu_trigger) %>
+      <% else %>
       <%= render "components/admin_dropdown" unless sidebar_active && studio_sidebar_replaces_admin_menu? %>
+      <% end %>
       <%= render "components/theme_toggle_morph" %>
     </span>
   </div>
