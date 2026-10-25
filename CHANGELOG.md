@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.113.0 — 2026-10-24
+
 ### Added
 
 - **`Studio.navbar_items` and `Studio.navbar_avatar_badge`: partial slots in
