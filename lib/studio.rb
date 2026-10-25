@@ -387,6 +387,26 @@ module Studio
     @@navbar_account_sidebar = config
   end
 
+  # ---- Navbar phone name ----
+  # true shows the signed-in name beside the avatar below md too, capped at
+  # 4.5rem (6rem from 400px) and fading out at its right edge when it does not
+  # fit, instead of hiding it as screen-reader text. The fade is CSS only
+  # (engine.css, THE PHONE NAME): it runs on the name's own scroll timeline,
+  # which is inactive when the name fits, so a short name never fades. A
+  # browser without scroll timelines clips the name. false, the default,
+  # renders byte-identical to before.
+  #
+  #   config.navbar_phone_name = true
+  mattr_reader :navbar_phone_name, default: false
+
+  def self.navbar_phone_name=(value)
+    unless [true, false].include?(value)
+      raise ArgumentError, "Studio.navbar_phone_name must be true or false (got #{value.inspect})"
+    end
+
+    @@navbar_phone_name = value
+  end
+
   # ---- The shared profile page (/profile) ----
   # The rows that make up /profile. `nil` — the default — means "the engine's
   # standard page", NOT "no rows": a brand-new app with an empty initializer gets

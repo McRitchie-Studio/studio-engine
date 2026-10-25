@@ -88,6 +88,7 @@ module Studio
   mattr_accessor :navbar_header_bars,   default: []
   mattr_accessor :navbar_menu_trigger,  default: nil
   mattr_accessor :navbar_account_sidebar, default: nil
+  mattr_accessor :navbar_phone_name,    default: false
   # nil, NOT [] — nil means "the engine's standard profile page". The unit suite
   # asserts that distinction (test/lib/studio/profile_sections_test.rb), so this
   # mirror has to carry the real default rather than a convenient one.

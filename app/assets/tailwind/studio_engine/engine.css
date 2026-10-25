@@ -883,6 +883,30 @@ body.modal-open .studio-app-banner {
     }
   }
 }
+/* THE PHONE NAME (Studio.navbar_phone_name, components/_user_nav). Below 768px
+   the signed-in name shows beside the avatar in a capped box. A name that
+   fits draws whole; one that does not fades out over its right half instead
+   of ending in an ellipsis. The fade needs no script: the name's box clips
+   (truncate), which makes it a scroll container, and a scroll timeline on a
+   container with nothing to scroll is inactive, so the animation, and its
+   mask, applies only while the name overflows. A browser without scroll
+   timelines clips the name. From 768px the name truncates as before. */
+@media (max-width: 767px) {
+  [data-nav-name-phone] > [data-nav-name] { text-overflow: clip; }
+  @supports (animation-timeline: scroll()) {
+    [data-nav-name-phone] > [data-nav-name] {
+      animation: nav-name-fade linear both;
+      animation-timeline: scroll(self inline);
+    }
+  }
+}
+@keyframes nav-name-fade {
+  from, to {
+    -webkit-mask-image: linear-gradient(to right, black 50%, transparent);
+    mask-image: linear-gradient(to right, black 50%, transparent);
+  }
+}
+
 /* THE IN-HEADER BARS ON THE SCROLL TIMELINE (Studio.navbar_header_bars, which
    layouts/_navbar renders in [data-nav-header-bars] at the top of the header).
    On the timeline the header sticks at minus its band, so its TOP band leaves
