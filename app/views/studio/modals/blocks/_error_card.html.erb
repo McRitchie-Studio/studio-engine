@@ -29,7 +29,7 @@
     secondary_close: boolean. The secondary action closes the modal store.
                      Raises with secondary_event.
     countdown_key:   Alpine expression for the seconds to wait, read once at
-                     mount (e.g. "props.secondsLeft", seeded from a 429's
+                     mount (e.g. "$store.modals.current().props.secondsLeft", from a 429's
                      Retry-After). Adds a "Try again in 12s." line that counts
                      down (minutes above 90s) and is hidden at zero.
     countdown_text:  the words before the wait. Default "Try again in".

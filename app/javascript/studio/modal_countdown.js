@@ -1,6 +1,6 @@
 // studio/modal_countdown: a modal card that counts down and closes itself.
 //
-//   x-data="studioModalCountdown({ seconds: props.secondsLeft, store: 'modals', autoClose: true })"
+//   x-data="studioModalCountdown({ seconds: $store.modals.current().props.secondsLeft, store: 'modals', autoClose: true })"
 //       blocks/_error_card with countdown_key: the "give it a sec" wait after
 //       a 429, seeded from the response's Retry-After. The card shows
 //       waitLabel and, at zero, closes the store it is mounted in.
