@@ -11,7 +11,8 @@
 #                               its row, so they never scroll away (a control
 #                               bar such as an impersonation escape)
 #   Studio.navbar_menu_trigger  one partial the icon rail and the phone row
-#                               render in place of the admin dropdown
+#                               render in place of the admin dropdown; it is
+#                               rendered twice, so it carries no ids
 #
 # A partial spec is one of:
 #

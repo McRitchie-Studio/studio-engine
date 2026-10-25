@@ -85,6 +85,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **The README warns of three navbar adoption traps** (pinned by
+  `test/docs/navbar_readme_warnings_test.rb`): `navbar_menu_trigger` renders
+  its partial twice, in the rail and the phone row, so it carries no ids; a
+  `navbar_header_bars` callable that raises drops every bar for that render
+  (reported once), so one that carries an OPSEC control (Turf Monster's
+  impersonation bar, OPSEC-046) must not raise; and `navbar_brand`'s word
+  classes live in the host's initializer, which the host's Tailwind scan must
+  include.
 - **`Studio.navbar_account_sidebar` refuses `controls:` that name the engine's
   link sidebar** (`studio-link-sidebar`, `studio-link-sidebar-mobile`) with
   `InvalidConfig` at assignment, and a callable's answer when it resolves.
