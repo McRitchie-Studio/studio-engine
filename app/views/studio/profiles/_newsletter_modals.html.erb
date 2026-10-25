@@ -46,21 +46,21 @@
     subtitle: and header: (more blocks/_card_header locals: size, icon,
     icon_emoji, icon_color), plus the keys listed. An unknown key raises.
 
-      unsubscribe_card  "newsletter-unsubscribe". button:, cancel:, saving:.
+      unsubscribe_card  'newsletter-unsubscribe'. button:, cancel:, saving:.
                         :json steps to goodbye_card when it is on.
-      email_card        "newsletter-email". button:, cancel:, saving:.
+      email_card        'newsletter-email'. button:, cancel:, saving:.
                         :json steps to success_card when it is on.
-      subscribe_card    "newsletter-subscribe". The join, with a consent box
+      subscribe_card    'newsletter-subscribe'. The join, with a consent box
                         (ticked to start; Subscribe waits for it) and, for an
                         account with no address, the address field. consent:,
                         button:, cancel:, saving:. :json steps to success_card.
-      success_card      "newsletter-success". The "Subscribed!" beat. partial:
+      success_card      'newsletter-success'. The "Subscribed!" beat. partial:
                         and locals: render the host's slot under the header (a
                         seeds bar, a next-step button); the card's props, the
                         host's JSON answer, are in scope there as `props`. With
                         no slot the card ends in a Close button; with one, a
                         Close link (cancel:).
-      goodbye_card      "newsletter-goodbye". The beat after an unsubscribe.
+      goodbye_card      'newsletter-goodbye'. The beat after an unsubscribe.
                         button:.
 %>
 <%

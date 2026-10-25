@@ -4,6 +4,41 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **The modal blocks carry what a consumer kept its own copies for.** Every new
+  local is optional, and unset each block renders byte for byte as in 0.113.0
+  (`test/views/modal_blocks_baseline_test.rb` holds the touched blocks to
+  goldens rendered by the released 0.113.0 gem). Measured against turf-monster's
+  kept modals (its `test/views/engine_modal_readoption_gaps_test.rb`):
+  - `studio/profiles/_newsletter_modals` takes `modal_store:` (default
+    `"profileModals"`) and `submit_mode: :json`, which posts JSON to the host's
+    `subscribe_url:` / `unsubscribe_url:` (`unsubscribe_method:`, default
+    `DELETE`) through `studio/newsletter_modal` with a spinner and an inline
+    error line, dispatches `changed_event:` (default
+    `studio:newsletter-changed`) with `{ subscribed, email, response }`, calls an
+    opener's `props.onSuccess`, and steps to the next card with no reload. An
+    opener's `props.onSubmit` takes the address instead and nothing is posted.
+    Three optional cards: `subscribe_card:` (a consent box), `success_card:`
+    (a host slot, `partial:` and `locals:`) and `goodbye_card:`; every card,
+    the two existing ones included, takes host copy and an `id:`.
+  - `blocks/_birthday` takes `progress_pill: { current:, total: }`, drawn first
+    inside the card.
+  - `blocks/_error_card` takes `countdown_key:` (an Alpine expression for the
+    seconds, a 429's Retry-After), `countdown_text:` and `auto_close:` (default
+    true), counted by `studio/modal_countdown`; and `cta_close:`,
+    `secondary_close:` and `modal_store:` for buttons that close the store.
+  - `blocks/_success_card` takes `cta_close:`, `secondary_close:`,
+    `modal_store:`, and `slot_position: :message`, which puts the block in the
+    message's place.
+  - `blocks/_change_username` takes `locked: { title:, subtitle:, cta_label:,
+    cta_href:, dismiss: }`, a card that says why the rename is not open yet.
+
+  The two factories, `studioModalCountdown` and `studioNewsletterModal`, are
+  published by `studio/alpine_scopes` and named in its guard. Every
+  `modal_store:` is validated as a JS identifier. The newsletter cards' JSON
+  mode uses the motion layer's `.spinner`.
+
 ### Fixed
 
 - **`studio/cropper_assets` pins Cropper.js with Subresource Integrity.** The

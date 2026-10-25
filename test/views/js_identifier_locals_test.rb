@@ -68,8 +68,8 @@ class JsIdentifierLocalsTest < ActiveSupport::TestCase
 
   # The census. partial => [store local, other required locals, renders as a layout?]
   #
-  # THE LIST IS THE CLAIM. Nineteen partials in this engine fetch a store-name local;
-  # seventeen of them reach identifier position and are here. The two that do not are
+  # THE LIST IS THE CLAIM. Twenty-three partials in this engine fetch a store-name local;
+  # twenty-one of them reach identifier position and are here. The two that do not are
   # asserted separately below, because "we left it alone" is a finding that has to be
   # provable rather than an omission that looks like one.
   VALIDATED = {
@@ -79,6 +79,15 @@ class JsIdentifierLocalsTest < ActiveSupport::TestCase
     "studio/modals/blocks/age_gate"          => [:modal_store, {}, false],
     "studio/modals/blocks/close_x"           => [:modal_store, {}, false],
     "studio/modals/blocks/cta_redirect"      => [:modal_store, { href_key: "props.url" }, false],
+    # engine-modal-blocks-carry-consumer: the close actions, the countdown's
+    # store, the locked username card and the newsletter cards all splice it.
+    "studio/modals/blocks/error_card"        => [:modal_store, { title: "Wait", cta_label: "OK", cta_close: true }, false],
+    "studio/modals/blocks/success_card"      => [:modal_store, { title: "Done", cta_label: "OK", cta_close: true }, false],
+    "studio/modals/blocks/change_username"   => [:modal_store, { current_username: "pat", submit_url: "/u",
+                                                                 locked: { title: "Locked" } }, false],
+    "studio/profiles/newsletter_modals"      => [:modal_store, { user: Struct.new(:email).new("pat@example.com"),
+                                                                 submit_mode: :json, subscribe_url: "/s",
+                                                                 unsubscribe_url: "/u" }, false],
     "studio/modals/blocks/entry_confirmed"   => [:modal_store, { title: "Confirmed" }, false],
     "studio/modals/blocks/free_entry_earned" => [:modal_store, {}, false],
     "studio/modals/blocks/leveling_activity" => [:modal_store, { title: "Quest", submit_url: "/l" }, false],
@@ -148,7 +157,7 @@ class JsIdentifierLocalsTest < ActiveSupport::TestCase
     js_bearing_strings(html).sum { |value| value.scan("$store.#{name}").size }
   end
 
-  # --- The seventeen partials that splice a store name into identifier position ---
+  # --- The twenty-one partials that splice a store name into identifier position ---
 
   VALIDATED.each do |partial, (local, extra, layout)|
     slug = partial.tr("/", "_")
