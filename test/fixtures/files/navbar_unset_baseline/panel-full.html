@@ -1,0 +1,38 @@
+
+<aside
+  id="p"
+  x-cloak
+  x-show="o"
+  @click.outside="o = false"
+  @keydown.escape.window="o = false"
+  @turbo:before-cache.window="o = false"
+  x-transition:enter="transition ease-out duration-300"
+  x-transition:enter-start="translate-x-full"
+  x-transition:enter-end="translate-x-0"
+  x-transition:leave="transition ease-in duration-200"
+  x-transition:leave-start="translate-x-0"
+  x-transition:leave-end="translate-x-full"
+  class="hidden md:flex fixed right-0 w-80 max-w-full bg-surface border-l border-subtle shadow-2xl studio-link-sidebar-layer flex-col "
+  style="top:var(--nav-bottom, var(--nav-h, 6rem));height:calc(100% - var(--nav-bottom, var(--nav-h, 6rem)))"
+  data-pin-edge
+  role="complementary"
+  aria-labelledby="p-title">
+  <div class="flex flex-col h-full">
+      <div class="flex items-center justify-between p-4 border-b border-subtle">
+          <h3 id="p-title" class="text-lg font-bold text-heading">Menu</h3>
+        <div class="flex items-center gap-2 ml-auto">
+          <i>a</i>
+            <button type="button"
+                    @click="o = false"
+                    class="flex items-center justify-center w-8 h-8 rounded-full text-secondary hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition"
+                    aria-label="Close sidebar"
+                    data-link-sidebar-close="true">
+              <span class="text-xl leading-none">&times;</span>
+            </button>
+        </div>
+      </div>
+
+    <p>b</p>
+    <p>f</p>
+  </div>
+</aside>

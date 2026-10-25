@@ -765,6 +765,44 @@ end
   and is reported once per process per error class, never a 500.
 - A host on an older engine can set it safely with
   `Studio.navbar_signed_out_cta = … if Studio.respond_to?(:navbar_signed_out_cta=)`.
+- Three optional keys; absent, the CTA renders as before:
+  - `modal:` `"auth"`, or `{ id: "auth", props: { step: "credentials" } }`. The
+    button opens that modal on the engine's modal host
+    (`$store.modals.open(id, props)`), and `path:` stays its `href`, the
+    fallback with no script or no modal host. The engine builds the expression
+    from this data: the id must be a plain name and the props JSON, so no host
+    JavaScript reaches the page as a string. The button carries
+    `data-nav-cta-modal="<id>"`.
+  - `sign_in_link: false` drops the quiet sign-in link in both rows, for an app
+    whose CTA is its sign-in (one Sign in, not two).
+  - `sign_in_path:` points the quiet sign-in link somewhere other than
+    `login_path`.
+
+```ruby
+config.navbar_signed_out_cta = { label: "Sign in", path: "/signin", sign_in_link: false,
+                                 modal: { id: "auth", props: { step: "credentials", mode: "signup" } } }
+```
+
+### Header bars — `Studio.navbar_header_bars`
+
+Partials the navbar renders INSIDE its pinned header, above the row, so they
+never scroll away: a control an admin must not lose, such as an impersonation
+bar's JS-free "Return to <admin>" button. An ambient label (the environment
+bar) belongs in the bar stack above the header, which scrolls. Empty (`[]`, the
+default), the navbar renders as before. Rules: `lib/studio/navbar_slots.rb`.
+
+```ruby
+config.navbar_header_bars = ->(view) { view.impersonating? ? ["shared/impersonation_banner"] : [] }
+```
+
+- They render in `[data-nav-header-bars]`, the header's first child, signed in
+  and out, never on a preview.
+- The cost of being in the header: it is a stacking context, so these bars do
+  not rise over an open modal the way the bar stack does.
+- On the scroll timeline `engine.css` (*THE IN-HEADER BARS*) carries them down
+  by the band, so they hold at the top of the window while the compact bar
+  sticks under them.
+- Validation and the raising-callable fallback are `navbar_items`'s.
 
 ### Navbar items — `Studio.navbar_items`
 
@@ -841,6 +879,81 @@ partial (String path, or `{ partial:, locals: }`):
 The legacy string locals (`balance_html`, `extra_icons_html`, `div2_html` —
 pre-rendered HTML injected via `raw`) are deprecated but still honored when the
 matching slot is absent, so existing call sites render unchanged.
+
+`layouts/_navbar` takes the same four (`balance_slot`, `extra_icons_slot`,
+`div2_slot`, `div2_html`) and forwards them, so an app rendering the engine
+navbar fills these seats without forking either partial:
+
+```erb
+<%= render "layouts/navbar", div2_slot: { partial: "components/seeds_bar", locals: { compact: true } } %>
+```
+
+A `balance_slot` reserves the balance column as `balance_html` does, and the
+link sidebar's trigger still follows an `extra_icons_slot`.
+
+### Menu trigger and account sidebar — `Studio.navbar_menu_trigger`, `Studio.navbar_account_sidebar`
+
+For an app whose menu is its own sidebar (Turf Monster's gear sidebar), not
+the admin dropdown or the engine's link sidebar. Both `nil` by default, which
+renders as before.
+
+```ruby
+config.navbar_menu_trigger = "components/gear_sidebar_trigger"
+config.navbar_account_sidebar = { flag: "gearOpen", controls: %w[gear-sidebar gear-sidebar-mobile] }
+```
+
+- `navbar_menu_trigger` is one partial spec (or a callable) rendered in the
+  admin dropdown's seat: the icon rail from `md` (in
+  `[data-nav-menu-trigger]`), and the phone row. Rules:
+  `lib/studio/navbar_slots.rb`.
+- `navbar_account_sidebar` makes the account control a button that toggles
+  `$store.<store>.<flag>` (`store:` defaults to `"sidebars"`), with
+  `aria-controls` naming the panels, `aria-haspopup="dialog"` and a bound
+  `aria-expanded`. It wins over the link sidebar and the account link. The
+  engine builds the toggle from the names, which must be plain identifiers. It
+  carries `data-profile-image-toggle`, so a host handler that claims its
+  triggers in the capture phase, before Alpine binds, claims it too. Rules:
+  `lib/studio/navbar_account_sidebar.rb`.
+
+### Sidebar panel lead and close hook
+
+`components/_sidebar_panel` takes two opt-in locals; unset, the panel renders
+as before:
+
+- `title_html:` HTML in the title's place, for a panel whose header leads with
+  a live status line. It is content, not a name: it never feeds
+  `aria-labelledby` or `aria-label`, so a caller that passes it instead of
+  `title:` passes `aria_label:`. `title:` wins when both are passed.
+- `close_hook: true` (with an `id:`) adds `data-sidebar-panel-close="<id>"` to
+  the close button, beside `data-link-sidebar-close`. The contract is the
+  host's: its own document handler matches the button to its panel by id
+  (Turf Monster's gear sidebar does). `studio/link_sidebar` reads only
+  `data-link-sidebar-close`, and only inside its own panels.
+
+### Phone name — `Studio.navbar_phone_name`
+
+`true` shows the signed-in name beside the avatar below `md` too, capped at
+4.5rem (6rem from 400px), and fades it out over its right half when it does not
+fit. The fade is CSS only (`engine.css`, *THE PHONE NAME*): it runs on the
+name's own scroll timeline, which is inactive while the name fits, so a short
+name never fades. A browser without scroll timelines clips the name. `false`,
+the default, keeps the name screen-reader text below `md`.
+
+### Brand, root hook and layer tier — `Studio.navbar_brand`, `Studio.navbar_root_hook`, `Studio.navbar_z_tier`
+
+```ruby
+config.navbar_brand = { logo: "/icon-192.png", logo_size: 48, alt: "Turf Monster",
+                        words: [{ text: "Turf" }, { text: "Monster", class: "tm-wordmark" }] }
+config.navbar_root_hook = true   # data-navbar-root on the header, live and preview
+config.navbar_z_tier = true      # the live header at z-[var(--z-nav)], not z-50
+```
+
+- `navbar_brand`: every key optional. `logo:` replaces the "Navbar Logo" theme
+  image, `logo_size:` adds `width` and `height`, `alt:` replaces `app_name` as
+  its alt, and `words:` replaces the `app_name` split: each word its own
+  truncating span with the host's class and nothing else. `navbar_wordmark`
+  wins when both are set. Rules: `lib/studio/navbar_brand.rb`.
+- `navbar_root_hook` and `navbar_z_tier` are booleans, `false` by default.
 
 ### The account row
 

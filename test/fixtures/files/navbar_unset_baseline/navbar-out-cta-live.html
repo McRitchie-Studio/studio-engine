@@ -1,0 +1,131 @@
+
+<header data-pin="nav" x-data data-studio-controller="nav-collapse" data-nav-collapse-scrolled-class="shadow-lg border-b border-subtle is-scrolled"
+        class="nav-shell sticky top-0 z-50 bg-page transition-shadow duration-300"
+        >
+  <style>
+    /* THE PHONE STEP IS A SHARE OF THE VIEWPORT, NOT A CONSTANT, and that is the
+       whole width fix. 14rem is 224px — 57% of a 390px screen — handed to a
+       flex-shrink-0 column, so the left column was left 166px for a 48px logo,
+       a 4px gap, 32px of padding and whatever the app is called. MEASURED on
+       /lab/bar_stack?signed_in=1 at 390x844, app_name "McRitchie Industries":
+       the title's own box ran to x=175.3 inside a column whose border box ends
+       at x=166, and "Industries" painted ON TOP of the wallet address in the
+       column beside it. documentElement.scrollWidth was 390 against a
+       clientWidth of 390 the entire time — the page did not scroll sideways,
+       so every document-level check of this header was green while the header
+       was visibly broken.
+
+       min() rather than a new breakpoint: the cap still resolves to 14rem on
+       anything at or above ~487px, so this band's desktop-side behaviour is
+       byte-identical and only the phone widths move. 46vw is not a taste
+       value — it is the largest share that still leaves the left column the
+       191px a 48px logo, its gap, its padding and a ten-character word need at
+       360px, the narrowest mainstream Android. Below that the title truncates
+       (see min-w-0 + truncate on the markup) instead of spilling.
+
+       BOTH LINES, and that is not redundancy. .user-nav-col is a hard width
+       (a host passing balance_html reserves the seat) and .user-nav-fit is a
+       cap (no balance, so the column hugs its content). They are two different
+       properties and a fix to one leaves the other exactly as broken. */
+    .user-nav-col { width: min(14rem, 46vw); }
+    /* No balance content → no reserved column. The nav hugs its icons and
+       name instead of floating in the balance's empty seat. max-width steps
+       mirror the col's clamps: the item is flex-shrink-0, so without them a
+       long nowrap username sizes the column past a narrow viewport. */
+    .user-nav-fit { max-width: min(14rem, 46vw); }
+    /* THE SAME SHARE IN THE NEXT BAND UP, and leaving it out was measurably
+       worse than not fixing the first one. With only the base band capped, a
+       412px screen (Pixel-class, and the 400px band's own territory) gave the
+       title 84px while a 390px screen gave it 107 — a WIDER phone showing LESS
+       of the app's name. Monotone or it is not fixed. min(15rem, 46vw) resolves
+       to the plain 15rem at ~522px and up, so everything above this band's
+       phone edge is unchanged. */
+    @media (min-width: 400px) { .user-nav-col { width: min(15rem, 46vw); } .user-nav-fit { max-width: min(15rem, 46vw); } }
+    @media (min-width: 768px) { .user-nav-col { width: 20rem; } .user-nav-fit { max-width: 20rem; } }
+    /* The COLLAPSE band table used to live here, which meant only an app
+       rendering THIS partial got it. Three of five apps fork the navbar, so each
+       was left to hand-write its own — the way four independent copies happened
+       in the first place. It ships from engine.css now (every consuming app
+       imports it), so a forking app OPTS IN with `nav-shell` +
+       data-studio-controller="nav-collapse" (or x-data="navCollapse()",
+       the Alpine shim) and overrides only the endpoints that differ.
+
+       THE OPT-IN IS NOT THE WHOLE JOB — this is the partial a forker actually
+       reads, so the caveat belongs here too rather than only beside the band
+       table. A hand-written header must also REMOVE the bindings that fight the
+       primitive (a :class size swap on the row, x-bind:class on the logo AND on
+       the title, transition-all alongside) and ADD the hooks the table keys on
+       (nav-row, nav-logo, nav-title, and the mobile-only nav-logo-link). The
+       title swap matters most: it is DISCRETE, which is the 1px reverse lurch
+       the primitive exists to delete. Full accounting in engine.css. */
+  </style>
+  <div class="nav-row flex items-center">
+    <div class="flex-1 min-w-0 px-4">
+      <div class="flex items-center gap-6 min-w-0">
+        <a class="nav-logo-link inline-flex items-center gap-3 group min-w-0" href="/">
+          <h1 class="nav-title font-extrabold text-heading tracking-tight min-w-0"><span class="truncate"></span><span class="text-primary truncate">Studio</span></h1>
+</a>        <nav class="hidden md:flex items-center gap-4">
+        </nav>
+      </div>
+    </div>
+    <div class="user-nav-fit flex-shrink-0 pl-0 pr-4 md:px-4">
+        <div class="flex items-center justify-end gap-3">
+          
+          <span class="hidden md:flex"><span class="relative flex" style="width: 16px; height: 16px;">
+  <span class="nav-toggle-icon absolute inset-0 transition-all duration-300" style="transform: scale(1) rotate(0deg); opacity: 1;">
+    <button @click="$store.theme.toggle()" class="flex text-secondary hover:text-heading transition" title="Toggle theme">
+  <!-- Moon icon (shown in dark mode) — Heroicons v2 outline -->
+  <svg x-show="$store.theme.isDark" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+  </svg>
+  <!-- Sun icon (shown in light mode) — Heroicons v2 outline -->
+  <svg x-show="!$store.theme.isDark" x-cloak xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+  </svg>
+</button>
+
+  </span>
+  <span class="nav-spinner-icon absolute inset-0 transition-all duration-300 pointer-events-none" style="transform: scale(0) rotate(-90deg); opacity: 0;">
+    <svg class="w-4 h-4 animate-spin text-secondary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+    </svg>
+  </span>
+</span>
+</span>
+          <a class="hidden md:inline text-sm font-semibold text-secondary hover:text-primary whitespace-nowrap transition" data-nav-sign-in="" href="/login">Log in</a>
+          <a class="btn btn-primary whitespace-nowrap" data-nav-signed-out-cta="" href="/build">Build App</a>
+        </div>
+    </div>
+  </div>
+  <div class="flex md:hidden items-center gap-3 px-4 py-1.5 border-t border-subtle bg-surface-alt">
+    <span class="ml-auto flex items-center gap-3">
+      <a class="text-xs font-semibold text-secondary hover:text-primary whitespace-nowrap transition" data-nav-sign-in="" href="/login">Log in</a>
+      
+      
+      <span class="relative flex" style="width: 16px; height: 16px;">
+  <span class="nav-toggle-icon absolute inset-0 transition-all duration-300" style="transform: scale(1) rotate(0deg); opacity: 1;">
+    <button @click="$store.theme.toggle()" class="flex text-secondary hover:text-heading transition" title="Toggle theme">
+  <!-- Moon icon (shown in dark mode) — Heroicons v2 outline -->
+  <svg x-show="$store.theme.isDark" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+  </svg>
+  <!-- Sun icon (shown in light mode) — Heroicons v2 outline -->
+  <svg x-show="!$store.theme.isDark" x-cloak xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+  </svg>
+</button>
+
+  </span>
+  <span class="nav-spinner-icon absolute inset-0 transition-all duration-300 pointer-events-none" style="transform: scale(0) rotate(-90deg); opacity: 0;">
+    <svg class="w-4 h-4 animate-spin text-secondary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+    </svg>
+  </span>
+</span>
+
+    </span>
+  </div>
+</header>
+

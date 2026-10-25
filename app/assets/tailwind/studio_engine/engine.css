@@ -883,6 +883,56 @@ body.modal-open .studio-app-banner {
     }
   }
 }
+/* THE PHONE NAME (Studio.navbar_phone_name, components/_user_nav). Below 768px
+   the signed-in name shows beside the avatar in a capped box. A name that
+   fits draws whole; one that does not fades out over its right half instead
+   of ending in an ellipsis. The fade needs no script: the name's box clips
+   (truncate), which makes it a scroll container, and a scroll timeline on a
+   container with nothing to scroll is inactive, so the animation, and its
+   mask, applies only while the name overflows. A browser without scroll
+   timelines clips the name. From 768px the name truncates as before. */
+@media (max-width: 767px) {
+  [data-nav-name-phone] > [data-nav-name] { text-overflow: clip; }
+  @supports (animation-timeline: scroll()) {
+    [data-nav-name-phone] > [data-nav-name] {
+      animation: nav-name-fade linear both;
+      animation-timeline: scroll(self inline);
+    }
+  }
+}
+@keyframes nav-name-fade {
+  from, to {
+    -webkit-mask-image: linear-gradient(to right, black 50%, transparent);
+    mask-image: linear-gradient(to right, black 50%, transparent);
+  }
+}
+
+/* THE IN-HEADER BARS ON THE SCROLL TIMELINE (Studio.navbar_header_bars, which
+   layouts/_navbar renders in [data-nav-header-bars] at the top of the header).
+   On the timeline the header sticks at minus its band, so its TOP band leaves
+   the window, and these bars sit at its top. So they move down by the band
+   over the range the band scrolls away in, on the same linear timeline: the
+   header rises by exactly as much as they fall, and they hold still at the top
+   of the window. The band needs no correction (the controller measures it as
+   expanded less collapsed height, and the bars are in both readings), nor
+   does the row (it slides down half the band, which centres it on what is left
+   below the bars). Same conditions as the collapse above. Lifted from Turf
+   Monster's fork of the navbar, where it was measured. */
+@layer utilities {
+  @supports (animation-timeline: scroll()) {
+    @media (min-width: 768px) {
+      .nav-shell[data-nav-timeline] > [data-nav-header-bars] {
+        position: relative;
+        z-index: 1;
+        animation: nav-tl-header-bars linear both;
+        animation-timeline: scroll(root block);
+        animation-range: var(--nav-start, 0px) calc(var(--nav-start, 0px) + var(--nav-band));
+      }
+    }
+  }
+}
+@keyframes nav-tl-header-bars { to { transform: translateY(var(--nav-band)); } }
+
 /* THE PINNED EDGE ON THE SCROLL TIMELINE (studio/pinned_stack).
    On a timeline header the pinned stack publishes where the stack sits once it
    has PINNED (the compact bar), and writes nothing per scroll frame. A sticky

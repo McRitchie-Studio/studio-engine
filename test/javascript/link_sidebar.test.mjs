@@ -152,6 +152,8 @@ test("click intent: a trigger toggles only when its aria-controls names the pane
   assert.equal(clickIntent(el(["[data-profile-image-toggle]", CONTROLS])), "toggle")
   assert.equal(clickIntent(el([TRIGGER])), "outside", "a trigger for some other panel")
   assert.equal(clickIntent(el([CONTROLS])), "outside", "aria-controls alone is not a trigger")
+  assert.equal(clickIntent(el(["[data-profile-image-toggle]"])), "outside",
+    "an account control opening a HOST sidebar (Studio.navbar_account_sidebar) is left to its host")
 })
 
 test("click intent: inside a panel, outside every panel, and no target at all", () => {

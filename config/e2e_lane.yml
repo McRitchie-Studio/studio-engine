@@ -1024,7 +1024,7 @@
 # and collapsed (24 / 23.97 / 23.94px); its control strips data-nav-links and
 # sees the gap widen (24 / 86.1 / 148.3px), the unfixed behaviour.
 #   npx playwright test --list  -> 361 tests in 52 files
-# 361 -> 369: e2e/modal_blocks.spec.js, 8 tests, 1 new file (task
+# 364 -> 372: e2e/modal_blocks.spec.js, 8 tests, 1 new file (task
 # engine-modal-blocks-carry-consumer). /lab/modal_blocks on the global host: the
 # error card's Retry-After countdown auto-closes at zero and reads minutes for a
 # long wait; the error, success and locked-username close actions close the
@@ -1034,8 +1034,9 @@
 # unsubscribe steps to the goodbye beat with no reload. Verified RED with the two
 # factories unpublished from studio/alpine_scopes: the five tests that bind them
 # fail.
-#   npx playwright test --list  -> 369 tests in 53 files
-total_specs: 369
+#   npx playwright test --list  -> 372 tests in 54 files (on top of the
+#   in-header bars' 361 -> 364, e2e/navbar_header_bars.spec.js)
+total_specs: 372
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1251,7 +1252,15 @@ total_specs: 369
 #   npx playwright test --list                                             -> 361 tests, 52 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 361
-executed: 369
+# And for the in-header bars (Studio.navbar_header_bars): 3 more tests (361 -> 364), 1 new file:
+#   npx playwright test --list                                             -> 364 tests, 53 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 364
+# And for the modal blocks' consumer locals: 8 more tests (364 -> 372), 1 new file:
+#   npx playwright test --list                                             -> 372 tests, 54 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 372
+executed: 372
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

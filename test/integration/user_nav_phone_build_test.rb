@@ -42,6 +42,25 @@ class UserNavPhoneBuildTest < Minitest::Test
       "the md: variants must compile inside the 768px breakpoint")
   end
 
+  # The opt-in navbar settings after 0.113.0 (Studio.navbar_phone_name,
+  # Studio.navbar_z_tier, Studio.navbar_header_bars) ask for arbitrary-value
+  # utilities and engine.css rules no default render uses, so a consumer build
+  # has to emit them from the engine's views alone.
+  def test_a_consumer_build_emits_the_opt_in_navbar_utilities_and_rules
+    css = compile_consumer_style_build
+
+    { '.max-w-\\[4\\.5rem\\]' => "max-width: 4.5rem",
+      '.min-\\[400px\\]\\:max-w-\\[6rem\\]' => "max-width: 6rem",
+      '.z-\\[var\\(--z-nav\\)\\]' => "z-index: var(--z-nav)" }.each do |selector, declaration|
+      rule = css[/#{Regexp.escape(selector)} \{[^}]*\}/m]
+      refute_nil rule, "#{selector} was not emitted by a consumer-shaped build"
+      assert_includes rule, declaration
+    end
+    assert_includes css, "@keyframes nav-name-fade"
+    assert_includes css, "@keyframes nav-tl-header-bars"
+    assert_match(/\[data-nav-name-phone\] *> *\[data-nav-name\]/, css)
+  end
+
   private
 
   def compile_consumer_style_build
