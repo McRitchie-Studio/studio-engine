@@ -772,7 +772,7 @@ end
     fallback with no script or no modal host. The engine builds the expression
     from this data: the id must be a plain name and the props JSON, so no host
     JavaScript reaches the page as a string. The button carries
-    `data-nav-cta-modal="<id>"`.
+    `data-nav-cta-modal="<id>"` and `aria-haspopup="dialog"`.
   - `sign_in_link: false` drops the quiet sign-in link in both rows, for an app
     whose CTA is its sign-in (one Sign in, not two).
   - `sign_in_path:` points the quiet sign-in link somewhere other than

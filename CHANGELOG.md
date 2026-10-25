@@ -85,6 +85,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **`Studio.navbar_signed_out_cta` with `modal:` marks its button
+  `aria-haspopup="dialog"`,** so a screen reader announces the dialog before
+  the press. A CTA without `modal:` renders as before.
 - **`Studio.navbar_phone_name` ends a long name in an ellipsis where scroll
   timelines are unsupported.** The `text-overflow: clip` that makes room for
   the fade now sits inside the `@supports (animation-timeline: scroll())`

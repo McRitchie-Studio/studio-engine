@@ -97,6 +97,8 @@ class NavbarSignedOutCtaRenderTest < ActiveSupport::TestCase
 
     button = doc.at_css("a.btn.btn-primary")
     assert_equal ["Build App", "/build"], [button.text, button["href"]]
+    refute button.key?("aria-haspopup"), "a CTA without modal: navigates; it opens no dialog " \
+                                         "(the navbar-out-cta-live golden pins the same bytes)"
 
     sign_in = doc.css("a[href='/login']")
     assert_equal ["Log in", "Log in"], sign_in.map(&:text)

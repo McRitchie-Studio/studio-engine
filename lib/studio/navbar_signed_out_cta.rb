@@ -19,7 +19,8 @@
 #
 #   modal:         "auth", or { id: "auth", props: { step: "credentials" } }.
 #                  The button opens that modal on the engine's modal host
-#                  ($store.modals.open(id, props)) and path stays its href, the
+#                  ($store.modals.open(id, props)), carries
+#                  aria-haspopup="dialog", and path stays its href, the
 #                  fallback with no script or no modal host. The expression is
 #                  the engine's, built from this data: the id is a plain name
 #                  and props must be JSON (strings, numbers, booleans, nil,
