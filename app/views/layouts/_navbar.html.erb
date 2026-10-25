@@ -4,6 +4,13 @@
       preview         — if true, disables scroll handler and sticky positioning
       balance_html    — raw HTML for balance display (passed through to _user_nav)
       extra_icons_html — raw HTML for extra icon buttons (passed through to _user_nav)
+      balance_slot, extra_icons_slot, div2_slot, div2_html
+                      — components/_user_nav's slot locals (a partial path, or
+                        { partial:, locals: }), forwarded to it as given. A
+                        balance_slot reserves the balance column as balance_html
+                        does. extra_icons_slot is rendered here, so the link
+                        sidebar's trigger still follows it; like the user nav,
+                        a slot wins over its legacy _html string.
       brand_heading   — boolean, draw the brand title as the page's h1 (default: true).
                         Pass false on a page that carries its own h1: the brand is
                         drawn as a div with the same classes and contents.
@@ -20,6 +27,13 @@
 <% pin_header = Studio.smooth_load && !is_preview %>
 <% balance_html = local_assigns.fetch(:balance_html, nil) %>
 <% extra_icons_html = local_assigns.fetch(:extra_icons_html, nil) %>
+<%# The user nav's slot locals, forwarded only when passed, so a navbar that
+    passes none renders the user nav exactly as before. %>
+<% user_nav_slots = local_assigns.slice(:balance_slot, :div2_slot, :div2_html).compact %>
+<% extra_icons_slot = local_assigns[:extra_icons_slot] %>
+<% if extra_icons_slot.present? %>
+  <% extra_icons_html = extra_icons_slot.is_a?(Hash) ? render(extra_icons_slot[:partial], **extra_icons_slot.fetch(:locals, {})) : render(extra_icons_slot.to_s) %>
+<% end %>
 <% brand_tag = local_assigns.fetch(:brand_heading, true) ? "h1" : "div" %>
 <%# Out-of-the-box navigation (engine 0.30): when the host declares
     Studio.sidebar_sections, the navbar mounts the link-sidebar trigger in its
@@ -201,9 +215,9 @@
     <%# Right side: user nav. The fixed column (matches sidebar width) exists
         to seat a balance in the top row; with no balance content it shrinks
         to fit. %>
-    <div class="<%= balance_html.present? ? 'user-nav-col' : 'user-nav-fit' %> flex-shrink-0 pl-0 pr-4 md:px-4">
+    <div class="<%= balance_html.present? || user_nav_slots[:balance_slot].present? ? 'user-nav-col' : 'user-nav-fit' %> flex-shrink-0 pl-0 pr-4 md:px-4">
       <% if show_user %>
-        <%= render "components/user_nav", balance_html: balance_html, extra_icons_html: extra_icons_html %>
+        <%= render "components/user_nav", balance_html: balance_html, extra_icons_html: extra_icons_html, **user_nav_slots %>
       <% else %>
         <div class="flex items-center justify-end gap-3">
           <%= sidebar_trigger_desktop if sidebar_active %>
