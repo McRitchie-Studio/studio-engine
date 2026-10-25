@@ -65,7 +65,7 @@ jobs:
   # A re-run of failed shards now reuses this job's output, so it re-runs the same SHA.
   consumer-refs:
     name: Resolve consumer commits
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned, not the floating latest label: that moves to images Playwright cannot install chromium on (guard: test/lib/ci_runner_image_pin_test.rb)
     timeout-minutes: 5
     outputs:
       shas: ${{ steps.consumer-ref.outputs.shas }}
@@ -248,7 +248,7 @@ jobs:
             needs_rails_credentials: false
             needs_solana_admin_key: false
             needs_tailwind_build: false
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
 
     services:
@@ -501,7 +501,7 @@ jobs:
   # matters.
   hub-executed-set:
     name: mcritchie_studio executed-set
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     needs: [consumer-refs, consumer-tests]
     if: always()
