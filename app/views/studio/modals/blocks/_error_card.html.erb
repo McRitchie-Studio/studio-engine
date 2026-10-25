@@ -94,7 +94,8 @@
   <% end %>
 
   <% if countdown_data %>
-    <p class="text-xs text-secondary mb-4" x-show="counting"><%= countdown_text %> <span class="text-heading font-semibold" x-text="waitLabel"></span>.</p>
+    <%# aria-live="off": the card is role="alert", and a label ticking inside it would be announced every second. %>
+    <p class="text-xs text-secondary mb-4" x-show="counting" aria-live="off"><%= countdown_text %> <span class="text-heading font-semibold" x-text="waitLabel"></span>.</p>
   <% end %>
   <% if local_assigns[:cta_reload] %>
     <button @click="window.location.reload()" class="btn btn-outline btn-sm"><%= cta_label %></button>

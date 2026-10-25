@@ -152,6 +152,7 @@ class ModalBlocksConsumerLocalsTest < ActiveSupport::TestCase
     line = card.at_css("[x-show=counting]")
     assert_equal "Try again in .", line.text.squish
     assert line.at_css("[x-text=waitLabel]"), "the wait is bound to the factory's label"
+    assert_equal "off", line["aria-live"], "the ticking label is not re-announced each second inside the alert"
     assert_equal "$store.hostModals.close()", card.at_css("button")["@click"]
   end
 
