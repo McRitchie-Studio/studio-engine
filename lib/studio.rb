@@ -34,6 +34,7 @@ require "studio/site_footer"
 require "studio/booking"
 require "studio/navbar_links"
 require "studio/navbar_signed_out_cta"
+require "studio/navbar_slots"
 require "studio/navbar_identity"
 require "studio/navbar_wordmark"
 require "studio/auth_labels"
@@ -297,6 +298,41 @@ module Studio
     NavbarSignedOutCta.validate!(config)
     NavbarSignedOutCta.reset_reported!
     @@navbar_signed_out_cta = config
+  end
+
+  # ---- Navbar items ----
+  # Partials the engine navbar renders after Studio.navbar_links, in the desktop
+  # bar AND the phone row (so each renders twice per page: give its markup no
+  # id). The default [] renders nothing, byte-identical to before. An Array, or
+  # a callable receiving the view, of partial specs: a partial path, or
+  # { partial:, locals: }. Rules: lib/studio/navbar_slots.rb.
+  #
+  #   config.navbar_items = ["components/geo_badge", "shared/wallet_signal"]
+  #   config.navbar_items = ->(view) { view.logged_in? ? ["shared/wallet_signal"] : [] }
+  mattr_reader :navbar_items, default: []
+
+  def self.navbar_items=(config)
+    NavbarSlots.validate_items!(config)
+    NavbarSlots.reset_reported!
+    @@navbar_items = config
+  end
+
+  # ---- Navbar avatar badge ----
+  # One partial the signed-in user nav renders over the avatar's upper-left
+  # corner, above it and out of flow, so the row gives it no width. It sits
+  # beside the account control, never inside it, so the control stays one tab
+  # stop and the badge may carry its own button. nil, the default, renders
+  # byte-identical to before. A partial spec, or a callable receiving the view
+  # (nil for no badge that render). Rules: lib/studio/navbar_slots.rb.
+  #
+  #   config.navbar_avatar_badge = "components/entry_token_badge"
+  #   config.navbar_avatar_badge = { partial: "components/entry_token_badge", locals: { size: :sm } }
+  mattr_reader :navbar_avatar_badge, default: nil
+
+  def self.navbar_avatar_badge=(config)
+    NavbarSlots.validate_badge!(config)
+    NavbarSlots.reset_reported!
+    @@navbar_avatar_badge = config
   end
 
   # ---- The shared profile page (/profile) ----
@@ -1438,6 +1474,16 @@ module Studio
   # (lib/studio/navbar_signed_out_cta.rb).
   def self.navbar_signed_out_cta_for(view)
     NavbarSignedOutCta.resolve(navbar_signed_out_cta, view)
+  end
+
+  # The navbar item partial specs for a view (lib/studio/navbar_slots.rb).
+  def self.navbar_items_for(view)
+    NavbarSlots.resolve_items(navbar_items, view)
+  end
+
+  # The avatar badge partial spec for a view, or nil (lib/studio/navbar_slots.rb).
+  def self.navbar_avatar_badge_for(view)
+    NavbarSlots.resolve_badge(navbar_avatar_badge, view)
   end
 
   # The signed-in user's navbar name for a view (lib/studio/navbar_identity.rb).

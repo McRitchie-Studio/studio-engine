@@ -766,6 +766,62 @@ end
 - A host on an older engine can set it safely with
   `Studio.navbar_signed_out_cta = … if Studio.respond_to?(:navbar_signed_out_cta=)`.
 
+### Navbar items — `Studio.navbar_items`
+
+Partials the navbar renders after its links, for the things an app shows in
+the bar that are not links: a location badge, a wallet signal. Empty (`[]`, the
+default), the navbar renders the same bytes as before. Rules:
+`lib/studio/navbar_slots.rb`.
+
+```ruby
+Studio.configure do |config|
+  # A partial path, or { partial:, locals: }.
+  config.navbar_items = ["components/geo_badge",
+                         { partial: "shared/wallet_signal", locals: { tone: "muted" } }]
+  # or a callable receiving the view; nil renders none for that render
+  # config.navbar_items = ->(view) { view.logged_in? ? ["shared/wallet_signal"] : [] }
+end
+```
+
+- Each item renders in BOTH rows: inside the desktop `<nav>` after the links
+  (from `md`), and in the phone row after its links (below `md`). So every item
+  is on the page twice; give its markup no `id`, and let it size itself for
+  either row.
+- Items render signed in and signed out, and in `preview: true` renders, as the
+  links do.
+- A bad static list raises `Studio::NavbarSlots::InvalidConfig` at assignment,
+  naming its index; a callable's bad answer raises it at render. A callable
+  that raises renders no items and is reported once per process per error
+  class, never a 500.
+- A host on an older engine can set it safely with
+  `Studio.navbar_items = … if Studio.respond_to?(:navbar_items=)`.
+
+### Avatar badge — `Studio.navbar_avatar_badge`
+
+One partial the signed-in user nav draws over the avatar's upper-left corner,
+the way a notification dot rides a profile picture. `nil`, the default, renders
+the user nav byte-identical to before. Rules: `lib/studio/navbar_slots.rb`.
+
+```ruby
+Studio.configure do |config|
+  config.navbar_avatar_badge = "components/entry_token_badge"
+  # or { partial:, locals: }, or a callable receiving the view (nil for no badge)
+end
+```
+
+- The badge renders in a `[data-nav-avatar-badge]` seat right after the
+  account control, never inside it: the name and avatar stay one control and
+  one tab stop, and the badge may carry its own button.
+- `engine.css` (*THE AVATAR BADGE*) seats it out of flow, so the row gives it
+  no width: an avatar-sized box over the avatar, z-index 20, the badge's root
+  8px left and 4px up from the avatar's corner. The seat tracks the one-row
+  40px avatar and scales with it on the scroll timeline. Only the badge takes
+  the pointer; the rest of the avatar still opens the account.
+- Signed out it never renders. Validation and the raising-callable fallback
+  are `navbar_items`'s.
+- A host on an older engine can set it safely with
+  `Studio.navbar_avatar_badge = … if Studio.respond_to?(:navbar_avatar_badge=)`.
+
 ### User nav slots
 
 `components/_user_nav.html.erb` renders the right-side navbar user section.

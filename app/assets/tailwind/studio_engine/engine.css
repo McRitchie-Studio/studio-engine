@@ -698,6 +698,32 @@ body.modal-open .studio-app-banner {
       }
     }
 
+    /* THE AVATAR BADGE (Studio.navbar_avatar_badge, components/_user_nav).
+       The seat is the account control's next sibling, and the account control
+       ends the user nav's flex row with the avatar at its right edge. So the
+       seat is an avatar-sized box pinned to the row's right edge and centred
+       on it, exactly over the avatar, and the badge rides its upper-left
+       corner, 8px out and 4px up. Absolute, so the row gives it no width and
+       no gap. z-index 20 lifts it over the avatar. The seat lets the pointer
+       through to the avatar under it; only the badge itself takes it. */
+    :has(> [data-nav-avatar-badge]) { position: relative; }
+    [data-nav-avatar-badge] {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      margin-block: auto;
+      width: 2rem;
+      height: 2rem;
+      z-index: 20;
+      pointer-events: none;
+    }
+    [data-nav-avatar-badge] > * {
+      position: absolute;
+      left: -0.5rem;
+      top: -0.25rem;
+      pointer-events: auto;
+    }
     /* THE ACCOUNT ROW (components/_user_nav), from 768px. Every app whose
        navbar renders the engine's user nav gets this; Turf Monster forks the
        partial, carries none of these hooks, and keeps its own two-row nav.
@@ -747,6 +773,11 @@ body.modal-open .studio-app-banner {
         width: var(--nav-avatar);
         height: var(--nav-avatar);
         font-size: 0.875rem;
+      }
+      /* The badge seat tracks the one-row avatar it sits over. */
+      .nav-shell [data-nav-rows="1"] + [data-nav-account] + [data-nav-avatar-badge] {
+        width: var(--nav-avatar);
+        height: var(--nav-avatar);
       }
       .nav-shell [data-nav-rows="1"] + [data-nav-account] [data-nav-name] {
         font-size: calc(var(--nav-avatar) / 3 / 0.7);
@@ -829,6 +860,7 @@ body.modal-open .studio-app-banner {
       }
       .nav-shell[data-nav-timeline] .nav-logo-link,
       .nav-shell[data-nav-timeline] [data-nav-account] > [aria-hidden],
+      .nav-shell[data-nav-timeline] [data-nav-avatar-badge],
       .nav-shell[data-nav-timeline] [data-nav-account] > span:first-child,
       .nav-shell[data-nav-timeline] [data-nav-tools],
       .nav-shell[data-nav-timeline] [data-nav-links] {
@@ -838,7 +870,8 @@ body.modal-open .studio-app-banner {
         animation-range: var(--nav-start, 0px) calc(var(--nav-start, 0px) + var(--nav-ramp));
       }
       .nav-shell[data-nav-timeline] .nav-logo-link { transform-origin: left center; animation-name: nav-tl-brand; }
-      .nav-shell[data-nav-timeline] [data-nav-account] > [aria-hidden] { transform-origin: right center; animation-name: nav-tl-avatar; }
+      .nav-shell[data-nav-timeline] [data-nav-account] > [aria-hidden],
+      .nav-shell[data-nav-timeline] [data-nav-avatar-badge] { transform-origin: right center; animation-name: nav-tl-avatar; }
       .nav-shell[data-nav-timeline] [data-nav-account] > span:first-child { transform-origin: right center; animation-name: nav-tl-name; }
       .nav-shell[data-nav-timeline] [data-nav-tools] { animation-name: nav-tl-tools; }
       .nav-shell[data-nav-timeline] [data-nav-links] { animation-name: nav-tl-links; }

@@ -4,6 +4,25 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`Studio.navbar_items` and `Studio.navbar_avatar_badge`: partial slots in
+  the engine navbar.** `navbar_items` is a list of partials (a path, or
+  `{ partial:, locals: }`) the navbar renders after `navbar_links` in both the
+  desktop `<nav>` and the phone row, for what an app shows in the bar that is
+  not a link, such as Turf Monster's geo badge and wallet signal.
+  `navbar_avatar_badge` is one partial the signed-in user nav draws over the
+  avatar's upper-left corner, such as Turf Monster's free-entry sparkle. Its
+  seat is the account control's next sibling, so the control stays one tab stop
+  and the badge may carry its own button, and `engine.css` (*THE AVATAR BADGE*)
+  places it out of flow over the avatar, so the row gives it no width; it
+  tracks the one-row 40px avatar and scales with it on the scroll timeline.
+  Either setting may be a callable receiving the view. Unset (the defaults)
+  the navbar renders byte-identical to before, signed in and out. A bad static
+  setting raises `Studio::NavbarSlots::InvalidConfig` at assignment; a raising
+  callable renders nothing and is reported once. README, *Navbar items* and
+  *Avatar badge*.
+
 ## 0.112.0 — 2026-10-19
 
 ### Added
