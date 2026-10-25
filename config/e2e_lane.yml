@@ -1024,7 +1024,18 @@
 # and collapsed (24 / 23.97 / 23.94px); its control strips data-nav-links and
 # sees the gap widen (24 / 86.1 / 148.3px), the unfixed behaviour.
 #   npx playwright test --list  -> 361 tests in 52 files
-total_specs: 361
+# 361 -> 369: e2e/modal_blocks.spec.js, 8 tests, 1 new file (task
+# engine-modal-blocks-carry-consumer). /lab/modal_blocks on the global host: the
+# error card's Retry-After countdown auto-closes at zero and reads minutes for a
+# long wait; the error, success and locked-username close actions close the
+# store; the birthday card mounts with its pill; JSON subscribe posts the
+# address, fires the window event and the opener's onSuccess and steps to
+# Subscribed!; an opener's onSubmit takes the address with nothing posted; JSON
+# unsubscribe steps to the goodbye beat with no reload. Verified RED with the two
+# factories unpublished from studio/alpine_scopes: the five tests that bind them
+# fail.
+#   npx playwright test --list  -> 369 tests in 53 files
+total_specs: 369
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1240,7 +1251,7 @@ total_specs: 361
 #   npx playwright test --list                                             -> 361 tests, 52 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 361
-executed: 361
+executed: 369
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
