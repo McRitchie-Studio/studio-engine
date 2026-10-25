@@ -15,6 +15,7 @@
 # reusable workflow (`uses:`) has no runner of its own and is skipped; the
 # workflow it calls is checked in its own right. To move the pin, change PIN
 # here and every runs-on in the same PR.
+require "bundler/setup"
 require "minitest/autorun"
 require "yaml"
 
