@@ -38,6 +38,7 @@ require "studio/navbar_slots"
 require "studio/navbar_account_sidebar"
 require "studio/navbar_identity"
 require "studio/navbar_wordmark"
+require "studio/navbar_brand"
 require "studio/auth_labels"
 require "studio/profile_sections"
 require "studio/profile_image"
@@ -400,12 +401,52 @@ module Studio
   mattr_reader :navbar_phone_name, default: false
 
   def self.navbar_phone_name=(value)
-    unless [true, false].include?(value)
-      raise ArgumentError, "Studio.navbar_phone_name must be true or false (got #{value.inspect})"
-    end
-
-    @@navbar_phone_name = value
+    @@navbar_phone_name = navbar_boolean!(:navbar_phone_name, value)
   end
+
+  # ---- Navbar brand ----
+  # The navbar's logo image and title words, for an app whose brand is not the
+  # "Navbar Logo" image plus app_name with its last word in text-primary: a
+  # logo path and size, its alt, and the title as words, each its own span
+  # with the host's class (a split wordmark). nil, the default, renders
+  # byte-identical to before; every key is optional. navbar_wordmark wins when
+  # both are set. Rules: lib/studio/navbar_brand.rb.
+  #
+  #   config.navbar_brand = { logo: "/icon-192.png", logo_size: 48,
+  #                           words: [{ text: "Turf" }, { text: "Monster", class: "tm-wordmark" }] }
+  mattr_reader :navbar_brand, default: nil
+
+  def self.navbar_brand=(config)
+    @@navbar_brand = NavbarBrand.normalize(config)
+  end
+
+  # ---- Navbar root hook and layer tier ----
+  # navbar_root_hook: true puts data-navbar-root on the header (live and
+  # preview), the hook a host's tests and scripts find the navbar by.
+  # navbar_z_tier: true layers the live header on the shared layer scale,
+  # z-[var(--z-nav)] (engine.css), in place of z-50, so a modal (--z-modal)
+  # covers it and the tiers stay one table. Both false by default, which
+  # renders byte-identical to before.
+  #
+  #   config.navbar_root_hook = true
+  #   config.navbar_z_tier = true
+  mattr_reader :navbar_root_hook, default: false
+  mattr_reader :navbar_z_tier, default: false
+
+  def self.navbar_root_hook=(value)
+    @@navbar_root_hook = navbar_boolean!(:navbar_root_hook, value)
+  end
+
+  def self.navbar_z_tier=(value)
+    @@navbar_z_tier = navbar_boolean!(:navbar_z_tier, value)
+  end
+
+  def self.navbar_boolean!(name, value)
+    return value if [true, false].include?(value)
+
+    raise ArgumentError, "Studio.#{name} must be true or false (got #{value.inspect})"
+  end
+  private_class_method :navbar_boolean!
 
   # ---- The shared profile page (/profile) ----
   # The rows that make up /profile. `nil` — the default — means "the engine's

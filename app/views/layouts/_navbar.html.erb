@@ -64,6 +64,13 @@
   prefix = words.join(" ")
   logo_path = Studio.logo_for("Navbar Logo")
   wordmark = Studio.navbar_wordmark
+  # Studio.navbar_brand: the host's logo, its size and alt, and the title as
+  # words with the host's classes. nil (the default) draws as before.
+  brand = Studio.navbar_brand
+  logo_path = brand[:logo] if brand && brand[:logo]
+  logo_alt = (brand && brand[:alt]) || Studio.app_name
+  logo_size = brand && brand[:logo_size]
+  brand_words = brand && brand[:words]
 %>
 
 <%# nav-shell is the --nav-p scope: the engine's nav-collapse controller (studio/nav_collapse) writes
@@ -90,7 +97,10 @@
     or a scroll_timeline: local for one render; engine.css, THE SCROLL-DRIVEN
     COLLAPSE). Never on a preview: the /navbar page drives --nav-p itself. %>
 <% scroll_timeline = local_assigns.fetch(:scroll_timeline, Studio.navbar_scroll_timeline) %>
-<header data-pin="nav"<% unless is_preview %> x-data data-studio-controller="nav-collapse" data-nav-collapse-scrolled-class="shadow-lg border-b border-subtle is-scrolled"<%= " data-nav-timeline" if scroll_timeline %><% end %>
+<%# Studio.navbar_root_hook puts data-navbar-root on the header, live and
+    preview; Studio.navbar_z_tier layers the live header at --z-nav on the
+    shared scale (engine.css) instead of z-50. Both off renders as before. %>
+<header <%= "data-navbar-root ".html_safe if Studio.navbar_root_hook %>data-pin="nav"<% unless is_preview %> x-data data-studio-controller="nav-collapse" data-nav-collapse-scrolled-class="shadow-lg border-b border-subtle is-scrolled"<%= " data-nav-timeline" if scroll_timeline %><% end %>
         <%# top-0, a STATIC value, and never a custom property. Any bars render as
             this header's sibling in normal flow (studio/banners/_stack), so they
             already occupy their own height above it and there is nothing to
@@ -99,7 +109,7 @@
             measurement landed, moved again on a webfont swap, and drew twice
             during a view transition composited at two different tops. Only CSS
             can set this top now, so none of that is reachable. %>
-        class="nav-shell <%= is_preview ? 'bg-page' : "#{'vt-pinned-header ' if pin_header}sticky top-0 z-50 bg-page transition-shadow duration-300" %>"
+        class="nav-shell <%= is_preview ? 'bg-page' : "#{'vt-pinned-header ' if pin_header}sticky top-0 #{Studio.navbar_z_tier ? 'z-[var(--z-nav)]' : 'z-50'} bg-page transition-shadow duration-300" %>"
         <%= %(:class="scrolled && 'shadow-lg border-b border-subtle is-scrolled'").html_safe if is_preview %>>
   <style>
     /* THE PHONE STEP IS A SHARE OF THE VIEWPORT, NOT A CONSTANT, and that is the
@@ -200,14 +210,18 @@
             <%# No w-*/h-* utility here: .nav-shell .nav-logo sizes it off --nav-p.
                 transition-transform, NOT transition-all — the hover lift still
                 eases, while width/height follow the finger with no clock. %>
-            <img src="<%= logo_path %>" alt="<%= Studio.app_name %>" class="nav-logo rounded-full shadow-lg <%= "group-hover:scale-105 transition-transform duration-300" unless is_preview %>">
+            <img src="<%= logo_path %>" alt="<%= logo_alt %>"<% if logo_size %> width="<%= logo_size %>" height="<%= logo_size %>"<% end %> class="nav-logo rounded-full shadow-lg <%= "group-hover:scale-105 transition-transform duration-300" unless is_preview %>">
           <% end %>
           <%# truncate on the SPANS, not the h1. .nav-title is itself a flex
               container (a column below 768px, a baseline row above), so the
               overflow that has to be clipped belongs to each word's own box —
               `truncate` on the h1 would clip the flex CONTAINER and leave the
               spans drawing outside it, which is the bug rather than the fix. %>
+          <% if brand_words %>
+          <<%= brand_tag %> class="nav-title font-extrabold text-heading tracking-tight min-w-0"><% brand_words.each do |word| %><span class="<%= [word[:class], "truncate"].compact.join(" ") %>"><%= word[:text] %></span><% end %></<%= brand_tag %>>
+          <% else %>
           <<%= brand_tag %> class="nav-title font-extrabold text-heading tracking-tight min-w-0"><span class="truncate"><%= prefix %></span><span class="text-primary truncate"><%= last_word %></span></<%= brand_tag %>>
+          <% end %>
           <% end %>
         <% end %>
         <%# Desktop nav — Studio.navbar_links, then Studio.navbar_items. data-nav-links, only where the
