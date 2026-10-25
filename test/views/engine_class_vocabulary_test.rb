@@ -101,6 +101,7 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
     studio/modals/blocks/_seeds_bar.html.erb
     studio/modals/onboarding/_first_name.html.erb
     studio/modals/shared/_email_field.html.erb
+    studio/profiles/_newsletter_modals.html.erb
   ].freeze
 
   # ── reading the views ──────────────────────────────────────────────────────
