@@ -235,8 +235,13 @@
           <%= sidebar_trigger_desktop if sidebar_active %>
           <span class="hidden md:flex"><%= render "components/theme_toggle_morph" %></span>
           <% if signed_out_cta %>
-          <%= link_to Studio.sign_in_label, login_path, class: "hidden md:inline text-sm font-semibold text-secondary hover:text-primary whitespace-nowrap transition", data: { nav_sign_in: "" } %>
-          <%= link_to signed_out_cta[:label], signed_out_cta[:path], class: "btn btn-primary whitespace-nowrap", data: { nav_signed_out_cta: "" } %>
+          <%# sign_in_link: false drops the quiet link (the CTA is the sign-in);
+              sign_in_path points it elsewhere; modal: opens a modal from the
+              button, its path the fallback (lib/studio/navbar_signed_out_cta.rb). %>
+          <% unless signed_out_cta[:sign_in_link] == false %>
+          <%= link_to Studio.sign_in_label, signed_out_cta[:sign_in_path] || login_path, class: "hidden md:inline text-sm font-semibold text-secondary hover:text-primary whitespace-nowrap transition", data: { nav_sign_in: "" } %>
+          <% end %>
+          <%= link_to signed_out_cta[:label], signed_out_cta[:path], class: "btn btn-primary whitespace-nowrap", data: { nav_signed_out_cta: "" }, **studio_navbar_cta_modal_options(signed_out_cta) %>
           <% else %>
           <%= link_to Studio.sign_in_label, login_path, class: "btn btn-primary" %>
           <% end %>
@@ -257,8 +262,8 @@
     <%= studio_navbar_slot_tag(item) %>
     <% end %>
     <span class="ml-auto flex items-center gap-3">
-      <% if signed_out_cta %>
-      <%= link_to Studio.sign_in_label, login_path, class: "text-xs font-semibold text-secondary hover:text-primary whitespace-nowrap transition", data: { nav_sign_in: "" } %>
+      <% if signed_out_cta && signed_out_cta[:sign_in_link] != false %>
+      <%= link_to Studio.sign_in_label, signed_out_cta[:sign_in_path] || login_path, class: "text-xs font-semibold text-secondary hover:text-primary whitespace-nowrap transition", data: { nav_sign_in: "" } %>
       <% end %>
       <%= render "components/link_sidebar_trigger" if sidebar_active %>
       <%= render "components/admin_dropdown" unless sidebar_active && studio_sidebar_replaces_admin_menu? %>
