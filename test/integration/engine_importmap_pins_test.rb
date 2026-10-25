@@ -74,8 +74,9 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
                     studio/controllers/modal_host_controller studio/controllers/nav_collapse_controller
                     studio/controllers/toast_controller studio/cropper studio/email_banner studio/head_chrome
                     studio/hold_button studio/hold_button_hooks studio/identity_mini studio/image_upload
-                    studio/lazy_controllers studio/leveling_activity studio/link_sidebar studio/modal_host
-                    studio/nav_collapse studio/pinned_stack studio/profile_form studio/stimulus
+                    studio/lazy_controllers studio/leveling_activity studio/link_sidebar studio/modal_countdown
+                    studio/modal_host studio/nav_collapse studio/newsletter_modal studio/pinned_stack
+                    studio/profile_form studio/stimulus
                     studio/theme_editor studio/toast], boot_graph
     refute_includes boot_graph, "studio/local_path", "a module nothing in the boot imports is not preloaded"
     refute_includes boot_graph, "studio/controllers/board_controller",
@@ -89,13 +90,14 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
   # controller does too.
   test "the factories a page binds are in the boot graph and never a dynamic import" do
     %w[studio/alpine_scopes studio/cropper studio/image_upload studio/birthday studio/profile_form
-       studio/identity_mini studio/controllers/identity_mini_controller].each do |name|
+       studio/modal_countdown studio/newsletter_modal studio/identity_mini studio/controllers/identity_mini_controller].each do |name|
       assert_includes boot_graph, name, "#{name} is not preloaded, so its page waits on a later request"
     end
 
     scopes = File.read(File.expand_path("../../app/javascript/studio/alpine_scopes.js", __dir__))
     imports = scopes.scan(Studio::Engine::JAVASCRIPT_STATIC_IMPORT).flatten
-    assert_equal %w[studio/cropper studio/image_upload studio/birthday studio/profile_form], imports,
+    assert_equal %w[studio/cropper studio/image_upload studio/birthday studio/profile_form
+                    studio/modal_countdown studio/newsletter_modal], imports,
                  "studio/alpine_scopes imports only the modules that own a factory, so a failure " \
                  "elsewhere in the boot does not take the factories with it"
     imports.each do |name|

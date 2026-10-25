@@ -35,13 +35,21 @@
                            on the left and a launch arrow on the
                            right. The "canonical" tx link.
 
-    slot_position:         :below_cta (default) or :above_cta — where the block
-                           renders. See the note on the slot itself.
+    slot_position:         :below_cta (default), :above_cta, or :message — where
+                           the block renders. :message puts it in the message's
+                           place, for copy richer than one string (two bound
+                           addresses with bold spans); it then replaces
+                           message / message_key. See the note on the slot itself.
     cta_label:             primary CTA button text.
     cta_href_key:          Alpine expression for the button's href.
                            Mutually exclusive with cta_event.
     cta_event:             window event name dispatched on click.
                            Mutually exclusive with cta_href_key.
+    cta_close:             boolean. The CTA closes the modal store
+                           ($store.<modal_store>.close()) instead of following
+                           a href or dispatching an event: the "Got it" of an
+                           informational card. Raises with cta_href_key or
+                           cta_event.
     cta_drain:             boolean. When set together with
                            auto_redirect_url_key, the countdown
                            drains as a translucent overlay on the CTA
@@ -51,6 +59,11 @@
 
     secondary_label:       optional secondary action label.
     secondary_event:       optional secondary action dispatch event.
+    secondary_close:       boolean. The secondary action closes the modal store
+                           instead of dispatching. Raises with secondary_event.
+    modal_store:           the Alpine store the two close actions close. Default
+                           "modals"; validated as a JS identifier
+                           (Studio::JsIdentifier), since it is spliced as a name.
 
     auto_redirect_url_key: Alpine expression for the redirect URL.
                            When set, an internal countdown ticks down
@@ -78,6 +91,22 @@
   # returns the layout's content, so a card rendered from a layout with no
   # block re-emitted the whole page body under its CTA. See Studio::PartialBlock.
   caller_block  = Studio::PartialBlock.content(self, yield)
+  block_in_message = caller_block && slot_position == :message
+
+  # THE CLOSE ACTIONS, and the store they close. Each is a third way to wire a
+  # button that already has two, so naming two at once is refused rather than
+  # resolved by an order nobody reads: a CTA that silently ignores the event the
+  # host passed is a card that renders right and does the wrong thing.
+  cta_close       = !!local_assigns[:cta_close]
+  secondary_close = !!local_assigns[:secondary_close]
+  if cta_close && (local_assigns[:cta_href_key] || local_assigns[:cta_event])
+    raise ArgumentError, "blocks/_success_card: cta_close closes the store; it takes no cta_href_key or cta_event"
+  end
+  if secondary_close && local_assigns[:secondary_event]
+    raise ArgumentError, "blocks/_success_card: secondary_close closes the store; it takes no secondary_event"
+  end
+  # IDENTIFIER position ($store.<name>.close()) — VALIDATED, never escaped.
+  modal_store = Studio::JsIdentifier.validate!(local_assigns.fetch(:modal_store, "modals"), local: :modal_store)
 
   data_attr = "{
     _remaining: #{redirect_secs},
@@ -169,7 +198,12 @@
     <p class="<%= title_class %>"><%= title %></p>
   <% end %>
 
-  <% if local_assigns[:message_key] %>
+  <%# The block IN the message's place (slot_position: :message): a div, not a
+      p, because the caller's markup may hold block elements, which a p would
+      have the parser split around. Same type and spacing as the message. %>
+  <% if block_in_message %>
+    <div class="text-sm text-secondary mb-4"><%= caller_block %></div>
+  <% elsif local_assigns[:message_key] %>
     <p class="text-sm text-secondary mb-4" x-text="<%= message_key %>"></p>
   <% elsif local_assigns[:message] %>
     <p class="text-sm text-secondary mb-4"><%= message %></p>
@@ -282,6 +316,8 @@
       <a :href="<%= cta_href_key %>" class="btn btn-primary btn-lg w-full"><%= cta_label %></a>
     <% elsif local_assigns[:cta_event] %>
       <button @click="$dispatch('<%= cta_event_js %>')" class="btn btn-primary btn-lg w-full"><%= cta_label %></button>
+    <% elsif cta_close %>
+      <button type="button" @click="$store.<%= modal_store %>.close()" class="btn btn-primary btn-lg w-full"><%= cta_label %></button>
     <% end %>
   <% end %>
 
@@ -290,12 +326,17 @@
             class="block mx-auto mt-3 text-xs text-secondary hover:text-heading underline underline-offset-2">
       <%= secondary_label %>
     </button>
+  <% elsif local_assigns[:secondary_label] && secondary_close %>
+    <button type="button" @click="$store.<%= modal_store %>.close()"
+            class="block mx-auto mt-3 text-xs text-secondary hover:text-heading underline underline-offset-2">
+      <%= secondary_label %>
+    </button>
   <% end %>
 
   <%# ...or below it, which stays the DEFAULT: every existing caller renders here
       and none of them asked to move. The block is captured once at the top, and
       exactly one of these two branches renders it. %>
-  <% if caller_block && slot_position != :above_cta %>
+  <% if caller_block && slot_position != :above_cta && !block_in_message %>
     <div class="mt-3"><%= caller_block %></div>
   <% end %>
 </div>

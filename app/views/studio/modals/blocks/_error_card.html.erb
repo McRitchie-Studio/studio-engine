@@ -20,6 +20,26 @@
 
     secondary_label: optional secondary action ("Close", "Cancel", etc).
     secondary_event: dispatch event for the secondary action.
+
+  Closing the modal, and counting down to it (each optional; unset, the card
+  renders exactly as it did before they existed):
+    cta_close:       boolean. The primary button closes the modal store instead
+                     of reloading or dispatching. Raises with cta_reload or
+                     cta_event.
+    secondary_close: boolean. The secondary action closes the modal store.
+                     Raises with secondary_event.
+    countdown_key:   Alpine expression for the seconds to wait, read once at
+                     mount (e.g. "props.secondsLeft", seeded from a 429's
+                     Retry-After). Adds a "Try again in 12s." line that counts
+                     down (minutes above 90s) and is hidden at zero.
+    countdown_text:  the words before the wait. Default "Try again in".
+    auto_close:      with countdown_key, close the store at zero. Default true.
+    modal_store:     the Alpine store the close actions and the auto-close
+                     close. Default "modals"; validated as a JS identifier
+                     (Studio::JsIdentifier), since the buttons splice it as a name.
+
+  The countdown is studio/modal_countdown's studioModalCountdown(), published by
+  studio/alpine_scopes; this card carries no script.
 %>
 <%
   icon_emoji = local_assigns[:icon_emoji] || "⏳"   # ⏳
@@ -33,12 +53,37 @@
   # interpolated form is load-bearing.
   cta_event_js       = Studio::JsLiteral.in_attribute(local_assigns[:cta_event])
   secondary_event_js = Studio::JsLiteral.in_attribute(local_assigns[:secondary_event])
+
+  # THE CLOSE ACTIONS. A third way to wire a button that already has two, so
+  # naming two at once is refused rather than settled by branch order: a Retry
+  # that silently closes instead of dispatching is a card that looks right.
+  cta_close       = !!local_assigns[:cta_close]
+  secondary_close = !!local_assigns[:secondary_close]
+  if cta_close && (local_assigns[:cta_reload] || local_assigns[:cta_event])
+    raise ArgumentError, "blocks/_error_card: cta_close closes the store; it takes no cta_reload or cta_event"
+  end
+  if secondary_close && local_assigns[:secondary_event]
+    raise ArgumentError, "blocks/_error_card: secondary_close closes the store; it takes no secondary_event"
+  end
+  # IDENTIFIER position ($store.<name>.close()) — VALIDATED, never escaped.
+  modal_store = Studio::JsIdentifier.validate!(local_assigns.fetch(:modal_store, "modals"), local: :modal_store)
+
+  # The countdown's x-data. countdown_key is an Alpine EXPRESSION by contract,
+  # like message_key, and lands as code; the store is a validated identifier,
+  # so it cannot leave the string it sits in. tag.attributes encodes the double
+  # quote, so the expression cannot close the attribute either.
+  countdown_key  = local_assigns[:countdown_key]
+  countdown_text = local_assigns.fetch(:countdown_text, "Try again in")
+  countdown_data = if countdown_key
+    "studioModalCountdown({ seconds: (#{countdown_key}), store: '#{modal_store}', " \
+      "autoClose: #{local_assigns.fetch(:auto_close, true) ? 'true' : 'false'} })".html_safe
+  end
 %>
 <%# role="alert" on the CARD, not on its message: the message is server-rendered
     static text, so it never "changes" for a live region to notice. The modal host
     renders content through <template x-if>, so this whole card ENTERS the DOM when
     the failure happens — which is the event a screen reader can announce. %>
-<div role="alert" class="text-center py-6">
+<div role="alert"<% if countdown_data %> <%= tag.attributes("x-data": countdown_data) %><% end %> class="text-center py-6">
   <div class="text-5xl mb-4 leading-none"><%= icon_emoji %></div>
   <p class="text-sm text-heading font-semibold mb-2"><%= title %></p>
 
@@ -48,14 +93,24 @@
     <p class="text-xs text-secondary mb-4"><%= message %></p>
   <% end %>
 
+  <% if countdown_data %>
+    <p class="text-xs text-secondary mb-4" x-show="counting"><%= countdown_text %> <span class="text-heading font-semibold" x-text="waitLabel"></span>.</p>
+  <% end %>
   <% if local_assigns[:cta_reload] %>
     <button @click="window.location.reload()" class="btn btn-outline btn-sm"><%= cta_label %></button>
   <% elsif local_assigns[:cta_event] %>
     <button @click="$dispatch('<%= cta_event_js %>')" class="btn btn-outline btn-sm"><%= cta_label %></button>
+  <% elsif cta_close %>
+    <button type="button" @click="$store.<%= modal_store %>.close()" class="btn btn-outline btn-sm"><%= cta_label %></button>
   <% end %>
 
   <% if local_assigns[:secondary_label] && local_assigns[:secondary_event] %>
     <button @click="$dispatch('<%= secondary_event_js %>')"
+            class="block mx-auto mt-3 text-xs text-secondary hover:text-heading underline underline-offset-2">
+      <%= secondary_label %>
+    </button>
+  <% elsif local_assigns[:secondary_label] && secondary_close %>
+    <button type="button" @click="$store.<%= modal_store %>.close()"
             class="block mx-auto mt-3 text-xs text-secondary hover:text-heading underline underline-offset-2">
       <%= secondary_label %>
     </button>

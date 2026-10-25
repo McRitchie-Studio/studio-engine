@@ -58,6 +58,12 @@
     demo_underage (Boolean, optional) — style-guide preview ONLY: make the local
                 resolve take the REFUSED branch, so the guide can show the
                 handoff without a backend. Ignored unless demo.
+    progress_pill (Hash, optional) — { current: Integer, total: Integer } for a
+                card that is one step of a chain (turf-monster's onboarding runs
+                it at 2 of 3). Renders blocks/_progress_pill FIRST inside the
+                card's root, above the title row, where the chain's other steps
+                put theirs. Absent (the default), the card renders exactly as it
+                did before the local existed. Any other key raises.
 
   The scope, birthdayModal(), is studio/birthday, published on every page by
   studio/alpine_scopes. Single root element (modal-host template mount rule).
@@ -90,8 +96,20 @@
   demo        = local_assigns.fetch(:demo, false)
   demo_underage     = local_assigns.fetch(:demo_underage, false)
   age_gate_modal_id = local_assigns.fetch(:age_gate_modal_id, "age-gate")
+  # A Hash or nothing, and only the two keys blocks/_progress_pill reads: a typo
+  # (`totl:`) would otherwise fall back to the pill's default total and draw a
+  # chain of the wrong length with no error anywhere.
+  progress_pill     = local_assigns[:progress_pill]
+  unless progress_pill.nil?
+    unless progress_pill.is_a?(Hash) && progress_pill.key?(:current) && (progress_pill.keys - %i[current total]).empty?
+      raise ArgumentError, "blocks/_birthday progress_pill: takes { current:, total: }, got #{progress_pill.inspect}"
+    end
+  end
 %>
 <div x-data="birthdayModal({ minAge: <%= min_age.to_i %>, state: '<%= j state %>', url: '<%= j submit_url %>', store: '<%= j modal_store %>', demo: <%= demo ? 'true' : 'false' %>, demoUnderage: <%= demo_underage ? 'true' : 'false' %>, gateId: '<%= j age_gate_modal_id.to_s %>' })">
+  <% if progress_pill %>
+  <%= render "studio/modals/blocks/progress_pill", **progress_pill %>
+  <% end %>
   <%= render layout: "studio/modals/blocks/shell", locals: { title: title, modal_store: modal_store } do %>
     <%# The age line only exists when the app HAS a bar. A card that says
         "You must be 0+" is what an unconditional line produces for a host that

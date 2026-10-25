@@ -7,13 +7,15 @@
 //   x-data="birthdayModal({ minAge, url })"          studio/birthday
 //   x-data="studioBirthdayFields('1991-01-31')"      studio/birthday
 //   x-data="studioProfileForm({ first_name: 'Pat' })" studio/profile_form
+//   x-data="studioModalCountdown({ seconds: 12 })"   studio/modal_countdown
+//   x-data="studioNewsletterModal({ url: '/n' })"    studio/newsletter_modal
 //   submitFormWithProgress(form, opts)               studio/image_upload
 //
 // WHY THESE ARRIVE WITH THE PAGE AND ARE NOT LAZY. Alpine evaluates an x-data
 // expression when it meets the element: at start for a page's own markup, at
 // mount for a modal card. A factory that is not defined by then leaves its
-// element dead, and the element here is a photo upload, the birthday gate or
-// the profile form. A dynamic import cannot promise to have resolved, and one
+// element dead, and the element here is a photo upload, the birthday gate,
+// the profile form, a rate-limit card's countdown or a newsletter card. A dynamic import cannot promise to have resolved, and one
 // that fails is final for the document (studio/lazy_controllers). So the
 // factories are imported statically and preloaded on every page.
 //
@@ -37,6 +39,8 @@ import { cropPhotoModal } from "studio/cropper"
 import { imageUploadHost, avatarCropperHost, submitFormWithProgress } from "studio/image_upload"
 import { birthdayModal, studioBirthdayFields } from "studio/birthday"
 import { studioProfileForm } from "studio/profile_form"
+import { studioModalCountdown } from "studio/modal_countdown"
+import { studioNewsletterModal } from "studio/newsletter_modal"
 
 // name -> the factory Alpine calls. Alpine passes the expression's own
 // arguments and nothing else.
@@ -46,7 +50,9 @@ export const SCOPES = {
   avatarCropperHost: () => avatarCropperHost(),
   birthdayModal: (opts) => birthdayModal(opts),
   studioBirthdayFields: (initial) => studioBirthdayFields(initial),
-  studioProfileForm: (initial) => studioProfileForm(initial)
+  studioProfileForm: (initial) => studioProfileForm(initial),
+  studioModalCountdown: (opts) => studioModalCountdown(opts),
+  studioNewsletterModal: (opts) => studioNewsletterModal(opts)
 }
 
 // Plain functions a page calls by name.
