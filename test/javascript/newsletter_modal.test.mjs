@@ -10,6 +10,9 @@
 //   - read success from response.ok alone: "a 200 that says success: false is a
 //     failure" fails.
 //   - always close instead of swapping: "a success steps to the next card" fails.
+//   - fall back to win.fetch when the named fetcher is missing: "a fetcher the
+//     module does not export fails the press" fails.
+//   - drop the null-response early return: "a fetcher that answers itself" fails.
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
@@ -17,13 +20,13 @@ import { readFileSync } from "node:fs"
 const source = readFileSync(new URL("../../app/javascript/studio/newsletter_modal.js", import.meta.url), "utf8")
 const {
   INVALID_EMAIL, SUBSCRIBE_FAILED, UNSUBSCRIBE_FAILED, CHANGED_EVENT,
-  cleanEmail, outcomeOf, csrfToken, studioNewsletterModal
+  HOST_FETCHERS, cleanEmail, outcomeOf, csrfToken, resolveFetcher, studioNewsletterModal
 } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 // A window with one store, a fetch that answers as told, and a record of
 // everything the card did.
 function harness({ status = 200, body = { success: true }, props = {}, throws = false, notJson = false } = {}) {
-  const log = { requests: [], events: [], closes: 0, swaps: [] }
+  const log = { requests: [], events: [], closes: 0, swaps: [], errors: [] }
   const store = {
     current: () => ({ id: "card", props }),
     close: () => { log.closes += 1 },
@@ -34,6 +37,7 @@ function harness({ status = 200, body = { success: true }, props = {}, throws = 
     Alpine: { store: (name) => (name === "modals" || name === "hostModals" ? store : undefined) },
     CustomEvent,
     dispatchEvent: (e) => { log.events.push(e) },
+    console: { error: (m) => { log.errors.push(m) } },
     document: { querySelector: (sel) => (sel === 'meta[name="csrf-token"]' ? { content: "tok" } : null) },
     fetch: async (url, init) => {
       log.requests.push({ url, init })
@@ -207,4 +211,72 @@ test("the card closes the store it was given", async () => {
   assert.equal(log.closes, 1)
   const missing = studioNewsletterModal({ url: "/s", store: "nowhere" }, { win })
   assert.deepEqual(missing.props, {}, "no such store reads as no props, not a throw")
+})
+
+// --- the host's fetcher (studio/host_fetchers) --------------------------------
+
+test("the engine's studio/host_fetchers is an empty seam that imports nothing", async () => {
+  const seam = readFileSync(new URL("../../app/javascript/studio/host_fetchers.js", import.meta.url), "utf8")
+  assert.doesNotMatch(seam, /^\s*import\s/m)
+  const mod = await import(`data:text/javascript,${encodeURIComponent(seam)}`)
+  assert.deepEqual(Object.keys(mod), [])
+  assert.equal(HOST_FETCHERS, "studio/host_fetchers")
+  assert.match(source, /import\("studio\/host_fetchers"\)/, "the default importer loads the seam by its pinned name")
+})
+
+test("resolveFetcher finds a named function export, and nothing else", async () => {
+  const fn = async () => {}
+  const importer = async () => ({ authedFetch: fn, notAFunction: 3 })
+  assert.equal(await resolveFetcher("authedFetch", importer), fn)
+  assert.equal(await resolveFetcher("notAFunction", importer), null)
+  assert.equal(await resolveFetcher("missing", importer), null)
+  assert.equal(await resolveFetcher("", importer), null)
+  assert.equal(await resolveFetcher("a.b", importer), null, "a name that is not an identifier is never looked up")
+  assert.equal(await resolveFetcher("authedFetch", async () => { throw new Error("404") }), null)
+})
+
+test("a named fetcher carries the request, and plain fetch is not called", async () => {
+  const { win, log } = harness()
+  const hostCalls = []
+  const importer = async () => ({
+    authedFetch: async (url, init) => {
+      hostCalls.push({ url, init })
+      return { ok: true, status: 200, json: async () => ({ success: true }) }
+    }
+  })
+  const card = studioNewsletterModal({ url: "/s", fetcher: "authedFetch" }, { win, importer })
+  await card.submit()
+  assert.equal(hostCalls.length, 1)
+  assert.equal(hostCalls[0].url, "/s")
+  assert.equal(hostCalls[0].init.headers["X-CSRF-Token"], "tok", "the host's fetcher gets the same request")
+  assert.equal(log.requests.length, 0, "plain fetch was not used")
+  assert.equal(log.closes, 1)
+})
+
+test("a fetcher that answers itself (null) stops the spinner and shows nothing", async () => {
+  const { win, log } = harness()
+  const importer = async () => ({ authedFetch: async () => null })
+  const card = studioNewsletterModal({ url: "/s", fetcher: "authedFetch", nextId: "next" }, { win, importer })
+  await card.submit()
+  assert.equal(card.saving, false)
+  assert.equal(card.error, "", "the host's own card speaks; this one says nothing")
+  assert.deepEqual([log.events.length, log.closes, log.swaps.length], [0, 0, 0])
+})
+
+test("a fetcher the module does not export fails the press, loudly, and never falls back", async () => {
+  const { win, log } = harness()
+  const card = studioNewsletterModal({ url: "/s", fetcher: "authedFetch" }, { win, importer: async () => ({}) })
+  await card.submit()
+  assert.equal(card.error, SUBSCRIBE_FAILED)
+  assert.equal(card.saving, false)
+  assert.equal(log.requests.length, 0, "plain fetch would drop the host's 401 handling")
+  assert.equal(log.errors.length, 1)
+  assert.match(log.errors[0], /authedFetch/)
+})
+
+test("with no fetcher named, the seam is never imported", async () => {
+  const { win, log } = harness()
+  const card = studioNewsletterModal({ url: "/s" }, { win, importer: async () => assert.fail("imported the seam") })
+  await card.submit()
+  assert.equal(log.requests.length, 1)
 })

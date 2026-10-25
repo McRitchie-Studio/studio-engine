@@ -70,6 +70,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
     `ArgumentError`); a raising callable falls back to the default and is
     reported once.
 
+- **`studio/profiles/_newsletter_modals` takes `fetcher:`, the host's own
+  request wrapper, in `submit_mode: :json`.** It names an export of the
+  importmap module `studio/host_fetchers`, which the engine pins to an empty
+  module and a host pins to a file of its own (Turf Monster:
+  `export { authedFetch } from "solana_utils"`, so a 401 opens sign-in and a
+  429 the rate-limit card). It is the standard's sanctioned seam: a host pin
+  of an engine name wins, and a `window.*` global is forbidden as an API
+  between files. Validated as a JS identifier and refused under `:form`. A
+  fetcher that returns null has answered the request itself; a name the module
+  does not export fails the press with the plain line and one console error,
+  and never falls back to plain fetch. Unset, the cards send plain fetch, as
+  before.
+
 ### Fixed
 
 - **`studio/cropper_assets` pins Cropper.js with Subresource Integrity.** The
