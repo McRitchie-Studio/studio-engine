@@ -18,6 +18,8 @@
 #
 # The toggle expression is the engine's, built from these names, which must be
 # plain JavaScript identifiers; no host JavaScript reaches the page as a string.
+# :controls may not name the engine's own link sidebar (studio-link-sidebar,
+# studio-link-sidebar-mobile): studio/link_sidebar would claim the click.
 # The button also carries data-profile-image-toggle, so a host's capture-phase
 # handler that claims its sidebar's triggers before Alpine binds (as
 # studio/link_sidebar does for the link sidebar) claims this one too.
@@ -33,6 +35,13 @@ module Studio
     KEYS = %i[flag store controls].freeze
     IDENTIFIER = /\A[A-Za-z_$][\w$]*\z/
     DOM_ID = /\A[A-Za-z][\w:.-]*\z/
+    # The engine's link sidebar panels: components/_link_sidebar renders them, and
+    # app/javascript/studio/link_sidebar.js (LINK_SIDEBAR_PANELS) is the source of
+    # truth; test/lib/navbar_account_sidebar_test.rb holds this list to it.
+    # studio/link_sidebar claims a click on any trigger whose aria-controls names
+    # them, so a host sidebar control that named one would open the engine's
+    # panel, not the host's.
+    ENGINE_LINK_SIDEBAR_IDS = %w[studio-link-sidebar studio-link-sidebar-mobile].freeze
 
     @reported = {}
     @reported_lock = Mutex.new
@@ -88,6 +97,11 @@ module Studio
       ids = ids.map { |id| id.is_a?(Symbol) ? id.to_s : id }
       if ids.empty? || !ids.all? { |id| id.is_a?(String) && id.match?(DOM_ID) }
         raise InvalidConfig, "#{SETTING} :controls must name the panel ids it opens (got #{value.inspect})"
+      end
+      if (engine = ids & ENGINE_LINK_SIDEBAR_IDS).any?
+        raise InvalidConfig, "#{SETTING} :controls names #{engine.join(' and ')}, the engine's link sidebar: " \
+                             "studio/link_sidebar would take the click and open its panel, not the host's. " \
+                             "Name the host's own panel ids, or leave the setting nil to keep the link sidebar"
       end
 
       ids.join(" ")

@@ -85,6 +85,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **`Studio.navbar_account_sidebar` refuses `controls:` that name the engine's
+  link sidebar** (`studio-link-sidebar`, `studio-link-sidebar-mobile`) with
+  `InvalidConfig` at assignment, and a callable's answer when it resolves.
+  `studio/link_sidebar` claims any trigger whose `aria-controls` names that
+  panel, so the account button would have opened the engine's link sidebar
+  instead of the host's.
 - **`Studio.navbar_signed_out_cta` with `modal:` marks its button
   `aria-haspopup="dialog"`,** so a screen reader announces the dialog before
   the press. A CTA without `modal:` renders as before.

@@ -912,7 +912,12 @@ config.navbar_account_sidebar = { flag: "gearOpen", controls: %w[gear-sidebar ge
   `aria-expanded`. It wins over the link sidebar and the account link. The
   engine builds the toggle from the names, which must be plain identifiers. It
   carries `data-profile-image-toggle`, so a host handler that claims its
-  triggers in the capture phase, before Alpine binds, claims it too. Rules:
+  triggers in the capture phase, before Alpine binds, claims it too. Its
+  `controls:` may not name the engine's own link sidebar
+  (`studio-link-sidebar`, `studio-link-sidebar-mobile`): `studio/link_sidebar`
+  claims a click on any trigger whose `aria-controls` names it, so the button
+  would open the engine's panel instead of the host's. That is refused with
+  `InvalidConfig` at assignment (a callable's answer, when it resolves). Rules:
   `lib/studio/navbar_account_sidebar.rb`.
 
 ### Sidebar panel lead and close hook
