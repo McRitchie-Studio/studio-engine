@@ -12,7 +12,7 @@ module Studio
   #     <td class="px-4 py-3"><%= time_ago_in_words(user.created_at) %> ago</td>
   #   <% end %>
   #
-  # min_width is an inline style, not a `min-w-[Npx]` class: Tailwind compiles
+  # min_width is an inline style, not an arbitrary min-width class: Tailwind compiles
   # only class names it can read in source, and a width interpolated at render
   # time is never in source, so the class painted only in a host whose own
   # markup happened to spell the same width.
