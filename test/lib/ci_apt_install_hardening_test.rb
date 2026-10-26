@@ -71,4 +71,22 @@ class CiAptInstallHardeningTest < Minitest::Test
                  "these jobs install apt packages without restoring the ~/apt-archives cache first " \
                  "(and pointing Dir::Cache::Archives at it), so every run re-downloads from the mirror"
   end
+
+  def test_a_failed_install_still_saves_its_progress
+    # A crawling mirror (2026-10-26: ~40 KB/s, 71 -> 41 MB left after three
+    # attempts) never trips the inactivity timeout. actions/cache saves only on
+    # success, so without an always() save a rerun starts from zero every time.
+    offenders = apt_jobs.reject do |job|
+      install = job[:steps].index(job[:installs].last)
+      save = job[:steps].index do |s|
+        s["uses"].to_s.start_with?("actions/cache/save") && s["if"].to_s.include?("always()") &&
+          s.dig("with", "path").to_s.include?("apt-archives")
+      end
+      save && save > install
+    end
+
+    assert_empty offenders.map { |j| j[:where] },
+                 "these jobs lose a failed install's downloaded .debs: add an actions/cache/save step " \
+                 "with `if: always()` after the install, keyed apart from the complete set"
+  end
 end
