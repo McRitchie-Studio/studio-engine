@@ -9,7 +9,7 @@ require_relative "../support/engine_tailwind_build"
 #
 # A host's build is `@import "tailwindcss"` plus the engine's one import, and
 # nothing else: no content glob naming the gem, no safelist, no `@config`. The
-# engine reaches its own classes through the @source lines in engine.css. The
+# engine reaches its own classes through the @source lines in host.css. The
 # expected set is read independently of Tailwind's scanner
 # (EngineTailwindBuild.emitted_classes: every quoted word in those files that
 # compiles as a class), so a directory the scan misses shows up as missing
@@ -19,7 +19,7 @@ require_relative "../support/engine_tailwind_build"
 # Ruby (app/components/studio/badge_component.rb), which no host ever scanned.
 class ComponentTailwindSourceTest < Minitest::Test
   B = EngineTailwindBuild
-  ENGINE_DIR = Pathname(File.dirname(B::ENGINE_CSS))
+  ENGINE_DIR = Pathname(File.dirname(B::HOST_CSS))
   SOURCE_LINE = '@source "../../../components";'
 
   def self.full = @full ||= B.classes_in_css(B.compile([]))
@@ -34,10 +34,10 @@ class ComponentTailwindSourceTest < Minitest::Test
   end
 
   # THE STRUCTURAL MUTATION. Every emitting directory is named by an @source
-  # line; removing any one line from engine.css makes uncovered_dirs name it.
+  # line; removing any one line from host.css makes uncovered_dirs name it.
   def test_every_emitting_directory_has_a_source_line
-    css = File.read(B::ENGINE_CSS)
-    assert_empty uncovered_dirs(css), "engine.css scans no source for these emitting directories"
+    css = File.read(B::HOST_CSS)
+    assert_empty uncovered_dirs(css), "host.css scans no source for these emitting directories"
 
     lines = B.source_lines
     assert_equal B::EMITTING_DIRS.size, lines.size, "one @source line per emitting directory"
@@ -51,7 +51,7 @@ class ComponentTailwindSourceTest < Minitest::Test
   # vendor/bundle there. An engine exclusion names vendored third-party code
   # only, and never a directory that emits engine markup.
   def test_exclusions_name_only_vendored_third_party_code
-    nots = File.read(B::ENGINE_CSS).lines.grep(/\A@source not /).map { |l| l[/"(.*)"/, 1] }
+    nots = File.read(B::HOST_CSS).lines.grep(/\A@source not /).map { |l| l[/"(.*)"/, 1] }
     refute_empty nots
     nots.each do |pattern|
       path = ENGINE_DIR.join(pattern).cleanpath.relative_path_from(Pathname(B::ROOT)).to_s

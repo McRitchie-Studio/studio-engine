@@ -30,7 +30,7 @@
   Animations come from the shared motion layer
   (app/assets/tailwind/studio_engine/engine-motion.css) — the .modal-card-* and
   .modal-backdrop-* classes — rather than an inline copy, so this stays small.
-  engine.css imports that layer, so every host has it; a page built without it
+  every host's engine import brings that layer (host.css); a page built without it
   still gets a working modal, just without the spring.
 
   Locals:

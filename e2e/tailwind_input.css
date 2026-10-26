@@ -2,10 +2,11 @@
   The lab's Tailwind entry point.
 
   It is assembled the same way a CONSUMING APP assembles its own: core Tailwind,
-  then the engine's one import. engine.css brings the theme (theme.css, which
-  replaced the JS preset and the `@config` line), the @source scan of the
-  engine's own views, components, helpers and scripts, and the motion / effect /
-  action layer (engine-motion.css). A lane compiled from a different source than
+  then host.css, which is what a host's one engine import resolves to
+  (Studio::TailwindEntry). It brings engine.css (the theme that replaced the JS
+  preset and the `@config` line, and the component layer), the @source scan of
+  the engine's own views, components, helpers and scripts, and the motion /
+  effect / action layer (engine-motion.css). A lane compiled from a different source than
   the apps would be grading CSS that ships nowhere.
 
   The one @source here is the dummy app's own views, the lab's equivalent of a
@@ -17,7 +18,7 @@
   computed `position` before they assert anything about movement.
 
   Note what is NOT here: no `@source "../app/views"`. The engine's views reach
-  this build only through engine.css, exactly as they reach a host's, so a lab
+  this build only through host.css, exactly as they reach a host's, so a lab
   page that renders an engine partial unstyled means the engine's own scan
   broke, not this file.
 */
@@ -25,4 +26,4 @@
 
 @source "../test/dummy/app/views";
 
-@import "../app/assets/tailwind/studio_engine/engine.css";
+@import "../app/assets/tailwind/studio_engine/host.css";

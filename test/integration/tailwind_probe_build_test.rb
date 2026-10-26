@@ -7,7 +7,7 @@ require_relative "../support/engine_tailwind_build"
 # `@import "../builds/tailwind/studio_engine"`, is the whole adoption.
 #
 # Compiles the engine exactly as a host's build resolves that line (Tailwind
-# core, then engine.css, which brings theme.css, its own @source scan and
+# core, then host.css, which brings engine.css and theme.css, its own @source scan and
 # engine-motion.css) and asserts:
 #   - the component classes RESOLVE to theme-var-wired CSS (an @apply typo or a
 #     token rename fails here, not in a consumer's build);
@@ -111,11 +111,11 @@ class TailwindProbeBuildTest < Minitest::Test
     css = self.class.probe_css
 
     %w[.spinner .progress-meter .studio-border-glow .hold-btn .level-badge-10].each do |selector|
-      assert_includes css, "#{selector} {", "#{selector} (engine-motion.css) did not reach a host through engine.css"
+      assert_includes css, "#{selector} {", "#{selector} (engine-motion.css) did not reach a host through host.css"
     end
   end
 
-  # THE MUTATION. Each @source line, removed from a copy of engine.css, must
+  # THE MUTATION. Each @source line, removed from a copy of host.css, must
   # take with it classes only its directory emits. These three directories
   # carry classes no other line reaches today, so each line is provably what
   # brings them. helpers/ and assets/javascripts/ share every class they emit
@@ -129,8 +129,8 @@ class TailwindProbeBuildTest < Minitest::Test
     full = B.classes_in_css(B.compile([]))
 
     MUST_BITE.each do |dir|
-      line = %(@source "#{relative_to_engine_css(dir)}";)
-      assert_includes B.source_lines, line, "engine.css lost its #{dir} source line"
+      line = %(@source "#{relative_to_host_css(dir)}";)
+      assert_includes B.source_lines, line, "host.css lost its #{dir} source line"
 
       only_here = emitted[dir] - emitted.except(dir).values.reduce(Set.new, :|)
       refute_empty only_here, "#{dir} emits no class another directory does not; re-point MUST_BITE"
@@ -142,6 +142,20 @@ class TailwindProbeBuildTest < Minitest::Test
       lost = only_here & (full - without)
       refute_empty lost, "dropping #{line} lost none of the #{only_here.size} classes only #{dir} emits"
     end
+  end
+
+  # engine.css on its own stays NARROW: a build that imports it by path (the
+  # hub's client kit, held to 100 KB) compiles the classes it names and no more:
+  # no engine @source scan, no motion layer. Both ride host.css instead.
+  def test_engine_css_alone_carries_no_sources_and_no_motion
+    css = B.compile_entry("@import 'tailwindcss' source(none);\n@import '#{B::ENGINE_CSS}';\n")
+    classes = B.classes_in_css(css)
+
+    refute_includes css, ".spinner {", "engine.css pulled in the motion layer"
+    view_only = B.emitted_classes["app/views"].to_a.grep(/\Agrid-cols-7\z|\Amin-h-\[60vh\]\z/)
+    refute_empty view_only, "re-point this probe at classes the engine views still emit"
+    assert_empty view_only & classes.to_a, "engine.css scanned the engine's views"
+    refute_match(/^@source/, File.read(B::ENGINE_CSS), "engine.css carries an @source line")
   end
 
   # The engine reads no JS preset and runs no bundler from Node. The preset
@@ -166,7 +180,7 @@ class TailwindProbeBuildTest < Minitest::Test
 
   private
 
-  def relative_to_engine_css(dir)
-    Pathname(File.join(B::ROOT, dir)).relative_path_from(Pathname(File.dirname(B::ENGINE_CSS))).to_s
+  def relative_to_host_css(dir)
+    Pathname(File.join(B::ROOT, dir)).relative_path_from(Pathname(File.dirname(B::HOST_CSS))).to_s
   end
 end

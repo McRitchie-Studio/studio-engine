@@ -36,10 +36,11 @@
     .seeds-bar-continuous 5-segment lockstep progress fill    (ported, TM)
 
   ─────────────────────────────────────────────────────────────────────────────
-  HOW IT REACHES A HOST — through engine.css, which imports this file last.
+  HOW IT REACHES A HOST — through host.css, which imports this file last.
 
-  A host's one line, `@import "../builds/tailwind/studio_engine";`, brings this
-  layer with the rest of the engine. It used to be OPT-IN: tailwindcss-rails'
+  A host's one line, `@import "../builds/tailwind/studio_engine";`, resolves to
+  host.css (Studio::TailwindEntry) and so brings this layer with the rest of
+  the engine. engine.css itself does not import it. It used to be OPT-IN: tailwindcss-rails'
   engines contract (Tailwindcss::Engines.bundle) writes a builds entry only for
   the file named exactly `engine.css`, so each host carried a rake task
   (lib/tasks/tailwindcss_engine_motion.rake) that generated a second entry,

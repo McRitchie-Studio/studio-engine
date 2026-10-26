@@ -1,0 +1,56 @@
+/*
+  studio-engine HOST ENTRY — what a host's one Tailwind line resolves to.
+
+      @import "tailwindcss";
+      @import "../builds/tailwind/studio_engine";
+
+  tailwindcss-rails' engines contract (Tailwindcss::Engines.bundle) writes
+  app/assets/builds/tailwind/studio_engine.css as an @import of the gem's
+  engine.css. Studio::TailwindEntry (lib/studio/tailwind_entry.rb) rewrites
+  that entry, right after the bundle runs, to import THIS file instead, so a
+  host gets, from the same line and with nothing of its own:
+
+    - engine.css: the theme (theme.css, the tokens that replaced the JS
+      preset and the host's `@config`) and the component @utility layer;
+    - the @source scan below, so no host lists the gem in a content glob or
+      safelists its classes;
+    - engine-motion.css, the motion / effect / leveling layer, which used to
+      need a per-host rake task (lib/tasks/tailwindcss_engine_motion.rake).
+
+  The path is resolved by Ruby from the gem's root, so Node never runs bundler
+  to find the gem. engine.css stays importable on its own as the narrow layer.
+  Recipe: README, "Tailwind".
+*/
+@import "./engine.css";
+
+/* -- Sources: every engine directory that emits a class --------------------
+   Tailwind v4 compiles only the classes it SEES, so every directory whose
+   files put a utility class on the page is scanned here, relative to this
+   file, in every host that imports it, with no host edit: views and
+   partials, the ViewComponents (their colour classes live in Ruby), the
+   helpers that build markup (admin_model_table), and both JavaScript trees
+   (classes added at runtime).
+
+   The exclusions are NARROW on purpose: the vendored, minified third-party
+   bundles (Stimulus, Alpine, Leaflet, Sortable, canvas-confetti) are not
+   engine markup, and scanning them mints junk utilities from their
+   identifiers. Never exclude a whole directory: the hub's
+   `@source not "../../../vendor/bundle"` once dropped every one of these
+   lines in CI, because the gem itself lives under vendor/bundle there.
+
+   test/integration/component_tailwind_source_test.rb proves every class these
+   directories emit compiles, and that dropping any one line turns it red. A
+   class built by interpolation (`bg-<%= tone %>`) is invisible to the scan;
+   test/views/dynamic_tailwind_class_guard_test.rb refuses one. */
+@source "../../../views";
+@source "../../../components";
+@source "../../../helpers";
+@source "../../../javascript";
+@source not "../../../javascript/studio/vendor";
+@source "../../javascripts";
+@source not "../../javascripts/studio/{alpine,canvas_confetti,leaflet,sortable}.js";
+
+/* -- Motion / effect / leveling layer ---------------------------------------
+   Last, so the theme and component layer it reads are in scope, as when hosts
+   imported it after engine.css themselves. */
+@import "./engine-motion.css";

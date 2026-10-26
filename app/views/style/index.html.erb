@@ -22,7 +22,8 @@
 
      Specimens use ONLY the engine's own classes (engine.css component layer plus
      engine-motion.css motion/effect/leveling layer), so a consumer that imports
-     engine.css (which brings engine-motion.css) styles them for real. The primitive
+     the engine's Tailwind entry (host.css: engine.css and engine-motion.css)
+     styles them for real. The primitive
      CSS is NOT inlined here - the consumer's Tailwind build provides it. Page
      chrome uses the engine's own .card / .label-upper / theme tokens. %>
 <%

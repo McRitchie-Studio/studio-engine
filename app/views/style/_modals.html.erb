@@ -28,8 +28,8 @@
      Free Entry Earned reward, gated by :leveling).
 
      The modal motion (modal-card-* / modal-backdrop-* keyframes + studio-modal-
-     drain + body.modal-open) ships in engine-motion.css, which engine.css
-     imports, so every consumer animates these for real. %>
+     drain + body.modal-open) ships in engine-motion.css, which every host's
+     engine import brings (host.css), so every consumer animates these for real. %>
 <%
   web3_on     = Studio.feature?(:web3)
   leveling_on = Studio.feature?(:leveling)

@@ -107,21 +107,19 @@ class EngineMotionCssTest < Minitest::Test
   end
 
   # The layer used to be OPT-IN, and this test refuted the import. It now rides
-  # the auto-bundle: `Tailwindcss::Engines.bundle` writes a host entry only for
-  # the file named engine.css, so engine.css imports this one, and a host needs
-  # no rake task of its own. Imported LAST, so the theme and the component
+  # every host's one Tailwind line: host.css, which that line resolves to
+  # (Studio::TailwindEntry), imports it LAST, so the theme and the component
   # layer it reads are already in scope, as when hosts imported it after.
-  def test_layer_rides_the_auto_bundle_through_engine_css
-    refute_equal File.basename(ENGINE_CSS_PATH), File.basename(CSS_PATH),
-      "the motion layer is a sibling of engine.css, not a second engine.css"
+  # engine.css itself still does not: it is the narrow layer a build may
+  # import by path (the hub's client kit) without taking motion along.
+  def test_layer_rides_the_host_entry_and_stays_out_of_engine_css
+    host_css = File.read(File.join(File.dirname(ENGINE_CSS_PATH), "host.css"))
+    imports = host_css.scan(/^@import "([^"]+)";/).flatten
+    assert_equal ["./engine.css", "./engine-motion.css"], imports,
+      "host.css must import engine.css first and engine-motion.css last"
 
-    engine_css = File.read(ENGINE_CSS_PATH)
-    imports = engine_css.scan(/^@import "([^"]+)";/).flatten
-    assert_equal "./engine-motion.css", imports.last,
-      "engine.css must @import engine-motion.css as its last import"
-    last_rule = engine_css.rindex(/^[^\s\/*@}][^\n]*\{/)
-    assert_operator engine_css.index('@import "./engine-motion.css"'), :>, last_rule,
-      "the motion import must come after every engine.css rule"
+    refute_match(/@import[^;]*engine-motion/, File.read(ENGINE_CSS_PATH),
+      "engine.css must stay the narrow layer; the motion import belongs in host.css")
   end
 
   # The hold-to-confirm button + its fizz. The invariants a consumer inherits:

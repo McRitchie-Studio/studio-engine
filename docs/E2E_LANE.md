@@ -181,7 +181,7 @@ imported `engine.css` only, so the lab served pages where `.fizz-bit` had no
 animation and `.hold-stack` no isolation, and the first run of these specs read
 browser defaults for everything. It then imported the opt-in `engine-motion.css`
 too, the way a consuming app opted into it — compile what the apps compile, or
-grade CSS that ships nowhere. Since the CSS-first change, `engine.css` imports
+grade CSS that ships nowhere. Since the CSS-first change, `host.css` imports
 the motion layer itself, so the lane's entry is core Tailwind, the dummy app's
 views and the engine's one import, exactly a host's shape.
 
@@ -332,7 +332,7 @@ revocation and expiry are covered by the node harness and by
 ## What the lane's OWN Tailwind build cannot see
 
 > **Since the CSS-first Tailwind change this blind spot is closed at its
-> source.** `engine.css` itself carries the `@source` lines for the engine's
+> source.** `host.css`, which every host's engine import resolves to, carries the `@source` lines for the engine's
 > views, components, helpers and scripts, so every host that imports it
 > compiles the same engine classes the lane does, and `e2e/tailwind_input.css`
 > no longer scans `../app/views` on its own. A host still on the deprecated

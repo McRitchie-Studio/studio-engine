@@ -9,7 +9,7 @@ require "tailwindcss/ruby"
 # [integration] The user nav's phone behaviour is built from responsive
 # utilities that nothing else in the engine used before engine-navbar-phone-polish
 # (md:not-sr-only and md:max-w-40). A utility only ships if a consumer's Tailwind
-# build emits it, so compile the way a consumer does — engine.css imported, its
+# build emits it, so compile the way a consumer does — host.css imported, its
 # own @source lines the only route to the views — and require each one, with its declaration,
 # inside a 768px media block.
 class UserNavPhoneBuildTest < Minitest::Test
@@ -65,7 +65,7 @@ class UserNavPhoneBuildTest < Minitest::Test
   private
 
   # A host-shaped build with NO host content: the engine's views reach it only
-  # through engine.css's own @source lines.
+  # through host.css's own @source lines.
   def compile_consumer_style_build
     EngineTailwindBuild.compile([])
   end

@@ -8,7 +8,7 @@ require_relative "../support/engine_tailwind_build"
 #
 # Hosts adopt the CSS-first layer on their own cards. Until each does, it still
 # builds with `@config` and tailwind/studio.tailwind.config.js, now ON TOP of the
-# engine's @theme (engine.css imports theme.css). So the two definitions must
+# engine's @theme (host.css imports engine.css, which imports theme.css). So the two definitions must
 # agree, or a host's colours move the day it bumps the gem, before it adopts.
 # This test goes when the shim goes.
 class TailwindPresetParityTest < Minitest::Test
@@ -60,7 +60,7 @@ class TailwindPresetParityTest < Minitest::Test
   # import, which now carries @theme, the sources and the motion layer. It must
   # build, and lose nothing the CSS-first build has.
   def test_a_host_still_on_config_builds_on_top_of_the_css_first_engine
-    both = compile_probe(->(dir, probe) { "#{preset_head(dir, probe)}@import '#{B::ENGINE_CSS}';\n" })
+    both = compile_probe(->(dir, probe) { "#{preset_head(dir, probe)}@import '#{B::HOST_CSS}';\n" })
     css_first = B.compile(self.class.tokens)
 
     missing = B.classes_in_css(css_first) - B.classes_in_css(both)

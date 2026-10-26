@@ -637,7 +637,7 @@ mode. The same import carries the theme tokens they `@apply`
 (10px) for dense UI instead of `text-[11px]`/`text-[10px]` arbitrary values.
 
 `@utility` classes are only emitted when Tailwind sees them used. The engine's
-`@source` lines make sure it sees every one the engine's own markup uses, so an
+`@source` lines (in `host.css`, which that import resolves to) make sure it sees every one the engine's own markup uses, so an
 app needs no glob over the gem. A class the APP names (`btn-primary` in its own
 view) is found by the app's own scan.
 

@@ -57,19 +57,27 @@ lines in `app/assets/tailwind/application.css`:
 
 tailwindcss-rails writes `app/assets/builds/tailwind/studio_engine.css` from
 Ruby on every build and watch (`bin/rails tailwindcss:engines` by hand), as an
-absolute `@import` of the gem's `app/assets/tailwind/studio_engine/engine.css`.
-That one import brings everything a host used to wire by hand:
+absolute `@import` of the gem's `engine.css`. The engine then points that entry
+at `app/assets/tailwind/studio_engine/host.css` (`Studio::TailwindEntry` wraps
+the contract's `bundle`), and that one import brings everything a host used to
+wire by hand:
 
 | What | Where it lives | What it replaced |
 |------|----------------|------------------|
 | The design tokens (surfaces, inks, the primary ladder, brand palettes, `text-2xs`/`text-3xs`, Montserrat) and the class-based `dark:` variant | `theme.css`, `@theme inline reference` | `tailwind/studio.tailwind.config.js` and the host's `@config` |
-| The scan of every engine directory that emits a class (views, components, helpers, both JavaScript trees) | `engine.css`, `@source` | the host's content glob over the gem's views, found with a bundler call from Node |
+| The scan of every engine directory that emits a class (views, components, helpers, both JavaScript trees) | `host.css`, `@source` | the host's content glob over the gem's views, found with a bundler call from Node |
 | Every engine class, with no safelist | the scan above; no class is assembled at render time | the host's primary-colour safelist (about 240 classes) |
-| The motion, effect and leveling primitives (`.spinner`, `.hold-btn`, `.level-badge-*`, ...) | `engine-motion.css`, imported last by `engine.css` | `lib/tasks/tailwindcss_engine_motion.rake` and its `studio_engine_motion` import |
+| The motion, effect and leveling primitives (`.spinner`, `.hold-btn`, `.level-badge-*`, ...) | `engine-motion.css`, imported last by `host.css` | `lib/tasks/tailwindcss_engine_motion.rake` and its `studio_engine_motion` import |
 
 `test/integration/tailwind_probe_build_test.rb` and
 `test/integration/component_tailwind_source_test.rb` build the engine exactly as
-a host does and hold all four.
+a host does and hold all four; `test/integration/tailwind_entry_test.rb` runs
+the real `Tailwindcss::Engines.bundle` and reads the entry it leaves.
+
+`engine.css` on its own stays the narrow layer: the theme and the component
+`@utility` definitions, with no `@source` and no motion. A build that imports it
+by path, such as the hub's client kit (`ClientApps::StudioKit::Css`, held to
+100 KB), compiles only the classes it names.
 
 ### Migrating a host from `@config`
 
@@ -78,7 +86,7 @@ McRitchie Industries, Cyvasse, Moms App). Until each one does, it keeps
 building unchanged: `tailwind/studio.tailwind.config.js` stays one release as a
 deprecated shim, and `test/integration/tailwind_preset_parity_test.rb` holds it
 to the same utilities as `theme.css`. A host that has bumped the gem but not
-yet migrated gets the motion layer twice (once through `engine.css`, once
+yet migrated gets the motion layer twice (once through `host.css`, once
 through its own generated import). The duplicate is harmless and goes with
 step 3.
 

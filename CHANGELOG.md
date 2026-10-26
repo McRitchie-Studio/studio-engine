@@ -7,12 +7,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 ### Changed
 
 - **The Tailwind layer is CSS-first; a host's whole adoption is `@import
-  "../builds/tailwind/studio_engine";`.** `engine.css` now imports
-  `theme.css` (the design tokens as `@theme inline reference`, and the
-  class-based `dark:` variant) and `engine-motion.css`, and carries `@source`
-  lines for every engine directory that emits a class: views, components,
-  helpers, `app/javascript` and `app/assets/javascripts` (the vendored
-  third-party bundles excluded by name). A host needs no `@config`, no
+  "../builds/tailwind/studio_engine";`.** That entry now imports the new
+  `host.css` (`Studio::TailwindEntry` rewrites it right after
+  tailwindcss-rails' `Tailwindcss::Engines.bundle` writes it), which brings
+  `engine.css`, `@source` lines for every engine directory that emits a class
+  (views, components, helpers, `app/javascript` and `app/assets/javascripts`,
+  the vendored third-party bundles excluded by name) and `engine-motion.css`.
+  `engine.css` imports `theme.css` (the design tokens as `@theme inline
+  reference`, and the class-based `dark:` variant) and otherwise stays the
+  narrow component layer: its `@source "../../../components"` line moved to
+  `host.css`, so a build importing `engine.css` by path (the hub's client kit)
+  compiles only what it names. A host needs no `@config`, no
   content glob over the gem found by a bundler call from Node, no safelist,
   and no motion rake task. The recipe for a host still on `@config`:
   README, "Tailwind". Hosts adopt on their own cards; nothing changes for one
@@ -38,7 +43,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   still on `@config` builds unchanged; `test/integration/tailwind_preset_parity_test.rb`
   holds it to the same utilities as `theme.css`. It is removed once every host
   has adopted. Until a host migrates it gets the motion layer twice (through
-  `engine.css` and through its own generated `studio_engine_motion` import);
+  `host.css` and through its own generated `studio_engine_motion` import);
   the duplicate is harmless, and step 3 of the recipe removes it.
   **Removing the shim will break, at build time or at runtime, everything that
   still reads it:** every host's `config/tailwind.config.js` (hub, Turf
@@ -64,6 +69,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `@source` line; exclusions name only vendored files.
 - `test/views/dynamic_tailwind_class_guard_test.rb` refuses a Tailwind class
   assembled at render time.
+- `test/integration/tailwind_entry_test.rb` runs the real
+  `Tailwindcss::Engines.bundle` and reads the entry: `host.css`, and in the
+  control without the wrap, `engine.css`.
 
 ## 0.114.1 — 2026-10-25
 

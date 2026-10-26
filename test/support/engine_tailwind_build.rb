@@ -8,10 +8,11 @@ require "fileutils"
 require "tailwindcss/ruby"
 
 # The consumer-style Tailwind v4 build of the engine, CSS-first: Tailwind core,
-# then engine.css, which itself brings the theme (theme.css), the @source scan
-# of the engine's own directories, and the motion layer (engine-motion.css). It
-# is exactly the input a host's `@import "../builds/tailwind/studio_engine"`
-# line resolves to. There is no `@config` and no JS preset any more.
+# then host.css, which brings engine.css (the theme and the component layer),
+# the @source scan of the engine's own directories, and the motion layer
+# (engine-motion.css). It is exactly the input a host's
+# `@import "../builds/tailwind/studio_engine"` line resolves to
+# (Studio::TailwindEntry). There is no `@config` and no JS preset any more.
 #
 # Shared by every test that must decide whether a class PAINTS, not whether it
 # is spelled. It depends on nothing but the tailwindcss-ruby binary, so it loads
@@ -22,6 +23,7 @@ module EngineTailwindBuild
   ENGINE_CSS  = File.join(TAILWIND_DIR, "engine.css")
   THEME_CSS   = File.join(TAILWIND_DIR, "theme.css")
   MOTION_CSS  = File.join(TAILWIND_DIR, "engine-motion.css")
+  HOST_CSS    = File.join(TAILWIND_DIR, "host.css")
   MOTION_IMPORT = '@import "./engine-motion.css";'
 
   module_function
@@ -33,11 +35,11 @@ module EngineTailwindBuild
   # OWN @source lines still apply, exactly as in a host, so the build carries
   # every class the engine emits plus the probe's.
   #
-  # motion: false compiles engine.css with its motion import removed, so a
+  # motion: false compiles host.css with its motion import removed, so a
   # caller can still ask which classes ONLY the motion layer defines.
-  # sources: false removes engine.css's @source lines, so the build carries
+  # sources: false removes host.css's @source lines, so the build carries
   # only what the probe names: the way to ask "what do these tokens add?".
-  # engine_css: compiles a variant of engine.css instead (see #with_variant).
+  # engine_css: compiles a variant of host.css instead (see #with_variant).
   def compile(tokens, motion: true, sources: true, engine_css: nil)
     unless motion && sources
       transform = lambda do |css|
@@ -52,7 +54,7 @@ module EngineTailwindBuild
       probe = File.join(dir, "probe.html")
       File.write(probe, %(<div class="#{tokens.join(' ')}"></div>\n))
       File.write(File.join(dir, "input.css"),
-                 "@import 'tailwindcss' source(none);\n@source '#{probe}';\n@import '#{engine_css || ENGINE_CSS}';\n")
+                 "@import 'tailwindcss' source(none);\n@source '#{probe}';\n@import '#{engine_css || HOST_CSS}';\n")
       build(dir)
     end
   end
@@ -65,12 +67,12 @@ module EngineTailwindBuild
     end
   end
 
-  # Yields the path of a copy of engine.css rewritten by `transform`, written
+  # Yields the path of a copy of host.css rewritten by `transform`, written
   # BESIDE the real file so every relative @import and @source in it resolves
   # exactly as in the original, and removed afterwards.
   def with_variant(transform)
-    copy = File.join(TAILWIND_DIR, "engine-variant-#{Process.pid}-#{SecureRandom.hex(4)}.css")
-    File.write(copy, transform.call(File.read(ENGINE_CSS)))
+    copy = File.join(TAILWIND_DIR, "host-variant-#{Process.pid}-#{SecureRandom.hex(4)}.css")
+    File.write(copy, transform.call(File.read(HOST_CSS)))
     yield copy
   ensure
     FileUtils.rm_f(copy) if copy
@@ -79,7 +81,7 @@ module EngineTailwindBuild
   # `css` without `line`, refusing to run when the line is not there, so a
   # control can never pass by removing nothing.
   def strip_line(css, line)
-    raise ArgumentError, "engine.css carries no #{line.inspect}" unless css.include?(line)
+    raise ArgumentError, "host.css carries no #{line.inspect}" unless css.include?(line)
 
     css.sub(line, "")
   end
@@ -106,7 +108,7 @@ module EngineTailwindBuild
   EMITTING_DIRS = %w[app/views app/components app/helpers app/javascript app/assets/javascripts].freeze
 
   # Third-party bundles vendored into the JS trees. Not engine markup, and
-  # engine.css excludes them by name.
+  # host.css excludes them by name.
   VENDORED = %w[
     app/javascript/studio/vendor/stimulus.js
     app/assets/javascripts/studio/alpine.js
@@ -135,7 +137,7 @@ module EngineTailwindBuild
   end
 
   # dir => the utility classes its files name: the tokens that compile as
-  # Tailwind classes in a build whose engine.css has NO @source lines, so the
+  # Tailwind classes in a build whose host.css has NO @source lines, so the
   # answer comes from the tokens alone, never from the scan under test.
   def emitted_classes
     @emitted_classes ||= begin
@@ -145,9 +147,9 @@ module EngineTailwindBuild
     end
   end
 
-  # The engine.css lines that add a source (not the `@source not` exclusions).
+  # The host.css lines that add a source (not the `@source not` exclusions).
   def source_lines
-    File.read(ENGINE_CSS).lines.grep(/\A@source "/).map(&:strip)
+    File.read(HOST_CSS).lines.grep(/\A@source "/).map(&:strip)
   end
 
   # Class names a stylesheet defines — escapes decoded (`hover\:x`, `\32 xl`).

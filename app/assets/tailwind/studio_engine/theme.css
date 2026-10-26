@@ -3,8 +3,9 @@
 
   This file replaced tailwind/studio.tailwind.config.js (the JS preset every
   consumer spread through `@config`, after shelling out to bundler from Node to
-  find the gem). engine.css imports it, so a consumer gets these tokens from
-  the same one line that brings the component layer:
+  find the gem). engine.css imports it (and host.css imports engine.css), so a
+  consumer gets these tokens from the same one line that brings the component
+  layer:
 
       @import "tailwindcss";
       @import "../builds/tailwind/studio_engine";

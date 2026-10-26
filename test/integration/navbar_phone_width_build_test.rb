@@ -8,7 +8,7 @@ require "tailwindcss/ruby"
 
 # [integration] The header's phone-width fix, compiled the way a CONSUMER
 # compiles it — a real Tailwind v4 build whose ONLY route to the engine's views
-# is engine.css's own `@source "../../../views"` line, which every host imports.
+# is host.css's own `@source "../../../views"` line, which every host imports.
 # (Hosts used to reach them through a `bundle show studio-engine` content glob in
 # a JS config; that recipe is retired.)
 #
@@ -98,7 +98,7 @@ class NavbarPhoneWidthBuildTest < Minitest::Test
   private
 
   # A host-shaped build with NO host content: the engine's views reach it only
-  # through engine.css's own @source lines, which is how every host gets them
+  # through host.css's own @source lines, which is how every host gets them
   # now that the content glob and the JS preset are retired.
   def compile_consumer_style_build
     EngineTailwindBuild.compile([])
