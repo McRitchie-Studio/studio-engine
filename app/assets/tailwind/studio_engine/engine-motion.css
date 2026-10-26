@@ -36,30 +36,18 @@
     .seeds-bar-continuous 5-segment lockstep progress fill    (ported, TM)
 
   ─────────────────────────────────────────────────────────────────────────────
-  OPT-IN — this layer does NOT auto-bundle.
+  HOW IT REACHES A HOST — through engine.css, which imports this file last.
 
-  tailwindcss-rails' `tailwindcss:engines` task (Tailwindcss::Engines.bundle)
-  generates a `builds/tailwind/<engine>.css` entry ONLY for the file named
-  exactly `engine.css`. This file is `engine-motion.css`, so that matcher skips
-  it BY CONSTRUCTION — it never rides the auto-generated `studio_engine.css`
-  entry that `engine.css` uses, and consumers must adopt it deliberately.
-
-  Adopt with ONE line in the consuming app's app/assets/tailwind/application.css,
-  AFTER `@import "tailwindcss";` (and after your `../builds/tailwind/studio_engine`
-  import so the theme role vars are in scope):
-
-      @import "STUDIO_ENGINE_PATH/app/assets/tailwind/studio_engine/engine-motion.css";
-
-  Resolve STUDIO_ENGINE_PATH the same way config/tailwind.config.js already
-  resolves the shared preset — `bundle show studio-engine`. A one-time helper the
-  app-side de-fork task can wire (mirrors the engines contract):
-
-      # config/tailwind.config.js already computes this:
-      #   const studioPath = execSync('bundle show studio-engine').toString().trim()
-      # emit an absolute @import into your app CSS (or a tiny generated entry).
-
-  App-side wiring + removing the forked local copies lands in the follow-up
-  adoption task; until then the MS/TM local copies stay canonical.
+  A host's one line, `@import "../builds/tailwind/studio_engine";`, brings this
+  layer with the rest of the engine. It used to be OPT-IN: tailwindcss-rails'
+  engines contract (Tailwindcss::Engines.bundle) writes a builds entry only for
+  the file named exactly `engine.css`, so each host carried a rake task
+  (lib/tasks/tailwindcss_engine_motion.rake) that generated a second entry,
+  `builds/tailwind/studio_engine_motion.css`, plus a matching @import. Both are
+  retired: a host deletes the task and the import (README, "Tailwind"). A host
+  that keeps them for a release gets this layer twice, which is harmless —
+  every rule below is a plain class, keyframe or @property, so the duplicate
+  resolves to the same values.
 
   ─────────────────────────────────────────────────────────────────────────────
   DESIGN RULES

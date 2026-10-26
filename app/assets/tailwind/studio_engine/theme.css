@@ -31,9 +31,9 @@
 */
 
 /* darkMode: 'class' — the theme tag toggles .dark on <html>. */
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:is(.dark *));
 
-@theme inline {
+@theme inline reference {
   /* fontFamily — REPLACED, not extended (the preset set theme.fontFamily). */
   --font-*: initial;
   --font-sans: Montserrat, system-ui, sans-serif;

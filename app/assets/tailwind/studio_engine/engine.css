@@ -11,12 +11,21 @@
   (or manually: `bin/rails tailwindcss:engines`) because this file lives at the
   Rails-engines contract path: app/assets/tailwind/<engine_name>/engine.css.
 
+  That one line is the WHOLE adoption. This file brings, through the same
+  import, everything a host used to wire by hand:
+  - the design tokens (theme.css: @theme, the dark variant) that replaced the
+    JS preset tailwind/studio.tailwind.config.js and the host's `@config`;
+  - the @source scan of every engine directory that emits classes (below), so
+    no host lists the gem's views in a content glob or safelists its classes;
+  - the motion / effect / leveling layer (engine-motion.css, imported at the
+    end), which used to need a per-host rake task to reach the build.
+  A host never resolves the gem's path itself: tailwindcss-rails writes the
+  `builds/tailwind/studio_engine.css` entry from Ruby, so no Node `execSync`
+  of `bundle show studio-engine` is involved. Recipe: README, "Tailwind".
+
   Requirements:
   - Tailwind v4 (this file uses @utility, so classes sort/override correctly
     in the utilities layer and take variants like `md:card`).
-  - The consumer's tailwind config spreads the engine preset
-    (tailwind/studio.tailwind.config.js) — it defines the surface / heading /
-    subtle / primary token utilities @apply'd below.
 
   Colors resolve through the 7-role theme CSS custom properties (--color-cta,
   --color-surface, ...) emitted by studio_theme_css_tag, so themed apps restyle
@@ -28,13 +37,34 @@
   their local copies for this import.
 */
 
-/* -- Components: in every host's class scan --------------------------------
-   The engine's ViewComponent classes (app/components) carry their colour
-   classes in Ruby, and a host's Tailwind config scans only the engine's
-   app/views. This adds app/components to the scan of every host that imports
-   this file, with no host edit. The path is relative to this file.
-   test/integration/component_tailwind_source_test.rb proves it compiles. */
+@import "./theme.css";
+
+/* -- Sources: every engine directory that emits a class --------------------
+   Tailwind v4 compiles only the classes it SEES, so every directory whose
+   files put a utility class on the page is scanned here, relative to this
+   file, in every host that imports it, with no host edit: views and
+   partials, the ViewComponents (their colour classes live in Ruby), the
+   helpers that build markup (admin_model_table), and both JavaScript trees
+   (classes added at runtime).
+
+   The exclusions are NARROW on purpose: the vendored, minified third-party
+   bundles (Stimulus, Alpine, Leaflet, Sortable, canvas-confetti) are not
+   engine markup, and scanning them mints junk utilities from their
+   identifiers. Never exclude a whole directory: the hub's
+   `@source not "../../../vendor/bundle"` once dropped every one of these
+   lines in CI, because the gem itself lives under vendor/bundle there.
+
+   test/integration/component_tailwind_source_test.rb proves every class these
+   directories emit compiles, and that dropping any one line turns it red. A
+   class built by interpolation (`bg-<%= tone %>`) is invisible to the scan;
+   test/views/dynamic_tailwind_class_guard_test.rb refuses one. */
+@source "../../../views";
 @source "../../../components";
+@source "../../../helpers";
+@source "../../../javascript";
+@source not "../../../javascript/studio/vendor";
+@source "../../javascripts";
+@source not "../../javascripts/studio/{alpine,canvas_confetti,leaflet,sortable}.js";
 
 /* -- Layer scale ------------------------------------------------------------
    The ONE stacking order every Studio app shares. Read the ORDER, not the
@@ -980,3 +1010,10 @@ body.modal-open .studio-app-banner {
 .studio-board[data-studio-controller-failed~="board"] > .studio-board-failed {
   display: block !important;
 }
+
+/* -- Motion / effect / leveling layer ---------------------------------------
+   Rides the same import as the rest of this file, so every host gets it from
+   its one `@import "../builds/tailwind/studio_engine"` line. It used to be
+   opt-in through a per-host rake task that generated a second builds entry;
+   that task and that import are retired (README, "Tailwind"). */
+@import "./engine-motion.css";
