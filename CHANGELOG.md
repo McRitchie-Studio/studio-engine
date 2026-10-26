@@ -40,6 +40,15 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   has adopted. Until a host migrates it gets the motion layer twice (through
   `engine.css` and through its own generated `studio_engine_motion` import);
   the duplicate is harmless, and step 3 of the recipe removes it.
+  **Removing the shim will break, at build time or at runtime, everything that
+  still reads it:** every host's `config/tailwind.config.js` (hub, Turf
+  Monster, McRitchie Industries, Cyvasse, Moms App and any newer app built from
+  the old `NEW_APP_SETUP.md`), the hub's production code
+  `app/services/client_apps/studio_kit/css.rb` (`ENGINE_CONFIG` and its own
+  `SAFELIST`, which build the client kit CSS at request time), and the tests
+  that read the preset's text (hub `test/views/status_colour_tokens_test.rb`,
+  Turf `test/views/error_text_contrast_test.rb`). Each moves to `theme.css` on
+  its host's adoption card first.
 
 ### Tests
 

@@ -117,7 +117,10 @@ step 3.
    each column above: `.text-heading`, `.btn-primary`, `.spinner`.
 
 When every host has adopted, the shim and the parity test are deleted in one
-engine change.
+engine change. Before that, every reader of the preset has to move, not only
+the build: the hub's `app/services/client_apps/studio_kit/css.rb` reads it at
+runtime to build the client kit CSS, and a few host tests read its text
+(CHANGELOG, Deprecated).
 
 ## Configuration
 
