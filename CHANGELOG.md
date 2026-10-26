@@ -34,10 +34,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   so the "green check" painted the inherited colour in every host. The style
   page's button specimens are keyed by whole class. `admin_model_table`'s
   `min_width:` is an inline `min-width` style instead of an arbitrary
-  `min-w-[Npx]` class.
+  `min-w-[Npx]` class. Visible: a table given any width but 940 (which a host
+  happened to compile) gets its minimum width for the first time, so on a phone
+  it scrolls sideways instead of squeezing.
 - **A host's build now carries five engine classes it could miss before**
   (`ring-primary`, `ring-red-500`, `ring-2`, `opacity-30`, `!visible`), written
-  only in the engine's helpers and scripts, which no host scanned.
+  only in the engine's helpers and scripts, which no host scanned. Visible: a
+  rejected drag on the board shows its red ring, and in a host that defines
+  `theme-transition` (the hub) a theme switch now animates.
 
 ### Deprecated
 
