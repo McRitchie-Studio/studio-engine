@@ -295,7 +295,7 @@ its script.
 **Rule.** Views use engine tokens only.
 
 - Colour comes from the semantic tokens `Studio::ThemeResolver` emits and
-  `tailwind/studio.tailwind.config.js` maps: `page`, `surface`,
+  `app/assets/tailwind/studio_engine/theme.css` maps: `page`, `surface`,
   `surface-alt`, `inset`, `primary-50..900`, the text and border ladders, and
   `success`, `warning`, `danger` with their `-ink` and `-fill` variants. The
   resolver also emits the theme-independent `--color-shade` and `--color-tint`

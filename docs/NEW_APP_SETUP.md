@@ -56,42 +56,24 @@ bundle install
 bin/rails tailwindcss:install
 ```
 
-## 3. Tailwind Config
+## 3. Tailwind
 
-Replace `config/tailwind.config.js`:
+There is no `config/tailwind.config.js` to write (delete one if the app has
+it). Make `app/assets/tailwind/application.css` start with:
 
-```js
-const execSync = require('child_process').execSync
-const studioPath = execSync('bundle show studio-engine').toString().trim()
-
-const studioColors = require(`${studioPath}/tailwind/studio.tailwind.config.js`)
-
-const shades = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900]
-const utilities = ['bg', 'text', 'border']
-const opacities = [5, 10, 20, 30, 40, 50]
-const safelist = [
-  ...utilities.map(util => `${util}-primary`),
-  ...utilities.flatMap(util => opacities.map(op => `${util}-primary/${op}`)),
-  ...shades.flatMap(shade =>
-    utilities.map(util => `${util}-primary-${shade}`)
-  ),
-  ...shades.flatMap(shade =>
-    utilities.flatMap(util => opacities.map(op => `${util}-primary-${shade}/${op}`))
-  ),
-]
-
-module.exports = {
-  darkMode: 'class',
-  content: [
-    './app/views/**/*.{erb,html}',
-    './app/helpers/**/*.rb',
-    './app/javascript/**/*.js',
-    `${studioPath}/app/views/**/*.{erb,html}`,
-  ],
-  safelist,
-  theme: studioColors.theme,
-}
+```css
+@import "tailwindcss";
+@import "../builds/tailwind/studio_engine";
 ```
+
+That second line brings the engine's design tokens (`@theme`), the class-based
+`dark:` variant, the scan of the engine's own views, components, helpers and
+scripts, the component classes (section 14) and the motion layer. No
+`@config`, no safelist, no rake task, and no bundler call from Node. The app's
+own sources are found by Tailwind 4's automatic detection. App-specific tokens
+go in an `@theme inline { ... }` block after the import. The full contract and
+the recipe for an app still on `@config`:
+[README, "Tailwind"](../README.md#tailwind).
 
 ## 4. Initializers
 
@@ -650,16 +632,14 @@ layer), the Alpine `[x-cloak]` pre-init rule, and the button system (`.btn`,
 `.btn-warning`, `.btn-success`, `.btn-google`, `.btn-neutral`, `.btn-sm`,
 `.btn-lg`) as Tailwind v4 utilities wired to the theme CSS custom properties
 (`--color-cta` etc.), so they follow the app's 7-role theme in dark and light
-mode. The
-shared Tailwind preset (already wired in section 3) is required — the classes
-`@apply` its `surface`/`heading`/`subtle`/`primary` tokens — and also provides
-`text-2xs` (11px) and `text-3xs` (10px) for dense UI instead of
-`text-[11px]`/`text-[10px]` arbitrary values.
+mode. The same import carries the theme tokens they `@apply`
+(`surface`/`heading`/`subtle`/`primary`) and `text-2xs` (11px) and `text-3xs`
+(10px) for dense UI instead of `text-[11px]`/`text-[10px]` arbitrary values.
 
-Section 3's `content` glob entry for the engine's views
-(`${studioPath}/app/views/**/*.{erb,html}`) is load-bearing here: `@utility`
-classes are only emitted when Tailwind sees them used, so an app that skips
-that glob gets silently unstyled engine partials.
+`@utility` classes are only emitted when Tailwind sees them used. The engine's
+`@source` lines make sure it sees every one the engine's own markup uses, so an
+app needs no glob over the gem. A class the APP names (`btn-primary` in its own
+view) is found by the app's own scan.
 
 ## 15. Hub Link (McRitchie Studio)
 

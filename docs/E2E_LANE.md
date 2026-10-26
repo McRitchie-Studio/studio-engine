@@ -179,9 +179,11 @@ switch.
 *And this spec file moved the lane's own Tailwind entry.* `e2e/tailwind_input.css`
 imported `engine.css` only, so the lab served pages where `.fizz-bit` had no
 animation and `.hold-stack` no isolation, and the first run of these specs read
-browser defaults for everything. It now imports the opt-in `engine-motion.css`
-too, the way a consuming app opts into it — same reasoning as the `@source`
-lines: compile what the apps compile, or grade CSS that ships nowhere.
+browser defaults for everything. It then imported the opt-in `engine-motion.css`
+too, the way a consuming app opted into it — compile what the apps compile, or
+grade CSS that ships nowhere. Since the CSS-first change, `engine.css` imports
+the motion layer itself, so the lane's entry is core Tailwind, the dummy app's
+views and the engine's one import, exactly a host's shape.
 
 **Two things this run taught, both worth more than the specs.**
 
