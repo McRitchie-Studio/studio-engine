@@ -1,36 +1,28 @@
 /*
   The lab's Tailwind entry point.
 
-  It is assembled the same way a CONSUMING APP assembles its own — core Tailwind,
-  then the shared preset via @config, then the engine's component layer — because
-  a lane compiled from a different source than the apps would be grading CSS that
-  ships nowhere. Compare mcritchie-studio/app/assets/tailwind/application.css:
-  same three ingredients, same order.
+  It is assembled the same way a CONSUMING APP assembles its own: core Tailwind,
+  then the engine's one import. engine.css brings the theme (theme.css, which
+  replaced the JS preset and the `@config` line), the @source scan of the
+  engine's own views, components, helpers and scripts, and the motion / effect /
+  action layer (engine-motion.css). A lane compiled from a different source than
+  the apps would be grading CSS that ships nowhere.
 
-  @source is what makes this honest for the ENGINE specifically. Tailwind v4 emits
-  only the utilities it can SEE used, and it scans the CSS file's own directory by
-  default — which here is e2e/, where no view lives. Without these two lines the
-  build would emit no `sticky`, no `top-0`, no `z-50`, every lab page would lay out
-  as static flow, and the paint specs would pass over a page with no pinned header
-  at all. That is a green lane observing nothing, so the specs assert the computed
-  `position` before they assert anything about movement.
+  The one @source here is the dummy app's own views, the lab's equivalent of a
+  host scanning its own app/views. Tailwind v4 emits only the utilities it can
+  SEE used, and it scans the CSS file's own directory by default, which here is
+  e2e/, where no view lives. Without it the lab pages' own markup would compile
+  to nothing, and the paint specs would pass over a page with no pinned header
+  at all. That is a green lane observing nothing, so the specs assert the
+  computed `position` before they assert anything about movement.
+
+  Note what is NOT here: no `@source "../app/views"`. The engine's views reach
+  this build only through engine.css, exactly as they reach a host's, so a lab
+  page that renders an engine partial unstyled means the engine's own scan
+  broke, not this file.
 */
 @import "tailwindcss";
 
-@config "../tailwind/studio.tailwind.config.js";
-
-@source "../app/views";
 @source "../test/dummy/app/views";
 
 @import "../app/assets/tailwind/studio_engine/engine.css";
-
-/*
-  And the OPT-IN motion / effect / action layer, exactly as a consuming app opts
-  into it (turf-monster compiles it to builds/tailwind/studio_engine_motion.css
-  and imports that). Without this line the lab serves pages where .fizz-bit has
-  no animation and .hold-stack no isolation — every computed style the hold
-  button's specs read comes back a browser default, which is a lane observing
-  nothing. The same reasoning as the @source lines above: compile what the apps
-  compile, or grade CSS that ships nowhere.
-*/
-@import "../app/assets/tailwind/studio_engine/engine-motion.css";

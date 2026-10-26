@@ -15,7 +15,7 @@ require "action_view"
 # partial that grows a `btn-ghost` fails this suite until the CSS ships too.
 class ComponentCssTest < Minitest::Test
   CSS_PATH = File.expand_path("../../app/assets/tailwind/studio_engine/engine.css", __dir__)
-  PRESET_PATH = File.expand_path("../../tailwind/studio.tailwind.config.js", __dir__)
+  PRESET_PATH = File.expand_path("../../app/assets/tailwind/studio_engine/theme.css", __dir__)
 
   # Everything that can reference a component class: ERB views, Ruby helpers
   # (a helper growing a btn-* class must not slip the invariant), and the
@@ -105,8 +105,8 @@ class ComponentCssTest < Minitest::Test
 
   def test_preset_defines_2xs_and_3xs_font_sizes
     preset = File.read(PRESET_PATH)
-    assert_match(/fontSize:\s*\{[^}]*'2xs':\s*'0\.6875rem'/m, preset, "preset must define text-2xs (11px)")
-    assert_match(/fontSize:\s*\{[^}]*'3xs':\s*'0\.625rem'/m, preset, "preset must define text-3xs (10px)")
+    assert_match(/--text-2xs:\s*0\.6875rem;/, preset, "theme.css must define text-2xs (11px)")
+    assert_match(/--text-3xs:\s*0\.625rem;/, preset, "theme.css must define text-3xs (10px)")
   end
 
   def test_gem_packages_the_stylesheet

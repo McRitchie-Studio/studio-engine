@@ -44,7 +44,7 @@ class ResendFooterErrorContrastTest < ActiveSupport::TestCase
   # Reads the committed tree, so it locates both files from itself rather than
   # through an app — same idiom as test/views/profile_partial_utility_guard_test.rb.
   PARTIAL = File.expand_path("../../app/views/studio/modals/auth/_resend_footer.html.erb", __dir__)
-  CONFIG  = File.expand_path("../../tailwind/studio.tailwind.config.js", __dir__)
+  CONFIG  = File.expand_path("../../app/assets/tailwind/studio_engine/theme.css", __dir__)
 
   # turf-monster's REAL configured palette: config/initializers/studio.rb sets
   # theme_primary and theme_accent only, so every other role takes the engine
@@ -100,15 +100,12 @@ class ResendFooterErrorContrastTest < ActiveSupport::TestCase
 
   # ── how a token becomes a colour ───────────────────────────────────────────
 
-  # The `text-<name>` → CSS-var map is READ from the shared Tailwind config, not
+  # The `text-<name>` → CSS-var map is READ from the shared Tailwind theme, not
   # restated here: that file is what the class actually compiles from, so a
   # restatement could go stale against the very thing it claims to describe.
   def text_colour_vars
     @text_colour_vars ||=
-      File.read(CONFIG)[/textColor:\s*\{(.*?)\n\s*\},/m, 1]
-          .to_s
-          .scan(/'?([A-Za-z0-9-]+)'?:\s*'var\((--[a-z0-9-]+)\)'/)
-          .to_h
+      File.read(CONFIG).scan(/--text-color-([a-z0-9-]+):\s*var\((--[a-z0-9-]+)\);/).to_h
   end
 
   def theme_vars(scheme)
@@ -131,7 +128,7 @@ class ResendFooterErrorContrastTest < ActiveSupport::TestCase
     else
       flunk("`text-#{token}` is on the alert paragraph and this guard cannot resolve it to a " \
             "colour, so it cannot measure it. Teach STATIC_HEX its hex, or register the token " \
-            "in tailwind/studio.tailwind.config.js under textColor — do NOT widen NON_COLOUR " \
+            "in app/assets/tailwind/studio_engine/theme.css as --text-color-<name> — do NOT widen NON_COLOUR " \
             "unless it genuinely paints nothing.")
     end
   end

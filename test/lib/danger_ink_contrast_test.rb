@@ -97,10 +97,10 @@ class DangerInkContrastTest < ActiveSupport::TestCase
   end
 
   # The token is worthless if no utility renders it.
-  def test_the_tailwind_config_exposes_a_text_danger_ink_utility
-    config = File.read(File.expand_path("../../tailwind/studio.tailwind.config.js", __dir__))
+  def test_the_tailwind_theme_exposes_a_text_danger_ink_utility
+    theme = File.read(File.expand_path("../../app/assets/tailwind/studio_engine/theme.css", __dir__))
 
-    assert_match(/'danger-ink':\s*'var\(--color-danger-ink\)'/, config,
+    assert_match(/--text-color-danger-ink:\s*var\(--color-danger-ink\);/, theme,
                  "--color-danger-ink is emitted but no text-danger-ink utility maps to it, so " \
                  "nothing can use it")
   end
