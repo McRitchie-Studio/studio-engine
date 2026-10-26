@@ -42,8 +42,12 @@ class ComponentCssBundleTest < ActiveSupport::TestCase
     assert File.exist?(entry),
       "tailwindcss-rails did not generate the studio_engine entry point"
 
-    engine_css = Studio::Engine.root.join("app/assets/tailwind/studio_engine/engine.css")
-    assert_includes File.read(entry), %(@import "#{engine_css}";),
-      "generated entry point must @import the engine's component stylesheet"
+    # The entry imports host.css, which imports engine.css first
+    # (Studio::TailwindEntry; test/integration/tailwind_entry_test.rb).
+    host_css = Studio::Engine.root.join("app/assets/tailwind/studio_engine/host.css")
+    assert_includes File.read(entry), %(@import "#{host_css}";),
+      "generated entry point must @import the engine's host entry"
+    assert_match(/^@import "\.\/engine\.css";/, File.read(host_css),
+      "host.css must bring the engine's component stylesheet")
   end
 end
