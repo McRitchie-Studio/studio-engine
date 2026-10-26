@@ -21,8 +21,8 @@
      app/views/style/_host.html.erb.
 
      Specimens use ONLY the engine's own classes (engine.css component layer plus
-     engine-motion.css motion/effect/leveling layer), so a consumer that bundles
-     engine.css and imports engine-motion.css styles them for real. The primitive
+     engine-motion.css motion/effect/leveling layer), so a consumer that imports
+     engine.css (which brings engine-motion.css) styles them for real. The primitive
      CSS is NOT inlined here - the consumer's Tailwind build provides it. Page
      chrome uses the engine's own .card / .label-upper / theme tokens. %>
 <%

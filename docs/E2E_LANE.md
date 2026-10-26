@@ -331,9 +331,17 @@ revocation and expiry are covered by the node harness and by
 
 ## What the lane's OWN Tailwind build cannot see
 
-`e2e/tailwind_input.css` carries `@source "../app/views"`, so the lane compiles
-the **engine's own views**. That is what makes the lab pages render at all — and
-it is also a blind spot with a measured cost.
+> **Since the CSS-first Tailwind change this blind spot is closed at its
+> source.** `engine.css` itself carries the `@source` lines for the engine's
+> views, components, helpers and scripts, so every host that imports it
+> compiles the same engine classes the lane does, and `e2e/tailwind_input.css`
+> no longer scans `../app/views` on its own. A host still on the deprecated
+> `@config` preset gets them too, because the import is the same. The history
+> below is kept for the rule it produced, which still holds.
+
+`e2e/tailwind_input.css` carried `@source "../app/views"`, so the lane compiled
+the **engine's own views**. That is what made the lab pages render at all, and
+it was also a blind spot with a measured cost.
 
 **A consuming app does not scan the gem's views.** The engine ships a prebuilt
 bundle, and a Tailwind utility exists in a consumer only if that consumer's own
