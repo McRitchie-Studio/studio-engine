@@ -144,10 +144,12 @@ class TailwindProbeBuildTest < Minitest::Test
     end
   end
 
-  def test_the_js_preset_and_the_shell_out_are_gone
+  # The engine reads no JS preset and runs no bundler from Node. The preset
+  # file itself survives one release as a deprecated shim for hosts still on
+  # `@config` (tailwind_preset_parity_test.rb), but nothing the engine ships
+  # imports it, and no shipped code resolves the gem by shelling out.
+  def test_the_engine_reads_no_js_preset_and_runs_no_shell_out
     root = B::ROOT
-    refute File.exist?(File.join(root, "tailwind/studio.tailwind.config.js")), "the JS preset is back"
-
     spec = Dir.chdir(root) { Gem::Specification.load(File.join(root, "studio-engine.gemspec")) }
     code = spec.files.select { |f| %w[.css .js .rb .erb].include?(File.extname(f)) }
     assert_operator code.size, :>, 200, "the gemspec scan found too few files to mean anything"
@@ -157,6 +159,9 @@ class TailwindProbeBuildTest < Minitest::Test
       (File.extname(f) == ".css" && src.match?(/^\s*@config\b/)) || src.include?("bundle show") || src.include?("execSync")
     end
     assert_empty offenders, "shipped code still carries an @config line or a bundler shell-out"
+
+    importers = code.select { |f| File.read(File.join(root, f)).match?(/require\(.*studio\.tailwind\.config/) }
+    assert_empty importers, "engine code requires the deprecated JS preset"
   end
 
   private
