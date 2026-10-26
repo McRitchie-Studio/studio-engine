@@ -15,15 +15,17 @@
      The color tokens/swatches now live in the Theme section (the landing section
      owns "the colors"); this section is the trick board. %>
 <%
+  # Keyed by the WHOLE class, never "btn-" + a name: Tailwind compiles only the
+  # @utility names it can read in source.
   button_variants = {
-    "primary"   => "Primary",
-    "secondary" => "Secondary",
-    "success"   => "Success",
-    "danger"    => "Danger",
-    "warning"   => "Warning",
-    "neutral"   => "Neutral",
-    "outline"   => "Outline",
-    "google"    => "Continue with Google"
+    "btn-primary"   => "Primary",
+    "btn-secondary" => "Secondary",
+    "btn-success"   => "Success",
+    "btn-danger"    => "Danger",
+    "btn-warning"   => "Warning",
+    "btn-neutral"   => "Neutral",
+    "btn-outline"   => "Outline",
+    "btn-google"    => "Continue with Google"
   }
 
   leveling_on = Studio.feature?(:leveling)
@@ -51,9 +53,9 @@
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <% button_variants.each do |name, label| %>
         <%= render layout: "style/specimen",
-              locals: { klass: ".btn .btn-#{name}",
-                        usage: %(<button class="btn btn-#{name}">#{label}</button>) } do %>
-          <button type="button" class="btn btn-<%= name %>"><%= label %></button>
+              locals: { klass: ".btn .#{name}",
+                        usage: %(<button class="btn #{name}">#{label}</button>) } do %>
+          <button type="button" class="btn <%= name %>"><%= label %></button>
         <% end %>
       <% end %>
 

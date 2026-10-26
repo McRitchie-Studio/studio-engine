@@ -2,14 +2,14 @@
   studio-engine THEME — the shared Tailwind v4 design tokens, CSS-first.
 
   This file replaced tailwind/studio.tailwind.config.js (the JS preset every
-  consumer spread through `@config`, after shelling out to `bundle show
-  studio-engine` to find it). engine.css imports it, so a consumer gets these
-  tokens from the same one line that brings the component layer:
+  consumer spread through `@config`, after shelling out to bundler from Node to
+  find the gem). engine.css imports it, so a consumer gets these tokens from
+  the same one line that brings the component layer:
 
       @import "tailwindcss";
       @import "../builds/tailwind/studio_engine";
 
-  No `@config`, no Node `execSync`, no generated motion entry.
+  No `@config`, no bundler call from Node, no generated motion entry.
 
   WHY `@theme inline`. Every runtime token here (surface, heading, the primary
   ladder, the status inks) is a CSS custom property that studio_theme_css_tag

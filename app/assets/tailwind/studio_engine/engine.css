@@ -20,8 +20,8 @@
   - the motion / effect / leveling layer (engine-motion.css, imported at the
     end), which used to need a per-host rake task to reach the build.
   A host never resolves the gem's path itself: tailwindcss-rails writes the
-  `builds/tailwind/studio_engine.css` entry from Ruby, so no Node `execSync`
-  of `bundle show studio-engine` is involved. Recipe: README, "Tailwind".
+  `builds/tailwind/studio_engine.css` entry from Ruby, so Node never runs
+  bundler to find the gem. Recipe: README, "Tailwind".
 
   Requirements:
   - Tailwind v4 (this file uses @utility, so classes sort/override correctly
