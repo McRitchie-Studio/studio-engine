@@ -1,0 +1,138 @@
+/*
+  studio-engine THEME — the shared Tailwind v4 design tokens, CSS-first.
+
+  This file replaced tailwind/studio.tailwind.config.js (the JS preset every
+  consumer spread through `@config`, after shelling out to `bundle show
+  studio-engine` to find it). engine.css imports it, so a consumer gets these
+  tokens from the same one line that brings the component layer:
+
+      @import "tailwindcss";
+      @import "../builds/tailwind/studio_engine";
+
+  No `@config`, no Node `execSync`, no generated motion entry.
+
+  WHY `@theme inline`. Every runtime token here (surface, heading, the primary
+  ladder, the status inks) is a CSS custom property that studio_theme_css_tag
+  writes per app and per theme. A plain `@theme` would ALSO declare
+  `--color-surface: var(--color-surface)` on :root — a self-reference, which is
+  invalid — and would put Tailwind's copy in a cascade race with the theme tag.
+  `inline` makes each utility carry the value itself (`bg-surface` compiles to
+  `background-color: var(--color-surface)`, exactly what the JS preset
+  compiled to) and declares nothing on :root.
+
+  WHY THE PER-UTILITY NAMESPACES. The status roles are deliberately NOT plain
+  colours. A bare role colour as text (text-danger, text-warning, text-success)
+  fails WCAG AA on one theme or the other, so it must stay uncompilable; the
+  text inks (*-ink, derived per theme by ThemeResolver#contrast_ink) are the
+  text spelling. Tailwind v4 reads `--text-color-*`, `--background-color-*` and
+  `--border-color-*` for ONLY that utility family, so registering a fill there
+  cannot mint the text utility, the same split the preset's textColor /
+  backgroundColor / borderColor keys made.
+*/
+
+/* darkMode: 'class' — the theme tag toggles .dark on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  /* fontFamily — REPLACED, not extended (the preset set theme.fontFamily). */
+  --font-*: initial;
+  --font-sans: Montserrat, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, monospace;
+
+  /* Sub-xs type scale for dense UI (badges, meta rows, tick labels). Bare
+     sizes, no line-height, so text-2xs / text-3xs are drop-in replacements for
+     the text-[11px] / text-[10px] arbitrary values. */
+  --text-2xs: 0.6875rem; /* 11px */
+  --text-3xs: 0.625rem;  /* 10px */
+
+  /* Theme-aware semantic surfaces (studio_theme_css_tag). */
+  --color-page: var(--color-page);
+  --color-surface: var(--color-surface);
+  --color-surface-alt: var(--color-surface-alt);
+  --color-inset: var(--color-inset);
+
+  /* The dynamic primary palette, from the theme's primary role. The -rgb
+     triples are space lists, so `rgb(var(--x-rgb))` is valid and Tailwind's
+     opacity modifier (bg-primary/20) mixes it. */
+  --color-primary: rgb(var(--color-primary-rgb));
+  --color-primary-50: rgb(var(--color-primary-50-rgb));
+  --color-primary-100: rgb(var(--color-primary-100-rgb));
+  --color-primary-200: rgb(var(--color-primary-200-rgb));
+  --color-primary-300: rgb(var(--color-primary-300-rgb));
+  --color-primary-400: rgb(var(--color-primary-400-rgb));
+  --color-primary-500: rgb(var(--color-primary-500-rgb));
+  --color-primary-600: rgb(var(--color-primary-600-rgb));
+  --color-primary-700: rgb(var(--color-primary-700-rgb));
+  --color-primary-800: rgb(var(--color-primary-800-rgb));
+  --color-primary-900: rgb(var(--color-primary-900-rgb));
+
+  /* Brand palettes. */
+  --color-mint: #06D6A0;
+  --color-mint-50: #e6faf4;
+  --color-mint-100: #b3f0de;
+  --color-mint-200: #80e6c8;
+  --color-mint-300: #4ddcb2;
+  --color-mint-400: #1ad29c;
+  --color-mint-500: #06D6A0;
+  --color-mint-600: #05b888;
+  --color-mint-700: #049a70;
+  --color-mint-800: #037c58;
+  --color-mint-900: #025e40;
+
+  --color-navy: #1A1535;
+  --color-navy-50: #e8e7ed;
+  --color-navy-100: #b8b5c8;
+  --color-navy-200: #8883a3;
+  --color-navy-300: #58517e;
+  --color-navy-400: #3a3359;
+  --color-navy-500: #1A1535;
+  --color-navy-600: #16122e;
+  --color-navy-700: #120f27;
+  --color-navy-800: #0e0c20;
+  --color-navy-900: #0a0919;
+
+  --color-violet: #8E82FE;
+  --color-violet-50: #f0eeff;
+  --color-violet-100: #EAE8FF;
+  --color-violet-200: #b2aafe;
+  --color-violet-300: #C5C0FE;
+  --color-violet-400: #8E82FE;
+  --color-violet-500: #8E82FE;
+  --color-violet-600: #6558e5;
+  --color-violet-700: #6558E0;
+  --color-violet-800: #3b2cb3;
+  --color-violet-900: #3D2FB5;
+
+  --color-mist: #F7F6FF;
+  --color-lavender: #E8E6F0;
+  --color-slate: #6B6580;
+  --color-charcoal: #2D2648;
+  --color-midnight: #120F28;
+  --color-ember: #FF8C69;
+  --color-gold: #FFD166;
+  --color-magenta: #F72585;
+
+  /* Text-only tokens. */
+  --text-color-heading: var(--color-text);
+  --text-color-body: var(--color-text-body);
+  --text-color-secondary: var(--color-text-secondary);
+  --text-color-muted: var(--color-text-muted);
+  /* The status roles as TEXT, held to AA on every surface. There is
+     deliberately NO text-danger, text-warning or text-success. */
+  --text-color-danger-ink: var(--color-danger-ink);
+  --text-color-warning-ink: var(--color-warning-ink);
+  --text-color-success-ink: var(--color-success-ink);
+  /* The primary role as chip text; text-primary stays the brand colour. */
+  --text-color-primary-ink: var(--color-primary-ink);
+
+  /* The status-role FILLS, for backgrounds and borders ONLY. */
+  --background-color-success: var(--color-success);
+  --background-color-warning: var(--color-warning);
+  --background-color-danger: var(--color-danger);
+
+  --border-color-subtle: var(--color-border);
+  --border-color-strong: var(--color-border-strong);
+  --border-color-success: var(--color-success);
+  --border-color-warning: var(--color-warning);
+  --border-color-danger: var(--color-danger);
+}
