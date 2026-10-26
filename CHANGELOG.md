@@ -20,8 +20,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   compiles only what it names. A host needs no `@config`, no
   content glob over the gem found by a bundler call from Node, no safelist,
   and no motion rake task. The recipe for a host still on `@config`:
-  README, "Tailwind". Hosts adopt on their own cards; nothing changes for one
-  until it does.
+  README, "Tailwind". Hosts adopt on their own cards. A host that only bumps
+  the gem still builds, with no class lost, but its CSS grows by the motion
+  layer (about 44 KB unminified; McRitchie Industries, Cyvasse and Moms App
+  get it for the first time) and the classes the new `@source` lines find.
 - **Engine classes are spelled whole, so the scan finds them.** The modal
   blocks' `icon_color:` and `color:` tones (`_card_header`, `_success_card`,
   `_processing_card`) are literal maps rather than `bg-<%= tone %>/15`, which
@@ -61,7 +63,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   (no `@config`), with `motion:`, `sources:` and `with_variant` for controls.
 - `tailwind_probe_build_test.rb`: the tokens compile from `@theme` (and the
   bare `text-<role>` still does not), the motion layer arrives through
-  `engine.css`, and dropping the views, components or JavaScript `@source`
+  `host.css`, and dropping the views, components or JavaScript `@source`
   line loses classes only that directory emits.
 - `component_tailwind_source_test.rb`: every class the five emitting
   directories name, read independently of Tailwind's scanner, is in a
