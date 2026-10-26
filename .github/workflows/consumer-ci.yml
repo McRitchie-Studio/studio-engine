@@ -307,9 +307,22 @@ jobs:
       # before the step bound existed, once for 10 after — while the other
       # consumers passed on the identical commit.
       #
-      # Each attempt is bounded on its own (`timeout`), so a HANG is retried
-      # rather than waited out; a healthy install takes well under a minute, and
-      # the worst case is two bounded attempts inside the step's own 13.
+      # Measured again on 2026-10-26 (release 0.114.2, run 40380540695): apt-get
+      # update answered fine, then the ~41 MB download stalled MID-TRANSFER and
+      # `timeout 240` killed it on both attempts, six reruns running, with no test
+      # ever reached. So three layers now, cheapest first:
+      #
+      #   1. The .debs are CACHED (the restore step below): a warm run downloads
+      #      nothing from the mirror but the package index.
+      #   2. apt itself fails a silent connection in 30s and re-fetches it
+      #      (Acquire::*::Timeout, Acquire::Retries), so one stalled socket
+      #      costs half a minute, not the whole attempt.
+      #   3. Three outer attempts, each bounded by `timeout -k 10` (SIGTERM, then
+      #      SIGKILL for a wedged apt), with `dpkg --configure -a` between them so
+      #      a half-unpacked attempt cannot fail the next one.
+      #
+      # The archive dir lives under $HOME so actions/cache can read and write it;
+      # the chown hands the root-written files back to the runner before the save.
       # librsvg2-bin: ImageMagick 6 reads SVG only through rsvg-convert, and the
       # hub's test/lib/workspace_icon_render_test.rb (landed 2026-09-25) renders
       # an SVG mark. The hub's own ci.yml installs it; without it here every
@@ -318,16 +331,39 @@ jobs:
       # main 2026-10-05) stitches video for real and refuses to skip without
       # ffmpeg and ffprobe; the hub's ci.yml installs it for the same reason.
       # Without it here every engine PR fails mcritchie_studio shard 4/4.
+      # ImageOS/ImageVersion are runner env vars, not the `env` context, so a
+      # step has to surface them before a cache key can name the image.
+      - name: Read runner image
+        id: runner-image
+        run: echo "id=${ImageOS}-${ImageVersion}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore apt package cache
+        uses: actions/cache@v4
+        with:
+          path: ~/apt-archives
+          # Runner image + the sorted package list. A new image week saves a
+          # fresh entry; restore-keys seeds it from the last one, so only the
+          # .debs that actually changed are fetched.
+          key: apt-${{ steps.runner-image.outputs.id }}-ffmpeg-imagemagick-libpq-dev-librsvg2-bin-libvips-postgresql-client
+          restore-keys: |
+            apt-ubuntu24-
+
       - name: Install system packages
-        timeout-minutes: 13
+        # 3 x (120s index + 420s fetch) + pauses, inside the 45-minute job.
+        timeout-minutes: 30
         run: |
-          for attempt in 1 2; do
-            if timeout 120 sudo apt-get update && \
-               timeout 240 sudo apt-get install --no-install-recommends -y \
-                 libpq-dev libvips imagemagick librsvg2-bin postgresql-client ffmpeg; then
+          mkdir -p "$HOME/apt-archives/partial"
+          APT_OPTS=(-o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+                    -o Dir::Cache::Archives="$HOME/apt-archives" -o APT::Keep-Downloaded-Packages=true)
+          for attempt in 1 2 3; do
+            if sudo timeout -k 10 120 apt-get "${APT_OPTS[@]}" update && \
+               sudo timeout -k 10 420 apt-get "${APT_OPTS[@]}" install --no-install-recommends -y \
+                 ffmpeg imagemagick libpq-dev librsvg2-bin libvips postgresql-client; then
+              sudo chown -R "$(id -u):$(id -g)" "$HOME/apt-archives"
               exit 0
             fi
             echo "::warning::apt attempt $attempt failed or hung; retrying"
+            sudo dpkg --configure -a || true
             sleep 10
           done
           exit 1
