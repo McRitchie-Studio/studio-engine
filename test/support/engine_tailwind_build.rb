@@ -35,9 +35,18 @@ module EngineTailwindBuild
   #
   # motion: false compiles engine.css with its motion import removed, so a
   # caller can still ask which classes ONLY the motion layer defines.
+  # sources: false removes engine.css's @source lines, so the build carries
+  # only what the probe names: the way to ask "what do these tokens add?".
   # engine_css: compiles a variant of engine.css instead (see #with_variant).
-  def compile(tokens, motion: true, engine_css: nil)
-    return with_variant(->(css) { strip_line(css, MOTION_IMPORT) }) { |path| compile(tokens, engine_css: path) } unless motion
+  def compile(tokens, motion: true, sources: true, engine_css: nil)
+    unless motion && sources
+      transform = lambda do |css|
+        css = strip_line(css, MOTION_IMPORT) unless motion
+        css = strip_sources(css) unless sources
+        css
+      end
+      return with_variant(transform) { |path| compile(tokens, engine_css: path) }
+    end
 
     Dir.mktmpdir("studio-engine-tw") do |dir|
       probe = File.join(dir, "probe.html")
@@ -73,6 +82,11 @@ module EngineTailwindBuild
     raise ArgumentError, "engine.css carries no #{line.inspect}" unless css.include?(line)
 
     css.sub(line, "")
+  end
+
+  # `css` with every @source line (sources and exclusions) removed.
+  def strip_sources(css)
+    css.lines.reject { |l| l.start_with?("@source") }.join
   end
 
   def build(dir)
@@ -126,10 +140,8 @@ module EngineTailwindBuild
   def emitted_classes
     @emitted_classes ||= begin
       tokens = EMITTING_DIRS.to_h { |dir| [dir, emitting_files(dir).flat_map { |f| tokens_in(f) }.uniq] }
-      with_variant(->(css) { css.lines.reject { |l| l.start_with?("@source") }.join }) do |bare|
-        floor = classes_in_css(compile([], engine_css: bare))
-        tokens.transform_values { |list| classes_in_css(compile(list, engine_css: bare)) - floor }
-      end
+      floor = classes_in_css(compile([], sources: false))
+      tokens.transform_values { |list| classes_in_css(compile(list, sources: false)) - floor }
     end
   end
 
