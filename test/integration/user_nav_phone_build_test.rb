@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require_relative "../support/engine_tailwind_build"
 require "tmpdir"
 require "open3"
 require "tailwindcss/ruby"
@@ -8,8 +9,8 @@ require "tailwindcss/ruby"
 # [integration] The user nav's phone behaviour is built from responsive
 # utilities that nothing else in the engine used before engine-navbar-phone-polish
 # (md:not-sr-only and md:max-w-40). A utility only ships if a consumer's Tailwind
-# build emits it, so compile the way a consumer does — the engine's own views as
-# the glob, engine.css imported — and require each one, with its declaration,
+# build emits it, so compile the way a consumer does — host.css imported, its
+# own @source lines the only route to the views — and require each one, with its declaration,
 # inside a 768px media block.
 class UserNavPhoneBuildTest < Minitest::Test
   ROOT = File.expand_path("../..", __dir__)
@@ -63,25 +64,9 @@ class UserNavPhoneBuildTest < Minitest::Test
 
   private
 
+  # A host-shaped build with NO host content: the engine's views reach it only
+  # through host.css's own @source lines.
   def compile_consumer_style_build
-    Dir.mktmpdir("studio-engine-user-nav") do |dir|
-      File.write(File.join(dir, "tailwind.config.js"), <<~JS)
-        const studio = require('#{ROOT}/tailwind/studio.tailwind.config.js')
-        module.exports = {
-          content: ['#{ROOT}/app/views/**/*.{erb,html}'],
-          theme: studio.theme
-        }
-      JS
-      File.write(File.join(dir, "input.css"), <<~CSS)
-        @import 'tailwindcss';
-        @config '#{dir}/tailwind.config.js';
-        @import '#{ROOT}/app/assets/tailwind/studio_engine/engine.css';
-      CSS
-
-      out_path = File.join(dir, "out.css")
-      _stdout, stderr, status = Open3.capture3(Tailwindcss::Ruby.executable, "-i", File.join(dir, "input.css"), "-o", out_path)
-      assert status.success?, "tailwind build failed:\n#{stderr}"
-      File.read(out_path)
-    end
+    EngineTailwindBuild.compile([])
   end
 end

@@ -29,6 +29,24 @@ require_relative "modal_blocks_baseline_cases"
 class ModalBlocksBaselineTest < ActiveSupport::TestCase
   GOLDENS = File.expand_path("../fixtures/files/modal_blocks_0.113.0", __dir__)
 
+  # DELIBERATE departures from 0.113.0, each applied to the golden before the
+  # comparison, so the goldens stay 0.113.0's own bytes and every change is
+  # named here with its reason. Each must still match some golden
+  # (test_every_intended_change_still_applies), so a stale entry fails.
+  #
+  # engine-tailwind-css-first-config: the success check's ink. 0.113.0 built
+  # `text-<%= icon_color %>`, so a success check wrote `text-success`, which the
+  # theme leaves uncompilable on purpose (a bare role colour fails AA as text):
+  # the "green check" painted the inherited colour in every host. The tones are
+  # now a literal map, and success uses the AA ink.
+  INTENDED_CHANGES = [
+    ['<svg class="w-7 h-7 text-success" ', '<svg class="w-7 h-7 text-success-ink" ']
+  ].freeze
+
+  def self.as_now_intended(golden)
+    INTENDED_CHANGES.reduce(golden) { |html, (from, to)| html.gsub(from, to) }
+  end
+
   def view
     v = ActionView::Base.with_empty_template_cache.with_view_paths([File.expand_path("../../app/views", __dir__)])
     v.extend(Studio::Engine.helpers)
@@ -42,10 +60,17 @@ class ModalBlocksBaselineTest < ActiveSupport::TestCase
       golden = File.join(GOLDENS, "#{name}.html")
       assert File.exist?(golden), "#{name} has no 0.113.0 golden; render it from the released gem"
 
-      expected = File.binread(golden).force_encoding(Encoding::UTF_8)
+      expected = self.class.as_now_intended(File.binread(golden).force_encoding(Encoding::UTF_8))
       actual = ModalBlocksBaselineCases.render(view, partial, locals, block).to_str
 
       assert_equal expected, actual, "#{partial} with only 0.113.0's locals no longer renders as 0.113.0 did"
+    end
+  end
+
+  def test_every_intended_change_still_applies
+    goldens = Dir[File.join(GOLDENS, "*.html")].map { |f| File.binread(f).force_encoding(Encoding::UTF_8) }
+    INTENDED_CHANGES.each do |from, _to|
+      assert goldens.any? { |html| html.include?(from) }, "#{from.inspect} matches no golden; delete the entry"
     end
   end
 

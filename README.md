@@ -45,6 +45,91 @@ resolved.
 - **Booking**: a simple scheduler on Google Calendar appointment schedules, with or without the footer. With `config.booking_url`, `studio_booking_frame` embeds Google's booking page, `studio_booking_link` opens it in a popup, and `config.draw_booking_routes = true` draws `/schedule` (or name the app's own page with `config.booking_path`). `config.booking_crop` crops the frame to the slot picker at rest, from numbers `bin/booking-crop-measure` reads off the app's own schedule. See [`docs/BOOKING.md`](docs/BOOKING.md).
 - **Surveys**: define a survey in app code (`config/surveys/*.rb`, `Studio.define_survey`) with six question types — emoji scale, 1–5 rating, single and multiple choice, short and long text — and the engine serves it at `/surveys/:slug`: one question per screen, autosave, resume, keyboard shortcuts, and a no-JavaScript fallback. `config.on_survey_completed` and `config.survey_ref_resolver` let the app fire its own goals and attribute email arrivals. An admin panel at `/admin/surveys` breaks results down per question and exports CSV. Opt in with `config.draw_survey_routes = true` and `config.draw_admin_survey_routes = true`. See [`docs/SURVEYS.md`](docs/SURVEYS.md).
 
+## Tailwind
+
+The engine's Tailwind 4 layer is CSS-first. A host's whole adoption is two
+lines in `app/assets/tailwind/application.css`:
+
+```css
+@import "tailwindcss";
+@import "../builds/tailwind/studio_engine";
+```
+
+tailwindcss-rails writes `app/assets/builds/tailwind/studio_engine.css` from
+Ruby on every build and watch (`bin/rails tailwindcss:engines` by hand), as an
+absolute `@import` of the gem's `engine.css`. The engine then points that entry
+at `app/assets/tailwind/studio_engine/host.css` (`Studio::TailwindEntry` wraps
+the contract's `bundle`), and that one import brings everything a host used to
+wire by hand:
+
+| What | Where it lives | What it replaced |
+|------|----------------|------------------|
+| The design tokens (surfaces, inks, the primary ladder, brand palettes, `text-2xs`/`text-3xs`, Montserrat) and the class-based `dark:` variant | `theme.css`, `@theme inline reference` | `tailwind/studio.tailwind.config.js` and the host's `@config` |
+| The scan of every engine directory that emits a class (views, components, helpers, both JavaScript trees) | `host.css`, `@source` | the host's content glob over the gem's views, found with a bundler call from Node |
+| Every engine class, with no safelist | the scan above; no class is assembled at render time | the host's primary-colour safelist (about 240 classes) |
+| The motion, effect and leveling primitives (`.spinner`, `.hold-btn`, `.level-badge-*`, ...) | `engine-motion.css`, imported last by `host.css` | `lib/tasks/tailwindcss_engine_motion.rake` and its `studio_engine_motion` import |
+
+`test/integration/tailwind_probe_build_test.rb` and
+`test/integration/component_tailwind_source_test.rb` build the engine exactly as
+a host does and hold all four; `test/integration/tailwind_entry_test.rb` runs
+the real `Tailwindcss::Engines.bundle` and reads the entry it leaves.
+
+`engine.css` on its own stays the narrow layer: the theme and the component
+`@utility` definitions, with no `@source` and no motion. A build that imports it
+by path, such as the hub's client kit (`ClientApps::StudioKit::Css`, held to
+100 KB), compiles only the classes it names.
+
+### Migrating a host from `@config`
+
+Hosts adopt on their own cards (hub, Turf Monster, Rolio, chain-ops, Rantly,
+McRitchie Industries, Cyvasse, Moms App). Until each one does, it keeps
+building unchanged: `tailwind/studio.tailwind.config.js` stays one release as a
+deprecated shim, and `test/integration/tailwind_preset_parity_test.rb` holds it
+to the same utilities as `theme.css`. A host that has bumped the gem but not
+yet migrated gets the motion layer twice (once through `host.css`, once
+through its own generated import). The duplicate is harmless and goes with
+step 3.
+
+1. **Bump** `studio-engine` to the release that carries this section.
+2. **`application.css`**: delete the `@config` line. Keep `@import
+   "tailwindcss";` and `@import "../builds/tailwind/studio_engine";` first.
+3. **Motion**: delete `@import "../builds/tailwind/studio_engine_motion";`,
+   `lib/tasks/tailwindcss_engine_motion.rake` and the generated
+   `app/assets/builds/tailwind/studio_engine_motion.css`.
+4. **`config/tailwind.config.js`**: delete it, moving only what is the host's
+   own into `application.css`:
+   - **`content:`** goes. Tailwind 4 detects the app's own sources from the
+     project root and skips what `.gitignore` names; the engine scans itself.
+     If CI or Heroku installs gems into `vendor/bundle` inside the app, exclude
+     only their Markdown: `@source not "../../../vendor/bundle/**/*.md";`.
+     Never exclude the whole directory: the gem lives under it there, and the
+     hub's build once lost every engine class that way. A file the default scan
+     misses (say `config/initializers/studio.rb` carrying navbar word classes)
+     takes its own `@source` line.
+   - **`safelist`** goes. The engine's own classes no longer need it. If a host
+     class is genuinely data-driven, spell its variants whole in source; as a
+     last resort, `@source inline()` takes brace expansion. The hub's whole
+     safelist is
+     `@source inline("{bg,text,border}-primary{,-{50,{100..900..100}}}{,/{5,10,20,30,40,50}}");`
+     (231 classes).
+   - **`theme` extensions** become `@theme inline { ... }` after the engine
+     import: a screen is `--breakpoint-pill-narrow: 530px;`, a palette is
+     `--color-warning-500: #FF7C47;`, and a text-only colour is
+     `--text-color-violet-ink: var(--color-violet-ink);` (the same name
+     overrides the engine's, as Turf's `text-primary` does with
+     `--text-color-primary: rgb(var(--color-primary-ink-rgb));`).
+   - **`darkMode: 'class'`** goes; `theme.css` declares it.
+5. **Verify** with `bin/rails tailwindcss:build`, then compare the class set of
+   `app/assets/builds/tailwind.css` before and after. It may only grow (the
+   engine now also scans its helpers and scripts). Spot-check one class from
+   each column above: `.text-heading`, `.btn-primary`, `.spinner`.
+
+When every host has adopted, the shim and the parity test are deleted in one
+engine change. Before that, every reader of the preset has to move, not only
+the build: the hub's `app/services/client_apps/studio_kit/css.rb` reads it at
+runtime to build the client kit CSS, and a few host tests read its text
+(CHANGELOG, Deprecated).
+
 ## Configuration
 
 Each consuming app configures the engine in `config/initializers/studio.rb`:
@@ -503,8 +588,8 @@ Two things that will bite you:
   tick *after* the stack empties, so a bare `.id` throws on every close.
 
 The scoped host takes its animations from `engine-motion.css` rather than an
-inline copy, so a consumer bundling that layer gets the same spring as the shared
-host.
+inline copy, so every host (the layer rides the engine's one Tailwind import)
+gets the same spring as the shared host.
 
 It carries the store API below with three deliberate differences: there is no
 `advance()`; `swap()` replaces the top entry immediately rather than running the
@@ -971,14 +1056,12 @@ config.navbar_z_tier = true      # the live header at z-[var(--z-nav)], not z-50
   truncating span with the host's class and nothing else. `navbar_wordmark`
   wins when both are set. Rules: `lib/studio/navbar_brand.rb`.
 - **The word classes live in the host's initializer**
-  (`config/initializers/studio.rb`), which a host's Tailwind scan does not
-  read by default (Turf Monster's `content:` lists `app/views`,
-  `app/helpers`, `app/javascript` and the engine's views). A utility named
-  only there, `text-heading` say, compiles only if some view also uses it.
-  Add the initializer to the scan (`content:`, or `@source` under Tailwind 4),
-  or give the word a class the host's CSS defines (`tm-wordmark`). The same
-  rule as the engine's views glob:
-  [NEW_APP_SETUP.md, section 14](docs/NEW_APP_SETUP.md#14-css-component-classes).
+  (`config/initializers/studio.rb`), which a host's Tailwind scan may not
+  read (a host still on `@config` lists only its `content:` globs). A utility
+  named only there, `text-heading` say, compiles only if some view also uses
+  it. Add the initializer to the scan (`@source "../../../config/initializers/studio.rb";`),
+  or give the word a class the host's CSS defines (`tm-wordmark`). See
+  [Tailwind](#tailwind).
 - `navbar_root_hook` and `navbar_z_tier` are booleans, `false` by default.
 
 ### The account row

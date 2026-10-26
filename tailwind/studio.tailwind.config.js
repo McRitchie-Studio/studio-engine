@@ -1,3 +1,17 @@
+// DEPRECATED — kept for ONE release so consumers can adopt on their own cards.
+//
+// The engine's Tailwind layer is CSS-first: the tokens below now live in
+// app/assets/tailwind/studio_engine/theme.css (@theme), and every host gets
+// them, the engine's @source scan and the motion layer from its one
+// `@import "../builds/tailwind/studio_engine";` line. Nothing in the engine
+// reads this file any more. A host still on `@config` + this preset builds
+// exactly as before; test/integration/tailwind_preset_parity_test.rb holds it
+// to the same utilities as theme.css until it goes.
+//
+// Migration (README, "Tailwind"): drop the host's `@config` line,
+// config/tailwind.config.js, its safelist and lib/tasks/tailwindcss_engine_motion.rake.
+// This file is removed in the release after every consumer has adopted.
+//
 // Shared Tailwind config for all Studio apps
 // Apps spread from this in their own tailwind.config.js
 

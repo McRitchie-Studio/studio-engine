@@ -91,10 +91,12 @@ class SignInOverlayBlurTest < ActiveSupport::TestCase
 
   # What the named classes ADD to a build that names nothing. engine.css's own
   # always-emitted rules appear on both sides and cancel, so a backdrop-filter
-  # somewhere in the engine sheet cannot pass this by accident.
+  # somewhere in the engine sheet cannot pass this by accident. sources: false,
+  # because host.css now scans the engine's views itself, and the overlay's
+  # classes would otherwise be on both sides too.
   def added_css(tokens)
-    (EngineTailwindBuild.compile(tokens, motion: false).lines -
-      EngineTailwindBuild.compile([], motion: false).lines).join
+    (EngineTailwindBuild.compile(tokens, motion: false, sources: false).lines -
+      EngineTailwindBuild.compile([], motion: false, sources: false).lines).join
   end
 
   # sessions/new through ActionView with the request-scoped helpers stubbed, the

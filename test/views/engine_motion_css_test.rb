@@ -106,16 +106,20 @@ class EngineMotionCssTest < Minitest::Test
     end
   end
 
-  def test_layer_stays_opt_in_not_auto_bundled
-    # `Tailwindcss::Engines.bundle` auto-generates a consumer entry ONLY for the
-    # file literally named engine.css. This file is a sibling, and engine.css
-    # must not pull it in — otherwise it would ride the auto-bundle.
-    refute_equal File.basename(ENGINE_CSS_PATH), File.basename(CSS_PATH),
-      "the motion layer must not be named engine.css or it would auto-bundle"
+  # The layer used to be OPT-IN, and this test refuted the import. It now rides
+  # every host's one Tailwind line: host.css, which that line resolves to
+  # (Studio::TailwindEntry), imports it LAST, so the theme and the component
+  # layer it reads are already in scope, as when hosts imported it after.
+  # engine.css itself still does not: it is the narrow layer a build may
+  # import by path (the hub's client kit) without taking motion along.
+  def test_layer_rides_the_host_entry_and_stays_out_of_engine_css
+    host_css = File.read(File.join(File.dirname(ENGINE_CSS_PATH), "host.css"))
+    imports = host_css.scan(/^@import "([^"]+)";/).flatten
+    assert_equal ["./engine.css", "./engine-motion.css"], imports,
+      "host.css must import engine.css first and engine-motion.css last"
 
-    engine_css = File.read(ENGINE_CSS_PATH)
-    refute_match(/@import[^;]*engine-motion/, engine_css,
-      "engine.css must NOT @import engine-motion.css — the motion layer is opt-in")
+    refute_match(/@import[^;]*engine-motion/, File.read(ENGINE_CSS_PATH),
+      "engine.css must stay the narrow layer; the motion import belongs in host.css")
   end
 
   # The hold-to-confirm button + its fizz. The invariants a consumer inherits:

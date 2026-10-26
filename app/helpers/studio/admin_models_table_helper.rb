@@ -12,6 +12,11 @@ module Studio
   #     <td class="px-4 py-3"><%= time_ago_in_words(user.created_at) %> ago</td>
   #   <% end %>
   #
+  # min_width is an inline style, not an arbitrary min-width class: Tailwind compiles
+  # only class names it can read in source, and a width interpolated at render
+  # time is never in source, so the class painted only in a host whose own
+  # markup happened to spell the same width.
+  #
   # The block yields each record and returns that row's <td> cells. Output matches
   # the long-standing markup (id="models-<key>-table", overflow wrapper, hover
   # rows, colspan empty state) so existing view assertions keep passing.
@@ -34,7 +39,7 @@ module Studio
       table = content_tag(:table,
         content_tag(:thead, header_row, class: "bg-surface-alt text-muted text-xs uppercase tracking-wide") +
           content_tag(:tbody, body, class: "divide-y divide-subtle"),
-        id: "models-#{key}-table", class: "w-full min-w-[#{min_width}px] text-sm")
+        id: "models-#{key}-table", class: "w-full text-sm", style: "min-width: #{min_width.to_i}px")
 
       content_tag(:div, table, class: "overflow-x-auto")
     end

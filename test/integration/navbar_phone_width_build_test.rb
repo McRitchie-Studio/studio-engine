@@ -1,27 +1,25 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require_relative "../support/engine_tailwind_build"
 require "tmpdir"
 require "open3"
 require "tailwindcss/ruby"
 
 # [integration] The header's phone-width fix, compiled the way a CONSUMER
-# compiles it — a real Tailwind v4 build whose content glob is the ENGINE'S OWN
-# VIEWS, which is the arrangement every consuming app's config/tailwind.config.js
-# actually uses:
-#
-#     content: ['./app/views/**/*.{erb,html}', …, `${studioPath}/app/views/**/*.{erb,html}`]
+# compiles it — a real Tailwind v4 build whose ONLY route to the engine's views
+# is host.css's own `@source "../../../views"` line, which every host imports.
+# (Hosts used to reach them through a `bundle show studio-engine` content glob in
+# a JS config; that recipe is retired.)
 #
 # WHY THIS TIER EXISTS, AND WHY A MARKUP TEST IS NOT ENOUGH. The fix in
 # layouts/_navbar is half inline CSS (the two width caps, which ship verbatim
 # inside the partial's own <style> element and cannot fail to arrive) and half
 # TAILWIND UTILITIES — min-w-0 on four elements and truncate on two. A utility
 # only exists in a consumer's stylesheet if that consumer's build SAW it used.
-# The engine is a gem: its ERB is not in any app's default glob, it is there
-# only because every consumer opts in with that studioPath line. If a consumer
-# ever drops it — or if Tailwind stops matching a class inside an ERB attribute
-# — `min-w-0` silently resolves to nothing, the min-width: auto floor comes
-# straight back, and the app name spills across the header again.
+# If the @source line goes — or if Tailwind stops matching a class inside an
+# ERB attribute — `min-w-0` silently resolves to nothing, the min-width: auto
+# floor comes straight back, and the app name spills across the header again.
 #
 # The markup tier (test/views/navbar_phone_width_test.rb) asserts the classes
 # are WRITTEN. This asserts they COMPILE. Neither implies the other, and the
@@ -99,29 +97,10 @@ class NavbarPhoneWidthBuildTest < Minitest::Test
 
   private
 
+  # A host-shaped build with NO host content: the engine's views reach it only
+  # through host.css's own @source lines, which is how every host gets them
+  # now that the content glob and the JS preset are retired.
   def compile_consumer_style_build
-    Dir.mktmpdir("studio-engine-navbar-width") do |dir|
-      File.write(File.join(dir, "tailwind.config.js"), <<~JS)
-        const studio = require('#{ROOT}/tailwind/studio.tailwind.config.js')
-        module.exports = {
-          content: ['#{ROOT}/app/views/**/*.{erb,html}'],
-          theme: studio.theme
-        }
-      JS
-
-      File.write(File.join(dir, "input.css"), <<~CSS)
-        @import 'tailwindcss';
-        @config '#{dir}/tailwind.config.js';
-        @import '#{ROOT}/app/assets/tailwind/studio_engine/engine.css';
-      CSS
-
-      out_path = File.join(dir, "out.css")
-      _stdout, stderr, status = Open3.capture3(
-        Tailwindcss::Ruby.executable,
-        "-i", File.join(dir, "input.css"), "-o", out_path
-      )
-      assert status.success?, "tailwind build failed:\n#{stderr}"
-      File.read(out_path)
-    end
+    EngineTailwindBuild.compile([])
   end
 end

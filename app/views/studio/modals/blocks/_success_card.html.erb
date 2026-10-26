@@ -80,6 +80,20 @@
 %>
 <%
   icon_color    = local_assigns[:icon_color] || 'primary'
+  # Each tone is spelled out WHOLE, never assembled from "bg-" + icon_color:
+  # Tailwind compiles only the class names it can read in this file, so an
+  # assembled one painted only in a host that happened to use or safelist it.
+  # The text half is the AA ink, not the bare role colour, which the theme
+  # leaves uncompilable on purpose (theme.css). An unknown token paints as
+  # primary. test/views/dynamic_tailwind_class_guard_test.rb refuses a
+  # rebuilt interpolation.
+  icon_tones = {
+    'primary' => { pill: 'bg-primary/15', ink: 'text-primary' },
+    'success' => { pill: 'bg-success/15', ink: 'text-success-ink' },
+    'warning' => { pill: 'bg-warning/15', ink: 'text-warning-ink' },
+    'mint'    => { pill: 'bg-mint/15',    ink: 'text-mint' }
+  }
+  icon_tone  = icon_tones.fetch(icon_color.to_s) { icon_tones['primary'] }
   redirect_secs = local_assigns[:auto_redirect_seconds] || 5
   has_redirect  = !!local_assigns[:auto_redirect_url_key]
   fire_confetti = !!local_assigns[:confetti]
@@ -182,8 +196,8 @@
   <% if local_assigns[:icon_emoji] %>
     <div class="text-5xl mb-4 leading-none"><%= icon_emoji %></div>
   <% else %>
-    <div class="mx-auto w-14 h-14 rounded-full bg-<%= icon_color %>/15 flex items-center justify-center mb-4">
-      <svg class="w-7 h-7 text-<%= icon_color %>" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+    <div class="mx-auto w-14 h-14 rounded-full <%= icon_tone[:pill] %> flex items-center justify-center mb-4">
+      <svg class="w-7 h-7 <%= icon_tone[:ink] %>" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
       </svg>
     </div>

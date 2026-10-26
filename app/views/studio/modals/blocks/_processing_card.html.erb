@@ -37,6 +37,16 @@
     'lg' => 'w-16 h-16 border-4'
   }
   spinner_class = sizes[size] || sizes['md']
+  # Each tone is spelled out WHOLE, never assembled from "border-" + color:
+  # Tailwind compiles only the class names it can read in this file. An
+  # unknown token spins in primary.
+  # test/views/dynamic_tailwind_class_guard_test.rb refuses a rebuilt one.
+  tones = {
+    'primary' => 'border-primary/30 border-t-primary',
+    'success' => 'border-success/30 border-t-success',
+    'warning' => 'border-warning/30 border-t-warning'
+  }
+  tone_class = tones.fetch(color.to_s) { tones['primary'] }
   # min_duration mirrors StudioModals.MIN_LOAD_MS (the JS default) so the Ruby and
   # JS sides of the convention agree on the same floor.
   min_duration = local_assigns[:min_duration] || 1400
@@ -62,7 +72,7 @@
     end
 %>
 <div class="text-center py-6"<%= resolve_attrs %>>
-  <div class="mx-auto <%= spinner_class %> rounded-full border-<%= color %>/30 border-t-<%= color %> animate-spin mb-5"></div>
+  <div class="mx-auto <%= spinner_class %> rounded-full <%= tone_class %> animate-spin mb-5"></div>
   <% if local_assigns[:title_key] %>
     <p class="text-base font-bold text-heading mb-1" x-text="<%= title_key %>"></p>
   <% elsif local_assigns[:title] %>

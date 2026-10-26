@@ -39,7 +39,7 @@ class VendoredMontserratTest < Minitest::Test
   HEAD     = File.join(ROOT, "app/views/layouts/studio/_head.html.erb")
   ENGINE   = File.join(ROOT, "lib/studio/engine.rb")
   FONT_DIR = File.join(ROOT, "app/assets/fonts/studio")
-  TAILWIND = File.join(ROOT, "tailwind/studio.tailwind.config.js")
+  TAILWIND = File.join(ROOT, "app/assets/tailwind/studio_engine/theme.css")
 
   SUBSETS = %w[latin latin-ext].freeze
 
@@ -104,7 +104,7 @@ class VendoredMontserratTest < Minitest::Test
   # A face nobody references is dead weight, and the two halves live in different
   # files, so nothing else in the suite would notice them drifting apart.
   def test_the_declared_family_is_the_one_tailwind_resolves_to
-    stack = File.read(TAILWIND)[/sans:\s*\[(.*?)\]/m, 1].to_s
+    stack = File.read(TAILWIND)[/--font-sans:\s*([^;]*);/, 1].to_s
     first = stack.split(",").first.to_s.strip.delete("'\"")
 
     assert_equal "Montserrat", first,

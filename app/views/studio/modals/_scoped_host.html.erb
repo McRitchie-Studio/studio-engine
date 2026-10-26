@@ -30,8 +30,8 @@
   Animations come from the shared motion layer
   (app/assets/tailwind/studio_engine/engine-motion.css) — the .modal-card-* and
   .modal-backdrop-* classes — rather than an inline copy, so this stays small.
-  A consumer that does not bundle engine-motion.css still gets a working modal,
-  just without the spring.
+  every host's engine import brings that layer (host.css); a page built without it
+  still gets a working modal, just without the spring.
 
   Locals:
     store      — REQUIRED. Alpine store name, e.g. "emailModals". Must be unique

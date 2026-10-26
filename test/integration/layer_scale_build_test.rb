@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require_relative "../support/engine_tailwind_build"
 require "tmpdir"
 require "open3"
 require "tailwindcss/ruby"
@@ -42,30 +43,10 @@ class LayerScaleBuildTest < Minitest::Test
   end
 
   # Assembled the way a consuming app assembles application.css: core Tailwind,
-  # the shared preset, then the engine's component layer. Compare
-  # e2e/tailwind_input.css and mcritchie-studio's own entry point.
+  # then the engine's one import (theme, sources, components, motion). Compare
+  # e2e/tailwind_input.css.
   def self.compile_consumer_bundle
-    Dir.mktmpdir("studio-engine-layer-scale") do |dir|
-      File.write(File.join(dir, "probe.html"), %(<div class="card"></div>\n))
-      File.write(File.join(dir, "tailwind.config.js"), <<~JS)
-        const studio = require('#{ROOT}/tailwind/studio.tailwind.config.js')
-        module.exports = { content: ['#{dir}/probe.html'], theme: studio.theme }
-      JS
-      File.write(File.join(dir, "input.css"), <<~CSS)
-        @import 'tailwindcss';
-        @config '#{dir}/tailwind.config.js';
-        @import '#{ROOT}/app/assets/tailwind/studio_engine/engine.css';
-      CSS
-
-      out_path = File.join(dir, "out.css")
-      _stdout, stderr, status = Open3.capture3(
-        Tailwindcss::Ruby.executable,
-        "-i", File.join(dir, "input.css"), "-o", out_path
-      )
-      raise "tailwind build failed:\n#{stderr}" unless status.success?
-
-      File.read(out_path)
-    end
+    EngineTailwindBuild.compile(%w[card])
   end
 
   # THE LAST DEFINITION WINS, and taking the last one is the point rather than a

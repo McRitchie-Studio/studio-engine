@@ -4,6 +4,81 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The Tailwind layer is CSS-first; a host's whole adoption is `@import
+  "../builds/tailwind/studio_engine";`.** That entry now imports the new
+  `host.css` (`Studio::TailwindEntry` rewrites it right after
+  tailwindcss-rails' `Tailwindcss::Engines.bundle` writes it), which brings
+  `engine.css`, `@source` lines for every engine directory that emits a class
+  (views, components, helpers, `app/javascript` and `app/assets/javascripts`,
+  the vendored third-party bundles excluded by name) and `engine-motion.css`.
+  `engine.css` imports `theme.css` (the design tokens as `@theme inline
+  reference`, and the class-based `dark:` variant) and otherwise stays the
+  narrow component layer: its `@source "../../../components"` line moved to
+  `host.css`, so a build importing `engine.css` by path (the hub's client kit)
+  compiles only what it names. A host needs no `@config`, no
+  content glob over the gem found by a bundler call from Node, no safelist,
+  and no motion rake task. The recipe for a host still on `@config`:
+  README, "Tailwind". Hosts adopt on their own cards. A host that only bumps
+  the gem still builds, with no class lost, but its CSS grows by the motion
+  layer (about 44 KB unminified; McRitchie Industries, Cyvasse and Moms App
+  get it for the first time) and the classes the new `@source` lines find.
+- **Engine classes are spelled whole, so the scan finds them.** The modal
+  blocks' `icon_color:` and `color:` tones (`_card_header`, `_success_card`,
+  `_processing_card`) are literal maps rather than `bg-<%= tone %>/15`, which
+  compiled only in a host whose safelist or markup spelled the same name; an
+  unknown token now paints as primary. Their check icon's `success` and
+  `warning` tones use `text-success-ink` and `text-warning-ink`: the bare
+  `text-success` the old interpolation produced is deliberately uncompilable,
+  so the "green check" painted the inherited colour in every host. The style
+  page's button specimens are keyed by whole class. `admin_model_table`'s
+  `min_width:` is an inline `min-width` style instead of an arbitrary
+  `min-w-[Npx]` class. Visible: a table given any width but 940 (which a host
+  happened to compile) gets its minimum width for the first time, so on a phone
+  it scrolls sideways instead of squeezing.
+- **A host's build now carries five engine classes it could miss before**
+  (`ring-primary`, `ring-red-500`, `ring-2`, `opacity-30`, `!visible`), written
+  only in the engine's helpers and scripts, which no host scanned. Visible: a
+  rejected drag on the board shows its red ring, and in a host that defines
+  `theme-transition` (the hub) a theme switch now animates.
+
+### Deprecated
+
+- **`tailwind/studio.tailwind.config.js`** is a shim for one release, so a host
+  still on `@config` builds unchanged; `test/integration/tailwind_preset_parity_test.rb`
+  holds it to the same utilities as `theme.css`. It is removed once every host
+  has adopted. Until a host migrates it gets the motion layer twice (through
+  `host.css` and through its own generated `studio_engine_motion` import);
+  the duplicate is harmless, and step 3 of the recipe removes it.
+  **Removing the shim will break, at build time or at runtime, everything that
+  still reads it:** every host's `config/tailwind.config.js` (hub, Turf
+  Monster, McRitchie Industries, Cyvasse, Moms App and any newer app built from
+  the old `NEW_APP_SETUP.md`), the hub's production code
+  `app/services/client_apps/studio_kit/css.rb` (`ENGINE_CONFIG` and its own
+  `SAFELIST`, which build the client kit CSS at request time), and the tests
+  that read the preset's text (hub `test/views/status_colour_tokens_test.rb`,
+  Turf `test/views/error_text_contrast_test.rb`). Each moves to `theme.css` on
+  its host's adoption card first.
+
+### Tests
+
+- `test/support/engine_tailwind_build.rb` builds the engine the CSS-first way
+  (no `@config`), with `motion:`, `sources:` and `with_variant` for controls.
+- `tailwind_probe_build_test.rb`: the tokens compile from `@theme` (and the
+  bare `text-<role>` still does not), the motion layer arrives through
+  `host.css`, and dropping the views, components or JavaScript `@source`
+  line loses classes only that directory emits.
+- `component_tailwind_source_test.rb`: every class the five emitting
+  directories name, read independently of Tailwind's scanner, is in a
+  host-shaped build with no safelist; every emitting directory has an
+  `@source` line; exclusions name only vendored files.
+- `test/views/dynamic_tailwind_class_guard_test.rb` refuses a Tailwind class
+  assembled at render time.
+- `test/integration/tailwind_entry_test.rb` runs the real
+  `Tailwindcss::Engines.bundle` and reads the entry: `host.css`, and in the
+  control without the wrap, `engine.css`.
+
 ## 0.114.1 — 2026-10-25
 
 ## 0.114.0 — 2026-10-25

@@ -330,6 +330,13 @@ module Studio
     # Studio.survey_definitions_path, loaded on boot and again on each
     # development reload so an edited definition takes effect without a restart.
     # Surveys defined in an initializer instead stay registered either way.
+    # The host's Tailwind entry for this engine imports host.css, not the bare
+    # engine.css (Studio::TailwindEntry says why). Rake's tailwindcss:engines
+    # runs after :environment, so every initializer has run by then.
+    initializer "studio.tailwind_entry", after: :load_config_initializers do
+      Studio::TailwindEntry.install!
+    end
+
     config.to_prepare do
       dir = Studio.survey_definitions_path
       Studio::Survey.load_definitions!(Rails.root.join(dir)) if dir.present? && Rails.root

@@ -11,12 +11,17 @@
   (or manually: `bin/rails tailwindcss:engines`) because this file lives at the
   Rails-engines contract path: app/assets/tailwind/<engine_name>/engine.css.
 
+  That line resolves to host.css, not to this file: studio-engine writes the
+  builds entry itself (Studio::TailwindEntry) so it can carry, beside this
+  component layer, the @source scan of the engine's own markup and the motion
+  layer. See host.css. This file stays the NARROW layer: the theme (theme.css,
+  imported below, emits nothing on its own) and the component @utility
+  definitions, with no sources and no motion, so a build that imports it by
+  path (the hub's client kit) compiles only the classes it names.
+
   Requirements:
   - Tailwind v4 (this file uses @utility, so classes sort/override correctly
     in the utilities layer and take variants like `md:card`).
-  - The consumer's tailwind config spreads the engine preset
-    (tailwind/studio.tailwind.config.js) — it defines the surface / heading /
-    subtle / primary token utilities @apply'd below.
 
   Colors resolve through the 7-role theme CSS custom properties (--color-cta,
   --color-surface, ...) emitted by studio_theme_css_tag, so themed apps restyle
@@ -28,13 +33,7 @@
   their local copies for this import.
 */
 
-/* -- Components: in every host's class scan --------------------------------
-   The engine's ViewComponent classes (app/components) carry their colour
-   classes in Ruby, and a host's Tailwind config scans only the engine's
-   app/views. This adds app/components to the scan of every host that imports
-   this file, with no host edit. The path is relative to this file.
-   test/integration/component_tailwind_source_test.rb proves it compiles. */
-@source "../../../components";
+@import "./theme.css";
 
 /* -- Layer scale ------------------------------------------------------------
    The ONE stacking order every Studio app shares. Read the ORDER, not the

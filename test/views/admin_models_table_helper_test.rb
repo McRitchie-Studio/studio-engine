@@ -25,7 +25,10 @@ class AdminModelsTableHelperTest < Minitest::Test
 
     assert_includes html, 'class="overflow-x-auto"'
     assert_includes html, 'id="models-people-table"'
-    assert_includes html, "min-w-[700px]"
+    # An inline style, not min-w-[700px]: a width built at render time is not in
+    # any source Tailwind scans, so that class compiled nowhere.
+    assert_includes html, 'style="min-width: 700px"'
+    refute_includes html, "min-w-["
     assert_includes html, ">Name</th>"
     assert_includes html, ">Role</th>"
     assert_includes html, ">Alice</td>"
