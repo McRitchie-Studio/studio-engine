@@ -10,8 +10,12 @@
 # production release. A step bound alone turns a hang into a red; these options
 # turn it into a retry, and the cache keeps a warm run off the mirror entirely.
 #
-# Asserted over every workflow file and every step that runs `apt-get install`,
-# so a step added tomorrow is enrolled without anyone remembering to.
+# Asserted over every workflow file and every step that can FETCH from apt: a
+# direct `apt-get`/`apt` install or update (continuation lines joined first, so a
+# multi-line invocation counts) and `playwright install --with-deps`, which runs
+# its own apt-get underneath. A step added tomorrow is enrolled without anyone
+# remembering to. Review of 2026-10-26 showed the first cut of this guard stayed
+# green on all three of those shapes; FETCH below is the fix.
 require "bundler/setup"
 require "minitest/autorun"
 require "yaml"
@@ -24,6 +28,25 @@ class CiAptInstallHardeningTest < Minitest::Test
     Acquire::https::Timeout=
   ].freeze
 
+  # The same three settings as apt.conf lines, for a machine-wide hardening step
+  # (`Acquire::Retries "5";` in /etc/apt/apt.conf.d/) that covers a fetch whose
+  # apt-get the workflow does not spell out itself, such as `--with-deps`.
+  CONF_KEYS = %w[Acquire::Retries Acquire::http::Timeout Acquire::https::Timeout].freeze
+
+  def self.joined(run)
+    run.to_s.gsub(/\\\n\s*/, " ")
+  end
+
+  def self.fetch?(run)
+    r = joined(run)
+    r.match?(/\bapt(?:-get)?\b[^\n]*\b(?:install|update|upgrade|dist-upgrade)\b/) || r.include?("--with-deps")
+  end
+
+  def self.conf_hardening?(run)
+    r = run.to_s
+    r.include?("/etc/apt/apt.conf.d/") && CONF_KEYS.all? { |k| r.include?(k) }
+  end
+
   def apt_jobs
     Dir[File.join(ROOT, ".github/workflows/*.yml")].sort.flat_map do |path|
       jobs = (YAML.load_file(path, aliases: true) || {})["jobs"] || {}
@@ -31,24 +54,53 @@ class CiAptInstallHardeningTest < Minitest::Test
         next unless job.is_a?(Hash)
 
         steps = Array(job["steps"]).select { |s| s.is_a?(Hash) }
-        installs = steps.select { |s| s["run"].to_s.match?(/apt-get\b[^\n]*\binstall\b/) }
-        next if installs.empty?
+        fetches = steps.select { |s| self.class.fetch?(s["run"]) }
+        next if fetches.empty?
 
-        { where: "#{File.basename(path)} :: #{name}", steps: steps, installs: installs }
+        # The hand-rolled loops: a direct apt-get install, not a tool's --with-deps.
+        installs = fetches.reject { |s| self.class.joined(s["run"]).include?("--with-deps") }
+        { where: "#{File.basename(path)} :: #{name}", steps: steps, fetches: fetches, installs: installs }
       end
     end
   end
 
   def test_the_guard_sees_the_consumer_install
-    assert apt_jobs.any? { |j| j[:where].start_with?("consumer-ci.yml") },
+    assert apt_jobs.any? { |j| j[:where].start_with?("consumer-ci.yml") && j[:installs].any? },
            "no apt-get install found in consumer-ci.yml — the guard is looking in the wrong place"
+    assert apt_jobs.any? { |j| j[:where].start_with?("engine-ci.yml") && j[:fetches].any? { |s| s["run"].include?("--with-deps") } },
+           "no `--with-deps` fetch found in engine-ci.yml — the guard is looking in the wrong place"
   end
 
-  def test_every_install_fails_a_stall_fast_and_retries
+  def test_the_fetch_matcher_sees_every_shape
+    assert self.class.fetch?("sudo apt-get \\\n  install -y ffmpeg"), "multi-line apt-get install"
+    assert self.class.fetch?("sudo apt install -y ffmpeg"), "`apt install`"
+    assert self.class.fetch?("npx playwright install --with-deps chromium"), "--with-deps"
+    refute self.class.fetch?("sudo apt-get autoclean"), "autoclean fetches nothing"
+  end
+
+  def test_every_fetch_is_hardened_and_bounded
+    offenders = apt_jobs.flat_map do |job|
+      job[:fetches].filter_map do |step|
+        at = job[:steps].index(step)
+        inline = REQUIRED_OPTIONS.all? { |opt| step["run"].to_s.include?(opt) }
+        machine = job[:steps][0...at].any? { |s| self.class.conf_hardening?(s["run"]) }
+        missing = []
+        missing << "Acquire retry/timeout options (inline, or an earlier apt.conf.d step)" unless inline || machine
+        missing << "a step timeout-minutes" unless step["timeout-minutes"]
+        "#{job[:where]} :: #{step['name']} lacks #{missing.join(' and ')}" unless missing.empty?
+      end
+    end
+
+    assert_empty offenders,
+                 "these apt fetches hang on a stalled mirror until the 45-minute job bound kills " \
+                 "them, unretried:\n  " + offenders.join("\n  ")
+  end
+
+  def test_every_hand_rolled_install_bounds_and_retries_its_attempts
     offenders = apt_jobs.flat_map do |job|
       job[:installs].flat_map do |step|
         run = step["run"].to_s
-        missing = REQUIRED_OPTIONS.reject { |opt| run.include?(opt) }
+        missing = []
         missing << "timeout -k" unless run.match?(/timeout\s+-k\s+\d+/)
         missing << "3 attempts" unless run.match?(/for attempt in 1 2 3\b/)
         missing.empty? ? [] : ["#{job[:where]} :: #{step['name']} lacks #{missing.join(', ')}"]
@@ -56,12 +108,12 @@ class CiAptInstallHardeningTest < Minitest::Test
     end
 
     assert_empty offenders,
-                 "a stalled Ubuntu mirror hangs these installs until the outer timeout kills them, " \
-                 "instead of apt dropping the dead socket in 30s and re-fetching:\n  " + offenders.join("\n  ")
+                 "these hand-rolled apt loops lose their per-attempt bound or their retries:\n  " +
+                 offenders.join("\n  ")
   end
 
   def test_every_install_reads_a_deb_cache
-    offenders = apt_jobs.reject do |job|
+    offenders = apt_jobs.select { |j| j[:installs].any? }.reject do |job|
       cache = job[:steps].index { |s| s["uses"].to_s.start_with?("actions/cache") && s.dig("with", "path").to_s.include?("apt-archives") }
       first_install = job[:steps].index(job[:installs].first)
       cache && cache < first_install && job[:installs].all? { |s| s["run"].include?("Dir::Cache::Archives") }
@@ -76,7 +128,7 @@ class CiAptInstallHardeningTest < Minitest::Test
     # A crawling mirror (2026-10-26: ~40 KB/s, 71 -> 41 MB left after three
     # attempts) never trips the inactivity timeout. actions/cache saves only on
     # success, so without an always() save a rerun starts from zero every time.
-    offenders = apt_jobs.reject do |job|
+    offenders = apt_jobs.select { |j| j[:installs].any? }.reject do |job|
       install = job[:steps].index(job[:installs].last)
       save = job[:steps].index do |s|
         s["uses"].to_s.start_with?("actions/cache/save") && s["if"].to_s.include?("always()") &&

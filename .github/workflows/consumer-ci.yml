@@ -357,8 +357,11 @@ jobs:
         run: |
           mkdir -p "$HOME/apt-archives/partial"
           # apt writes the .debs as root; hand them back to the runner on ANY exit
-          # so the save step below can read a failed attempt's progress too.
-          trap 'sudo chown -R "$(id -u):$(id -g)" "$HOME/apt-archives" || true' EXIT
+          # so the save step below can read a failed attempt's progress too, and
+          # autoclean first, so a saved entry drops .debs the index no longer lists
+          # and the cache stops growing image week over image week.
+          trap 'sudo timeout 60 apt-get -o Dir::Cache::Archives="$HOME/apt-archives" autoclean || true
+                sudo chown -R "$(id -u):$(id -g)" "$HOME/apt-archives" || true' EXIT
           APT_OPTS=(-o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
                     -o Dir::Cache::Archives="$HOME/apt-archives" -o APT::Keep-Downloaded-Packages=true)
           for attempt in 1 2 3; do
