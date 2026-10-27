@@ -2,7 +2,7 @@ const { test, expect } = require("@playwright/test");
 const { watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive } = require("./helpers");
 
 // THE STICKY TABLE HEADER'S CLONE SITS ON THE PINNED BAR (config.sticky_table_headers;
-// app/assets/javascripts/studio/sticky_table_header.js).
+// app/javascript/studio/sticky_table_header.js).
 //
 // The clone is a position:fixed copy of a table's header row, shown once the real
 // one scrolls up under the navbar. Its top used to come from --nav-h, re-read only

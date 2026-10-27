@@ -7,7 +7,7 @@ module Studio
   # signed in? `state` is :anonymous or :authenticated, `fingerprint`
   # (Studio::SessionFingerprint) names the session without exposing it, and
   # `to_stamp` is the JSON every page carries so the browser store
-  # (app/assets/javascripts/studio/session.js) can notice when the session
+  # (app/javascript/studio/session.js) can notice when the session
   # changes underneath a page.
   #
   # It reads the viewer and nothing else. What an identity IS stays outside: a

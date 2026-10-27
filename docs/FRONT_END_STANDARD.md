@@ -127,8 +127,11 @@ them with no edit: the engine's `config/importmap.rb` pins each module under
 `app/javascript/studio` as `studio/<name>`, and the `studio.importmap`
 initializer adds that file to importmap-rails' maps before the host's own, so a
 host that pins the same name wins. A module's logical asset path shares the
-`studio/` prefix with the classic scripts in `app/assets/javascripts/studio`, so
-it may not reuse one of their names. `studio/local_path`, the browser twin of
+`studio/` prefix with the vendored third-party builds in
+`app/assets/javascripts/studio`, so it may not reuse one of their names. Every
+engine script is a module: the six that were classic scripts (Alpine, canvas-confetti, `studio_confetti`, `session`,
+`sticky_table_header`, Leaflet) now load by a `type="module"` tag after the
+import map, by an importmap pin, or by `import()`. `studio/local_path`, the browser twin of
 `Studio::LocalPath.local?`, is held to the Ruby rule by
 `test/lib/studio/local_path_js_parity_test.rb`, which also runs every
 `node:test` file in `test/javascript` in the engine suite.
@@ -274,7 +277,8 @@ console error naming the attribute and its event.
 **Today.** The shared head carries three inline
 scripts, all nonced: the pre-paint theme, the hold button's guard and the
 x-data factories' guard; its behaviour is the modules above. The engine
-vendors Alpine and loads it with `javascript_include_tag`. Every app pins its
+vendors Alpine and loads it as a module, with `javascript_include_tag` and
+`type: "module"`, after the import map. Every app pins its
 modules with importmap.
 Cyvasse and Industries pin Stimulus; the hub has `stimulus-rails` in its
 Gemfile but no Stimulus pin and no controllers, four modules in

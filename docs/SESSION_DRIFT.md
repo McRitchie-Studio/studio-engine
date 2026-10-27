@@ -13,9 +13,13 @@ that in as an **identity source** (see [Plugging in an external identity](#plugg
   `SessionContext`), `Studio::SessionFingerprint`, `Studio::SessionDrift`
   (included by `Studio::ErrorHandling`), `Studio::SessionStatesController`
   (`GET /session/state`, opt-in).
-- Browser: `app/assets/javascripts/studio/session.js`, which publishes
-  `window.StudioSession`.
-- Delivery: `layouts/studio/_head` renders `studio/_session_stamp` on every page.
+- Browser: `app/javascript/studio/session.js`, an ES module pinned as
+  `studio/session`. Its default export is the store; it also publishes
+  `window.StudioSession`, a compatibility global that is deprecated for host
+  code (`import StudioSession from "studio/session"` instead).
+- Delivery: `layouts/studio/_head` renders `studio/_session_stamp` (the meta
+  stamp) on every page, and `studio/_session_store` (a `type="module"` tag for
+  the store) below the import map and before Alpine.
 
 ## States
 

@@ -133,8 +133,11 @@ class SessionDriftTest < ActionDispatch::IntegrationTest
 
     scripts = css_select("script[src]").map { |s| s["src"] }
     assert scripts.any? { |src| src.include?("studio/session") }, "the page loads the store, got #{scripts.inspect}"
+    # Its place in the head (below the import map, above Alpine) is held by
+    # test/views/studio_session_store_test.rb and head_script_nonce_test.rb.
     script = css_select("script[src]").find { |s| s["src"].include?("studio/session") }
-    assert_nil script["defer"], "the store must run before deferred Alpine to hear alpine:init"
+    assert_equal "module", script["type"], "the store is an ES module"
+    assert_empty script.text.strip, "an external module tag, not an inline script"
   end
 
   # ---- 2. the fingerprint follows the session -----------------------------------

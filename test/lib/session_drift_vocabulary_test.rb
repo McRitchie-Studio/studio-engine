@@ -51,7 +51,8 @@ class SessionDriftVocabularyTest < Minitest::Test
     app/controllers/concerns/studio/session_drift.rb
     app/controllers/studio/session_states_controller.rb
     app/views/studio/_session_stamp.html.erb
-    app/assets/javascripts/studio/session.js
+    app/views/studio/_session_store.html.erb
+    app/javascript/studio/session.js
     docs/SESSION_DRIFT.md
     test/lib/session_drift_vocabulary_test.rb
     test/lib/studio/session_state_test.rb
@@ -71,7 +72,7 @@ class SessionDriftVocabularyTest < Minitest::Test
     ["docs/USER_CONTRACT.md", "| `#session_token`", "| `#regenerate_session_token!`", "Studio::SessionFingerprint"],
     ["app/models/session_context.rb", "# ---- Session state (docs/SESSION_DRIFT.md)", "# ---- end session state", "def to_stamp"],
     ["app/controllers/concerns/studio/error_handling.rb", "# The session-drift stamp every page carries", "include Studio::SessionDrift", "SESSION_DRIFT.md"],
-    ["app/views/layouts/studio/_head.html.erb", "<%# The session-drift stamp + browser store.", %(<%= render "studio/session_stamp" %>), "ErrorHandling"],
+    ["app/views/layouts/studio/_head.html.erb", "<%# The session-drift stamp. Renders nothing", %(<%= render "studio/session_stamp" %>), "ErrorHandling"],
     ["lib/studio.rb", "# Draw the session-drift rehydrate endpoint", "mattr_accessor :session_fingerprint_secret, default: nil", "draw_session_routes"],
     ["lib/studio.rb", "# The session-drift rehydrate endpoint (Studio::SessionStatesController).", "defaults: { format: :json }", "session/state"],
     ["README.md", "- **Session drift**:", "See [`docs/SESSION_DRIFT.md`](docs/SESSION_DRIFT.md).", "StudioSession"],

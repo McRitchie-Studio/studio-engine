@@ -43,8 +43,8 @@ class E2eLabController < ActionController::Base
   # app/helpers) so it cannot shadow the real ActionView helpers for the view tests
   # that render engine partials through ActionView::Base.
   #
-  # NAMED LIMIT: `javascript_importmap_tags` delivers NOTHING (Alpine now ships in the
-  # engine and arrives through javascript_include_tag, like every other engine asset).
+  # NAMED LIMIT: `javascript_importmap_tags` delivers no host entry point (Alpine ships
+  # in the engine and arrives through the head's own type="module" include tag).
   # There is no Turbo in the lab, so `turbo:load`/`turbo:render` listeners never fire
   # and the lane cannot observe Turbo-navigation behavior. docs/E2E_LANE.md records it.
   # Where the lab visitor is standing. A host supplies these from
@@ -73,7 +73,9 @@ class E2eLabController < ActionController::Base
       "studio/leaflet.js" => "/e2e/js/studio/leaflet.js",
       "studio/leaflet.css" => "/e2e/css/studio/leaflet.css",
       # The "sortablejs" pin: studio/board imports the vendored SortableJS by it.
-      "studio/sortable.js" => "/e2e/js/studio/sortable.js"
+      "studio/sortable.js" => "/e2e/js/studio/sortable.js",
+      # The "canvas-confetti" pin: studio/studio_confetti imports it.
+      "studio/canvas_confetti.js" => "/e2e/js/studio/canvas_confetti.js"
     }.freeze
 
     def asset_path(source, **options)
@@ -100,9 +102,16 @@ class E2eLabController < ActionController::Base
       safe_join(links)
     end
 
+    # A source that is one of the engine's ES modules (app/javascript) resolves
+    # through asset_path above, to /e2e/modules, exactly where the import map
+    # sends the same module, so the tag and an import of it are one module
+    # instance. Anything else is a vendored build under /e2e/js. `type` and
+    # `defer` pass through as a host's pipeline passes them.
     def javascript_include_tag(*sources, **options)
       scripts = sources.map do |source|
-        tag.script("".html_safe, src: "/e2e/js/#{source}.js", defer: options[:defer].present?)
+        logical = "#{source}.js"
+        src = Studio::Engine.javascript_module_logical_paths.include?(logical) ? asset_path(logical) : "/e2e/js/#{logical}"
+        tag.script("".html_safe, src: src, type: options[:type], defer: options[:defer].present?)
       end
       safe_join(scripts)
     end

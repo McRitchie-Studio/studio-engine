@@ -214,7 +214,26 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     refute_nil boot, "the head does not import studio/application"
     refute_nil alpine, "the head does not load Alpine"
     assert_operator boot, :<, alpine, "Alpine must come after the module tags"
-    assert scripts[alpine].key?("defer"), "Alpine must stay deferred, or it runs before the modules"
+    assert_equal "module", scripts[alpine]["type"], "Alpine must be a module (deferred by definition), or it runs before the modules"
+  end
+
+  # The engine's scripts are ES modules, loaded by URL. A module tag above the
+  # import map makes a browser without dynamic import maps ignore the map, so
+  # every script with a src in the head comes after it; and each one is an
+  # external module, so none of them adds an inline script to the count above.
+  test "every engine script in the head is a module tag below the import map" do
+    scripts = head_scripts("/lab/bar_stack")
+    importmap = scripts.index { |script| script["type"] == "importmap" }
+    refute_nil importmap
+
+    by_src = scripts.each_with_index.select { |script, _| script["src"] }
+    refute_empty by_src, "the head loads no script by URL, so this proves nothing"
+    by_src.each do |script, index|
+      assert_equal "module", script["type"], "#{script["src"]} is a classic script"
+      assert_operator importmap, :<, index, "#{script["src"]} is above the import map"
+      assert_empty script.text.strip, "#{script["src"]} carries a body"
+    end
+    assert_includes by_src.map { |script, _| script["src"] }.join(" "), "studio/studio_confetti"
   end
 
   # The favicon link carries the file's content version (Studio::PublicFileVersion),
