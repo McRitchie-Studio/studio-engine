@@ -1053,7 +1053,14 @@
 # (and not under reduced motion).
 # Verified RED by restoring Alpine's classic `defer: true` tag (test 1 fails).
 #   npx playwright test --list  -> 379 tests in 56 files
-total_specs: 379
+# 379 -> 380: e2e/confetti_resolves_under_a_slow_head.spec.js (confetti-resolves-on-hub).
+# studio/studio_confetti resolves its bare "canvas-confetti" import however slowly
+# the head parses: the spec holds back the session store above the import map so a
+# Link-header modulepreload of the module finishes first. Verified RED on the
+# 0.115.1.rc1 head (javascript_include_tag by URL): the page throws "Failed to
+# resolve module specifier", the hub's 11-spec failure.
+#   npx playwright test --list  -> 380 tests in 57 files
+total_specs: 380
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1285,7 +1292,11 @@ total_specs: 379
 #   npx playwright test --list                                             -> 379 tests, 56 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 379
-executed: 379
+# And for confetti under a slow head: 1 more test (379 -> 380), 1 new file:
+#   npx playwright test --list                                             -> 380 tests, 57 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 380
+executed: 380
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

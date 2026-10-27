@@ -3,9 +3,10 @@
   vendored canvas-confetti (app/assets/javascripts/studio/canvas_confetti.js,
   pinned as "canvas-confetti", no CDN).
 
-  An ES module (the head loads it with a type="module" tag after the import
-  map). It imports canvas-confetti for its side effect, which defines the
-  library's global `confetti`, and exports:
+  An ES module (the head imports it with an inline module tag after the import
+  map, never by URL: a URL tag's Link modulepreload header would resolve the
+  bare import below before the map exists). It imports canvas-confetti for its
+  side effect, which defines the library's global `confetti`, and exports:
 
     import { burst, cannons, confetti } from "studio/studio_confetti"
     burst(cardEl)    // radial burst behind a card/modal
