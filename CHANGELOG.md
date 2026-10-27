@@ -10,8 +10,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   deleted**, with its parity test (`test/integration/tailwind_preset_parity_test.rb`),
   and the gemspec no longer packages a `tailwind/` directory. Every host in the
   release relock set had already moved to the CSS-first entry (hub, Turf
-  Monster, Rolio, chain-ops, Rantly, McRitchie Industries, Cyvasse, Moms App,
-  Alex Build, Commercial Welding), so none of them reads it. The one known
+  Monster, Rantly, McRitchie Industries, Cyvasse, Moms App, Alex Build,
+  Commercial Welding), so none of them reads it. The one known
   holdout is acquisition-studio, pinned to 0.24.0 and outside the relock set;
   it migrates on its next bump.
   **Upgrade note for a host still on `@config` + the preset** (its

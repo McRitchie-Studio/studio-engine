@@ -1,6 +1,6 @@
 # Studio Engine
 
-Shared Rails engine for McRitchie apps. Provides authentication, error handling, dynamic theming, and common concerns used by [McRitchie Studio](https://app.mcritchie.studio), [Turf Monster](https://app.turfmonster.media) and the other McRitchie hosts: Rolio, chain-ops, Rantly, McRitchie Industries, Cyvasse, Moms App, Alex Build and Commercial Welding.
+Shared Rails engine for McRitchie apps. Provides authentication, error handling, dynamic theming, and common concerns used by [McRitchie Studio](https://app.mcritchie.studio), [Turf Monster](https://app.turfmonster.media) and the other McRitchie hosts: Rantly, McRitchie Industries, Cyvasse, Moms App, Alex Build and Commercial Welding.
 
 > **Part of the McRitchie ecosystem** — see [`ECOSYSTEM.md`](https://github.com/McRitchie-Studio/mcritchie-studio/blob/main/docs/ECOSYSTEM.md) for the 5-repo map; [`house-burn-down.md`](https://github.com/McRitchie-Studio/mcritchie-studio/blob/main/docs/agents/system/house-burn-down.md) for fresh-Mac recovery.
 
@@ -25,8 +25,8 @@ resolved.
 
 > Published to RubyGems as of v0.4.0 (2026-05-17). New installs should use the
 > RubyGems form, which every consumer Rails app (`mcritchie-studio`,
-> `turf-monster`, `rolio`, `chain-ops`, `rantly`, `mcritchie-industries`,
-> `cyvasse`, `moms-app`, `alex-build`, `commercial-welding`) already uses.
+> `turf-monster`, `rantly`, `mcritchie-industries`, `cyvasse`, `moms-app`,
+> `alex-build`, `commercial-welding`) already uses.
 
 ## What It Provides
 
@@ -82,8 +82,8 @@ by path, such as the hub's client kit (`ClientApps::StudioKit::Css`, held to
 
 ### Migrating a host from `@config`
 
-Every host has migrated: hub, Turf Monster, Rolio, chain-ops, Rantly,
-McRitchie Industries, Cyvasse, Moms App, Alex Build and Commercial Welding.
+Every host has migrated: hub, Turf Monster, Rantly, McRitchie Industries,
+Cyvasse, Moms App, Alex Build and Commercial Welding.
 The deprecated JS preset `tailwind/studio.tailwind.config.js` and its parity
 test are **deleted**, so a host still on `@config` that bumps the gem past
 0.114.3 fails at its own Tailwind build (`require` of a file the gem no longer
