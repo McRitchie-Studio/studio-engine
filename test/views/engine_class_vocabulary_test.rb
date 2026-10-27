@@ -20,7 +20,7 @@ require_relative "../support/engine_tailwind_build"
 #
 # HOW THIS DECIDES "DEFINED". Not by a list of class names someone keeps up to
 # date: by COMPILING. Every class token the engine's views name is fed through a
-# real consumer-style Tailwind v4 build — core, the shared preset via @config,
+# real consumer-style Tailwind v4 build — core, theme.css (the shared tokens),
 # engine.css, and the opt-in engine-motion.css, the same ingredients and order
 # every consuming app uses (test/integration/tailwind_probe_build_test.rb is the
 # precedent) — and a token counts as defined only if the compiled CSS carries a

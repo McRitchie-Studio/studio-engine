@@ -87,7 +87,7 @@ McRitchie Industries, Cyvasse, Moms App, Alex Build and Commercial Welding.
 The deprecated JS preset `tailwind/studio.tailwind.config.js` and its parity
 test are **deleted**, so a host still on `@config` that bumps the gem past
 0.114.3 fails at its own Tailwind build (`require` of a file the gem no longer
-ships). Run this recipe in the same change as that bump (CHANGELOG, Removed).
+ships). Run this recipe in the same change as that bump (CHANGELOG, Breaking).
 
 1. **Bump** `studio-engine` to the release that carries this section.
 2. **`application.css`**: delete the `@config` line. Keep `@import
@@ -1054,7 +1054,8 @@ config.navbar_z_tier = true      # the live header at z-[var(--z-nav)], not z-50
   wins when both are set. Rules: `lib/studio/navbar_brand.rb`.
 - **The word classes live in the host's initializer**
   (`config/initializers/studio.rb`), which a host's Tailwind scan may not
-  read (a host still on `@config` lists only its `content:` globs). A utility
+  read (Tailwind's automatic detection and the engine's own `@source` lines
+  may both miss it). A utility
   named only there, `text-heading` say, compiles only if some view also uses
   it. Add the initializer to the scan (`@source "../../../config/initializers/studio.rb";`),
   or give the word a class the host's CSS defines (`tm-wordmark`). See

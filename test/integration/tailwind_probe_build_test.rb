@@ -179,7 +179,7 @@ class TailwindProbeBuildTest < Minitest::Test
   end
 
   # The shim is gone, not merely unread: a host still on `@config` that bumps
-  # past the deletion must fail loudly at its own build (CHANGELOG, Removed),
+  # past the deletion must fail loudly at its own build (CHANGELOG, Breaking),
   # so the file must not come back and the gem must not package a tailwind/
   # directory again.
   def test_the_deprecated_js_preset_is_deleted_and_unpackaged

@@ -72,8 +72,8 @@ scripts, the component classes (section 14) and the motion layer. No
 `@config`, no safelist, no rake task, and no bundler call from Node. The app's
 own sources are found by Tailwind 4's automatic detection. App-specific tokens
 go in an `@theme inline { ... }` block after the import. The full contract and
-the recipe for an app still on `@config`:
-[README, "Tailwind"](../README.md#tailwind).
+the upgrade recipe for an app still on `@config` (CHANGELOG, Breaking, past
+0.114.3): [README, "Tailwind"](../README.md#tailwind).
 
 ## 4. Initializers
 
