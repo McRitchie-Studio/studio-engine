@@ -26,10 +26,10 @@ const SOURCE = fs.readFileSync(SOURCE_PATH, "utf8");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// A BUS ROUND TRIP IS A CHAIN OF TIMERS, NOT A DURATION. The fake BroadcastChannel
+// A BUS ROUND TRIP IS A SEQUENCE OF TIMERS, NOT A DURATION. The fake BroadcastChannel
 // below delivers each message on its own setTimeout(0), so "outsider says hello,
 // tab answers" is two timer hops, and the second hop is only SCHEDULED when the
-// first one fires. A fixed `await sleep(20)` raced that chain: when the event loop
+// first one fires. A fixed `await sleep(20)` raced that sequence: when the event loop
 // stalls past 20ms (a GC pause, or a CI box at load average 13), node wakes with
 // both the first hop and the sleep already due, runs them in deadline order, and
 // the sleep resolves before the second hop, which was scheduled 1ms in the future
@@ -52,7 +52,7 @@ async function until(predicate, label, timeoutMs = 2000) {
 
 // Each setTimeout(0) queued before ours runs before ours (node keeps same-duration
 // timers FIFO), and every hop it schedules lands ahead of our next one. Five rounds
-// outlasts the longest chain any scenario drives (hello, answer, and one echo).
+// outlasts the longest sequence any scenario drives (hello, answer, and one echo).
 async function settle(rounds = 5) {
   for (let i = 0; i < rounds; i += 1) await sleep(0);
 }
