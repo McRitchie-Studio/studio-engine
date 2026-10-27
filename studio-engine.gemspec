@@ -30,7 +30,7 @@ Gem::Specification.new do |spec|
   # citation should resolve in the installed gem, not only on GitHub. The rest of
   # docs/ is the engine's own operating material. Guarded by
   # test/lib/gemspec_ships_footer_docs_test.rb.
-  spec.files = Dir["lib/**/*", "app/**/*", "config/**/*", "db/**/*", "tailwind/**/*", "Gemfile", "studio-engine.gemspec", "README.md", "CHANGELOG.md", "LICENSE",
+  spec.files = Dir["lib/**/*", "app/**/*", "config/**/*", "db/**/*", "Gemfile", "studio-engine.gemspec", "README.md", "CHANGELOG.md", "LICENSE",
                    "docs/SITE_FOOTER.md", "docs/BOOKING.md"] - ["config/e2e_lane.yml"]
   spec.require_paths = ["lib"]
 

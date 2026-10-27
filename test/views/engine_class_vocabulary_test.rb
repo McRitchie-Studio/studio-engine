@@ -20,7 +20,7 @@ require_relative "../support/engine_tailwind_build"
 #
 # HOW THIS DECIDES "DEFINED". Not by a list of class names someone keeps up to
 # date: by COMPILING. Every class token the engine's views name is fed through a
-# real consumer-style Tailwind v4 build — core, the shared preset via @config,
+# real consumer-style Tailwind v4 build — core, theme.css (the shared tokens),
 # engine.css, and the opt-in engine-motion.css, the same ingredients and order
 # every consuming app uses (test/integration/tailwind_probe_build_test.rb is the
 # precedent) — and a token counts as defined only if the compiled CSS carries a
@@ -258,10 +258,10 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
   # where the scanner above cannot look: Ruby strings such as emails/show's
   # badge `case`. So this reads RAW source.
   #
-  # The contract (tailwind/studio.tailwind.config.js + ThemeResolver): a status
+  # The contract (theme.css + ThemeResolver): a status
   # role is a FILL (bg-/border-<role>, vivid, free) or an INK (text-<role>-ink,
   # derived per theme to clear AA). A bare text-<role> is the defect: the default
-  # role colours fail AA as text, so the preset deliberately never mints one.
+  # role colours fail AA as text, so theme.css deliberately never mints one.
   STATUS_ROLE = /(?<![\w-])(?:[a-z-]+:)*(?:bg|border|text)-(?:success|warning|danger)(?:-ink)?(?:\/\d+)?(?![\w-])/
 
   def self.status_role_tokens
