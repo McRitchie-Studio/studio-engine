@@ -693,7 +693,8 @@ silent socket in 30s and re-fetch it, bound the step, and retry it whole:
 
 ```yaml
 - name: Install packages
-  timeout-minutes: 15
+  # 3 x (120s index + 420s fetch) + pauses, so all three attempts fit.
+  timeout-minutes: 30
   run: |
     APT_OPTS=(-o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
     for attempt in 1 2 3; do
