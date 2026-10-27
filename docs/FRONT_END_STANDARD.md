@@ -224,8 +224,8 @@ nothing: a `.hold-stack` whose controller has not written
 `data-studio-controller-failed="hold-button"`, reads as unavailable, and shows
 "This button could not load. Reload the page." A late connect clears it.
 
-Alpine loads after the module tags. Deferred classic scripts and module scripts
-run in document order, so by the time Alpine starts, the boot has installed the
+Alpine loads after the module tags, as a module tag itself. Module scripts run
+in document order, so by the time Alpine starts, the boot has installed the
 Alpine shims (`studio/alpine_shims`): the `window.*` globals and Alpine stores
 consumers still bind to, each a thin delegate to the module that owns the
 behaviour. A shim stays while a consumer binds to it. The engine's converted
