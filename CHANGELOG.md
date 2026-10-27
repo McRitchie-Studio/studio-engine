@@ -4,6 +4,26 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **One Node tooling package, shipped in the gem** (`lib/studio/node_tooling/`,
+  see its `README.md`). `versions.json` pins Node 22, `@playwright/test`
+  1.62.1 and `axe-core` 4.11.0. `playwright_base.js` holds the browser lane's
+  shared defaults; `e2e_helpers.js` holds `watchPageErrors` and
+  `blockOffsiteRequests`; `node_test/register.mjs` lets `node --test` import a
+  module by its importmap name. `bin/rails studio:node:link` links it at
+  `node_modules/.studio-engine` (run it after `npm ci`), and
+  `bin/rails studio:node:check` exits 1, naming each pin a host drifts from. No
+  host change is needed until a host adopts it.
+
+### Changed
+
+- **The engine runs Node 22.** `.tool-versions` reads `nodejs 22`, both
+  `engine-ci.yml` Node steps read it through `node-version-file`, and
+  `package.json` pins `@playwright/test` at exactly 1.62.1. The engine's
+  Playwright config and e2e helpers build on the shared package, and resolve to
+  the same config as before.
+
 ### Fixed
 
 - **`studio/studio_confetti` resolves `"canvas-confetti"` on every page.** In

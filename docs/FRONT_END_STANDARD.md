@@ -354,6 +354,28 @@ roles, and the badge's `tone:` renders the same chip classes. The badge's older
 
 The hub's `docs/agents/modules/testing.md` names the tiers each shape requires.
 
+## Node tooling
+
+Every app runs Node 22. The engine ships the one Node tooling package, in
+`lib/studio/node_tooling/` (its `README.md` lists the files), so an app gets it
+with the gem, from no npm registry.
+
+- **The pins.** `versions.json` holds Node's major and the exact version of each
+  shared npm package (`@playwright/test`, `axe-core`). An app pins Node in
+  `.tool-versions` (`nodejs 22`), which mise reads on a laptop and
+  `actions/setup-node` reads in CI through `node-version-file`. An app's
+  package.json `engines.node` reads `22.x`. A shared package it declares, it
+  declares at exactly the pinned version, never a range.
+- **The link.** `bin/rails studio:node:link`, run after `npm ci`, links the
+  package at `node_modules/.studio-engine`. A `playwright.config.js` builds on
+  `playwright_base.js`; e2e specs take `watchPageErrors` and
+  `blockOffsiteRequests` from `e2e_helpers.js`; a `node --test` register file
+  calls `registerImportmapHooks` from `node_test/register.mjs` with its own
+  importmap prefixes.
+- **The check.** `bin/rails studio:node:check` exits 1 and names each pin the
+  app drifts from. The engine holds itself to the same check
+  (`test/lib/studio/node_tooling_test.rb`).
+
 ## Migration order
 
 Existing code moves in this order, one task each, highest traffic first:
@@ -401,10 +423,9 @@ Decided by Alex:
 - The engine supplies its modules through its own importmap pins; no app lists
   them.
 - The Stimulus migration proceeds, engine behaviour first.
+- Every app runs Node 22, pinned as "Node tooling" describes.
 
 Still open, recorded on the task `front-end-standard-page`:
 
 1. **The CSP target.** Once inline scripts are gone, does every app drop
    `unsafe_inline` from `script_src`?
-2. **One Node version.** The engine's `package.json` pins Node 20; the hub
-   pins 22.

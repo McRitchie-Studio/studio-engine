@@ -42,7 +42,7 @@ class DesignSystemModalsTurboRegistrationTest < ActiveSupport::TestCase
     refute_empty node_path,
                  "node runtime NOT FOUND on PATH. The dsModals Turbo-registration suite " \
                  "executes the store registration for real; skipping it would report green " \
-                 "with zero coverage. Install node (mise install node@20) and re-run."
+                 "with zero coverage. Install node (mise install node@22) and re-run."
   end
 
   def test_the_overlay_declares_the_full_stack_under_the_guides_name

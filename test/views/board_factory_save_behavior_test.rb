@@ -38,7 +38,7 @@ class BoardFactorySaveBehaviorTest < Minitest::Test
                  "node runtime NOT FOUND on PATH. The board factory save-behavior suite " \
                  "executes the factory for real and is the only coverage of how a refused " \
                  "reorder reaches the operator — skipping it would report green with zero " \
-                 "coverage. Install node (mise install node@20) and re-run."
+                 "coverage. Install node (mise install node@22) and re-run."
   end
 
   def test_save_order_surfaces_refusals_under_node
