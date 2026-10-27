@@ -1,8 +1,9 @@
 # Engine CI — runs THIS engine's OWN test suite.
 #
-# Why this exists: `consumer-ci.yml` runs the two CONSUMER app suites against
-# this engine commit. Both are valuable, and neither runs the engine's own
-# 24-file suite — so before this lane existed, `test/views/component_css_test.rb`,
+# Why this exists: `consumer-ci.yml` runs the CONSUMER app suites (and a subset
+# of the hub's browser specs, its `hub-browser` job) against this engine commit.
+# Both are valuable, and neither runs the engine's own 24-file suite — so
+# before this lane existed, `test/views/component_css_test.rb`,
 # `test/integration/component_css_bundle_test.rb`, and
 # `test/views/modal_host_store_behavior_test.rb` had NO CI coverage at all. The
 # store behavior suite is the only test that executes the modal host's Alpine

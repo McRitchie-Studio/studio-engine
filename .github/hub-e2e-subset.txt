@@ -1,0 +1,44 @@
+# The hub's Playwright specs that consumer-ci.yml's `hub-browser` job runs against
+# THIS engine tree (path gem), one hub-relative path per line. `#` starts a comment.
+#
+# WHY A SUBSET, AND WHY THESE. Engine PR #485 (engine-scripts-become-modules) loaded
+# studio/studio_confetti by URL, whose Link modulepreload header resolved the bare
+# "canvas-confetti" import before the import map existed. Every Rails suite stayed
+# green; the hub's browser suite went red on 41 tests in 23 files ("Failed to resolve
+# module specifier", hub ci run 40463820951) only after the release lock bump. These
+# are specs that assert zero page errors on engine-rendered chrome across the hub's
+# layouts (boards, /dreams, the devops countdown, the navbar, model pages, public
+# pages), chosen so most of them went red on that regression, all of them exist on
+# the hub's main, release AND accepted, and the whole set runs in about 75s.
+#
+# The full hub suite stays the hub's own job (its ci.yml `playwright` lane, three
+# shards, ~8 min each): running it here would make every hub flake an engine red.
+#
+# THE HUB OWNS THESE FILES, THIS LIST NAMES THEM. A renamed or deleted spec fails the
+# job at "Resolve the hub spec subset" by name rather than quietly shrinking the set;
+# repoint or drop the line here. bin/hub-e2e-subset audits the run's JSON receipt, so
+# a listed file that ran no test (all skipped, all quarantined) is red too.
+# Guard: test/lib/consumer_ci_hub_browser_test.rb.
+
+# Boards and the deployments chrome
+e2e/depth_chart_board.spec.js
+e2e/engine_board_reach.spec.js
+e2e/model_pipeline_board.spec.js
+e2e/contents_board.spec.js
+e2e/news_board.spec.js
+e2e/deployments_exit_fx.spec.js
+e2e/devops_countdown.spec.js
+e2e/last_release_fx_router.spec.js
+e2e/release_duration_dashboard.spec.js
+
+# /dreams
+e2e/dream_approve.spec.js
+e2e/dream_chat_ruling.spec.js
+e2e/dream_retire.spec.js
+e2e/dreams_filter.spec.js
+e2e/dreams_step_dreams.spec.js
+
+# The navbar and the public (visitor) layout
+e2e/navbar_layout.spec.js
+e2e/landing_build_cta.spec.js
+e2e/propshaft_assets.spec.js

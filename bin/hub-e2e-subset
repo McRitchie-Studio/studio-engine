@@ -1,0 +1,101 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# bin/hub-e2e-subset — the hub browser subset consumer-ci.yml runs against this engine.
+#
+#   bin/hub-e2e-subset paths <list> <hub-dir>     print the listed spec paths, one per line;
+#                                                 exit 1 naming every listed file the hub
+#                                                 checkout does not have
+#   bin/hub-e2e-subset audit <list> <report.json> exit 1 unless every listed file executed
+#                                                 at least one test and none was skipped
+#
+# WHY THE AUDIT. Playwright's exit code says the tests it RAN passed. It cannot say it
+# ran the ones we asked for: a listed spec whose every test is quarantined (the job
+# passes --grep-invert @quarantine), skipped or fixme'd contributes nothing and the
+# job still exits 0. The receipt is the only place that shows it. The list file's
+# header says why these specs (.github/hub-e2e-subset.txt).
+#
+# Stdlib only: it audits the lane, so a bundle problem in the lane must not break it.
+
+require "json"
+
+module HubE2eSubset
+  module_function
+
+  def read_list(path)
+    File.readlines(path, chomp: true).map { |l| l.sub(/#.*/, "").strip }.reject(&:empty?)
+  end
+
+  def missing(list, hub_dir)
+    list.reject { |rel| File.file?(File.join(hub_dir, rel)) }
+  end
+
+  # Playwright names a suite's file relative to testDir ("navbar_layout.spec.js");
+  # the list names it relative to the hub ("e2e/navbar_layout.spec.js"). Compare on
+  # the part after e2e/ so a nested spec dir still matches.
+  def key(rel) = rel.sub(%r{\Ae2e/}, "")
+
+  # => { "navbar_layout.spec.js" => { ran: n, skipped: n } }
+  def tally(report)
+    rows = Hash.new { |h, k| h[k] = { ran: 0, skipped: 0 } }
+    walk = lambda do |suite, file|
+      file = suite["file"] || file
+      Array(suite["specs"]).each do |spec|
+        Array(spec["tests"]).each do |test|
+          results = Array(test["results"])
+          if results.empty? || results.all? { |r| r["status"] == "skipped" }
+            rows[file][:skipped] += 1
+          else
+            rows[file][:ran] += 1
+          end
+        end
+      end
+      Array(suite["suites"]).each { |child| walk.call(child, file) }
+    end
+    Array(report["suites"]).each { |s| walk.call(s, nil) }
+    rows
+  end
+
+  def audit_failures(list, report)
+    rows = tally(report)
+    list.filter_map do |rel|
+      row = rows.fetch(key(rel), { ran: 0, skipped: 0 })
+      if row[:ran].zero?
+        "#{rel} executed no test (#{row[:skipped]} skipped) — absent from the receipt, " \
+          "quarantined, skipped or renamed"
+      elsif row[:skipped].positive?
+        "#{rel} skipped #{row[:skipped]} test(s); the subset runs whole or says why"
+      end
+    end
+  end
+end
+
+if $PROGRAM_NAME == __FILE__
+  cmd, list_path, target = ARGV
+  abort "usage: bin/hub-e2e-subset paths|audit <list> <hub-dir|report.json>" unless list_path && target
+  list = HubE2eSubset.read_list(list_path)
+  abort "#{list_path} names no spec" if list.empty?
+
+  case cmd
+  when "paths"
+    gone = HubE2eSubset.missing(list, target)
+    unless gone.empty?
+      warn "HUB E2E SUBSET: RED — the hub checkout has no #{gone.join(', ')}."
+      warn "  The hub renamed or deleted a listed spec. Repoint or drop it in #{list_path}."
+      exit 1
+    end
+    puts list
+  when "audit"
+    abort "HUB E2E SUBSET: RED — no receipt at #{target}; the lane did not run to the end" unless File.file?(target)
+    failures = HubE2eSubset.audit_failures(list, JSON.parse(File.read(target)))
+    if failures.empty?
+      puts "HUB E2E SUBSET: GREEN — all #{list.length} listed specs executed, none skipped"
+    else
+      warn "HUB E2E SUBSET: RED"
+      failures.each { |f| warn "  ✗ #{f}" }
+      exit 1
+    end
+  else
+    abort "unknown command #{cmd.inspect}: paths | audit"
+  end
+end
