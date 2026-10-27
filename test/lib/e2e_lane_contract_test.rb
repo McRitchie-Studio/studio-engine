@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "json"
+require "open3"
 require "yaml"
 
 # THE STATIC HALF of the browser lane's guard. bin/e2e-executed-set-check is the
@@ -22,6 +24,9 @@ class E2eLaneContractTest < Minitest::Test
   ROOT = File.expand_path("../..", __dir__)
   CONTRACT_PATH = File.join(ROOT, "config", "e2e_lane.yml")
   CONFIG_PATH = File.join(ROOT, "playwright.config.js")
+  # The config builds on the engine's shared base (lib/studio/node_tooling), so a
+  # narrowing key added THERE narrows this lane too, and every host's.
+  BASE_PATH = File.join(ROOT, "lib", "studio", "node_tooling", "playwright_base.js")
   WORKFLOW_PATH = File.join(ROOT, ".github", "workflows", "engine-ci.yml")
   SPEC_GLOB = File.join(ROOT, "e2e", "*.spec.js")
 
@@ -48,8 +53,28 @@ class E2eLaneContractTest < Minitest::Test
   SELECTION_CALL = /(?<receiver>[\w$()\].]+)\s*\.\s*(?<verb>#{Regexp.union(SELECTION_VERBS)})\s*\(/
 
   def contract = @contract ||= YAML.safe_load_file(CONTRACT_PATH)
-  def config_source = @config_source ||= File.read(CONFIG_PATH)
+  def config_source = @config_source ||= File.read(CONFIG_PATH) + File.read(BASE_PATH)
   def workflow_source = @workflow_source ||= File.read(WORKFLOW_PATH)
+
+  # The config as Playwright receives it, under `env`: the property is what the
+  # resolved object says, wherever in the two files a key is set. The engine
+  # suite's job runs no `npm ci`, so @playwright/test is stubbed with an
+  # identity defineConfig (Playwright's own returns the object it is given).
+  def resolved_config(env = {})
+    script = <<~JS
+      const Module = require("node:module");
+      const load = Module._load;
+      Module._load = function (request, ...rest) {
+        if (request === "@playwright/test") return { defineConfig: (config) => config };
+        return load.call(this, request, ...rest);
+      };
+      process.stdout.write(JSON.stringify(require(#{CONFIG_PATH.to_json})));
+    JS
+    clean = { "CI" => nil, "PW_BASE_URL" => nil, "BASE_URL" => nil, "E2E_PORT" => nil }
+    out, err, status = Open3.capture3(clean.merge(env), "node", "-e", script, chdir: ROOT)
+    assert status.success?, "node could not load playwright.config.js: #{err}"
+    JSON.parse(out)
+  end
   def spec_paths = @spec_paths ||= Dir.glob(SPEC_GLOB).sort
 
   # The spec files name every one of these tokens in their own prose. Strip comments
@@ -156,8 +181,14 @@ class E2eLaneContractTest < Minitest::Test
   end
 
   def test_unit_playwright_config_does_not_narrow_the_test_set
-    assert_match(/testDir:\s*["']\.\/e2e["']/, config_source,
-                 "the lane must collect from ./e2e")
+    config = resolved_config("CI" => "1")
+    assert_equal "./e2e", config["testDir"], "the lane must collect from ./e2e"
+    %w[testIgnore testMatch grep grepInvert].each do |key|
+      refute config.key?(key), "#{key} in the resolved config narrows the executed set"
+      (config["projects"] || []).each do |project|
+        refute project.key?(key), "#{key} on project #{project["name"]} narrows the executed set"
+      end
+    end
 
     %w[testIgnore testMatch grepInvert].each do |key|
       refute_match(/#{key}/, config_source, "#{key} in playwright.config.js narrows the executed set")
@@ -167,9 +198,10 @@ class E2eLaneContractTest < Minitest::Test
   end
 
   def test_unit_playwright_forbids_only_under_ci
-    assert_match(/forbidOnly:\s*!!process\.env\.CI/, config_source,
+    assert_equal true, resolved_config("CI" => "1")["forbidOnly"],
                  "forbidOnly must be on under CI — a stray test.only would otherwise green the " \
-                 "lane over one spec")
+                 "lane over one spec"
+    assert_equal false, resolved_config["forbidOnly"], "forbidOnly is for CI; a local run may focus"
   end
 
   # THE LANE MUST RUN UNCONDITIONALLY. A job-level `if:` is the cheapest way to turn a

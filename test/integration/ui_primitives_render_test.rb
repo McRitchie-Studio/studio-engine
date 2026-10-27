@@ -113,7 +113,7 @@ class UiPrimitivesRenderTest < ActiveSupport::TestCase
     end
 
     node = `which node 2>/dev/null`.strip
-    refute_empty node, "node runtime NOT FOUND (mise install node@20)"
+    refute_empty node, "node runtime NOT FOUND (mise install node@22)"
     path = File.expand_path("../../app/javascript/studio/modal_host.js", __dir__)
     out = `#{node} --input-type=module --check < #{path} 2>&1`
     assert $?.success?, "studio/modal_host does not parse:\n#{out}"

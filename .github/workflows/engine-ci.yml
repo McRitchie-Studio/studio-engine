@@ -109,14 +109,14 @@ jobs:
           ruby-version: 3.3.11
           bundler-cache: true
 
-      # Node 20 matches the ecosystem's mise-managed local runtime (v20.20.2),
-      # which is what the store behavior harness was written and verified
-      # against. Keep this MAJOR in step with `mise install node@20` so a
-      # passing local run and a passing CI run mean the same thing.
+      # Node's major is pinned once, in .tool-versions, the file mise reads on a
+      # laptop and setup-node reads here, so a passing local run and a passing CI
+      # run mean the same Node. lib/studio/node_tooling/versions.json holds the
+      # same major, and test/lib/studio/node_tooling_test.rb holds the two together.
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .tool-versions
 
       - name: Run the engine suite
         run: bin/release-check
@@ -177,7 +177,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .tool-versions
           cache: npm
 
       - name: Install JS dependencies
