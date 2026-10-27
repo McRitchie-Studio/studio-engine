@@ -4,6 +4,20 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **`studio/studio_confetti` resolves `"canvas-confetti"` on every page.** In
+  0.115.1.rc1 the head loaded it with `javascript_include_tag ..., type:
+  "module"`, which also sends a `Link: rel=modulepreload` response header. The
+  browser acts on that header before it parses the import map, so on a page
+  whose head parsed slowly it resolved the module's bare import against no map
+  and threw `TypeError: Failed to resolve module specifier "canvas-confetti"`
+  (11 hub e2e specs: the boards and `/dreams`). The head now imports it with
+  `javascript_import_module_tag` below the map, which sends no header. No host
+  change is needed. A module the head loads by URL may import no bare specifier
+  (`test/views/head_url_modules_import_no_bare_specifier_test.rb`), and the e2e
+  lab now sends the Link header Rails sends, which its stub had dropped.
+
 ## 0.115.1 — 2026-10-27
 
 ### Changed
