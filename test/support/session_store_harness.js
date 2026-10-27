@@ -26,6 +26,36 @@ const SOURCE = fs.readFileSync(SOURCE_PATH, "utf8");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// A BUS ROUND TRIP IS A CHAIN OF TIMERS, NOT A DURATION. The fake BroadcastChannel
+// below delivers each message on its own setTimeout(0), so "outsider says hello,
+// tab answers" is two timer hops, and the second hop is only SCHEDULED when the
+// first one fires. A fixed `await sleep(20)` raced that chain: when the event loop
+// stalls past 20ms (a GC pause, or a CI box at load average 13), node wakes with
+// both the first hop and the sleep already due, runs them in deadline order, and
+// the sleep resolves before the second hop, which was scheduled 1ms in the future
+// only a moment earlier. The assertion then reads an empty `heard`. A 30ms stall
+// reproduces it every time.
+//
+// So a scenario that waits for a bus message waits for the MESSAGE: `until` polls
+// the condition with a generous deadline (it returns as soon as the condition holds,
+// so a healthy run pays nothing for the headroom), and `settle` then drains the
+// zero-delay hops still queued, so an unwanted SECOND message has its chance to
+// arrive before the exact-match assertion. Both are ordering-based, not clock-based.
+async function until(predicate, label, timeoutMs = 2000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error("timed out after " + timeoutMs + "ms waiting for " + label);
+    await sleep(1);
+  }
+}
+
+// Each setTimeout(0) queued before ours runs before ours (node keeps same-duration
+// timers FIFO), and every hop it schedules lands ahead of our next one. Five rounds
+// outlasts the longest chain any scenario drives (hello, answer, and one echo).
+async function settle(rounds = 5) {
+  for (let i = 0; i < rounds; i += 1) await sleep(0);
+}
+
 // Each tab is its own realm, so its TypeError is not this file's TypeError.
 const isTypeError = (error) => !!error && error.name === "TypeError";
 
@@ -742,11 +772,12 @@ scenario("answers_a_hello_with_its_session", async () => {
   const outsider = new world.BroadcastChannel("studio-session");
   const heard = [];
   outsider.onmessage = (event) => heard.push(event.data);
-  await sleep(10);
+  await settle();
   heard.length = 0;
 
   outsider.postMessage({ v: 1, type: "hello", tabId: "outsider" });
-  await sleep(20);
+  await until(() => heard.length > 0, "the tab's answer to the hello");
+  await settle();
   assert.deepStrictEqual(heard.map((m) => [m.type, m.fingerprint]), [["announce", "fp-u1"]]);
   outsider.close();
 });
@@ -766,7 +797,8 @@ scenario("a_stale_tab_does_not_announce", async () => {
   const heard = [];
   outsider.onmessage = (event) => heard.push(event.data);
   outsider.postMessage({ v: 1, type: "hello", tabId: "outsider" });
-  await sleep(20);
+  await until(() => heard.length > 0, "the current tab's answer to the hello");
+  await settle();
   assert.deepStrictEqual(heard.map((m) => m.fingerprint), ["anonymous"],
     "only the tab with a current stamp answers; the stale one has nothing true to say");
   assert.strictEqual(b.store.current().state, "anonymous");
