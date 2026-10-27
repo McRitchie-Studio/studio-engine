@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.115.1 — 2026-10-27
+
 ### Changed
 
 - **Five of the engine's six classic scripts are ES modules.** No host change
