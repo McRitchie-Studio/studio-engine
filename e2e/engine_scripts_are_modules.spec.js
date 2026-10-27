@@ -29,15 +29,20 @@ test("every script the head loads by URL is a module below the import map, and t
     const map = scripts.findIndex((script) => script.type === "importmap");
     return {
       map,
+      confettiImport: scripts.findIndex((script) => script.type === "module" && script.text.trim() === 'import "studio/studio_confetti"'),
       bySrc: scripts.map((script, index) => ({ index, src: script.getAttribute("src"), type: script.type })).filter((script) => script.src)
     };
   });
 
   expect(head.map).toBeGreaterThanOrEqual(0);
   const names = head.bySrc.map((script) => script.src).join(" ");
-  for (const name of ["studio/studio_confetti", "studio/alpine", "studio/sticky_table_header"]) {
+  for (const name of ["studio/alpine", "studio/sticky_table_header"]) {
     expect(names, `${name} is not loaded by the head`).toContain(name);
   }
+  // Confetti imports a bare specifier, so it is imported below the map, never by URL
+  // (e2e/confetti_resolves_under_a_slow_head.spec.js says why).
+  expect(names).not.toContain("studio/studio_confetti");
+  expect(head.confettiImport, "studio/studio_confetti is not imported below the import map").toBeGreaterThan(head.map);
   for (const script of head.bySrc) {
     expect(script.type, `${script.src} is a classic script`).toBe("module");
     expect(script.index, `${script.src} is above the import map`).toBeGreaterThan(head.map);

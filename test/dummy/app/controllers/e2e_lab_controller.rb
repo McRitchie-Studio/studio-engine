@@ -107,12 +107,28 @@ class E2eLabController < ActionController::Base
     # sends the same module, so the tag and an import of it are one module
     # instance. Anything else is a vendored build under /e2e/js. `type` and
     # `defer` pass through as a host's pipeline passes them.
+    #
+    # And it sends the `Link` response header Rails' own javascript_include_tag
+    # sends (config.action_view.preload_links_header, on by default): `preload`
+    # for a classic script, `modulepreload` for type="module", none for a
+    # deferred one or a call that passes preload_links_header: false. The browser
+    # acts on that header before it parses the body, so it is part of what the
+    # head does to a page. A stub that dropped it hid the 0.115.1.rc1 regression
+    # (task confetti-resolves-on-hub): a module tag fetched, and its bare import
+    # resolved, before the import map existed (e2e/confetti_resolves_under_a_slow_head.spec.js).
     def javascript_include_tag(*sources, **options)
+      use_header = options.key?(:preload_links_header) ? options.delete(:preload_links_header) : ActionView::Helpers::AssetTagHelper.preload_links_header
+      preload_links = []
       scripts = sources.map do |source|
         logical = "#{source}.js"
         src = Studio::Engine.javascript_module_logical_paths.include?(logical) ? asset_path(logical) : "/e2e/js/#{logical}"
+        if use_header && options[:defer].blank?
+          rel = options[:type].to_s == "module" ? "modulepreload" : "preload"
+          preload_links << "<#{src}>; rel=#{rel}; as=script; nopush"
+        end
         tag.script("".html_safe, src: src, type: options[:type], defer: options[:defer].present?)
       end
+      send_preload_links_header(preload_links)
       safe_join(scripts)
     end
 

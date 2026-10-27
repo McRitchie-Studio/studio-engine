@@ -76,11 +76,13 @@ class StudioConfettiJsTest < Minitest::Test
   end
 
   def test_head_loads_bundled_confetti_not_the_cdn
-    assert_includes head_erb, %(javascript_include_tag "studio/studio_confetti", type: "module"),
-      "the head must load the confetti module via the asset pipeline"
+    assert_includes head_erb, %(javascript_import_module_tag "studio/studio_confetti"),
+      "the head must import the confetti module by its pin"
+    refute_includes head_erb, %(javascript_include_tag "studio/studio_confetti"),
+      "by URL, its Link modulepreload header resolves \"canvas-confetti\" before the import map exists"
     refute_includes head_erb, %(javascript_include_tag "studio/canvas_confetti"),
       "the library arrives by the module's import, not a classic tag of its own"
-    assert_operator head_erb.index("javascript_importmap_tags %>"), :<, head_erb.index(%(javascript_include_tag "studio/studio_confetti")),
+    assert_operator head_erb.index("javascript_importmap_tags %>"), :<, head_erb.index(%(javascript_import_module_tag "studio/studio_confetti")),
       "a module tag above the import map makes older browsers ignore the map"
     refute_includes head_erb, "cdn.jsdelivr.net/npm/canvas-confetti",
       "the head must NOT link the jsDelivr confetti CDN (bundled, CSP-safe)"

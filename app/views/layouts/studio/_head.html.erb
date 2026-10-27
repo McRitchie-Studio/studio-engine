@@ -195,7 +195,13 @@
     take every bare specifier on the page down with it. The ones below that load by
     URL (type="module" with a src) are external files, not inline scripts: they
     carry no body and need no nonce under a policy that allows 'self'. The session
-    store (studio/_session_stamp, above) is the one classic script, and says why. %>
+    store (studio/_session_stamp, above) is the one classic script, and says why.
+    A MODULE LOADED BY URL MUST IMPORT NO BARE SPECIFIER. javascript_include_tag
+    also sends a `Link: rel=modulepreload` response header, which the browser
+    acts on before it parses this map, so a bare import in that module can
+    resolve against no map at all and fail for good (0.115.1.rc1, task
+    confetti-resolves-on-hub). A module with bare imports takes a
+    javascript_import_module_tag, which sends no header. %>
 <%# THE ENGINE'S BROWSER BOOT (studio/application): its every-page Stimulus
     controllers, the pinned stack, and the Alpine shims. A module tag, so it
     carries the nonce. %>
@@ -238,13 +244,19 @@
     module that owns it. Its imports import nothing, and studio/alpine_shims
     imports it, so a failed boot leaves a page its uploads. %>
 <%= javascript_import_module_tag "studio/alpine_scopes" %>
-<%# CONFETTI, BY URL. studio/studio_confetti imports the vendored canvas-confetti
-    (pinned "canvas-confetti", app/assets/javascripts/studio/canvas_confetti.js:
-    no CDN, same-origin) and exports burst, cannons and confetti. It also keeps
-    the deprecated globals window.studioConfetti and window.confetti, which
-    studio/head_chrome's fireSuccessConfetti and host classic code still call.
-    Before Alpine, so both exist by the time an x-init can fire one. %>
-<%= javascript_include_tag "studio/studio_confetti", type: "module", "data-turbo-track": "reload" %>
+<%# CONFETTI, BY ITS OWN DOOR, AND NOT BY URL. studio/studio_confetti imports the
+    vendored canvas-confetti by its bare pin ("canvas-confetti",
+    app/assets/javascripts/studio/canvas_confetti.js: no CDN, same-origin) and
+    exports burst, cannons and confetti. It also keeps the deprecated globals
+    window.studioConfetti and window.confetti, which studio/head_chrome's
+    fireSuccessConfetti and host classic code still call. Before Alpine, so both
+    exist by the time an x-init can fire one.
+    An inline module tag, never javascript_include_tag: that helper's Link
+    modulepreload header had the browser resolve "canvas-confetti" before the
+    map above existed, so on a page whose head parsed slowly (the hub's boards
+    and /dreams) the module failed with "Failed to resolve module specifier"
+    (e2e/confetti_resolves_under_a_slow_head.spec.js). %>
+<%= javascript_import_module_tag "studio/studio_confetti" %>
 <%# ALPINE LOADS AFTER THE MODULE TAGS, and the order is the contract. Module
     scripts (and deferred classic ones) execute in document order, so by the time
     Alpine starts, studio/application has defined the shims it evaluates
