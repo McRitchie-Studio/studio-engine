@@ -57,9 +57,19 @@ class E2eLaneContractTest < Minitest::Test
   def workflow_source = @workflow_source ||= File.read(WORKFLOW_PATH)
 
   # The config as Playwright receives it, under `env`: the property is what the
-  # resolved object says, wherever in the two files a key is set.
+  # resolved object says, wherever in the two files a key is set. The engine
+  # suite's job runs no `npm ci`, so @playwright/test is stubbed with an
+  # identity defineConfig (Playwright's own returns the object it is given).
   def resolved_config(env = {})
-    script = "process.stdout.write(JSON.stringify(require(#{CONFIG_PATH.to_json})))"
+    script = <<~JS
+      const Module = require("node:module");
+      const load = Module._load;
+      Module._load = function (request, ...rest) {
+        if (request === "@playwright/test") return { defineConfig: (config) => config };
+        return load.call(this, request, ...rest);
+      };
+      process.stdout.write(JSON.stringify(require(#{CONFIG_PATH.to_json})));
+    JS
     clean = { "CI" => nil, "PW_BASE_URL" => nil, "BASE_URL" => nil, "E2E_PORT" => nil }
     out, err, status = Open3.capture3(clean.merge(env), "node", "-e", script, chdir: ROOT)
     assert status.success?, "node could not load playwright.config.js: #{err}"
