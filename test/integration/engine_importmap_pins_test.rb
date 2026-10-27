@@ -18,7 +18,8 @@ require "nokogiri"
 #
 #   1. every module under app/javascript/studio is pinned as studio/<name>, and
 #      the rendered importmap tags carry it, preloading only the boot graph
-#      (studio/application and what it imports) and @hotwired/stimulus;
+#      (studio/application and what it imports) and @hotwired/stimulus; the
+#      vendored SortableJS and canvas-confetti are pinned by package name;
 #   2. the engine's map is drawn before the host's, so a host pin of the same
 #      name wins (the control: the same draw with the engine's map last loses);
 #   3. each module resolves as an asset: on the asset paths and in sprockets'
@@ -64,6 +65,8 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
     assert_nil pins["studio/vendor/stimulus"], "a vendored library is pinned by its package name only"
     assert_equal "studio/sortable.js", pins["sortablejs"].path
     assert_equal false, pins["sortablejs"].preload, "SortableJS is fetched only by a page that drags"
+    assert_equal "studio/canvas_confetti.js", pins["canvas-confetti"].path, "the pin is the vendored build (no CDN)"
+    assert_equal false, pins["canvas-confetti"].preload, "studio/studio_confetti imports it; its own tag is not the boot"
   end
 
   test "the boot graph follows studio/application's static imports" do

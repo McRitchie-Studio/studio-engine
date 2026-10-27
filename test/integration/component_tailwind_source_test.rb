@@ -33,6 +33,19 @@ class ComponentTailwindSourceTest < Minitest::Test
     assert_operator B.emitted_classes["app/views"].size, :>, 300, "the views emit too few classes for this to mean anything"
   end
 
+  # THE EXEMPTION, MEASURED. host.css scans no line for app/assets/javascripts,
+  # on the claim that nothing there but vendored code puts a class on a page
+  # (studio/session.js is the one engine file). A class added there would paint
+  # nothing in a host, so the claim fails here instead.
+  def test_an_unscanned_directory_emits_no_class
+    B::UNSCANNED_DIRS.each do |dir|
+      files, classes = B.unscanned_classes(dir)
+      refute_empty files, "#{dir} holds no engine file, so this proves nothing"
+      assert_empty classes, "#{dir} emits classes no @source line reaches: #{classes.to_a.sort.first(20).inspect}"
+      refute_includes File.read(B::HOST_CSS), %(@source "#{Pathname(B::ROOT).join(dir).relative_path_from(ENGINE_DIR)}";)
+    end
+  end
+
   # THE STRUCTURAL MUTATION. Every emitting directory is named by an @source
   # line; removing any one line from host.css makes uncovered_dirs name it.
   def test_every_emitting_directory_has_a_source_line

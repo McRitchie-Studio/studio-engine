@@ -18,8 +18,16 @@
 // fail on its elements: that app's map carries no data-leaflet-js, so there is
 // nothing here to fetch.
 //
-// It imports nothing; test/javascript/footer_map.test.mjs loads it as a data:
-// module. Started by the footer-map controller.
+// LEAFLET IS A MODULE IMPORT. The vendored build (studio/leaflet.js) is
+// imported by the URL the element carries, as a dynamic import(), not a
+// <script> element injected into the head: it assigns window.L when it is
+// evaluated, and an import is governed by the page's script-src exactly as the
+// module that asks for it is. A browser never refetches a module whose fetch
+// failed, so a retry asks for the same file under a fresh query string.
+//
+// It imports nothing statically; test/javascript/footer_map.test.mjs loads it as
+// a data: module and hands installFooterMaps its own importer. Started by the
+// footer-map controller.
 
 export const MAPS = "[data-footer-map][data-leaflet-js]"
 export const TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -33,15 +41,25 @@ export function mapOptions(dataset) {
   return { at, zoom: parseInt(dataset.zoom, 10) || 15, zoomControl: dataset.controls !== "false" }
 }
 
+// The URL of the nth attempt at one file: the file itself first, then the same
+// file under ?retry=n, because the module map remembers a failed fetch.
+export function attemptUrl(src, attempt) {
+  if (!attempt) return src
+  return `${src}${src.includes("?") ? "&" : "?"}retry=${attempt}`
+}
+
+const importModule = (url) => import(url)
+
 // Installs the footer maps, once per document. Answers the function that arms
 // the maps now on the page (after `load`), whether this call installed it or an
-// earlier one did.
-export function installFooterMaps(win, doc) {
+// earlier one did. `load` is how a module is imported (a test passes its own).
+export function installFooterMaps(win, doc, { load = importModule } = {}) {
   if (win.__studioFooterMapsArmed) return win.__studioFooterMapsArm || (() => {})
   win.__studioFooterMapsArmed = true
 
   let maps = []
   let loading = null
+  let attempts = 0
 
   // Checked on every mount, not once: a page visit that rebuilds the head must
   // not leave a mounted map without its stylesheet.
@@ -57,14 +75,12 @@ export function installFooterMaps(win, doc) {
   function loadLeaflet(src) {
     if (win.L) return Promise.resolve()
     if (loading) return loading
-    loading = new Promise((resolve, reject) => {
-      const s = doc.createElement("script")
-      s.src = src
-      s.onload = resolve
+    const url = attemptUrl(src, attempts)
+    attempts += 1
+    loading = new Promise((resolve) => resolve(load(url)))
+      .then(() => { if (!win.L) throw new Error("leaflet loaded without window.L") })
       // A failed fetch must not be remembered: the next visit tries again.
-      s.onerror = () => { loading = null; s.remove(); reject(new Error("leaflet failed to load")) }
-      doc.head.appendChild(s)
-    })
+      .catch((error) => { loading = null; throw error })
     return loading
   }
 

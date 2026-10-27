@@ -219,7 +219,7 @@ A **fixed** reader on a timeline header is also on screen at the top of the
 page, where the expanded header still reaches `travel` further down: its live
 edge is `bottom + max(0, travel - scrollY)`, which is what `data-pin-edge` does
 in CSS. The sticky table header (`config.sticky_table_headers`) places its clone
-this way; see `app/assets/javascripts/studio/sticky_table_header.js`.
+this way; see `app/javascript/studio/sticky_table_header.js`.
 
 ## CSS Class Hooks
 

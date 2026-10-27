@@ -28,13 +28,15 @@
    files put a utility class on the page is scanned here, relative to this
    file, in every host that imports it, with no host edit: views and
    partials, the ViewComponents (their colour classes live in Ruby), the
-   helpers that build markup (admin_model_table), and both JavaScript trees
-   (classes added at runtime).
+   helpers that build markup (admin_model_table), and the engine's ES modules
+   (app/javascript: classes added at runtime). app/assets/javascripts is not
+   scanned: since the engine's scripts became modules it holds the vendored,
+   minified third-party builds (Alpine, Leaflet, Sortable, canvas-confetti) and
+   studio/session.js, which puts no class on a page (held by
+   test/integration/component_tailwind_source_test.rb).
 
-   The exclusions are NARROW on purpose: the vendored, minified third-party
-   bundles (Stimulus, Alpine, Leaflet, Sortable, canvas-confetti) are not
-   engine markup, and scanning them mints junk utilities from their
-   identifiers. Never exclude a whole directory: the hub's
+   The exclusions are NARROW on purpose: the vendored bundles are not engine
+   markup, and scanning them mints junk utilities from their identifiers. Never exclude a whole directory: the hub's
    `@source not "../../../vendor/bundle"` once dropped every one of these
    lines in CI, because the gem itself lives under vendor/bundle there.
 
@@ -47,8 +49,6 @@
 @source "../../../helpers";
 @source "../../../javascript";
 @source not "../../../javascript/studio/vendor";
-@source "../../javascripts";
-@source not "../../javascripts/studio/{alpine,canvas_confetti,leaflet,sortable}.js";
 
 /* -- Motion / effect / leveling layer ---------------------------------------
    Last, so the theme and component layer it reads are in scope, as when hosts

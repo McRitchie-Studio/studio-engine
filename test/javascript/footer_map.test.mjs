@@ -7,11 +7,36 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/footer_map.js", import.meta.url), "utf8")
-const { MAPS, TILES, mapOptions, installFooterMaps } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+const { MAPS, TILES, mapOptions, attemptUrl, installFooterMaps } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
-test("the module imports nothing", () => {
+test("the module imports nothing statically", () => {
   assert.doesNotMatch(source, /^\s*import\s/m)
 })
+
+// Leaflet arrives by a dynamic import() of the URL the element carries, never a
+// <script> element in the head.
+test("Leaflet is imported, not injected as a script element", () => {
+  assert.match(source, /\bimport\(url\)/)
+  assert.doesNotMatch(source, /createElement\("script"\)/)
+})
+
+test("a retry asks for the same file under a fresh query, because a failed module is never refetched", () => {
+  assert.equal(attemptUrl("/assets/leaflet.js", 0), "/assets/leaflet.js")
+  assert.equal(attemptUrl("/assets/leaflet.js", 1), "/assets/leaflet.js?retry=1")
+  assert.equal(attemptUrl("/assets/leaflet.js?v=2", 2), "/assets/leaflet.js?v=2&retry=2")
+})
+
+// What installFooterMaps imports Leaflet with: it records each URL and leaves
+// the import pending until the test settles it.
+function fakeLoader() {
+  const urls = []
+  const pending = []
+  const load = (url) => {
+    urls.push(url)
+    return new Promise((resolve, reject) => pending.push({ resolve, reject }))
+  }
+  return { urls, pending, load }
+}
 
 test("only an engine-rendered map is armed, and the tiles are keyless", () => {
   assert.equal(MAPS, "[data-footer-map][data-leaflet-js]")
@@ -101,7 +126,8 @@ test("install: nothing is watched before `load`, and it installs once", () => {
   const win = fakeWindow()
   const doc = fakeDocument([mapElement()], "interactive")
 
-  const arm = installFooterMaps(win, doc)
+  const loader = fakeLoader()
+  const arm = installFooterMaps(win, doc, loader)
   assert.equal(win.__studioFooterMapsArmed, true)
   assert.equal(Watcher.all.length, 0)
   assert.equal(installFooterMaps(win, doc), arm, "a second install answers the same arm and adds no listener")
@@ -111,7 +137,8 @@ test("install: nothing is watched before `load`, and it installs once", () => {
   win.fire("load")
   assert.equal(Watcher.all.length, 1)
   assert.equal(Watcher.all[0].options.rootMargin, "400px")
-  assert.equal(doc.head.children.length, 0, "Leaflet is not fetched until the map nears the viewport")
+  assert.equal(doc.head.children.length, 0, "the stylesheet is not fetched until the map nears the viewport")
+  assert.deepEqual(loader.urls, [], "Leaflet is not imported until the map nears the viewport")
 })
 
 test("near the viewport: the stylesheet and Leaflet are fetched once, and the map mounts over its fallback", async () => {
@@ -120,17 +147,18 @@ test("near the viewport: the stylesheet and Leaflet are fetched once, and the ma
   const el = mapElement()
   const second = mapElement()
   const doc = fakeDocument([el, second])
-  installFooterMaps(win, doc)
+  const loader = fakeLoader()
+  installFooterMaps(win, doc, loader)
 
   Watcher.all[0].callback([{ isIntersecting: true }])
   Watcher.all[1].callback([{ isIntersecting: true }])
-  const script = doc.head.children.find((n) => n.tag === "script")
-  assert.deepEqual(doc.head.children.map((n) => n.tag), ["link", "script"], "two maps, one stylesheet and one script")
-  assert.equal(script.src, "/assets/leaflet.js")
+  assert.deepEqual(doc.head.children.map((n) => n.tag), ["link"], "two maps, one stylesheet, and no script element")
+  assert.deepEqual(loader.urls, ["/assets/leaflet.js"], "two maps, one import")
   assert.equal(doc.head.children[0].href, "/assets/leaflet.css")
 
+  // The vendored build assigns window.L when it is evaluated.
   win.L = fakeLeaflet()
-  script.onload()
+  loader.pending[0].resolve({})
   await settle()
 
   assert.equal(win.L.calls.maps.length, 2)
@@ -153,13 +181,15 @@ test("a phone gets no one-finger drag", async () => {
   const leaflet = fakeLeaflet()
   leaflet.Browser.mobile = true
   const win = fakeWindow({ L: leaflet })
-  installFooterMaps(win, fakeDocument([mapElement()]))
+  const loader = fakeLoader()
+  installFooterMaps(win, fakeDocument([mapElement()]), loader)
 
   Watcher.all[0].callback([{ isIntersecting: true }])
   await settle()
 
   assert.equal(leaflet.calls.maps[0].options.dragging, false)
   assert.equal(leaflet.calls.maps[0].options.touchZoom, true)
+  assert.deepEqual(loader.urls, [], "a page that already has Leaflet imports nothing")
 })
 
 test("a failed Leaflet fetch leaves the fallback and is not remembered", async () => {
@@ -167,19 +197,42 @@ test("a failed Leaflet fetch leaves the fallback and is not remembered", async (
   const win = fakeWindow()
   const el = mapElement()
   const doc = fakeDocument([el])
-  const arm = installFooterMaps(win, doc)
+  const loader = fakeLoader()
+  const arm = installFooterMaps(win, doc, loader)
 
   Watcher.all[0].callback([{ isIntersecting: true }])
-  const failed = doc.head.children.find((n) => n.tag === "script")
-  failed.onerror()
+  loader.pending[0].reject(new TypeError("Failed to fetch dynamically imported module"))
   await settle()
-  assert.equal(failed.removed, true)
   assert.equal(el.fallback.removed, 0, "the link is still the whole map")
   assert.equal(el.__footerMap, undefined)
 
   arm()
   Watcher.all[1].callback([{ isIntersecting: true }])
-  assert.equal(doc.head.children.filter((n) => n.tag === "script").length, 2, "the next visit tries again")
+  assert.deepEqual(loader.urls, ["/assets/leaflet.js", "/assets/leaflet.js?retry=1"],
+                   "the next visit tries again, under a URL the module map has not seen fail")
+
+  win.L = fakeLeaflet()
+  loader.pending[1].resolve({})
+  await settle()
+  assert.equal(win.L.calls.maps.length, 1, "the retry mounts the map")
+})
+
+test("a file that loads but defines no window.L is a failure, and is tried again", async () => {
+  Watcher.all = []
+  const win = fakeWindow()
+  const el = mapElement()
+  const doc = fakeDocument([el])
+  const loader = fakeLoader()
+  const arm = installFooterMaps(win, doc, loader)
+
+  Watcher.all[0].callback([{ isIntersecting: true }])
+  loader.pending[0].resolve({})
+  await settle()
+  assert.equal(el.fallback.removed, 0, "the link is still the whole map")
+
+  arm()
+  Watcher.all[1].callback([{ isIntersecting: true }])
+  assert.equal(loader.urls.length, 2)
 })
 
 test("before a Turbo snapshot the map is taken down and its fallback put back", async () => {
@@ -188,7 +241,7 @@ test("before a Turbo snapshot the map is taken down and its fallback put back", 
   const win = fakeWindow({ L: leaflet })
   const el = mapElement()
   const doc = fakeDocument([el])
-  installFooterMaps(win, doc)
+  installFooterMaps(win, doc, fakeLoader())
   Watcher.all[0].callback([{ isIntersecting: true }])
   await settle()
   el.mounted = true
@@ -203,6 +256,8 @@ test("before a Turbo snapshot the map is taken down and its fallback put back", 
 test("with no IntersectionObserver the map is fetched as soon as it is armed", () => {
   const win = fakeWindow({ IntersectionObserver: undefined })
   const doc = fakeDocument([mapElement()])
-  installFooterMaps(win, doc)
-  assert.deepEqual(doc.head.children.map((n) => n.tag), ["link", "script"])
+  const loader = fakeLoader()
+  installFooterMaps(win, doc, loader)
+  assert.deepEqual(doc.head.children.map((n) => n.tag), ["link"])
+  assert.deepEqual(loader.urls, ["/assets/leaflet.js"])
 })

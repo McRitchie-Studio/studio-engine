@@ -1045,7 +1045,15 @@
 # RED three ways: the fetcher ignored (test 1 fails), the null answer read as a
 # response (test 2), and a missing export falling back to plain fetch (test 3).
 #   npx playwright test --list  -> 375 tests in 55 files
-total_specs: 375
+# 375 -> 379: e2e/engine_scripts_are_modules.spec.js (engine-scripts-become-modules).
+# The engine's six classic scripts became ES modules: every head script with a src
+# is a module below the import map and the map still resolves, the converted
+# modules' exports are the compatibility globals they keep, the session store stays
+# classic and exists before any module runs, and confetti fires from the module
+# (and not under reduced motion).
+# Verified RED by restoring Alpine's classic `defer: true` tag (test 1 fails).
+#   npx playwright test --list  -> 379 tests in 56 files
+total_specs: 379
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1273,7 +1281,11 @@ total_specs: 375
 #   npx playwright test --list                                             -> 375 tests, 55 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 375
-executed: 375
+# And for the engine scripts as modules: 4 more tests (375 -> 379), 1 new file:
+#   npx playwright test --list                                             -> 379 tests, 56 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 379
+executed: 379
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

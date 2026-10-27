@@ -78,8 +78,8 @@ abort "e2e/boot: tailwind build produced nothing at #{css_out}" if File.size?(cs
 # over dead components. The lane compensated for the defect instead of observing it.
 #
 # The engine now VENDORS Alpine (app/assets/javascripts/studio/alpine.js), so the
-# block below already copies it, and the head's own javascript_include_tag delivers
-# it — the real path a consumer uses. Keeping the node_modules copy would load Alpine
+# block below already copies it, and the head's own type="module" include tag
+# delivers it — the real path a consumer uses. Keeping the node_modules copy would load Alpine
 # TWICE and, worse, make the delivery UNOBSERVABLE: with a second Alpine always in
 # the page, e2e/vendored_alpine.spec.js stayed green with the CDN tag restored, which
 # is how this was found.
@@ -90,8 +90,8 @@ abort "e2e/boot: tailwind build produced nothing at #{css_out}" if File.size?(cs
 
 # ---- The engine's OWN served assets ------------------------------------------
 #
-# app/assets/javascripts/studio/*.js and app/assets/stylesheets/studio/*.css are
-# files the engine SHIPS and a consumer's asset pipeline serves verbatim. Copying
+# app/assets/javascripts/studio/*.js (the vendored third-party builds, each loaded
+# as a module) and app/assets/stylesheets/studio/*.css are files the engine SHIPS and a consumer's asset pipeline serves verbatim. Copying
 # rather than regenerating them is the point: the bytes a spec drives here are the
 # bytes a consumer gets. E2eLabController::AssetDelivery serves them from these
 # paths in place of the host asset pipeline the dummy does not have.

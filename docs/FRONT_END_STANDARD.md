@@ -127,8 +127,14 @@ them with no edit: the engine's `config/importmap.rb` pins each module under
 `app/javascript/studio` as `studio/<name>`, and the `studio.importmap`
 initializer adds that file to importmap-rails' maps before the host's own, so a
 host that pins the same name wins. A module's logical asset path shares the
-`studio/` prefix with the classic scripts in `app/assets/javascripts/studio`, so
-it may not reuse one of their names. `studio/local_path`, the browser twin of
+`studio/` prefix with the files in `app/assets/javascripts/studio` (the
+vendored third-party builds and `studio/session.js`), so it may not reuse one
+of their names. Five of the six engine scripts that were classic (Alpine,
+canvas-confetti, `studio_confetti`, `sticky_table_header`, Leaflet) now load as
+modules: by a `type="module"` tag after the import map, by an importmap pin, or
+by `import()`. `studio/session.js` stays a synchronous classic script above the
+map, because host modules register with `window.StudioSession` as they
+evaluate (`layouts/studio/_head` says why). `studio/local_path`, the browser twin of
 `Studio::LocalPath.local?`, is held to the Ruby rule by
 `test/lib/studio/local_path_js_parity_test.rb`, which also runs every
 `node:test` file in `test/javascript` in the engine suite.
@@ -218,8 +224,8 @@ nothing: a `.hold-stack` whose controller has not written
 `data-studio-controller-failed="hold-button"`, reads as unavailable, and shows
 "This button could not load. Reload the page." A late connect clears it.
 
-Alpine loads after the module tags. Deferred classic scripts and module scripts
-run in document order, so by the time Alpine starts, the boot has installed the
+Alpine loads after the module tags, as a module tag itself. Module scripts run
+in document order, so by the time Alpine starts, the boot has installed the
 Alpine shims (`studio/alpine_shims`): the `window.*` globals and Alpine stores
 consumers still bind to, each a thin delegate to the module that owns the
 behaviour. A shim stays while a consumer binds to it. The engine's converted
@@ -274,7 +280,8 @@ console error naming the attribute and its event.
 **Today.** The shared head carries three inline
 scripts, all nonced: the pre-paint theme, the hold button's guard and the
 x-data factories' guard; its behaviour is the modules above. The engine
-vendors Alpine and loads it with `javascript_include_tag`. Every app pins its
+vendors Alpine and loads it as a module, with `javascript_include_tag` and
+`type: "module"`, after the import map. Every app pins its
 modules with importmap.
 Cyvasse and Industries pin Stimulus; the hub has `stimulus-rails` in its
 Gemfile but no Stimulus pin and no controllers, four modules in

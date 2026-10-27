@@ -105,17 +105,34 @@ module EngineTailwindBuild
   # Every directory whose files put a class on a page. The rest of app/
   # (controllers, models, jobs, mailers, services) and lib/ write no markup:
   # their class-shaped strings are hash keys and comment prose.
-  EMITTING_DIRS = %w[app/views app/components app/helpers app/javascript app/assets/javascripts].freeze
+  # app/assets/javascripts is not one: since the engine's scripts became ES
+  # modules (app/javascript) it holds the vendored third-party builds and
+  # studio/session.js, which emits no class (UNSCANNED_DIRS, asserted).
+  EMITTING_DIRS = %w[app/views app/components app/helpers app/javascript].freeze
 
-  # Third-party bundles vendored into the JS trees. Not engine markup, and
-  # host.css excludes them by name.
+  # Third-party bundles vendored into the module tree. Not engine markup, and
+  # host.css excludes them.
   VENDORED = %w[
     app/javascript/studio/vendor/stimulus.js
+  ].freeze
+
+  # Directories host.css does not scan because nothing in them puts a class on
+  # a page. A claim, so ComponentTailwindSourceTest measures it.
+  UNSCANNED_DIRS = %w[app/assets/javascripts].freeze
+  UNSCANNED_VENDORED = %w[
     app/assets/javascripts/studio/alpine.js
     app/assets/javascripts/studio/canvas_confetti.js
     app/assets/javascripts/studio/leaflet.js
     app/assets/javascripts/studio/sortable.js
   ].freeze
+
+  # The classes an unscanned directory's own (non-vendored) files would emit.
+  def unscanned_classes(dir)
+    files = Dir[File.join(ROOT, dir, "**/*.{erb,html,rb,js}")].reject { |f| UNSCANNED_VENDORED.include?(f.delete_prefix("#{ROOT}/")) }
+    tokens = files.flat_map { |f| tokens_in(f) }.uniq
+    floor = classes_in_css(compile([], sources: false))
+    [files, classes_in_css(compile(tokens, sources: false)) - floor]
+  end
 
   def emitting_files(dir)
     Dir[File.join(ROOT, dir, "**/*.{erb,html,rb,js}")].reject { |f| VENDORED.include?(f.delete_prefix("#{ROOT}/")) }.sort

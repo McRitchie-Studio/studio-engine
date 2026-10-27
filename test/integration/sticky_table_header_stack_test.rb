@@ -26,20 +26,28 @@ require "action_dispatch/testing/integration"
 #     engine view pins a `top:` to the header's height first.
 class StickyTableHeaderStackTest < ActionDispatch::IntegrationTest
   ROOT = File.expand_path("../..", __dir__)
-  SCRIPT = File.join(ROOT, "app/assets/javascripts/studio/sticky_table_header.js")
+  SCRIPT = File.join(ROOT, "app/javascript/studio/sticky_table_header.js")
 
   def test_integration_the_lab_page_gets_the_assets_by_local_and_its_neighbour_does_not
     refute Studio.sticky_table_headers, "the dummy host leaves the config off"
 
     get "/lab/sticky_table?timeline=1"
     assert_response :success
-    assert_includes response.body, "/e2e/js/studio/sticky_table_header.js"
+    script = css_select("head script").find { |s| s["src"].to_s.include?("studio/sticky_table_header") }
+    refute_nil script, "the lab page does not load the sticky header"
+    assert_equal "/e2e/modules/studio/sticky_table_header.js", script["src"], "the module, where the import map sends it"
+    assert_equal "module", script["type"]
     assert_includes response.body, "/e2e/css/studio/sticky_table_header.css"
     assert_includes response.body, "data-nav-timeline", "?timeline=1 reaches the navbar"
 
     get "/lab/bar_stack"
     assert_response :success
-    refute_includes response.body, "studio/sticky_table_header", "the local did not leak into the next request"
+    # By tag, not by text: the import map pins studio/sticky_table_header on every
+    # page, like every engine module, and pinning loads nothing.
+    refute css_select("head script[src]").any? { |s| s["src"].include?("studio/sticky_table_header") },
+           "the local did not leak into the next request"
+    refute css_select("head link[rel=stylesheet]").any? { |l| l["href"].to_s.include?("studio/sticky_table_header") },
+           "nor did the stylesheet"
     refute Studio.sticky_table_headers, "the lab never writes the process-wide slot"
   end
 

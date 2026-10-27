@@ -118,10 +118,10 @@ class TailwindProbeBuildTest < Minitest::Test
   # THE MUTATION. Each @source line, removed from a copy of host.css, must
   # take with it classes only its directory emits. These three directories
   # carry classes no other line reaches today, so each line is provably what
-  # brings them. helpers/ and assets/javascripts/ share every class they emit
-  # with views/ at the moment, so dropping their line changes no build; the
+  # brings them. helpers/ shares every class it emits with views/ at the
+  # moment, so dropping its line changes no build; the
   # structural mutation in ComponentTailwindSourceTest
-  # (#test_every_emitting_directory_has_a_source_line) holds them instead.
+  # (#test_every_emitting_directory_has_a_source_line) holds it instead.
   MUST_BITE = %w[app/views app/components app/javascript].freeze
 
   def test_dropping_an_source_line_drops_the_classes_only_it_reaches

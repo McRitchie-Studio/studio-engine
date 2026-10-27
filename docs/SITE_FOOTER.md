@@ -279,7 +279,9 @@ element, isolate that element too.
 Leaflet is served by the engine through the app's asset pipeline
 (`studio/leaflet.js`, `studio/leaflet.css`, both in the engine's precompile
 list), so it works on Heroku with no extra step in either a Sprockets or a
-Propshaft app. The engine's copy of the stylesheet drops Leaflet's default marker
+Propshaft app. `studio/footer_map` imports the script as a module, with a
+dynamic `import()` of the URL on the map element, and the vendored build
+assigns `window.L` when it is evaluated. The engine's copy of the stylesheet drops Leaflet's default marker
 image and its layers-control image, which are not shipped: mark a point with
 `L.divIcon`, as the footer does.
 
