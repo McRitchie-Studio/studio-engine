@@ -17,7 +17,8 @@
 # THE HUB OWNS THESE FILES, THIS LIST NAMES THEM. A renamed or deleted spec fails the
 # job at "Resolve the hub spec subset" by name rather than quietly shrinking the set;
 # repoint or drop the line here. bin/hub-e2e-subset audits the run's JSON receipt, so
-# a listed file that ran no test (all skipped, all quarantined) is red too.
+# a listed file that ran no test (all skipped, all quarantined) is red too. On any red
+# the job's "E2E_LANE triage line" step prints one line naming the specs at fault.
 # Guard: test/lib/consumer_ci_hub_browser_test.rb.
 
 # Boards and the deployments chrome

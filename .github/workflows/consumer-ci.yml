@@ -58,6 +58,15 @@ on:
     # precisely BECAUSE the version commit arrives outside a PR.
     branches: [main, release]
 
+# LEAST PRIVILEGE FOR THE WORKFLOW'S OWN TOKEN. GITHUB_TOKEN here only checks out
+# this engine repo; artifacts and caches ride the runner's own runtime token, and
+# every consumer is read through the GitHub App token each job mints below. No job
+# writes to GitHub, so no job widens this. A job that ever needs more declares its
+# own `permissions:` block naming exactly what and why.
+# Guard: test/lib/consumer_ci_hardening_test.rb.
+permissions:
+  contents: read
+
 jobs:
   # ONE COMMIT PER CONSUMER FOR THE WHOLE RUN.
   #
@@ -81,6 +90,10 @@ jobs:
           app-id: ${{ secrets.MCRITCHIE_AGENT_APP_ID }}
           private-key: ${{ secrets.MCRITCHIE_AGENT_PRIVATE_KEY }}
           owner: McRitchie-Studio
+          # Read-only, and only the consumers this job resolves (CONSUMER_REPOS below).
+          repositories: mcritchie-studio,turf-monster,mcritchie-industries,cyvasse,moms-app
+          permission-contents: read
+          permission-metadata: read
 
       # THE CONSUMER IS CHECKED OUT AT THE SAME LADDER RUNG AS THE ENGINE REF UNDER
       # TEST — never at whatever its default branch happens to be.
@@ -268,9 +281,17 @@ jobs:
         options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
+      # EVERY CHECKOUT HERE SETS persist-credentials: false. By default actions/checkout
+      # writes its token into the clone's .git/config, where every later step (bundle
+      # install, the consumer's whole test suite, npm ci, Playwright) can read it. Nothing
+      # after a checkout talks to GitHub through git: the consumers carry no git-sourced
+      # gems, the hub's history tests read refs fetched at checkout time (fetch-depth: 0),
+      # and the executed-set re-point is a local `git checkout`. So the token leaves the
+      # disk with the checkout step.
       - name: Checkout engine
         uses: actions/checkout@v4
         with:
+          persist-credentials: false
           path: studio
 
       # UNCONDITIONAL by design: every consumer repo is private under the
@@ -284,6 +305,10 @@ jobs:
           app-id: ${{ secrets.MCRITCHIE_AGENT_APP_ID }}
           private-key: ${{ secrets.MCRITCHIE_AGENT_PRIVATE_KEY }}
           owner: McRitchie-Studio
+          # Read-only, and only this matrix entry's consumer.
+          repositories: ${{ matrix.repo }}
+          permission-contents: read
+          permission-metadata: read
 
       # fetch-depth: 0 IS LOAD-BEARING — do not "optimize" it back to the default.
       # The hub's e2e quarantine ratchet (test/lib/e2e_quarantine_ratchet_test.rb)
@@ -298,6 +323,7 @@ jobs:
       - name: Checkout ${{ matrix.consumer }}
         uses: actions/checkout@v4
         with:
+          persist-credentials: false
           repository: McRitchie-Studio/${{ matrix.repo }}
           ref: ${{ fromJSON(needs.consumer-refs.outputs.shas)[matrix.repo] }}
           path: ${{ matrix.consumer }}
@@ -576,6 +602,10 @@ jobs:
           app-id: ${{ secrets.MCRITCHIE_AGENT_APP_ID }}
           private-key: ${{ secrets.MCRITCHIE_AGENT_PRIVATE_KEY }}
           owner: McRitchie-Studio
+          # Read-only, and only the hub.
+          repositories: mcritchie-studio
+          permission-contents: read
+          permission-metadata: read
 
       # The gate RE-DERIVES the expected file set from THIS tree, so it checks out the
       # very commit the shards ran: the one consumer-refs resolved.
@@ -587,6 +617,7 @@ jobs:
       - name: Checkout mcritchie_studio
         uses: actions/checkout@v4
         with:
+          persist-credentials: false
           repository: McRitchie-Studio/mcritchie-studio
           ref: ${{ fromJSON(needs.consumer-refs.outputs.shas)['mcritchie-studio'] }}
           token: ${{ steps.app-token.outputs.token }}
@@ -727,6 +758,7 @@ jobs:
       - name: Checkout engine
         uses: actions/checkout@v4
         with:
+          persist-credentials: false
           path: studio
 
       - name: Mint consumer checkout token
@@ -736,12 +768,17 @@ jobs:
           app-id: ${{ secrets.MCRITCHIE_AGENT_APP_ID }}
           private-key: ${{ secrets.MCRITCHIE_AGENT_PRIVATE_KEY }}
           owner: McRitchie-Studio
+          # Read-only, and only the hub.
+          repositories: mcritchie-studio
+          permission-contents: read
+          permission-metadata: read
 
       # The same hub commit the Rails shards run (consumer-refs). Default depth: nothing
       # in this job reads the hub's history.
       - name: Checkout mcritchie_studio
         uses: actions/checkout@v4
         with:
+          persist-credentials: false
           repository: McRitchie-Studio/mcritchie-studio
           ref: ${{ fromJSON(needs.consumer-refs.outputs.shas)['mcritchie-studio'] }}
           path: mcritchie_studio
@@ -749,6 +786,7 @@ jobs:
 
       # Before any slow setup, so a renamed hub spec fails in seconds and by name.
       - name: Resolve the hub spec subset
+        id: subset
         run: ruby studio/bin/hub-e2e-subset paths studio/.github/hub-e2e-subset.txt mcritchie_studio > hub-e2e-subset.list
 
       # The consumer-tests install pattern (cache, inline Acquire timeouts, three bounded
@@ -867,8 +905,18 @@ jobs:
       # ALWAYS once the subset resolved: a red run still wrote a receipt, and a run that
       # wrote none is red here too.
       - name: Audit the receipt covers every listed spec
+        id: audit
         if: always() && steps.playwright.outcome != 'skipped'
         run: ruby studio/bin/hub-e2e-subset audit studio/.github/hub-e2e-subset.txt hub-e2e-report.json
+
+      # THE E2E_LANE TRIAGE LINE. When this lane is red, ONE line (an ::error annotation,
+      # so it also heads the run summary) names the lane and the spec files that failed:
+      # a listed spec the hub no longer has, the specs with an unexpected result in the
+      # receipt, or the specs the coverage audit flagged. The reader learns which hub spec
+      # to open without scrolling Playwright's list reporter. It never changes the verdict.
+      - name: E2E_LANE triage line
+        if: failure() && (steps.subset.outcome == 'failure' || steps.playwright.outcome == 'failure' || steps.audit.outcome == 'failure')
+        run: ruby studio/bin/hub-e2e-subset triage studio/.github/hub-e2e-subset.txt hub-e2e-report.json mcritchie_studio
 
       - name: Keep the Playwright report from a failed run
         uses: actions/upload-artifact@v4

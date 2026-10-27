@@ -144,6 +144,83 @@ class ConsumerCiHubBrowserTest < Minitest::Test
     end
   end
 
+  # ==== triage (the E2E_LANE line) ===================================================
+
+  # A receipt whose tests carry Playwright's own test-level verdict ("expected",
+  # "unexpected", "flaky", "skipped"), as the json reporter writes it.
+  def verdict_report(files, errors = [])
+    {
+      "errors" => errors,
+      "suites" => files.map do |file, verdicts|
+        { "title" => file, "file" => file, "specs" => [],
+          "suites" => [{ "title" => "describe",
+                         "specs" => verdicts.map.with_index do |v, i|
+                           { "title" => "t#{i}", "tests" => [{ "status" => v, "results" => [{ "status" => { "unexpected" => "failed", "skipped" => "skipped" }.fetch(v, "passed") }] }] }
+                         end }] }
+      end
+    }
+  end
+
+  def triage(entries, report: nil, hub_files: entries)
+    with_list(entries) do |dir, list|
+      hub = File.join(dir, "hub")
+      hub_files.each do |rel|
+        FileUtils.mkdir_p(File.dirname(File.join(hub, rel)))
+        File.write(File.join(hub, rel), "")
+      end
+      FileUtils.mkdir_p(hub)
+      rep = File.join(dir, "r.json")
+      File.write(rep, report.is_a?(String) ? report : JSON.dump(report)) if report
+      out, err, ok = run_script("triage", list, rep, hub)
+      assert ok, "triage reports, it never gates: #{err}"
+      assert_equal 1, out.lines.length, "the triage is ONE line: #{out}"
+      out.strip
+    end
+  end
+
+  def test_unit_triage_names_the_lane_and_every_failing_spec_file
+    line = triage(%w[e2e/a.spec.js e2e/b.spec.js e2e/c.spec.js],
+                  report: verdict_report("a.spec.js" => %w[expected unexpected], "b.spec.js" => %w[expected],
+                                         "c.spec.js" => %w[unexpected unexpected]))
+    assert line.start_with?("::error::E2E_LANE hub-browser RED"), line
+    assert_includes line, "2 failing spec file(s): e2e/a.spec.js, e2e/c.spec.js"
+    refute_includes line, "b.spec.js", "a green spec is not named"
+  end
+
+  def test_unit_triage_does_not_name_a_flaky_spec_that_passed_on_retry
+    line = triage(%w[e2e/a.spec.js e2e/b.spec.js],
+                  report: verdict_report("a.spec.js" => %w[flaky], "b.spec.js" => %w[unexpected]))
+    assert_includes line, "1 failing spec file(s): e2e/b.spec.js"
+  end
+
+  def test_unit_triage_names_a_listed_spec_the_hub_renamed
+    line = triage(%w[e2e/a.spec.js e2e/renamed.spec.js], hub_files: %w[e2e/a.spec.js])
+    assert_includes line, "E2E_LANE hub-browser RED"
+    assert_includes line, "missing from the hub checkout (renamed or deleted): e2e/renamed.spec.js"
+  end
+
+  def test_unit_triage_says_when_there_is_no_receipt
+    assert_includes triage(%w[e2e/a.spec.js]), "no receipt"
+  end
+
+  def test_unit_triage_names_errors_outside_any_test
+    line = triage(%w[e2e/a.spec.js],
+                  report: verdict_report({ "a.spec.js" => %w[expected] },
+                                         [{ "message" => "Error: Timed out waiting 120000ms from config.webServer.\nmore" }]))
+    assert_includes line, "1 Playwright error(s) outside any test"
+    assert_includes line, "config.webServer"
+  end
+
+  def test_unit_triage_names_what_the_coverage_audit_flagged
+    line = triage(%w[e2e/a.spec.js e2e/b.spec.js],
+                  report: verdict_report("a.spec.js" => %w[expected], "b.spec.js" => %w[skipped]))
+    assert_includes line, "ran no test or skipped some: e2e/b.spec.js"
+  end
+
+  def test_unit_triage_survives_a_receipt_that_is_not_json
+    assert_includes triage(%w[e2e/a.spec.js], report: "{ truncated"), "is not JSON"
+  end
+
   # ==== the job's wiring =============================================================
 
   def job = YAML.safe_load_file(WORKFLOW, aliases: true).dig("jobs", "hub-browser")
@@ -184,5 +261,18 @@ class ConsumerCiHubBrowserTest < Minitest::Test
     assert_includes audit["if"].to_s, "always()",
                     "on success() alone a red run skips the audit, and a run that skipped specs AND failed reads the same as one that failed"
     assert_includes audit["run"], "hub-e2e-subset audit studio/.github/hub-e2e-subset.txt hub-e2e-report.json"
+  end
+
+  def test_unit_a_red_lane_prints_the_triage_line
+    triage = step("E2E_LANE triage")
+    cond = triage["if"].to_s
+    assert_includes cond, "failure()", "on success() alone the triage step never runs on the red it exists for"
+    %w[subset playwright audit].each do |id|
+      assert_includes cond, "steps.#{id}.outcome == 'failure'", "a red at step #{id} must print the line"
+      assert_equal 1, steps.count { |s| s["id"] == id }, "the triage condition names step id #{id}"
+    end
+    assert_includes triage["run"],
+                    "hub-e2e-subset triage studio/.github/hub-e2e-subset.txt hub-e2e-report.json mcritchie_studio"
+    assert_operator index("E2E_LANE triage"), :>, index("Audit the receipt"), "triage reads the audit's verdict too"
   end
 end
