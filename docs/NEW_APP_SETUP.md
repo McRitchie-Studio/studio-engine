@@ -686,6 +686,44 @@ The generated workflow installs a short fixed list and nothing else — on a Rai
   run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev libvips
 ```
 
+**Harden that step before your first push.** The generated form has no fetch
+timeout, so a stalled Ubuntu mirror hangs it until the job's six-hour bound
+(on 2026-10-26 a stalled mirror held the engine's consumer CI red). Make apt drop a
+silent socket in 30s and re-fetch it, bound the step, and retry it whole:
+
+```yaml
+- name: Install packages
+  timeout-minutes: 15
+  run: |
+    APT_OPTS=(-o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+    for attempt in 1 2 3; do
+      if sudo timeout -k 10 120 apt-get "${APT_OPTS[@]}" update && \
+         sudo timeout -k 10 420 apt-get "${APT_OPTS[@]}" install --no-install-recommends -y libpq-dev libvips; then
+        exit 0
+      fi
+      echo "::warning::apt attempt $attempt failed or hung; retrying"
+      sudo dpkg --configure -a || true
+      sleep 10
+    done
+    exit 1
+```
+
+A step that runs its own apt underneath, such as `npx playwright install
+--with-deps chromium`, never sees those `-o` options. Set them machine-wide in
+a step before it, and bound it:
+
+```yaml
+- name: Harden apt fetches
+  run: printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' | sudo tee /etc/apt/apt.conf.d/80-retries
+- name: Install Playwright browser
+  timeout-minutes: 15
+  run: npx playwright install --with-deps chromium
+```
+
+The engine's own `.github/workflows/consumer-ci.yml` and `engine-ci.yml` are the
+reference (they also cache the `.deb` files), and
+`test/lib/ci_apt_install_hardening_test.rb` guards them.
+
 **If your app shells out to any other binary, add it to that step in EVERY job
 that runs tests.** How many jobs that is depends on your Rails version, and this
 engine supports both (`studio-engine.gemspec:24` — `rails >= 7.2, < 8.2`):

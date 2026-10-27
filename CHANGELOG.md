@@ -4,6 +4,37 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Breaking
+
+- **The deprecated JS Tailwind preset `tailwind/studio.tailwind.config.js` is
+  deleted**, with its parity test (`test/integration/tailwind_preset_parity_test.rb`),
+  and the gemspec no longer packages a `tailwind/` directory. Every host in the
+  release relock set had already moved to the CSS-first entry (hub, Turf
+  Monster, Rolio, chain-ops, Rantly, McRitchie Industries, Cyvasse, Moms App,
+  Alex Build, Commercial Welding), so none of them reads it.
+  **Upgrade note for a host still on `@config` + the preset** (its
+  `config/tailwind.config.js` `require`s
+  `${studioPath}/tailwind/studio.tailwind.config.js`): bumping past 0.114.3
+  fails its Tailwind build, because the file is gone. Switch to the CSS-first
+  entry in the same change as the bump:
+  1. Make `app/assets/tailwind/application.css` start with `@import
+     "tailwindcss";` and `@import "../builds/tailwind/studio_engine";`, and
+     delete its `@config` line (and any `studio_engine_motion` import).
+  2. Delete `config/tailwind.config.js` and
+     `lib/tasks/tailwindcss_engine_motion.rake`, moving only the host's own
+     theme extensions into an `@theme inline { ... }` block after the import.
+  3. Rebuild with `bin/rails tailwindcss:build` and check that the class set of
+     `app/assets/builds/tailwind.css` only grew.
+  The full recipe, with the safelist and `vendor/bundle` cases: README,
+  "Migrating a host from `@config`".
+
+### Changed
+
+- README lists every host, and `docs/NEW_APP_SETUP.md` section 16's apt
+  install sample carries the hardened pattern (apt retries and 30s fetch
+  timeouts, a bounded step, three attempts), so a new app's first CI does not
+  hang on a stalled mirror.
+
 ## 0.114.3 — 2026-10-26
 
 ## 0.114.2 — 2026-10-26

@@ -258,10 +258,10 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
   # where the scanner above cannot look: Ruby strings such as emails/show's
   # badge `case`. So this reads RAW source.
   #
-  # The contract (tailwind/studio.tailwind.config.js + ThemeResolver): a status
+  # The contract (theme.css + ThemeResolver): a status
   # role is a FILL (bg-/border-<role>, vivid, free) or an INK (text-<role>-ink,
   # derived per theme to clear AA). A bare text-<role> is the defect: the default
-  # role colours fail AA as text, so the preset deliberately never mints one.
+  # role colours fail AA as text, so theme.css deliberately never mints one.
   STATUS_ROLE = /(?<![\w-])(?:[a-z-]+:)*(?:bg|border|text)-(?:success|warning|danger)(?:-ink)?(?:\/\d+)?(?![\w-])/
 
   def self.status_role_tokens
