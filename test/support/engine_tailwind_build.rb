@@ -105,16 +105,14 @@ module EngineTailwindBuild
   # Every directory whose files put a class on a page. The rest of app/
   # (controllers, models, jobs, mailers, services) and lib/ write no markup:
   # their class-shaped strings are hash keys and comment prose.
-  EMITTING_DIRS = %w[app/views app/components app/helpers app/javascript app/assets/javascripts].freeze
+  # app/assets/javascripts is not one: since the engine's scripts became ES
+  # modules (app/javascript) it holds only vendored third-party builds.
+  EMITTING_DIRS = %w[app/views app/components app/helpers app/javascript].freeze
 
-  # Third-party bundles vendored into the JS trees. Not engine markup, and
-  # host.css excludes them by name.
+  # Third-party bundles vendored into the module tree. Not engine markup, and
+  # host.css excludes them.
   VENDORED = %w[
     app/javascript/studio/vendor/stimulus.js
-    app/assets/javascripts/studio/alpine.js
-    app/assets/javascripts/studio/canvas_confetti.js
-    app/assets/javascripts/studio/leaflet.js
-    app/assets/javascripts/studio/sortable.js
   ].freeze
 
   def emitting_files(dir)
