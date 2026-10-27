@@ -1,6 +1,6 @@
 # Studio Engine
 
-Shared Rails engine for McRitchie apps. Provides authentication, error handling, dynamic theming, and common concerns used by [McRitchie Studio](https://app.mcritchie.studio) and [Turf Monster](https://app.turfmonster.media).
+Shared Rails engine for McRitchie apps. Provides authentication, error handling, dynamic theming, and common concerns used by [McRitchie Studio](https://app.mcritchie.studio), [Turf Monster](https://app.turfmonster.media) and the other McRitchie hosts: Rantly, McRitchie Industries, Cyvasse, Moms App, Alex Build and Commercial Welding.
 
 > **Part of the McRitchie ecosystem** — see [`ECOSYSTEM.md`](https://github.com/McRitchie-Studio/mcritchie-studio/blob/main/docs/ECOSYSTEM.md) for the 5-repo map; [`house-burn-down.md`](https://github.com/McRitchie-Studio/mcritchie-studio/blob/main/docs/agents/system/house-burn-down.md) for fresh-Mac recovery.
 
@@ -24,8 +24,9 @@ rather than constraining the resolve — read the `Gemfile.lock` for what really
 resolved.
 
 > Published to RubyGems as of v0.4.0 (2026-05-17). New installs should use the
-> RubyGems form, which all three consumer Rails apps (`mcritchie-studio`,
-> `turf-monster`, `mcritchie-industries`) already use.
+> RubyGems form, which every consumer Rails app (`mcritchie-studio`,
+> `turf-monster`, `rantly`, `mcritchie-industries`, `cyvasse`, `moms-app`,
+> `alex-build`, `commercial-welding`) already uses.
 
 ## What It Provides
 
@@ -64,7 +65,7 @@ wire by hand:
 
 | What | Where it lives | What it replaced |
 |------|----------------|------------------|
-| The design tokens (surfaces, inks, the primary ladder, brand palettes, `text-2xs`/`text-3xs`, Montserrat) and the class-based `dark:` variant | `theme.css`, `@theme inline reference` | `tailwind/studio.tailwind.config.js` and the host's `@config` |
+| The design tokens (surfaces, inks, the primary ladder, brand palettes, `text-2xs`/`text-3xs`, Montserrat) and the class-based `dark:` variant | `theme.css`, `@theme inline reference` | the deleted JS preset `tailwind/studio.tailwind.config.js` and the host's `@config` |
 | The scan of every engine directory that emits a class (views, components, helpers, both JavaScript trees) | `host.css`, `@source` | the host's content glob over the gem's views, found with a bundler call from Node |
 | Every engine class, with no safelist | the scan above; no class is assembled at render time | the host's primary-colour safelist (about 240 classes) |
 | The motion, effect and leveling primitives (`.spinner`, `.hold-btn`, `.level-badge-*`, ...) | `engine-motion.css`, imported last by `host.css` | `lib/tasks/tailwindcss_engine_motion.rake` and its `studio_engine_motion` import |
@@ -81,14 +82,12 @@ by path, such as the hub's client kit (`ClientApps::StudioKit::Css`, held to
 
 ### Migrating a host from `@config`
 
-Hosts adopt on their own cards (hub, Turf Monster, Rolio, chain-ops, Rantly,
-McRitchie Industries, Cyvasse, Moms App). Until each one does, it keeps
-building unchanged: `tailwind/studio.tailwind.config.js` stays one release as a
-deprecated shim, and `test/integration/tailwind_preset_parity_test.rb` holds it
-to the same utilities as `theme.css`. A host that has bumped the gem but not
-yet migrated gets the motion layer twice (once through `host.css`, once
-through its own generated import). The duplicate is harmless and goes with
-step 3.
+Every host has migrated: hub, Turf Monster, Rantly, McRitchie Industries,
+Cyvasse, Moms App, Alex Build and Commercial Welding.
+The deprecated JS preset `tailwind/studio.tailwind.config.js` and its parity
+test are **deleted**, so a host still on `@config` that bumps the gem past
+0.114.3 fails at its own Tailwind build (`require` of a file the gem no longer
+ships). Run this recipe in the same change as that bump (CHANGELOG, Breaking).
 
 1. **Bump** `studio-engine` to the release that carries this section.
 2. **`application.css`**: delete the `@config` line. Keep `@import
@@ -124,11 +123,9 @@ step 3.
    engine now also scans its helpers and scripts). Spot-check one class from
    each column above: `.text-heading`, `.btn-primary`, `.spinner`.
 
-When every host has adopted, the shim and the parity test are deleted in one
-engine change. Before that, every reader of the preset has to move, not only
-the build: the hub's `app/services/client_apps/studio_kit/css.rb` reads it at
-runtime to build the client kit CSS, and a few host tests read its text
-(CHANGELOG, Deprecated).
+A migrating host also moves every other reader of the preset, not only the
+build: any production code or test that `require`s or reads the preset's text
+reads `theme.css` instead.
 
 ## Configuration
 
@@ -1057,7 +1054,8 @@ config.navbar_z_tier = true      # the live header at z-[var(--z-nav)], not z-50
   wins when both are set. Rules: `lib/studio/navbar_brand.rb`.
 - **The word classes live in the host's initializer**
   (`config/initializers/studio.rb`), which a host's Tailwind scan may not
-  read (a host still on `@config` lists only its `content:` globs). A utility
+  read (Tailwind's automatic detection and the engine's own `@source` lines
+  may both miss it). A utility
   named only there, `text-heading` say, compiles only if some view also uses
   it. Add the initializer to the scan (`@source "../../../config/initializers/studio.rb";`),
   or give the word a class the host's CSS defines (`tm-wordmark`). See

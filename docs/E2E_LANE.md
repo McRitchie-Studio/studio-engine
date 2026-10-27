@@ -335,8 +335,8 @@ revocation and expiry are covered by the node harness and by
 > source.** `host.css`, which every host's engine import resolves to, carries the `@source` lines for the engine's
 > views, components, helpers and scripts, so every host that imports it
 > compiles the same engine classes the lane does, and `e2e/tailwind_input.css`
-> no longer scans `../app/views` on its own. A host still on the deprecated
-> `@config` preset gets them too, because the import is the same. The history
+> no longer scans `../app/views` on its own. The deprecated `@config` preset
+> is deleted, so there is no second build shape to drift. The history
 > below is kept for the rule it produced, which still holds.
 
 `e2e/tailwind_input.css` carried `@source "../app/views"`, so the lane compiled
