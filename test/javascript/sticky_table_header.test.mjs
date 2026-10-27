@@ -1,14 +1,20 @@
 // [unit] studio/sticky_table_header: where the cloned header row is placed, and
-// what re-places it. The asset is a classic script (an IIFE, no exports), so it
-// runs here in a node:vm context over a fake document that answers only what
-// the script reads. Each test gets a fresh context: the script guards itself
-// with window.StudioStickyTableHeaders.loaded.
+// what re-places it. The module is one function and a single export line, so it
+// runs here in a node:vm context (with that line cut) over a fake document that
+// answers only what the script reads. Each test gets a fresh context: the script
+// guards itself with window.StudioStickyTableHeaders.loaded.
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import vm from "node:vm"
 
-const source = readFileSync(new URL("../../app/assets/javascripts/studio/sticky_table_header.js", import.meta.url), "utf8")
+const MODULE_EXPORT = /^export default window\.StudioStickyTableHeaders\s*$/m
+const moduleSource = readFileSync(new URL("../../app/javascript/studio/sticky_table_header.js", import.meta.url), "utf8")
+// Exactly one module line, the export: anything else is module syntax a vm
+// context cannot run, and cutting it would test a different program.
+assert.equal((moduleSource.match(/^\s*(?:import|export)\b/gm) || []).length, 1, "one module line, the default export")
+assert.match(moduleSource, MODULE_EXPORT)
+const source = moduleSource.replace(MODULE_EXPORT, "")
 
 const rect = (r) => ({ top: 0, bottom: 0, left: 0, width: 0, height: 0, ...r })
 

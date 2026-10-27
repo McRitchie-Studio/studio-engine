@@ -1,3 +1,12 @@
+// studio/sticky_table_header: pins a cloned header row over a long table as it
+// scrolls under the navbar (docs/NAVBAR_SETUP.md). An ES module that installs on
+// import: the head loads it with a type="module" tag when
+// Studio.sticky_table_headers is on (or the head's sticky_table_headers local
+// says so). Its default export is window.StudioStickyTableHeaders
+// ({ loaded, pinnedEdge, placement }), which stays as the compatibility global
+// (CHANGELOG, "Deprecated"). The body stays one function with no import, so
+// test/javascript/sticky_table_header.test.mjs still runs it in a node:vm
+// context per test (cutting the single export line).
 (() => {
   if (window.StudioStickyTableHeaders?.loaded) return;
 
@@ -259,3 +268,5 @@
   window.addEventListener("scroll", scheduleUpdate, { passive: true });
   window.addEventListener("resize", scheduleUpdate, { passive: true });
 })();
+
+export default window.StudioStickyTableHeaders

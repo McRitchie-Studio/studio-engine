@@ -27,8 +27,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <%= csrf_meta_tags %>
 <%= csp_meta_tag %>
-<%# The session-drift stamp + browser store. Renders nothing unless the controller
-    includes Studio::ErrorHandling. See studio/_session_stamp. %>
+<%# The session-drift stamp. Renders nothing unless the controller includes
+    Studio::ErrorHandling. See studio/_session_stamp; its browser store is a
+    module, so studio/_session_store loads it below the import map. %>
 <%= render "studio/session_stamp" %>
 <%= render "layouts/studio/smooth_load" %>
 <%# The favicon's URL carries its content version (Studio::PublicFileVersion),
@@ -116,14 +117,8 @@
   }
 </style>
 
-<%# canvas-confetti is VENDORED into the engine (studio/canvas_confetti.js) and
-    shipped through the asset pipeline — no CDN, CSP-safe (same-origin :self),
-    zero-per-app dependency. Defines the global `confetti`; studio_confetti.js
-    then builds window.studioConfetti (burst/cannons). fireSuccessConfetti
-    (studio/head_chrome) rides the same global. %>
-<%= javascript_include_tag "studio/canvas_confetti", "data-turbo-track": "reload" %>
-<%= javascript_include_tag "studio/studio_confetti", "data-turbo-track": "reload" %>
-<%# The theme and devMode stores are studio/alpine_stores (its module tag is below).
+<%# Confetti is a module now: studio/studio_confetti, loaded below the import map.
+    The theme and devMode stores are studio/alpine_stores (its module tag is below).
     showNavSpinner / hideNavSpinner and fireSuccessConfetti are studio/head_chrome,
     installed by studio/alpine_shims. %>
 
@@ -187,6 +182,13 @@
   <%= stylesheet_link_tag "studio/sticky_table_header", "data-turbo-track": "reload" %>
 <% end %>
 <%= javascript_importmap_tags %>
+<%# EVERY ENGINE SCRIPT IS A MODULE, AND EVERY MODULE TAG COMES AFTER THE IMPORT
+    MAP. A browser without dynamic import maps ignores an import map that arrives
+    after its first module script, so a module tag above this line would take every
+    bare specifier on the page down with it. The ones below that load by URL
+    (type="module" with a src) are external files, not inline scripts: they carry
+    no body and need no nonce under a policy that allows 'self'. %>
+<%= render "studio/session_store" %>
 <%# THE ENGINE'S BROWSER BOOT (studio/application): its every-page Stimulus
     controllers, the pinned stack, and the Alpine shims. A module tag, so it
     carries the nonce. %>
@@ -229,8 +231,15 @@
     module that owns it. Its imports import nothing, and studio/alpine_shims
     imports it, so a failed boot leaves a page its uploads. %>
 <%= javascript_import_module_tag "studio/alpine_scopes" %>
-<%# ALPINE LOADS AFTER THE MODULE TAGS, and the order is the contract. Deferred
-    classic scripts and module scripts execute in document order, so by the time
+<%# CONFETTI, BY URL. studio/studio_confetti imports the vendored canvas-confetti
+    (pinned "canvas-confetti", app/assets/javascripts/studio/canvas_confetti.js:
+    no CDN, same-origin) and exports burst, cannons and confetti. It also keeps
+    the deprecated globals window.studioConfetti and window.confetti, which
+    studio/head_chrome's fireSuccessConfetti and host classic code still call.
+    Before Alpine, so both exist by the time an x-init can fire one. %>
+<%= javascript_include_tag "studio/studio_confetti", type: "module", "data-turbo-track": "reload" %>
+<%# ALPINE LOADS AFTER THE MODULE TAGS, and the order is the contract. Module
+    scripts (and deferred classic ones) execute in document order, so by the time
     Alpine starts, studio/application has defined the shims it evaluates
     (x-data="navCollapse()"), studio/alpine_stores has registered the
     `alpine:init` listener that installs $store.theme and $store.devMode, and
@@ -255,7 +264,13 @@
     Investigated as a suspect in the board-filter flake (three PRs reddened in one
     day, 2026-08-15). This removes a real source of run-to-run variance; it does NOT
     claim to be that flake's cause, and the remaining suspect there is untouched. %>
-<%= javascript_include_tag "studio/alpine", defer: true, "data-turbo-track": "reload" %>
+<%# A MODULE TAG, NOT A DEFERRED CLASSIC ONE (it was `defer: true` until the
+    engine's scripts became modules). A module is deferred by definition, so its
+    place in the document order is unchanged. The vendored build is unedited: it
+    assigns window.Alpine and starts Alpine in a microtask after it is evaluated,
+    which as a module is after every module above it. window.Alpine is not
+    deprecated; Alpine itself and every host read it. %>
+<%= javascript_include_tag "studio/alpine", type: "module", "data-turbo-track": "reload" %>
 <% if sticky_table_headers %>
-  <%= javascript_include_tag "studio/sticky_table_header", defer: true, "data-turbo-track": "reload" %>
+  <%= javascript_include_tag "studio/sticky_table_header", type: "module", "data-turbo-track": "reload" %>
 <% end %>
