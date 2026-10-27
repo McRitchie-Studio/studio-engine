@@ -423,6 +423,11 @@ Also not covered:
   that for Alpine, and the precompile entry a sprockets consumer needs is asserted
   statically in `test/lib/vendored_alpine_test.rb`.
 
+  A real consumer's delivery is seen one lane over: consumer-ci.yml's `hub-browser`
+  job boots the hub on this engine tree (path gem) and runs the hub specs listed in
+  `.github/hub-e2e-subset.txt`. That is the lane that would have caught #485, whose
+  modulepreload race existed only under the hub's own asset delivery.
+
   A stand-in that delivers something the engine also delivers makes the engine's own
   delivery UNOBSERVABLE, and this lane shipped that bug for a while: the importmap
   stand-in served its own Alpine from `node_modules`, so specs stayed green with the

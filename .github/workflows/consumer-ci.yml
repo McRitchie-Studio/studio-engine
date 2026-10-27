@@ -707,7 +707,7 @@ jobs:
   # booting the test server (db:test:prepare, tailwind, e2e/seed.rb, rails server). The one
   # addition is consumer-tests' engine-migration install, and a schema dump after it, so the
   # webServer's db:test:prepare loads a schema that carries this engine's tables.
-  # Guard: test/lib/hub_e2e_subset_test.rb.
+  # Guard: test/lib/consumer_ci_hub_browser_test.rb.
   hub-browser:
     name: mcritchie_studio browser subset vs this engine
     needs: consumer-refs

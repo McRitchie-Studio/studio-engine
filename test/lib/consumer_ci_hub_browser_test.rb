@@ -14,7 +14,7 @@
 #     audit made conditional on success), so the wiring is read from the real workflow.
 #
 # Run directly:
-#   ruby -Itest test/lib/hub_e2e_subset_test.rb
+#   ruby -Itest test/lib/consumer_ci_hub_browser_test.rb
 #
 # One tier here (backend shape):
 #   [unit] the helper's list, missing-file and receipt arithmetic, run as a subprocess
@@ -29,7 +29,7 @@ require "open3"
 require "tmpdir"
 require "fileutils"
 
-class HubE2eSubsetTest < Minitest::Test
+class ConsumerCiHubBrowserTest < Minitest::Test
   ROOT     = File.expand_path("../..", __dir__)
   SCRIPT   = File.join(ROOT, "bin/hub-e2e-subset")
   LIST     = File.join(ROOT, ".github/hub-e2e-subset.txt")

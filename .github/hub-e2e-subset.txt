@@ -18,7 +18,7 @@
 # job at "Resolve the hub spec subset" by name rather than quietly shrinking the set;
 # repoint or drop the line here. bin/hub-e2e-subset audits the run's JSON receipt, so
 # a listed file that ran no test (all skipped, all quarantined) is red too.
-# Guard: test/lib/hub_e2e_subset_test.rb.
+# Guard: test/lib/consumer_ci_hub_browser_test.rb.
 
 # Boards and the deployments chrome
 e2e/depth_chart_board.spec.js
