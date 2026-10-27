@@ -264,6 +264,14 @@ class ConsumerCiHubBrowserTest < Minitest::Test
     assert_includes audit["run"], "hub-e2e-subset audit studio/.github/hub-e2e-subset.txt hub-e2e-report.json"
   end
 
+  def test_unit_the_hub_links_the_engine_node_tooling_between_npm_ci_and_playwright
+    link = step("Link studio-engine's Node tooling")
+    assert_includes link["run"], "bin/rails node_tooling:link",
+                    "the hub's playwright.config.js requires node_modules/.studio-engine; unlinked, Playwright never starts"
+    assert_operator index("Install JS dependencies"), :<, index("Link studio-engine's Node tooling"), "npm ci deletes node_modules"
+    assert_operator index("Link studio-engine's Node tooling"), :<, index("Run the hub browser subset")
+  end
+
   def test_unit_a_red_lane_prints_the_triage_line
     triage = step("E2E_LANE triage")
     cond = triage["if"].to_s

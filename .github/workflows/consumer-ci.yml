@@ -861,6 +861,21 @@ jobs:
         working-directory: mcritchie_studio
         run: npm ci
 
+      # The hub's playwright.config.js now builds on studio-engine's Node tooling package
+      # (/tasks/hub-adopts-node-tooling), which it requires from node_modules/.studio-engine.
+      # `npm ci` just deleted node_modules, so the link comes AFTER it, exactly as the hub's
+      # own reusable-ci.yml playwright job does. With the path gem above, the link points
+      # at THIS engine tree's package, so the job tests this commit's tooling too. A hub
+      # rung that predates the adoption has no node_tooling:link task and needs no link.
+      - name: Link studio-engine's Node tooling into the hub
+        working-directory: mcritchie_studio
+        run: |
+          if [ -f lib/tasks/node_tooling.rake ]; then
+            bin/rails node_tooling:link
+          else
+            echo "::notice::this hub rung has no node_tooling:link task; nothing to link"
+          fi
+
       - name: Cache the Playwright browser
         uses: actions/cache@v4
         with:
