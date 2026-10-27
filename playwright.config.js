@@ -55,72 +55,52 @@
 // was refused, are in docs/E2E_LANE.md.
 
 const { defineConfig } = require("@playwright/test");
+// The engine's own Node tooling package, the one every host links at
+// node_modules/.studio-engine (lib/studio/node_tooling/README.md). The engine is
+// its first consumer, so it requires the source directly.
+const { studioPlaywrightConfig } = require("./lib/studio/node_tooling/playwright_base.js");
 
-const port = process.env.E2E_PORT || "3620";
-const externalBaseURL = process.env.PW_BASE_URL || process.env.BASE_URL;
-const baseURL = externalBaseURL || `http://127.0.0.1:${port}`;
+module.exports = defineConfig(
+  studioPlaywrightConfig({
+    defaultPort: "3620",
+    // One worker, and the reason is DETERMINISM rather than isolation: the paint
+    // spec samples animation frames, and frame scheduling on a loaded runner is
+    // exactly what a frame-sampling assertion is sensitive to.
+    //
+    // THAT SENTENCE WAS FALSE ONCE AND NOTHING NOTICED, which is why it now names
+    // its guard instead of asserting itself. E2eLabController#bar_stack assigned
+    // `Studio.sidebar_sections` — a `mattr_accessor`, one slot for the whole Puma
+    // process — from `?sidebar=1` on the way past. Measured at a73edfe on one
+    // process: after a single /lab/bar_stack?sidebar=1, /lab/toast_over_banner
+    // served 2 link-sidebar triggers, 2 slide-out panels and --nav-h 145px, against
+    // 0/0/125px before it. The lane stayed green purely because Playwright walks
+    // e2e/ in FILE-NAME order and nav_collapse.spec.js, which clears the slot,
+    // sorts between the contaminator and the victim — run those two adjacent and
+    // every assertion still passes. So a comment claiming statelessness was
+    // arming whoever next raised this number, and the lane could not have told
+    // them.
+    //
+    // WHAT HOLDS IT NOW. The lab writes no process global per request — the sidebar
+    // is declared as a local of the request, and test/dummy/config/application.rb
+    // carries the argument. test/integration/e2e_lab_isolation_test.rb drives the
+    // order that broke AND sweeps every lab route the router knows, bare and with
+    // every knob, snapshotting every one of Studio's writable accessors either
+    // side (74 of them on 2026-09-28) to refuse the next one written per request
+    // whatever it is called. Raising `workers` is a real option again — but read
+    // that file first, because a contaminated page is invisible from here.
+    workers: 1,
+    // No `use` override, and DELIBERATELY NOT `reducedMotion: "reduce"`. The hub
+    // sets it to stop Turbo view transitions landing mid-click. Here it would be
+    // actively wrong: this lane's sharpest spec measures whether a header MOVES
+    // between frames, and one of the three ways the original defect showed itself
+    // was two headers compositing at different tops DURING a view transition.
+    // Suppressing motion would suppress the evidence.
 
-const config = {
-  testDir: "./e2e",
-  timeout: 30_000,
-  retries: 0,
-  // One worker, and the reason is DETERMINISM rather than isolation: the paint
-  // spec samples animation frames, and frame scheduling on a loaded runner is
-  // exactly what a frame-sampling assertion is sensitive to.
-  //
-  // THAT SENTENCE WAS FALSE ONCE AND NOTHING NOTICED, which is why it now names
-  // its guard instead of asserting itself. E2eLabController#bar_stack assigned
-  // `Studio.sidebar_sections` — a `mattr_accessor`, one slot for the whole Puma
-  // process — from `?sidebar=1` on the way past. Measured at a73edfe on one
-  // process: after a single /lab/bar_stack?sidebar=1, /lab/toast_over_banner
-  // served 2 link-sidebar triggers, 2 slide-out panels and --nav-h 145px, against
-  // 0/0/125px before it. The lane stayed green purely because Playwright walks
-  // e2e/ in FILE-NAME order and nav_collapse.spec.js, which clears the slot,
-  // sorts between the contaminator and the victim — run those two adjacent and
-  // every assertion still passes. So a comment claiming statelessness was
-  // arming whoever next raised this number, and the lane could not have told
-  // them.
-  //
-  // WHAT HOLDS IT NOW. The lab writes no process global per request — the sidebar
-  // is declared as a local of the request, and test/dummy/config/application.rb
-  // carries the argument. test/integration/e2e_lab_isolation_test.rb drives the
-  // order that broke AND sweeps every lab route the router knows, bare and with
-  // every knob, snapshotting every one of Studio's writable accessors either
-  // side (74 of them on 2026-09-28) to refuse the next one written per request
-  // whatever it is called. Raising `workers` is a real option again — but read
-  // that file first, because a contaminated page is invisible from here.
-  workers: 1,
-  forbidOnly: !!process.env.CI,
-  use: {
-    baseURL,
-    headless: true,
-  },
-  // DELIBERATELY NOT `reducedMotion: "reduce"`. The hub sets it to stop Turbo view
-  // transitions landing mid-click. Here it would be actively wrong: this lane's
-  // sharpest spec measures whether a header MOVES between frames, and one of the
-  // three ways the original defect showed itself was two headers compositing at
-  // different tops DURING a view transition. Suppressing motion would suppress the
-  // evidence.
-  projects: [{ name: "chromium", use: { browserName: "chromium" } }],
-};
-
-if (!externalBaseURL) {
-  config.webServer = {
     // A gem has no Rails root — no bin/rails, no config.ru, no config/environments.
     // e2e/boot.rb does the three jobs the hub's four-command chain does (build CSS,
-    // build JS, serve) directly against test/dummy. See its header.
-    command: `bundle exec ruby e2e/boot.rb`,
-    url: `http://127.0.0.1:${port}/up`,
-    reuseExistingServer: !process.env.CI,
-    // Generous because the FIRST run compiles Tailwind. Steady-state boot is ~3s.
-    timeout: 120_000,
-    stdout: "pipe",
-    stderr: "pipe",
-    env: {
-      RAILS_ENV: "test",
-      E2E_PORT: port,
-    },
-  };
-}
-
-module.exports = defineConfig(config);
+    // build JS, serve) directly against test/dummy. See its header. The base gives
+    // the server 120s, because the FIRST run compiles Tailwind; steady-state boot
+    // is ~3s.
+    webServer: { command: "bundle exec ruby e2e/boot.rb" },
+  })
+);

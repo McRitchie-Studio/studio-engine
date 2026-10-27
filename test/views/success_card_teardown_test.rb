@@ -41,7 +41,7 @@ class SuccessCardTeardownTest < Minitest::Test
     refute_empty node_path,
                  "node runtime NOT FOUND on PATH. This suite executes the success card's " \
                  "own JavaScript and is the only coverage of its teardown — skipping would " \
-                 "report green with zero coverage. Install node (mise install node@20)."
+                 "report green with zero coverage. Install node (mise install node@22)."
   end
 
   def test_destroy_cancels_the_redirect_and_the_browser_never_navigates

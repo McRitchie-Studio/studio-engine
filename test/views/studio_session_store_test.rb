@@ -91,7 +91,7 @@ class StudioSessionStoreTest < Minitest::Test
     refute_empty self.class.node_path,
                  "node runtime NOT FOUND on PATH. The session store suite executes the store for " \
                  "real; skipping it would report green with zero coverage. Install node " \
-                 "(mise install node@20) and re-run."
+                 "(mise install node@22) and re-run."
   end
 
   def test_the_harness_passes_every_scenario_it_runs

@@ -42,7 +42,7 @@ class BirthdayReturnTripTest < Minitest::Test
     refute_empty node_path,
                  "node runtime NOT FOUND on PATH. The birthday return-trip suite executes " \
                  "the card's own JavaScript and is the only coverage of it — skipping would " \
-                 "report green with zero coverage. Install node (mise install node@20)."
+                 "report green with zero coverage. Install node (mise install node@22)."
   end
 
   def test_the_return_trip_under_node

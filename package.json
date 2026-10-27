@@ -2,13 +2,13 @@
   "name": "studio-engine",
   "private": true,
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "scripts": {
     "test:e2e": "npx playwright test",
     "test:e2e:headed": "npx playwright test --headed"
   },
   "devDependencies": {
-    "@playwright/test": "^1.52.0"
+    "@playwright/test": "1.62.1"
   }
 }
