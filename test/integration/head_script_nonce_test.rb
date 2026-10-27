@@ -56,10 +56,10 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "what stays inline is the pre-paint theme, the two guards, the import map, the boot import and the six own-door imports" do
+  test "what stays inline is the pre-paint theme, the two guards, the import map, the boot import and the seven own-door imports" do
     inline = head_scripts("/lab/bar_stack").reject { |script| script["src"] }
 
-    assert_equal 11, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
+    assert_equal 12, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
     assert_includes inline[0].text, "classList.add('dark')", "the pre-paint theme script comes first"
     assert_includes inline[1].text, "studioHoldButtonGuard", "the hold button's guard comes second"
     assert_includes inline[2].text, "studioScopesGuard", "the x-data factories' guard comes third"
@@ -67,9 +67,9 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     assert_equal "module", inline[4]["type"]
     assert_equal %(import "studio/application"), inline[4].text.strip
     assert_equal %w[studio/stimulus studio/alpine_stores studio/modal_host studio/toast studio/link_sidebar
-                    studio/alpine_scopes],
+                    studio/alpine_scopes studio/studio_confetti],
                  inline[5..].map { |script| script.text.strip[/\Aimport "([^"]+)"\z/, 1] }
-    assert_equal %w[module] * 6, inline[5..].map { |script| script["type"] }
+    assert_equal %w[module] * 7, inline[5..].map { |script| script["type"] }
   end
 
   # The factories' guard reports a page whose x-data factories failed to load, so
@@ -241,7 +241,8 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
       assert_operator importmap, :<, index, "#{script["src"]} is above the import map"
       assert_empty script.text.strip, "#{script["src"]} carries a body"
     end
-    assert_includes by_src.map { |script, _| script["src"] }.join(" "), "studio/studio_confetti"
+    refute_includes by_src.map { |script, _| script["src"] }.join(" "), "studio/studio_confetti",
+                    "confetti imports a bare specifier, so it must not load by URL (its Link preload beats the map)"
   end
 
   # The favicon link carries the file's content version (Studio::PublicFileVersion),
