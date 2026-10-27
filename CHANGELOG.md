@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.115.3 — 2026-10-27
+
 ### Changed
 
 - **Consumer CI holds its credentials tighter.** `.github/workflows/consumer-ci.yml`
