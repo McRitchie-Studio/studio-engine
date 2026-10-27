@@ -16,8 +16,9 @@ require "test_helper"
 #
 # This reads every engine view, finds each javascript_include_tag with type "module",
 # and scans the module's source for a static import or re-export of a specifier that
-# is not a URL or a relative path. A dynamic import() resolves when it is called,
-# after the map, so it is allowed.
+# is not a URL or a relative path, following relative imports (a bare one a hop down
+# fails the same way). A dynamic import() resolves when it is called, after the map,
+# so it is allowed.
 class HeadUrlModulesImportNoBareSpecifierTest < Minitest::Test
   ROOT = File.expand_path("../..", __dir__)
 
@@ -44,6 +45,16 @@ class HeadUrlModulesImportNoBareSpecifierTest < Minitest::Test
     code.scan(STATIC_IMPORT).flatten.reject { |spec| spec.match?(%r{\A(?:/|\./|\.\./|[a-z][a-z0-9+.-]*:)}i) }
   end
 
+  def self.bare_imports_deep(file, seen = {})
+    return [] if seen[file]
+    seen[file] = true
+    code = File.read(file).gsub(%r{/\*.*?\*/}m, "").gsub(%r{^\s*//.*$}, "")
+    code.scan(STATIC_IMPORT).flatten.grep(%r{\A\.\.?/}).flat_map do |spec|
+      child = File.expand_path(spec, File.dirname(file))
+      File.file?(child) ? bare_imports_deep(child, seen) : ["#{spec} (unresolved from #{File.basename(file)})"]
+    end + bare_static_imports(File.read(file))
+  end
+
   def test_the_head_loads_modules_by_url
     refute_empty self.class.url_modules, "found no module loaded by URL, so the rule below checks nothing"
   end
@@ -52,9 +63,17 @@ class HeadUrlModulesImportNoBareSpecifierTest < Minitest::Test
     self.class.url_modules.each do |source|
       file = self.class.module_file(source)
       refute_nil file, "#{source} names no engine file"
-      bare = self.class.bare_static_imports(File.read(file))
+      bare = self.class.bare_imports_deep(file)
       assert_empty bare,
         "#{source} loads by URL (a Link modulepreload, fetched before the import map) yet imports #{bare.inspect}; use javascript_import_module_tag"
+    end
+  end
+
+  def test_the_scan_follows_relative_imports
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "a.js"), %(import "./b.js"\n))
+      File.write(File.join(dir, "b.js"), %(import "canvas-confetti"\n))
+      assert_equal ["canvas-confetti"], self.class.bare_imports_deep(File.join(dir, "a.js"))
     end
   end
 
