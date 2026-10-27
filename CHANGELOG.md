@@ -4,6 +4,23 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **Consumer CI holds its credentials tighter.** `.github/workflows/consumer-ci.yml`
+  now declares `permissions: contents: read` at the top (no job widens it), sets
+  `persist-credentials: false` on every checkout so no token sits in a clone's
+  `.git/config` while the consumer suites, `bundle install` and `npm ci` run, and
+  mints each job's GitHub App token read-only (`contents`, `metadata`) for only the
+  repos that job clones. Same secrets as before. Guard:
+  `test/lib/consumer_ci_hardening_test.rb`.
+- **A red `hub-browser` job prints one triage line.** `bin/hub-e2e-subset triage`
+  writes `E2E_LANE hub-browser RED: …` as an error annotation naming the failing
+  spec files, a listed spec the hub renamed, or the receipt's own errors, so the
+  log reads at a glance. It reports and never changes the verdict.
+- **The session store's hello scenarios wait for the answer.** The node harness
+  slept a fixed 20ms for a two-hop message chain and flaked on a loaded box; it now
+  waits for the message with a 2s deadline. No host change.
+
 ## 0.115.2 — 2026-10-27
 
 ### Added

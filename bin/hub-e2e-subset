@@ -8,6 +8,10 @@
 #                                                 checkout does not have
 #   bin/hub-e2e-subset audit <list> <report.json> exit 1 unless every listed file executed
 #                                                 at least one test and none was skipped
+#   bin/hub-e2e-subset triage <list> <report.json> <hub-dir>
+#                                                 print the ONE E2E_LANE line naming the
+#                                                 lane and the spec files that made it red;
+#                                                 always exit 0 (it reports, never gates)
 #
 # WHY THE AUDIT. Playwright's exit code says the tests it RAN passed. It cannot say it
 # ran the ones we asked for: a listed spec whose every test is quarantined (the job
@@ -56,6 +60,63 @@ module HubE2eSubset
     rows
   end
 
+  LANE = "hub-browser"
+  FAILED_RESULTS = %w[failed timedOut interrupted].freeze
+
+  # A test failed when Playwright's own verdict is "unexpected"; a report without the
+  # test-level status falls back to its results (a retried test that passed is "flaky",
+  # not a failure, so the verdict field wins whenever it is present).
+  def failed_test?(test)
+    return test["status"] == "unexpected" if test.key?("status")
+
+    results = Array(test["results"])
+    !results.empty? && results.all? { |r| FAILED_RESULTS.include?(r["status"]) }
+  end
+
+  # => ["e2e/a.spec.js", ...] in the list's own spelling where the list names the file.
+  def failing_files(list, report)
+    by_key = list.to_h { |rel| [key(rel), rel] }
+    files = []
+    walk = lambda do |suite, file|
+      file = suite["file"] || file
+      Array(suite["specs"]).each do |spec|
+        files << file if Array(spec["tests"]).any? { |t| failed_test?(t) }
+      end
+      Array(suite["suites"]).each { |child| walk.call(child, file) }
+    end
+    Array(report["suites"]).each { |s| walk.call(s, nil) }
+    files.compact.uniq.map { |f| by_key.fetch(f, f) }
+  end
+
+  # The one line. Checked in the order the job runs, so it names the FIRST thing that
+  # went red: the list against the checkout, then the receipt's failures, then the
+  # receipt's own errors, then the coverage audit.
+  def triage_line(list, report_path, hub_dir)
+    head = "::error::E2E_LANE #{LANE} RED"
+    return "#{head}: the hub checkout never landed at #{hub_dir}; the lane failed before any spec" unless File.directory?(hub_dir)
+
+    gone = missing(list, hub_dir)
+    return "#{head}: listed spec(s) missing from the hub checkout (renamed or deleted): #{gone.join(', ')}" unless gone.empty?
+    return "#{head}: no receipt at #{report_path}; Playwright never finished (see its step log)" unless File.file?(report_path)
+
+    report = JSON.parse(File.read(report_path))
+    failing = failing_files(list, report)
+    return "#{head}: #{failing.length} failing spec file(s): #{failing.join(', ')}" unless failing.empty?
+
+    errors = Array(report["errors"])
+    unless errors.empty?
+      first = errors.first["message"].to_s.lines.first.to_s.strip
+      return "#{head}: #{errors.length} Playwright error(s) outside any test (config, boot or webServer): #{first}"
+    end
+
+    flagged = audit_failures(list, report).map { |f| f.split(" ", 2).first }
+    return "#{head}: listed spec(s) ran no test or skipped some: #{flagged.join(', ')}" unless flagged.empty?
+
+    "#{head}: no failing spec in the receipt; read the failed step's log"
+  rescue JSON::ParserError => e
+    "#{head}: the receipt at #{report_path} is not JSON (#{e.message.lines.first.strip})"
+  end
+
   def audit_failures(list, report)
     rows = tally(report)
     list.filter_map do |rel|
@@ -72,7 +133,7 @@ end
 
 if $PROGRAM_NAME == __FILE__
   cmd, list_path, target = ARGV
-  abort "usage: bin/hub-e2e-subset paths|audit <list> <hub-dir|report.json>" unless list_path && target
+  abort "usage: bin/hub-e2e-subset paths|audit|triage <list> <hub-dir|report.json> [hub-dir]" unless list_path && target
   list = HubE2eSubset.read_list(list_path)
   abort "#{list_path} names no spec" if list.empty?
 
@@ -80,7 +141,7 @@ if $PROGRAM_NAME == __FILE__
   when "paths"
     gone = HubE2eSubset.missing(list, target)
     unless gone.empty?
-      warn "HUB E2E SUBSET: RED — the hub checkout has no #{gone.join(', ')}."
+      warn "::error::HUB E2E SUBSET: RED — the hub checkout has no #{gone.join(', ')}."
       warn "  The hub renamed or deleted a listed spec. Repoint or drop it in #{list_path}."
       exit 1
     end
@@ -95,7 +156,9 @@ if $PROGRAM_NAME == __FILE__
       failures.each { |f| warn "  ✗ #{f}" }
       exit 1
     end
+  when "triage"
+    puts HubE2eSubset.triage_line(list, target, ARGV[3].to_s)
   else
-    abort "unknown command #{cmd.inspect}: paths | audit"
+    abort "unknown command #{cmd.inspect}: paths | audit | triage"
   end
 end

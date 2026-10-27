@@ -428,6 +428,12 @@ Also not covered:
   `.github/hub-e2e-subset.txt`. That is the lane that would have caught #485, whose
   modulepreload race existed only under the hub's own asset delivery.
 
+  When `hub-browser` goes red, its `E2E_LANE triage line` step prints one annotation,
+  `E2E_LANE hub-browser RED: …`, naming the failing spec files, a listed spec the hub
+  renamed or deleted, or Playwright's own errors outside any test
+  (`bin/hub-e2e-subset triage`). Start there; the step reports and never changes the
+  verdict. A renamed hub spec is fixed in `.github/hub-e2e-subset.txt`, not in the hub.
+
   A stand-in that delivers something the engine also delivers makes the engine's own
   delivery UNOBSERVABLE, and this lane shipped that bug for a while: the importmap
   stand-in served its own Alpine from `node_modules`, so specs stayed green with the
