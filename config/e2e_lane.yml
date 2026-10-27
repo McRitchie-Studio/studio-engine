@@ -1048,8 +1048,9 @@
 # 375 -> 379: e2e/engine_scripts_are_modules.spec.js (engine-scripts-become-modules).
 # The engine's six classic scripts became ES modules: every head script with a src
 # is a module below the import map and the map still resolves, the converted
-# modules' exports are the compatibility globals they keep, the session store is a
-# module, and confetti fires from the module (and not under reduced motion).
+# modules' exports are the compatibility globals they keep, the session store stays
+# classic and exists before any module runs, and confetti fires from the module
+# (and not under reduced motion).
 # Verified RED by restoring Alpine's classic `defer: true` tag (test 1 fails).
 #   npx playwright test --list  -> 379 tests in 56 files
 total_specs: 379

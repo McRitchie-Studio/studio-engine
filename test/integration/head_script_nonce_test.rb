@@ -221,12 +221,20 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
   # import map makes a browser without dynamic import maps ignore the map, so
   # every script with a src in the head comes after it; and each one is an
   # external module, so none of them adds an inline script to the count above.
-  test "every engine script in the head is a module tag below the import map" do
-    scripts = head_scripts("/lab/bar_stack")
+  # The session store is the one classic script (layouts/studio/_head says
+  # why), and the session lab is the page that renders it.
+  test "every engine script in the head is a module tag below the import map, but the session store" do
+    scripts = head_scripts("/lab/session_drift")
     importmap = scripts.index { |script| script["type"] == "importmap" }
     refute_nil importmap
 
-    by_src = scripts.each_with_index.select { |script, _| script["src"] }
+    session = scripts.index { |script| script["src"].to_s.include?("studio/session") }
+    refute_nil session, "the session lab renders no session store, so its exception proves nothing"
+    assert_nil scripts[session]["type"], "the session store is classic, so host modules find it as they evaluate"
+    assert_nil scripts[session]["defer"]
+    assert_operator session, :<, importmap, "the session store runs before every module"
+
+    by_src = scripts.each_with_index.select { |script, index| script["src"] && index != session }
     refute_empty by_src, "the head loads no script by URL, so this proves nothing"
     by_src.each do |script, index|
       assert_equal "module", script["type"], "#{script["src"]} is a classic script"

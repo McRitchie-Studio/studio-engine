@@ -4,7 +4,7 @@ require "test_helper"
 require "action_view"
 require "open3"
 
-# [component] The browser session store (app/javascript/studio/session.js),
+# [component] The browser session store (app/assets/javascripts/studio/session.js),
 # EXECUTED under node, plus the wiring that delivers it to every page.
 #
 # WHY NODE AND NOT STRING ASSERTIONS. The store's value is its transitions: which
@@ -22,7 +22,7 @@ require "open3"
 # the same rule and why). CI installs node in the engine-suite lane.
 class StudioSessionStoreTest < Minitest::Test
   ROOT = File.expand_path("../..", __dir__)
-  STORE = File.join(ROOT, "app/javascript/studio/session.js")
+  STORE = File.join(ROOT, "app/assets/javascripts/studio/session.js")
   HARNESS = File.join(ROOT, "test/support/session_store_harness.js")
 
   SCENARIOS = %w[
@@ -113,36 +113,28 @@ class StudioSessionStoreTest < Minitest::Test
 
   # ---- delivery -------------------------------------------------------------
 
-  def test_the_store_partial_loads_the_store_as_a_module
-    partial = File.read(File.join(ROOT, "app/views/studio/_session_store.html.erb"))
-    assert_includes partial, %(javascript_include_tag "studio/session", type: "module")
-    stamp = File.read(File.join(ROOT, "app/views/studio/_session_stamp.html.erb"))
-    refute_includes stamp, "javascript_include_tag", "the stamp partial is above the import map, so it carries no module tag"
+  def test_the_stamp_partial_loads_the_store_from_the_asset_pipeline
+    partial = File.read(File.join(ROOT, "app/views/studio/_session_stamp.html.erb"))
+    assert_includes partial, %(javascript_include_tag "studio/session")
+    refute_match(/javascript_include_tag "studio\/session"[^%]*defer/, partial,
+                 "the store must run before deferred Alpine so it hears alpine:init")
   end
 
-  def test_the_store_module_exports_the_store
-    assert_match(/^export default window\.StudioSession;$/, File.read(STORE))
-  end
-
-  def test_the_head_renders_the_stamp_and_the_store_in_order
+  def test_the_head_renders_the_stamp_partial
     head = File.read(File.join(ROOT, "app/views/layouts/studio/_head.html.erb"))
     assert_includes head, %(render "studio/session_stamp")
-    store = head.index(%(render "studio/session_store"))
-    refute_nil store, "the head does not render the store"
-    assert_operator head.index("javascript_importmap_tags %>"), :<, store, "the store's module tag comes after the import map"
-    assert_operator store, :<, head.index(%(javascript_include_tag "studio/alpine")), "the store loads before Alpine"
+    assert_operator head.index(%(render "studio/session_stamp")), :<, head.index(%(javascript_include_tag "studio/alpine")),
+                    "the store loads before Alpine"
   end
 
   def test_the_asset_is_precompiled_and_packaged
     engine_rb = File.read(File.join(ROOT, "lib/studio/engine.rb"))
-    assert_includes engine_rb, "app.config.assets.precompile += Studio::Engine.javascript_module_logical_paths",
-                    "sprockets hosts need the precompile entry, which every engine module gets"
+    assert_includes engine_rb, "studio/session.js", "sprockets hosts need the precompile entry"
 
     spec = Gem::Specification.load(File.join(ROOT, "studio-engine.gemspec"))
     %w[
-      app/javascript/studio/session.js
+      app/assets/javascripts/studio/session.js
       app/views/studio/_session_stamp.html.erb
-      app/views/studio/_session_store.html.erb
       app/controllers/studio/session_states_controller.rb
       app/controllers/concerns/studio/session_drift.rb
       lib/studio/session_fingerprint.rb

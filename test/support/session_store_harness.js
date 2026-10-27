@@ -1,4 +1,4 @@
-// Executes app/javascript/studio/session.js FOR REAL under node.
+// Executes app/assets/javascripts/studio/session.js FOR REAL under node.
 //
 // Driven by test/views/studio_session_store_test.rb, which asserts every scenario
 // below by NAME, so a scenario that silently stops running reddens the suite.
@@ -22,17 +22,7 @@ if (!SOURCE_PATH) {
   console.error("usage: node session_store_harness.js <path to studio/session.js>");
   process.exit(2);
 }
-// The store is an ES module whose only module syntax is its last line, `export
-// default window.StudioSession;`. A vm context runs scripts, not modules, so that
-// one line is cut, and nothing else: a second export, or an import, is module
-// syntax this harness cannot run, and it refuses rather than guess.
-const MODULE_EXPORT = /^export default window\.StudioSession;\s*$/m;
-const RAW_SOURCE = fs.readFileSync(SOURCE_PATH, "utf8");
-if ((RAW_SOURCE.match(/^\s*(?:import|export)\b/gm) || []).length !== 1 || !MODULE_EXPORT.test(RAW_SOURCE)) {
-  console.error("session_store_harness: expected exactly one module line, `export default window.StudioSession;`");
-  process.exit(2);
-}
-const SOURCE = RAW_SOURCE.replace(MODULE_EXPORT, "");
+const SOURCE = fs.readFileSync(SOURCE_PATH, "utf8");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

@@ -12,9 +12,7 @@ class SessionLabController < ActionController::Base
   skip_before_action :require_authentication
 
   def show
-    # The head's two session partials, in the head's order: the stamp, then the
-    # store's module tag (which the head renders below its import map).
-    render inline: %(<%= render "studio/session_stamp" %><%= render "studio/session_store" %>)
+    render inline: %(<%= render "studio/session_stamp" %>)
   end
 
   def sign_in

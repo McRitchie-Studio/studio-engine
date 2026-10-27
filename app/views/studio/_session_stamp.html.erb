@@ -1,12 +1,10 @@
 <%# The session-drift stamp (docs/SESSION_DRIFT.md), rendered by
     layouts/studio/_head on every page.
 
-    It emits the meta tag named studio-session, carrying the stamp as JSON. The
-    browser store that reads it (studio/session, an ES module that publishes
-    window.StudioSession) is studio/_session_store, which the head renders below
-    the import map: a module tag above the map would make browsers without
-    dynamic import maps ignore it. The store still runs before Alpine, so its
-    alpine:init listener is in place when Alpine starts.
+    It emits two things: a meta tag named studio-session carrying the stamp as
+    JSON, and the browser store that reads it (studio/session.js, which publishes
+    window.StudioSession). The store is NOT deferred: it has to register its
+    alpine:init listener before the deferred Alpine script runs.
 
     A META TAG, NOT A JSON SCRIPT TAG, AND THAT IS LOAD-BEARING. Turbo merges the
     head on every navigation. Script elements are copied in and never removed, so
@@ -21,11 +19,14 @@
     before this partial existed.
 
     THE SCRIPT DOES NOT DEPEND ON THE STAMP. A nil stamp (a production failure,
-    logged to ErrorLog) omits the meta tag; studio/_session_store still loads the
-    store, which then stays dormant. %>
+    logged to ErrorLog) omits the meta tag and still loads the store, which then
+    stays dormant. The script is Turbo-tracked like every engine asset, and Turbo
+    fully reloads when two pages' tracked scripts differ, so a page whose stamp
+    failed must not also drop the script and turn the next click into a reload. %>
 <% if respond_to?(:studio_session_page_stamp) %>
 <% studio_session_stamp_value = studio_session_page_stamp %>
 <% if studio_session_stamp_value %>
 <%= tag.meta(name: "studio-session", content: studio_session_stamp_value.to_json) %>
 <% end %>
+<%= javascript_include_tag "studio/session", "data-turbo-track": "reload" %>
 <% end %>

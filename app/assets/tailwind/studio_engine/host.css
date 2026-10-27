@@ -30,8 +30,10 @@
    partials, the ViewComponents (their colour classes live in Ruby), the
    helpers that build markup (admin_model_table), and the engine's ES modules
    (app/javascript: classes added at runtime). app/assets/javascripts is not
-   scanned: since every engine script became a module it holds only vendored,
-   minified third-party builds (Alpine, Leaflet, Sortable, canvas-confetti).
+   scanned: since the engine's scripts became modules it holds the vendored,
+   minified third-party builds (Alpine, Leaflet, Sortable, canvas-confetti) and
+   studio/session.js, which puts no class on a page (held by
+   test/integration/component_tailwind_source_test.rb).
 
    The exclusions are NARROW on purpose: the vendored bundles are not engine
    markup, and scanning them mints junk utilities from their identifiers. Never exclude a whole directory: the hub's

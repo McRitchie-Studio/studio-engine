@@ -76,11 +76,12 @@ module Studio
     end
 
     initializer "studio.assets" do |app|
-      # The vendored third-party builds (app/assets/javascripts/studio). Each is
-      # loaded as an ES module: Alpine by the head's type="module" tag,
+      # app/assets/javascripts/studio: the vendored third-party builds, each
+      # loaded as an ES module (Alpine by the head's type="module" tag,
       # canvas-confetti and SortableJS through their importmap pins, Leaflet by
-      # studio/footer_map's import(). The engine's own scripts are modules under
-      # app/javascript, enumerated below.
+      # studio/footer_map's import()), and studio/session.js, the one classic
+      # script (layouts/studio/_head says why). The engine's own modules are
+      # under app/javascript, enumerated below.
       app.config.assets.precompile += %w[
         studio/sticky_table_header.css
         studio/alpine.js
@@ -88,6 +89,7 @@ module Studio
         studio/sortable.js
         studio/leaflet.js
         studio/leaflet.css
+        studio/session.js
         studio/montserrat-latin.woff2
         studio/montserrat-latin-ext.woff2
       ]
@@ -132,9 +134,9 @@ module Studio
     # The contract a module joins by being here:
     #   - it lives under app/javascript/studio/ and is pinned as "studio/<name>";
     #   - pins are NOT preloaded, so a page fetches only the modules it imports;
-    #   - its logical asset path shares the studio/ prefix with the vendored
-    #     builds in app/assets/javascripts/studio, so a module may not reuse one
-    #     of those names (test/integration/engine_importmap_pins_test.rb).
+    #   - its logical asset path shares the studio/ prefix with the files in
+    #     app/assets/javascripts/studio (vendored builds, studio/session.js), so
+    #     a module may not reuse one of those names (test/integration/engine_importmap_pins_test.rb).
     # A host without importmap-rails (a footer-only consumer) skips this.
     initializer "studio.importmap", before: "importmap" do |app|
       next unless app.config.respond_to?(:importmap)

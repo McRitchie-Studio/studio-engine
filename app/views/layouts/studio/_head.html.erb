@@ -27,9 +27,16 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <%= csrf_meta_tags %>
 <%= csp_meta_tag %>
-<%# The session-drift stamp. Renders nothing unless the controller includes
-    Studio::ErrorHandling. See studio/_session_stamp; its browser store is a
-    module, so studio/_session_store loads it below the import map. %>
+<%# The session-drift stamp + browser store. Renders nothing unless the controller
+    includes Studio::ErrorHandling. See studio/_session_stamp.
+
+    THE ONE ENGINE SCRIPT THAT STAYS CLASSIC, AND SYNCHRONOUS. Host code
+    registers identity sources with window.StudioSession as its own modules
+    EVALUATE (turf-monster's wallet_signal, through solana-studio's
+    walletIdentity.register), and the host's entry point is the module tag
+    javascript_importmap_tags renders, which any engine module tag below the map
+    would follow. A module store would not exist yet, and the registration would
+    silently be null. It becomes a module when those consumers wait for it. %>
 <%= render "studio/session_stamp" %>
 <%= render "layouts/studio/smooth_load" %>
 <%# The favicon's URL carries its content version (Studio::PublicFileVersion),
@@ -182,13 +189,13 @@
   <%= stylesheet_link_tag "studio/sticky_table_header", "data-turbo-track": "reload" %>
 <% end %>
 <%= javascript_importmap_tags %>
-<%# EVERY ENGINE SCRIPT IS A MODULE, AND EVERY MODULE TAG COMES AFTER THE IMPORT
-    MAP. A browser without dynamic import maps ignores an import map that arrives
-    after its first module script, so a module tag above this line would take every
-    bare specifier on the page down with it. The ones below that load by URL
-    (type="module" with a src) are external files, not inline scripts: they carry
-    no body and need no nonce under a policy that allows 'self'. %>
-<%= render "studio/session_store" %>
+<%# EVERY ENGINE SCRIPT BELOW IS A MODULE, AND EVERY MODULE TAG COMES AFTER THE
+    IMPORT MAP. A browser without dynamic import maps ignores an import map that
+    arrives after its first module script, so a module tag above this line would
+    take every bare specifier on the page down with it. The ones below that load by
+    URL (type="module" with a src) are external files, not inline scripts: they
+    carry no body and need no nonce under a policy that allows 'self'. The session
+    store (studio/_session_stamp, above) is the one classic script, and says why. %>
 <%# THE ENGINE'S BROWSER BOOT (studio/application): its every-page Stimulus
     controllers, the pinned stack, and the Alpine shims. A module tag, so it
     carries the nonce. %>

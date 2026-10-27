@@ -36,14 +36,8 @@
 // and broadcasts nothing, until a Turbo navigation brings a stamp in. Once seated
 // it stays seated: a later page without a stamp keeps the binding it has.
 //
-// AN ES MODULE THAT INSTALLS ON IMPORT. The head loads it with a type="module"
-// tag after the import map (studio/_session_store) and before Alpine, so its
-// alpine:init listener is in place when Alpine starts. `import StudioSession from
-// "studio/session"` is the module's interface; window.StudioSession stays as the
-// compatibility global (CHANGELOG, "Deprecated") for classic code, and is set
-// before any export is read. The body stays one function with no import, so
-// test/support/session_store_harness.js still runs it in a node:vm context per
-// tab (it strips the single export line below).
+// Written as ES5 with Promises and no framework, like the other engine assets,
+// so every host's asset pipeline accepts it untouched.
 (function () {
   "use strict";
 
@@ -651,5 +645,3 @@
     document.addEventListener("alpine:init", installAlpineStore);
   }
 })();
-
-export default window.StudioSession;

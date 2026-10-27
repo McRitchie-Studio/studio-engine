@@ -307,8 +307,7 @@ page that was working correctly — the lane catching a defect in itself.
 
 `e2e/session_drift.spec.js` drives `/lab/session_drift`, whose subject lives in
 the HEAD: the engine's `layouts/studio/_head` renders `studio/_session_stamp`, which
-emits the meta stamp, and `studio/_session_store`, which loads the `studio/session`
-module below the import map. The lab controller supplies
+emits the meta stamp and loads `studio/session.js`. The lab controller supplies
 the stamp's input from the query string (a host supplies it from
 `Studio::SessionDrift`); only that action sets it, so every other lab page keeps a
 head with no stamp and no store.

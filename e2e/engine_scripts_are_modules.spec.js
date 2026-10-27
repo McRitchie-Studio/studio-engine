@@ -4,9 +4,11 @@ const { blockOffsiteRequests, watchPageErrors } = require("./helpers");
 // [e2e] The engine's scripts are ES modules, and every one of them still runs.
 //
 // Six engine scripts were classic until this lane's change: Alpine,
-// canvas-confetti, studio/studio_confetti, studio/session,
-// studio/sticky_table_header and Leaflet. The view tests prove the head names
-// each as a type="module" tag below the import map. Only a browser proves the
+// canvas-confetti, studio/studio_confetti, studio/sticky_table_header,
+// Leaflet and studio/session. All but the last became modules; the session
+// store stays a synchronous classic script, because host modules register with
+// window.StudioSession as they evaluate (layouts/studio/_head says why). The
+// view tests prove the head names each as it should. Only a browser proves the
 // consequences: that a module tag below the map leaves the map honoured (a bare
 // specifier still resolves), that the unedited vendored builds still assign
 // their globals when evaluated as modules (strict mode, no `this`), that a
@@ -74,17 +76,39 @@ test("each converted module's export is the compatibility global it keeps, one i
   expect(same).toEqual({ confettiDefault: true, burst: true, cannons: true, library: "function", sticky: true });
 });
 
-test("the session store is a module whose export is window.StudioSession", async ({ page }) => {
+// A host module that registers an identity source as it evaluates (turf-monster's
+// wallet_signal) needs window.StudioSession to exist before ANY module runs. The
+// classic store, ahead of the import map, is what gives it that.
+test("the session store stays classic, ahead of every module, and exists before they run", async ({ page }) => {
   await blockOffsiteRequests(page);
-  await page.goto("/lab/session_drift?fp=fp-alice&issued=1000&state=authenticated");
-  await page.waitForFunction(() => Boolean(window.StudioSession && window.StudioSession.loaded), null, { timeout: 10_000 });
-
-  const store = await page.evaluate(async () => {
-    const tag = [...document.head.querySelectorAll("script[src]")].find((script) => script.src.includes("studio/session"));
-    const { default: exported } = await import("studio/session");
-    return { type: tag && tag.type, same: exported === window.StudioSession, state: window.StudioSession.current().state };
+  // Record, as the parser reaches the import map (before which no module can
+  // run), whether the store is already there.
+  await page.addInitScript(() => {
+    window.__sessionBeforeModules = undefined;
+    const observer = new MutationObserver(() => {
+      const map = document.querySelector("script[type=importmap]");
+      if (map && window.__sessionBeforeModules === undefined) {
+        window.__sessionBeforeModules = Boolean(window.StudioSession && window.StudioSession.loaded);
+        observer.disconnect();
+      }
+    });
+    observer.observe(document, { childList: true, subtree: true });
   });
-  expect(store).toEqual({ type: "module", same: true, state: "authenticated" });
+  await page.goto("/lab/session_drift?fp=fp-alice&issued=1000&state=authenticated");
+  await page.waitForFunction(() => Boolean(window.Alpine && window.StudioSession), null, { timeout: 10_000 });
+
+  const store = await page.evaluate(() => {
+    const scripts = [...document.head.querySelectorAll("script")];
+    const tag = scripts.findIndex((script) => (script.getAttribute("src") || "").includes("studio/session"));
+    const map = scripts.findIndex((script) => script.type === "importmap");
+    return {
+      classic: tag >= 0 && scripts[tag].type === "" && !scripts[tag].defer && !scripts[tag].async,
+      beforeMap: tag >= 0 && tag < map,
+      beforeModules: window.__sessionBeforeModules,
+      state: window.StudioSession.current().state
+    };
+  });
+  expect(store).toEqual({ classic: true, beforeMap: true, beforeModules: true, state: "authenticated" });
 });
 
 test("confetti fires from the module, and not under reduced motion", async ({ page }) => {

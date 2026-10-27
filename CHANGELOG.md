@@ -6,16 +6,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Changed
 
-- **The engine's six classic scripts are ES modules.** No host change is
-  needed: every host renders `layouts/studio/head`, which now loads them as
+- **Five of the engine's six classic scripts are ES modules.** No host change
+  is needed: every host renders `layouts/studio/head`, which now loads them as
   modules, and every global a host calls is kept.
-  - `studio/session`, `studio/sticky_table_header` and `studio/studio_confetti`
-    moved from `app/assets/javascripts/studio/` to `app/javascript/studio/`, so
-    the importmap pins them as `studio/<name>` like every engine module. Each
-    has a default export (the store, the sticky-header API, `{ burst, cannons }`);
+  - `studio/sticky_table_header` and `studio/studio_confetti` moved from
+    `app/assets/javascripts/studio/` to `app/javascript/studio/`, so the
+    importmap pins them as `studio/<name>` like every engine module. Each has a
+    default export (the sticky-header API, `{ burst, cannons }`);
     `studio/studio_confetti` also exports `burst`, `cannons` and `confetti`.
   - Alpine and canvas-confetti stay vendored, unedited, in
-    `app/assets/javascripts/studio/`, which now holds only third-party builds.
+    `app/assets/javascripts/studio/`, which now holds only those builds and the
+    classic `studio/session.js`.
     Alpine loads by a `type="module"` tag; canvas-confetti is pinned as
     `"canvas-confetti"` and imported by `studio/studio_confetti`, so the head no
     longer has its own tag for it.
@@ -23,23 +24,30 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
     map element, not a `<script>` element injected into the head. A failed fetch
     is retried under `?retry=n`, because a browser never refetches a module whose
     fetch failed.
-  - Every head script with a `src` is a `type="module"` tag below the import map
-    (a module tag above it makes browsers without dynamic import maps ignore the
-    map). The session store's tag moved out of `studio/_session_stamp`, which now
-    emits only the meta stamp, into the new `studio/_session_store`, which the
-    head renders right after `javascript_importmap_tags`. The head adds no inline
-    script, so the strict-nonce count is unchanged.
-  - **Timing.** `window.confetti`, `window.studioConfetti` and
-    `window.StudioSession` used to exist while the body parsed (synchronous
-    classic tags); they now exist once the head's modules run, which is still
-    before Alpine starts and before `DOMContentLoaded`. A host's inline body
+  - Every head script with a `src`, but the session store, is a `type="module"`
+    tag below the import map (a module tag above it makes browsers without
+    dynamic import maps ignore the map). The head adds no inline script, so the
+    strict-nonce count is unchanged.
+  - **Held: `studio/session.js` stays a synchronous classic script**, above the
+    import map, unchanged. Host code registers identity sources with
+    `window.StudioSession` as its own modules evaluate (turf-monster's
+    `wallet_signal.js` calls solana-studio's `walletIdentity.register()` at
+    import), and a host's entry point is the module tag
+    `javascript_importmap_tags` renders, which an engine module tag below the
+    map would follow: the store would not exist yet and the registration would
+    silently be null. It becomes a module once those consumers wait for it.
+  - **Timing.** `window.confetti` and `window.studioConfetti` used to exist
+    while the body parsed (synchronous classic tags); they now exist once the
+    head's modules run, which is still before Alpine starts and before
+    `DOMContentLoaded`. A host's inline body
     script that calls one of them at parse time, rather than from a handler,
     would now find it missing. No host on `origin/accepted` does: turf-monster's
     `confetti()` calls in `solana_utils.js` and `shared/_alpine_factories` run
     from functions its handlers call, and each checks `typeof confetti` first.
   - `host.css` no longer scans `app/assets/javascripts` (its `@source` line and
-    the vendored-file exclusion are gone): every file there is vendored. The
-    moved scripts are scanned under `app/javascript` as before.
+    the vendored-file exclusion are gone): it holds the vendored builds and
+    `studio/session.js`, which puts no class on a page, and a test measures
+    that. The moved scripts are scanned under `app/javascript`.
 
 ### Deprecated
 
@@ -49,7 +57,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   - `window.confetti` (the canvas-confetti library global) as a host call:
     `import { confetti } from "studio/studio_confetti"`. turf-monster calls it
     today; the engine's own `fireSuccessConfetti` still reads it.
-  - `window.StudioSession`: `import StudioSession from "studio/session"`.
   - `window.StudioStickyTableHeaders`: `import StickyTableHeaders from "studio/sticky_table_header"`.
   `window.Alpine` and `window.L` are not deprecated: Alpine and Leaflet read
   their own globals.
