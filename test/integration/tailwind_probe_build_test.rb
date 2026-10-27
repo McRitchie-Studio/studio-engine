@@ -159,9 +159,9 @@ class TailwindProbeBuildTest < Minitest::Test
   end
 
   # The engine reads no JS preset and runs no bundler from Node. The preset
-  # file itself survives one release as a deprecated shim for hosts still on
-  # `@config` (tailwind_preset_parity_test.rb), but nothing the engine ships
-  # imports it, and no shipped code resolves the gem by shelling out.
+  # (tailwind/studio.tailwind.config.js) was deleted once every host had
+  # adopted the CSS-first entry, so nothing the engine ships imports it, and no
+  # shipped code resolves the gem by shelling out.
   def test_the_engine_reads_no_js_preset_and_runs_no_shell_out
     root = B::ROOT
     spec = Dir.chdir(root) { Gem::Specification.load(File.join(root, "studio-engine.gemspec")) }
@@ -176,6 +176,17 @@ class TailwindProbeBuildTest < Minitest::Test
 
     importers = code.select { |f| File.read(File.join(root, f)).match?(/require\(.*studio\.tailwind\.config/) }
     assert_empty importers, "engine code requires the deprecated JS preset"
+  end
+
+  # The shim is gone, not merely unread: a host still on `@config` that bumps
+  # past the deletion must fail loudly at its own build (CHANGELOG, Removed),
+  # so the file must not come back and the gem must not package a tailwind/
+  # directory again.
+  def test_the_deprecated_js_preset_is_deleted_and_unpackaged
+    root = B::ROOT
+    refute File.exist?(File.join(root, "tailwind/studio.tailwind.config.js")), "the deprecated JS preset is back"
+    spec = Dir.chdir(root) { Gem::Specification.load(File.join(root, "studio-engine.gemspec")) }
+    assert_empty spec.files.grep(%r{\Atailwind/}), "the gemspec packages a top-level tailwind/ directory again"
   end
 
   private
