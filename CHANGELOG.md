@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.115.0 — 2026-10-26
+
 ### Breaking
 
 - **The deprecated JS Tailwind preset `tailwind/studio.tailwind.config.js` is
