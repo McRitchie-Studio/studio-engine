@@ -28,6 +28,9 @@
 #      dependency pins
 #   5. Generates any non-secret test-only env the consumer needs
 #   6. Runs the consumer's standard test suite
+#   7. For the hub only, also runs a listed subset of its Playwright specs in a
+#      browser (the `hub-browser` job; .github/hub-e2e-subset.txt), because a
+#      Rails suite never loads a page's modules
 #
 # Add a new consumer: append its repo and local label to the matrix, and its
 # repo to CONSUMER_REPOS in the consumer-refs job. test/lib/consumer_ci_ref_pairing_test.rb
@@ -679,3 +682,201 @@ jobs:
           ruby -ryaml -e 'c = YAML.safe_load_file("config/rails_lane.yml"); c.delete("max_skips"); File.write("consumer-lane.yml", c.to_yaml)'
           bin/rails-executed-set-check rails-reports --contract consumer-lane.yml
 
+
+  # THE HUB'S BROWSER, AGAINST THIS ENGINE TREE.
+  #
+  # Every job above runs a consumer's RAILS suite. None of them opens a page in a browser,
+  # and a whole class of engine defect lives only there: engine PR #485 loaded
+  # studio/studio_confetti by URL, the browser acted on its Link modulepreload header before
+  # the import map existed, and "canvas-confetti" failed to resolve on every page whose head
+  # parsed slowly. Every consumer Rails suite here was green. The hub's own `playwright`
+  # lane went red on 41 tests in 23 files (hub run 40463820951), and only after the release
+  # lock bump had already pinned 0.115.1.rc1; #487 fixed it.
+  #
+  # So this job runs a SUBSET of the hub's Playwright specs (.github/hub-e2e-subset.txt says
+  # which and why) with the hub's Gemfile pointed at ../studio, exactly as consumer-tests
+  # does. A subset, not the hub's whole suite: the specs that assert zero page errors over
+  # engine-rendered chrome on several layouts, ~75s of tests in one job. The full suite stays
+  # the hub's own lane, where a hub flake reddens a hub PR and not an engine one. The list
+  # lives HERE because the hub owns no selection mechanism yet (a tag or list in the hub
+  # would be a hub change); bin/hub-e2e-subset fails the job by name when a listed file is
+  # gone, and audits the JSON receipt so a listed spec that ran nothing cannot pass quietly.
+  #
+  # The setup copies the hub's own `playwright` job (reusable-ci.yml): node 22 + npm ci, the
+  # browser cache, apt hardened machine-wide before `--with-deps`, and Playwright's webServer
+  # booting the test server (db:test:prepare, tailwind, e2e/seed.rb, rails server). The one
+  # addition is consumer-tests' engine-migration install, and a schema dump after it, so the
+  # webServer's db:test:prepare loads a schema that carries this engine's tables.
+  # Guard: test/lib/hub_e2e_subset_test.rb.
+  hub-browser:
+    name: mcritchie_studio browser subset vs this engine
+    needs: consumer-refs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout engine
+        uses: actions/checkout@v4
+        with:
+          path: studio
+
+      - name: Mint consumer checkout token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.MCRITCHIE_AGENT_APP_ID }}
+          private-key: ${{ secrets.MCRITCHIE_AGENT_PRIVATE_KEY }}
+          owner: McRitchie-Studio
+
+      # The same hub commit the Rails shards run (consumer-refs). Default depth: nothing
+      # in this job reads the hub's history.
+      - name: Checkout mcritchie_studio
+        uses: actions/checkout@v4
+        with:
+          repository: McRitchie-Studio/mcritchie-studio
+          ref: ${{ fromJSON(needs.consumer-refs.outputs.shas)['mcritchie-studio'] }}
+          path: mcritchie_studio
+          token: ${{ steps.app-token.outputs.token }}
+
+      # Before any slow setup, so a renamed hub spec fails in seconds and by name.
+      - name: Resolve the hub spec subset
+        run: ruby studio/bin/hub-e2e-subset paths studio/.github/hub-e2e-subset.txt mcritchie_studio > hub-e2e-subset.list
+
+      # The consumer-tests install pattern (cache, inline Acquire timeouts, three bounded
+      # attempts, always-save), with the packages the hub's own playwright job installs.
+      - name: Read runner image
+        id: runner-image
+        run: echo "id=${ImageOS}-${ImageVersion}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore apt package cache
+        id: apt-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/apt-archives
+          key: apt-${{ steps.runner-image.outputs.id }}-curl-imagemagick-libjemalloc2-libpq-dev-libvips-postgresql-client
+          restore-keys: |
+            apt-${{ steps.runner-image.outputs.id }}-
+            apt-ubuntu24-
+
+      - name: Install system packages
+        id: apt
+        timeout-minutes: 20
+        run: |
+          mkdir -p "$HOME/apt-archives/partial"
+          trap 'sudo timeout 60 apt-get -o Dir::Cache::Archives="$HOME/apt-archives" autoclean || true
+                sudo chown -R "$(id -u):$(id -g)" "$HOME/apt-archives" || true' EXIT
+          APT_OPTS=(-o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+                    -o Dir::Cache::Archives="$HOME/apt-archives" -o APT::Keep-Downloaded-Packages=true)
+          for attempt in 1 2 3; do
+            if sudo timeout -k 10 120 apt-get "${APT_OPTS[@]}" update && \
+               sudo timeout -k 10 300 apt-get "${APT_OPTS[@]}" install --no-install-recommends -y \
+                 curl imagemagick libjemalloc2 libpq-dev libvips postgresql-client; then
+              exit 0
+            fi
+            echo "::warning::apt attempt $attempt failed or hung; retrying"
+            sudo dpkg --configure -a || true
+            sleep 10
+          done
+          exit 1
+
+      - name: Save apt package cache
+        if: always() && steps.apt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/apt-archives
+          key: ${{ steps.apt-cache.outputs.cache-primary-key }}${{ steps.apt.outcome != 'success' && format('-partial-{0}-{1}', github.run_id, github.run_attempt) || '' }}
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3.11
+          working-directory: mcritchie_studio
+
+      - name: Point mcritchie_studio Gemfile at this engine commit
+        working-directory: mcritchie_studio
+        run: |
+          sed -i.bak 's|^gem "studio-engine".*|gem "studio-engine", path: "../studio"|' Gemfile
+          grep -q '^gem "studio-engine", path: "../studio"$' Gemfile
+          bundle install --jobs 4 --retry 2
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mcritchie_studio/package-lock.json
+
+      - name: Install JS dependencies
+        working-directory: mcritchie_studio
+        run: npm ci
+
+      - name: Cache the Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('mcritchie_studio/package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      # `--with-deps` runs its own apt-get outside the loop above, so apt's timeouts are
+      # set machine-wide for it (the hub's pattern, from ci-apt-install-survives-stalls).
+      - name: Harden apt fetches
+        run: printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' | sudo tee /etc/apt/apt.conf.d/80-retries
+
+      - name: Install Playwright browser
+        working-directory: mcritchie_studio
+        timeout-minutes: 15
+        run: npx playwright install --with-deps chromium
+
+      # consumer-tests' reason, verbatim in effect: the engine here is ahead of the hub by
+      # construction, so its new migrations are installed and migrated in. The dump then
+      # writes them into db/schema.rb, because Playwright's webServer starts with
+      # `db:test:prepare`, which reloads the test DB from that file.
+      - name: Install this engine's migrations into the hub
+        working-directory: mcritchie_studio
+        env:
+          RAILS_ENV: test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432
+        run: |
+          bundle exec rails studio_engine:install:migrations
+          bundle exec rails db:test:prepare
+          bundle exec rails db:migrate
+          bundle exec rails db:schema:dump
+
+      # The hub's own flags: --grep-invert @quarantine keeps its quarantined specs out, and
+      # the json reporter writes the receipt the audit below reads. CI=true (set by Actions)
+      # arms forbidOnly and boots a fresh webServer.
+      - name: Run the hub browser subset
+        id: playwright
+        working-directory: mcritchie_studio
+        env:
+          RAILS_ENV: test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/hub-e2e-report.json
+        run: npx playwright test --grep-invert @quarantine --reporter=list,json $(cat ../hub-e2e-subset.list)
+
+      # ALWAYS once the subset resolved: a red run still wrote a receipt, and a run that
+      # wrote none is red here too.
+      - name: Audit the receipt covers every listed spec
+        if: always() && steps.playwright.outcome != 'skipped'
+        run: ruby studio/bin/hub-e2e-subset audit studio/.github/hub-e2e-subset.txt hub-e2e-report.json
+
+      - name: Keep the Playwright report from a failed run
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: hub-browser-playwright-report
+          path: |
+            ${{ github.workspace }}/hub-e2e-report.json
+            ${{ github.workspace }}/mcritchie_studio/playwright-report
+            ${{ github.workspace }}/mcritchie_studio/test-results
+          if-no-files-found: ignore

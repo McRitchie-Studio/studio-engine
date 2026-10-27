@@ -6,6 +6,15 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **Consumer CI opens the hub in a browser.** A new `hub-browser` job in
+  `.github/workflows/consumer-ci.yml` runs a listed subset of the hub's
+  Playwright specs (`.github/hub-e2e-subset.txt`: boards, `/dreams`, the
+  navbar, public pages) against the PR's engine tree through a path gem.
+  Engine #485 broke 41 hub browser tests while every consumer Rails suite
+  stayed green; this job goes red on that regression. `bin/hub-e2e-subset`
+  fails it by name when the hub drops a listed spec, and audits its JSON
+  receipt so a listed spec that ran nothing cannot pass. No host change.
+
 - **One Node tooling package, shipped in the gem** (`lib/studio/node_tooling/`,
   see its `README.md`). `versions.json` pins Node 22, `@playwright/test`
   1.62.1 and `axe-core` 4.11.0. `playwright_base.js` holds the browser lane's
