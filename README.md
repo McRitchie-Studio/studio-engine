@@ -127,6 +127,23 @@ A migrating host also moves every other reader of the preset, not only the
 build: any production code or test that `require`s or reads the preset's text
 reads `theme.css` instead.
 
+## Node tooling
+
+The gem ships the one Node tooling package every app shares, in
+`lib/studio/node_tooling/` (its `README.md` lists the files): the pins
+(`versions.json`: Node 22, `@playwright/test` 1.62.1, `axe-core` 4.11.0), a
+Playwright config base, the shared e2e helpers, and the `node --test` importmap
+hooks.
+
+```bash
+bin/rails studio:node:link    # node_modules/.studio-engine -> the package; run after npm ci
+bin/rails studio:node:check   # exits 1, naming each pin this app drifts from
+```
+
+An app pins Node in `.tool-versions` (`nodejs 22`), the file mise and
+`actions/setup-node`'s `node-version-file` both read.
+`docs/FRONT_END_STANDARD.md`, "Node tooling", has the rest.
+
 ## Configuration
 
 Each consuming app configures the engine in `config/initializers/studio.rb`:
