@@ -106,6 +106,7 @@ class ConsumerCiHubBrowserTest < Minitest::Test
       out, err, ok = run_script("paths", list, File.join(dir, "hub"))
       refute ok, "a renamed hub spec must fail the job, not shrink the set"
       assert_includes err, "e2e/gone.spec.js"
+      assert_match(/^::error::HUB E2E SUBSET: RED/, err, "the missing-spec red is an annotation, so it heads the run summary")
       assert_empty out, "nothing is handed to Playwright when the list is wrong"
     end
   end

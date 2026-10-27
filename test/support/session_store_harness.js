@@ -36,7 +36,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // only a moment earlier. The assertion then reads an empty `heard`. A 30ms stall
 // reproduces it every time.
 //
-// So a scenario that waits for a bus message waits for the MESSAGE: `until` polls
+// The three scenarios that wait on an outsider's round trip (two hellos and an older
+// announce) wait for the MESSAGE: `until` polls
 // the condition with a generous deadline (it returns as soon as the condition holds,
 // so a healthy run pays nothing for the headroom), and `settle` then drains the
 // zero-delay hops still queued, so an unwanted SECOND message has its chance to
@@ -378,12 +379,14 @@ scenario("answers_an_older_announce_with_its_own", async () => {
   const outsider = new world.BroadcastChannel("studio-session");
   const heard = [];
   outsider.onmessage = (event) => heard.push(event.data);
-  await sleep(10);
+  await settle();
   heard.length = 0;
 
-  // No hello: only the announce itself can prompt the answer.
+  // No hello: only the announce itself can prompt the answer. The same two-hop bus
+  // round trip as a hello, so it waits for the answer (see `until` above).
   outsider.postMessage({ v: 1, type: "announce", tabId: "outsider", fingerprint: "anonymous", state: "anonymous", issuedAt: 1 });
-  await sleep(20);
+  await until(() => heard.length > 0, "the tab's answer to the older announce");
+  await settle();
 
   assert.strictEqual(tab.store.current().state, "authenticated", "an older truth does not move this tab");
   const answers = heard.filter((m) => m.type === "announce" && m.fingerprint === "fp-u1");

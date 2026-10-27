@@ -10,9 +10,10 @@
 # Operator setup (one-time, in studio repo Settings → Secrets and variables → Actions):
 #   MCRITCHIE_AGENT_APP_ID      — the `mcritchie-agent` GitHub App's numeric id.
 #   MCRITCHIE_AGENT_PRIVATE_KEY — that app's private key (the .pem contents).
-#   The "Mint consumer checkout token" step exchanges them for a short-lived
-#   installation token scoped to the McRitchie-Studio org, so actions/checkout
-#   can clone the private consumer repos. Fine-grained PATs died with the
+#   Each job's "Mint consumer checkout token" step exchanges them for a short-lived
+#   installation token, READ-ONLY (contents, metadata) and limited to the repos that
+#   job clones (its `repositories:` list), so actions/checkout can clone the private
+#   consumer repos and nothing else. Fine-grained PATs died with the
 #   2026-07-29 org migration (they cannot call the check-runs API at all), and
 #   the classic CONSUMER_REPO_TOKEN PAT retired with them.
 #
@@ -33,8 +34,10 @@
 #      Rails suite never loads a page's modules
 #
 # Add a new consumer: append its repo and local label to the matrix, and its
-# repo to CONSUMER_REPOS in the consumer-refs job. test/lib/consumer_ci_ref_pairing_test.rb
-# holds the two lists to each other and to its own.
+# repo to CONSUMER_REPOS in the consumer-refs job AND to that job's token
+# `repositories:` list (without it the resolve 404s, which reads like an auth failure).
+# test/lib/consumer_ci_ref_pairing_test.rb holds the matrix and CONSUMER_REPOS to each
+# other; test/lib/consumer_ci_hardening_test.rb holds the token list to CONSUMER_REPOS.
 
 name: Consumer CI
 
@@ -234,9 +237,9 @@ jobs:
             needs_solana_admin_key: true
             needs_tailwind_build: false
           # Successor to the retired acquisition-studio prototype's lane. The
-          # checkout token is minted from the `mcritchie-agent` GitHub App —
-          # org-scoped, so it covers ALL private McRitchie-Studio repos, this
-          # one included; no per-repo secret needed.
+          # checkout token is minted from the `mcritchie-agent` GitHub App, whose
+          # installation covers every private McRitchie-Studio repo, so no per-repo
+          # secret is needed; each cell's mint narrows it to `matrix.repo`, read-only.
           - consumer: mcritchie_industries
             repo: mcritchie-industries
             managed_wallet_encryption_key: ""
@@ -731,7 +734,8 @@ jobs:
   # the hub's own lane, where a hub flake reddens a hub PR and not an engine one. The list
   # lives HERE because the hub owns no selection mechanism yet (a tag or list in the hub
   # would be a hub change); bin/hub-e2e-subset fails the job by name when a listed file is
-  # gone, and audits the JSON receipt so a listed spec that ran nothing cannot pass quietly.
+  # gone, audits the JSON receipt so a listed spec that ran nothing cannot pass quietly, and
+  # on any red prints the one E2E_LANE triage line naming the specs at fault.
   #
   # The setup copies the hub's own `playwright` job (reusable-ci.yml): node 22 + npm ci, the
   # browser cache, apt hardened machine-wide before `--with-deps`, and Playwright's webServer

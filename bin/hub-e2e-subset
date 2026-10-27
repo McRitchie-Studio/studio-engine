@@ -141,7 +141,7 @@ if $PROGRAM_NAME == __FILE__
   when "paths"
     gone = HubE2eSubset.missing(list, target)
     unless gone.empty?
-      warn "HUB E2E SUBSET: RED — the hub checkout has no #{gone.join(', ')}."
+      warn "::error::HUB E2E SUBSET: RED — the hub checkout has no #{gone.join(', ')}."
       warn "  The hub renamed or deleted a listed spec. Repoint or drop it in #{list_path}."
       exit 1
     end
