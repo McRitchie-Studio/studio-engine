@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.115.2 — 2026-10-27
+
 ### Added
 
 - **Consumer CI opens the hub in a browser.** A new `hub-browser` job in
