@@ -130,3 +130,35 @@ test("the hooks resolve a host's importmap prefixes and top-level names as ES mo
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test("a top-level name with digits maps to its file; a relative or URL specifier still falls through", () => {
+  const root = mkdtempSync(join(tmpdir(), "studio-node-hooks-"))
+  try {
+    mkdirSync(join(root, "app/javascript"), { recursive: true })
+    mkdirSync(join(root, "test/javascript/support"), { recursive: true })
+    writeFileSync(join(root, "app/javascript/base58.js"), "export const encode = () => 'b58'\n")
+    // topLevelDir holds the file a name-mapping of "./x.js" would land on, so a
+    // hook that mapped relative specifiers by name would answer "top", not "local".
+    writeFileSync(join(root, "app/javascript/x.js.js"), "export const where = 'top'\n")
+    writeFileSync(join(root, "test/javascript/x.js"), "export const where = 'local'\n")
+    const register = new URL("node_test/register.mjs", TOOLING).href
+    writeFileSync(join(root, "test/javascript/support/register.mjs"), `
+      import { registerImportmapHooks } from ${JSON.stringify(register)}
+      registerImportmapHooks({
+        root: new URL("../../../", import.meta.url),
+        topLevelDir: "app/javascript/",
+        esmDirs: ["app/javascript/", "test/javascript/"],
+      })
+    `)
+    writeFileSync(join(root, "test/javascript/probe.js"), `
+      import { encode } from "base58"
+      import { where } from "./x.js"
+      import { u } from "data:text/javascript,export const u = 'url'"
+      process.stdout.write(encode() + " " + where + " " + u)
+    `)
+    const out = execFileSync(process.execPath, ["--import", "./test/javascript/support/register.mjs", "test/javascript/probe.js"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
+    assert.equal(out, "b58 local url")
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
