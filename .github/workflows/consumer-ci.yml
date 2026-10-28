@@ -838,12 +838,14 @@ jobs:
           key: ${{ steps.apt-cache.outputs.cache-primary-key }}${{ steps.apt.outcome != 'success' && format('-partial-{0}-{1}', github.run_id, github.run_attempt) || '' }}
 
       - name: Set up Ruby
+        id: ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.3.11
           working-directory: mcritchie_studio
 
       - name: Point mcritchie_studio Gemfile at this engine commit
+        id: bundle
         working-directory: mcritchie_studio
         run: |
           sed -i.bak 's|^gem "studio-engine".*|gem "studio-engine", path: "../studio"|' Gemfile
@@ -851,6 +853,7 @@ jobs:
           bundle install --jobs 4 --retry 2
 
       - name: Set up Node
+        id: node
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -858,6 +861,7 @@ jobs:
           cache-dependency-path: mcritchie_studio/package-lock.json
 
       - name: Install JS dependencies
+        id: npm
         working-directory: mcritchie_studio
         run: npm ci
 
@@ -868,6 +872,7 @@ jobs:
       # at THIS engine tree's package, so the job tests this commit's tooling too. A hub
       # rung that predates the adoption has no node_tooling:link task and needs no link.
       - name: Link studio-engine's Node tooling into the hub
+        id: node-tooling
         working-directory: mcritchie_studio
         run: |
           if [ -f lib/tasks/node_tooling.rake ]; then
@@ -877,6 +882,7 @@ jobs:
           fi
 
       - name: Cache the Playwright browser
+        id: browser-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -887,9 +893,11 @@ jobs:
       # `--with-deps` runs its own apt-get outside the loop above, so apt's timeouts are
       # set machine-wide for it (the hub's pattern, from ci-apt-install-survives-stalls).
       - name: Harden apt fetches
+        id: apt-harden
         run: printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' | sudo tee /etc/apt/apt.conf.d/80-retries
 
       - name: Install Playwright browser
+        id: browser
         working-directory: mcritchie_studio
         timeout-minutes: 15
         run: npx playwright install --with-deps chromium
@@ -899,6 +907,7 @@ jobs:
       # writes them into db/schema.rb, because Playwright's webServer starts with
       # `db:test:prepare`, which reloads the test DB from that file.
       - name: Install this engine's migrations into the hub
+        id: migrations
         working-directory: mcritchie_studio
         env:
           RAILS_ENV: test
@@ -929,12 +938,33 @@ jobs:
         run: ruby studio/bin/hub-e2e-subset audit studio/.github/hub-e2e-subset.txt hub-e2e-report.json
 
       # THE E2E_LANE TRIAGE LINE. When this lane is red, ONE line (an ::error annotation,
-      # so it also heads the run summary) names the lane and the spec files that failed:
-      # a listed spec the hub no longer has, the specs with an unexpected result in the
-      # receipt, or the specs the coverage audit flagged. The reader learns which hub spec
-      # to open without scrolling Playwright's list reporter. It never changes the verdict.
+      # so it also heads the run summary) names the lane and what made it red: a listed
+      # spec the hub no longer has, a SETUP step (apt, Ruby, bundle, Node, npm ci, the
+      # browser install, the migrations) that failed before Playwright could write a
+      # receipt, the specs with an unexpected result in the receipt, or the specs the
+      # coverage audit flagged. The reader learns which step or spec to open without
+      # scrolling. It never changes the verdict.
+      #
+      # `if: failure()` ALONE, so any red step prints the line. SETUP_OUTCOMES hands the
+      # helper every setup step's outcome in job order; a new setup step needs an id and
+      # a pair here (guard: test/lib/consumer_ci_hub_browser_test.rb), or its red reads
+      # as "no receipt".
       - name: E2E_LANE triage line
-        if: failure() && (steps.subset.outcome == 'failure' || steps.playwright.outcome == 'failure' || steps.audit.outcome == 'failure')
+        if: failure()
+        env:
+          SETUP_OUTCOMES: >-
+            runner-image=${{ steps.runner-image.outcome }}
+            apt-cache=${{ steps.apt-cache.outcome }}
+            apt=${{ steps.apt.outcome }}
+            ruby=${{ steps.ruby.outcome }}
+            bundle=${{ steps.bundle.outcome }}
+            node=${{ steps.node.outcome }}
+            npm=${{ steps.npm.outcome }}
+            node-tooling=${{ steps.node-tooling.outcome }}
+            browser-cache=${{ steps.browser-cache.outcome }}
+            apt-harden=${{ steps.apt-harden.outcome }}
+            browser=${{ steps.browser.outcome }}
+            migrations=${{ steps.migrations.outcome }}
         run: ruby studio/bin/hub-e2e-subset triage studio/.github/hub-e2e-subset.txt hub-e2e-report.json mcritchie_studio
 
       - name: Keep the Playwright report from a failed run
