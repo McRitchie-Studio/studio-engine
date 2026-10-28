@@ -39,6 +39,7 @@ The engine reads these values only through consumer apps.
 | `RESEND_MARKETING_FROM` | Apps with newsletters/broadcasts | Optional marketing sender; falls back to `RESEND_MAILER_FROM`. |
 | `STUDIO_HEALTH_REPORT_TO` | `Studio::HealthReportJob` | Optional; who gets the daily health report (comma-separated). Unset means no report. `config.health_report_to` wins over it. See [`HEALTH_REPORT.md`](HEALTH_REPORT.md). |
 | `STUDIO_HEALTH_TOKEN` | `GET /_studio/health_report` | Optional; the bearer token the McRitchie Studio hub presents to pull the daily health report as JSON. Unset means the endpoint answers 404. `config.health_report_token` wins over it. See [`HEALTH_REPORT.md`](HEALTH_REPORT.md#the-hub-endpoint). |
+| `AGENT_CHAT_TOKEN` | The shared agent chat (`Studio::AgentChat`) | Optional; the app's own bearer credential for the hub's agent chat API (1Password `apps.<slug>.agent-chat`). Unset means the chat answers "can't reach" and the proxy logs why. `Studio.agent_chat_token` wins over it; the hub is `Studio.agent_chat_hub_url` (default `https://mcritchie.studio`). See [`AGENT_CHAT.md`](AGENT_CHAT.md). |
 
 App-specific variables such as `SOLANA_ADMIN_KEY`, RPC URLs, AWS bucket names,
 or product API keys belong in the owning app's docs and McRitchie Studio's
