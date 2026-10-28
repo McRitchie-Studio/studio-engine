@@ -47,6 +47,7 @@ require "studio/profile_image"
 require "studio/oauth_identity"
 require "studio/newsletter"
 require "studio/health_report"
+require "studio/agent_chat"
 require "studio/username_generator"
 require "studio/public_user"
 require "studio/name_parts"
@@ -1313,6 +1314,34 @@ module Studio
   mattr_accessor :draw_knowledge_routes, default: false
   mattr_accessor :knowledge_agents,      default: []
 
+  # The shared agent chat (docs/AGENT_CHAT.md): `render "studio/agent_chat/chat",
+  # soul:, name:, portrait:` on any page, answered by the hub's agents. The hub
+  # holds every thread; the app's server proxies the browser's two calls
+  # (Studio::AgentChatsController, Studio::AgentChat).
+  #
+  # agent_chat_souls is the app's ALLOW-LIST of agent slugs a page may chat
+  # with (e.g. %w[alex]). It is the gate: an app that names no soul draws no
+  # /agent_chat routes, and a request naming a soul off the list is a 404. The
+  # browser's `soul` is never trusted beyond it, and the hub re-checks that this
+  # app may address that soul.
+  mattr_accessor :agent_chat_souls,   default: []
+  mattr_accessor :agent_chat_hub_url, default: "https://mcritchie.studio"
+  # The app's bearer credential for the hub. Leave nil to read
+  # ENV["AGENT_CHAT_TOKEN"] (1Password apps.<slug>.agent-chat).
+  mattr_accessor :agent_chat_token,   default: nil
+  # Which signed-in users the hub may know by email. An email the user only
+  # CLAIMS (the profile page saves a new address and clears email_verified_at;
+  # password signup saves any address) would open that person's hub thread on
+  # every app, so by default only a user whose email_verified_at is present is
+  # sent by email; everyone else chats as an anonymous visitor (the anon
+  # cookie). Set a callable ->(user) { "proven@address" or nil } to use another
+  # proof; nil keeps the default. Never answer a claimed address.
+  mattr_accessor :agent_chat_verified_email, default: nil
+
+  def self.agent_chat_soul_list
+    Array(agent_chat_souls).map { |soul| soul.to_s.strip }.reject(&:empty?).uniq
+  end
+
   class S3ConfigError < StandardError; end
 
   # Whether to validate the host app's User model at boot. See docs/USER_CONTRACT.md.
@@ -1700,6 +1729,16 @@ module Studio
              constraints: { token: %r{[^/]+} }
         post "l/:token", to: "studio/links#consume", as: :link_consume,
              constraints: { token: %r{[^/]+} }
+      end
+
+      # The shared agent chat's proxy (Studio::AgentChatsController): the
+      # browser's two calls, which the app's server forwards to the hub. Drawn
+      # only for an app that names a soul (Studio.agent_chat_souls).
+      if Studio.agent_chat_soul_list.any?
+        post "agent_chat/messages", to: "studio/agent_chats#create", as: :studio_agent_chat_messages,
+             defaults: { format: :json }
+        get  "agent_chat/turns",    to: "studio/agent_chats#turns",  as: :studio_agent_chat_turns,
+             defaults: { format: :json }
       end
 
       # The session-drift rehydrate endpoint (Studio::SessionStatesController).

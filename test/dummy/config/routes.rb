@@ -23,6 +23,11 @@ Studio.draw_session_routes = true
 Studio.draw_survey_routes = true
 Studio.draw_admin_survey_routes = true
 
+# Opt in to the shared agent chat's proxy (POST /agent_chat/messages, GET
+# /agent_chat/turns), as a consuming app does by naming the souls its pages may
+# chat with. OFF by default: no soul, no route. See Studio.agent_chat_souls.
+Studio.agent_chat_souls = %w[alex]
+
 Rails.application.routes.draw do
   # Draw the engine's shared route table the same way every consuming app does
   # (Studio.routes(self), not `mount`). The boot test asserts the named path
@@ -137,6 +142,11 @@ Rails.application.routes.draw do
   # The survey lane's admin sign-in (SurveyLabSessionsController). Outside /lab
   # on purpose: see that controller.
   get "survey_lab/sign_in", to: "survey_lab_sessions#create"
+
+  # A host page rendering the shared agent chat (AgentChatLabController). Outside
+  # /lab: it talks to a hub (test/support/agent_chat_stub_hub.rb in the suite),
+  # which the browser lane does not stand up.
+  get "agent_chat_lab", to: "agent_chat_lab#show"
 
   get "lab/session", to: "session_lab#show"
   post "lab/session/sign_in", to: "session_lab#sign_in"
