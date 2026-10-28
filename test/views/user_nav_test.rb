@@ -348,6 +348,24 @@ class UserNavTest < Minitest::Test
     assert_includes account.at_css("[data-nav-name]")["class"], "group-hover:text-primary"
   end
 
+  # engine.css lights the gear, name and avatar together (THE ACCOUNT GROUP)
+  # by finding a row that holds the icon column and an account whose
+  # aria-controls names the link sidebar. Pin both hooks, as direct children,
+  # and that an account link never matches.
+  def test_account_group_hooks_sit_on_one_row_only_when_the_account_opens_the_sidebar
+    fragment = Nokogiri::HTML.fragment(render_nav(opens_sidebar: true))
+    account = fragment.at_css("[data-nav-account]")
+
+    assert_includes account["aria-controls"].split, "studio-link-sidebar"
+    assert_equal account.parent, fragment.at_css("[data-nav-tools]").parent, "the tools and the account share the row"
+
+    [nil, false].each do |opens_sidebar|
+      link = Nokogiri::HTML.fragment(render_nav(opens_sidebar: opens_sidebar)).at_css("[data-nav-account]")
+
+      assert_nil link["aria-controls"], "opens_sidebar=#{opens_sidebar.inspect}"
+    end
+  end
+
   # The engine dimmed the whole account on hover, which turned the name's
   # primary into a duller purple than the brand's; the name's colour is the cue.
   def test_account_does_not_dim_on_hover

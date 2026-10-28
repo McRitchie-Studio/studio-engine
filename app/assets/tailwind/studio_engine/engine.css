@@ -723,6 +723,32 @@ body.modal-open .studio-app-banner {
       top: -0.25rem;
       pointer-events: auto;
     }
+    /* THE ACCOUNT GROUP (components/_user_nav). Where the account (name and
+       avatar) opens the link sidebar, as the gear does, the two are one
+       control to the eye: pointing at or focusing any of the three lights all
+       three. The gear and the name take the primary colour, the gear turns an
+       eighth, and the avatar glows in the brand's primary. The gear drops its
+       own hover pill, which would mark it out as a separate control.
+
+       The group is the user nav's row, found by what it holds: the icon
+       column and an account whose aria-controls names the link sidebar. So no
+       markup changes (the navbar baseline holds its bytes), and an account
+       that goes elsewhere, a link or a host sidebar, is never grouped. */
+    :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]) [data-link-sidebar-trigger] svg,
+    :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]) [data-nav-account] > [aria-hidden] > * {
+      transition: transform 200ms ease, box-shadow 200ms ease;
+    }
+    :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]) [data-link-sidebar-trigger]:hover { background-color: transparent; }
+    :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]):has([data-link-sidebar-trigger]:hover, [data-nav-account]:hover, [data-link-sidebar-trigger]:focus-visible, [data-nav-account]:focus-visible) [data-link-sidebar-trigger],
+    :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]):has([data-link-sidebar-trigger]:hover, [data-nav-account]:hover, [data-link-sidebar-trigger]:focus-visible, [data-nav-account]:focus-visible) [data-nav-name] { color: var(--color-primary); }
+    :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]):has([data-link-sidebar-trigger]:hover, [data-nav-account]:hover, [data-link-sidebar-trigger]:focus-visible, [data-nav-account]:focus-visible) [data-nav-account] > [aria-hidden] > * {
+      box-shadow:
+        0 0 0 2px rgb(var(--color-primary-rgb) / 0.85),
+        0 0 14px 2px rgb(var(--color-primary-rgb) / 0.45);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]):has([data-link-sidebar-trigger]:hover, [data-nav-account]:hover, [data-link-sidebar-trigger]:focus-visible, [data-nav-account]:focus-visible) [data-link-sidebar-trigger] svg { transform: rotate(45deg); }
+    }
     /* THE ACCOUNT ROW (components/_user_nav), from 768px. Every app whose
        navbar renders the engine's user nav gets this; Turf Monster forks the
        partial, carries none of these hooks, and keeps its own two-row nav.

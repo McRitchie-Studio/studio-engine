@@ -4,6 +4,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The gear, the name and the avatar light together.** Where the account opens
+  the link sidebar, as the gear does, pointing at or focusing any of the three
+  turns the gear and the name the theme's primary, turns the gear an eighth
+  (not under reduced motion) and puts a soft primary glow on the avatar; the
+  gear's own hover pill is dropped inside the group. CSS only (`engine.css`,
+  *THE ACCOUNT GROUP*), keyed on the row's existing hooks, so the navbar
+  baseline's bytes are unchanged. An account link or a host sidebar is not
+  grouped. Guards: `test/views/navbar_account_group_css_test.rb`,
+  `test/views/user_nav_test.rb`, `e2e/navbar_account_group.spec.js`.
+
 ## 0.115.3 — 2026-10-27
 
 ### Changed

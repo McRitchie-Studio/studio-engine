@@ -1097,6 +1097,12 @@ helper `studio_account_opens_sidebar?` to decide otherwise; with no sidebar
 the account stays a link to the account page. Log out lives in the sidebar,
 never the bar.
 
+Since the gear and the account open the same sidebar, they read as one control:
+pointing at or focusing any of the gear, the name or the avatar lights all three
+(the primary colour, a turn of the gear, a primary glow on the avatar). It
+applies only when the account opens the link sidebar, never an account link or a
+host sidebar (`engine.css`, *THE ACCOUNT GROUP*).
+
 ## Transactional emails
 
 Every consuming app can render the same admin page — **`/admin/emails`** —
