@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.116.1 — 2026-10-28
+
 ### Fixed
 
 - **`node --test` importmap hooks map a top-level name with digits.** A bare pin
