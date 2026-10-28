@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.116.0 — 2026-10-28
+
 ### Added
 
 - **The shared agent chat.** `render "studio/agent_chat/chat", soul:, name:, portrait:`
