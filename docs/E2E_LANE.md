@@ -430,8 +430,9 @@ Also not covered:
 
   When `hub-browser` goes red, its `E2E_LANE triage line` step prints one annotation,
   `E2E_LANE hub-browser RED: …`, naming the failing spec files, a listed spec the hub
-  renamed or deleted, or Playwright's own errors outside any test
-  (`bin/hub-e2e-subset triage`). Start there; the step reports and never changes the
+  renamed or deleted, a setup step (apt, Ruby, bundle, Node, npm ci, the browser
+  install, the migrations) that failed before any spec ran, or Playwright's own errors
+  outside any test (`bin/hub-e2e-subset triage`). Start there; the step reports and never changes the
   verdict. A renamed hub spec is fixed in `.github/hub-e2e-subset.txt`, not in the hub.
 
   A stand-in that delivers something the engine also delivers makes the engine's own

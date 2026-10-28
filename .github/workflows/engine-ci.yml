@@ -88,6 +88,14 @@ on:
     # `accepted` are NORMAL. mcritchie-studio's ci.yml carries the full argument.
     branches: [main, release, accepted]
 
+# THE SAME CREDENTIAL SETTINGS AS consumer-ci.yml. GITHUB_TOKEN here only checks out this
+# repo, and every checkout below sets `persist-credentials: false`, so the token does not
+# sit in .git/config while bin/release-check, npm ci and Playwright run. Artifacts ride the
+# runner's own runtime token. No job writes to GitHub, so no job widens this.
+# Guard: test/lib/engine_ci_hardening_test.rb (held to consumer-ci.yml's settings).
+permissions:
+  contents: read
+
 jobs:
   engine-suite:
     name: engine suite (bin/release-check)
@@ -97,6 +105,8 @@ jobs:
     steps:
       - name: Checkout engine
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       # Gemfile.lock MUST keep the `x86_64-linux` platform or this step fails
       # with "your bundle only supports platforms [arm64-darwin-*]" — the lock
@@ -168,6 +178,8 @@ jobs:
     steps:
       - name: Checkout engine
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -279,6 +291,8 @@ jobs:
     steps:
       - name: Checkout engine
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1

@@ -4,6 +4,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The `hub-browser` triage line also names a red setup step.** It used to fire only
+  when the subset, the Playwright run or the coverage audit failed, so a red apt,
+  bundle or Node step printed nothing. The step now runs on any failure and is handed
+  every setup step's outcome (`SETUP_OUTCOMES`), so the line reads
+  `setup step bundle failed before any spec ran`. Guard:
+  `test/lib/consumer_ci_hub_browser_test.rb`.
+- **Engine CI holds its credentials like Consumer CI.** `.github/workflows/engine-ci.yml`
+  declares `permissions: contents: read` and sets `persist-credentials: false` on
+  every checkout. Guard: `test/lib/engine_ci_hardening_test.rb`, held to
+  `consumer-ci.yml`'s settings.
+
 ## 0.115.3 — 2026-10-27
 
 ### Changed
