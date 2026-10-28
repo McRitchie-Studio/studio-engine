@@ -5,6 +5,9 @@
 # pattern and does not match a symlink, so a machine-local link into another
 # worktree was committed and reached accepted.
 node_modules
+# A desk that links its packages writes .npmrc (script-shell = the npm script guard,
+# the hub's bin/lib/desk_node_modules.rb); ignored so the desk stays clean for `git worktree remove`.
+/.npmrc
 /test-results/
 /playwright-report/
 /e2e-report.json
