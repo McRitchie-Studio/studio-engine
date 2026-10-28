@@ -434,6 +434,8 @@ Also not covered:
   install, the migrations) that failed before any spec ran, or Playwright's own errors
   outside any test (`bin/hub-e2e-subset triage`). Start there; the step reports and never changes the
   verdict. A renamed hub spec is fixed in `.github/hub-e2e-subset.txt`, not in the hub.
+  The list ships in the gem, and the hub's `test/lib/hub_e2e_subset_guard_test.rb` reads
+  it from there, so the hub PR that renames a listed spec goes red in the hub first.
 
   A stand-in that delivers something the engine also delivers makes the engine's own
   delivery UNOBSERVABLE, and this lane shipped that bug for a while: the importmap
