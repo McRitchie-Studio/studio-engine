@@ -11,8 +11,10 @@ class NavbarAccountGroupCssTest < Minitest::Test
   CSS = File.read(File.expand_path("../../app/assets/tailwind/studio_engine/engine.css", __dir__)).freeze
 
   GROUP = ':has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"])'
-  LIT = "#{GROUP}:has([data-link-sidebar-trigger]:hover, [data-nav-account]:hover, " \
-        "[data-link-sidebar-trigger]:focus-visible, [data-nav-account]:focus-visible)"
+  # [data-nav-name-trigger] is the name as its own control in row 1
+  # (Studio.navbar_name_in_rows); pointing at it lights the group too.
+  LIT = "#{GROUP}:has([data-link-sidebar-trigger]:hover, [data-nav-account]:hover, [data-nav-name-trigger]:hover, " \
+        "[data-link-sidebar-trigger]:focus-visible, [data-nav-account]:focus-visible, [data-nav-name-trigger]:focus-visible)"
 
   def lit_rule(target) = CSS[/^\s*#{Regexp.escape("#{LIT} #{target}")}[^{]*\{[^}]*\}/]
 
@@ -43,8 +45,8 @@ class NavbarAccountGroupCssTest < Minitest::Test
   HOST = ':has(> [data-nav-tools] [data-nav-menu-trigger]):has(> [data-nav-account][data-profile-image-toggle]' \
          ':not([aria-controls~="studio-link-sidebar"]))'
   HOST_GEAR = "[data-nav-menu-trigger] [aria-controls]"
-  HOST_LIT = "#{HOST}:has(#{HOST_GEAR}:hover, [data-nav-account]:hover, " \
-             "#{HOST_GEAR}:focus-visible, [data-nav-account]:focus-visible)"
+  HOST_LIT = "#{HOST}:has(#{HOST_GEAR}:hover, [data-nav-account]:hover, [data-nav-name-trigger]:hover, " \
+             "#{HOST_GEAR}:focus-visible, [data-nav-account]:focus-visible, [data-nav-name-trigger]:focus-visible)"
 
   def test_a_host_sidebar_groups_the_menu_trigger_with_the_account
     rule = CSS[/^\s*#{Regexp.escape("#{HOST_LIT} #{HOST_GEAR},")}[^{]*\{[^}]*\}/]

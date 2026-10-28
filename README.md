@@ -1057,6 +1057,16 @@ name never fades. A browser without scroll timelines (Firefox today) ends a long
 name in an ellipsis instead. `false`, the default, keeps the name
 screen-reader text below `md`.
 
+### Name in rows — `Studio.navbar_name_in_rows`
+
+`true` ends the user nav's row 1 with the signed-in name, after the icons, so
+it stacks over the row-2 slot (`div2_slot`, or the engine's wallet-and-level
+row), and leaves the avatar alone in `[data-nav-account]` with the name as its
+`aria-label`. The name is its own control (`[data-nav-name-trigger]`) of the
+avatar's kind and opens what the avatar opens. It may shrink and truncate; the
+icons may not. `Studio.navbar_phone_name` still decides whether it shows below
+`md`. `false`, the default, keeps the name inside the account control.
+
 ### Brand, root hook and layer tier — `Studio.navbar_brand`, `Studio.navbar_root_hook`, `Studio.navbar_z_tier`
 
 ```ruby

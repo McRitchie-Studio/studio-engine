@@ -738,36 +738,38 @@ body.modal-open .studio-app-banner {
            (Studio.navbar_menu_trigger) and an account that opens the host's
            sidebar (Studio.navbar_account_sidebar). A host that sets both is
            saying they are its one menu, as Turf Monster's gear sidebar is.
+       With Studio.navbar_name_in_rows the name is its own control in row 1
+       ([data-nav-name-trigger]), and pointing at it lights the group too.
        An account link is never grouped. */
     :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]) [data-link-sidebar-trigger] svg,
     :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]) [data-nav-account] > [aria-hidden] > * {
       transition: transform 200ms ease, box-shadow 200ms ease;
     }
     :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]) [data-link-sidebar-trigger]:hover { background-color: transparent; }
-    :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]):has([data-link-sidebar-trigger]:hover, [data-nav-account]:hover, [data-link-sidebar-trigger]:focus-visible, [data-nav-account]:focus-visible) [data-link-sidebar-trigger],
-    :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]):has([data-link-sidebar-trigger]:hover, [data-nav-account]:hover, [data-link-sidebar-trigger]:focus-visible, [data-nav-account]:focus-visible) [data-nav-name] { color: var(--color-primary); }
-    :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]):has([data-link-sidebar-trigger]:hover, [data-nav-account]:hover, [data-link-sidebar-trigger]:focus-visible, [data-nav-account]:focus-visible) [data-nav-account] > [aria-hidden] > * {
+    :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]):has([data-link-sidebar-trigger]:hover, [data-nav-account]:hover, [data-nav-name-trigger]:hover, [data-link-sidebar-trigger]:focus-visible, [data-nav-account]:focus-visible, [data-nav-name-trigger]:focus-visible) [data-link-sidebar-trigger],
+    :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]):has([data-link-sidebar-trigger]:hover, [data-nav-account]:hover, [data-nav-name-trigger]:hover, [data-link-sidebar-trigger]:focus-visible, [data-nav-account]:focus-visible, [data-nav-name-trigger]:focus-visible) [data-nav-name] { color: var(--color-primary); }
+    :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]):has([data-link-sidebar-trigger]:hover, [data-nav-account]:hover, [data-nav-name-trigger]:hover, [data-link-sidebar-trigger]:focus-visible, [data-nav-account]:focus-visible, [data-nav-name-trigger]:focus-visible) [data-nav-account] > [aria-hidden] > * {
       box-shadow:
         0 0 0 2px rgb(var(--color-primary-rgb) / 0.85),
         0 0 14px 2px rgb(var(--color-primary-rgb) / 0.45);
     }
     @media (prefers-reduced-motion: no-preference) {
-      :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]):has([data-link-sidebar-trigger]:hover, [data-nav-account]:hover, [data-link-sidebar-trigger]:focus-visible, [data-nav-account]:focus-visible) [data-link-sidebar-trigger] svg { transform: rotate(45deg); }
+      :has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"]):has([data-link-sidebar-trigger]:hover, [data-nav-account]:hover, [data-nav-name-trigger]:hover, [data-link-sidebar-trigger]:focus-visible, [data-nav-account]:focus-visible, [data-nav-name-trigger]:focus-visible) [data-link-sidebar-trigger] svg { transform: rotate(45deg); }
     }
     :has(> [data-nav-tools] [data-nav-menu-trigger]):has(> [data-nav-account][data-profile-image-toggle]:not([aria-controls~="studio-link-sidebar"])) [data-nav-menu-trigger] [aria-controls] svg,
     :has(> [data-nav-tools] [data-nav-menu-trigger]):has(> [data-nav-account][data-profile-image-toggle]:not([aria-controls~="studio-link-sidebar"])) [data-nav-account] > [aria-hidden] > * {
       transition: transform 200ms ease, box-shadow 200ms ease;
     }
     :has(> [data-nav-tools] [data-nav-menu-trigger]):has(> [data-nav-account][data-profile-image-toggle]:not([aria-controls~="studio-link-sidebar"])) [data-nav-menu-trigger] [aria-controls]:hover { background-color: transparent; }
-    :has(> [data-nav-tools] [data-nav-menu-trigger]):has(> [data-nav-account][data-profile-image-toggle]:not([aria-controls~="studio-link-sidebar"])):has([data-nav-menu-trigger] [aria-controls]:hover, [data-nav-account]:hover, [data-nav-menu-trigger] [aria-controls]:focus-visible, [data-nav-account]:focus-visible) [data-nav-menu-trigger] [aria-controls],
-    :has(> [data-nav-tools] [data-nav-menu-trigger]):has(> [data-nav-account][data-profile-image-toggle]:not([aria-controls~="studio-link-sidebar"])):has([data-nav-menu-trigger] [aria-controls]:hover, [data-nav-account]:hover, [data-nav-menu-trigger] [aria-controls]:focus-visible, [data-nav-account]:focus-visible) [data-nav-name] { color: var(--color-primary); }
-    :has(> [data-nav-tools] [data-nav-menu-trigger]):has(> [data-nav-account][data-profile-image-toggle]:not([aria-controls~="studio-link-sidebar"])):has([data-nav-menu-trigger] [aria-controls]:hover, [data-nav-account]:hover, [data-nav-menu-trigger] [aria-controls]:focus-visible, [data-nav-account]:focus-visible) [data-nav-account] > [aria-hidden] > * {
+    :has(> [data-nav-tools] [data-nav-menu-trigger]):has(> [data-nav-account][data-profile-image-toggle]:not([aria-controls~="studio-link-sidebar"])):has([data-nav-menu-trigger] [aria-controls]:hover, [data-nav-account]:hover, [data-nav-name-trigger]:hover, [data-nav-menu-trigger] [aria-controls]:focus-visible, [data-nav-account]:focus-visible, [data-nav-name-trigger]:focus-visible) [data-nav-menu-trigger] [aria-controls],
+    :has(> [data-nav-tools] [data-nav-menu-trigger]):has(> [data-nav-account][data-profile-image-toggle]:not([aria-controls~="studio-link-sidebar"])):has([data-nav-menu-trigger] [aria-controls]:hover, [data-nav-account]:hover, [data-nav-name-trigger]:hover, [data-nav-menu-trigger] [aria-controls]:focus-visible, [data-nav-account]:focus-visible, [data-nav-name-trigger]:focus-visible) [data-nav-name] { color: var(--color-primary); }
+    :has(> [data-nav-tools] [data-nav-menu-trigger]):has(> [data-nav-account][data-profile-image-toggle]:not([aria-controls~="studio-link-sidebar"])):has([data-nav-menu-trigger] [aria-controls]:hover, [data-nav-account]:hover, [data-nav-name-trigger]:hover, [data-nav-menu-trigger] [aria-controls]:focus-visible, [data-nav-account]:focus-visible, [data-nav-name-trigger]:focus-visible) [data-nav-account] > [aria-hidden] > * {
       box-shadow:
         0 0 0 2px rgb(var(--color-primary-rgb) / 0.85),
         0 0 14px 2px rgb(var(--color-primary-rgb) / 0.45);
     }
     @media (prefers-reduced-motion: no-preference) {
-      :has(> [data-nav-tools] [data-nav-menu-trigger]):has(> [data-nav-account][data-profile-image-toggle]:not([aria-controls~="studio-link-sidebar"])):has([data-nav-menu-trigger] [aria-controls]:hover, [data-nav-account]:hover, [data-nav-menu-trigger] [aria-controls]:focus-visible, [data-nav-account]:focus-visible) [data-nav-menu-trigger] [aria-controls] svg { transform: rotate(45deg); }
+      :has(> [data-nav-tools] [data-nav-menu-trigger]):has(> [data-nav-account][data-profile-image-toggle]:not([aria-controls~="studio-link-sidebar"])):has([data-nav-menu-trigger] [aria-controls]:hover, [data-nav-account]:hover, [data-nav-name-trigger]:hover, [data-nav-menu-trigger] [aria-controls]:focus-visible, [data-nav-account]:focus-visible, [data-nav-name-trigger]:focus-visible) [data-nav-menu-trigger] [aria-controls] svg { transform: rotate(45deg); }
     }
     /* THE ACCOUNT ROW (components/_user_nav), from 768px. Every app whose
        navbar renders the engine's user nav gets this, Turf Monster included:
@@ -906,7 +908,7 @@ body.modal-open .studio-app-banner {
       .nav-shell[data-nav-timeline] .nav-logo-link,
       .nav-shell[data-nav-timeline] [data-nav-account] > [aria-hidden],
       .nav-shell[data-nav-timeline] [data-nav-avatar-badge],
-      .nav-shell[data-nav-timeline] [data-nav-account] > span:first-child,
+      .nav-shell[data-nav-timeline] [data-nav-account] > span:first-child:not([aria-hidden]),
       .nav-shell[data-nav-timeline] [data-nav-tools],
       .nav-shell[data-nav-timeline] [data-nav-links] {
         animation-timing-function: ease-in-out;
@@ -917,7 +919,7 @@ body.modal-open .studio-app-banner {
       .nav-shell[data-nav-timeline] .nav-logo-link { transform-origin: left center; animation-name: nav-tl-brand; }
       .nav-shell[data-nav-timeline] [data-nav-account] > [aria-hidden],
       .nav-shell[data-nav-timeline] [data-nav-avatar-badge] { transform-origin: right center; animation-name: nav-tl-avatar; }
-      .nav-shell[data-nav-timeline] [data-nav-account] > span:first-child { transform-origin: right center; animation-name: nav-tl-name; }
+      .nav-shell[data-nav-timeline] [data-nav-account] > span:first-child:not([aria-hidden]) { transform-origin: right center; animation-name: nav-tl-name; }
       .nav-shell[data-nav-timeline] [data-nav-tools] { animation-name: nav-tl-tools; }
       .nav-shell[data-nav-timeline] [data-nav-links] { animation-name: nav-tl-links; }
     }
