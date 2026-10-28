@@ -1060,7 +1060,11 @@
 # 0.115.1.rc1 head (javascript_include_tag by URL): the page throws "Failed to
 # resolve module specifier", the hub's 11-spec failure.
 #   npx playwright test --list  -> 380 tests in 57 files
-total_specs: 380
+# 380 -> 381: e2e/navbar_account_group.spec.js (navbar-account-hover-unified).
+# Pointing at the gear, the name or the avatar lights all three (engine.css,
+# THE ACCOUNT GROUP): computed style on :has(:hover), which no byte test can see.
+#   npx playwright test --list  -> 381 tests in 58 files
+total_specs: 381
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1296,7 +1300,11 @@ total_specs: 380
 #   npx playwright test --list                                             -> 380 tests, 57 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 380
-executed: 380
+# And for the navbar account group: 1 more test (380 -> 381), 1 new file:
+#   npx playwright test --list                                             -> 381 tests, 58 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 381
+executed: 381
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
