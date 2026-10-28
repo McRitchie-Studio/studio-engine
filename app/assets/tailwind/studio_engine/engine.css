@@ -770,8 +770,8 @@ body.modal-open .studio-app-banner {
       :has(> [data-nav-tools] [data-nav-menu-trigger]):has(> [data-nav-account][data-profile-image-toggle]:not([aria-controls~="studio-link-sidebar"])):has([data-nav-menu-trigger] [aria-controls]:hover, [data-nav-account]:hover, [data-nav-menu-trigger] [aria-controls]:focus-visible, [data-nav-account]:focus-visible) [data-nav-menu-trigger] [aria-controls] svg { transform: rotate(45deg); }
     }
     /* THE ACCOUNT ROW (components/_user_nav), from 768px. Every app whose
-       navbar renders the engine's user nav gets this; Turf Monster forks the
-       partial, carries none of these hooks, and keeps its own two-row nav.
+       navbar renders the engine's user nav gets this, Turf Monster included:
+       it renders the engine's partial, its gear in the menu trigger seat.
 
        ICONS. The theme toggle leads the rail (the partial renders it first) and
        both icons sit a size down: the moon at 14px, the gear's 16px glyph in a
