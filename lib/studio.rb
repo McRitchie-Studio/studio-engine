@@ -407,6 +407,23 @@ module Studio
     @@navbar_phone_name = navbar_boolean!(:navbar_phone_name, value)
   end
 
+  # ---- Navbar name in rows ----
+  # true moves the signed-in name out of the account control and into the user
+  # nav's rows: it ends row 1 ([data-nav-tools], after the icons), so it stacks
+  # directly over the row-2 slot (a level or seeds bar), and the avatar stands
+  # alone in [data-nav-account]. The name stays a control of its own that opens
+  # what the avatar opens, and the account group (engine.css, THE ACCOUNT
+  # GROUP) lights the three together from either. Turf Monster's stacked name
+  # and level, as before it adopted the engine's user nav. false, the default,
+  # renders byte-identical to before.
+  #
+  #   config.navbar_name_in_rows = true
+  mattr_reader :navbar_name_in_rows, default: false
+
+  def self.navbar_name_in_rows=(value)
+    @@navbar_name_in_rows = navbar_boolean!(:navbar_name_in_rows, value)
+  end
+
   # ---- Navbar brand ----
   # The navbar's logo image and title words, for an app whose brand is not the
   # "Navbar Logo" image plus app_name with its last word in text-primary: a
