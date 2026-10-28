@@ -4,8 +4,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
-## 0.115.4 — 2026-10-27
-
 ### Changed
 
 - **The gear, the name and the avatar light together.** Where the account opens
@@ -20,6 +18,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   sidebar (`Studio.navbar_account_sidebar`), as Turf Monster's gear sidebar
   does. An account link is never grouped. Guards: `test/views/navbar_account_group_css_test.rb`,
   `test/views/user_nav_test.rb`, `e2e/navbar_account_group.spec.js`.
+
+## 0.115.4 — 2026-10-27
+
+### Changed
+
 - **The `hub-browser` triage line also names a red setup step.** It used to fire only
   when the subset, the Playwright run or the coverage audit failed, so a red apt,
   bundle or Node step printed nothing. The step now runs on any failure and is handed
