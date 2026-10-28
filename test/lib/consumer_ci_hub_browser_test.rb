@@ -35,8 +35,8 @@ class ConsumerCiHubBrowserTest < Minitest::Test
   LIST     = File.join(ROOT, ".github/hub-e2e-subset.txt")
   WORKFLOW = File.join(ROOT, ".github/workflows/consumer-ci.yml")
 
-  def run_script(*args)
-    out, err, status = Open3.capture3("ruby", SCRIPT, *args)
+  def run_script(*args, env: {})
+    out, err, status = Open3.capture3(env, "ruby", SCRIPT, *args)
     [out, err, status.success?]
   end
 
@@ -88,6 +88,15 @@ class ConsumerCiHubBrowserTest < Minitest::Test
   end
 
   # ==== paths ========================================================================
+
+  # The hub's own guard (mcritchie-studio test/lib/hub_e2e_subset_guard_test.rb) reads
+  # this list from the INSTALLED gem, so a hub PR that renames a listed spec goes red in
+  # the hub, not only later in this lane. Unshipped, that guard has nothing to read.
+  def test_unit_the_list_ships_in_the_gem_for_the_hubs_guard
+    files = Dir.chdir(ROOT) { Gem::Specification.load(File.join(ROOT, "studio-engine.gemspec")).files }
+    assert_includes files, ".github/hub-e2e-subset.txt"
+    assert_empty files.grep(%r{\A\.github/workflows/}), "only the list ships, not the workflows"
+  end
 
   def test_unit_paths_prints_the_list_when_the_hub_has_every_file
     with_list(%w[e2e/a.spec.js e2e/b.spec.js]) do |dir, list|
@@ -162,7 +171,7 @@ class ConsumerCiHubBrowserTest < Minitest::Test
     }
   end
 
-  def triage(entries, report: nil, hub_files: entries)
+  def triage(entries, report: nil, hub_files: entries, setup: nil)
     with_list(entries) do |dir, list|
       hub = File.join(dir, "hub")
       hub_files.each do |rel|
@@ -172,7 +181,7 @@ class ConsumerCiHubBrowserTest < Minitest::Test
       FileUtils.mkdir_p(hub)
       rep = File.join(dir, "r.json")
       File.write(rep, report.is_a?(String) ? report : JSON.dump(report)) if report
-      out, err, ok = run_script("triage", list, rep, hub)
+      out, err, ok = run_script("triage", list, rep, hub, env: { "SETUP_OUTCOMES" => setup })
       assert ok, "triage reports, it never gates: #{err}"
       assert_equal 1, out.lines.length, "the triage is ONE line: #{out}"
       out.strip
@@ -220,6 +229,33 @@ class ConsumerCiHubBrowserTest < Minitest::Test
 
   def test_unit_triage_survives_a_receipt_that_is_not_json
     assert_includes triage(%w[e2e/a.spec.js], report: "{ truncated"), "is not JSON"
+  end
+
+  # A SETUP step going red (apt, bundle, node, the browser install) ends the job before
+  # Playwright writes a receipt. The line must name that step, not say "no receipt".
+  def test_unit_triage_names_the_setup_step_that_failed
+    line = triage(%w[e2e/a.spec.js],
+                  setup: "runner-image=success apt-cache=success apt=success ruby=success bundle=failure node=skipped npm=skipped")
+    assert line.start_with?("::error::E2E_LANE hub-browser RED"), line
+    assert_includes line, "setup step bundle failed before any spec ran"
+    refute_includes line, "no receipt"
+  end
+
+  def test_unit_triage_names_an_apt_or_node_failure_too
+    assert_includes triage(%w[e2e/a.spec.js], setup: "apt=failure ruby=skipped"), "setup step apt failed"
+    assert_includes triage(%w[e2e/a.spec.js], setup: "apt=success node=success npm=failure"), "setup step npm failed"
+  end
+
+  def test_unit_triage_reads_the_receipt_when_every_setup_step_passed
+    line = triage(%w[e2e/a.spec.js], report: verdict_report("a.spec.js" => %w[unexpected]),
+                                     setup: "apt=success bundle=success npm=success")
+    assert_includes line, "1 failing spec file(s): e2e/a.spec.js"
+  end
+
+  def test_unit_a_missing_listed_spec_outranks_a_setup_failure
+    # The subset resolves before any setup step, so a rename is the first red.
+    line = triage(%w[e2e/gone.spec.js], hub_files: [], setup: "apt=skipped")
+    assert_includes line, "missing from the hub checkout"
   end
 
   # ==== the job's wiring =============================================================
@@ -274,14 +310,34 @@ class ConsumerCiHubBrowserTest < Minitest::Test
 
   def test_unit_a_red_lane_prints_the_triage_line
     triage = step("E2E_LANE triage")
-    cond = triage["if"].to_s
-    assert_includes cond, "failure()", "on success() alone the triage step never runs on the red it exists for"
-    %w[subset playwright audit].each do |id|
-      assert_includes cond, "steps.#{id}.outcome == 'failure'", "a red at step #{id} must print the line"
-      assert_equal 1, steps.count { |s| s["id"] == id }, "the triage condition names step id #{id}"
-    end
+    assert_equal "failure()", triage["if"].to_s.strip,
+                 "the line fires on ANY red step, setup included; a narrower condition is silent on a red apt, bundle or node"
     assert_includes triage["run"],
                     "hub-e2e-subset triage studio/.github/hub-e2e-subset.txt hub-e2e-report.json mcritchie_studio"
     assert_operator index("E2E_LANE triage"), :>, index("Audit the receipt"), "triage reads the audit's verdict too"
+  end
+
+  # Every step between the subset resolve and the Playwright run is SETUP: if it goes
+  # red, no receipt exists, so the triage can only name it if the step's outcome is
+  # handed over. A new setup step without an id here would leave the line saying
+  # "no receipt" over a red apt-get, which is the gap this pins shut.
+  def setup_steps
+    from = index("Resolve the hub spec subset") + 1
+    to = index("Run the hub browser subset")
+    steps[from...to].reject { |s| s["if"].to_s.start_with?("always()") }
+  end
+
+  def test_unit_the_triage_is_handed_every_setup_step_outcome
+    # The raw expressions hold spaces; at run time each becomes one word (success, failure,
+    # skipped, cancelled), which is what the helper splits on.
+    handed = step("E2E_LANE triage").dig("env", "SETUP_OUTCOMES").to_s.scan(/(\S+)=(\$\{\{[^}]*\}\})/).to_h
+    assert_operator setup_steps.length, :>=, 8, "apt, ruby, bundle, node, npm, link, browser, migrations at least"
+    setup_steps.each do |s|
+      refute_nil s["id"], "setup step '#{s['name']}' has no id, so the triage line cannot name it when it goes red"
+      assert_equal "${{ steps.#{s['id']}.outcome }}", handed[s["id"]],
+                   "SETUP_OUTCOMES must hand over '#{s['name']}' as #{s['id']}=${{ steps.#{s['id']}.outcome }}"
+    end
+    assert_equal setup_steps.map { |s| s["id"] }, handed.keys, "in job order, so the first red is the one named"
+    %w[apt bundle node npm].each { |id| assert_includes handed.keys, id }
   end
 end
