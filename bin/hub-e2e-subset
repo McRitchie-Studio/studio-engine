@@ -11,7 +11,10 @@
 #   bin/hub-e2e-subset triage <list> <report.json> <hub-dir>
 #                                                 print the ONE E2E_LANE line naming the
 #                                                 lane and the spec files that made it red;
-#                                                 always exit 0 (it reports, never gates)
+#                                                 always exit 0 (it reports, never gates).
+#                                                 SETUP_OUTCOMES="<step-id>=<outcome> ..."
+#                                                 (in job order) names a setup step that
+#                                                 went red before Playwright could run
 #
 # WHY THE AUDIT. Playwright's exit code says the tests it RAN passed. It cannot say it
 # ran the ones we asked for: a listed spec whose every test is quarantined (the job
@@ -88,15 +91,29 @@ module HubE2eSubset
     files.compact.uniq.map { |f| by_key.fetch(f, f) }
   end
 
+  # "apt=success bundle=failure npm=skipped" => ["bundle"]: the setup steps (apt, Ruby,
+  # bundle, Node, npm ci, the browser install, the migrations) that went red, in job order.
+  # The workflow passes every setup step's outcome, so a red before Playwright is named
+  # by its step id instead of reading as a missing receipt.
+  def failed_setup(outcomes)
+    outcomes.to_s.split.filter_map do |pair|
+      id, outcome = pair.split("=", 2)
+      id if outcome == "failure"
+    end
+  end
+
   # The one line. Checked in the order the job runs, so it names the FIRST thing that
-  # went red: the list against the checkout, then the receipt's failures, then the
-  # receipt's own errors, then the coverage audit.
-  def triage_line(list, report_path, hub_dir)
+  # went red: the list against the checkout, then a setup step, then the receipt's
+  # failures, then the receipt's own errors, then the coverage audit.
+  def triage_line(list, report_path, hub_dir, setup_outcomes = nil)
     head = "::error::E2E_LANE #{LANE} RED"
     return "#{head}: the hub checkout never landed at #{hub_dir}; the lane failed before any spec" unless File.directory?(hub_dir)
 
     gone = missing(list, hub_dir)
     return "#{head}: listed spec(s) missing from the hub checkout (renamed or deleted): #{gone.join(', ')}" unless gone.empty?
+
+    red_setup = failed_setup(setup_outcomes).first
+    return "#{head}: setup step #{red_setup} failed before any spec ran (see that step's log)" if red_setup
     return "#{head}: no receipt at #{report_path}; Playwright never finished (see its step log)" unless File.file?(report_path)
 
     report = JSON.parse(File.read(report_path))
@@ -157,7 +174,7 @@ if $PROGRAM_NAME == __FILE__
       exit 1
     end
   when "triage"
-    puts HubE2eSubset.triage_line(list, target, ARGV[3].to_s)
+    puts HubE2eSubset.triage_line(list, target, ARGV[3].to_s, ENV["SETUP_OUTCOMES"])
   else
     abort "unknown command #{cmd.inspect}: paths | audit | triage"
   end

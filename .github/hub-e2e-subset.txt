@@ -19,6 +19,9 @@
 # repoint or drop the line here. bin/hub-e2e-subset audits the run's JSON receipt, so
 # a listed file that ran no test (all skipped, all quarantined) is red too. On any red
 # the job's "E2E_LANE triage line" step prints one line naming the specs at fault.
+# This file SHIPS IN THE GEM (studio-engine.gemspec) so the hub guards it too: the hub's
+# test/lib/hub_e2e_subset_guard_test.rb reads it from the installed gem and fails the hub
+# PR that renames a listed spec, before this lane ever sees the rename.
 # Guard: test/lib/consumer_ci_hub_browser_test.rb.
 
 # Boards and the deployments chrome
