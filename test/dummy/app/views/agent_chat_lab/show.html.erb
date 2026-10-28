@@ -1,0 +1,6 @@
+<%# The shared agent chat on a host page: the one render call an app makes, with a card in the card slot. %>
+<% card = capture do %>
+  <div class="card p-4 text-sm text-body" data-test="agent-chat-lab-card">A card from the host page sits here, as /build's intake cards will.</div>
+<% end %>
+<%= render "studio/agent_chat/chat", soul: "alex", name: "Alex", role: "Fractional CTO", cards: card,
+           portrait: tag.span("A", class: "w-24 h-24 text-3xl rounded-full flex items-center justify-center bg-primary text-white font-bold") %>
