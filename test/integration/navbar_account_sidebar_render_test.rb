@@ -79,6 +79,21 @@ class NavbarAccountSidebarRenderTest < ActiveSupport::TestCase
     assert_equal 2, page.css("[data-slot-trigger]").size, "one per row"
   end
 
+  # engine.css lights the gear, name and avatar together (THE ACCOUNT GROUP,
+  # A HOST SIDEBAR) by finding a row whose icon column holds the menu trigger
+  # seat and whose account is a host sidebar toggle. Pin those hooks, on one row.
+  test "with both set, the row carries the account group's host hooks" do
+    Studio.navbar_menu_trigger = "navbar_slot_fixtures/trigger"
+    Studio.navbar_account_sidebar = GEAR
+    page = doc(signed_in: true)
+    account = page.at_css("[data-nav-account]")
+    row = account.parent
+
+    assert row.at_css("> [data-nav-tools] [data-nav-menu-trigger] [aria-controls]"), "the gear sits in the row's icon column"
+    assert account.key?("data-profile-image-toggle")
+    refute_includes account["aria-controls"].split, "studio-link-sidebar"
+  end
+
   test "for an admin the trigger replaces both admin gears" do
     assert_equal 2, Nokogiri::HTML5(render(signed_in: true, admin: true)).css("[data-nav-admin-gear]").size,
                  "the admin dropdown draws in the rail and the phone row by default"
