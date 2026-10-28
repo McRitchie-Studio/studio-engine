@@ -21,7 +21,9 @@ module Studio
   #   GET  /api/v1/agent_chat/turns     soul, person, after, limit (<= 50)
   #        200 {turns: [...], pending: bool}
   #
-  # `person` is {email:} for a signed-in user, else {anon_token:}. A turn is
+  # `person` is {email:} for a signed-in user, else {anon_token:}; a signed-in
+  # POST that still holds the visitor's anon token sends {email:, anon_token:},
+  # and the hub folds the anonymous thread into the person's. A turn is
   # {id, role: "user"|"agent", text, created_at, status} with status
   # pending|typing|answered|failed.
   #
@@ -116,12 +118,16 @@ module Studio
 
       private
 
+      # {email:}, {anon_token:}, or both: a signed-in post that still holds the
+      # visitor's anon token sends both, and the hub folds that anonymous thread
+      # into the person's.
       def person_param(person)
         person = person.to_h.transform_keys(&:to_s)
-        if person["email"].present? then { email: person["email"].to_s }
-        elsif person["anon_token"].present? then { anon_token: person["anon_token"].to_s }
-        else raise ArgumentError, "person needs an email or an anon_token"
-        end
+        email = person["email"].to_s.strip
+        token = person["anon_token"].to_s.strip
+        raise ArgumentError, "person needs an email or an anon_token" if email.empty? && token.empty?
+
+        { email: email.presence, anon_token: token.presence }.compact
       end
 
       def request(verb, path, body: nil, query: nil)

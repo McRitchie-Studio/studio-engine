@@ -53,6 +53,25 @@ class StudioAgentChatTest < Minitest::Test
     assert_equal({ "anon_token" => "a" * 43 }, @hub.requests.last.json["person"])
   end
 
+  def test_post_message_sends_both_email_and_anon_token_when_given_both_so_the_hub_can_fold
+    @hub.respond { [201, { "turn" => TURN }] }
+    Chat.post_message(soul: "alex", text: "Hi", person: { email: "sam@example.com", anon_token: "a" * 43 })
+
+    assert_equal({ "email" => "sam@example.com", "anon_token" => "a" * 43 }, @hub.requests.last.json["person"])
+  end
+
+  def test_the_stand_in_hub_folds_an_anon_thread_into_the_persons_on_a_post_naming_both
+    @hub.converse!(answer_after: 0)
+    anon = { anon_token: "a" * 43 }
+    Chat.post_message(soul: "alex", text: "Before sign-in", person: anon)
+    Chat.post_message(soul: "alex", text: "Signed in now", person: anon.merge(email: "sam@example.com"))
+    sleep 0.1
+
+    texts = Chat.turns(soul: "alex", person: { email: "sam@example.com" })["turns"].select { |t| t["role"] == "user" }.map { |t| t["text"] }
+    assert_equal ["Before sign-in", "Signed in now"], texts
+    assert_empty Chat.turns(soul: "alex", person: anon)["turns"]
+  end
+
   def test_a_person_with_neither_email_nor_token_is_refused_before_any_request
     assert_raises(ArgumentError) { Chat.post_message(soul: "alex", text: "Hi", person: {}) }
     assert_empty @hub.requests

@@ -166,6 +166,53 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
     assert_equal "no-store", response.headers["Cache-Control"]
   end
 
+  def test_a_signed_in_post_with_an_anon_cookie_sends_both_so_the_hub_folds_the_thread_then_clears_it
+    post "/agent_chat/messages", params: { soul: "alex", text: "Before sign-in" }.to_json, headers: json_headers
+    assert_response :created
+    anon = @hub.requests.last.json.dig("person", "anon_token")
+    assert anon.present?
+    refute cookies["studio_agent_chat_anon"].blank?
+
+    sign_in(@sam)
+    post "/agent_chat/messages", params: { soul: "alex", text: "Signed in now" }.to_json, headers: json_headers
+
+    assert_response :created
+    assert_equal({ "email" => "sam@example.com", "anon_token" => anon }, @hub.requests.last.json["person"])
+    assert cookies["studio_agent_chat_anon"].blank?, "the anon cookie is spent once the hub has folded the thread"
+
+    post "/agent_chat/messages", params: { soul: "alex", text: "And again" }.to_json, headers: json_headers
+    assert_equal({ "email" => "sam@example.com" }, @hub.requests.last.json["person"], "folded once")
+  end
+
+  def test_a_signed_in_post_without_an_anon_cookie_sends_the_email_only_and_mints_nothing
+    sign_in(@sam)
+    post "/agent_chat/messages", params: { soul: "alex", text: "Hi" }.to_json, headers: json_headers
+    assert_response :created
+    assert_equal({ "email" => "sam@example.com" }, @hub.requests.last.json["person"])
+    refute_match(/studio_agent_chat_anon=/, Array(response.headers["Set-Cookie"]).join("\n"))
+  end
+
+  def test_a_signed_in_post_the_hub_refuses_keeps_the_anon_cookie_for_the_next_try
+    post "/agent_chat/messages", params: { soul: "alex", text: "Before sign-in" }.to_json, headers: json_headers
+    anon = @hub.requests.last.json.dig("person", "anon_token")
+    sign_in(@sam)
+    @hub.respond { [502, "<html>Bad gateway</html>"] }
+    post "/agent_chat/messages", params: { soul: "alex", text: "Signed in now" }.to_json, headers: json_headers
+    assert_response :service_unavailable
+    refute cookies["studio_agent_chat_anon"].blank?, "no fold happened, so the thread's token is kept"
+
+    @hub.respond { [201, { "turn" => TURN }] }
+    post "/agent_chat/messages", params: { soul: "alex", text: "Retry" }.to_json, headers: json_headers
+    assert_equal anon, @hub.requests.last.json.dig("person", "anon_token")
+  end
+
+  def test_signed_in_turns_send_the_email_only_even_with_an_anon_cookie
+    post "/agent_chat/messages", params: { soul: "alex", text: "Before sign-in" }.to_json, headers: json_headers
+    sign_in(@sam)
+    get "/agent_chat/turns", params: { soul: "alex" }
+    assert_equal({ "email" => "sam@example.com" }, @hub.requests.last.query["person"])
+  end
+
   def test_signed_in_turns_are_asked_for_by_email_with_after_and_limit
     sign_in(@sam)
     get "/agent_chat/turns", params: { soul: "alex", after: "40", limit: "10" }, headers: { "Accept" => "application/json" }

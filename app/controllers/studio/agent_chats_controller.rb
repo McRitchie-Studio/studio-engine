@@ -19,7 +19,9 @@ module Studio
   #   person  never. A signed-in visitor is current_user.email; a signed-out
   #           one is a random token in a SIGNED, http-only cookie
   #           (ANON_COOKIE), minted on the first message. A browser cannot name
-  #           another person's email or forge another's token.
+  #           another person's email or forge another's token. A signed-in POST
+  #           that still holds the cookie sends both, so the hub folds the
+  #           anonymous thread into the person's; the cookie is then deleted.
   #   ip      never: request.remote_ip, which the hub caps on.
   #
   # The host's ApplicationController is the base, so its session, current_user
@@ -49,7 +51,11 @@ module Studio
                             :unprocessable_entity)
       end
 
-      turn = Studio::AgentChat.post_message(soul: @soul, text: text, person: person(mint: true), ip: request.remote_ip)
+      who = person(mint: true, fold: true)
+      turn = Studio::AgentChat.post_message(soul: @soul, text: text, person: who, ip: request.remote_ip)
+      # A signed-in post that carried the anon token has folded that thread into
+      # the person's: the token is spent. Kept on any failure, for the retry.
+      cookies.delete(ANON_COOKIE) if who.key?(:email) && who.key?(:anon_token)
       render json: { turn: turn }, status: :created
     rescue Studio::AgentChat::Error => e
       render_hub_error(e)
@@ -85,23 +91,35 @@ module Studio
 
     # {email:} when signed in, else {anon_token:} from the signed cookie. With
     # mint: false a visitor with no cookie is nil.
-    def person(mint:)
+    #
+    # THE FOLD. With fold: true (the POST) a signed-in visitor who still holds
+    # a valid anon cookie is {email:, anon_token:}: the hub folds the anonymous
+    # thread into the person's, and #create then deletes the cookie. A
+    # signed-in visitor is never minted a token, and GET /turns sends the email
+    # alone (the fold is the hub's job on a post).
+    def person(mint:, fold: false)
       user = respond_to?(:current_user, true) ? current_user : nil
       email = user.respond_to?(:email) ? user.email.to_s.strip : ""
-      return { email: email } if email.present?
-
-      token = cookies.signed[ANON_COOKIE].to_s
-      token = "" unless token.match?(/\A[A-Za-z0-9_-]{32,64}\z/)
-      if token.empty?
-        return nil unless mint
-
-        token = SecureRandom.urlsafe_base64(32)
-        cookies.signed[ANON_COOKIE] = {
-          value: token, expires: ANON_TTL.from_now, httponly: true, same_site: :lax,
-          secure: request.ssl?
-        }
+      token = anon_token
+      if email.present?
+        return fold && token ? { email: email, anon_token: token } : { email: email }
       end
+      return { anon_token: token } if token
+      return nil unless mint
+
+      token = SecureRandom.urlsafe_base64(32)
+      cookies.signed[ANON_COOKIE] = {
+        value: token, expires: ANON_TTL.from_now, httponly: true, same_site: :lax,
+        secure: request.ssl?
+      }
       { anon_token: token }
+    end
+
+    # The token in the signed anon cookie, or nil when there is none or it is
+    # not one this app minted.
+    def anon_token
+      token = cookies.signed[ANON_COOKIE].to_s
+      token.match?(/\A[A-Za-z0-9_-]{32,64}\z/) ? token : nil
     end
 
     def render_hub_error(error)

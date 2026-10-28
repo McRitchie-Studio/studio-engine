@@ -39,11 +39,13 @@ class AgentChatStubHub
   # agent's ("agent"). `after` is a row id (rows with id > after). A row is
   # "pending", "typing" after half of `answer_after` seconds, then "answered"
   # with "You said: <text>". A message containing "[hub-down]" is answered 503,
-  # as a hub that is down; it is not stored.
+  # as a hub that is down; it is not stored. A post naming BOTH an email and an
+  # anon_token folds that anonymous thread into the email's, as the hub does.
   def converse!(answer_after: 1.5)
     threads = Hash.new { |hash, key| hash[key] = [] }
     seq = 0
     lock = Mutex.new
+    key_of = ->(person) { person["email"].to_s.empty? ? "anon:#{person["anon_token"]}" : "email:#{person["email"]}" }
     turns_of = lambda do |row|
       user = { "id" => row[:id], "role" => "user", "text" => row[:text], "created_at" => row[:at], "status" => row[:status] }
       next [user] unless row[:reply]
@@ -55,8 +57,13 @@ class AgentChatStubHub
         body = request.json
         next [503, { "error" => "down" }] if body["text"].to_s.include?("[hub-down]")
 
-        key = body["person"].to_a.sort.to_s
+        person = body["person"].to_h
+        key = key_of.call(person)
         row = lock.synchronize do
+          unless person["email"].to_s.empty? || person["anon_token"].to_s.empty?
+            folded = threads.delete("anon:#{person["anon_token"]}") || []
+            threads[key] = (folded + threads[key]).sort_by { |r| r[:id] }
+          end
           seq += 1
           { id: seq, text: body["text"], at: Time.now.utc.iso8601, status: "pending", reply: nil }.tap { |r| threads[key] << r }
         end
@@ -68,7 +75,7 @@ class AgentChatStubHub
         end
         [201, { "turn" => lock.synchronize { turns_of.call(row).first } }]
       else
-        key = request.query["person"].to_a.sort.to_s
+        key = key_of.call(request.query["person"].to_h)
         after = request.query["after"].to_s
         lock.synchronize do
           rows = threads[key]

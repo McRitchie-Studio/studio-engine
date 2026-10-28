@@ -55,6 +55,15 @@ browser ──GET  /agent_chat/turns?after=<id>──▶ app ──GET hub /api/
   (`studio_agent_chat_anon`, one year), minted on the first message. A signed-out
   visitor who has never written is answered `{turns: [], pending: false}` without
   asking the hub.
+- **The fold on sign-in.** A signed-in `POST /agent_chat/messages` from a browser
+  that still holds the anon cookie sends `person: {email, anon_token}`, and the
+  hub folds that anonymous thread into the person's. After the hub's 201 the
+  proxy deletes the cookie, so the fold happens once; on any failure the cookie
+  is kept for the retry. A signed-in visitor is never minted a token, a
+  signed-in post with no cookie sends `{email}` alone, and a signed-in
+  `GET /agent_chat/turns` always sends `{email}` alone (the fold is the hub's
+  job, on a post). So a visitor who chats signed out, then signs in, keeps the
+  thread once they send their next message.
 - **Never the IP.** The proxy sends `request.remote_ip`, which the hub caps on.
 
 The POST is CSRF-protected (the host's `protect_from_forgery`, forced to
@@ -86,7 +95,8 @@ own message. `after` is a row id (rows with id > after).
 
 `Studio::AgentChat.post_message(soul:, text:, person:, ip:)` and
 `Studio::AgentChat.turns(soul:, person:, after:, limit:)` are the two calls, usable
-outside the controller. `person` is `{email:}` or `{anon_token:}`. Every failure is
+outside the controller. `person` is `{email:}`, `{anon_token:}`, or both (a
+signed-in post that folds the visitor's anonymous thread). Every failure is
 a `Studio::AgentChat::Error`: `Unavailable`, `Unauthorized`, `UnknownSoul`,
 `Invalid`, `Capped` (`#retry_after`).
 
