@@ -23,6 +23,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   Guarded by `test/integration/navbar_name_in_rows_render_test.rb` and
   `e2e/navbar_name_in_rows.spec.js`.
 
+### Changed
+
+- **`.gitignore` ignores `/.npmrc`.** The hub's `bin/agent-worktree` writes a
+  desk-local `.npmrc` (the npm script guard) before it links a desk's
+  `node_modules` to the primary's; unignored, that file would dirty the desk, so
+  desks fell back to `npm ci`. Development only; the packaged gem is unchanged.
+
 ## 0.116.1 — 2026-10-28
 
 ### Fixed
