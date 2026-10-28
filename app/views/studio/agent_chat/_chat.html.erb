@@ -22,7 +22,7 @@
 %>
 <% souls = Studio.agent_chat_soul_list %>
 <% raise ArgumentError, "studio/agent_chat/chat: soul #{soul.inspect} is not in Studio.agent_chat_souls (#{souls.inspect})" unless souls.include?(soul.to_s) %>
-<section class="studio-agent-chat w-full max-w-3xl mx-auto px-4 pt-4 sm:pt-8 flex flex-col gap-6 min-w-0"
+<section class="w-full max-w-3xl mx-auto px-4 pt-4 sm:pt-8 flex flex-col gap-6 min-w-0"
          data-studio-controller="agent-chat" data-test="agent-chat"
          data-agent-chat-soul="<%= soul %>" data-agent-chat-name="<%= name %>"
          data-agent-chat-messages-url="<%= studio_agent_chat_messages_path %>"

@@ -103,7 +103,9 @@ machine (a developer's local hub).
 
 Turn text is set as text, never HTML. The look is the partials under
 `app/views/studio/agent_chat/` and `.studio-agent-typing` in `engine-motion.css`,
-all on theme tokens, so dark mode follows the host theme.
+all on theme tokens, so dark mode follows the host theme. The typing line needs
+the motion layer, which the default Tailwind entry (`host.css`) imports; a host
+that imports only `engine.css` sees both of its labels.
 
 ## Tests
 

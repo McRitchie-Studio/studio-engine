@@ -2022,127 +2022,144 @@ body.modal-open { overflow: visible; }
    data-phase picks the look (studio/agent_chat sets it); the other fades out
    and is hidden, so it is not read aloud. Theme tokens only, so dark mode
    follows the theme. Under prefers-reduced-motion nothing moves and the swap
-   is instant. */
-.studio-agent-typing {
-  --studio-agent-typing-beat: 2.4s;
-  --studio-agent-typing-fade: 280ms;
-  display: grid;
-  align-items: center;
-  padding-block: 0.375rem;
-  font-size: 0.75rem;
-  line-height: 1rem;
-  color: var(--color-text-muted);
-}
+   is instant. In the components layer, like every rule here; needs this
+   layer, which host.css imports (a host that skips it sees both labels). */
+@layer components {
+  .studio-agent-typing {
+    --studio-agent-typing-beat: 2.4s;
+    --studio-agent-typing-fade: 280ms;
+    display: grid;
+    align-items: center;
+    padding-block: 0.375rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--color-text-muted);
+  }
 
-.studio-agent-typing > .studio-agent-typing-layer {
-  grid-area: 1 / 1;
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  min-width: 0;
-  transition: opacity var(--studio-agent-typing-fade) ease, transform var(--studio-agent-typing-fade) ease,
-    visibility 0s linear 0s;
-}
+  .studio-agent-typing > .studio-agent-typing-layer {
+    grid-area: 1 / 1;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-width: 0;
+    transition: opacity var(--studio-agent-typing-fade) ease, transform var(--studio-agent-typing-fade) ease,
+      visibility 0s linear 0s;
+  }
 
-.studio-agent-typing[data-phase="thinking"] > .studio-agent-typing-types,
-.studio-agent-typing[data-phase="typing"] > .studio-agent-typing-thinks {
-  opacity: 0;
-  transform: translateY(3px);
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity var(--studio-agent-typing-fade) ease, transform var(--studio-agent-typing-fade) ease,
-    visibility 0s linear var(--studio-agent-typing-fade);
-}
+  .studio-agent-typing[data-phase="thinking"] > .studio-agent-typing-types,
+  .studio-agent-typing[data-phase="typing"] > .studio-agent-typing-thinks {
+    opacity: 0;
+    transform: translateY(3px);
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity var(--studio-agent-typing-fade) ease, transform var(--studio-agent-typing-fade) ease,
+      visibility 0s linear var(--studio-agent-typing-fade);
+  }
 
-.studio-agent-typing-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+  .studio-agent-typing-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
-.studio-agent-typing-orbit {
-  position: relative;
-  display: inline-flex;
-  flex: none;
-  border-radius: 9999px;
-  padding: 3px;
-}
+  .studio-agent-typing-orbit {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    border-radius: 9999px;
+    padding: 3px;
+  }
 
-.studio-agent-typing-orbit::before,
-.studio-agent-typing-orbit::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-}
-
-.studio-agent-typing-orbit::before {
-  background: conic-gradient(
-    from 0deg,
-    rgb(var(--color-primary-rgb) / 0) 0deg,
-    rgb(var(--color-primary-rgb) / 0.25) 90deg,
-    rgb(var(--color-primary-rgb) / 0.95) 200deg,
-    rgb(var(--color-primary-rgb) / 0) 300deg
-  );
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
-          mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
-  animation: studio-agent-typing-spin var(--studio-agent-typing-beat) linear infinite;
-}
-
-.studio-agent-typing-orbit::after {
-  box-shadow: 0 0 0.9rem 0.05rem rgb(var(--color-primary-rgb) / 0.35);
-  animation: studio-agent-typing-breathe var(--studio-agent-typing-beat) ease-in-out infinite;
-}
-
-.studio-agent-typing-orbit > * {
-  position: relative;
-  z-index: 1;
-}
-
-.studio-agent-typing-shimmer {
-  background-image: linear-gradient(100deg, var(--color-text-muted) 0%, var(--color-text-muted) 38%,
-    var(--color-text) 50%, var(--color-text-muted) 62%, var(--color-text-muted) 100%);
-  background-size: 250% 100%;
-  -webkit-background-clip: text;
-          background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  animation: studio-agent-typing-shimmer var(--studio-agent-typing-beat) ease-in-out infinite;
-}
-
-.studio-agent-typing-bubble {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  flex: none;
-  padding: 0.625rem 0.75rem;
-  border-radius: 1rem 1rem 1rem 0.25rem;
-  background: var(--color-inset);
-  border: 1px solid var(--color-border);
-}
-
-.studio-agent-typing-dot {
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 9999px;
-  background: var(--color-text-muted);
-  animation: studio-agent-typing-wave calc(var(--studio-agent-typing-beat) / 2) ease-in-out infinite;
-}
-
-.studio-agent-typing-dot:nth-child(2) { animation-delay: 0.15s; }
-.studio-agent-typing-dot:nth-child(3) { animation-delay: 0.3s; }
-
-@keyframes studio-agent-typing-spin { to { transform: rotate(360deg); } }
-@keyframes studio-agent-typing-breathe { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
-@keyframes studio-agent-typing-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0% 0; } }
-@keyframes studio-agent-typing-wave { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-3px); opacity: 1; } }
-
-@media (prefers-reduced-motion: reduce) {
   .studio-agent-typing-orbit::before,
-  .studio-agent-typing-orbit::after,
-  .studio-agent-typing-shimmer,
-  .studio-agent-typing-dot { animation: none; }
-  .studio-agent-typing > .studio-agent-typing-layer { transition: none; }
+  .studio-agent-typing-orbit::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  .studio-agent-typing-orbit::before {
+    background: conic-gradient(
+      from 0deg,
+      rgb(var(--color-primary-rgb) / 0) 0deg,
+      rgb(var(--color-primary-rgb) / 0.25) 90deg,
+      rgb(var(--color-primary-rgb) / 0.95) 200deg,
+      rgb(var(--color-primary-rgb) / 0) 300deg
+    );
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+            mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+    animation: studio-agent-typing-spin var(--studio-agent-typing-beat) linear infinite;
+  }
+
+  .studio-agent-typing-orbit::after {
+    box-shadow: 0 0 0.9rem 0.05rem rgb(var(--color-primary-rgb) / 0.35);
+    animation: studio-agent-typing-breathe var(--studio-agent-typing-beat) ease-in-out infinite;
+  }
+
+  .studio-agent-typing-orbit > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .studio-agent-typing-shimmer {
+    background-image: linear-gradient(100deg, var(--color-text-muted) 0%, var(--color-text-muted) 38%,
+      var(--color-text) 50%, var(--color-text-muted) 62%, var(--color-text-muted) 100%);
+    background-size: 250% 100%;
+    -webkit-background-clip: text;
+            background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: studio-agent-typing-shimmer var(--studio-agent-typing-beat) ease-in-out infinite;
+  }
+
+  .studio-agent-typing-bubble {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex: none;
+    padding: 0.625rem 0.75rem;
+    border-radius: 1rem 1rem 1rem 0.25rem;
+    background: var(--color-inset);
+    border: 1px solid var(--color-border);
+  }
+
+  .studio-agent-typing-dot {
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 9999px;
+    background: var(--color-text-muted);
+    animation: studio-agent-typing-wave calc(var(--studio-agent-typing-beat) / 2) ease-in-out infinite;
+  }
+
+  .studio-agent-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+  .studio-agent-typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .studio-agent-typing-orbit::before,
+    .studio-agent-typing-orbit::after,
+    .studio-agent-typing-shimmer,
+    .studio-agent-typing-dot { animation: none; }
+    .studio-agent-typing > .studio-agent-typing-layer { transition: none; }
+  }
+
+  @keyframes studio-agent-typing-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes studio-agent-typing-breathe {
+    0%, 100% { opacity: 0.45; }
+    50% { opacity: 1; }
+  }
+
+  @keyframes studio-agent-typing-shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: 0% 0; }
+  }
+
+  @keyframes studio-agent-typing-wave {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+    30% { transform: translateY(-3px); opacity: 1; }
+  }
 }

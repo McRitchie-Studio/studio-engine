@@ -92,6 +92,7 @@ class EngineClassVocabularyTest < ActiveSupport::TestCase
   # exempt: it is the showcase for this layer by design.
   OPT_IN_DEPENDENTS = %w[
     studio/_fizz_layer.html.erb
+    studio/agent_chat/_typing.html.erb
     studio/_hold_button.html.erb
     studio/modals/auth/_resend_footer.html.erb
     studio/modals/blocks/_birthday.html.erb
