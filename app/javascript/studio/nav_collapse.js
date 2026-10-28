@@ -451,7 +451,9 @@ export class NavCollapse {
     var el = this.el;
     var brand = el.querySelector('.nav-logo-link');
     var avatar = el.querySelector('[data-nav-account] > [aria-hidden]');
-    var name = el.querySelector('[data-nav-account] > span:first-child');
+    // The name's box, never the avatar's: with Studio.navbar_name_in_rows the
+    // name is in row 1 and the avatar is the account's first child.
+    var name = el.querySelector('[data-nav-account] > span:first-child:not([aria-hidden])');
     var read = function () {
       return {
         h: el.offsetHeight,

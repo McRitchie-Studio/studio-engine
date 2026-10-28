@@ -4,6 +4,25 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`Studio.navbar_name_in_rows`: the name stacks over the second row.** `true`
+  moves the signed-in name out of the account control to the end of the user
+  nav's row 1 (`[data-nav-tools]`, after the icons), so it sits directly over the
+  row-2 slot (a level or seeds bar), and the avatar stands alone in
+  `[data-nav-account]`, labelled with the name. The name is its own control of
+  the avatar's kind (`[data-nav-name-trigger]`: the host sidebar button, the link
+  sidebar button, the account link or plain text) and opens what the avatar
+  opens; the account group in `engine.css` lights gear, name and avatar from it
+  too. Below `md` the name control is `hidden` (no invisible tab stop) unless
+  `Studio.navbar_phone_name` shows the name there. `false`, the default, renders byte-identical to before. The scroll
+  timeline's name scale and `studio/nav_collapse`'s name width now skip the
+  avatar's `aria-hidden` box, so neither mistakes it for the name. The partial
+  reads it through `studio_navbar_name_in_rows?`, memoized per render like the
+  other navbar helpers, so one request may set `@studio_navbar_name_in_rows`.
+  Guarded by `test/integration/navbar_name_in_rows_render_test.rb` and
+  `e2e/navbar_name_in_rows.spec.js`.
+
 ### Changed
 
 - **`.gitignore` ignores `/.npmrc`.** The hub's `bin/agent-worktree` writes a

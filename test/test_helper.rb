@@ -90,6 +90,7 @@ module Studio
   mattr_accessor :navbar_menu_trigger,  default: nil
   mattr_accessor :navbar_account_sidebar, default: nil
   mattr_accessor :navbar_phone_name,    default: false
+  mattr_accessor :navbar_name_in_rows,  default: false
   mattr_accessor :navbar_brand,         default: nil
   mattr_accessor :navbar_root_hook,     default: false
   mattr_accessor :navbar_z_tier,        default: false

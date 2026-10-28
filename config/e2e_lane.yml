@@ -1076,7 +1076,13 @@
 # (engine.css, THE ACCOUNT GROUP), for the link sidebar and for a host sidebar
 # (Turf Monster's shape): computed style on :has(:hover), which no byte test can see.
 #   npx playwright test --list  -> 385 tests in 59 files
-total_specs: 385
+# 385 -> 387: e2e/navbar_name_in_rows.spec.js (turf-navbar-name-stacks-over-level),
+# two tests. With Studio.navbar_name_in_rows the name stacks over the level bar
+# beside the lone avatar and pointing at it lights the avatar; on the scroll
+# timeline nav_collapse measures the name's box, not the avatar's. Verified RED
+# by reverting nav_collapse.js's name selector (--nav-tools-shift 16 vs 8).
+#   npx playwright test --list  -> 387 tests in 60 files
+total_specs: 387
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1324,7 +1330,11 @@ total_specs: 385
 #   npx playwright test --list                                             -> 385 tests, 59 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 385
-executed: 385
+# And for the name in rows: 2 more tests (385 -> 387), 1 new file:
+#   npx playwright test --list                                             -> 387 tests, 60 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 387
+executed: 387
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

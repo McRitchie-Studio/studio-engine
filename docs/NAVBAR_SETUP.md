@@ -35,7 +35,8 @@ If your app doesn't create its own `app/views/layouts/_navbar.html.erb`, the eng
   a preview), `Studio.navbar_menu_trigger` (a host partial in the admin
   dropdown's seat, rail and phone row), `Studio.navbar_account_sidebar` (the
   account control opens a host sidebar), `Studio.navbar_phone_name` (the name
-  below `md`, faded when it overflows), `Studio.navbar_brand` (logo, size, alt,
+  below `md`, faded when it overflows), `Studio.navbar_name_in_rows` (the name
+  ends row 1 over the second row, its own control; the avatar stands alone), `Studio.navbar_brand` (logo, size, alt,
   split title words), `Studio.navbar_root_hook` (`data-navbar-root`) and
   `Studio.navbar_z_tier` (the live header at `--z-nav`). The signed-out CTA
   also takes `modal:`, `sign_in_link: false` and `sign_in_path:`.

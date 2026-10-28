@@ -50,6 +50,14 @@ module StudioNavbarHelper
     @studio_navbar_avatar_badge = Studio.navbar_avatar_badge_for(self)
   end
 
+  # Studio.navbar_name_in_rows, read once per render pass. The ivar lets one
+  # request set it without writing the process-wide setting (the e2e lab).
+  def studio_navbar_name_in_rows?
+    return @studio_navbar_name_in_rows if defined?(@studio_navbar_name_in_rows)
+
+    @studio_navbar_name_in_rows = Studio.navbar_name_in_rows
+  end
+
   # Studio.navbar_header_bars as partial specs, [] for none.
   def studio_navbar_header_bars
     @studio_navbar_header_bars ||= Studio.navbar_header_bars_for(self)
