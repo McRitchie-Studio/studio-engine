@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.115.4 — 2026-10-27
+
 ### Changed
 
 - **The gear, the name and the avatar light together.** Where the account opens
