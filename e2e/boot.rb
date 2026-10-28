@@ -318,6 +318,18 @@ class User < ApplicationRecord
 end
 abort "e2e/boot: geo table missing" unless ActiveRecord::Base.connection.table_exists?(:studio_geo_settings)
 
+# ---- The agent chat's hub ----------------------------------------------------
+#
+# /agent_chat_lab renders the shared agent chat, whose proxy talks to the hub. The
+# lane stands up a stand-in hub in this process (test/support/agent_chat_stub_hub.rb,
+# AgentChatStubHub#converse!) on its own loopback port, so the chat's whole round
+# trip, browser to proxy to hub and back, is real HTTP with no outside network.
+# Six seconds to answer: typing from 3s, so the page's 2.5s poll sees each phase.
+require_relative "../test/support/agent_chat_stub_hub"
+agent_chat_hub = AgentChatStubHub.start.converse!(answer_after: 6)
+Studio.agent_chat_hub_url = agent_chat_hub.url
+Studio.agent_chat_token = "e2e-lab-agent-chat"
+
 require "puma"
 require "puma/server"
 

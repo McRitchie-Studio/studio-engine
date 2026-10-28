@@ -2,6 +2,7 @@
 
 require "socket"
 require "json"
+require "time"
 require "uri"
 require "rack/utils"
 
@@ -30,6 +31,52 @@ class AgentChatStubHub
   end
 
   def url = "http://127.0.0.1:#{port}"
+
+  # A hub that holds a conversation, for the browser lane (e2e/boot.rb): one
+  # thread per person ({email} or {anon_token}), a message stored "pending", then
+  # "typing" after half of `answer_after` seconds, then answered by an agent turn
+  # quoting it. A message containing "[hub-down]" is answered 503, as a hub that
+  # is down; it is not stored.
+  def converse!(answer_after: 1.5)
+    threads = Hash.new { |hash, key| hash[key] = [] }
+    seq = 0
+    lock = Mutex.new
+    unsettled = ->(turns) { turns.any? { |turn| %w[pending typing].include?(turn["status"]) } }
+    respond do |request|
+      if request.method == "POST"
+        body = request.json
+        next [503, { "error" => "down" }] if body["text"].to_s.include?("[hub-down]")
+
+        key = body["person"].to_a.sort.to_s
+        turn = lock.synchronize do
+          seq += 1
+          { "id" => seq.to_s, "role" => "user", "text" => body["text"], "created_at" => Time.now.utc.iso8601,
+            "status" => "pending" }.tap { |row| threads[key] << row }
+        end
+        Thread.new do
+          sleep answer_after / 2.0
+          lock.synchronize { turn["status"] = "typing" }
+          sleep answer_after / 2.0
+          lock.synchronize do
+            seq += 1
+            turn["status"] = "answered"
+            threads[key] << { "id" => seq.to_s, "role" => "agent", "text" => "You said: #{turn["text"]}",
+                              "created_at" => Time.now.utc.iso8601, "status" => "answered" }
+          end
+        end
+        [201, { "turn" => turn.dup }]
+      else
+        key = request.query["person"].to_a.sort.to_s
+        lock.synchronize do
+          turns = threads[key]
+          after = request.query["after"]
+          from = after ? (turns.index { |turn| turn["id"] == after } || -1) + 1 : 0
+          [200, { "turns" => turns[from..].map(&:dup), "pending" => unsettled.call(turns) }]
+        end
+      end
+    end
+    self
+  end
 
   def respond(&block)
     @handler = block
