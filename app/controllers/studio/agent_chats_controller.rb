@@ -16,11 +16,15 @@ module Studio
   #   soul    only from the app's allow-list (Studio.agent_chat_souls); off the
   #           list, or absent when the list holds more than one, is a 404. The
   #           hub re-checks that this app may address it.
-  #   person  never. A signed-in visitor is current_user.email; a signed-out
-  #           one is a random token in a SIGNED, http-only cookie
-  #           (ANON_COOKIE), minted on the first message. A browser cannot name
-  #           another person's email or forge another's token. A signed-in POST
-  #           that still holds the cookie sends both, so the hub folds the
+  #   person  never. A signed-in user with a VERIFIED email (email_verified_at
+  #           present, or the app's Studio.agent_chat_verified_email hook) is
+  #           that email. Everyone else, signed out or signed in with an address
+  #           they only claimed (the profile page and password signup save any
+  #           address), is a random token in a SIGNED, http-only cookie
+  #           (ANON_COOKIE), minted on the first message: a claimed address
+  #           would open its owner's hub thread on every app. A browser cannot
+  #           name another person's email or forge another's token. A verified
+  #           POST that still holds the cookie sends both, so the hub folds the
   #           anonymous thread into the person's; the cookie is then deleted.
   #   ip      never: request.remote_ip, which the hub caps on.
   #
@@ -89,19 +93,19 @@ module Studio
       render_error("No chat here.", :not_found) unless @soul
     end
 
-    # {email:} when signed in, else {anon_token:} from the signed cookie. With
+    # {email:} for a user with a VERIFIED email (#verified_email), else
+    # {anon_token:} from the signed cookie, as for a signed-out visitor. With
     # mint: false a visitor with no cookie is nil.
     #
-    # THE FOLD. With fold: true (the POST) a signed-in visitor who still holds
-    # a valid anon cookie is {email:, anon_token:}: the hub folds the anonymous
-    # thread into the person's, and #create then deletes the cookie. A
-    # signed-in visitor is never minted a token, and GET /turns sends the email
-    # alone (the fold is the hub's job on a post).
+    # THE FOLD. With fold: true (the POST) a verified user who still holds a
+    # valid anon cookie is {email:, anon_token:}: the hub folds the anonymous
+    # thread into the person's, and #create then deletes the cookie. A verified
+    # user is never minted a token, and GET /turns sends the email alone (the
+    # fold is the hub's job on a post).
     def person(mint:, fold: false)
-      user = respond_to?(:current_user, true) ? current_user : nil
-      email = user.respond_to?(:email) ? user.email.to_s.strip : ""
+      email = verified_email
       token = anon_token
-      if email.present?
+      if email
         return fold && token ? { email: email, anon_token: token } : { email: email }
       end
       return { anon_token: token } if token
@@ -113,6 +117,26 @@ module Studio
         secure: request.ssl?
       }
       { anon_token: token }
+    end
+
+    # The email the hub may know this user by, or nil. The hub keys a person's
+    # threads on it across every app, so a CLAIMED address is never enough: the
+    # profile page saves a new email directly and clears email_verified_at, and
+    # password signup saves any address. The app's Studio.agent_chat_verified_email
+    # hook decides when set; otherwise only a user whose email_verified_at is
+    # present (the magic link stamps it; so does the host from_omniauth pattern
+    # in docs/GOOGLE_AUTH_SETUP.md) counts. Anyone else chats as an
+    # anonymous visitor.
+    def verified_email
+      user = respond_to?(:current_user, true) ? current_user : nil
+      return nil unless user
+
+      hook = Studio.agent_chat_verified_email
+      email = if hook.respond_to?(:call) then hook.call(user)
+              elsif user.respond_to?(:email_verified_at) && user.email_verified_at.present? && user.respond_to?(:email)
+                user.email
+              end
+      email.to_s.strip.presence
     end
 
     # The token in the signed anon cookie, or nil when there is none or it is

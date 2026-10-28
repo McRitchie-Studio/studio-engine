@@ -13,8 +13,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   thread; `Studio::AgentChatsController` (`POST /agent_chat/messages`,
   `GET /agent_chat/turns`) proxies to it with the signed-in user's email or a
   signed anonymous cookie token, and `Studio::AgentChat` is the bounded hub
-  client. Opt in with `Studio.agent_chat_souls` and `AGENT_CHAT_TOKEN`; no soul,
-  no route. [`docs/AGENT_CHAT.md`](docs/AGENT_CHAT.md).
+  client. Only a verified email (`email_verified_at`, or the app's
+  `Studio.agent_chat_verified_email` hook) names a person to the hub; anyone
+  else chats anonymously. Opt in with `Studio.agent_chat_souls` and
+  `AGENT_CHAT_TOKEN`; no soul, no route. [`docs/AGENT_CHAT.md`](docs/AGENT_CHAT.md).
 
 ## 0.115.4 — 2026-10-27
 

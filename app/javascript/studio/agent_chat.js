@@ -10,7 +10,8 @@
 //   POLL     answers arrive by polling, as on the hub's /build: every POLL_MS
 //            while an answer is pending, slowing to SLOW_MS once it has waited
 //            SLOW_AFTER_MS (a hub that is down is not hammered); every IDLE_MS
-//            otherwise, and not at all while the tab is hidden. Each poll asks
+//            otherwise, and not at all while the tab is hidden (it asks at once
+//            when the tab comes back). Each poll asks
 //            for turns AFTER the last settled one (afterCursor), so a turn still
 //            pending is asked about again until it settles.
 //   SEND     Enter sends, Shift+Enter is a new line. The words stay in the box
@@ -44,15 +45,19 @@ export function turnKey(turn) {
 }
 
 // Merge `incoming` turns into `turns` (both oldest first): a known (id, role) is
-// replaced in place, a new one appended. Returns a new array.
+// replaced in place. A new agent turn goes right after its own user turn (same
+// id), so when the visitor sends A then B before A is answered, A's answer sits
+// under A, not under B. Any other new turn is appended. Returns a new array.
 export function mergeTurns(turns, incoming) {
   const merged = turns.slice()
-  const index = new Map(merged.map((turn, i) => [turnKey(turn), i]))
   for (const turn of incoming || []) {
     if (!turn || turn.id == null) continue
     const key = turnKey(turn)
-    if (index.has(key)) merged[index.get(key)] = turn
-    else { index.set(key, merged.length); merged.push(turn) }
+    const at = merged.findIndex((known) => turnKey(known) === key)
+    if (at !== -1) { merged[at] = turn; continue }
+    const own = turn.role === "agent" ? merged.findIndex((known) => turnKey(known) === `${turn.id}:user`) : -1
+    if (own !== -1) merged.splice(own + 1, 0, turn)
+    else merged.push(turn)
   }
   return merged
 }
@@ -147,7 +152,12 @@ export function mountAgentChat(root, {
         node = template.content.firstElementChild.cloneNode(true)
         node.dataset.turnId = String(turn.id)
         node.dataset.turnKey = key
-        log.appendChild(node)
+        // Placed where mergeTurns put it: after the previous turn's element.
+        const index = state.turns.indexOf(turn)
+        const prevKey = index > 0 ? turnKey(state.turns[index - 1]) : null
+        const prev = prevKey && Array.from(log.querySelectorAll("[data-turn-key]")).find((el) => el.dataset.turnKey === prevKey)
+        if (prev) prev.after(node)
+        else log.appendChild(node)
       }
       node.dataset.status = turn.status || ""
       const text = node.querySelector("[data-agent-chat-text]")
@@ -246,9 +256,15 @@ export function mountAgentChat(root, {
     poll()
   }
 
+  // A tab that comes back asks at once rather than waiting out an idle poll.
+  function onVisible() {
+    if (doc && doc.visibilityState === "visible" && !state.inFlight) { clearTimer(state.timer); poll() }
+  }
+
   form && form.addEventListener("submit", submit)
   input && input.addEventListener("keydown", onKeydown)
   retry && retry.addEventListener("click", onRetry)
+  doc && doc.addEventListener && doc.addEventListener("visibilitychange", onVisible)
   root.dataset.agentChatReady = "true"
   poll()
 
@@ -263,6 +279,7 @@ export function mountAgentChat(root, {
       form && form.removeEventListener("submit", submit)
       input && input.removeEventListener("keydown", onKeydown)
       retry && retry.removeEventListener("click", onRetry)
+      doc && doc.removeEventListener && doc.removeEventListener("visibilitychange", onVisible)
       delete root.dataset.agentChatReady
     }
   }

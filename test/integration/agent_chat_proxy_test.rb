@@ -81,6 +81,7 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
         t.string :provider
         t.string :uid
         t.string :session_token
+        t.datetime :email_verified_at
         t.timestamps
       end
     end
@@ -92,9 +93,14 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
     Rails.application.routes.url_helpers.studio_agent_chat_turns_path
     self.class.ensure_schema!
     User.delete_all
-    @sam = User.create!(email: "sam@example.com", name: "Sam")
+    # Sam proved his address (a magic link stamps email_verified_at); Eve did
+    # not: she typed sam's neighbour's address into her profile.
+    @sam = User.create!(email: "sam@example.com", name: "Sam", email_verified_at: Time.current)
+    @eve = User.create!(email: "victim@example.com", name: "Eve")
     @hub = AgentChatStubHub.start
-    @saved = { url: Studio.agent_chat_hub_url, token: Studio.agent_chat_token, souls: Studio.agent_chat_souls }
+    @saved = { url: Studio.agent_chat_hub_url, token: Studio.agent_chat_token, souls: Studio.agent_chat_souls,
+               verified: Studio.agent_chat_verified_email }
+    Studio.agent_chat_verified_email = nil
     Studio.agent_chat_hub_url = @hub.url
     Studio.agent_chat_token = "app-credential"
     Studio.agent_chat_souls = %w[alex]
@@ -108,6 +114,7 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
     Studio.agent_chat_hub_url = @saved[:url]
     Studio.agent_chat_token = @saved[:token]
     Studio.agent_chat_souls = @saved[:souls]
+    Studio.agent_chat_verified_email = @saved[:verified]
     ActionController::Base.allow_forgery_protection = false
   end
 
@@ -211,6 +218,54 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
     sign_in(@sam)
     get "/agent_chat/turns", params: { soul: "alex" }
     assert_equal({ "email" => "sam@example.com" }, @hub.requests.last.query["person"])
+  end
+
+  # ── an UNVERIFIED email names no one ─────────────────────────
+  # The profile page saves a new address directly and clears email_verified_at;
+  # password signup saves any address. Such an email is a claim, not a proof:
+  # sent to the hub it would open that person's thread on every app.
+
+  def test_an_unverified_signed_in_user_chats_as_anonymous_and_never_sends_the_email
+    sign_in(@eve)
+    post "/agent_chat/messages", params: { soul: "alex", text: "Hi" }.to_json, headers: json_headers
+
+    assert_response :created
+    person = @hub.requests.last.json["person"]
+    assert_equal ["anon_token"], person.keys
+    refute_includes @hub.requests.last.body, "victim@example.com"
+    refute cookies["studio_agent_chat_anon"].blank?, "an unverified user gets the anon cookie, as signed out"
+
+    get "/agent_chat/turns", params: { soul: "alex" }
+    assert_equal({ "anon_token" => person["anon_token"] }, @hub.requests.last.query["person"])
+  end
+
+  def test_an_unverified_signed_in_user_with_no_thread_is_answered_without_the_hub
+    sign_in(@eve)
+    get "/agent_chat/turns", params: { soul: "alex" }
+    assert_equal({ "turns" => [], "pending" => false }, response.parsed_body)
+    assert_empty @hub.requests
+  end
+
+  def test_a_user_whose_model_has_no_email_verified_at_is_anonymous
+    User.connection.remove_column(:users, :email_verified_at)
+    User.reset_column_information
+    sign_in(User.create!(email: "nocol@example.com", name: "No Column"))
+    post "/agent_chat/messages", params: { soul: "alex", text: "Hi" }.to_json, headers: json_headers
+    assert_equal ["anon_token"], @hub.requests.last.json["person"].keys
+  ensure
+    User.connection.add_column(:users, :email_verified_at, :datetime) unless User.column_names.include?("email_verified_at")
+    User.reset_column_information
+  end
+
+  def test_the_app_hook_decides_the_verified_email_when_set
+    Studio.agent_chat_verified_email = ->(user) { user.name == "Eve" ? "eve@proven.example" : nil }
+    sign_in(@eve)
+    post "/agent_chat/messages", params: { soul: "alex", text: "Hi" }.to_json, headers: json_headers
+    assert_equal({ "email" => "eve@proven.example" }, @hub.requests.last.json["person"])
+
+    sign_in(@sam)
+    post "/agent_chat/messages", params: { soul: "alex", text: "Hi" }.to_json, headers: json_headers
+    assert_equal ["anon_token"], @hub.requests.last.json["person"].keys, "the hook answered nil: anonymous"
   end
 
   def test_signed_in_turns_are_asked_for_by_email_with_after_and_limit

@@ -50,20 +50,28 @@ browser ──GET  /agent_chat/turns?after=<id>──▶ app ──GET hub /api/
 - **The soul** only from `Studio.agent_chat_souls`. Off the list is a 404; with
   one soul on the list a request naming none uses it. The hub checks again that
   your app may address that soul.
-- **Never the person.** Signed in, the proxy sends `current_user.email`. Signed
-  out, it sends a random token from a signed, http-only cookie
+- **Never the person, and only a PROVEN email.** The hub keys a person's
+  threads on their email across every app, so a claimed address would open its
+  owner's thread. The proxy sends `current_user.email` only when the user's
+  `email_verified_at` is present (the engine's magic link stamps it, as does
+  the host `from_omniauth` pattern in [`GOOGLE_AUTH_SETUP.md`](GOOGLE_AUTH_SETUP.md);
+  the profile page clears it when the address changes, and the engine's
+  password signup never sets it). Set `Studio.agent_chat_verified_email = ->(user) { ... }` to use
+  another proof: it answers the proven address or nil, and when set it decides
+  alone. Everyone else, signed out or signed in unverified, chats as an
+  anonymous visitor: a random token from a signed, http-only cookie
   (`studio_agent_chat_anon`, one year), minted on the first message. A signed-out
   visitor who has never written is answered `{turns: [], pending: false}` without
   asking the hub.
-- **The fold on sign-in.** A signed-in `POST /agent_chat/messages` from a browser
+- **The fold on sign-in.** A verified `POST /agent_chat/messages` from a browser
   that still holds the anon cookie sends `person: {email, anon_token}`, and the
   hub folds that anonymous thread into the person's. After the hub's 201 the
   proxy deletes the cookie, so the fold happens once; on any failure the cookie
-  is kept for the retry. A signed-in visitor is never minted a token, a
-  signed-in post with no cookie sends `{email}` alone, and a signed-in
+  is kept for the retry. A verified user is never minted a token, a verified
+  post with no cookie sends `{email}` alone, and a verified
   `GET /agent_chat/turns` always sends `{email}` alone (the fold is the hub's
-  job, on a post). So a visitor who chats signed out, then signs in, keeps the
-  thread once they send their next message.
+  job, on a post). So a visitor who chats signed out, then signs in with a
+  verified address, keeps the thread once they send their next message.
 - **Never the IP.** The proxy sends `request.remote_ip`, which the hub caps on.
 
 The POST is CSRF-protected (the host's `protect_from_forgery`, forced to
@@ -89,7 +97,9 @@ status: the visitor's words (`role: "user"`) and, once answered, the agent's
 alone: `turnKey` in `studio/agent_chat` is `"<id>:<role>"`, `mergeTurns` keys by
 it, and each turn's element carries it as `data-turn-key` (plus the bare row id
 as `data-turn-id`). Keyed by id alone, the answer would replace the visitor's
-own message. `after` is a row id (rows with id > after).
+own message. A new agent turn is placed right after its own user turn, so a
+visitor who sends A, then B before A is answered, sees A's answer under A.
+`after` is a row id (rows with id > after).
 
 ## The hub client
 
@@ -112,7 +122,8 @@ machine (a developer's local hub).
 - loads the latest turns on connect; a failure shows the offline notice and
   retries every 15 seconds, or at once on **Try again**;
 - polls every 2.5 seconds while an answer is pending, 10 seconds after two
-  minutes of waiting, 30 seconds otherwise, and not while the tab is hidden. Each
+  minutes of waiting, 30 seconds otherwise, and not while the tab is hidden (it
+  asks at once when the tab comes back). Each
   poll sends `after` = the row id of the last turn before the first unsettled one,
   so a pending row is asked about until it settles (an unsettled row's user turn
   is itself unsettled, so the cursor lands on an earlier row);

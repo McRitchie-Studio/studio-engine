@@ -51,6 +51,18 @@ test("mergeTurns keeps a user turn and an agent turn that share a hub row id (tu
   assert.equal(turnKey(merged[1]), "9:agent")
 })
 
+test("mergeTurns places an agent turn right after its own user turn, not at the end", () => {
+  // The visitor sent A (row 1) then B (row 2) before A was answered.
+  const sent = [turn(1, "pending", "user"), turn(2, "pending", "user")]
+  const merged = mergeTurns(sent, [turn(1, "answered", "user"), { ...turn(1, "answered", "agent"), text: "answer to A" }])
+  assert.deepEqual(merged.map(turnKey), ["1:user", "1:agent", "2:user"])
+})
+
+test("mergeTurns appends an agent turn whose user turn it has not seen", () => {
+  const merged = mergeTurns([turn(1, "answered", "user")], [turn(3, "answered", "agent")])
+  assert.deepEqual(merged.map(turnKey), ["1:user", "3:agent"])
+})
+
 test("mergeTurns does not mutate its input", () => {
   const turns = [turn(1)]
   mergeTurns(turns, [turn(2)])

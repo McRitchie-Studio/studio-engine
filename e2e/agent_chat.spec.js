@@ -20,6 +20,8 @@ const { blockOffsiteRequests, watchPageErrors } = require("./helpers");
 //   - key turns by `turn.id` alone (turnKey in studio/agent_chat): the first spec
 //     fails at the answer, which lands in the visitor's own bubble because it
 //     shares their row id, so no agent turn ever appears.
+//   - append every new turn at the end in `mergeTurns` (and the DOM): the third
+//     spec fails at the order, the first answer landing under the second question.
 
 const PAGE = "/agent_chat_lab";
 
@@ -73,4 +75,30 @@ test("a hub that is down keeps the words in the box and says why", async ({ page
   await expect(input).toHaveValue("Hello [hub-down]");
   await expect(page.locator('[data-test="agent-chat-sent"]')).toHaveCount(0);
   await expect(page.locator('[data-test="agent-chat-send"]')).toBeEnabled();
+});
+
+test("an answer lands under its own message when the visitor sent another before it was answered", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+  await page.goto(PAGE);
+  await expect(page.locator('[data-test="agent-chat"]')).toHaveAttribute("data-agent-chat-ready", "true");
+
+  const input = page.locator('[data-test="agent-chat-input"]');
+  await input.fill("First question");
+  await input.press("Enter");
+  await expect(input).toHaveValue("");
+  await input.fill("Second question");
+  await input.press("Enter");
+  await expect(input).toHaveValue("");
+
+  const turns = page.locator('[data-test="agent-chat-messages"] [data-agent-chat-turn]');
+  await expect(turns).toHaveCount(4, { timeout: 20000 });
+  const order = await turns.evaluateAll((els) => els.map((el) => `${el.dataset.role}: ${el.querySelector("[data-agent-chat-text]").textContent}`));
+  expect(order).toEqual([
+    "user: First question",
+    "agent: You said: First question",
+    "user: Second question",
+    "agent: You said: Second question"
+  ]);
+  expect(errors).toEqual([]);
 });

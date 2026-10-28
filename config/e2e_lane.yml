@@ -1067,7 +1067,11 @@
 # says why. Verified RED by dropping "agent-chat" from LAZY (both fail) and by
 # clearing the box before the POST (test 2 fails).
 #   npx playwright test --list  -> 382 tests in 58 files
-total_specs: 382
+# 382 -> 383: e2e/agent_chat.spec.js gains the answer-order case (review of
+# engine-agent-chat-primitive): a visitor who sends A then B before A is answered
+# sees A's answer under A. Verified RED by appending every new turn at the end.
+#   npx playwright test --list  -> 383 tests in 58 files
+total_specs: 383
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1307,7 +1311,11 @@ total_specs: 382
 #   npx playwright test --list                                             -> 382 tests, 58 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 382
-executed: 382
+# And for the answer-order case: 1 more test (382 -> 383), no new file:
+#   npx playwright test --list                                             -> 383 tests, 58 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 383
+executed: 383
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

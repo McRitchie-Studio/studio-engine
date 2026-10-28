@@ -1329,6 +1329,14 @@ module Studio
   # The app's bearer credential for the hub. Leave nil to read
   # ENV["AGENT_CHAT_TOKEN"] (1Password apps.<slug>.agent-chat).
   mattr_accessor :agent_chat_token,   default: nil
+  # Which signed-in users the hub may know by email. An email the user only
+  # CLAIMS (the profile page saves a new address and clears email_verified_at;
+  # password signup saves any address) would open that person's hub thread on
+  # every app, so by default only a user whose email_verified_at is present is
+  # sent by email; everyone else chats as an anonymous visitor (the anon
+  # cookie). Set a callable ->(user) { "proven@address" or nil } to use another
+  # proof; nil keeps the default. Never answer a claimed address.
+  mattr_accessor :agent_chat_verified_email, default: nil
 
   def self.agent_chat_soul_list
     Array(agent_chat_souls).map { |soul| soul.to_s.strip }.reject(&:empty?).uniq
