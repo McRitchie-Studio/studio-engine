@@ -245,6 +245,8 @@ Set `Studio.draw_survey_routes = true` to add the public survey pages (`/surveys
 
 **Magic links need the `studio_links` table.** Install it with `bin/rails studio_engine:install:migrations && bin/rails db:migrate` (install all of them) before enabling `:magic_link` — never by hand-copying the migration, which collides with the task's own copy on `class CreateStudioLinks`. Without the table, the first sign-in raises `Studio::Link::MissingTable`.
 
+Set `Studio.agent_chat_souls = %w[alex]` to add the shared agent chat's proxy (`POST /agent_chat/messages`, `GET /agent_chat/turns`), which forwards to the McRitchie Studio hub with the app's `AGENT_CHAT_TOKEN`; then `render "studio/agent_chat/chat", soul: "alex", name: "Alex", portrait: ...` on any page ([`docs/AGENT_CHAT.md`](docs/AGENT_CHAT.md)).
+
 In non-production local requests, this also draws `/_studio/local_emails`, a local email inbox for agent/worktree proof flows. Set `LOCAL_EMAIL_CAPTURE=1` or run with `AGENT_WORKTREE=1` to record outbox rows without sending real email.
 
 In every environment, production included, it also draws `/_studio/health_report`: the daily health report as counts-only JSON, which the McRitchie Studio hub pulls at 07:00 and posts to Discord. It answers 404 until the app sets `STUDIO_HEALTH_TOKEN` (or `config.health_report_token`), and 401 to a request without that bearer token ([`docs/HEALTH_REPORT.md`](docs/HEALTH_REPORT.md#the-hub-endpoint)).

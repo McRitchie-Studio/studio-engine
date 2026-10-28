@@ -4,6 +4,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **The shared agent chat.** `render "studio/agent_chat/chat", soul:, name:, portrait:`
+  puts one chat with a hub agent on any page: the portrait header, a card slot
+  (`cards:`), the thread, the thinking/typing line, the composer and a friendly
+  retry when the hub is down, lifted from the hub's /build chat. The hub holds the
+  thread; `Studio::AgentChatsController` (`POST /agent_chat/messages`,
+  `GET /agent_chat/turns`) proxies to it with the signed-in user's email or a
+  signed anonymous cookie token, and `Studio::AgentChat` is the bounded hub
+  client. Opt in with `Studio.agent_chat_souls` and `AGENT_CHAT_TOKEN`; no soul,
+  no route. [`docs/AGENT_CHAT.md`](docs/AGENT_CHAT.md).
+
 ## 0.115.3 — 2026-10-27
 
 ### Changed
