@@ -39,4 +39,21 @@ class NavbarAccountGroupCssTest < Minitest::Test
   def test_the_gear_drops_its_own_hover_pill_inside_the_group
     assert_includes CSS, "#{GROUP} [data-link-sidebar-trigger]:hover { background-color: transparent; }"
   end
+
+  HOST = ':has(> [data-nav-tools] [data-nav-menu-trigger]):has(> [data-nav-account][data-profile-image-toggle]' \
+         ':not([aria-controls~="studio-link-sidebar"]))'
+  HOST_GEAR = "[data-nav-menu-trigger] [aria-controls]"
+  HOST_LIT = "#{HOST}:has(#{HOST_GEAR}:hover, [data-nav-account]:hover, " \
+             "#{HOST_GEAR}:focus-visible, [data-nav-account]:focus-visible)"
+
+  def test_a_host_sidebar_groups_the_menu_trigger_with_the_account
+    rule = CSS[/^\s*#{Regexp.escape("#{HOST_LIT} #{HOST_GEAR},")}[^{]*\{[^}]*\}/]
+
+    refute_nil rule, "no lit rule for the host gear in engine.css"
+    assert_includes rule, "#{HOST_LIT} [data-nav-name]"
+    assert_includes rule, "color: var(--color-primary)"
+    assert_includes CSS, "#{HOST_LIT} [data-nav-account] > [aria-hidden] > * {"
+    assert_includes CSS, "#{HOST_LIT} #{HOST_GEAR} svg { transform: rotate(45deg); }"
+    assert_includes CSS, "#{HOST} #{HOST_GEAR}:hover { background-color: transparent; }"
+  end
 end

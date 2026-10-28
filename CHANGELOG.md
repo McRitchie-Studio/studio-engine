@@ -12,8 +12,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   (not under reduced motion) and puts a soft primary glow on the avatar; the
   gear's own hover pill is dropped inside the group. CSS only (`engine.css`,
   *THE ACCOUNT GROUP*), keyed on the row's existing hooks, so the navbar
-  baseline's bytes are unchanged. An account link or a host sidebar is not
-  grouped. Guards: `test/views/navbar_account_group_css_test.rb`,
+  baseline's bytes are unchanged. Two shapes group: the engine's link sidebar
+  gear with an account that opens it, and a host's gear in the menu trigger
+  seat (`Studio.navbar_menu_trigger`) with an account that opens the host's
+  sidebar (`Studio.navbar_account_sidebar`), as Turf Monster's gear sidebar
+  does. An account link is never grouped. Guards: `test/views/navbar_account_group_css_test.rb`,
   `test/views/user_nav_test.rb`, `e2e/navbar_account_group.spec.js`.
 
 ## 0.115.3 — 2026-10-27

@@ -53,3 +53,49 @@ test("pointing at the gear, the name or the avatar lights all three", async ({ p
   }
   expect(errors).toEqual([]);
 });
+
+// A HOST SIDEBAR (Turf Monster's shape): the host's gear in the menu trigger
+// seat and an account that opens the host's sidebar. The lab draws the link
+// sidebar, so the page is rewired to the markup the engine renders for
+// Studio.navbar_menu_trigger + Studio.navbar_account_sidebar
+// (test/integration/navbar_account_sidebar_render_test.rb pins that markup).
+test("a host sidebar's gear and account light together too", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  const errors = watchPageErrors(page);
+  await page.setViewportSize(DESKTOP);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/lab/bar_stack?one_row=1&sidebar=1");
+  const primary = (await lit(page)).primary;
+
+  await page.evaluate((gear) => {
+    const engineGear = document.querySelector(gear);
+    const seat = document.createElement("span");
+    seat.setAttribute("data-nav-menu-trigger", "");
+    const hostGear = engineGear.cloneNode(true);
+    hostGear.removeAttribute("data-link-sidebar-trigger");
+    hostGear.setAttribute("aria-controls", "gear-sidebar gear-sidebar-mobile");
+    seat.appendChild(hostGear);
+    engineGear.replaceWith(seat);
+    document.querySelector("header [data-nav-account]").setAttribute("aria-controls", "gear-sidebar gear-sidebar-mobile");
+  }, GEAR);
+
+  const HOST_GEAR = "header [data-nav-tools] [data-nav-menu-trigger] [aria-controls]";
+  const read = () => page.evaluate(([gear, name, avatar]) => ({
+    gear: getComputedStyle(document.querySelector(gear)).color,
+    name: getComputedStyle(document.querySelector(name)).color,
+    glow: getComputedStyle(document.querySelector(avatar)).boxShadow,
+  }), [HOST_GEAR, NAME, AVATAR]);
+
+  await page.mouse.move(5, 400);
+  expect((await read()).glow).toBe("none");
+
+  for (const target of [HOST_GEAR, NAME, AVATAR]) {
+    await page.hover(target);
+    await expect.poll(async () => { const on = await read(); return [on.gear, on.name]; }, { message: target })
+      .toEqual([primary, primary]);
+    expect((await read()).glow, target).not.toBe("none");
+    await page.mouse.move(5, 400);
+    await expect.poll(async () => (await read()).glow).toBe("none");
+  }
+  expect(errors).toEqual([]);
+});

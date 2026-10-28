@@ -1064,7 +1064,9 @@
 # Pointing at the gear, the name or the avatar lights all three (engine.css,
 # THE ACCOUNT GROUP): computed style on :has(:hover), which no byte test can see.
 #   npx playwright test --list  -> 381 tests in 58 files
-total_specs: 381
+# 381 -> 382: the same file's host sidebar test (Turf Monster's shape).
+#   npx playwright test --list  -> 382 tests in 58 files
+total_specs: 382
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1304,7 +1306,11 @@ total_specs: 381
 #   npx playwright test --list                                             -> 381 tests, 58 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 381
-executed: 381
+# And its host sidebar test: 1 more test (381 -> 382), no new file:
+#   npx playwright test --list                                             -> 382 tests, 58 files
+#   npx playwright test --list --grep "@devnet"                            -> 0
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 382
+executed: 382
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

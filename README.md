@@ -1099,9 +1099,10 @@ never the bar.
 
 Since the gear and the account open the same sidebar, they read as one control:
 pointing at or focusing any of the gear, the name or the avatar lights all three
-(the primary colour, a turn of the gear, a primary glow on the avatar). It
-applies only when the account opens the link sidebar, never an account link or a
-host sidebar (`engine.css`, *THE ACCOUNT GROUP*).
+(the primary colour, a turn of the gear, a primary glow on the avatar). The
+same holds for a host sidebar: a host that sets both `navbar_menu_trigger` and
+`navbar_account_sidebar` gets its gear and account lit as one menu. An account
+link is never grouped (`engine.css`, *THE ACCOUNT GROUP*).
 
 ## Transactional emails
 
