@@ -105,6 +105,10 @@ module Studio
   # Mirrors the knowledge-layer accessors in lib/studio.rb.
   mattr_accessor :draw_knowledge_routes, default: false
   mattr_accessor :knowledge_agents,      default: []
+  # Mirrors the agent-chat accessors in lib/studio.rb (Studio::AgentChat reads them).
+  mattr_accessor :agent_chat_souls,   default: []
+  mattr_accessor :agent_chat_hub_url, default: "https://mcritchie.studio"
+  mattr_accessor :agent_chat_token,   default: nil
   # Mirrors the geo accessors in lib/studio.rb. Studio::GeoHelper and
   # Studio::Geo::Lookup read them, so the unit suite needs them defined; tests
   # that depend on a specific value set it explicitly and restore it.
