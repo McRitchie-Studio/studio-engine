@@ -9,7 +9,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **`node --test` importmap hooks map a top-level name with digits.** A bare pin
   such as `base58` with its own file in `topLevelDir` now resolves to that file,
   as prefixed names already did; the name gate admits digits. Paths, scoped names
-  and URLs still fall through to Node's resolver.
+  and URLs still fall through to Node's resolver. Guarded by
+  `test/javascript/node_tooling.test.mjs`.
 
 ## 0.116.0 — 2026-10-28
 

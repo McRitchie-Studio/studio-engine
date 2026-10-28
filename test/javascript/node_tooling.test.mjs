@@ -131,7 +131,7 @@ test("the hooks resolve a host's importmap prefixes and top-level names as ES mo
   }
 })
 
-test("a top-level name with digits maps to its file; a relative specifier still falls through", () => {
+test("a top-level name with digits maps to its file; a relative or URL specifier still falls through", () => {
   const root = mkdtempSync(join(tmpdir(), "studio-node-hooks-"))
   try {
     mkdirSync(join(root, "app/javascript"), { recursive: true })
@@ -153,10 +153,11 @@ test("a top-level name with digits maps to its file; a relative specifier still 
     writeFileSync(join(root, "test/javascript/probe.js"), `
       import { encode } from "base58"
       import { where } from "./x.js"
-      process.stdout.write(encode() + " " + where)
+      import { u } from "data:text/javascript,export const u = 'url'"
+      process.stdout.write(encode() + " " + where + " " + u)
     `)
     const out = execFileSync(process.execPath, ["--import", "./test/javascript/support/register.mjs", "test/javascript/probe.js"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] })
-    assert.equal(out, "b58 local")
+    assert.equal(out, "b58 local url")
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
