@@ -1723,9 +1723,6 @@ module Studio
              constraints: { token: %r{[^/]+} }
       end
 
-      # The session-drift rehydrate endpoint (Studio::SessionStatesController).
-      # OPT-IN — see Studio.draw_session_routes. JSON only: the browser store is
-      # its one caller, and an HTML answer would only ever be a mistake.
       # The shared agent chat's proxy (Studio::AgentChatsController): the
       # browser's two calls, which the app's server forwards to the hub. Drawn
       # only for an app that names a soul (Studio.agent_chat_souls).
@@ -1736,6 +1733,9 @@ module Studio
              defaults: { format: :json }
       end
 
+      # The session-drift rehydrate endpoint (Studio::SessionStatesController).
+      # OPT-IN — see Studio.draw_session_routes. JSON only: the browser store is
+      # its one caller, and an HTML answer would only ever be a mistake.
       if Studio.draw_session_routes
         get "session/state", to: "studio/session_states#show", as: :studio_session_state,
             defaults: { format: :json }
