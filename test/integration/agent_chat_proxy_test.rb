@@ -285,11 +285,26 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
     assert_match(/try again/i, response.parsed_body["error"])
   end
 
+  def test_a_failed_send_is_an_error_log_row_and_a_failed_poll_is_not
+    ErrorLog.delete_all
+    @hub.respond { [502, "<html>Bad gateway</html>"] }
+    sign_in(@sam)
+    get "/agent_chat/turns", params: { soul: "alex" }
+    assert_response :service_unavailable
+    assert_equal 0, ErrorLog.count, "an open page polls every 15s through an outage; no row per poll"
+
+    post "/agent_chat/messages", params: { soul: "alex", text: "Hi" }.to_json, headers: json_headers
+    assert_response :service_unavailable
+    assert_equal 1, ErrorLog.count
+    assert_match(/502/, ErrorLog.last.message)
+  end
+
   def test_a_refused_app_credential_is_a_503_never_a_401_to_the_visitor
     @hub.respond { [401, { "error" => "unauthorized" }] }
     post "/agent_chat/messages", params: { soul: "alex", text: "Hi" }.to_json, headers: json_headers
     assert_response :service_unavailable
     refute_includes response.body, "credential"
+    assert_match(/credential/, ErrorLog.last.message, "a refused app credential is always an ErrorLog row")
   end
 
   def test_a_post_without_the_authenticity_token_is_refused

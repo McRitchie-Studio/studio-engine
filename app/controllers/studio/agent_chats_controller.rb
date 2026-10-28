@@ -28,7 +28,8 @@ module Studio
   # skipped: a signed-out visitor may chat, as on /build.
   #
   # Every answer is JSON and no-store. A hub that is down, slow or misconfigured
-  # is a 503 {error, retry: true}, which the page shows as a friendly retry.
+  # is a 503 {error, retry: true}, which the page shows as a friendly retry, and
+  # a failed send or a refused app credential is an ErrorLog row (#capture).
   class AgentChatsController < ::ApplicationController
     skip_before_action :require_authentication, raise: false
     protect_from_forgery with: :exception
@@ -113,8 +114,19 @@ module Studio
       when Studio::AgentChat::UnknownSoul then render_error("No chat here.", :not_found)
       else
         Rails.logger.warn("[studio] agent chat: #{error.class}: #{error.message}")
+        capture(error) if error.is_a?(Studio::AgentChat::Unauthorized) || action_name == "create"
         render_error(UNAVAILABLE, :service_unavailable, retry: true)
       end
+    end
+
+    # An ErrorLog row for a message that could not be sent, and for every
+    # refusal of the app's own credential (a configuration fault). A poll that
+    # fails is only logged: an open page polls every 15 seconds while the hub is
+    # down, and a row per poll would bury the outage it reports. Never raises.
+    def capture(error)
+      ::ErrorLog.capture!(error) if defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
+    rescue StandardError
+      nil
     end
 
     def render_error(message, status, **extra)
