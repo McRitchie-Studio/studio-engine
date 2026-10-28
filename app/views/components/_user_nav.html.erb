@@ -102,7 +102,7 @@
     <%# Studio.navbar_phone_name: the name shows below md too, capped, and
         fades at its edge when it overflows (engine.css, THE PHONE NAME). %>
     <% phone_name = Studio.navbar_phone_name %>
-    <% name_in_rows = Studio.navbar_name_in_rows %>
+    <% name_in_rows = respond_to?(:studio_navbar_name_in_rows?) ? studio_navbar_name_in_rows? : Studio.navbar_name_in_rows %>
     <% nav_user_name = Studio.navbar_user_name_for(current_user, self) %>
     <%# The name: its box (screen-reader text below md, or the phone name's
         capped box) around the truncating data-nav-name. Built here as a

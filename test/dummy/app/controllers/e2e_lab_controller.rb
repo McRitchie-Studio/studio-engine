@@ -295,6 +295,9 @@ class E2eLabController < ActionController::Base
     # (Studio.navbar_header_bars), for this request alone, the same way: the
     # ivar studio_navbar_header_bars memoizes, never a write to the setting.
     @studio_navbar_header_bars = Studio::NavbarSlots.resolve_header_bars(LAB_HEADER_BARS, view_context) if params[:header_bars].present?
+    # `name_in_rows` ends row 1 with the name (Studio.navbar_name_in_rows), for
+    # this request alone: the ivar studio_navbar_name_in_rows? memoizes.
+    @studio_navbar_name_in_rows = true if params[:name_in_rows].present?
   end
 
   LAB_HEADER_BARS = ["e2e_lab/header_bar"].freeze

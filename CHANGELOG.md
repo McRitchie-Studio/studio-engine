@@ -16,8 +16,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   opens; the account group in `engine.css` lights gear, name and avatar from it
   too. `false`, the default, renders byte-identical to before. The scroll
   timeline's name scale and `studio/nav_collapse`'s name width now skip the
-  avatar's `aria-hidden` box, so neither mistakes it for the name. Guarded by
-  `test/integration/navbar_name_in_rows_render_test.rb`.
+  avatar's `aria-hidden` box, so neither mistakes it for the name. The partial
+  reads it through `studio_navbar_name_in_rows?`, memoized per render like the
+  other navbar helpers, so one request may set `@studio_navbar_name_in_rows`.
+  Guarded by `test/integration/navbar_name_in_rows_render_test.rb` and
+  `e2e/navbar_name_in_rows.spec.js`.
 
 ## 0.116.1 — 2026-10-28
 
