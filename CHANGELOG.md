@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.116.2 — 2026-10-28
+
 ### Added
 
 - **`Studio.navbar_name_in_rows`: the name stacks over the second row.** `true`
