@@ -815,6 +815,11 @@ body.modal-open .studio-app-banner {
       .nav-shell [data-nav-tools] :has(> [data-nav-theme-toggle="desktop"]) { gap: calc(var(--nav-gap) - 8.6px); }
       .nav-shell :has(> [data-nav-tools]) { gap: calc(var(--nav-gap) - 6.3px); }
       .nav-shell [data-nav-account] { gap: var(--nav-gap); }
+      /* Studio.navbar_name_in_rows: the name ends row 1, so the row's gap is
+         now name to avatar, a whole --nav-gap, and gear to name is row 1's,
+         the same gap less the name's 6.3px side bearing (its gap-2 given back). */
+      .nav-shell :has(> [data-nav-tools] [data-nav-name-trigger]) { gap: var(--nav-gap); }
+      .nav-shell [data-nav-tools] [data-nav-name-trigger] { margin-inline-start: calc(var(--nav-gap) - 6.3px - 0.5rem); }
       .nav-shell [data-nav-tools][data-nav-rows="1"] > div:first-child { padding-inline: 0 !important; }
       .nav-shell [data-nav-rows="1"] + [data-nav-account] > [aria-hidden] > * {
         width: var(--nav-avatar);
@@ -909,6 +914,7 @@ body.modal-open .studio-app-banner {
       .nav-shell[data-nav-timeline] [data-nav-account] > [aria-hidden],
       .nav-shell[data-nav-timeline] [data-nav-avatar-badge],
       .nav-shell[data-nav-timeline] [data-nav-account] > span:first-child:not([aria-hidden]),
+      .nav-shell[data-nav-timeline] [data-nav-name-trigger],
       .nav-shell[data-nav-timeline] [data-nav-tools],
       .nav-shell[data-nav-timeline] [data-nav-links] {
         animation-timing-function: ease-in-out;
@@ -919,6 +925,11 @@ body.modal-open .studio-app-banner {
       .nav-shell[data-nav-timeline] .nav-logo-link { transform-origin: left center; animation-name: nav-tl-brand; }
       .nav-shell[data-nav-timeline] [data-nav-account] > [aria-hidden],
       .nav-shell[data-nav-timeline] [data-nav-avatar-badge] { transform-origin: right center; animation-name: nav-tl-avatar; }
+      /* The name in row 1 (Studio.navbar_name_in_rows) rides the icon column's
+         slide and scales by the avatar's ratio from its right edge, so it
+         keeps its gap to the avatar; the gear-to-name gap grows by what the
+         name gives up. */
+      .nav-shell[data-nav-timeline] [data-nav-name-trigger] { transform-origin: right center; animation-name: nav-tl-avatar; }
       .nav-shell[data-nav-timeline] [data-nav-account] > span:first-child:not([aria-hidden]) { transform-origin: right center; animation-name: nav-tl-name; }
       .nav-shell[data-nav-timeline] [data-nav-tools] { animation-name: nav-tl-tools; }
       .nav-shell[data-nav-timeline] [data-nav-links] { animation-name: nav-tl-links; }

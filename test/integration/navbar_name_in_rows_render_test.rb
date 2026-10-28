@@ -122,6 +122,16 @@ class NavbarNameInRowsRenderTest < ActiveSupport::TestCase
     assert_includes js, "el.querySelector('[data-nav-account] > span:first-child:not([aria-hidden])')"
   end
 
+  test "engine.css spaces the name in row 1 and scales it on the timeline" do
+    css = File.read(File.expand_path("../../app/assets/tailwind/studio_engine/engine.css", __dir__))
+    row = css[/@media \(min-width: 768px\) \{\n      \.nav-shell \{\n        --nav-avatar.*?\n    \}\n/m]
+
+    refute_nil row, "THE ACCOUNT ROW's 768px block"
+    assert_includes row, ".nav-shell :has(> [data-nav-tools] [data-nav-name-trigger]) { gap: var(--nav-gap); }"
+    assert_includes row, ".nav-shell [data-nav-tools] [data-nav-name-trigger] { margin-inline-start: calc(var(--nav-gap) - 6.3px - 0.5rem); }"
+    assert_includes css, ".nav-shell[data-nav-timeline] [data-nav-name-trigger] { transform-origin: right center; animation-name: nav-tl-avatar; }"
+  end
+
   test "only true or false is accepted" do
     assert_raises(ArgumentError) { Studio.navbar_name_in_rows = "yes" }
     assert_raises(ArgumentError) { Studio.navbar_name_in_rows = nil }
