@@ -30,8 +30,13 @@ Gem::Specification.new do |spec|
   # citation should resolve in the installed gem, not only on GitHub. The rest of
   # docs/ is the engine's own operating material. Guarded by
   # test/lib/gemspec_ships_footer_docs_test.rb.
+  #
+  # .github/hub-e2e-subset.txt ships because the hub guards it: mcritchie-studio's
+  # test/lib/hub_e2e_subset_guard_test.rb reads the list from the installed gem and
+  # fails a hub PR that renames or deletes a spec this engine's hub-browser lane runs.
+  # Guarded by test/lib/consumer_ci_hub_browser_test.rb.
   spec.files = Dir["lib/**/*", "app/**/*", "config/**/*", "db/**/*", "Gemfile", "studio-engine.gemspec", "README.md", "CHANGELOG.md", "LICENSE",
-                   "docs/SITE_FOOTER.md", "docs/BOOKING.md"] - ["config/e2e_lane.yml"]
+                   "docs/SITE_FOOTER.md", "docs/BOOKING.md", ".github/hub-e2e-subset.txt"] - ["config/e2e_lane.yml"]
   spec.require_paths = ["lib"]
 
   spec.add_dependency "rails", ">= 7.2", "< 8.2"

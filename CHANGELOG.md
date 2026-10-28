@@ -17,6 +17,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   every checkout. Guard: `test/lib/engine_ci_hardening_test.rb`, held to
   `consumer-ci.yml`'s settings.
 
+- **The hub-browser spec list ships in the gem.** `.github/hub-e2e-subset.txt` is now in
+  the gemspec's `files`, so a host can read it from the installed gem. The hub's
+  `test/lib/hub_e2e_subset_guard_test.rb` does, and fails a hub PR that renames or
+  deletes a listed spec. No runtime change.
+
 ## 0.115.3 — 2026-10-27
 
 ### Changed

@@ -89,6 +89,15 @@ class ConsumerCiHubBrowserTest < Minitest::Test
 
   # ==== paths ========================================================================
 
+  # The hub's own guard (mcritchie-studio test/lib/hub_e2e_subset_guard_test.rb) reads
+  # this list from the INSTALLED gem, so a hub PR that renames a listed spec goes red in
+  # the hub, not only later in this lane. Unshipped, that guard has nothing to read.
+  def test_unit_the_list_ships_in_the_gem_for_the_hubs_guard
+    files = Dir.chdir(ROOT) { Gem::Specification.load(File.join(ROOT, "studio-engine.gemspec")).files }
+    assert_includes files, ".github/hub-e2e-subset.txt"
+    assert_empty files.grep(%r{\A\.github/workflows/}), "only the list ships, not the workflows"
+  end
+
   def test_unit_paths_prints_the_list_when_the_hub_has_every_file
     with_list(%w[e2e/a.spec.js e2e/b.spec.js]) do |dir, list|
       FileUtils.mkdir_p(File.join(dir, "hub/e2e"))
