@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.115.4 — 2026-10-27
+
 ### Changed
 
 - **The `hub-browser` triage line also names a red setup step.** It used to fire only
