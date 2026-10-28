@@ -1,0 +1,18 @@
+<%# locals: (name:, portrait: nil) %>
+<%# A pending answer (studio/agent_chat/_chat), as the hub's agent_chats/_typing: THINKING (a small portrait in a turning ring, "<name> is thinking" shimmering) until the hub says the answer has begun, then TYPING (a bubble of wave dots). Both are drawn in one grid cell so the swap never moves the page; data-phase picks one (studio/agent_chat sets it). The motion is engine-motion.css (.studio-agent-typing) and holds still under reduced motion. %>
+<div class="studio-agent-typing" data-phase="thinking" data-agent-chat-phase data-test="agent-chat-typing">
+  <div class="studio-agent-typing-layer studio-agent-typing-thinks" data-test="agent-chat-thinking">
+    <span class="studio-agent-typing-orbit" aria-hidden="true">
+      <span class="w-10 h-10 text-sm rounded-full flex items-center justify-center bg-inset border border-subtle text-heading font-bold shrink-0 overflow-hidden [&>img]:w-full [&>img]:h-full [&>img]:object-cover [&>svg]:w-full [&>svg]:h-full">
+        <% if portrait.present? %><%= portrait %><% else %><%= name.to_s.first.to_s.upcase %><% end %>
+      </span>
+    </span>
+    <span class="studio-agent-typing-label studio-agent-typing-shimmer"><%= name %> is thinking</span>
+  </div>
+  <div class="studio-agent-typing-layer studio-agent-typing-types" data-test="agent-chat-typing-bubble">
+    <span class="studio-agent-typing-bubble" aria-hidden="true">
+      <span class="studio-agent-typing-dot"></span><span class="studio-agent-typing-dot"></span><span class="studio-agent-typing-dot"></span>
+    </span>
+    <span class="studio-agent-typing-label"><%= name %> is typing</span>
+  </div>
+</div>

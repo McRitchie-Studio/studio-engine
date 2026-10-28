@@ -1,0 +1,52 @@
+<%# locals: (soul:, name:, portrait: nil, role: nil, empty: nil, cards: nil) %>
+<%#
+  The shared agent chat (docs/AGENT_CHAT.md): one conversation with one agent,
+  held by the hub, on any app's page.
+
+    render "studio/agent_chat/chat", soul: "alex", name: "Alex", portrait: image_tag("alex.png", class: "w-24 h-24 rounded-full")
+
+  soul      the agent's slug; must be on the app's Studio.agent_chat_souls.
+  name      the agent's display name (header, composer, typing line).
+  portrait  ready markup for the big round portrait; nil shows the initial.
+  role      ready markup or text under the name.
+  empty     the line an empty thread shows (default "Say hello to <name>.").
+  cards     THE CARD SLOT: ready markup shown between the header and the
+            thread (/build's intake cards). A local, never a bare yield: a
+            partial rendered without a block yields the LAYOUT's body.
+
+  Top to bottom, as the hub's /build: the portrait and name, the card slot, the
+  thread, the typing line, the offline notice and the composer. The thread is
+  drawn by studio/agent_chat (the "agent-chat" controller, loaded lazily) from
+  the two <template>s below, which are studio/agent_chat/_turn: the look lives
+  here, in ERB, and the script only fills it. ONE PAGE HOLDS ONE CHAT.
+%>
+<% souls = Studio.agent_chat_soul_list %>
+<% raise ArgumentError, "studio/agent_chat/chat: soul #{soul.inspect} is not in Studio.agent_chat_souls (#{souls.inspect})" unless souls.include?(soul.to_s) %>
+<section class="studio-agent-chat w-full max-w-3xl mx-auto px-4 pt-4 sm:pt-8 flex flex-col gap-6 min-w-0"
+         data-studio-controller="agent-chat" data-test="agent-chat"
+         data-agent-chat-soul="<%= soul %>" data-agent-chat-name="<%= name %>"
+         data-agent-chat-messages-url="<%= studio_agent_chat_messages_path %>"
+         data-agent-chat-turns-url="<%= studio_agent_chat_turns_path %>">
+  <%= render "studio/agent_chat/header", name: name, portrait: portrait, role: role %>
+  <% if cards.present? %>
+    <div class="flex flex-col gap-3 min-w-0" data-agent-chat-cards data-test="agent-chat-cards"><%= cards %></div>
+  <% end %>
+  <div class="flex flex-col gap-3 min-w-0">
+    <div role="log" aria-live="polite" aria-label="Conversation with <%= name %>"
+         class="flex flex-col gap-4 px-1 py-2 overflow-y-auto overscroll-contain max-h-[60vh] min-w-0"
+         data-agent-chat-log data-test="agent-chat-messages">
+      <p class="hidden only:block text-center text-secondary text-sm py-6" data-test="agent-chat-empty"><%= empty.presence || "Say hello to #{name}." %></p>
+    </div>
+    <div class="px-1" data-agent-chat-typing hidden data-test="agent-chat-typing-slot">
+      <%= render "studio/agent_chat/typing", name: name, portrait: portrait %>
+    </div>
+    <div class="rounded-2xl border border-subtle bg-inset px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+         role="alert" data-agent-chat-offline hidden data-test="agent-chat-offline">
+      <p class="text-sm text-body min-w-0">Can't reach <%= name %> right now. Your messages are safe; try again in a moment.</p>
+      <button type="button" class="btn btn-secondary btn-sm shrink-0" data-agent-chat-retry data-test="agent-chat-retry">Try again</button>
+    </div>
+    <%= render "studio/agent_chat/form", soul: soul, name: name %>
+  </div>
+  <template data-agent-chat-template="user"><%= render "studio/agent_chat/turn", turn: { "role" => "user" }, name: name %></template>
+  <template data-agent-chat-template="agent"><%= render "studio/agent_chat/turn", turn: { "role" => "agent" }, name: name %></template>
+</section>

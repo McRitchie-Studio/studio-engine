@@ -1,0 +1,23 @@
+<%# locals: (soul:, name:) %>
+<%# The chat's composer (studio/agent_chat/_chat), as the hub's agent_chats/_form: the text over a round send button at its bottom right, sticky at the window's bottom. Enter sends; Shift+Enter is a new line (studio/agent_chat). It posts to POST /agent_chat/messages with the page's authenticity token (form_with adds it; the script sends it as X-CSRF-Token). A send that fails keeps the words in the box and says why above them. %>
+<%= form_with url: studio_agent_chat_messages_path, method: :post, local: true,
+              html: { style: "view-transition-name: agent-composer;" },
+              class: "sticky bottom-3 z-10 rounded-3xl border border-subtle bg-surface shadow-lg focus-within:border-primary transition-colors p-2 flex flex-col gap-2",
+              data: { agent_chat_form: true, turbo: false, test: "agent-chat-form" } do |f| %>
+  <%= hidden_field_tag :soul, soul, id: nil %>
+  <p class="px-3 pt-1 text-xs text-danger-ink" role="alert" data-agent-chat-error hidden data-test="agent-chat-error"></p>
+  <p class="sr-only" role="status" aria-live="polite" data-agent-chat-status data-test="agent-chat-status"></p>
+  <div class="relative">
+    <%= label_tag :studio_agent_chat_text, "Message #{name}", class: "sr-only" %>
+    <%= text_area_tag :text, nil, id: "studio_agent_chat_text", rows: 2, maxlength: Studio::AgentChat::MAX_TEXT_LENGTH, required: true,
+                      placeholder: "Message #{name}…", autocomplete: "off",
+                      class: "block w-full min-w-0 resize-none bg-transparent pl-3 pr-14 py-2 text-base text-heading placeholder:text-muted focus:outline-none",
+                      data: { agent_chat_input: true, test: "agent-chat-input" } %>
+    <button type="submit" class="absolute bottom-1 right-1 inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white disabled:opacity-40"
+            aria-label="Send to <%= name %>" data-agent-chat-send data-test="agent-chat-send">
+      <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 19V5M5 12l7-7 7 7"/>
+      </svg>
+    </button>
+  </div>
+<% end %>
