@@ -140,7 +140,11 @@
               slot, as its own control (data-nav-name-trigger) of the avatar's
               kind. It is the one that gives way: it may shrink and truncate,
               the icons may not. %>
-          <% name_classes = "group min-w-0 flex-shrink rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40" %>
+          <%# Below md, unless Studio.navbar_phone_name, the name is not shown,
+              so its control is not rendered there at all (hidden, never a
+              0x0 tab stop announcing the name a second time): the avatar,
+              labelled with the name, is the account below md. %>
+          <% name_classes = "group min-w-0 flex-shrink rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40#{" hidden md:block" unless phone_name}" %>
           <% if account_sidebar %>
             <% name_js = studio_navbar_account_sidebar_expressions(account_sidebar) %>
             <%= tag.button type: "button", class: "#{name_classes} cursor-pointer",
@@ -305,7 +309,7 @@
     <% elsif studio_nav_destination %>
       <%= link_to account_inner, studio_nav_destination, class: account_classes, "data-nav-account": "", "aria-label": account_label, "x-bind:style": "$store.devMode && 'background: lightgreen'" %>
     <% else %>
-      <span class="<%= account_classes %>" data-nav-account<%= %( aria-label="#{h(account_label)}").html_safe if account_label %> x-bind:style="$store.devMode && 'background: lightgreen'"><%= account_inner %></span>
+      <span class="<%= account_classes %>" data-nav-account x-bind:style="$store.devMode && 'background: lightgreen'"><%= account_inner %></span>
     <% end %>
     <%# Studio.navbar_avatar_badge: one partial over the avatar's upper-left
         corner, the way a notification dot rides a profile picture. Its seat

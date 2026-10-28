@@ -14,7 +14,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   the avatar's kind (`[data-nav-name-trigger]`: the host sidebar button, the link
   sidebar button, the account link or plain text) and opens what the avatar
   opens; the account group in `engine.css` lights gear, name and avatar from it
-  too. `false`, the default, renders byte-identical to before. The scroll
+  too. Below `md` the name control is `hidden` (no invisible tab stop) unless
+  `Studio.navbar_phone_name` shows the name there. `false`, the default, renders byte-identical to before. The scroll
   timeline's name scale and `studio/nav_collapse`'s name width now skip the
   avatar's `aria-hidden` box, so neither mistakes it for the name. The partial
   reads it through `studio_navbar_name_in_rows?`, memoized per render like the

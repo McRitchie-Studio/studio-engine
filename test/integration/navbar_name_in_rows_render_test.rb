@@ -103,6 +103,22 @@ class NavbarNameInRowsRenderTest < ActiveSupport::TestCase
     assert_equal account["href"], name["href"]
   end
 
+  # Carl and Shannon's review: below md the name box is screen-reader text, so
+  # a rendered name control there was a 0x0 tab stop that announced the name a
+  # second time (the avatar already carries it as its label).
+  test "below md the name control is display none unless the phone name is on" do
+    Studio.navbar_name_in_rows = true
+    Studio.navbar_account_sidebar = GEAR
+    Studio.navbar_phone_name = false
+    classes = doc.at_css("[data-nav-name-trigger]")["class"].split
+    assert_includes classes, "hidden"
+    assert_includes classes, "md:block"
+
+    Studio.navbar_phone_name = true
+    classes = doc.at_css("[data-nav-name-trigger]")["class"].split
+    refute_includes classes, "hidden", "the phone name shows below md, so its control does too"
+  end
+
   test "the phone name setting still shapes the name's box in the rows" do
     Studio.navbar_name_in_rows = true
     Studio.navbar_phone_name = true
