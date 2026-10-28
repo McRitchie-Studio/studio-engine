@@ -17,6 +17,9 @@ const { blockOffsiteRequests, watchPageErrors } = require("./helpers");
 //     specs fail waiting for data-agent-chat-ready.
 //   - clear `input.value` before the POST in `submit`: the second spec fails at
 //     the kept draft.
+//   - key turns by `turn.id` alone (turnKey in studio/agent_chat): the first spec
+//     fails at the answer, which lands in the visitor's own bubble because it
+//     shares their row id, so no agent turn ever appears.
 
 const PAGE = "/agent_chat_lab";
 
@@ -41,6 +44,13 @@ test("a message sent with Enter is answered by polling, through thinking and typ
   const reply = page.locator('[data-role="agent"] [data-agent-chat-text]');
   await expect(reply).toHaveText("You said: Build me a booking app", { timeout: 15000 });
   await expect(typing).toBeHidden();
+  // The hub answers one row as two turns sharing its id: the answer must sit
+  // BELOW the visitor's words, never replace them.
+  const turns = page.locator('[data-test="agent-chat-messages"] [data-agent-chat-turn]');
+  await expect(turns).toHaveCount(2);
+  await expect(turns.nth(0)).toHaveAttribute("data-role", "user");
+  await expect(turns.nth(0)).toContainText("Build me a booking app");
+  await expect(turns.nth(1)).toHaveAttribute("data-role", "agent");
   await expect(page.locator('[data-test="agent-chat-empty"]')).toBeHidden();
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

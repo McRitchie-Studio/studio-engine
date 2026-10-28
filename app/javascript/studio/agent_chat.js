@@ -36,23 +36,32 @@ export function settled(turn) {
   return !UNSETTLED.has(String(turn && turn.status))
 }
 
-// Merge `incoming` turns into `turns` (both oldest first): a known id is
+// A turn's identity is its id AND its role: the hub answers one message row as
+// two turns with the row's id, the visitor's words ("user") and, once answered,
+// the agent's ("agent"). Keyed by id alone, the answer would replace the words.
+export function turnKey(turn) {
+  return `${turn.id}:${turn.role === "agent" ? "agent" : "user"}`
+}
+
+// Merge `incoming` turns into `turns` (both oldest first): a known (id, role) is
 // replaced in place, a new one appended. Returns a new array.
 export function mergeTurns(turns, incoming) {
   const merged = turns.slice()
-  const index = new Map(merged.map((turn, i) => [String(turn.id), i]))
+  const index = new Map(merged.map((turn, i) => [turnKey(turn), i]))
   for (const turn of incoming || []) {
     if (!turn || turn.id == null) continue
-    const id = String(turn.id)
-    if (index.has(id)) merged[index.get(id)] = turn
-    else { index.set(id, merged.length); merged.push(turn) }
+    const key = turnKey(turn)
+    if (index.has(key)) merged[index.get(key)] = turn
+    else { index.set(key, merged.length); merged.push(turn) }
   }
   return merged
 }
 
 // The `after` a poll sends: the id of the last turn before the first one still
 // unsettled (so that one is asked about again), or of the last turn when all
-// are settled. null asks for the latest turns.
+// are settled. null asks for the latest turns. `after` is a hub ROW id (rows
+// with id > after): an unsettled row's user turn is itself unsettled, so the
+// cursor lands on an earlier row and the pending row is asked about again.
 export function afterCursor(turns) {
   const first = turns.findIndex((turn) => !settled(turn))
   if (first === -1) return turns.length ? String(turns[turns.length - 1].id) : null
@@ -130,13 +139,14 @@ export function mountAgentChat(root, {
   function render() {
     const follow = state.following
     for (const turn of state.turns) {
-      const id = String(turn.id)
-      let node = Array.from(log.querySelectorAll("[data-turn-id]")).find((el) => el.dataset.turnId === id)
+      const key = turnKey(turn)
+      let node = Array.from(log.querySelectorAll("[data-turn-key]")).find((el) => el.dataset.turnKey === key)
       if (!node) {
         const template = root.querySelector(`template[data-agent-chat-template="${turn.role === "agent" ? "agent" : "user"}"]`)
         if (!template) continue
         node = template.content.firstElementChild.cloneNode(true)
-        node.dataset.turnId = id
+        node.dataset.turnId = String(turn.id)
+        node.dataset.turnKey = key
         log.appendChild(node)
       }
       node.dataset.status = turn.status || ""

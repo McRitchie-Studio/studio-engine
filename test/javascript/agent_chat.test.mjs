@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/agent_chat.js", import.meta.url), "utf8")
 const {
-  settled, mergeTurns, afterCursor, pollDelay, typingPhase, isFollowing, csrfToken, turnsUrl,
+  settled, mergeTurns, turnKey, afterCursor, pollDelay, typingPhase, isFollowing, csrfToken, turnsUrl,
   POLL_MS, SLOW_MS, SLOW_AFTER_MS, IDLE_MS, OFFLINE_MS, LIMIT
 } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
@@ -39,6 +39,18 @@ test("mergeTurns matches ids as strings and drops turns with no id", () => {
   assert.equal(merged[0].status, "failed")
 })
 
+test("mergeTurns keeps a user turn and an agent turn that share a hub row id (turns are keyed by id and role)", () => {
+  // The hub answers one agent_messages row as TWO turns with the row's id: the
+  // visitor's words and, once answered, the agent's.
+  const asked = [turn(9, "pending", "user")]
+  const answered = [turn(9, "answered", "user"), { ...turn(9, "answered", "agent"), text: "reply" }]
+  const merged = mergeTurns(asked, answered)
+  assert.deepEqual(merged.map((t) => [t.id, t.role, t.status]), [[9, "user", "answered"], [9, "agent", "answered"]])
+  assert.equal(merged[0].text, "t9", "the visitor's own words survive the answer")
+  assert.equal(turnKey(merged[0]), "9:user")
+  assert.equal(turnKey(merged[1]), "9:agent")
+})
+
 test("mergeTurns does not mutate its input", () => {
   const turns = [turn(1)]
   mergeTurns(turns, [turn(2)])
@@ -53,6 +65,11 @@ test("afterCursor: null for an empty thread, the last id when all are settled", 
 test("afterCursor asks again about the first unsettled turn", () => {
   assert.equal(afterCursor([turn(1), turn(2), turn(3, "pending"), turn(4, "typing")]), "2")
   assert.equal(afterCursor([turn(1, "pending")]), null, "the first turn unsettled: the latest turns")
+})
+
+test("afterCursor with the hub's shared row ids: an answered row's two turns, then a pending row", () => {
+  const turns = [turn(5, "answered", "user"), turn(5, "answered", "agent"), turn(6, "pending", "user")]
+  assert.equal(afterCursor(turns), "5", "rows after 5: the pending row 6 is asked about again")
 })
 
 test("pollDelay: fast while waiting, slow after a long wait, idle when nothing waits, slow when offline", () => {

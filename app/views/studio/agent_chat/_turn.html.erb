@@ -1,9 +1,10 @@
 <%# locals: (turn:, name:) %>
-<%# One turn of the chat (studio/agent_chat/_chat), from a hub turn {id, role, text, status}. The page renders it twice, blank, as the <template>s studio/agent_chat clones; a host may also render real turns with it. The visitor's words sit in a right-hand bubble; the agent's are plain text across the thread (as the hub's agent-reply), its name kept for a screen reader. Text only, never HTML: the script sets textContent. A failed turn says so. %>
+<%# One turn of the chat (studio/agent_chat/_chat), from a hub turn {id, role, text, status}, identified by its id AND role (data-turn-key "<id>:<role>"): the hub answers one message row as a user turn and an agent turn sharing the row's id. The page renders it twice, blank, as the <template>s studio/agent_chat clones; a host may also render real turns with it. The visitor's words sit in a right-hand bubble; the agent's are plain text across the thread (as the hub's agent-reply), its name kept for a screen reader. Text only, never HTML: the script sets textContent. A failed turn says so. %>
 <% agent = turn["role"].to_s == "agent" %>
 <% status = turn["status"].to_s %>
 <div class="flex flex-col gap-2 min-w-0" data-agent-chat-turn data-role="<%= agent ? "agent" : "user" %>"
-     data-status="<%= status %>" data-turn-id="<%= turn["id"] %>" data-test="agent-chat-turn">
+     data-status="<%= status %>" data-turn-id="<%= turn["id"] %>"
+     data-turn-key="<%= "#{turn["id"]}:#{agent ? "agent" : "user"}" if turn["id"].present? %>" data-test="agent-chat-turn">
   <% if agent %>
     <div class="self-stretch min-w-0" data-test="agent-chat-reply">
       <p class="sr-only"><%= name %>:</p>

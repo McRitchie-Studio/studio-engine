@@ -32,46 +32,49 @@ class AgentChatStubHub
 
   def url = "http://127.0.0.1:#{port}"
 
-  # A hub that holds a conversation, for the browser lane (e2e/boot.rb): one
-  # thread per person ({email} or {anon_token}), a message stored "pending", then
-  # "typing" after half of `answer_after` seconds, then answered by an agent turn
-  # quoting it. A message containing "[hub-down]" is answered 503, as a hub that
-  # is down; it is not stored.
+  # A hub that holds a conversation, for the browser lane (e2e/boot.rb), in the
+  # hub's own shape (hub-agent-chat-api, AgentChat::Turns): one thread per person
+  # ({email} or {anon_token}) of message ROWS, each answered as two turns that
+  # SHARE the row's id and status, the visitor's ("user") and, once answered, the
+  # agent's ("agent"). `after` is a row id (rows with id > after). A row is
+  # "pending", "typing" after half of `answer_after` seconds, then "answered"
+  # with "You said: <text>". A message containing "[hub-down]" is answered 503,
+  # as a hub that is down; it is not stored.
   def converse!(answer_after: 1.5)
     threads = Hash.new { |hash, key| hash[key] = [] }
     seq = 0
     lock = Mutex.new
-    unsettled = ->(turns) { turns.any? { |turn| %w[pending typing].include?(turn["status"]) } }
+    turns_of = lambda do |row|
+      user = { "id" => row[:id], "role" => "user", "text" => row[:text], "created_at" => row[:at], "status" => row[:status] }
+      next [user] unless row[:reply]
+
+      [user, { "id" => row[:id], "role" => "agent", "text" => row[:reply], "created_at" => row[:at], "status" => row[:status] }]
+    end
     respond do |request|
       if request.method == "POST"
         body = request.json
         next [503, { "error" => "down" }] if body["text"].to_s.include?("[hub-down]")
 
         key = body["person"].to_a.sort.to_s
-        turn = lock.synchronize do
+        row = lock.synchronize do
           seq += 1
-          { "id" => seq.to_s, "role" => "user", "text" => body["text"], "created_at" => Time.now.utc.iso8601,
-            "status" => "pending" }.tap { |row| threads[key] << row }
+          { id: seq, text: body["text"], at: Time.now.utc.iso8601, status: "pending", reply: nil }.tap { |r| threads[key] << r }
         end
         Thread.new do
           sleep answer_after / 2.0
-          lock.synchronize { turn["status"] = "typing" }
+          lock.synchronize { row[:status] = "typing" }
           sleep answer_after / 2.0
-          lock.synchronize do
-            seq += 1
-            turn["status"] = "answered"
-            threads[key] << { "id" => seq.to_s, "role" => "agent", "text" => "You said: #{turn["text"]}",
-                              "created_at" => Time.now.utc.iso8601, "status" => "answered" }
-          end
+          lock.synchronize { row.merge!(status: "answered", reply: "You said: #{row[:text]}") }
         end
-        [201, { "turn" => turn.dup }]
+        [201, { "turn" => lock.synchronize { turns_of.call(row).first } }]
       else
         key = request.query["person"].to_a.sort.to_s
+        after = request.query["after"].to_s
         lock.synchronize do
-          turns = threads[key]
-          after = request.query["after"]
-          from = after ? (turns.index { |turn| turn["id"] == after } || -1) + 1 : 0
-          [200, { "turns" => turns[from..].map(&:dup), "pending" => unsettled.call(turns) }]
+          rows = threads[key]
+          shown = after.match?(/\A\d+\z/) ? rows.select { |r| r[:id] > after.to_i } : rows
+          [200, { "turns" => shown.flat_map { |r| turns_of.call(r) },
+                  "pending" => rows.any? { |r| %w[pending typing].include?(r[:status]) } }]
         end
       end
     end

@@ -72,6 +72,16 @@ script sends it as `X-CSRF-Token`. Every answer is JSON with `Cache-Control: no-
 | `404 {error}` | a soul off the list, or one the hub has no web chat for |
 | `503 {error, retry: true}` | the hub is down, slow, answered 5xx or garbage, refused the app's credential (401/403), or the app has no token. The visitor sees "Can't reach <name> right now" and **Try again**; the cause is in the log. |
 
+## Turns: keyed by id and role
+
+The hub answers one message row as two turns that share the row's id and
+status: the visitor's words (`role: "user"`) and, once answered, the agent's
+(`role: "agent"`). A turn is therefore identified by **(id, role)**, never by id
+alone: `turnKey` in `studio/agent_chat` is `"<id>:<role>"`, `mergeTurns` keys by
+it, and each turn's element carries it as `data-turn-key` (plus the bare row id
+as `data-turn-id`). Keyed by id alone, the answer would replace the visitor's
+own message. `after` is a row id (rows with id > after).
+
 ## The hub client
 
 `Studio::AgentChat.post_message(soul:, text:, person:, ip:)` and
@@ -93,8 +103,9 @@ machine (a developer's local hub).
   retries every 15 seconds, or at once on **Try again**;
 - polls every 2.5 seconds while an answer is pending, 10 seconds after two
   minutes of waiting, 30 seconds otherwise, and not while the tab is hidden. Each
-  poll sends `after` = the last turn before the first unsettled one, so a pending
-  turn is asked about until it settles;
+  poll sends `after` = the row id of the last turn before the first unsettled one,
+  so a pending row is asked about until it settles (an unsettled row's user turn
+  is itself unsettled, so the cursor lands on an earlier row);
 - Enter sends, Shift+Enter is a new line; the words stay in the box until the
   app answers 201, and a refusal shows its reason above them;
 - keeps the thread at its end while the reader is within 20px of it;
@@ -113,5 +124,7 @@ that imports only `engine.css` sees both of its labels.
   socket (both calls, timeouts, error mapping).
 - `test/integration/agent_chat_proxy_test.rb`: the dummy host's page
   (`/agent_chat_lab`) and the proxy, signed in and signed out.
-- `test/javascript/agent_chat.test.mjs`: the script's merge, cursor, cadence and
-  follow rules.
+- `test/javascript/agent_chat.test.mjs`: the script's merge (a user turn and an
+  agent turn sharing a row id both survive), cursor, cadence and follow rules.
+- `e2e/agent_chat.spec.js`: the chat in a browser against the stand-in hub
+  `e2e/boot.rb` runs (`AgentChatStubHub#converse!`, the hub's shared-id shape).
