@@ -353,6 +353,18 @@ class E2eLabController < ActionController::Base
   # e2e/boot.rb, so the signature styles read real marked layers.
   def loader = render(:loader)
 
+  # The overlay under Turbo, for WHEN it shows and that it always clears: a page
+  # that answers `?ms=` late (capped at 3s, so the route sweep stays quick), a
+  # Turbo link and a data-turbo="false" form to a download with no extension,
+  # and `?max_wait=` for the cap. Same layout as hold_button_events.
+  def loader_visits
+    sleep(params[:ms].to_i.clamp(0, 3000) / 1000.0)
+    render(:loader_visits, layout: "survey_turbo_lab")
+  end
+
+  # A response a browser saves rather than shows, at a URL Turbo would follow.
+  def loader_download = send_data("a,b\n1,2\n", filename: "report.csv", type: "text/csv", disposition: "attachment")
+
   # The button answered through its hold-button:* events, the way a page written
   # against the controller answers it, under Turbo so a spec can leave and come
   # Back.
