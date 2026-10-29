@@ -1,0 +1,67 @@
+<%# The branded loader's lab page (docs/LOADER.md).
+
+    Every style Alex McRitchie picked from the Loader Lab, each on the brand it
+    was picked for, rendered by the engine helpers and nothing else: a 96px
+    loader on the brand's ground, the same loader at 32 and 20px beside text,
+    and the pending state inside a real button (held busy so it shows). A card
+    sets the brand's theme colours the way studio_theme_css_tag would, so the
+    loader's colours come from the theme exactly as in a host.
+
+    The icons and art are the committed fixtures e2e/boot.rb copies to
+    /e2e/loader. The overlay button shows the real page-load overlay through
+    window.StudioLoader. %>
+<%
+  brands = {
+    welding:    { name: "Commercial Welding", icon: "/e2e/loader/welding-icon.svg", primary: "#2D5E8E", accent: "#F08A5A", ground: "#0E1C2B" },
+    studio:     { name: "McRitchie Studio", icon: "/e2e/loader/studio-icon.svg", primary: "#8E82FE", accent: "#C9C2FF", ground: "#1A1535" },
+    industries: { name: "McRitchie Industries", icon: "/e2e/loader/industries-icon.svg", primary: "#9DA3AB", accent: "#C9CED5", ground: "#15171B" }
+  }
+  cards = [
+    { n: "05", title: "Weld bead loop", style: :weld_bead, brand: :welding, art: "/e2e/loader/welding-bead.svg", kind: "signature, opt-in (art)" },
+    { n: "04", title: "Spark orbit", style: :orbit, brand: :welding, kind: "generic" },
+    { n: "08", title: "Sparkle", style: :sparkle, brand: :studio, art: "/e2e/loader/studio-sparkle.svg", kind: "signature, opt-in (art)" },
+    { n: "09", title: "Steel square spin", style: :steel, brand: :industries, kind: "generic" },
+    { n: "01", title: "Breathe", style: :breathe, brand: :studio, kind: "generic, the default" },
+    { n: "03", title: "Liquid fill", style: :liquid, brand: :welding, kind: "generic, takes a percent" }
+  ]
+%>
+<main class="p-6 grid gap-6" data-test="loader-lab">
+  <header class="flex flex-wrap items-center gap-3">
+    <h1 class="text-2xl font-bold text-heading">Branded loader</h1>
+    <button type="button" class="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white" data-test="show-overlay"
+            x-data x-on:click="window.StudioLoader.show('Building your page…'); setTimeout(() => window.StudioLoader.hide(), 2500)">Show page-load overlay</button>
+  </header>
+  <div class="grid gap-5" style="grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));">
+    <% cards.each do |card| %>
+      <% brand = brands[card[:brand]] %>
+      <% opts = { style: card[:style], icon: brand[:icon], art: card[:art] } %>
+      <article class="overflow-hidden rounded-xl border border-subtle bg-surface" data-test="loader-card" data-style="<%= card[:style] %>"
+               style="--color-primary: <%= brand[:primary] %>; --color-accent: <%= brand[:accent] %>; --color-page: <%= brand[:ground] %>;">
+        <div class="grid place-items-center" style="background: <%= brand[:ground] %>; aspect-ratio: 4 / 3;" data-test="loader-stage">
+          <%= studio_loader(**opts, label: "Loading #{brand[:name]}") %>
+        </div>
+        <div class="grid gap-2 px-4 py-3 text-sm text-white" style="background: color-mix(in srgb, <%= brand[:ground] %> 88%, #fff);">
+          <div class="flex items-center gap-2"><%= studio_loader(**opts, size: 32, label: "Loading") %><span>Loading at 32px</span></div>
+          <div class="flex items-center gap-2"><%= studio_loader(**opts, size: 20, label: "Saving") %><span>Saving at 20px</span></div>
+          <div>
+            <button type="button" aria-busy="true" class="inline-flex items-center gap-2 rounded-lg px-4 py-2 font-semibold text-white" style="background: <%= brand[:primary] %>;">
+              <%= studio_loader_pending(icon: brand[:icon]) %><span>Saving…</span>
+            </button>
+          </div>
+        </div>
+        <div class="px-4 py-3">
+          <p class="text-xs text-muted"><%= card[:n] %> · <%= brand[:name] %> · <%= card[:kind] %></p>
+          <h2 class="text-lg font-bold text-heading"><%= card[:title] %></h2>
+        </div>
+      </article>
+    <% end %>
+  </div>
+  <section class="grid gap-2 rounded-xl border border-subtle bg-surface p-4" x-data style="--color-primary: #4BAF50;">
+    <h2 class="text-lg font-bold text-heading">Liquid fill with a percent</h2>
+    <div class="flex items-center gap-4">
+      <div x-ref="pct" data-test="loader-percent"><%= studio_loader(style: :liquid, icon: brands[:welding][:icon], percent: 40, size: 72, label: "Uploading") %></div>
+      <input type="range" min="0" max="100" value="40" aria-label="Percent" x-on:input="window.StudioLoader.setPercent($refs.pct, $event.target.value)">
+    </div>
+  </section>
+  <%= studio_loader_overlay(label: "Loading", delay: 0, style: :sparkle, icon: brands[:studio][:icon], art: "/e2e/loader/studio-sparkle.svg") %>
+</main>

@@ -28,6 +28,10 @@
     .hold-stack/.fizz-bit the carbonation behind it           (ported, TM)
     .email-reject         email field rejection shake + fade  (extracted, TM)
 
+  Loader:
+    .studio-loader        the app's icon as a branded loader   (Loader Lab picks)
+    .studio-loader-overlay  the page-load overlay around it    (docs/LOADER.md)
+
   Leveling:
     .level-badge(-1..-10) progressive level pill ladder       (ported, TM)
     .level-up-pop         level-up pop + glow burst           (ported, TM)
@@ -2377,7 +2381,8 @@ body.modal-open { overflow: visible; }
 
   /* 08 Sparkle: the icon's own sparkles flare in turn, in the art's order. */
   .studio-loader-sparkle {
-    fill: color-mix(in srgb, var(--studio-loader-color) 22%, #fff);
+    fill: color-mix(in srgb, var(--studio-loader-color) 15%, #fff);
+    filter: drop-shadow(0 0 2px color-mix(in srgb, var(--studio-loader-color) 60%, #fff));
     transform-box: fill-box;
     transform-origin: center;
     opacity: 0;
@@ -2477,7 +2482,7 @@ body.modal-open { overflow: visible; }
 
   @keyframes studio-loader-twinkle {
     0% { transform: scale(0.8); opacity: 0; }
-    9% { transform: scale(1.45) rotate(25deg); opacity: 1; animation-timing-function: ease-in; }
+    9% { transform: scale(1.7) rotate(25deg); opacity: 1; animation-timing-function: ease-in; }
     26%, 100% { transform: scale(0.8); opacity: 0; }
   }
 }

@@ -347,6 +347,12 @@ class E2eLabController < ActionController::Base
   # from engine-motion.css: neither is observable from the response bytes.
   def hold_button = render(:hold_button)
 
+  # The branded loader (docs/LOADER.md): every style on the brand it was picked
+  # for, at overlay, inline and button sizes, plus the overlay itself. The icons
+  # and art are test/fixtures/files/loader, copied to public/e2e/loader by
+  # e2e/boot.rb, so the signature styles read real marked layers.
+  def loader = render(:loader)
+
   # The button answered through its hold-button:* events, the way a page written
   # against the controller answers it, under Turbo so a spec can leave and come
   # Back.

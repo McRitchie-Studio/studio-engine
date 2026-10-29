@@ -242,6 +242,7 @@ components:
 | Pinned stack (`--pin-*`, `--nav-h`, `--nav-bottom`) | `studio/pinned_stack` | the boot | none needed in CSS; a script reads `window.studioPinnedStack.bottom()`, never the root, and re-places on `studio:pinned-stack-refresh` and `studio:pinned-stack-published` (the sticky table header does) |
 | Theme and dev mode | `studio/alpine_stores` | its own module tag, and the boot | `$store.theme`, `$store.devMode` |
 | Nav spinner, success confetti | `studio/head_chrome` | the boot | `showNavSpinner`, `hideNavSpinner`, `fireSuccessConfetti` |
+| Branded loader: page-load overlay, pending buttons (docs/LOADER.md) | `studio/loader` | the boot | `window.StudioLoader.show`, `.hide`, `.setPercent` |
 | Modal host, scoped host | `studio/modal_host` | `modal-host`, its own module tag | `$store.modals`, each scoped `$store.<name>`, `window.ModalAnimations`, `window.StudioModals` |
 | Toast queue (`layouts/studio/_flash`) | `studio/toast` | `toast`, its own module tag | none needed: the API is the `toast` window event; the queue is `$store.toasts` |
 | Link sidebar flag | `studio/link_sidebar` | `link-sidebar`, its own module tag | `$store.sidebars.linkTreeOpen` |

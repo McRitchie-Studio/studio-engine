@@ -168,6 +168,17 @@ FileUtils.mkdir_p(IMG_DIR)
   FileUtils.cp(source, File.join(IMG_DIR, target_name)) if File.exist?(source)
 end
 
+# ---- The branded loader's icons and art ----------------------------------------
+#
+# /lab/loader draws each style on a real brand icon, and the signature styles
+# inline the marked layers of a real art file, which the helper reads from
+# public/ exactly as a host's would. Copied from the committed fixtures.
+LOADER_SOURCE = File.join(ROOT, "test", "fixtures", "files", "loader")
+LOADER_DIR = File.join(PUBLIC_DIR, "loader")
+FileUtils.mkdir_p(LOADER_DIR)
+FileUtils.cp(Dir.glob(File.join(LOADER_SOURCE, "*.svg")), LOADER_DIR)
+abort "e2e/boot: loader art not copied to #{LOADER_DIR}" unless File.size?(File.join(LOADER_DIR, "studio-sparkle.svg")).to_i.positive?
+
 # ---- The geo grid's flag art -------------------------------------------------
 #
 # The geo lab page renders 52 subdivision squares, each with its flag. The dummy
