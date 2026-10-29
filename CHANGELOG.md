@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.118.0 — 2026-10-28
+
 ### Added
 
 - **The type scale: five text roles every app draws from.** `type-title` (6x),
