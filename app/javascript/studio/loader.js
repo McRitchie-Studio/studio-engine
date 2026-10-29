@@ -13,11 +13,11 @@
 //                 submitting form aria-busy itself; for a form Turbo does not
 //                 drive, the submitter is marked here, and cleared on pagehide
 //                 and on pageshow (a bfcache restore).
-//   the cap       an automatic show and a marked button clear themselves after
-//                 data-max-wait ms (MAX_WAIT_MS by default): a response that
+//   the cap       a submit Turbo does not drive clears its overlay and button
+//                 after data-max-wait ms (MAX_WAIT_MS by default): a response that
 //                 turned into a download replaces no page, so nothing else
-//                 would. A Turbo visit whose response is not HTML clears at
-//                 once, on turbo:reload.
+//                 would. A Turbo visit is never capped; a non-HTML response
+//                 clears at once, on turbo:reload.
 //   the API       window.StudioLoader.show(caption) / hide() for any other long
 //                 wait, and setPercent(el, n) for a loader drawn with percent:.
 //
@@ -130,15 +130,14 @@ function armCap(doc) {
   }, maxWait(findOverlay(doc)))
 }
 
-// Show after the overlay's delay, so a fast load never flashes it; settle after
-// the cap, so a wait that never ends in a page never sticks.
+// Show after the overlay's delay, so a fast load never flashes it. Uncapped: a
+// slow Turbo visit keeps its overlay until the page arrives.
 export function showSoon(caption, doc) {
   doc = doc || document
   var overlay = findOverlay(doc)
   if (!overlay || !overlay.hidden) return
   clearTimeout(pendingTimer)
   pendingTimer = setTimeout(function () { show(caption, doc); autoShown = true }, overlayDelay(overlay))
-  armCap(doc)
 }
 
 export function markBusy(button, doc) {
@@ -202,7 +201,7 @@ export function installStudioLoader(doc) {
     if (win && win.Turbo && form.getAttribute('data-turbo') !== 'false') return
     var button = pendingSubmitter(event)
     if (button) markBusy(button, doc)
-    if (form.hasAttribute('data-studio-loader-overlay')) showSoon(form.getAttribute('data-studio-loader-overlay') || '', doc)
+    if (form.hasAttribute('data-studio-loader-overlay')) { showSoon(form.getAttribute('data-studio-loader-overlay') || '', doc); armCap(doc) }
   })
 
   if (doc.defaultView && !doc.defaultView.StudioLoader) {

@@ -167,3 +167,11 @@ test("two shows inside the announce gap keep the Loading label", async () => {
   assert.equal(label.textContent, "Loading", "the second show restored the emptied text")
   settle(doc)
 })
+
+test("a Turbo visit is never capped: a slow page keeps its overlay", async () => {
+  const overlay = fakeOverlay("5"); overlay.setAttribute("data-max-wait", "30")
+  showSoon("", fakeDoc(overlay))
+  await sleep(70)
+  assert.equal(overlay.hidden, false, "the cap hid a page that was still loading")
+  settle(fakeDoc(overlay))
+})
