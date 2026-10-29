@@ -1,0 +1,52 @@
+<%# The "Sign in with Google" button, for every engine page that offers Google
+    (sessions/new, registrations/new, studio/profiles/_google_section).
+
+    Locals:
+      label          — REQUIRED. The button's words ("Sign in with Google").
+      button_class   — optional. Default "btn btn-google btn-lg w-full gap-3".
+      email_fallback — optional, default true. The modal's "Use email instead",
+                       which closes it and focuses the page's email field. The
+                       profile page, where the person is already signed in,
+                       passes false and gets "Not now".
+
+    TWO STATES, by Studio::GoogleSignIn.button_posts?:
+
+      READY — the app has its OAuth client (or registered its own provider, or
+      OmniAuth is in test mode). A POST form to /auth/google_oauth2, Turbo off:
+      OmniAuth's middleware owns that path, and the request phase is POST-only
+      and CSRF-checked.
+
+      NOT YET — no client yet. The same button, opening a modal on a page-scoped
+      host (store googleSetupModals) that says Google sign-in is still being set
+      up, offers "Request Google setup" (POST /_studio/google_setup_request,
+      which mails the team once per host per day) and a way back to email.
+
+    The x-data on the wrapper is load-bearing: studio/modals/_scoped_host
+    declares no Alpine scope of its own, and without one above it the modal
+    registers, opens, and renders nothing (see studio/profiles/show). One button
+    per page; two would mount two hosts on one store. %>
+<%
+  google_label = local_assigns.fetch(:label)
+  google_button_class = local_assigns.fetch(:button_class, "btn btn-google btn-lg w-full gap-3")
+  google_email_fallback = local_assigns.fetch(:email_fallback, true)
+%>
+<% if Studio::GoogleSignIn.button_posts? %>
+  <%= button_to Studio::GoogleSignIn::REQUEST_PATH, method: :post, data: { turbo: false, google_sign_in: "ready" },
+        class: google_button_class do %>
+    <%= render "components/google_logo" %>
+    <%= google_label %>
+  <% end %>
+<% else %>
+  <div x-data data-google-sign-in="setup">
+    <button type="button" class="<%= google_button_class %>" aria-haspopup="dialog"
+            @click="$store.googleSetupModals.open('google-setup')">
+      <%= render "components/google_logo" %>
+      <%= google_label %>
+    </button>
+    <%= render "studio/modals/scoped_host", store: "googleSetupModals" do %>
+      <template x-if="$store.googleSetupModals.current()?.id === 'google-setup'">
+        <%= render "studio/google_sign_in/setup_modal", email_fallback: google_email_fallback %>
+      </template>
+    <% end %>
+  </div>
+<% end %>

@@ -47,6 +47,7 @@ require "studio/auth_labels"
 require "studio/profile_sections"
 require "studio/profile_image"
 require "studio/oauth_identity"
+require "studio/google_sign_in"
 require "studio/newsletter"
 require "studio/health_report"
 require "studio/agent_chat"
@@ -185,6 +186,19 @@ module Studio
   #   config.auth_methods = %i[magic_link google wallet]
   #   config.features     = %i[web3]
   mattr_accessor :auth_methods, default: %i[magic_link google]
+
+  # ---- Google sign-in, ready out of the box (Studio::GoogleSignIn) ----------
+  # :google in auth_methods draws the button; the engine registers the strategy
+  # and a default User.from_omniauth. What is left is the OAuth client, and
+  # google_ready? says whether the app has one: GOOGLE_CLIENT_ID and
+  # GOOGLE_CLIENT_SECRET both set. While it is false the button opens a modal
+  # whose "Request Google setup" mails google_setup_request_to, once per host
+  # per day, with the redirect URI to register. docs/GOOGLE_AUTH_SETUP.md.
+  def self.google_ready?(env: ENV)
+    GoogleSignIn.ready?(env: env)
+  end
+
+  mattr_accessor :google_setup_request_to, default: "team@mcritchie.studio"
 
   # ---- Capability features --------------------------------------------------
   # Coarse app-level capability switches an app opts into. Distinct from
@@ -1757,6 +1771,15 @@ module Studio
       post "signup", to: "registrations#create"
       get  "auth/:provider/callback", to: "omniauth_callbacks#create"
       get  "auth/failure", to: "omniauth_callbacks#failure"
+
+      # "Request Google setup", the button in the Google modal an app shows
+      # while its OAuth client is unset (Studio::GoogleSignIn). Mails the team
+      # once per host per day; unauthenticated, since the person asking cannot
+      # sign in yet. Drawn whenever the Google button can be.
+      if Studio.auth_method?(:google)
+        post "_studio/google_setup_request", to: "studio/google_setup_requests#create",
+             as: :studio_google_setup_request
+      end
 
       # The daily health report as JSON, for the hub's central 07:00 pull
       # (Studio::HealthReportsController). Drawn in EVERY environment, production

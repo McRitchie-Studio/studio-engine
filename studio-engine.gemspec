@@ -63,6 +63,14 @@ Gem::Specification.new do |spec|
   # allows accepts redis 6. test/lib/gemspec_redis_bound_test.rb pins it.
   spec.add_dependency "redis", ">= 4.0.1", "< 6"
   spec.add_dependency "turbo-rails", ">= 1.0"
+  # Google sign-in ships ready (Studio::GoogleSignIn). Every app draws the
+  # "Sign in with Google" button, so every app carries the strategy: the engine
+  # registers google_oauth2 itself unless the host's own initializer already did.
+  # Bounds match the consumers' locks (omniauth 2.1, google-oauth2 1.2,
+  # rails_csrf_protection 1.0 and 2.0).
+  spec.add_dependency "omniauth", ">= 2.1", "< 3"
+  spec.add_dependency "omniauth-google-oauth2", ">= 1.1", "< 2"
+  spec.add_dependency "omniauth-rails_csrf_protection", ">= 1.0", "< 3"
   # IP -> location for Studio::Geo. A dependency rather than a host concern
   # because the point of the geo primitive is that EVERY app has the capacity:
   # an app that has to add a gem before it can place a visitor does not.

@@ -1,0 +1,16 @@
+Someone asked for Google sign-in on <%= @app_name %> (<%= @host %>).
+
+The app already draws the "Sign in with Google" button; it opens a setup notice
+until the OAuth client is in place. Two steps finish it:
+
+1. Add this redirect URI to the shared production OAuth client
+   (Google Cloud project <%= @oauth_project %>, admin@ Chrome profile; Steffon's lane):
+
+   <%= @redirect_uri %>
+
+2. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the app, then restart it.
+
+Once both are set, the button posts straight to Google. This request is sent at
+most once per host per day.
+
+Guide: studio-engine docs/GOOGLE_AUTH_SETUP.md

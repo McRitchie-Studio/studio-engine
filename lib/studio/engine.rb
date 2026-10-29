@@ -11,6 +11,15 @@ require_relative "component_gallery"
 # the order this file saw; out of order, the gallery is not mounted.
 Studio::ComponentGallery.lookbook_loaded_before_engine = defined?(::Lookbook::Engine) ? true : false
 require "view_component"
+# Google sign-in ships ready (Studio::GoogleSignIn): the strategy, and the CSRF
+# check on its POST-only request phase. Required here because Bundler.require
+# loads only the gems a host's Gemfile names, and a new app names none of these.
+# The CSRF gem registers a Railtie, so it has to load before the app initializes,
+# which a require at engine load does. Idempotent beside a host's own require.
+require "omniauth"
+require "omniauth-google-oauth2"
+require "omniauth/rails_csrf_protection"
+require_relative "google_sign_in"
 
 module Studio
   class Engine < ::Rails::Engine
@@ -272,6 +281,23 @@ module Studio
             .select { |path| path.start_with?("#{root_path}/") && File.directory?(path) }
             .reject { |path| FOOTER_ONLY_EAGER_ROOTS.include?(path.delete_prefix("#{root_path}/")) }
             .sort
+    end
+
+    # GOOGLE SIGN-IN, the engine's registration (Studio::GoogleSignIn). The
+    # middleware is added to every host and decides per request whether it is
+    # the google_oauth2 strategy or a pass-through: a host whose own
+    # config/initializers/omniauth.rb registers google_oauth2 keeps its own, and
+    # the engine never registers a second. It cannot decide here, because the
+    # host's initializers have not run yet. `use` appends, and this runs before
+    # the host's initializers, so the engine's middleware sits outside the
+    # host's OmniAuth::Builder and hands the request on to it.
+    #
+    # The request phase is POST-only (omniauth-rails_csrf_protection checks the
+    # token), set here for the app that has no omniauth initializer; a host that
+    # sets it itself runs later and wins.
+    initializer "studio.google_sign_in" do |app|
+      app.config.middleware.use Studio::GoogleSignIn::Middleware
+      OmniAuth.config.allowed_request_methods = [:post]
     end
 
     initializer "studio.footer_only_eager_load" do

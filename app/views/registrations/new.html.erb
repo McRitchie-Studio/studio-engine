@@ -87,11 +87,9 @@
           </div>
         <% end %>
 
-        <%= button_to "/auth/google_oauth2", method: :post, data: { turbo: false },
-          class: "btn btn-google btn-lg w-full gap-3" do %>
-          <%= render "components/google_logo" %>
-          Sign up with Google
-        <% end %>
+        <%# A POST to the strategy once the app has its OAuth client, the setup
+            modal until then (studio/google_sign_in/_button). %>
+        <%= render "studio/google_sign_in/button", label: "Sign up with Google" %>
       <% end %>
 
       <p class="text-center text-secondary text-sm mt-6">

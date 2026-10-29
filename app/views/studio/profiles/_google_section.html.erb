@@ -48,9 +48,9 @@
     <% end %>
   </div>
 <% else %>
-  <%= button_to "/auth/google_oauth2", method: :post, data: { turbo: false },
-                class: "btn btn-google gap-3 w-full" do %>
-    <%= render "components/google_logo" %>
-    Link Google Account
-  <% end %>
+  <%# A POST to OmniAuth once the app has its OAuth client, the setup modal
+      until then (studio/google_sign_in/_button). Already signed in, so the
+      modal offers "Not now" rather than a way back to email. %>
+  <%= render "studio/google_sign_in/button", label: "Link Google Account",
+             button_class: "btn btn-google gap-3 w-full", email_fallback: false %>
 <% end %>
