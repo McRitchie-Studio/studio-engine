@@ -2401,7 +2401,7 @@ body.modal-open { overflow: visible; }
   .studio-loader-overlay {
     position: fixed;
     inset: 0;
-    z-index: 9990;
+    z-index: var(--z-alert);
     display: grid;
     place-items: center;
     background: color-mix(in srgb, var(--color-page) 78%, transparent);
