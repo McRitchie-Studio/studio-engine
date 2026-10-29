@@ -68,10 +68,24 @@ marked layer falls back to Breathe rather than blanking the loader.
 ```
 
 - **Page loads.** `studio_loader_overlay` renders hidden. `studio/loader`
-  shows it when a Turbo visit outlasts its `delay:` (350ms) and hides it when
-  the page arrives, so a fast load never flashes it. A form marked
+  shows it when a visit the user started (a Turbo `advance` or `restore`)
+  outlasts its `delay:` (350ms) and hides it when the page arrives, so a fast
+  load never flashes it. A `replace` visit never shows it: that is a background
+  refresh, such as a poll's `Turbo.visit(url, { action: "replace" })` or Turbo
+  8's page refresh; frames and prefetches fire no visit at all. A form marked
   `data-studio-loader-overlay="Caption"` shows it while it submits.
   `window.StudioLoader.show("Caption")` / `.hide()` cover any other long wait.
+- **Always clears.** A Turbo visit whose response is not HTML (a download at a
+  URL with no extension) clears at once, on `turbo:reload`. Leaving the page
+  (`pagehide`) and a back/forward-cache restore (`pageshow`) clear the overlay
+  and every busy button. An automatic show and a busy button clear themselves
+  after `max_wait:` (15000ms), because a `data-turbo="false"` form whose
+  response is a download replaces no page; raise it for a form that
+  legitimately waits longer. The cap never hides an overlay `StudioLoader.show`
+  opened.
+- **Announced.** The overlay's `role="status"` label ("Loading") is a live
+  region, re-said each time the overlay shows. The overlay is never
+  `aria-busy`, which would mute it.
 - **Pending buttons.** Put `studio_loader_pending` inside the button (a small
   Breathe in the button's text colour) and mark what it replaces
   `data-loader-idle`. It shows while the button or its form is
@@ -93,4 +107,7 @@ animation, and the halo, orbit spark, bead and sparkle flares are not drawn.
 ## Lab
 
 `/lab/loader` in the dummy app (`e2e/loader.spec.js`) shows every style on its
-brand from `test/fixtures/files/loader`.
+brand from `test/fixtures/files/loader`. `/lab/loader_visits` puts the overlay
+under Turbo (`e2e/loader_visits.spec.js`, `e2e/loader_bfcache.spec.js`): a slow
+page, a background replace visit, `data-turbo="false"` forms and a download
+with no extension.

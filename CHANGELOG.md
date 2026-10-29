@@ -17,6 +17,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   an art file of marked layers. Declared with `config.loader`. Reduced motion
   shows a still icon. Nothing renders until an app calls a helper. docs/LOADER.md.
 
+### Fixed
+
+- **The page-load overlay shows only for visits the user started, and always
+  clears.** A Turbo `replace` visit (a poll's background refresh, Turbo 8's page
+  refresh) no longer shows it; only `advance` and `restore` visits do. A Turbo
+  link to a download with no extension clears it on `turbo:reload`; `pagehide`
+  and a bfcache `pageshow` clear it and every busy button a `data-turbo="false"`
+  form marked; and a new `studio_loader_overlay(max_wait:)` cap (15000ms)
+  clears an automatic show and a busy button whose response was a download. The
+  overlay no longer marks itself `aria-busy`, so its "Loading" status is
+  announced. docs/LOADER.md.
+
 ## 0.118.0 — 2026-10-28
 
 ### Added
