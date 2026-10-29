@@ -192,7 +192,7 @@ module Studio
   # and a default User.from_omniauth. What is left is the OAuth client, and
   # google_ready? says whether the app has one: GOOGLE_CLIENT_ID and
   # GOOGLE_CLIENT_SECRET both set. While it is false the button opens a modal
-  # whose "Request Google setup" mails google_setup_request_to, once per host
+  # whose "Request Google setup" mails google_setup_request_to, once per app
   # per day, with the redirect URI to register. docs/GOOGLE_AUTH_SETUP.md.
   def self.google_ready?(env: ENV)
     GoogleSignIn.ready?(env: env)
@@ -1781,7 +1781,8 @@ module Studio
 
       # "Request Google setup", the button in the Google modal an app shows
       # while its OAuth client is unset (Studio::GoogleSignIn). Mails the team
-      # once per host per day; unauthenticated, since the person asking cannot
+      # once per app per day, and answers 404 once the
+      # button posts; unauthenticated, since the person asking cannot
       # sign in yet. Drawn whenever the Google button can be.
       if Studio.auth_method?(:google)
         post "_studio/google_setup_request", to: "studio/google_setup_requests#create",

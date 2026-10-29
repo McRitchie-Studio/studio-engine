@@ -4,6 +4,7 @@ require "test_helper"
 require "omniauth"
 require "omniauth-google-oauth2"
 require "active_support/cache"
+require "ipaddr"
 
 # [unit] Studio::GoogleSignIn: is the app's OAuth client configured, does a
 # host's own middleware already register Google, and the once-a-day claim behind
@@ -118,6 +119,87 @@ class GoogleSignInTest < Minitest::Test
     assert_equal :none, Studio::GoogleSignIn.registration(env: {})
   end
 
+  # --- the canonical host: configuration, never the request ------------------
+
+  def test_canonical_host_prefers_the_configured_setting
+    assert_equal "voicebox.mcritchie.studio",
+                 Studio::GoogleSignIn.canonical_host(env: { "APP_HOST" => "other.example" },
+                                                     configured: "https://Voicebox.McRitchie.Studio/", hosts: ["third.example"])
+  end
+
+  def test_canonical_host_falls_back_to_app_host
+    assert_equal "app.mcritchie.studio",
+                 Studio::GoogleSignIn.canonical_host(env: { "APP_HOST" => "app.mcritchie.studio" }, configured: nil, hosts: ["third.example"])
+  end
+
+  def test_canonical_host_then_takes_the_first_plain_hostname_in_config_hosts
+    hosts = [IPAddr.new("10.0.0.0/8"), /.*\.herokuapp\.com/, ".mcritchie.studio", "localhost:3000", "Cyvasse.xyz", "www.cyvasse.xyz"]
+
+    assert_equal "cyvasse.xyz", Studio::GoogleSignIn.canonical_host(env: {}, configured: nil, hosts: hosts),
+                 "no IPAddr, no Regexp, no leading dot, no port"
+  end
+
+  def test_with_nothing_configured_there_is_no_canonical_host
+    assert_nil Studio::GoogleSignIn.canonical_host(env: {}, configured: nil, hosts: [])
+    assert_nil Studio::GoogleSignIn.canonical_host(env: { "APP_HOST" => "  " }, configured: "", hosts: [".example.com"])
+  end
+
+  def test_the_redirect_uri_is_https_in_production
+    env = { "APP_HOST" => "voicebox.mcritchie.studio" }
+
+    assert_equal "https://voicebox.mcritchie.studio/auth/google_oauth2/callback",
+                 Studio::GoogleSignIn.canonical_redirect_uri(env: env, production: true)
+    assert_equal "http://voicebox.mcritchie.studio/auth/google_oauth2/callback",
+                 Studio::GoogleSignIn.canonical_redirect_uri(env: env, production: false)
+    assert_nil Studio::GoogleSignIn.canonical_redirect_uri(env: {}, production: true)
+  end
+
+  def test_full_host_is_pinned_only_in_production_and_only_from_an_explicit_host
+    env = { "APP_HOST" => "voicebox.mcritchie.studio" }
+
+    assert_equal "https://voicebox.mcritchie.studio", Studio::GoogleSignIn.pinned_full_host(env: env, production: true)
+    assert_nil Studio::GoogleSignIn.pinned_full_host(env: env, production: false), "a desk keeps its own port"
+    assert_nil Studio::GoogleSignIn.pinned_full_host(env: {}, production: true)
+  end
+
+  def test_allowed_hosts_mirror_config_hosts
+    allowed = Studio::GoogleSignIn.allowed_hosts_from(["Cyvasse.xyz", "localhost:3000", ".mcritchie.studio", /qa\.example/])
+
+    assert_includes allowed, "cyvasse.xyz"
+    assert_includes allowed, "localhost", "OmniAuth compares bare hosts, so the port is dropped"
+    pattern = allowed.find { |entry| entry.is_a?(Regexp) && entry.source.include?("mcritchie") }
+    assert_match(/\A(?:#{pattern})\z/, "voicebox.mcritchie.studio")
+    assert_match(/\A(?:#{pattern})\z/, "mcritchie.studio")
+    refute_match(/\A(?:#{pattern})\z/, "evilmcritchie.studio")
+  end
+
+  def test_allowed_hosts_stay_unset_when_config_hosts_admits_everything_or_nothing
+    assert_nil Studio::GoogleSignIn.allowed_hosts_from([])
+    assert_nil Studio::GoogleSignIn.allowed_hosts_from([IPAddr.new("0.0.0.0/0"), "localhost"])
+  end
+
+  def test_seeding_never_overrides_the_apps_own_omniauth_host_config
+    OmniAuth.config.allowed_hosts = nil
+    OmniAuth.config.full_host = "https://hub.example"
+    Studio::GoogleSignIn.seed_allowed_hosts!(hosts: ["cyvasse.xyz"])
+    assert_nil OmniAuth.config.allowed_hosts
+
+    OmniAuth.config.full_host = nil
+    Studio::GoogleSignIn.seed_allowed_hosts!(hosts: ["cyvasse.xyz"])
+    assert_equal ["cyvasse.xyz"], OmniAuth.config.allowed_hosts
+  ensure
+    OmniAuth.config.full_host = nil
+    OmniAuth.config.allowed_hosts = nil
+  end
+
+  def test_the_daily_key_is_the_app_not_a_host
+    prior = Studio.app_name
+    Studio.app_name = "Voice Box!"
+    assert_equal "voice-box", Studio::GoogleSignIn.app_key
+  ensure
+    Studio.app_name = prior
+  end
+
   # --- the once-a-day claim ---------------------------------------------------
 
   def test_the_first_request_of_the_day_claims_it_and_the_rest_do_not
@@ -126,16 +208,16 @@ class GoogleSignInTest < Minitest::Test
 
     assert Studio::GoogleSignIn.claim_daily_request("voicebox.example", store: store, today: today)
     refute Studio::GoogleSignIn.claim_daily_request("voicebox.example", store: store, today: today)
-    refute Studio::GoogleSignIn.claim_daily_request("VOICEBOX.example", store: store, today: today), "hosts compare case-insensitively"
+    refute Studio::GoogleSignIn.claim_daily_request("VOICEBOX.example", store: store, today: today), "app keys compare case-insensitively"
   end
 
-  def test_the_claim_is_per_host_and_per_day
+  def test_the_claim_is_per_app_and_per_day
     store = ActiveSupport::Cache::MemoryStore.new
     today = Date.new(2026, 10, 29)
 
-    assert Studio::GoogleSignIn.claim_daily_request("voicebox.example", store: store, today: today)
-    assert Studio::GoogleSignIn.claim_daily_request("qa.voicebox.example", store: store, today: today)
-    assert Studio::GoogleSignIn.claim_daily_request("voicebox.example", store: store, today: today + 1)
+    assert Studio::GoogleSignIn.claim_daily_request("voicebox", store: store, today: today)
+    assert Studio::GoogleSignIn.claim_daily_request("cyvasse", store: store, today: today)
+    assert Studio::GoogleSignIn.claim_daily_request("voicebox", store: store, today: today + 1)
   end
 
   # A store that ignores unless_exist (as some do) must still rate-limit.

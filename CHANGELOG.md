@@ -31,8 +31,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `GOOGLE_CLIENT_SECRET` are set; until then the Google button on `/login`,
   `/signup` and `/profile` opens a modal whose "Request Google setup"
   (`POST /_studio/google_setup_request`) mails `Studio.google_setup_request_to`
-  (team@mcritchie.studio) once per host per day with the redirect URI to
-  register. The remaining manual step: add
+  (team@mcritchie.studio) once per app per day with the redirect URI to
+  register, built from the app's configured canonical host
+  (`Studio.google_canonical_host`, else `APP_HOST`, else the first plain
+  `config.hosts` entry), never from the request; it answers 404 once the
+  button posts. Where the engine owns the strategy it pins OmniAuth's callback
+  host (`full_host` in production from an explicit host, else
+  `allowed_hosts` from `config.hosts`). The remaining manual step: add
   `https://<host>/auth/google_oauth2/callback` to the shared OAuth client and
   set the two env vars. docs/GOOGLE_AUTH_SETUP.md.
 

@@ -49,14 +49,41 @@ are both set.
   rather than sending the person to a Google error page.
 
 **Request Google setup** posts to `POST /_studio/google_setup_request`
-(`Studio::GoogleSetupRequestsController`). It writes a `[google-setup]` log line
-on every request, and at most once per host per day it mails
+(`Studio::GoogleSetupRequestsController`, CSRF-checked). It answers 404 when the
+app's button already posts (client configured, its own provider, or OmniAuth
+test mode): there is nothing to request. Otherwise it writes a `[google-setup]`
+log line on every request, and at most once per app per day it mails
 `Studio.google_setup_request_to` (default `team@mcritchie.studio`) through the
 app's own mailer (`Studio::GoogleSetupMailer`, sent from `Studio.mailer_from`).
-The email carries the app name, the host and the exact redirect URI to register.
-The daily claim is a `Rails.cache` key (`studio/google_setup_request/<host>/<date>`);
-an app whose cache is a `NullStore` falls back to an in-process store, so it
-still gets one email per dyno per day.
+The email carries the app name, its canonical host and the exact redirect URI
+to register.
+
+**Nothing in it comes from the request's host.** A Host header, a port or an
+`X-Forwarded-Host` is whatever the sender typed, and the email asks ops to add
+the URI it carries to the shared production OAuth client. So:
+
+- the daily claim is a `Rails.cache` key on the app
+  (`studio/google_setup_request/<app>/<date>`, from `Studio.app_name`); an app
+  whose cache is a `NullStore` falls back to an in-process store, so it still
+  gets one email per dyno per day;
+- the redirect URI comes from the app's **canonical host**, chosen in order:
+  `Studio.google_canonical_host`, then `ENV["APP_HOST"]`, then the first
+  `config.hosts` entry that is a plain hostname (no port, no leading dot, not a
+  pattern or IP range). It is `https` in production. With none configured the
+  email says so and names no host: set `APP_HOST` (or
+  `Studio.google_canonical_host`) and the next day's request names it.
+
+### OmniAuth's callback host
+
+When the engine owns the strategy it also keeps OmniAuth from building the
+`redirect_uri` from a forged host (and silences OmniAuth 2.3's warning about
+it). In production, with an explicit canonical host (`Studio.google_canonical_host`
+or `APP_HOST`), the strategy's `full_host` is pinned to `https://<that host>`.
+Otherwise, unless the app set `OmniAuth.config.full_host` or `allowed_hosts`
+itself, `OmniAuth.config.allowed_hosts` is seeded from `config.hosts` (ports
+dropped, `.example.com` as its subdomain pattern). It is left unset when
+`config.hosts` is empty or admits every host. The request phase is POST-only by
+OmniAuth 2's own default; the engine does not restate it.
 
 ## The manual step: give the app an OAuth client
 
@@ -108,8 +135,8 @@ three Gemfile lines and its `from_omniauth` to take the engine's, but it does no
 have to. Keep the initializer if it does more than register the provider (the
 hub pins the callback host with `CanonicalHost.pin_omniauth!`).
 
-`OmniAuth.config.allowed_request_methods = [:post]` is set by the engine; a host
-that sets it too runs later and wins.
+`OmniAuth.config.allowed_request_methods` is OmniAuth 2's default `[:post]`;
+the engine leaves it alone, and a host that sets it keeps its value.
 
 ## Current apps
 

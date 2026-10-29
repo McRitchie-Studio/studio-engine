@@ -95,7 +95,7 @@ class User < ApplicationRecord
 end
 
 class GoogleSignInShipsReadyTest < ActionDispatch::IntegrationTest
-  GOOGLE_KEYS = %w[GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET].freeze
+  GOOGLE_KEYS = %w[GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET APP_HOST].freeze
 
   def setup
     @prior_auth = Studio.auth_methods
@@ -106,6 +106,9 @@ class GoogleSignInShipsReadyTest < ActionDispatch::IntegrationTest
     OmniAuth.config.test_mode = false
     OmniAuth.config.mock_auth[:google_oauth2] = nil
     Studio::GoogleSignIn.reset!
+    @prior_canonical = Studio.google_canonical_host
+    Studio.google_canonical_host = nil
+    ENV.delete("APP_HOST")
     User.delete_all
   end
 
@@ -114,6 +117,8 @@ class GoogleSignInShipsReadyTest < ActionDispatch::IntegrationTest
     @prior_env.each { |key, value| value.nil? ? ENV.delete(key) : ENV[key] = value }
     OmniAuth.config.test_mode = false
     OmniAuth.config.mock_auth[:google_oauth2] = nil
+    Studio.google_canonical_host = @prior_canonical
+    ApplicationController.allow_forgery_protection = false
   end
 
   # --- with an OAuth client -------------------------------------------------
@@ -155,6 +160,7 @@ class GoogleSignInShipsReadyTest < ActionDispatch::IntegrationTest
     assert_equal "http://www.example.com/auth/google_oauth2/callback", query["redirect_uri"]
   end
 
+  # OmniAuth 2's own default; the engine no longer restates it.
   test "the request phase is POST-only" do
     configure_google
 
@@ -177,6 +183,25 @@ class GoogleSignInShipsReadyTest < ActionDispatch::IntegrationTest
     assert_equal "new.person@example.com", user.email
     assert_equal "google_oauth2", user.provider
     assert_equal user.id, session[Studio.session_key]
+  end
+
+  test "a callback that fails is written to ErrorLog before the redirect" do
+    configure_google
+    mock_google(email: "boom@example.com", uid: "g-boom", name: "Boom")
+    original = Studio::OmniauthUser.method(:resolve)
+    Studio::OmniauthUser.define_singleton_method(:resolve) { |*_args, **_opts| raise "lab: find-or-create blew up" }
+
+    begin
+      assert_difference -> { ErrorLog.count }, 1 do
+        post "/auth/google_oauth2"
+        follow_redirect!
+      end
+    ensure
+      Studio::OmniauthUser.define_singleton_method(:resolve, original)
+    end
+
+    assert_redirected_to "/login"
+    assert_equal "lab: find-or-create blew up", ErrorLog.last.message
   end
 
   # --- without one ------------------------------------------------------------
@@ -214,11 +239,11 @@ class GoogleSignInShipsReadyTest < ActionDispatch::IntegrationTest
     assert_raises(ActionController::RoutingError) { post "/auth/google_oauth2" }
   end
 
-  test "Request Google setup mails the team once, with the redirect URI, and logs every request" do
+  test "Request Google setup mails the team once, with the configured redirect URI, and logs every request" do
+    ENV["APP_HOST"] = "voicebox.mcritchie.studio"
     log = StringIO.new
     prior_logger = Rails.logger
     Rails.logger = ActiveSupport::Logger.new(log)
-    https!
 
     begin
       post "/_studio/google_setup_request"
@@ -228,16 +253,19 @@ class GoogleSignInShipsReadyTest < ActionDispatch::IntegrationTest
       mail = ActionMailer::Base.deliveries.last
       assert_equal ["team@mcritchie.studio"], mail.to
       assert_includes mail.subject, Studio.app_name
-      assert_includes mail.subject, "www.example.com"
-      body = mail.text_part ? mail.text_part.body.to_s : mail.body.to_s
-      assert_includes body, "https://www.example.com/auth/google_oauth2/callback"
+      assert_includes mail.subject, "voicebox.mcritchie.studio"
+      body = mail_text(mail)
+      # http here because the dummy is not production; production is https
+      # (google_sign_in_test.rb, canonical_redirect_uri).
+      assert_includes body, "http://voicebox.mcritchie.studio/auth/google_oauth2/callback"
+      refute_includes body, "www.example.com", "the request's own host never reaches the email"
       assert_includes body, "GOOGLE_CLIENT_ID"
       assert_includes flash[:notice], "asked the team"
 
       # The second request the same day is answered, and mails nobody.
       post "/_studio/google_setup_request"
       assert_redirected_to "/login"
-      assert_equal 1, ActionMailer::Base.deliveries.size, "rate-limited: once per host per day"
+      assert_equal 1, ActionMailer::Base.deliveries.size, "rate-limited: once per app per day"
       assert_includes flash[:notice], "already has a request"
     ensure
       Rails.logger = prior_logger
@@ -247,7 +275,82 @@ class GoogleSignInShipsReadyTest < ActionDispatch::IntegrationTest
     assert_equal 2, lines.size, "every request is logged, the repeat included"
     assert_includes lines.first, "notified=true"
     assert_includes lines.last, "notified=false"
-    assert_includes lines.first, "redirect_uri=https://www.example.com/auth/google_oauth2/callback"
+    assert_includes lines.first, "redirect_uri=http://voicebox.mcritchie.studio/auth/google_oauth2/callback"
+  end
+
+  # THE BLOCKER (Carl and Steffon, 2026-10-29). The claim and the mailed URI
+  # were both built from request.host_with_port, so every new port or
+  # X-Forwarded-Host minted a fresh day, and the email asked ops to register
+  # whatever host the attacker typed.
+  test "a forged port never mints another email or reaches the email" do
+    ENV["APP_HOST"] = "voicebox.mcritchie.studio"
+
+    %w[4441 4442 4443].each do |port|
+      post "/_studio/google_setup_request", headers: { "HOST" => "www.example.com:#{port}" }
+    end
+
+    assert_equal 1, ActionMailer::Base.deliveries.size, "three ports, one email"
+    body = mail_text(ActionMailer::Base.deliveries.last)
+    %w[4441 4442 4443].each { |port| refute_includes body, port }
+    assert_includes body, "voicebox.mcritchie.studio/auth/google_oauth2/callback"
+  end
+
+  test "a forged X-Forwarded-Host never mints another email or reaches the email" do
+    ENV["APP_HOST"] = "voicebox.mcritchie.studio"
+
+    %w[evil-1.example evil-2.example evil-3.example].each do |forged|
+      post "/_studio/google_setup_request", headers: { "X-Forwarded-Host" => forged }
+    end
+
+    assert_equal 1, ActionMailer::Base.deliveries.size
+    mail = ActionMailer::Base.deliveries.last
+    refute_includes mail_text(mail), "evil", "a forged host is never put in front of ops"
+    refute_includes mail.subject, "evil"
+  end
+
+  test "with no canonical host configured the email says so and names no host" do
+    post "/_studio/google_setup_request", headers: { "X-Forwarded-Host" => "evil.example" }
+
+    assert_equal 1, ActionMailer::Base.deliveries.size
+    body = mail_text(ActionMailer::Base.deliveries.last)
+    assert_includes body, "names no canonical host"
+    refute_includes body, "evil"
+    refute_includes body, "www.example.com"
+  end
+
+  # The hub, turf-monster and moms-app already post to Google: there is nothing
+  # to request, so the endpoint does not exist for them.
+  test "an app whose button already posts answers 404 and mails nobody" do
+    configure_google
+
+    post "/_studio/google_setup_request"
+
+    assert_response :not_found
+    assert_empty ActionMailer::Base.deliveries
+  end
+
+  test "an app in OmniAuth test mode, whose button posts, answers 404 too" do
+    OmniAuth.config.test_mode = true
+
+    post "/_studio/google_setup_request"
+
+    assert_response :not_found
+    assert_empty ActionMailer::Base.deliveries
+  end
+
+  test "the setup request is CSRF-checked: no token is refused, the page's token is accepted" do
+    ApplicationController.allow_forgery_protection = true
+
+    assert_raises(ActionController::InvalidAuthenticityToken) { post "/_studio/google_setup_request" }
+    assert_empty ActionMailer::Base.deliveries
+
+    get "/login"
+    token = page.at_css("form[action='/_studio/google_setup_request'] input[name=authenticity_token]")
+    refute_nil token, "the modal's form carries the page's CSRF token"
+    post "/_studio/google_setup_request", params: { authenticity_token: token["value"] }
+
+    assert_redirected_to "/login"
+    assert_equal 1, ActionMailer::Base.deliveries.size
   end
 
   test "the setup request answers JSON for a fetch" do
@@ -261,6 +364,10 @@ class GoogleSignInShipsReadyTest < ActionDispatch::IntegrationTest
 
   def page
     Nokogiri::HTML5(response.body)
+  end
+
+  def mail_text(mail)
+    mail.text_part ? mail.text_part.body.to_s : mail.body.to_s
   end
 
   def configure_google(client_id: "lab-client-id")

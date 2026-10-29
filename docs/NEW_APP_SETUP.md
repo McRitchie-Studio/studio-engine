@@ -615,7 +615,9 @@ it added an email-only admin.
 
 The Google button works the moment the app has an OAuth client. Until then it
 opens the setup modal, and "Request Google setup" mails team@mcritchie.studio the
-exact redirect URI. To finish:
+exact redirect URI, built from the app's canonical host: set `APP_HOST` (or
+`Studio.google_canonical_host`) to the production hostname so the email can name
+it. To finish:
 
 1. Register `https://<host>/auth/google_oauth2/callback` (and
    `http://localhost:{PORT}/auth/google_oauth2/callback` for a local desk) on the

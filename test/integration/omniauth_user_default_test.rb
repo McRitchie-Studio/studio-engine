@@ -160,6 +160,38 @@ class OmniauthUserDefaultTest < ActiveSupport::TestCase
     assert_match(/UNIQUE|unique/i, ErrorLog.last.message)
   end
 
+  # A RACE: the address was free when step 2 looked and taken by the insert.
+  # Simulated by making step 2's lookup miss once. The rescue may hand back the
+  # row holding the address only when Google verified it, the same rule step 2
+  # applies; otherwise an unverified address would take over someone's account.
+  def with_first_email_lookup_missing
+    original = Studio::OmniauthUser.method(:find_by_email)
+    calls = 0
+    Studio::OmniauthUser.define_singleton_method(:find_by_email) do |model, email|
+      calls += 1
+      calls == 1 ? nil : original.call(model, email)
+    end
+    yield
+  ensure
+    # The stub REPLACED the method on the same singleton class, so it is put
+    # back rather than removed (removing would delete the original too).
+    Studio::OmniauthUser.define_singleton_method(:find_by_email, original)
+  end
+
+  test "a raced insert returns the address's row only for a verified address" do
+    member = User.create!(email: "mia@example.com", name: "Mia")
+
+    with_first_email_lookup_missing do
+      assert_nil from_omniauth(auth(uid: "g-race", email: "mia@example.com", name: "Other"), email_verified: false),
+                 "an unverified address must not be handed someone else's row"
+    end
+    assert_nil member.reload.uid
+
+    with_first_email_lookup_missing do
+      assert_equal member, from_omniauth(auth(uid: "g-race", email: "mia@example.com", name: "Other"), email_verified: true)
+    end
+  end
+
   test "a missing uid signs nobody in" do
     assert_nil from_omniauth(OmniAuth::AuthHash.new(provider: "google_oauth2", uid: nil, info: { email: "x@example.com" }))
   end
