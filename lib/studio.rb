@@ -200,6 +200,13 @@ module Studio
 
   mattr_accessor :google_setup_request_to, default: "team@mcritchie.studio"
 
+  # The host Google's callback lives on, e.g. "voicebox.mcritchie.studio". It
+  # names the redirect URI the setup-request email asks ops to register, and in
+  # production it pins OmniAuth's callback host. nil, the default, falls back to
+  # ENV["APP_HOST"], then the first plain hostname in config.hosts
+  # (Studio::GoogleSignIn.canonical_host). Never read from the request.
+  mattr_accessor :google_canonical_host, default: nil
+
   # ---- Capability features --------------------------------------------------
   # Coarse app-level capability switches an app opts into. Distinct from
   # auth_methods (which sign-in methods the login views render) — these gate

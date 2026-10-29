@@ -66,7 +66,7 @@ module Studio
         end
 
         attributes = { provider: provider, uid: uid, email: email, name: read(auth, "info", "name") }
-        create_with_free_slug(model, attributes)
+        create_with_free_slug(model, attributes, email_verified: email_verified)
       end
 
       def normalize_email(value)
@@ -82,7 +82,7 @@ module Studio
 
       private
 
-      def create_with_free_slug(model, attributes)
+      def create_with_free_slug(model, attributes, email_verified: false)
         assignable = attributes.select { |key, value| !value.nil? && column?(model, key.to_s) }
         last_error = nil
 
@@ -95,8 +95,11 @@ module Studio
           rescue ActiveRecord::RecordNotUnique => e
             last_error = e
             # A concurrent sign-in made the row first: that row is the answer.
-            found = (assignable[:email] && find_by_email(model, assignable[:email])) ||
-                    model.find_by(provider: assignable[:provider], uid: assignable[:uid])
+            # The Google id always identifies it; the address only when Google
+            # verified it, the same rule as step 2 above. An unverified address
+            # that collides with someone else's row hands that row to nobody.
+            found = model.find_by(provider: assignable[:provider], uid: assignable[:uid])
+            found ||= find_by_email(model, assignable[:email]) if email_verified && assignable[:email]
             return found if found
           end
         end

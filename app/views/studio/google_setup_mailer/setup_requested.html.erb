@@ -1,14 +1,18 @@
 <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; line-height: 1.5; color: #1f2937; max-width: 560px;">
-  <p>Someone asked for Google sign-in on <strong><%= @app_name %></strong> (<%= @host %>).</p>
+  <p>Someone asked for Google sign-in on <strong><%= @app_name %></strong><%= " (#{@host})" if @host %>.</p>
   <p>The app already draws the "Sign in with Google" button; it opens a setup notice until the OAuth client is in place. Two steps finish it:</p>
   <ol>
     <li>
       Add this redirect URI to the shared production OAuth client
       (Google Cloud project <code><%= @oauth_project %></code>, admin@ Chrome profile; Steffon's lane):
-      <p><code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;"><%= @redirect_uri %></code></p>
+      <% if @redirect_uri %>
+        <p><code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;"><%= @redirect_uri %></code></p>
+      <% else %>
+        <p>None yet: the app names no canonical host. Set <code>APP_HOST</code>, or <code>Studio.google_canonical_host</code>, to its production hostname; the URI is then <code>https://&lt;that host&gt;/auth/google_oauth2/callback</code>.</p>
+      <% end %>
     </li>
     <li>Set <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> on the app, then restart it.</li>
   </ol>
-  <p>Once both are set, the button posts straight to Google. This request is sent at most once per host per day.</p>
+  <p>Once both are set, the button posts straight to Google. This request is sent at most once per app per day. The URI above comes from the app's configuration, never from the request that asked.</p>
   <p style="color: #6b7280; font-size: 13px;">Guide: studio-engine docs/GOOGLE_AUTH_SETUP.md</p>
 </div>

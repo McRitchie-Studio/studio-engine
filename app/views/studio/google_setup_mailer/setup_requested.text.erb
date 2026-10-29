@@ -1,4 +1,4 @@
-Someone asked for Google sign-in on <%= @app_name %> (<%= @host %>).
+Someone asked for Google sign-in on <%= @app_name %><%= " (#{@host})" if @host %>.
 
 The app already draws the "Sign in with Google" button; it opens a setup notice
 until the OAuth client is in place. Two steps finish it:
@@ -6,11 +6,18 @@ until the OAuth client is in place. Two steps finish it:
 1. Add this redirect URI to the shared production OAuth client
    (Google Cloud project <%= @oauth_project %>, admin@ Chrome profile; Steffon's lane):
 
+<% if @redirect_uri -%>
    <%= @redirect_uri %>
+<% else -%>
+   (none yet: the app names no canonical host. Set APP_HOST, or
+   Studio.google_canonical_host, to its production hostname; the URI is then
+   https://<that host>/auth/google_oauth2/callback)
+<% end -%>
 
 2. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on the app, then restart it.
 
 Once both are set, the button posts straight to Google. This request is sent at
-most once per host per day.
+most once per app per day. The URI above comes from the app's configuration,
+never from the request that asked.
 
 Guide: studio-engine docs/GOOGLE_AUTH_SETUP.md

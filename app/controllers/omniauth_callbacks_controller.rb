@@ -34,7 +34,14 @@ class OmniauthCallbacksController < ApplicationController
       set_app_session(user)
       redirect_to root_path, notice: "Signed in with Google!"
     end
-  rescue StandardError
+  rescue StandardError => e
+    # Recorded before the redirect, so a failing sign-in shows up somewhere the
+    # team looks rather than only as a flash the person dismisses.
+    begin
+      ErrorLog.capture!(e) if defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
+    rescue StandardError
+      Rails.logger.warn("[omniauth] could not log the Google sign-in failure: #{e.class}")
+    end
     redirect_to login_path, alert: "Google sign-in failed. Please try again."
   end
 

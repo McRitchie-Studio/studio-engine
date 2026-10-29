@@ -91,10 +91,22 @@ module Studio
 
       private
 
+      # The strategy's callback host is pinned when the app names one (see
+      # GoogleSignIn.pinned_full_host), and otherwise OmniAuth's allowed_hosts
+      # is seeded from config.hosts (GoogleSignIn.seed_allowed_hosts!), so a
+      # forged Host or X-Forwarded-Host never becomes the redirect_uri Google
+      # sees. Either one also settles OmniAuth 2.3's request-host warning.
       def strategy(client_id, client_secret)
         @lock.synchronize do
-          @strategies[[client_id, client_secret]] ||=
-            ::OmniAuth::Strategies::GoogleOauth2.new(@app, client_id, client_secret, scope: SCOPE, prompt: PROMPT)
+          @strategies[[client_id, client_secret]] ||= begin
+            options = { scope: SCOPE, prompt: PROMPT }
+            if (full_host = GoogleSignIn.pinned_full_host)
+              options[:full_host] = full_host
+            else
+              GoogleSignIn.seed_allowed_hosts!
+            end
+            ::OmniAuth::Strategies::GoogleOauth2.new(@app, client_id, client_secret, **options)
+          end
         end
       end
     end
@@ -141,6 +153,93 @@ module Studio
       # The callback a Google OAuth client must list for this host.
       def redirect_uri(host:, scheme: "https")
         "#{scheme}://#{host}#{CALLBACK_PATH}"
+      end
+
+      # ---- The app's canonical host: from configuration, NEVER the request ----
+      #
+      # "Request Google setup" mails ops a redirect URI to add to the shared
+      # production OAuth client, so that URI must not come from a header a
+      # stranger controls (Host, X-Forwarded-Host). In order:
+      #
+      #   1. Studio.google_canonical_host, set in config/initializers/studio.rb
+      #   2. ENV["APP_HOST"], the deployed apps' canonical host (the hub's
+      #      CanonicalHost reads the same variable)
+      #   3. the first config.hosts entry that is a plain hostname: a String of
+      #      letters, digits, dots and hyphens, no port, no leading dot
+      #
+      # nil when none is configured; the email then says so instead of naming
+      # a host.
+      PLAIN_HOSTNAME = /\A[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\z/i
+
+      def canonical_host(env: ENV, configured: configured_canonical_host, hosts: rails_config_hosts)
+        explicit = normalize_host(configured) || normalize_host(env["APP_HOST"])
+        return explicit if explicit
+
+        Array(hosts).find { |entry| entry.is_a?(String) && PLAIN_HOSTNAME.match?(entry) }&.downcase
+      end
+
+      # Scheme and host only, lowercased: "https://App.Example/x" -> "app.example".
+      # A port an operator wrote into APP_HOST is kept; it is configuration.
+      def normalize_host(value)
+        text = value.to_s.strip.sub(%r{\A[a-z][a-z0-9+.-]*://}i, "").split("/").first.to_s.downcase
+        text.empty? ? nil : text
+      end
+
+      def canonical_scheme(production: rails_production?)
+        production ? "https" : "http"
+      end
+
+      # The redirect URI to register, from the canonical host; nil when the app
+      # names none.
+      def canonical_redirect_uri(env: ENV, production: rails_production?)
+        host = canonical_host(env: env)
+        host && redirect_uri(host: host, scheme: canonical_scheme(production: production))
+      end
+
+      # The strategy's full_host: pinned only in production and only from an
+      # EXPLICIT host (Studio.google_canonical_host or APP_HOST). A desk on
+      # localhost:<port> must keep its own port in the callback, and a QA app's
+      # config.hosts may list the production host first.
+      def pinned_full_host(env: ENV, production: rails_production?)
+        return nil unless production
+
+        host = normalize_host(configured_canonical_host) || normalize_host(env["APP_HOST"])
+        host && "https://#{host}"
+      end
+
+      # OmniAuth.config.allowed_hosts mirrored from config.hosts, so OmniAuth
+      # builds callbacks only on hosts the app already accepts. Left alone when
+      # the app set OmniAuth's own host config, when config.hosts is empty, or
+      # when it admits every host anyway (an IPAddr range, as development has).
+      # A leading-dot entry (".example.com") becomes the same subdomain pattern
+      # Rails gives it; ports are dropped, since OmniAuth compares bare hosts.
+      def allowed_hosts_from(hosts)
+        entries = Array(hosts)
+        return nil if entries.empty?
+        return nil if entries.any? { |entry| !entry.is_a?(String) && !entry.is_a?(Regexp) }
+
+        entries.map do |entry|
+          next entry if entry.is_a?(Regexp)
+
+          bare = entry.downcase.sub(/:\d+\z/, "")
+          bare.start_with?(".") ? /(?:[a-z0-9-]+\.)*#{Regexp.escape(bare.delete_prefix("."))}/i : bare
+        end.uniq
+      end
+
+      def seed_allowed_hosts!(hosts: rails_config_hosts)
+        return unless defined?(::OmniAuth)
+        return if ::OmniAuth.config.full_host || ::OmniAuth.config.allowed_hosts
+
+        allowed = allowed_hosts_from(hosts)
+        ::OmniAuth.config.allowed_hosts = allowed if allowed
+      end
+
+      # The once-a-day key: the app, not the request's host, so a forged Host or
+      # port cannot mint a fresh day.
+      def app_key
+        name = defined?(Studio) && Studio.respond_to?(:app_name) ? Studio.app_name.to_s : ""
+        key = name.downcase.gsub(/[^a-z0-9]+/, "-").delete_prefix("-").delete_suffix("-")
+        key.empty? ? "app" : key
       end
 
       # Does a built middleware stack already register google_oauth2? Reads each
@@ -203,14 +302,15 @@ module Studio
         @fallback_store = nil
       end
 
-      # "Request Google setup" is answered once per host per day. Returns true
-      # for the request that claims the day, false for every later one.
+      # "Request Google setup" is answered once per APP per day (key: app_key,
+      # never a request header). Returns true for the request that claims the
+      # day, false for every later one.
       #
       # Checked with exist? before the unless_exist write, because not every
       # cache store honours unless_exist; the two together leave only a race
       # between simultaneous first clicks, which costs one extra email.
-      def claim_daily_request(host, store: request_store, today: current_date)
-        key = "studio/google_setup_request/#{host.to_s.downcase}/#{today.iso8601}"
+      def claim_daily_request(app = app_key, store: request_store, today: current_date)
+        key = "studio/google_setup_request/#{app.to_s.downcase}/#{today.iso8601}"
         return false if store.exist?(key)
 
         store.write(key, today.iso8601, unless_exist: true, expires_in: REQUEST_TTL_SECONDS) ? true : false
@@ -235,6 +335,20 @@ module Studio
       end
 
       private
+
+      def configured_canonical_host
+        defined?(Studio) && Studio.respond_to?(:google_canonical_host) ? Studio.google_canonical_host : nil
+      end
+
+      def rails_config_hosts
+        return [] unless defined?(::Rails) && ::Rails.respond_to?(:application) && ::Rails.application
+
+        Array(::Rails.application.config.hosts)
+      end
+
+      def rails_production?
+        defined?(::Rails) && ::Rails.respond_to?(:env) && ::Rails.env.production? ? true : false
+      end
 
       def rails_middleware_stack
         return nil unless defined?(::Rails) && ::Rails.respond_to?(:application) && ::Rails.application

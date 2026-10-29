@@ -292,12 +292,11 @@ module Studio
     # the host's initializers, so the engine's middleware sits outside the
     # host's OmniAuth::Builder and hands the request on to it.
     #
-    # The request phase is POST-only (omniauth-rails_csrf_protection checks the
-    # token), set here for the app that has no omniauth initializer; a host that
-    # sets it itself runs later and wins.
+    # The request phase is POST-only by OmniAuth 2's own default
+    # (allowed_request_methods [:post]), and omniauth-rails_csrf_protection
+    # checks the token on it; nothing here changes either.
     initializer "studio.google_sign_in" do |app|
       app.config.middleware.use Studio::GoogleSignIn::Middleware
-      OmniAuth.config.allowed_request_methods = [:post]
     end
 
     initializer "studio.footer_only_eager_load" do
