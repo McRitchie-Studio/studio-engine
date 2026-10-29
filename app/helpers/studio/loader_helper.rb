@@ -54,11 +54,14 @@ module Studio
     end
 
     # The full-page overlay: once, in the layout's body. studio/loader shows it
-    # when a Turbo visit or a marked form outlasts `delay` ms, and
-    # window.StudioLoader.show() / hide() drive it for any other long wait.
+    # when a visit the user started (never a background replace) or a marked
+    # form outlasts `delay` ms, and window.StudioLoader.show() / hide() drive it
+    # for any other long wait. A submit Turbo does not drive clears its overlay
+    # and busy button after `max_wait` ms, so a response that became a download
+    # never leaves them up; a Turbo visit is never capped.
     # Any studio_loader option (style:, icon:, art:) passes through.
-    def studio_loader_overlay(label: "Loading", delay: 350, size: 96, **options)
-      render "studio/loader/overlay", label: label, delay: delay.to_i, size: size, options: options
+    def studio_loader_overlay(label: "Loading", delay: 350, max_wait: 15_000, size: 96, **options)
+      render "studio/loader/overlay", label: label, delay: delay.to_i, max_wait: max_wait.to_i, size: size, options: options
     end
 
     def studio_loader_size(size)
