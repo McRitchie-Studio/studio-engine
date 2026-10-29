@@ -459,13 +459,47 @@ class ProfilePageRenderTest < Minitest::Test
       "unlinking removes an identity — it is a DELETE"
   end
 
+  def with_google_env(values)
+    keys = %w[GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET]
+    prior = keys.to_h { |key| [key, ENV[key]] }
+    keys.each { |key| values[key].nil? ? ENV.delete(key) : ENV[key] = values[key] }
+    yield
+  ensure
+    prior.each { |key, value| value.nil? ? ENV.delete(key) : ENV[key] = value }
+  end
+
   def test_the_unlinked_state_offers_the_omniauth_connect_button
-    doc = Nokogiri::HTML5.fragment(google_row(GoogleUser.new(provider: nil, uid: nil)))
+    doc = with_google_env("GOOGLE_CLIENT_ID" => "lab-id", "GOOGLE_CLIENT_SECRET" => "lab-secret") do
+      Nokogiri::HTML5.fragment(google_row(GoogleUser.new(provider: nil, uid: nil)))
+    end
 
     assert_includes doc.text, "Link Google Account"
     # OmniAuth's own path; the engine does not draw it, the middleware owns it.
     assert_equal "/auth/google_oauth2", doc.at_css("form")["action"]
     refute_includes doc.text, "Connected via Google"
+  end
+
+  # No OAuth client yet: the same button opens the setup modal, and the modal
+  # offers "Not now" rather than a way back to email, since the person is signed in.
+  def test_the_unlinked_state_without_a_google_client_opens_the_setup_modal
+    doc = with_google_env({}) do
+      v = view
+      v.define_singleton_method(:profile_unlink_google_path) { "/profile/google" }
+      v.define_singleton_method(:studio_google_setup_request_path) { "/_studio/google_setup_request" }
+      Nokogiri::HTML5.fragment(v.render(partial: "studio/profiles/google_section",
+                                        locals: { user: GoogleUser.new(provider: nil, uid: nil) }))
+    end
+
+    assert_nil doc.at_css("form[action='/auth/google_oauth2']"), "no POST to a strategy with no client"
+    opener = doc.at_css("[data-google-sign-in=setup] button[type=button]")
+    refute_nil opener
+    assert_includes opener.text, "Link Google Account"
+    assert_includes opener["@click"], "googleSetupModals.open('google-setup')"
+    modal = doc.at_css("template")
+    refute_nil modal
+    assert_includes modal.inner_html, "Request Google setup"
+    assert_includes modal.inner_html, "Not now"
+    refute_includes modal.inner_html, "Use email instead"
   end
 
   # THE ORPHAN GUARD, at the UI. An account whose only sign-in is Google must not

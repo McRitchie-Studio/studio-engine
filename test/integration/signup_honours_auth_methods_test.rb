@@ -98,9 +98,15 @@ class SignupHonoursAuthMethodsTest < ActionDispatch::IntegrationTest
     [%i[magic_link google wallet], %i[email reference], "Turf Monster"]
   ].freeze
 
+  # Google configured, so the button is the POST form google_button looks for;
+  # the unconfigured button (the setup modal) is google_sign_in_ships_ready_test.rb's.
+  GOOGLE_ENV = { "GOOGLE_CLIENT_ID" => "lab-client-id", "GOOGLE_CLIENT_SECRET" => "lab-client-secret" }.freeze
+
   def setup
     @prior_auth = Studio.auth_methods
     @prior_params = Studio.registration_params
+    @prior_google_env = GOOGLE_ENV.keys.to_h { |key| [key, ENV[key]] }
+    ENV.update(GOOGLE_ENV)
     Studio::Link.delete_all
     User.delete_all
     ActionMailer::Base.deliveries.clear
@@ -109,6 +115,7 @@ class SignupHonoursAuthMethodsTest < ActionDispatch::IntegrationTest
   def teardown
     Studio.auth_methods = @prior_auth
     Studio.registration_params = @prior_params
+    @prior_google_env.each { |key, value| value.nil? ? ENV.delete(key) : ENV[key] = value }
     User.send(:remove_method, :authenticate) if User.method_defined?(:authenticate, false)
   end
 

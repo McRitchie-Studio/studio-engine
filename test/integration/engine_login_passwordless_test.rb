@@ -16,13 +16,20 @@ require "nokogiri"
 # view always rendered a password field. Assert the PROPERTY — a password field iff passwords are
 # actually available — across permutations, not a spelling.
 class EngineLoginPasswordlessTest < ActiveSupport::TestCase
+  # Google configured, so the button is the POST form these tests look for; the
+  # unconfigured button (the setup modal) is google_sign_in_ships_ready_test.rb's.
+  GOOGLE_ENV = { "GOOGLE_CLIENT_ID" => "lab-client-id", "GOOGLE_CLIENT_SECRET" => "lab-client-secret" }.freeze
+
   def setup
     @orig_auth = Studio.auth_methods
+    @orig_google_env = GOOGLE_ENV.keys.to_h { |key| [key, ENV[key]] }
+    ENV.update(GOOGLE_ENV)
     remove_user_const
   end
 
   def teardown
     Studio.auth_methods = @orig_auth
+    @orig_google_env.each { |key, value| value.nil? ? ENV.delete(key) : ENV[key] = value }
     remove_user_const
   end
 
