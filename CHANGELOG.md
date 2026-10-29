@@ -17,6 +17,25 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   an art file of marked layers. Declared with `config.loader`. Reduced motion
   shows a still icon. Nothing renders until an app calls a helper. docs/LOADER.md.
 
+- **Google sign-in ships ready with every app.** The engine now depends on
+  `omniauth`, `omniauth-google-oauth2` and `omniauth-rails_csrf_protection`,
+  registers the `google_oauth2` strategy itself (POST-only, `email,profile`,
+  `select_account`) and supplies a default `User.from_omniauth`
+  (`Studio::OmniauthUser`), so a new app needs no gem, initializer or User code
+  for Google. A host that registers its own provider keeps it (the engine reads
+  the built middleware stack and stands aside), and a host's own
+  `from_omniauth` wins. The default links a verified address
+  case-insensitively, refuses an unverified match (`:email_not_verified`), and
+  gives a same-name newcomer `user-<id>` instead of failing on the slug index.
+  `Studio.google_ready?` is true when `GOOGLE_CLIENT_ID` and
+  `GOOGLE_CLIENT_SECRET` are set; until then the Google button on `/login`,
+  `/signup` and `/profile` opens a modal whose "Request Google setup"
+  (`POST /_studio/google_setup_request`) mails `Studio.google_setup_request_to`
+  (team@mcritchie.studio) once per host per day with the redirect URI to
+  register. The remaining manual step: add
+  `https://<host>/auth/google_oauth2/callback` to the shared OAuth client and
+  set the two env vars. docs/GOOGLE_AUTH_SETUP.md.
+
 ## 0.118.0 — 2026-10-28
 
 ### Added
