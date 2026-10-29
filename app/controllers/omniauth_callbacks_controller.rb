@@ -6,6 +6,9 @@
 # email_verified + expiry before trusting the identity. Only a Google-confirmed
 # verified email is allowed to find-or-create an account.
 #
+# The strategy itself is registered by the engine (Studio::GoogleSignIn) unless
+# the host registered its own.
+#
 # Engine GENERIC base. turf-monster OVERRIDES this controller for popup-mode,
 # account merge, wallet-collision stashing, and funnel attribution.
 class OmniauthCallbacksController < ApplicationController
@@ -19,7 +22,10 @@ class OmniauthCallbacksController < ApplicationController
       return redirect_to login_path, alert: "Google sign-in could not be verified. Please try again."
     end
 
-    user = User.from_omniauth(auth, email_verified: result.email_verified)
+    # The host's own User.from_omniauth when it defines one, else the engine's
+    # default (Studio::OmniauthUser), so a new app signs people in with Google
+    # before it writes any User code of its own.
+    user = Studio::OmniauthUser.resolve(User, auth, email_verified: result.email_verified)
     unless user.is_a?(User)
       return redirect_to login_path, alert: "Google sign-in couldn't be completed. Please try another method."
     end
@@ -28,7 +34,14 @@ class OmniauthCallbacksController < ApplicationController
       set_app_session(user)
       redirect_to root_path, notice: "Signed in with Google!"
     end
-  rescue StandardError
+  rescue StandardError => e
+    # Recorded before the redirect, so a failing sign-in shows up somewhere the
+    # team looks rather than only as a flash the person dismisses.
+    begin
+      ErrorLog.capture!(e) if defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
+    rescue StandardError
+      Rails.logger.warn("[omniauth] could not log the Google sign-in failure: #{e.class}")
+    end
     redirect_to login_path, alert: "Google sign-in failed. Please try again."
   end
 

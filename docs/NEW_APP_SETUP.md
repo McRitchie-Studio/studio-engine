@@ -45,11 +45,11 @@ gem "tailwindcss-rails", "~> 4.5"
 # Environment variables
 gem "dotenv-rails", groups: [:development, :test]
 
-# Google OAuth
-gem "omniauth"
-gem "omniauth-google-oauth2"
-gem "omniauth-rails_csrf_protection", "~> 1.0"
 ```
+
+No Google gems: `omniauth`, `omniauth-google-oauth2` and
+`omniauth-rails_csrf_protection` come with studio-engine (see
+[GOOGLE_AUTH_SETUP.md](GOOGLE_AUTH_SETUP.md)).
 
 ```bash
 bundle install
@@ -168,22 +168,16 @@ Rails.application.config.session_store :cookie_store,
 
 Use an app-specific cookie key by default. Shared-domain SSO is optional and should be enabled only after the hub/satellite cookie contract is deliberately reviewed.
 
-### `config/initializers/omniauth.rb`
+### No `config/initializers/omniauth.rb`
 
-```ruby
-Rails.application.config.middleware.use OmniAuth::Builder do
-  provider :google_oauth2,
-    ENV["GOOGLE_CLIENT_ID"],
-    ENV["GOOGLE_CLIENT_SECRET"],
-    scope: "email,profile",
-    prompt: "select_account"
-end
-
-OmniAuth.config.allowed_request_methods = [:post]
-```
-
-Keep OmniAuth's request phase POST-only. Custom Google entrypoints should render
-an auto-submitting POST form to `/auth/google_oauth2`, not redirect with GET.
+Google sign-in ships ready. The engine registers the `google_oauth2` strategy
+(POST-only request phase, `scope: "email,profile"`, `prompt: "select_account"`)
+and a default `User.from_omniauth`, and `/login`, `/signup` and `/profile` draw
+the Google button. Until the app has an OAuth client the button opens a modal
+whose "Request Google setup" mails the team the redirect URI to register; see
+§ 13. An app that does write its own `OmniAuth::Builder` initializer keeps it,
+and the engine registers no second provider. Custom Google entrypoints should
+POST to `/auth/google_oauth2`, never redirect with GET.
 
 ## 5. Database Migrations
 
@@ -311,25 +305,10 @@ class User < ApplicationRecord
     role == "admin"
   end
 
-  def self.from_omniauth(auth)
-    user = find_by(provider: auth.provider, uid: auth.uid)
-    return user if user
-
-    user = find_by(email: auth.info.email)
-    if user
-      user.update!(provider: auth.provider, uid: auth.uid)
-      return user
-    end
-
-    create!(
-      email: auth.info.email,
-      name: auth.info.name,
-      provider: auth.provider,
-      uid: auth.uid
-    )
-  rescue ActiveRecord::RecordNotUnique
-    find_by(email: auth.info.email) || find_by(provider: auth.provider, uid: auth.uid)
-  end
+  # No from_omniauth: the engine's default (Studio::OmniauthUser) finds by Google
+  # id, links a verified address case-insensitively, creates otherwise, and gives
+  # a same-name newcomer user-<id> rather than failing on the slug index. Define
+  # `def self.from_omniauth(auth, email_verified: false)` only to change that.
 end
 ```
 
@@ -632,12 +611,19 @@ first row that happens to have no wallet, so a seed adopting rows by wallet will
 adopt a stranger's account and overwrite it. turf-monster hit exactly this when
 it added an email-only admin.
 
-## 13. Google Cloud Console
+## 13. Google OAuth client (the one manual step)
 
-Add redirect URI for your app's port:
-```
-http://localhost:{PORT}/auth/google_oauth2/callback
-```
+The Google button works the moment the app has an OAuth client. Until then it
+opens the setup modal, and "Request Google setup" mails team@mcritchie.studio the
+exact redirect URI, built from the app's canonical host: set `APP_HOST` (or
+`Studio.google_canonical_host`) to the production hostname so the email can name
+it. To finish:
+
+1. Register `https://<host>/auth/google_oauth2/callback` (and
+   `http://localhost:{PORT}/auth/google_oauth2/callback` for a local desk) on the
+   shared production OAuth client, Google Cloud project
+   `enduring-maxim-491202-t6`. Steffon does this from the admin@ Chrome profile.
+2. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` on the app and restart it.
 
 See [GOOGLE_AUTH_SETUP.md](GOOGLE_AUTH_SETUP.md) for full instructions.
 
@@ -871,7 +857,7 @@ bin/rails server -p {PORT}
 - [ ] `/signin` (or the app's chosen auth page) shows logo + enabled auth methods
 - [ ] Legacy `/login` and `/signup` GETs redirect to `/signin`, if using the unified auth pattern
 - [ ] Magic-link sign-in works
-- [ ] Google OAuth works (after adding redirect URI)
+- [ ] The Google button shows on `/login` and `/signup`; it opens the setup modal until the OAuth client is set (§ 13), and signs in after
 - [ ] `/admin/theme` loads (logged in as admin)
 - [ ] `/admin/navbar` loads (admin preview page)
 - [ ] `/error_logs` loads

@@ -1095,7 +1095,13 @@
 # download (Turbo link or plain form) clears the overlay and the button, and the
 # overlay is never aria-busy. Each verified RED by reverting its own fix once.
 #   npx playwright test --list  -> 397 tests in 63 files
-total_specs: 397
+# 397 -> 399: e2e/google_setup_modal.spec.js (google-sign-in-ships-ready), two
+# tests on /login with no Google OAuth client: the Google button opens the setup
+# modal, and "Use email instead" closes it and focuses the email field. Verified
+# RED with the wrapper's x-data removed (the modal never renders) and with the
+# focus not waiting out the close (the host hands focus back to the opener).
+#   npx playwright test --list  -> 399 tests in 64 files
+total_specs: 399
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1353,7 +1359,10 @@ total_specs: 397
 # And for the loader's visit fixes: 5 more tests (392 -> 397), 2 new files:
 #   npx playwright test --list                                             -> 397 tests, 63 files
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 397
-executed: 397
+# And for the Google setup modal: 2 more tests (397 -> 399), 1 new file:
+#   npx playwright test --list                                             -> 399 tests, 64 files
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 399
+executed: 399
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

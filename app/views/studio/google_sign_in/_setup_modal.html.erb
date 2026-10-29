@@ -1,0 +1,55 @@
+<%# The Google setup modal, opened by studio/google_sign_in/_button while the
+    app has no OAuth client. One root element: the host's template x-if clones
+    only the first. No double quote inside any x-data or @click below.
+
+    Locals:
+      email_fallback — true: "Use email instead" closes the modal and focuses
+                       the page's email field. false: "Not now" only closes it.
+                       The focus waits out the close: the host hands focus
+                       back to the opener when its last card leaves (220ms,
+                       CLOSE_ANIM_MS), which would otherwise undo it.
+
+    "Request Google setup" is a plain form POST with Turbo off, so it works with
+    the same CSRF token as every other engine form, and the flash on the page it
+    lands back on says what happened. Hidden when the host draws its own routes
+    without Studio.routes, which leaves nowhere to send it. %>
+<%
+  setup_email_fallback = local_assigns.fetch(:email_fallback, true)
+  setup_request_path = respond_to?(:studio_google_setup_request_path) ? studio_google_setup_request_path : nil
+%>
+<div class="text-center" data-google-setup-modal>
+  <div class="flex justify-end -mt-2 -mr-2">
+    <button type="button" @click="$store.googleSetupModals.close()"
+            class="text-secondary hover:text-heading text-xl leading-none"
+            aria-label="Close">&times;</button>
+  </div>
+
+  <div class="mx-auto mb-4 w-12 h-12 rounded-full bg-white border border-subtle shadow-sm flex items-center justify-center">
+    <%= render "components/google_logo" %>
+  </div>
+
+  <h3 class="text-heading font-bold text-lg leading-tight">Google sign-in is almost ready</h3>
+  <p class="text-secondary text-sm mt-2">
+    Google sign-in is still being set up for <%= Studio.app_name %>.
+    <% if setup_request_path %>Ask the team to finish it, and<% else %>Until it is,<% end %>
+    <% if setup_email_fallback %>sign in with your email in the meantime.<% else %>use another sign-in method in the meantime.<% end %>
+  </p>
+
+  <div class="mt-6 flex flex-col gap-3">
+    <% if setup_request_path %>
+      <%= button_to "Request Google setup", setup_request_path, method: :post,
+            data: { turbo: false }, class: "btn btn-primary w-full", form: { class: "w-full" } %>
+    <% end %>
+
+    <% if setup_email_fallback %>
+      <button type="button" class="btn btn-neutral w-full"
+              @click="$store.googleSetupModals.close(); setTimeout(() => document.querySelector('input[type=email]')?.focus(), 260)">
+        Use email instead
+      </button>
+    <% else %>
+      <button type="button" class="btn btn-neutral w-full" @click="$store.googleSetupModals.close()">
+        Not now
+      </button>
+    <% end %>
+  </div>
+</div>

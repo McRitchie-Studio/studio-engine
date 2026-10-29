@@ -24,10 +24,27 @@ These are the methods/attributes the engine actively calls. Missing one of these
 |------|---------|-------|
 | `#authenticate(password)` | `SessionsController#create` | Provided by `has_secure_password`. Only required when `Studio.auth_methods` includes `:password`. |
 
-### Class method — only if you enable Google OAuth
+### Google sign-in — nothing to write; the engine ships a default
 | Name | Used by | Notes |
 |------|---------|-------|
-| `User.from_omniauth(auth_hash)` | `OmniauthCallbacksController#create` | Should find-or-create by `(provider, uid)` and return the user. Wrap the find-or-create in `rescue ActiveRecord::RecordNotUnique` to handle concurrent OAuth callbacks for the same user. |
+| `User.from_omniauth(auth, email_verified:)` | `OmniauthCallbacksController#create`, through `Studio::OmniauthUser.resolve` | **Optional.** When `User` defines it, it is called. When it does not, the engine's default answers (`Studio::OmniauthUser`, below). Needs `provider` and `uid` columns either way. |
+
+The default, `Studio::OmniauthUser.find_or_create`:
+
+1. returns the account holding this Google id (`provider` + `uid`);
+2. else, for an address that matches an account case-insensitively, links it when
+   Google verified the address and answers `:email_not_verified` when it did not;
+3. else creates an account with the address downcased and Google's name.
+
+A new account whose `name_slug` is blank or already held gets `user-<id>`
+instead, so two people named "Mia" can both sign up: the unique slug index no
+longer turns the second into a failed sign-in. A `RecordNotUnique` with a
+matching account (a concurrent callback) returns that account; one with nobody
+to find is logged with `ErrorLog.capture!` and answers `nil`, which the
+controller turns into a "use another method" redirect.
+
+`include Studio::OmniauthUser` gives `User.from_omniauth` the default under its
+own name. A `def self.from_omniauth` in the class body overrides it either way.
 
 ## Optional
 
@@ -98,27 +115,7 @@ class User < ApplicationRecord
     (name.presence || email.to_s.split("@").first).parameterize
   end
 
-  def self.from_omniauth(auth, email_verified: false)
-    user = find_by(provider: auth["provider"], uid: auth["uid"])
-    return user if user
-
-    email = auth.dig("info", "email")
-    if email.present? && (existing = find_by(email: email))
-      return :email_not_verified unless email_verified
-
-      existing.update!(provider: auth["provider"], uid: auth["uid"])
-      return existing
-    end
-
-    create!(
-      email: email,
-      name: auth.dig("info", "name"),
-      provider: auth["provider"],
-      uid: auth["uid"]
-    )
-  rescue ActiveRecord::RecordNotUnique
-    find_by(email: email) || find_by(provider: auth["provider"], uid: auth["uid"])
-  end
+  # No from_omniauth: Google sign-in uses the engine default (Studio::OmniauthUser).
 end
 ```
 

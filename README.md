@@ -30,7 +30,7 @@ resolved.
 
 ## What It Provides
 
-- **Authentication**: Passwordless magic-link auth, optional password auth, Google OAuth via OmniAuth, Solana wallet sign-in, and optional one-way SSO patterns
+- **Authentication**: Passwordless magic-link auth, optional password auth, Google OAuth via OmniAuth (ships ready: strategy, default `User.from_omniauth` and a setup modal until the OAuth client is set; docs/GOOGLE_AUTH_SETUP.md), Solana wallet sign-in, and optional one-way SSO patterns
 - **Error handling**: `Studio::ErrorHandling` concern with `rescue_and_log`, `ErrorLog` model with `capture!`, error log viewer at `/error_logs`
 - **Session drift**: every page carries a session stamp and loads `window.StudioSession`, which notices when another tab signs in or out, the session expires, or the server revokes it; `session:changed` / `session:mismatch` events, cross-tab sync, an identity-source plug-in interface, and `expectChange` holds for deliberate switches. The rehydrate endpoint (`GET /session/state`) is opt-in. See [`docs/SESSION_DRIFT.md`](docs/SESSION_DRIFT.md).
 - **Theme system**: Dynamic CSS custom properties generated from 7 role colors (primary, dark, light, success, accent, warning, danger). Dark/light mode toggle. Admin theme editor at `/admin/theme`.

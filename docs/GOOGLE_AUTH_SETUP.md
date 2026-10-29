@@ -1,117 +1,144 @@
 # Google OAuth Setup
 
-How to add Google sign-in to a new McRitchie app.
+Google sign-in ships ready with studio-engine. A new app gets the "Sign in with
+Google" button, the OmniAuth strategy and a default `User.from_omniauth` with no
+gem, initializer or User code of its own. What is left is one manual step: give
+the app an OAuth client.
 
-## Prerequisites
+## What the engine ships
 
-- A Google Cloud project with OAuth 2.0 credentials
-- An app-local `.env` file, hydrated from McRitchie Studio's credential inventory or the app's hosting config
+| Piece | Where | A host that has its own |
+|---|---|---|
+| `omniauth`, `omniauth-google-oauth2`, `omniauth-rails_csrf_protection` | gemspec runtime dependencies, required by `lib/studio/engine.rb` | keeps its Gemfile lines; same gems |
+| The `google_oauth2` strategy (POST-only request phase, `scope: "email,profile"`, `prompt: "select_account"`) | `Studio::GoogleSignIn::Middleware`, added by the `studio.google_sign_in` initializer | its own `OmniAuth::Builder` wins; the engine's middleware passes the request through |
+| `User.from_omniauth` | `Studio::OmniauthUser` (`app/models/concerns/studio/omniauth_user.rb`) | its own `def self.from_omniauth` wins |
+| The callback | `OmniauthCallbacksController`, drawn by `Studio.routes` | turf-monster overrides the controller; unchanged |
+| The button | `studio/google_sign_in/_button`, on `/login`, `/signup` and the `/profile` Google row | an app that renders its own auth card keeps it |
 
-## Shared Credentials
+### How the engine knows the host registered Google
 
-Each local app should carry its own `.env`:
+The engine's initializers run before the host's `config/initializers`, so at boot
+the host's `OmniAuth::Builder` is not on the stack yet. The engine therefore adds
+its middleware unconditionally and decides per request. Once the app's
+middleware stack is built, `Studio::GoogleSignIn.host_registered?` reads it
+(`Rails.application.config.middleware.middlewares`) and memoizes the answer:
 
-```env
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=GOCSPX-your-secret
-```
+- an entry whose class is `OmniAuth::Strategies::GoogleOauth2` counts;
+- an `OmniAuth::Builder` entry counts when its block calls `provider
+  :google_oauth2` (or names the strategy class). The block is evaluated against a
+  recorder that registers nothing;
+- a Builder that registers only other providers does not count, so the engine
+  still supplies Google beside them;
+- a block the recorder cannot evaluate counts, because two strategies on one path
+  is the failure this exists to prevent.
 
-Apps load this via `dotenv-rails` in development/test. In production, set these
-as config vars on the deployed app. McRitchie Studio's agent credential docs are
-the source of truth for 1Password item names.
+`Studio::GoogleSignIn.registration` answers `:host`, `:engine` or `:none`.
 
-## Steps for a New App
+### The button's two states
 
-### 1. Add gems to Gemfile
+`Studio.google_ready?` is true when `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+are both set.
 
-```ruby
-# Google OAuth
-gem "omniauth"
-gem "omniauth-google-oauth2"
-gem "omniauth-rails_csrf_protection", "~> 1.0"
+- **Ready.** The button is a POST form to `/auth/google_oauth2`. It is also
+  ready when the host registered its own provider (that host owns its own
+  readiness, and its tests post with no credentials) or OmniAuth is in test mode.
+- **Not yet.** The button stays visible and opens a modal: Google sign-in is
+  still being set up for this app. The modal offers **Request Google setup** and
+  **Use email instead** ("Not now" on `/profile`). With no client, the engine's
+  strategy is off, so a direct POST to `/auth/google_oauth2` answers 404
+  rather than sending the person to a Google error page.
 
-# Environment variables (if not already present)
-gem "dotenv-rails", groups: [:development, :test]
-```
+**Request Google setup** posts to `POST /_studio/google_setup_request`
+(`Studio::GoogleSetupRequestsController`, CSRF-checked). It answers 404 when the
+app's button already posts (client configured, its own provider, or OmniAuth
+test mode): there is nothing to request. Otherwise it writes a `[google-setup]`
+log line on every request, and at most once per app per day it mails
+`Studio.google_setup_request_to` (default `team@mcritchie.studio`) through the
+app's own mailer (`Studio::GoogleSetupMailer`, sent from `Studio.mailer_from`).
+The email carries the app name, its canonical host and the exact redirect URI
+to register.
 
-Run `bundle install`.
+**Nothing in it comes from the request's host.** A Host header, a port or an
+`X-Forwarded-Host` is whatever the sender typed, and the email asks ops to add
+the URI it carries to the shared production OAuth client. So:
 
-### 2. Create OmniAuth initializer
+- the daily claim is a `Rails.cache` key on the app
+  (`studio/google_setup_request/<app>/<date>`, from `Studio.app_name`); an app
+  whose cache is a `NullStore` falls back to an in-process store, so it still
+  gets one email per dyno per day;
+- the redirect URI comes from the app's **canonical host**, chosen in order:
+  `Studio.google_canonical_host`, then `ENV["APP_HOST"]`, then the first
+  `config.hosts` entry that is a plain hostname (no port, no leading dot, not a
+  pattern or IP range). It is `https` in production. With none configured the
+  email says so and names no host: set `APP_HOST` (or
+  `Studio.google_canonical_host`) and the next day's request names it.
 
-Create `config/initializers/omniauth.rb`:
+### OmniAuth's callback host
 
-```ruby
-Rails.application.config.middleware.use OmniAuth::Builder do
-  provider :google_oauth2,
-    ENV["GOOGLE_CLIENT_ID"],
-    ENV["GOOGLE_CLIENT_SECRET"],
-    scope: "email,profile",
-    prompt: "select_account"
-end
+When the engine owns the strategy it also keeps OmniAuth from building the
+`redirect_uri` from a forged host (and silences OmniAuth 2.3's warning about
+it). In production, with an explicit canonical host (`Studio.google_canonical_host`
+or `APP_HOST`), the strategy's `full_host` is pinned to `https://<that host>`.
+Otherwise, unless the app set `OmniAuth.config.full_host` or `allowed_hosts`
+itself, `OmniAuth.config.allowed_hosts` is seeded from `config.hosts` (ports
+dropped, `.example.com` as its subdomain pattern). It is left unset when
+`config.hosts` is empty or admits every host. The request phase is POST-only by
+OmniAuth 2's own default; the engine does not restate it.
 
-OmniAuth.config.allowed_request_methods = [:post]
-```
+## The manual step: give the app an OAuth client
 
-Keep the OmniAuth request phase POST-only. If an app needs a popup or custom
-entrypoint, render an auto-submitting POST form to `/auth/google_oauth2`
-instead of redirecting a GET request into OmniAuth.
+1. **Register the redirect URI** on the shared production OAuth client, in Google
+   Cloud project `enduring-maxim-491202-t6`. Steffon does this from the admin@
+   Chrome profile. The URI is
+   `https://<host>/auth/google_oauth2/callback`, exactly what the setup-request
+   email names. For a local desk, use `http://localhost:{PORT}/auth/google_oauth2/callback`.
+2. **Set the two env vars** on the app, then restart it:
 
-### 3. Add `from_omniauth` to User model
+   ```bash
+   heroku config:set GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... --app your-app
+   ```
 
-Passwordless apps should not create throwaway passwords for Google users. The
-engine passes `email_verified:` after server-side tokeninfo validation, so use
-that signal when linking Google to an existing email account.
+   Locally they go in the app's own `.env` (`dotenv-rails`), hydrated from the
+   credential inventory. Never paste a secret into a chat or a log. A local boot
+   must not carry the production client's secret (hub
+   `Devops::GoogleOAuthClients`).
 
-```ruby
-def self.from_omniauth(auth, email_verified: false)
-  user = find_by(provider: auth.provider, uid: auth.uid)
-  return user if user
+Once both are set, the button posts straight to Google.
 
-  email = auth.info.email
-  if email.present? && (existing = find_by(email: email))
-    return :email_not_verified unless email_verified
+## User model
 
-    existing.update!(
-      provider: auth.provider,
-      uid: auth.uid,
-      email_verified_at: existing.email_verified_at || Time.current
-    )
-    return existing
-  end
+The default `from_omniauth` needs `provider:string` and `uid:string` on `users`
+(plus the usual unique `email`). In order, it:
 
-  create!(
-    email: email,
-    name: auth.info.name,
-    provider: auth.provider,
-    uid: auth.uid,
-    email_verified_at: email_verified ? Time.current : nil
-  )
-rescue ActiveRecord::RecordNotUnique
-  find_by(email: auth.info.email) || find_by(provider: auth.provider, uid: auth.uid)
-end
-```
+1. finds the account holding this Google id (`provider` + `uid`);
+2. else links the account holding the address, compared case-insensitively, but
+   only when Google verified it; an unverified match answers
+   `:email_not_verified`;
+3. else creates an account, with the address downcased.
 
-### 4. Ensure User model has provider/uid columns
+If the new account's `name_slug` is blank or already taken (a second "Mia"), the
+slug becomes `user-<id>` instead of failing on the unique slug index. A collision
+with nobody to find is logged with `ErrorLog.capture!` and the sign-in is refused
+with a "use another method" message rather than a 500.
 
-```ruby
-# Migration
-add_column :users, :provider, :string
-add_column :users, :uid, :string
-add_column :users, :email_verified_at, :datetime
-```
+To use your own rules, define `def self.from_omniauth(auth, email_verified: false)`
+on `User`; it wins. To keep the default under its own name, `include
+Studio::OmniauthUser`. See [USER_CONTRACT.md](USER_CONTRACT.md).
 
-### 5. Add redirect URI in Google Cloud Console
+## Apps that wire Google themselves
 
-Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → your OAuth 2.0 Client ID → Authorized redirect URIs.
+The hub, turf-monster, moms-app, cyvasse and acquisition-studio carry
+`config/initializers/omniauth.rb` and their own `from_omniauth`. They keep
+working unchanged: the engine sees their provider and stands aside, and their
+`from_omniauth` is the one called. Such an app may delete its initializer, its
+three Gemfile lines and its `from_omniauth` to take the engine's, but it does not
+have to. Keep the initializer if it does more than register the provider (the
+hub pins the callback host with `CanonicalHost.pin_omniauth!`).
 
-Add the callback URL for your new app:
+`OmniAuth.config.allowed_request_methods` is OmniAuth 2's default `[:post]`;
+the engine leaves it alone, and a host that sets it keeps its value.
 
-| Environment | URI |
-|------------|-----|
-| Development | `http://localhost:{PORT}/auth/google_oauth2/callback` |
-| Production | `https://{subdomain}.mcritchie.studio/auth/google_oauth2/callback` |
-
-**Current apps:**
+## Current apps
 
 | App | Port | Dev URI | Prod URI |
 |-----|------|---------|----------|
@@ -119,31 +146,16 @@ Add the callback URL for your new app:
 | Turf Monster | 3100 | `http://localhost:3100/auth/google_oauth2/callback` | `https://app.turfmonster.media/auth/google_oauth2/callback` |
 | Tax Studio | 3200 | `http://localhost:3200/auth/google_oauth2/callback` | `https://tax.mcritchie.studio/auth/google_oauth2/callback` |
 
-### 6. Routes (already handled)
-
-`Studio.routes(self)` draws the OAuth callback route automatically:
-
-```ruby
-get "auth/:provider/callback", to: "omniauth_callbacks#create"
-get "auth/failure", to: "omniauth_callbacks#failure"
-```
-
-The engine's `OmniauthCallbacksController` handles the callback. Override it locally if you need custom logic (e.g. Turf Monster's account merge flow).
-
-### 7. Restart the server
-
-OmniAuth middleware is loaded at boot — restart required after adding the initializer.
-
-## Production (Heroku)
-
-```bash
-heroku config:set GOOGLE_CLIENT_ID=your-client-id --app your-app
-heroku config:set GOOGLE_CLIENT_SECRET=your-secret --app your-app
-```
-
 ## Troubleshooting
 
-- **"No route matches [POST] /auth/google_oauth2"** — missing OmniAuth gems or initializer. Run `bundle install` and restart.
-- **GET `/auth/google_oauth2` does not start OAuth** — expected. Use a POST form or `button_to` for the request phase.
-- **"redirect_uri_mismatch"** — the callback URI isn't registered in Google Cloud Console. Add it (see step 5).
-- **Credentials not loading** — ensure `dotenv-rails` is in the Gemfile and the app-local `.env` exists.
+- **The button opens "Google sign-in is still being set up".** `GOOGLE_CLIENT_ID`
+  or `GOOGLE_CLIENT_SECRET` is unset on this app. Do the manual step above.
+- **"No route matches [POST] /auth/google_oauth2".** The same cause: with no
+  client the engine's strategy is off.
+- **GET `/auth/google_oauth2` does not start OAuth.** Expected. The request phase
+  is POST-only; use `button_to` or a POST form.
+- **"redirect_uri_mismatch".** The callback is not registered on the OAuth client.
+  Register the exact URI from the setup-request email.
+- **OmniAuth warns that it builds callback URLs from the request's host.** Pin the
+  host (`OmniAuth.config.full_host`, or the hub's `CanonicalHost.pin_omniauth!`)
+  on an app that answers on more than one hostname.
