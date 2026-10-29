@@ -1,8 +1,9 @@
 # Minimal Rails 8.1 host application used to boot studio-engine against a real
 # Rails app in the test suite. It loads only the frameworks the engine's
 # self-contained surfaces (ActiveRecord models, the Railtie, the route DSL)
-# need — deliberately NOT the omniauth / solana controllers, which require
-# host-app gems that live in the consuming apps, not in this engine.
+# need. OmniAuth comes with the engine itself now (Google sign-in ships ready:
+# lib/studio/engine.rb requires it), so the dummy loads it the way every host
+# does; the Solana controllers still need a host-app gem.
 require "rails"
 require "active_model/railtie"
 require "active_record/railtie"
@@ -60,7 +61,7 @@ module Dummy
     config.load_defaults 8.1
 
     # Autoload (don't eager-load): the engine ships controllers/concerns that
-    # reference host-app-only gems (omniauth, solana-studio). Eager loading
+    # reference host-app-only gems (solana-studio). Eager loading
     # would pull those in; lazy autoloading lets the boot test exercise just the
     # self-contained ErrorLog / ThemeSetting / Sluggable / route surfaces.
     config.eager_load = false

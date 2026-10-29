@@ -53,7 +53,10 @@ module Studio
       Studio::Email.deliver(Studio::GoogleSetupMailer, :setup_requested,
                             Studio.app_name.to_s, host, redirect_uri, recipient, to: recipient)
     rescue StandardError => e
+      # The person asking still gets an answer; the failure goes where the team
+      # looks for failures.
       Rails.logger.warn("[google-setup] the request email failed: #{e.class}: #{e.message.to_s[0, 200]}")
+      ErrorLog.capture!(e) if defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
     end
   end
 end

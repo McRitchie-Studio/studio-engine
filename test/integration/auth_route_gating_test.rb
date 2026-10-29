@@ -97,6 +97,20 @@ class AuthRouteGatingTest < ActiveSupport::TestCase
            "a magic-link-only app must publish no /auth/phantom/* path"
   end
 
+  # --- the Google setup request ----------------------------------------------
+
+  # "Request Google setup" (Studio::GoogleSetupRequestsController) is a public,
+  # unauthenticated POST that mails the team. It exists for the Google button,
+  # so it draws only where the button can render.
+  test "the Google setup request draws with :google and only with it" do
+    with_google = drawn_route_names(auth_methods: %i[magic_link google])
+    assert_includes with_google, "studio_google_setup_request"
+
+    without_google = drawn_route_names(auth_methods: %i[magic_link])
+    refute_includes without_google, "studio_google_setup_request",
+                    "an app without Google publishes no setup-request endpoint"
+  end
+
   # --- the wallet app --------------------------------------------------------
 
   test "declaring wallet draws all three solana paths" do
