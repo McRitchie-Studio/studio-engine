@@ -61,11 +61,13 @@ var autoShown = false
 
 // The overlay's status is a live region; rewriting its label after the overlay
 // unhides makes a screen reader say it, where text already present when a
-// region appears is often skipped.
+// region appears is often skipped. The label is kept in data-studio-loader-label,
+// so a second show inside the gap restores it rather than the emptied text.
 function announce(overlay, doc) {
   var label = overlay.querySelector('[role="status"] .sr-only')
   if (!label) return
-  var text = label.textContent
+  var text = label.getAttribute('data-studio-loader-label')
+  if (text === null) { text = label.textContent; label.setAttribute('data-studio-loader-label', text) }
   label.textContent = ''
   var win = doc.defaultView
   ;(win && win.setTimeout ? win.setTimeout.bind(win) : setTimeout)(function () { label.textContent = text }, 50)

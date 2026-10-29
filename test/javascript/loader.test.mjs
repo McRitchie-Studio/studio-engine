@@ -153,3 +153,17 @@ test("only a submitter holding a pending loader counts", () => {
   assert.equal(pendingSubmitter({ detail: { formSubmission: { submitter: withLoader } } }), withLoader)
   assert.equal(pendingSubmitter({}), null)
 })
+
+test("two shows inside the announce gap keep the Loading label", async () => {
+  const overlay = fakeOverlay("0")
+  const attrs = {}
+  const label = { textContent: "Loading", getAttribute: (k) => (k in attrs ? attrs[k] : null), setAttribute: (k, v) => { attrs[k] = String(v) } }
+  const base = overlay.querySelector
+  overlay.querySelector = (selector) => (selector === '[role="status"] .sr-only' ? label : base(selector))
+  const doc = fakeDoc(overlay)
+  show("Uploading", doc)
+  show("Processing", doc)
+  await new Promise((resolve) => setTimeout(resolve, 80))
+  assert.equal(label.textContent, "Loading", "the second show restored the emptied text")
+  settle(doc)
+})
