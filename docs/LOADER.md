@@ -72,20 +72,23 @@ marked layer falls back to Breathe rather than blanking the loader.
   outlasts its `delay:` (350ms) and hides it when the page arrives, so a fast
   load never flashes it. A `replace` visit never shows it: that is a background
   refresh, such as a poll's `Turbo.visit(url, { action: "replace" })` or Turbo
-  8's page refresh; frames and prefetches fire no visit at all. A form marked
+  8's page refresh; frames and prefetches fire no visit at all. So is a link
+  marked `data-turbo-action="replace"`, even one the user clicks. A form marked
   `data-studio-loader-overlay="Caption"` shows it while it submits.
   `window.StudioLoader.show("Caption")` / `.hide()` cover any other long wait.
 - **Always clears.** A Turbo visit whose response is not HTML (a download at a
   URL with no extension) clears at once, on `turbo:reload`. Leaving the page
   (`pagehide`) and a back/forward-cache restore (`pageshow`) clear the overlay
-  and every busy button. An automatic show and a busy button clear themselves
-  after `max_wait:` (15000ms), because a `data-turbo="false"` form whose
-  response is a download replaces no page; raise it for a form that
-  legitimately waits longer. The cap never hides an overlay `StudioLoader.show`
-  opened.
+  and every busy button. A submit Turbo does not drive clears its overlay and
+  busy button after `max_wait:` (15000ms), because a `data-turbo="false"` form
+  whose response is a download replaces no page; raise it for a form that
+  legitimately waits longer. A Turbo visit is never capped: it always ends in
+  an event. The cap never hides an overlay `StudioLoader.show` opened.
 - **Announced.** The overlay's `role="status"` label ("Loading") is a live
   region, re-said each time the overlay shows. The overlay is never
-  `aria-busy`, which would mute it.
+  `aria-busy`, which would mute it. During a Turbo visit Turbo marks `<html>`
+  `aria-busy` itself, so a screen reader that honours it hears the status for
+  `StudioLoader.show` and non-Turbo submits, not for Turbo visits.
 - **Pending buttons.** Put `studio_loader_pending` inside the button (a small
   Breathe in the button's text colour) and mark what it replaces
   `data-loader-idle`. It shows while the button or its form is
