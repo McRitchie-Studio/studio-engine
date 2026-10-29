@@ -20,7 +20,7 @@ class StudioTest < Minitest::Test
     Studio.theme_danger        = "#EF4444"
     Studio.theme_accent        = "#F72585"
     Studio.mailer_from         = nil
-    Studio.resend_mailer_from  = "McRitchie Studio <team@mcritchie.studio>"
+    Studio.resend_mailer_from  = nil
     Studio.local_email_capture = nil
     ENV.delete("LOCAL_EMAIL_CAPTURE")
     ENV.delete("AGENT_WORKTREE")
@@ -192,6 +192,24 @@ class StudioTest < Minitest::Test
     assert_equal "McRitchie Studio <team@mcritchie.studio>",
                  Studio.mailer_from_for_transport(env: {}, ses_from: "App <team@example.com>")
     assert_equal "McRitchie Studio <team@mcritchie.studio>", Studio.mailer_from_for_transport(env: {})
+  end
+
+  # Owner ruling 2026-10-28: unset, every app sends as itself from team@. An
+  # initializer that still passes only the retired ses_from: gets that default.
+  def test_mailer_from_for_transport_defaults_to_the_app_name_at_team
+    Studio.app_name = "Voicebox"
+    assert_equal "Voicebox <team@mcritchie.studio>", Studio.resend_mailer_from
+    assert_equal "Voicebox <team@mcritchie.studio>",
+                 Studio.mailer_from_for_transport(env: {}, ses_from: "Voicebox <team@voicebox.example>")
+    assert_equal "Voicebox <team@mcritchie.studio>", Studio.marketing_from_for_transport(env: {})
+    assert_equal "Client <hi@client.test>",
+                 Studio.mailer_from_for_transport(env: {}, resend_from: "Client <hi@client.test>")
+  end
+
+  def test_an_explicit_resend_mailer_from_still_wins
+    Studio.app_name = "Voicebox"
+    Studio.resend_mailer_from = "Shared <team@mcritchie.studio>"
+    assert_equal "Shared <team@mcritchie.studio>", Studio.mailer_from_for_transport(env: {})
   end
 
   def test_marketing_from_for_transport_ignores_ses_from_and_a_stale_ses_env

@@ -107,7 +107,7 @@ module Studio
       def sender(env = ENV)
         studio_value(:mailer_from) ||
           env_value(env, "MAILER_FROM") ||
-          "McRitchie Studio <team@mcritchie.studio>"
+          default_sender
       end
 
       def transport_label(action_mailer:, env: ENV)
@@ -127,6 +127,14 @@ module Studio
       end
 
       private
+
+      def default_sender
+        if defined?(Studio) && Studio.respond_to?(:default_mailer_from)
+          Studio.default_mailer_from
+        else
+          "McRitchie Studio <team@mcritchie.studio>"
+        end
+      end
 
       def body_for(app_name:, to:, from:, transport:, delivery_method:, perform_deliveries:, sent_at:)
         <<~TEXT

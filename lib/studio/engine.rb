@@ -347,6 +347,21 @@ module Studio
     end
 
     config.after_initialize do
+      # Refuse to boot in production when ApplicationMailer (or the magic-link
+      # UserMailer) sends from an example.com placeholder: the Rails scaffold's
+      # app/mailers/application_mailer.rb shadows the engine's and Resend
+      # refuses every send. Boot, not the email smoke: Heroku's build boots
+      # production for assets:precompile, so the build fails and the bad slug
+      # never releases, while the smoke is an operator step a deploy can skip.
+      # Rake tasks are checked too, on purpose. Studio::MailSender.
+      if defined?(::ActionMailer::Base)
+        Studio::MailSender.verify!(
+          mailer_classes: %w[ApplicationMailer UserMailer].filter_map(&:safe_constantize),
+          rails_env: Rails.env,
+          logger: Rails.logger
+        )
+      end
+
       # Configure the IP -> location provider for every app that has the gem,
       # so geo detection works the same way everywhere: HTTPS (without which
       # ipinfo silently returns nothing), a 3s timeout, and a Rails.cache-backed
