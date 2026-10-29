@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.119.0 — 2026-10-29
+
 ### Added
 
 - **The branded loader: every app's own icon, in its own colours, as its
