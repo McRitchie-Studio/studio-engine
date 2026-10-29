@@ -1,0 +1,75 @@
+<%# locals: (style:, size:, icon:, art:, label:, percent:, mono:, pending:, uid:, html: {}) %>
+<%#
+  The branded loader (Studio::LoaderHelper#studio_loader, docs/LOADER.md): ONE
+  class, .studio-loader, sized by --studio-loader-size, styled per
+  data-loader-style by engine-motion.css (section "Branded loader"). The icon is
+  the app's own file; a signature style inlines the art's marked layers over it.
+
+  A pending loader sits inside a button: hidden from assistive tech (the button
+  carries aria-busy) and from sight until the button or its form is busy.
+%>
+<%
+  extra = html.dup
+  data = (extra.delete(:data) || {}).merge(loader_style: style.to_s.tr("_", "-"))
+  data[:loader_pending] = "" if pending
+  data[:loader_mono] = "" if mono
+  data[:loader_percent] = "" unless percent.nil?
+  vars = [ "--studio-loader-size: #{size}" ]
+  vars << "--studio-loader-percent: #{percent}" unless percent.nil?
+  vars << extra.delete(:style) if extra[:style]
+  classes = [ "studio-loader", extra.delete(:class) ].compact.join(" ")
+  draw_icon = lambda do |modifier = nil|
+    css = [ "studio-loader-icon", modifier ].compact.join(" ")
+    if icon.blank?
+      tag.span(class: css, data: { loader_blank: "" })
+    elsif mono
+      tag.span(class: css, style: "--studio-loader-mask: url(\"#{icon.to_s.gsub('"', '%22')}\")")
+    else
+      tag.img(src: icon, alt: "", class: css, draggable: "false", decoding: "async")
+    end
+  end
+  aria = pending ? { hidden: "true" } : { live: "polite" }
+%>
+<%= tag.span(class: classes, role: (pending ? nil : "status"), aria: aria, data: data, style: vars.join("; "), **extra) do %>
+  <% case style %>
+  <% when :breathe %>
+    <span class="studio-loader-halo" aria-hidden="true"></span>
+    <%= draw_icon.call %>
+  <% when :liquid %>
+    <%= draw_icon.call("studio-loader-ghost") %>
+    <span class="studio-loader-fill" aria-hidden="true"><%= draw_icon.call %></span>
+  <% when :orbit %>
+    <span class="studio-loader-track" aria-hidden="true"></span>
+    <%= draw_icon.call %>
+    <span class="studio-loader-orb" aria-hidden="true"><span class="studio-loader-trail"></span><span class="studio-loader-spark"></span></span>
+  <% when :steel %>
+    <svg class="studio-loader-frame" viewBox="0 0 100 100" aria-hidden="true"><path d="M0,14V0H14M86,0H100V14M100,86V100H86M14,100H0V86"/></svg>
+    <%= draw_icon.call %>
+  <% when :weld_bead %>
+    <%= draw_icon.call %>
+    <svg class="studio-loader-art" viewBox="<%= art[:view_box] %>" aria-hidden="true">
+      <defs><filter id="<%= uid %>-glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="<%= (art[:width] / 52.86).round(2) %>" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+      <% outline = art[:layers].first %>
+      <% layers = studio_loader_bead_layers(art) %>
+      <% [ layers.reject { |l| l[:glow] }, layers.select { |l| l[:glow] } ].each_with_index do |group, glowing| %>
+        <%= tag.g(filter: (glowing == 1 ? "url(##{uid}-glow)" : nil), transform: outline[:transform]) do %>
+          <% group.each do |layer| %>
+            <%= tag.path(d: outline[:d], pathLength: "100", class: "studio-loader-bead", data: { layer: layer[:n] },
+                         "stroke-width": layer[:width], "stroke-opacity": layer[:opacity],
+                         "stroke-dasharray": "#{layer[:dash]} #{(100 - layer[:dash]).round(2)}",
+                         style: "--studio-loader-bead-length: #{layer[:dash]}") %>
+          <% end %>
+        <% end %>
+      <% end %>
+    </svg>
+  <% when :sparkle %>
+    <%= draw_icon.call %>
+    <svg class="studio-loader-art" viewBox="<%= art[:view_box] %>" aria-hidden="true">
+      <% art[:layers].each_with_index do |spark, index| %>
+        <%= tag.path(d: spark[:d], transform: spark[:transform], class: "studio-loader-sparkle",
+                     style: "--studio-loader-i: #{index}; --studio-loader-sparks: #{art[:layers].size}") %>
+      <% end %>
+    </svg>
+  <% end %>
+  <% unless pending || label.blank? %><span class="sr-only"><%= label %></span><% end %>
+<% end %>
