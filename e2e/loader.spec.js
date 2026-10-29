@@ -75,8 +75,18 @@ test("a pending loader shows inside a busy button, in the button's text colour",
   }));
   expect(look.background).toBe(look.text);
 
+  // Pin the element: the busy-scoped locator above would match nothing once
+  // the button is idle, and toBeHidden would pass on nothing.
+  await pending.evaluate((el) => el.setAttribute("data-e2e-pinned", ""));
+  const pinned = page.locator(".studio-loader[data-e2e-pinned]");
   await page.evaluate(() => document.querySelectorAll("button[aria-busy]").forEach((b) => b.removeAttribute("aria-busy")));
-  await expect(pending).toBeHidden();
+  await expect(pinned).toHaveCount(1);
+  await expect(pinned).toBeHidden();
+
+  // Turbo marks <html> busy on every Drive visit (and a frame on its load):
+  // only the button or its own form may wake a pending loader.
+  await page.evaluate(() => document.documentElement.setAttribute("aria-busy", "true"));
+  await expect(pinned).toBeHidden();
 });
 
 test("StudioLoader shows and hides the page-load overlay", async ({ page }) => {

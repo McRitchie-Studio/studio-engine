@@ -2392,8 +2392,8 @@ body.modal-open { overflow: visible; }
 
   /* ---- Pending: inside a button, shown only while it or its form is busy --- */
   .studio-loader[data-loader-pending] { display: none; }
-  [aria-busy="true"] .studio-loader[data-loader-pending] { display: inline-grid; }
-  [aria-busy="true"] [data-loader-idle] { display: none; }
+  :where(form, button)[aria-busy="true"] .studio-loader[data-loader-pending] { display: inline-grid; }
+  :where(form, button)[aria-busy="true"] [data-loader-idle] { display: none; }
   .studio-loader[data-loader-pending] .studio-loader-halo { display: none; }
   .studio-loader[data-loader-pending] .studio-loader-icon { width: 100%; height: 100%; animation-duration: 1.4s; }
 
