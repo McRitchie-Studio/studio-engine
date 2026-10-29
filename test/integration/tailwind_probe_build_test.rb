@@ -101,6 +101,20 @@ class TailwindProbeBuildTest < Minitest::Test
     refute_match(/--color-primary:\s*rgb\(var\(--color-primary-rgb\)\)/, self.class.probe_css)
   end
 
+  # Task engine-type-scale-roles: a consumer's build turns each type-* role into
+  # its multiple of --type-base, and type-dense into the dense base, with sm:
+  # variants, the way a page draws them.
+  def test_the_type_scale_roles_compile_for_a_consumer
+    css = B.compile(%w[type-title type-heading type-subhead type-body type-fine type-dense sm:type-title])
+    rules = Studio::TypeScale::ROLES.to_h { |name, _, _| [name, css[/^\s*\.#{Regexp.escape(name)} \{(.*?)\}/m, 1]] }
+    Studio::TypeScale::ROLES.each do |name, multiple, _|
+      assert rules[name], ".#{name} did not compile"
+      assert_includes rules[name], "font-size: calc(var(--type-base, 16px) * #{multiple})", name
+    end
+    assert_match(/\.type-dense \{\s*--type-base: var\(--type-dense-base, 14px\);/, css)
+    assert_match(/\.sm\\:type-title \{\s*@media/, css)
+  end
+
   def test_dark_mode_is_the_class_strategy
     css = B.compile(%w[dark:bg-surface])
 

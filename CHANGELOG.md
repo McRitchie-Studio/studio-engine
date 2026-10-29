@@ -4,6 +4,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **The type scale: five text roles every app draws from.** `type-title` (6x),
+  `type-heading` (3x), `type-subhead` (1.5x), `type-body` (1x) and `type-fine`
+  (0.75x), each a multiple of `--type-base`, which the theme tag sets from
+  `Studio.type_base` (16). A `type-dense` container swaps in
+  `Studio.type_dense_base` (14) for admin and ops pages. Title and heading take
+  `Studio.type_display_weight` (800), the rest `Studio.type_text_weight` (400).
+  Nothing changes on a page until it uses a role. README "Type scale".
+
 ## 0.117.0 — 2026-10-28
 
 ### Changed
