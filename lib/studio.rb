@@ -51,6 +51,7 @@ require "studio/agent_chat"
 require "studio/username_generator"
 require "studio/public_user"
 require "studio/name_parts"
+require "studio/mail_sender"
 require "studio/s3"
 require "studio/storage"
 require "studio/image_cache"
@@ -1206,7 +1207,22 @@ module Studio
   # Default From: for engine-sent mail (magic links). Apps set this to their
   # verified sending address in config/initializers/studio.rb.
   mattr_accessor :mailer_from, default: nil
-  mattr_accessor :resend_mailer_from, default: "McRitchie Studio <team@mcritchie.studio>"
+  # The Resend sender when neither RESEND_MAILER_FROM nor `resend_from:` is
+  # given. Unset (nil), it reads "<Studio.app_name> <team@mcritchie.studio>"
+  # (Studio::MailSender.default_for): every app sends from team@ under its own
+  # name, and a client's own sending domain is a paid tier upgrade.
+  mattr_writer :resend_mailer_from, default: nil
+
+  def self.resend_mailer_from
+    value = @@resend_mailer_from
+    value.nil? || value.to_s.strip.empty? ? default_mailer_from : value
+  end
+
+  # "<Studio.app_name> <team@mcritchie.studio>"; "McRitchie Studio" for an app
+  # that never set app_name.
+  def self.default_mailer_from
+    Studio::MailSender.default_for(app_name)
+  end
 
   # Local/worktree email capture. nil means "auto": enabled when AGENT_WORKTREE
   # is truthy, otherwise disabled. Production always disables capture.
@@ -1410,8 +1426,10 @@ module Studio
 
   # The sender for transactional mail. Resend is the only provider (SES was
   # retired 2026-10-10): RESEND_MAILER_FROM, then resend_from, then
-  # Studio.resend_mailer_from. `ses_from:` is still ACCEPTED so existing
-  # consumer initializers keep booting, and IGNORED; drop it at your leisure.
+  # Studio.resend_mailer_from (unset: "<app_name> <team@mcritchie.studio>").
+  # `ses_from:` is still ACCEPTED so existing consumer initializers keep
+  # booting, and IGNORED: pass resend_from: instead. Set app_name BEFORE this
+  # call in the configure block, since the default reads it.
   def self.mailer_from_for_transport(env: ENV, ses_from: nil, resend_from: nil)
     env_value(env, "RESEND_MAILER_FROM") || resend_from || resend_mailer_from
   end

@@ -35,7 +35,7 @@ The engine reads these values only through consumer apps.
 | `GOOGLE_CLIENT_SECRET` | Google OAuth consumers | Keep per environment; never commit. |
 | `MAIL_TRANSPORT` | Apps that send mail | Optional; unset or `resend`. `ses` is no longer supported (SES retired 2026-10-10) and only logs a warning. |
 | `RESEND_API_KEY` | Apps that send mail | Selects the Resend transport. |
-| `RESEND_MAILER_FROM` | Apps that send mail | Transactional sender on a Resend-verified domain; default convention is `McRitchie Studio <team@mcritchie.studio>`. |
+| `RESEND_MAILER_FROM` | Apps that send mail | Transactional sender on a Resend-verified domain. Unset, the engine sends as `<app_name> <team@mcritchie.studio>`; set it only for a client domain (a paid tier upgrade). |
 | `RESEND_MARKETING_FROM` | Apps with newsletters/broadcasts | Optional marketing sender; falls back to `RESEND_MAILER_FROM`. |
 | `STUDIO_HEALTH_REPORT_TO` | `Studio::HealthReportJob` | Optional; who gets the daily health report (comma-separated). Unset means no report. `config.health_report_to` wins over it. See [`HEALTH_REPORT.md`](HEALTH_REPORT.md). |
 | `STUDIO_HEALTH_TOKEN` | `GET /_studio/health_report` | Optional; the bearer token the McRitchie Studio hub presents to pull the daily health report as JSON. Unset means the endpoint answers 404. `config.health_report_token` wins over it. See [`HEALTH_REPORT.md`](HEALTH_REPORT.md#the-hub-endpoint). |

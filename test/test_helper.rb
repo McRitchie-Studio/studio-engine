@@ -35,6 +35,7 @@ require_relative "../lib/studio/profile_sections"
 require_relative "../lib/studio/profile_image"
 require_relative "../lib/studio/oauth_identity"
 require_relative "../lib/studio/name_parts"
+require_relative "../lib/studio/mail_sender"
 require_relative "../lib/studio/session_fingerprint"
 require_relative "../lib/studio/session_state"
 require_relative "../lib/studio/theme_resolver"
@@ -166,7 +167,17 @@ module Studio
   mattr_accessor :theme_danger,   default: "#EF4444"
   mattr_accessor :theme_accent,   default: "#F72585"
   mattr_accessor :mailer_from, default: nil
-  mattr_accessor :resend_mailer_from, default: "McRitchie Studio <team@mcritchie.studio>"
+  # Mirrors lib/studio.rb: unset, the sender is "<app_name> <team@...>".
+  mattr_writer :resend_mailer_from, default: nil
+
+  def self.resend_mailer_from
+    value = @@resend_mailer_from
+    value.nil? || value.to_s.strip.empty? ? default_mailer_from : value
+  end
+
+  def self.default_mailer_from
+    Studio::MailSender.default_for(app_name)
+  end
   mattr_accessor :local_email_capture, default: nil
 
   # S3 / object storage. s3_key_prefix is the optional key namespace inside the

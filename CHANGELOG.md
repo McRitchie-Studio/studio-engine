@@ -4,6 +4,36 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The default sender names the app: `"<Studio.app_name> <team@mcritchie.studio>"`.**
+  With no `RESEND_MAILER_FROM` and no `resend_from:`,
+  `Studio.mailer_from_for_transport`, `Studio.marketing_from_for_transport`, the
+  engine's `ApplicationMailer` and `studio:email:smoke` now send as the app
+  (`Studio.default_mailer_from`) rather than as "McRitchie Studio"; an app that
+  never set `app_name` still sends as "McRitchie Studio". Every app sends from
+  team@mcritchie.studio; a client's own sending domain is a paid tier upgrade
+  set through `RESEND_MAILER_FROM`. `Studio.resend_mailer_from` defaults to
+  nil and reads that default; setting it still wins. The retired `ses_from:`
+  stays ignored, so an initializer passing only `ses_from:` now gets the app's
+  own name. Set `app_name` before calling the helper in the configure block.
+
+### Added
+
+- **Production refuses an example.com sender.** The engine's after_initialize
+  raises `Studio::MailSender::PlaceholderSenderError` in production when
+  `ApplicationMailer` or `UserMailer` resolves to an example.com, .net or .org
+  address: the Rails scaffold's `app/mailers/application_mailer.rb`
+  (`default from: "from@example.com"`) shadows the engine's, and Resend refused
+  every magic link in voicebox and moms-app. It runs in rake tasks too, so
+  Heroku's `assets:precompile` fails the build and the placeholder never
+  releases. The message names the fix. A sender proc that raises at boot is
+  logged and skipped. **Consumers still carrying the scaffold mailer must
+  delete it or re-point it at `Studio.mailer_from` before bumping.**
+  [`docs/NEW_APP_SETUP.md`](docs/NEW_APP_SETUP.md). Guarded by
+  `test/lib/studio/mail_sender_test.rb` and
+  `test/integration/mail_sender_boot_test.rb`.
+
 ## 0.116.2 — 2026-10-28
 
 ### Added

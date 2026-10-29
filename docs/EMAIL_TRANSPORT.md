@@ -29,12 +29,18 @@ Studio::MailTransport.configure!
 
 The app still owns `Studio.mailer_from` in `config/initializers/studio.rb`.
 Use the sender helper, which answers `RESEND_MAILER_FROM`, then `resend_from:`,
-then `Studio.resend_mailer_from`:
+then `Studio.resend_mailer_from`, which unset reads
+`"<Studio.app_name> <team@mcritchie.studio>"`. Every app sends from
+`team@mcritchie.studio`; a client's own sending domain is a paid tier upgrade.
+In production the engine refuses to boot when `ApplicationMailer` or
+`UserMailer` resolves to an example.com sender (the Rails scaffold's
+`app/mailers/application_mailer.rb`; see
+[`NEW_APP_SETUP.md`](NEW_APP_SETUP.md)).
 
 ```ruby
 Studio.configure do |config|
   config.mailer_from = Studio.mailer_from_for_transport(
-    resend_from: "My App <team@example.com>" # optional; must be on a Resend-verified domain
+    resend_from: "My App <team@mcritchie.studio>" # optional; must be on a Resend-verified domain
   )
 end
 ```
