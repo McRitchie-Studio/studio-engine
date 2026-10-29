@@ -42,6 +42,7 @@ require "studio/navbar_account_sidebar"
 require "studio/navbar_identity"
 require "studio/navbar_wordmark"
 require "studio/navbar_brand"
+require "studio/loader"
 require "studio/auth_labels"
 require "studio/profile_sections"
 require "studio/profile_image"
@@ -281,6 +282,27 @@ module Studio
 
   def self.navbar_wordmark=(config)
     @@navbar_wordmark = NavbarWordmark.normalize(config)
+  end
+
+  # ---- Branded loader ----
+  # The loader every page load, long wait and pending button draws: the app's
+  # own icon in its own theme colours, no per-app code. A style name, or a Hash
+  # with the icon (default: the navbar brand logo, else theme_logos' "Navbar
+  # Logo") and, for a signature style, the art file of marked layers. The
+  # default is :breathe. Rules: lib/studio/loader.rb; docs/LOADER.md.
+  #
+  #   config.loader = :orbit
+  #   config.loader = { style: :sparkle, icon: "/brand/icon-dark.svg",
+  #                     art: "/brand/loader-sparkle.svg" }
+  mattr_reader :loader, default: Loader.normalize(nil)
+
+  def self.loader=(config)
+    @@loader = Loader.normalize(config)
+  end
+
+  # The icon the loader draws: the configured one, else Loader.default_icon.
+  def self.loader_icon
+    loader[:icon] || Loader.default_icon
   end
 
   def self.sign_in_label=(label)
