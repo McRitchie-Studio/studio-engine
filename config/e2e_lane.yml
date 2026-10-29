@@ -1088,7 +1088,13 @@
 # overlay shows and hides. Verified RED with the reduced-motion emulation not
 # applied (every loader part still animating).
 #   npx playwright test --list  -> 392 tests in 61 files
-total_specs: 392
+# 392 -> 394: e2e/google_setup_modal.spec.js (google-sign-in-ships-ready), two
+# tests on /login with no Google OAuth client: the Google button opens the setup
+# modal, and "Use email instead" closes it and focuses the email field. Verified
+# RED with the wrapper's x-data removed (the modal never renders) and with the
+# focus not waiting out the close (the host hands focus back to the opener).
+#   npx playwright test --list  -> 394 tests in 62 files
+total_specs: 394
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1343,7 +1349,10 @@ total_specs: 392
 # And for the branded loader: 5 more tests (387 -> 392), 1 new file:
 #   npx playwright test --list                                             -> 392 tests, 61 files
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 392
-executed: 392
+# And for the Google setup modal: 2 more tests (392 -> 394), 1 new file:
+#   npx playwright test --list                                             -> 394 tests, 62 files
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 394
+executed: 394
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
