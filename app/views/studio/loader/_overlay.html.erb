@@ -1,12 +1,14 @@
-<%# locals: (label:, delay:, size:, options: {}) %>
+<%# locals: (label:, delay:, max_wait:, size:, options: {}) %>
 <%#
   The page-load overlay (Studio::LoaderHelper#studio_loader_overlay). Rendered
-  hidden, once per page; studio/loader shows it when a Turbo visit or a form
-  marked data-studio-loader-overlay outlasts data-delay ms, and
-  window.StudioLoader.show(caption) / hide() drive it for any other long wait.
-  The caption line is empty until a caller names one.
+  hidden, once per page; studio/loader shows it when a visit the user started
+  or a form marked data-studio-loader-overlay outlasts data-delay ms, clears it
+  after data-max-wait ms at most, and window.StudioLoader.show(caption) /
+  hide() drive it for any other long wait. The caption line is empty until a
+  caller names one. It never marks itself aria-busy: that would mute the
+  "Loading" status inside it.
 %>
-<%= tag.div(class: "studio-loader-overlay", hidden: true, data: { studio_loader_overlay: "", delay: delay }) do %>
+<%= tag.div(class: "studio-loader-overlay", hidden: true, data: { studio_loader_overlay: "", delay: delay, max_wait: max_wait }) do %>
   <div class="studio-loader-overlay-panel">
     <%= studio_loader(size: size, label: label, **options) %>
     <p class="studio-loader-caption" data-studio-loader-caption></p>
