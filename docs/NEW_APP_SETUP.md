@@ -103,6 +103,10 @@ Studio.configure do |config|
   # `vt-pinned-header` on the sticky header (exactly one per page).
   # config.smooth_load = true
   # config.nav_spinner_min_ms = 300            # default 2500
+  # Branded loader (docs/LOADER.md): the app's own icon in its theme colours
+  # for page loads, long waits and pending buttons. Breathe by default; put
+  # `<%= studio_loader_overlay %>` once in the layout body to get page loads.
+  # config.loader = :orbit                      # breathe | liquid | orbit | steel
   # Out-of-the-box navigation (default OFF — empty sections render nothing):
   # declare link sections and the engine navbar mounts a link-sidebar trigger
   # + slide-out panel. A callable receives the view context (route helpers,
