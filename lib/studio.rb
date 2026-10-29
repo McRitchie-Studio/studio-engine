@@ -27,6 +27,7 @@ require "studio/color_scale"
 require "studio/environment_banner"
 require "studio/theme_resolver"
 require "studio/ui_primitives"
+require "studio/type_scale"
 require "studio/js_literal"
 require "studio/js_identifier"
 require "studio/hold_button"
@@ -1268,6 +1269,15 @@ module Studio
   mattr_accessor :theme_warning,  default: "#FF7C47"
   mattr_accessor :theme_danger,   default: "#EF4444"
   mattr_accessor :theme_accent,   default: "#F72585"
+
+  # Type scale (Studio::TypeScale): the body size every type-* role multiplies.
+  # type_base for public pages, type_dense_base inside a `type-dense` container
+  # (admin and ops pages). Weights: title and heading take the display weight,
+  # subhead, body and fine print the text weight. Set them from the brand kit.
+  mattr_accessor :type_base,           default: 16
+  mattr_accessor :type_dense_base,     default: 14
+  mattr_accessor :type_display_weight, default: 800
+  mattr_accessor :type_text_weight,    default: 400
 
   # S3 / object storage — host apps MUST set s3_bucket_prefix explicitly in
   # config/initializers/studio.rb before any S3-touching code runs (ImageCache,

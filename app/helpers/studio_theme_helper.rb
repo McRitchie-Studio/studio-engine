@@ -10,6 +10,6 @@ module StudioThemeHelper
       Studio::ThemeResolver.new(colors).to_css
     end
 
-    tag.style("#{css}\n#{Studio::UiPrimitives.css}".html_safe, nonce: content_security_policy_nonce)
+    tag.style("#{css}\n#{Studio::TypeScale.css}\n#{Studio::UiPrimitives.css}".html_safe, nonce: content_security_policy_nonce)
   end
 end

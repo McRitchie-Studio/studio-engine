@@ -310,6 +310,47 @@ flag — it cannot know where the reader is sitting, so only the reader's machin
 may assert one. A host that omits the script still gets working stamps, just
 frozen in the app's timezone. Specimen: `/admin/style` → Tricks → Time stamps.
 
+### Type scale — `type-*`
+
+The one set of text sizes every Studio app uses (Alex McRitchie's standard,
+2026-10-28; the hub's `/logos/<brand>` Type Scale card shows it per brand).
+Each role is a multiple of one base:
+
+| Utility | Multiple | Public base (16 px) | Dense base (14 px) | Weight |
+|---|---|---|---|---|
+| `type-title` | 6x | 96 px | 84 px | display |
+| `type-heading` | 3x | 48 px | 42 px | display |
+| `type-subhead` | 1.5x | 24 px | 21 px | text |
+| `type-body` | 1x | 16 px | 14 px | text |
+| `type-fine` | 0.75x | 12 px | 10.5 px | text |
+
+```erb
+<h1 class="type-title text-heading">Winter Run 2026</h1>
+<p class="type-body text-body">Since 2016 ...</p>
+
+<%# an admin or ops page: everything inside takes the dense base %>
+<main class="type-dense">
+  <h1 class="type-heading text-heading">Releases</h1>
+</main>
+```
+
+- **Public pages** use the public base. **Admin and ops pages** put
+  `type-dense` on their container: the roles inside keep their ratios on the
+  dense base.
+- **Set the base and weights from the brand kit**, in
+  `config/initializers/studio.rb`: `Studio.type_base`,
+  `Studio.type_dense_base`, `Studio.type_display_weight`,
+  `Studio.type_text_weight`. The theme tag (`studio_theme_css_tag`) writes them
+  as `--type-base`, `--type-dense-base`, `--type-display-weight` and
+  `--type-text-weight`; a bad value raises, naming the setting.
+- **A role sets size, weight and line height only.** Colour stays with
+  `text-heading`, `text-body` and the rest, which are colour utilities, not
+  sizes.
+- **Nothing is smaller than `type-fine`.** A new page uses the roles, not
+  `text-xs` or `text-2xs`; existing pages move over app by app.
+- The multiples live in `Studio::TypeScale::ROLES` and in `engine.css`;
+  `test/lib/type_scale_contract_test.rb` keeps the two the same.
+
 ### Tints and shades — `.scrim`
 
 Text laid over media on a PAGE (a hero photo, a video, a banner) reads through

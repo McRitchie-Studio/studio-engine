@@ -179,6 +179,50 @@ body.modal-open .studio-app-banner {
   @apply bg-inset rounded-xl border border-subtle p-4 overflow-x-auto;
 }
 
+/* -- Type scale ------------------------------------------------------------
+   The one set of text sizes every app draws from (Studio::TypeScale, README
+   "Type scale"). Each role is a multiple of --type-base: title 6x, heading 3x,
+   subhead 1.5x, body 1x, fine print 0.75x. The theme tag sets the app's base
+   (Studio.type_base, 16px) and weights; `type-dense` swaps in the dense base
+   (Studio.type_dense_base, 14px) for everything inside it, for admin and ops
+   pages. The fallbacks are the engine defaults, for a page with no theme tag.
+   The multiples here must match Studio::TypeScale::ROLES
+   (test/lib/type_scale_contract_test.rb). */
+
+@utility type-dense {
+  --type-base: var(--type-dense-base, 14px);
+}
+
+@utility type-title {
+  font-size: calc(var(--type-base, 16px) * 6);
+  font-weight: var(--type-display-weight, 800);
+  line-height: 1.05;
+}
+
+@utility type-heading {
+  font-size: calc(var(--type-base, 16px) * 3);
+  font-weight: var(--type-display-weight, 800);
+  line-height: 1.1;
+}
+
+@utility type-subhead {
+  font-size: calc(var(--type-base, 16px) * 1.5);
+  font-weight: var(--type-text-weight, 400);
+  line-height: 1.25;
+}
+
+@utility type-body {
+  font-size: calc(var(--type-base, 16px) * 1);
+  font-weight: var(--type-text-weight, 400);
+  line-height: 1.5;
+}
+
+@utility type-fine {
+  font-size: calc(var(--type-base, 16px) * 0.75);
+  font-weight: var(--type-text-weight, 400);
+  line-height: 1.4;
+}
+
 /* -- Scrims: tints and shades ----------------------------------------------
    A scrim is the wash laid over media (a photo, a video) so text reads on it.
    It comes in two TONES, and the tone is a design decision, not a colour pick:

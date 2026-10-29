@@ -40,6 +40,7 @@ require_relative "../lib/studio/session_fingerprint"
 require_relative "../lib/studio/session_state"
 require_relative "../lib/studio/theme_resolver"
 require_relative "../lib/studio/ui_primitives"
+require_relative "../lib/studio/type_scale"
 # Studio::JsLiteral is referenced by engine PARTIALS, and test/views/*.rb render
 # those partials through this helper — so it has to resolve here, not just in the
 # dummy app. It requires action_view, which is why lib/studio/s3.rb had to stop
@@ -166,6 +167,11 @@ module Studio
   mattr_accessor :theme_warning,  default: "#FF7C47"
   mattr_accessor :theme_danger,   default: "#EF4444"
   mattr_accessor :theme_accent,   default: "#F72585"
+  # Mirrors lib/studio.rb: the type scale bases and weights (Studio::TypeScale).
+  mattr_accessor :type_base,           default: 16
+  mattr_accessor :type_dense_base,     default: 14
+  mattr_accessor :type_display_weight, default: 800
+  mattr_accessor :type_text_weight,    default: 400
   mattr_accessor :mailer_from, default: nil
   # Mirrors lib/studio.rb: unset, the sender is "<app_name> <team@...>".
   mattr_writer :resend_mailer_from, default: nil

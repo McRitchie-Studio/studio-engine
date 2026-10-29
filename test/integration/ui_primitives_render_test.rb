@@ -139,4 +139,22 @@ class UiPrimitivesRenderTest < ActiveSupport::TestCase
     assert_includes html, "$store.theme.toggle()", "div2_slot should render the engine theme_toggle partial"
     refute_includes html, "seedsNavbar", "div2_slot should replace the default level bar"
   end
+
+  # Task engine-type-scale-roles: the theme tag every layout renders carries the
+  # app's type-scale base, dense base and weights, read fresh from Studio.*
+  # (outside the hour-long cache of the colour CSS).
+  test "the theme tag carries the type scale variables, and a changed base shows at once" do
+    controller = Class.new(ActionController::Base) { helper StudioThemeHelper }
+    html = controller.render(inline: "<%= studio_theme_css_tag %>")
+    assert_includes html, "--type-base: 16px;"
+    assert_includes html, "--type-dense-base: 14px;"
+    assert_includes html, "--type-display-weight: 800;"
+    assert_includes html, "--type-text-weight: 400;"
+
+    saved = Studio.type_base
+    Studio.type_base = 18
+    assert_includes controller.render(inline: "<%= studio_theme_css_tag %>"), "--type-base: 18px;"
+  ensure
+    Studio.type_base = saved if saved
+  end
 end
