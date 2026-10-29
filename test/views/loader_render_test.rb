@@ -23,7 +23,7 @@ require_relative "../../app/helpers/studio/loader_helper"
 #   D. A signature style inlines only the art's marked layers over the icon,
 #      and falls back to Breathe when the art is missing.
 #   E. A pending loader is hidden from assistive tech and drawn in currentColor;
-#      the overlay renders hidden with its delay.
+#      the overlay renders hidden with its delay and cap, and is never aria-busy.
 #   F. Reduced motion stops every animation and hides the moving parts.
 class LoaderRenderTest < ActiveSupport::TestCase
   ENGINE_ROOT = File.expand_path("../..", __dir__)
@@ -148,21 +148,30 @@ class LoaderRenderTest < ActiveSupport::TestCase
     assert_nil loader.at_css(".sr-only")
   end
 
-  test "the overlay renders hidden, once, with its delay and a caption line" do
+  test "the overlay renders hidden, once, with its delay, its cap and a caption line" do
     overlay = render_view { |view| view.studio_loader_overlay(delay: 500) }.at_css(".studio-loader-overlay")
 
     assert overlay.key?("hidden")
     assert_equal "500", overlay["data-delay"]
+    assert_equal "15000", overlay["data-max-wait"]
+    assert_nil overlay["aria-busy"], "aria-busy would mute the Loading status inside it"
     assert overlay.key?("data-studio-loader-overlay")
     assert overlay.at_css(".studio-loader-overlay-panel .studio-loader[role=status]")
     assert overlay.at_css("[data-studio-loader-caption]")
+    assert_equal "4000", render_view { |view| view.studio_loader_overlay(max_wait: 4000) }.at_css(".studio-loader-overlay")["data-max-wait"]
   end
 
+  # Whole lines, anchored: a substring match would also pass an unscoped
+  # `[aria-busy="true"] …` rule, which Turbo's busy <html> would wake on every visit.
   test "pending loaders show only inside a busy button or form" do
-    css = File.read(MOTION_CSS)
+    lines = File.readlines(MOTION_CSS, chomp: true).map(&:strip)
 
-    assert_includes css, ".studio-loader[data-loader-pending] { display: none; }"
-    assert_includes css, %([aria-busy="true"] .studio-loader[data-loader-pending] { display: inline-grid; })
+    assert_includes lines, ".studio-loader[data-loader-pending] { display: none; }"
+    assert_includes lines, %(:where(form, button)[aria-busy="true"] .studio-loader[data-loader-pending] { display: inline-grid; }),
+                    "the scoped pending rule, exactly"
+    assert_includes lines, %(:where(form, button)[aria-busy="true"] [data-loader-idle] { display: none; })
+    unscoped = lines.grep(/\A\[aria-busy="true"\]/)
+    assert_empty unscoped, "a pending rule must be scoped to its own form or button"
   end
 
   # ── F ─────────────────────────────────────────────────────

@@ -1,0 +1,19 @@
+<%# The page-load overlay under Turbo (e2e/loader_visits.spec.js, docs/LOADER.md).
+
+    One page that is also every destination: /lab/loader_visits?ms=N answers N
+    ms late. The overlay waits 100ms, so a destination at 1200ms is a visit a
+    user would wait on. The spec makes the background visit itself, the way the
+    hub's usage_countdown.js does: Turbo.visit(url, { action: "replace" }). %>
+<main class="p-6 grid gap-4" data-test="loader-visits">
+  <p data-test="arrived"><%= params[:ms].to_i %></p>
+  <a href="/lab/loader_visits?ms=1200" data-test="slow-link">A page a user waits on</a>
+  <a href="/lab/loader_download" data-test="download-link">Report (a download with no extension)</a>
+  <%= form_with url: "/lab/loader_visits", method: :get, data: { turbo: "false", test: "plain-form" } do %>
+    <input type="hidden" name="ms" value="300">
+    <button type="submit" data-test="plain-submit"><%= studio_loader_pending %><span data-loader-idle>Save</span></button>
+  <% end %>
+  <%= form_with url: "/lab/loader_download", method: :get, data: { turbo: "false", test: "download-form" } do %>
+    <button type="submit" data-test="download-submit"><%= studio_loader_pending %><span data-loader-idle>Export</span></button>
+  <% end %>
+  <%= studio_loader_overlay(delay: 100, max_wait: params[:max_wait].presence || 15_000) %>
+</main>
