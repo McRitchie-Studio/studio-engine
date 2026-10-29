@@ -1082,7 +1082,13 @@
 # timeline nav_collapse measures the name's box, not the avatar's. Verified RED
 # by reverting nav_collapse.js's name selector (--nav-tools-shift 16 vs 8).
 #   npx playwright test --list  -> 387 tests in 60 files
-total_specs: 387
+# 387 -> 392: e2e/loader.spec.js (branded-app-loader), five tests on /lab/loader:
+# each picked style renders and animates, takes the theme's colours, stands
+# still under reduced motion, shows pending inside a busy button, and the
+# overlay shows and hides. Verified RED with the reduced-motion emulation not
+# applied (every loader part still animating).
+#   npx playwright test --list  -> 392 tests in 61 files
+total_specs: 392
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1334,7 +1340,10 @@ total_specs: 387
 #   npx playwright test --list                                             -> 387 tests, 60 files
 #   npx playwright test --list --grep "@devnet"                            -> 0
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 387
-executed: 387
+# And for the branded loader: 5 more tests (387 -> 392), 1 new file:
+#   npx playwright test --list                                             -> 392 tests, 61 files
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 392
+executed: 392
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

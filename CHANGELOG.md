@@ -4,6 +4,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **The branded loader: every app's own icon, in its own colours, as its
+  loader.** `studio_loader` (inline, any size), `studio_loader_pending` (inside a
+  submit button, shown while it or its form is `aria-busy`) and
+  `studio_loader_overlay` (the page-load overlay, shown when a Turbo visit
+  outlasts 350ms; `window.StudioLoader.show/hide` for other long waits). One
+  class, `.studio-loader`, one size variable, `--studio-loader-size`. Six styles
+  from the Loader Lab: generic `breathe` (the default), `liquid` (takes a
+  percent), `orbit` and `steel`; signature `weld_bead` and `sparkle`, which need
+  an art file of marked layers. Declared with `config.loader`. Reduced motion
+  shows a still icon. Nothing renders until an app calls a helper. docs/LOADER.md.
+
 ## 0.118.0 — 2026-10-28
 
 ### Added

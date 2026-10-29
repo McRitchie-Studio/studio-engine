@@ -30,6 +30,7 @@ require_relative "../lib/studio/navbar_account_sidebar"
 require_relative "../lib/studio/navbar_identity"
 require_relative "../lib/studio/navbar_wordmark"
 require_relative "../lib/studio/navbar_brand"
+require_relative "../lib/studio/loader"
 require_relative "../lib/studio/auth_labels"
 require_relative "../lib/studio/profile_sections"
 require_relative "../lib/studio/profile_image"
@@ -94,6 +95,7 @@ module Studio
   mattr_accessor :navbar_phone_name,    default: false
   mattr_accessor :navbar_name_in_rows,  default: false
   mattr_accessor :navbar_brand,         default: nil
+  mattr_accessor :loader,               default: Studio::Loader.normalize(nil)
   mattr_accessor :navbar_root_hook,     default: false
   mattr_accessor :navbar_z_tier,        default: false
   # nil, NOT [] — nil means "the engine's standard profile page". The unit suite

@@ -265,6 +265,25 @@ class StylePageTest < ActiveSupport::TestCase
   # the fizz on its own, the button live, and the button re-themed from an
   # ancestor with no new CSS. A broken partial path here 500s the whole page in
   # every host, so this renders them rather than string-matching the source.
+  # The branded loader group (docs/LOADER.md): this app's own loader, a busy
+  # pending button, the overlay trigger, and every style. A signature style the
+  # app has no art for stays present but flagged, never hidden.
+  test "the Tricks section stages the branded loader in this app's style" do
+    doc = Nokogiri::HTML.fragment(render_index)
+    group = doc.at_css("section#loader")
+    assert group, "the loader group has its #loader anchor"
+
+    assert_operator group.css(".studio-loader[data-loader-style='#{Studio.loader[:style].to_s.tr('_', '-')}']").size, :>=, 3,
+      "this app's loader at three sizes"
+    assert group.at_css("button[aria-busy='true'] .studio-loader[data-loader-pending]"), "a busy pending button"
+    assert group.at_css("[data-test='style-show-loader-overlay']"), "the overlay trigger"
+    %w[breathe liquid orbit steel].each do |style|
+      assert group.at_css(".studio-loader[data-loader-style='#{style}']"), "the #{style} specimen"
+    end
+    assert_equal 2, group.css("[aria-disabled='true']").size,
+      "with no art file, weld bead and sparkle are flagged as needing one"
+  end
+
   test "the Tricks section stages the hold-to-confirm button and its fizz" do
     doc = Nokogiri::HTML.fragment(render_index)
 

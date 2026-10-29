@@ -17,9 +17,11 @@ import LinkSidebarController from "studio/controllers/link_sidebar_controller"
 import IdentityMiniController from "studio/controllers/identity_mini_controller"
 import { startPinnedStack } from "studio/pinned_stack"
 import { installAlpineShims } from "studio/alpine_shims"
+import { installStudioLoader } from "studio/loader"
 
 installAlpineShims()
 startPinnedStack()
+installStudioLoader()
 
 application.register("nav-collapse", NavCollapseController)
 application.register("modal-host", ModalHostController)

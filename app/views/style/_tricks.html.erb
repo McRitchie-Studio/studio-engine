@@ -185,6 +185,65 @@
     </div>
   </section>
 
+  <!-- Branded loader -->
+  <%
+    loader_config = Studio.loader
+    # An ERB tag as text, built so this file never holds a closing tag inside one.
+    erb_tag = ->(code) { "<" + "%= #{code} %" + ">" }
+    loader_art_styles = Studio::Loader::ART_STYLES.keys.select do |style|
+      loader_config[:art] && Studio::Loader.art(loader_config[:art], style)
+    end
+  %>
+  <section id="loader" class="space-y-5" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
+    <div class="space-y-1">
+      <h3 class="text-xl font-bold text-heading">Branded loader</h3>
+      <p class="text-muted text-sm max-w-2xl">
+        This app's own icon in its theme colours, in the style <code class="font-mono text-2xs">config.loader</code>
+        names (<strong><%= loader_config[:style].to_s.tr("_", " ") %></strong>). Page loads, long waits and pending
+        buttons all draw it. One class, <code class="font-mono text-2xs">.studio-loader</code>, sized by
+        <code class="font-mono text-2xs">--studio-loader-size</code>. studio-engine docs/LOADER.md.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <%= render layout: "style/specimen",
+            locals: { klass: ".studio-loader (this app's style)",
+                      usage: [erb_tag.call("studio_loader"), erb_tag.call('studio_loader size: 20, label: "Saving"')].join("\n") } do %>
+        <%= studio_loader %>
+        <%= studio_loader size: 32 %>
+        <%= studio_loader size: 20 %>
+      <% end %>
+
+      <%= render layout: "style/specimen",
+            locals: { klass: "studio_loader_pending (inside a busy button)",
+                      usage: ["<button class=\"btn btn-primary\">", "  <span data-loader-idle>Save</span>", "  #{erb_tag.call('studio_loader_pending')}", "</button>"].join("\n") } do %>
+        <button type="button" class="btn btn-primary" aria-busy="true">
+          <%= studio_loader_pending %><span class="ml-2">Saving…</span>
+        </button>
+      <% end %>
+
+      <%= render layout: "style/specimen",
+            locals: { klass: "studio_loader_overlay (the page-load overlay)",
+                      usage: ["#{erb_tag.call('studio_loader_overlay')}  (once, in the layout body)", 'window.StudioLoader.show("Caption") / .hide()'].join("\n") } do %>
+        <button type="button" class="btn btn-secondary" data-test="style-show-loader-overlay"
+                x-data x-on:click="window.StudioLoader && window.StudioLoader.show('Loading your page…'); setTimeout(() => window.StudioLoader && window.StudioLoader.hide(), 3000)">
+          Show the overlay for 3 seconds
+        </button>
+      <% end %>
+
+      <% Studio::Loader::STYLES.each do |style| %>
+        <% signature = Studio::Loader.art_style?(style) %>
+        <% unavailable = signature && !loader_art_styles.include?(style) %>
+        <%= render layout: "style/specimen",
+              locals: { klass: %(style: :#{style}#{signature ? " (signature, needs art)" : ""}),
+                        usage: %(config.loader = #{signature ? "{ style: :#{style}, art: \"/brand/loader-#{style}.svg\" }" : ":#{style}"}),
+                        disabled: unavailable, disabled_label: "needs this app's art file" } do %>
+          <%= studio_loader style: style, size: 72 %>
+          <%= studio_loader style: style, size: 28 %>
+        <% end %>
+      <% end %>
+    </div>
+  </section>
+
   <!-- Motion primitives -->
   <section class="space-y-5">
     <div class="space-y-1">
