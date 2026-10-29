@@ -1,3 +1,3 @@
 module Studio
-  VERSION = "0.116.2"
+  VERSION = "0.117.0"
 end

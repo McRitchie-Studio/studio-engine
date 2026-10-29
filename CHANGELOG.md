@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.117.0 — 2026-10-28
+
 ### Changed
 
 - **The default sender names the app: `"<Studio.app_name> <team@mcritchie.studio>"`.**
