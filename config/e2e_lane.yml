@@ -1088,7 +1088,14 @@
 # overlay shows and hides. Verified RED with the reduced-motion emulation not
 # applied (every loader part still animating).
 #   npx playwright test --list  -> 392 tests in 61 files
-total_specs: 392
+# 392 -> 397: e2e/loader_visits.spec.js (four tests) and e2e/loader_bfcache.spec.js
+# (one, on the full Chromium build so the back/forward cache is on), both on
+# /lab/loader_visits (loader-skips-background-visits): a background replace visit
+# shows no overlay, Back after a data-turbo=false submit leaves nothing busy, a
+# download (Turbo link or plain form) clears the overlay and the button, and the
+# overlay is never aria-busy. Each verified RED by reverting its own fix once.
+#   npx playwright test --list  -> 397 tests in 63 files
+total_specs: 397
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1343,7 +1350,10 @@ total_specs: 392
 # And for the branded loader: 5 more tests (387 -> 392), 1 new file:
 #   npx playwright test --list                                             -> 392 tests, 61 files
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 392
-executed: 392
+# And for the loader's visit fixes: 5 more tests (392 -> 397), 2 new files:
+#   npx playwright test --list                                             -> 397 tests, 63 files
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 397
+executed: 397
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

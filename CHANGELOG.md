@@ -9,25 +9,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **The branded loader: every app's own icon, in its own colours, as its
   loader.** `studio_loader` (inline, any size), `studio_loader_pending` (inside a
   submit button, shown while it or its form is `aria-busy`) and
-  `studio_loader_overlay` (the page-load overlay, shown when a Turbo visit
-  outlasts 350ms; `window.StudioLoader.show/hide` for other long waits). One
+  `studio_loader_overlay` (the page-load overlay, shown when a visit the user
+  started, a Turbo `advance` or `restore`, outlasts 350ms, never for a
+  background `replace` refresh; `window.StudioLoader.show/hide` for other long
+  waits). The overlay and busy buttons always clear: on `turbo:reload` (a
+  download at a URL with no extension), on `pagehide` and a bfcache `pageshow`
+  (Back after a `data-turbo="false"` submit), and at a `max_wait:` cap
+  (15000ms) for a form whose response was a download. The overlay's "Loading"
+  status is announced; it never marks itself `aria-busy`. One
   class, `.studio-loader`, one size variable, `--studio-loader-size`. Six styles
   from the Loader Lab: generic `breathe` (the default), `liquid` (takes a
   percent), `orbit` and `steel`; signature `weld_bead` and `sparkle`, which need
   an art file of marked layers. Declared with `config.loader`. Reduced motion
   shows a still icon. Nothing renders until an app calls a helper. docs/LOADER.md.
-
-### Fixed
-
-- **The page-load overlay shows only for visits the user started, and always
-  clears.** A Turbo `replace` visit (a poll's background refresh, Turbo 8's page
-  refresh) no longer shows it; only `advance` and `restore` visits do. A Turbo
-  link to a download with no extension clears it on `turbo:reload`; `pagehide`
-  and a bfcache `pageshow` clear it and every busy button a `data-turbo="false"`
-  form marked; and a new `studio_loader_overlay(max_wait:)` cap (15000ms)
-  clears an automatic show and a busy button whose response was a download. The
-  overlay no longer marks itself `aria-busy`, so its "Loading" status is
-  announced. docs/LOADER.md.
 
 ## 0.118.0 — 2026-10-28
 
