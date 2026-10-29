@@ -86,7 +86,7 @@ Studio.configure do |config|
   config.welcome_message = ->(user) { "Welcome to X App, #{user.display_name}!" }
   config.auth_methods = %i[magic_link google]  # add :wallet or :password only when needed
   config.registration_params = [:name, :email]
-  config.mailer_from = Studio.mailer_from_for_transport # RESEND_MAILER_FROM, else the shared sender
+  config.mailer_from = Studio.mailer_from_for_transport # RESEND_MAILER_FROM, else "X App <team@mcritchie.studio>"
   config.configure_sso_user = ->(user) { user.role = "viewer" }
   # Optional: defaults check wallet_address, then solana_address.
   # Set this if your User exposes a different wallet column/helper.
@@ -123,9 +123,34 @@ Studio::MailTransport.configure!
 ```
 
 This shared transport selects Resend when `RESEND_API_KEY` is present, and
-`Studio.mailer_from_for_transport` answers `RESEND_MAILER_FROM`, else the shared
-`McRitchie Studio <team@mcritchie.studio>` sender. SES was retired on 2026-10-10;
-do not set `MAIL_TRANSPORT=ses` (see [`EMAIL_TRANSPORT.md`](EMAIL_TRANSPORT.md)).
+`Studio.mailer_from_for_transport` answers `RESEND_MAILER_FROM`, then
+`resend_from:`, else `"<app_name> <team@mcritchie.studio>"` (set `app_name`
+first in the configure block). It ignores the retired `ses_from:` keyword, so
+pass `resend_from:` if you pass anything. SES was retired on 2026-10-10; do not
+set `MAIL_TRANSPORT=ses` (see [`EMAIL_TRANSPORT.md`](EMAIL_TRANSPORT.md)).
+
+**Every app sends from `team@mcritchie.studio`, under its own name.** A client's
+own sending domain is a paid tier upgrade: verify the domain in Resend, then set
+`RESEND_MAILER_FROM` on that app.
+
+**Delete or re-point the scaffold mailer.** `rails new` writes
+`app/mailers/application_mailer.rb` with `default from: "from@example.com"`.
+That class shadows the engine's `ApplicationMailer`, so every mailer, the magic
+link included, sends from the placeholder and Resend refuses it. Delete the file
+(the engine's `ApplicationMailer` then applies), or, if the app needs its own
+layout, re-point it:
+
+```ruby
+class ApplicationMailer < ActionMailer::Base
+  default from: -> { Studio.mailer_from.presence || "X App <team@mcritchie.studio>" }
+  layout "mailer"
+end
+```
+
+The engine refuses to boot in production while `ApplicationMailer` or
+`UserMailer` resolves to an example.com sender (`Studio::MailSender`). Heroku's
+build boots production for `assets:precompile`, so the build fails and the
+placeholder never releases.
 
 ### `config/initializers/session_store.rb`
 
