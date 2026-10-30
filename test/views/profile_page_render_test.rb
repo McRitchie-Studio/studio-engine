@@ -34,6 +34,10 @@ class ProfilePageRenderTest < Minitest::Test
     def avatar = @avatar ||= Class.new { def attached? = false }.new
     def avatar_color = "#6366f1"
     def avatar_initials = "PS"
+    # The voice trio (the add_voice_profile_to_users migration): present, empty.
+    def voice_embedding = nil
+    def voice_embedding_model = nil
+    def voice_embedding_updated_at = nil
   end
 
   def view(user: StubUser.new)
@@ -43,6 +47,7 @@ class ProfilePageRenderTest < Minitest::Test
     v.define_singleton_method(:profile_avatar_path) { "/profile/avatar" }
     v.define_singleton_method(:edit_profile_path) { "/profile/edit" }
     v.define_singleton_method(:profile_newsletter_path) { "/profile/newsletter" }
+    v.define_singleton_method(:profile_voice_path) { "/profile/voice" }
     # show.html.erb reads flash[:email_change_pending] to decide whether to open
     # the handoff modal. A bare ActionView has no controller to delegate flash
     # to, so supply the empty case — the populated one is exercised by a real
@@ -597,7 +602,7 @@ class ProfilePageRenderTest < Minitest::Test
       render_page(Studio::ProfileSections.defaults.select { |x| x[:page] == :show })
     )
 
-    assert_equal %w[google newsletter], doc.css("[data-profile-section]").map { |x| x["data-profile-section"] }
+    assert_equal %w[google newsletter voice], doc.css("[data-profile-section]").map { |x| x["data-profile-section"] }
   end
 
   # ONE CARD PER ROW (operator's call). The identity header above already renders
@@ -761,5 +766,48 @@ class ProfileEditPageRenderTest < ProfilePageRenderTest
     seed = JSON.parse(doc.at_css("[x-data]")["x-data"][/studioProfileForm\((.*)\)\z/m, 1])
 
     assert_equal doc.at_css('input[name="profile[first_name]"]')["value"], seed["first_name"]
+  end
+
+  # --- the voice row ------------------------------------------------------------
+
+  def voice_row(user: StubUser.new, embedder: nil)
+    locals = { user: user }
+    locals[:embedder] = embedder if embedder
+    Nokogiri::HTML(view(user: user).render(partial: "studio/profiles/voice_section", locals: locals))
+  end
+
+  def test_the_voice_row_says_what_it_stores_and_names_its_embedder
+    doc = voice_row
+    root = doc.at_css("[data-studio-controller='voice-profile']")
+
+    assert root, "the row mounts the lazy voice-profile controller"
+    assert_equal "/profile/voice", root["data-voice-save-url"]
+    assert_equal "wespeaker", JSON.parse(root["data-voice-embedder"])["name"]
+    assert_includes doc.at_css("[data-voice-consent]").text.squish, "This saves a voice pattern, not a recording."
+    assert_equal Studio::VoiceMatch::PHRASES.size, doc.css("[data-voice-phrase]").size
+    assert doc.at_css("[data-voice-setup][hidden]"), "the setup waits behind the button"
+    assert_nil doc.at_css("form[data-voice-delete]"), "nothing saved, nothing to delete"
+  end
+
+  def test_a_saved_voice_renders_delete_as_a_plain_form
+    saved = Class.new(StubUser) do
+      def voice_embedding = [0.5, 0.5]
+      def voice_embedding_model = Studio::VoiceMatch.model_id("wespeaker")
+      def voice_embedding_updated_at = Time.utc(2026, 10, 29)
+    end.new
+    doc = voice_row(user: saved)
+
+    form = doc.at_css("form[data-voice-delete]")
+    assert form, "Delete works without JavaScript"
+    assert_equal "/profile/voice", form["action"]
+    assert_equal "delete", form.at_css("input[name='_method']")["value"]
+    assert_equal "current", doc.at_css("[data-voice-saved]")["data-voice-saved"]
+    assert_includes doc.text, "Re-record"
+  end
+
+  def test_the_embedder_local_overrides_the_setting
+    root = voice_row(embedder: "fake").at_css("[data-voice-embedder]")
+
+    assert_equal "fake-256", JSON.parse(root["data-voice-embedder"])["id"]
   end
 end
