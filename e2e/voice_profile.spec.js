@@ -27,16 +27,23 @@ async function generatedMicrophone(page, { gain }) {
   await page.addInitScript((level) => {
     window.studioFakeMicGain = level;
     window.studioFakeVoice = "pat";
+    // ONE audio context for every take: Chrome caps how many a page may hold,
+    // and a context past the cap stays suspended, which reads as silence.
+    let mic = null;
     navigator.mediaDevices.getUserMedia = async () => {
-      const context = new AudioContext();
-      const oscillator = context.createOscillator();
-      oscillator.frequency.value = 220;
-      const volume = context.createGain();
-      volume.gain.value = window.studioFakeMicGain;
-      const out = context.createMediaStreamDestination();
-      oscillator.connect(volume).connect(out);
-      oscillator.start();
-      if (context.state === "suspended") await context.resume();
+      if (!mic) {
+        const context = new AudioContext();
+        const oscillator = context.createOscillator();
+        oscillator.frequency.value = 220;
+        const volume = context.createGain();
+        oscillator.connect(volume);
+        oscillator.start();
+        mic = { context, volume };
+      }
+      if (mic.context.state === "suspended") await mic.context.resume();
+      mic.volume.gain.value = window.studioFakeMicGain;
+      const out = mic.context.createMediaStreamDestination();
+      mic.volume.connect(out);
       return out.stream;
     };
   }, gain);
