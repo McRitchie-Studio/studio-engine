@@ -26,9 +26,10 @@
 //   fake       Tests only: a fixed vector per voice name (window.studioFakeVoice),
 //              because Chrome's fake microphone cannot play chosen audio.
 //
-// It imports nothing statically; the model runtime is a dynamic import of
-// "@huggingface/transformers" (pinned by the engine's importmap, never
-// preloaded). test/javascript/voice_profile.test.mjs loads it as a data: module.
+// It imports nothing statically; the model runtime is a dynamic import of the
+// transformers.js URL the page names (Studio::VoiceMatch::TRANSFORMERS_URL), made
+// only once someone opens the setup. test/javascript/voice_profile.test.mjs
+// loads it as a data: module.
 
 // The model hears 16 kHz mono; a take is cut to its first MAX_SECONDS.
 export const SAMPLE_RATE = 16000
@@ -185,7 +186,8 @@ class WespeakerEmbedder {
   warm() {
     if (!this.loading) {
       this.loading = (async () => {
-        const transformers = await import("@huggingface/transformers")
+        // By full URL (the page's config.runtime), never an importmap pin.
+        const transformers = await import(this.config.runtime)
         // The model comes from the Hugging Face hub at a pinned revision, never
         // from this app's own /models path.
         transformers.env.allowLocalModels = false

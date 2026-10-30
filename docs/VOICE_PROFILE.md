@@ -40,7 +40,8 @@ how you sound, so your agent can tell it's you. Delete it any time."
    end
    ```
 
-3. Let the browser fetch the model. The page loads transformers.js from
+3. Let the browser fetch the model. The page imports transformers.js by URL
+   (`Studio::VoiceMatch::TRANSFORMERS_URL`, never an importmap pin) from
    **jsDelivr** (`cdn.jsdelivr.net`, which also serves its onnxruntime-web
    WebAssembly) and the speaker model from **Hugging Face** (`huggingface.co`,
    which redirects the file to `*.hf.co`). Add them to the app's CSP:

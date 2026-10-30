@@ -19,7 +19,7 @@ function cosine(a, b) {
 
 test("the module imports nothing statically", () => {
   assert.doesNotMatch(source, /^\s*import\s/m)
-  assert.match(source, /import\("@huggingface\/transformers"\)/, "the runtime is a dynamic import")
+  assert.match(source, /await import\(this\.config\.runtime\)/, "the runtime is a dynamic import of the page's URL")
 })
 
 test("the silence line is -40 dBFS, as measured in Voicebox", () => {

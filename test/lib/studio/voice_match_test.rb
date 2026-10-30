@@ -201,9 +201,12 @@ class VoiceMatchTest < Minitest::Test
     assert_includes error.message, "wespeaker"
   end
 
-  def test_the_importmap_pin_matches_the_runtime_version
+  # The runtime is fetched by URL, not pinned: a host's every importmap pin must
+  # be a fingerprinted local asset (the hub's AssetUrlsTest went red on a pin).
+  def test_the_runtime_is_a_pinned_url_and_not_an_importmap_pin
+    assert_equal "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6/dist/transformers.min.js",
+                 VM.browser_config("wespeaker")["runtime"]
     map = File.read(File.expand_path("../../../config/importmap.rb", __dir__))
-
-    assert_includes map, "@huggingface/transformers@#{VM::TRANSFORMERS_VERSION}/"
+    refute_includes map, "huggingface"
   end
 end

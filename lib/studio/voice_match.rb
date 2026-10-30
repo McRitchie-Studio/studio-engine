@@ -35,13 +35,22 @@ module Studio
     # microphone cannot play chosen audio.
     TRANSFORMERS_VERSION = "3.7.6"
 
+    # Where the browser imports transformers.js from, by full URL. NOT an
+    # importmap pin: every pin a host draws must be a fingerprinted local asset
+    # (the hub's AssetUrlsTest), and a ~1 MB runtime that fetches its own
+    # onnxruntime WebAssembly from the same jsDelivr path anyway gains nothing
+    # from being vendored. A host's CSP names this package path.
+    TRANSFORMERS_URL =
+      "https://cdn.jsdelivr.net/npm/@huggingface/transformers@#{TRANSFORMERS_VERSION}/dist/transformers.min.js"
+
     EMBEDDERS = {
       "wespeaker" => {
         "id" => "wespeaker-voxceleb-resnet34-LM@6a61a18",
         "size" => 256,
         "model" => "onnx-community/wespeaker-voxceleb-resnet34-LM",
         "revision" => "6a61a1833ff2583aabeba044f5c8221f00b67ceb",
-        "dtype" => "q8"
+        "dtype" => "q8",
+        "runtime" => TRANSFORMERS_URL
       }.freeze,
       "fake" => {
         "id" => "fake-256",
