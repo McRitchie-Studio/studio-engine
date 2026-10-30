@@ -4,6 +4,20 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **The theme toggle names itself.** `components/_theme_toggle` now renders
+  `type="button"` (it no longer submits a form it sits inside),
+  `aria-label="Dark theme"` and an `aria-pressed` bound to the theme store
+  (`$store.theme.isDark`), so a screen reader hears a toggle button and its
+  state, and the state flips with the theme. The `title` tooltip, classes and
+  icons are unchanged. With `Studio.navbar_name_in_rows` on, the truncating name
+  control carries the full name as its `title`. Hosts that patched these in at
+  runtime (turf-monster `app/javascript/nav_labels.js`) can drop the patch once
+  they lock this version. This is a deliberate change to the unset navbar's
+  bytes: `test/fixtures/files/navbar_unset_baseline` was regenerated, and the
+  toggle's button line is the only line that moved.
+
 ## 0.119.0 — 2026-10-29
 
 ### Added

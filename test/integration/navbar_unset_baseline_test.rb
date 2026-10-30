@@ -8,6 +8,10 @@
 # test/fixtures/files/navbar_unset_baseline were captured from v0.113.0, loaded
 # from its own Gemfile, by test/support/navbar_baseline_cases.rb, which also
 # holds the cases and how to regenerate them.
+#
+# Deliberate changes since the capture, each regenerated and named in the
+# CHANGELOG: the theme toggle's button gained type, aria-label and a bound
+# aria-pressed (/tasks/engine-theme-toggle-labels).
 
 require "bundler/setup"
 

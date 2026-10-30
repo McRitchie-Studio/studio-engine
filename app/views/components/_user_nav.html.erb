@@ -144,21 +144,25 @@
               so its control is not rendered there at all (hidden, never a
               0x0 tab stop announcing the name a second time): the avatar,
               labelled with the name, is the account below md. %>
+          <%# The name truncates from md, so each control carries the full name as
+              its title for a pointer reader; its accessible name was always the
+              full text. %>
+          <% name_title = nav_user_name.to_s.squish %>
           <% name_classes = "group min-w-0 flex-shrink rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40#{" hidden md:block" unless phone_name}" %>
           <% if account_sidebar %>
             <% name_js = studio_navbar_account_sidebar_expressions(account_sidebar) %>
-            <%= tag.button type: "button", class: "#{name_classes} cursor-pointer",
+            <%= tag.button type: "button", class: "#{name_classes} cursor-pointer", title: name_title,
                            data: { nav_name_trigger: "", profile_image_toggle: "" },
                            aria: { controls: account_sidebar[:controls], haspopup: "dialog" },
                            ":aria-expanded": name_js[:expanded], "@click.stop": name_js[:toggle] do %><%= name_html %><% end %>
           <% elsif account_opens_sidebar %>
-            <button type="button" class="<%= name_classes %> cursor-pointer" data-nav-name-trigger data-profile-image-toggle
+            <button type="button" class="<%= name_classes %> cursor-pointer" title="<%= name_title %>" data-nav-name-trigger data-profile-image-toggle
                     aria-controls="studio-link-sidebar studio-link-sidebar-mobile" aria-haspopup="dialog"
                     :aria-expanded="$store.sidebars && $store.sidebars.linkTreeOpen ? 'true' : 'false'"><%= name_html %></button>
           <% elsif studio_nav_destination %>
-            <%= link_to name_html, studio_nav_destination, class: name_classes, "data-nav-name-trigger": "" %>
+            <%= link_to name_html, studio_nav_destination, class: name_classes, title: name_title, "data-nav-name-trigger": "" %>
           <% else %>
-            <span class="<%= name_classes %>" data-nav-name-trigger><%= name_html %></span>
+            <span class="<%= name_classes %>" title="<%= name_title %>" data-nav-name-trigger><%= name_html %></span>
           <% end %>
         <% end %>
       </div>
