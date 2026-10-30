@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.120.0 — 2026-10-30
+
 ### Added
 
 - **Voice profile on `/profile`, opt-in.** `config.voice_profile = true` adds a
