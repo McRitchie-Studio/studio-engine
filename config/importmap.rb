@@ -34,3 +34,14 @@ end
 pin "@hotwired/stimulus", to: "studio/vendor/stimulus.js", preload: true
 pin "sortablejs", to: "studio/sortable.js", preload: false
 pin "canvas-confetti", to: "studio/canvas_confetti.js", preload: false
+
+# The voice row's speaker-model runtime (studio/voice_profile imports it
+# dynamically, only once someone opens "Set up your voice"), so it is never
+# preloaded. From jsDelivr, not vendored: it is ~1 MB and it fetches its own
+# onnxruntime-web WebAssembly from the same CDN anyway. Keep the version equal
+# to Studio::VoiceMatch::TRANSFORMERS_VERSION. A host that turns
+# Studio.voice_profile on names cdn.jsdelivr.net and the Hugging Face hosts in
+# its CSP (docs/VOICE_PROFILE.md).
+pin "@huggingface/transformers",
+    to: "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6/dist/transformers.min.js",
+    preload: false
