@@ -46,9 +46,14 @@ how you sound, so your agent can tell it's you. Delete it any time."
    which redirects the file to `*.hf.co`). Add them to the app's CSP:
 
    ```ruby
-   policy.script_src  ..., "https://cdn.jsdelivr.net"
-   policy.connect_src ..., "https://cdn.jsdelivr.net", "https://huggingface.co", "https://*.hf.co"
+   runtime = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6/"
+   policy.script_src  ..., runtime
+   policy.connect_src ..., runtime, "https://huggingface.co", "https://*.hf.co"
    ```
+
+   The runtime is a package path, not the whole CDN: transformers.js and the
+   onnxruntime WebAssembly it fetches both live under it. Keep the version equal
+   to `Studio::VoiceMatch::TRANSFORMERS_VERSION`.
 
    `script_src` also needs `'wasm-unsafe-eval'` (or `'unsafe-eval'`) for the
    WebAssembly runtime, and the page needs the microphone, so a
