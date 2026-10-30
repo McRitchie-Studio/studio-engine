@@ -358,4 +358,16 @@ class VoiceProfileRequestsTest < ActionDispatch::IntegrationTest
     AddVoiceProfileToUsers.new.migrate(:up)
     User.reset_column_information
   end
+
+  test "the engine keeps voice vectors out of the request log and User#inspect" do
+    sign_in create_user
+    save_voice
+    assert_response :ok
+
+    logged = request.filtered_parameters
+    assert_equal "[FILTERED]", logged.dig("voice", "embeddings")
+    assert_equal MODEL, logged.dig("voice", "model"), "the model id stays readable"
+    assert_equal "[FILTERED]", logged.dig("profile", "voice", "embeddings"), "the JSON param wrapper copy too"
+    assert_includes User.last.inspect, "voice_embedding: [FILTERED]", "User#inspect masks voice_embedding"
+  end
 end

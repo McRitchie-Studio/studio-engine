@@ -299,6 +299,14 @@ module Studio
       app.config.middleware.use Studio::GoogleSignIn::Middleware
     end
 
+    # The voice row's vectors stay out of every consumer's request log and
+    # User#inspect: POST /profile/voice carries voice[embeddings], and the user
+    # holds voice_embedding (Voicebox logged vectors until it filtered them).
+    # `(\A|\.)` also masks the JSON param wrapper's copy (profile.voice.embeddings).
+    initializer "studio.voice_profile.filter_parameters" do |app|
+      app.config.filter_parameters += [/(\A|\.)voice\.embeddings\z/, /\Avoice_embedding\z/]
+    end
+
     initializer "studio.footer_only_eager_load" do
       next if Studio.active_record?
 
