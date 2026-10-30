@@ -153,8 +153,6 @@ class NavbarNameInRowsRenderTest < ActiveSupport::TestCase
     assert_raises(ArgumentError) { Studio.navbar_name_in_rows = nil }
   end
 
-  private
-
   # The name truncates from md, so its control carries the full name as a title
   # for a pointer reader, in every kind the control takes
   # (/tasks/engine-theme-toggle-labels; hosts once patched it in at runtime).
@@ -180,6 +178,8 @@ class NavbarNameInRowsRenderTest < ActiveSupport::TestCase
     Studio.navbar_name_in_rows = false
     assert_nil doc.at_css("[data-nav-account]")["title"]
   end
+
+  private
 
   def doc = Nokogiri::HTML5(NavbarRenderHost.render_navbar(signed_in: true))
 end
