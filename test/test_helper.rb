@@ -149,6 +149,8 @@ module Studio
   # specific value (a wallet app included) set it explicitly and restore it in
   # teardown.
   mattr_accessor :auth_methods,         default: %i[magic_link google]
+  mattr_accessor :voice_profile,        default: false
+  mattr_accessor :voice_embedder,       default: "wespeaker"
 
   # READ from lib/studio.rb rather than restated. This mirror block is
   # hand-maintained, and a restated number here would be a second definition of
