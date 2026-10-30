@@ -4,6 +4,24 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **Voice profile on `/profile`, opt-in.** `config.voice_profile = true` adds a
+  "Your voice" row: the signed-in user reads three phrases while a live level
+  meter shows the microphone being heard, silent takes are refused, and each
+  take becomes a speaker embedding on the device (WeSpeaker ResNet34 int8 from
+  Hugging Face at a pinned revision, through transformers.js 3.7.6 from
+  jsDelivr). Save posts only the three vectors (`POST /profile/voice`); the
+  server averages them onto the user's own record. Re-record and Delete
+  (`DELETE /profile/voice`) are on the row, with a consent line saying what is
+  stored. A new host-table migration, `add_voice_profile_to_users`, adds
+  `voice_embedding`, `voice_embedding_model` and `voice_embedding_updated_at`.
+  `Studio::VoiceMatch.identify(embedding, among:, model:)` returns the closest
+  user at or above 0.6 cosine, else nil, comparing only voices from the same
+  model. `config.voice_embedder = "fake"` is the test embedder
+  (`window.studioFakeVoice`). docs/VOICE_PROFILE.md lists the CSP and privacy
+  changes a host makes first.
+
 ## 0.119.1 — 2026-10-29
 
 ### Fixed

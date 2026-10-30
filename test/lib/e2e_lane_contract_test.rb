@@ -356,7 +356,10 @@ class E2eLaneContractTest < Minitest::Test
       # is asserted on the layout below rather than on a page.
       "site_footer_home.html.erb" => ["studio_booking_frame"],
       "site_footer_schedule.html.erb" => ["studio_booking_frame"],
-      "site_footer_index.html.erb" => ["studio_booking_link"]
+      "site_footer_index.html.erb" => ["studio_booking_link"],
+      # The voice row's recorder, meter and save are the engine's program
+      # (studio/voice_profile), mounted by the row's own markup.
+      "voice_profile.html.erb" => ["studio/profiles/voice_section"]
     }.each do |page, partials|
       source = File.read(File.join(lab, page))
 

@@ -1101,7 +1101,14 @@
 # RED with the wrapper's x-data removed (the modal never renders) and with the
 # focus not waiting out the close (the host hands focus back to the opener).
 #   npx playwright test --list  -> 399 tests in 64 files
-total_specs: 399
+# 399 -> 402: e2e/voice_profile.spec.js (voice-profile-on-every-profile), three
+# tests on /lab/voice_profile at 390px with a generated microphone and the fake
+# embedder: three heard takes save three vectors and no audio, a silent take is
+# refused, and a saved voice offers Re-record and Delete. Verified RED with
+# SILENCE_RMS set to 0 (the silent take is kept) and with the vectors dropped
+# from the save body.
+#   npx playwright test --list  -> 402 tests in 65 files
+total_specs: 402
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1362,7 +1369,10 @@ total_specs: 399
 # And for the Google setup modal: 2 more tests (397 -> 399), 1 new file:
 #   npx playwright test --list                                             -> 399 tests, 64 files
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 399
-executed: 399
+# And for the voice row: 3 more tests (399 -> 402), 1 new file:
+#   npx playwright test --list                                             -> 402 tests, 65 files
+#   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 402
+executed: 402
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

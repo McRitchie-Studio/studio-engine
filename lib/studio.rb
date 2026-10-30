@@ -46,6 +46,7 @@ require "studio/loader"
 require "studio/auth_labels"
 require "studio/profile_sections"
 require "studio/profile_image"
+require "studio/voice_match"
 require "studio/oauth_identity"
 require "studio/google_sign_in"
 require "studio/newsletter"
@@ -555,6 +556,25 @@ module Studio
   # account_path, and a shared /account could never be default-on. An app that
   # wants the page gone still sets this false.
   mattr_accessor :draw_profile_routes, default: true
+
+  # The voice row on /profile: "Set up your voice". The signed-in user reads
+  # three short phrases; each take becomes a speaker embedding ON THEIR DEVICE
+  # (studio/voice_profile, a WeSpeaker model run by transformers.js), the audio
+  # is dropped, and only the vectors are posted. The server averages them into
+  # one vector on the user's own record (users.voice_embedding, installed by the
+  # engine migration add_voice_profile_to_users). Studio::VoiceMatch.identify
+  # answers "who is speaking" from an embedding.
+  #
+  # OFF BY DEFAULT. Turning it on is a privacy decision (a voice pattern is
+  # biometric data in several jurisdictions) and it makes the page fetch a model
+  # from Hugging Face and its runtime from jsDelivr, which a host's CSP and
+  # privacy page must both name. docs/VOICE_PROFILE.md lists what to change.
+  mattr_accessor :voice_profile, default: false
+
+  # Which speaker embedder the browser runs: "wespeaker" (the real one) or
+  # "fake" (tests only; a fixed vector per window.studioFakeVoice). The server
+  # refuses a voice saved by any other embedder, so a page cannot pick its own.
+  mattr_accessor :voice_embedder, default: "wespeaker"
 
   # How long a freshly minted magic link stays live.
   mattr_accessor :magic_link_ttl, default: 15.minutes
@@ -1926,6 +1946,13 @@ module Studio
         post   "profile/newsletter", to: "studio/profiles#subscribe_newsletter",
                as: :profile_newsletter
         delete "profile/newsletter", to: "studio/profiles#unsubscribe_newsletter"
+
+        # The voice row. POST saves (or replaces) the voice from the setup's
+        # vectors; DELETE removes it. Drawn with the page, like the newsletter
+        # pair; the actions refuse unless the row renders (Studio.voice_profile
+        # on, and the user has the columns).
+        post   "profile/voice", to: "studio/profiles#save_voice", as: :profile_voice
+        delete "profile/voice", to: "studio/profiles#delete_voice"
       end
 
       resources :error_logs, only: [:index, :show]

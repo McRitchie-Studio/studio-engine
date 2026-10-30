@@ -646,6 +646,27 @@ class E2eLabController < ActionController::Base
     def avatar_initials = "BF"
   end
 
+  # THE VOICE ROW: an account with the voice columns and nothing saved, and
+  # (?saved=1) one with a saved voice, which is the state Re-record and Delete
+  # belong to. The row renders by name in lab/voice_profile with the "fake"
+  # embedder as a LOCAL, so no process-wide setting is written.
+  class LabVoiceUser < LabUser
+    def voice_embedding = nil
+    def voice_embedding_model = nil
+    def voice_embedding_updated_at = nil
+  end
+
+  class LabVoiceUserSaved < LabVoiceUser
+    def voice_embedding = Array.new(256, 0.0625)
+    def voice_embedding_model = Studio::VoiceMatch.model_id("fake")
+    def voice_embedding_updated_at = Time.utc(2026, 10, 29, 12)
+  end
+
+  def voice_profile
+    @user = params[:saved].present? ? LabVoiceUserSaved.new : LabVoiceUser.new
+    render(:voice_profile)
+  end
+
   def profile_edit
     @user =
       if params[:identity] == "long"

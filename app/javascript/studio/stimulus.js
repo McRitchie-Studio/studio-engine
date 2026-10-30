@@ -57,7 +57,9 @@ export const schema = {
 // knowledge transcript: a recording whose controller failed still plays from
 // its own controls, and its page says that click-to-play did not load. So is the
 // agent chat: a chat whose controller failed still renders, and its section
-// carries data-studio-controller-failed="agent-chat".
+// carries data-studio-controller-failed="agent-chat". So is the voice row: a
+// row whose controller failed keeps its saved state and its Delete, and says
+// that recording did not load (data-studio-controller-failed="voice-profile").
 export const LAZY = {
   "board": () => import("studio/controllers/board_controller"),
   "geo-settings": () => import("studio/controllers/geo_settings_controller"),
@@ -67,7 +69,8 @@ export const LAZY = {
   "footer-map": () => import("studio/controllers/footer_map_controller"),
   "survey": () => import("studio/controllers/survey_controller"),
   "knowledge-transcript": () => import("studio/controllers/knowledge_transcript_controller"),
-  "agent-chat": () => import("studio/controllers/agent_chat_controller")
+  "agent-chat": () => import("studio/controllers/agent_chat_controller"),
+  "voice-profile": () => import("studio/controllers/voice_profile_controller")
 }
 
 export const application = Application.start(document.documentElement, schema)

@@ -217,7 +217,7 @@ class ProfileSectionsTest < Minitest::Test
   end
 
   def test_studio_default_profile_sections_is_the_public_composition_handle
-    assert_equal %i[google newsletter name email birthday], Studio.default_profile_sections.map { |s| s[:key] }
+    assert_equal %i[google newsletter voice name email birthday], Studio.default_profile_sections.map { |s| s[:key] }
   end
 
   # --- the app-capability gate (`if:`) ----------------------------------------
@@ -329,5 +329,41 @@ class ProfileSectionsTest < Minitest::Test
   def test_default_config_is_nil_so_a_bare_app_gets_the_standard_page
     assert_nil Studio.profile_sections,
       "the shipped default must be nil (= standard page), not [] (= blank page)"
+  end
+
+  # --- the voice row: off by default, and gated on the columns ----------------
+
+  VoiceUser = Struct.new(:voice_embedding, :voice_embedding_model, :voice_embedding_updated_at)
+
+  def voice_view = UserView.new(VoiceUser.new(nil, nil, nil))
+
+  def show_keys(view) = Studio::ProfileSections.resolve(nil, view, page: :show).map { |s| s[:key] }
+
+  # OFF BY DEFAULT. Turning it on fetches a model from Hugging Face and stores a
+  # voice pattern, which a host's CSP and privacy page must say first.
+  def test_the_voice_row_is_off_by_default
+    refute Studio.voice_profile, "voice_profile must ship false"
+    refute_includes show_keys(voice_view), :voice
+  end
+
+  def test_the_voice_row_renders_on_the_read_page_once_the_host_turns_it_on
+    Studio.voice_profile = true
+
+    assert_includes show_keys(voice_view), :voice
+    refute_includes Studio::ProfileSections.resolve(nil, voice_view, page: :edit).map { |s| s[:key] }, :voice
+  ensure
+    Studio.voice_profile = false
+  end
+
+  # A host that turned it on but has not installed the migration gets no row,
+  # rather than a NoMethodError on every profile view.
+  def test_the_voice_row_needs_every_voice_column
+    Studio.voice_profile = true
+
+    refute_includes show_keys(thin_view), :voice
+    partial = Struct.new(:voice_embedding).new(nil)
+    refute_includes show_keys(UserView.new(partial)), :voice
+  ensure
+    Studio.voice_profile = false
   end
 end

@@ -202,7 +202,63 @@ module Studio
       end
     end
 
+    # POST /profile/voice — save (or replace) the signed-in user's voice.
+    #
+    # THE BODY IS VECTORS, NEVER AUDIO. The page records three phrases, turns
+    # each into a speaker embedding on the device (studio/voice_profile) and
+    # drops the takes; this receives `voice[model]` and `voice[embeddings]` (a
+    # JSON array of Studio::VoiceMatch::TAKES vectors) and averages them here.
+    #
+    # The model must be the one this app runs (Studio.voice_embedder), so a page
+    # cannot save vectors from an embedder the matcher would never compare, and
+    # the test embedder can never be saved where the real one runs. A take that
+    # embedded to all zeros (silence the browser let through) is refused by
+    # VoiceMatch.enrol.
+    #
+    # Answers JSON for the page's fetch and redirects for anything else.
+    def save_voice
+      return voice_refused("This app has no voice profile to set up.", :not_found) unless row_rendered?(:voice)
+
+      embedder = Studio.voice_embedder.to_s
+      model = params.dig(:voice, :model).to_s
+      unless model == Studio::VoiceMatch.model_id(embedder)
+        return voice_refused("That voice came from a different model. Reload the page and record again.")
+      end
+
+      vector = Studio::VoiceMatch.enrol(params.dig(:voice, :embeddings), size: Studio::VoiceMatch.size(embedder))
+      if vector.nil?
+        return voice_refused("We couldn't use those recordings. Read all three phrases again.")
+      end
+
+      rescue_and_log(target: current_user) do
+        current_user.update!(voice_embedding: vector, voice_embedding_model: model,
+                             voice_embedding_updated_at: Time.current)
+        respond_to do |format|
+          format.json { render json: { url: profile_path }, status: :ok }
+          format.any  { redirect_to profile_path, notice: "Your voice is set up.", status: :see_other }
+        end
+      end
+    end
+
+    # DELETE /profile/voice — remove the stored voice entirely: the vector, its
+    # model and its date. Nothing of it is kept.
+    def delete_voice
+      return unsupported("voice profile") unless row_rendered?(:voice)
+
+      rescue_and_log(target: current_user) do
+        current_user.update!(voice_embedding: nil, voice_embedding_model: nil, voice_embedding_updated_at: nil)
+        redirect_to profile_path, notice: "Your voice was deleted.", status: :see_other
+      end
+    end
+
     private
+
+    def voice_refused(message, status = :unprocessable_entity)
+      respond_to do |format|
+        format.json { render json: { error: message }, status: status }
+        format.any  { redirect_to profile_path, alert: message, status: :see_other }
+      end
+    end
 
     # Tell the host, and NEVER let it break the subscription.
     #

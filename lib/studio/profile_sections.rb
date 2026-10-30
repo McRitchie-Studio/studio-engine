@@ -6,6 +6,7 @@
 # and the engine fails to boot. Declaring the dependency where it is used makes
 # the pair immune to a future reorder of that require list.
 require_relative "newsletter"
+require_relative "voice_match"
 
 # Resolves Studio.profile_sections — the rows that make up the shared /profile
 # page — for a given view context. Pure Ruby (no Rails dependency) so the unit
@@ -99,6 +100,16 @@ module Studio
         partial: "studio/profiles/newsletter_section",
         requires: Studio::Newsletter::COLUMNS,
         modals: "studio/profiles/newsletter_modals" },
+
+      # The voice: three phrases read once, so an agent can tell who is
+      # talking. OPT-IN (Studio.voice_profile), because it fetches a speaker
+      # model from Hugging Face and stores a voice pattern, and a host's CSP and
+      # privacy page must say so first. Gated on the columns too: the engine
+      # migration add_voice_profile_to_users installs them.
+      { key: :voice, title: "Your voice", page: :show,
+        partial: "studio/profiles/voice_section",
+        requires: Studio::VoiceMatch::USER_COLUMNS,
+        if: -> { Studio.voice_profile } },
 
       # --- the edit page ------------------------------------------------------
       # These are FIELDS in one form with one Save, so they carry no buttons of

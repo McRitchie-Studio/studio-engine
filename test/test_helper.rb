@@ -33,6 +33,7 @@ require_relative "../lib/studio/navbar_brand"
 require_relative "../lib/studio/loader"
 require_relative "../lib/studio/auth_labels"
 require_relative "../lib/studio/profile_sections"
+require_relative "../lib/studio/voice_match"
 require_relative "../lib/studio/profile_image"
 require_relative "../lib/studio/oauth_identity"
 require_relative "../lib/studio/google_sign_in"
@@ -148,6 +149,8 @@ module Studio
   # specific value (a wallet app included) set it explicitly and restore it in
   # teardown.
   mattr_accessor :auth_methods,         default: %i[magic_link google]
+  mattr_accessor :voice_profile,        default: false
+  mattr_accessor :voice_embedder,       default: "wespeaker"
 
   # READ from lib/studio.rb rather than restated. This mirror block is
   # hand-maintained, and a restated number here would be a second definition of

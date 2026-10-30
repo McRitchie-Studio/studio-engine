@@ -1,0 +1,108 @@
+<%# The voice row: "Set up your voice". Rendered only when Studio.voice_profile
+    is on and the user has the voice columns (lib/studio/profile_sections.rb).
+
+    Locals: user (required); embedder (optional, defaults to
+    Studio.voice_embedder: the browser e2e lab passes "fake" rather than write
+    the process-wide setting).
+
+    THE DEVICE DOES THE LISTENING. Three phrases are recorded one at a time;
+    studio/voice_profile turns each take into a speaker embedding in the browser,
+    drops the audio, and Save posts only the vectors to /profile/voice, where
+    Studio::VoiceMatch averages them into one voice on this user. Nothing here
+    uploads a recording.
+
+    WITHOUT JAVASCRIPT the row still says whether a voice is saved and still
+    deletes it: the summary and the Delete form are plain HTML. Only recording
+    needs the controller (lazy, studio/stimulus). If it fails to load, the row
+    carries data-studio-controller-failed="voice-profile" and says so.
+
+    SCOPED CSS rather than utilities, as in _identity_styles: the meter ring and
+    the phrase marks must render in an app whose Tailwind build never saw this
+    file. The ring reads --studio-voice-level (0..1), which the module writes
+    while a take records. %>
+<% embedder = local_assigns.fetch(:embedder, Studio.voice_embedder).to_s %>
+<% config = Studio::VoiceMatch.browser_config(embedder) %>
+<% saved = user.voice_embedding.present? %>
+<% current = saved && user.voice_embedding_model.to_s == config["id"] %>
+
+<style>
+  .studio-voice-consent { font-size: .8125rem; color: var(--color-text-secondary, inherit); margin-bottom: 1rem; }
+  .studio-voice-lead { margin-bottom: .5rem; }
+  .studio-voice-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+  .studio-voice-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+  .studio-voice-phrases { list-style: none; padding: 0; margin: 0 0 1rem; display: grid; gap: .5rem; }
+  .studio-voice-phrase { display: flex; align-items: center; gap: .75rem; padding: .75rem; border-radius: .75rem;
+    border: 1px solid var(--color-border, rgb(127 127 127 / .25)); }
+  .studio-voice-phrase[data-phrase-state="current"] { outline: 2px solid rgb(var(--color-primary-500-rgb, 99 102 241)); outline-offset: 1px; }
+  .studio-voice-mark { flex-shrink: 0; width: 1.75rem; height: 1.75rem; border-radius: 9999px; display: flex;
+    align-items: center; justify-content: center; font-size: .8125rem; font-weight: 700;
+    border: 1px solid var(--color-border, rgb(127 127 127 / .25)); color: var(--color-text-secondary, inherit); }
+  .studio-voice-phrase[data-phrase-state="done"] .studio-voice-mark { background: #10b981; border-color: #10b981; color: #fff; }
+  .studio-voice-controls { display: flex; flex-direction: column; align-items: center; gap: .75rem; text-align: center; }
+  .studio-voice-record { min-width: 12rem; border-radius: 9999px; padding: .875rem 1.75rem; font-weight: 700;
+    color: #fff; background: rgb(var(--color-primary-500-rgb, 99 102 241));
+    box-shadow: 0 0 0 calc(var(--studio-voice-level, 0) * 14px) rgb(var(--color-primary-500-rgb, 99 102 241) / .3);
+    transition: box-shadow 80ms linear; }
+  .studio-voice-record:disabled { opacity: .5; cursor: not-allowed; }
+  [data-voice-state="recording"] .studio-voice-record { background: #dc2626; }
+  @media (prefers-reduced-motion: reduce) { .studio-voice-record { transition: none; } }
+  .studio-voice-status { min-height: 2.5rem; max-width: 24rem; color: var(--color-text-body, inherit); }
+  .studio-voice-failed { display: none; font-size: .8125rem; color: var(--color-text-secondary, inherit); }
+  [data-studio-controller-failed~="voice-profile"] .studio-voice-failed { display: block; }
+</style>
+
+<div data-studio-controller="voice-profile"
+     data-voice-state="idle"
+     data-voice-save-url="<%= profile_voice_path %>"
+     data-voice-embedder="<%= config.to_json %>">
+  <p class="studio-voice-consent" data-voice-consent>
+    This saves a voice pattern, not a recording. Your device listens to three short phrases and keeps
+    only numbers that describe how you sound, so your agent can tell it's you. Delete it any time.
+  </p>
+
+  <div class="studio-voice-row" data-voice-summary>
+    <p class="text-body min-w-0" data-voice-saved="<%= current ? "current" : (saved ? "stale" : "none") %>">
+      <% if current %>
+        Your voice is set up<% if user.voice_embedding_updated_at %> (<%= user.voice_embedding_updated_at.to_date.to_fs(:long) %>)<% end %>.
+      <% elsif saved %>
+        Your saved voice came from an older model. Record it again to keep using it.
+      <% else %>
+        Read three short phrases so your agent knows your voice.
+      <% end %>
+    </p>
+    <div class="studio-voice-actions">
+      <button type="button" class="btn btn-primary btn-sm" data-voice-action="open">
+        <%= saved ? "Re-record" : "Set up your voice" %>
+      </button>
+      <% if saved %>
+        <%= button_to "Delete", profile_voice_path, method: :delete,
+                      class: "btn btn-sm", form: { class: "inline", data: { voice_delete: true } } %>
+      <% end %>
+    </div>
+  </div>
+  <p class="studio-voice-failed">Recording didn't load on this page. Reload to try again.</p>
+
+  <div data-voice-setup hidden>
+    <p class="studio-voice-lead text-sm font-semibold text-heading">Read each one out loud</p>
+    <ol class="studio-voice-phrases">
+      <% Studio::VoiceMatch::PHRASES.each_with_index do |phrase, i| %>
+        <li class="studio-voice-phrase" data-voice-phrase data-phrase-state="waiting">
+          <span class="studio-voice-mark" aria-hidden="true"><%= i + 1 %></span>
+          <span class="text-body">&ldquo;<%= phrase %>&rdquo;</span>
+        </li>
+      <% end %>
+    </ol>
+
+    <div class="studio-voice-controls">
+      <button type="button" class="studio-voice-record" data-voice-action="record" data-voice-record
+              aria-pressed="false" disabled>
+        <span data-voice-record-label>Record phrase 1</span>
+      </button>
+      <p class="studio-voice-status" data-voice-status role="status" aria-live="polite"></p>
+      <div class="studio-voice-actions">
+        <button type="button" class="btn btn-primary btn-sm" data-voice-action="save" data-voice-save disabled>Save</button>
+        <button type="button" class="btn btn-sm" data-voice-action="cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
