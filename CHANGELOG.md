@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.119.1 — 2026-10-29
+
 ### Fixed
 
 - **The theme toggle names itself.** `components/_theme_toggle` now renders
