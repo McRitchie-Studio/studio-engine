@@ -87,7 +87,7 @@
 
           <span class="hidden md:flex"><span class="relative flex" style="width: 16px; height: 16px;">
   <span class="nav-toggle-icon absolute inset-0 transition-all duration-300" style="transform: scale(1) rotate(0deg); opacity: 1;">
-    <button @click="$store.theme.toggle()" class="flex text-secondary hover:text-heading transition" title="Toggle theme">
+    <button type="button" @click="$store.theme.toggle()" class="flex text-secondary hover:text-heading transition" title="Toggle theme" aria-label="Dark theme" :aria-pressed="$store.theme.isDark ? 'true' : 'false'">
   <!-- Moon icon (shown in dark mode) — Heroicons v2 outline -->
   <svg x-show="$store.theme.isDark" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
     <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
@@ -131,7 +131,7 @@
       
       <span class="relative flex" style="width: 16px; height: 16px;">
   <span class="nav-toggle-icon absolute inset-0 transition-all duration-300" style="transform: scale(1) rotate(0deg); opacity: 1;">
-    <button @click="$store.theme.toggle()" class="flex text-secondary hover:text-heading transition" title="Toggle theme">
+    <button type="button" @click="$store.theme.toggle()" class="flex text-secondary hover:text-heading transition" title="Toggle theme" aria-label="Dark theme" :aria-pressed="$store.theme.isDark ? 'true' : 'false'">
   <!-- Moon icon (shown in dark mode) — Heroicons v2 outline -->
   <svg x-show="$store.theme.isDark" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
     <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />

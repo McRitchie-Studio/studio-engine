@@ -155,5 +155,31 @@ class NavbarNameInRowsRenderTest < ActiveSupport::TestCase
 
   private
 
+  # The name truncates from md, so its control carries the full name as a title
+  # for a pointer reader, in every kind the control takes
+  # (/tasks/engine-theme-toggle-labels; hosts once patched it in at runtime).
+  test "each kind of name control carries the full name as its title" do
+    Studio.navbar_name_in_rows = true
+    kinds = {}
+
+    Studio.navbar_account_sidebar = GEAR
+    kinds[:host_sidebar] = doc.at_css("[data-nav-name-trigger]")
+    Studio.navbar_account_sidebar = nil
+
+    Studio.sidebar_sections = SECTIONS
+    kinds[:link_sidebar] = doc.at_css("[data-nav-name-trigger]")
+    Studio.sidebar_sections = nil
+
+    kinds[:link] = Nokogiri::HTML5(LinkHost.render_navbar(signed_in: true)).at_css("[data-nav-name-trigger]")
+
+    assert_equal %w[button button a], kinds.values.map(&:name), "the three kinds rendered"
+    kinds.each { |kind, el| assert_equal "Plain User", el["title"], kind.to_s }
+  end
+
+  test "false, the default, adds no title anywhere the name renders" do
+    Studio.navbar_name_in_rows = false
+    assert_nil doc.at_css("[data-nav-account]")["title"]
+  end
+
   def doc = Nokogiri::HTML5(NavbarRenderHost.render_navbar(signed_in: true))
 end
