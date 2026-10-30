@@ -1,0 +1,13 @@
+<%# THE VOICE ROW LAB PAGE: /profile's "Your voice" card, rendered by name with
+    the test embedder as a local. What only a browser can show: the lazy
+    voice-profile controller registers, the level meter moves while a take
+    records, a silent take is refused, three heard takes enable Save, and Save
+    posts vectors (never audio). e2e/voice_profile.spec.js drives it at phone
+    width with a generated microphone, since Chrome's fake one cannot play
+    chosen audio. %>
+<div class="max-w-2xl mx-auto py-8 px-4">
+  <section class="card p-6 mb-6" data-profile-section="voice">
+    <h2 class="text-sm font-bold text-heading mb-4">Your voice</h2>
+    <%= render "studio/profiles/voice_section", user: @user, embedder: "fake" %>
+  </section>
+</div>

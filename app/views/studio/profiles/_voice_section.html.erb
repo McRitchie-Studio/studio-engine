@@ -1,7 +1,9 @@
 <%# The voice row: "Set up your voice". Rendered only when Studio.voice_profile
     is on and the user has the voice columns (lib/studio/profile_sections.rb).
 
-    Locals: user (required).
+    Locals: user (required); embedder (optional, defaults to
+    Studio.voice_embedder: the browser e2e lab passes "fake" rather than write
+    the process-wide setting).
 
     THE DEVICE DOES THE LISTENING. Three phrases are recorded one at a time;
     studio/voice_profile turns each take into a speaker embedding in the browser,
@@ -18,7 +20,7 @@
     the phrase marks must render in an app whose Tailwind build never saw this
     file. The ring reads --studio-voice-level (0..1), which the module writes
     while a take records. %>
-<% embedder = Studio.voice_embedder.to_s %>
+<% embedder = local_assigns.fetch(:embedder, Studio.voice_embedder).to_s %>
 <% config = Studio::VoiceMatch.browser_config(embedder) %>
 <% saved = user.voice_embedding.present? %>
 <% current = saved && user.voice_embedding_model.to_s == config["id"] %>
