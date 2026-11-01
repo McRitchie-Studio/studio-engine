@@ -105,8 +105,8 @@ result.score   # the closest cosine, or nil when nobody had a comparable voice
 `among` is any scope or enumerable of users; a scope is narrowed to the model in
 SQL. Only users whose `voice_embedding_model` equals `model` are compared. The
 threshold was measured in Voicebox (same voice 0.85 to 0.91, different voices
-0.04 to 0.53 on synthetic speech). Nothing in the engine calls it yet; agent chat
-wiring is a later change.
+0.04 to 0.53 on synthetic speech). `POST /voice/takes` calls it for each take,
+against the signed-in user only ([`VOICE_TRANSCRIPTION.md`](VOICE_TRANSCRIPTION.md)).
 
 ## Tests
 

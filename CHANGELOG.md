@@ -21,6 +21,19 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `studio/microphone`, `studio/level_meter` (the one meter),
   `studio/voice_recorder`, `studio/microphone_chip`. docs/VOICE_CAPTURE.md is
   the contract.
+- **Voice transcription: a take becomes `{text, speaker, score}`.**
+  `Studio::VoiceTranscription.hear(audio:, mime_type:, user:, embedding:, model:)`
+  transcribes a take with a mock-first adapter ported from Voicebox (`openai`:
+  `gpt-4o-transcribe`, one retry on `whisper-1`, told the language; `mock`
+  elsewhere) and names the speaker with `Studio::VoiceMatch` against the user's
+  own `users.voice_embedding`, same embedder revision only, else "Someone new".
+  Opt-in `POST /voice/takes` (`config.voice_transcription = true`) wraps it for a
+  signed-in, CSRF-protected page: 10 MB and 120 s caps, an allow-list of audio
+  types, a refused no-speech transcript, and a 503 with a showable line when the
+  app has no `OPENAI_API_KEY`. The real adapter raises `LiveCallAttempted`
+  before any socket while `VOICE_NO_LIVE_CALLS=1` and in every Rails test
+  environment. Nothing is stored; `voice[audio]` and `voice[embedding]` join the
+  parameter filter. docs/VOICE_TRANSCRIPTION.md is the contract.
 
 ### Changed
 
