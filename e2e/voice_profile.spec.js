@@ -16,7 +16,7 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 // it. The speaker vector comes from the "fake" embedder (window.studioFakeVoice).
 //
 // CONTROLS, run against this file:
-//   - set SILENCE_RMS to 0 in studio/voice_profile.js: "a silent take is
+//   - set SILENCE_RMS to 0 in studio/level_meter.js (the one meter): "a silent take is
 //     refused" fails (the take is kept and phrase 2 becomes current).
 //   - drop `embeddings: vectors` from the save body: "three heard takes save"
 //     fails at the payload.

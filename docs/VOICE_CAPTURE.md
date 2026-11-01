@@ -122,7 +122,8 @@ The pick is kept in `localStorage` under **`studio.microphone`**, one key for
 every engine page on an origin, so a chip on the chat and one on `/profile`
 agree. A host that must keep an older key (Voicebox's `voicebox.microphone`, when
 it moves onto the engine) renders the chip with `storage_key:`, or calls
-`configureMicrophone({ storageKey })`. A storage that throws (private mode,
+`configureMicrophone({ storageKey })`; without that, a Voicebox user picks their
+microphone once more after the move. A storage that throws (private mode,
 blocked site data) means "no pick": the default opens.
 
 ## What a host must allow

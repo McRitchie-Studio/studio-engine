@@ -114,6 +114,7 @@ wiring is a later change.
   validation.
 - `test/integration/voice_profile_requests_test.rb`: the row's gates, the
   endpoints scoped to the signed-in user, the migration up and down.
-- `test/javascript/voice_profile.test.mjs`: the meter, the silence rule, the
-  fake embedder and the mounted flow against a stub browser.
+- `test/javascript/voice_profile.test.mjs`: the silence rule, the fake embedder
+  and the mounted flow against a stub browser (the meter itself is
+  `studio/level_meter`, tested in `test/javascript/level_meter.test.mjs`).
 - `e2e/voice_profile.spec.js`: the row at 390px with a generated microphone.

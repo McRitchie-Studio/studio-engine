@@ -359,7 +359,11 @@ class E2eLaneContractTest < Minitest::Test
       "site_footer_index.html.erb" => ["studio_booking_link"],
       # The voice row's recorder, meter and save are the engine's program
       # (studio/voice_profile), mounted by the row's own markup.
-      "voice_profile.html.erb" => ["studio/profiles/voice_section"]
+      "voice_profile.html.erb" => ["studio/profiles/voice_section"],
+      # The capture layer's chip, help and recorder are the engine's programs
+      # (studio/microphone_chip, studio/voice_recorder); the spec hears the take
+      # through the recorder's own event, so the page holds no script.
+      "voice_capture.html.erb" => ["studio/voice/microphone_chip", "studio/voice/recorder"]
     }.each do |page, partials|
       source = File.read(File.join(lab, page))
 

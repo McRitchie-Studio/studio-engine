@@ -31,6 +31,8 @@ module Studio
       "fell_back" => "That microphone isn't connected, so I'm using %{microphone}.",
       "empty" => "No microphones found. Plug one in and it shows up here.",
       "in_use" => "In use",
+      # Shown only when the chip's controller failed to load.
+      "unavailable" => "Picking a microphone didn't load. Reload to try again.",
       # The help dialog. Switching happens on the page, by device id, so the
       # dialog never sends anyone to Chrome to switch: Chrome's settings are
       # where the microphone is ALLOWED, and where a person checks it when a

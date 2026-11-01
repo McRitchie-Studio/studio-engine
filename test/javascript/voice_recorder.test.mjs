@@ -257,3 +257,19 @@ test("formatElapsed and mergeCopy", () => {
   assert.equal(merged.recording.button, COPY.recording.button)
   assert.equal(merged.junk, undefined)
 })
+
+test("torn down while the microphone is opening (a Turbo visit): the late stream is let go, nothing records", async () => {
+  let resolveOpen
+  const { win, log, stream } = stubWindow({ level: 0.1 })
+  const slowOpen = () => new Promise((resolve) => { resolveOpen = resolve })
+  const r = buildRecorder()
+  const handle = mountVoiceRecorder(r.root, { win, open: slowOpen })
+  r.root.fire("click", r.button)
+  assert.equal(r.root.dataset.voiceRecorderState, "starting")
+  handle.destroy()
+  resolveOpen({ stream, label: "MacBook Pro Microphone", deviceId: "mbp", fellBack: false })
+  await flush()
+  assert.equal(log.stopped, 1, "the microphone opened after teardown is stopped")
+  assert.equal(log.recorders.length, 0, "no MediaRecorder was started")
+  assert.equal(takes(r.root, EVENTS.take).length, 0)
+})

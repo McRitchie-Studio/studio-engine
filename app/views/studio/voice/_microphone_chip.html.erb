@@ -12,8 +12,9 @@
 
     The chip never opens the microphone: a recorder (studio/voice/_recorder or
     any studio/voice_recorder) does, and the chip listens on window. The
-    controller is lazy (studio/stimulus); without it the chip shows its prompt
-    line and nothing more. %>
+    controller is lazy (studio/stimulus); if it fails to load, the root carries
+    data-studio-controller-failed="microphone-chip" and says that picking a
+    microphone did not load (the recorder still uses the system default). %>
 <% copy = Studio::VoiceCapture.microphone_copy(local_assigns[:copy]) %>
 <% picker_id = local_assigns.fetch(:id, "studio-microphone-picker") %>
 <% storage_key = local_assigns.fetch(:storage_key, Studio::VoiceCapture::STORAGE_KEY) %>
@@ -39,5 +40,6 @@
     <ul class="studio-mic-list" data-microphone-list aria-label="Microphones"></ul>
     <button type="button" class="studio-mic-help-link" data-microphone-help-link><%= copy.dig("help", "link") %></button>
   </div>
+  <p class="studio-mic-failed"><%= copy["unavailable"] %></p>
   <%= render "studio/voice/microphone_help", copy: copy, title_id: "#{picker_id}-help-title" %>
 </div>

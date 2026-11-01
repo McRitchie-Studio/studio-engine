@@ -81,6 +81,8 @@
   .studio-recorder-status { min-height: 2.5rem; max-width: 24rem; margin: 0; color: var(--color-text-body, inherit); }
   .studio-recorder-failed { display: none; font-size: .8125rem; color: var(--color-text-secondary, inherit); }
   [data-studio-controller-failed~="voice-recorder"] .studio-recorder-failed { display: block; }
+  .studio-mic-failed { display: none; margin: 0; font-size: .8125rem; color: var(--color-text-secondary, inherit); }
+  [data-studio-controller-failed~="microphone-chip"] .studio-mic-failed { display: block; }
   @media (prefers-reduced-motion: reduce) {
     [data-microphone-live="true"] .studio-mic-dot { transform: none; transition: none; }
     .studio-recorder-button { transition: none; }

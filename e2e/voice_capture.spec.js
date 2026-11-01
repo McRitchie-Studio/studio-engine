@@ -41,6 +41,7 @@ async function stubMicrophones(page, { gain = 0.3, denied = false } = {}) {
     window.micCalls = [];
     window.labTakes = [];
     window.labSilent = 0;
+    window.stubMics = mics;
     document.addEventListener("studio:voice-recorder:take", (event) => {
       const { blob, mimeType, durationMs, peakRms, microphone } = event.detail;
       window.labTakes.push({ size: blob.size, type: blob.type, isBlob: blob instanceof Blob, mimeType, durationMs, peakRms, microphone });
@@ -48,7 +49,7 @@ async function stubMicrophones(page, { gain = 0.3, denied = false } = {}) {
     document.addEventListener("studio:voice-recorder:silent", () => { window.labSilent += 1; });
     const granted = () => sessionStorage.getItem("stub-mic-granted") === "1";
     const media = navigator.mediaDevices;
-    media.enumerateDevices = async () => mics.map((m) => ({
+    media.enumerateDevices = async () => window.stubMics.map((m) => ({
       kind: "audioinput", groupId: "", deviceId: granted() ? m.deviceId : "", label: granted() ? m.label : ""
     }));
     if (navigator.permissions) {
@@ -64,7 +65,7 @@ async function stubMicrophones(page, { gain = 0.3, denied = false } = {}) {
       const exact = c && c.audio && c.audio.deviceId && c.audio.deviceId.exact;
       // exact "default" opens the system default under its real name; a bare
       // request opens the first device.
-      const mic = exact ? mics.find((m) => m.deviceId === exact) : mics[1];
+      const mic = exact ? window.stubMics.find((m) => m.deviceId === exact) : window.stubMics[1];
       if (!mic) throw new DOMException("gone", "OverconstrainedError");
       sessionStorage.setItem("stub-mic-granted", "1");
       if (!source) {
@@ -204,6 +205,31 @@ test("picking another microphone opens that exact deviceId on the next take, and
   await recordATake(page);
   calls = await page.evaluate(() => window.micCalls);
   expect(calls).toEqual([{ audio: { deviceId: { exact: "arctis" } } }]);
+});
+
+test("a headset plugged in shows up at once (devicechange), and one pulled out is gone", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await stubMicrophones(page);
+  await openLab(page);
+  await recordATake(page);
+
+  const chip = page.locator(CHIP);
+  await page.locator(".studio-mic-chip").click();
+  await expect(chip.locator(".studio-mic-option")).toHaveCount(2);
+
+  await page.evaluate(() => {
+    window.stubMics = [...window.stubMics, { deviceId: "yeti", label: "Yeti Stereo Microphone (046d:0ab7)" }];
+    navigator.mediaDevices.dispatchEvent(new Event("devicechange"));
+  });
+  await expect(chip.locator(".studio-mic-option")).toHaveCount(3);
+  await expect(chip.locator(".studio-mic-option").filter({ hasText: "Yeti Stereo Microphone" })).toBeVisible();
+
+  await page.evaluate(() => {
+    window.stubMics = window.stubMics.filter((m) => m.deviceId !== "arctis");
+    navigator.mediaDevices.dispatchEvent(new Event("devicechange"));
+  });
+  await expect(chip.locator(".studio-mic-option")).toHaveCount(2);
+  await expect(chip.locator(".studio-mic-option").filter({ hasText: "Arctis" })).toHaveCount(0);
 });
 
 test("a silent take is refused, named, and the second one in a row opens the help", async ({ page }) => {
