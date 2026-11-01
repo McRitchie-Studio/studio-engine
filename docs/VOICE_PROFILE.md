@@ -87,6 +87,8 @@ level ring around the record button (`--studio-voice-level`, 0..1). A take whose
 loudest frame never reaches RMS 0.01 (-40 dBFS) is refused in the browser and
 the phrase stays current ("I couldn't hear that one"). The embedder checks the
 decoded samples again, and the server refuses a take that embedded to zeros.
+The meter is the engine's one level meter, `studio/level_meter`, shared with
+the voice capture layer ([`VOICE_CAPTURE.md`](VOICE_CAPTURE.md)).
 
 ## Asking who is speaking
 
