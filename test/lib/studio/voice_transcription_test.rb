@@ -21,9 +21,10 @@ class StudioVoiceTranscriptionTest < Minitest::Test
     @saved = {
       transcriber: Studio.voice_transcriber, key: Studio.voice_openai_api_key, embedder: Studio.voice_embedder,
       env_key: ENV.fetch("OPENAI_API_KEY", nil), env_name: ENV.fetch("STUDIO_VOICE_TRANSCRIBER", nil),
-      guard: ENV.fetch("VOICE_NO_LIVE_CALLS", nil)
+      guard: ENV.fetch("VOICE_NO_LIVE_CALLS", nil), voice_key: ENV.fetch("STUDIO_VOICE_OPENAI_API_KEY", nil)
     }
     ENV.delete("OPENAI_API_KEY")
+    ENV.delete("STUDIO_VOICE_OPENAI_API_KEY")
     ENV.delete("STUDIO_VOICE_TRANSCRIBER")
     Studio.voice_transcriber = nil
     Studio.voice_openai_api_key = nil
@@ -36,7 +37,8 @@ class StudioVoiceTranscriptionTest < Minitest::Test
     Studio.voice_transcriber = @saved[:transcriber]
     Studio.voice_openai_api_key = @saved[:key]
     Studio.voice_embedder = @saved[:embedder]
-    { "OPENAI_API_KEY" => :env_key, "STUDIO_VOICE_TRANSCRIBER" => :env_name, "VOICE_NO_LIVE_CALLS" => :guard }.each do |name, key|
+    { "OPENAI_API_KEY" => :env_key, "STUDIO_VOICE_TRANSCRIBER" => :env_name, "VOICE_NO_LIVE_CALLS" => :guard,
+      "STUDIO_VOICE_OPENAI_API_KEY" => :voice_key }.each do |name, key|
       @saved[key] ? ENV[name] = @saved[key] : ENV.delete(name)
     end
     VT::Mock.reset!
@@ -95,10 +97,12 @@ class StudioVoiceTranscriptionTest < Minitest::Test
     assert_match "openai, mock", error.message
   end
 
-  def test_the_key_comes_from_host_config_then_openai_api_key
-    assert_equal "", VT.api_key
-    ENV["OPENAI_API_KEY"] = "env-key"
-    assert_equal "env-key", VT.api_key
+  def test_the_key_comes_from_host_config_then_voices_own_env_never_the_shared_openai_key
+    ENV["OPENAI_API_KEY"] = "shared-image-key"
+    assert_equal "", VT.api_key, "the app's shared OPENAI_API_KEY is never voice's key"
+    refute VT::OpenAI.new.configured?
+    ENV["STUDIO_VOICE_OPENAI_API_KEY"] = "voice-env-key"
+    assert_equal "voice-env-key", VT.api_key
     Studio.voice_openai_api_key = "config-key"
     assert_equal "config-key", VT.api_key
     refute VT::OpenAI.new(api_key: " ").configured?
@@ -135,7 +139,18 @@ class StudioVoiceTranscriptionTest < Minitest::Test
     with_rails_env("production") { refute VT.live_calls_blocked? }
     ENV["VOICE_NO_LIVE_CALLS"] = "1"
     assert_nil VT.guard_live_call!("OpenAI", host: "127.0.0.1")
+    assert_nil VT.guard_live_call!("OpenAI", host: "::1")
     assert_raises(VT::LiveCallAttempted) { VT.guard_live_call!("OpenAI", host: "api.openai.com") }
+    assert_raises(VT::LiveCallAttempted) { VT.guard_live_call!("OpenAI", host: "[::1].example.com") }
+  end
+
+  # CONTROL: put uri.host back in OpenAI#perform and this trips the trap, since
+  # URI("http://[::1]:9/").host is "[::1]" (bracketed), never "::1".
+  def test_an_ipv6_loopback_endpoint_is_this_machine_not_a_live_call
+    stt = VT::OpenAI.new(api_key: "test-key", fallback_model: nil, deadline: 2,
+                         endpoint: "http://[::1]:9/v1/audio/transcriptions")
+    error = assert_raises(VT::HttpError) { stt.transcribe(**take) }
+    assert_equal 0, error.status
   end
 
   # ── the OpenAI adapter, against a stub on 127.0.0.1 ──────────
@@ -182,7 +197,9 @@ class StudioVoiceTranscriptionTest < Minitest::Test
       before = @server.requests.size
       error = assert_raises(VT::HttpError) { client.transcribe(**take) }
       assert_equal status, error.status
-      assert_match "Incorrect API key provided", error.message
+      assert_equal "unauthorized", error.reason
+      refute_match "Incorrect API key", error.message, "the vendor's words stay out of the message (and ErrorLog)"
+      assert_equal "OpenAI gpt-4o-transcribe answered HTTP #{status} (unauthorized)", error.message
       assert_equal before + 1, @server.requests.size
     end
 
@@ -195,7 +212,7 @@ class StudioVoiceTranscriptionTest < Minitest::Test
   def test_a_missing_key_is_not_configured_before_any_request
     stub_openai
     error = assert_raises(VT::NotConfigured) { client(api_key: nil).transcribe(**take) }
-    assert_match "OPENAI_API_KEY", error.message
+    assert_match(/\bSTUDIO_VOICE_OPENAI_API_KEY is not set/, error.message)
     assert_empty @server.requests
     assert_kind_of StandardError, error
   end
@@ -204,8 +221,80 @@ class StudioVoiceTranscriptionTest < Minitest::Test
     stub_openai
     url = "#{@server.url}/v1/audio/transcriptions"
     @server.stop
-    error = assert_raises(VT::HttpError) { client(endpoint: url, fallback_model: nil).transcribe(**take) }
+    error = assert_raises(VT::HttpError) { client(endpoint: url).transcribe(**take) }
     assert_equal 0, error.status
+    assert_equal "unreachable", error.reason
+  end
+
+  # ── one deadline, and what is never retried ─────────────────
+
+  def elapsed
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    yield
+    Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+  end
+
+  # CONTROL: restore READ_TIMEOUT = 120 as the read timeout and drop the
+  # Timeout backstop: this waits out the stub's 5 s.
+  def test_a_vendor_that_never_answers_is_cut_at_the_deadline_and_not_retried
+    stub_openai
+    @server.respond { sleep 5; [200, { "text" => "too late" }] }
+    error = nil
+    took = elapsed { error = assert_raises(VT::HttpError) { client(deadline: 0.6).transcribe(**take) } }
+
+    assert_equal "timeout", error.reason
+    assert_equal 0, error.status
+    assert_operator took, :<, 2.0, "the take was held #{took.round(2)} s, past its 0.6 s deadline"
+    assert_equal 1, @server.requests.size, "no fallback after a timeout"
+  end
+
+  # CONTROL: give each attempt a fresh deadline (ends_at per request_text) and
+  # the second attempt runs its own 3 s: about 3.9 s in all.
+  def test_both_attempts_share_one_deadline
+    stub_openai
+    @server.respond do |req|
+      if req.body.include?("gpt-4o-transcribe")
+        sleep 0.9
+        [500, { "error" => { "message" => "overloaded" } }]
+      else
+        sleep 5
+        [200, { "text" => "too late" }]
+      end
+    end
+    error = nil
+    took = elapsed { error = assert_raises(VT::HttpError) { client(deadline: 3).transcribe(**take) } }
+
+    assert_equal 2, @server.requests.size, "the 5xx was retried on the fallback"
+    assert_equal "timeout", error.reason
+    assert_operator took, :<, 3.5, "the two attempts took #{took.round(2)} s against one 3 s deadline"
+  end
+
+  # CONTROL: drop "rate_limited" from OpenAI::NO_RETRY and whisper-1 is asked too.
+  def test_a_vendor_429_is_not_retried_on_the_fallback
+    stub_openai
+    @server.respond { [429, { "error" => { "message" => "Rate limit reached for org-secret123" } }] }
+    error = assert_raises(VT::HttpError) { client.transcribe(**take) }
+
+    assert_equal 429, error.status
+    assert_equal "rate_limited", error.reason
+    assert_equal 1, @server.requests.size
+    refute_match "org-secret123", error.message
+  end
+
+  def test_no_retry_when_too_little_of_the_deadline_is_left
+    stub_openai
+    @server.respond { sleep 0.3; [500, "<html>down</html>"] }
+    error = assert_raises(VT::HttpError) { client(deadline: 2).transcribe(**take) }
+    assert_equal "server_error", error.reason
+    assert_equal 1, @server.requests.size, "under MIN_RETRY_SECONDS left, the fallback is not started"
+  end
+
+  def test_reason_codes_for_each_status
+    assert_equal %w[unauthorized unauthorized rate_limited server_error server_error rejected unreachable],
+                 [401, 403, 429, 500, 503, 400, 0].map { |status| VT::HttpError.reason_for(status) }
+    assert_equal "timeout", VT::HttpError.new("x", status: 0, reason: "timeout").reason
+    assert_equal 25, Studio.voice_transcribe_deadline
+    assert_in_delta 25.0, VT::OpenAI.new(api_key: "k").deadline
   end
 
   # ── types and the no-speech rule ────────────────────────────

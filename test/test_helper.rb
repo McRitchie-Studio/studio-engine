@@ -165,6 +165,8 @@ module Studio
   mattr_accessor :voice_transcribe_model, default: "gpt-4o-transcribe"
   mattr_accessor :voice_transcribe_fallback_model, default: "whisper-1"
   mattr_accessor :voice_transcribe_language, default: "en"
+  mattr_accessor :voice_transcribe_deadline, default: 25
+  mattr_accessor :voice_takes_rate_limit, default: { to: 20, within: 600 }
 
   # READ from lib/studio.rb rather than restated. This mirror block is
   # hand-maintained, and a restated number here would be a second definition of
