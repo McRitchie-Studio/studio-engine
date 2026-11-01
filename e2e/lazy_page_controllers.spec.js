@@ -7,7 +7,8 @@ const { blockOffsiteRequests } = require("./helpers");
 //
 // These controllers carry their pages' own behaviour (the geo preview, the link
 // preview card, the email banner scale, the booking frame and popup, the footer
-// map, the survey stepper, the knowledge transcript, the voice row). A lazy controller is one more request, and a
+// map, the survey stepper, the knowledge transcript, the voice row, the
+// microphone chip and the voice recorder). A lazy controller is one more request, and a
 // browser never fetches a failed module again in the same document
 // (e2e/lazy_controller_failure.spec.js), so the failure has to be a state the
 // page can show: data-studio-controller-failed on the element.
@@ -30,7 +31,9 @@ const PAGES = [
   ["footer-map", "/lab/site_footer", "footer_map_controller"],
   ["survey", "/surveys/first-game", "survey_controller"],
   ["knowledge-transcript", "/lab/knowledge_transcript/frame", "knowledge_transcript_controller"],
-  ["voice-profile", "/lab/voice_profile", "voice_profile_controller"]
+  ["voice-profile", "/lab/voice_profile", "voice_profile_controller"],
+  ["microphone-chip", "/lab/voice_capture", "microphone_chip_controller"],
+  ["voice-recorder", "/lab/voice_capture", "voice_recorder_controller"]
 ];
 
 const CONTROLLER = /\/studio\/controllers\/([a-z_]+_controller)(?:-[0-9a-f]+)?\.js(?:\?|$)/;
