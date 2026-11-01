@@ -54,6 +54,10 @@ document.getElementById("chat-recorder").addEventListener("studio:voice-recorder
 })
 ```
 
+To turn a take into words and a speaker, post it to the engine's own
+`POST /voice/takes`, which answers `{text, speaker, score}` and keeps nothing:
+[`VOICE_TRANSCRIPTION.md`](VOICE_TRANSCRIPTION.md) is that contract.
+
 The chip and the recorder find each other through `window` events, so they can
 sit anywhere on the page. One chip serves any number of recorders.
 

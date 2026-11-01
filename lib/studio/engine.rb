@@ -303,8 +303,10 @@ module Studio
     # User#inspect: POST /profile/voice carries voice[embeddings], and the user
     # holds voice_embedding (Voicebox logged vectors until it filtered them).
     # `(\A|\.)` also masks the JSON param wrapper's copy (profile.voice.embeddings).
+    # POST /voice/takes carries voice[embedding] (one take's vector) and
+    # voice[audio] (the take itself); both are masked the same way.
     initializer "studio.voice_profile.filter_parameters" do |app|
-      app.config.filter_parameters += [/(\A|\.)voice\.embeddings\z/, /\Avoice_embedding\z/]
+      app.config.filter_parameters += [/(\A|\.)voice\.(embeddings|embedding|audio)\z/, /\Avoice_embedding\z/]
     end
 
     initializer "studio.footer_only_eager_load" do

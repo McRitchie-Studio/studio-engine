@@ -3,6 +3,11 @@
 require "bundler/setup"
 require "minitest/autorun"
 
+# No unit test may reach a speech-to-text vendor: Studio::VoiceTranscription's
+# real adapter raises LiveCallAttempted before opening a socket while this is
+# armed (a dummy-app test is armed by RAILS_ENV=test alone).
+ENV["VOICE_NO_LIVE_CALLS"] = "1"
+
 # Load ActiveSupport for mattr_accessor, symbolize_keys, etc.
 require "active_support"
 require "active_support/concern"
@@ -35,6 +40,7 @@ require_relative "../lib/studio/auth_labels"
 require_relative "../lib/studio/profile_sections"
 require_relative "../lib/studio/voice_match"
 require_relative "../lib/studio/voice_capture"
+require_relative "../lib/studio/voice_transcription"
 require_relative "../lib/studio/profile_image"
 require_relative "../lib/studio/oauth_identity"
 require_relative "../lib/studio/google_sign_in"
@@ -152,6 +158,13 @@ module Studio
   mattr_accessor :auth_methods,         default: %i[magic_link google]
   mattr_accessor :voice_profile,        default: false
   mattr_accessor :voice_embedder,       default: "wespeaker"
+  # Mirrors the transcription accessors in lib/studio.rb (Studio::VoiceTranscription).
+  mattr_accessor :voice_transcription,   default: false
+  mattr_accessor :voice_transcriber,     default: nil
+  mattr_accessor :voice_openai_api_key,  default: nil
+  mattr_accessor :voice_transcribe_model, default: "gpt-4o-transcribe"
+  mattr_accessor :voice_transcribe_fallback_model, default: "whisper-1"
+  mattr_accessor :voice_transcribe_language, default: "en"
 
   # READ from lib/studio.rb rather than restated. This mirror block is
   # hand-maintained, and a restated number here would be a second definition of

@@ -28,6 +28,11 @@ Studio.draw_admin_survey_routes = true
 # chat with. OFF by default: no soul, no route. See Studio.agent_chat_souls.
 Studio.agent_chat_souls = %w[alex]
 
+# Opt in to the voice understanding endpoint (POST /voice/takes), as a consuming
+# app does. OFF by default: every take is a paid vendor call. The dummy runs the
+# mock transcriber (Studio::VoiceTranscription.adapter_name in test).
+Studio.voice_transcription = true
+
 Rails.application.routes.draw do
   # Draw the engine's shared route table the same way every consuming app does
   # (Studio.routes(self), not `mount`). The boot test asserts the named path
