@@ -1,0 +1,45 @@
+<%# The microphone chip (docs/VOICE_CAPTURE.md): names the microphone the page
+    records from, and a tap lists every microphone, the one in use marked, to
+    pick from (studio/microphone_chip, studio/microphone). While a take records
+    the dot beside the name shows the live level, so a dead microphone is
+    visible at a glance. Help: studio/voice/_microphone_help, inside it.
+
+    Locals, all optional:
+      copy:        overrides merged over Studio::VoiceCapture::MICROPHONE_COPY
+      storage_key: where the pick is remembered (default "studio.microphone")
+      id:          the picker's id, for aria-controls (one chip per page needs
+                   none; two chips need two ids)
+
+    The chip never opens the microphone: a recorder (studio/voice/_recorder or
+    any studio/voice_recorder) does, and the chip listens on window. The
+    controller is lazy (studio/stimulus); if it fails to load, the root carries
+    data-studio-controller-failed="microphone-chip" and says that picking a
+    microphone did not load (the recorder still uses the system default). %>
+<% copy = Studio::VoiceCapture.microphone_copy(local_assigns[:copy]) %>
+<% picker_id = local_assigns.fetch(:id, "studio-microphone-picker") %>
+<% storage_key = local_assigns.fetch(:storage_key, Studio::VoiceCapture::STORAGE_KEY) %>
+<%= render "studio/voice/styles" %>
+<div class="studio-mic"
+     data-studio-controller="microphone-chip"
+     data-microphone-state="prompt"
+     data-microphone-storage-key="<%= storage_key %>"
+     data-microphone-copy="<%= copy.to_json %>">
+  <button type="button" class="studio-mic-chip" data-microphone-chip aria-expanded="false" aria-controls="<%= picker_id %>">
+    <svg class="studio-mic-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2a3.5 3.5 0 0 0-3.5 3.5v6a3.5 3.5 0 0 0 7 0v-6A3.5 3.5 0 0 0 12 2Z"/>
+      <path d="M6 10.5a1 1 0 1 0-2 0 8 8 0 0 0 7 7.94V21H8.5a1 1 0 1 0 0 2h7a1 1 0 1 0 0-2H13v-2.56a8 8 0 0 0 7-7.94 1 1 0 1 0-2 0 6 6 0 0 1-12 0Z"/>
+    </svg>
+    <span class="studio-mic-dot" data-microphone-dot aria-hidden="true"></span>
+    <span class="studio-mic-name" data-microphone-label><%= copy.dig("prompt", "chip") %></span>
+    <svg class="studio-mic-caret" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+      <path d="M2.2 4.2a.75.75 0 0 1 1.06 0L6 6.94l2.74-2.74a.75.75 0 1 1 1.06 1.06L6.53 8.53a.75.75 0 0 1-1.06 0L2.2 5.26a.75.75 0 0 1 0-1.06Z"/>
+    </svg>
+  </button>
+  <div id="<%= picker_id %>" class="studio-mic-panel card" data-microphone-panel hidden>
+    <p class="studio-mic-note" data-microphone-note role="status"><%= copy.dig("prompt", "note") %></p>
+    <ul class="studio-mic-list" data-microphone-list aria-label="Microphones"></ul>
+    <button type="button" class="studio-mic-help-link" data-microphone-help-link><%= copy.dig("help", "link") %></button>
+  </div>
+  <p class="studio-mic-failed"><%= copy["unavailable"] %></p>
+  <%= render "studio/voice/microphone_help", copy: copy, title_id: "#{picker_id}-help-title" %>
+</div>

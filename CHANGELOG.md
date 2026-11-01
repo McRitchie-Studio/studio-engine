@@ -4,6 +4,32 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **Voice capture layer, ported from Voicebox.** `studio/voice/_microphone_chip`
+  names the microphone a page records from (the track's own label, with a live
+  level dot) and lists the others; a pick is remembered in `localStorage` under
+  `studio.microphone` (`storage_key:` to change it) and opened by exact device
+  id, a pick that is gone falls back to the system default, and with nothing
+  picked the system default is asked for by id rather than Chrome's per-site
+  preference. Its native `<dialog>` help shows Chrome's site-settings steps or a
+  generic line, and opens on a switch, a refusal, a second silent take in a row,
+  or the help link. `studio/voice/_recorder` (controller `voice-recorder`, tap or
+  hold to talk) refuses a take under -40 dBFS and hands a heard take to the page
+  as `studio:voice-recorder:take` with the blob; it uploads nothing. A recorder
+  that cannot start lets go of the microphone and the meter. New modules:
+  `studio/microphone`, `studio/level_meter` (the one meter),
+  `studio/voice_recorder`, `studio/microphone_chip`. docs/VOICE_CAPTURE.md is
+  the contract.
+
+### Changed
+
+- The voice row on `/profile` (`studio/voice_profile`) runs on the shared meter
+  and recording format (`studio/level_meter`, `studio/voice_recorder`) instead
+  of its own copy; it still re-exports `SILENCE_RMS`, `meterLevel`,
+  `takeWasHeard`, `pickMimeType` and friends. Under reduced motion its ring now
+  steps in quarters, as the recorder's does.
+
 ## 0.120.0 — 2026-10-30
 
 ### Added

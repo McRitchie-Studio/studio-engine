@@ -1,0 +1,18 @@
+<%# THE VOICE CAPTURE LAB PAGE: the engine's capture layer as a consumer would
+    render it (docs/VOICE_CAPTURE.md): the microphone chip above a record
+    button, both by name with their default words. What only a browser can
+    show: the two lazy controllers register, the chip names the microphone a
+    take opened, picking another opens that exact deviceId on the next take, a
+    silent take is refused, and a heard take hands the page a blob in a
+    studio:voice-recorder:take event. e2e/voice_capture.spec.js drives it at
+    phone width with stubbed microphones; the page itself listens to nothing.
+    ?mode=hold renders the hold-to-talk recorder. %>
+<div class="max-w-2xl mx-auto py-8 px-4">
+  <section class="card p-6" data-lab="voice-capture">
+    <h2 class="text-sm font-bold text-heading mb-4">Talk to your agent</h2>
+    <div class="flex flex-col items-center gap-6">
+      <%= render "studio/voice/microphone_chip" %>
+      <%= render "studio/voice/recorder", id: "lab-recorder", mode: params[:mode] == "hold" ? "hold" : "toggle" %>
+    </div>
+  </section>
+</div>

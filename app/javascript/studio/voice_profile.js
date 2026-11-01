@@ -26,30 +26,24 @@
 //   fake       Tests only: a fixed vector per voice name (window.studioFakeVoice),
 //              because Chrome's fake microphone cannot play chosen audio.
 //
-// It imports nothing statically; the model runtime is a dynamic import of the
-// transformers.js URL the page names (Studio::VoiceMatch::TRANSFORMERS_URL), made
-// only once someone opens the setup. test/javascript/voice_profile.test.mjs
-// loads it as a data: module.
+// The level meter, the silence rule and the recording format are the engine's
+// one copy (studio/level_meter, studio/voice_recorder; docs/VOICE_CAPTURE.md),
+// re-exported here so callers of this module keep their names. The model
+// runtime is a dynamic import of the transformers.js URL the page names
+// (Studio::VoiceMatch::TRANSFORMERS_URL), made only once someone opens the
+// setup. test/javascript/voice_profile.test.mjs loads it with its studio/
+// imports inlined (test/javascript/support/studio_module.mjs).
+import { SILENCE_RMS, rootMeanSquare, peakWindowRms, meterLevel, takeWasHeard, createLevelMeter } from "studio/level_meter"
+import { pickMimeType } from "studio/voice_recorder"
+
+export { SILENCE_RMS, rootMeanSquare, peakWindowRms, meterLevel, takeWasHeard, pickMimeType }
 
 // The model hears 16 kHz mono; a take is cut to its first MAX_SECONDS.
 export const SAMPLE_RATE = 16000
 export const MAX_SECONDS = 10
 
-// The loudest frame (RMS, 0..1) a take must reach to count as heard: 0.01 is
-// -40 dBFS. A muted microphone sits at 0, a quiet room near 0.002-0.006, and
-// speech at arm's length peaks well above 0.05.
-export const SILENCE_RMS = 0.01
-
 // A phrase is about four seconds; the take stops itself after TAKE_MS.
 export const TAKE_MS = 6000
-
-const MIME_CANDIDATES = [
-  "audio/webm;codecs=opus",
-  "audio/webm",
-  "audio/mp4;codecs=mp4a.40.2",
-  "audio/mp4",
-  "audio/ogg;codecs=opus"
-]
 
 export const COPY = {
   idle: ["", ""],
@@ -70,50 +64,6 @@ export const MESSAGES = {
 }
 
 export class SilentTakeError extends Error {}
-
-export function rootMeanSquare(samples) {
-  if (!samples || samples.length === 0) return 0
-  let sum = 0
-  for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i]
-  return Math.sqrt(sum / samples.length)
-}
-
-// The loudest 50 ms window's RMS, 0..1, at 16 kHz.
-export function peakWindowRms(samples, windowSize = 800) {
-  let peak = 0
-  if (!samples) return peak
-  for (let start = 0; start < samples.length; start += windowSize) {
-    const end = Math.min(samples.length, start + windowSize)
-    let sum = 0
-    for (let i = start; i < end; i++) sum += samples[i] * samples[i]
-    const rms = Math.sqrt(sum / Math.max(1, end - start))
-    if (rms > peak) peak = rms
-  }
-  return peak
-}
-
-// The meter's reading, 0..1: logarithmic from -40 dBFS to -10 dBFS, where
-// speech lives.
-export function meterLevel(rms) {
-  if (!(rms > 0)) return 0
-  const db = 20 * Math.log10(rms)
-  return Math.min(1, Math.max(0, (db + 40) / 30))
-}
-
-// Heard, unless the meter measured the take and it stayed under SILENCE_RMS. A
-// take the meter never measured (no Web Audio, a context that never ran) is
-// let through, and the embedder's own check on the decoded samples decides.
-export function takeWasHeard(peakRms, framesMeasured) {
-  if (!framesMeasured) return true
-  return peakRms >= SILENCE_RMS
-}
-
-export function pickMimeType(isTypeSupported) {
-  if (typeof isTypeSupported !== "function") return ""
-  return MIME_CANDIDATES.find((type) => {
-    try { return isTypeSupported(type) } catch (_) { return false }
-  }) || ""
-}
 
 // The words for a state, with {n} the phrase being read (1-based).
 export function copyFor(state, step) {
@@ -258,13 +208,7 @@ export function mountVoiceProfile(root, win = window) {
   let recorder = null
   let chunks = []
   let timer = null
-  let audioContext = null
-  let analyser = null
-  let levelBuffer = null
-  let meterFrame = null
-  let meterTimer = null
-  let peakRms = 0
-  let frames = 0
+  let meter = null
   let starting = false
   let destroyed = false
 
@@ -327,56 +271,27 @@ export function mountVoiceProfile(root, win = window) {
     root.dataset.voiceLevel = level.toFixed(2)
   }
 
-  function sampleLevel() {
-    if (!analyser || !audioContext || audioContext.state !== "running") return
-    analyser.getFloatTimeDomainData(levelBuffer)
-    const rms = rootMeanSquare(levelBuffer)
-    frames += 1
-    if (rms > peakRms) {
-      peakRms = rms
-      root.dataset.voicePeak = rms.toFixed(4)
-    }
-    if (rms >= SILENCE_RMS) root.dataset.voiceHeard = "true"
-    paintLevel(meterLevel(rms))
-  }
-
+  // The engine's one meter (studio/level_meter) on the take's own stream.
   function startMeter(source) {
-    peakRms = 0
-    frames = 0
     root.dataset.voiceHeard = "false"
     root.dataset.voicePeak = "0"
-    paintLevel(0)
-    const AudioContextClass = win.AudioContext || win.webkitAudioContext
-    if (!AudioContextClass) return
-    try {
-      audioContext = new AudioContextClass()
-      const input = audioContext.createMediaStreamSource(source)
-      analyser = audioContext.createAnalyser()
-      analyser.fftSize = 1024
-      levelBuffer = new Float32Array(analyser.fftSize)
-      input.connect(analyser)
-      if (audioContext.state === "suspended" && audioContext.resume) audioContext.resume().catch(() => {})
-    } catch (_) {
-      closeMeter()
-      return
-    }
-    const frame = () => {
-      sampleLevel()
-      meterFrame = win.requestAnimationFrame(frame)
-    }
-    meterFrame = win.requestAnimationFrame(frame)
-    // A background tab stops animation frames; the timer keeps measuring.
-    meterTimer = win.setInterval(sampleLevel, 100)
+    let peak = 0
+    meter = createLevelMeter(source, {
+      win,
+      onPaint: paintLevel,
+      onSample: (rms) => {
+        if (rms > peak) {
+          peak = rms
+          root.dataset.voicePeak = rms.toFixed(4)
+        }
+        if (rms >= SILENCE_RMS) root.dataset.voiceHeard = "true"
+      }
+    })
   }
 
   function closeMeter() {
-    if (meterFrame) win.cancelAnimationFrame(meterFrame)
-    if (meterTimer) win.clearInterval(meterTimer)
-    meterFrame = null
-    meterTimer = null
-    analyser = null
-    if (audioContext && audioContext.state !== "closed") audioContext.close().catch(() => {})
-    audioContext = null
+    if (meter) meter.close()
+    meter = null
     paintLevel(0)
   }
 
@@ -428,8 +343,8 @@ export function mountVoiceProfile(root, win = window) {
 
   async function finishTake() {
     const discarded = recorder && recorder.discard
-    sampleLevel()
-    const heard = takeWasHeard(peakRms, frames)
+    if (meter) meter.sample()
+    const heard = meter ? meter.heard() : true
     closeMeter()
     release()
     const type = (recorder && recorder.mimeType) || "audio/webm"

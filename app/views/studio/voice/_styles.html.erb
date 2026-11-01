@@ -1,0 +1,90 @@
+<%# The voice capture layer's scoped CSS (docs/VOICE_CAPTURE.md), rendered by
+    the chip and the recorder partials. Scoped classes rather than utilities, as
+    in studio/profiles/_voice_section: the chip, the dot, the ring and the help
+    drawing must render in an app whose Tailwind build never saw these files.
+    Every colour is a theme token (the primary through --color-primary-500-rgb
+    and the CTA fill under its label), so dark mode and each app's palette come
+    for free. Tap targets are 44px. A page rendering both partials carries this
+    block twice, which is harmless. %>
+<style>
+  .studio-mic { display: flex; width: 100%; flex-direction: column; align-items: center; gap: .5rem; }
+  .studio-mic-chip { display: inline-flex; min-height: 44px; max-width: 100%; align-items: center; gap: .5rem;
+    border-radius: 1.5rem; border: 1px solid var(--color-border, rgb(127 127 127 / .25));
+    background: var(--color-inset, rgb(127 127 127 / .12)); padding: .5rem 1rem; font-size: .875rem; font-weight: 600;
+    color: var(--color-text, inherit); cursor: pointer; text-align: left; }
+  .studio-mic-chip:focus-visible { outline: 3px solid rgb(var(--color-primary-500-rgb, 99 102 241) / .5); outline-offset: 2px; }
+  .studio-mic-icon { width: 1rem; height: 1rem; flex-shrink: 0; color: var(--color-text-secondary, currentColor); }
+  .studio-mic-name { min-width: 0; overflow-wrap: anywhere; }
+  .studio-mic-caret { width: .75rem; height: .75rem; flex-shrink: 0; color: var(--color-text-muted, currentColor); }
+  .studio-mic-chip[aria-expanded="true"] .studio-mic-caret { transform: rotate(180deg); }
+  [data-microphone-state="denied"] .studio-mic-chip { border-color: rgb(var(--color-primary-500-rgb, 99 102 241)); }
+  /* The live dot: hollow while nothing records; while a take records it fills
+     with the primary colour as loud as the voice (--studio-mic-level, 0..1). */
+  .studio-mic-dot { width: .625rem; height: .625rem; flex-shrink: 0; border-radius: 9999px; border: 2px solid currentColor; opacity: .35; }
+  [data-microphone-live="true"] .studio-mic-dot { opacity: 1; border-color: rgb(var(--color-primary-500-rgb, 99 102 241));
+    background-color: rgb(var(--color-primary-500-rgb, 99 102 241) / calc(.15 + var(--studio-mic-level, 0) * .85));
+    transform: scale(calc(1 + var(--studio-mic-level, 0) * .5)); transition: transform 80ms linear, background-color 80ms linear; }
+  .studio-mic-panel { width: 100%; max-width: 24rem; padding: .75rem; text-align: left; display: grid; gap: .5rem; }
+  .studio-mic-panel[hidden] { display: none; }
+  .studio-mic-note { font-size: .875rem; color: var(--color-text-muted, inherit); }
+  .studio-mic-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
+  .studio-mic-option { display: flex; min-height: 44px; width: 100%; align-items: center; gap: .5rem; border-radius: .75rem;
+    border: 1px solid transparent; background: transparent; padding: .5rem .75rem; text-align: left; font-size: .875rem;
+    color: var(--color-text, inherit); cursor: pointer; }
+  .studio-mic-option:hover { background-color: rgb(var(--color-primary-500-rgb, 99 102 241) / .08); }
+  .studio-mic-option[aria-current="true"] { border-color: rgb(var(--color-primary-500-rgb, 99 102 241));
+    background-color: rgb(var(--color-primary-500-rgb, 99 102 241) / .12); font-weight: 600; }
+  .studio-mic-check { width: 1rem; flex-shrink: 0; font-weight: 700; color: rgb(var(--color-primary-500-rgb, 99 102 241)); }
+  .studio-mic-option-label { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+  .studio-mic-in-use { flex-shrink: 0; border-radius: 9999px; padding: .125rem .5rem; font-size: .75rem; font-weight: 700;
+    background: var(--color-cta-fill, var(--color-cta, rgb(var(--color-primary-500-rgb, 99 102 241)))); color: var(--btn-primary-fg, #fff); }
+  .studio-mic-help-link { min-height: 44px; width: 100%; border-radius: .75rem; padding: 0 .75rem; text-align: left; font-size: .875rem;
+    font-weight: 600; color: var(--color-text-secondary, inherit); text-decoration: underline; background: transparent; border: 0; cursor: pointer; }
+  /* The help dialog: a native modal <dialog>, so the page behind it is inert. */
+  .studio-mic-help { border: 0; padding: 0; margin: auto; width: min(28rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem);
+    overflow-y: auto; text-align: left; color: var(--color-text-body, inherit); background: var(--color-surface, Canvas); border-radius: 1rem; }
+  .studio-mic-help::backdrop { background-color: rgb(0 0 0 / .55); }
+  .studio-mic-help-body { display: grid; gap: 1rem; padding: 1.25rem; }
+  .studio-mic-help-lead { display: grid; gap: .25rem; border-radius: .75rem; background: var(--color-inset, rgb(127 127 127 / .12)); padding: .75rem; }
+  .studio-mic-help-lead[hidden], .studio-mic-help-chrome[hidden], .studio-mic-help-other[hidden] { display: none; }
+  .studio-mic-help-headline { font-weight: 600; color: var(--color-text, inherit); margin: 0; }
+  .studio-mic-help-tip { font-size: .875rem; color: var(--color-text-secondary, inherit); margin: 0; }
+  .studio-mic-help-title { font-size: 1.25rem; font-weight: 700; color: var(--color-text, inherit); margin: 0; }
+  .studio-mic-help-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+  .studio-mic-help-steps li { display: flex; align-items: flex-start; gap: .75rem; }
+  .studio-mic-step { display: flex; width: 1.5rem; height: 1.5rem; flex-shrink: 0; align-items: center; justify-content: center;
+    border-radius: 9999px; font-size: .75rem; font-weight: 700;
+    background: var(--color-cta-fill, var(--color-cta, rgb(var(--color-primary-500-rgb, 99 102 241)))); color: var(--btn-primary-fg, #fff); }
+  .studio-mic-help-actions { display: flex; justify-content: flex-end; margin: 0; }
+  .studio-mic-help-close { min-height: 44px; padding: 0 1.5rem; }
+  /* The drawn address bar: never a screenshot, every stroke a token. */
+  .studio-mic-mock { width: 100%; height: auto; color: var(--color-text, currentColor); }
+  .studio-mic-mock .mock-bar, .studio-mic-mock .mock-panel { fill: var(--color-inset, rgb(127 127 127 / .12)); stroke: currentColor; stroke-opacity: .25; }
+  .studio-mic-mock .mock-ring { fill: none; stroke: rgb(var(--color-primary-500-rgb, 99 102 241)); stroke-width: 3; }
+  .studio-mic-mock .mock-ink { stroke: currentColor; }
+  .studio-mic-mock .mock-knob { fill: currentColor; stroke: none; }
+  .studio-mic-mock .mock-text { fill: currentColor; font-family: inherit; }
+  .studio-mic-mock .mock-on, .studio-mic-mock .mock-badge { fill: rgb(var(--color-primary-500-rgb, 99 102 241)); }
+  .studio-mic-mock .mock-knob-on, .studio-mic-mock .mock-badge-text { fill: var(--color-surface, Canvas); }
+
+  /* The record button: a ring as loud as the voice (--studio-recorder-level). */
+  .studio-recorder { display: flex; flex-direction: column; align-items: center; gap: .75rem; text-align: center; }
+  .studio-recorder-button { min-height: 44px; min-width: 12rem; max-width: 100%; border: 0; border-radius: 9999px; padding: .875rem 1.75rem;
+    font-weight: 700; cursor: pointer; touch-action: none; -webkit-user-select: none; user-select: none;
+    color: var(--btn-primary-fg, #fff); background: var(--color-cta-fill, var(--color-cta, rgb(var(--color-primary-500-rgb, 99 102 241))));
+    box-shadow: 0 0 0 calc(var(--studio-recorder-level, 0) * 14px) rgb(var(--color-primary-500-rgb, 99 102 241) / .3);
+    transition: box-shadow 80ms linear; }
+  .studio-recorder-button:focus-visible { outline: 3px solid rgb(var(--color-primary-500-rgb, 99 102 241) / .5); outline-offset: 3px; }
+  .studio-recorder-button:disabled { opacity: .5; cursor: not-allowed; }
+  [data-voice-recorder-state="recording"] .studio-recorder-button { background: var(--color-danger-fill, var(--color-danger, #dc2626)); }
+  .studio-recorder-timer { font-variant-numeric: tabular-nums; font-size: .875rem; color: var(--color-text-muted, inherit); }
+  .studio-recorder-status { min-height: 2.5rem; max-width: 24rem; margin: 0; color: var(--color-text-body, inherit); }
+  .studio-recorder-failed { display: none; font-size: .8125rem; color: var(--color-text-secondary, inherit); }
+  [data-studio-controller-failed~="voice-recorder"] .studio-recorder-failed { display: block; }
+  .studio-mic-failed { display: none; margin: 0; font-size: .8125rem; color: var(--color-text-secondary, inherit); }
+  [data-studio-controller-failed~="microphone-chip"] .studio-mic-failed { display: block; }
+  @media (prefers-reduced-motion: reduce) {
+    [data-microphone-live="true"] .studio-mic-dot { transform: none; transition: none; }
+    .studio-recorder-button { transition: none; }
+  }
+</style>

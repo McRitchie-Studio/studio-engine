@@ -87,6 +87,8 @@ level ring around the record button (`--studio-voice-level`, 0..1). A take whose
 loudest frame never reaches RMS 0.01 (-40 dBFS) is refused in the browser and
 the phrase stays current ("I couldn't hear that one"). The embedder checks the
 decoded samples again, and the server refuses a take that embedded to zeros.
+The meter is the engine's one level meter, `studio/level_meter`, shared with
+the voice capture layer ([`VOICE_CAPTURE.md`](VOICE_CAPTURE.md)).
 
 ## Asking who is speaking
 
@@ -112,6 +114,7 @@ wiring is a later change.
   validation.
 - `test/integration/voice_profile_requests_test.rb`: the row's gates, the
   endpoints scoped to the signed-in user, the migration up and down.
-- `test/javascript/voice_profile.test.mjs`: the meter, the silence rule, the
-  fake embedder and the mounted flow against a stub browser.
+- `test/javascript/voice_profile.test.mjs`: the silence rule, the fake embedder
+  and the mounted flow against a stub browser (the meter itself is
+  `studio/level_meter`, tested in `test/javascript/level_meter.test.mjs`).
 - `e2e/voice_profile.spec.js`: the row at 390px with a generated microphone.
