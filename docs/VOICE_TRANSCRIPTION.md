@@ -30,8 +30,10 @@ and beside the microphone where the take is recorded.
 **The app keeps nothing.** The upload is read once, handed to the transcriber, and its
 tempfile is deleted before the answer. No row is written. `voice[audio]` and
 `voice[embedding]` are in the engine's parameter filter (beside the profile's
-`voice[embeddings]`), so neither reaches a request log. The vendor's error words
-can reach `ErrorLog`; the audio and the vector never do.
+`voice[embeddings]`), so neither reaches a request log. A failure's `ErrorLog`
+row carries the engine's own words (the model, the HTTP status and a reason
+code) on the user who sent the take (`target`); the vendor's error text, the
+audio and the vector never reach it.
 
 ## Turn it on in an app
 
@@ -44,14 +46,17 @@ can reach `ErrorLog`; the audio and the vector never do.
    Studio.configure do |config|
      config.voice_transcription = true            # draws POST /voice/takes
      # config.voice_transcriber = "openai"        # default: openai in production, mock elsewhere
-     # config.voice_openai_api_key = ...          # default: ENV["OPENAI_API_KEY"]
+     # config.voice_openai_api_key = ...          # default: ENV["STUDIO_VOICE_OPENAI_API_KEY"]
+     # config.voice_takes_rate_limit = { to: 20, within: 600 }   # per user; false turns it off
+     # config.voice_transcribe_deadline = 25      # seconds, both models together
    end
    ```
 
-3. Set the app's own **`OPENAI_API_KEY`** in its Heroku config (or
-   `Studio.voice_openai_api_key`). Each app holds its own key; never copy
-   another app's. Without one the endpoint answers the 503 below, and nothing
-   crashes.
+3. Set the app's own **`STUDIO_VOICE_OPENAI_API_KEY`** in its Heroku config (or
+   `Studio.voice_openai_api_key`): voice's own key, on its own budget. The
+   app's shared `OPENAI_API_KEY` (on the hub, the image key) is **never** read.
+   Each app holds its own key; never copy another app's. Without one the
+   endpoint answers the 503 below, and nothing crashes.
 
 ## The endpoint: `POST /voice/takes`
 
@@ -62,6 +67,12 @@ take is a paid vendor call). Route name `studio_voice_takes`.
   signed out).
 - **CSRF-protected**: send the page's token as `X-CSRF-Token`.
 - **JSON answers**, `Cache-Control: no-store`.
+- **Rate-limited per user**: at most `Studio.voice_takes_rate_limit` takes
+  (default 20 in any 10-minute window, a fixed window per user id). Over it,
+  the `429` below, before the take is read or sent anywhere. The counter lives
+  in `Rails.cache` (or the config's `store:`); when that is a `NullStore`, a
+  per-process memory store, so the limit never goes inert. It instruments
+  `rate_limit.action_controller` as Rails' own `rate_limit` does.
 
 ### Request (multipart/form-data)
 
@@ -97,10 +108,11 @@ recorder.addEventListener("studio:voice-recorder:take", async ({ detail }) => {
 | `401` | `{error: "unauthenticated"}` | signed out |
 | `413` | `{error}` | over 10 MB |
 | `415` | `{error}` | a type a take cannot be |
-| `422` | `{error}` | no audio, empty audio, no or too long a duration |
+| `422` | `{error}` | no audio (including a `voice` param that is a string or a list), empty audio, no or too long a duration |
 | `422` | `{error, reason: "no_speech"}` | the transcript is what a model writes for silence ("Thank you for watching", a lone "um", empty, or no Latin letters when told English) |
 | `503` | `{error, reason: "not_configured"}` | no key, or an unknown transcriber name. `error` is `NOT_CONFIGURED_MESSAGE`: "Voice isn't set up on this app yet, so I can't hear recordings. Type instead for now." The cause is an `ErrorLog` row. |
-| `503` | `{error, reason: "transcriber_failed", retry: true}` | the vendor failed on both models, refused the key, or could not be reached. The cause is an `ErrorLog` row. |
+| `429` | `{error, reason: "rate_limited", retry_after}` | over the per-user limit; `retry_after` is seconds until the window ends, also sent as `Retry-After`. Nothing was transcribed. |
+| `503` | `{error, reason: "transcriber_failed", retry: true}` | the vendor failed (on both models where a retry applies), refused the key, throttled the account, could not be reached, or ran past the deadline. The cause is an `ErrorLog` row on the user. |
 
 `error` is always a line the page can show as is.
 
@@ -133,14 +145,17 @@ Studio::VoiceTranscription.no_speech_reason(heard.text)  # => nil, or why it is 
 ```
 
 It raises `Studio::VoiceTranscription::NotConfigured` (no key, unknown
-transcriber), `HttpError` (`#status`; 0 when the vendor could not be reached)
-and `ArgumentError` (a type a take cannot be). All three are `StandardError`.
+transcriber), `HttpError` (`#status`, 0 when nothing answered; `#reason`, one of
+`unauthorized`, `rate_limited`, `server_error`, `rejected`, `timeout`,
+`unreachable`) and `ArgumentError` (a type a take cannot be). All three are
+`StandardError`. An `HttpError`'s message is the model, the status and the
+reason, never the vendor's words.
 
 ## Transcribers
 
 | Name | What | Default where |
 |---|---|---|
-| `openai` | OpenAI `POST /v1/audio/transcriptions`, multipart, one file. `gpt-4o-transcribe`, retried once on `whisper-1` for any failure but a 401 or 403 (`Studio.voice_transcribe_model`, `Studio.voice_transcribe_fallback_model`; blank the fallback to turn the retry off). Both are told `Studio.voice_transcribe_language` (`"en"`): left to guess, a model handed near-silence answers a stock word in any language. Timeouts 10 s to connect, 120 s to read. | production |
+| `openai` | OpenAI `POST /v1/audio/transcriptions`, multipart, one file. `gpt-4o-transcribe`, retried once on `whisper-1` when the first model fell over (a 5xx, or a 4xx other than 401, 403 and 429) and at least 2 s of the deadline are left (`Studio.voice_transcribe_model`, `Studio.voice_transcribe_fallback_model`; blank the fallback to turn the retry off). Never retried after a timeout, a 429, an auth failure, or no answer at all. Both are told `Studio.voice_transcribe_language` (`"en"`): left to guess, a model handed near-silence answers a stock word in any language. **One deadline for the whole take**, `Studio.voice_transcribe_deadline` (25 s), shared by both attempts: every socket timeout is what is left of it (connecting at most 10 s), and a hard timeout backs it, so a take never holds a web thread past it. | production |
 | `mock` | No network. Answers `Mock::DEFAULT_TEXT`; `Mock.reply = ->(filename:, content_type:, bytes:) { "..." }` swaps it, `Mock.calls` records sizes (never bytes), `Mock.reset!` clears both. | everywhere else |
 
 The name comes from `Studio.voice_transcriber`, else `STUDIO_VOICE_TRANSCRIBER`,
@@ -154,7 +169,8 @@ The OpenAI adapter calls `guard_live_call!` before it opens a socket. It raises
 StandardError** so no rescue swallows it, while **`VOICE_NO_LIVE_CALLS=1`**, and
 in **any Rails test environment** unless `VOICE_NO_LIVE_CALLS=0`. So a host's
 suite is protected without setting anything. A call to this machine
-(`127.0.0.1`, `localhost`) is not live: the engine's own tests drive the real
+(`127.0.0.1`, `localhost`, `::1`; the check reads `URI#hostname`, so an IPv6
+literal arrives unbracketed) is not live: the engine's own tests drive the real
 adapter against a stub server there.
 
 ## Config
@@ -163,7 +179,9 @@ adapter against a stub server there.
 |---|---|---|
 | `Studio.voice_transcription` | `false` | Draws `POST /voice/takes`. |
 | `Studio.voice_transcriber` | `nil` | `"openai"` or `"mock"`; `nil` as above. |
-| `Studio.voice_openai_api_key` | `nil` | The key; `nil` reads `OPENAI_API_KEY`. |
+| `Studio.voice_openai_api_key` | `nil` | The key; `nil` reads `STUDIO_VOICE_OPENAI_API_KEY`, never `OPENAI_API_KEY`. |
+| `Studio.voice_transcribe_deadline` | `25` | Seconds for the whole take at the vendor, both attempts together. |
+| `Studio.voice_takes_rate_limit` | `{ to: 20, within: 600 }` | Takes per user per window (seconds); `store:` optional; `false` turns it off. |
 | `Studio.voice_transcribe_model` | `"gpt-4o-transcribe"` | First model. |
 | `Studio.voice_transcribe_fallback_model` | `"whisper-1"` | The one retry; blank turns it off. |
 | `Studio.voice_transcribe_language` | `"en"` | ISO-639-1; blank lets the model guess. |
@@ -173,17 +191,24 @@ adapter against a stub server there.
 
 - The size cap is checked after Rack has parsed the upload; an app that wants
   to refuse a huge body earlier caps it at the web server.
-- There is no per-user rate limit in the engine yet. Each take is one vendor
-  call (two on a retry); the pilot should watch spend.
+- Each take is one vendor call (two on a retry), at most 20 per user per 10
+  minutes by default. Spend is the vendor's to alert on: set a monthly budget
+  and alert on the voice key's OpenAI project.
+- The rate limit's window is per process when the app's cache is a `NullStore`
+  (development); on a real shared cache it is per user across dynos.
 
 ## Tests
 
 - `test/lib/studio/voice_transcription_test.rb` (unit): adapter selection, the
-  key, the mock, the trap, the OpenAI request against a stub server on
-  `127.0.0.1` (multipart body, model, language, bearer), the retry and its
-  exceptions, a missing key, an unreachable vendor, the no-speech rule, and who
-  spoke (matched, below threshold, embedder mismatch, no profile, no embedding).
+  key (never `OPENAI_API_KEY`), the mock, the trap (IPv6 loopback included), the
+  OpenAI request against a stub server on `127.0.0.1` (multipart body, model,
+  language, bearer), the retry and its exceptions, the one deadline against a
+  stub that sleeps (cut, shared by both attempts, never retried), a vendor 429
+  not retried, reason codes and no vendor words in a message, a missing key, an
+  unreachable vendor, the no-speech rule, and who spoke (matched, below
+  threshold, embedder mismatch, no profile, no embedding).
 - `test/integration/voice_takes_requests_test.rb`: the endpoint through the
   dummy app with the mock: the answer, Someone new, only the signed-in user is
   compared, nothing stored or logged, signed out, CSRF, the caps, no speech,
-  and the 503 without a key.
+  the 503 without a key (the shared key does not count), the `ErrorLog` row on
+  the user, the per-user 429 (on a `NullStore` too), and a string `voice` 422.
