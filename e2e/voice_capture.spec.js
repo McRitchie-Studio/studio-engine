@@ -286,18 +286,77 @@ test("hold to talk: pressing records, letting go hands over the take", async ({ 
   expect(await page.evaluate(() => window.labTakes.length)).toBe(1);
 });
 
-test("dark mode: the chip and the button read on the dark surface", async ({ page }) => {
+// THE LAB IS DARK-ONLY (layouts/e2e_lab hard-codes class="dark"), so the
+// light pass strips the class after load and grades the light palette itself.
+for (const scheme of ["dark", "light"]) {
+  test(`${scheme} mode: the chip and the button read on the ${scheme} surface`, async ({ page }) => {
+    await blockOffsiteRequests(page);
+    await page.emulateMedia({ colorScheme: scheme });
+    await stubMicrophones(page);
+    await openLab(page);
+    if (scheme === "light") await page.evaluate(() => document.documentElement.classList.remove("dark"));
+    expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(scheme === "dark");
+    const colours = await page.evaluate(() => {
+      const read = (selector) => getComputedStyle(document.querySelector(selector));
+      return { chipText: read(".studio-mic-chip").color, chipBg: read(".studio-mic-chip").backgroundColor,
+               buttonText: read(".studio-recorder-button").color, buttonBg: read(".studio-recorder-button").backgroundColor,
+               body: getComputedStyle(document.body).backgroundColor };
+    });
+    expect(colours.chipText).not.toBe(colours.chipBg);
+    expect(colours.buttonText).not.toBe(colours.buttonBg);
+    expect(colours.buttonBg, "the button is painted, not transparent").not.toBe("rgba(0, 0, 0, 0)");
+    // The palette really switched: light text on the dark surface, dark on the light.
+    const lightness = (rgb) => { const [r, g, b] = rgb.match(/\d+(\.\d+)?/g).map(Number); return (r + g + b) / 765; };
+    if (scheme === "dark") expect(lightness(colours.chipText), `chip text ${colours.chipText}`).toBeGreaterThan(0.5);
+    else expect(lightness(colours.chipText), `chip text ${colours.chipText}`).toBeLessThan(0.5);
+    expect(await sideways(page)).toBeLessThanOrEqual(0);
+  });
+}
+
+test("keyboard: Esc in the open list returns focus to the chip, and options and the help link wear the 3px ring", async ({ page }) => {
   await blockOffsiteRequests(page);
-  await page.emulateMedia({ colorScheme: "dark" });
   await stubMicrophones(page);
   await openLab(page);
-  const colours = await page.evaluate(() => {
-    const read = (selector) => getComputedStyle(document.querySelector(selector));
-    return { chipText: read(".studio-mic-chip").color, chipBg: read(".studio-mic-chip").backgroundColor,
-             buttonText: read(".studio-recorder-button").color, buttonBg: read(".studio-recorder-button").backgroundColor };
+  await recordATake(page);
+
+  const chip = page.locator(".studio-mic-chip");
+  await chip.focus();
+  await page.keyboard.press("Enter");
+  const options = page.locator(CHIP).locator(".studio-mic-option");
+  await expect(options).toHaveCount(2);
+  for (const option of await options.all()) {
+    await expect(option).not.toHaveAttribute("aria-pressed", /.*/);
+  }
+
+  await page.keyboard.press("Tab");
+  await expect(options.first()).toBeFocused();
+  const ring = (locator) => locator.evaluate((el) => {
+    const style = getComputedStyle(el);
+    return { width: style.outlineWidth, style: style.outlineStyle };
   });
-  expect(colours.chipText).not.toBe(colours.chipBg);
-  expect(colours.buttonText).not.toBe(colours.buttonBg);
-  expect(colours.buttonBg, "the button is painted, not transparent").not.toBe("rgba(0, 0, 0, 0)");
-  expect(await sideways(page)).toBeLessThanOrEqual(0);
+  expect(await ring(options.first())).toEqual({ width: "3px", style: "solid" });
+  await page.locator("[data-microphone-help-link]").focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(page.locator("[data-microphone-help-link]")).toBeFocused();
+  expect(await ring(page.locator("[data-microphone-help-link]"))).toEqual({ width: "3px", style: "solid" });
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-microphone-panel]")).toBeHidden();
+  await expect(chip, "focus goes back to the chip").toBeFocused();
+  await expect(chip).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("[data-microphone-dialog]")).toBeHidden();
+});
+
+test("a microphone busy in another app says so, not that none was found", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await stubMicrophones(page);
+  await page.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = async () => { throw new DOMException("Could not start audio source", "NotReadableError"); };
+  });
+  await openLab(page);
+  await page.locator("[data-voice-recorder-button]").click();
+  await expect(page.locator(RECORDER)).toHaveAttribute("data-voice-recorder-state", "failed");
+  await expect(page.locator("[data-voice-recorder-status]")).toHaveText(
+    "Your microphone is busy in another app. Close it there, then try again.");
 });
