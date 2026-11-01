@@ -5,6 +5,7 @@ require "net/http"
 require "openssl"
 require "securerandom"
 require "stringio"
+require "timeout"
 require "uri"
 
 # Understand: one finished take (the recorder's blob and its mime type, plus the
@@ -38,17 +39,36 @@ require "uri"
 # logger and environment, so the unit suite runs it without an app.
 module Studio
   module VoiceTranscription
-    # A transcriber call that failed: the message carries the vendor's words.
+    # A transcriber call that failed.
     class Error < StandardError; end
 
-    # The vendor answered a non-2xx; the status rides along so a caller can tell
-    # an auth failure from a model that fell over.
+    # The vendor failed. The status rides along (0 when nothing answered) with a
+    # reason code, so a caller can tell an auth failure from a model that fell
+    # over. The message names only the model, the status and the reason, never
+    # the vendor's own words: it reaches ErrorLog, and a vendor's error text can
+    # echo what it was sent.
     class HttpError < Error
-      attr_reader :status
+      # Why, as a code: unauthorized (401/403), rate_limited (429),
+      # server_error (5xx), rejected (another non-2xx), timeout (the deadline
+      # ran out), unreachable (no answer: refused, reset, DNS, TLS).
+      REASONS = %w[unauthorized rate_limited server_error rejected timeout unreachable].freeze
 
-      def initialize(message, status:)
+      attr_reader :status, :reason
+
+      def initialize(message, status:, reason: nil)
         super(message)
         @status = status
+        @reason = reason || self.class.reason_for(status)
+      end
+
+      def self.reason_for(status)
+        case status.to_i
+        when 401, 403 then "unauthorized"
+        when 429 then "rate_limited"
+        when 500..599 then "server_error"
+        when 0 then "unreachable"
+        else "rejected"
+        end
       end
     end
 
@@ -64,7 +84,8 @@ module Studio
 
     NO_LIVE_CALLS_ENV = "VOICE_NO_LIVE_CALLS"
     TRANSCRIBER_ENV = "STUDIO_VOICE_TRANSCRIBER"
-    API_KEY_ENV = "OPENAI_API_KEY"
+    # Voice's own key. Deliberately NOT the app's shared OPENAI_API_KEY.
+    API_KEY_ENV = "STUDIO_VOICE_OPENAI_API_KEY"
 
     # What a page shows when the app has no transcriber key. Says what is wrong
     # without naming the variable to a visitor.
@@ -123,24 +144,38 @@ module Studio
     # The real speech-to-text: OpenAI's POST /v1/audio/transcriptions, one
     # multipart file. Ported from Voicebox's Transcription::OpenAI: the model is
     # told the language (left to guess, a model handed near-silence answers a
-    # stock word in any language), and a failure other than auth is retried once
-    # on the fallback model from the start of the audio.
+    # stock word in any language), and a model that fell over (a 5xx, or a 4xx
+    # other than auth and 429) is retried once on the fallback from the start of
+    # the audio.
+    #
+    # ONE DEADLINE for the whole take (Studio.voice_transcribe_deadline, 25 s):
+    # both attempts share it, every socket timeout is what is left of it, and a
+    # hard Timeout backs it, so a vendor that trickles bytes cannot hold a web
+    # thread past it. Nothing is retried after a timeout (the deadline is spent),
+    # a 429 (the account is throttled; a second model only spends more), an auth
+    # failure, or no answer at all; nor with under MIN_RETRY_SECONDS left.
     class OpenAI
       ENDPOINT = "https://api.openai.com/v1/audio/transcriptions"
+      # The cap on connecting, inside the deadline.
       OPEN_TIMEOUT = 10
-      READ_TIMEOUT = 120
-      AUTH_FAILURES = [401, 403].freeze
+      NO_RETRY = %w[unauthorized rate_limited timeout unreachable].freeze
+      MIN_RETRY_SECONDS = 2
 
-      attr_reader :model, :fallback_model, :language, :endpoint
+      # The hard backstop's exception; turned into HttpError(reason: "timeout").
+      class DeadlineExceeded < Timeout::Error; end
+
+      attr_reader :model, :fallback_model, :language, :endpoint, :deadline
 
       def initialize(api_key: VoiceTranscription.api_key, model: Studio.voice_transcribe_model,
                      fallback_model: Studio.voice_transcribe_fallback_model,
-                     language: Studio.voice_transcribe_language, endpoint: ENDPOINT)
+                     language: Studio.voice_transcribe_language, endpoint: ENDPOINT,
+                     deadline: Studio.voice_transcribe_deadline)
         @api_key = api_key
         @model = model.to_s
         @fallback_model = fallback_model.to_s.strip.empty? ? nil : fallback_model.to_s
         @language = language.to_s.strip.empty? ? nil : language.to_s
         @endpoint = endpoint
+        @deadline = deadline.to_f.positive? ? deadline.to_f : 25.0
       end
 
       def configured? = !@api_key.to_s.strip.empty?
@@ -149,13 +184,24 @@ module Studio
       def transcribe(io:, filename:, content_type:)
         raise NotConfigured, "#{API_KEY_ENV} is not set, so this app cannot transcribe voice" unless configured?
 
-        request_text(model, io, filename, content_type)
-      rescue HttpError => e
-        raise if fallback_model.nil? || fallback_model == model || AUTH_FAILURES.include?(e.status)
+        ends_at = now + deadline
+        begin
+          request_text(model, io, filename, content_type, ends_at)
+        rescue HttpError => e
+          raise unless retry?(e, ends_at)
 
-        VoiceTranscription.log_warn("#{model} transcription failed (#{e.message}); retrying on #{fallback_model}")
-        io.rewind
-        request_text(fallback_model, io, filename, content_type)
+          VoiceTranscription.log_warn("#{model} transcription failed (HTTP #{e.status}, #{e.reason}); " \
+                                      "retrying on #{fallback_model}")
+          io.rewind
+          request_text(fallback_model, io, filename, content_type, ends_at)
+        end
+      end
+
+      def retry?(error, ends_at)
+        return false if fallback_model.nil? || fallback_model == model
+        return false if NO_RETRY.include?(error.reason)
+
+        ends_at - now >= MIN_RETRY_SECONDS
       end
 
       # The multipart fields, apart from the socket so a test reads them.
@@ -184,36 +230,52 @@ module Studio
 
       private
 
-      def request_text(model_name, io, filename, content_type)
-        perform(model_name, io, filename, content_type).fetch("text", "").to_s.strip
+      def now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+      def request_text(model_name, io, filename, content_type, ends_at)
+        perform(model_name, io, filename, content_type, ends_at).fetch("text", "").to_s.strip
       end
 
       # The only place a socket opens, so the only place the trap sits.
-      def perform(model_name, io, filename, content_type)
+      # uri.hostname, not uri.host: an IPv6 literal's host keeps its brackets
+      # ("[::1]"), which neither the loopback check nor the connect reads.
+      def perform(model_name, io, filename, content_type, ends_at)
         uri = URI.parse(endpoint)
-        VoiceTranscription.guard_live_call!("OpenAI", host: uri.host)
+        VoiceTranscription.guard_live_call!("OpenAI", host: uri.hostname)
+
+        left = ends_at - now
+        raise HttpError.new("OpenAI #{model_name} was not tried: the take's deadline ran out", status: 0, reason: "timeout") if left <= 0
 
         request = build_request(model_name, io, filename, content_type)
-        response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
-                                                       open_timeout: OPEN_TIMEOUT, read_timeout: READ_TIMEOUT) do |http|
-          http.request(request)
+        response = Timeout.timeout(left, DeadlineExceeded) do
+          Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == "https", open_timeout: [OPEN_TIMEOUT, left].min,
+                                                  read_timeout: left, write_timeout: left) do |http|
+            http.request(request)
+          end
         end
         interpret(response, model_name)
-      rescue Timeout::Error, SystemCallError, IOError, OpenSSL::SSL::SSLError, SocketError => e
-        raise HttpError.new("OpenAI #{model_name} could not be reached (#{e.class})", status: 0)
+      rescue Timeout::Error => e
+        raise HttpError.new("OpenAI #{model_name} did not answer within the take's #{deadline.round(1)} s deadline (#{e.class})",
+                            status: 0, reason: "timeout")
+      rescue SystemCallError, IOError, OpenSSL::SSL::SSLError, SocketError => e
+        raise HttpError.new("OpenAI #{model_name} could not be reached (#{e.class})", status: 0, reason: "unreachable")
       end
 
+      # A failure carries the status and its reason code, never the vendor's
+      # words (HttpError).
       def interpret(response, model_name)
+        status = response.code.to_i
+        unless response.is_a?(Net::HTTPSuccess)
+          reason = HttpError.reason_for(status)
+          raise HttpError.new("OpenAI #{model_name} answered HTTP #{status} (#{reason})", status: status, reason: reason)
+        end
+
         parsed = begin
           JSON.parse(response.body.to_s)
         rescue JSON::ParserError
           {}
         end
-        parsed = {} unless parsed.is_a?(Hash)
-        return parsed if response.is_a?(Net::HTTPSuccess)
-
-        detail = parsed.dig("error", "message") || response.body.to_s[0, 200]
-        raise HttpError.new("OpenAI #{model_name} answered HTTP #{response.code}: #{detail}", status: response.code.to_i)
+        parsed.is_a?(Hash) ? parsed : {}
       end
     end
 
@@ -269,7 +331,8 @@ module Studio
       klass.new
     end
 
-    # Studio.voice_openai_api_key, else OPENAI_API_KEY (Voicebox's name).
+    # Studio.voice_openai_api_key, else STUDIO_VOICE_OPENAI_API_KEY. Never the
+    # app's shared OPENAI_API_KEY: voice spends on its own key and budget.
     def api_key
       key = Studio.voice_openai_api_key.to_s.strip
       key.empty? ? ENV[API_KEY_ENV].to_s.strip : key
@@ -285,9 +348,12 @@ module Studio
       rails_env == "test"
     end
 
+    # This machine. host is URI#hostname, so IPv6 arrives unbracketed.
+    LOOPBACK_HOSTS = %w[127.0.0.1 localhost ::1].freeze
+
     def guard_live_call!(vendor, host:)
       return unless live_calls_blocked?
-      return if %w[127.0.0.1 localhost ::1].include?(host.to_s)
+      return if LOOPBACK_HOSTS.include?(host.to_s)
 
       raise LiveCallAttempted, "A live #{vendor} call was attempted with #{NO_LIVE_CALLS_ENV} armed. " \
                                "Tests drive the mock transcriber (Studio.voice_transcriber = \"mock\")."
