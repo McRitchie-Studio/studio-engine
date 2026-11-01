@@ -10,7 +10,7 @@ import { studioSource, studioModuleUrl } from "./support/studio_module.mjs"
 const source = studioSource("studio/voice_profile")
 const {
   SILENCE_RMS, TAKE_MS, rootMeanSquare, peakWindowRms, meterLevel, takeWasHeard, pickMimeType,
-  copyFor, phraseStates, fakeVector, embedderFor, SilentTakeError, MESSAGES
+  copyFor, phraseStates, fakeVector, embedderFor, SilentTakeError, MESSAGES, openFailure
 } = await import(studioModuleUrl("studio/voice_profile"))
 
 function cosine(a, b) {
@@ -223,6 +223,21 @@ test("three heard takes save three vectors, with the model id and the CSRF token
   assert.deepEqual(body.voice.embeddings[0], fakeVector("alex"))
   assert.equal(Object.keys(body.voice).sort().join(","), "embeddings,model", "vectors only, never audio")
   assert.equal(win.location.assigned, "/profile")
+})
+
+test("a microphone busy in another app says so, not read it again", async () => {
+  const { win } = stubWindow(0.1, null)
+  win.navigator.mediaDevices.getUserMedia = async () => { throw Object.assign(new Error("busy"), { name: "NotReadableError" }) }
+  const row = buildRow(FAKE)
+  mountVoiceProfile(row.root, win)
+  row.root.click(row.open)
+  row.root.click(row.record)
+  await flush()
+
+  assert.equal(row.status.textContent, MESSAGES.busy)
+  assert.equal(openFailure({ name: "TrackStartError" }), MESSAGES.busy)
+  assert.equal(openFailure({ name: "NotAllowedError" }), MESSAGES.denied)
+  assert.equal(openFailure({ name: "NotFoundError" }), MESSAGES.failed)
 })
 
 test("a silent take is refused and the phrase stays current", async () => {

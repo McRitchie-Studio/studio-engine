@@ -248,6 +248,35 @@ class StudioVoiceTranscriptionTest < Minitest::Test
     assert_equal 1, @server.requests.size, "no fallback after a timeout"
   end
 
+  # A vendor that DRIPS: headers at once, then a byte every 0.2 s. Every socket
+  # read succeeds inside any per-read timeout, so only the deadline's hard
+  # backstop stops it. CONTROL: drop the Timeout.timeout around Net::HTTP.start
+  # and this runs the drip out (about 12 s).
+  def test_a_vendor_that_drips_bytes_is_cut_at_the_deadline
+    server = TCPServer.new("127.0.0.1", 0)
+    port = server.addr[1]
+    dripper = Thread.new do
+      socket = server.accept
+      socket.gets("\r\n\r\n")
+      socket.write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 60\r\nConnection: close\r\n\r\n")
+      60.times { socket.write(" "); socket.flush; sleep 0.2 }
+    rescue StandardError
+      nil
+    ensure
+      socket&.close rescue nil
+    end
+    stt = VT::OpenAI.new(api_key: "test-key", fallback_model: "whisper-1", deadline: 1,
+                         endpoint: "http://127.0.0.1:#{port}/v1/audio/transcriptions")
+    error = nil
+    took = elapsed { error = assert_raises(VT::HttpError) { stt.transcribe(**take) } }
+
+    assert_equal "timeout", error.reason
+    assert_operator took, :<, 2.5, "a dripping vendor held the take #{took.round(2)} s against a 1 s deadline"
+  ensure
+    server&.close
+    dripper&.kill
+  end
+
   # CONTROL: give each attempt a fresh deadline (ends_at per request_text) and
   # the second attempt runs its own 3 s: about 3.9 s in all.
   def test_both_attempts_share_one_deadline
