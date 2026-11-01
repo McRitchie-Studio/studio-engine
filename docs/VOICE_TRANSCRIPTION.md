@@ -22,7 +22,12 @@ page (embeds the take on the device) ──POST /voice/takes (multipart)──�
 
 ## What is kept
 
-**Nothing.** The upload is read once, handed to the transcriber, and its
+The take's audio **does leave the app**: it goes to the speech-to-text vendor
+(OpenAI, under the app's own key) to be transcribed. Name OpenAI, and that a
+spoken message's audio is sent to it and not kept, on the app's privacy page
+and beside the microphone where the take is recorded.
+
+**The app keeps nothing.** The upload is read once, handed to the transcriber, and its
 tempfile is deleted before the answer. No row is written. `voice[audio]` and
 `voice[embedding]` are in the engine's parameter filter (beside the profile's
 `voice[embeddings]`), so neither reaches a request log. The vendor's error words

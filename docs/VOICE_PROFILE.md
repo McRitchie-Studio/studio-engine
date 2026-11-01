@@ -10,11 +10,15 @@ tell who is speaking. It is off by default.
 - **Stored:** `users.voice_embedding` (an array of 256 floats, a unit vector),
   `users.voice_embedding_model` (which embedder and revision made it) and
   `users.voice_embedding_updated_at`.
-- **Never stored or uploaded:** audio. Each take is recorded in the browser,
+- **Never stored or uploaded (for setting up a voice):** audio. Each setup take is recorded in the browser,
   embedded there (`app/javascript/studio/voice_profile.js`) and dropped. The save
   request (`POST /profile/voice`) carries only `voice[model]` and
   `voice[embeddings]`, three vectors, and the server averages them
   (`Studio::VoiceMatch.enrol`).
+- **A spoken message is different.** A take posted to `POST /voice/takes` (a
+  chat message said aloud) does go to the app's speech-to-text vendor (OpenAI)
+  to be transcribed, and is not kept by the app afterwards
+  ([`VOICE_TRANSCRIPTION.md`](VOICE_TRANSCRIPTION.md)).
 - **Delete** (`DELETE /profile/voice`) clears all three columns.
 
 The row shows this consent line: "This saves a voice pattern, not a recording.

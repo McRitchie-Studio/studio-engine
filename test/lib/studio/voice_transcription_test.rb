@@ -217,6 +217,9 @@ class StudioVoiceTranscriptionTest < Minitest::Test
     assert_nil VT.mime_type(nil)
     assert_equal "take.ogg", VT.filename_for("audio/ogg;codecs=opus")
     assert_equal "take.m4a", VT.filename_for("audio/x-m4a")
+    # What the recorder actually emits (studio/voice_recorder pickMimeType).
+    assert_equal "take.mp4", VT.filename_for("audio/mp4;codecs=mp4a.40.2")
+    assert_equal "take.webm", VT.filename_for("audio/webm;codecs=opus")
   end
 
   def test_no_speech_catches_what_models_write_for_silence
