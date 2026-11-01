@@ -73,6 +73,7 @@ Rails.application.routes.draw do
   get "lab/profile", to: "e2e_lab#profile"
   get "lab/profile_edit", to: "e2e_lab#profile_edit"
   get "lab/voice_profile", to: "e2e_lab#voice_profile"
+  get "lab/voice_capture", to: "e2e_lab#voice_capture"
   get "lab/hold_button", to: "e2e_lab#hold_button"
   get "lab/loader", to: "e2e_lab#loader"
   get "lab/loader_visits", to: "e2e_lab#loader_visits"

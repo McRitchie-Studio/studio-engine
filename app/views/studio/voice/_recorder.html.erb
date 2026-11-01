@@ -1,0 +1,34 @@
+<%# The record button (docs/VOICE_CAPTURE.md): studio/voice_recorder opens the
+    microphone through studio/microphone (so it records from what the chip
+    names), runs the engine's one level meter (studio/level_meter) as the ring
+    around the button, refuses a silent take, and hands a heard take to the page
+    as a studio:voice-recorder:take event with the blob. It uploads nothing:
+    the page that renders it decides where the audio goes.
+
+    Locals, all optional:
+      copy:   per-state words merged over studio/voice_recorder's COPY
+              (e.g. { "idle" => { "button" => "Talk" } })
+      mode:   "toggle" (tap to start, tap to stop; the default) or "hold"
+              (press and hold to talk)
+      max_ms: stop a take on its own after this long (default 60000)
+      id:     an id for the root, for a page's own listener
+
+    The controller is lazy (studio/stimulus); if it fails to load, the root
+    carries data-studio-controller-failed="voice-recorder" and says so. %>
+<% copy = Studio::VoiceCapture.recorder_copy(local_assigns[:copy]) %>
+<% mode = local_assigns.fetch(:mode, "toggle").to_s == "hold" ? "hold" : "toggle" %>
+<%= render "studio/voice/styles" %>
+<div class="studio-recorder"
+     <%= tag.attributes(id: local_assigns[:id]) %>
+     data-studio-controller="voice-recorder"
+     data-voice-recorder-state="idle"
+     data-voice-recorder-mode="<%= mode %>"
+     data-voice-recorder-max-ms="<%= local_assigns.fetch(:max_ms, 60_000).to_i %>"
+     data-voice-recorder-copy="<%= copy.except("unavailable").to_json %>">
+  <button type="button" class="studio-recorder-button" data-voice-recorder-button aria-pressed="false">
+    <span data-voice-recorder-label><%= copy.dig("idle", "button") %></span>
+  </button>
+  <span class="studio-recorder-timer" data-voice-recorder-timer aria-hidden="true">0:00</span>
+  <p class="studio-recorder-status" data-voice-recorder-status role="status" aria-live="polite"></p>
+  <p class="studio-recorder-failed"><%= copy["unavailable"] %></p>
+</div>

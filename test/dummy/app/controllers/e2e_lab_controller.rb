@@ -662,6 +662,12 @@ class E2eLabController < ActionController::Base
     def voice_embedding_updated_at = Time.utc(2026, 10, 29, 12)
   end
 
+  # The voice capture layer (docs/VOICE_CAPTURE.md): chip, help and recorder by
+  # name, no user and no setting.
+  def voice_capture
+    render(:voice_capture)
+  end
+
   def voice_profile
     @user = params[:saved].present? ? LabVoiceUserSaved.new : LabVoiceUser.new
     render(:voice_profile)
