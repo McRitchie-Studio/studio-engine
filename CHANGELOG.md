@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.121.0 — 2026-11-01
+
 ### Added
 
 - **Voice capture layer, ported from Voicebox.** `studio/voice/_microphone_chip`
