@@ -1,15 +1,17 @@
 // [unit] studio/voice_profile: the voice row's level meter, silence rule, copy,
 // phrase states, test embedder and the mounted flow against a stub browser.
-// Loaded from source as a data: module, like knowledge_transcript.test.mjs.
+// Loaded from source with its studio/ imports inlined (support/studio_module.mjs):
+// the meter and the recording format are the engine's one copy, studio/level_meter
+// and studio/voice_recorder.
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { readFileSync } from "node:fs"
+import { studioSource, studioModuleUrl } from "./support/studio_module.mjs"
 
-const source = readFileSync(new URL("../../app/javascript/studio/voice_profile.js", import.meta.url), "utf8")
+const source = studioSource("studio/voice_profile")
 const {
   SILENCE_RMS, TAKE_MS, rootMeanSquare, peakWindowRms, meterLevel, takeWasHeard, pickMimeType,
   copyFor, phraseStates, fakeVector, embedderFor, SilentTakeError, MESSAGES
-} = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+} = await import(studioModuleUrl("studio/voice_profile"))
 
 function cosine(a, b) {
   let dot = 0, na = 0, nb = 0
@@ -17,8 +19,10 @@ function cosine(a, b) {
   return dot / Math.sqrt(na * nb)
 }
 
-test("the module imports nothing statically", () => {
-  assert.doesNotMatch(source, /^\s*import\s/m)
+test("the module imports only the engine's meter and recorder statically", () => {
+  const imports = source.match(/^\s*import\s.*$/gm) || []
+  assert.deepEqual(imports.map((line) => line.match(/"([^"]+)"/)[1]), ["studio/level_meter", "studio/voice_recorder"])
+  assert.doesNotMatch(source, /function rootMeanSquare|getFloatTimeDomainData|MIME_CANDIDATES/, "no second copy of the meter")
   assert.match(source, /await import\(this\.config\.runtime\)/, "the runtime is a dynamic import of the page's URL")
 })
 
@@ -180,7 +184,7 @@ globalThis.Blob = class { constructor(parts) { this.size = parts.reduce((n, p) =
 
 const FAKE = { name: "fake", id: "fake-256", size: 256 }
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
-const { mountVoiceProfile } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
+const { mountVoiceProfile } = await import(studioModuleUrl("studio/voice_profile"))
 
 async function readPhrase(row) {
   row.root.click(row.record)
