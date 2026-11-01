@@ -9,7 +9,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { studioSource, loadStudioModule } from "./support/studio_module.mjs"
 
-const { mountVoiceRecorder, pickMimeType, formatElapsed, mergeCopy, COPY, EVENTS } = await loadStudioModule("studio/voice_recorder")
+const { mountVoiceRecorder, pickMimeType, formatElapsed, mergeCopy, failedLine, COPY, EVENTS } = await loadStudioModule("studio/voice_recorder")
 
 class El {
   constructor(attrs = {}, children = []) {
@@ -180,6 +180,30 @@ test("no microphone at all: failed, with the missing line", async () => {
   await flush()
   assert.equal(r.root.dataset.voiceRecorderState, "failed")
   assert.equal(r.status.textContent, COPY.failed.missing)
+})
+
+// CONTROL: drop "NotReadableError" from BUSY_ERRORS and this reads "couldn't
+// find a microphone", which sends the person looking for a plug.
+test("a microphone busy in another app gets its own line, not the missing one", async () => {
+  const busy = async () => { throw Object.assign(new Error("Could not start audio source"), { name: "NotReadableError" }) }
+  const { win, log } = stubWindow()
+  const r = buildRecorder()
+  mountVoiceRecorder(r.root, { win, open: busy })
+  r.root.fire("click", r.button)
+  await flush()
+  assert.equal(r.root.dataset.voiceRecorderState, "failed")
+  assert.equal(r.status.textContent, "Your microphone is busy in another app. Close it there, then try again.")
+  assert.notEqual(r.status.textContent, COPY.failed.missing)
+  assert.ok(!log.announced.includes("studio:microphone:denied"), "busy is not a refusal")
+})
+
+test("the busy line: Chrome's older TrackStartError too, and a page's copy overrides it", () => {
+  assert.equal(failedLine({ name: "TrackStartError" }), COPY.failed.busy)
+  assert.equal(failedLine({ name: "NotFoundError" }), COPY.failed.missing)
+  assert.equal(failedLine(null), COPY.failed.missing)
+  const copy = mergeCopy({ failed: { busy: "Mic in use elsewhere." } })
+  assert.equal(failedLine({ name: "NotReadableError" }, copy), "Mic in use elsewhere.")
+  assert.equal(copy.failed.missing, COPY.failed.missing, "the other failed lines stand")
 })
 
 test("a MediaRecorder that will not start lets go of the microphone and the meter", async () => {

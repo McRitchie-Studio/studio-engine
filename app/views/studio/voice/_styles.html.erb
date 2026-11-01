@@ -32,6 +32,9 @@
     border: 1px solid transparent; background: transparent; padding: .5rem .75rem; text-align: left; font-size: .875rem;
     color: var(--color-text, inherit); cursor: pointer; }
   .studio-mic-option:hover { background-color: rgb(var(--color-primary-500-rgb, 99 102 241) / .08); }
+  /* The same 3px ring as the chip on every control in the picker. */
+  .studio-mic-option:focus-visible, .studio-mic-help-link:focus-visible {
+    outline: 3px solid rgb(var(--color-primary-500-rgb, 99 102 241) / .5); outline-offset: 2px; }
   .studio-mic-option[aria-current="true"] { border-color: rgb(var(--color-primary-500-rgb, 99 102 241));
     background-color: rgb(var(--color-primary-500-rgb, 99 102 241) / .12); font-weight: 600; }
   .studio-mic-check { width: 1rem; flex-shrink: 0; font-weight: 700; color: rgb(var(--color-primary-500-rgb, 99 102 241)); }
@@ -64,6 +67,7 @@
   .studio-mic-mock .mock-ink { stroke: currentColor; }
   .studio-mic-mock .mock-knob { fill: currentColor; stroke: none; }
   .studio-mic-mock .mock-text { fill: currentColor; font-family: inherit; }
+  .studio-mic-mock .mock-address { fill: currentColor; fill-opacity: .3; }
   .studio-mic-mock .mock-on, .studio-mic-mock .mock-badge { fill: rgb(var(--color-primary-500-rgb, 99 102 241)); }
   .studio-mic-mock .mock-knob-on, .studio-mic-mock .mock-badge-text { fill: var(--color-surface, Canvas); }
 

@@ -61,7 +61,8 @@ export const COPY = {
   silent: { button: "Record", status: "I couldn't hear anything. Check your microphone and try again.",
             named: "I couldn't hear anything from %{microphone}. Pick another microphone and try again." },
   failed: { button: "Try again", status: "That didn't record. Try again.", start: "I couldn't start recording. Try again.",
-            missing: "I couldn't find a microphone. Plug one in and try again." },
+            missing: "I couldn't find a microphone. Plug one in and try again.",
+            busy: "Your microphone is busy in another app. Close it there, then try again." },
   denied: { button: "Record", status: "Allow the microphone to record." },
   unsupported: { button: "Record", status: "This browser can't record here. Try Safari or Chrome." }
 }
@@ -76,6 +77,16 @@ export function pickMimeType(isTypeSupported) {
 export function formatElapsed(ms) {
   const seconds = Math.max(0, Math.floor(ms / 1000))
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
+}
+
+// The line for a microphone that would not open (NotAllowedError is "denied",
+// not this). NotReadableError is a microphone another app holds (Chrome's
+// older name, TrackStartError); everything else reads as no microphone found.
+export const BUSY_ERRORS = ["NotReadableError", "TrackStartError"]
+
+export function failedLine(error, copy = COPY) {
+  const busy = !!error && BUSY_ERRORS.includes(error.name)
+  return busy ? (copy.failed.busy || COPY.failed.busy) : copy.failed.missing
 }
 
 // The page's words over the defaults, one state at a time.
@@ -193,7 +204,7 @@ export function mountVoiceRecorder(root, { win = window, open = openMicrophone, 
       if (destroyed) return
       const denied = error && error.name === "NotAllowedError"
       if (denied) announce(MICROPHONE_EVENTS.denied, {}, win)
-      setState(denied ? "denied" : "failed", denied ? null : copy.failed.missing)
+      setState(denied ? "denied" : "failed", denied ? null : failedLine(error, copy))
       return
     }
     stream = opened.stream
