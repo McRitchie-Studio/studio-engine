@@ -48,6 +48,7 @@ require "studio/profile_sections"
 require "studio/profile_image"
 require "studio/voice_match"
 require "studio/voice_capture"
+require "studio/voice_transcription"
 require "studio/oauth_identity"
 require "studio/google_sign_in"
 require "studio/newsletter"
@@ -576,6 +577,27 @@ module Studio
   # "fake" (tests only; a fixed vector per window.studioFakeVoice). The server
   # refuses a voice saved by any other embedder, so a page cannot pick its own.
   mattr_accessor :voice_embedder, default: "wespeaker"
+
+  # Understand (docs/VOICE_TRANSCRIPTION.md): POST /voice/takes turns a signed-in
+  # user's take into {text, speaker, score}. OFF BY DEFAULT: every take costs a
+  # speech-to-text call, so an app turns it on when a page posts takes.
+  mattr_accessor :voice_transcription, default: false
+
+  # Which transcriber answers: "openai" or "mock". nil means
+  # STUDIO_VOICE_TRANSCRIBER, else "openai" in production and "mock" elsewhere
+  # (Studio::VoiceTranscription.adapter_name). Tests never reach the vendor:
+  # VOICE_NO_LIVE_CALLS is armed in every test environment.
+  mattr_accessor :voice_transcriber, default: nil
+
+  # The OpenAI key for the real transcriber. nil reads OPENAI_API_KEY. Missing,
+  # the endpoint answers 503 with a line the page can show; nothing crashes.
+  mattr_accessor :voice_openai_api_key, default: nil
+
+  # The speech-to-text models (Voicebox's measured pair) and the language both
+  # are told to hear. A blank fallback turns the one retry off.
+  mattr_accessor :voice_transcribe_model, default: "gpt-4o-transcribe"
+  mattr_accessor :voice_transcribe_fallback_model, default: "whisper-1"
+  mattr_accessor :voice_transcribe_language, default: "en"
 
   # How long a freshly minted magic link stays live.
   mattr_accessor :magic_link_ttl, default: 15.minutes
@@ -1954,6 +1976,13 @@ module Studio
         # on, and the user has the columns).
         post   "profile/voice", to: "studio/profiles#save_voice", as: :profile_voice
         delete "profile/voice", to: "studio/profiles#delete_voice"
+      end
+
+      # Understand: one signed-in take in, {text, speaker, score} out
+      # (Studio::VoiceTakesController, docs/VOICE_TRANSCRIPTION.md). Drawn only
+      # for an app that turns it on, because every take is a paid vendor call.
+      if Studio.voice_transcription
+        post "voice/takes", to: "studio/voice_takes#create", as: :studio_voice_takes
       end
 
       resources :error_logs, only: [:index, :show]
