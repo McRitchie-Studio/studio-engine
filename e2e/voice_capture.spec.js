@@ -288,30 +288,32 @@ test("hold to talk: pressing records, letting go hands over the take", async ({ 
 
 // THE LAB IS DARK-ONLY (layouts/e2e_lab hard-codes class="dark"), so the
 // light pass strips the class after load and grades the light palette itself.
-for (const scheme of ["dark", "light"]) {
-  test(`${scheme} mode: the chip and the button read on the ${scheme} surface`, async ({ page }) => {
-    await blockOffsiteRequests(page);
-    await page.emulateMedia({ colorScheme: scheme });
-    await stubMicrophones(page);
-    await openLab(page);
-    if (scheme === "light") await page.evaluate(() => document.documentElement.classList.remove("dark"));
-    expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(scheme === "dark");
-    const colours = await page.evaluate(() => {
-      const read = (selector) => getComputedStyle(document.querySelector(selector));
-      return { chipText: read(".studio-mic-chip").color, chipBg: read(".studio-mic-chip").backgroundColor,
-               buttonText: read(".studio-recorder-button").color, buttonBg: read(".studio-recorder-button").backgroundColor,
-               body: getComputedStyle(document.body).backgroundColor };
-    });
-    expect(colours.chipText).not.toBe(colours.chipBg);
-    expect(colours.buttonText).not.toBe(colours.buttonBg);
-    expect(colours.buttonBg, "the button is painted, not transparent").not.toBe("rgba(0, 0, 0, 0)");
-    // The palette really switched: light text on the dark surface, dark on the light.
-    const lightness = (rgb) => { const [r, g, b] = rgb.match(/\d+(\.\d+)?/g).map(Number); return (r + g + b) / 765; };
-    if (scheme === "dark") expect(lightness(colours.chipText), `chip text ${colours.chipText}`).toBeGreaterThan(0.5);
-    else expect(lightness(colours.chipText), `chip text ${colours.chipText}`).toBeLessThan(0.5);
-    expect(await sideways(page)).toBeLessThanOrEqual(0);
+// One body, two literal test() calls: config/e2e_lane.yml counts test( in the
+// source, so a loop would count one spec and run two.
+async function gradeScheme(page, scheme) {
+  await blockOffsiteRequests(page);
+  await page.emulateMedia({ colorScheme: scheme });
+  await stubMicrophones(page);
+  await openLab(page);
+  if (scheme === "light") await page.evaluate(() => document.documentElement.classList.remove("dark"));
+  expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(scheme === "dark");
+  const colours = await page.evaluate(() => {
+    const read = (selector) => getComputedStyle(document.querySelector(selector));
+    return { chipText: read(".studio-mic-chip").color, chipBg: read(".studio-mic-chip").backgroundColor,
+             buttonText: read(".studio-recorder-button").color, buttonBg: read(".studio-recorder-button").backgroundColor };
   });
+  expect(colours.chipText).not.toBe(colours.chipBg);
+  expect(colours.buttonText).not.toBe(colours.buttonBg);
+  expect(colours.buttonBg, "the button is painted, not transparent").not.toBe("rgba(0, 0, 0, 0)");
+  // The palette really switched: light text on the dark surface, dark on the light.
+  const lightness = (rgb) => { const [r, g, b] = rgb.match(/\d+(\.\d+)?/g).map(Number); return (r + g + b) / 765; };
+  if (scheme === "dark") expect(lightness(colours.chipText), `chip text ${colours.chipText}`).toBeGreaterThan(0.5);
+  else expect(lightness(colours.chipText), `chip text ${colours.chipText}`).toBeLessThan(0.5);
+  expect(await sideways(page)).toBeLessThanOrEqual(0);
 }
+
+test("dark mode: the chip and the button read on the dark surface", async ({ page }) => gradeScheme(page, "dark"));
+test("light mode: the chip and the button read on the light surface", async ({ page }) => gradeScheme(page, "light"));
 
 test("keyboard: Esc in the open list returns focus to the chip, and options and the help link wear the 3px ring", async ({ page }) => {
   await blockOffsiteRequests(page);
