@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.122.0 — 2026-11-01
+
 ### Added
 
 - **`POST /voice/takes` is rate-limited per user.** `Studio.voice_takes_rate_limit`
