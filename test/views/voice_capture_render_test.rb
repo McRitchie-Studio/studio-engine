@@ -16,6 +16,7 @@ require "active_support/core_ext/object/try"
 class VoiceCaptureRenderTest < Minitest::Test
   def view
     v = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
+    # A request that answers a host, so a partial printing it would be caught.
     v.define_singleton_method(:request) { Struct.new(:host).new("studio.test") }
     v
   end
@@ -46,7 +47,8 @@ class VoiceCaptureRenderTest < Minitest::Test
     assert_equal "chat-mic-help-title", dialog["aria-labelledby"]
     assert_equal 4, dialog.css("[data-microphone-help-steps] li").size
     assert_includes dialog.at_css("[data-microphone-help-other]").text, "Allow the microphone"
-    assert_includes dialog.at_css("svg.studio-mic-mock").text, "studio.test", "the drawing names this site"
+    refute_includes dialog.to_html, "studio.test", "the drawing never prints the request's host"
+    refute_nil dialog.at_css("svg.studio-mic-mock rect.mock-address"), "the address is a drawn bar"
     assert_equal "dialog", dialog.at_css("form")["method"]
   end
 
@@ -96,6 +98,10 @@ class VoiceCaptureRenderTest < Minitest::Test
     %w[.studio-mic-chip .studio-mic-option .studio-mic-help-link .studio-recorder-button .studio-mic-help-close].each do |selector|
       rule = styles[/#{Regexp.escape(selector)}\s*\{[^}]*\}/]
       assert_match(/min-height:\s*44px/, rule.to_s, "#{selector} is a 44px tap target")
+    end
+    %w[.studio-mic-option .studio-mic-help-link].each do |selector|
+      ring = styles[/#{Regexp.escape(selector)}:focus-visible[^{]*\{[^}]*\}/]
+      assert_match(/outline:\s*3px solid rgb\(var\(--color-primary-500-rgb/, ring.to_s, "#{selector} has the 3px token focus ring")
     end
     bare = styles.scan(/(?<!, )#[0-9a-f]{3,6}\b/i)
     assert_empty bare, "a hex colour outside a var() fallback: #{bare.inspect}"

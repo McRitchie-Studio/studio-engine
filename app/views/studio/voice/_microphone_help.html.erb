@@ -27,7 +27,9 @@
           <line x1="19" y1="20" x2="33" y2="20"/><circle cx="23" cy="20" r="2.5" class="mock-knob"/>
           <line x1="19" y1="28" x2="33" y2="28"/><circle cx="29" cy="28" r="2.5" class="mock-knob"/>
         </g>
-        <text x="48" y="29" class="mock-text" font-size="13"><%= request.host %></text>
+        <%# The address is a drawn bar, not this app's host: the drawing is the
+            same on every app, and renders without a request. %>
+        <rect x="48" y="19" width="132" height="10" rx="5" class="mock-address"/>
         <rect x="12" y="54" width="232" height="106" rx="10" class="mock-panel"/>
         <g class="mock-ink" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
           <rect x="26" y="68" width="8" height="13" rx="4"/><path d="M23 77a7 7 0 0 0 14 0M30 84v4"/>

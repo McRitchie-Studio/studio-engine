@@ -26,6 +26,9 @@ require_relative "../../db/migrate/20261029120000_add_voice_profile_to_users"
 #   - the caps: size, duration, type
 #   - a missing key is a 503 the page can show, not a crash
 #   - silence the model made words of is refused
+#   - a per-user rate limit answers 429 before anything is transcribed
+#   - a string voice param is a 422, not a 500
+#   - an ErrorLog row names the user and none of the vendor's words
 #   - nothing is kept: no row written, and neither the audio nor the vector
 #     reaches the request log
 ActionDispatch::IntegrationTest.app = Rails.application
@@ -93,11 +96,15 @@ class VoiceTakesRequestsTest < ActionDispatch::IntegrationTest
     User.delete_all
     ErrorLog.delete_all
     @saved = { transcriber: Studio.voice_transcriber, key: Studio.voice_openai_api_key,
-               embedder: Studio.voice_embedder, env_key: ENV.fetch("OPENAI_API_KEY", nil) }
+               embedder: Studio.voice_embedder, env_key: ENV.fetch("OPENAI_API_KEY", nil),
+               voice_key: ENV.fetch("STUDIO_VOICE_OPENAI_API_KEY", nil), limit: Studio.voice_takes_rate_limit }
     Studio.voice_transcriber = nil
     Studio.voice_openai_api_key = nil
     Studio.voice_embedder = "wespeaker"
+    # A fresh counter per test, at the default numbers.
+    Studio.voice_takes_rate_limit = { to: 20, within: 600, store: ActiveSupport::Cache::MemoryStore.new }
     ENV.delete("OPENAI_API_KEY")
+    ENV.delete("STUDIO_VOICE_OPENAI_API_KEY")
     VT::Mock.reset!
     VT::Mock.reply = ->(**) { "Hey Alex, what's on my calendar today?" }
     @pat = User.create!(email: "pat@example.com", name: "Pat Studio",
@@ -108,7 +115,9 @@ class VoiceTakesRequestsTest < ActionDispatch::IntegrationTest
     Studio.voice_transcriber = @saved[:transcriber]
     Studio.voice_openai_api_key = @saved[:key]
     Studio.voice_embedder = @saved[:embedder]
+    Studio.voice_takes_rate_limit = @saved[:limit]
     @saved[:env_key] ? ENV["OPENAI_API_KEY"] = @saved[:env_key] : ENV.delete("OPENAI_API_KEY")
+    @saved[:voice_key] ? ENV["STUDIO_VOICE_OPENAI_API_KEY"] = @saved[:voice_key] : ENV.delete("STUDIO_VOICE_OPENAI_API_KEY")
     VT::Mock.reset!
     ActionController::Base.allow_forgery_protection = false
   end
@@ -265,7 +274,106 @@ class VoiceTakesRequestsTest < ActionDispatch::IntegrationTest
     assert_response :service_unavailable
     assert_equal({ "error" => VT::NOT_CONFIGURED_MESSAGE, "reason" => "not_configured" }, json)
     refute_includes response.body, "OPENAI_API_KEY"
-    assert_match "OPENAI_API_KEY", ErrorLog.last.message
+    assert_match "STUDIO_VOICE_OPENAI_API_KEY is not set", ErrorLog.last.message
+    assert_equal @pat, ErrorLog.last.target, "the row names who sent the take"
+  end
+
+  test "the app's shared OPENAI_API_KEY does not turn voice on" do
+    Studio.voice_transcriber = "openai"
+    ENV["OPENAI_API_KEY"] = "shared-image-key"
+    sign_in @pat
+    post_take
+    assert_response :service_unavailable
+    assert_equal "not_configured", json["reason"]
+  end
+
+  test "a vendor failure is a 503 with retry, and its ErrorLog row carries the user and the engine's words only" do
+    VT::Mock.reply = ->(**) { raise VT::HttpError.new("OpenAI gpt-4o-transcribe answered HTTP 500 (server_error)", status: 500) }
+    sign_in @pat
+    post_take
+
+    assert_response :service_unavailable
+    assert_equal({ "error" => Studio::VoiceTakesController::UNAVAILABLE, "reason" => "transcriber_failed", "retry" => true }, json)
+    log = ErrorLog.last
+    assert_equal @pat, log.target
+    assert_equal "OpenAI gpt-4o-transcribe answered HTTP 500 (server_error)", log.message
+  end
+
+  # ── the per-user rate limit ─────────────────────────────────
+
+  test "over the per-user limit is a JSON 429 with retry_after, before anything is transcribed; others are untouched" do
+    Studio.voice_takes_rate_limit = { to: 2, within: 600, store: ActiveSupport::Cache::MemoryStore.new }
+    sign_in @pat
+    2.times do
+      post_take
+      assert_response :ok
+    end
+    post_take
+
+    assert_response :too_many_requests
+    assert_equal "rate_limited", json["reason"]
+    assert_equal Studio::VoiceTakesController::TOO_MANY, json["error"]
+    assert_includes 1..600, json["retry_after"]
+    assert_equal json["retry_after"].to_s, response.headers["Retry-After"]
+    assert_equal "no-store", response.headers["Cache-Control"]
+    assert_equal 2, VT::Mock.calls.size, "the limited take never reached the transcriber"
+
+    sam = User.create!(email: "sam@example.com", name: "Sam")
+    sign_in sam
+    post_take
+    assert_response :ok, "the limit is per user"
+  end
+
+  # CONTROL: drop the NullStore fallback in #rate_limit_store and this posts
+  # forever: a NullStore's increment answers nil, which counts as no limit.
+  test "the limit holds when the app's cache is a NullStore, and false turns it off" do
+    Studio.voice_takes_rate_limit = { to: 1, within: 600 }
+    Studio::VoiceTakesController::FALLBACK_STORE.clear
+    original = Rails.cache
+    Rails.cache = ActiveSupport::Cache::NullStore.new
+    sign_in @pat
+    post_take
+    assert_response :ok
+    post_take
+    assert_response :too_many_requests
+
+    Studio.voice_takes_rate_limit = false
+    post_take
+    assert_response :ok
+  ensure
+    Rails.cache = original
+    Studio::VoiceTakesController::FALLBACK_STORE.clear
+  end
+
+  test "the limit reads string keys and the default is 20 takes in 10 minutes" do
+    assert_equal({ to: 20, within: 600 }, Studio.voice_takes_rate_limit.slice(:to, :within))
+    Studio.voice_takes_rate_limit = { "to" => 1, "within" => 60, "store" => ActiveSupport::Cache::MemoryStore.new }
+    sign_in @pat
+    post_take
+    post_take
+    assert_response :too_many_requests
+    assert_includes 1..60, json["retry_after"]
+  end
+
+  test "signed out is still a 401, never a 429" do
+    Studio.voice_takes_rate_limit = { to: 0, within: 600, store: ActiveSupport::Cache::MemoryStore.new }
+    post_take
+    assert_response :unauthorized
+  end
+
+  # ── a voice param that is no take ───────────────────────────
+
+  # CONTROL: drop the ActionController::Parameters check in #create and a
+  # string answers 500 (String#[] with a Symbol).
+  test "a voice param that is a string or a list is a 422, not a 500" do
+    sign_in @pat
+    post "/voice/takes", params: { voice: "abc" }, headers: { "Accept" => "application/json" }
+    assert_response :unprocessable_entity
+    assert_equal "Record something first.", json["error"]
+
+    post "/voice/takes", params: { voice: %w[a b] }, headers: { "Accept" => "application/json" }
+    assert_response :unprocessable_entity
+    assert_empty VT::Mock.calls
   end
 
   test "with a key, the real transcriber in a test environment trips the no-live-calls trap" do

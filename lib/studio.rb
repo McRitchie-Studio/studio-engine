@@ -589,9 +589,24 @@ module Studio
   # VOICE_NO_LIVE_CALLS is armed in every test environment.
   mattr_accessor :voice_transcriber, default: nil
 
-  # The OpenAI key for the real transcriber. nil reads OPENAI_API_KEY. Missing,
-  # the endpoint answers 503 with a line the page can show; nothing crashes.
+  # The OpenAI key for the real transcriber, voice's OWN key. nil reads
+  # STUDIO_VOICE_OPENAI_API_KEY, and never the app's shared OPENAI_API_KEY (on
+  # the hub that is the image key, with its own budget). Missing, the endpoint
+  # answers 503 with a line the page can show; nothing crashes.
   mattr_accessor :voice_openai_api_key, default: nil
+
+  # One take's whole budget at the vendor, in seconds: the first model AND the
+  # fallback share it, so a take never holds a web thread longer than this
+  # (Studio::VoiceTranscription::OpenAI). A timeout or a vendor 429 is not
+  # retried.
+  mattr_accessor :voice_transcribe_deadline, default: 25
+
+  # POST /voice/takes per signed-in user: at most `to` takes in any `within`
+  # seconds (a fixed window), else a JSON 429 with retry_after. Every take is a
+  # paid vendor call. `store:` (optional) is the counter's cache; nil uses
+  # Rails.cache, or a per-process memory store when Rails.cache is a NullStore.
+  # false turns the limit off.
+  mattr_accessor :voice_takes_rate_limit, default: { to: 20, within: 600 }
 
   # The speech-to-text models (Voicebox's measured pair) and the language both
   # are told to hear. A blank fallback turns the one retry off.

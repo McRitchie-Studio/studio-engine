@@ -58,12 +58,22 @@ export const MESSAGES = {
   silent: "I couldn't hear that one. Check your microphone and read it again.",
   failed: "That one didn't work. Tap Record and read it again.",
   denied: "Allow the microphone to set up your voice.",
+  busy: "Your microphone is busy in another app. Close it there, then try again.",
   unsupported: "This browser can't record here. Try Safari or Chrome.",
   network: "We couldn't reach the server. Tap Save again.",
   notSaved: "That didn't save. Tap Save again."
 }
 
 export class SilentTakeError extends Error {}
+
+// Why the microphone would not open: refused, held by another app
+// (NotReadableError; Chrome's older TrackStartError), or anything else.
+export function openFailure(error) {
+  const name = error && error.name
+  if (name === "NotAllowedError") return MESSAGES.denied
+  if (name === "NotReadableError" || name === "TrackStartError") return MESSAGES.busy
+  return MESSAGES.failed
+}
 
 // The words for a state, with {n} the phrase being read (1-based).
 export function copyFor(state, step) {
@@ -304,7 +314,7 @@ export function mountVoiceProfile(root, win = window) {
     try {
       stream = await win.navigator.mediaDevices.getUserMedia({ audio: true })
     } catch (error) {
-      setState("ready", error && error.name === "NotAllowedError" ? MESSAGES.denied : MESSAGES.failed)
+      setState("ready", openFailure(error))
       return
     }
     if (destroyed || state !== "ready") { release(); return }

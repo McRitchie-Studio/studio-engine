@@ -4,6 +4,47 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`POST /voice/takes` is rate-limited per user.** `Studio.voice_takes_rate_limit`
+  (default `{ to: 20, within: 600 }`, a fixed window per user id; `store:`
+  optional; `false` turns it off). Over it: a JSON `429`
+  `{error, reason: "rate_limited", retry_after}` with `Retry-After`, before the
+  take is read or transcribed. On a `NullStore` cache it counts in a per-process
+  memory store rather than going inert.
+- **One deadline per take at the vendor.** `Studio.voice_transcribe_deadline`
+  (25 s) covers both models together; every socket timeout is what is left of
+  it, and a hard timeout backs it (the old 10 s + 120 s per attempt could hold a
+  Puma thread about 260 s).
+- `Studio::VoiceTranscription::HttpError#reason` (`unauthorized`,
+  `rate_limited`, `server_error`, `rejected`, `timeout`, `unreachable`).
+- The recorder's `failed.busy` line: a microphone another app holds
+  (`NotReadableError`) reads "Your microphone is busy in another app. Close it
+  there, then try again.", not "I couldn't find a microphone".
+
+### Changed
+
+- **Voice reads its own key.** `Studio.voice_openai_api_key`, else
+  `STUDIO_VOICE_OPENAI_API_KEY`; the app's shared `OPENAI_API_KEY` is no longer
+  read. An app that turned voice on with `OPENAI_API_KEY` alone sets
+  `STUDIO_VOICE_OPENAI_API_KEY` (until then a take answers the 503
+  `not_configured`).
+- The `whisper-1` fallback no longer runs after a timeout, a vendor 429, or no
+  answer at all, nor with under 2 s of the deadline left.
+- `HttpError` messages, and so `ErrorLog` rows, carry the model, the status and
+  a reason code, never the vendor's error text. The row's `target` is the user
+  who sent the take.
+- Microphone picker: Esc in the open list returns focus to the chip; options
+  drop `aria-pressed` (the one in use keeps `aria-current`); options and the
+  help link wear the chip's 3px focus ring; the help's address-bar drawing shows
+  a drawn bar instead of printing `request.host`.
+
+### Fixed
+
+- A `voice` param that is a string or a list answers `422`, not `500`.
+- The no-live-calls trap reads `URI#hostname`, so an IPv6 loopback endpoint
+  (`http://[::1]:…`) counts as this machine.
+
 ## 0.121.0 — 2026-11-01
 
 ### Added

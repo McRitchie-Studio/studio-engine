@@ -193,7 +193,8 @@ export function mountMicrophoneChip(root, { win = window } = {}) {
       button.type = "button"
       button.className = "studio-mic-option"
       button.dataset.microphoneOption = choice.deviceId
-      button.setAttribute("aria-pressed", inUse ? "true" : "false")
+      // aria-current marks the one in use; aria-pressed would make each option
+      // a toggle, which picking is not.
       if (inUse) button.setAttribute("aria-current", "true")
       const mark = doc.createElement("span")
       mark.className = "studio-mic-check"
@@ -333,12 +334,15 @@ export function mountMicrophoneChip(root, { win = window } = {}) {
     if (chip && target.closest("[data-microphone-chip]") === chip) toggle()
   }
 
-  // Esc closes the list, but an Esc inside the help dialog is the dialog's: it
-  // shuts the dialog and leaves the list where it was.
+  // Esc closes the list and hands focus back to the chip, so a keyboard user
+  // is not left on an option that just vanished. An Esc inside the help dialog
+  // is the dialog's: it shuts the dialog and leaves the list where it was.
   function onKey(event) {
     if (event.key !== "Escape") return
     if (dialog && dialog.contains(event.target)) return
+    if (!panel || panel.hidden) return
     closePanel()
+    if (chip) chip.focus()
   }
 
   const onDeviceChange = () => refresh()

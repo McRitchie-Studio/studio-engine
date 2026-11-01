@@ -19,6 +19,10 @@ module Studio
   # CSRF-protected (send the page's token as X-CSRF-Token), JSON, no-store.
   # The speaker is matched only against the signed-in user's own saved voice.
   #
+  # RATE-LIMITED per user (Studio.voice_takes_rate_limit, 20 takes in 10
+  # minutes): over it, a JSON 429 {error, reason: "rate_limited", retry_after}
+  # and a Retry-After header, before anything is read or transcribed.
+  #
   # NOTHING IS KEPT: the upload is read once, handed to the transcriber, and its
   # tempfile is deleted before the answer; no audio or vector is stored or
   # logged (voice[audio] and voice[embedding] are in the engine's parameter
@@ -27,13 +31,22 @@ module Studio
     before_action :require_authentication
     protect_from_forgery with: :exception
     before_action :no_store
+    before_action :limit_takes
 
     CANT_HEAR = "I couldn't hear any words in that. Check your microphone and try again."
     UNAVAILABLE = "I couldn't transcribe that just now. Try again in a moment."
+    TOO_MANY = "That's a lot of recordings in a short time. Wait a moment, then try again."
+
+    # The counter's fallback when the app's Rails.cache counts nothing (a
+    # NullStore, as many apps run in development): per process, so a limit
+    # still holds.
+    FALLBACK_STORE = ActiveSupport::Cache::MemoryStore.new(size: 4.megabytes)
 
     def create
       voice = params[:voice]
-      audio = voice.respond_to?(:[]) ? voice[:audio] : nil
+      # A string (voice=abc) or an array is no take: refuse it, never index it.
+      voice = nil unless voice.is_a?(ActionController::Parameters)
+      audio = voice ? voice[:audio] : nil
       return refuse("Record something first.") unless audio.respond_to?(:read) && audio.respond_to?(:size)
 
       begin
@@ -68,6 +81,41 @@ module Studio
 
     private
 
+    # The per-user limit, a fixed window: the window's number is in the key, so
+    # its end (retry_after) is known exactly. Rails' own rate_limit macro fixes
+    # to:/within: when the class loads and counts nothing on a NullStore; this
+    # reads the config per request and never goes inert. It instruments the same
+    # rate_limit.action_controller event.
+    def limit_takes
+      limit = Studio.voice_takes_rate_limit
+      return unless limit && current_user
+
+      limit = limit.to_h.transform_keys(&:to_sym)
+
+      to = limit[:to].to_i
+      within = limit[:within].to_i
+      return unless to.positive? && within.positive?
+
+      epoch = Time.now.to_i
+      window = epoch / within
+      key = "rate-limit:#{controller_path}:#{current_user.id}:#{window}"
+      count = rate_limit_store(limit).increment(key, 1, expires_in: within)
+      return if count.nil? || count <= to
+
+      retry_after = within - (epoch % within)
+      ActiveSupport::Notifications.instrument("rate_limit.action_controller",
+                                              request: request, count: count, to: to, within: within,
+                                              by: current_user.id, name: nil, scope: controller_path, cache_key: key) do
+        response.headers["Retry-After"] = retry_after.to_s
+        refuse(TOO_MANY, :too_many_requests, reason: "rate_limited", retry_after: retry_after)
+      end
+    end
+
+    def rate_limit_store(limit)
+      store = limit[:store] || (Rails.cache if defined?(Rails.cache))
+      store.nil? || store.is_a?(ActiveSupport::Cache::NullStore) ? FALLBACK_STORE : store
+    end
+
     def refuse(message, status = :unprocessable_entity, **extra)
       render json: { error: message, **extra }, status: status
     end
@@ -84,8 +132,13 @@ module Studio
       nil
     end
 
+    # An ErrorLog row on the user who sent the take. The error's message is the
+    # engine's own words (model, status, reason code), never the vendor's.
     def capture(error)
-      ::ErrorLog.capture!(error) if defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
+      return unless defined?(::ErrorLog) && ::ErrorLog.respond_to?(:capture!)
+
+      log = ::ErrorLog.capture!(error)
+      log.update(target: current_user) if log.respond_to?(:target=) && current_user
     rescue StandardError
       nil
     end

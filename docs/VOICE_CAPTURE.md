@@ -33,6 +33,10 @@ silence with nothing on the page saying which microphone was used. So:
 - A take whose loudest frame stays under **-40 dBFS** (`SILENCE_RMS = 0.01`) is
   refused before it goes anywhere: a speech model handed silence makes a word up.
   Two silent takes in a row on one microphone open the help.
+- A microphone another app holds (`NotReadableError`, Chrome's older
+  `TrackStartError`) gets its own line, "Your microphone is busy in another
+  app. Close it there, then try again." (`failed.busy`, overridable with the
+  recorder's `copy:`), never "I couldn't find a microphone".
 
 ## Adopt it in a page
 
@@ -147,6 +151,12 @@ least 44px tall, nothing scrolls sideways at 390px, and under reduced motion the
 meter steps in quarters four times a second and the dot stops scaling. Labels a
 device gives are inserted as text, never markup.
 
+Keyboard and screen readers: the chip, every option and the help link wear the
+same 3px primary focus ring. Esc in the open list closes it and puts focus back
+on the chip. The option in use carries `aria-current="true"`; options carry no
+`aria-pressed` (picking is not a toggle). The help's drawing of Chrome's address
+bar shows a drawn bar, not the app's host.
+
 ## Tests
 
 - `test/javascript/microphone.test.mjs`: the chooser (Voicebox's
@@ -155,8 +165,12 @@ device gives are inserted as text, never markup.
 - `test/javascript/level_meter.test.mjs`: the silence line, the scale,
   `takeWasHeard`, a meter against a stub Web Audio graph.
 - `test/javascript/voice_recorder.test.mjs`: heard and silent takes, a refused
-  microphone, a recorder that will not start releasing the microphone, hold mode.
+  microphone, a busy one, a recorder that will not start releasing the
+  microphone, hold mode.
+- `test/javascript/microphone_chip.test.mjs`: Esc returns focus to the chip;
+  options carry `aria-current`, not `aria-pressed`.
 - `test/views/voice_capture_render_test.rb`: the partials and their contract.
 - `e2e/voice_capture.spec.js` on `/lab/voice_capture`: the chip, a switch to an
   exact device that survives a reload, a silent take refused, a heard take's
-  blob, a devicechange relist, a refusal, hold to talk, dark mode.
+  blob, a devicechange relist, a refusal, a busy microphone, hold to talk, the
+  keyboard (Esc, the 3px rings), dark and light.
