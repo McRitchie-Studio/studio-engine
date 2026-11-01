@@ -155,4 +155,4 @@ device gives are inserted as text, never markup.
 - `test/views/voice_capture_render_test.rb`: the partials and their contract.
 - `e2e/voice_capture.spec.js` on `/lab/voice_capture`: the chip, a switch to an
   exact device that survives a reload, a silent take refused, a heard take's
-  blob, a refusal, hold to talk, dark mode.
+  blob, a devicechange relist, a refusal, hold to talk, dark mode.
