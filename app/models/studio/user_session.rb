@@ -16,12 +16,15 @@ module Studio
 
     IDLE = 30.minutes
     THROTTLE = 5.minutes
-    COOKIE_KEY = :studio_user_session
 
     belongs_to :user, class_name: "::User", optional: true
 
     scope :recent, -> { order(last_seen_at: :desc) }
     scope :non_admin, -> { where(admin: false) }
+
+    # Per app, like Studio.session_key: apps on the hub's shared cookie
+    # (STUDIO_SSO_SHARED_COOKIE) must not read each other's mark.
+    def self.cookie_key = :"#{Studio.session_key}_session_mark"
 
     # Off under test unless a test asks: the row a first request writes would count in
 
@@ -49,7 +52,7 @@ module Studio
     def self.track(store, user, now: Time.current)
       return if user.nil? || !recording?
 
-      mark = store[COOKIE_KEY]
+      mark = store[cookie_key]
       mark = mark.to_h.transform_keys(&:to_s) if mark.respond_to?(:to_h)
       same_user = mark.is_a?(Hash) && mark["user"] == user.id
       seen = same_user ? Time.zone.at(mark["at"].to_i) : nil
@@ -63,7 +66,7 @@ module Studio
         admin = user.respond_to?(:admin?) && user.admin?
         row = create!(user_id: user.id, admin: admin ? true : false, started_at: now, last_seen_at: now)
       end
-      store[COOKIE_KEY] = { "id" => row.id, "user" => user.id, "at" => now.to_i }
+      store[cookie_key] = { "id" => row.id, "user" => user.id, "at" => now.to_i }
       row
     rescue StandardError => e
       Rails.logger&.warn("[user_session] #{e.class}: #{e.message}")

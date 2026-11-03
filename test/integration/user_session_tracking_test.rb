@@ -47,7 +47,7 @@ class UserSessionTrackingTest < ActiveSupport::TestCase
     assert_equal 7, row.user_id
     refute row.admin
     assert_equal now, row.started_at
-    assert_equal row.id, store[Session::COOKIE_KEY]["id"]
+    assert_equal row.id, store[Session.cookie_key]["id"]
   end
 
   test "an admin's row says so" do
@@ -88,10 +88,22 @@ class UserSessionTrackingTest < ActiveSupport::TestCase
     assert_equal 8, other.user_id
   end
 
+  test "two apps on one shared cookie keep separate marks" do
+    store = {}
+    hub = Studio.session_key
+    Session.track(store, member, now: now)
+    Studio.session_key = :other_app_user_id
+    assert Session.track(store, member, now: now + 1.minute), "the other app's mark does not throttle this one"
+    Studio.session_key = hub
+    assert_nil Session.track(store, member, now: now + 2.minutes), "this app's own mark survives"
+  ensure
+    Studio.session_key = hub
+  end
+
   test "a cookie that went through JSON still reads" do
     store = {}
     Session.track(store, member, now: now)
-    store[Session::COOKIE_KEY] = JSON.parse(store[Session::COOKIE_KEY].to_json)
+    store[Session.cookie_key] = JSON.parse(store[Session.cookie_key].to_json)
 
     assert_nil Session.track(store, member, now: now + 1.minute)
   end
