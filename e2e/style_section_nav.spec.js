@@ -38,6 +38,17 @@ test("the highlight follows the scroll and a tab's own jump", async ({ page }) =
   await row(page).locator("a", { hasText: "Modals" }).click();
   await expect(current(page)).toHaveText("Modals");
 
+  // A header that collapses after the jump lifts the row, not the section. The
+  // lab has no header, so a 44px --nav-h stands in for one. The next scroll must
+  // not hand the highlight back to the section above.
+  await page.evaluate(() => document.documentElement.style.setProperty("--nav-h", "44px"));
+  await row(page).locator("a", { hasText: "Tricks" }).click();
+  await expect(current(page)).toHaveText("Tricks");
+  await page.evaluate(() => document.documentElement.style.removeProperty("--nav-h"));
+  await page.mouse.wheel(0, 1);
+  await page.waitForTimeout(200);
+  await expect(current(page)).toHaveText("Tricks");
+
   await row(page).locator("a", { hasText: "Components" }).click();
   await expect(current(page)).toHaveText("Components");
 

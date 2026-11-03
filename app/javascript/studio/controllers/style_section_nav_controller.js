@@ -11,10 +11,11 @@ import { activeIndex } from "studio/style_section_nav"
 
 const ACTIVE = "btn-primary"
 const REST = "btn-neutral"
-// A jump lands a section under the row by its scroll-margin (--nav-h + 5rem), which
-// is more than the row is tall, so the line sits this far below the row or the
-// tab just clicked would not light.
-const LINE_SLACK = 40
+// A jump lands a section by its scroll-margin (--nav-h + 5rem), read while the
+// header may still be tall; the header then collapses, so the row rises and the
+// section does not. The full margin keeps the clicked section past the line,
+// with the collapse's height to spare, for any later scroll or resize.
+const LINE_SLACK = 80
 
 export default class extends Controller {
   static targets = ["link", "scroller"]
