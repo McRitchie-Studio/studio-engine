@@ -190,6 +190,8 @@ test("a silent take is refused on the device, and nothing is sent", async ({ pag
 
   await expect(page.locator(MIC)).toHaveAttribute("data-agent-chat-voice-state", "silent");
   await expect(page.locator(STATUS)).toContainText("I couldn't hear anything");
+  // Said once: the recorder's own line for it is hidden in the composer.
+  await expect(page.locator(`${MIC} .studio-recorder-status`)).toBeHidden();
   expect(posts).toBe(0);
 });
 

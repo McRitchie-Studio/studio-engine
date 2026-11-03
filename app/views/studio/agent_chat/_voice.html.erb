@@ -29,7 +29,8 @@
   .studio-agent-voice-row .studio-recorder-timer { display: none; }
   .studio-agent-voice-row [data-voice-recorder-state="recording"] .studio-recorder-timer { display: inline; }
   .studio-agent-voice-row .studio-recorder-status { flex: 1 0 100%; min-height: 0; max-width: none; font-size: .875rem; }
-  .studio-agent-voice-row .studio-recorder-status:empty { display: none; }
+  .studio-agent-voice-row .studio-recorder-status:empty,
+  .studio-agent-voice-row [data-voice-recorder-state="silent"] .studio-recorder-status { display: none; }
   .studio-agent-voice-row .studio-recorder-failed { flex: 1 0 100%; }
 </style>
 <div class="studio-agent-voice" role="group" aria-label="Talk to <%= name %>"

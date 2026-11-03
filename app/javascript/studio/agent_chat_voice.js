@@ -38,7 +38,7 @@ export const MESSAGES = {
   sending: (name) => `Sending to ${name}...`,
   sent: (speaker) => `Sent. Spoken by ${speaker}.`,
   sentPlain: "Sent.",
-  silent: "I couldn't hear anything. Check your microphone and hold to talk again.",
+  silent: (label) => `I couldn't hear anything${label ? ` from ${label}` : ""}. Check your microphone and hold to talk again.`,
   noSpeech: "I couldn't hear any words in that. Check your microphone and try again.",
   notConfigured: "Voice isn't set up on this app yet, so I can't hear recordings. Type instead for now.",
   rateLimited: "That's a lot of voice messages in a row. Wait a moment, then hold to talk again.",
@@ -261,8 +261,10 @@ export function mountAgentChatVoice(root, {
     if (event.detail && event.detail.blob) takeArrived(event.detail)
   }
 
-  function onSilent() {
-    say("silent", MESSAGES.silent)
+  // The one line for a silent take, naming the microphone (the recorder's own
+  // line for it is hidden in the composer, studio/agent_chat/_voice).
+  function onSilent(event) {
+    say("silent", MESSAGES.silent(event.detail && event.detail.microphone && event.detail.microphone.label))
   }
 
   // The recorder's state, on the one line: a new hold replaces whatever the last

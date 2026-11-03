@@ -167,6 +167,29 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
   PRIVACY = "When you speak to an agent, your recording is sent to OpenAI to turn it into text, then deleted. We never keep the audio."
   MIC = 'form[data-test="agent-chat-form"] [data-test="agent-chat-voice"]'
 
+  def test_voice_chat_allowed_defaults_to_anyone_signed_in_and_never_asks_about_no_user
+    assert_equal true, Studio.voice_chat_allowed?(@eve)
+    assert_equal false, Studio.voice_chat_allowed?(nil)
+    with_voice_hook(->(_user) { flunk "asked about nobody" }) { assert_equal false, Studio.voice_chat_allowed?(nil) }
+  end
+
+  def test_voice_chat_allowed_reads_the_hook_and_a_raising_or_false_hook_is_no
+    with_voice_hook(->(user) { user == @sam }) do
+      assert_equal true, Studio.voice_chat_allowed?(@sam)
+      assert_equal false, Studio.voice_chat_allowed?(@eve)
+    end
+    with_voice_hook(->(_user) { raise "gate broke" }) { assert_equal false, Studio.voice_chat_allowed?(@sam) }
+    with_voice_hook(false) { assert_equal false, Studio.voice_chat_allowed?(@sam) }
+  end
+
+  def test_the_voice_and_footer_chat_settings_default_off
+    assert_nil Studio.site_footer_chat_path
+    assert_equal "Chat", Studio.site_footer_chat_label
+    assert_nil Studio.site_footer_chat_allowed
+    partial = File.read(File.expand_path("../../app/views/studio/agent_chat/_chat.html.erb", __dir__))
+    assert_match(/voice: false/, partial[/\A.*?%>/])
+  end
+
   def test_a_chat_with_no_voice_option_has_no_mic_even_signed_in
     sign_in(@sam)
     get "/agent_chat_lab"

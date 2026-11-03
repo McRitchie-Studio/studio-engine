@@ -270,7 +270,9 @@ test("a silent take only says so", async () => {
   mount(page, fetcher)
   page.listeners["studio:voice-recorder:silent"]({ detail: {} })
   assert.equal(page.state(), "silent")
-  assert.equal(page.status.textContent, MESSAGES.silent)
+  assert.equal(page.status.textContent, "I couldn't hear anything. Check your microphone and hold to talk again.")
+  page.listeners["studio:voice-recorder:silent"]({ detail: { microphone: { label: "Arctis" } } })
+  assert.equal(page.status.textContent, "I couldn't hear anything from Arctis. Check your microphone and hold to talk again.")
   assert.equal(calls.length, 0)
 })
 

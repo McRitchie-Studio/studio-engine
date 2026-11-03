@@ -296,46 +296,6 @@ class StudioTest < Minitest::Test
     assert_equal "#F72585", config[:accent]
   end
 
-  # ── the chat's voice option ─────────────────────────────────
-
-  def test_voice_chat_allowed_defaults_to_anyone_signed_in
-    assert_equal true, Studio.voice_chat_allowed?(Object.new)
-    assert_equal false, Studio.voice_chat_allowed?(nil)
-  end
-
-  def test_voice_chat_allowed_never_asks_the_hook_about_no_user
-    with_voice_hook(->(_user) { flunk "asked about nobody" }) { assert_equal false, Studio.voice_chat_allowed?(nil) }
-    with_voice_hook(->(_user) { true }) { assert_equal false, Studio.voice_chat_allowed?(nil) }
-  end
-
-  def test_voice_chat_allowed_reads_the_hook_and_a_raising_hook_is_no
-    with_voice_hook(->(user) { user == :admin }) do
-      assert_equal true, Studio.voice_chat_allowed?(:admin)
-      assert_equal false, Studio.voice_chat_allowed?(:member)
-    end
-    with_voice_hook(->(_user) { raise "gate broke" }) { assert_equal false, Studio.voice_chat_allowed?(:admin) }
-    with_voice_hook(false) { assert_equal false, Studio.voice_chat_allowed?(:admin) }
-  end
-
-  def test_the_footer_chat_defaults_are_off
-    assert_nil Studio.site_footer_chat_path
-    assert_equal "Chat", Studio.site_footer_chat_label
-    assert_nil Studio.site_footer_chat_allowed
-  end
-
-  def test_voice_is_off_by_default_on_the_chat_partial
-    partial = File.read(File.expand_path("../../app/views/studio/agent_chat/_chat.html.erb", __dir__))
-    assert_match(/voice: false/, partial[/\A.*?%>/])
-  end
-
-  def with_voice_hook(hook)
-    saved = Studio.voice_chat_allowed
-    Studio.voice_chat_allowed = hook
-    yield
-  ensure
-    Studio.voice_chat_allowed = saved
-  end
-
   # ── version ─────────────────────────────────────────────────
 
   def test_version_is_defined
