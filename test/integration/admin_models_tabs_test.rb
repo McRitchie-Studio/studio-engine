@@ -126,6 +126,15 @@ class AdminModelsTabsTest < ActionDispatch::IntegrationTest
     assert_equal 1, Studio::UserSession.count, "a second request inside the throttle adds no row"
   end
 
+  test "a live user with no email is not called deleted; a missing user is" do
+    wallet_only = User.create!(role: "user", session_token: "w")
+    [wallet_only.id, 0].each { |id| Studio::UserSession.create!(user_id: id, started_at: Time.current, last_seen_at: Time.current) }
+
+    get "/admin/models/sessions"
+    assert_select "table#models-sessions-table td", text: /User ##{wallet_only.id}/, count: 1
+    assert_select "table#models-sessions-table td", text: /Deleted user/, count: 1
+  end
+
   test "an unknown model is not found" do
       assert_raises(ActiveRecord::RecordNotFound) { get "/admin/models/nope" }
   end

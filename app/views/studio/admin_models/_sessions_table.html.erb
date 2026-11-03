@@ -12,7 +12,8 @@
       <% records.each do |row| %>
         <tr>
           <td class="px-4 py-3">
-            <span class="font-semibold text-heading"><%= row.user&.email.presence || "Deleted user" %></span>
+            <% user = row.user %>
+            <span class="font-semibold text-heading"><%= user ? (user.email.presence || user.try(:display_name).presence || "User ##{user.id}") : "Deleted user" %></span>
             <% if row.admin %><span class="ml-2 label-upper">admin</span><% end %>
           </td>
           <td class="px-4 py-3 text-muted whitespace-nowrap"><%= time_ago_in_words(row.started_at) %> ago</td>
