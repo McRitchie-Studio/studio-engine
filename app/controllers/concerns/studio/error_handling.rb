@@ -21,12 +21,25 @@ module Studio
       rescue_from "Sluggable::SlugRefused", with: :handle_slug_refused
 
       before_action :require_authentication
+      after_action :track_user_session
 
       helper_method :current_user, :logged_in?, :sso_user_available?, :sso_display_name, :sso_source_app, :sso_hub_logo, :admin?,
                     :onchain_session?, :wallet_context, :client_session_payload
     end
 
     private
+
+    # The signed-in person, not whoever an admin is impersonating. A signed-out
+    # request stops at the cookie: it runs no query it would not otherwise run. A
+    # request must not fail because its bookkeeping did.
+    def track_user_session
+      return unless session[Studio.session_key]
+
+      user = respond_to?(:true_user, true) ? true_user : current_user
+      Studio::UserSession.track(session, user) if user
+    rescue StandardError => e
+      Rails.logger&.warn("[user_session] #{e.class}: #{e.message}")
+    end
 
     def current_user
       return @current_user if defined?(@current_user)

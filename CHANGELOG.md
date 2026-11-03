@@ -4,6 +4,20 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`Studio::UserSession` and `studio_user_sessions`.** One row per signed-in browser
+  session: user, admin, started, last seen. A new row after 30 idle minutes; at most one
+  write per 5 minutes, and no query between writes. No IP and no user agent. An app with
+  the migration records automatically.
+- **A standard Sessions tab on the admin models page** when the table exists.
+
+### Changed
+
+- **The admin models page is one table per tab.** The title and tabs share one sticky
+  row and the open tab is highlighted. `/admin/models` shows the first tab; a page's `h1`
+  is now always "Models". `studio/admin_models/index` and `PREVIEW_LIMIT` are gone.
+
 ## 0.122.0 — 2026-11-01
 
 ### Added

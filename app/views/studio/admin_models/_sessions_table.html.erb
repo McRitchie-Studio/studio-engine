@@ -1,0 +1,27 @@
+<%# locals: (records:) %>
+<div class="overflow-x-auto">
+  <table id="models-sessions-table" class="w-full min-w-[640px] text-sm">
+    <thead class="bg-surface-alt text-muted text-xs uppercase tracking-wide">
+      <tr>
+        <th class="px-4 py-3 text-left font-semibold">User</th>
+        <th class="px-4 py-3 text-left font-semibold">Started</th>
+        <th class="px-4 py-3 text-left font-semibold">Last seen</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-subtle">
+      <% records.each do |row| %>
+        <tr>
+          <td class="px-4 py-3">
+            <span class="font-semibold text-heading"><%= row.user&.email.presence || "Deleted user" %></span>
+            <% if row.admin %><span class="ml-2 label-upper">admin</span><% end %>
+          </td>
+          <td class="px-4 py-3 text-muted whitespace-nowrap"><%= time_ago_in_words(row.started_at) %> ago</td>
+          <td class="px-4 py-3 text-muted whitespace-nowrap"><%= time_ago_in_words(row.last_seen_at) %> ago</td>
+        </tr>
+      <% end %>
+      <% if records.empty? %>
+        <tr><td colspan="3" class="px-4 py-6 text-muted">No sessions yet.</td></tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
