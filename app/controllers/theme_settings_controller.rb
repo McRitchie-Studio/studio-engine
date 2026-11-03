@@ -1,10 +1,11 @@
+# The role colours' save endpoints. The editor lives on the style guide
+# (style/_theme), so GET /admin/theme sends an admin there; the route and its
+# name stay, because hosts link and register them.
 class ThemeSettingsController < ApplicationController
   before_action :require_admin
 
   def edit
-    @theme_setting = ThemeSetting.current
-    @defaults = Studio.theme_config
-    @preview_css = Studio::ThemeResolver.new(@theme_setting.resolved_colors).to_css
+    redirect_to editor_path
   end
 
   def update
@@ -18,10 +19,7 @@ class ThemeSettingsController < ApplicationController
   rescue StandardError => e
     return render(json: { error: e.message }, status: :unprocessable_entity) if request.format.json?
 
-    @defaults = Studio.theme_config
-    @preview_css = Studio::ThemeResolver.new(@theme_setting.resolved_colors).to_css
-    flash.now[:alert] = "Error saving theme: #{e.message}"
-    render :edit, status: :unprocessable_entity
+    redirect_to editor_path, alert: "Error saving theme: #{e.message}"
   end
 
   def regenerate
@@ -31,12 +29,14 @@ class ThemeSettingsController < ApplicationController
 
   private
 
+  def editor_path = admin_style_path(anchor: "theme")
+
   # The style guide saves by fetch and asks for JSON: a 204 is its proof of the
   # write. A form post is redirected back to the editor.
   def done(notice)
     return head(:no_content) if request.format.json?
 
-    redirect_to admin_theme_path, notice: notice
+    redirect_to editor_path, notice: notice
   end
 
   def theme_params

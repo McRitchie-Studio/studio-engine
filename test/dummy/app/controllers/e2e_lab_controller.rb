@@ -703,6 +703,13 @@ class E2eLabController < ActionController::Base
     render(:style_theme)
   end
 
+  # The whole style guide, for its sticky title row and the tabs that follow the
+  # scroll. It reads what StyleController sets.
+  def style_nav
+    @theme_setting = ThemeSetting.current if ThemeSetting.table_exists?
+    render(template: "style/index")
+  end
+
   # The style guide's Tasks section: three live boards on the board primitive
   # (a kanban, one with chrome state and an archive column, and a depth chart
   # with locked cards), all in demo mode, so a drag sends nothing.

@@ -3,10 +3,10 @@
      application.html.erb, inheriting that app's navbar and theme, so every
      specimen restyles per app and in dark or light automatically.
 
-     Five ENGINE sections, reached by the sticky section nav below and rendered
+     Five ENGINE sections, reached by the sticky title row below and rendered
      as sibling partials: Theme is the landing section (the color foundation - it
-     owns the role tokens/swatches, the folded-in /admin/theme editor, and the
-     live preview), then Modals (the shared host + engine card blocks), Tricks
+     owns the role tokens/swatches, the theme editor, the live preview, and the
+     logos and type), then Modals (the shared host + engine card blocks), Tricks
      (the button/surface/motion/effect/leveling primitives, framed as a board of
      copy-paste-for-an-agent snippets), Tasks (the shared board primitive), and
      Components (the ViewComponent previews, linking into the gallery at
@@ -54,36 +54,34 @@
   ]
 %>
 <div class="max-w-6xl mx-auto px-4 pb-16">
-  <header class="space-y-2 pt-8 pb-6">
-    <p class="label-upper">studio-engine &middot; v<%= Studio::VERSION %></p>
-    <h1 class="text-3xl font-bold text-heading">Style</h1>
-    <p class="text-body max-w-2xl">
-      A living gallery of the shared UI primitives, rendered live in this app's
-      theme. Everything below is styled by the engine's own
-      <code class="font-mono text-2xs bg-inset px-1.5 py-0.5 rounded">engine.css</code>
-      and
-      <code class="font-mono text-2xs bg-inset px-1.5 py-0.5 rounded">engine-motion.css</code>
-      layers - toggle this app between light and dark and every specimen follows.
-    </p>
-  </header>
-
-  <%# Section nav — sticky under the whole pinned stack (--pin-stack-bottom; then
-      --nav-bottom and --nav-h for a host on an older publisher; then 0). Not --nav-h first: that
-      is the header's HEIGHT, and chrome stacked above the header would sit over
-      the nav by its own height. A pill per
-      section; the row scrolls horizontally on narrow screens, its edges softened
-      by the .fade-edge-x primitive. Order leads with Theme (the color foundation).
-      It sits at --z-sticky, above --z-raised, so the live hold button's portal
-      bubbles scroll under it rather than over it. %>
-  <nav class="sticky -mx-4 px-4 py-3 bg-surface border-y border-subtle"
-       style="top: var(--pin-stack-bottom, var(--nav-bottom, var(--nav-h, 0px))); z-index: var(--z-sticky, 30)" aria-label="Style guide sections">
-    <div class="fade-edge-x overflow-x-auto">
-      <div class="flex items-center gap-2 min-w-max">
-        <% sections.each do |anchor, label| %>
-          <a href="#<%= anchor %>" class="btn btn-neutral btn-sm"><%= label %></a>
+  <%# The page's title and its section tabs, one sticky row under the whole pinned
+      stack (--pin-stack-bottom; then --nav-bottom and --nav-h for a host on an
+      older publisher; then 0). Not --nav-h first: that is the header's HEIGHT,
+      and chrome stacked above the header would sit over the row by its own
+      height. The tabs scroll sideways on a narrow screen, softened by
+      .fade-edge-x; px-8 matches its 2rem fade, so a tab at rest is not faded.
+      The row sits at --z-sticky, above --z-raised, so the live hold button's
+      portal bubbles scroll under it rather than over it.
+  
+      The style-section-nav controller moves the highlight as the page scrolls
+      (studio/style_section_nav). Theme starts active, so the first paint is
+      right before the module loads. %>
+  <nav class="sticky -mx-4 mt-6 px-4 py-2 bg-surface border-y border-subtle flex items-center gap-2"
+       style="top: var(--pin-stack-bottom, var(--nav-bottom, var(--nav-h, 0px))); z-index: var(--z-sticky, 30)"
+       aria-label="Style guide sections"
+       data-studio-controller="style-section-nav">
+    <h1 class="text-xl font-bold text-heading shrink-0">Style</h1>
+    <div class="fade-edge-x overflow-x-auto min-w-0 flex-1" data-style-section-nav-target="scroller">
+      <div class="flex items-center gap-2 min-w-max px-8">
+        <% sections.each_with_index do |(anchor, label), index| %>
+          <a href="#<%= anchor %>"
+             class="btn btn-sm <%= index.zero? ? "btn-primary" : "btn-neutral" %>"
+             <%= 'aria-current="true"'.html_safe if index.zero? %>
+             data-style-section-nav-target="link"><%= label %></a>
         <% end %>
       </div>
     </div>
+    <p class="label-upper shrink-0 hidden md:block" title="studio-engine">v<%= Studio::VERSION %></p>
   </nav>
 
   <div class="space-y-16 pt-10">

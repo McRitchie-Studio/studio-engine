@@ -4,6 +4,25 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **`/admin/style` has one sticky header row.** The title and the section tabs
+  share it, and the tab highlight follows the section in view
+  (`studio/style_section_nav`). The intro paragraph is gone; the version sits at
+  the row's right.
+- **`GET /admin/theme` redirects to `/admin/style#theme`.** The route and the
+  `admin_theme_path` helper stay, and so do the save endpoints. A form save now
+  lands on the style guide. The standalone page's logos, semantic tokens and type
+  moved to the Theme section; its button and component specimens were already in
+  Tricks.
+
+### Removed
+
+- **`/admin/design_system` and `admin_design_system_path`.** The route only
+  redirected to `/admin/style`. No app links it.
+- **`theme_settings/edit` and the `themeEditor` factory** (`window.themeEditor`).
+  `dsThemeEditor` is the one editor.
+
 ### Fixed
 
 - **The emoji swap no longer clips a large glyph.** Its box is `max(1.25rem, 1.25em)` tall and
