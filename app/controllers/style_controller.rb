@@ -6,14 +6,11 @@
 # The view is a bare content wrapper that renders inside each host's
 # application.html.erb, so it inherits that app's navbar + theme automatically.
 #
-# Reached at /admin/style (helper admin_style_path). The legacy /admin/design_system
-# route redirects here and keeps its admin_design_system_path helper resolving, so a
-# shipped host sidebar link that still points at the old helper keeps working.
+# Reached at /admin/style (helper admin_style_path).
 class StyleController < ApplicationController
   before_action :require_admin
 
-  # Load the live theme so the Theme section (the landing section, folded in from
-  # /admin/theme) shows this app's saved colors + the CSRF-protected editor.
+  # Load the live theme so the Theme section (the landing section) shows this app's saved colors + the CSRF-protected editor.
   # Best-effort: the section renders from Studio.theme_config defaults when no
   # ThemeSetting row exists, so a load hiccup must not take the whole page down.
   def index

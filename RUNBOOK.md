@@ -48,7 +48,7 @@ Troubleshooting guide for autonomous agents. Format: problem, diagnosis, fix.
 - Diagnosis: The `-rgb` vars are SPACE-separated lists (`--color-primary-500-rgb: 142 130 254`), so the legacy comma form `rgba(var(--color-primary-500-rgb), 0.12)` is invalid. The browser reports no error; it drops the declaration and paints nothing, in both themes. The engine's own toast halo and success-card explorer link shipped this way until `test/views/legacy_rgba_var_guard_test.rb` caught them.
 - Fix: Write the slash form, `rgb(var(--color-primary-500-rgb) / 0.12)`. The engine's guard refuses the legacy form in every code file the gem packages; a consumer app needs its own guard (turf-monster's `test/views/legacy_rgba_var_guard_test.rb`).
 
-**Theme page (admin/theme) returns 403/redirect**
+**Theme editor (admin/style, Theme section; admin/theme redirects there) returns 403/redirect**
 - Diagnosis: `require_admin_for_theme` before_action rejects non-admin users.
 - Fix: Verify the logged-in user has `role == "admin"`. Check `current_user.admin?` in console.
 

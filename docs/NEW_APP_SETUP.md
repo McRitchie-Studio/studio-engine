@@ -862,7 +862,7 @@ bin/rails server -p {PORT}
 - [ ] Legacy `/login` and `/signup` GETs redirect to `/signin`, if using the unified auth pattern
 - [ ] Magic-link sign-in works
 - [ ] The Google button shows on `/login` and `/signup`; it opens the setup modal until the OAuth client is set (§ 13), and signs in after
-- [ ] `/admin/theme` loads (logged in as admin)
+- [ ] `/admin/style` loads (logged in as admin)
 - [ ] `/admin/navbar` loads (admin preview page)
 - [ ] `/error_logs` loads
 - [ ] SSO from McRitchie Studio works, if enabled

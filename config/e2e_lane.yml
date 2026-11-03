@@ -1117,7 +1117,7 @@
 # dark mode. Verified RED with SILENCE_RMS set to 0 (a take event arrives) and
 # with openMicrophone asking { audio: true } (the exact deviceId is lost).
 #   npx playwright test --list  -> 409 tests in 66 files
-total_specs: 412
+total_specs: 414
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1384,7 +1384,9 @@ total_specs: 412
 # And for the voice capture layer: 7 more tests (402 -> 409), 1 new file:
 #   npx playwright test --list                                             -> 409 tests, 66 files
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 409
-executed: 412
+# And for the style guide's sticky row: 2 more tests (412 -> 414), 1 new file:
+# e2e/style_section_nav.spec.js, on the new /lab/style_nav page.
+executed: 414
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
