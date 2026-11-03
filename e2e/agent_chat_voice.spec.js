@@ -237,73 +237,76 @@ test("a send that fails puts the words in the box", async ({ page }) => {
   await expect(input).toHaveValue(`my draft\n${MOCK_TEXT}`);
 });
 
-for (const theme of ["dark", "light"]) {
-  test(`the mic at 390px in ${theme}: 44px targets, theme tokens, nothing sideways`, async ({ page }) => {
-    await openSignedIn(page);
-    if (theme === "light") {
-      await page.evaluate(() => document.documentElement.classList.remove("dark"));
-      // The composer's background eases over (transition-colors): read it settled.
-      await page.waitForTimeout(400);
-    }
-    await page.locator(STATUS).evaluate((el) => { el.textContent = "Sent. Spoken by Someone new."; });
+async function expectMicAt390(page, theme) {
+  await openSignedIn(page);
+  if (theme === "light") {
+    await page.evaluate(() => document.documentElement.classList.remove("dark"));
+    // The composer's background eases over (transition-colors): read it settled.
+    await page.waitForTimeout(400);
+  }
+  await page.locator(STATUS).evaluate((el) => { el.textContent = "Sent. Spoken by Someone new."; });
 
-    for (const selector of [".studio-recorder-button", ".studio-mic-chip"]) {
-      const box = await page.locator(`${MIC} ${selector}`).boundingBox();
-      expect(box.height, `${selector} is a 44px target`).toBeGreaterThanOrEqual(44);
-      expect(box.x + box.width, `${selector} stays on the page`).toBeLessThanOrEqual(390);
-    }
-    const form = await page.locator('form[data-test="agent-chat-form"]').boundingBox();
-    const talk = await page.locator(`${MIC} .studio-recorder-button`).boundingBox();
-    expect(talk.y + talk.height, "the talk button sits inside the composer").toBeLessThanOrEqual(form.y + form.height);
+  for (const selector of [".studio-recorder-button", ".studio-mic-chip"]) {
+    const box = await page.locator(`${MIC} ${selector}`).boundingBox();
+    expect(box.height, `${selector} is a 44px target`).toBeGreaterThanOrEqual(44);
+    expect(box.x + box.width, `${selector} stays on the page`).toBeLessThanOrEqual(390);
+  }
+  const form = await page.locator('form[data-test="agent-chat-form"]').boundingBox();
+  const talk = await page.locator(`${MIC} .studio-recorder-button`).boundingBox();
+  expect(talk.y + talk.height, "the talk button sits inside the composer").toBeLessThanOrEqual(form.y + form.height);
 
-    // The status line and the privacy line read on what is behind them (AA).
-    const ratios = await page.evaluate((statusSelector) => {
-      const channels = (css) => css.match(/[\d.]+/g).slice(0, 3).map(Number);
-      const luminance = (rgb) => {
-        const [r, g, b] = rgb.map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
-        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      };
-      const contrast = (a, b) => { const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
-      const color = (selector) => channels(getComputedStyle(document.querySelector(selector)).color);
-      const background = (selector) => channels(getComputedStyle(document.querySelector(selector)).backgroundColor);
-      return {
-        status: contrast(color(statusSelector), background('form[data-test="agent-chat-form"]')),
-        privacy: contrast(color('[data-test="agent-chat-voice-privacy"]'), background("body"))
-      };
-    }, STATUS);
-    expect(ratios.status).toBeGreaterThanOrEqual(4.5);
-    expect(ratios.privacy).toBeGreaterThanOrEqual(4.5);
+  // The status line and the privacy line read on what is behind them (AA).
+  const ratios = await page.evaluate((statusSelector) => {
+    const channels = (css) => css.match(/[\d.]+/g).slice(0, 3).map(Number);
+    const luminance = (rgb) => {
+      const [r, g, b] = rgb.map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const contrast = (a, b) => { const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+    const color = (selector) => channels(getComputedStyle(document.querySelector(selector)).color);
+    const background = (selector) => channels(getComputedStyle(document.querySelector(selector)).backgroundColor);
+    return {
+      status: contrast(color(statusSelector), background('form[data-test="agent-chat-form"]')),
+      privacy: contrast(color('[data-test="agent-chat-voice-privacy"]'), background("body"))
+    };
+  }, STATUS);
+  expect(ratios.status).toBeGreaterThanOrEqual(4.5);
+  expect(ratios.privacy).toBeGreaterThanOrEqual(4.5);
 
-    // The picker opens inside the composer, full width, and closes.
-    await page.locator(`${MIC} .studio-mic-chip`).click();
-    const panel = await page.locator(`${MIC} .studio-mic-panel`).boundingBox();
-    expect(panel.width).toBeGreaterThan(300);
-    expect(await sideways(page)).toBeLessThanOrEqual(0);
-    await page.locator(`${MIC} .studio-mic-chip`).click();
-    expect(await sideways(page)).toBeLessThanOrEqual(0);
-  });
-
-  test(`the footer's Chat link at 390px in ${theme}: a Contact link like its neighbours`, async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await blockOffsiteRequests(page);
-    await page.goto("/lab/site_footer?chat_footer=1");
-    if (theme === "light") await page.evaluate(() => document.documentElement.classList.remove("dark"));
-
-    const contact = page.locator("footer[data-site-footer] nav[aria-label='Contact']");
-    const chat = contact.locator("a", { hasText: /^Chat$/ });
-    await chat.scrollIntoViewIfNeeded();
-    await expect(chat).toBeVisible();
-    await expect(chat).toHaveAttribute("href", "/agent_chat_voice_lab");
-
-    const styles = await page.evaluate(() => {
-      const read = (el) => { const s = getComputedStyle(el); return [s.color, s.fontSize, s.fontWeight, s.textDecorationLine]; };
-      const links = [...document.querySelectorAll("footer[data-site-footer] nav[aria-label='Contact'] a")];
-      return { chat: read(links.find((a) => a.textContent.trim() === "Chat")), neighbour: read(links.find((a) => a.textContent.trim() === "Contact")) };
-    });
-    expect(styles.chat).toEqual(styles.neighbour);
-    expect(await sideways(page)).toBeLessThanOrEqual(0);
-  });
+  // The picker opens inside the composer, full width, and closes.
+  await page.locator(`${MIC} .studio-mic-chip`).click();
+  const panel = await page.locator(`${MIC} .studio-mic-panel`).boundingBox();
+  expect(panel.width).toBeGreaterThan(300);
+  expect(await sideways(page)).toBeLessThanOrEqual(0);
+  await page.locator(`${MIC} .studio-mic-chip`).click();
+  expect(await sideways(page)).toBeLessThanOrEqual(0);
 }
+
+async function expectFooterChatAt390(page, theme) {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/site_footer?chat_footer=1");
+  if (theme === "light") await page.evaluate(() => document.documentElement.classList.remove("dark"));
+
+  const contact = page.locator("footer[data-site-footer] nav[aria-label='Contact']");
+  const chat = contact.locator("a", { hasText: /^Chat$/ });
+  await chat.scrollIntoViewIfNeeded();
+  await expect(chat).toBeVisible();
+  await expect(chat).toHaveAttribute("href", "/agent_chat_voice_lab");
+
+  const styles = await page.evaluate(() => {
+    const read = (el) => { const s = getComputedStyle(el); return [s.color, s.fontSize, s.fontWeight, s.textDecorationLine]; };
+    const links = [...document.querySelectorAll("footer[data-site-footer] nav[aria-label='Contact'] a")];
+    return { chat: read(links.find((a) => a.textContent.trim() === "Chat")), neighbour: read(links.find((a) => a.textContent.trim() === "Contact")) };
+  });
+  expect(styles.chat).toEqual(styles.neighbour);
+  expect(await sideways(page)).toBeLessThanOrEqual(0);
+}
+
+test("the mic at 390px in dark: 44px targets, AA lines, nothing sideways", async ({ page }) => { await expectMicAt390(page, "dark"); });
+test("the mic at 390px in light: 44px targets, AA lines, nothing sideways", async ({ page }) => { await expectMicAt390(page, "light"); });
+test("the footer's Chat link at 390px in dark: a Contact link like its neighbours", async ({ page }) => { await expectFooterChatAt390(page, "dark"); });
+test("the footer's Chat link at 390px in light: a Contact link like its neighbours", async ({ page }) => { await expectFooterChatAt390(page, "light"); });
 
 test("a footer with no chat configured has no Chat link", async ({ page }) => {
   await blockOffsiteRequests(page);
