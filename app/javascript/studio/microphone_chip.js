@@ -325,6 +325,7 @@ export function mountMicrophoneChip(root, { win = window } = {}) {
     if (!target.closest) return
     // A click on the backdrop lands on the dialog element itself.
     if (dialog && target === dialog) { dialog.close(); return }
+    if (dialog && target.closest("[data-microphone-help-close]")) { dialog.close(); return }
     const option = target.closest("[data-microphone-option]")
     if (option && root.contains(option)) { pick(option); return }
     if (target.closest("[data-microphone-help-link]")) {

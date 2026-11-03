@@ -19,6 +19,11 @@ module Studio
   # CSRF-protected (send the page's token as X-CSRF-Token), JSON, no-store.
   # The speaker is matched only against the signed-in user's own saved voice.
   #
+  # ALLOWED USERS ONLY (Studio.voice_chat_allowed; by default anyone signed in):
+  # anyone else is a JSON 403 {error, reason: "not_allowed"}, before the rate
+  # limit counts or anything is read. Hiding the microphone is not the gate; each
+  # take is a paid call.
+  #
   # RATE-LIMITED per user (Studio.voice_takes_rate_limit, 20 takes in 10
   # minutes): over it, a JSON 429 {error, reason: "rate_limited", retry_after}
   # and a Retry-After header, before anything is read or transcribed.
@@ -31,11 +36,13 @@ module Studio
     before_action :require_authentication
     protect_from_forgery with: :exception
     before_action :no_store
+    before_action :require_voice_allowed
     before_action :limit_takes
 
     CANT_HEAR = "I couldn't hear any words in that. Check your microphone and try again."
     UNAVAILABLE = "I couldn't transcribe that just now. Try again in a moment."
     TOO_MANY = "That's a lot of recordings in a short time. Wait a moment, then try again."
+    NOT_ALLOWED = "Voice isn't available on your account yet. Type instead for now."
 
     # The counter's fallback when the app's Rails.cache counts nothing (a
     # NullStore, as many apps run in development): per process, so a limit
@@ -80,6 +87,10 @@ module Studio
     end
 
     private
+
+    def require_voice_allowed
+      refuse(NOT_ALLOWED, :forbidden, reason: "not_allowed") unless Studio.voice_chat_allowed?(current_user)
+    end
 
     # The per-user limit, a fixed window: the window's number is in the key, so
     # its end (retry_after) is known exactly. Rails' own rate_limit macro fixes

@@ -1471,7 +1471,7 @@ module Studio
   mattr_accessor :agent_chat_souls,   default: []
   mattr_accessor :agent_chat_hub_url, default: "https://mcritchie.studio"
   # The app's bearer credential for the hub. Leave nil to read
-  # ENV["AGENT_CHAT_TOKEN"] (1Password apps.<slug>.agent-chat).
+  # ENV["AGENT_CHAT_TOKEN"] (1Password agent-chat.<slug>.applications).
   mattr_accessor :agent_chat_token,   default: nil
   # Which signed-in users the hub may know by email. An email the user only
   # CLAIMS (the profile page saves a new address and clears email_verified_at;
@@ -1484,6 +1484,50 @@ module Studio
 
   def self.agent_chat_soul_list
     Array(agent_chat_souls).map { |soul| soul.to_s.strip }.reject(&:empty?).uniq
+  end
+
+  # Who may use the chat at all: a callable taking the user, nil when signed out.
+  # The server's gate, not only the look: Studio::AgentChatsController answers a
+  # refused viewer 403 on both calls before any hub call, and the chat partial
+  # renders nothing for them. The footer's Chat link follows it too unless
+  # site_footer_chat_allowed is set, so one setting covers both. Default: everyone
+  # (a public chat). While testing:
+  #
+  #   config.agent_chat_allowed = ->(user) { user&.admin? }
+  mattr_accessor :agent_chat_allowed, default: ->(_user) { true }
+
+  # The one reading of Studio.agent_chat_allowed. A hook that raises answers false
+  # and logs: `user.admin?` on a signed-out visitor closes the chat, never opens it.
+  def self.agent_chat_allowed?(user)
+    hook = agent_chat_allowed
+    (hook.respond_to?(:call) ? hook.call(user) : hook) ? true : false
+  rescue StandardError => e
+    Rails.logger&.warn("[studio] agent_chat_allowed raised #{e.class}: treated as not allowed") if defined?(Rails.logger)
+    false
+  end
+
+  # Who may talk by voice (docs/AGENT_CHAT.md, "Talking by voice"): a callable
+  # taking the signed-in user. It decides who sees the chat's microphone, who
+  # may post a take to POST /voice/takes (each one is a paid vendor call), and
+  # whether the proxy forwards a message's `voice`. A signed-out visitor is
+  # never asked about: no user, no voice. While testing, an app narrows it:
+  #
+  #   config.voice_chat_allowed = ->(user) { user.admin? }
+  #
+  # A user Studio.agent_chat_allowed refuses may not talk either, whatever this says.
+  mattr_accessor :voice_chat_allowed, default: ->(user) { user.present? }
+
+  # The one reading of Studio.voice_chat_allowed. False for no user, and for a user
+  # the chat itself refuses, whatever the hook says. A hook that raises answers false and logs: the safe answer on a
+  # paid, sign-in-only control, and a page never falls over because of it.
+  def self.voice_chat_allowed?(user)
+    return false if user.nil? || !agent_chat_allowed?(user)
+
+    hook = voice_chat_allowed
+    (hook.respond_to?(:call) ? hook.call(user) : hook) ? true : false
+  rescue StandardError => e
+    Rails.logger&.warn("[studio] voice_chat_allowed raised #{e.class}: treated as not allowed") if defined?(Rails.logger)
+    false
   end
 
   class S3ConfigError < StandardError; end
@@ -1733,6 +1777,20 @@ module Studio
     SidebarSections.resolve(sidebar_sections, view)
   end
 
+  # The standard Chat entry in the footer's Contact column (docs/SITE_FOOTER.md,
+  # "The Chat link"). OFF until the app names a path: no path, no entry.
+  #
+  #   config.site_footer_chat_path = "/chat"       # or ->(view) { view.chat_path }
+  #   config.site_footer_chat_label = "Chat"       # the default
+  #   config.site_footer_chat_allowed = ->(user) { user&.admin? }  # default: Studio.agent_chat_allowed
+  #
+  # site_footer_chat_allowed takes the viewer, nil when signed out; a hook that
+  # raises hides the entry and logs (SiteFooter.chat_row). Unset, the link follows
+  # Studio.agent_chat_allowed, so the link shows to whom the chat answers.
+  mattr_accessor :site_footer_chat_path, default: nil
+  mattr_accessor :site_footer_chat_label, default: "Chat"
+  mattr_accessor :site_footer_chat_allowed, default: nil
+
   # The site footer's facts resolved for a view (lib/studio/site_footer.rb), or
   # nil when the app turned the footer off (or its own callable answered nil).
   # Unset, the facts are the default footer's. The name defaults to the site
@@ -1744,7 +1802,10 @@ module Studio
 
     declared = site_footer.nil? ? SiteFooter.default_facts(view, routes: host_route_set) : site_footer
     SiteFooter.resolve(declared, view, name: site_identity[:title], logo: logo_for("Footer Logo"),
-                                       booking_path: booking_path_for(view), address: site_footer_address)
+                                       booking_path: booking_path_for(view), address: site_footer_address,
+                                       chat: SiteFooter.chat_row(view, path: site_footer_chat_path,
+                                                                       label: site_footer_chat_label,
+                                                                       allowed: site_footer_chat_allowed.nil? ? agent_chat_allowed : site_footer_chat_allowed))
   end
 
   # The host's route set, for the default footer's legal links. nil outside a

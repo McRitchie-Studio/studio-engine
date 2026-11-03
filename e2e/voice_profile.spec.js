@@ -67,6 +67,9 @@ async function readOnePhrase(row, { heard }) {
     await expect(root, "the meter never heard the microphone").toHaveAttribute("data-voice-heard", "true");
     await expect.poll(() => root.evaluate((el) => parseFloat(el.style.getPropertyValue("--studio-voice-level") || "0")),
       "the meter ring never moved").toBeGreaterThan(0);
+    // Read on for a moment, as a person does: a take stopped the instant the meter
+    // hears it is not kept (7 of 8 runs failed here on a quiet machine, 0 of 8 with this).
+    await row.page().waitForTimeout(600);
   } else {
     await row.page().waitForTimeout(700);
   }

@@ -5,11 +5,17 @@ module Studio
   # to its own app; this controller forwards its two calls to the hub through
   # Studio::AgentChat:
   #
-  #   POST /agent_chat/messages  soul, text         -> 201 {turn}
+  #   POST /agent_chat/messages  soul, text, voice  -> 201 {turn, voice}
   #   GET  /agent_chat/turns     soul, after, limit -> 200 {turns, pending}
   #
   # Drawn by Studio.routes only for an app that names a soul
   # (Studio.agent_chat_souls).
+  #
+  # WHO MAY USE IT: Studio.agent_chat_allowed, asked of the viewer on both calls.
+  # A refused viewer is a JSON 403 {error, reason: "not_allowed"} before any hub
+  # call and before an anon cookie is minted. These routes skip sign-in, so hiding
+  # a link is not the gate; with the app's token set the hub answers whoever gets
+  # through here.
   #
   # WHAT THE BROWSER MAY CHOOSE, AND WHAT IT MAY NOT:
   #
@@ -27,6 +33,10 @@ module Studio
   #           POST that still holds the cookie sends both, so the hub folds the
   #           anonymous thread into the person's; the cookie is then deleted.
   #   ip      never: request.remote_ip, which the hub caps on.
+  #   voice   only what a take measured, {check, score, duration_ms}
+  #           (Studio::AgentChat.voice_param), and only from a user
+  #           Studio.voice_chat_allowed? lets talk; anyone else's words go as
+  #           typed. Never a name: the hub names the speaker.
   #
   # The host's ApplicationController is the base, so its session, current_user
   # and CSRF protection hold: the POST must carry the page's authenticity token
@@ -43,8 +53,10 @@ module Studio
     ANON_COOKIE = :studio_agent_chat_anon
     ANON_TTL = 1.year
     UNAVAILABLE = "Can't reach the chat right now. Try again in a moment."
+    NOT_ALLOWED = "This chat isn't open to you yet."
 
     before_action :no_store
+    before_action :require_chat_allowed
     before_action :resolve_soul
 
     def create
@@ -56,11 +68,13 @@ module Studio
       end
 
       who = person(mint: true, fold: true)
-      turn = Studio::AgentChat.post_message(soul: @soul, text: text, person: who, ip: request.remote_ip)
+      turn = Studio::AgentChat.post_message(soul: @soul, text: text, person: who, ip: request.remote_ip,
+                                            voice: spoken_voice)
       # A signed-in post that carried the anon token has folded that thread into
       # the person's: the token is spent. Kept on any failure, for the retry.
       cookies.delete(ANON_COOKIE) if who.key?(:email) && who.key?(:anon_token)
-      render json: { turn: turn }, status: :created
+      # `voice` is what the hub kept, so the page says who the agent was told spoke.
+      render json: { turn: turn.except("voice"), voice: turn["voice"] }.compact, status: :created
     rescue Studio::AgentChat::Error => e
       render_hub_error(e)
     end
@@ -79,6 +93,19 @@ module Studio
     end
 
     private
+
+    # The message's `voice`, for a user who may talk; nil otherwise.
+    def spoken_voice
+      params[:voice] if Studio.voice_chat_allowed?(viewer)
+    end
+
+    def viewer
+      respond_to?(:current_user, true) ? current_user : nil
+    end
+
+    def require_chat_allowed
+      render_error(NOT_ALLOWED, :forbidden, reason: "not_allowed") unless Studio.agent_chat_allowed?(viewer)
+    end
 
     def no_store
       response.headers["Cache-Control"] = "no-store"
@@ -128,7 +155,7 @@ module Studio
     # in docs/GOOGLE_AUTH_SETUP.md) counts. Anyone else chats as an
     # anonymous visitor.
     def verified_email
-      user = respond_to?(:current_user, true) ? current_user : nil
+      user = viewer
       return nil unless user
 
       hook = Studio.agent_chat_verified_email

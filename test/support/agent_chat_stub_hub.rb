@@ -38,7 +38,8 @@ class AgentChatStubHub
   # SHARE the row's id and status, the visitor's ("user") and, once answered, the
   # agent's ("agent"). `after` is a row id (rows with id > after). A row is
   # "pending", "typing" after half of `answer_after` seconds, then "answered"
-  # with "You said: <text>". A message containing "[hub-down]" is answered 503,
+  # with "You said: <text>". A post with `voice` is answered with what the hub
+  # kept of it, the speaker named here. A message containing "[hub-down]" is answered 503,
   # as a hub that is down; it is not stored. A post naming BOTH an email and an
   # anon_token folds that anonymous thread into the email's, as the hub does.
   def converse!(answer_after: 1.5)
@@ -73,7 +74,13 @@ class AgentChatStubHub
           sleep answer_after / 2.0
           lock.synchronize { row.merge!(status: "answered", reply: "You said: #{row[:text]}") }
         end
-        [201, { "turn" => lock.synchronize { turns_of.call(row).first } }]
+        answer = { "turn" => lock.synchronize { turns_of.call(row).first } }
+        # A spoken message: the hub names the speaker itself, never from the post.
+        if (voice = body["voice"])
+          speaker = voice["check"] == "matched" ? person["email"].to_s : "Someone new"
+          answer["voice"] = voice.slice("check", "score", "duration_ms").merge("speaker" => speaker)
+        end
+        [201, answer]
       else
         key = key_of.call(request.query["person"].to_h)
         after = request.query["after"].to_s

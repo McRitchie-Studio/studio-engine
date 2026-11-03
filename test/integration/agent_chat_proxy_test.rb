@@ -7,6 +7,7 @@ require_relative "../dummy/config/environment"
 
 require "minitest/autorun"
 require "json"
+require "stringio"
 require "active_support/test_case"
 require "action_dispatch"
 require "action_dispatch/testing/integration"
@@ -123,6 +124,14 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
     assert_response :ok
   end
 
+  def with_voice_hook(hook)
+    saved = Studio.voice_chat_allowed
+    Studio.voice_chat_allowed = hook
+    yield
+  ensure
+    Studio.voice_chat_allowed = saved
+  end
+
   # ── 1. the page ─────────────────────────────────────────────
 
   def test_the_host_page_renders_the_chat_with_its_urls_card_slot_and_token
@@ -152,6 +161,313 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
     Studio.agent_chat_souls = %w[ray]
     error = assert_raises(ActionView::Template::Error) { get "/agent_chat_lab" }
     assert_match(/not in Studio.agent_chat_souls/, error.message)
+  end
+
+  # ── who may use the chat ────────────────────────────────────
+
+  def with_chat_hook(hook)
+    saved = Studio.agent_chat_allowed
+    Studio.agent_chat_allowed = hook
+    yield
+  ensure
+    Studio.agent_chat_allowed = saved
+  end
+
+  def assert_refused_before_the_hub
+    before = @hub.requests.size
+    post "/agent_chat/messages", params: { soul: "alex", text: "Hello" }.to_json, headers: json_headers
+    assert_response :forbidden
+    assert_equal "not_allowed", JSON.parse(response.body)["reason"]
+    assert_kind_of String, JSON.parse(response.body)["error"]
+    assert_equal "no-store", response.headers["Cache-Control"]
+    assert_nil cookies[Studio::AgentChatsController::ANON_COOKIE.to_s], "a refused visitor is minted nothing"
+
+    get "/agent_chat/turns", params: { soul: "alex" }
+    assert_response :forbidden
+    assert_equal "not_allowed", JSON.parse(response.body)["reason"]
+    assert_equal before, @hub.requests.size, "the hub is never asked"
+  end
+
+  def test_by_default_a_signed_out_visitor_may_chat
+    post "/agent_chat/messages", params: { soul: "alex", text: "Hello" }.to_json, headers: json_headers
+    assert_response :created
+    get "/agent_chat/turns", params: { soul: "alex" }
+    assert_response :ok
+  end
+
+  def test_a_refused_signed_out_visitor_is_a_403_on_both_calls_before_the_hub
+    seen = []
+    with_chat_hook(->(user) { seen << user; user&.admin? }) { assert_refused_before_the_hub }
+    assert_equal [nil], seen.uniq, "the hook is asked about a signed-out visitor, as nil"
+  end
+
+  def test_a_refused_signed_in_user_is_a_403_and_an_allowed_one_reaches_the_hub
+    sign_in(@sam)
+    with_chat_hook(->(user) { user&.admin? }) do
+      assert_refused_before_the_hub
+
+      @sam.update!(role: "admin")
+      post "/agent_chat/messages", params: { soul: "alex", text: "Hello" }.to_json, headers: json_headers
+      assert_response :created
+      get "/agent_chat/turns", params: { soul: "alex" }
+      assert_response :ok
+    end
+  end
+
+  def test_a_chat_hook_that_raises_closes_the_chat
+    with_chat_hook(->(user) { user.admin? }) { assert_refused_before_the_hub }
+  end
+
+  def test_a_refused_viewer_sees_no_chat_on_the_page
+    with_chat_hook(->(_user) { false }) do
+      get "/agent_chat_lab"
+      assert_response :success
+      assert_select '[data-test="agent-chat"]', 0
+      assert_select '[data-test="agent-chat-form"]', 0
+    end
+  end
+
+  def test_a_user_the_chat_refuses_may_not_talk_whatever_the_voice_hook_says
+    sign_in(@sam)
+    with_chat_hook(->(_user) { false }) do
+      with_voice_hook(->(_user) { true }) { assert_equal false, Studio.voice_chat_allowed?(@sam) }
+    end
+  end
+
+  # ── the mic ─────────────────────────────────────────────────
+
+  PRIVACY = "When you speak to an agent, your recording is sent to OpenAI to turn it into text, then deleted. We never keep the audio."
+  MIC = 'form[data-test="agent-chat-form"] [data-test="agent-chat-voice"]'
+
+  def test_voice_chat_allowed_defaults_to_anyone_signed_in_and_never_asks_about_no_user
+    assert_equal true, Studio.voice_chat_allowed?(@eve)
+    assert_equal false, Studio.voice_chat_allowed?(nil)
+    with_voice_hook(->(_user) { flunk "asked about nobody" }) { assert_equal false, Studio.voice_chat_allowed?(nil) }
+  end
+
+  def test_voice_chat_allowed_reads_the_hook_and_a_raising_or_false_hook_is_no
+    with_voice_hook(->(user) { user == @sam }) do
+      assert_equal true, Studio.voice_chat_allowed?(@sam)
+      assert_equal false, Studio.voice_chat_allowed?(@eve)
+    end
+    with_voice_hook(->(_user) { raise "gate broke" }) { assert_equal false, Studio.voice_chat_allowed?(@sam) }
+    with_voice_hook(false) { assert_equal false, Studio.voice_chat_allowed?(@sam) }
+  end
+
+  def test_the_voice_and_footer_chat_settings_default_off
+    assert_nil Studio.site_footer_chat_path
+    assert_equal "Chat", Studio.site_footer_chat_label
+    assert_nil Studio.site_footer_chat_allowed
+    partial = File.read(File.expand_path("../../app/views/studio/agent_chat/_chat.html.erb", __dir__))
+    assert_match(/voice: false/, partial[/\A.*?%>/])
+  end
+
+  def test_a_chat_with_no_voice_option_has_no_mic_even_signed_in
+    sign_in(@sam)
+    get "/agent_chat_lab"
+
+    assert_response :success
+    assert_select MIC, 0
+    assert_select '[data-test="agent-chat-voice-privacy"]', 0
+    assert_select "[data-studio-controller~='voice-recorder']", 0
+    assert_no_match(/studio-agent-voice/, response.body)
+  end
+
+  def test_a_signed_out_visitor_never_sees_the_mic
+    get "/agent_chat_voice_lab"
+
+    assert_response :success
+    assert_select '[data-test="agent-chat"]', 1
+    assert_select MIC, 0
+    assert_select '[data-test="agent-chat-voice-privacy"]', 0
+  end
+
+  def test_a_hook_that_says_yes_to_everyone_still_shows_a_signed_out_visitor_no_mic
+    with_voice_hook(->(_user) { true }) do
+      get "/agent_chat_voice_lab"
+      assert_select MIC, 0
+    end
+  end
+
+  def test_a_signed_in_user_gets_the_mic_in_the_composer_with_the_privacy_line
+    sign_in(@sam)
+    get "/agent_chat_voice_lab"
+
+    assert_response :success
+    mic = css_select(MIC)
+    assert_equal 1, mic.size
+    assert_equal "agent-chat-voice", mic.first["data-studio-controller"]
+    assert_equal "/voice/takes", mic.first["data-agent-chat-voice-takes-url"]
+    assert_equal "alex", mic.first["data-agent-chat-voice-soul"]
+    assert_equal "Alex", mic.first["data-agent-chat-voice-name"]
+    assert_nil mic.first["data-agent-chat-voice-embedder"], "no saved voice, no model to download"
+    assert_select "#{MIC} [data-studio-controller='voice-recorder'][data-voice-recorder-mode='hold'] button", text: "Hold to talk"
+    assert_select "#{MIC} [data-studio-controller='microphone-chip'] .studio-mic-chip", text: /Microphone: hold to talk to allow/
+    assert_select "#{MIC} [data-test='agent-chat-voice-status'][role='status']", 1
+    assert_select "#{MIC} .studio-agent-voice-failed", 1
+    assert_select '[data-test="agent-chat-voice-privacy"]', text: PRIVACY, count: 1
+  end
+
+  def test_the_privacy_line_is_overridable_and_blank_is_never_none
+    sign_in(@sam)
+    get "/agent_chat_voice_lab", params: { copy: "1" }
+
+    assert_select '[data-test="agent-chat-voice-privacy"]', text: "This app's own privacy line.", count: 1
+  end
+
+  def test_the_hook_narrows_the_mic
+    sign_in(@sam)
+    with_voice_hook(->(user) { user.admin? }) do
+      get "/agent_chat_voice_lab"
+      assert_select MIC, 0
+
+      @sam.update!(role: "admin")
+      get "/agent_chat_voice_lab"
+      assert_select MIC, 1
+    end
+  end
+
+  def test_a_hook_that_raises_shows_no_mic_and_the_page_stands
+    sign_in(@sam)
+    with_voice_hook(->(_user) { raise "gate broke" }) do
+      get "/agent_chat_voice_lab"
+      assert_response :success
+      assert_select MIC, 0
+    end
+  end
+
+  def test_an_app_with_takes_off_shows_no_mic
+    sign_in(@sam)
+    Studio.voice_transcription = false
+    get "/agent_chat_voice_lab"
+
+    assert_response :success
+    assert_select MIC, 0
+  ensure
+    Studio.voice_transcription = true
+  end
+
+  def test_the_page_names_the_embedder_only_for_a_voice_the_apps_own_embedder_saved
+    helper = Object.new.extend(Studio::AgentChatHelper)
+    person = Struct.new(:voice_embedding, :voice_embedding_model)
+    own = Studio::VoiceMatch.model_id(Studio.voice_embedder.to_s)
+
+    assert_equal own, JSON.parse(helper.studio_agent_chat_embedder(person.new([0.1], own)))["id"]
+    assert_nil helper.studio_agent_chat_embedder(person.new([0.1], "another-model"))
+    assert_nil helper.studio_agent_chat_embedder(person.new(nil, own))
+    assert_nil helper.studio_agent_chat_embedder(@sam), "a host with no voice columns"
+    assert_nil helper.studio_agent_chat_embedder(nil)
+  end
+
+  # ── the page's two tokens, with forgery on ──────────────────
+
+  # Sign in BEFORE turning forgery on: the test door posts with no token.
+  def tokens_off_the_voice_lab
+    get "/agent_chat_voice_lab"
+    assert_response :success
+    [css_select("meta[name='csrf-token']").first["content"],
+     css_select("form[data-test='agent-chat-form'] input[name='authenticity_token']").first["value"]]
+  end
+
+  def post_take_with(token)
+    audio = Rack::Test::UploadedFile.new(StringIO.new("\x1A\x45\xDF\xA3audio".b), "audio/webm", true, original_filename: "take")
+    post "/voice/takes", params: { voice: { audio: audio, mime_type: "audio/webm", duration_ms: 900 } },
+                         headers: { "Accept" => "application/json", "X-CSRF-Token" => token }
+    response.status
+  rescue ActionController::InvalidAuthenticityToken
+    :invalid_token
+  end
+
+  def test_with_forgery_on_a_take_passes_on_the_meta_token_and_is_refused_on_the_chat_forms
+    sign_in(@sam)
+    ActionController::Base.allow_forgery_protection = true
+    meta, form = tokens_off_the_voice_lab
+    refute_equal meta, form, "the form's token is per-form under load_defaults 8.1"
+
+    assert_equal 200, post_take_with(meta)
+    assert_includes [:invalid_token, 422], post_take_with(form), "the reason the script reads the meta tag first"
+  end
+
+  def test_with_forgery_on_the_chat_post_passes_on_the_meta_token
+    sign_in(@sam)
+    ActionController::Base.allow_forgery_protection = true
+    meta, = tokens_off_the_voice_lab
+    @hub.respond { [201, { "turn" => { "id" => 9 } }] }
+
+    post "/agent_chat/messages", params: { soul: "alex", text: "Spoken", voice: VOICE }.to_json,
+                                 headers: json_headers.merge("X-CSRF-Token" => meta)
+    assert_response :created
+  end
+
+  # ── voice through the proxy ─────────────────────────────────
+
+  VOICE = { check: "matched", score: 0.8731, duration_ms: 2140 }.freeze
+
+  def post_voice(voice, text: "Spoken words")
+    post "/agent_chat/messages", params: { soul: "alex", text: text, voice: voice }.to_json, headers: json_headers
+  end
+
+  def test_a_spoken_message_reaches_the_hub_with_the_exact_payload_and_answers_what_the_hub_kept
+    sign_in(@sam)
+    @hub.respond { [201, { "turn" => { "id" => 9, "role" => "user", "text" => "Spoken words", "status" => "pending" },
+                           "voice" => { "speaker" => "Sam", "check" => "matched" } }] }
+    post_voice(VOICE)
+
+    assert_response :created
+    assert_equal({ "check" => "matched", "score" => 0.8731, "duration_ms" => 2140 }, @hub.requests.last.json["voice"])
+    assert_equal "sam@example.com", @hub.requests.last.json.dig("person", "email")
+    body = JSON.parse(response.body)
+    assert_equal "Sam", body.dig("voice", "speaker")
+    refute body["turn"].key?("voice"), "the turn stays a turn"
+  end
+
+  def test_a_browser_chosen_name_is_never_forwarded
+    sign_in(@sam)
+    @hub.respond { [201, { "turn" => { "id" => 9 } }] }
+    post_voice(VOICE.merge(speaker: "Alex McRitchie", name: "Alex McRitchie", identified: true))
+
+    assert_response :created
+    assert_equal %w[check duration_ms score], @hub.requests.last.json["voice"].keys.sort
+    assert_no_match(/Alex McRitchie/, @hub.requests.last.body)
+  end
+
+  def test_a_typed_message_carries_no_voice_and_answers_no_voice
+    sign_in(@sam)
+    @hub.respond { [201, { "turn" => { "id" => 9 } }] }
+    post "/agent_chat/messages", params: { soul: "alex", text: "Typed" }.to_json, headers: json_headers
+
+    assert_response :created
+    refute @hub.requests.last.json.key?("voice")
+    refute JSON.parse(response.body).key?("voice")
+  end
+
+  def test_a_signed_out_visitor_voice_is_dropped_and_the_words_still_go
+    @hub.respond { [201, { "turn" => { "id" => 9 } }] }
+    post_voice(VOICE)
+
+    assert_response :created
+    refute @hub.requests.last.json.key?("voice")
+    assert_equal "Spoken words", @hub.requests.last.json["text"]
+  end
+
+  def test_a_user_the_hook_refuses_has_their_voice_dropped
+    sign_in(@sam)
+    @hub.respond { [201, { "turn" => { "id" => 9 } }] }
+    with_voice_hook(->(_user) { false }) { post_voice(VOICE) }
+
+    assert_response :created
+    refute @hub.requests.last.json.key?("voice")
+  end
+
+  def test_a_malformed_voice_is_a_422_not_a_500_and_the_hub_is_never_asked
+    sign_in(@sam)
+    before = @hub.requests.size
+    ["abc", ["matched"], { check: "trust-me" }, { score: 0.5 }].each do |bad|
+      post_voice(bad)
+      assert_response :unprocessable_entity, bad.inspect
+      assert_kind_of String, JSON.parse(response.body)["error"]
+    end
+    assert_equal before, @hub.requests.size
   end
 
   # ── 2. signed in ────────────────────────────────────────────

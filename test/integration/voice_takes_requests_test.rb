@@ -122,6 +122,37 @@ class VoiceTakesRequestsTest < ActionDispatch::IntegrationTest
     ActionController::Base.allow_forgery_protection = false
   end
 
+  # ---- who may talk ------------------------------------------------------------
+
+  test "a user Studio.voice_chat_allowed refuses is a 403, not transcribed and not counted" do
+    sign_in(@pat)
+    saved = Studio.voice_chat_allowed
+    heard = 0
+    VT::Mock.reply = ->(**) { heard += 1; "words" }
+    Studio.voice_takes_rate_limit = { to: 1, within: 600, store: ActiveSupport::Cache::MemoryStore.new }
+
+    Studio.voice_chat_allowed = ->(user) { user.admin? }
+    2.times do
+      post_take
+      assert_response :forbidden
+      assert_equal "not_allowed", JSON.parse(response.body)["reason"]
+    end
+    assert_equal 0, heard
+
+    @pat.update!(role: "admin")
+    post_take
+    assert_response :ok, "the refused posts spent none of the limit"
+    assert_equal 1, heard
+  ensure
+    Studio.voice_chat_allowed = saved
+  end
+
+  test "the default hook lets anyone signed in post a take" do
+    sign_in(@pat)
+    post_take
+    assert_response :ok
+  end
+
   def saved_voice = Array.new(SIZE) { |i| i < 2 ? MARK : 0.0 }
 
   def sign_in(user)

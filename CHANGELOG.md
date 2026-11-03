@@ -6,6 +6,42 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **Hold to talk in the shared agent chat.** `render "studio/agent_chat/chat", ..., voice: true`
+  puts the microphone chip and a hold-to-talk button in the composer's mic slot,
+  with the approved privacy line under it (`Studio::AgentChat::VOICE_PRIVACY`;
+  `voice_copy: { privacy:, recorder:, chip: }` overrides). Off by default, and
+  shown only where `Studio.voice_transcription` is on. Moved from the hub's
+  `chat/_voice` and `voice_chat.js` (new: `studio/agent_chat_voice`, the lazy
+  `agent-chat-voice` controller). Two fixes on the way: a new hold clears the last
+  take's line, and a take recorded during transcription waits its turn. A failed
+  send now adds the words after a typed draft instead of losing them.
+  [`docs/AGENT_CHAT.md`](docs/AGENT_CHAT.md) carries the adoption checklist.
+- **`Studio.voice_chat_allowed`**, a callable taking the signed-in user (default:
+  anyone signed in). It decides who sees the mic, who may post to
+  `POST /voice/takes` (a JSON `403 {error, reason: "not_allowed"}` otherwise), and
+  whether the proxy forwards a message's `voice`. A signed-out visitor is never
+  allowed, whatever the hook says.
+- **`studio:voice-recorder:hint`**, on the recorder: `{ kind, text }` for a line
+  while it records. A blank `copy.recording[kind]` now blanks that line.
+- **`Studio.agent_chat_allowed`**, the chat's server-side gate: a callable taking
+  the user, nil when signed out (default: everyone, so a public chat is unchanged).
+  `Studio::AgentChatsController` answers a refused viewer a JSON `403 {error, reason:
+  "not_allowed"}` on both calls before any hub call, and the chat partial renders
+  nothing for them. The footer's Chat link follows it unless
+  `site_footer_chat_allowed` is set, and a user it refuses may not talk by voice.
+- **The proxy carries `voice`.** `POST /agent_chat/messages` and
+  `Studio::AgentChat.post_message(voice:)` forward `{check, score, duration_ms}`
+  to the hub, and never a name: the hub names the speaker. A malformed `voice` is
+  a `422`. When the hub answers what it kept, the proxy answers `{turn, voice}`.
+- **A public refresh hook on the chat.** Dispatch `studio:agent-chat:refresh` on
+  the chat's section, optionally with `{detail: {turn}}`: the turn shows at once
+  and the chat polls now; a poll in flight is followed by one more.
+- **The footer's standard Chat link.** `Studio.site_footer_chat_path` (a path or a
+  callable taking the view), `site_footer_chat_label` (default "Chat") and
+  `site_footer_chat_allowed` (a callable taking the viewer, nil when signed out;
+  default `Studio.agent_chat_allowed`) add a plain link at the end of the Contact
+  column, or a Contact column if the facts have none. No path, no link.
+  [`docs/SITE_FOOTER.md`](docs/SITE_FOOTER.md), *The Chat link*.
 - **`Studio::UserSession` and `studio_user_sessions`.** One row per signed-in browser
   session: user, admin, started, last seen. A new row after 30 idle minutes; at most one
   write per 5 minutes, and no query between writes. No IP and no user agent. An app with
@@ -17,9 +53,6 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **The admin models page is one table per tab.** The title and tabs share one sticky
   row and the open tab is highlighted. `/admin/models` shows the first tab; a page's `h1`
   is now always "Models". `studio/admin_models/index` and `PREVIEW_LIMIT` are gone.
-
-### Changed
-
 - **`/admin/style` has one sticky header row.** The title and the section tabs
   share it, and the tab highlight follows the section in view
   (`studio/style_section_nav`). The intro paragraph is gone; the version sits at
@@ -39,6 +72,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **The microphone help's Close never submits a surrounding form.** It is a plain
+  button now, not `<form method="dialog">`, which the parser drops inside a form.
+- **A hold-to-talk recorder stops when a held key loses focus**, instead of recording
+  to the cap and sending a take on its own, and a right-click or control-click no
+  longer starts a take.
 - **The emoji swap no longer clips a large glyph.** Its box is `max(1.25rem, 1.25em)` tall and
   `max(1.5rem, 1.25em)` wide, so a 24px emoji fits.
 

@@ -49,6 +49,7 @@ audio and the vector never reach it.
      # config.voice_openai_api_key = ...          # default: ENV["STUDIO_VOICE_OPENAI_API_KEY"]
      # config.voice_takes_rate_limit = { to: 20, within: 600 }   # per user; false turns it off
      # config.voice_transcribe_deadline = 25      # seconds, both models together
+     # config.voice_chat_allowed = ->(user) { user.admin? }   # who may post a take; default anyone signed in
    end
    ```
 

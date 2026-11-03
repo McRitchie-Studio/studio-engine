@@ -290,6 +290,7 @@ ActiveRecord::Migration.suppress_messages do
     t.string :email
     t.string :username
     t.string :role
+    t.datetime :email_verified_at
     t.timestamps
   end
   ActiveRecord::Base.connection.create_table(:error_logs) do |t|
@@ -340,6 +341,20 @@ require_relative "../test/support/agent_chat_stub_hub"
 agent_chat_hub = AgentChatStubHub.start.converse!(answer_after: 6)
 Studio.agent_chat_hub_url = agent_chat_hub.url
 Studio.agent_chat_token = "e2e-lab-agent-chat"
+
+# Forgery protection ON for the chat's whole path, with the per-form tokens every
+# real host runs (load_defaults). The dummy turns it off in test, which once let a
+# take carry the chat form's own token: green here, InvalidAuthenticityToken on
+# every real app. e2e/agent_chat_voice.spec.js passes only against the real check.
+[AgentChatLabController, AgentChatVoiceLabController, Studio::AgentChatsController, Studio::VoiceTakesController].each do |controller|
+  controller.allow_forgery_protection = true
+end
+
+# The footer's Chat entry, only on a page that asks with ?chat_footer=1, so every
+# other footer spec keeps the footer it pins (e2e/agent_chat_voice.spec.js).
+Studio.site_footer_chat_path = lambda do |view|
+  "/agent_chat_voice_lab" if view.respond_to?(:params) && view.params[:chat_footer] == "1"
+end
 
 require "puma"
 require "puma/server"

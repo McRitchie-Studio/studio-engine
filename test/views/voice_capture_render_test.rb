@@ -49,7 +49,10 @@ class VoiceCaptureRenderTest < Minitest::Test
     assert_includes dialog.at_css("[data-microphone-help-other]").text, "Allow the microphone"
     refute_includes dialog.to_html, "studio.test", "the drawing never prints the request's host"
     refute_nil dialog.at_css("svg.studio-mic-mock rect.mock-address"), "the address is a drawn bar"
-    assert_equal "dialog", dialog.at_css("form")["method"]
+    # No form: inside the chat's composer the parser drops a nested one, and Close
+    # would submit the chat.
+    assert_empty dialog.css("form")
+    assert_equal "button", dialog.at_css("[data-microphone-help-close]")["type"]
   end
 
   def test_a_host_overrides_the_words_and_the_key

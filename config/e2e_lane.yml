@@ -1117,7 +1117,23 @@
 # dark mode. Verified RED with SILENCE_RMS set to 0 (a take event arrives) and
 # with openMicrophone asking { audio: true } (the exact deviceId is lost).
 #   npx playwright test --list  -> 409 tests in 66 files
-total_specs: 414
+# 414 -> 426 (412 -> 414 is the style guide below): e2e/agent_chat_voice.spec.js (engine-chat-takes-voice), twelve tests
+# on /agent_chat_voice_lab and /lab/site_footer?chat_footer=1 at 390px with a
+# stubbed microphone, the mock transcriber and the stand-in hub: a signed-out
+# visitor has no mic, a hold posts the words through the proxy and the hub names
+# the speaker, a new hold clears the old line, a take during transcription waits
+# its turn, a silent take and each refusal send nothing, a failed send puts the
+# words in the box, and the mic and the footer's Chat link in light and dark.
+# Verified RED by each control in the spec's header.
+#   npx playwright test --list  -> 426 tests in 68 files
+# 426 -> 431: e2e/agent_chat_voice.spec.js, five more (Carl's and Shannon's send-back
+# on engine-chat-takes-voice): a held button does not move in a stuck composer, the
+# quiet hint on the one line, the help's Close keeps the draft and posts nothing, a
+# right-click starts no take, a held key stops when focus leaves. e2e/boot.rb turns
+# forgery on for the chat's path, so the lane now proves the token too. Verified RED
+# by each control in the spec's header.
+#   npx playwright test --list  -> 431 tests in 68 files
+total_specs: 431
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1386,7 +1402,7 @@ total_specs: 414
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 409
 # And for the style guide's sticky row: 2 more tests (412 -> 414), 1 new file:
 # e2e/style_section_nav.spec.js, on the new /lab/style_nav page.
-executed: 414
+executed: 431
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
