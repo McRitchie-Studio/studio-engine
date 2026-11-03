@@ -9,6 +9,9 @@ class ThemeSetting < ApplicationRecord
   end
 
   validates :app_name, presence: true, uniqueness: true
+  # Every page's head runs these through Studio::ColorScale, which reads six hex
+  # digits. A saved "#abc" would answer 500 on every page, the editor included.
+  validates(*ROLES.map { |role| db_column_for(role) }, format: { with: /\A#\h{6}\z/, message: "must be a #rrggbb colour" }, allow_blank: true)
 
   # Returns the ThemeSetting for the current app, or a new unsaved instance.
   def self.current

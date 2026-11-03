@@ -152,6 +152,17 @@ class ThemeSettingsSaveTest < ActionDispatch::IntegrationTest
     assert_nil stored_primary
   end
 
+  test "a colour that is not #rrggbb is refused, so the theme cannot take the app down" do
+    ["#abc", "abc", "#12345", "purple"].each do |color|
+      save color
+      assert_response :unprocessable_entity
+      assert_nil stored_primary, "#{color.inspect} was stored"
+    end
+
+    get "/admin/style"
+    assert_response :success
+  end
+
   test "a form save is redirected to the style guide editor with its notice" do
     save "#123456", headers: { "ACCEPT" => "text/html" }
 
