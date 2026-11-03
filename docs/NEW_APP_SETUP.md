@@ -183,6 +183,10 @@ POST to `/auth/google_oauth2`, never redirect with GET.
 
 ### Engine migrations — install these FIRST
 
+The engine's migrations also create `studio_user_sessions`, one small row per signed-in
+browser session. With it, `Studio::UserSession` records sessions by itself and the admin
+models page gains a standard Sessions tab.
+
 The engine ships its own migrations (the email outbox, `Studio::Link`,
 `Studio::Enumeral`, the geo settings table, and the three tables the engine's
 models write in your database: `error_logs`, `theme_settings` and

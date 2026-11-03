@@ -42,9 +42,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   default `Studio.agent_chat_allowed`) add a plain link at the end of the Contact
   column, or a Contact column if the facts have none. No path, no link.
   [`docs/SITE_FOOTER.md`](docs/SITE_FOOTER.md), *The Chat link*.
+- **`Studio::UserSession` and `studio_user_sessions`.** One row per signed-in browser
+  session: user, admin, started, last seen. A new row after 30 idle minutes; at most one
+  write per 5 minutes, and no query between writes. No IP and no user agent. An app with
+  the migration records automatically.
+- **A standard Sessions tab on the admin models page** when the table exists.
 
 ### Changed
 
+- **The admin models page is one table per tab.** The title and tabs share one sticky
+  row and the open tab is highlighted. `/admin/models` shows the first tab; a page's `h1`
+  is now always "Models". `studio/admin_models/index` and `PREVIEW_LIMIT` are gone.
 - **`/admin/style` has one sticky header row.** The title and the section tabs
   share it, and the tab highlight follows the section in view
   (`studio/style_section_nav`). The intro paragraph is gone; the version sits at
