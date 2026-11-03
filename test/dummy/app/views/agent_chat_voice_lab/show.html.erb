@@ -1,0 +1,4 @@
+<%# The shared agent chat with hold to talk: the one render call an app makes. ?copy=1 passes the app's own privacy line. %>
+<%= render "studio/agent_chat/chat", soul: "alex", name: "Alex", role: "Sales and Marketing", voice: true,
+           voice_copy: (params[:copy] == "1" ? { privacy: "This app's own privacy line." } : nil),
+           portrait: tag.span("A", class: "w-24 h-24 text-3xl rounded-full flex items-center justify-center bg-primary text-white font-bold") %>

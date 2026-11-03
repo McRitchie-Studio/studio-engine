@@ -41,6 +41,94 @@ class SiteFooterTest < Minitest::Test
     assert_raises(ArgumentError) { Studio::SiteFooter.validate!([]) }
   end
 
+  # ---- the Chat entry ------------------------------------------------------------
+
+  ChatViewer = Struct.new(:current_user)
+  CONTACT = [["Contact", [["team@example.com", "mailto:team@example.com"]]], ["Company", [["Home", "/"]]]].freeze
+
+  def chat_row(user: nil, **options) = Studio::SiteFooter.chat_row(ChatViewer.new(user), path: "/chat", **options)
+
+  def test_no_chat_path_means_no_chat_row
+    assert_nil Studio::SiteFooter.chat_row(ChatViewer.new(nil), path: nil)
+    assert_nil Studio::SiteFooter.chat_row(ChatViewer.new(nil), path: "  ")
+    assert_nil Studio::SiteFooter.chat_row(ChatViewer.new(nil), path: ->(_view) { nil })
+  end
+
+  def test_the_chat_row_defaults_its_label_and_takes_a_path_from_the_view
+    assert_equal ["Chat", "/chat"], chat_row
+    assert_equal ["Talk to us", "/chat"], chat_row(label: "Talk to us")
+    view = ChatViewer.new(:someone)
+    assert_equal ["Chat", "/someone"], Studio::SiteFooter.chat_row(view, path: ->(asked) { "/#{asked.current_user}" })
+  end
+
+  def test_the_allowed_hook_receives_the_viewer_and_can_hide_the_row
+    admins = ->(user) { user == :admin }
+
+    assert_equal ["Chat", "/chat"], chat_row(user: :admin, allowed: admins)
+    assert_nil chat_row(user: :member, allowed: admins)
+    assert_nil chat_row(user: nil, allowed: admins), "a signed-out viewer reaches the hook as nil"
+  end
+
+  def test_an_allowed_hook_that_raises_hides_the_row_and_is_reported
+    said = []
+    Studio::SiteFooter.reporter = ->(message) { said << message }
+
+    assert_nil chat_row(allowed: ->(user) { user.admin? })
+    assert_match(/site_footer_chat_allowed raised NoMethodError/, said.join)
+  ensure
+    Studio::SiteFooter.reporter = nil
+  end
+
+  def test_a_view_with_no_current_user_is_a_signed_out_viewer
+    seen = :unset
+    row = Studio::SiteFooter.chat_row(View.new("/"), path: "/chat", allowed: ->(user) { seen = user; true })
+
+    assert_equal ["Chat", "/chat"], row
+    assert_nil seen
+  end
+
+  def test_chat_joins_the_end_of_the_contact_column_with_a_plain_link
+    columns = resolve({ columns: CONTACT }, chat: ["Chat", "/chat"])[:columns]
+
+    assert_equal %w[Contact Company], columns.map { |column| column[:heading] }
+    assert_equal ["team@example.com", "Chat"], columns[0][:links].map { |link| link[:label] }
+    assert_equal({ label: "Chat", href: "/chat", disabled: false, unlinked: false, external: false, booking: false },
+                 columns[0][:links].last)
+    assert_equal ["Home"], columns[1][:links].map { |link| link[:label] }, "no other column changes"
+  end
+
+  def test_chat_finds_the_contact_column_in_any_case
+    columns = resolve({ columns: [["CONTACT", [["Us", "/us"]]]] }, chat: ["Chat", "/chat"])[:columns]
+
+    assert_equal 1, columns.size
+    assert_equal %w[Us Chat], columns[0][:links].map { |link| link[:label] }
+  end
+
+  def test_chat_makes_a_contact_column_when_the_app_has_none
+    columns = resolve({ columns: [["Company", [["Home", "/"]]]] }, chat: ["Chat", "/chat"])[:columns]
+    assert_equal %w[Company Contact], columns.map { |column| column[:heading] }
+    assert_equal ["Chat"], columns[1][:links].map { |link| link[:label] }
+
+    assert_equal ["Contact"], resolve({}, chat: ["Chat", "/chat"])[:columns].map { |column| column[:heading] }
+  end
+
+  def test_an_app_that_already_links_the_path_keeps_its_own_row
+    columns = resolve({ columns: [["Contact", [["Talk to Alex", "/chat"]]]] }, chat: ["Chat", "/chat"])[:columns]
+
+    assert_equal ["Talk to Alex"], columns[0][:links].map { |link| link[:label] }
+  end
+
+  def test_no_chat_changes_no_column_and_a_refused_href_adds_nothing
+    plain = resolve({ columns: CONTACT })[:columns]
+
+    assert_equal ["team@example.com"], plain[0][:links].map { |link| link[:label] }
+    Studio::SiteFooter.reporter = ->(_message) {}
+    assert_equal plain, resolve({ columns: CONTACT }, chat: ["Chat", "javascript:alert(1)"])[:columns]
+  ensure
+    Studio::SiteFooter.reporter = nil
+    Studio::SiteFooter.reset_reported!
+  end
+
   # ---- the default footer, the opt-out, the one-setting location ----------------
 
   # A host view: it answers only the route helpers it was given.

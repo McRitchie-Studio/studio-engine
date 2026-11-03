@@ -21,6 +21,7 @@ class ApplicationController < ActionController::Base
   layout "site_footer_host"
 
   def logged_in? = request.headers["X-Signed-In"].present?
+  def current_user = nil
 end
 
 # A public page: the kind an app lists in config.site_footer_controllers.
@@ -105,7 +106,9 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
       site_title: Studio.site_title, theme_logos: Studio.theme_logos,
       site_footer_visible: Studio.site_footer_visible,
       booking_crop: Studio.booking_crop, booking_path: Studio.booking_path,
-      site_footer_address: Studio.site_footer_address
+      site_footer_address: Studio.site_footer_address,
+      site_footer_chat_path: Studio.site_footer_chat_path, site_footer_chat_label: Studio.site_footer_chat_label,
+      site_footer_chat_allowed: Studio.site_footer_chat_allowed
     }
     Studio.site_footer_address = nil
     Studio.site_footer = FACTS
@@ -142,6 +145,65 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
   end
 
   def footer = "footer[data-site-footer]"
+
+  # ---- the Chat entry ----------------------------------------------------------
+
+  CHAT_FACTS = { columns: [["Contact", [["Write to us", "/write"]]], ["Company", [["Home", "/"]]]] }.freeze
+  CHAT_LINK = "nav.ftr-col[aria-label='Contact'] a.ftr-link[href='/chat']"
+
+  test "an app with no chat configured renders no Chat link" do
+    Studio.site_footer = CHAT_FACTS
+    get "/footer_host/landing"
+
+    assert_response :success
+    assert_select "footer[data-site-footer] a", { text: "Chat", count: 0 }
+    assert_select "nav.ftr-col[aria-label='Contact'] li", 1
+  end
+
+  test "a configured chat is a plain Contact link, the same as its neighbours" do
+    Studio.site_footer = CHAT_FACTS
+    Studio.site_footer_chat_path = "/chat"
+    get "/footer_host/landing"
+
+    assert_select CHAT_LINK, { text: "Chat", count: 1 }
+    assert_select "nav.ftr-col[aria-label='Contact'] li", 2
+    neighbour = css_select("nav.ftr-col[aria-label='Contact'] a[href='/write']").first
+    chat = css_select(CHAT_LINK).first
+    assert_equal neighbour["class"], chat["class"]
+    assert_nil chat["target"], "an in-app link keeps the page"
+  end
+
+  test "the label is configurable and the default footer gains a Contact column" do
+    Studio.site_footer = nil
+    Studio.site_footer_chat_path = ->(_view) { "/chat" }
+    Studio.site_footer_chat_label = "Talk to Alex"
+    get "/footer_host/landing"
+
+    assert_select CHAT_LINK, { text: "Talk to Alex", count: 1 }
+  end
+
+  test "the allowed hook limits the link to whom it names" do
+    Studio.site_footer = CHAT_FACTS
+    Studio.site_footer_chat_path = "/chat"
+    Studio.site_footer_chat_allowed = ->(_user) { false }
+    get "/footer_host/landing"
+    assert_select CHAT_LINK, 0
+
+    Studio.site_footer_chat_allowed = ->(_user) { true }
+    get "/footer_host/landing"
+    assert_select CHAT_LINK, 1
+  end
+
+  test "the allowed hook is asked per viewer, and one that raises costs only the link" do
+    Studio.site_footer = CHAT_FACTS
+    Studio.site_footer_chat_path = "/chat"
+    Studio.site_footer_chat_allowed = ->(user) { user.admin? } # nil for this visitor
+    get "/footer_host/landing"
+
+    assert_response :success
+    assert_select "footer[data-site-footer]", 1
+    assert_select CHAT_LINK, 0
+  end
 
   # ---- 1. the footer prints the facts ----------------------------------------
 

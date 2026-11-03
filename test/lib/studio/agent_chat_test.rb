@@ -46,6 +46,77 @@ class StudioAgentChatTest < Minitest::Test
                    "ip" => "203.0.113.9" }, request.json)
   end
 
+  def test_post_message_forwards_only_what_a_take_measured_and_never_a_name
+    @hub.respond { [201, { "turn" => TURN }] }
+    Chat.post_message(soul: "alex", text: "Hi", person: { email: "sam@example.com" },
+                      voice: { "speaker" => "Alex McRitchie", "name" => "Forged", "score" => 0.87312, "check" => "matched",
+                               "duration_ms" => 2140, "identified" => true })
+
+    assert_equal({ "check" => "matched", "score" => 0.8731, "duration_ms" => 2140 }, @hub.requests.last.json["voice"])
+  end
+
+  def test_post_message_with_no_voice_sends_no_voice_key
+    @hub.respond { [201, { "turn" => TURN }] }
+    [nil, ""].each do |none|
+      Chat.post_message(soul: "alex", text: "Hi", person: { email: "sam@example.com" }, voice: none)
+      refute @hub.requests.last.json.key?("voice")
+    end
+  end
+
+  def test_post_message_answers_what_the_hub_kept_beside_the_turn
+    kept = { "speaker" => "Sam", "check" => "matched" }
+    @hub.respond { [201, { "turn" => TURN, "voice" => kept }] }
+
+    assert_equal TURN.merge("voice" => kept), Chat.post_message(soul: "alex", text: "Hi", person: { email: "s@e.com" },
+                                                                voice: { check: "matched" })
+
+    @hub.respond { [201, { "turn" => TURN, "voice" => "not a hash" }] }
+    assert_equal TURN, Chat.post_message(soul: "alex", text: "Hi", person: { email: "s@e.com" })
+  end
+
+  def test_a_voice_the_hub_would_refuse_is_refused_here_and_never_sent
+    [{ check: "trust-me" }, { score: 0.9 }, "matched", ["matched"]].each do |bad|
+      before = @hub.requests.size
+      assert_raises(Chat::Invalid, bad.inspect) { Chat.post_message(soul: "alex", text: "Hi", person: { email: "s@e.com" }, voice: bad) }
+      assert_equal before, @hub.requests.size
+    end
+  end
+
+  def test_voice_param_bounds_the_score_and_the_length
+    bounded = ->(**voice) { Chat.voice_param({ check: "no_embedding", **voice }) }
+
+    assert_equal 1.0, bounded.call(score: 7)[:score]
+    assert_equal(-1.0, bounded.call(score: -7)[:score])
+    assert_nil bounded.call(score: "soon")[:score]
+    assert_nil bounded.call(score: Float::NAN)[:score]
+    assert_nil bounded.call(score: { a: 1 })[:score]
+    assert_nil bounded.call[:score]
+    assert_equal 2100, bounded.call(duration_ms: "2100")[:duration_ms]
+    assert_nil bounded.call(duration_ms: 0)[:duration_ms]
+    assert_nil bounded.call(duration_ms: Studio::VoiceTranscription::MAX_DURATION_MS + 1)[:duration_ms]
+    assert_nil bounded.call(duration_ms: "2100; drop")[:duration_ms]
+  end
+
+  def test_every_check_the_engine_answers_is_one_the_client_forwards
+    Studio::VoiceTranscription::CHECKS.each { |check| assert_equal check, Chat.voice_param(check: check)[:check] }
+  end
+
+  def test_voice_copy_defaults_verbatim_and_overrides_by_section
+    default = Chat.voice_copy
+
+    assert_equal "When you speak to an agent, your recording is sent to OpenAI to turn it into text, then deleted. " \
+                 "We never keep the audio.", default["privacy"]
+    assert_equal "Hold to talk", default["recorder"].dig("idle", "button")
+    assert_equal "Microphone: hold to talk to allow", default["chip"].dig("prompt", "chip")
+
+    copied = Chat.voice_copy(privacy: "Ours.", recorder: { idle: { button: "Talk" } }, chip: { "prompt" => { "chip" => "Mic" } })
+    assert_equal "Ours.", copied["privacy"]
+    assert_equal "Talk", copied["recorder"].dig("idle", "button")
+    assert_equal "Let go to send", copied["recorder"].dig("recording", "button"), "the sections not named keep theirs"
+    assert_equal "Mic", copied["chip"].dig("prompt", "chip")
+    assert_equal default["privacy"], Chat.voice_copy(privacy: "  ")["privacy"], "a blank line is the approved one, never none"
+  end
+
   def test_post_message_sends_an_anon_token_for_a_signed_out_person
     @hub.respond { [201, { "turn" => TURN }] }
     Chat.post_message(soul: "alex", text: "Hi", person: { anon_token: "a" * 43 }, ip: "203.0.113.9")

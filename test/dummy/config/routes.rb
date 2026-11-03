@@ -157,6 +157,8 @@ Rails.application.routes.draw do
   # /lab: it talks to a hub (test/support/agent_chat_stub_hub.rb in the suite),
   # which the browser lane does not stand up.
   get "agent_chat_lab", to: "agent_chat_lab#show"
+  get "agent_chat_voice_lab", to: "agent_chat_voice_lab#show"
+  get "agent_chat_voice_lab/sign_in", to: "agent_chat_voice_lab#sign_in"
 
   get "lab/session", to: "session_lab#show"
   post "lab/session/sign_in", to: "session_lab#sign_in"

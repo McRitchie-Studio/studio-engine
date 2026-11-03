@@ -7,8 +7,8 @@ import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/agent_chat.js", import.meta.url), "utf8")
 const {
-  settled, mergeTurns, turnKey, afterCursor, pollDelay, typingPhase, isFollowing, csrfToken, turnsUrl,
-  POLL_MS, SLOW_MS, SLOW_AFTER_MS, IDLE_MS, OFFLINE_MS, LIMIT
+  settled, mergeTurns, turnKey, afterCursor, pollDelay, typingPhase, isFollowing, csrfToken, turnsUrl, mountAgentChat,
+  POLL_MS, SLOW_MS, SLOW_AFTER_MS, IDLE_MS, OFFLINE_MS, LIMIT, REFRESH_EVENT
 } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 const turn = (id, status = "answered", role = "user") => ({ id, role, status, text: `t${id}` })
@@ -114,4 +114,97 @@ test("turnsUrl carries soul, limit and after, and appends to a URL with a query"
   assert.equal(turnsUrl("/agent_chat/turns", { soul: "alex", after: null }), `/agent_chat/turns?soul=alex&limit=${LIMIT}`)
   assert.equal(turnsUrl("/agent_chat/turns", { soul: "alex", after: "12" }), `/agent_chat/turns?soul=alex&limit=${LIMIT}&after=12`)
   assert.equal(turnsUrl("/x?y=1", { soul: "a b", after: null, limit: 5 }), "/x?y=1&soul=a+b&limit=5")
+})
+
+// ---- the public refresh hook ---------------------------------------------------
+
+// A stand-in chat section with no templates: what the hook does is visible on the
+// returned state and the fetches it makes.
+function standIn() {
+  const listeners = {}
+  const log = { addEventListener() {}, removeEventListener() {}, querySelectorAll: () => [], scrollHeight: 0, clientHeight: 0, scrollTop: 0 }
+  const typing = { hidden: true }
+  const parts = { "[data-agent-chat-log]": log, "[data-agent-chat-typing]": typing }
+  const root = {
+    dataset: { agentChatSoul: "alex", agentChatName: "Alex", agentChatTurnsUrl: "/agent_chat/turns" },
+    querySelector: (selector) => parts[selector] || null,
+    addEventListener: (type, fn) => { listeners[type] = fn },
+    removeEventListener: (type) => { delete listeners[type] }
+  }
+  return { root, listeners, typing }
+}
+
+function deferredFetch() {
+  const asks = []
+  const fetcher = (url) => new Promise((resolve) => {
+    asks.push({ url, answer: (turns = [], pending = false) => resolve({ ok: true, json: async () => ({ turns, pending }) }) })
+  })
+  return { asks, fetcher }
+}
+
+const flush = () => new Promise((resolve) => setImmediate(resolve))
+
+function mountStandIn(page, fetcher) {
+  const timers = []
+  const chat = mountAgentChat(page.root, { fetch: fetcher, doc: null, setTimer: (fn, ms) => { timers.push({ fn, ms }); return timers.length }, clearTimer: () => {} })
+  return { chat, timers }
+}
+
+test("the refresh event polls now", async () => {
+  assert.equal(REFRESH_EVENT, "studio:agent-chat:refresh")
+  const page = standIn()
+  const { asks, fetcher } = deferredFetch()
+  mountStandIn(page, fetcher)
+  asks[0].answer()
+  await flush()
+  assert.equal(asks.length, 1)
+
+  page.listeners[REFRESH_EVENT]({ detail: null })
+  assert.equal(asks.length, 2, "no wait for the idle poll")
+})
+
+test("a refresh during a poll is not swallowed: one more poll follows it", async () => {
+  const page = standIn()
+  const { asks, fetcher } = deferredFetch()
+  const { chat } = mountStandIn(page, fetcher)
+
+  chat.refresh()
+  chat.refresh()
+  assert.equal(asks.length, 1, "still one poll in flight")
+
+  asks[0].answer()
+  await flush()
+  assert.equal(asks.length, 2, "the second poll goes as soon as the first lands")
+  asks[1].answer()
+  await flush()
+  assert.equal(asks.length, 2, "and only one")
+})
+
+test("a refresh with a turn shows it at once as waiting, and the next poll asks about it", async () => {
+  const page = standIn()
+  const { asks, fetcher } = deferredFetch()
+  const { chat } = mountStandIn(page, fetcher)
+  asks[0].answer([turn(1)])
+  await flush()
+
+  page.listeners[REFRESH_EVENT]({ detail: { turn: turn(2, "pending") } })
+
+  assert.deepEqual(chat.state.turns.map((t) => t.id), [1, 2])
+  assert.equal(chat.state.pending, true)
+  assert.equal(page.typing.hidden, false, "the typing line shows without waiting for the poll")
+  assert.equal(asks.length, 2)
+  assert.match(asks[1].url, /after=1(&|$)/, "the unsettled turn is asked about again")
+})
+
+test("after destroy the hook is gone and a refresh does nothing", async () => {
+  const page = standIn()
+  const { asks, fetcher } = deferredFetch()
+  const { chat } = mountStandIn(page, fetcher)
+  asks[0].answer()
+  await flush()
+  chat.destroy()
+
+  assert.equal(page.listeners[REFRESH_EVENT], undefined)
+  chat.refresh()
+  assert.equal(asks.length, 1)
 })
