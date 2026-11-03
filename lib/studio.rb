@@ -1471,7 +1471,7 @@ module Studio
   mattr_accessor :agent_chat_souls,   default: []
   mattr_accessor :agent_chat_hub_url, default: "https://mcritchie.studio"
   # The app's bearer credential for the hub. Leave nil to read
-  # ENV["AGENT_CHAT_TOKEN"] (1Password apps.<slug>.agent-chat).
+  # ENV["AGENT_CHAT_TOKEN"] (1Password agent-chat.<slug>.applications).
   mattr_accessor :agent_chat_token,   default: nil
   # Which signed-in users the hub may know by email. An email the user only
   # CLAIMS (the profile page saves a new address and clears email_verified_at;
@@ -1805,7 +1805,7 @@ module Studio
                                        booking_path: booking_path_for(view), address: site_footer_address,
                                        chat: SiteFooter.chat_row(view, path: site_footer_chat_path,
                                                                        label: site_footer_chat_label,
-                                                                       allowed: site_footer_chat_allowed || agent_chat_allowed))
+                                                                       allowed: site_footer_chat_allowed.nil? ? agent_chat_allowed : site_footer_chat_allowed))
   end
 
   # The host's route set, for the default footer's legal links. nil outside a

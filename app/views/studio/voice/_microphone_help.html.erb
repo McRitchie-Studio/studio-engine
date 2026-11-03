@@ -58,8 +58,11 @@
 
     <p class="studio-mic-help-other" data-microphone-help-other hidden><%= help.fetch("other") %></p>
 
-    <form method="dialog" class="studio-mic-help-actions">
-      <button type="submit" class="btn btn-primary studio-mic-help-close" data-microphone-help-close><%= help.fetch("close") %></button>
-    </form>
+    <%# A button, never <form method="dialog">: this chip can sit inside a form (the
+        chat's composer), where the parser drops a nested form and Close would
+        submit the outer one. studio/microphone_chip closes the dialog. %>
+    <div class="studio-mic-help-actions">
+      <button type="button" class="btn btn-primary studio-mic-help-close" data-microphone-help-close><%= help.fetch("close") %></button>
+    </div>
   </div>
 </dialog>

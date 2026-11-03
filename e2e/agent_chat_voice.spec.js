@@ -27,6 +27,13 @@ const { blockOffsiteRequests, watchPageErrors } = require("./helpers");
 //     fails at the second take's POST.
 //   - remove the `next === "starting"` branch in onState and the "listening" line:
 //     the old-line spec fails at the cleared status.
+//   - read the form's token before the meta tag in csrfToken: POST /voice/takes is
+//     refused (e2e/boot.rb turns forgery on for this path) and the first spec fails.
+//   - put <form method="dialog"> back in _microphone_help: the Close spec fails at
+//     the POST and the draft.
+//   - drop the [data-voice-recorder-state="recording"] rule in _voice, or
+//     "heard" => "" in VOICE_RECORDER_COPY: the held-button spec fails.
+//   - drop onFocusOut's stop, or the event.button check: their specs fail.
 //   - delete `voice && studio_agent_chat_voice?` for a bare `voice`: the signed-out
 //     spec fails (a route exists, so the mic renders for a visitor).
 
@@ -110,14 +117,20 @@ test("hold to talk through the proxy: the words post, the hub names the speaker,
   await expect(page.locator(`form[data-test="agent-chat-form"] ${MIC} ${RECORDER}`)).toHaveCount(1);
 
   const sent = [];
+  const takeTokens = [];
   page.on("request", (request) => {
     if (request.url().endsWith("/agent_chat/messages") && request.method() === "POST") sent.push(request.postDataJSON());
+    if (request.url().endsWith("/voice/takes") && request.method() === "POST") takeTokens.push(request.headers()["x-csrf-token"]);
   });
 
   await holdToTalk(page);
 
   await expect(page.locator(MIC)).toHaveAttribute("data-agent-chat-voice-state", "sent");
   await expect(page.locator(STATUS)).toHaveText("Sent. Spoken by Someone new.");
+  // Forgery is on for this path (e2e/boot.rb): "sent" means the real check passed.
+  const meta = await page.locator("meta[name='csrf-token']").getAttribute("content");
+  expect(meta).toBeTruthy();
+  expect(takeTokens).toEqual([meta]);
   await expect(page.locator('[data-test="agent-chat-sent"]').filter({ hasText: MOCK_TEXT })).toBeVisible();
   await expect(page.locator('[data-test="agent-chat-typing"]')).toBeVisible();
 
@@ -143,11 +156,95 @@ test("the old line clears on the next hold, and a new one says Listening", async
   await page.mouse.down();
   await expect(recorder).toHaveAttribute("data-voice-recorder-state", "recording");
   await expect(page.locator(STATUS)).toHaveText("Listening...");
-  // The button does not move under the finger when the line changes.
-  const held = await recorder.locator("[data-voice-recorder-button]").boundingBox();
-  expect(Math.abs(held.y - box.y)).toBeLessThan(2);
   await page.waitForTimeout(300);
   await page.mouse.up();
+  await expect(page.locator(MIC)).toHaveAttribute("data-agent-chat-voice-state", "sent");
+});
+
+// A window short enough that the composer sticks to its bottom, as on a long thread.
+async function openStuck(page, options) {
+  await openSignedIn(page, options);
+  await page.setViewportSize({ width: 390, height: 460 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const form = await page.locator('form[data-test="agent-chat-form"]').boundingBox();
+  expect(form.y + form.height, "the composer is stuck to the window's bottom").toBeLessThanOrEqual(460);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight), "the page scrolls behind it").toBeGreaterThan(460);
+}
+
+test("a held button does not move in a stuck composer, and one live line says Listening", async ({ page }) => {
+  await openStuck(page);
+  const recorder = page.locator(RECORDER);
+  const button = recorder.locator("[data-voice-recorder-button]");
+  const before = await button.boundingBox();
+  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+  await page.mouse.down();
+  // After the first audible frame: that is when the recorder's own line would land.
+  await expect(recorder).toHaveAttribute("data-voice-recorder-heard", "true");
+  await page.waitForTimeout(150);
+  const held = await button.boundingBox();
+  expect(Math.abs(held.y - before.y), "the button stays under the finger").toBeLessThan(2);
+  await expect(page.locator(STATUS)).toHaveText("Listening...");
+  await expect(recorder.locator("[data-voice-recorder-status]")).toBeHidden();
+  await page.mouse.up();
+  await expect(page.locator(MIC)).toHaveAttribute("data-agent-chat-voice-state", "sent");
+});
+
+test("the quiet hint speaks on the one line and does not move a held button", async ({ page }) => {
+  await openStuck(page, { gain: 0 });
+  const recorder = page.locator(RECORDER);
+  const button = recorder.locator("[data-voice-recorder-button]");
+  const before = await button.boundingBox();
+  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+  await page.mouse.down();
+  await expect(page.locator(STATUS)).toHaveText("I can't hear anything yet. Is your microphone on?", { timeout: 6000 });
+  const held = await button.boundingBox();
+  expect(Math.abs(held.y - before.y)).toBeLessThan(2);
+  await page.mouse.up();
+  await expect(page.locator(MIC)).toHaveAttribute("data-agent-chat-voice-state", "silent");
+});
+
+test("the microphone help's Close keeps the draft and posts nothing", async ({ page }) => {
+  await openSignedIn(page);
+  const posts = [];
+  page.on("request", (request) => { if (request.url().endsWith("/agent_chat/messages") && request.method() === "POST") posts.push(request.url()); });
+  const input = page.locator('[data-test="agent-chat-input"]');
+  await input.fill("my draft");
+
+  await page.locator(`${MIC} .studio-mic-chip`).click();
+  await page.locator(`${MIC} [data-microphone-help-link]`).click();
+  const dialog = page.locator(`${MIC} [data-microphone-dialog]`);
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Close" }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(page.locator(`${MIC} .studio-mic-chip`), "focus goes back to the chip").toBeFocused();
+  await page.waitForTimeout(300);
+  expect(posts).toEqual([]);
+  await expect(input).toHaveValue("my draft");
+  await expect(page.locator('[data-test="agent-chat-sent"]')).toHaveCount(0);
+});
+
+test("a right-click on the talk button starts no take", async ({ page }) => {
+  await openSignedIn(page);
+  const recorder = page.locator(RECORDER);
+  const box = await recorder.locator("[data-voice-recorder-button]").boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down({ button: "right" });
+  await page.waitForTimeout(200);
+  await expect(recorder).toHaveAttribute("data-voice-recorder-state", "idle");
+  await page.mouse.up({ button: "right" });
+});
+
+test("a key held on the talk button stops the take when focus leaves", async ({ page }) => {
+  await openSignedIn(page);
+  const recorder = page.locator(RECORDER);
+  await recorder.locator("[data-voice-recorder-button]").focus();
+  await page.keyboard.down(" ");
+  await expect(recorder).toHaveAttribute("data-voice-recorder-state", "recording");
+  await page.waitForTimeout(500);
+  await page.locator('[data-test="agent-chat-input"]').focus();
+  await expect(recorder).not.toHaveAttribute("data-voice-recorder-state", /recording|starting/);
+  await page.keyboard.up(" ");
   await expect(page.locator(MIC)).toHaveAttribute("data-agent-chat-voice-state", "sent");
 });
 

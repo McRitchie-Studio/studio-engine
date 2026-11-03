@@ -7,6 +7,7 @@ require_relative "../dummy/config/environment"
 
 require "minitest/autorun"
 require "json"
+require "stringio"
 require "active_support/test_case"
 require "action_dispatch"
 require "action_dispatch/testing/integration"
@@ -356,6 +357,46 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
     assert_nil helper.studio_agent_chat_embedder(person.new(nil, own))
     assert_nil helper.studio_agent_chat_embedder(@sam), "a host with no voice columns"
     assert_nil helper.studio_agent_chat_embedder(nil)
+  end
+
+  # ── the page's two tokens, with forgery on ──────────────────
+
+  # Sign in BEFORE turning forgery on: the test door posts with no token.
+  def tokens_off_the_voice_lab
+    get "/agent_chat_voice_lab"
+    assert_response :success
+    [css_select("meta[name='csrf-token']").first["content"],
+     css_select("form[data-test='agent-chat-form'] input[name='authenticity_token']").first["value"]]
+  end
+
+  def post_take_with(token)
+    audio = Rack::Test::UploadedFile.new(StringIO.new("\x1A\x45\xDF\xA3audio".b), "audio/webm", true, original_filename: "take")
+    post "/voice/takes", params: { voice: { audio: audio, mime_type: "audio/webm", duration_ms: 900 } },
+                         headers: { "Accept" => "application/json", "X-CSRF-Token" => token }
+    response.status
+  rescue ActionController::InvalidAuthenticityToken
+    :invalid_token
+  end
+
+  def test_with_forgery_on_a_take_passes_on_the_meta_token_and_is_refused_on_the_chat_forms
+    sign_in(@sam)
+    ActionController::Base.allow_forgery_protection = true
+    meta, form = tokens_off_the_voice_lab
+    refute_equal meta, form, "the form's token is per-form under load_defaults 8.1"
+
+    assert_equal 200, post_take_with(meta)
+    assert_includes [:invalid_token, 422], post_take_with(form), "the reason the script reads the meta tag first"
+  end
+
+  def test_with_forgery_on_the_chat_post_passes_on_the_meta_token
+    sign_in(@sam)
+    ActionController::Base.allow_forgery_protection = true
+    meta, = tokens_off_the_voice_lab
+    @hub.respond { [201, { "turn" => { "id" => 9 } }] }
+
+    post "/agent_chat/messages", params: { soul: "alex", text: "Spoken", voice: VOICE }.to_json,
+                                 headers: json_headers.merge("X-CSRF-Token" => meta)
+    assert_response :created
   end
 
   # ── voice through the proxy ─────────────────────────────────

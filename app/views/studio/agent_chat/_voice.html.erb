@@ -29,7 +29,10 @@
   .studio-agent-voice-row .studio-recorder-timer { display: none; }
   .studio-agent-voice-row [data-voice-recorder-state="recording"] .studio-recorder-timer { display: inline; }
   .studio-agent-voice-row .studio-recorder-status { flex: 1 0 100%; min-height: 0; max-width: none; font-size: .875rem; }
+  /* The chat's status line speaks for these three; a second live line would say
+     them twice, and its coming and going would move a held button. */
   .studio-agent-voice-row .studio-recorder-status:empty,
+  .studio-agent-voice-row [data-voice-recorder-state="recording"] .studio-recorder-status,
   .studio-agent-voice-row [data-voice-recorder-state="silent"] .studio-recorder-status { display: none; }
   .studio-agent-voice-row .studio-recorder-failed { flex: 1 0 100%; }
 </style>

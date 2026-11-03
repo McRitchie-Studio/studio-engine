@@ -123,4 +123,14 @@ class VoiceCaptureRenderTest < Minitest::Test
 
     assert_includes source, %(export const STORAGE_KEY = "#{Studio::VoiceCapture::STORAGE_KEY}")
   end
+
+  # A nested form is dropped by the parser, so Close would submit the chat around it.
+  def test_the_help_dialog_holds_no_form_and_its_close_is_a_plain_button
+    html = view.render(partial: "studio/voice/microphone_chip")
+    dialog = Nokogiri::HTML5.fragment(html).at_css("[data-microphone-dialog]")
+
+    assert_empty dialog.css("form")
+    assert_equal "button", dialog.at_css("[data-microphone-help-close]")["type"]
+  end
+
 end

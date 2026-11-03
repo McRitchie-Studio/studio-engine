@@ -113,6 +113,7 @@ On the recorder's root (they bubble):
 | `studio:voice-recorder:take` | `{ blob, mimeType, durationMs, peakRms, microphone: { label, deviceId } }`: a heard take |
 | `studio:voice-recorder:silent` | `{ durationMs, microphone }`: a take refused as silent; no blob is handed over |
 | `studio:voice-recorder:state` | `{ state }` on every change |
+| `studio:voice-recorder:hint` | `{ kind, text }`: a line while it records, `kind` "heard" or "quiet". A blank `copy.recording[kind]` blanks the line |
 
 On `window`, from the recorder to the chip (`studio/microphone`'s `EVENTS`):
 `studio:microphone:opened` (`{ label, deviceId, fellBack }`),

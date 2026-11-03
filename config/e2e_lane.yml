@@ -1126,7 +1126,14 @@
 # words in the box, and the mic and the footer's Chat link in light and dark.
 # Verified RED by each control in the spec's header.
 #   npx playwright test --list  -> 424 tests in 67 files
-total_specs: 424
+# 424 -> 429: e2e/agent_chat_voice.spec.js, five more (Carl's and Shannon's send-back
+# on engine-chat-takes-voice): a held button does not move in a stuck composer, the
+# quiet hint on the one line, the help's Close keeps the draft and posts nothing, a
+# right-click starts no take, a held key stops when focus leaves. e2e/boot.rb turns
+# forgery on for the chat's path, so the lane now proves the token too. Verified RED
+# by each control in the spec's header.
+#   npx playwright test --list  -> 429 tests in 67 files
+total_specs: 429
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1393,7 +1400,7 @@ total_specs: 424
 # And for the voice capture layer: 7 more tests (402 -> 409), 1 new file:
 #   npx playwright test --list                                             -> 409 tests, 66 files
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 409
-executed: 424
+executed: 429
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

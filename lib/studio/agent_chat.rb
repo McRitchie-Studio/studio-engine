@@ -99,7 +99,7 @@ module Studio
     # not move under a held finger when the line appears.
     VOICE_RECORDER_COPY = {
       "idle" => { "button" => "Hold to talk" },
-      "recording" => { "button" => "Let go to send", "status" => "" },
+      "recording" => { "button" => "Let go to send", "status" => "", "heard" => "" },
       "captured" => { "button" => "Hold to talk", "status" => "" },
       "silent" => { "button" => "Hold to talk" },
       "failed" => { "button" => "Hold to try again" },

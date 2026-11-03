@@ -84,12 +84,15 @@ test("the words go after a draft, never over it", () => {
   assert.equal(wordsInBox("my draft", "spoken"), "my draft\nspoken")
 })
 
-test("the CSRF token: the form's own field, else the meta tag", () => {
+test("the CSRF token: the meta tag first, because the form's is bound to its own action", () => {
   const form = { querySelector: () => ({ value: "form-token" }) }
   const doc = { querySelector: () => ({ getAttribute: () => "meta-token" }) }
-  assert.equal(csrfToken(form, doc), "form-token")
-  assert.equal(csrfToken({ querySelector: () => null }, doc), "meta-token")
-  assert.equal(csrfToken(null, { querySelector: () => null }), null)
+  const noMeta = { querySelector: () => null }
+  assert.equal(csrfToken(form, doc), "meta-token")
+  assert.equal(csrfToken(form, { querySelector: () => ({ getAttribute: () => "" }) }), "form-token", "an empty meta is no token")
+  assert.equal(csrfToken(form, noMeta), "form-token")
+  assert.equal(csrfToken({ querySelector: () => null }, noMeta), null)
+  assert.equal(csrfToken(null, noMeta), null)
 })
 
 test("within: the promise's value, else the fallback once the wait is over", async () => {
@@ -145,16 +148,17 @@ function scripted(...answers) {
 test("a take with a saved voice: embedded, transcribed, sent with voice, handed to the chat; the line names who the server kept", async () => {
   const page = composer({ embedder: '{"name":"fake","id":"fake-256"}' })
   const { calls, fetcher } = scripted(answer(200, HEARD), answer(201, { turn: TURN, voice: { speaker: "Pat Kept" } }))
-  const voice = mount(page, fetcher, { loadEmbedder: async () => ({ id: "fake-256", embed: async () => [0.5, 0.5] }) })
+  const doc = { querySelector: (s) => (s.includes("csrf-token") ? { getAttribute: () => "meta-token" } : null) }
+  const voice = mount(page, fetcher, { doc, loadEmbedder: async () => ({ id: "fake-256", embed: async () => [0.5, 0.5] }) })
 
   await voice.takeArrived(take())
 
   assert.equal(calls[0].url, "/voice/takes")
-  assert.equal(calls[0].init.headers["X-CSRF-Token"], "form-token")
+  assert.equal(calls[0].init.headers["X-CSRF-Token"], "meta-token", "POST /voice/takes refuses the chat form's own token")
   assert.equal(calls[0].init.body.get("voice[model]"), "fake-256")
   assert.equal(calls[0].init.body.get("voice[embedding]"), "[0.5,0.5]")
   assert.equal(calls[1].url, "/agent_chat/messages")
-  assert.equal(calls[1].init.headers["X-CSRF-Token"], "form-token")
+  assert.equal(calls[1].init.headers["X-CSRF-Token"], "meta-token")
   assert.deepEqual(JSON.parse(calls[1].init.body), { soul: "alex", text: "Hello Alex", voice: { check: "matched", score: 0.91, duration_ms: 2100 } })
   assert.equal(page.state(), "sent")
   assert.equal(page.status.textContent, "Sent. Spoken by Pat Kept.")
@@ -262,6 +266,26 @@ test("a new hold clears the old line, and letting go with no take does not leave
   page.listeners["studio:voice-recorder:state"]({ detail: { state: "idle" } })
   assert.equal(page.state(), "idle")
   assert.equal(page.status.textContent, "")
+})
+
+test("mounting clears the line: a restored page shows no old take", () => {
+  const page = composer()
+  page.status.textContent = "Sent. Spoken by Pat."
+  page.root.dataset.agentChatVoiceState = "sent"
+  mount(page, async () => answer(200, {}))
+  assert.equal(page.status.textContent, "")
+  assert.equal(page.state(), "idle")
+})
+
+test("a recorder's hint speaks on the one line; a blank one does not wipe it", () => {
+  const page = composer()
+  mount(page, async () => answer(200, {}))
+  page.listeners["studio:voice-recorder:state"]({ detail: { state: "recording" } })
+  page.listeners["studio:voice-recorder:hint"]({ detail: { kind: "heard", text: "" } })
+  assert.equal(page.status.textContent, MESSAGES.listening)
+  page.listeners["studio:voice-recorder:hint"]({ detail: { kind: "quiet", text: "I can't hear anything yet." } })
+  assert.equal(page.status.textContent, "I can't hear anything yet.")
+  assert.equal(page.state(), "listening")
 })
 
 test("a silent take only says so", async () => {

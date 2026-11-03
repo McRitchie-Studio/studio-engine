@@ -22,6 +22,7 @@
 //   studio:voice-recorder:take    detail { blob, mimeType, durationMs, peakRms, microphone: { label, deviceId } }
 //   studio:voice-recorder:silent  detail { durationMs, microphone }  (nothing heard: no blob is handed over)
 //   studio:voice-recorder:state   detail { state }
+//   studio:voice-recorder:hint    detail { kind, text }  (kind "heard" or "quiet", while it records)
 // and, on window, studio/microphone's EVENTS, which the chip listens to.
 //
 // MODES: "toggle" (tap to start, tap to stop) or "hold" (press and hold to
@@ -34,7 +35,8 @@ import { createLevelMeter, SILENCE_RMS } from "studio/level_meter"
 export const EVENTS = {
   take: "studio:voice-recorder:take",
   silent: "studio:voice-recorder:silent",
-  state: "studio:voice-recorder:state"
+  state: "studio:voice-recorder:state",
+  hint: "studio:voice-recorder:hint"
 }
 
 // What to ask MediaRecorder for, in order: webm/opus on Chrome and Firefox,
@@ -125,6 +127,7 @@ export function mountVoiceRecorder(root, { win = window, open = openMicrophone, 
   let microphone = { label: "", deviceId: null }
   let hinted = null
   let stopWanted = false
+  let keyHeld = false
   let destroyed = false
 
   function setState(next, message = null) {
@@ -159,10 +162,11 @@ export function mountVoiceRecorder(root, { win = window, open = openMicrophone, 
   }
 
   function hint(kind) {
-    if (state !== "recording" || hinted === kind || !copy.recording[kind]) return
+    if (state !== "recording" || hinted === kind || copy.recording[kind] == null) return
     hinted = kind
     const status = one("[data-voice-recorder-status]")
     if (status) status.textContent = copy.recording[kind]
+    root.dispatchEvent(new win.CustomEvent(EVENTS.hint, { bubbles: true, detail: { kind, text: copy.recording[kind] } }))
   }
 
   function onSample(rms) {
@@ -302,6 +306,9 @@ export function mountVoiceRecorder(root, { win = window, open = openMicrophone, 
     if (mode !== "hold") return
     const button = event.target.closest && event.target.closest("[data-voice-recorder-button]")
     if (!button || !root.contains(button)) return
+    // Only the main button holds: a right-click (or a Mac's control-click) is a
+    // context menu, not a take. Touch and pen report button 0.
+    if (event.button || event.ctrlKey) return
     event.preventDefault()
     if (button.setPointerCapture && event.pointerId != null) {
       try { button.setPointerCapture(event.pointerId) } catch (_) { /* a synthetic pointer */ }
@@ -318,12 +325,24 @@ export function mountVoiceRecorder(root, { win = window, open = openMicrophone, 
     if (mode !== "hold" || event.repeat || ![" ", "Enter"].includes(event.key)) return
     if (!event.target.closest || !event.target.closest("[data-voice-recorder-button]")) return
     event.preventDefault()
+    keyHeld = true
     start()
   }
 
   function onKeyUp(event) {
     if (mode !== "hold" || ![" ", "Enter"].includes(event.key)) return
     event.preventDefault()
+    keyHeld = false
+    onPointerUp()
+  }
+
+  // A key held on the button when focus leaves it (Tab, another window): its
+  // keyup lands elsewhere and never reaches here, and the microphone would stay
+  // live to the max_ms cap and send a take on its own. A pointer hold is captured,
+  // so it has its own pointerup.
+  function onFocusOut() {
+    if (!keyHeld) return
+    keyHeld = false
     onPointerUp()
   }
 
@@ -333,6 +352,7 @@ export function mountVoiceRecorder(root, { win = window, open = openMicrophone, 
   root.addEventListener("pointercancel", onPointerUp)
   root.addEventListener("keydown", onKeyDown)
   root.addEventListener("keyup", onKeyUp)
+  root.addEventListener("focusout", onFocusOut)
   root.dataset.voiceRecorderMode = mode
   paintLevel(0)
   if (supported()) setState("idle")
@@ -352,6 +372,7 @@ export function mountVoiceRecorder(root, { win = window, open = openMicrophone, 
       root.removeEventListener("pointercancel", onPointerUp)
       root.removeEventListener("keydown", onKeyDown)
       root.removeEventListener("keyup", onKeyUp)
+      root.removeEventListener("focusout", onFocusOut)
       if (recorder && recorder.state !== "inactive") {
         try { recorder.stop() } catch (_) { /* already stopped */ }
       }

@@ -108,12 +108,16 @@ export function wordsInBox(current, text) {
   return current && current.trim() ? `${current.trimEnd()}\n${text}` : text
 }
 
-// The chat form's own token, else the page's (csrf_meta_tags).
+// The page's token (csrf_meta_tags), else the chat form's. In that order: the
+// meta tag's is good for any action, and the form's is per-form under
+// load_defaults 8.1, bound to POST /agent_chat/messages, so POST /voice/takes
+// refuses it.
 export function csrfToken(form, doc = globalThis.document) {
-  const field = form && form.querySelector("input[name='authenticity_token']")
-  if (field && field.value) return field.value
   const meta = doc && doc.querySelector("meta[name='csrf-token']")
-  return meta ? meta.getAttribute("content") : null
+  const content = meta && meta.getAttribute("content")
+  if (content) return content
+  const field = form && form.querySelector("input[name='authenticity_token']")
+  return field && field.value ? field.value : null
 }
 
 // Resolves to `promise`'s value, or `fallback` once `ms` have passed.
@@ -283,9 +287,20 @@ export function mountAgentChatVoice(root, {
     }
   }
 
+  // "I can't hear anything yet" on the one line: the recorder's own line is hidden
+  // in the composer while it records, so a held button never moves for it.
+  function onHint(event) {
+    const text = event.detail && event.detail.text
+    if (text) say("listening", text)
+  }
+
+  // A Turbo restore brings back whatever the line last said, with no take behind it.
+  say("idle", "")
+
   root.addEventListener("studio:voice-recorder:take", onTake)
   root.addEventListener("studio:voice-recorder:silent", onSilent)
   root.addEventListener("studio:voice-recorder:state", onState)
+  root.addEventListener("studio:voice-recorder:hint", onHint)
 
   return {
     takeArrived,
@@ -294,6 +309,7 @@ export function mountAgentChatVoice(root, {
       root.removeEventListener("studio:voice-recorder:take", onTake)
       root.removeEventListener("studio:voice-recorder:silent", onSilent)
       root.removeEventListener("studio:voice-recorder:state", onState)
+      root.removeEventListener("studio:voice-recorder:hint", onHint)
     }
   }
 }

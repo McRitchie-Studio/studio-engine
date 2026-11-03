@@ -21,7 +21,7 @@ browser ──GET  /agent_chat/turns?after=<id>──▶ app ──GET hub /api/
    ```
 
 2. **Set the app's credential** as `AGENT_CHAT_TOKEN` (Heroku config; 1Password
-   `apps.<slug>.agent-chat`). The hub stores only its digest and must list your
+   `agent-chat.<slug>.applications`). The hub stores only its digest and must list your
    app under `config/agent_routes.yml` `web: apps:` for that soul. Or set
    `Studio.agent_chat_token` directly.
 
@@ -179,6 +179,11 @@ answers no `voice`. On the hub the same two paths are answered in-process
 | `rate_limited` | 429 on the take or the send, with the wait when the server gives one. |
 | `refused` | 401 ("Sign in again to talk."), 403, 413, 415, or another 422. |
 | `failed` | The transcriber failed, the network failed, or the send failed. |
+
+**The token.** The script sends the page's `csrf_meta_tags` token and falls back to
+the form's only without one: the form's is per-form under `load_defaults` 8.1, bound
+to `/agent_chat/messages`, and `POST /voice/takes` refuses it. So the page's head must
+carry `csrf_meta_tags`, as `layouts/studio/_head` does.
 
 **No words are lost.** A send that fails puts the words in the box, after anything
 already typed, and says so; press send to try again.

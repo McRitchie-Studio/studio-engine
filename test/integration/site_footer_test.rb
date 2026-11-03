@@ -206,6 +206,17 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     assert_select CHAT_LINK, 1
   end
 
+  test "site_footer_chat_allowed = false hides the link while the chat stays open" do
+    Studio.site_footer = CHAT_FACTS
+    Studio.site_footer_chat_path = "/chat"
+    Studio.agent_chat_allowed = ->(_user) { true }
+    Studio.site_footer_chat_allowed = false
+    get "/footer_host/landing"
+
+    assert_response :success
+    assert_select CHAT_LINK, 0
+  end
+
   test "the allowed hook is asked per viewer, and one that raises costs only the link" do
     Studio.site_footer = CHAT_FACTS
     Studio.site_footer_chat_path = "/chat"

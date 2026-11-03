@@ -3,7 +3,7 @@
 # the mic's gates read a real current_user: signed out, /agent_chat_voice_lab has
 # no mic. Outside /lab because e2e_lab_isolation_test visits every /lab route in a
 # process with no users table. e2e/agent_chat_voice.spec.js drives it in a browser
-# and test/integration/agent_chat_voice_test.rb renders it.
+# and test/integration/agent_chat_proxy_test.rb renders it.
 class AgentChatVoiceLabController < ActionController::Base
   include Studio::ErrorHandling
 

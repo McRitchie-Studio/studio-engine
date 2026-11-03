@@ -21,6 +21,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `POST /voice/takes` (a JSON `403 {error, reason: "not_allowed"}` otherwise), and
   whether the proxy forwards a message's `voice`. A signed-out visitor is never
   allowed, whatever the hook says.
+- **`studio:voice-recorder:hint`**, on the recorder: `{ kind, text }` for a line
+  while it records. A blank `copy.recording[kind]` now blanks that line.
 - **`Studio.agent_chat_allowed`**, the chat's server-side gate: a callable taking
   the user, nil when signed out (default: everyone, so a public chat is unchanged).
   `Studio::AgentChatsController` answers a refused viewer a JSON `403 {error, reason:
@@ -43,6 +45,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **The microphone help's Close never submits a surrounding form.** It is a plain
+  button now, not `<form method="dialog">`, which the parser drops inside a form.
+- **A hold-to-talk recorder stops when a held key loses focus**, instead of recording
+  to the cap and sending a take on its own, and a right-click or control-click no
+  longer starts a take.
 - **The emoji swap no longer clips a large glyph.** Its box is `max(1.25rem, 1.25em)` tall and
   `max(1.5rem, 1.25em)` wide, so a 24px emoji fits.
 
