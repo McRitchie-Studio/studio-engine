@@ -129,3 +129,19 @@ test("options mark the one in use with aria-current and carry no aria-pressed", 
   options.forEach((el) => assert.equal(el.hasAttribute("aria-pressed"), false, `${el.dataset.microphoneOption} has aria-pressed`))
   assert.deepEqual(options.map((el) => el.getAttribute("aria-current")), ["true", null])
 })
+
+test("the help's Close shuts the dialog itself: it is a plain button, with no form to submit", async () => {
+  const page = build()
+  const close = new El(page.doc, "button", { "data-microphone-help-close": "" })
+  const dialog = new El(page.doc, "dialog", { "data-microphone-dialog": "" }, [close])
+  let closed = 0
+  dialog.close = () => { closed += 1 }
+  page.root.append(dialog)
+  mountMicrophoneChip(page.root, { win: page.win })
+  await flush()
+
+  page.root.fire("click", close)
+  assert.equal(closed, 1)
+  page.root.fire("click", page.chip)
+  assert.equal(closed, 1, "another click is not Close")
+})
