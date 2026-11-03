@@ -108,7 +108,7 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
       booking_crop: Studio.booking_crop, booking_path: Studio.booking_path,
       site_footer_address: Studio.site_footer_address,
       site_footer_chat_path: Studio.site_footer_chat_path, site_footer_chat_label: Studio.site_footer_chat_label,
-      site_footer_chat_allowed: Studio.site_footer_chat_allowed
+      site_footer_chat_allowed: Studio.site_footer_chat_allowed, agent_chat_allowed: Studio.agent_chat_allowed
     }
     Studio.site_footer_address = nil
     Studio.site_footer = FACTS
@@ -186,6 +186,18 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
     Studio.site_footer = CHAT_FACTS
     Studio.site_footer_chat_path = "/chat"
     Studio.site_footer_chat_allowed = ->(_user) { false }
+    get "/footer_host/landing"
+    assert_select CHAT_LINK, 0
+
+    Studio.site_footer_chat_allowed = ->(_user) { true }
+    get "/footer_host/landing"
+    assert_select CHAT_LINK, 1
+  end
+
+  test "unset, the link follows Studio.agent_chat_allowed, and its own hook overrides that" do
+    Studio.site_footer = CHAT_FACTS
+    Studio.site_footer_chat_path = "/chat"
+    Studio.agent_chat_allowed = ->(_user) { false }
     get "/footer_host/landing"
     assert_select CHAT_LINK, 0
 

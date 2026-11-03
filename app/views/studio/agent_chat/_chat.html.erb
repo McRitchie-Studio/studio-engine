@@ -25,9 +25,13 @@
   drawn by studio/agent_chat (the "agent-chat" controller, loaded lazily) from
   the two <template>s below, which are studio/agent_chat/_turn: the look lives
   here, in ERB, and the script only fills it. ONE PAGE HOLDS ONE CHAT.
+
+  A viewer Studio.agent_chat_allowed refuses gets nothing here: the proxy would
+  answer them 403 on every poll.
 %>
 <% souls = Studio.agent_chat_soul_list %>
 <% raise ArgumentError, "studio/agent_chat/chat: soul #{soul.inspect} is not in Studio.agent_chat_souls (#{souls.inspect})" unless souls.include?(soul.to_s) %>
+<% if Studio.agent_chat_allowed?(studio_agent_chat_viewer) %>
 <section class="w-full max-w-3xl mx-auto px-4 pt-4 sm:pt-8 flex flex-col gap-6 min-w-0"
          data-studio-controller="agent-chat" data-test="agent-chat"
          data-agent-chat-soul="<%= soul %>" data-agent-chat-name="<%= name %>"
@@ -60,3 +64,4 @@
   <template data-agent-chat-template="user"><%= render "studio/agent_chat/turn", turn: { "role" => "user" }, name: name %></template>
   <template data-agent-chat-template="agent"><%= render "studio/agent_chat/turn", turn: { "role" => "agent" }, name: name %></template>
 </section>
+<% end %>

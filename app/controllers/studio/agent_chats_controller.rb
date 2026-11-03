@@ -11,6 +11,12 @@ module Studio
   # Drawn by Studio.routes only for an app that names a soul
   # (Studio.agent_chat_souls).
   #
+  # WHO MAY USE IT: Studio.agent_chat_allowed, asked of the viewer on both calls.
+  # A refused viewer is a JSON 403 {error, reason: "not_allowed"} before any hub
+  # call and before an anon cookie is minted. These routes skip sign-in, so hiding
+  # a link is not the gate; with the app's token set the hub answers whoever gets
+  # through here.
+  #
   # WHAT THE BROWSER MAY CHOOSE, AND WHAT IT MAY NOT:
   #
   #   soul    only from the app's allow-list (Studio.agent_chat_souls); off the
@@ -47,8 +53,10 @@ module Studio
     ANON_COOKIE = :studio_agent_chat_anon
     ANON_TTL = 1.year
     UNAVAILABLE = "Can't reach the chat right now. Try again in a moment."
+    NOT_ALLOWED = "This chat isn't open to you yet."
 
     before_action :no_store
+    before_action :require_chat_allowed
     before_action :resolve_soul
 
     def create
@@ -88,8 +96,15 @@ module Studio
 
     # The message's `voice`, for a user who may talk; nil otherwise.
     def spoken_voice
-      user = respond_to?(:current_user, true) ? current_user : nil
-      params[:voice] if Studio.voice_chat_allowed?(user)
+      params[:voice] if Studio.voice_chat_allowed?(viewer)
+    end
+
+    def viewer
+      respond_to?(:current_user, true) ? current_user : nil
+    end
+
+    def require_chat_allowed
+      render_error(NOT_ALLOWED, :forbidden, reason: "not_allowed") unless Studio.agent_chat_allowed?(viewer)
     end
 
     def no_store
@@ -140,7 +155,7 @@ module Studio
     # in docs/GOOGLE_AUTH_SETUP.md) counts. Anyone else chats as an
     # anonymous visitor.
     def verified_email
-      user = respond_to?(:current_user, true) ? current_user : nil
+      user = viewer
       return nil unless user
 
       hook = Studio.agent_chat_verified_email

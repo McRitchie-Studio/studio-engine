@@ -47,6 +47,21 @@ browser ──GET  /agent_chat/turns?after=<id>──▶ app ──GET hub /api/
    (`layouts/studio/_head`), which every host already renders: the chat's script
    is the lazy `agent-chat` controller on the engine's Stimulus application.
 
+## Who may use it
+
+`Studio.agent_chat_allowed` is a callable taking the user, **nil when signed out**.
+Default: everyone, a public chat. It is the server's gate, not only the look: the
+`/agent_chat` routes skip sign-in, so with `AGENT_CHAT_TOKEN` set anyone can POST
+there even with every link hidden, and the hub answers. A refused viewer gets
+`403 {error, reason: "not_allowed"}` on both calls, before any hub call and with no
+anon cookie, and the chat partial renders nothing for them. One setting covers the
+footer's Chat link too, unless `site_footer_chat_allowed` says otherwise, and a user
+it refuses may not talk by voice. A hook that raises closes the chat and logs.
+
+```ruby
+config.agent_chat_allowed = ->(user) { user&.admin? }   # admins only, while testing
+```
+
 ## What the browser may choose
 
 - **The soul** only from `Studio.agent_chat_souls`. Off the list is a 404; with
@@ -89,6 +104,7 @@ script sends it as `X-CSRF-Token`. Every answer is JSON with `Cache-Control: no-
 | `200 {turns, pending}` | the thread after `after` (a turn id), at most `limit` (≤ 50) |
 | `422 {error}` | a blank or over-4,000-character message, a malformed `voice`, or the hub's own refusal (its reason) |
 | `429 {error, retry_after}` | the hub's cap; `Retry-After` is passed on |
+| `403 {error, reason: "not_allowed"}` | `Studio.agent_chat_allowed` refused this viewer; the hub was not asked |
 | `404 {error}` | a soul off the list, or one the hub has no web chat for |
 | `503 {error, retry: true}` | the hub is down, slow, answered 5xx or garbage, refused the app's credential (401/403), or the app has no token. The visitor sees "Can't reach <name> right now" and **Try again**; the cause is in the log. |
 
@@ -124,7 +140,8 @@ recorder ──take──▶ studio/agent_chat_voice ──POST /voice/takes (mu
 2. the app turned takes on (`Studio.voice_transcription`; no route otherwise);
 3. someone is signed in. `POST /voice/takes` is sign-in only and each take is paid,
    so a signed-out visitor never sees it, whatever the hook says;
-4. `Studio.voice_chat_allowed`, a callable taking the user (default: anyone signed
+4. `Studio.agent_chat_allowed` lets them chat at all, and
+   `Studio.voice_chat_allowed`, a callable taking the user (default: anyone signed
    in), says yes. A hook that raises says no, and logs.
 
 **The hook is the gate, not only the look.** `POST /voice/takes` answers a user it
@@ -193,9 +210,15 @@ The steps an app's adoption task follows, in order. Nothing here is on by defaul
    config.voice_transcription = true
    # A SHARED counter: per-process memory lets each dyno count alone.
    config.voice_takes_rate_limit = { to: 20, within: 600, store: Rack::Attack.cache.store }
-   # While testing, who may talk (default: anyone signed in):
-   config.voice_chat_allowed = ->(user) { user.admin? }
+   # While testing, who may use the chat at all (default: everyone). The server
+   # refuses anyone else with a 403 before the hub; the footer link follows it:
+   config.agent_chat_allowed = ->(user) { user&.admin? }
+   # Who may talk (default: anyone signed in the chat allows):
+   # config.voice_chat_allowed = ->(user) { user.admin? }
    ```
+
+   **Set `agent_chat_allowed` before `AGENT_CHAT_TOKEN` reaches production on an
+   app whose chat is not meant to be public:** hiding the link is not a gate.
 
 7. **QA runs the mock.** `STUDIO_VOICE_TRANSCRIBER=mock` on the QA app, which runs
    `RAILS_ENV=production` and would otherwise spend the real key.
@@ -208,9 +231,8 @@ The steps an app's adoption task follows, in order. Nothing here is on by defaul
    ([`VOICE_CAPTURE.md`](VOICE_CAPTURE.md), "What a host must allow").
 9. **Render it**: `voice: true` on the chat. The page needs the engine's head.
 10. **Privacy page.** Add `Studio::AgentChat::VOICE_PRIVACY` verbatim.
-11. **Footer.** `config.site_footer_chat_path` and, while testing,
-    `config.site_footer_chat_allowed = ->(user) { user&.admin? }`
-    ([`SITE_FOOTER.md`](SITE_FOOTER.md), "The Chat link"). A signed-in admin sees the
+11. **Footer.** `config.site_footer_chat_path`; the link follows
+    `agent_chat_allowed` ([`SITE_FOOTER.md`](SITE_FOOTER.md), "The Chat link"). A signed-in admin sees the
     footer only on `site_footer_controllers`.
 
 ## The hub client

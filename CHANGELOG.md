@@ -21,6 +21,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   `POST /voice/takes` (a JSON `403 {error, reason: "not_allowed"}` otherwise), and
   whether the proxy forwards a message's `voice`. A signed-out visitor is never
   allowed, whatever the hook says.
+- **`Studio.agent_chat_allowed`**, the chat's server-side gate: a callable taking
+  the user, nil when signed out (default: everyone, so a public chat is unchanged).
+  `Studio::AgentChatsController` answers a refused viewer a JSON `403 {error, reason:
+  "not_allowed"}` on both calls before any hub call, and the chat partial renders
+  nothing for them. The footer's Chat link follows it unless
+  `site_footer_chat_allowed` is set, and a user it refuses may not talk by voice.
 - **The proxy carries `voice`.** `POST /agent_chat/messages` and
   `Studio::AgentChat.post_message(voice:)` forward `{check, score, duration_ms}`
   to the hub, and never a name: the hub names the speaker. A malformed `voice` is
@@ -30,8 +36,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   and the chat polls now; a poll in flight is followed by one more.
 - **The footer's standard Chat link.** `Studio.site_footer_chat_path` (a path or a
   callable taking the view), `site_footer_chat_label` (default "Chat") and
-  `site_footer_chat_allowed` (a callable taking the viewer, nil when signed out)
-  add a plain link at the end of the Contact column, or a Contact column if the
+  `site_footer_chat_allowed` (a callable taking the viewer, nil when signed out;
+  default `Studio.agent_chat_allowed`) add a plain link at the end of the Contact column, or a Contact column if the
   facts have none. No path, no link.
   [`docs/SITE_FOOTER.md`](docs/SITE_FOOTER.md), *The Chat link*.
 

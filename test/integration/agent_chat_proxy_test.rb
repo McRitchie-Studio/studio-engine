@@ -162,6 +162,77 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
     assert_match(/not in Studio.agent_chat_souls/, error.message)
   end
 
+  # ── who may use the chat ────────────────────────────────────
+
+  def with_chat_hook(hook)
+    saved = Studio.agent_chat_allowed
+    Studio.agent_chat_allowed = hook
+    yield
+  ensure
+    Studio.agent_chat_allowed = saved
+  end
+
+  def assert_refused_before_the_hub
+    before = @hub.requests.size
+    post "/agent_chat/messages", params: { soul: "alex", text: "Hello" }.to_json, headers: json_headers
+    assert_response :forbidden
+    assert_equal "not_allowed", JSON.parse(response.body)["reason"]
+    assert_kind_of String, JSON.parse(response.body)["error"]
+    assert_equal "no-store", response.headers["Cache-Control"]
+    assert_nil cookies[Studio::AgentChatsController::ANON_COOKIE.to_s], "a refused visitor is minted nothing"
+
+    get "/agent_chat/turns", params: { soul: "alex" }
+    assert_response :forbidden
+    assert_equal "not_allowed", JSON.parse(response.body)["reason"]
+    assert_equal before, @hub.requests.size, "the hub is never asked"
+  end
+
+  def test_by_default_a_signed_out_visitor_may_chat
+    post "/agent_chat/messages", params: { soul: "alex", text: "Hello" }.to_json, headers: json_headers
+    assert_response :created
+    get "/agent_chat/turns", params: { soul: "alex" }
+    assert_response :ok
+  end
+
+  def test_a_refused_signed_out_visitor_is_a_403_on_both_calls_before_the_hub
+    seen = []
+    with_chat_hook(->(user) { seen << user; user&.admin? }) { assert_refused_before_the_hub }
+    assert_equal [nil], seen.uniq, "the hook is asked about a signed-out visitor, as nil"
+  end
+
+  def test_a_refused_signed_in_user_is_a_403_and_an_allowed_one_reaches_the_hub
+    sign_in(@sam)
+    with_chat_hook(->(user) { user&.admin? }) do
+      assert_refused_before_the_hub
+
+      @sam.update!(role: "admin")
+      post "/agent_chat/messages", params: { soul: "alex", text: "Hello" }.to_json, headers: json_headers
+      assert_response :created
+      get "/agent_chat/turns", params: { soul: "alex" }
+      assert_response :ok
+    end
+  end
+
+  def test_a_chat_hook_that_raises_closes_the_chat
+    with_chat_hook(->(user) { user.admin? }) { assert_refused_before_the_hub }
+  end
+
+  def test_a_refused_viewer_sees_no_chat_on_the_page
+    with_chat_hook(->(_user) { false }) do
+      get "/agent_chat_lab"
+      assert_response :success
+      assert_select '[data-test="agent-chat"]', 0
+      assert_select '[data-test="agent-chat-form"]', 0
+    end
+  end
+
+  def test_a_user_the_chat_refuses_may_not_talk_whatever_the_voice_hook_says
+    sign_in(@sam)
+    with_chat_hook(->(_user) { false }) do
+      with_voice_hook(->(_user) { true }) { assert_equal false, Studio.voice_chat_allowed?(@sam) }
+    end
+  end
+
   # ── the mic ─────────────────────────────────────────────────
 
   PRIVACY = "When you speak to an agent, your recording is sent to OpenAI to turn it into text, then deleted. We never keep the audio."
