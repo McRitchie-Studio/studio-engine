@@ -217,7 +217,7 @@ test("the microphone help's Close keeps the draft and posts nothing", async ({ p
   await dialog.getByRole("button", { name: "Close" }).click();
 
   await expect(dialog).toBeHidden();
-  await expect(page.locator(`${MIC} .studio-mic-chip`), "focus goes back to the chip").toBeFocused();
+  await expect(page.locator(`${MIC} [data-microphone-help-link]`), "focus goes back to what opened it").toBeFocused();
   await page.waitForTimeout(300);
   expect(posts).toEqual([]);
   await expect(input).toHaveValue("my draft");
