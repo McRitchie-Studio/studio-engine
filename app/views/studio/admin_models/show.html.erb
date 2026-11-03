@@ -7,8 +7,8 @@
        style="top: var(--pin-stack-bottom, var(--nav-bottom, var(--nav-h, 0px))); z-index: var(--z-sticky, 30)"
        aria-label="Models">
     <h1 class="text-xl font-bold text-heading shrink-0">Models</h1>
-    <div class="fade-edge-x overflow-x-auto min-w-0 flex-1">
-      <div class="flex items-center gap-2 min-w-max px-8">
+    <div class="overflow-x-auto min-w-0 flex-1">
+      <div class="flex items-center gap-2 min-w-max pl-4">
         <% admin_model_configs.each do |key, config| %>
           <% open = key.to_s == @key %>
           <%= link_to config.fetch(:label), admin_model_path(key),
