@@ -2,7 +2,6 @@ module Studio
   module AdminModels
     extend ActiveSupport::Concern
 
-    PREVIEW_LIMIT = 10
     PER_PAGE = 25
     TEAM_SORTS = {
       "team" => "LOWER(teams.name)",
@@ -10,27 +9,22 @@ module Studio
       "league" => "LOWER(COALESCE(teams.league, ''))"
     }.freeze
     SHARED_TABLE_KEYS = %w[teams arenas].freeze
+    SESSIONS_CONFIG = { label: "Sessions", description: "Signed-in sessions, most recent first" }.freeze
 
     included do
       before_action :set_model_config, only: :show
       helper Studio::AdminModelsTableHelper
-      helper_method :team_sort_url, :team_sort_indicator, :team_sport_emoji,
+      helper_method :admin_model_configs, :team_sort_url, :team_sort_indicator, :team_sport_emoji,
                     :team_record_json, :admin_models_table_partial
     end
 
+    # The first tab. Each model has its own tab and page (#show); this page is that
+    # first one, so /admin/models always shows a table.
     def index
-      @sections = admin_model_configs.map do |key, config|
-        scope = admin_model_scope_for(key)
-        {
-          key: key,
-          label: config.fetch(:label),
-          description: config.fetch(:description),
-          count: scope.count,
-          records: scope.limit(PREVIEW_LIMIT)
-        }
-      end
-
-      render "studio/admin_models/index"
+      @key = admin_model_configs.keys.first.to_s
+      @config = admin_model_configs.fetch(@key)
+      @scope = admin_model_scope(@key)
+      show
     end
 
     def show
@@ -47,11 +41,23 @@ module Studio
     def set_model_config
       @key = params[:key].to_s
       @config = admin_model_configs.fetch(@key) { raise ActiveRecord::RecordNotFound }
-      @scope = admin_model_scope_for(@key)
+      @scope = admin_model_scope(@key)
     end
 
+    # The host's models, with the engine's standard ones after its Users tab. A host
+    # adds a model by adding it to MODELS and answering it in #admin_model_scope_for.
     def admin_model_configs
-      self.class::MODELS
+      configs = self.class::MODELS.to_a
+      return configs.to_h unless Studio::UserSession.available?
+
+      at = (configs.index { |key, _| key.to_s == "users" } || -1) + 1
+      configs.insert(at, ["sessions", SESSIONS_CONFIG]).to_h
+    end
+
+    def admin_model_scope(key)
+      return Studio::UserSession.includes(:user).recent if key.to_s == "sessions"
+
+      admin_model_scope_for(key)
     end
 
     def admin_model_scope_for(_key)
@@ -107,6 +113,8 @@ module Studio
     end
 
     def admin_models_table_partial(key)
+      return "studio/admin_models/sessions_table" if key.to_s == "sessions"
+
       shared_table_keys = if self.class.const_defined?(:SHARED_TABLE_KEYS, false)
         self.class::SHARED_TABLE_KEYS
       else
