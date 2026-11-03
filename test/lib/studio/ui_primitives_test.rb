@@ -3,6 +3,12 @@
 require_relative "../../test_helper"
 
 class StudioUiPrimitivesTest < Minitest::Test
+  def test_the_emoji_swap_box_grows_with_its_glyph
+    css = Studio::UiPrimitives::EMOJI_SWAP_CSS
+    assert_includes css, "height: max(1.25rem, 1.25em)"
+    assert_includes css, "width: max(1.5rem, 1.25em)"
+  end
+
   def test_css_includes_emoji_swap_contract
     css = Studio::UiPrimitives.css
 

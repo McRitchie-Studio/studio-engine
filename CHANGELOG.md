@@ -37,9 +37,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **The footer's standard Chat link.** `Studio.site_footer_chat_path` (a path or a
   callable taking the view), `site_footer_chat_label` (default "Chat") and
   `site_footer_chat_allowed` (a callable taking the viewer, nil when signed out;
-  default `Studio.agent_chat_allowed`) add a plain link at the end of the Contact column, or a Contact column if the
-  facts have none. No path, no link.
+  default `Studio.agent_chat_allowed`) add a plain link at the end of the Contact
+  column, or a Contact column if the facts have none. No path, no link.
   [`docs/SITE_FOOTER.md`](docs/SITE_FOOTER.md), *The Chat link*.
+
+### Fixed
+
+- **The emoji swap no longer clips a large glyph.** Its box is `max(1.25rem, 1.25em)` tall and
+  `max(1.5rem, 1.25em)` wide, so a 24px emoji fits.
 
 ## 0.122.0 — 2026-11-01
 
