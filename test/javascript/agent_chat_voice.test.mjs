@@ -286,6 +286,17 @@ test("a recorder's hint speaks on the one line; a blank one does not wipe it", (
   page.listeners["studio:voice-recorder:hint"]({ detail: { kind: "quiet", text: "I can't hear anything yet." } })
   assert.equal(page.status.textContent, "I can't hear anything yet.")
   assert.equal(page.state(), "listening")
+  // Then the person speaks: the line takes the quiet hint back.
+  page.listeners["studio:voice-recorder:hint"]({ detail: { kind: "heard", text: "" } })
+  assert.equal(page.status.textContent, MESSAGES.listening)
+})
+
+test("a blank hint does not wipe a line a take in hand has written", () => {
+  const page = composer()
+  mount(page, async () => answer(200, {}))
+  page.status.textContent = "Sending to Alex..."
+  page.listeners["studio:voice-recorder:hint"]({ detail: { kind: "heard", text: "" } })
+  assert.equal(page.status.textContent, "Sending to Alex...")
 })
 
 test("a silent take only says so", async () => {

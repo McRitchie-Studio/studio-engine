@@ -292,6 +292,9 @@ export function mountAgentChatVoice(root, {
   function onHint(event) {
     const text = event.detail && event.detail.text
     if (text) say("listening", text)
+    // Heard after the quiet hint: the recorder's "heard" is blank here, so this takes
+    // "I can't hear anything yet" back. No write when the line already says it.
+    else if (root.dataset.agentChatVoiceState === "listening" && status && status.textContent !== MESSAGES.listening) say("listening", MESSAGES.listening)
   }
 
   // A Turbo restore brings back whatever the line last said, with no take behind it.
