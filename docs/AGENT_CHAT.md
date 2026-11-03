@@ -40,6 +40,8 @@ browser ──GET  /agent_chat/turns?after=<id>──▶ app ──GET hub /api/
    | `role:` | Optional text or markup under the name. |
    | `empty:` | Optional line for an empty thread (default "Say hello to <name>."). |
    | `cards:` | **The card slot**: ready markup between the header and the thread (a `capture` block). /build puts its intake cards here. |
+   | `voice:` | `true` puts hold to talk in the composer ("Talking by voice" below). Off by default. |
+   | `voice_copy:` | The words of that option: `{ privacy:, recorder:, chip: }`, each optional. |
 
    One page holds one chat. The page needs the engine's head
    (`layouts/studio/_head`), which every host already renders: the chat's script
@@ -73,6 +75,7 @@ browser ──GET  /agent_chat/turns?after=<id>──▶ app ──GET hub /api/
   job, on a post). So a visitor who chats signed out, then signs in with a
   verified address, keeps the thread once they send their next message.
 - **Never the IP.** The proxy sends `request.remote_ip`, which the hub caps on.
+- **`voice` only as a measurement.** See "Talking by voice".
 
 The POST is CSRF-protected (the host's `protect_from_forgery`, forced to
 `:exception` on this controller); the composer's form carries the token and the
@@ -82,9 +85,9 @@ script sends it as `X-CSRF-Token`. Every answer is JSON with `Cache-Control: no-
 
 | Proxy answer | When |
 |--------------|------|
-| `201 {turn}` | the hub stored the message |
+| `201 {turn}` | the hub stored the message; `{turn, voice}` when it answered what it kept of a spoken one |
 | `200 {turns, pending}` | the thread after `after` (a turn id), at most `limit` (≤ 50) |
-| `422 {error}` | a blank or over-4,000-character message, or the hub's own refusal (its reason) |
+| `422 {error}` | a blank or over-4,000-character message, a malformed `voice`, or the hub's own refusal (its reason) |
 | `429 {error, retry_after}` | the hub's cap; `Retry-After` is passed on |
 | `404 {error}` | a soul off the list, or one the hub has no web chat for |
 | `503 {error, retry: true}` | the hub is down, slow, answered 5xx or garbage, refused the app's credential (401/403), or the app has no token. The visitor sees "Can't reach <name> right now" and **Try again**; the cause is in the log. |
@@ -101,9 +104,118 @@ own message. A new agent turn is placed right after its own user turn, so a
 visitor who sends A, then B before A is answered, sees A's answer under A.
 `after` is a row id (rows with id > after).
 
+## Talking by voice
+
+```erb
+<%= render "studio/agent_chat/chat", soul: "alex", name: "Alex", voice: true %>
+```
+
+A microphone chip and a hold-to-talk button sit in the composer, under the box,
+and the privacy line under the composer. A take goes:
+
+```text
+recorder ──take──▶ studio/agent_chat_voice ──POST /voice/takes (multipart)──▶ {text, speaker, score, check, duration_ms}
+                   studio/agent_chat_voice ──POST /agent_chat/messages {soul, text, voice}──▶ proxy ──▶ hub
+```
+
+**Who gets the mic.** All of these, or the chat renders as it always did:
+
+1. the render passes `voice: true`;
+2. the app turned takes on (`Studio.voice_transcription`; no route otherwise);
+3. someone is signed in. `POST /voice/takes` is sign-in only and each take is paid,
+   so a signed-out visitor never sees it, whatever the hook says;
+4. `Studio.voice_chat_allowed`, a callable taking the user (default: anyone signed
+   in), says yes. A hook that raises says no, and logs.
+
+**The hook is the gate, not only the look.** `POST /voice/takes` answers a user it
+refuses `403 {error, reason: "not_allowed"}` before counting or transcribing, and
+the proxy drops their `voice` (the words still go, as typed).
+
+**`voice` is a measurement, never a name.** The exact field the proxy sends the hub,
+beside `soul`, `text`, `person` and `ip`:
+
+```json
+{ "voice": { "check": "matched", "score": 0.8731, "duration_ms": 2140 } }
+```
+
+`check` must be one of `Studio::VoiceTranscription::CHECKS` (else a 422); `score` is
+a cosine clamped to -1..1 at 4 places, or null; `duration_ms` is
+1..`MAX_DURATION_MS`, or null. Anything else in the post, a browser-chosen name
+above all, stops at `Studio::AgentChat.voice_param`. The hub names the speaker
+itself: the verified person's own name when `check` is `matched`, else "Someone
+new", and an anonymous visitor is always "Someone new". The status line says who
+the hub answered it kept (`{turn, voice: {speaker}}`), or a plain "Sent." when it
+answers no `voice`. On the hub the same two paths are answered in-process
+(`HubAgentChatsController`); the proxy is not involved.
+
+**The status line** (`data-agent-chat-voice-status`, set as text) and its state
+(`data-agent-chat-voice-state`):
+
+| State | When |
+|-------|------|
+| `idle`, `listening` | Between takes, and while the button is held. A new hold clears the last take's line. |
+| `transcribing`, `sending`, `sent` | The take's journey. `sent` names the speaker the server kept. |
+| `queued` | A take landed while another is being transcribed. It waits its turn, in order; none is dropped. |
+| `silent` | The recorder heard nothing. Nothing is sent. |
+| `no_speech` | `/voice/takes` heard no words (422). |
+| `not_configured` | No voice key on this app (503). |
+| `rate_limited` | 429 on the take or the send, with the wait when the server gives one. |
+| `refused` | 401 ("Sign in again to talk."), 403, 413, 415, or another 422. |
+| `failed` | The transcriber failed, the network failed, or the send failed. |
+
+**No words are lost.** A send that fails puts the words in the box, after anything
+already typed, and says so; press send to try again.
+
+**The words.** `Studio::AgentChat::VOICE_PRIVACY` is the privacy line Alex McRitchie
+approved on 2026-11-01: use the constant on the privacy page too. `voice_copy:
+{ privacy: "..." }` replaces it beside the mic; a blank one is the default, never
+none. `recorder:` and `chip:` merge over `VOICE_RECORDER_COPY` and `VOICE_CHIP_COPY`
+one level deep, as the partials' `copy:` does ([`VOICE_CAPTURE.md`](VOICE_CAPTURE.md)).
+
+### Adopting voice: the checklist
+
+The steps an app's adoption task follows, in order. Nothing here is on by default.
+
+1. **Bump the engine** to a release carrying this.
+2. **Souls.** `config.agent_chat_souls = %w[alex]` (or the app's own soul), and the
+   hub lists the app under `config/agent_routes.yml` `web: apps:`.
+3. **`AGENT_CHAT_TOKEN`** in the app's Heroku config (1Password
+   `agent-chat.<slug>.applications`). The hub stores its digest.
+4. **A verified email.** The app's `users` has `email_verified_at`, or set
+   `config.agent_chat_verified_email`. Without one every user is an anonymous
+   visitor, and every take says "Someone new".
+5. **`STUDIO_VOICE_OPENAI_API_KEY`**, the app's own, never another app's
+   ([`VOICE_TRANSCRIPTION.md`](VOICE_TRANSCRIPTION.md)). Without it a take answers
+   the `not_configured` line and nothing crashes.
+6. **Turn takes on**, in `config/initializers/studio.rb`:
+
+   ```ruby
+   config.voice_transcription = true
+   # A SHARED counter: per-process memory lets each dyno count alone.
+   config.voice_takes_rate_limit = { to: 20, within: 600, store: Rack::Attack.cache.store }
+   # While testing, who may talk (default: anyone signed in):
+   config.voice_chat_allowed = ->(user) { user.admin? }
+   ```
+
+7. **QA runs the mock.** `STUDIO_VOICE_TRANSCRIBER=mock` on the QA app, which runs
+   `RAILS_ENV=production` and would otherwise spend the real key.
+8. **CSP, only if `config.voice_profile` is on.** With a saved voice the page runs
+   the embedder in the browser, so add the entries in
+   [`VOICE_PROFILE.md`](VOICE_PROFILE.md), step 3 (jsDelivr's transformers path,
+   `huggingface.co`, `*.hf.co`). Without `voice_profile`, no entry is needed and
+   every take says "Someone new". Allow the microphone too: a
+   `Permissions-Policy` must not deny `microphone=(self)`
+   ([`VOICE_CAPTURE.md`](VOICE_CAPTURE.md), "What a host must allow").
+9. **Render it**: `voice: true` on the chat. The page needs the engine's head.
+10. **Privacy page.** Add `Studio::AgentChat::VOICE_PRIVACY` verbatim.
+11. **Footer.** `config.site_footer_chat_path` and, while testing,
+    `config.site_footer_chat_allowed = ->(user) { user&.admin? }`
+    ([`SITE_FOOTER.md`](SITE_FOOTER.md), "The Chat link"). A signed-in admin sees the
+    footer only on `site_footer_controllers`.
+
 ## The hub client
 
-`Studio::AgentChat.post_message(soul:, text:, person:, ip:)` and
+`Studio::AgentChat.post_message(soul:, text:, person:, ip:, voice:)` and
 `Studio::AgentChat.turns(soul:, person:, after:, limit:)` are the two calls, usable
 outside the controller. `person` is `{email:}`, `{anon_token:}`, or both (a
 signed-in post that folds the visitor's anonymous thread). Every failure is
@@ -130,6 +242,11 @@ machine (a developer's local hub).
 - Enter sends, Shift+Enter is a new line; the words stay in the box until the
   app answers 201, and a refusal shows its reason above them;
 - keeps the thread at its end while the reader is within 20px of it;
+- answers **the public refresh hook**: dispatch `studio:agent-chat:refresh` on the
+  chat's section, optionally with `{ detail: { turn } }` (a turn your code just
+  got from the app). The turn shows at once with the typing line, the thread
+  follows it, and the chat polls now; a poll already in flight is followed by one
+  more, so a refresh is never swallowed. Use this, never a click on Try again;
 - shows "<name> is thinking", then "<name> is typing" once a turn's status is
   `typing`, and "<name> could not answer this one" on a `failed` turn.
 
@@ -149,3 +266,7 @@ that imports only `engine.css` sees both of its labels.
   agent turn sharing a row id both survive), cursor, cadence and follow rules.
 - `e2e/agent_chat.spec.js`: the chat in a browser against the stand-in hub
   `e2e/boot.rb` runs (`AgentChatStubHub#converse!`, the hub's shared-id shape).
+- `test/javascript/agent_chat_voice.test.mjs`: every refusal line, the take's body,
+  `voice` carrying no name, a queued take, a failed send keeping the words.
+- `e2e/agent_chat_voice.spec.js`: a real hold at 390px, light and dark, through the
+  mock transcriber and the proxy to the stand-in hub, and the footer's Chat link.

@@ -13,9 +13,10 @@ class AgentChatVoiceLabController < ActionController::Base
 
   def show; end
 
-  # The browser lane's sign-in door: a verified user, created on first use.
+  # The browser lane's sign-in door: a verified user, created on first use. The
+  # hub keeps one thread per email, so ?as= gives a spec its own empty thread.
   def sign_in
-    user = User.find_or_create_by!(email: "talker@lab.test") do |row|
+    user = User.find_or_create_by!(email: "talker-#{params[:as].to_s.gsub(/\W/, "")}@lab.test") do |row|
       row.email_verified_at = Time.current
       row.username = "lab-talker"
       row.role = "user"

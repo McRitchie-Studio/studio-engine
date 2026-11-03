@@ -4,6 +4,37 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **Hold to talk in the shared agent chat.** `render "studio/agent_chat/chat", ..., voice: true`
+  puts the microphone chip and a hold-to-talk button in the composer's mic slot,
+  with the approved privacy line under it (`Studio::AgentChat::VOICE_PRIVACY`;
+  `voice_copy: { privacy:, recorder:, chip: }` overrides). Off by default, and
+  shown only where `Studio.voice_transcription` is on. Moved from the hub's
+  `chat/_voice` and `voice_chat.js` (new: `studio/agent_chat_voice`, the lazy
+  `agent-chat-voice` controller). Two fixes on the way: a new hold clears the last
+  take's line, and a take recorded during transcription waits its turn. A failed
+  send now adds the words after a typed draft instead of losing them.
+  [`docs/AGENT_CHAT.md`](docs/AGENT_CHAT.md) carries the adoption checklist.
+- **`Studio.voice_chat_allowed`**, a callable taking the signed-in user (default:
+  anyone signed in). It decides who sees the mic, who may post to
+  `POST /voice/takes` (a JSON `403 {error, reason: "not_allowed"}` otherwise), and
+  whether the proxy forwards a message's `voice`. A signed-out visitor is never
+  allowed, whatever the hook says.
+- **The proxy carries `voice`.** `POST /agent_chat/messages` and
+  `Studio::AgentChat.post_message(voice:)` forward `{check, score, duration_ms}`
+  to the hub, and never a name: the hub names the speaker. A malformed `voice` is
+  a `422`. When the hub answers what it kept, the proxy answers `{turn, voice}`.
+- **A public refresh hook on the chat.** Dispatch `studio:agent-chat:refresh` on
+  the chat's section, optionally with `{detail: {turn}}`: the turn shows at once
+  and the chat polls now; a poll in flight is followed by one more.
+- **The footer's standard Chat link.** `Studio.site_footer_chat_path` (a path or a
+  callable taking the view), `site_footer_chat_label` (default "Chat") and
+  `site_footer_chat_allowed` (a callable taking the viewer, nil when signed out)
+  add a plain link at the end of the Contact column, or a Contact column if the
+  facts have none. No path, no link.
+  [`docs/SITE_FOOTER.md`](docs/SITE_FOOTER.md), *The Chat link*.
+
 ## 0.122.0 — 2026-11-01
 
 ### Added

@@ -40,7 +40,10 @@ silence with nothing on the page saying which microphone was used. So:
 
 ## Adopt it in a page
 
-Render the two partials. Both are lazy controllers on the engine's Stimulus
+**To talk to an agent, use the chat's own option**, `voice: true` on
+`studio/agent_chat/chat` ([`AGENT_CHAT.md`](AGENT_CHAT.md), "Talking by voice"): it
+renders both partials in the composer and carries the take to the agent. For any
+other page, render the two partials. Both are lazy controllers on the engine's Stimulus
 application (`studio/stimulus`), so nothing loads on a page that renders neither.
 
 ```erb

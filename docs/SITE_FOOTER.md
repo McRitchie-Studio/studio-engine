@@ -319,6 +319,36 @@ config.site_footer = ->(view) {
   only with a lockup (`studio/site_footer/_lockup_assets`). An engine older
   than the fact ignores the key, so a host can declare it before it upgrades.
 
+## The Chat link
+
+The standard way to reach an app's agent chat ([`AGENT_CHAT.md`](AGENT_CHAT.md)):
+a plain link at the end of the column headed **Contact** (any case), or a new
+Contact column at the end if the facts have none. An app that sets nothing sees
+no change.
+
+```ruby
+config.site_footer_chat_path = "/chat"             # or ->(view) { view.chat_path }
+# config.site_footer_chat_label = "Chat"           # the default
+config.site_footer_chat_allowed = ->(user) { user&.admin? }   # admins only, while testing
+```
+
+| Setting | Meaning | Unset |
+|---------|---------|-------|
+| `site_footer_chat_path` | A path, or a callable taking the view (route helpers do not exist yet in an initializer). It answers nil to show no link on this page | No link |
+| `site_footer_chat_label` | The link's words | "Chat" |
+| `site_footer_chat_allowed` | A callable taking the viewer: `current_user`, **nil when signed out**, so write `user&.admin?` | Everyone |
+
+- The link looks and behaves as any other column link (`_link.html.erb`). An href
+  the footer refuses (`javascript:`) adds nothing, and a Contact column that
+  already links the same path keeps its own row and label.
+- A hook that raises hides the link and reports once through
+  `Studio::SiteFooter.reporter`, so `user.admin?` on a signed-out viewer shows the
+  link to no one and costs no page. Write `user&.admin?` all the same.
+- **An admin-only link needs a page that shows the footer to a signed-in viewer.**
+  A signed-in viewer sees the footer only on `site_footer_controllers` (see
+  *Where it shows*), so list the pages your admins will look at.
+- Never cache the footer across viewers while the link is limited.
+
 ## Where it shows
 
 `studio_site_footer` asks `config.site_footer_visible`, one callable that
