@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.123.0 — 2026-11-03
+
 ### Added
 
 - **Hold to talk in the shared agent chat.** `render "studio/agent_chat/chat", ..., voice: true`
