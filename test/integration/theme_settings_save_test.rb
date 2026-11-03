@@ -152,12 +152,35 @@ class ThemeSettingsSaveTest < ActionDispatch::IntegrationTest
     assert_nil stored_primary
   end
 
-  test "a form save is redirected back to the editor with its notice" do
+  test "a colour that is not #rrggbb is refused, so the theme cannot take the app down" do
+    ["#abc", "abc", "#12345", "purple"].each do |color|
+      save color
+      assert_response :unprocessable_entity
+      assert_nil stored_primary, "#{color.inspect} was stored"
+    end
+
+    get "/admin/style"
+    assert_response :success
+  end
+
+  test "a form save is redirected to the style guide editor with its notice" do
     save "#123456", headers: { "ACCEPT" => "text/html" }
 
-    assert_redirected_to "/admin/theme"
+    assert_redirected_to "/admin/style#theme"
     assert_equal "Theme saved.", flash[:notice]
     assert_equal "#123456", stored_primary
+  end
+
+  test "GET /admin/theme sends an admin to the Theme section of the style guide" do
+    get "/admin/theme"
+    assert_redirected_to "/admin/style#theme"
+  end
+
+  test "GET /admin/theme stays gated for everyone else" do
+    delete "/theme_test_sign_out"
+    get "/admin/theme"
+    assert_response :redirect
+    refute_equal "/admin/style#theme", URI(response.location).then { |u| "#{u.path}##{u.fragment}" }
   end
 
   test "regenerate answers a fetch 204 and a form post the redirect" do
@@ -165,7 +188,7 @@ class ThemeSettingsSaveTest < ActionDispatch::IntegrationTest
     assert_response :no_content
 
     post "/admin/theme/regenerate", headers: { "ACCEPT" => "text/html" }
-    assert_redirected_to "/admin/theme"
+    assert_redirected_to "/admin/style#theme"
 
     delete "/theme_test_sign_out"
     post "/admin/theme/regenerate", headers: JSON_FETCH

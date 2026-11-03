@@ -2112,11 +2112,8 @@ module Studio
         get "schedule", to: "studio/bookings#show", as: :studio_booking
       end
 
-      # The living style guide. Canonical at /admin/style (StyleController#index);
-      # /admin/design_system redirects here but KEEPS its admin_design_system_path
-      # helper so a shipped host sidebar link on the old helper still resolves.
+      # The living style guide (StyleController#index).
       get   "admin/style",            to: "style#index",               as: :admin_style
-      get   "admin/design_system",    to: redirect("/admin/style"),    as: :admin_design_system
 
       # The component gallery: Lookbook over the engine's ViewComponent previews.
       # The router refuses anyone but a signed-in admin, so a visitor and a

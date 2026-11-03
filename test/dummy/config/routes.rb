@@ -89,6 +89,7 @@ Rails.application.routes.draw do
   get "lab/site_identity", to: "e2e_lab#site_identity"
   get "lab/style_modals", to: "e2e_lab#style_modals"
   get "lab/style_theme", to: "e2e_lab#style_theme"
+  get "lab/style_nav", to: "e2e_lab#style_nav"
   get "lab/board", to: "e2e_lab#board"
   get "lab/chips", to: "e2e_lab#chips"
   get "lab/scrims", to: "e2e_lab#scrims"
