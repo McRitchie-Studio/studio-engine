@@ -23,6 +23,20 @@ module Studio
     scope :recent, -> { order(last_seen_at: :desc) }
     scope :non_admin, -> { where(admin: false) }
 
+    # Off under test unless a test asks: the row a first request writes would count in
+
+    # every host's query-budget test, which measures the page and not this.
+
+    cattr_accessor :record_in_test, default: false
+
+
+    def self.recording?
+
+      !Rails.env.test? || record_in_test
+
+    end
+
+
     def self.available?
       connection.data_source_exists?(table_name)
     rescue ActiveRecord::ActiveRecordError, NoMethodError
@@ -33,7 +47,7 @@ module Studio
     # Answers the row it wrote, or nil. Never raises: a request must not fail
     # because its bookkeeping did.
     def self.track(store, user, now: Time.current)
-      return if user.nil?
+      return if user.nil? || !recording?
 
       mark = store[COOKIE_KEY]
       mark = mark.to_h.transform_keys(&:to_s) if mark.respond_to?(:to_h)

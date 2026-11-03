@@ -3,8 +3,6 @@
 # its own, and a deleted user's sessions may stay as counts.
 class CreateStudioUserSessions < ActiveRecord::Migration[7.2]
   def change
-    return if table_exists?(:studio_user_sessions)
-
     create_table :studio_user_sessions do |t|
       t.bigint :user_id, null: false
       t.boolean :admin, null: false, default: false

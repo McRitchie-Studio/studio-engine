@@ -26,7 +26,16 @@ class UserSessionTrackingTest < ActiveSupport::TestCase
   Session = Studio::UserSession
   Person = Struct.new(:id, :is_admin) { def admin? = is_admin }
 
-  setup { Session.delete_all }
+  setup do
+
+    Session.record_in_test = true
+
+    Session.delete_all
+
+  end
+
+
+  teardown { Session.record_in_test = false }
 
   def now = Time.zone.parse("2026-11-03 12:00:00")
   def member = Person.new(7, false)
@@ -86,6 +95,18 @@ class UserSessionTrackingTest < ActiveSupport::TestCase
 
     assert_nil Session.track(store, member, now: now + 1.minute)
   end
+
+  test "under test it records nothing unless asked, so host query budgets hold" do
+
+    Session.record_in_test = false
+
+
+    assert_nil Session.track({}, member, now: now)
+
+    assert_equal 0, Session.count
+
+  end
+
 
   test "no user records nothing, and a failure never raises" do
     assert_nil Session.track({}, nil, now: now)

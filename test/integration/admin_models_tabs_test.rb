@@ -79,11 +79,15 @@ Rails.application.reload_routes!
 # Sessions as a standard tab, and the row a real request records.
 class AdminModelsTabsTest < ActionDispatch::IntegrationTest
   setup do
+    Studio::UserSession.record_in_test = true
     Studio::UserSession.delete_all
     User.delete_all
     @admin = User.create!(email: "admin@example.test", role: "admin", session_token: "tok")
     post "/tabs_test_sign_in/#{@admin.id}"
   end
+
+  teardown { Studio::UserSession.record_in_test = false }
+
 
   def tabs = css_select("nav[aria-label='Models'] a")
   def open_tabs = css_select("nav[aria-label='Models'] a[aria-current='page']").map(&:text)
