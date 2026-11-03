@@ -10,8 +10,10 @@ module Studio
         align-items: center;
         justify-content: center;
         vertical-align: middle;
-        width: 1.5rem;
-        height: 1.25rem;
+        /* In em so a larger glyph fits: at text-lg on a 16px scale a fixed 1.25rem
+           box clipped 4px off a 24px emoji. The floor keeps the navbar size. */
+        width: max(1.5rem, 1.25em);
+        height: max(1.25rem, 1.25em);
         overflow: hidden;
       }
 

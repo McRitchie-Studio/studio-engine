@@ -18,6 +18,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   row and the open tab is highlighted. `/admin/models` shows the first tab; a page's `h1`
   is now always "Models". `studio/admin_models/index` and `PREVIEW_LIMIT` are gone.
 
+### Fixed
+
+- **The emoji swap no longer clips a large glyph.** Its box is `max(1.25rem, 1.25em)` tall and
+  `max(1.5rem, 1.25em)` wide, so a 24px emoji fits.
+
 ## 0.122.0 — 2026-11-01
 
 ### Added
