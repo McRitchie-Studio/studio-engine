@@ -63,6 +63,8 @@ export const schema = {
 // So are the voice capture pair (docs/VOICE_CAPTURE.md): a chip whose controller
 // failed still shows its prompt line, and a recorder whose controller failed
 // says recording did not load (data-studio-controller-failed="voice-recorder").
+// So is the chat's mic: a mic whose controller failed says voice did not load,
+// and the box still types (data-studio-controller-failed="agent-chat-voice").
 export const LAZY = {
   "board": () => import("studio/controllers/board_controller"),
   "geo-settings": () => import("studio/controllers/geo_settings_controller"),
@@ -73,6 +75,7 @@ export const LAZY = {
   "survey": () => import("studio/controllers/survey_controller"),
   "knowledge-transcript": () => import("studio/controllers/knowledge_transcript_controller"),
   "agent-chat": () => import("studio/controllers/agent_chat_controller"),
+  "agent-chat-voice": () => import("studio/controllers/agent_chat_voice_controller"),
   "voice-profile": () => import("studio/controllers/voice_profile_controller"),
   "microphone-chip": () => import("studio/controllers/microphone_chip_controller"),
   "voice-recorder": () => import("studio/controllers/voice_recorder_controller")

@@ -170,7 +170,8 @@ module Studio
     #   booking_path: the booking page's path (Studio.booking_path_for), or nil
     #   address:      Studio.site_footer_address: the address of facts that
     #                 carry none of their own
-    def resolve(declared, view, name: nil, logo: nil, booking_path: nil, address: nil)
+    #   chat:         the Chat entry's [label, path] (`chat_row`), or nil
+    def resolve(declared, view, name: nil, logo: nil, booking_path: nil, address: nil, chat: nil)
       raw = declared.respond_to?(:call) ? declared.call(view) : declared
       return nil if raw.nil? || raw == false
 
@@ -189,7 +190,7 @@ module Studio
         email: text(facts[:email]),
         address: address_for(facts, address),
         social: Array(facts[:social]).filter_map { |row| social(row) },
-        columns: Array(facts[:columns]).filter_map { |row| column(row, booking_path) },
+        columns: with_chat(Array(facts[:columns]).filter_map { |row| column(row, booking_path) }, chat),
         legal: Array(facts[:legal]).filter_map { |row| link(row, booking_path) },
         booking_label: text(booking[:label]) || DEFAULT_BOOKING_LABEL,
         booking_title: text(booking[:title])
@@ -372,6 +373,48 @@ module Studio
 
       options = options.respond_to?(:to_h) && !options.is_a?(Array) ? symbolize(options) : {}
       { heading: heading, links: links, width: column_width(options[:width]) }
+    end
+
+    # The column the standard Chat entry joins, made if the app has none.
+    CONTACT_HEADING = "Contact"
+
+    # The Chat entry for this viewer as a [label, path] row, or nil: no path
+    # means the app has no chat, and `allowed` (a callable taking the viewer, nil
+    # when signed out) can hide it, e.g. admins only while testing. A hook that
+    # raises hides the entry and logs; the footer is on every page, and a link
+    # meant for a few must not show because its gate broke.
+    def chat_row(view, path:, label: nil, allowed: nil)
+      href = path.respond_to?(:call) ? path.call(view) : path
+      return nil if text(href).nil?
+      return nil unless chat_allowed?(view, allowed)
+
+      [text(label) || "Chat", href]
+    end
+
+    def chat_allowed?(view, allowed)
+      return true if allowed.nil?
+
+      user = view.respond_to?(:current_user) ? view.current_user : nil
+      (allowed.respond_to?(:call) ? allowed.call(user) : allowed) ? true : false
+    rescue StandardError => error
+      SiteFooter.reporter.call("[studio.site_footer] site_footer_chat_allowed raised #{error.class}: the Chat link is hidden")
+      false
+    end
+
+    # `columns` with the Chat entry last in the Contact column (any case), which
+    # is added at the end if there is none. A refused href adds nothing, and an
+    # app that already links the same path keeps its own row.
+    def with_chat(columns, chat)
+      row = chat && link(chat)
+      return columns if row.nil? || row[:href].nil?
+
+      at = columns.index { |column| column[:heading].to_s.casecmp?(CONTACT_HEADING) }
+      return columns + [{ heading: CONTACT_HEADING, links: [row], width: nil }] if at.nil?
+      return columns if columns[at][:links].any? { |known| known[:href] == row[:href] }
+
+      columns.each_with_index.map do |column, index|
+        index == at ? column.merge(links: column[:links] + [row]) : column
+      end
     end
 
     # A column's width hint, or nil for the default share. Anything that is not a

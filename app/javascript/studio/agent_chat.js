@@ -18,6 +18,12 @@
 //            until the app answers 201; a refusal shows its reason above them.
 //   FOLLOW   the thread stays at its end while the reader is within FOLLOW_PX of
 //            it, and always after their own send (the hub's chat_follow rule).
+//   REFRESH  the public hook for code outside the chat (studio/agent_chat_voice, a
+//            host's own composer): dispatch studio:agent-chat:refresh on the
+//            chat's section, optionally with {detail: {turn}}, a turn the app
+//            just answered. The turn shows at once, the chat follows it, and it
+//            polls now; a poll already in flight is followed by one more, so a
+//            refresh is never swallowed.
 //   TYPING   the typing line shows while the hub says an answer is pending:
 //            "thinking", then "typing" once a turn's status is "typing".
 //
@@ -31,6 +37,7 @@ export const IDLE_MS = 30000
 export const OFFLINE_MS = 15000
 export const FOLLOW_PX = 20
 export const LIMIT = 50
+export const REFRESH_EVENT = "studio:agent-chat:refresh"
 const UNSETTLED = new Set(["pending", "typing"])
 
 export function settled(turn) {
@@ -123,7 +130,7 @@ export function mountAgentChat(root, {
   const soul = root.dataset.agentChatSoul
   const name = root.dataset.agentChatName || "The agent"
 
-  const state = { turns: [], pending: false, waitingSince: null, offline: false, inFlight: false, sending: false, timer: null, alive: true, following: true }
+  const state = { turns: [], pending: false, waitingSince: null, offline: false, inFlight: false, pollAgain: false, sending: false, timer: null, alive: true, following: true }
 
   const onScroll = () => { state.following = isFollowing(log) }
   log.addEventListener("scroll", onScroll, { passive: true })
@@ -199,8 +206,38 @@ export function mountAgentChat(root, {
       setOffline(true)
     } finally {
       state.inFlight = false
-      schedule()
+      if (state.pollAgain) {
+        state.pollAgain = false
+        if (state.alive) poll()
+      } else {
+        schedule()
+      }
     }
+  }
+
+  // The public refresh hook (REFRESH above). Returns poll's promise, or nothing
+  // when the poll in flight will be followed by another.
+  function refresh({ turn } = {}) {
+    if (!state.alive) return undefined
+    if (turn) {
+      state.turns = mergeTurns(state.turns, [turn])
+      state.pending = true
+      state.following = true
+      state.waitingSince = now()
+      setOffline(false)
+      render()
+      toEnd()
+    }
+    if (state.inFlight) {
+      state.pollAgain = true
+      return undefined
+    }
+    clearTimer(state.timer)
+    return poll()
+  }
+
+  function onRefresh(event) {
+    refresh(event.detail || {})
   }
 
   async function submit(event) {
@@ -264,6 +301,7 @@ export function mountAgentChat(root, {
   form && form.addEventListener("submit", submit)
   input && input.addEventListener("keydown", onKeydown)
   retry && retry.addEventListener("click", onRetry)
+  root.addEventListener(REFRESH_EVENT, onRefresh)
   doc && doc.addEventListener && doc.addEventListener("visibilitychange", onVisible)
   root.dataset.agentChatReady = "true"
   poll()
@@ -271,6 +309,7 @@ export function mountAgentChat(root, {
   return {
     state,
     poll,
+    refresh,
     submit,
     destroy() {
       state.alive = false
@@ -279,6 +318,7 @@ export function mountAgentChat(root, {
       form && form.removeEventListener("submit", submit)
       input && input.removeEventListener("keydown", onKeydown)
       retry && retry.removeEventListener("click", onRetry)
+      root.removeEventListener(REFRESH_EVENT, onRefresh)
       doc && doc.removeEventListener && doc.removeEventListener("visibilitychange", onVisible)
       delete root.dataset.agentChatReady
     }

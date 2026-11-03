@@ -1,4 +1,4 @@
-<%# locals: (soul:, name:, portrait: nil, role: nil, empty: nil, cards: nil) %>
+<%# locals: (soul:, name:, portrait: nil, role: nil, empty: nil, cards: nil, voice: false, voice_copy: nil) %>
 <%#
   The shared agent chat (docs/AGENT_CHAT.md): one conversation with one agent,
   held by the hub, on any app's page.
@@ -13,6 +13,12 @@
   cards     THE CARD SLOT: ready markup shown between the header and the
             thread (/build's intake cards). A local, never a bare yield: a
             partial rendered without a block yields the LAYOUT's body.
+  voice     true puts hold to talk in the composer's mic slot, with the privacy
+            line under it. It still shows only where the app turned takes on
+            (Studio.voice_transcription) and only to a user
+            Studio.voice_chat_allowed lets talk; never to a signed-out visitor.
+  voice_copy  the words: { privacy:, recorder:, chip: }, each optional, over the
+            defaults (Studio::AgentChat.voice_copy).
 
   Top to bottom, as the hub's /build: the portrait and name, the card slot, the
   thread, the typing line, the offline notice and the composer. The thread is
@@ -45,7 +51,11 @@
       <p class="text-sm text-body min-w-0">Can't reach <%= name %> right now. Your messages are safe; try again in a moment.</p>
       <button type="button" class="btn btn-secondary btn-sm shrink-0" data-agent-chat-retry data-test="agent-chat-retry">Try again</button>
     </div>
-    <%= render "studio/agent_chat/form", soul: soul, name: name %>
+    <% mic = render("studio/agent_chat/voice", soul: soul, name: name, copy: voice_copy) if voice && studio_agent_chat_voice? %>
+    <%= render "studio/agent_chat/form", soul: soul, name: name, mic: mic %>
+    <% if mic %>
+      <p class="px-3 text-center text-xs text-secondary break-words" data-test="agent-chat-voice-privacy"><%= Studio::AgentChat.voice_copy(voice_copy)["privacy"] %></p>
+    <% end %>
   </div>
   <template data-agent-chat-template="user"><%= render "studio/agent_chat/turn", turn: { "role" => "user" }, name: name %></template>
   <template data-agent-chat-template="agent"><%= render "studio/agent_chat/turn", turn: { "role" => "agent" }, name: name %></template>

@@ -5,7 +5,7 @@ module Studio
   # to its own app; this controller forwards its two calls to the hub through
   # Studio::AgentChat:
   #
-  #   POST /agent_chat/messages  soul, text         -> 201 {turn}
+  #   POST /agent_chat/messages  soul, text, voice  -> 201 {turn, voice}
   #   GET  /agent_chat/turns     soul, after, limit -> 200 {turns, pending}
   #
   # Drawn by Studio.routes only for an app that names a soul
@@ -27,6 +27,10 @@ module Studio
   #           POST that still holds the cookie sends both, so the hub folds the
   #           anonymous thread into the person's; the cookie is then deleted.
   #   ip      never: request.remote_ip, which the hub caps on.
+  #   voice   only what a take measured, {check, score, duration_ms}
+  #           (Studio::AgentChat.voice_param), and only from a user
+  #           Studio.voice_chat_allowed? lets talk; anyone else's words go as
+  #           typed. Never a name: the hub names the speaker.
   #
   # The host's ApplicationController is the base, so its session, current_user
   # and CSRF protection hold: the POST must carry the page's authenticity token
@@ -56,11 +60,13 @@ module Studio
       end
 
       who = person(mint: true, fold: true)
-      turn = Studio::AgentChat.post_message(soul: @soul, text: text, person: who, ip: request.remote_ip)
+      turn = Studio::AgentChat.post_message(soul: @soul, text: text, person: who, ip: request.remote_ip,
+                                            voice: spoken_voice)
       # A signed-in post that carried the anon token has folded that thread into
       # the person's: the token is spent. Kept on any failure, for the retry.
       cookies.delete(ANON_COOKIE) if who.key?(:email) && who.key?(:anon_token)
-      render json: { turn: turn }, status: :created
+      # `voice` is what the hub kept, so the page says who the agent was told spoke.
+      render json: { turn: turn.except("voice"), voice: turn["voice"] }.compact, status: :created
     rescue Studio::AgentChat::Error => e
       render_hub_error(e)
     end
@@ -79,6 +85,12 @@ module Studio
     end
 
     private
+
+    # The message's `voice`, for a user who may talk; nil otherwise.
+    def spoken_voice
+      user = respond_to?(:current_user, true) ? current_user : nil
+      params[:voice] if Studio.voice_chat_allowed?(user)
+    end
 
     def no_store
       response.headers["Cache-Control"] = "no-store"

@@ -16,8 +16,8 @@ module Studio
   #
   # THE CONTRACT (.agents/epics/agent-chat-primitive.md, "Contract"):
   #
-  #   POST /api/v1/agent_chat/messages  soul, text, person, ip
-  #        201 {turn} · 422 {error} · 429 capped · 404 soul has no web chat
+  #   POST /api/v1/agent_chat/messages  soul, text, person, ip, voice (optional)
+  #        201 {turn, voice} · 422 {error} · 429 capped · 404 soul has no web chat
   #   GET  /api/v1/agent_chat/turns     soul, person, after, limit (<= 50)
   #        200 {turns: [...], pending: bool}
   #
@@ -26,6 +26,11 @@ module Studio
   # and the hub folds the anonymous thread into the person's. A turn is
   # {id, role: "user"|"agent", text, created_at, status} with status
   # pending|typing|answered|failed.
+  #
+  # `voice` marks a spoken message: {check, score, duration_ms}, what POST
+  # /voice/takes answered for the take (voice_param). NEVER A NAME: the hub
+  # names the speaker itself (the verified person's own name when check is
+  # "matched", else "Someone new") and may answer what it kept as `voice`.
   #
   # AUTHENTICATION is the APP's own bearer credential (Studio.agent_chat_token,
   # else ENV["AGENT_CHAT_TOKEN"]), never a user's. It is sent only over TLS: a
@@ -83,6 +88,31 @@ module Studio
     MAX_TEXT_LENGTH = 4_000
     # A hub answer larger than this is not a chat answer.
     MAX_BODY_BYTES = 1_048_576
+    # The words beside the microphone, approved by Alex McRitchie on 2026-11-01.
+    # Verbatim here and on an app's privacy page, from this one constant.
+    VOICE_PRIVACY = "When you speak to an agent, your recording is sent to OpenAI to turn it " \
+                    "into text, then deleted. We never keep the audio."
+
+    # The hold-to-talk button's words per recorder state (merged over
+    # Studio::VoiceCapture::RECORDER_COPY). The recorder says nothing while it
+    # records: the chat's own status line says "Listening...", so the button does
+    # not move under a held finger when the line appears.
+    VOICE_RECORDER_COPY = {
+      "idle" => { "button" => "Hold to talk" },
+      "recording" => { "button" => "Let go to send", "status" => "" },
+      "captured" => { "button" => "Hold to talk", "status" => "" },
+      "silent" => { "button" => "Hold to talk" },
+      "failed" => { "button" => "Hold to try again" },
+      "denied" => { "button" => "Hold to talk" },
+      "unsupported" => { "button" => "Hold to talk" }
+    }.freeze
+
+    # The microphone chip's first words (the engine's say "tap Record").
+    VOICE_CHIP_COPY = {
+      "prompt" => { "chip" => "Microphone: hold to talk to allow",
+                    "note" => "Hold the talk button once and allow the microphone. Then you can pick one here." }
+    }.freeze
+
     LOOPBACK_HOSTS = %w[localhost 127.0.0.1 ::1 [::1]].freeze
     NETWORK_ERRORS = [
       Net::OpenTimeout, Net::ReadTimeout, Net::WriteTimeout, Timeout::Error,
@@ -93,13 +123,49 @@ module Studio
     class << self
       # Stores one message from `person` to `soul` and answers its turn (a Hash
       # with string keys). Raises a Studio::AgentChat::Error.
-      def post_message(soul:, text:, person:, ip: nil)
-        body = { soul: soul.to_s, text: text.to_s, person: person_param(person), ip: ip.to_s.presence }.compact
+      #
+      # `voice` marks it as spoken (voice_param). When the hub answers what it
+      # kept, the returned Hash also carries it under "voice".
+      def post_message(soul:, text:, person:, ip: nil, voice: nil)
+        body = { soul: soul.to_s, text: text.to_s, person: person_param(person), ip: ip.to_s.presence,
+                 voice: voice_param(voice) }.compact
         payload = request(:post, MESSAGES_PATH, body: body)
         turn = payload.is_a?(Hash) && payload["turn"].is_a?(Hash) ? payload["turn"] : payload
         raise Unavailable.new("the hub answered with no turn", status: 201) unless turn.is_a?(Hash)
 
-        turn
+        kept = payload["voice"] if payload.is_a?(Hash)
+        kept.is_a?(Hash) ? turn.merge("voice" => kept) : turn
+      end
+
+      # The words of the chat's voice option: {"privacy", "recorder", "chip"},
+      # the `overrides` (voice_copy: on studio/agent_chat/chat) over the defaults.
+      # A blank privacy line is the default one: the line is never just dropped.
+      def voice_copy(overrides = nil)
+        words = (overrides || {}).to_h.transform_keys(&:to_s)
+        {
+          "privacy" => words["privacy"].presence || VOICE_PRIVACY,
+          "recorder" => Studio::VoiceCapture.merge(VOICE_RECORDER_COPY, words["recorder"]),
+          "chip" => Studio::VoiceCapture.merge(VOICE_CHIP_COPY, words["chip"])
+        }
+      end
+
+      # What a message's `voice` may say to the hub, as the hub reads it: `check`
+      # is one of the engine's own (else Invalid), `score` a cosine (-1..1, 4
+      # places) or nil, `duration_ms` 1..MAX_DURATION_MS or nil. Everything else,
+      # a browser-chosen name above all, stops here. nil or "" is a typed message.
+      def voice_param(voice)
+        return nil if voice.nil? || voice == ""
+
+        voice = voice.to_unsafe_h if voice.respond_to?(:to_unsafe_h)
+        raise Invalid.new("voice must be {check, score, duration_ms}", status: 422) unless voice.is_a?(Hash)
+
+        voice = voice.transform_keys(&:to_s)
+        check = voice["check"].to_s
+        unless Studio::VoiceTranscription::CHECKS.include?(check)
+          raise Invalid.new("voice.check is not one the engine answers", status: 422)
+        end
+
+        { check: check, score: voice_score(voice["score"]), duration_ms: voice_duration(voice["duration_ms"]) }
       end
 
       # The thread's turns after `after` (a turn id; nil for the latest), and
@@ -117,6 +183,18 @@ module Studio
       def token = Studio.agent_chat_token.presence || ENV["AGENT_CHAT_TOKEN"].presence
 
       private
+
+      def voice_score(raw)
+        return nil unless raw.is_a?(Numeric) || raw.is_a?(String)
+
+        value = Float(raw, exception: false)
+        value&.finite? ? value.clamp(-1.0, 1.0).round(4) : nil
+      end
+
+      def voice_duration(raw)
+        value = raw.to_s.match?(/\A\d{1,9}\z/) ? raw.to_s.to_i : nil
+        value&.between?(1, Studio::VoiceTranscription::MAX_DURATION_MS) ? value : nil
+      end
 
       # {email:}, {anon_token:}, or both: a signed-in post that still holds the
       # visitor's anon token sends both, and the hub folds that anonymous thread

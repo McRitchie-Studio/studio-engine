@@ -1,5 +1,5 @@
-<%# locals: (soul:, name:) %>
-<%# The chat's composer (studio/agent_chat/_chat), as the hub's agent_chats/_form: the text over a round send button at its bottom right, sticky at the window's bottom. Enter sends; Shift+Enter is a new line (studio/agent_chat). It posts to POST /agent_chat/messages with the page's authenticity token (form_with adds it; the script sends it as X-CSRF-Token). A send that fails keeps the words in the box and says why above them. %>
+<%# locals: (soul:, name:, mic: nil) %>
+<%# The chat's composer (studio/agent_chat/_chat), as the hub's agent_chats/_form: the text over a round send button at its bottom right, sticky at the window's bottom. Enter sends; Shift+Enter is a new line (studio/agent_chat). It posts to POST /agent_chat/messages with the page's authenticity token (form_with adds it; the script sends it as X-CSRF-Token). A send that fails keeps the words in the box and says why above them. `mic` is the mic slot: ready markup under the box (studio/agent_chat/_voice), nothing without it. %>
 <%= form_with url: studio_agent_chat_messages_path, method: :post, local: true,
               html: { style: "view-transition-name: agent-composer;" },
               class: "sticky bottom-3 z-10 rounded-3xl border border-subtle bg-surface shadow-lg focus-within:border-primary transition-colors p-2 flex flex-col gap-2",
@@ -20,4 +20,5 @@
       </svg>
     </button>
   </div>
+  <%= mic %>
 <% end %>

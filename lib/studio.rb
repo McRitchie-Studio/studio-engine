@@ -1486,6 +1486,28 @@ module Studio
     Array(agent_chat_souls).map { |soul| soul.to_s.strip }.reject(&:empty?).uniq
   end
 
+  # Who may talk by voice (docs/AGENT_CHAT.md, "Talking by voice"): a callable
+  # taking the signed-in user. It decides who sees the chat's microphone, who
+  # may post a take to POST /voice/takes (each one is a paid vendor call), and
+  # whether the proxy forwards a message's `voice`. A signed-out visitor is
+  # never asked about: no user, no voice. While testing, an app narrows it:
+  #
+  #   config.voice_chat_allowed = ->(user) { user.admin? }
+  mattr_accessor :voice_chat_allowed, default: ->(user) { user.present? }
+
+  # The one reading of Studio.voice_chat_allowed. False for no user, whatever the
+  # hook says. A hook that raises answers false and logs: the safe answer on a
+  # paid, sign-in-only control, and a page never falls over because of it.
+  def self.voice_chat_allowed?(user)
+    return false if user.nil?
+
+    hook = voice_chat_allowed
+    (hook.respond_to?(:call) ? hook.call(user) : hook) ? true : false
+  rescue StandardError => e
+    Rails.logger&.warn("[studio] voice_chat_allowed raised #{e.class}: treated as not allowed") if defined?(Rails.logger)
+    false
+  end
+
   class S3ConfigError < StandardError; end
 
   # Whether to validate the host app's User model at boot. See docs/USER_CONTRACT.md.
@@ -1733,6 +1755,19 @@ module Studio
     SidebarSections.resolve(sidebar_sections, view)
   end
 
+  # The standard Chat entry in the footer's Contact column (docs/SITE_FOOTER.md,
+  # "The Chat link"). OFF until the app names a path: no path, no entry.
+  #
+  #   config.site_footer_chat_path = "/chat"       # or ->(view) { view.chat_path }
+  #   config.site_footer_chat_label = "Chat"       # the default
+  #   config.site_footer_chat_allowed = ->(user) { user&.admin? }  # default: everyone
+  #
+  # site_footer_chat_allowed takes the viewer, nil when signed out; a hook that
+  # raises hides the entry and logs (SiteFooter.chat_row).
+  mattr_accessor :site_footer_chat_path, default: nil
+  mattr_accessor :site_footer_chat_label, default: "Chat"
+  mattr_accessor :site_footer_chat_allowed, default: nil
+
   # The site footer's facts resolved for a view (lib/studio/site_footer.rb), or
   # nil when the app turned the footer off (or its own callable answered nil).
   # Unset, the facts are the default footer's. The name defaults to the site
@@ -1744,7 +1779,10 @@ module Studio
 
     declared = site_footer.nil? ? SiteFooter.default_facts(view, routes: host_route_set) : site_footer
     SiteFooter.resolve(declared, view, name: site_identity[:title], logo: logo_for("Footer Logo"),
-                                       booking_path: booking_path_for(view), address: site_footer_address)
+                                       booking_path: booking_path_for(view), address: site_footer_address,
+                                       chat: SiteFooter.chat_row(view, path: site_footer_chat_path,
+                                                                       label: site_footer_chat_label,
+                                                                       allowed: site_footer_chat_allowed))
   end
 
   # The host's route set, for the default footer's legal links. nil outside a
