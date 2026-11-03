@@ -114,6 +114,7 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
   # only by the page that names them.
   test "the style guide's modules and the interstitial's are outside the boot graph" do
     %w[studio/style_guide studio/style_modals studio/controllers/style_modals_controller
+       studio/style_section_nav studio/controllers/style_section_nav_controller
        studio/confirm_interstitial].each do |name|
       refute_includes boot_graph, name, "#{name} is preloaded on every page"
       assert_includes engine_modules, name, "#{name} is not pinned"

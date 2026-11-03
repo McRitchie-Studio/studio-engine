@@ -14,9 +14,8 @@ require "nokogiri"
 # admin/design_system). Load-bearing properties, each exercised (not just
 # declared):
 #
-#   1. Studio.routes draws admin_style_path -> style#index, AND keeps the legacy
-#      admin_design_system_path helper resolving as a redirect to /admin/style
-#      (a shipped host sidebar still links the old helper).
+#   1. Studio.routes draws admin_style_path -> style#index, and the retired
+#      admin/design_system route is gone.
 #   2. The require_admin gate the controller relies on (from the already-included
 #      Studio::ErrorHandling concern) redirects a logged-out visitor AND a
 #      logged-in non-admin to root, and lets an admin through.
@@ -54,19 +53,45 @@ class StylePageTest < ActiveSupport::TestCase
     assert_equal "index", route.defaults[:action]
   end
 
-  test "the legacy admin_design_system helper survives as a redirect to /admin/style" do
-    # The helper must still resolve — MS's shipped sidebar links admin_design_system_path.
-    assert_equal "/admin/design_system", routes.admin_design_system_path
+  test "the retired admin_design_system route is gone" do
+    refute Rails.application.routes.routes.any? { |r| r.name == "admin_design_system" }
+    refute Rails.application.routes.routes.any? { |r| r.path.spec.to_s.start_with?("/admin/design_system") }
+  end
 
-    route = Rails.application.routes.routes.find { |r| r.name == "admin_design_system" }
-    refute_nil route, "the admin_design_system helper must survive the rename"
+  test "the title and the section tabs share one sticky row" do
+    doc = Nokogiri::HTML.fragment(render_index)
+    row = doc.at_css("nav[aria-label='Style guide sections']")
 
-    # It is now a redirect (no controller#action dispatch).
-    endpoint = route.app
-    endpoint = endpoint.app while endpoint.respond_to?(:app) &&
-                                 !endpoint.is_a?(ActionDispatch::Routing::Redirect)
-    assert endpoint.is_a?(ActionDispatch::Routing::Redirect),
-      "admin_design_system must be a redirect to /admin/style, not a controller action"
+    assert_includes row["class"].split, "sticky"
+    assert_equal "style-section-nav", row["data-studio-controller"]
+    assert_equal "Style", row.at_css("h1")&.text
+    assert_equal 1, doc.css("h1").size, "the row carries the page's only title"
+    assert_nil doc.at_css("header"), "no separate header above the row"
+
+    links = row.css("[data-style-section-nav-target='link']")
+    assert_equal %w[#theme #modals #tricks #tasks #components], links.map { |a| a["href"] }
+    assert_equal ["#theme"], row.css("a[aria-current='true']").map { |a| a["href"] }, "Theme starts active"
+    assert_includes links.first["class"].split, "btn-primary"
+    assert_includes links.last["class"].split, "btn-neutral"
+  end
+
+  test "the Theme section shows the app's logos" do
+    before = Studio.theme_logos
+    Studio.theme_logos = [{ file: "brand/mark.svg", title: "The Mark" }]
+    doc = Nokogiri::HTML.fragment(render_index)
+
+    assert doc.at_css("#theme img[src='/brand/mark.svg'][alt='The Mark']"), "the configured logo renders"
+  ensure
+    Studio.theme_logos = before
+  end
+
+  test "the Theme section carries what the standalone page showed" do
+    doc = Nokogiri::HTML.fragment(render_index)
+    labels = doc.css("#theme .label-upper").map { |n| n.text.strip }
+
+    assert_includes labels, "Semantic tokens"
+    assert_includes labels, "Typography"
+    assert doc.at_css("#theme .border-strong"), "the semantic token specimens render"
   end
 
   # --- 2. the require_admin gate actually gates ------------------------------

@@ -9,5 +9,7 @@
 // demos the moment the page is up finds them there.
 import { application } from "studio/stimulus"
 import StyleModalsController from "studio/controllers/style_modals_controller"
+import StyleSectionNavController from "studio/controllers/style_section_nav_controller"
 
 application.register("style-modals", StyleModalsController)
+application.register("style-section-nav", StyleSectionNavController)

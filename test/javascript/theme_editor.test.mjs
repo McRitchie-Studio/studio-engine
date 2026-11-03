@@ -1,5 +1,4 @@
-// [unit] studio/theme_editor: the two theme editors' colour helpers, the CSS
-// variables each writes, and the save-in-place request. Loaded from source as a
+// [unit] studio/theme_editor: the theme editor's CSS variables, and the save-in-place request. Loaded from source as a
 // data: module, like nav_collapse.test.mjs.
 import { test } from "node:test"
 import assert from "node:assert/strict"
@@ -7,8 +6,7 @@ import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/theme_editor.js", import.meta.url), "utf8")
 const {
-  ROLES, normalizeHex, lightenColor, seededColors, previewProperties, stylePreviewProperties,
-  formRequest, saved, failureReason, SIGNED_OUT, themeEditor, dsThemeEditor
+  stylePreviewProperties, formRequest, saved, failureReason, SIGNED_OUT, dsThemeEditor
 } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 // The root's inline style, as the factories write it.
@@ -35,78 +33,6 @@ async function withGlobals(globals, run) {
 
 test("the module imports nothing", () => {
   assert.doesNotMatch(source, /^\s*import\s/m)
-})
-
-test("normalizeHex adds the #, doubles a short hex, and refuses anything else", () => {
-  assert.equal(normalizeHex("#1a2B3c"), "#1a2B3c")
-  assert.equal(normalizeHex(" 1a2b3c "), "#1a2b3c")
-  assert.equal(normalizeHex("#abc"), "#aabbcc")
-  assert.equal(normalizeHex("f0c"), "#ff00cc")
-  assert.equal(normalizeHex("#12345"), null)
-  assert.equal(normalizeHex("purple"), null)
-  assert.equal(normalizeHex(""), null)
-  assert.equal(normalizeHex(null), null)
-})
-
-test("lightenColor moves each channel toward white", () => {
-  assert.equal(lightenColor("#000000", 0.3), "#4d4d4d")
-  assert.equal(lightenColor("#ffffff", 0.3), "#ffffff")
-  assert.equal(lightenColor("#0f172a", 0), "#0f172a")
-  assert.equal(lightenColor("102030", 1), "#ffffff", "a hex with no # is read the same")
-})
-
-test("the standalone editor seeds every role, blank where the server resolved none", () => {
-  assert.deepEqual(Object.keys(seededColors({ primary: "#111111" })), ROLES)
-  assert.equal(seededColors({ primary: "#111111" }).primary, "#111111")
-  assert.equal(seededColors({ warning: null }).warning, "")
-  assert.equal(seededColors(undefined).dark, "")
-})
-
-test("the standalone preview sets the fill beside a typed colour and drops it when cleared", () => {
-  const typed = Object.fromEntries(previewProperties(seededColors({ primary: "#111111", success: "#222222", warning: "#333333", danger: "#444444" })))
-  assert.deepEqual(typed, {
-    "--color-cta": "#111111", "--color-success": "#222222",
-    "--color-warning": "#333333", "--color-danger": "#444444",
-    "--color-warning-fill": "#333333", "--color-danger-fill": "#444444"
-  })
-
-  const cleared = Object.fromEntries(previewProperties(seededColors({ primary: "#111111" })))
-  assert.equal(cleared["--color-warning"], "#FF7C47", "a cleared warning previews the engine default")
-  assert.equal(cleared["--color-danger"], "#EF4444")
-  assert.equal(cleared["--color-warning-fill"], null, "and its fill override is removed")
-  assert.equal(cleared["--color-danger-fill"], null)
-})
-
-test("themeEditor: typing, resetting and normalizing repaint the document", async () => {
-  const doc = fakeRoot()
-  await withGlobals({ document: doc }, () => {
-    const editor = themeEditor({ primary: "#111111", warning: "#333333", dark: "#000000", light: "#fafafa" })
-
-    editor.updatePreview()
-    assert.equal(doc.documentElement.style.values["--color-cta"], "#111111")
-    assert.equal(doc.documentElement.style.values["--color-warning-fill"], "#333333")
-
-    editor.colors.warning = ""
-    editor.updatePreview()
-    assert.equal("--color-warning-fill" in doc.documentElement.style.values, false)
-
-    editor.resetColor("primary", "#abcdef")
-    assert.equal(doc.documentElement.style.values["--color-cta"], "#abcdef")
-
-    editor.colors.primary = "0f0"
-    editor.normalizeHex("primary")
-    assert.equal(editor.colors.primary, "#00ff00")
-    assert.equal(doc.documentElement.style.values["--color-cta"], "#00ff00")
-
-    editor.colors.primary = "not a colour"
-    editor.normalizeHex("primary")
-    assert.equal(editor.colors.primary, "not a colour", "an unreadable value is left for the operator to fix")
-
-    assert.deepEqual(editor.darkPreviewStyle(), { backgroundColor: "#000000", borderRadius: "0" })
-    assert.equal(editor.darkSurfaceStyle().backgroundColor, "#4d4d4d")
-    assert.deepEqual(editor.lightPreviewStyle(), { backgroundColor: "#fafafa", borderRadius: "0" })
-    assert.equal(editor.lightSurfaceStyle().backgroundColor, "#ffffff")
-  })
 })
 
 test("the style guide's preview sets the cta fill and only what has a value", () => {
