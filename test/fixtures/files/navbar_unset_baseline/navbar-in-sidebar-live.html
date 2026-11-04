@@ -208,10 +208,10 @@
   style="top:var(--nav-bottom, var(--nav-h, 6rem));height:calc(100% - var(--nav-bottom, var(--nav-h, 6rem)))"
   data-pin-edge
   role="navigation"
-  aria-labelledby="studio-link-sidebar-title">
+  aria-label="Links menu">
   <div class="flex flex-col h-full">
       <div class="flex items-center justify-between p-4 border-b border-subtle">
-          <h3 id="studio-link-sidebar-title" class="text-lg font-bold text-heading">Links</h3>
+          <div class="min-w-0 flex-1" data-sidebar-panel-lead><p class="type-subhead text-heading truncate pr-3" title="Plain" data-link-sidebar-title="">Plain</p></div>
         <div class="flex items-center gap-2 ml-auto">
           
             <button type="button"
@@ -224,27 +224,20 @@
         </div>
       </div>
 
-      <nav class="flex-1 min-h-0 overflow-y-auto py-2" aria-label="Studio links">
-      <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
-        <span>You</span>
-      </div>
-
-        <a class="group flex items-start gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition" @click="$store.sidebars.linkTreeOpen = false" href="/profile">
-            <span class="text-lg leading-none flex-shrink-0">👤</span>
-          <span class="min-w-0">
-            <span class="block font-medium truncate">Profile</span>
-              <span class="block text-xs text-muted leading-snug mt-0.5">Your name, email and photo</span>
-          </span>
-</a>      <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
-        <span>Site</span>
-      </div>
-
+      <nav class="flex-1 min-h-0 overflow-y-auto py-1" aria-label="Studio links">
+      <div role="group" aria-label="You" class="py-1">
+        <a class="group flex items-center gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition" @click="$store.sidebars.linkTreeOpen = false" href="/profile">
+            <span class="studio-emoji-box text-lg leading-none flex-shrink-0">👤</span>
+            <span class="min-w-0">
+              <span class="block font-medium truncate">Profile</span>
+            </span>
+</a></div>      <div role="group" aria-label="Site" class="py-1 border-t border-subtle">
         <a class="group flex items-center gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition" @click="$store.sidebars.linkTreeOpen = false" href="/">
-            <span class="text-lg leading-none flex-shrink-0">*</span>
-          <span class="min-w-0">
-            <span class="block font-medium truncate">Home</span>
-          </span>
-</a>
+            <span class="studio-emoji-box text-lg leading-none flex-shrink-0">*</span>
+            <span class="min-w-0">
+              <span class="block font-medium truncate">Home</span>
+            </span>
+</a></div>
   </nav>
 
         <div class="border-t border-subtle p-2">
@@ -274,10 +267,10 @@
   style="top:var(--nav-bottom, var(--nav-h, 6rem));height:calc(100% - var(--nav-bottom, var(--nav-h, 6rem)))"
   data-pin-edge
   role="navigation"
-  aria-labelledby="studio-link-sidebar-mobile-title">
+  aria-label="Links menu">
   <div class="flex flex-col h-full">
       <div class="flex items-center justify-between p-4 border-b border-subtle">
-          <h3 id="studio-link-sidebar-mobile-title" class="text-lg font-bold text-heading">Links</h3>
+          <div class="min-w-0 flex-1" data-sidebar-panel-lead><p class="type-subhead text-heading truncate pr-3" title="Plain" data-link-sidebar-title="">Plain</p></div>
         <div class="flex items-center gap-2 ml-auto">
           
             <button type="button"
@@ -290,27 +283,20 @@
         </div>
       </div>
 
-      <nav class="flex-1 min-h-0 overflow-y-auto py-2" aria-label="Studio links">
-      <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
-        <span>You</span>
-      </div>
-
-        <a class="group flex items-start gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition" @click="$store.sidebars.linkTreeOpen = false" href="/profile">
-            <span class="text-lg leading-none flex-shrink-0">👤</span>
-          <span class="min-w-0">
-            <span class="block font-medium truncate">Profile</span>
-              <span class="block text-xs text-muted leading-snug mt-0.5">Your name, email and photo</span>
-          </span>
-</a>      <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
-        <span>Site</span>
-      </div>
-
+      <nav class="flex-1 min-h-0 overflow-y-auto py-1" aria-label="Studio links">
+      <div role="group" aria-label="You" class="py-1">
+        <a class="group flex items-center gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition" @click="$store.sidebars.linkTreeOpen = false" href="/profile">
+            <span class="studio-emoji-box text-lg leading-none flex-shrink-0">👤</span>
+            <span class="min-w-0">
+              <span class="block font-medium truncate">Profile</span>
+            </span>
+</a></div>      <div role="group" aria-label="Site" class="py-1 border-t border-subtle">
         <a class="group flex items-center gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition" @click="$store.sidebars.linkTreeOpen = false" href="/">
-            <span class="text-lg leading-none flex-shrink-0">*</span>
-          <span class="min-w-0">
-            <span class="block font-medium truncate">Home</span>
-          </span>
-</a>
+            <span class="studio-emoji-box text-lg leading-none flex-shrink-0">*</span>
+            <span class="min-w-0">
+              <span class="block font-medium truncate">Home</span>
+            </span>
+</a></div>
   </nav>
 
         <div class="border-t border-subtle p-2">

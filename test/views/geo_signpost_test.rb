@@ -67,16 +67,16 @@ class GeoSignpostTest < Minitest::Test
       html = render_signpost(variant: variant, admin: true, geo_flag: true, geo_routes: false)
 
       assert_includes html, "geo-signpost-disabled", "#{variant}: renders rather than raising"
-      assert_includes html, "Draw the geo routes first", "#{variant}: names the other prerequisite"
+      assert_includes html, "config.draw_geo_routes = true", "#{variant}: names the other prerequisite"
       refute_includes html, "/admin/geo"
     end
   end
 
   # Both chromes agree on the WORDS, not merely on being disabled. The signage is
-  # the feature — an operator reading "Draw the geo routes first" in one app and
+  # the feature — an operator reading "config.draw_geo_routes = true" in one app and
   # something vaguer in another learns less than the dropdown taught alone.
   def test_both_variants_carry_the_same_signage
-    [[true, "ENABLE_GEO_BLOCKING"], [false, "Draw the geo routes first"]].each do |routes, phrase|
+    [[true, "ENABLE_GEO_BLOCKING"], [false, "config.draw_geo_routes = true"]].each do |routes, phrase|
       rendered = VARIANTS.to_h do |variant|
         [variant, render_signpost(variant: variant, admin: true, geo_flag: false, geo_routes: routes)]
       end
@@ -127,7 +127,7 @@ class GeoSignpostTest < Minitest::Test
   # painted ~28px past the w-44 dropdown's right border. It is its own element
   # now so the break class lands on it ALONE, leaving prose to wrap normally.
   def test_the_machine_string_is_its_own_breakable_element
-    VARIANTS.each do |variant|
+    [:dropdown].each do |variant|
       [true, false].each do |routes|
         node = Nokogiri::HTML5.fragment(
           render_signpost(variant: variant, admin: true, geo_flag: false, geo_routes: routes)
@@ -138,6 +138,20 @@ class GeoSignpostTest < Minitest::Test
                         "#{variant}/routes=#{routes}: an unbreakable token needs the break class ON IT"
         refute_includes node.text, " the ", "#{variant}/routes=#{routes}: prose must stay outside the break-all"
       end
+    end
+  end
+
+  # The sidebar's row is one line, so its description truncates and the row's title
+  # holds the long form.
+  def test_the_sidebars_machine_string_is_its_own_element_in_a_truncating_line
+    [true, false].each do |routes|
+      node = Nokogiri::HTML5.fragment(
+        render_signpost(variant: :sidebar, admin: true, geo_flag: false, geo_routes: routes)
+      ).at_css("[data-test='geo-signpost-disabled'] [data-sidebar-row-desc]")
+
+      assert_includes node["class"].split, "truncate"
+      refute_nil node.at_css("code"), "routes=#{routes}: the copyable string is its own element"
+      assert_equal node.at_css("code").text, node.text, "routes=#{routes}: the description holds only the string"
     end
   end
 

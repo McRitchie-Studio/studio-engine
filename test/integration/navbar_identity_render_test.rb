@@ -75,7 +75,8 @@ class NavbarIdentityRenderTest < ActiveSupport::TestCase
     Studio.navbar_user_name = :player_name
     Studio.sign_in_label = "Sign in"
 
-    assert_equal default_in, render_navbar.sub(">Guest_4821</span>", ">Plain User</span>")
+    # The name appears in the navbar, and in the link sidebar's title on both panels.
+    assert_equal default_in, render_navbar.gsub("Guest_4821", "Plain User")
     assert_equal default_out, render_navbar(signed_in: false).sub(">Sign in</a>", ">Log in</a>")
     assert_equal default_nav_out, render_user_nav(signed_in: false).sub(">Sign in</a>", ">Log in</a>")
   end
@@ -86,6 +87,8 @@ class NavbarIdentityRenderTest < ActiveSupport::TestCase
 
     assert_equal "Guest_4821", doc.at_css("[data-nav-name]").text
     refute_includes doc.to_html, "Plain User"
+    assert_equal "Guest_4821", doc.at_css("#studio-link-sidebar [data-link-sidebar-title]").text,
+                 "the panel's title is the name the navbar shows"
   end
 
   test "a lambda receives the user and the view" do

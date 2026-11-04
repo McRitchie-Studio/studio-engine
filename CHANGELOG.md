@@ -4,6 +4,21 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **Link sidebar: no section labels, a calmer title, one line a row at rest.** No section shows
+  a label word or the ADMIN chip at any level; a subtle divider separates the groups, and each
+  group keeps its words as its accessible name. Every row is one line and one height at rest. A
+  link's `desc:` fades in on hover or keyboard focus with no layout change: 200ms after 150ms in,
+  140ms out, the label lifting 8px by a transform. A touch screen shows none, and reduced motion
+  slides nothing. The engine's Profile row no longer passes a `desc:`. The Geo rows behave the
+  same; the row that cannot link holds only the string to copy, reveals it on a tap as well, and
+  keeps the long form in its title. A plain emoji now sits in the swap's box
+  (`.studio-emoji-box`), so a mixed list is one height. The title is `type-subhead`: signed in, admin included, the name the navbar shows
+  (`Studio.navbar_user_name`); signed out, Good morning, Good afternoon or Good evening by the
+  browser's local time, written by `studio/link_sidebar`. The panel's accessible name stays
+  "Admin menu" or "Links menu". The navbar baseline is regenerated for it.
+
 ## 0.125.0 — 2026-11-04
 
 ### Added
