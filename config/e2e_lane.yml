@@ -1153,6 +1153,11 @@
 # items-start back on the row.
 #   npx playwright test --list                                             -> 481
 total_specs: 481
+# 485 -> 486: e2e/link_sidebar.spec.js, a one-line sidebar row's icon and label share a
+# center (sidebar-rows-center-icon-and-label). Pixels exist only in a browser. RED with
+# items-start back on the row.
+#   npx playwright test --list                                             -> 486
+total_specs: 486
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1453,6 +1458,10 @@ total_specs: 481
 # 480 -> 481: e2e/link_sidebar.spec.js, named above.
 #   npx playwright test --list                                             -> 481 tests, 71 files
 executed: 481
+#
+# 485 -> 486: e2e/link_sidebar.spec.js, named above.
+#   npx playwright test --list                                             -> 486 tests, 71 files
+executed: 486
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

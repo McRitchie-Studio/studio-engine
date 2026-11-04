@@ -16,7 +16,8 @@ export const DIRECTIONS = Object.freeze({
   bottom: Object.freeze(["fade-bottom", "unfold-top"]),
 })
 
-// A same-page visit (a refresh, a poll): the transition still runs, and draws nothing.
+// A same-page visit (a refresh, a poll, the second half of a redirect): the transition still
+// runs, and draws nothing.
 export const STILL = "still"
 export const READY_CAP_MS = 500
 const MAX_READY_IMAGES = 12
@@ -29,10 +30,12 @@ export function pickStyle(direction, random = Math.random) {
 }
 
 // The style for one visit, STILL, or null to leave the swap alone (the engine's fade plays,
-// and a morph between two pages stands).
-export function planVisit({ direction, from, to, transitions, sharedName }, random = Math.random) {
+// and a morph between two pages stands). An advance visit to the same path can bring a new
+// page, as a launch panel does when it gives way to the chat at its own address, so a name
+// the two share still morphs. A refresh replaces, and stays silent.
+export function planVisit({ direction, from, to, transitions, sharedName, advance }, random = Math.random) {
   if (!transitions || !from || !to || !Object.hasOwn(DIRECTIONS, direction)) return null
-  if (from === to) return STILL
+  if (from === to) return advance && sharedName ? null : STILL
   return sharedName ? null : pickStyle(direction, random)
 }
 
@@ -109,12 +112,14 @@ export function installPageTransitions(doc) {
   const known = new Map()
   let from = win.location.pathname
   let target = null
+  let advance = false
+  let rendered = false
 
   const nameTheMorph = (shared) => {
     if (shared) root.dataset.pageTransitionMorph = ""
     else delete root.dataset.pageTransitionMorph
   }
-  const predict = (names) => nameTheMorph(target !== from && shareName(morphNames(doc), names))
+  const predict = (names) => nameTheMorph((target !== from || advance) && shareName(morphNames(doc), names))
 
   root.dataset.pageTransitionDirection = readDirection(doc)
   markHeld(doc)
@@ -123,6 +128,12 @@ export function installPageTransitions(doc) {
   doc.addEventListener("turbo:visit", (event) => {
     root.dataset.pageTransitionVisit = ""
     target = new URL(event.detail.url).pathname
+    // A GET that redirects: Turbo renders the response, then replaces to the final address
+    // with that same response, all before turbo:load. The page has landed, so nothing moves.
+    const action = event.detail.action
+    if (rendered && action === "replace") from = target
+    rendered = false
+    advance = action === "advance"
     predict(known.get(target))
   })
 
@@ -154,6 +165,7 @@ export function installPageTransitions(doc) {
       to: target,
       transitions: !!doc.startViewTransition && !win.matchMedia(REDUCED_MOTION).matches,
       sharedName,
+      advance,
     })
     nameTheMorph(sharedName && style !== STILL)
     if (style) root.dataset.pageTransition = style
@@ -161,10 +173,16 @@ export function installPageTransitions(doc) {
     if (style && style !== STILL) holdRender(event, () => readyForSwap(doc, newBody))
   }, { capture: true })
 
+  // A refused form renders with no visit and fires no turbo:load, so only a render inside a
+  // visit counts. Otherwise the flag would outlive that render and eat the next page's move.
+  doc.addEventListener("turbo:render", () => { rendered = !!target })
+
   // Turbo fires this after the transition has finished.
   doc.addEventListener("turbo:load", () => {
     from = win.location.pathname
     target = null
+    advance = false
+    rendered = false
     known.set(from, morphNames(doc))
     delete root.dataset.pageTransition
     delete root.dataset.pageTransitionVisit

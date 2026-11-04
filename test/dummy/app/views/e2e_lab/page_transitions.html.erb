@@ -14,6 +14,7 @@
   <h2 class="text-2xl font-bold">Page <%= @lab_page %></h2>
   <a href="<%= @lab_other_url %>" data-test="other">The other page</a>
   <a href="<%= request.fullpath %>" data-test="same">This page again</a>
+  <a href="/lab/page_transitions_redirect?<%= request.query_string %>" data-test="redirect">A page that redirects</a>
   <% if params[:morph] == "both" || (params[:morph] == "a" && @lab_page == "a") %>
     <%= render "studio/agent_chat/header", name: "Ada" %>
   <% end %>
