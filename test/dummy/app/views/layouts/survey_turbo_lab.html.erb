@@ -10,6 +10,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>studio-engine e2e lab · survey with Turbo</title>
+    <%= tag.meta(name: "turbo-visit-control", content: "reload") if params[:control] == "reload" %>
     <%= render "layouts/studio/head" %>
     <script type="module" src="/e2e/js/turbo.min.js"></script>
   </head>

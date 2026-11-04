@@ -30,7 +30,7 @@
 <%# The session-drift stamp + browser store. Renders nothing unless the controller
     includes Studio::ErrorHandling. See studio/_session_stamp.
 
-    THE ONE ENGINE SCRIPT THAT STAYS CLASSIC, AND SYNCHRONOUS. Host code
+    AN ENGINE SCRIPT THAT STAYS CLASSIC, AND SYNCHRONOUS. Host code
     registers identity sources with window.StudioSession as its own modules
     EVALUATE (turf-monster registers its identity source from a module at
     import; CHANGELOG, "Held"), and the host's entry point is the module tag
@@ -39,6 +39,14 @@
     silently be null. It becomes a module when those consumers wait for it. %>
 <%= render "studio/session_stamp" %>
 <%= render "layouts/studio/smooth_load" %>
+<%# A FULL PAGE LOAD PLAYS THE SAME TRANSITION, only with the setting on: an app without it
+    gets neither tag. The sheet carries the at-rule that takes no selector, so it cannot sit in
+    the engine's bundle. The script is classic and synchronous, the second one here, because
+    pagereveal fires before the first render, ahead of every module. docs/PAGE_TRANSITIONS.md. %>
+<% if @studio_page_transition_direction || Studio.page_transition_direction %>
+  <%= stylesheet_link_tag "studio/page_transition_full_load" %>
+  <%= javascript_include_tag "studio/page_transition_reveal", nonce: studio_script_nonce %>
+<% end %>
 <%# The favicon's URL carries its content version (Studio::PublicFileVersion),
     so a redrawn favicon is a new URL no browser has cached. %>
 <link rel="icon" type="image/png" href="<%= Studio::PublicFileVersion.path("/favicon.png") %>">
@@ -197,7 +205,8 @@
     take every bare specifier on the page down with it. The ones below that load by
     URL (type="module" with a src) are external files, not inline scripts: they
     carry no body and need no nonce under a policy that allows 'self'. The session
-    store (studio/_session_stamp, above) is the one classic script, and says why.
+    store (studio/_session_stamp, above) and the full-load script above are the two
+    classic scripts, and each says why.
     A MODULE LOADED BY URL MUST IMPORT NO BARE SPECIFIER. javascript_include_tag
     also sends a `Link: rel=modulepreload` response header, which the browser
     acts on before it parses this map, so a bare import in that module can

@@ -120,11 +120,19 @@ class SmoothLoadConventionTest < ActiveSupport::TestCase
 
   test "the head loads the module only with a direction, below the import map" do
     head = File.read(HEAD_ERB)
-    gate = head.index('<% if @studio_page_transition_direction || Studio.page_transition_direction %>')
+    gate = head.rindex('<% if @studio_page_transition_direction || Studio.page_transition_direction %>')
 
     assert gate, "the module tag must sit behind the setting"
     assert_operator head.index("<%= javascript_importmap_tags %>"), :<, gate
     assert_match(/\A<% if [^\n]+%>\n  <%= javascript_import_module_tag "studio\/page_transitions" %>\n<% end %>/, head[gate..])
+  end
+
+  test "the head links the full-load sheet and its script only with a direction, ahead of the modules" do
+    head = File.read(HEAD_ERB)
+    gate = head.index('<% if @studio_page_transition_direction || Studio.page_transition_direction %>')
+
+    assert_match(%r{\A<% if [^\n]+%>\n  <%= stylesheet_link_tag "studio/page_transition_full_load" %>\n  <%= javascript_include_tag "studio/page_transition_reveal", nonce: studio_script_nonce %>\n<% end %>}, head[gate..])
+    assert_operator gate, :<, head.index("<%= javascript_importmap_tags %>")
   end
 
   test "every view-transition name an engine view sets inline carries the morph marker" do
@@ -159,6 +167,14 @@ class SmoothLoadConventionTest < ActiveSupport::TestCase
     assert_match(/^html\[data-page-transition-direction\]\[data-page-transition-visit\] \[data-vt-held\] \{/, css, "the stack's name lasts for the visit, behind the setting")
     refute_match(/^\.studio-bar-stack \{[^}]*view-transition-name/, css)
     refute_includes css, '[style*="view-transition-name'
+  end
+
+  # A host with Studio.smooth_load and no direction runs the engine's fade with this navbar, and
+  # no browser spec plays that fade, so only this test stops the rule losing its attribute.
+  test "engine.css hides the old navbar's picture only on a visit that plays a style" do
+    hiding = File.read(CSS_PATH).scan(/^([^\n{}]*::view-transition-old\(studio-header\)[^\n{}]*)\{[^}]*opacity/).flatten.map(&:strip)
+
+    assert_equal [%(html[data-page-transition]:not([data-page-transition="still"])::view-transition-old(studio-header))], hiding
   end
 
   test "engine.css ships the full transition choreography" do

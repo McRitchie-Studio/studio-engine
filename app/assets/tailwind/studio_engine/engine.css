@@ -695,6 +695,12 @@ html[data-page-transition-direction][data-page-transition-visit] [data-vt-held] 
   animation: none;
 }
 
+/* A taller old navbar would show under the new one for the whole motion, then pop off.
+   Only the new navbar draws. Where the two match, the new one covers the same pixels. */
+html[data-page-transition]:not([data-page-transition="still"])::view-transition-old(studio-header) {
+  opacity: 0;
+}
+
 /* A named element moves with the page, unless both pages share its name. The
    script decides that before the old page's picture, and only then is the name let
    through, so the morph stands. data-vt-morph carries the name it marks. */

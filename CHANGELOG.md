@@ -4,6 +4,28 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **Page transitions across full page loads.** With `Studio.page_transition_direction` set,
+  a same-origin full load plays the app's direction through the browser's cross-document
+  view transition: the same pair of styles, keyframes and timing as a Turbo visit, with the
+  navbar and banners held still. This reaches strict-policy pages, which must stay their
+  own documents. New files, linked only with a direction: `studio/page_transition_full_load.css`
+  and the classic `studio/page_transition_reveal.js`, which carries the request's nonce. A
+  reload, a same-path load, reduced motion and a browser without support load plainly. A full
+  load has no morph, and it cannot wait for images, so the 500ms image cap does not apply.
+  With no direction, a host renders no new tag.
+  [`docs/PAGE_TRANSITIONS.md`](docs/PAGE_TRANSITIONS.md).
+
+### Fixed
+
+- **A Turbo visit answered by `turbo-visit-control: reload` no longer plays the engine's fade**
+  before the full load. Turbo opens its view transition before it reads the meta, so that
+  transition now draws nothing.
+- **The navbar no longer draws twice during a page transition** when the old header is taller
+  than the new one, as on Back to a scrolled page. This changes Turbo visits too: only the new
+  navbar draws.
+
 - Link sidebar: a one-line row centers its icon on its label. It sat 3px low. A row with a
   description keeps its icon at the top. The navbar baseline is regenerated for it.
 - Page transitions: an advance visit to the same path keeps a shared `data-vt-morph` name, so

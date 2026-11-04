@@ -112,6 +112,27 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     assert_operator scripts.index(guard), :<, first_module
   end
 
+  # The one script with a direction alone, and the head at 12 inline scripts above without it.
+  test "the full-load script carries the request nonce, and no attribute with no generator" do
+    reveal = -> { head_scripts("/lab/page_transitions?direction=left").find { |script| script["src"].to_s.include?("page_transition_reveal") } }
+    assert_equal NONCE, reveal.call["nonce"]
+
+    Rails.application.env_config[KEY] = nil
+    refute reveal.call.key?("nonce")
+  end
+
+  test "with no direction the head has no full-load script" do
+    refute(head_scripts("/lab/page_transitions").any? { |script| script["src"].to_s.include?("page_transition_reveal") })
+  end
+
+  test "the full-load script runs ahead of every module, since pagereveal fires before first render" do
+    scripts = head_scripts("/lab/page_transitions?direction=left")
+    reveal = scripts.index { |script| script["src"].to_s.include?("page_transition_reveal") }
+    refute scripts[reveal].key?("defer")
+    refute scripts[reveal].key?("type")
+    assert_operator reveal, :<, scripts.index { |script| %w[module importmap].include?(script["type"]) }
+  end
+
   test "with no nonce generator the guard renders without a nonce attribute" do
     Rails.application.env_config[KEY] = nil
     guard = head_scripts("/lab/bar_stack").find { |script| script.text.include?("studioHoldButtonGuard") }

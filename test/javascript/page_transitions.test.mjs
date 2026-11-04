@@ -4,9 +4,10 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
+import { runInNewContext } from "node:vm"
 
 const source = readFileSync(new URL("../../app/javascript/studio/page_transitions.js", import.meta.url), "utf8")
-const { DIRECTIONS, STILL, READY_CAP_MS, pickStyle, planVisit, withCap, shareName, holdRender, installPageTransitions } =
+const { DIRECTIONS, STILL, READY_CAP_MS, FULL_LOAD_STYLE_KEY, pickStyle, planVisit, planFullLoad, leaveStyle, withCap, shareName, holdRender, installPageTransitions } =
   await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 const visit = { direction: "left", from: "/", to: "/chat", transitions: true, sharedName: false }
@@ -124,4 +125,264 @@ test("another listener's resume cannot end the wait", async () => {
 test("with no resume to call, the render is not paused", () => {
   const event = { detail: {}, preventDefault() { throw new Error("paused a render it cannot restart") } }
   assert.equal(holdRender(event, () => {}), false)
+})
+
+// ---- A full page load ------------------------------------------------------------------
+
+const activation = (url) => ({ entry: { url: `https://app.test${url}` } })
+const fullLoad = { direction: "left", from: "/" }
+
+test("a full load draws from the same pick as a Turbo visit, at the same random value", () => {
+  for (const direction of Object.keys(DIRECTIONS)) {
+    for (const value of [0, 0.49, 0.5, 0.99]) {
+      assert.equal(planFullLoad({ direction, from: "/", activation: activation("/x") }, () => value), pickStyle(direction, () => value))
+    }
+  }
+})
+
+test("a full load to the same path plans nothing, whatever the query", () => {
+  assert.equal(planFullLoad({ ...fullLoad, activation: activation("/?page=2") }), null)
+})
+
+test("a full load with no activation entry, or no direction, plans nothing", () => {
+  assert.equal(planFullLoad({ ...fullLoad, activation: null }), null)
+  assert.equal(planFullLoad({ ...fullLoad, activation: {} }), null)
+  assert.equal(planFullLoad({ direction: null, from: "/", activation: activation("/x") }), null)
+})
+
+test("the style goes to the next document, and a refusal reads as a plain load", () => {
+  const store = new Map()
+  const sessionStorage = { setItem: (key, value) => store.set(key, value), removeItem: (key) => store.delete(key) }
+  assert.equal(leaveStyle({ sessionStorage }, "fade-left"), true)
+  assert.equal(store.get(FULL_LOAD_STYLE_KEY), "fade-left")
+  assert.equal(leaveStyle({ sessionStorage }, null), false)
+  assert.equal(store.size, 0)
+  assert.equal(leaveStyle({ sessionStorage: { setItem() { throw new Error("full") } } }, "fade-left"), false)
+})
+
+// A module-level flag lets one document install once, so each case imports its own copy.
+async function installed(pathname = "/a") {
+  const { installPageTransitions: install } = await import(`data:text/javascript,${encodeURIComponent(`${source}\n// ${Math.random()}`)}`)
+  const on = { doc: {}, win: {} }
+  const store = new Map()
+  const root = { dataset: {} }
+  const win = {
+    location: { pathname },
+    addEventListener: (name, handler) => { on.win[name] = handler },
+    sessionStorage: { setItem: (key, value) => store.set(key, value), removeItem: (key) => store.delete(key) },
+  }
+  const doc = {
+    defaultView: win,
+    documentElement: root,
+    querySelector: (selector) => (selector.startsWith("meta") ? { content: "left" } : null),
+    querySelectorAll: () => [],
+    addEventListener: (name, handler) => { on.doc[name] = handler },
+  }
+  assert.equal(install(doc), true)
+  const swap = (url) => {
+    const skipped = { value: false }
+    on.win.pageswap({ viewTransition: { skipTransition: () => { skipped.value = true } }, activation: activation(url) })
+    return skipped.value
+  }
+  return { on, root, store, win, swap }
+}
+
+test("pageswap leaves a style and names the stack for the old picture", async () => {
+  const { root, store, swap } = await installed()
+  root.dataset.pageTransitionMorph = ""
+  assert.equal(swap("/b"), false)
+  assert.ok(DIRECTIONS.left.includes(store.get(FULL_LOAD_STYLE_KEY)))
+  assert.equal(root.dataset.pageTransitionVisit, "")
+  assert.equal(root.dataset.pageTransitionMorph, undefined)
+})
+
+test("pageswap with no transition leaves nothing, and clears a stale style", async () => {
+  const { on, root, store } = await installed()
+  store.set(FULL_LOAD_STYLE_KEY, "fade-left")
+  on.win.pageswap({ viewTransition: null, activation: activation("/b") })
+  assert.equal(store.size, 0)
+  assert.equal(root.dataset.pageTransitionVisit, undefined)
+})
+
+test("pageswap with blocked storage throws nothing, and the load is plain", async () => {
+  const { on, win, root, swap } = await installed()
+  Object.defineProperty(win, "sessionStorage", { get() { throw new Error("SecurityError") } })
+  on.win.pageswap({ viewTransition: null, activation: activation("/b") })
+  assert.equal(swap("/b"), true)
+  assert.equal(root.dataset.pageTransitionVisit, undefined)
+})
+
+test("pageswap to the same path skips the transition", async () => {
+  const { root, store, swap } = await installed()
+  assert.equal(swap("/a"), true)
+  assert.equal(store.size, 0)
+  assert.equal(root.dataset.pageTransitionVisit, undefined)
+})
+
+test("a Turbo visit answered by a reload stays still, and a real one is overwritten at before-render", async () => {
+  const { on, root } = await installed()
+  on.doc["turbo:visit"]({ detail: { url: "https://app.test/b" } })
+  assert.equal(root.dataset.pageTransition, STILL)
+  on.doc["turbo:reload"]({})
+  assert.equal(root.dataset.pageTransition, STILL, "the transition Turbo opened must still draw nothing")
+  assert.equal(root.dataset.pageTransitionVisit, undefined)
+})
+
+test("a visit that fails leaves no style at rest", async () => {
+  const { on, root } = await installed()
+  on.doc["turbo:visit"]({ detail: { url: "https://app.test/b" } })
+  on.doc["turbo:fetch-request-error"]({})
+  assert.equal(root.dataset.pageTransition, undefined)
+})
+
+test("a visit does not cut a motion that is still running", async () => {
+  const { on, root } = await installed()
+  root.dataset.pageTransition = "fade-left"
+  on.doc["turbo:visit"]({ detail: { url: "https://app.test/b" } })
+  assert.equal(root.dataset.pageTransition, "fade-left")
+})
+
+test("the document's own first turbo:load leaves a full load's motion alone", async () => {
+  const { on, root } = await installed()
+  root.dataset.pageTransition = "fade-left"
+  root.dataset.pageTransitionVisit = ""
+  on.doc["turbo:load"]({})
+  assert.equal(root.dataset.pageTransition, "fade-left")
+  assert.equal(root.dataset.pageTransitionVisit, "")
+})
+
+test("the turbo:load that ends a visit clears the marks", async () => {
+  const { on, root } = await installed()
+  on.doc["turbo:visit"]({ detail: { url: "https://app.test/b" } })
+  on.doc["turbo:load"]({})
+  assert.equal(root.dataset.pageTransition, undefined)
+})
+
+test("back from the back/forward cache, the page plans from where it now stands", async () => {
+  const { on, win, store, swap } = await installed("/a")
+  on.doc["turbo:visit"]({ detail: { url: "https://app.test/b" } })
+  win.location.pathname = "/c"
+  on.win.pageshow({ persisted: false })
+  assert.equal(swap("/c"), false, "a fresh pageshow changes nothing")
+  store.clear()
+  on.win.pageshow({ persisted: true })
+  assert.equal(swap("/c"), true, "the restored page is at /c, so /c is the same path")
+})
+
+// ---- studio/page_transition_reveal, the classic script ------------------------------------
+
+const revealSource = readFileSync(new URL("../../app/assets/javascripts/studio/page_transition_reveal.js", import.meta.url), "utf8")
+
+function reveal({ style = null, storage, stack = {} } = {}) {
+  const store = new Map(style ? [[FULL_LOAD_STYLE_KEY, style]] : [])
+  const listeners = {}
+  const attributes = {}
+  const appended = []
+  const element = stack && { setAttribute: (name, value) => { attributes[name] = value } }
+  const root = { dataset: {} }
+  const document = {
+    documentElement: root,
+    head: { appendChild: (el) => appended.push(el) },
+    createElement: () => ({ setAttribute(name, value) { this[name] = value }, remove() { this.removed = true } }),
+    querySelector: (selector) => (selector.startsWith("meta") ? { content: "left" } : element),
+  }
+  const timers = []
+  const window = {
+    addEventListener: (name, handler) => { listeners[name] = handler },
+    setTimeout: (fn, ms) => timers.push({ fn, ms }),
+    sessionStorage: storage ?? {
+      getItem: (key) => store.get(key) ?? null,
+      removeItem: (key) => store.delete(key),
+    },
+  }
+  runInNewContext(revealSource, { window, document })
+  return { listeners, root, store, attributes, appended, timers }
+}
+
+function transition() {
+  const state = { skipped: false }
+  let finish
+  const finished = new Promise((done) => { finish = done })
+  return { state, finish, viewTransition: { skipTransition: () => { state.skipped = true }, finished } }
+}
+
+test("the classic script holds no table of styles and shares the module's key", () => {
+  assert.doesNotMatch(revealSource, /fade-|unfold-/)
+  assert.ok(revealSource.includes(`"${FULL_LOAD_STYLE_KEY}"`))
+  assert.doesNotMatch(revealSource, /^\s*(import|export)\s/m)
+})
+
+test("an arrival applies the left style, names the stack, and cleans up when the motion ends", async () => {
+  const { listeners, root, store, attributes } = reveal({ style: "unfold-right" })
+  const { viewTransition, finish, state } = transition()
+  listeners.pagereveal({ viewTransition })
+  assert.equal(root.dataset.pageTransition, "unfold-right")
+  assert.equal(root.dataset.pageTransitionDirection, "left")
+  assert.equal(root.dataset.pageTransitionVisit, "")
+  assert.equal(attributes["data-vt-held"], "")
+  assert.equal(store.size, 0)
+  assert.equal(state.skipped, false)
+  finish()
+  await viewTransition.finished
+  await new Promise((done) => setTimeout(done, 0))
+  assert.equal(root.dataset.pageTransition, undefined)
+  assert.equal(root.dataset.pageTransitionVisit, undefined)
+})
+
+test("a motion's end leaves a Turbo visit's own style alone", async () => {
+  const { listeners, root } = reveal({ style: "fade-left" })
+  const { viewTransition, finish } = transition()
+  listeners.pagereveal({ viewTransition })
+  root.dataset.pageTransition = "unfold-right"
+  finish()
+  await viewTransition.finished
+  await new Promise((done) => setTimeout(done, 0))
+  assert.equal(root.dataset.pageTransition, "unfold-right")
+})
+
+test("an arrival nobody planned is skipped, so the browser's own fade never plays", () => {
+  const { listeners, root } = reveal()
+  const { viewTransition, state } = transition()
+  listeners.pagereveal({ viewTransition })
+  assert.equal(state.skipped, true)
+  assert.equal(root.dataset.pageTransition, undefined)
+})
+
+test("a page back from the cache sheds what it wore when it left, with or without a motion", () => {
+  const { listeners, root, store } = reveal({ style: "fade-left" })
+  root.dataset.pageTransition = "fade-left"
+  root.dataset.pageTransitionVisit = ""
+  listeners.pagereveal({ viewTransition: null })
+  assert.equal(root.dataset.pageTransition, undefined)
+  assert.equal(root.dataset.pageTransitionVisit, undefined)
+  assert.equal(store.size, 0, "a stale style must not reach a later load")
+})
+
+test("a page with no stack still plays", () => {
+  const { listeners, root } = reveal({ style: "fade-left", stack: null })
+  listeners.pagereveal({ viewTransition: transition().viewTransition })
+  assert.equal(root.dataset.pageTransition, "fade-left")
+})
+
+test("storage that throws reads as a plain load, and nothing escapes", () => {
+  const storage = { getItem() { throw new Error("denied") }, removeItem() { throw new Error("denied") } }
+  const { listeners, appended, root } = reveal({ storage })
+  const { viewTransition, state } = transition()
+  listeners.pagereveal({ viewTransition })
+  assert.equal(state.skipped, true)
+  assert.equal(appended.length, 0)
+  assert.equal(root.dataset.pageTransition, undefined)
+})
+
+test("the first render waits for the whole page only on a planned arrival, up to the cap", () => {
+  assert.equal(reveal().appended.length, 0)
+  assert.equal(reveal().timers.length, 0)
+  const { appended: [link], timers: [timer] } = reveal({ style: "fade-left" })
+  assert.equal(link.rel, "expect")
+  assert.equal(link.blocking, "render")
+  assert.match(link.href, /^#/)
+  assert.equal(timer.ms, 3000)
+  assert.equal(link.removed, undefined)
+  timer.fn()
+  assert.equal(link.removed, true)
 })

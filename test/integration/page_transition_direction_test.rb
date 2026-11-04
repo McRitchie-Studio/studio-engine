@@ -7,6 +7,7 @@ require_relative "../dummy/config/environment"
 
 require "minitest/autorun"
 require "active_support/test_case"
+require "nokogiri"
 
 # [integration] Studio.page_transition_direction against the REAL lib/studio.rb (the
 # test_helper mirror does not validate), and the lab route the browser lane drives.
@@ -41,6 +42,47 @@ class PageTransitionDirectionTest < ActionDispatch::IntegrationTest
     assert_includes response.body, '<meta name="view-transition" content="same-origin">'
     assert_includes response.body, 'import "studio/page_transitions"'
     assert_equal 1, response.body.scan("vt-pinned-header").size
+  end
+
+  test "the full-load sheet and script render only with a direction" do
+    get "/lab/page_transitions"
+    refute_includes response.body, "page_transition_full_load"
+    refute_includes response.body, "page_transition_reveal"
+
+    get "/lab/page_transitions?direction=right"
+    assert_includes response.body, "/e2e/css/studio/page_transition_full_load.css"
+    assert_includes response.body, "/e2e/js/studio/page_transition_reveal.js"
+  end
+
+  test "the classic script is not a module, so a host with no direction gets no new import map entry" do
+    refute_includes Studio::Engine.javascript_module_logical_paths, "studio/page_transition_reveal.js"
+    get "/lab/page_transitions"
+    refute_includes response.body[/<script type="importmap".*?<\/script>/m], "page_transition_reveal"
+  end
+
+  test "a strict page's script carries the nonce its header names, and the header adds no unsafe-inline" do
+    get "/lab/page_transitions?direction=left&strict=1"
+    policy = response.headers["Content-Security-Policy"]
+    script_src = policy[/script-src [^;]+/]
+    refute_includes script_src, "unsafe-inline"
+
+    script = Nokogiri::HTML(response.body).at_css('head script[src*="page_transition_reveal"]')
+    assert script, "no reveal script in the head"
+    assert_includes script_src, "'nonce-#{script['nonce']}'"
+    Nokogiri::HTML(response.body).css("head script").reject { |tag| tag["src"] }.each do |inline|
+      assert_includes script_src, "'nonce-#{inline['nonce']}'", "an inline head script has no nonce:\n#{inline.text[0, 100]}"
+    end
+  end
+
+  test "the at-rule that takes no selector is in the named sheet alone, behind reduced motion" do
+    root = File.expand_path("../..", __dir__)
+    sheet = File.read(File.join(root, "app/assets/stylesheets/studio/page_transition_full_load.css"))
+    assert_match(/@media \(prefers-reduced-motion: no-preference\) \{\s*@view-transition \{\s*navigation: auto;/, sheet)
+    refute_includes File.read(File.join(root, "app/assets/tailwind/studio_engine/engine.css")), "@view-transition"
+    assert_includes Rails.application.config.assets.precompile, "studio/page_transition_full_load.css" if Rails.application.config.respond_to?(:assets)
+    engine = File.read(File.join(root, "lib/studio/engine.rb"))
+    assert_includes engine, "studio/page_transition_full_load.css"
+    assert_includes engine, "studio/page_transition_reveal.js"
   end
 
   test "the engine chat's morph markers render only with a direction" do

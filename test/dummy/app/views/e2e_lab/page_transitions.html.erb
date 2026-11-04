@@ -3,7 +3,9 @@
     knobs: direction; img=ok|hung|failed, an eager image on page b; twice=1, a second
     banner stack; morph=both|a, the chat head on both pages or on page a alone; overlay=1,
     the page-load overlay with a short delay; modal=1, the modal host; sidebar=1, the
-    link sidebar. The spec answers the image URLs itself. %>
+    link sidebar; strict=1, the enforced policy of a host's signing page; control=reload, the
+    turbo-visit-control meta such a page carries; slow=ms, page b answers late; split=ms, page b's
+    body arrives in two chunks. The spec answers the image URLs itself. %>
 <div x-data>
 <%= render "studio/banners/stack", devnet: true %>
 <% if params[:twice].present? %>
@@ -15,6 +17,8 @@
   <a href="<%= @lab_other_url %>" data-test="other">The other page</a>
   <a href="<%= request.fullpath %>" data-test="same">This page again</a>
   <a href="/lab/page_transitions_redirect?<%= request.query_string %>" data-test="redirect">A page that redirects</a>
+  <a href="<%= @lab_other_url %>" data-test="other-full" data-turbo="false">The other page, by a full load</a>
+  <a href="<%= request.fullpath %>" data-test="same-full" data-turbo="false">This page again, by a full load</a>
   <% if params[:morph] == "both" || (params[:morph] == "a" && @lab_page == "a") %>
     <%= render "studio/agent_chat/header", name: "Ada" %>
   <% end %>

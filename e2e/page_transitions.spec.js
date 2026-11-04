@@ -30,7 +30,9 @@ async function record(page, randomValue = 0) {
         const key = `${pseudo} ${animation.animationName || ""}`;
         if (!window.__seen.includes(key)) window.__seen.push(key);
       }
-      if (document.documentElement.hasAttribute("data-page-transition")) {
+      // Only a real motion: "still" stands from turbo:visit, before any transition exists.
+      const style = document.documentElement.dataset.pageTransition;
+      if (style && style !== "still") {
         const read = (pseudo) => getComputedStyle(document.documentElement, pseudo).transform;
         window.__frames.push({
           root: read("::view-transition-old(root)"),
@@ -389,6 +391,15 @@ test("after a refused form, the next link still moves the page", async ({ page }
   await open(page, "direction=left", 0);
   await refuseForm(page);
   await go(page);
+  expectPlayed(await seen(page), "pt-out-left", "pt-in-from-right");
+});
+
+test("after a refused form, a replace visit to another path still moves the page", async ({ page }) => {
+  await open(page, "direction=left", 0);
+  await refuseForm(page);
+  const load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
+  await page.evaluate(() => window.Turbo.visit(document.querySelector('[data-test="other"]').href, { action: "replace" }));
+  await load;
   expectPlayed(await seen(page), "pt-out-left", "pt-in-from-right");
 });
 

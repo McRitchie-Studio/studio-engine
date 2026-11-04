@@ -89,8 +89,9 @@ module Studio
       # loaded as an ES module (Alpine by the head's type="module" tag,
       # canvas-confetti and SortableJS through their importmap pins, Leaflet by
       # studio/footer_map's import()), and studio/session.js, the one classic
-      # script (layouts/studio/_head says why). The engine's own modules are
-      # under app/javascript, enumerated below.
+      # script (layouts/studio/_head says why), with studio/page_transition_reveal.js,
+      # the other classic one. The engine's own modules are under app/javascript,
+      # enumerated below.
       app.config.assets.precompile += %w[
         studio/sticky_table_header.css
         studio/alpine.js
@@ -99,6 +100,8 @@ module Studio
         studio/leaflet.js
         studio/leaflet.css
         studio/session.js
+        studio/page_transition_full_load.css
+        studio/page_transition_reveal.js
         studio/montserrat-latin.woff2
         studio/montserrat-latin-ext.woff2
       ]
