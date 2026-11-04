@@ -1471,7 +1471,12 @@ total_specs: 514
 #
 # 486 -> 514: e2e/page_transitions_full_load.spec.js and one more, named above.
 #   npx playwright test --list                                             -> 514 tests, 72 files
-executed: 514
+#
+# 514 -> 527: e2e/link_sidebar_title.spec.js. The word the browser writes by its own
+# clock and zone, a drawn divider, and a long name beside the close button: none is in
+# the response bytes. Its controls are listed at the top of that file.
+#   npx playwright test --list                                             -> 527 tests, 73 files
+executed: 527
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
