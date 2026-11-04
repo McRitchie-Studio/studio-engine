@@ -1148,11 +1148,12 @@
 # each view-transition pseudo ran, chrome that holds still in pixels, a paused render, and
 # reduced motion exist only in a browser. Each verified RED by a mutation of its own.
 #   npx playwright test --list                                             -> 480
-# 480 -> 483: e2e/page_transitions.spec.js (3), transition-same-address-and-redirects. The
-# same path with a shared name, a refresh of it, and a redirecting GET. The morph and the
-# redirect specs verified RED with the fix removed.
-#   npx playwright test --list                                             -> 483
-total_specs: 483
+# 480 -> 485: e2e/page_transitions.spec.js (5), transition-same-address-and-redirects. The
+# same path with a shared name, a refresh of it, a redirecting GET, and a next visit after a
+# refused form, both ways. The morph, redirect and refused-form specs verified RED with the
+# fix removed or the render flag unscoped; the refresh spec by Carl's mutation.
+#   npx playwright test --list                                             -> 485
+total_specs: 485
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1450,9 +1451,9 @@ total_specs: 483
 # 457 -> 480: e2e/page_transitions.spec.js, named above.
 #   npx playwright test --list                                             -> 480 tests, 71 files
 #
-# 480 -> 483: e2e/page_transitions.spec.js, named above.
-#   npx playwright test --list                                             -> 483 tests, 71 files
-executed: 483
+# 480 -> 485: e2e/page_transitions.spec.js, named above.
+#   npx playwright test --list                                             -> 485 tests, 71 files
+executed: 485
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

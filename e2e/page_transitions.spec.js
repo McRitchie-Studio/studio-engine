@@ -370,6 +370,36 @@ test("a visit that redirects moves the page once", async ({ page }) => {
   expectPlayed(await seen(page), "pt-out-left", "pt-in-from-right");
 });
 
+// A refused form: Turbo renders the 422 with no visit, and fires no turbo:load.
+async function refuseForm(page) {
+  const html = await page.evaluate(() => fetch(window.location.href).then((response) => response.text()));
+  await page.route("**/lab/refused", (route) => route.fulfill({ status: 422, contentType: "text/html", body: html }));
+  const rendered = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:render", done, { once: true })));
+  await page.evaluate(() => {
+    const form = document.createElement("form");
+    form.method = "post";
+    form.action = "/lab/refused";
+    document.body.appendChild(form);
+    form.requestSubmit();
+  });
+  await rendered;
+}
+
+test("after a refused form, the next link still moves the page", async ({ page }) => {
+  await open(page, "direction=left", 0);
+  await refuseForm(page);
+  await go(page);
+  expectPlayed(await seen(page), "pt-out-left", "pt-in-from-right");
+});
+
+test("after a refused form, an advance to the same path still morphs", async ({ page }) => {
+  await open(page, "direction=left&morph=both", 0);
+  await refuseForm(page);
+  await visitHere(page, {});
+  const names = await seen(page);
+  expect(names.some((name) => name.startsWith("::view-transition-group(agent-portrait)"))).toBe(true);
+});
+
 test("Back between two chat heads still morphs, from Turbo's cache", async ({ page }) => {
   await open(page, "direction=left&morph=both", 0);
   await go(page);

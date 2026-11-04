@@ -128,10 +128,12 @@ export function installPageTransitions(doc) {
   doc.addEventListener("turbo:visit", (event) => {
     root.dataset.pageTransitionVisit = ""
     target = new URL(event.detail.url).pathname
-    // A GET that redirects: Turbo renders the response, then visits the final address with
-    // that same response, all before turbo:load. The page has landed, so nothing moves.
-    if (rendered) from = target
-    advance = !rendered && event.detail.action === "advance"
+    // A GET that redirects: Turbo renders the response, then replaces to the final address
+    // with that same response, all before turbo:load. The page has landed, so nothing moves.
+    const action = event.detail.action
+    if (rendered && action === "replace") from = target
+    rendered = false
+    advance = action === "advance"
     predict(known.get(target))
   })
 
@@ -171,7 +173,9 @@ export function installPageTransitions(doc) {
     if (style && style !== STILL) holdRender(event, () => readyForSwap(doc, newBody))
   }, { capture: true })
 
-  doc.addEventListener("turbo:render", () => { rendered = true })
+  // A refused form renders with no visit and fires no turbo:load, so only a render inside a
+  // visit counts. Otherwise the flag would outlive that render and eat the next page's move.
+  doc.addEventListener("turbo:render", () => { rendered = !!target })
 
   // Turbo fires this after the transition has finished.
   doc.addEventListener("turbo:load", () => {

@@ -44,7 +44,7 @@ route. Back and Forward play the same direction, and Turbo restores the scroll p
 | The visit | What plays |
 |---|---|
 | A change of path, Back or Forward included | The direction |
-| The same path: a refresh, a poll, a change of query only | Nothing |
+| The same path: a refresh, a poll, a change of query only, with no morph name shared | Nothing |
 | The same path, an advance visit, with a morph name on both sides | The engine's fade and the morph |
 | A GET that redirects | The direction once, for the first render. The follow-up visit draws nothing |
 | Two pages that share a morph name | The engine's fade and the morph |
