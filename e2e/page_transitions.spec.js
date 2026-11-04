@@ -124,8 +124,8 @@ test("bottom plays its fade, then its unfold, moving down", async ({ page }) => 
   expectPlayed(await seen(page), "pt-out-bottom", "pt-unfold-top");
 });
 
-test("the page moves while the banner stack and the navbar hold still", async ({ page }) => {
-  await open(page, "direction=left", 0);
+// Stops the motion partway and compares pixels: chrome that moved with the page differs.
+async function expectChromeHoldsStill(page) {
   const stack = page.locator("[data-vt-held]");
   await expect(stack).toBeVisible();
   const stackBox = await stack.boundingBox();
@@ -134,14 +134,12 @@ test("the page moves while the banner stack and the navbar hold still", async ({
     stack: await page.screenshot({ clip: stackBox }),
     header: await page.screenshot({ clip: headerBox }),
   };
-  expect(await stack.evaluate((el) => getComputedStyle(el).viewTransitionName)).toBe("studio-bar-stack");
 
-  // Stop the motion partway, and compare pixels: a chrome that moved with the page differs.
   await page.evaluate(() => document.querySelector('[data-test="other"]').click());
   await page.waitForFunction(() => document.getAnimations().some((a) => (a.animationName || "").startsWith("pt-")));
   await page.evaluate(() => transitionAnimations().forEach((a) => { a.pause(); a.currentTime = 280; }));
-  const page_moved = await page.evaluate(() => getComputedStyle(document.documentElement, "::view-transition-old(root)").transform);
-  expect(page_moved, "the page never moved, so this measured nothing").not.toBe("none");
+  const pageMoved = await page.evaluate(() => getComputedStyle(document.documentElement, "::view-transition-old(root)").transform);
+  expect(pageMoved, "the page never moved, so this measured nothing").not.toBe("none");
   const during = {
     stack: await page.screenshot({ clip: stackBox }),
     header: await page.screenshot({ clip: headerBox }),
@@ -150,9 +148,46 @@ test("the page moves while the banner stack and the navbar hold still", async ({
   await page.waitForFunction(() => !document.documentElement.hasAttribute("data-page-transition"));
   expect(await changedShare(page, before.stack, during.stack), "the banner stack moved").toBeLessThan(0.01);
   expect(await changedShare(page, before.header, during.header), "the navbar moved").toBeLessThan(0.01);
+}
+
+test("the page moves while the banner stack and the navbar hold still", async ({ page }) => {
+  await open(page, "direction=left", 0);
+  await expectChromeHoldsStill(page);
   const names = await seen(page);
   expect(names.filter((name) => /(old|new)\(studio-bar-stack\)/.test(name))).toEqual([]);
   expect(names.filter((name) => /(old|new)\(studio-header\)/.test(name))).toEqual([]);
+});
+
+test("the stack has its name for the visit alone, so its tooltip stays over the navbar", async ({ page }) => {
+  await open(page, "direction=left", 0);
+  const stack = page.locator("[data-vt-held]");
+  const name = () => stack.evaluate((el) => getComputedStyle(el).viewTransitionName);
+  expect(await name()).toBe("none");
+
+  const button = page.locator("[data-studio-banner-button]:has([data-studio-banner-tooltip])").first();
+  await button.hover();
+  const onTop = await button.evaluate((el) => {
+    const tip = el.querySelector("[data-studio-banner-tooltip]");
+    tip.style.pointerEvents = "auto";
+    const box = tip.getBoundingClientRect();
+    const header = document.querySelector(".vt-pinned-header").getBoundingClientRect();
+    const y = box.top + box.height / 2;
+    return {
+      overlapsHeader: y > header.top && y < header.bottom,
+      top: tip.contains(document.elementFromPoint(box.left + box.width / 2, y)),
+    };
+  });
+  expect(onTop.overlapsHeader, "the tooltip does not reach the navbar, so this measured nothing").toBe(true);
+  expect(onTop.top, "the tooltip painted under the navbar").toBe(true);
+  await page.mouse.move(0, 400);
+
+  await page.evaluate(() => { window.__names = []; document.addEventListener("turbo:before-render", () => {
+    window.__names.push(getComputedStyle(document.querySelector("[data-vt-held]")).viewTransitionName);
+  }, { once: true }); });
+  await go(page);
+  expect(await page.evaluate(() => window.__names)).toEqual(["studio-bar-stack"]);
+  expect(await name()).toBe("none");
+  expect(await page.evaluate(() => document.documentElement.dataset.pageTransitionVisit)).toBeUndefined();
 });
 
 test("a second banner stack gets no second name, so the transition still plays", async ({ page }) => {
@@ -170,7 +205,7 @@ test("a same-page visit plays nothing", async ({ page }) => {
   expect(names.filter((name) => /\((root)\) /.test(name) && !name.includes("group"))).toEqual([]);
 });
 
-test("the setting off keeps the engine's fade, with no script, no marks and no name", async ({ page }) => {
+test("the setting off plays no style, with no script, no marks and no name", async ({ page }) => {
   const requests = [];
   page.on("request", (request) => requests.push(request.url()));
   const moduleRequests = () => requests.filter((url) => url.includes("studio/page_transitions"));
@@ -180,6 +215,12 @@ test("the setting off keeps the engine's fade, with no script, no marks and no n
   expect(await page.evaluate(() => document.documentElement.dataset.pageTransitionDirection)).toBeUndefined();
   await expect(page.locator("[data-vt-held]")).toHaveCount(0);
   await expect(page.locator("header.vt-pinned-header, .vt-pinned-header")).toHaveCount(0);
+  expect(moduleRequests()).toEqual([]);
+
+  await page.locator('[data-test="other"]').first().click();
+  await expect(page.locator('[data-test="page-b"]')).toBeVisible();
+  expect((await seen(page)).filter((name) => name.includes(" pt-"))).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.hasAttribute("data-page-transition"))).toBe(false);
   expect(moduleRequests()).toEqual([]);
 
   // The control: the same page with the setting on does fetch it.
@@ -334,11 +375,7 @@ test("a sidebar open across the swap comes back closed, and the move still plays
 test("at phone width the chrome holds still while the page moves", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await open(page, "direction=top", 0);
-  await go(page);
-  const frames = await page.evaluate(() => window.__frames);
-  expect(new Set(frames.map((frame) => frame.root)).size).toBeGreaterThan(3);
-  expect(await page.locator("[data-vt-held]").evaluate((el) => getComputedStyle(el).viewTransitionName)).toBe("studio-bar-stack");
-  expect(await page.locator(".vt-pinned-header").count()).toBe(1);
+  await expectChromeHoldsStill(page);
   expectPlayed(await seen(page), "pt-out-top", "pt-in-from-bottom");
 });
 

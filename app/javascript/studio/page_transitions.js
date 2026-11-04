@@ -74,7 +74,9 @@ function loadImage(doc, img) {
 
 function readyForSwap(doc, body) {
   const fonts = doc.fonts ? doc.fonts.ready.catch(() => {}) : null
-  return Promise.all([...eagerImages(body).map((img) => loadImage(doc, img)), fonts])
+  // At least one tick, so Turf's one-tick hold for its snapshot stays honest.
+  const tick = new Promise((done) => setTimeout(done, 0))
+  return Promise.all([...eagerImages(body).map((img) => loadImage(doc, img)), fonts, tick])
 }
 
 // Turbo's resume is a promise's resolve, so the FIRST caller starts the render. Another
@@ -119,6 +121,7 @@ export function installPageTransitions(doc) {
   known.set(from, morphNames(doc))
 
   doc.addEventListener("turbo:visit", (event) => {
+    root.dataset.pageTransitionVisit = ""
     target = new URL(event.detail.url).pathname
     predict(known.get(target))
   })
@@ -164,8 +167,14 @@ export function installPageTransitions(doc) {
     target = null
     known.set(from, morphNames(doc))
     delete root.dataset.pageTransition
+    delete root.dataset.pageTransitionVisit
     nameTheMorph(false)
   })
+
+  // A visit that never renders: the stack must not keep its name at rest.
+  for (const name of ["turbo:fetch-request-error", "turbo:reload"]) {
+    doc.addEventListener(name, () => { delete root.dataset.pageTransitionVisit })
+  }
   return true
 }
 

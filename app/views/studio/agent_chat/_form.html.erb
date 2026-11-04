@@ -3,7 +3,7 @@
 <%= form_with url: studio_agent_chat_messages_path, method: :post, local: true,
               html: { style: "view-transition-name: agent-composer;" },
               class: "sticky bottom-3 z-10 rounded-3xl border border-subtle bg-surface shadow-lg focus-within:border-primary transition-colors p-2 flex flex-col gap-2",
-              data: { agent_chat_form: true, turbo: false, test: "agent-chat-form", vt_morph: "agent-composer" } do |f| %>
+              data: { agent_chat_form: true, turbo: false, test: "agent-chat-form", vt_morph: ("agent-composer" if @studio_page_transition_direction || Studio.page_transition_direction) } do |f| %>
   <%= hidden_field_tag :soul, soul, id: nil %>
   <p class="px-3 pt-1 text-xs text-danger-ink" role="alert" data-agent-chat-error hidden data-test="agent-chat-error"></p>
   <p class="sr-only" role="status" aria-live="polite" data-agent-chat-status data-test="agent-chat-status"></p>

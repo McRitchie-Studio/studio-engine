@@ -43,6 +43,18 @@ class PageTransitionDirectionTest < ActionDispatch::IntegrationTest
     assert_equal 1, response.body.scan("vt-pinned-header").size
   end
 
+  test "the engine chat's morph markers render only with a direction" do
+    get "/agent_chat_lab"
+    assert_response :success
+    assert_includes response.body, "view-transition-name: agent-portrait"
+    refute_includes response.body, "data-vt-morph"
+
+    Studio.page_transition_direction = :left
+    get "/agent_chat_lab"
+    assert_includes response.body, 'data-vt-morph="agent-portrait"'
+    assert_includes response.body, 'data-vt-morph="agent-composer"'
+  end
+
   test "the module is pinned for a host, and not preloaded on every page" do
     refute_includes Studio::Engine.javascript_boot_graph, "studio/page_transitions"
     assert_includes Studio::Engine.javascript_module_logical_paths, "studio/page_transitions.js"

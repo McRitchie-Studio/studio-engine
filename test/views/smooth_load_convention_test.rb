@@ -131,7 +131,7 @@ class SmoothLoadConventionTest < ActiveSupport::TestCase
     named = Dir[File.join(ENGINE_ROOT, "app/views/**/*.erb")].flat_map do |path|
       source = File.read(path)
       source.scan(/view-transition-name: ([\w-]+);/).flatten.map do |name|
-        assert_match(/data-vt-morph="#{name}"|vt_morph: "#{name}"/, source, "#{path}: #{name}")
+        assert_match(/data-vt-morph="#{name}"|vt_morph: \(?"#{name}"/, source, "#{path}: #{name}")
         name
       end
     end
@@ -156,7 +156,7 @@ class SmoothLoadConventionTest < ActiveSupport::TestCase
     end
     assert_match(/animation-duration: 700ms;\s*\n\s*animation-timing-function: ease;/, css)
     assert_equal 4, css.scan("perspective(1200px)").size
-    assert_match(/^html\[data-page-transition-direction\] \[data-vt-held\] \{/, css, "the stack's name is behind the setting")
+    assert_match(/^html\[data-page-transition-direction\]\[data-page-transition-visit\] \[data-vt-held\] \{/, css, "the stack's name lasts for the visit, behind the setting")
     refute_match(/^\.studio-bar-stack \{[^}]*view-transition-name/, css)
     refute_includes css, '[style*="view-transition-name'
   end

@@ -47,7 +47,8 @@ route. Back and Forward play the same direction, and Turbo restores the scroll p
 | The same path: a refresh, a poll, a change of query only | Nothing |
 | Two pages that share a morph name | The engine's fade and the morph |
 | Reduced motion, or a browser without view transitions | The plain swap, with no pause |
-| A page whose layout has no metas | The plain swap, with no pause |
+| Arriving at a page whose layout has no metas | The plain swap, with no pause |
+| Leaving a page whose layout has no metas | The plain swap. An image on the new page can pause it, up to the cap |
 
 **A black backdrop gives the shading:** a page at opacity 0.3 darkens as it moves. In a
 light theme the page goes grey as it moves, and an unfold shows black wedges at its edges.
@@ -58,7 +59,9 @@ That is a stronger contrast than in a dark theme, and it is the ruled look.
 The navbar (`vt-pinned-header`, the group it has always been) and the banner stack
 (`.studio-bar-stack`) hold still while the page moves. The stack's name goes on the first
 stack in the page, through a `data-vt-held` mark, so a page that renders two stacks has
-one name. A duplicate name silently cancels the whole transition.
+one name. A duplicate name silently cancels the whole transition. The name lasts for the
+visit: from `turbo:visit` to `turbo:load`. At rest the stack has no name, because a name
+makes it a stacking context, and its tooltip then paints under the navbar.
 
 ## Images and fonts
 
@@ -76,9 +79,10 @@ never by reading style text:
 <div style="view-transition-name: agent-portrait;" data-vt-morph="agent-portrait">
 ```
 
-The value is the name. The engine's `agent_chat` portrait and composer carry it. **A host
-that sets a direction must mark its own inline names**, or those elements float still over
-the moving page. Without a direction the marker does nothing, so a host can mark ahead.
+The value is the name. The engine's `agent_chat` portrait and composer carry it, only with
+a direction set, so an app without one renders the bytes it always did. **A host that sets
+a direction must mark its own inline names**, or those elements float still over the moving
+page. Without a direction the marker does nothing, so a host can mark ahead.
 The studio-header name and any class-named element that should stay still need no marker.
 
 The browser takes the old page's picture before `turbo:before-render` fires, so the
@@ -100,6 +104,18 @@ fade with the element fading across, and no morph.
   exactly once per page. The engine navbar does this itself.
 - **A host's own `::view-transition-*(root)` rule** loses to these on specificity, so it
   can stay. It still applies to the engine's fade on a shared-name visit.
+
+## What each host changes on adoption
+
+Each sets `config.page_transition_direction`. Beyond that:
+
+| Host | Also |
+|---|---|
+| McRitchie Studio (hub) | Mark `agent_chats/_header` (2), `_shell`, `_form`, `build/_launch` (2) and `build/_first_form` with `data-vt-morph` |
+| Turf Monster | No inline names to mark. Run `e2e/cart_survives_turbo_restore.spec.js` with motion on: the pause widens the window for a Back press inside a render |
+| moms-app | Its forked navbar has no pin. Add `vt-pinned-header`, once per page |
+| Commercial Welding | Its wrapper has `data-studio-bar-stack` and no `.studio-bar-stack`, so its utility bar moves with the page. Add the class to the wrapper. Its forked navbar is pinned already |
+| alex-build, Voicebox, Rantly, Cyvasse, Industries | Nothing further. Check that pages answer fast, because of `no-preview` |
 
 ## Proposed assignment
 
