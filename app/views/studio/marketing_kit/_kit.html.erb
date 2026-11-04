@@ -70,7 +70,7 @@
   <% if kit[:typefaces].any? %>
     <section aria-labelledby="mkit-type" data-test="kit-type">
       <h2 id="mkit-type" class="mkit-heading">Typefaces</h2>
-      <div class="mkit-card mkit-faces">
+      <div class="mkit-card">
         <% kit[:typefaces].each do |face| %>
           <div class="mkit-face">
             <% style = [ ("font-family: #{face[:family]}, sans-serif" if face[:family]), ("font-weight: #{face[:weight]}" if face[:weight]) ].compact.join("; ") %>
