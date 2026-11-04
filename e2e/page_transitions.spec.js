@@ -18,6 +18,9 @@ async function record(page, randomValue = 0) {
       Math.random = () => window.__random;
       setTimeout(() => { Math.random = real; }, 0);
     }, { capture: true });
+    // Only the transition's own: a page's infinite animation refuses finish().
+    window.transitionAnimations = () => document.getAnimations()
+      .filter((a) => a.effect && (a.effect.pseudoElement || "").startsWith("::view-transition"));
     window.__seen = [];
     window.__frames = [];
     const tick = () => {
@@ -136,14 +139,14 @@ test("the page moves while the banner stack and the navbar hold still", async ({
   // Stop the motion partway, and compare pixels: a chrome that moved with the page differs.
   await page.evaluate(() => document.querySelector('[data-test="other"]').click());
   await page.waitForFunction(() => document.getAnimations().some((a) => (a.animationName || "").startsWith("pt-")));
-  await page.evaluate(() => document.getAnimations().forEach((a) => { a.pause(); a.currentTime = 280; }));
+  await page.evaluate(() => transitionAnimations().forEach((a) => { a.pause(); a.currentTime = 280; }));
   const page_moved = await page.evaluate(() => getComputedStyle(document.documentElement, "::view-transition-old(root)").transform);
   expect(page_moved, "the page never moved, so this measured nothing").not.toBe("none");
   const during = {
     stack: await page.screenshot({ clip: stackBox }),
     header: await page.screenshot({ clip: headerBox }),
   };
-  await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+  await page.evaluate(() => transitionAnimations().forEach((a) => a.finish()));
   await page.waitForFunction(() => !document.documentElement.hasAttribute("data-page-transition"));
   expect(await changedShare(page, before.stack, during.stack), "the banner stack moved").toBeLessThan(0.01);
   expect(await changedShare(page, before.header, during.header), "the navbar moved").toBeLessThan(0.01);
