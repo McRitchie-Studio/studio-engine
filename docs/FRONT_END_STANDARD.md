@@ -251,7 +251,7 @@ components:
 | Modal host, scoped host | `studio/modal_host` | `modal-host`, its own module tag | `$store.modals`, each scoped `$store.<name>`, `window.ModalAnimations`, `window.StudioModals` |
 | Toast queue (`layouts/studio/_flash`) | `studio/toast` | `toast`, its own module tag | none needed: the API is the `toast` window event; the queue is `$store.toasts` |
 | Link sidebar flag | `studio/link_sidebar` | `link-sidebar`, its own module tag | `$store.sidebars.linkTreeOpen` |
-| Turbo snapshot of a running x-transition | `studio/transition_snapshot` | the boot, its own module tag | none: it finishes running transitions on `turbo:before-cache` and strips a whole phase's named classes on `turbo:before-render` |
+| Turbo snapshot of a running x-transition | `studio/transition_snapshot` | the boot, its own module tag | none: it finishes running transitions on `turbo:before-cache` and strips a whole phase's named classes on `turbo:before-render`. Every host loads it, with or without a page transition direction: 5.9 KB, 2.4 KB gzipped |
 | Hold button | `studio/hold_button`, `studio/hold_button_hooks` | `hold-button`, registered by `studio/stimulus` | `window.studioFizzPortal` |
 | Board primitive (`studio/board/_board`) | `studio/board` | `board` (lazy), which loads SortableJS | `x-data="studioBoard({...})"`, `window.Sortable.create` until SortableJS loads |
 | Leveling activity modals | `studio/leveling_activity` | the Alpine scope alone | `x-data="levelingActionModal({...})"` |

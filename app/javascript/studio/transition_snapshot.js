@@ -42,8 +42,8 @@
 // THE STRIP'S RULE. It removes only classes named in the element's own x-transition
 // attributes, and only when the element holds a whole phase: all of a direction's
 // `during` classes plus all of its `-start` or all of its `-end`. A panel at rest
-// never holds that. The cost: a class the element ALSO keeps at rest, named in that
-// phase, goes with it on a restore that needed the strip. No view in the engine, the
+// never holds that. The cost: the strip runs on every Turbo render, not only a restore,
+// so an element that keeps a whole phase at rest loses those classes. No view in the engine, the
 // hub or turf-monster names one (scanned 2026-11-04).
 //
 // Nothing here sets `display`: studio/link_sidebar's contract stands, and x-show
