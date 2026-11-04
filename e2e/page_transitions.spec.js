@@ -60,9 +60,11 @@ async function open(page, query, randomValue) {
   await page.waitForFunction(() => window.Turbo);
 }
 
-// The share of pixels that differ, at quarter size, with where they are for a failure. Text
-// antialiases differently in a snapshot on the CI's Linux (2 to 5% of full-size pixels), and
-// bytes cannot compare a gradient's snapshot either. Averaging keeps chrome that moved (100%).
+// The share of pixels that differ, at quarter size, with where they start for a failure.
+// Chrome that moved reads 100% here. The ceiling is 10%, not 0: on the CI's Linux the phone
+// stack's label reads 3% changed, starting at its left edge (x16), with the page paused; it
+// did not reproduce on a Mac, and a slow font did not cause it. Text paints differently in a
+// snapshot there, by all that was measured. Bytes cannot compare a gradient's snapshot either.
 function changedShare(page, a, b) {
   return page.evaluate(async ([one, two]) => {
     const read = async (encoded) => {
@@ -160,8 +162,8 @@ async function expectChromeHoldsStill(page) {
   await page.waitForFunction(() => !document.documentElement.hasAttribute("data-page-transition"));
   const stackChange = await changedShare(page, before.stack, during.stack);
   const headerChange = await changedShare(page, before.header, during.header);
-  expect(stackChange.share, `the banner stack moved, from ${stackChange.first}`).toBeLessThan(0.01);
-  expect(headerChange.share, `the navbar moved, from ${headerChange.first}`).toBeLessThan(0.01);
+  expect(stackChange.share, `the banner stack moved, from ${stackChange.first}`).toBeLessThan(0.1);
+  expect(headerChange.share, `the navbar moved, from ${headerChange.first}`).toBeLessThan(0.1);
 }
 
 test("the page moves while the banner stack and the navbar hold still", async ({ page }) => {
