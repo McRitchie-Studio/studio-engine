@@ -283,7 +283,9 @@ test.describe("on a touch screen", () => {
     const rest = await layoutOf(phonePanel(page));
     expect(await opacityOf(descOf(row)), "hidden at rest").toBe(0);
 
-    await row.tap();
+    // Playwright's row.tap() refuses an aria-disabled element; a finger does not.
+    const box = await row.boundingBox();
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
 
     await expect.poll(() => opacityOf(descOf(row))).toBe(1);
     await expect(descOf(row)).toHaveText(/^(ENABLE_GEO_BLOCKING=true|config\.draw_geo_routes = true)$/);
