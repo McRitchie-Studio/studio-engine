@@ -1148,11 +1148,11 @@
 # each view-transition pseudo ran, chrome that holds still in pixels, a paused render, and
 # reduced motion exist only in a browser. Each verified RED by a mutation of its own.
 #   npx playwright test --list                                             -> 480
-# 480 -> 481: e2e/link_sidebar.spec.js, a one-line sidebar row's icon and label share a
-# center (sidebar-rows-center-icon-and-label). Pixels exist only in a browser. RED with
-# items-start back on the row.
-#   npx playwright test --list                                             -> 481
-total_specs: 481
+# 480 -> 485: e2e/page_transitions.spec.js (5), transition-same-address-and-redirects. The
+# same path with a shared name, a refresh of it, a redirecting GET, and a next visit after a
+# refused form, both ways. The morph, redirect and refused-form specs verified RED with the
+# fix removed or the render flag unscoped; the refresh spec by Carl's mutation.
+#   npx playwright test --list                                             -> 485
 # 485 -> 486: e2e/link_sidebar.spec.js, a one-line sidebar row's icon and label share a
 # center (sidebar-rows-center-icon-and-label). Pixels exist only in a browser. RED with
 # items-start back on the row.
@@ -1455,9 +1455,8 @@ total_specs: 486
 # 457 -> 480: e2e/page_transitions.spec.js, named above.
 #   npx playwright test --list                                             -> 480 tests, 71 files
 #
-# 480 -> 481: e2e/link_sidebar.spec.js, named above.
-#   npx playwright test --list                                             -> 481 tests, 71 files
-executed: 481
+# 480 -> 485: e2e/page_transitions.spec.js, named above.
+#   npx playwright test --list                                             -> 485 tests, 71 files
 #
 # 485 -> 486: e2e/link_sidebar.spec.js, named above.
 #   npx playwright test --list                                             -> 486 tests, 71 files
