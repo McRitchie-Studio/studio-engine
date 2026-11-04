@@ -24,8 +24,8 @@
 // THE GREETING. A signed-out panel's title is a greeting by the browser's local
 // time. components/_link_sidebar renders a default; this writes the right word
 // over it on load, after a Turbo visit or snapshot restore (turbo:load), on a bfcache
-// restore, as the trigger opens the panel, and once a minute for a panel left open
-// past a boundary.
+// restore, and as the trigger opens the panel. A panel left open across a boundary
+// keeps its word until it next opens.
 //
 // THE DOCUMENT HANDLERS run in the capture phase, so the trigger works for a
 // click that lands before Alpine has bound it. They are installed once, on
@@ -44,7 +44,6 @@ export const LINK_SIDEBAR_TRIGGERS = "[data-link-sidebar-trigger], [data-usernam
 const CONTROLS_PANEL = '[aria-controls~="studio-link-sidebar"]'
 const CLOSE_BUTTON = "[data-link-sidebar-close]"
 const GREETING = "[data-link-sidebar-greeting]"
-const GREETING_REPAINT_MS = 60000
 
 // The three words, by the hour of `now` in the browser's own time zone.
 export function greetingFor(now) {
@@ -184,8 +183,6 @@ export function installLinkSidebar({ win, doc, now = () => new Date() } = {}) {
     if (handleLinkSidebarClick(event, host.Alpine) === "toggle") paint()
   }, true)
   root.addEventListener("keydown", (event) => handleLinkSidebarKeydown(event, host.Alpine), true)
-
-  if (typeof host.setInterval === "function") host.setInterval(() => paint(), GREETING_REPAINT_MS)
 
   // Alpine already started (a host that loads it ahead of the module tags).
   if (host.Alpine && host.Alpine.version) register()

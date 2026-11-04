@@ -357,11 +357,10 @@ const greetingPage = (hour) => {
   const node = { textContent: "unpainted" }
   const doc = fakeDocument()
   doc.querySelectorAll = () => [node]
-  const timers = []
-  const win = fakeWindow({ Alpine: fakeAlpine(), setInterval: (fn, ms) => timers.push({ fn, ms }) })
+  const win = fakeWindow({ Alpine: fakeAlpine() })
   const clock = { hour }
   installLinkSidebar({ win, doc, now: () => at(clock.hour) })
-  return { node, doc, win, timers, clock }
+  return { node, doc, win, clock }
 }
 
 test("install paints at once, and again on alpine:init and turbo:load", () => {
@@ -402,16 +401,6 @@ test("the trigger paints as it opens the panel; another click does not", () => {
   doc.fire("click", clickOn(el([], el(["main"]))))
   assert.equal(node.textContent, "Good morning")
   doc.fire("click", clickOn(el([TRIGGER, CONTROLS])))
-  assert.equal(node.textContent, "Good afternoon")
-})
-
-test("a panel left open past a boundary repaints within a minute", () => {
-  const { node, timers, clock } = greetingPage(11)
-  assert.equal(timers.length, 1)
-  assert.equal(timers[0].ms, 60000)
-
-  clock.hour = 12
-  timers[0].fn()
   assert.equal(node.textContent, "Good afternoon")
 })
 

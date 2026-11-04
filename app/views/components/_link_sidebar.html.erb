@@ -34,7 +34,7 @@
     absolutely in the row's padding as the label lifts by a transform. engine.css, THE
     SIDEBAR ROW'S DESCRIPTION, holds the rules. A row with no desc: gains no attribute. %>
 <% sidebar_group = lambda do |title:, admin:, first:, &block|
-     name = [title.presence, ("admin" if admin)].compact.join(", ").presence
+     name = [title.presence, ("admin" if admin && !title.to_s.match?(/\badmin\b/i))].compact.join(", ").presence
      tag.div(role: "group", aria: { label: name }, class: ["py-1", ("border-t border-subtle" unless first)], &block)
    end %>
 <% close_action = "$store.sidebars.linkTreeOpen = false" %>
@@ -70,7 +70,7 @@
                   hover: link[:hover_emoji],
                   class_name: "text-lg leading-none" %>
           <% else %>
-            <span class="text-lg leading-none flex-shrink-0"><%= link[:emoji] %></span>
+            <span class="studio-emoji-box text-lg leading-none flex-shrink-0"><%= link[:emoji] %></span>
           <% end %>
           <% if link[:desc].present? %>
             <span class="relative min-w-0 flex-1">

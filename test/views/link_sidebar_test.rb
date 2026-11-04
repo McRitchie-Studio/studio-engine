@@ -71,6 +71,17 @@ class LinkSidebarTest < Minitest::Test
     assert_equal ["Site", "Ops, admin", "Geo, admin"], names
   end
 
+  # Cyvasse, Industries and Commercial Welding name their admin section "Admin".
+  def test_a_group_named_admin_does_not_say_it_twice
+    sections = ["Admin", "Admin tools", "Administrators"].map do |title|
+      { title: title, admin: true, links: [{ label: title, href: "/#{title.parameterize}", emoji: "*" }] }
+    end
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: sections, admin: true))
+
+    assert_equal ["Admin", "Admin tools", "Administrators, admin"],
+                 doc.css('#studio-link-sidebar nav > [role="group"]').first(3).map { |group| group["aria-label"] }
+  end
+
   def test_a_divider_separates_the_groups_and_none_tops_the_first
     doc = Nokogiri::HTML5.fragment(render_sidebar(sections: SECTIONS, admin: true))
 
@@ -131,15 +142,26 @@ class LinkSidebarTest < Minitest::Test
     assert_equal "Country and subdivision blocking", row.at_css("[data-sidebar-row-desc]").text
   end
 
-  # The row that cannot link keeps its second line: it is the fix the operator has to
-  # copy, and a title is mouse-only and cannot be selected.
-  def test_the_disabled_geo_row_keeps_the_fix_on_show
+  # The row that cannot link is one line too. Its description holds only the string to
+  # copy, and tabindex lets a tap and a key reach it.
+  def test_the_disabled_geo_row_is_one_line_with_the_fix_as_its_description
     doc = Nokogiri::HTML5.fragment(render_sidebar(sections: SECTIONS, admin: true, geo_flag: false, geo_routes: false))
     row = doc.at_css('#studio-link-sidebar [data-test="geo-signpost-disabled"]')
 
-    assert_includes row.text, "Draw the geo routes first"
-    assert_includes row.at_css("code").text, "config.draw_geo_routes = true"
-    assert_includes row["class"].split, "items-start"
+    assert_includes row["class"].split, "items-center"
+    refute_nil row["data-sidebar-row-described"]
+    assert_equal "0", row["tabindex"]
+    assert_equal "config.draw_geo_routes = true", row.at_css("[data-sidebar-row-desc]").text
+    assert_includes row["title"], "config/initializers/studio.rb", "the long form stays in the title"
+  end
+
+  def test_a_plain_emoji_sits_in_the_swaps_box
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: SECTIONS, admin: true, geo_flag: true, geo_routes: true))
+
+    assert_includes doc.at_css(%(#studio-link-sidebar a[href="/error_logs"]))&.at_css("span")&.[]("class").to_s.split, "studio-emoji-box"
+    assert_includes doc.at_css(%(#studio-link-sidebar a[href="/admin/geo"]))&.at_css("span")&.[]("class").to_s.split, "studio-emoji-box"
+    css = Studio::UiPrimitives::EMOJI_SWAP_CSS
+    assert_match(/\.studio-emoji-box,\s*\.studio-emoji-swap,\s*\.nav-emoji-swap \{/, css, "one rule, one box")
   end
 
   # --- the panel's title and its name ----------------------------------------
@@ -285,7 +307,7 @@ class LinkSidebarTest < Minitest::Test
     html = render_sidebar(sections: SECTIONS, admin: true, geo_flag: false, geo_routes: false)
 
     assert_includes html, "geo-signpost-disabled"
-    assert_includes html, "Draw the geo routes first"
+    assert_includes html, "config.draw_geo_routes = true"
     refute_includes html, "/admin/geo", "a row you are told is off must not be linked"
   end
 
