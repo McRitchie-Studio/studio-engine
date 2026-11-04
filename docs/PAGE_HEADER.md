@@ -45,6 +45,14 @@ a sticky row can travel only as far as its parent.
 Put the space above the row on the container, as `pt-6` is above. The row carries no
 top margin, because a stuck row is measured from its place in the flow.
 
+Two limits, for now:
+
+- **The row's parent is a block.** In a flex or grid parent with a sibling above the
+  row, the sentinel stays at the start of the parent, so the row reads as stuck at rest
+  and shows the bar.
+- **The title is short.** It does not wrap. Past about 18 characters on a phone it
+  squeezes the tabs out, and a much longer title overflows the page.
+
 ## How it behaves
 
 - **At rest** the row has no background and no border. It reads as a normal page
@@ -66,8 +74,8 @@ Anything that sits under the stack positions off `--pin-stack-bottom` or, in a
 script, `window.studioPinnedStack.read()`. It needs no edit when a page adopts the
 row. The sticky table header's clone is one such reader. It needs
 `config.sticky_table_headers` on in the host, or the `sticky_table_headers` local on
-the head partial; a table's own `position: sticky` header cells also read
-`--pin-stack-bottom`.
+the head partial. The engine draws no `position: sticky` header cells of its own: a
+page that draws them gets no clone, and points their `top` at `--pin-stack-bottom`.
 
 At rest the row's bottom edge is part of the stack, so `--pin-stack-bottom` is lower
 at the top of the page than once the row has stuck. A sticky reader under the row
