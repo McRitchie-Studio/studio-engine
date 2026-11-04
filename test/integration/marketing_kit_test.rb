@@ -206,6 +206,13 @@ class MarketingKitIntegrationTest < ActionDispatch::IntegrationTest
     assert_match(/\.mkit-download \{ color: var\(--mkit-link\)/, styles)
   end
 
+  test "an empty confirmation stays in the accessibility tree, so its first text is announced" do
+    get "/marketing-kit"
+
+    assert_no_match(/\.mkit-status:empty \{[^}]*display: none/, css_select("style").map(&:text).join)
+    assert_match(/\.mkit-status:empty \{ padding: 0; background: none; \}/, css_select("style").map(&:text).join)
+  end
+
   test "a kit callable that raises shows here, and in production costs only its own facts" do
     Studio.marketing_kit = ->(_view) { raise "the kit's own bug" }
 

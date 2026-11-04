@@ -34,7 +34,8 @@
   /* The confirmation sits on the chip, on a ground of its own, so it reads over any colour. */
   .mkit-status { position: absolute; top: .5rem; right: .5rem; padding: .125rem .5rem; border-radius: 9999px;
     background: #111827; color: #fff; font-size: .75rem; font-weight: 600; pointer-events: none; }
-  .mkit-status:empty { display: none; }
+  /* Empty, it shows nothing but stays in the tree: a live region that was display: none can miss its announcement. */
+  .mkit-status:empty { padding: 0; background: none; }
 
   .mkit-face { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .75rem; padding: 1rem; }
   .mkit-face + .mkit-face { border-top: 1px solid var(--mkit-line); }
