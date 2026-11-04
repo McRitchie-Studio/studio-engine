@@ -1,0 +1,6 @@
+<%# /marketing-kit (Studio::MarketingKitController). The kit is a partial so a host
+    can render it in a page of its own. %>
+<% kit = studio_marketing_kit %>
+<% content_for(:title, [ Studio::MarketingKit::LABEL, kit[:name] ].compact.join(" · ")) %>
+<% content_for(:full_width, true) %>
+<%= render "studio/marketing_kit/kit", kit: kit %>

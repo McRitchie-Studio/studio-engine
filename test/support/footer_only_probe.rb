@@ -31,6 +31,8 @@ require "bundler/setup"
 #   PROBE_RESULT  file to write the JSON result to
 #   PROBE_FOOTER  "default" leaves Studio.site_footer UNSET (the default footer)
 #                 and draws a `privacy` route; anything else declares the facts
+#   PROBE_KIT     "1" draws the marketing kit (Studio.marketing_kit_routes, the one
+#                 engine route such an app can call) and asks for its page
 #   RAILS_ENV     the environment to boot
 
 require "json"
@@ -103,6 +105,7 @@ end
 Rails.application.routes.draw do
   root "pages#show"
   get "privacy", to: "pages#show", as: :privacy if DEFAULT_FOOTER
+  Studio.marketing_kit_routes(self) if ENV["PROBE_KIT"] == "1"
 end
 
 result = {
@@ -115,7 +118,8 @@ result = {
 
 case ACTION
 when "render"
-  status, _headers, body = Rails.application.call(Rack::MockRequest.env_for("http://localhost/"))
+  page = ENV["PROBE_KIT"] == "1" ? "http://localhost/marketing-kit" : "http://localhost/"
+  status, _headers, body = Rails.application.call(Rack::MockRequest.env_for(page))
   html = +""
   body.each { |chunk| html << chunk }
   body.close if body.respond_to?(:close)

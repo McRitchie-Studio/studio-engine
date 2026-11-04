@@ -31,8 +31,8 @@ module Studio
     DEFAULT_BOOKING_LABEL = "Schedule a call"
     DEFAULT_ZOOM = 15
 
-    # The engine's own booking page keeps the footer for a signed-in viewer.
-    OWN_CONTROLLERS = %w[studio/bookings].freeze
+    # The engine's own public pages keep the footer for a signed-in viewer.
+    OWN_CONTROLLERS = %w[studio/bookings studio/marketing_kit].freeze
 
     # The only schemes a footer href may carry. Anything else, notably
     # `javascript:` and `data:`, is never written into an href: the label is
@@ -124,7 +124,7 @@ module Studio
     # THE DEFAULT FOOTER'S FACTS: what an app that sets nothing gets. Only what
     # is known to be true of the host: a legal line linking the routes in
     # DEFAULT_LEGAL that the host really has. The name and the logo come from
-    # `resolve`'s own fallbacks. No address, no email, no tagline, no social row
+    # `resolve`'s own fallbacks, and so does the Marketing Kit link. No address, no email, no tagline, no social row
     # and no link columns: the engine cannot know them, and a guessed link is a
     # dead one.
     #
@@ -171,13 +171,16 @@ module Studio
     #   address:      Studio.site_footer_address: the address of facts that
     #                 carry none of their own
     #   chat:         the Chat entry's [label, path] (`chat_row`), or nil
-    def resolve(declared, view, name: nil, logo: nil, booking_path: nil, address: nil, chat: nil)
+    #   marketing_kit: the kit page's path (Studio::MarketingKit.page_path), or nil
+    def resolve(declared, view, name: nil, logo: nil, booking_path: nil, address: nil, chat: nil, marketing_kit: nil)
       raw = declared.respond_to?(:call) ? declared.call(view) : declared
       return nil if raw.nil? || raw == false
 
       facts = symbolize(raw)
       site_name = text(facts[:name]) || text(name)
       booking = symbolize(facts[:booking] || {})
+      columns = with_chat(Array(facts[:columns]).filter_map { |row| column(row, booking_path) }, chat)
+      legal = Array(facts[:legal]).filter_map { |row| link(row, booking_path) }
 
       {
         name: site_name,
@@ -190,8 +193,9 @@ module Studio
         email: text(facts[:email]),
         address: address_for(facts, address),
         social: Array(facts[:social]).filter_map { |row| social(row) },
-        columns: with_chat(Array(facts[:columns]).filter_map { |row| column(row, booking_path) }, chat),
-        legal: Array(facts[:legal]).filter_map { |row| link(row, booking_path) },
+        columns: columns,
+        legal: legal,
+        marketing_kit: marketing_kit_link(facts, marketing_kit, columns, legal),
         booking_label: text(booking[:label]) || DEFAULT_BOOKING_LABEL,
         booking_title: text(booking[:title])
       }
@@ -415,6 +419,18 @@ module Studio
       columns.each_with_index.map do |column, index|
         index == at ? column.merge(links: column[:links] + [row]) : column
       end
+    end
+
+    # THE MARKETING KIT LINK, in the brand block: every app with the page gets it
+    # without declaring it. An app that links the page itself keeps its own row
+    # and gets no second one, and `marketing_kit: false` in the facts shows none.
+    def marketing_kit_link(facts, path, columns, legal)
+      return nil if path.nil? || (facts.key?(:marketing_kit) && !facts[:marketing_kit])
+
+      declared = columns.flat_map { |column| column[:links] } + legal
+      return nil if declared.any? { |row| Studio::Booking.same_path?(row[:href], path) }
+
+      link([ Studio::MarketingKit::LABEL, path ])
     end
 
     # A column's width hint, or nil for the default share. Anything that is not a

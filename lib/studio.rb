@@ -34,6 +34,7 @@ require "studio/hold_button"
 require "studio/partial_block"
 require "studio/sidebar_sections"
 require "studio/site_footer"
+require "studio/marketing_kit"
 require "studio/booking"
 require "studio/navbar_links"
 require "studio/navbar_signed_out_cta"
@@ -1805,7 +1806,8 @@ module Studio
                                        booking_path: booking_path_for(view), address: site_footer_address,
                                        chat: SiteFooter.chat_row(view, path: site_footer_chat_path,
                                                                        label: site_footer_chat_label,
-                                                                       allowed: site_footer_chat_allowed.nil? ? agent_chat_allowed : site_footer_chat_allowed))
+                                                                       allowed: site_footer_chat_allowed.nil? ? agent_chat_allowed : site_footer_chat_allowed),
+                                       marketing_kit: MarketingKit.page_path(view, host_route_set))
   end
 
   # The host's route set, for the default footer's legal links. nil outside a
@@ -1814,6 +1816,65 @@ module Studio
     return nil unless defined?(::Rails) && ::Rails.respond_to?(:application) && ::Rails.application
 
     ::Rails.application.routes
+  end
+
+  # The marketing kit: the public page at /marketing-kit (lib/studio/marketing_kit.rb,
+  # docs/SITE_FOOTER.md). A Hash, or a callable receiving the view. Unset, the logos
+  # and colours derive from the app's own brand artwork and the colours it paints,
+  # so a new app has a working page with no setup.
+  mattr_reader :marketing_kit, default: nil
+
+  def self.marketing_kit=(declared)
+    MarketingKit.validate!(declared)
+    @@marketing_kit = declared
+  end
+
+  # Whether Studio.routes draws /marketing-kit (Studio::MarketingKitController).
+  #
+  # ON BY DEFAULT: every app should have a kit. The helper is
+  # studio_marketing_kit_path, not marketing_kit_path, because the hub already
+  # owns that name, and a second claim on it raises `Invalid route name, already
+  # in use` and takes down the host's route set (see draw_admin_emails_routes).
+  # The PATH can be shared: a host's own /marketing-kit wins, whichever side of
+  # Studio.routes it is drawn on (Studio.marketing_kit_routes).
+  mattr_accessor :draw_marketing_kit_routes, default: true
+
+  # The kit for a view. `declared` lets a page render a kit other than the app's.
+  def self.marketing_kit_for(view, declared: marketing_kit)
+    colors = marketing_kit_colors
+    MarketingKit.resolve(declared, view, logos: theme_logos, theme: colors,
+                                         artwork: [["Navbar logo", navbar_wordmark], ["Footer logo", marketing_kit_lockup(view)]],
+                                         name: site_identity[:title], dark_ground: colors[:dark])
+  end
+
+  # What the app paints: an /admin/theme edit included, as studio_theme_css_tag
+  # reads it. An app with no database, or no table yet, paints its config.
+  def self.marketing_kit_colors
+    return theme_config unless active_record? && defined?(::ThemeSetting)
+
+    ::ThemeSetting.current.resolved_colors
+  rescue StandardError
+    theme_config
+  end
+
+  # The footer's lockup, already resolved for this request where the view is one.
+  def self.marketing_kit_lockup(view)
+    view.studio_site_footer_facts&.dig(:lockup) if view.respond_to?(:studio_site_footer_facts)
+  end
+
+  # Draws the page into `router`, unless the host's own /marketing-kit got there
+  # first: then this draws nothing, and the host's page is the only route. A host
+  # route drawn later is handled at request time, by the route's constraint.
+  #
+  # Studio.routes calls this. An app with no database cannot call Studio.routes
+  # (docs/SITE_FOOTER.md, "An app with no database") and calls this alone.
+  def self.marketing_kit_routes(router)
+    router.instance_exec do
+      next if MarketingKit.host_route?(@set)
+
+      get MarketingKit::PATH.delete_prefix("/"), to: "#{MarketingKit::CONTROLLER}#show", as: MarketingKit::ROUTE_NAME,
+          format: false, constraints: MarketingKit::YieldToHostRoute.new(@set)
+    end
   end
 
   # Navbar links resolved for a view context (lib/studio/navbar_links.rb).
@@ -2111,6 +2172,10 @@ module Studio
       if Studio.draw_booking_routes
         get "schedule", to: "studio/bookings#show", as: :studio_booking
       end
+
+      # The marketing kit (/marketing-kit): public, ON by default. A host's own
+      # page of the same path wins. See Studio.marketing_kit_routes.
+      Studio.marketing_kit_routes(self) if Studio.draw_marketing_kit_routes
 
       # The living style guide (StyleController#index).
       get   "admin/style",            to: "style#index",               as: :admin_style

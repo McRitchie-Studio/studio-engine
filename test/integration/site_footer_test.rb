@@ -582,7 +582,8 @@ class SiteFooterTest < ActionDispatch::IntegrationTest
       assert_select ".ftr-wordmark", text: /Default\s*Co/
       assert_select ".ftr-copyright", "© #{Time.current.year} Default Co"
       assert_select "nav.ftr-col", 0, "no link columns: the engine guesses no links"
-      assert_select "a", 1, "the only link is the brand's own, to the home page"
+      assert_select "a", 2, "the only links are the brand's own, to the home page, and the app's own marketing kit"
+      assert_select ".ftr-brand .ftr-kit a[href='/marketing-kit']", 1
       assert_select ".ftr-tagline", 0
       assert_select ".ftr-email", 0
       assert_select ".ftr-socials", 0

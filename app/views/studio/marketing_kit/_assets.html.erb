@@ -1,0 +1,44 @@
+<%# The kit's scoped styles, read from the theme's tokens with a fallback beside
+    each, like the footer's. Inline, so nothing joins the app's asset manifest or
+    its Tailwind build. %>
+<style>
+  .mkit { --mkit-ink: var(--color-text, #111827); --mkit-soft: var(--color-text-secondary, #4b5563);
+    --mkit-line: var(--color-border, rgb(127 127 127 / .3)); --mkit-card: var(--color-surface, transparent);
+    --mkit-primary: var(--color-primary, currentColor);
+    --mkit-link: var(--color-primary-ink, var(--mkit-primary));
+    max-width: 64rem; margin-inline: auto; padding: 4rem 1rem; display: grid; gap: 3rem; }
+  .mkit-hero { max-width: 48rem; margin-inline: auto; text-align: center; }
+  .mkit-tagline { margin: 0 0 .5rem; color: var(--mkit-link); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+  .mkit-title { margin: 0; color: var(--mkit-ink); font-size: 2.25rem; line-height: 1.1; font-weight: 800; letter-spacing: -.025em; }
+  .mkit-lede { margin: 1rem 0 0; color: var(--mkit-soft); font-size: 1.125rem; line-height: 1.625; }
+  .mkit-heading { margin: 0 0 1rem; color: var(--mkit-ink); font-size: 1.25rem; font-weight: 700; }
+  .mkit-card { overflow: hidden; border: 1px solid var(--mkit-line); border-radius: .75rem; background: var(--mkit-card); }
+  .mkit-card-body { display: block; padding: 1rem; }
+  .mkit-name { display: block; margin: 0; color: var(--mkit-ink); font-weight: 600; }
+
+  .mkit-logos { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); }
+  .mkit-tiles { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .mkit-tile { display: flex; align-items: center; justify-content: center; height: 8rem; padding: 1rem; }
+  .mkit-tile-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .mkit-downloads { display: flex; flex-wrap: wrap; gap: .25rem 1rem; margin-top: .5rem; font-size: .875rem; }
+  .mkit-download { color: var(--mkit-link); text-decoration: underline; text-underline-offset: 2px; }
+  .mkit-download:hover { text-decoration-thickness: 2px; }
+
+  .mkit-palette { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); }
+  .mkit-swatch { position: relative; }
+  .mkit-swatch-button { display: block; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: copy; }
+  .mkit-swatch-button:focus-visible { outline: 2px solid var(--mkit-primary); outline-offset: -2px; }
+  .mkit-swatch:hover { border-color: var(--mkit-primary); }
+  .mkit-chip { display: block; height: 5rem; border-bottom: 1px solid var(--mkit-line); }
+  .mkit-hex { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .875rem; color: var(--mkit-soft); user-select: text; }
+  /* The confirmation sits on the chip, on a ground of its own, so it reads over any colour. */
+  .mkit-status { position: absolute; top: .5rem; right: .5rem; padding: .125rem .5rem; border-radius: 9999px;
+    background: #111827; color: #fff; font-size: .75rem; font-weight: 600; pointer-events: none; }
+  /* Empty, it shows nothing but stays in the tree: a live region that was display: none can miss its announcement. */
+  .mkit-status:empty { padding: 0; background: none; }
+
+  .mkit-face { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .75rem; padding: 1rem; }
+  .mkit-face + .mkit-face { border-top: 1px solid var(--mkit-line); }
+  .mkit-specimen { margin: 0; color: var(--mkit-ink); font-size: 1.25rem; }
+  .mkit-face-label { margin: 0; color: var(--mkit-soft); font-size: .875rem; }
+</style>

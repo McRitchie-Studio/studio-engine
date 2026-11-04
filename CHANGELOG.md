@@ -6,6 +6,21 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **The marketing kit: every app has a public `/marketing-kit`, and its footer links
+  it, with no setup.** `Studio.routes` draws the page (`Studio.draw_marketing_kit_routes`,
+  default true; helper `studio_marketing_kit_path`) with no sign-in, and a host's own
+  route of that path wins from either side of `Studio.routes`. `Studio.marketing_kit`
+  (a Hash or a callable taking the view) declares `logos`, `palette`, `typefaces` and
+  `tagline`; unset, the logos derive from `Studio.navbar_wordmark`, the footer's lockup
+  and `Studio.theme_logos`, and the colours from what the app paints. Logos read "Download Light" and "Download Dark", the PNG when
+  there is one, else the SVG; a missing file shows no link and no broken image. One
+  click on a colour copies its hex and confirms (new: the lazy `copy-text` controller).
+  An app with no database can draw the page alone with `Studio.marketing_kit_routes(self)`.
+- **The footer's Marketing Kit link**, in the brand block (`.ftr-kit`), on every app
+  with the page, signed in or out. An app that links the page in a column or on the
+  legal line gets no second link, and `marketing_kit: false` in the facts shows none.
+  Its columns and legal line are unchanged. [`docs/SITE_FOOTER.md`](docs/SITE_FOOTER.md),
+  *The marketing kit*.
 - **`studio/_page_header`, and the triple stack as a standard.** A page title,
   optional meta beside it and optional tabs on the right. At rest it has no
   background and no border; once stuck under the navbar it takes the bar. It joins

@@ -11,8 +11,8 @@ module Studio
   #   <%= studio_footer_map %>              the map alone, e.g. on a contact page
   #
   # THE FOOTER IS ON BY DEFAULT: with Studio.site_footer unset, the layout line
-  # renders the default footer (the site name, the logo, and the legal links the
-  # host has routes for), and `config.site_footer = false` turns it off. The
+  # renders the default footer (the site name, the logo, the legal links the host
+  # has routes for, and the Marketing Kit link where the page is drawn), and `config.site_footer = false` turns it off. The
   # booking helpers render NOTHING without Studio.booking_url, and the map
   # nothing without an address, so a layout or a shared view can call any of
   # them before an app has declared anything.
@@ -68,6 +68,19 @@ module Studio
 
       render "studio/site_footer/map", address: address, classes: options[:class], style: options[:style],
                                        zoom: options[:zoom], controls: options.fetch(:controls, true)
+    end
+
+    # The kit /marketing-kit prints (Studio.marketing_kit_for). A callable that
+    # raises costs the app's own facts, not the page: in production the error is
+    # logged once and the page shows what derives from the theme. In development
+    # and test it raises.
+    def studio_marketing_kit
+      Studio.marketing_kit_for(self)
+    rescue StandardError => error
+      raise if studio_site_footer_raise?
+
+      studio_site_footer_report(error)
+      Studio.marketing_kit_for(self, declared: nil)
     end
 
     # ---- booking ------------------------------------------------------------
