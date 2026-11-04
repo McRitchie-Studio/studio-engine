@@ -4,12 +4,13 @@
     banner stack; morph=both|a, the chat head on both pages or on page a alone; overlay=1,
     the page-load overlay with a short delay; modal=1, the modal host; sidebar=1, the
     link sidebar. The spec answers the image URLs itself. %>
+<div x-data>
 <%= render "studio/banners/stack", devnet: true %>
 <% if params[:twice].present? %>
   <%= render "studio/banners/stack", devnet: true %>
 <% end %>
 <%= render "layouts/navbar" %>
-<main class="p-8 grid gap-4" x-data data-test="page-<%= @lab_page %>">
+<main class="p-8 grid gap-4" data-test="page-<%= @lab_page %>">
   <h2 class="text-2xl font-bold">Page <%= @lab_page %></h2>
   <a href="<%= @lab_other_url %>" data-test="other">The other page</a>
   <a href="<%= request.fullpath %>" data-test="same">This page again</a>
@@ -31,3 +32,4 @@
   <% end %>
   <div style="height: 3000px"></div>
 </main>
+</div>

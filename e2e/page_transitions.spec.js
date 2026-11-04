@@ -10,7 +10,14 @@ const PIXEL_PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+
 
 async function record(page, randomValue = 0) {
   await page.addInitScript((value) => {
-    Math.random = () => value;
+    // Only for the pick: Turbo draws its history ids from Math.random too, and a constant
+    // gives every history entry one id, which loses the scroll position on Back.
+    window.__random = value;
+    window.addEventListener("turbo:before-render", () => {
+      const real = Math.random;
+      Math.random = () => window.__random;
+      setTimeout(() => { Math.random = real; }, 0);
+    }, { capture: true });
     window.__seen = [];
     window.__frames = [];
     const tick = () => {
@@ -63,7 +70,7 @@ test("left plays its fade, then its unfold, moving left", async ({ page }) => {
   await open(page, "direction=left", 0);
   await go(page);
   expectPlayed(await seen(page), "pt-out-left", "pt-in-from-right");
-  await page.evaluate(() => { Math.random = () => 0.99; window.__seen.length = 0; });
+  await page.evaluate(() => { window.__random = 0.99; window.__seen.length = 0; });
   await go(page);
   expectPlayed(await seen(page), "pt-out-left", "pt-unfold-right");
   expect(errors).toEqual([]);
@@ -73,7 +80,7 @@ test("right plays its fade, then its unfold, moving right", async ({ page }) => 
   await open(page, "direction=right", 0);
   await go(page);
   expectPlayed(await seen(page), "pt-out-right", "pt-in-from-left");
-  await page.evaluate(() => { Math.random = () => 0.99; window.__seen.length = 0; });
+  await page.evaluate(() => { window.__random = 0.99; window.__seen.length = 0; });
   await go(page);
   expectPlayed(await seen(page), "pt-out-right", "pt-unfold-left");
 });
@@ -82,7 +89,7 @@ test("top plays its fade, then its unfold, moving up", async ({ page }) => {
   await open(page, "direction=top", 0);
   await go(page);
   expectPlayed(await seen(page), "pt-out-top", "pt-in-from-bottom");
-  await page.evaluate(() => { Math.random = () => 0.99; window.__seen.length = 0; });
+  await page.evaluate(() => { window.__random = 0.99; window.__seen.length = 0; });
   await go(page);
   expectPlayed(await seen(page), "pt-out-top", "pt-unfold-bottom");
 });
@@ -91,7 +98,7 @@ test("bottom plays its fade, then its unfold, moving down", async ({ page }) => 
   await open(page, "direction=bottom", 0);
   await go(page);
   expectPlayed(await seen(page), "pt-out-bottom", "pt-in-from-top");
-  await page.evaluate(() => { Math.random = () => 0.99; window.__seen.length = 0; });
+  await page.evaluate(() => { window.__random = 0.99; window.__seen.length = 0; });
   await go(page);
   expectPlayed(await seen(page), "pt-out-bottom", "pt-unfold-top");
 });
@@ -165,17 +172,18 @@ test("a failed image does not hold the visit", async ({ page }) => {
 });
 
 test("the incoming image is decoded before the swap, and another listener's resume cannot cut it short", async ({ page }) => {
+  // What Turf's turbo_snapshot_cache.js does: a hold of one tick, from a listener bound
+  // ahead of the engine's module, as a host's entry point is.
+  await page.addInitScript(() => document.addEventListener("turbo:before-render", (event) => {
+    const { resume } = event.detail;
+    event.preventDefault();
+    setTimeout(resume, 0);
+  }));
   await open(page, "direction=left&img=slow", 0);
   await page.route("**/e2e/img/pt-slow.png", async (route) => {
     await new Promise((done) => setTimeout(done, 300));
     await route.fulfill({ body: Buffer.from(PIXEL_PNG, "base64"), contentType: "image/png" });
   });
-  // What Turf's turbo_snapshot_cache.js does: a hold of one tick.
-  await page.evaluate(() => document.addEventListener("turbo:before-render", (event) => {
-    const { resume } = event.detail;
-    event.preventDefault();
-    setTimeout(resume, 0);
-  }));
   const complete = await page.evaluate(() => new Promise((done) => {
     document.addEventListener("turbo:render", () => {
       const img = document.querySelector('[data-test="eager-image"]');

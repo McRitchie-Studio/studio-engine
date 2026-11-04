@@ -78,9 +78,9 @@ function readyForSwap(doc, body) {
 }
 
 // Turbo's resume is a promise's resolve, so the FIRST caller starts the render. Another
-// listener's short hold (Turf's turbo_snapshot_cache resumes on a timeout of 0) would end
-// this wait, so listeners that run after this one get a resume that does nothing, and this
-// wait, which is never shorter than theirs in effect, releases the render. It always does.
+// listener's short hold (Turf's turbo_snapshot_cache resumes on a timeout of 0) would cut
+// this wait to nothing, so a listener that runs after this one gets a resume that does
+// nothing, and this wait releases the render. It always does: cap, failure or success.
 export function holdRender(event, wait, cap = READY_CAP_MS) {
   const resume = event.detail && event.detail.resume
   if (typeof resume !== "function") return false
