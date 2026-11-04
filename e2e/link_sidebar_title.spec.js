@@ -16,14 +16,17 @@ const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 //   - greetingFor reads getUTCHours: the Denver and Tokyo specs and the phone spec
 //     read the UTC word, Good afternoon. 15:00Z in Paris is afternoon either way.
 //   - drop the interval: the boundary spec stays on "Good morning" after the minute.
-//   - drop the paint on turbo:load and in the controller's connect: the restore spec
-//     reads the evening's word on the hidden panel after Back. Either one alone
-//     covers it, so each alone turns nothing red; the unit test holds turbo:load.
+//   - drop the paint on turbo:load and in the controller's connect: the Turbo spec
+//     reads the server's Good morning after the visit. Either one alone covers it, so
+//     each alone turns nothing red; the unit test holds turbo:load.
+//   - paint only once in a document: the Turbo spec reads Good evening after Back.
 //   - drop `border-t` from the group: the divider spec reads a border width of 0px.
 //   - drop `truncate` from the title: the long-name specs read no overflow.
-//   - THE ROW'S DESCRIPTION, engine.css. position: static on the description, the
-//     layout-affecting version: the no-shift spec reads a row 16px taller and the next
-//     row 16px lower. transition: none: the fade spec reads no value between 0 and 1.
+//   - THE ROW'S DESCRIPTION, engine.css. In-flow and display: none until hover, the
+//     layout-affecting version: the no-shift spec reads the row taller and the next row
+//     lower. In-flow and always laid out, the reserved line: the rest-height spec
+//     reads the rows at two heights. transition: none: the fade spec reads no value
+//     between 0 and 1.
 //     The :hover rules out of @media (hover: hover): the touch spec reads opacity 1.
 //     The :focus-visible rules dropped: the keyboard spec reads opacity 0. The reduced
 //     motion block dropped: the reduced-motion spec reads a slide.
@@ -43,27 +46,32 @@ const openLab = async (page, query = "sidebar=1") => {
 
 // One instant, three zones, three words: only the browser's own local time can
 // answer differently for the same moment.
-for (const [zone, localHour, word] of [
-  ["America/Denver", 8, "Good morning"],
-  ["Europe/Paris", 16, "Good afternoon"],
-  ["Asia/Tokyo", 0, "Good evening"]
-]) {
-  test.describe(`at ${INSTANT} in ${zone}`, () => {
-    test.use({ timezoneId: zone });
+const saysTheWord = (localHour, word) => async ({ page }) => {
+  const errors = watchPageErrors(page);
+  await page.clock.install({ time: INSTANT });
+  await openLab(page);
+  expect(await page.evaluate(() => new Date().getHours()), "the browser's local hour").toBe(localHour);
 
-    test(`a signed-out panel says ${word}`, async ({ page }) => {
-      const errors = watchPageErrors(page);
-      await page.clock.install({ time: INSTANT });
-      await openLab(page);
-      expect(await page.evaluate(() => new Date().getHours()), "the browser's local hour").toBe(localHour);
+  await trigger(page).click();
+  await expect(panel(page)).toBeVisible();
+  await expect(titleOf(panel(page))).toHaveText(word);
+  expect(errors).toEqual([]);
+};
 
-      await trigger(page).click();
-      await expect(panel(page)).toBeVisible();
-      await expect(titleOf(panel(page))).toHaveText(word);
-      expect(errors).toEqual([]);
-    });
-  });
-}
+test.describe(`at ${INSTANT} in Denver`, () => {
+  test.use({ timezoneId: "America/Denver" });
+  test("a signed-out panel says Good morning", saysTheWord(8, "Good morning"));
+});
+
+test.describe(`at ${INSTANT} in Paris`, () => {
+  test.use({ timezoneId: "Europe/Paris" });
+  test("a signed-out panel says Good afternoon", saysTheWord(16, "Good afternoon"));
+});
+
+test.describe(`at ${INSTANT} in Tokyo`, () => {
+  test.use({ timezoneId: "Asia/Tokyo" });
+  test("a signed-out panel says Good evening", saysTheWord(0, "Good evening"));
+});
 
 test.describe("on a phone", () => {
   test.use({ timezoneId: "Asia/Tokyo", viewport: { width: 390, height: 844 } });
@@ -394,36 +402,37 @@ test.describe("under reduced motion", () => {
   });
 });
 
-for (const [name, viewport, scope] of [
-  ["a 320px phone", { width: 320, height: 640 }, phonePanel],
-  ["desktop, in the 320px panel", { width: 1280, height: 800 }, panel]
-]) {
-  test.describe(`a long name on ${name}`, () => {
-    test.use({ viewport });
+const truncatesBesideClose = (scope, viewportWidth) => async ({ page }) => {
+  await openLab(page, "sidebar=1&long_name=1");
+  await trigger(page).click();
+  const box = scope(page);
+  await expect(box).toBeVisible();
+  await page.waitForTimeout(350); // the 300ms slide, or the boxes read off-canvas
 
-    test("truncates and leaves the close button whole and clear", async ({ page }) => {
-      await openLab(page, "sidebar=1&long_name=1");
-      await trigger(page).click();
-      const box = scope(page);
-      await expect(box).toBeVisible();
-      await page.waitForTimeout(350); // the 300ms slide, or the boxes read off-canvas
+  const title = titleOf(box);
+  const measure = await title.evaluate((node) => ({
+    overflows: node.scrollWidth > node.clientWidth,
+    right: node.getBoundingClientRect().right,
+    text: getComputedStyle(node).textOverflow,
+    lines: Math.round(node.getBoundingClientRect().height / parseFloat(getComputedStyle(node).lineHeight))
+  }));
+  const close = await box.locator("[data-link-sidebar-close]").boundingBox();
 
-      const title = titleOf(box);
-      const measure = await title.evaluate((node) => ({
-        overflows: node.scrollWidth > node.clientWidth,
-        right: node.getBoundingClientRect().right,
-        text: getComputedStyle(node).textOverflow,
-        lines: Math.round(node.getBoundingClientRect().height / parseFloat(getComputedStyle(node).lineHeight))
-      }));
-      const close = await box.locator("[data-link-sidebar-close]").boundingBox();
+  expect(measure.overflows, "the name is long enough to prove anything").toBe(true);
+  expect(measure.text).toBe("ellipsis");
+  expect(measure.lines).toBe(1);
+  expect(measure.right, "the name stops short of the close button").toBeLessThanOrEqual(close.x);
+  expect(close.x + close.width, "the close button stays in the viewport").toBeLessThanOrEqual(viewportWidth);
+  expect(close.width).toBe(32);
+  await expect(title).toHaveAttribute("title", "Bartholomew Fitzgerald-Wellington");
+};
 
-      expect(measure.overflows, "the name is long enough to prove anything").toBe(true);
-      expect(measure.text).toBe("ellipsis");
-      expect(measure.lines).toBe(1);
-      expect(measure.right, "the name stops short of the close button").toBeLessThanOrEqual(close.x);
-      expect(close.x + close.width, "the close button stays in the viewport").toBeLessThanOrEqual(viewport.width);
-      expect(close.width).toBe(32);
-      await expect(title).toHaveAttribute("title", "Bartholomew Fitzgerald-Wellington");
-    });
-  });
-}
+test.describe("a long name on a 320px phone", () => {
+  test.use({ viewport: { width: 320, height: 640 } });
+  test("truncates and leaves the close button whole and clear", truncatesBesideClose(phonePanel, 320));
+});
+
+test.describe("a long name on desktop, in the 320px panel", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+  test("truncates and leaves the close button whole and clear", truncatesBesideClose(panel, 1280));
+});
