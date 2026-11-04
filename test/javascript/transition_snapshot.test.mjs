@@ -154,6 +154,14 @@ test("the module imports nothing", () => {
   assert.doesNotMatch(source, /^\s*import\s/m)
 })
 
+test("a handle with no finish() does not throw, so the strip still runs", () => {
+  const el = element("transition ease-in duration-200 translate-x-full")
+  el._x_transitioning = {}
+  assert.doesNotThrow(() => finishTransitions(rootOf(el)))
+  stripMidSlideClasses(rootOf(el))
+  assert.equal(el.className, "")
+})
+
 // What the first half leans on in the vendored build. An Alpine bump that renames
 // these fails here, not in a browser.
 test("the vendored Alpine keeps the transition handle this module calls", () => {

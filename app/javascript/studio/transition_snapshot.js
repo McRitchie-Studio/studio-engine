@@ -87,11 +87,12 @@ export function stripMidSlideClasses(root) {
 }
 
 // The first half. finish() is what Alpine's own timer calls when a slide ends, and
-// it runs once, so that timer does nothing afterward.
+// it runs once, so that timer does nothing afterward. An Alpine with no such handle
+// or no finish() finishes nothing here, and must not throw: the strip runs next.
 export function finishTransitions(root) {
   if (!root || typeof root.querySelectorAll !== "function") return
   root.querySelectorAll(RUNS_A_TRANSITION).forEach((el) => {
-    if (el._x_transitioning) el._x_transitioning.finish()
+    if (typeof el._x_transitioning?.finish === "function") el._x_transitioning.finish()
   })
 }
 
