@@ -16,6 +16,9 @@
 # trigger and panel stay invisible to everyone else even when the host
 # declares nothing but admin links.
 #
+# A section's title is its group's accessible name; the panel shows no label word. A
+# link's desc is optional and shows only on hover or keyboard focus.
+#
 # THE ENGINE PREPENDS ONE SECTION OF ITS OWN — "You", linking to /profile. The
 # engine ships that page, so it ships the way in rather than asking five apps to
 # declare the same entry and watch them drift. See `standard` below for the two
