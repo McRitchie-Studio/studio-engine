@@ -15,6 +15,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   [`docs/PAGE_HEADER.md`](docs/PAGE_HEADER.md) carries the rule and the locals. New:
   `studio/page_header` and the lazy `page-header` controller.
 
+### Changed
+
+- **A signed-out visitor's link sidebar has no "Links" title.** Signed-in and admin titles
+  are unchanged, and the panel keeps its accessible name.
+
 ### Fixed
 
 - **A table's sticky header no longer sits on top of the page row on `/admin/models`.**

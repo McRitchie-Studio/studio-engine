@@ -66,6 +66,9 @@ class LinkSidebarTest < Minitest::Test
   def test_logged_out_render_omits_the_logout_footer
     html = render_sidebar(sections: [SECTIONS.first], admin: false, logged_in: false)
 
+    refute_includes html, ">Links<", "a signed-out visitor's panel has no title"
+    assert_includes html, 'aria-label="Links menu"', "it keeps its accessible name"
+
     refute_includes html, "Log out"
   end
 
