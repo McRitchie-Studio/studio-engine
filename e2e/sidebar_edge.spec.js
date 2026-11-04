@@ -20,14 +20,18 @@ const openLab = async (page) => {
   await page.waitForFunction(() => window.Alpine);
 };
 
+// Two frames, so the next screenshot reads the band as set.
 const setBand = (page, on) =>
-  page.evaluate((on) => {
+  page.evaluate(async (on) => {
     document.querySelector("style[data-band-off]")?.remove();
-    if (on) return;
-    const style = document.createElement("style");
-    style.dataset.bandOff = "";
-    style.textContent = "[data-sidebar-edge]::before { display: none !important; }";
-    document.head.appendChild(style);
+    if (!on) {
+      const style = document.createElement("style");
+      style.dataset.bandOff = "";
+      style.textContent = "[data-sidebar-edge]::before { display: none !important; }";
+      document.head.appendChild(style);
+    }
+    await new Promise(requestAnimationFrame);
+    await new Promise(requestAnimationFrame);
   }, on);
 
 // The same strip of the page with the band on, then off.
