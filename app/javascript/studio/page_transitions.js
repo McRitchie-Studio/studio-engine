@@ -245,6 +245,8 @@ export function installPageTransitions(doc) {
     markHeld(doc)
     root.dataset.pageTransitionVisit = ""
     nameTheMorph(false)
+    // The loader settles at pagehide, which comes after the picture.
+    if (win.StudioLoader) win.StudioLoader.hide()
   })
 
   // Back from the back/forward cache: a visit that left by a full load is over.

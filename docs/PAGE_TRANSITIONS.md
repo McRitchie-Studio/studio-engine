@@ -75,8 +75,8 @@ same pair of styles, the same keyframes and the same 700ms. The switch is the sa
    it cannot sit in `engine.css`: there it would act on every host. Only a page with a
    direction links the file. Both documents must have it.
 2. `pageswap`, on the old page: `studio/page_transitions` draws the style with `planVisit`, the
-   rule a Turbo visit uses. It writes the style to `sessionStorage` and names the held stack,
-   and the browser then takes the old picture.
+   rule a Turbo visit uses. It writes the style to `sessionStorage`, names the held stack and
+   hides the page-load overlay, and the browser then takes the old picture.
 3. `pagereveal`, on the new page: `studio/page_transition_reveal` reads the style, sets
    `data-page-transition`, and names the stack. The browser then takes the new picture and
    `engine.css` plays the motion. When it ends, the script removes the marks.

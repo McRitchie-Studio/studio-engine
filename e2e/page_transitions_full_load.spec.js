@@ -221,6 +221,34 @@ test("a redirect plays once, and a redirect back to this path plays nothing", as
   expect(lines.filter((line) => line.startsWith("::view-transition"))).toEqual([]);
 });
 
+test("a native form's page-load overlay is not frozen into the old page's picture", async ({ page }) => {
+  await open(page, `${STRICT}&overlay=1&slow=400`, 0);
+  await page.evaluate(() => window.addEventListener("pageswap", () => {
+    window.ptLog(`overlay hidden ${document.querySelector("[data-studio-loader-overlay]").hidden}`);
+  }));
+  await page.evaluate((action) => {
+    const form = document.createElement("form");
+    form.method = "get";
+    form.action = action;
+    form.dataset.turbo = "false";
+    form.setAttribute("data-studio-loader-overlay", "");
+    for (const [name, value] of new URLSearchParams(window.location.search)) {
+      const input = document.createElement("input");
+      Object.assign(input, { type: "hidden", name, value });
+      form.appendChild(input);
+    }
+    document.body.appendChild(form);
+    form.requestSubmit();
+    // The control: the overlay is up while the page waits, so the line below measures something.
+    setTimeout(() => window.ptLog(`overlay waited hidden ${document.querySelector("[data-studio-loader-overlay]").hidden}`), 200);
+  }, "/lab/page_transitions_b");
+  await settled(page, "b");
+  const lines = await logged(page);
+  expect(lines).toContain("overlay waited hidden false");
+  expect(lines).toContain("overlay hidden true");
+  expectOneMotion(lines, "pt-out-left", "pt-in-from-right");
+});
+
 test("a click before the old page's module has run gets the plain load, not the browser's fade", async ({ page }) => {
   await blockOffsiteRequests(page);
   await installRecorder(page, 0);
