@@ -26,6 +26,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   browser's local time, written by `studio/link_sidebar`. The panel's accessible name stays
   "Admin menu" or "Links menu". The navbar baseline is regenerated for it.
 
+### Fixed
+
+- **A panel link followed by Back no longer leaves the panel off-screen for good.** Turbo
+  clones the page one tick after `turbo:before-cache`, so a response inside a
+  `components/_sidebar_panel`'s 200ms leave filed the panel with Alpine's phase classes on it.
+  A hovered link has a prefetched response, so this reached production too: after Back the
+  gear set the flag, and the panel sat one width past the viewport, until a full load. The new
+  `studio/transition_snapshot` finishes every running x-transition before the clone, and
+  strips a whole phase's named classes from a restored page. Hosts pick it up with the gem: it
+  covers their own panels on the shared partial and their other `x-show` transitions. A host
+  that overrides `layouts/studio/_head` gets it from `studio/application`.
+
 ## 0.125.0 — 2026-11-04
 
 ### Added

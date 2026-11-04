@@ -97,6 +97,8 @@ Rails.application.routes.draw do
   get "lab/session_drift", to: "e2e_lab#session_drift"
   get "lab/sidebar_panels", to: "e2e_lab#sidebar_panels"
   get "lab/sidebar_panels_turbo", to: "e2e_lab#sidebar_panels_turbo"
+  get "lab/sidebar_snapshot", to: "e2e_lab#sidebar_snapshot"
+  get "lab/sidebar_snapshot_b", to: "e2e_lab#sidebar_snapshot_b"
   get "lab/bar_stack_turbo", to: "e2e_lab#bar_stack_turbo"
   get "lab/page_transitions", to: "e2e_lab#page_transitions"
   get "lab/page_transitions_b", to: "e2e_lab#page_transitions_b"
