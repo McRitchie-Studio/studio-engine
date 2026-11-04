@@ -59,7 +59,7 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
   test "what stays inline is the pre-paint theme, the two guards, the import map, the boot import and the seven own-door imports" do
     inline = head_scripts("/lab/bar_stack").reject { |script| script["src"] }
 
-    assert_equal 12, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
+    assert_equal 13, inline.size, "the head's inline scripts:\n#{inline.map { |s| s.to_html[0, 120] }.join("\n")}"
     assert_includes inline[0].text, "classList.add('dark')", "the pre-paint theme script comes first"
     assert_includes inline[1].text, "studioHoldButtonGuard", "the hold button's guard comes second"
     assert_includes inline[2].text, "studioScopesGuard", "the x-data factories' guard comes third"
@@ -67,9 +67,9 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     assert_equal "module", inline[4]["type"]
     assert_equal %(import "studio/application"), inline[4].text.strip
     assert_equal %w[studio/stimulus studio/alpine_stores studio/modal_host studio/toast studio/link_sidebar
-                    studio/alpine_scopes studio/studio_confetti],
+                    studio/transition_snapshot studio/alpine_scopes studio/studio_confetti],
                  inline[5..].map { |script| script.text.strip[/\Aimport "([^"]+)"\z/, 1] }
-    assert_equal %w[module] * 7, inline[5..].map { |script| script["type"] }
+    assert_equal %w[module] * 8, inline[5..].map { |script| script["type"] }
   end
 
   # The factories' guard reports a page whose x-data factories failed to load, so
@@ -169,6 +169,17 @@ class HeadScriptNonceTest < ActionDispatch::IntegrationTest
     assert_equal NONCE, scripts[sidebar]["nonce"]
     assert_equal "module", scripts[sidebar]["type"]
     assert_operator sidebar, :<, alpine, "the flag's listener must be registered before Alpine starts"
+  end
+
+  # The snapshot cleanup's own door: a failed boot must not bring back a panel that
+  # Turbo filed mid-slide and that only a full load clears.
+  test "the snapshot cleanup loads by its own nonced module tag" do
+    scripts = head_scripts("/lab/bar_stack")
+    cleanup = scripts.find { |script| script.text.strip == %(import "studio/transition_snapshot") }
+
+    refute_nil cleanup, "the head does not import studio/transition_snapshot by its own tag"
+    assert_equal NONCE, cleanup["nonce"]
+    assert_equal "module", cleanup["type"]
   end
 
   # The toast queue's own door: layouts/studio/_flash binds $store.toasts, so a

@@ -80,7 +80,7 @@ class EngineImportmapPinsTest < ActiveSupport::TestCase
                     studio/lazy_controllers studio/leveling_activity studio/link_sidebar studio/loader studio/modal_countdown
                     studio/modal_host studio/nav_collapse studio/newsletter_modal studio/pinned_stack
                     studio/profile_form studio/stimulus
-                    studio/theme_editor studio/toast], boot_graph
+                    studio/theme_editor studio/toast studio/transition_snapshot], boot_graph
     refute_includes boot_graph, "studio/local_path", "a module nothing in the boot imports is not preloaded"
     refute_includes boot_graph, "studio/controllers/board_controller",
                     "the board controller is registered lazily, so it is not preloaded on every page"
