@@ -42,6 +42,14 @@ class NavbarVariantsAdminHostController < NavbarVariantsHostController
   def admin? = true
 end
 
+class NavbarVariantsSignedOutHostController < NavbarVariantsHostController
+  helper_method :login_path, :signup_path
+
+  def logged_in? = false
+  def login_path = "/login"
+  def signup_path = "/signup"
+end
+
 class NavbarPhoneDesktopVariantsRenderTest < ActiveSupport::TestCase
   MD_DISPLAY = %w[md:flex md:block md:inline-flex md:inline md:grid md:inline-block].freeze
 
@@ -112,6 +120,34 @@ class NavbarPhoneDesktopVariantsRenderTest < ActiveSupport::TestCase
       "the phone row keeps its own trigger"
   end
 
+  # navbar-gear-and-name-hover. One order everywhere: the theme toggle, then the
+  # gear, read in source order, which is the order a flex row draws.
+  test "signed out, the desktop rail draws the theme toggle before the sidebar gear" do
+    Studio.sidebar_sections = [{ title: "Site", links: [{ label: "Home", href: "/", emoji: "🏠" }] }]
+
+    assert_equal %i[toggle gear], rail_order(render_header(NavbarVariantsSignedOutHostController), :desktop)
+  end
+
+  test "signed in, the desktop rail draws the theme toggle before the sidebar gear" do
+    Studio.sidebar_sections = [{ title: "Site", links: [{ label: "Home", href: "/", emoji: "🏠" }] }]
+
+    assert_equal %i[toggle gear], rail_order(render_header, :desktop)
+  end
+
+  test "the phone row draws the theme toggle before the gear, signed in or out" do
+    Studio.sidebar_sections = [{ title: "Site", links: [{ label: "Home", href: "/", emoji: "🏠" }] }]
+
+    assert_equal %i[toggle gear], rail_order(render_header, :phone)
+    assert_equal %i[toggle gear], rail_order(render_header(NavbarVariantsSignedOutHostController), :phone)
+  end
+
+  test "an admin's phone row draws the theme toggle before the admin cog" do
+    order = rail_order(render_header(NavbarVariantsAdminHostController), :phone)
+
+    assert_equal :toggle, order.first, order.inspect
+    assert_includes order, :gear
+  end
+
   test "an admin keeps the admin menu" do
     header = render_header(NavbarVariantsAdminHostController)
 
@@ -164,6 +200,14 @@ class NavbarPhoneDesktopVariantsRenderTest < ActiveSupport::TestCase
   end
 
   def classes(el) = el["class"].to_s.split
+
+  # What the width draws, in document order: :toggle for the theme toggle, :gear
+  # for the sidebar trigger or the admin cog.
+  def rail_order(header, width)
+    header.css(".nav-toggle-icon, [data-link-sidebar-trigger], button[title='Admin']")
+          .select { |el| visible?(el, width) }
+          .map { |el| classes(el).include?("nav-toggle-icon") ? :toggle : :gear }
+  end
 
   def visible_cogs(header, width)
     header.css("button[title='Admin']").select { |cog| visible?(cog, width) }

@@ -70,7 +70,6 @@
     </div>
     <div class="user-nav-fit flex-shrink-0 pl-0 pr-4 md:px-4">
         <div class="flex items-center justify-end gap-3">
-          
           <span class="hidden md:flex"><span class="relative flex" style="width: 16px; height: 16px;">
   <span class="nav-toggle-icon absolute inset-0 transition-all duration-300" style="transform: scale(1) rotate(0deg); opacity: 1;">
     <button type="button" @click="$store.theme.toggle()" class="flex text-secondary hover:text-heading transition" title="Toggle theme" aria-label="Dark theme" :aria-pressed="$store.theme.isDark ? 'true' : 'false'">
@@ -93,6 +92,7 @@
   </span>
 </span>
 </span>
+          
           <a class="hidden md:inline text-sm font-semibold text-secondary hover:text-primary whitespace-nowrap transition" data-nav-sign-in="" href="/login">Log in</a>
           <a class="btn btn-primary whitespace-nowrap" data-nav-signed-out-cta="" href="/build">Build App</a>
         </div>
@@ -101,8 +101,6 @@
   <div class="flex md:hidden items-center gap-3 px-4 py-1.5 border-t border-subtle bg-surface-alt">
     <span class="ml-auto flex items-center gap-3">
       <a class="text-xs font-semibold text-secondary hover:text-primary whitespace-nowrap transition" data-nav-sign-in="" href="/login">Log in</a>
-      
-      
       <span class="relative flex" style="width: 16px; height: 16px;">
   <span class="nav-toggle-icon absolute inset-0 transition-all duration-300" style="transform: scale(1) rotate(0deg); opacity: 1;">
     <button type="button" @click="$store.theme.toggle()" class="flex text-secondary hover:text-heading transition" title="Toggle theme" aria-label="Dark theme" :aria-pressed="$store.theme.isDark ? 'true' : 'false'">
@@ -125,6 +123,8 @@
   </span>
 </span>
 
+      
+      
     </span>
   </div>
 </header>
