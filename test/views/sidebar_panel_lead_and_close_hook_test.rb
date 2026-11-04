@@ -26,6 +26,15 @@ class SidebarPanelLeadAndCloseHookTest < ActiveSupport::TestCase
     refute_includes plain, "data-sidebar-panel-lead"
   end
 
+  test "every panel carries the hook for its blurred edge, whose rule takes no clicks" do
+    assert_equal "", parse(render_panel(**BASE, title: "Settings")).at_css("aside")["data-sidebar-edge"]
+
+    css = File.read(File.expand_path("../../app/assets/tailwind/studio_engine/engine.css", __dir__))
+    rule = css[/\[data-sidebar-edge\]::before \{(.*?)\}/m, 1]
+    assert_includes rule, "pointer-events: none;"
+    assert_includes rule, "backdrop-filter: blur(8px);"
+  end
+
   test "title_html renders in the title's place, before the actions, and names nothing" do
     doc = parse(render_panel(**BASE, title_html: LEAD.html_safe, aria_label: "Settings menu"))
     aside = doc.at_css("aside")
