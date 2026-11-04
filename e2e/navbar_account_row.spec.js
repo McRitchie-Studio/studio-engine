@@ -84,23 +84,24 @@ const visibleXs = (page, selector) => page.evaluate((s) => [...document.querySel
   .filter((r) => r.width > 0)
   .map((r) => r.x), selector);
 
-for (const [label, path] of [
-  ["signed in", ONE_ROW],
-  ["signed out", "/lab/bar_stack?sidebar=1"],
-]) {
-  for (const [band, viewport] of [["desktop", DESKTOP], ["phone", { width: 390, height: 844 }]]) {
-    test(`${label}, ${band}: the theme toggle draws left of the gear`, async ({ page }) => {
-      await page.setViewportSize(viewport);
-      await page.goto(path);
+const PHONE = { width: 390, height: 844 };
+const SIGNED_OUT = "/lab/bar_stack?sidebar=1";
 
-      const moons = await visibleXs(page, "header button[title='Toggle theme']");
-      const gears = await visibleXs(page, "header [data-link-sidebar-trigger]");
-      expect(moons.length, "one visible toggle").toBe(1);
-      expect(gears.length, "one visible gear").toBe(1);
-      expect(moons[0]).toBeLessThan(gears[0]);
-    });
-  }
-}
+const expectToggleLeftOfGear = async (page, viewport, path) => {
+  await page.setViewportSize(viewport);
+  await page.goto(path);
+
+  const moons = await visibleXs(page, "header button[title='Toggle theme']");
+  const gears = await visibleXs(page, "header [data-link-sidebar-trigger]");
+  expect(moons.length, "one visible toggle").toBe(1);
+  expect(gears.length, "one visible gear").toBe(1);
+  expect(moons[0]).toBeLessThan(gears[0]);
+};
+
+test("signed in, desktop: the theme toggle draws left of the gear", ({ page }) => expectToggleLeftOfGear(page, DESKTOP, ONE_ROW));
+test("signed in, phone: the theme toggle draws left of the gear", ({ page }) => expectToggleLeftOfGear(page, PHONE, ONE_ROW));
+test("signed out, desktop: the theme toggle draws left of the gear", ({ page }) => expectToggleLeftOfGear(page, DESKTOP, SIGNED_OUT));
+test("signed out, phone: the theme toggle draws left of the gear", ({ page }) => expectToggleLeftOfGear(page, PHONE, SIGNED_OUT));
 
 test("moon, gear, name and avatar are one gap apart, at rest and scrolled", async ({ page }) => {
   await page.setViewportSize(DESKTOP);
