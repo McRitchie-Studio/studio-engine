@@ -55,6 +55,16 @@ class LinkSidebarTest < Minitest::Test
     assert_includes html, "Admin Menu", "admin viewers see the admin title"
   end
 
+  def test_a_row_centers_its_icon_unless_a_description_runs_under_the_label
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: SECTIONS, admin: true))
+    row = ->(href) { doc.at_css(%(#studio-link-sidebar a[href="#{href}"]))["class"].split }
+
+    assert_includes row.call("/"), "items-start", "a two-line row keeps its icon at the top"
+    assert_includes row.call("/docs"), "items-center", "a one-line row with an emoji swap centers it"
+    assert_includes row.call("/error_logs"), "items-center", "a one-line row with a plain emoji centers it"
+    refute_includes row.call("/docs"), "items-start"
+  end
+
   def test_non_admin_render_uses_links_title_and_shows_logout_when_logged_in
     html = render_sidebar(sections: [SECTIONS.first], admin: false, logged_in: true)
 

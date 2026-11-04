@@ -4,6 +4,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+- Link sidebar: a one-line row centers its icon on its label. It sat 3px low. A row with a
+  description keeps its icon at the top. The navbar baseline is regenerated for it.
+
 ## 0.124.0 — 2026-11-04
 
 ### Added
