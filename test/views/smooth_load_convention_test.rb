@@ -120,11 +120,19 @@ class SmoothLoadConventionTest < ActiveSupport::TestCase
 
   test "the head loads the module only with a direction, below the import map" do
     head = File.read(HEAD_ERB)
-    gate = head.index('<% if @studio_page_transition_direction || Studio.page_transition_direction %>')
+    gate = head.rindex('<% if @studio_page_transition_direction || Studio.page_transition_direction %>')
 
     assert gate, "the module tag must sit behind the setting"
     assert_operator head.index("<%= javascript_importmap_tags %>"), :<, gate
     assert_match(/\A<% if [^\n]+%>\n  <%= javascript_import_module_tag "studio\/page_transitions" %>\n<% end %>/, head[gate..])
+  end
+
+  test "the head links the full-load sheet and its script only with a direction, ahead of the modules" do
+    head = File.read(HEAD_ERB)
+    gate = head.index('<% if @studio_page_transition_direction || Studio.page_transition_direction %>')
+
+    assert_match(%r{\A<% if [^\n]+%>\n  <%= stylesheet_link_tag "studio/page_transition_full_load" %>\n  <%= javascript_include_tag "studio/page_transition_reveal", nonce: studio_script_nonce %>\n<% end %>}, head[gate..])
+    assert_operator gate, :<, head.index("<%= javascript_importmap_tags %>")
   end
 
   test "every view-transition name an engine view sets inline carries the morph marker" do

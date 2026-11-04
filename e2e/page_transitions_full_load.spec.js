@@ -206,6 +206,21 @@ test("a full load of the same path plays nothing", async ({ page }) => {
   expect(lines.filter((line) => line.startsWith("::view-transition"))).toEqual([]);
 });
 
+test("a redirect plays once, and a redirect back to this path plays nothing", async ({ page }) => {
+  await open(page, STRICT, 0);
+  const bounce = (query) => page.evaluate((url) => window.location.assign(url), `/lab/page_transitions_redirect?${query}`);
+  await bounce(STRICT);
+  await settled(page, "b");
+  expectOneMotion(await logged(page), "pt-out-left", "pt-in-from-right");
+  await page.waitForFunction(() => window.Turbo && document.documentElement.dataset.pageTransitionDirection);
+  await page.evaluate(() => sessionStorage.removeItem("pt-log"));
+  await bounce(STRICT);
+  await page.waitForFunction(() => sessionStorage.getItem("pt-log")?.includes("pagereveal"));
+  const lines = await logged(page);
+  expect(lines).toContain("pagereveal plain");
+  expect(lines.filter((line) => line.startsWith("::view-transition"))).toEqual([]);
+});
+
 test("a click before the old page's module has run gets the plain load, not the browser's fade", async ({ page }) => {
   await blockOffsiteRequests(page);
   await installRecorder(page, 0);
@@ -367,7 +382,7 @@ test("with no direction, a full load has no sheet, no script, no at-rule and not
   const lines = await logged(page);
   expect(lines).toEqual(expect.arrayContaining(["pageswap plain", "pagereveal plain"]));
   expect(lines.filter((line) => line.startsWith("::view-transition"))).toEqual([]);
-  expect(requests.filter((url) => /page_transition/.test(url))).toEqual([]);
+  expect(requests.filter((url) => /studio\/page_transition/.test(url))).toEqual([]);
   const viewTransitionRules = () => page.evaluate(() => {
     const count = (rules) => [...rules].reduce((sum, rule) => sum + (rule.constructor.name === "CSSViewTransitionRule" ? 1 : 0) + (rule.cssRules ? count(rule.cssRules) : 0), 0);
     return [...document.styleSheets].reduce((sum, sheet) => sum + count(sheet.cssRules), 0);

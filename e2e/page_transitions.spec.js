@@ -30,7 +30,9 @@ async function record(page, randomValue = 0) {
         const key = `${pseudo} ${animation.animationName || ""}`;
         if (!window.__seen.includes(key)) window.__seen.push(key);
       }
-      if (document.documentElement.hasAttribute("data-page-transition")) {
+      // Only a real motion: "still" stands from turbo:visit, before any transition exists.
+      const style = document.documentElement.dataset.pageTransition;
+      if (style && style !== "still") {
         const read = (pseudo) => getComputedStyle(document.documentElement, pseudo).transform;
         window.__frames.push({
           root: read("::view-transition-old(root)"),
