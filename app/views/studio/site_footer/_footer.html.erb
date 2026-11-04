@@ -44,6 +44,11 @@
         <% if facts[:email] %>
           <p class="ftr-email"><a href="mailto:<%= facts[:email] %>" class="ftr-link ftr-link-solid"><%= facts[:email] %></a></p>
         <% end %>
+        <%# The brand block, not a link column or the legal line: the kit belongs to the
+            brand, and an app's own columns and legal line stay exactly what it wrote. %>
+        <% if facts[:marketing_kit] %>
+          <p class="ftr-kit"><%= render "studio/site_footer/link", link: facts[:marketing_kit], booking: booking %></p>
+        <% end %>
         <% if facts[:social].any? %>
           <ul class="ftr-socials" aria-label="Social profiles">
             <% facts[:social].each do |profile| %>

@@ -83,6 +83,28 @@ class FooterOnlyConsumerTest < Minitest::Test
     assert_no_leaflet(html)
   end
 
+  # It never calls Studio.routes, so it has no page and its footer links none.
+  def test_a_footer_with_no_kit_route_links_no_kit
+    html = probe(env: "development", eager: false).fetch("html")
+
+    assert_includes html, "data-site-footer"
+    refute_includes html, "Marketing Kit"
+    refute_includes html, "/marketing-kit"
+  end
+
+  # The one engine route such an app can draw needs no table and no session,
+  # and the page answers with the app booted either way.
+  def test_the_kit_page_renders_without_active_record
+    [["development", false], ["production", true]].each do |env, eager|
+      result = probe(env: env, eager: eager, kit: true)
+
+      refute result["active_record_loaded"], "the page pulled in ActiveRecord (#{env})"
+      assert_equal 200, result["status"], "the page did not render (#{env}):\n#{result['html'].to_s[0, 2000]}"
+      assert_includes result["html"], "Marketing Kit"
+      assert_includes result["html"], "data-marketing-kit"
+    end
+  end
+
   def test_install_migrations_is_a_clean_no_op_without_active_record
     result = probe(env: "development", eager: false, action: "rake")
 
@@ -134,7 +156,7 @@ class FooterOnlyConsumerTest < Minitest::Test
     refute_includes html, ".ftr-map", "a footer with no address must not ship the map's CSS"
   end
 
-  def probe(env:, eager:, action: "render", footer: "declared")
+  def probe(env:, eager:, action: "render", footer: "declared", kit: false)
     Dir.mktmpdir("studio-footer-only") do |root|
       result_path = File.join(root, "result.json")
       env_vars = {
@@ -144,6 +166,7 @@ class FooterOnlyConsumerTest < Minitest::Test
         "PROBE_ACTION" => action,
         "PROBE_RESULT" => result_path,
         "PROBE_FOOTER" => footer,
+        "PROBE_KIT" => kit ? "1" : "0",
         "BUNDLE_GEMFILE" => File.join(ENGINE_ROOT, "Gemfile")
       }
       out = IO.popen(env_vars, [RbConfig.ruby, "-I#{File.join(ENGINE_ROOT, 'lib')}", PROBE], err: %i[child out], &:read)

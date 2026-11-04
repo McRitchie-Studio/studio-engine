@@ -703,6 +703,27 @@ class E2eLabController < ActionController::Base
     render(:style_theme)
   end
 
+  # The marketing kit, with one logo of each kind: both tones with both formats,
+  # one tone with an SVG alone, and one whose files are not there. e2e/boot.rb
+  # writes the files. The chain from Studio.marketing_kit to this partial is the
+  # engine's; only the declared kit is the lab's.
+  LAB_MARKETING_KIT = {
+    name: "Lab Co",
+    tagline: "Everything, by example",
+    logos: [
+      { title: "Both tones", light: { png: "/e2e/kit/both-light.png", svg: "/e2e/kit/both-light.svg" },
+                             dark: { png: "/e2e/kit/both-dark.png", svg: "/e2e/kit/both-dark.svg" } },
+      { title: "Light only", light: { svg: "/e2e/kit/both-light.svg" }, dark: { png: "/e2e/kit/not-there.png" } },
+      { title: "No files", light: { png: "/e2e/kit/not-there.png" }, dark: { svg: "/e2e/kit/not-there.svg" } }
+    ],
+    palette: [{ name: "Ink", hex: "#1A1535" }, { name: "Violet", hex: "#8E82FE" }, { name: "Not a colour", hex: "red" }],
+    typefaces: [{ role: "Headings", family: "Montserrat", weight: 800, name: "Montserrat ExtraBold" }]
+  }.freeze
+
+  def marketing_kit
+    @lab_marketing_kit = LAB_MARKETING_KIT
+  end
+
   # The whole style guide, for its sticky title row and the tabs that follow the
   # scroll. It reads what StyleController sets.
   def style_nav

@@ -103,6 +103,7 @@ Rails.application.routes.draw do
   get "lab/knowledge_transcript/frame", to: "e2e_lab#knowledge_transcript_frame"
   # One route per page, spelled out: test/integration/e2e_lab_isolation_test.rb
   # visits every /lab route by its literal path, which an optional segment is not.
+  get "lab/marketing_kit", to: "e2e_lab#marketing_kit"
   get "lab/site_footer", to: "e2e_lab#site_footer"
   get "lab/site_footer/terms", to: "e2e_lab#site_footer", defaults: { variant: "terms" }
   get "lab/site_footer/home", to: "e2e_lab#site_footer", defaults: { variant: "home" }

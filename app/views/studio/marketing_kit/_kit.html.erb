@@ -1,0 +1,84 @@
+<%# The marketing kit: logos, colours and typefaces (a resolved `kit`, from
+    Studio::MarketingKit.resolve). Each part goes when it has nothing to show. The
+    layout is scoped CSS (.mkit-*), not Tailwind utilities, for the footer's
+    reason: a utility a consumer's build has not seen compiles to nothing. %>
+<%= render "studio/marketing_kit/assets" %>
+<div class="mkit" data-marketing-kit>
+  <header class="mkit-hero">
+    <% if kit[:tagline] %>
+      <p class="mkit-tagline"><%= kit[:tagline] %></p>
+    <% end %>
+    <h1 class="mkit-title"><%= Studio::MarketingKit::LABEL %></h1>
+    <p class="mkit-lede">The <%= kit[:name] ? "#{kit[:name]} " : "" %>logos, colours and typefaces. Use them when you write about us.</p>
+  </header>
+
+  <% if kit[:logos].any? %>
+    <section aria-labelledby="mkit-logos" data-test="kit-logos">
+      <h2 id="mkit-logos" class="mkit-heading">Logos</h2>
+      <div class="mkit-logos">
+        <% kit[:logos].each do |logo| %>
+          <div class="mkit-card">
+            <div class="mkit-tiles">
+              <% logo[:tones].each do |tone| %>
+                <div class="mkit-tile" style="background-color: <%= tone[:ground] %>">
+                  <img src="<%= tone[:src] %>" alt="<%= tone[:alt] %>" class="mkit-tile-img">
+                </div>
+              <% end %>
+            </div>
+            <div class="mkit-card-body">
+              <% if logo[:title] %>
+                <p class="mkit-name"><%= logo[:title] %></p>
+              <% end %>
+              <div class="mkit-downloads">
+                <% logo[:tones].each do |tone| %>
+                  <a href="<%= tone[:href] %>" download class="mkit-download"><%= tone[:label] %></a>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
+  <% if kit[:palette].any? %>
+    <section aria-labelledby="mkit-colours" data-test="kit-colours">
+      <h2 id="mkit-colours" class="mkit-heading">Colours</h2>
+      <div class="mkit-palette">
+        <% kit[:palette].each do |swatch| %>
+          <%# One button holds the chip, the name and the hex, so a click on any of
+              them copies. The confirmation sits outside it: a button's children
+              are not announced, and a status must be. %>
+          <div class="mkit-card mkit-swatch" data-studio-controller="copy-text" data-copy-text-text-value="<%= swatch[:hex] %>">
+            <button type="button" class="mkit-swatch-button" data-studio-action="click->copy-text#copy"
+                    aria-label="Copy <%= [ swatch[:name], swatch[:hex] ].compact.join(", ") %>">
+              <span class="mkit-chip" style="background-color: <%= swatch[:hex] %>"></span>
+              <span class="mkit-card-body">
+                <% if swatch[:name] %>
+                  <span class="mkit-name"><%= swatch[:name] %></span>
+                <% end %>
+                <code class="mkit-hex"><%= swatch[:hex] %></code>
+              </span>
+            </button>
+            <span class="mkit-status" role="status" data-copy-text-target="status"></span>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
+  <% if kit[:typefaces].any? %>
+    <section aria-labelledby="mkit-type" data-test="kit-type">
+      <h2 id="mkit-type" class="mkit-heading">Typefaces</h2>
+      <div class="mkit-card">
+        <% kit[:typefaces].each do |face| %>
+          <div class="mkit-face">
+            <% style = [ ("font-family: #{face[:family]}, sans-serif" if face[:family]), ("font-weight: #{face[:weight]}" if face[:weight]) ].compact.join("; ") %>
+            <p class="mkit-specimen"<% if style.present? %> style="<%= style %>"<% end %>><%= kit[:name] || face[:name] %></p>
+            <p class="mkit-face-label"><%= [ face[:role], face[:name] ].compact.join(" · ") %></p>
+          </div>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+</div>
