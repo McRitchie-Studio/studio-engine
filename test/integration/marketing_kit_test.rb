@@ -130,6 +130,33 @@ class MarketingKitIntegrationTest < ActionDispatch::IntegrationTest
     assert_select "[data-test='kit-logos'] a[download][href=?]", "/#{FILES}/mark-dark.png", text: "Download Dark"
   end
 
+  test "the wordmark and the footer's lockup are the logos, each with both tones" do
+    %w[nav-light.svg nav-dark.svg stack-light.svg stack-dark.png].each { |name| write_file(name) }
+    Studio.navbar_wordmark = { light: "/#{FILES}/nav-light.svg", dark: "/#{FILES}/nav-dark.svg" }
+    Studio.site_footer = { name: "Example Co", lockup: { light: "/#{FILES}/stack-light.svg", dark: "/#{FILES}/stack-dark.svg" } }
+
+    get "/marketing-kit"
+    assert_response :success
+
+    assert_equal ["Navbar logo", "Footer logo"], css_select("[data-test='kit-logos'] .mkit-name").map { |p| p.text.strip }
+    assert_equal ["/#{FILES}/nav-light.svg", "/#{FILES}/nav-dark.svg", "/#{FILES}/stack-light.svg", "/#{FILES}/stack-dark.png"],
+                 css_select("[data-test='kit-logos'] a[download]").map { |a| a["href"] }
+  ensure
+    Studio.navbar_wordmark = nil
+  end
+
+  test "the colours are what the app paints, an /admin/theme edit included" do
+    original = ::ThemeSetting.method(:current)
+    ::ThemeSetting.define_singleton_method(:current) { Struct.new(:resolved_colors).new({ primary: "#123456" }) }
+
+    get "/marketing-kit"
+
+    assert_select "[data-test='kit-colours'] code.mkit-hex", text: "#123456"
+    assert_select "[data-test='kit-colours'] code.mkit-hex", 1
+  ensure
+    ::ThemeSetting.define_singleton_method(:current, original)
+  end
+
   test "a declared kit prints whole, each link reading exactly Download Light or Download Dark" do
     %w[icon-light.png icon-light.svg icon-dark.png icon-dark.svg].each { |name| write_file(name) }
     Studio.marketing_kit = lambda do |view|

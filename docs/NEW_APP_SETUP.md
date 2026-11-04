@@ -528,6 +528,26 @@ config.site_footer = false
 Every key, the rules a row can carry, and where the footer shows are in
 [SITE_FOOTER.md](SITE_FOOTER.md).
 
+**The marketing kit comes with it.** `Studio.routes` (§ 8) draws a public page at
+`/marketing-kit`, and the footer links it with nothing declared. With no setup it
+shows the app's logos (`config.navbar_wordmark`, the footer's lockup,
+`config.theme_logos`) and the colours it paints; a click on a colour copies its hex.
+
+To finish it, put each logo's files in `public/brand/`, a transparent PNG and an SVG
+for each tone, and declare them with the typefaces and the tagline:
+
+```ruby
+config.marketing_kit = {
+  tagline:   "Everything, by example",
+  logos:     [ { title: "Icon", light: { png: "/brand/icon-light.png", svg: "/brand/icon-light.svg" },
+                                dark:  { png: "/brand/icon-dark.png",  svg: "/brand/icon-dark.svg" } } ],
+  typefaces: [ { role: "Headings", family: "Montserrat", weight: 800, name: "Montserrat ExtraBold" } ]
+}
+```
+
+A file that is not there shows no link and no broken image. The rest is in
+[SITE_FOOTER.md, The marketing kit](SITE_FOOTER.md#the-marketing-kit).
+
 ## 11. Public Assets
 
 Place in `public/`:

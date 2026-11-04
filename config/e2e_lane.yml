@@ -1133,7 +1133,11 @@
 # forgery on for the chat's path, so the lane now proves the token too. Verified RED
 # by each control in the spec's header.
 #   npx playwright test --list  -> 431 tests in 68 files
-total_specs: 431
+# 431 -> 438: e2e/marketing_kit.spec.js. A click puts a hex on the clipboard and a
+# confirmation on the page; the attributes are in the server's bytes whether or not
+# the lazy controller ever runs, so only a browser can say. Seven, on /lab/marketing_kit.
+#   npx playwright test --list                                             -> 438
+total_specs: 438
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1402,7 +1406,9 @@ total_specs: 431
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 409
 # And for the style guide's sticky row: 2 more tests (412 -> 414), 1 new file:
 # e2e/style_section_nav.spec.js, on the new /lab/style_nav page.
-executed: 431
+# And for the marketing kit: 7 more tests (431 -> 438), 1 new file:
+# e2e/marketing_kit.spec.js, on the new /lab/marketing_kit page.
+executed: 438
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

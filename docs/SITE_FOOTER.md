@@ -53,6 +53,9 @@ It prints only what the engine knows to be true of the app:
   when a GET reaches it and its path needs no arguments. A host with neither
   gets the © line alone.
 
+- **A Marketing Kit link**, when the app has the page: every app that calls
+  `Studio.routes` does ([The marketing kit](#the-marketing-kit)).
+
 It has no address, no map, no phone, no email, no tagline, no social row and no
 link columns, and the page names no Leaflet. The engine cannot know those, and
 a guessed link is a dead one. For any of them, add a location (below) or
@@ -150,8 +153,9 @@ Leave `config.site_footer` unset and the same app gets
 [the default footer](#the-default-footer), its name read from `config.app_name`
 since there is no site-identity table to ask.
 
-Do not call `Studio.routes(self)`: everything it draws (sign-in, admin, error
-logs) needs a database. The app also needs an asset pipeline (Propshaft or
+Do not call `Studio.routes(self)`: what it draws (sign-in, admin, error logs)
+needs a database. The one route that does not is the marketing kit's, which such
+an app can draw alone ([The marketing kit](#the-marketing-kit)). The app also needs an asset pipeline (Propshaft or
 Sprockets), as every Rails 8 app has, and a mapping of the theme tokens onto its
 own palette (see [Colours](#colours)).
 
@@ -200,6 +204,7 @@ Every key is optional. A missing key removes its part of the footer.
 | `columns` | Link columns under bold headings. A column may carry a width hint: `[ "Contact", links, { width: 1.5 } ]` | Brand only |
 | `legal` | The centred line above the © | The © alone |
 | `booking` | `{ label:, title: }` for the popup's heading and the frame's accessible name | "Schedule a call", and "Schedule a call with <name>" |
+| `marketing_kit` | `false` removes the footer's link to the kit ([The marketing kit](#the-marketing-kit)) | The link, on an app with the page |
 
 Rows may be tuples, as above, or hashes (`{ label:, href: }`, `{ heading:, links: }`,
 `{ label:, icon:, url: }`). The rules a row can carry:
@@ -318,6 +323,103 @@ config.site_footer = ->(view) {
 - A footer that declares no lockup renders exactly as before: its styles ride
   only with a lockup (`studio/site_footer/_lockup_assets`). An engine older
   than the fact ignores the key, so a host can declare it before it upgrades.
+
+## The marketing kit
+
+Every app has a public page at `/marketing-kit`, with its logos, colours and
+typefaces, and the footer links it. Neither needs a line of setup.
+
+**The page.** `Studio.routes` draws it by default, with no sign-in. The route's
+helper is `studio_marketing_kit_path`.
+
+| Setting | Meaning | Unset |
+|---------|---------|-------|
+| `config.draw_marketing_kit_routes` | `false` draws no page, and with no page the footer links none | `true` |
+| `config.marketing_kit` | The kit: a Hash, or a callable taking the view | Derived from the theme (below) |
+
+```ruby
+# config/initializers/studio.rb
+config.marketing_kit = {
+  tagline:   "Everything, by example",
+  logos:     [ { title: "Icon", light: { png: "/brand/icon-light.png", svg: "/brand/icon-light.svg" },
+                                dark:  { png: "/brand/icon-dark.png",  svg: "/brand/icon-dark.svg" } } ],
+  palette:   [ { name: "Ink", hex: "#1A1535" } ],
+  typefaces: [ { role: "Headings", family: "Montserrat", weight: 800, name: "Montserrat ExtraBold" } ]
+}
+```
+
+Every key is optional, and each key stands alone: a kit that declares only
+`tagline:` still derives its logos and colours. `logos: []` shows none. `name:`
+overrides the site name in the page's first line.
+
+| Key | With no declaration |
+|-----|---------------------|
+| `logos` | `config.navbar_wordmark` and the footer's `lockup`, each with its two tones, then one logo for each entry in `config.theme_logos` but the favicon. A theme entry names one file, so the rest is looked for beside it: a `-light`/`-dark` or `_light`/`_dark` sibling. A name with no tone in it is the light artwork. Every file's other format (`.png`, `.svg`) is looked for too |
+| `palette` | The colours the app paints: its `/admin/theme` values over `Studio.theme_config` (primary, dark, light, success, warning, danger, accent) |
+| `typefaces` | None. The engine cannot know them, so the section is gone |
+| `tagline` | None |
+
+- **`light` is the artwork for a light background**, and `dark` for a dark one.
+- **A logo offers "Download Light" and "Download Dark".** Each downloads the PNG when
+  there is one, else the SVG. Make the PNG transparent. The tile shows the SVG when
+  there is one. Only PNG and SVG are offered.
+- **A file that is not there is not an error.** Each file is looked for before it is
+  linked, in `public/` and, for a name with no leading `/`, in the asset pipeline. A
+  tone with no file has no tile and no link. A logo with no file has no card. An
+  `http(s)` URL is taken at its word and is not fetched, so a dead one shows a broken
+  image; a browser downloads a cross-origin file only if that host says so.
+- **A colour copies on one click**, on the chip, the name or the hex, and shows
+  "Copied" on the chip. It runs from the lazy `copy-text` controller
+  (`studio/controllers/copy_text_controller`). Only a real hex is printed.
+- **A tile's image carries `?kit`.** A host may repaint its own logo by the image's
+  exact `src` on a dark page, as the hub's `.dark img[src="/brand/icon-light.svg"]`
+  does, and that would turn a light tile's artwork dark. The download keeps the plain URL.
+- **A callable that raises** shows locally. In production it is logged once and the
+  page shows what derives from the theme.
+
+**A host's own page wins.** A GET route of the path `/marketing-kit` beats the
+engine's, whichever side of `Studio.routes` it is drawn on. Drawn before, the engine
+draws nothing; drawn after, the engine's route yields at request time. So the hub
+keeps its page until it adopts this one.
+
+**Sign-in.** `Studio::MarketingKitController` inherits the host's
+`ApplicationController` for its layout and skips each gate it knows by name
+(`HOST_GATES`): `require_authentication`, the hub's `require_admin_wall`,
+`require_admin`, `require_login`, `authenticate_user!` and
+`require_profile_completion`. A gate of another name needs one line:
+
+```ruby
+# config/initializers/studio.rb
+Rails.application.config.to_prepare do
+  Studio::MarketingKitController.skip_before_action :my_gate, raise: false
+end
+```
+
+A host whose test suite walks its route table sees `studio/marketing_kit#show` as a
+public page; list it wherever that suite lists them.
+
+**An app with no database** does not call `Studio.routes`, so it has no page and its
+footer links none. To have both, draw the one route. The page reads no table and no
+session:
+
+```ruby
+# config/routes.rb
+Studio.marketing_kit_routes(self)
+```
+
+**The footer link** is "Marketing Kit", in the brand block, under the tagline and the
+email. Every viewer who sees the footer sees it, on every app with the page, with
+nothing declared. It is not in a link column or on the legal line, so an app's columns
+and legal line stay exactly what it wrote.
+
+- An app that already links the page in a column or on the legal line keeps its own
+  row and gets no second link. The comparison is on the path, so a query or a trailing
+  `/` still counts.
+- `marketing_kit: false` in the facts shows no link.
+- A signed-in viewer sees the footer on the page itself, as on the booking page.
+
+To render the kit in a page of your own:
+`render "studio/marketing_kit/kit", kit: Studio.marketing_kit_for(self)`.
 
 ## The Chat link
 
@@ -478,6 +580,7 @@ These class names are stable, and an app may style against them:
 | `.ftr-link`, `.ftr-link-solid`, `.ftr-link-disabled` | A link; an address kept on one line; a "coming soon" label. `--ftr-link-ink` on `.ftr` is the link colour |
 | `.ftr-location`, `.ftr-location-title`, `.ftr-address` | The Location band |
 | `.ftr-legal`, `.ftr-copyright` | The legal line and the © line |
+| `.ftr-kit` | The Marketing Kit link's line in the brand block |
 | `.ftr-map` | The map |
 | `.ftr-lockup`, `.ftr-lockup-light`, `.ftr-lockup-dark` | The lockup's images; `--ftr-lockup-height` on `.ftr` is its height |
 
@@ -526,6 +629,14 @@ link. Those rules are more specific than the engine's and still apply.
   1024 and 1280px with two, three, four and five columns, the address on one
   line inside its column at each, and the line heights. These lab pages load Turbo, so the map's remount after a Turbo visit is
   covered.
+
+- `test/lib/studio/marketing_kit_test.rb`: what a kit resolves to, derived and
+  declared, and that a missing file or a malformed row costs nothing.
+- `test/integration/marketing_kit_test.rb`: the page through a real signed-out
+  request in a host that gates every controller, the footer link and its no-double
+  rule, and a host route of the same path winning from either side.
+- `e2e/marketing_kit.spec.js`: the hex on the clipboard, the confirmation, the
+  refused copy, and the downloads, in a browser.
 
 `/admin/style` shows the footer under Tricks, with this app's own facts, or a
 sample when it has declared none (the default footer or `false`).

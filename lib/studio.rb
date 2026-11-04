@@ -1820,8 +1820,8 @@ module Studio
 
   # The marketing kit: the public page at /marketing-kit (lib/studio/marketing_kit.rb,
   # docs/SITE_FOOTER.md). A Hash, or a callable receiving the view. Unset, the logos
-  # and colours derive from Studio.theme_logos and Studio.theme_config, so a new
-  # app has a working page with no setup.
+  # and colours derive from the app's own brand artwork and the colours it paints,
+  # so a new app has a working page with no setup.
   mattr_reader :marketing_kit, default: nil
 
   def self.marketing_kit=(declared)
@@ -1841,8 +1841,25 @@ module Studio
 
   # The kit for a view. `declared` lets a page render a kit other than the app's.
   def self.marketing_kit_for(view, declared: marketing_kit)
-    MarketingKit.resolve(declared, view, logos: theme_logos, theme: theme_config,
-                                         name: site_identity[:title], dark_ground: theme_dark)
+    colors = marketing_kit_colors
+    MarketingKit.resolve(declared, view, logos: theme_logos, theme: colors,
+                                         artwork: [["Navbar logo", navbar_wordmark], ["Footer logo", marketing_kit_lockup(view)]],
+                                         name: site_identity[:title], dark_ground: colors[:dark])
+  end
+
+  # What the app paints: an /admin/theme edit included, as studio_theme_css_tag
+  # reads it. An app with no database, or no table yet, paints its config.
+  def self.marketing_kit_colors
+    return theme_config unless active_record? && defined?(::ThemeSetting)
+
+    ::ThemeSetting.current.resolved_colors
+  rescue StandardError
+    theme_config
+  end
+
+  # The footer's lockup, already resolved for this request where the view is one.
+  def self.marketing_kit_lockup(view)
+    view.studio_site_footer_facts&.dig(:lockup) if view.respond_to?(:studio_site_footer_facts)
   end
 
   # Draws the page into `router`, unless the host's own /marketing-kit got there

@@ -12,9 +12,10 @@
 #     typefaces: [ { role: "Headings", family: "Montserrat", weight: 800, name: "Montserrat ExtraBold" } ]
 #   }
 #
-# Every key is optional. A missing `logos` derives from Studio.theme_logos and a
-# missing `palette` from Studio.theme_config, so a new app has a working page
-# with no setup. The engine knows no typeface or tagline, so those parts are
+# Every key is optional. A missing `logos` derives from the app's brand artwork
+# (Studio.navbar_wordmark, the footer's lockup, Studio.theme_logos) and a missing
+# `palette` from the colours it paints (ThemeSetting, else Studio.theme_config),
+# so a new app has a working page with no setup. The engine knows no typeface or tagline, so those parts are
 # simply absent until declared.
 #
 # A FILE THAT IS NOT THERE IS NOT AN ERROR. Each file is looked for before it is
@@ -53,11 +54,13 @@ module Studio
     # The kit the page prints.
     #
     #   logos:       Studio.theme_logos, for a kit that declares no `logos`
-    #   theme:       Studio.theme_config, for a kit that declares no `palette`
+    #   artwork:     brand artwork of one file per theme, [ title, { light:, dark: } ]
+    #                rows that come before them (the wordmark, the lockup)
+    #   theme:       the colours the app paints, for a kit that declares no `palette`
     #   name:        the site's name, for a kit that declares none
     #   dark_ground: the dark tile's background
     #   locate:      a callable answering a file's URL, or nil when it is not there
-    def resolve(declared, view, logos: [], theme: {}, name: nil, dark_ground: nil,
+    def resolve(declared, view, logos: [], artwork: [], theme: {}, name: nil, dark_ground: nil,
                 locate: ->(file) { locate(file, view) })
       raw = declared.respond_to?(:call) ? declared.call(view) : declared
       validate!(raw)
@@ -67,7 +70,7 @@ module Studio
       {
         name: SiteFooter.text(facts[:name]) || SiteFooter.text(name),
         tagline: SiteFooter.text(facts[:tagline]),
-        logos: logo_cards(facts.key?(:logos) ? facts[:logos] : derived_logos(logos), locate, ground),
+        logos: logo_cards(facts.key?(:logos) ? facts[:logos] : derived_artwork(artwork) + derived_logos(logos), locate, ground),
         palette: swatches(facts.key?(:palette) ? facts[:palette] : derived_palette(theme)),
         typefaces: typefaces(facts[:typefaces])
       }
@@ -119,6 +122,17 @@ module Studio
       return url if url.match?(%r{\Ahttps?://}i)
 
       "#{url}#{url.include?('?') ? '&' : '?'}kit"
+    end
+
+    # Artwork that already names its file per tone, as the wordmark and the
+    # lockup do. Each file may have its other format beside it.
+    def derived_artwork(rows)
+      Array(rows).filter_map do |title, files|
+        next unless files.respond_to?(:to_h) && !files.is_a?(Array)
+
+        tones = SiteFooter.symbolize(files).slice(:light, :dark).compact
+        { title: title }.merge(tones.transform_values { |file| both_formats(file.to_s.delete_suffix(File.extname(file.to_s))) })
+      end
     end
 
     # The logos Studio.theme_logos implies. It names one file per logo and says
@@ -219,9 +233,7 @@ module Studio
     end
 
     def public_file?(path)
-      return false unless defined?(::Rails) && ::Rails.respond_to?(:public_path) && ::Rails.public_path
-
-      File.file?(File.join(::Rails.public_path.to_s, path.split(/[?#]/).first))
+      !PublicFileVersion.version(path.split(/[?#]/).first).nil?
     end
 
     def pipeline_path(name, view)

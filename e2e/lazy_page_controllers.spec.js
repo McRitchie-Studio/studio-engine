@@ -34,6 +34,7 @@ const PAGES = [
   ["voice-profile", "/lab/voice_profile", "voice_profile_controller"],
   ["microphone-chip", "/lab/voice_capture", "microphone_chip_controller"],
   ["voice-recorder", "/lab/voice_capture", "voice_recorder_controller"],
+  ["copy-text", "/lab/marketing_kit", "copy_text_controller"],
   // A signed-in door: the mic is never on a signed-out page.
   ["agent-chat-voice", "/agent_chat_voice_lab/sign_in?as=lazy", "agent_chat_voice_controller"]
 ];

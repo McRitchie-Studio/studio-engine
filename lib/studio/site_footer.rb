@@ -124,7 +124,7 @@ module Studio
     # THE DEFAULT FOOTER'S FACTS: what an app that sets nothing gets. Only what
     # is known to be true of the host: a legal line linking the routes in
     # DEFAULT_LEGAL that the host really has. The name and the logo come from
-    # `resolve`'s own fallbacks. No address, no email, no tagline, no social row
+    # `resolve`'s own fallbacks, and so does the Marketing Kit link. No address, no email, no tagline, no social row
     # and no link columns: the engine cannot know them, and a guessed link is a
     # dead one.
     #

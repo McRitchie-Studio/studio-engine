@@ -34,6 +34,17 @@ class MarketingKitTest < Minitest::Test
     assert_equal "logo.png", kit[:logos].first[:tones].first[:href]
   end
 
+  def test_brand_artwork_comes_first_with_its_two_tones_and_its_other_format
+    kit = resolve(artwork: [["Navbar logo", { light: "/brand/nav-light.svg", dark: "/brand/nav-dark.svg" }], ["Footer logo", nil]],
+                  logos: [{ file: "/brand/nav-light.svg", title: "Navbar Logo" }, { file: "logo.png", title: "Auth Logo" }],
+                  files: %w[/brand/nav-light.svg /brand/nav-dark.svg /brand/nav-dark.png logo.png])
+
+    assert_equal ["Navbar logo", "Auth Logo"], kit[:logos].map { |logo| logo[:title] }
+    light, dark = kit[:logos].first[:tones]
+    assert_equal "/brand/nav-light.svg", light[:href]
+    assert_equal "/brand/nav-dark.png", dark[:href], "the PNG found beside the declared SVG"
+  end
+
   def test_one_file_under_two_titles_is_one_card
     kit = resolve(logos: [{ file: "logo.png", title: "Navbar Logo" }, { file: "logo.png", title: "Auth Logo" }],
                   files: %w[logo.png])
