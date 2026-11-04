@@ -1141,7 +1141,10 @@
 #   npx playwright test --list                                             -> 447
 # 447 -> 453: the navbar's rail order (navbar-gear-and-name-hover), six tests; named below.
 #   npx playwright test --list                                             -> 453
-total_specs: 453
+# 453 -> 457: the account group on a touch screen (account-group-skips-touch-hover), four
+# tests; named below.
+#   npx playwright test --list                                             -> 457
+total_specs: 457
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1427,7 +1430,15 @@ total_specs: 453
 # link lights the name from the name and the avatar (RED with group-hover:text-primary
 # off the name). Position and computed style, which the response bytes cannot show.
 #   npx playwright test --list                                             -> 453 tests, 70 files
-executed: 453
+#
+# 453 -> 457: e2e/navbar_account_group.spec.js. A tap leaves :hover on what was tapped, so
+# on a touch screen the group's raw :hover rules kept the gear, name and avatar lit after
+# the sidebar closed. Tablet and phone, link sidebar and host sidebar: each RED with the
+# hover rules outside @media (hover: hover), and each first proves the device reports no
+# hover and the tapped control still matches :hover. Keyboard focus on a host sidebar's
+# account is the fourth: RED with its :focus-visible rules dropped.
+#   npx playwright test --list                                             -> 457 tests, 70 files
+executed: 457
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

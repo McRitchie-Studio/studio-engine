@@ -2,6 +2,14 @@
 
 The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — `MAJOR.MINOR.PATCH`. Consumer Rails apps install the released RubyGems package and pin the floor each one needs — the pins differ on purpose, and every consumer records why beside its own. Bumping the gem version and updating consumer lockfiles is a release; `bin/release prepare` allocates the version and does both (see [`docs/RELEASE.md`](./docs/RELEASE.md)). Write entries under `## Unreleased` and never write a version heading: when `prepare` allocates a version it rolls this file in the same commit, moving everything under `## Unreleased` beneath a new `## <version> — <date>` heading (written even when the bucket is empty) and leaving `## Unreleased` first and empty. It refuses the sweep, with nothing published, when the roll would lie or it cannot read this file; when it skips allocation, nothing rolls. [`docs/RELEASE.md`](./docs/RELEASE.md), *Rolling `Unreleased` into a version*, says when each happens and what to do by hand. `test/docs/changelog_structure_test.rb` guards the shape.
 
+### Fixed
+
+- **A tap no longer leaves the navbar's account group lit.** On a touch screen a tap
+  leaves `:hover` on what was tapped, so the gear, the name and the avatar (THE ACCOUNT
+  GROUP in `engine.css`) stayed lit after the sidebar closed. Every `:hover` of the
+  group now sits inside `@media (hover: hover)`; `:focus-visible` stays outside it, so
+  a keyboard still lights the group. A mouse sees no change.
+
 ## Unreleased
 
 ### Added
