@@ -196,6 +196,16 @@ class MarketingKitIntegrationTest < ActionDispatch::IntegrationTest
     assert_no_match(/\son(click|load|error)=/i, css_select("[data-marketing-kit]").to_s)
   end
 
+  # A raw brand colour read 3.1:1 as link text; ThemeResolver derives this ink to clear AA.
+  test "words on the page are painted in the theme's text ink, not the raw primary" do
+    get "/marketing-kit"
+
+    styles = css_select("style").map(&:text).join
+    assert_match(/--mkit-link: var\(--color-primary-ink,/, styles)
+    assert_match(/\.mkit-tagline \{[^}]*color: var\(--mkit-link\)/, styles)
+    assert_match(/\.mkit-download \{ color: var\(--mkit-link\)/, styles)
+  end
+
   test "a kit callable that raises shows here, and in production costs only its own facts" do
     Studio.marketing_kit = ->(_view) { raise "the kit's own bug" }
 
