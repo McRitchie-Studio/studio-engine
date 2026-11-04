@@ -325,6 +325,8 @@ test("the navbar and the banner stack hold still across a full load", async ({ p
     }
     return changed / (left.length / 4);
   }, [a.toString("base64"), b.toString("base64")]);
+  // By name too: the lab's navbar is dark on a black backdrop, so its pixels hide a move.
+  expect((await logged(page)).some((line) => line.startsWith("::view-transition-group(studio-header)"))).toBe(true);
   // The ceiling and why it is not 0: expectChromeHoldsStill in page_transitions.spec.js.
   expect(await share(before.stack, during.stack), "the banner stack moved").toBeLessThan(0.1);
   expect(await share(before.header, during.header), "the navbar moved").toBeLessThan(0.1);
