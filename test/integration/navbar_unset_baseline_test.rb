@@ -12,7 +12,9 @@
 # Deliberate changes since the capture, each regenerated and named in the
 # CHANGELOG: the theme toggle's button gained type, aria-label and a bound
 # aria-pressed (/tasks/engine-theme-toggle-labels); a signed-out visitor's link
-# sidebar lost its Links title (/tasks/sidebar-drops-links-title).
+# sidebar lost its Links title (/tasks/sidebar-drops-links-title); the theme toggle
+# draws before the gear signed out and in the phone row
+# (/tasks/navbar-gear-and-name-hover).
 
 require "bundler/setup"
 

@@ -1133,7 +1133,7 @@
 # forgery on for the chat's path, so the lane now proves the token too. Verified RED
 # by each control in the spec's header.
 #   npx playwright test --list  -> 431 tests in 68 files
-total_specs: 440
+total_specs: 446
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1408,7 +1408,16 @@ total_specs: 440
 # computed styles and boxes, so only a browser can read them. Six controls, each red
 # on the specs that name them, are listed at the top of that file.
 #   npx playwright test --list                                             -> 440 tests, 69 files
-executed: 440
+# And for the navbar's rail order (navbar-gear-and-name-hover): 6 more tests (440 ->
+# 446), no new file. e2e/navbar_account_row.spec.js: the theme toggle draws left of
+# the gear, signed in and out, desktop and phone; three of the four RED on the
+# views at accepted (signed in on desktop already held). e2e/navbar_account_group.spec.js:
+# keyboard focus on the account lights the group as the name's hover does (RED with
+# [data-nav-account]:hover and :focus-visible out of THE ACCOUNT GROUP), and an account
+# link lights the name from the name and the avatar (RED with group-hover:text-primary
+# off the name). Position and computed style, which the response bytes cannot show.
+#   npx playwright test --list                                             -> 446 tests, 69 files
+executed: 446
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

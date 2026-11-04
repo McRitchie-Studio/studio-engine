@@ -87,12 +87,16 @@ test("keyboard focus on the account lights the group as hovering the name does",
 });
 
 // AN ACCOUNT LINK (no sidebar): the name and avatar are one link, and pointing at
-// either lights the name. There is no avatar glow to share in this shape.
+// either lights the name. There is no avatar glow to share in this shape. The lab's
+// account opens the sidebar, so dropping aria-controls takes it out of the group, as
+// a link is (test/views/user_nav_test.rb pins the link's markup); then only the
+// name's group-hover can light it.
 test("an account link lights the name from the name and from the avatar", async ({ page }) => {
   await blockOffsiteRequests(page);
   await page.setViewportSize(DESKTOP);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/lab/bar_stack?one_row=1");
+  await page.evaluate(() => document.querySelector("header [data-nav-account]").removeAttribute("aria-controls"));
   const color = () => page.evaluate((name) => getComputedStyle(document.querySelector(name)).color, NAME);
   const primary = await primaryColour(page);
 

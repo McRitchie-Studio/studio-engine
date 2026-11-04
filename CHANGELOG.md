@@ -22,6 +22,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **The theme toggle draws left of the gear at every width, signed in or out.** The
+  signed-in desktop rail already did. The signed-out rail (`layouts/_navbar` and the
+  signed-out branch of `components/_user_nav`) and the phone row drew the gear first.
+  The navbar baseline (`test/fixtures/files/navbar_unset_baseline`) is regenerated for
+  this order: 14 of its 19 files move, and only the order of their lines changes. A
+  host that draws its own pair keeps its own order: the hub's
+  `layouts/_navbar_phone_account` still draws gear, then toggle.
 - **A table's sticky header no longer sits on top of the page row on `/admin/models`.**
 - **The open tab on `/admin/models` is scrolled into view at phone width.**
 - **`studio/pinned_stack` places a header with no `data-pin` at its place in the
