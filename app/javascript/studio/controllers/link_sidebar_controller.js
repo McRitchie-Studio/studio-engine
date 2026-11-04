@@ -6,13 +6,15 @@
 //
 // The open flag and the document handlers are studio/link_sidebar, which
 // registers $store.sidebars.linkTreeOpen on alpine:init and before a Turbo
-// render. connect() registers it too, for a sidebar that arrived any other way.
+// render. connect() registers it too, and writes the panel's greeting, for a
+// sidebar that arrived any other way.
 // Registered by studio/application.
 import { Controller } from "@hotwired/stimulus"
-import { ensureLinkSidebarStore } from "studio/link_sidebar"
+import { ensureLinkSidebarStore, paintGreetings } from "studio/link_sidebar"
 
 export default class extends Controller {
   connect() {
     ensureLinkSidebarStore(window.Alpine)
+    paintGreetings(document)
   }
 }

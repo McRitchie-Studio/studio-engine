@@ -824,11 +824,45 @@ class E2eLabController < ActionController::Base
   # TWO SIDEBARS ON ONE PAGE — the link sidebar beside a host's own panel, both built
   # on the shared components/_sidebar_panel. The only page where the link sidebar's
   # click bridge can be caught claiming a close button it did not render.
-  def sidebar_panels = render(:sidebar_panels)
+  def sidebar_panels
+    sidebar_panels_viewer
+    render(:sidebar_panels)
+  end
 
   # The same page under Turbo, so a spec can leave it with the sidebar open and
   # come Back.
-  def sidebar_panels_turbo = render(:sidebar_panels, layout: "survey_turbo_lab")
+  def sidebar_panels_turbo
+    sidebar_panels_viewer
+    render(:sidebar_panels, layout: "survey_turbo_lab")
+  end
+
+  # This page's own knobs, for this request alone. `sidebar` draws groups enough to
+  # show what separates them, the admin one for an admin only, and two links with a
+  # desc: for the hover, one too long for its line. `signed_in` and `admin` choose the panel's title;
+  # `long_name` is the name that must truncate.
+  LAB_SIDEBAR_PANEL_SECTIONS = (LAB_SIDEBAR_SECTIONS + [
+    { title: "Help", links: [
+      { label: "Terms", href: "/site_footer/terms", emoji: "📜", desc: "What you agree to" },
+      { label: "Privacy", href: "/site_footer/privacy", emoji: "🔒",
+        desc: "What this app keeps about you, for how long, and how to ask for all of it to be removed" }
+    ] },
+    { title: "Ops", admin: true, links: [{ label: "Errors", href: "/up", emoji: "🚨" }] }
+  ]).freeze
+
+  private def sidebar_panels_viewer
+    @lab_sidebar_sections = LAB_SIDEBAR_PANEL_SECTIONS if params[:sidebar].present?
+    @lab_admin = params[:admin].present?
+    return unless params[:signed_in].present? || params[:long_name].present?
+
+    @lab_signed_in = true
+    @user = params[:long_name].present? ? LabUserWithLongFirstName.new : LabUser.new
+  end
+
+  # The navbar prints the first name, so this is the long one a host's name setting
+  # or a first_name column can hand the panel's title.
+  class LabUserWithLongFirstName < LabUser
+    def first_name = "Bartholomew Fitzgerald-Wellington"
+  end
 
   # The navbar under Turbo, so a spec can leave it scrolled and come Back: Turbo
   # restores a CLONE of the page from its snapshot cache, header and all.

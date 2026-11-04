@@ -11,7 +11,7 @@ const source = readFileSync(new URL("../../app/javascript/studio/link_sidebar.js
 const {
   LINK_SIDEBAR_PANELS, LINK_SIDEBAR_TRIGGERS, ensureLinkSidebarStore, linkSidebarStore, closeLinkSidebar,
   rendersLinkSidebar, registerLinkSidebar, clickIntent, handleLinkSidebarClick, handleLinkSidebarKeydown,
-  installLinkSidebar
+  installLinkSidebar, greetingFor, paintGreetings
 } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 // Alpine.store as Alpine has it: one argument reads, two register.
@@ -312,6 +312,96 @@ test("install: the document handlers toggle, close on Escape and close on an out
   doc.fire("click", clickOn(el([TRIGGER, CONTROLS])))
   doc.fire("click", clickOn(el([], el(["main"]))))
   assert.equal(sidebars.linkTreeOpen, false)
+})
+
+// A clock at one local hour and minute. greetingFor reads local time, so a Date built
+// from local parts is the same hour in whatever zone this suite runs.
+const at = (hour, minute = 0) => new Date(2026, 10, 4, hour, minute)
+
+test("the greeting at every boundary, in local time", () => {
+  const table = [
+    [at(0), "Good evening"], [at(4, 59), "Good evening"],
+    [at(5), "Good morning"], [at(11, 59), "Good morning"],
+    [at(12), "Good afternoon"], [at(16, 59), "Good afternoon"],
+    [at(17), "Good evening"], [at(23, 59), "Good evening"]
+  ]
+  for (const [now, word] of table) assert.equal(greetingFor(now), word, now.toString())
+})
+
+const greetingRoot = (nodes) => ({
+  nodes,
+  selector: null,
+  querySelectorAll(selector) { this.selector = selector; return nodes }
+})
+
+test("paint writes every greeting under the root, and leaves one already right", () => {
+  let writes = 0
+  const right = { get textContent() { return "Good morning" }, set textContent(_) { writes += 1 } }
+  const wrong = { textContent: "Good evening" }
+  const root = greetingRoot([right, wrong])
+
+  paintGreetings(root, at(9))
+
+  assert.equal(root.selector, "[data-link-sidebar-greeting]")
+  assert.equal(wrong.textContent, "Good morning")
+  assert.equal(writes, 0, "no DOM write when the word already stands")
+})
+
+test("paint with no root, or none that can be queried, does nothing", () => {
+  assert.doesNotThrow(() => paintGreetings(null, at(9)))
+  assert.doesNotThrow(() => paintGreetings({}, at(9)))
+})
+
+// A document with one greeting in it and a clock the test moves.
+const greetingPage = (hour) => {
+  const node = { textContent: "unpainted" }
+  const doc = fakeDocument()
+  doc.querySelectorAll = () => [node]
+  const win = fakeWindow({ Alpine: fakeAlpine() })
+  const clock = { hour }
+  installLinkSidebar({ win, doc, now: () => at(clock.hour) })
+  return { node, doc, win, clock }
+}
+
+test("install paints at once, and again on alpine:init and turbo:load", () => {
+  const { node, doc, clock } = greetingPage(9)
+  assert.equal(node.textContent, "Good morning")
+
+  clock.hour = 13
+  doc.fire("alpine:init")
+  assert.equal(node.textContent, "Good afternoon")
+
+  clock.hour = 18
+  doc.fire("turbo:load")
+  assert.equal(node.textContent, "Good evening")
+})
+
+test("install paints with Alpine not yet present", () => {
+  const node = { textContent: "unpainted" }
+  const doc = fakeDocument()
+  doc.querySelectorAll = () => [node]
+  installLinkSidebar({ win: fakeWindow(), doc, now: () => at(13) })
+  assert.equal(node.textContent, "Good afternoon")
+})
+
+test("a bfcache restore paints; an ordinary pageshow does not", () => {
+  const { node, win, clock } = greetingPage(9)
+
+  clock.hour = 13
+  win.fire("pageshow", { persisted: false })
+  assert.equal(node.textContent, "Good morning")
+  win.fire("pageshow", { persisted: true })
+  assert.equal(node.textContent, "Good afternoon")
+})
+
+test("the trigger paints as it opens the panel; another click does not", () => {
+  const { node, doc, clock } = greetingPage(9)
+
+  clock.hour = 13
+  doc.fire("click", clickOn(el([], el(["main"]))))
+  assert.equal(node.textContent, "Good morning")
+  doc.fire("click", clickOn(el([TRIGGER, CONTROLS])))
+  assert.equal(node.textContent, "Good afternoon")
 })
 
 test("install: no document, no install", () => {

@@ -47,7 +47,12 @@ If your app doesn't create its own `app/views/layouts/_navbar.html.erb`, the eng
   renders always skip it (the `/admin/navbar` preview repeats the partial;
   the panels carry page-unique ids). When the viewer's sections include an
   `admin: true` entry, the sidebar replaces the admin dropdown — both use the
-  cog glyph, and two gears side by side read as a duplicate.
+  cog glyph, and two gears side by side read as a duplicate. The panel's title
+  is the viewer's name (`Studio.navbar_user_name`), or a greeting by the
+  browser's local time when signed out. A section's `title` is its group's
+  accessible name, not a visible label: a divider separates the groups. A row
+  is one line at rest. A link's optional `desc:` fades in on hover or keyboard
+  focus and moves nothing; a touch screen does not show it, so keep it extra.
 
 ## How to Override
 

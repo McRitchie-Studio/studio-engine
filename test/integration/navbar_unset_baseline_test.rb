@@ -15,7 +15,9 @@
 # sidebar lost its Links title (/tasks/sidebar-drops-links-title); the theme toggle
 # draws before the gear signed out and in the phone row
 # (/tasks/navbar-gear-and-name-hover); a one-line sidebar row centers its icon
-# (/tasks/sidebar-rows-center-icon-and-label).
+# (/tasks/sidebar-rows-center-icon-and-label); the link sidebar's title became the
+# viewer's name or a greeting, its section labels gave way to dividers and its rows
+# to one line each at rest (/tasks/sidebar-greeting-and-no-labels).
 
 require "bundler/setup"
 

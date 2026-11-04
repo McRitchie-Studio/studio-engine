@@ -6,9 +6,37 @@
     this automatically when sections are declared. %>
 <% sections = studio_sidebar_sections %>
 <% sidebar_admin = respond_to?(:admin?) && admin? %>
-<%# A signed-out visitor's panel has no title: its links say what it is. It keeps its
-    accessible name (aria_label) and its close button. %>
-<% sidebar_title = if sidebar_admin then "Admin Menu" elsif respond_to?(:logged_in?) && logged_in? then "Links" end %>
+<%# THE PANEL'S TITLE. Signed in, admin included: the name the navbar shows, from the
+    same call. Signed out: a greeting by the browser's local time, which the server
+    cannot know, so studio/link_sidebar writes the word over this default before the
+    panel opens (greetingFor). The panel is hidden until then, so nothing flashes.
+
+    It goes in the panel's lead slot (title_html), not its title. A title names the
+    panel through aria-labelledby, and "Good morning" or "Alex" is no name for a
+    menu: the panel keeps "Admin menu" or "Links menu" as its aria-label. %>
+<% sidebar_signed_in = respond_to?(:logged_in?) && logged_in? %>
+<% sidebar_user = sidebar_signed_in && respond_to?(:current_user) ? current_user : nil %>
+<% sidebar_title_class = "type-subhead text-heading truncate pr-3" %>
+<% sidebar_title_html =
+     if sidebar_user
+       sidebar_name = Studio.navbar_user_name_for(sidebar_user, self).to_s.squish
+       tag.p(sidebar_name, class: sidebar_title_class, title: sidebar_name, data: { link_sidebar_title: "" })
+     elsif !sidebar_signed_in
+       tag.p("Good morning", class: sidebar_title_class, data: { link_sidebar_title: "", link_sidebar_greeting: "" })
+     end %>
+<%# THE GROUPS. No section shows a label word and none shows the admin chip: a divider
+    separates the groups. The words stay as each group's accessible name, so a screen
+    reader still announces them. An empty section draws no group, or its two dividers
+    would touch.
+
+    A ROW IS ONE LINE AT REST, with or without a desc:, so the spacing never changes. A
+    desc: fades in on hover or keyboard focus, and nothing moves to make room: it sits
+    absolutely in the row's padding as the label lifts by a transform. engine.css, THE
+    SIDEBAR ROW'S DESCRIPTION, holds the rules. A row with no desc: gains no attribute. %>
+<% sidebar_group = lambda do |title:, admin:, first:, &block|
+     name = [title.presence, ("admin" if admin && !title.to_s.match?(/\badmin\b/i))].compact.join(", ").presence
+     tag.div(role: "group", aria: { label: name }, class: ["py-1", ("border-t border-subtle" unless first)], &block)
+   end %>
 <% close_action = "$store.sidebars.linkTreeOpen = false" %>
 
 <style>
@@ -25,21 +53,16 @@
 <template data-studio-controller="link-sidebar"></template>
 
 <% body_html = capture do %>
-  <nav class="flex-1 min-h-0 overflow-y-auto py-2" aria-label="Studio links">
-    <% sections.each do |section| %>
-      <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
-        <span><%= section[:title] %></span>
-        <% if section[:admin] %>
-          <span class="rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-mono text-primary-ink">ADMIN</span>
-        <% end %>
-      </div>
-
+  <nav class="flex-1 min-h-0 overflow-y-auto py-1" aria-label="Studio links">
+    <% sections.select { |section| section[:links].any? }.each_with_index do |section, index| %>
+      <%= sidebar_group.call(title: section[:title], admin: section[:admin], first: index.zero?) do %>
       <% section[:links].each do |link| %>
         <% target = link[:target].presence %>
         <%= link_to link[:href],
-              class: "group flex #{link[:desc].present? ? "items-start" : "items-center"} gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition",
+              class: "group flex items-center gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition",
               target: target,
               rel: target == "_blank" ? "noopener" : nil,
+              "data-sidebar-row-described": (link[:desc].present? ? "" : nil),
               "@click": close_action do %>
           <% if link[:hover_emoji].present? %>
             <%= render "components/emoji_swap",
@@ -47,15 +70,20 @@
                   hover: link[:hover_emoji],
                   class_name: "text-lg leading-none" %>
           <% else %>
-            <span class="text-lg leading-none flex-shrink-0"><%= link[:emoji] %></span>
+            <span class="studio-emoji-box text-lg leading-none flex-shrink-0"><%= link[:emoji] %></span>
           <% end %>
-          <span class="min-w-0">
-            <span class="block font-medium truncate"><%= link[:label] %></span>
-            <% if link[:desc].present? %>
-              <span class="block text-xs text-muted leading-snug mt-0.5"><%= link[:desc] %></span>
-            <% end %>
-          </span>
+          <% if link[:desc].present? %>
+            <span class="relative min-w-0 flex-1">
+              <span class="block font-medium truncate" data-sidebar-row-label><%= link[:label] %></span>
+              <span class="block truncate text-xs text-muted" data-sidebar-row-desc><%= link[:desc] %></span>
+            </span>
+          <% else %>
+            <span class="min-w-0">
+              <span class="block font-medium truncate"><%= link[:label] %></span>
+            </span>
+          <% end %>
         <% end %>
+      <% end %>
       <% end %>
     <% end %>
 
@@ -93,11 +121,9 @@
         bare call would raise for them. The two must stay the same question —
         if the helper's rule changes, this changes with it. %>
     <% if sidebar_admin && sections.any? { |section| section[:admin] } %>
-      <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
-        <span>Geo</span>
-        <span class="rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-mono text-primary-ink">ADMIN</span>
-      </div>
-      <%= render "components/geo_signpost", variant: :sidebar, close_action: close_action %>
+      <%= sidebar_group.call(title: "Geo", admin: true, first: false) do %>
+        <%= render "components/geo_signpost", variant: :sidebar, close_action: close_action %>
+      <% end %>
     <% end %>
   </nav>
 <% end %>
@@ -116,7 +142,7 @@
 
 <%= render "components/sidebar_panel",
       id: "studio-link-sidebar",
-      title: sidebar_title,
+      title_html: sidebar_title_html,
       open: "$store.sidebars.linkTreeOpen",
       body_html: body_html,
       footer_html: footer_html,
@@ -129,7 +155,7 @@
 
 <%= render "components/sidebar_panel",
       id: "studio-link-sidebar-mobile",
-      title: sidebar_title,
+      title_html: sidebar_title_html,
       open: "$store.sidebars.linkTreeOpen",
       body_html: body_html,
       footer_html: footer_html,
