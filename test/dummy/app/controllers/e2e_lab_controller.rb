@@ -325,7 +325,10 @@ class E2eLabController < ActionController::Base
   # than a fork of it — declares sections, so the trigger is part of the header
   # under test rather than an optional extra.
   LAB_SIDEBAR_SECTIONS = [
-    { title: "Site", links: [{ label: "Home", href: "/", emoji: "🏠" }] }
+    { title: "Site", links: [
+      { label: "Home", href: "/", emoji: "🏠" },
+      { label: "Docs", href: "/up", emoji: "📚", hover_emoji: "🔎" }
+    ] }
   ].freeze
 
   # `?sidebar=1` on ANY lab page, answered for that request alone. The header

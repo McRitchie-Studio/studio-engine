@@ -116,20 +116,21 @@ test("a link sidebar anchor that arrives after load registers the flag through i
   expect(errors).toEqual([]);
 });
 
+// The emoji swap is the row that sat 3px low: the plain emoji misses by about 1px either way.
 test("a one-line row centers its icon on its label", async ({ page }) => {
   await blockOffsiteRequests(page);
-  await page.goto("/lab/sidebar_panels");
+  await page.goto("/lab/sidebar_panels?sidebar=1");
   await page.waitForFunction(() => window.Alpine);
   await trigger(page).click();
   await expect(panel(page)).toBeVisible();
-  const gap = await panel(page).locator("nav a").first().evaluate((row) => {
+  const gap = await panel(page).locator('nav a[href="/up"]').evaluate((row) => {
     const middle = (el) => {
       const range = document.createRange();
       range.selectNodeContents(el);
       const box = range.getBoundingClientRect();
       return box.top + box.height / 2;
     };
-    return Math.abs(middle(row.firstElementChild) - middle(row.children[1].firstElementChild));
+    return Math.abs(middle(row.querySelector(".studio-emoji-swap-base")) - middle(row.children[1].firstElementChild));
   });
   expect(gap).toBeLessThanOrEqual(1);
 });
