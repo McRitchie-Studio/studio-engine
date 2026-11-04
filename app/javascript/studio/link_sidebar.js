@@ -21,6 +21,12 @@
 // A host with its own `sidebars` store keeps it and gains the flag
 // (turf-monster's holds gearOpen).
 //
+// THE GREETING. A signed-out panel's title is a greeting by the browser's local
+// time. components/_link_sidebar renders a default; this writes the right word
+// over it on load, into the incoming body of a Turbo visit or snapshot restore, on
+// a bfcache restore, as the trigger opens the panel, and once a minute for a panel
+// left open past a boundary.
+//
 // THE DOCUMENT HANDLERS run in the capture phase, so the trigger works for a
 // click that lands before Alpine has bound it. They are installed once, on
 // every page, and do nothing where no link sidebar is rendered.
@@ -37,6 +43,26 @@ export const LINK_SIDEBAR_PANELS = "#studio-link-sidebar, #studio-link-sidebar-m
 export const LINK_SIDEBAR_TRIGGERS = "[data-link-sidebar-trigger], [data-username-display], [data-profile-image-toggle]"
 const CONTROLS_PANEL = '[aria-controls~="studio-link-sidebar"]'
 const CLOSE_BUTTON = "[data-link-sidebar-close]"
+const GREETING = "[data-link-sidebar-greeting]"
+const GREETING_REPAINT_MS = 60000
+
+// The three words, by the hour of `now` in the browser's own time zone.
+export function greetingFor(now) {
+  const hour = now.getHours()
+  if (hour >= 5 && hour < 12) return "Good morning"
+  if (hour >= 12 && hour < 17) return "Good afternoon"
+  return "Good evening"
+}
+
+// Writes the word into every greeting under `root`, the desktop and the phone panel
+// both. A signed-in panel holds no greeting, so its name is left alone.
+export function paintGreetings(root, now = new Date()) {
+  if (!root || typeof root.querySelectorAll !== "function") return
+  const word = greetingFor(now)
+  root.querySelectorAll(GREETING).forEach((node) => {
+    if (node.textContent !== word) node.textContent = word
+  })
+}
 
 // Registers the flag: a new `sidebars` store, or one more key on the host's.
 // Null before Alpine exists.
@@ -130,27 +156,41 @@ export function handleLinkSidebarKeydown(event, Alpine) {
 const installed = new WeakSet()
 
 // Once per window: a second call adds no second listener.
-export function installLinkSidebar({ win, doc } = {}) {
+export function installLinkSidebar({ win, doc, now = () => new Date() } = {}) {
   const host = win || globalThis
   const root = doc || host.document
   if (!root || typeof root.addEventListener !== "function") return false
   if (installed.has(host)) return false
   installed.add(host)
 
-  const register = () => registerLinkSidebar(host.Alpine, root)
+  const paint = (target = root) => paintGreetings(target, now())
+  const register = () => {
+    registerLinkSidebar(host.Alpine, root)
+    paint()
+  }
   root.addEventListener("alpine:init", register)
   root.addEventListener("turbo:load", register)
   root.addEventListener("turbo:before-render", (event) => {
     registerLinkSidebar(host.Alpine, event.detail && event.detail.newBody)
+    paint(event.detail && event.detail.newBody)
   })
   // A page restored from Turbo's cache or the bfcache comes back closed.
   root.addEventListener("turbo:before-cache", () => closeLinkSidebar(host.Alpine))
-  host.addEventListener("pageshow", (event) => { if (event.persisted) closeLinkSidebar(host.Alpine) })
-  root.addEventListener("click", (event) => handleLinkSidebarClick(event, host.Alpine), true)
+  host.addEventListener("pageshow", (event) => {
+    if (!event.persisted) return
+    closeLinkSidebar(host.Alpine)
+    paint()
+  })
+  root.addEventListener("click", (event) => {
+    if (handleLinkSidebarClick(event, host.Alpine) === "toggle") paint()
+  }, true)
   root.addEventListener("keydown", (event) => handleLinkSidebarKeydown(event, host.Alpine), true)
+
+  if (typeof host.setInterval === "function") host.setInterval(() => paint(), GREETING_REPAINT_MS)
 
   // Alpine already started (a host that loads it ahead of the module tags).
   if (host.Alpine && host.Alpine.version) register()
+  else paint()
   return true
 }
 

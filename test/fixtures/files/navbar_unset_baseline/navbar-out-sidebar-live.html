@@ -188,6 +188,7 @@
   aria-label="Links menu">
   <div class="flex flex-col h-full">
       <div class="flex items-center justify-between p-4 border-b border-subtle">
+          <div class="min-w-0 flex-1" data-sidebar-panel-lead><p class="type-subhead text-heading truncate pr-3" data-link-sidebar-title="" data-link-sidebar-greeting="">Good morning</p></div>
         <div class="flex items-center gap-2 ml-auto">
           
             <button type="button"
@@ -200,17 +201,14 @@
         </div>
       </div>
 
-      <nav class="flex-1 min-h-0 overflow-y-auto py-2" aria-label="Studio links">
-      <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
-        <span>Site</span>
-      </div>
-
+      <nav class="flex-1 min-h-0 overflow-y-auto py-1" aria-label="Studio links">
+      <div role="group" aria-label="Site" class="py-1">
         <a class="group flex items-center gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition" @click="$store.sidebars.linkTreeOpen = false" href="/">
             <span class="text-lg leading-none flex-shrink-0">*</span>
           <span class="min-w-0">
             <span class="block font-medium truncate">Home</span>
           </span>
-</a>
+</a></div>
   </nav>
 
     
@@ -239,6 +237,7 @@
   aria-label="Links menu">
   <div class="flex flex-col h-full">
       <div class="flex items-center justify-between p-4 border-b border-subtle">
+          <div class="min-w-0 flex-1" data-sidebar-panel-lead><p class="type-subhead text-heading truncate pr-3" data-link-sidebar-title="" data-link-sidebar-greeting="">Good morning</p></div>
         <div class="flex items-center gap-2 ml-auto">
           
             <button type="button"
@@ -251,17 +250,14 @@
         </div>
       </div>
 
-      <nav class="flex-1 min-h-0 overflow-y-auto py-2" aria-label="Studio links">
-      <div class="px-4 pt-4 pb-1 label-upper font-bold text-muted flex items-center gap-2">
-        <span>Site</span>
-      </div>
-
+      <nav class="flex-1 min-h-0 overflow-y-auto py-1" aria-label="Studio links">
+      <div role="group" aria-label="Site" class="py-1">
         <a class="group flex items-center gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition" @click="$store.sidebars.linkTreeOpen = false" href="/">
             <span class="text-lg leading-none flex-shrink-0">*</span>
           <span class="min-w-0">
             <span class="block font-medium truncate">Home</span>
           </span>
-</a>
+</a></div>
   </nav>
 
     

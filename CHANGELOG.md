@@ -4,6 +4,18 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **Link sidebar: no section labels, a calmer title, one line a row.** No section shows a label
+  word or the ADMIN chip at any level; a subtle divider separates the groups, and each group
+  keeps its words as its accessible name. A row is one line: `desc:` is still accepted and no
+  longer shows, so every row centers its icon. The live Geo row moves its gloss to a hover title;
+  the Geo row that cannot link keeps its second line, because that line is the fix to copy. The
+  title is `type-subhead`: signed in, admin included, the name the navbar shows
+  (`Studio.navbar_user_name`); signed out, Good morning, Good afternoon or Good evening by the
+  browser's local time, written by `studio/link_sidebar`. The panel's accessible name stays
+  "Admin menu" or "Links menu". The navbar baseline is regenerated for it.
+
 ## 0.125.0 — 2026-11-04
 
 ### Added

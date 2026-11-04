@@ -8,8 +8,8 @@ require "nokogiri"
 # _link_sidebar_trigger) through ActionView and pins the emitted contract:
 # dual desktop/mobile panels driven by the `sidebars` Alpine store, the anchor
 # for the link-sidebar controller (the store flag and the click handlers are
-# studio/link_sidebar), section/link rendering (admin chip, emoji swap,
-# descriptions), and the trigger's aria wiring.
+# studio/link_sidebar), the panel's title and name, section/link rendering (groups
+# with no label word, one line a row, emoji swap), and the trigger's aria wiring.
 class LinkSidebarTest < Minitest::Test
   SECTIONS = [
     { title: "Site", links: [
@@ -42,44 +42,163 @@ class LinkSidebarTest < Minitest::Test
     assert_includes html, "html { overflow-x: clip; }"
   end
 
-  def test_renders_sections_links_admin_chip_and_emoji_swap
+  def test_renders_links_and_emoji_swap
     html = render_sidebar(sections: SECTIONS, admin: true)
 
-    assert_includes html, "Site"
-    assert_includes html, "Front door"
     assert_includes html, %(href="/docs")
     assert_includes html, %(target="_blank")
     assert_includes html, %(rel="noopener")
-    assert_includes html, ">ADMIN<", "admin-flagged section must show the ADMIN chip"
     assert_includes html, "studio-emoji-swap", "hover_emoji links render through emoji_swap"
-    assert_includes html, "Admin Menu", "admin viewers see the admin title"
   end
 
-  def test_a_row_centers_its_icon_unless_a_description_runs_under_the_label
+  # --- no label word, and the groups stay apart ------------------------------
+
+  def test_no_section_shows_a_label_word_at_any_level
+    [[true, SECTIONS], [false, [SECTIONS.first]]].each do |admin, sections|
+      doc = Nokogiri::HTML5.fragment(render_sidebar(sections: sections, admin: admin))
+
+      refute_includes doc.at_css("#studio-link-sidebar nav").text, "Site"
+      refute_includes doc.at_css("#studio-link-sidebar nav").text, "Ops"
+      refute_includes doc.at_css("#studio-link-sidebar nav").text, "ADMIN"
+      assert_empty doc.css("#studio-link-sidebar .label-upper")
+    end
+  end
+
+  def test_each_group_keeps_its_words_as_an_accessible_name
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: SECTIONS, admin: true, geo_flag: true, geo_routes: true))
+
+    names = doc.css('#studio-link-sidebar nav > [role="group"]').map { |group| group["aria-label"] }
+    assert_equal ["Site", "Ops, admin", "Geo, admin"], names
+  end
+
+  def test_a_divider_separates_the_groups_and_none_tops_the_first
     doc = Nokogiri::HTML5.fragment(render_sidebar(sections: SECTIONS, admin: true))
-    row = ->(href) { doc.at_css(%(#studio-link-sidebar a[href="#{href}"]))["class"].split }
 
-    assert_includes row.call("/"), "items-start", "a two-line row keeps its icon at the top"
-    assert_includes row.call("/docs"), "items-center", "a one-line row with an emoji swap centers it"
-    assert_includes row.call("/error_logs"), "items-center", "a one-line row with a plain emoji centers it"
-    refute_includes row.call("/docs"), "items-start"
+    first, second = doc.css('#studio-link-sidebar nav > [role="group"]').map { |group| group["class"].split }
+    refute_includes first, "border-t"
+    assert_includes second, "border-t"
+    assert_includes second, "border-subtle"
   end
 
-  def test_non_admin_render_uses_links_title_and_shows_logout_when_logged_in
-    html = render_sidebar(sections: [SECTIONS.first], admin: false, logged_in: true)
+  def test_a_section_with_no_links_draws_no_group
+    sections = [SECTIONS.first, { title: "Empty", links: [] }, { title: "Last", links: [{ label: "End", href: "/end", emoji: "*" }] }]
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: sections, admin: false))
 
-    assert_includes html, ">Links<"
+    assert_equal %w[Site Last], doc.css('#studio-link-sidebar nav > [role="group"]').map { |group| group["aria-label"] }
+  end
+
+  # --- one line a row --------------------------------------------------------
+
+  def test_a_row_is_one_line_and_a_desc_is_accepted_but_not_shown
+    html = render_sidebar(sections: SECTIONS, admin: true)
+    doc = Nokogiri::HTML5.fragment(html)
+
+    refute_includes html, "Front door", "a host may still pass desc:"
+    %w[/ /docs /error_logs].each do |href|
+      row = doc.at_css(%(#studio-link-sidebar a[href="#{href}"]))["class"].split
+      assert_includes row, "items-center", href
+      refute_includes row, "items-start", href
+    end
+  end
+
+  # The live row is one line, like every other. Its gloss moves to a hover title.
+  def test_the_live_geo_row_is_one_line
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: SECTIONS, admin: true, geo_flag: true, geo_routes: true))
+    row = doc.at_css(%(#studio-link-sidebar a[href="/admin/geo"]))
+
+    assert_includes row["class"].split, "items-center"
+    assert_equal "Geo", row.text.split.last
+    assert_equal "Country and subdivision blocking", row["title"]
+  end
+
+  # The row that cannot link keeps its second line: it is the fix the operator has to
+  # copy, and a title is mouse-only and cannot be selected.
+  def test_the_disabled_geo_row_keeps_the_fix_on_show
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: SECTIONS, admin: true, geo_flag: false, geo_routes: false))
+    row = doc.at_css('#studio-link-sidebar [data-test="geo-signpost-disabled"]')
+
+    assert_includes row.text, "Draw the geo routes first"
+    assert_includes row.at_css("code").text, "config.draw_geo_routes = true"
+    assert_includes row["class"].split, "items-start"
+  end
+
+  # --- the panel's title and its name ----------------------------------------
+
+  def test_a_signed_in_panel_titles_itself_with_the_navbars_name
+    [true, false].each do |admin|
+      doc = Nokogiri::HTML5.fragment(render_sidebar(sections: [SECTIONS.first], admin: admin, user: named_user("Alex")))
+
+      %w[#studio-link-sidebar #studio-link-sidebar-mobile].each do |panel|
+        title = doc.at_css("#{panel} [data-link-sidebar-title]")
+        assert_equal "Alex", title.text, "#{panel}, admin: #{admin}"
+        assert_nil doc.at_css("#{panel} [data-link-sidebar-greeting]"), "a signed-in title is not a greeting"
+      end
+      refute_includes doc.to_html, ">Links<"
+      refute_includes doc.to_html, "Admin Menu"
+    end
+  end
+
+  # The same call the navbar makes, so a host's name setting reaches both.
+  def test_the_title_follows_the_hosts_name_setting
+    previous = Studio.navbar_user_name
+    Studio.navbar_user_name = ->(user) { "#{user.first_name} the Host" }
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: [SECTIONS.first], admin: false, user: named_user("Alex")))
+
+    assert_equal "Alex the Host", doc.at_css("#studio-link-sidebar [data-link-sidebar-title]").text
+  ensure
+    Studio.navbar_user_name = previous
+  end
+
+  def test_a_long_name_truncates_and_keeps_its_full_text_for_a_pointer
+    long = "Bartholomew Fitzgerald-Wellington"
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: [SECTIONS.first], admin: false, user: named_user(long)))
+    title = doc.at_css("#studio-link-sidebar [data-link-sidebar-title]")
+
+    assert_includes title["class"].split, "truncate"
+    assert_equal long, title["title"]
+  end
+
+  def test_a_name_is_escaped
+    doc_html = render_sidebar(sections: [SECTIONS.first], admin: false, user: named_user("<b>Al</b>"))
+
+    refute_includes doc_html, "<b>Al</b>"
+  end
+
+  def test_a_signed_out_panel_titles_itself_with_a_greeting_and_omits_the_logout_footer
+    html = render_sidebar(sections: [SECTIONS.first], admin: false, logged_in: false)
+    doc = Nokogiri::HTML5.fragment(html)
+
+    %w[#studio-link-sidebar #studio-link-sidebar-mobile].each do |panel|
+      title = doc.at_css("#{panel} [data-link-sidebar-title][data-link-sidebar-greeting]")
+      refute_nil title, "#{panel}: studio/link_sidebar writes over this element"
+      assert_includes ["Good morning", "Good afternoon", "Good evening"], title.text
+    end
+    refute_includes html, ">Links<"
+    refute_includes html, "Log out"
+  end
+
+  def test_a_signed_in_panel_shows_the_logout_footer
+    html = render_sidebar(sections: [SECTIONS.first], admin: false, user: named_user("Alex"))
+
     assert_includes html, "Log out"
     assert_includes html, "/logout"
   end
 
-  def test_logged_out_render_omits_the_logout_footer
-    html = render_sidebar(sections: [SECTIONS.first], admin: false, logged_in: false)
+  # The visible title is a name or a greeting, neither of which names a menu. The
+  # panel's own name stays, through aria-label and not aria-labelledby.
+  def test_the_panel_keeps_its_accessible_name_at_every_level
+    [
+      [{ admin: true, user: named_user("Alex") }, "Admin menu"],
+      [{ admin: false, user: named_user("Alex") }, "Links menu"],
+      [{ admin: false, logged_in: false }, "Links menu"]
+    ].each do |viewer, name|
+      doc = Nokogiri::HTML5.fragment(render_sidebar(sections: [SECTIONS.first], **viewer))
 
-    refute_includes html, ">Links<", "a signed-out visitor's panel has no title"
-    assert_includes html, 'aria-label="Links menu"', "it keeps its accessible name"
-
-    refute_includes html, "Log out"
+      %w[#studio-link-sidebar #studio-link-sidebar-mobile].each do |panel|
+        assert_equal name, doc.at_css(panel)["aria-label"], viewer.inspect
+        assert_nil doc.at_css(panel)["aria-labelledby"], "the title never names the panel"
+      end
+    end
   end
 
   def test_trigger_wires_aria_to_both_panels
@@ -167,7 +286,7 @@ class LinkSidebarTest < Minitest::Test
   def test_the_sidebar_yields_the_signpost_when_it_is_not_the_admin_menu
     html = render_sidebar(sections: [SECTIONS.first], admin: true, geo_flag: true, geo_routes: true)
 
-    refute_includes html, ">ADMIN<",
+    refute_includes html, ", admin",
                      "precondition: no admin-flagged section, so the dropdown is NOT suppressed"
     refute_includes html, "/admin/geo", "the dropdown carries the row for this shape"
     refute_includes html, ">Geo<"
@@ -211,22 +330,27 @@ class LinkSidebarTest < Minitest::Test
 
   private
 
-  def render_sidebar(sections:, admin:, logged_in: true, geo_flag: nil, geo_routes: false)
+  def named_user(first_name)
+    Struct.new(:first_name, :display_name).new(first_name, first_name)
+  end
+
+  def render_sidebar(sections:, admin:, logged_in: true, user: nil, geo_flag: nil, geo_routes: false)
     previous = Studio.geo_blocking_enabled
     Studio.geo_blocking_enabled = geo_flag
-    view(sections: sections, admin: admin, logged_in: logged_in, geo_routes: geo_routes)
+    view(sections: sections, admin: admin, logged_in: logged_in, user: user, geo_routes: geo_routes)
       .render(partial: "components/link_sidebar")
   ensure
     Studio.geo_blocking_enabled = previous
   end
 
-  def view(sections:, admin:, logged_in: true, geo_routes: false)
+  def view(sections:, admin:, logged_in: true, user: nil, geo_routes: false)
     resolved = Studio::SidebarSections.resolve(sections, Struct.new(:a) { def admin? = true }.new(1))
     resolved = resolved.reject { |s| s[:admin] } unless admin
     view = ActionView::Base.with_empty_template_cache.with_view_paths(["app/views"])
     view.define_singleton_method(:studio_sidebar_sections) { resolved }
     view.define_singleton_method(:admin?) { admin }
     view.define_singleton_method(:logged_in?) { logged_in }
+    view.define_singleton_method(:current_user) { user }
     view.define_singleton_method(:logout_path) { "/logout" }
     # Present only where the host drew the geo routes — the state that decides
     # whether the signpost links or explains.
