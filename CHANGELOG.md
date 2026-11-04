@@ -4,6 +4,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+- Page transitions: an advance visit to the same path keeps a shared `data-vt-morph` name, so
+  a launch panel still morphs into the chat at its own address. A refresh stays silent.
+- Page transitions: a GET that redirects moves the page once. It played the move twice, because
+  Turbo renders the response and then visits the final address with that same response.
+
 ## 0.124.0 — 2026-11-04
 
 ### Added
