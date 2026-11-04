@@ -53,7 +53,7 @@ test("the trigger opens the sidebar once per click; Escape and an outside click 
   await trigger(page).click();
   await expect(panel(page)).toBeVisible();
   // A click inside the panel leaves it open.
-  await panel(page).locator(".label-upper").first().click();
+  await panel(page).locator("> div > div").first().click({ position: { x: 10, y: 10 } });
   await expect(panel(page)).toBeVisible();
   await page.locator("[data-test='lab-body']").click();
   await expect(panel(page)).toBeHidden();
