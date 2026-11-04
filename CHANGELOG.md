@@ -31,6 +31,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   covers their own panels on the shared partial and their other `x-show` transitions. A host
   that overrides `layouts/studio/_head` gets it from `studio/application`.
 
+- `/admin/schema`: a database with an expression index renders. Rails returns such an index's
+  columns as a String, and the page called `join` on it, which answered 500.
+
 ## 0.125.0 — 2026-11-04
 
 ### Added
