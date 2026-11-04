@@ -674,7 +674,7 @@ html[data-page-transition]::view-transition-new(root) {
   backface-visibility: hidden;
 }
 
-/* A same-page visit (a refresh, a poll) draws nothing. */
+/* A same-page visit (a refresh, a poll, the second half of a redirect) draws nothing. */
 html[data-page-transition="still"]::view-transition-old(root),
 html[data-page-transition="still"]::view-transition-new(root) {
   animation: none;

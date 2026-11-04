@@ -100,6 +100,7 @@ Rails.application.routes.draw do
   get "lab/bar_stack_turbo", to: "e2e_lab#bar_stack_turbo"
   get "lab/page_transitions", to: "e2e_lab#page_transitions"
   get "lab/page_transitions_b", to: "e2e_lab#page_transitions_b"
+  get "lab/page_transitions_redirect", to: redirect { |_params, request| "/lab/page_transitions_b?#{request.query_string}" }
   # A recording beside its transcript: the page with the lazy frame, and the frame.
   get "lab/knowledge_transcript", to: "e2e_lab#knowledge_transcript"
   get "lab/knowledge_transcript/frame", to: "e2e_lab#knowledge_transcript_frame"

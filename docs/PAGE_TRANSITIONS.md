@@ -45,6 +45,8 @@ route. Back and Forward play the same direction, and Turbo restores the scroll p
 |---|---|
 | A change of path, Back or Forward included | The direction |
 | The same path: a refresh, a poll, a change of query only | Nothing |
+| The same path, an advance visit, with a morph name on both sides | The engine's fade and the morph |
+| A GET that redirects | The direction once, for the first render. The follow-up visit draws nothing |
 | Two pages that share a morph name | The engine's fade and the morph |
 | Reduced motion, or a browser without view transitions | The plain swap, with no pause |
 | Arriving at a page whose layout has no metas | The plain swap, with no pause |
@@ -89,6 +91,10 @@ The browser takes the old page's picture before `turbo:before-render` fires, so 
 decision is made ahead of it. The script reads the marks from the response, and from a
 remembered list for a page in Turbo's cache. If the response is late, the visit plays the
 fade with the element fading across, and no morph.
+
+An advance visit to the page's own path counts as two pages: a launch panel can give way to
+the chat at the same address, and the portrait they share morphs. A replace is a refresh,
+so the same names on the same path play nothing.
 
 ## What a host should know
 

@@ -327,6 +327,49 @@ test("a chat head on both pages morphs, and no style plays", async ({ page }) =>
   expect(names.filter((name) => name.includes(" pt-"))).toEqual([]);
 });
 
+// The launch panel's own visit: a new page at the address it already holds.
+async function visitHere(page, options) {
+  const load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
+  await page.evaluate((visit) => window.Turbo.visit(window.location.href, visit), options);
+  await load;
+}
+
+test("an advance visit to the same path morphs a shared name, and no style plays", async ({ page }) => {
+  await open(page, "direction=left&morph=both", 0);
+  await visitHere(page, {});
+  const names = await seen(page);
+  expect(names.some((name) => name.startsWith("::view-transition-group(agent-portrait)"))).toBe(true);
+  expect(names.filter((name) => name.includes(" pt-"))).toEqual([]);
+});
+
+test("a refresh of the same path plays nothing, with a chat head on the page", async ({ page }) => {
+  await open(page, "direction=left&morph=both", 0);
+  await visitHere(page, { action: "replace" });
+  const names = await seen(page);
+  expect(names.some((name) => name.includes("agent-portrait"))).toBe(false);
+  expect(names.filter((name) => /\(root\) /.test(name) && !name.includes("group"))).toEqual([]);
+});
+
+test("a visit that redirects moves the page once", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__moves = [];
+    const start = document.startViewTransition.bind(document);
+    document.startViewTransition = (update) => {
+      const transition = start(update);
+      transition.ready.then(() => {
+        window.__moves.push(document.getAnimations().some((a) => (a.animationName || "").startsWith("pt-")));
+      }, () => {});
+      return transition;
+    };
+  });
+  await open(page, "direction=left", 0);
+  await go(page, "redirect");
+  await expect(page.locator('[data-test="page-b"]')).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe("/lab/page_transitions_b");
+  expect(await page.evaluate(() => window.__moves)).toEqual([true, false]);
+  expectPlayed(await seen(page), "pt-out-left", "pt-in-from-right");
+});
+
 test("Back between two chat heads still morphs, from Turbo's cache", async ({ page }) => {
   await open(page, "direction=left&morph=both", 0);
   await go(page);

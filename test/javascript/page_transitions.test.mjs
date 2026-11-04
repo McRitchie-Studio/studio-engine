@@ -51,6 +51,12 @@ test("a same-page visit is still", () => {
   assert.equal(planVisit({ ...visit, to: "/", sharedName: true }), STILL)
 })
 
+test("an advance to the same path keeps a shared name's morph, and nothing else changes", () => {
+  assert.equal(planVisit({ ...visit, to: "/", sharedName: true, advance: true }), null)
+  assert.equal(planVisit({ ...visit, to: "/", advance: true }), STILL)
+  assert.equal(planVisit({ ...visit, to: "/", sharedName: true, advance: false }), STILL)
+})
+
 test("two pages sharing a name play no style, so their morph stands", () => {
   assert.equal(planVisit({ ...visit, sharedName: true }), null)
 })
