@@ -47,6 +47,21 @@ File.binwrite(favicon, Base64.decode64(
 # spec happened to observe it.
 abort "e2e/boot: favicon not written at #{favicon}" if File.size?(favicon).to_i.zero?
 
+# ---- The marketing kit's files ----------------------------------------------
+#
+# The lab page (/lab/marketing_kit) links real files, because the page looks for
+# each one before it links it. Written, not committed, like the favicon.
+kit_dir = File.join(PUBLIC_DIR, "kit")
+FileUtils.mkdir_p(kit_dir)
+{ "light" => "#1A1535", "dark" => "#FFFFFF" }.each do |tone, ink|
+  File.write(File.join(kit_dir, "both-#{tone}.svg"),
+             %(<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="#{ink}"/></svg>))
+  File.binwrite(File.join(kit_dir, "both-#{tone}.png"), Base64.decode64(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk" \
+    "YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+  ))
+end
+
 # ---- CSS ---------------------------------------------------------------------
 #
 # The SAME binary tailwindcss-rails hands consumers (tailwindcss-ruby is already a

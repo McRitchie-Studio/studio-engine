@@ -357,6 +357,8 @@ class E2eLaneContractTest < Minitest::Test
       "site_footer_home.html.erb" => ["studio_booking_frame"],
       "site_footer_schedule.html.erb" => ["studio_booking_frame"],
       "site_footer_index.html.erb" => ["studio_booking_link"],
+      # The kit's copy control and downloads are the engine's markup and program.
+      "marketing_kit.html.erb" => ["studio/marketing_kit/kit"],
       # The voice row's recorder, meter and save are the engine's program
       # (studio/voice_profile), mounted by the row's own markup.
       "voice_profile.html.erb" => ["studio/profiles/voice_section"],
