@@ -223,6 +223,93 @@ body.modal-open .studio-app-banner {
   line-height: 1.4;
 }
 
+/* -- The page header (studio/_page_header, docs/PAGE_HEADER.md) ---------
+   A normal page header at rest and a bar once stuck. The border is there in
+   both states, in transparent at rest, so the row's height never changes and
+   the pinned stack has nothing to republish. The layout is owned here: the
+   engine's views depend on no responsive utility a host may not have emitted.
+   The fade is owned too, because .fade-edge-x is in the opt-in motion layer, and
+   it marks only an end that hides a tab (studio/controllers/page_header). */
+
+@utility page-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-block: 0.5rem;
+  border-block: 1px solid transparent;
+  background-color: transparent;
+  transition: background-color 150ms ease, border-color 150ms ease;
+
+  &[data-stuck],
+  [data-studio-controller-failed~="page-header"] + & {
+    @apply bg-surface border-subtle;
+  }
+}
+
+@utility page-header-sentinel {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+@utility page-header-lead {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+@utility page-header-title {
+  @apply text-heading;
+  font-size: calc(var(--type-base, 16px) * 1.5);
+  font-weight: var(--type-display-weight, 800);
+  line-height: 1.25;
+}
+
+@utility page-header-meta {
+  white-space: nowrap;
+
+  @media (width < 40rem) {
+    display: none;
+  }
+}
+
+@utility page-header-tabs {
+  --page-header-fade-start: 0px;
+  --page-header-fade-end: 0px;
+  flex: 1 1 0%;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--page-header-fade-start), #000 calc(100% - var(--page-header-fade-end)), transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0, #000 var(--page-header-fade-start), #000 calc(100% - var(--page-header-fade-end)), transparent 100%);
+
+  &[data-fade-start] {
+    --page-header-fade-start: 2rem;
+  }
+
+  &[data-fade-end] {
+    --page-header-fade-end: 2rem;
+  }
+}
+
+/* width: max-content, then an auto margin: the tabs float right while they fit,
+   and start at the left, all reachable, once they do not. justify-content would
+   push the overflow past the start, where no scroll can reach it. */
+@utility page-header-track {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: max-content;
+  margin-left: auto;
+}
+
+@utility page-header-actions {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 /* -- Scrims: tints and shades ----------------------------------------------
    A scrim is the wash laid over media (a photo, a video) so text reads on it.
    It comes in two TONES, and the tone is a design decision, not a colour pick:

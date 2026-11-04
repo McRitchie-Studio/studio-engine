@@ -285,6 +285,17 @@ actions; the engine supplies only the banner.
 
 ## UI Primitives
 
+### The page header — `studio/_page_header`
+
+An admin page's title: a plain header at rest, a bar once stuck under the navbar,
+in the pinned stack so a table's sticky header sits under it
+([`docs/PAGE_HEADER.md`](docs/PAGE_HEADER.md)).
+
+```erb
+<%= render "studio/page_header", title: "Models", meta: "v1.2.3", label: "Models",
+      tabs: [{ label: "Users", href: users_path, current: "page" }, { label: "Teams", href: teams_path }] %>
+```
+
 ### The "at" time stamp — `at_time_tag`
 
 Stamps WHEN something happened, on the reader's own clock: `at 3:53p`, gaining a

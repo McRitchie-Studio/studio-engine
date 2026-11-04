@@ -8,7 +8,7 @@ const { blockOffsiteRequests } = require("./helpers");
 // These controllers carry their pages' own behaviour (the geo preview, the link
 // preview card, the email banner scale, the booking frame and popup, the footer
 // map, the survey stepper, the knowledge transcript, the voice row, the
-// microphone chip and the voice recorder). A lazy controller is one more request, and a
+// microphone chip, the voice recorder and the page header). A lazy controller is one more request, and a
 // browser never fetches a failed module again in the same document
 // (e2e/lazy_controller_failure.spec.js), so the failure has to be a state the
 // page can show: data-studio-controller-failed on the element.
@@ -35,6 +35,7 @@ const PAGES = [
   ["microphone-chip", "/lab/voice_capture", "microphone_chip_controller"],
   ["voice-recorder", "/lab/voice_capture", "voice_recorder_controller"],
   ["copy-text", "/lab/marketing_kit", "copy_text_controller"],
+  ["page-header", "/lab/admin_models/users", "page_header_controller"],
   // A signed-in door: the mic is never on a signed-out page.
   ["agent-chat-voice", "/agent_chat_voice_lab/sign_in?as=lazy", "agent_chat_voice_controller"]
 ];

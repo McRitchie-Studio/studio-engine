@@ -141,6 +141,17 @@ export function measurePin(el, name, legacy, timeline) {
   return { el: el, name: name, legacy: legacy, h: el.offsetHeight - band, bottom: Math.max(0, r.bottom) };
 }
 
+// WHERE AN ADOPTED HEADER GOES: its place in the document, since order is
+// document order (composed). Appended, it read as below every layer, so a layer
+// under it (studio/_page_header) composed a top of 0 and pinned over it.
+export function documentIndex(list, el) {
+  var FOLLOWING = 4; // Node.DOCUMENT_POSITION_FOLLOWING
+  for (var i = 0; i < list.length; i++) {
+    if (el.compareDocumentPosition(list[i].el) & FOLLOWING) return i;
+  }
+  return list.length;
+}
+
 // THE REGISTRY IS DERIVED, NEVER CACHED — and that is a correctness rule.
 //
 // This used to build a `pins` array once and hold each element by reference
@@ -179,7 +190,7 @@ export function readStack() {
   // contest board and mcritchie-studio's heartbeat CSS all read — would
   // never publish at all. Both live consumers own their header, so it is
   // adopted as a pin even when it does not ask to be.
-  if (header && !headerPinned) list.push(measurePin(header, 'nav', true, timeline));
+  if (header && !headerPinned) list.splice(documentIndex(list, header), 0, measurePin(header, 'nav', true, timeline));
   return {
     pins: list,
     stack: timeline ? pinnedAt(list) : composed(list),

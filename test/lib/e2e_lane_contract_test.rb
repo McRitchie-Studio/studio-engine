@@ -280,6 +280,7 @@ class E2eLaneContractTest < Minitest::Test
       # The sticky table clone is placed off this chrome; a hand-rolled header
       # would grade the lab's header, not the stack the clone reads.
       "sticky_table.html.erb" => ["studio/banners/stack", "layouts/navbar"],
+      "admin_models.html.erb" => ["studio/banners/stack", "layouts/navbar"],
       "toast_over_banner.html.erb" => [
         "studio/banners/stack", "layouts/navbar", "layouts/studio/flash",
         "studio/modals/host"
@@ -390,6 +391,11 @@ class E2eLaneContractTest < Minitest::Test
     lab = File.join(ROOT, "test", "dummy", "app", "views", "e2e_lab")
     frame = File.read(File.join(lab, "knowledge_transcript_frame.html.erb"))
     page = File.read(File.join(lab, "knowledge_transcript.html.erb"))
+
+    # The page itself, by name, so the spec reads the row the app renders.
+    assert_match(/<%=\s*render template: "studio\/admin_models\/show"\s*%>/,
+                 File.read(File.join(lab, "admin_models.html.erb")),
+                 "the lab's models page must render the engine's own view")
 
     assert_match(/<%=\s*render template: "studio\/knowledge_docs\/preview"\s*%>/, frame,
                  "knowledge_transcript_frame.html.erb must render the engine's preview template BY NAME")

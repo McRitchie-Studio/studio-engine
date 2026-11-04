@@ -1137,7 +1137,9 @@
 # confirmation on the page; the attributes are in the server's bytes whether or not
 # the lazy controller ever runs, so only a browser can say. Seven, on /lab/marketing_kit.
 #   npx playwright test --list                                             -> 438
-total_specs: 438
+# 438 -> 447: e2e/page_header.spec.js (9), merged from accepted.
+#   npx playwright test --list                                             -> 447
+total_specs: 447
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1408,7 +1410,13 @@ total_specs: 438
 # e2e/style_section_nav.spec.js, on the new /lab/style_nav page.
 # And for the marketing kit: 7 more tests (431 -> 438), 1 new file:
 # e2e/marketing_kit.spec.js, on the new /lab/marketing_kit page.
-executed: 438
+# And for the page header (studio/_page_header): 9 more tests (438 -> 447), 1 new
+# file, e2e/page_header.spec.js, on the new /lab/admin_models page, which renders the
+# real studio/admin_models/show under the real navbar. Rest, stuck and no overlap are
+# computed styles and boxes, so only a browser can read them. Six controls, each red
+# on the specs that name them, are listed at the top of that file.
+#   npx playwright test --list                                             -> 447 tests, 70 files
+executed: 447
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
