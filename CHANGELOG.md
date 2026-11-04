@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.125.0 — 2026-11-04
+
 ### Added
 
 - **Page transitions across full page loads.** With `Studio.page_transition_direction` set,
