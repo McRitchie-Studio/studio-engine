@@ -70,25 +70,27 @@ test("the band blurs the page beside the panel and leaves the page beyond it sha
 
 test("the band moves with the panel through the slide", async ({ page }) => {
   await openLab(page);
+  // Alpine ends a transition on its own timer, read from the computed duration, so a slide
+  // merely paused snaps home on a slow runner. A long duration keeps that timer away.
+  await page.addStyleTag({ content: "#studio-link-sidebar { transition-duration: 60s !important; }" });
   await trigger(page).click();
-  // Hold the slide halfway, where a filter stranded by the transform would show.
+  // Hold the slide part way, where a filter stranded by the transform would show.
   const left = await panel(page).evaluate(async (node) => {
     while (!node.getAnimations().length) await new Promise(requestAnimationFrame);
     const slide = node.getAnimations()[0];
     slide.pause();
-    slide.currentTime = 150;
+    slide.currentTime = 30000;
     await new Promise(requestAnimationFrame);
     return node.getBoundingClientRect().left;
   });
-  expect(left, "the panel is part way in").toBeGreaterThan(960);
+  expect(left, "the panel is far enough from home to tell the two places apart").toBeGreaterThan(1000);
   expect(left).toBeLessThan(1270);
 
   const beside = { x: left - 24, y: 200, width: 22, height: 300 };
   expect(await stripsDiffer(page, beside), "the blur is beside the panel, here").toBe(true);
-  const rest = { x: 960 - 24, y: 200, width: 22, height: 300 };
-  if (left - 40 > rest.x + rest.width) {
-    expect(await stripsDiffer(page, rest), "and not where the panel will end up").toBe(false);
-  }
+  const home = { x: 960 - 24, y: 200, width: 22, height: 300 };
+  expect(await stripsDiffer(page, home), "and not where the panel will end up").toBe(false);
+  expect((await panel(page).boundingBox()).x, "the slide held through every read").toBe(left);
 });
 
 test("the band takes no clicks: a click in it reaches the page and closes the panel", async ({ page }) => {
