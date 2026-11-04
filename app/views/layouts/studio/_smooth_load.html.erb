@@ -8,8 +8,17 @@
     Transition styling ships in engine.css ("Smooth-load convention" block);
     pin an app's sticky header with the .vt-pinned-header utility (exactly one
     element per page — a duplicate view-transition-name silently disables the
-    whole transition). %>
-<% if Studio.smooth_load %>
+    whole transition).
+
+    Studio.page_transition_direction is the one switch for the app-to-app page
+    transition (docs/PAGE_TRANSITIONS.md): set, it turns all of this on, whatever
+    Studio.smooth_load says. The ivar lets one request set it without writing the
+    process-wide setting (the e2e lab). %>
+<% page_transition_direction = @studio_page_transition_direction || Studio.page_transition_direction %>
+<% if Studio.smooth_load || page_transition_direction %>
   <meta name="view-transition" content="same-origin">
   <meta name="turbo-cache-control" content="no-preview">
+<% end %>
+<% if page_transition_direction %>
+  <meta name="page-transition-direction" content="<%= page_transition_direction %>">
 <% end %>

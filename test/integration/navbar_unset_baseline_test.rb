@@ -32,7 +32,7 @@ class NavbarUnsetBaselineTest < ActiveSupport::TestCase
   DEFAULTS = {
     navbar_header_bars: [], navbar_menu_trigger: nil, navbar_account_sidebar: nil,
     navbar_phone_name: false, navbar_name_in_rows: false, navbar_brand: nil, navbar_root_hook: false,
-    navbar_z_tier: false
+    navbar_z_tier: false, page_transition_direction: nil
   }.freeze
 
   setup { @prior = DEFAULTS.keys.to_h { |key| [key, Studio.public_send(key)] } }

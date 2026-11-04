@@ -1,7 +1,7 @@
 <%# locals: (name:, portrait: nil, role: nil) %>
 <%# The chat's head (studio/agent_chat/_chat): the agent's portrait, a big circle centered on top, its name and role under it. `portrait` is ready markup; with none, the name's initial on a plain circle. The portrait keeps one view-transition name, as on the hub's agent pages. %>
 <div class="flex flex-col items-center gap-2 text-center min-w-0" data-test="agent-chat-header" data-agent-name="<%= name %>">
-  <div class="rounded-full shadow-md overflow-hidden" style="view-transition-name: agent-portrait;" data-test="agent-chat-portrait">
+  <div class="rounded-full shadow-md overflow-hidden" style="view-transition-name: agent-portrait;" data-vt-morph="agent-portrait" data-test="agent-chat-portrait">
     <% if portrait.present? %>
       <%= portrait %>
     <% else %>
