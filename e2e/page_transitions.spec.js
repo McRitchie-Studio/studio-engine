@@ -60,24 +60,32 @@ async function open(page, query, randomValue) {
   await page.waitForFunction(() => window.Turbo);
 }
 
-// The share of pixels that differ by more than dither. A gradient's snapshot is not
-// byte-identical to its live paint, so bytes cannot compare two screenshots here.
+// The share of pixels that differ, at quarter size, with where they are for a failure. Text
+// antialiases differently in a snapshot on the CI's Linux (2 to 5% of full-size pixels), and
+// bytes cannot compare a gradient's snapshot either. Averaging keeps chrome that moved (100%).
 function changedShare(page, a, b) {
   return page.evaluate(async ([one, two]) => {
     const read = async (encoded) => {
       const blob = await (await fetch(`data:image/png;base64,${encoded}`)).blob();
       const bitmap = await createImageBitmap(blob);
-      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const width = Math.ceil(bitmap.width / 4);
+      const height = Math.ceil(bitmap.height / 4);
+      const canvas = new OffscreenCanvas(width, height);
       const context = canvas.getContext("2d");
-      context.drawImage(bitmap, 0, 0);
-      return context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+      context.imageSmoothingQuality = "high";
+      context.drawImage(bitmap, 0, 0, width, height);
+      return { width, data: context.getImageData(0, 0, width, height).data };
     };
     const [left, right] = [await read(one), await read(two)];
     let changed = 0;
-    for (let i = 0; i < left.length; i += 4) {
-      if (Math.abs(left[i] - right[i]) + Math.abs(left[i + 1] - right[i + 1]) + Math.abs(left[i + 2] - right[i + 2]) > 24) changed += 1;
+    let first = null;
+    for (let i = 0; i < left.data.length; i += 4) {
+      if (Math.abs(left.data[i] - right.data[i]) + Math.abs(left.data[i + 1] - right.data[i + 1]) + Math.abs(left.data[i + 2] - right.data[i + 2]) > 24) {
+        changed += 1;
+        if (!first) first = `x${((i / 4) % left.width) * 4}`;
+      }
     }
-    return changed / (left.length / 4);
+    return { share: changed / (left.data.length / 4), first };
   }, [a.toString("base64"), b.toString("base64")]);
 }
 
@@ -150,8 +158,10 @@ async function expectChromeHoldsStill(page) {
   };
   await page.evaluate(() => transitionAnimations().forEach((a) => a.finish()));
   await page.waitForFunction(() => !document.documentElement.hasAttribute("data-page-transition"));
-  expect(await changedShare(page, before.stack, during.stack), "the banner stack moved").toBeLessThan(0.01);
-  expect(await changedShare(page, before.header, during.header), "the navbar moved").toBeLessThan(0.01);
+  const stackChange = await changedShare(page, before.stack, during.stack);
+  const headerChange = await changedShare(page, before.header, during.header);
+  expect(stackChange.share, `the banner stack moved, from ${stackChange.first}`).toBeLessThan(0.01);
+  expect(headerChange.share, `the navbar moved, from ${headerChange.first}`).toBeLessThan(0.01);
 }
 
 test("the page moves while the banner stack and the navbar hold still", async ({ page }) => {
