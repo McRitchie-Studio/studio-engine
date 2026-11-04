@@ -207,6 +207,17 @@ test("the snapshot holds no phase class when turbo:before-cache itself started t
   await expectOnScreen(page, DESKTOP);
 });
 
+test("the snapshot holds no phase class with the page transition on", async ({ page }) => {
+  const errors = await start(page, "?direction=left");
+  await openLinkSidebar(page, DESKTOP);
+  await clickLinkMidLeave(page, DESKTOP, LINK_IN(DESKTOP));
+  await waitForSnapshot(page, "/lab/sidebar_snapshot?direction=left");
+
+  const snapshot = await snapshotOf(page, "/lab/sidebar_snapshot?direction=left", DESKTOP);
+  expect(snapshot.phase).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
 test("an x-transition with no class names is filed without its inline style", async ({ page }) => {
   await start(page);
   const fade = "[data-test='lab-fade']";
