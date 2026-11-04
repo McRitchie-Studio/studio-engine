@@ -114,7 +114,9 @@ holds its last frame until the new page's first render, as it does for any load.
 browser's own limit it gives up on the transition and the page loads plainly: in Chromium 151
 a page that took 3 seconds to parse played, and one that took 4.5 seconds did not. The first render waits for the end
 of parsing, through `<link rel="expect" blocking="render">`, and only on a planned arrival: a
-render of half a body has no navbar or stack to hold still.
+render of half a body has no navbar or stack to hold still. Chromium prints one console warning
+for that link on each arrival ("Did not find element expected to be parsed"). It is expected: no
+element has that id, so the hold lasts to the end of parsing.
 
 **Images do not wait across a full load.** The 500ms image cap in [Images and fonts](#images-and-fonts)
 applies only to a Turbo visit. There, the script holds the swap and loads the images from the
