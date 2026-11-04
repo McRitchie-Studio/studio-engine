@@ -1,0 +1,10 @@
+/* Opts a document in to the browser's cross-document view transition. A separate file,
+   because this at-rule takes no selector: in the engine's bundle it would act on every
+   host. layouts/studio/_head links it only with Studio.page_transition_direction set.
+   Both documents must carry it. Reduced motion gets no transition at all.
+   docs/PAGE_TRANSITIONS.md, "Full page loads". */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+}

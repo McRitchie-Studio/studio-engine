@@ -7,6 +7,10 @@
 // settled ahead of the visit: the held banner stack and the morph names are decided here on
 // turbo:visit and from the response, never first at before-render.
 //
+// A full load is the other path to the same look. The new document draws the motion, so the old
+// one only plans it: at pageswap it names what it holds, draws the style here, and leaves it for
+// studio/page_transition_reveal, the classic script that applies it at pagereveal.
+//
 // The effects are from the Codrops Page Transitions demo; the keyframes were written fresh.
 
 export const DIRECTIONS = Object.freeze({
@@ -20,6 +24,8 @@ export const DIRECTIONS = Object.freeze({
 // runs, and draws nothing.
 export const STILL = "still"
 export const READY_CAP_MS = 500
+// Read by app/assets/javascripts/studio/page_transition_reveal.js too.
+export const FULL_LOAD_STYLE_KEY = "studio-page-transition-style"
 const MAX_READY_IMAGES = 12
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)"
 
@@ -37,6 +43,28 @@ export function planVisit({ direction, from, to, transitions, sharedName, advanc
   if (!transitions || !from || !to || !Object.hasOwn(DIRECTIONS, direction)) return null
   if (from === to) return advance && sharedName ? null : STILL
   return sharedName ? null : pickStyle(direction, random)
+}
+
+// The style a full load should play, or null for a plain load: planVisit's own rule, so the
+// two paths cannot differ. No morph, since the old page cannot read the new page's names
+// before its picture, and a browser with no activation entry has nothing to compare.
+export function planFullLoad({ direction, from, activation }, random = Math.random) {
+  const url = activation && activation.entry && activation.entry.url
+  if (!url) return null
+  const to = new URL(url).pathname
+  const style = planVisit({ direction, from, to, transitions: true, sharedName: false }, random)
+  return style === STILL ? null : style
+}
+
+// Hands the style to the next document. Storage can refuse, and then the load is plain.
+export function leaveStyle(storage, style) {
+  try {
+    if (style) storage.setItem(FULL_LOAD_STYLE_KEY, style)
+    else storage.removeItem(FULL_LOAD_STYLE_KEY)
+    return !!style
+  } catch {
+    return false
+  }
 }
 
 // A slow image must not hold a click: past the cap the swap goes ahead.
@@ -177,13 +205,16 @@ export function installPageTransitions(doc) {
   // visit counts. Otherwise the flag would outlive that render and eat the next page's move.
   doc.addEventListener("turbo:render", () => { rendered = !!target })
 
-  // Turbo fires this after the transition has finished.
+  // Turbo fires this after the transition has finished. With no visit, it is this document's
+  // own first load, and a full load's motion can still be playing: its script cleans up.
   doc.addEventListener("turbo:load", () => {
+    const visited = target !== null
     from = win.location.pathname
     target = null
     advance = false
     rendered = false
     known.set(from, morphNames(doc))
+    if (!visited) return
     delete root.dataset.pageTransition
     delete root.dataset.pageTransitionVisit
     nameTheMorph(false)
@@ -193,6 +224,28 @@ export function installPageTransitions(doc) {
   for (const name of ["turbo:fetch-request-error", "turbo:reload"]) {
     doc.addEventListener(name, () => { delete root.dataset.pageTransitionVisit })
   }
+
+  // The last moment on the old document. The browser takes its picture after this.
+  win.addEventListener("pageswap", (event) => {
+    const transition = event.viewTransition
+    const style = transition && planFullLoad({ direction: readDirection(doc), from, activation: event.activation })
+    const left = leaveStyle(win.sessionStorage, style)
+    if (!transition) return
+    if (!left) {
+      transition.skipTransition()
+      return
+    }
+    markHeld(doc)
+    root.dataset.pageTransitionVisit = ""
+    nameTheMorph(false)
+  })
+
+  // Back from the back/forward cache: a visit that left by a full load is over.
+  win.addEventListener("pageshow", (event) => {
+    if (!event.persisted) return
+    from = win.location.pathname
+    target = null
+  })
   return true
 }
 

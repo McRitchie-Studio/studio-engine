@@ -1,0 +1,54 @@
+// studio/page_transition_reveal: the arriving half of a full-load page transition
+// (docs/PAGE_TRANSITIONS.md, "Full page loads"). Loaded only with
+// Studio.page_transition_direction set.
+//
+// CLASSIC AND SYNCHRONOUS ON PURPOSE. pagereveal fires before the first render, and a listener
+// bound after that misses it for good. A module is deferred, so it can be too late.
+//
+// It holds no table of styles. The leaving page drew the style with studio/page_transitions
+// at pageswap and left it here. No style means the leaving page did not plan this one (its
+// module had not run, or it was the same path), so the load is plain, not the browser's fade.
+(function () {
+  var STYLE_KEY = "studio-page-transition-style"
+
+  function takeStyle() {
+    try {
+      var style = window.sessionStorage.getItem(STYLE_KEY)
+      window.sessionStorage.removeItem(STYLE_KEY)
+      return style
+    } catch (_error) {
+      return null
+    }
+  }
+
+  window.addEventListener("pagereveal", function (event) {
+    var root = document.documentElement
+    // A page back from the back/forward cache still wears what it had on when it left.
+    delete root.dataset.pageTransition
+    delete root.dataset.pageTransitionVisit
+
+    var style = takeStyle()
+    var transition = event.viewTransition
+    if (!transition) return
+    var direction = document.querySelector('meta[name="page-transition-direction"]')
+    if (!style || !direction) {
+      transition.skipTransition()
+      return
+    }
+
+    // engine.css reads these three. The new page's picture comes after this listener, so the
+    // held stack and every morph name are settled in time.
+    root.dataset.pageTransitionDirection = direction.content
+    root.dataset.pageTransition = style
+    root.dataset.pageTransitionVisit = ""
+    var stack = document.querySelector("[data-vt-held], .studio-bar-stack")
+    if (stack) stack.setAttribute("data-vt-held", "")
+
+    var done = function () {
+      if (root.dataset.pageTransition !== style) return
+      delete root.dataset.pageTransition
+      delete root.dataset.pageTransitionVisit
+    }
+    transition.finished.then(done, done)
+  })
+})()

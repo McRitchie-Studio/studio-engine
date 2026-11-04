@@ -54,7 +54,10 @@ class E2eLabController < ActionController::Base
   LAB_SUBDIVISION = "CO"
 
   module AssetDelivery
-    ENGINE_STYLESHEETS = { "studio/sticky_table_header" => "/e2e/css/studio/sticky_table_header.css" }.freeze
+    ENGINE_STYLESHEETS = {
+      "studio/sticky_table_header" => "/e2e/css/studio/sticky_table_header.css",
+      "studio/page_transition_full_load" => "/e2e/css/studio/page_transition_full_load.css"
+    }.freeze
 
     # The head's @font-face and preload address Montserrat by LOGICAL path through
     # asset_path, which is the host pipeline's job like the tags below. Without this
@@ -126,7 +129,7 @@ class E2eLabController < ActionController::Base
           rel = options[:type].to_s == "module" ? "modulepreload" : "preload"
           preload_links << "<#{src}>; rel=#{rel}; as=script; nopush"
         end
-        tag.script("".html_safe, src: src, type: options[:type], defer: options[:defer].present?)
+        tag.script("".html_safe, src: src, type: options[:type], defer: options[:defer].present?, nonce: options[:nonce])
       end
       send_preload_links_header(preload_links)
       safe_join(scripts)
@@ -844,7 +847,22 @@ class E2eLabController < ActionController::Base
     @studio_page_transition_direction = params[:direction].presence_in(Studio::PAGE_TRANSITION_DIRECTIONS.map(&:to_s))
     @lab_page = name
     @lab_other_url = "#{other_path}?#{request.query_string}"
+    apply_strict_lab_policy if params[:strict].present?
+    sleep(params[:slow].to_f / 1000) if params[:slow].present? && name == "b"
     render(:page_transitions, layout: "survey_turbo_lab")
+  end
+
+  # The enforced policy of a host's signing page (turf-monster's SigningCsp): script-src with
+  # no 'unsafe-inline' and a nonce minted for this document. The generator is the one a host
+  # configures, so the head's tags read it through content_security_policy_nonce.
+  private def apply_strict_lab_policy
+    request.content_security_policy_nonce_generator = ->(_request) { SecureRandom.base64(16) }
+    response.headers["Content-Security-Policy"] = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-eval' 'nonce-#{request.content_security_policy_nonce}'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data:"
+    ].join("; ")
   end
 
   # ---- The site footer and the booking primitives (docs/SITE_FOOTER.md) ------

@@ -39,6 +39,14 @@
     silently be null. It becomes a module when those consumers wait for it. %>
 <%= render "studio/session_stamp" %>
 <%= render "layouts/studio/smooth_load" %>
+<%# A FULL PAGE LOAD PLAYS THE SAME TRANSITION, only with the setting on: an app without it
+    gets neither tag. The sheet carries the at-rule that takes no selector, so it cannot sit in
+    the engine's bundle. The script is classic and synchronous, the second one here, because
+    pagereveal fires before the first render, ahead of every module. docs/PAGE_TRANSITIONS.md. %>
+<% if @studio_page_transition_direction || Studio.page_transition_direction %>
+  <%= stylesheet_link_tag "studio/page_transition_full_load" %>
+  <%= javascript_include_tag "studio/page_transition_reveal", nonce: studio_script_nonce %>
+<% end %>
 <%# The favicon's URL carries its content version (Studio::PublicFileVersion),
     so a redrawn favicon is a new URL no browser has cached. %>
 <link rel="icon" type="image/png" href="<%= Studio::PublicFileVersion.path("/favicon.png") %>">
