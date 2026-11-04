@@ -61,6 +61,7 @@ test("the band moves with the panel through the slide", async ({ page }) => {
   await trigger(page).click();
   // Hold the slide halfway, where a filter stranded by the transform would show.
   const left = await panel(page).evaluate(async (node) => {
+    while (!node.getAnimations().length) await new Promise(requestAnimationFrame);
     const slide = node.getAnimations()[0];
     slide.pause();
     slide.currentTime = 150;
