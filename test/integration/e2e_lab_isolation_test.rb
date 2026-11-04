@@ -63,7 +63,7 @@ class E2eLabIsolationTest < ActionDispatch::IntegrationTest
   TRIGGER = "[data-link-sidebar-trigger]"
   PANELS = "#studio-link-sidebar, #studio-link-sidebar-mobile"
 
-  # The one link LAB_SIDEBAR_SECTIONS declares, and the only thing on the page
+  # A link only LAB_SIDEBAR_SECTIONS declares, and the only thing on the page
   # that ONLY that constant can put there.
   DECLARED_LINK = "#studio-link-sidebar a[href='/']"
 
