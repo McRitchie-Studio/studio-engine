@@ -1165,7 +1165,15 @@
 # in page_transitions.spec.js is Carl's ask: a replace visit after a refused form still moves,
 # RED with `rendered = true`.
 #   npx playwright test --list                                             -> 514
-total_specs: 526
+# 526 -> 536: e2e/sidebar_turbo_snapshot.spec.js (10), sidebar-survives-turbo-snapshot. A panel
+# Turbo filed mid-slide: after Back the gear must open it on screen, read from the rect. All ten
+# were RED without studio/transition_snapshot, the rect specs at x equal to the viewport. Controls
+# on the module: drop the finish at before-render -> the inline-style spec; drop the before-cache
+# tick -> the page-transition snapshot spec; drop the restore strip -> the already-filed spec;
+# keep the strip alone -> all three snapshot specs on the plain path; remove the partial's
+# x-transition attributes -> the slide spec reads 0 frames between on-screen and off-screen.
+#   npx playwright test --list                                             -> 536
+total_specs: 536
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1477,7 +1485,10 @@ total_specs: 526
 # description fading in with no layout change in any frame: none is in the response
 # bytes. Its controls are listed at the top of that file.
 #   npx playwright test --list                                             -> 526 tests, 73 files
-executed: 526
+#
+# 526 -> 536: e2e/sidebar_turbo_snapshot.spec.js, named above.
+#   npx playwright test --list                                             -> 536 tests, 74 files
+executed: 536
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
