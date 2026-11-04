@@ -199,9 +199,23 @@ test("the snapshot holds no phase class when turbo:before-cache itself started t
   expect(snapshot.phase).toEqual([]);
 
   // x-show owns display, and the leave's own hide may land after the clone: what
-  // counts is that the page comes back closed, and the gear opens it on screen.
+  // counts is that the page comes back closed with no frame of an open panel, and
+  // the gear opens it on screen.
+  await page.evaluate((sel) => {
+    window.__seen = [];
+    const sample = () => {
+      const panel = document.querySelector(sel);
+      if (panel && document.querySelector('[data-lab-page="a"]')) {
+        window.__seen.push(getComputedStyle(panel).display === "none" ? "hidden" : "shown");
+      }
+      if (window.__seen.length < 30) requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  }, DESKTOP);
   await page.goBack();
   await onLabPage(page, "a");
+  await page.waitForFunction(() => window.__seen.length >= 30);
+  expect([...new Set(await page.evaluate(() => window.__seen))], "every frame of the restored page").toEqual(["hidden"]);
   await expect(page.locator(DESKTOP)).toBeHidden();
   await trigger(page).click();
   await expectOnScreen(page, DESKTOP);
