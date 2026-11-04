@@ -116,6 +116,9 @@ The first render waits for the end of parsing, through `<link rel="expect" block
 and only on a planned arrival: a render of half a body has no navbar or stack to hold still. The
 browser sets no limit on this hold, so the script removes the link after 3 seconds. A body slower
 than that paints at 3 seconds, and the motion plays with the page as far as it has arrived.
+The navbar and the stack hold still only if they have arrived by then. One that arrives during the
+motion moves with the new page until the motion ends. One that arrives after it appears in place,
+as on a plain load.
 
 The browser has its own limit on the transition, and it does not release the hold. In Chromium
 151, with no cap, a page that held for 3 seconds played, and one that held for 4.5 seconds loaded
