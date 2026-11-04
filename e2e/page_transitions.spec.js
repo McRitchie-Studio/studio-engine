@@ -29,12 +29,9 @@ async function record(page, randomValue = 0) {
       }
       if (document.documentElement.hasAttribute("data-page-transition")) {
         const read = (pseudo) => getComputedStyle(document.documentElement, pseudo).transform;
-        const box = (selector) => { const el = document.querySelector(selector); return el ? el.getBoundingClientRect().top : null; };
         window.__frames.push({
           root: read("::view-transition-old(root)"),
           stack: read("::view-transition-group(studio-bar-stack)"),
-          header: read("::view-transition-group(studio-header)"),
-          stackTop: box("[data-vt-held]"),
         });
       }
       requestAnimationFrame(tick);
@@ -58,6 +55,27 @@ async function open(page, query, randomValue) {
   await page.route("**/e2e/img/pt-failed.png", (route) => route.abort());
   await page.goto(`${LAB}?${query}`);
   await page.waitForFunction(() => window.Turbo);
+}
+
+// The share of pixels that differ by more than dither. A gradient's snapshot is not
+// byte-identical to its live paint, so bytes cannot compare two screenshots here.
+function changedShare(page, a, b) {
+  return page.evaluate(async ([one, two]) => {
+    const read = async (encoded) => {
+      const blob = await (await fetch(`data:image/png;base64,${encoded}`)).blob();
+      const bitmap = await createImageBitmap(blob);
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const context = canvas.getContext("2d");
+      context.drawImage(bitmap, 0, 0);
+      return context.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    };
+    const [left, right] = [await read(one), await read(two)];
+    let changed = 0;
+    for (let i = 0; i < left.length; i += 4) {
+      if (Math.abs(left[i] - right[i]) + Math.abs(left[i + 1] - right[i + 1]) + Math.abs(left[i + 2] - right[i + 2]) > 24) changed += 1;
+    }
+    return changed / (left.length / 4);
+  }, [a.toString("base64"), b.toString("base64")]);
 }
 
 function expectPlayed(names, oldName, newName) {
@@ -105,13 +123,30 @@ test("bottom plays its fade, then its unfold, moving down", async ({ page }) => 
 
 test("the page moves while the banner stack and the navbar hold still", async ({ page }) => {
   await open(page, "direction=left", 0);
-  await expect(page.locator("[data-vt-held]")).toBeVisible();
-  await go(page);
-  const frames = await page.evaluate(() => window.__frames);
-  const distinct = (key) => new Set(frames.map((frame) => frame[key]));
-  expect(distinct("root").size, "the page never moved, so this measured nothing").toBeGreaterThan(3);
-  expect(distinct("stack").size).toBe(1);
-  expect(distinct("header").size).toBe(1);
+  const stack = page.locator("[data-vt-held]");
+  await expect(stack).toBeVisible();
+  const stackBox = await stack.boundingBox();
+  const headerBox = await page.locator(".vt-pinned-header").boundingBox();
+  const before = {
+    stack: await page.screenshot({ clip: stackBox }),
+    header: await page.screenshot({ clip: headerBox }),
+  };
+  expect(await stack.evaluate((el) => getComputedStyle(el).viewTransitionName)).toBe("studio-bar-stack");
+
+  // Stop the motion partway, and compare pixels: a chrome that moved with the page differs.
+  await page.evaluate(() => document.querySelector('[data-test="other"]').click());
+  await page.waitForFunction(() => document.getAnimations().some((a) => (a.animationName || "").startsWith("pt-")));
+  await page.evaluate(() => document.getAnimations().forEach((a) => { a.pause(); a.currentTime = 280; }));
+  const page_moved = await page.evaluate(() => getComputedStyle(document.documentElement, "::view-transition-old(root)").transform);
+  expect(page_moved, "the page never moved, so this measured nothing").not.toBe("none");
+  const during = {
+    stack: await page.screenshot({ clip: stackBox }),
+    header: await page.screenshot({ clip: headerBox }),
+  };
+  await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+  await page.waitForFunction(() => !document.documentElement.hasAttribute("data-page-transition"));
+  expect(await changedShare(page, before.stack, during.stack), "the banner stack moved").toBeLessThan(0.01);
+  expect(await changedShare(page, before.header, during.header), "the navbar moved").toBeLessThan(0.01);
   const names = await seen(page);
   expect(names.filter((name) => /(old|new)\(studio-bar-stack\)/.test(name))).toEqual([]);
   expect(names.filter((name) => /(old|new)\(studio-header\)/.test(name))).toEqual([]);
@@ -133,15 +168,21 @@ test("a same-page visit plays nothing", async ({ page }) => {
 });
 
 test("the setting off keeps the engine's fade, with no script, no marks and no name", async ({ page }) => {
-  await open(page, "", 0);
   const requests = [];
   page.on("request", (request) => requests.push(request.url()));
+  const moduleRequests = () => requests.filter((url) => url.includes("studio/page_transitions"));
+
+  await open(page, "", 0);
   expect(await page.locator('meta[name="page-transition-direction"]').count()).toBe(0);
   expect(await page.evaluate(() => document.documentElement.dataset.pageTransitionDirection)).toBeUndefined();
   await expect(page.locator("[data-vt-held]")).toHaveCount(0);
-  await page.locator('[data-test="other"]').first().click();
-  await expect(page.locator('[data-test="page-b"]')).toBeVisible();
-  expect(requests.filter((url) => url.includes("page_transitions-") || url.endsWith("page_transitions.js"))).toEqual([]);
+  await expect(page.locator("header.vt-pinned-header, .vt-pinned-header")).toHaveCount(0);
+  expect(moduleRequests()).toEqual([]);
+
+  // The control: the same page with the setting on does fetch it.
+  await page.goto(`${LAB}?direction=left`);
+  await page.waitForFunction(() => document.documentElement.dataset.pageTransitionDirection === "left");
+  expect(moduleRequests().length).toBeGreaterThan(0);
 });
 
 test("a hung image releases the swap at the cap", async ({ page }) => {
@@ -293,8 +334,8 @@ test("at phone width the chrome holds still while the page moves", async ({ page
   await go(page);
   const frames = await page.evaluate(() => window.__frames);
   expect(new Set(frames.map((frame) => frame.root)).size).toBeGreaterThan(3);
-  expect(new Set(frames.map((frame) => frame.stack)).size).toBe(1);
-  expect(new Set(frames.map((frame) => frame.header)).size).toBe(1);
+  expect(await page.locator("[data-vt-held]").evaluate((el) => getComputedStyle(el).viewTransitionName)).toBe("studio-bar-stack");
+  expect(await page.locator(".vt-pinned-header").count()).toBe(1);
   expectPlayed(await seen(page), "pt-out-top", "pt-in-from-bottom");
 });
 
