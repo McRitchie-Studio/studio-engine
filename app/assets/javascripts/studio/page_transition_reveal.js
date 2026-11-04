@@ -11,6 +11,21 @@
 (function () {
   var STYLE_KEY = "studio-page-transition-style"
 
+  // Holds the first render to the end of parsing, on an arrival only (nothing has this id). A
+  // render of half a body would give the new picture no navbar or stack to hold still.
+  function holdForTheWholePage() {
+    try {
+      if (!window.sessionStorage.getItem(STYLE_KEY)) return
+    } catch (_error) {
+      return
+    }
+    var link = document.createElement("link")
+    link.rel = "expect"
+    link.href = "#studio-page-transition-end-of-parse"
+    link.setAttribute("blocking", "render")
+    document.head.appendChild(link)
+  }
+
   function takeStyle() {
     try {
       var style = window.sessionStorage.getItem(STYLE_KEY)
@@ -20,6 +35,8 @@
       return null
     }
   }
+
+  holdForTheWholePage()
 
   window.addEventListener("pagereveal", function (event) {
     var root = document.documentElement

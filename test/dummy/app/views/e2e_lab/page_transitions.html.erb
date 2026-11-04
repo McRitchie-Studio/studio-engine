@@ -4,8 +4,8 @@
     banner stack; morph=both|a, the chat head on both pages or on page a alone; overlay=1,
     the page-load overlay with a short delay; modal=1, the modal host; sidebar=1, the
     link sidebar; strict=1, the enforced policy of a host's signing page; control=reload, the
-    turbo-visit-control meta such a page carries; slow=ms, page b answers late. The spec answers
-    the image URLs itself. %>
+    turbo-visit-control meta such a page carries; slow=ms, page b answers late; split=ms, page b's
+    body arrives in two chunks. The spec answers the image URLs itself. %>
 <div x-data>
 <%= render "studio/banners/stack", devnet: true %>
 <% if params[:twice].present? %>

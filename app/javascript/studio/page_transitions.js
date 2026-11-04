@@ -155,6 +155,10 @@ export function installPageTransitions(doc) {
 
   doc.addEventListener("turbo:visit", (event) => {
     root.dataset.pageTransitionVisit = ""
+    // Turbo opens its view transition before it reads turbo-visit-control. A response it will
+    // not render gets no turbo:before-render, so this stands, and that transition draws nothing.
+    // The full load after it plays the one motion. Left alone while a motion is still running.
+    if (!root.dataset.pageTransition) root.dataset.pageTransition = STILL
     target = new URL(event.detail.url).pathname
     // A GET that redirects: Turbo renders the response, then replaces to the final address
     // with that same response, all before turbo:load. The page has landed, so nothing moves.
@@ -222,7 +226,10 @@ export function installPageTransitions(doc) {
 
   // A visit that never renders: the stack must not keep its name at rest.
   for (const name of ["turbo:fetch-request-error", "turbo:reload"]) {
-    doc.addEventListener(name, () => { delete root.dataset.pageTransitionVisit })
+    doc.addEventListener(name, () => {
+      delete root.dataset.pageTransitionVisit
+      if (name !== "turbo:reload") delete root.dataset.pageTransition
+    })
   }
 
   // The last moment on the old document. The browser takes its picture after this.

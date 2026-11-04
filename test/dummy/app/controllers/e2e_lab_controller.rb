@@ -849,7 +849,17 @@ class E2eLabController < ActionController::Base
     @lab_other_url = "#{other_path}?#{request.query_string}"
     apply_strict_lab_policy if params[:strict].present?
     sleep(params[:slow].to_f / 1000) if params[:slow].present? && name == "b"
-    render(:page_transitions, layout: "survey_turbo_lab")
+    return render(:page_transitions, layout: "survey_turbo_lab") unless params[:split].present? && name == "b"
+
+    # split=ms: page b arrives in two chunks, cut inside the body ahead of the stack.
+    first, cut, rest = render_to_string(:page_transitions, layout: "survey_turbo_lab").partition("</nav>")
+    wait = params[:split].to_f / 1000
+    self.content_type = "text/html"
+    self.response_body = Enumerator.new do |chunks|
+      chunks << first + cut
+      sleep(wait)
+      chunks << rest
+    end
   end
 
   # The enforced policy of a host's signing page (turf-monster's SigningCsp): script-src with
