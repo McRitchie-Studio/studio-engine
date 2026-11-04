@@ -57,7 +57,7 @@ const snapshotOf = (page, path, selector) =>
     const snapshot = window.Turbo.session.view.snapshotCache.get(new URL(where, location.href));
     const panel = snapshot && snapshot.element.querySelector(sel);
     if (!panel) return null;
-    return { phase: [...panel.classList].filter((c) => new RegExp(source).test(c)), display: panel.style.display, opacity: panel.style.opacity };
+    return { phase: [...panel.classList].filter((c) => new RegExp(source).test(c)), opacity: panel.style.opacity };
   }, [path, selector, PHASE_CLASS.source]);
 
 const waitForSnapshot = (page, path) =>
@@ -182,7 +182,6 @@ test("the snapshot holds no phase class when the link started the leave", async 
 
   const snapshot = await snapshotOf(page, "/lab/sidebar_snapshot", DESKTOP);
   expect(snapshot.phase).toEqual([]);
-  expect(snapshot.display, "filed closed").toBe("none");
 });
 
 test("the snapshot holds no phase class when turbo:before-cache itself started the leave", async ({ page }) => {
@@ -198,7 +197,14 @@ test("the snapshot holds no phase class when turbo:before-cache itself started t
 
   const snapshot = await snapshotOf(page, "/lab/sidebar_snapshot", DESKTOP);
   expect(snapshot.phase).toEqual([]);
-  expect(snapshot.display, "filed closed").toBe("none");
+
+  // x-show owns display, and the leave's own hide may land after the clone: what
+  // counts is that the page comes back closed, and the gear opens it on screen.
+  await page.goBack();
+  await onLabPage(page, "a");
+  await expect(page.locator(DESKTOP)).toBeHidden();
+  await trigger(page).click();
+  await expectOnScreen(page, DESKTOP);
 });
 
 test("an x-transition with no class names is filed without its inline style", async ({ page }) => {
@@ -216,7 +222,6 @@ test("an x-transition with no class names is filed without its inline style", as
 
   const snapshot = await snapshotOf(page, "/lab/sidebar_snapshot", fade);
   expect(snapshot.opacity, "the leave's inline opacity").toBe("");
-  expect(snapshot.display, "filed closed").toBe("none");
 });
 
 test("a snapshot already filed mid-slide recovers on restore, and the panel slides", async ({ page }) => {

@@ -251,6 +251,7 @@ components:
 | Modal host, scoped host | `studio/modal_host` | `modal-host`, its own module tag | `$store.modals`, each scoped `$store.<name>`, `window.ModalAnimations`, `window.StudioModals` |
 | Toast queue (`layouts/studio/_flash`) | `studio/toast` | `toast`, its own module tag | none needed: the API is the `toast` window event; the queue is `$store.toasts` |
 | Link sidebar flag | `studio/link_sidebar` | `link-sidebar`, its own module tag | `$store.sidebars.linkTreeOpen` |
+| Turbo snapshot of a running x-transition | `studio/transition_snapshot` | the boot, its own module tag | none: it finishes running transitions on `turbo:before-cache` and strips a whole phase's named classes on `turbo:before-render` |
 | Hold button | `studio/hold_button`, `studio/hold_button_hooks` | `hold-button`, registered by `studio/stimulus` | `window.studioFizzPortal` |
 | Board primitive (`studio/board/_board`) | `studio/board` | `board` (lazy), which loads SortableJS | `x-data="studioBoard({...})"`, `window.Sortable.create` until SortableJS loads |
 | Leveling activity modals | `studio/leveling_activity` | the Alpine scope alone | `x-data="levelingActionModal({...})"` |
@@ -268,8 +269,8 @@ The stores load by their own nonced module tag as well as the boot, because
 every host's `<body>` binds `$store.devMode`: a boot that fails to load must
 not make that binding throw. `studio/alpine_stores` imports nothing, and
 registers a store only where Alpine has none of that name. `studio/modal_host`,
-`studio/toast` and `studio/link_sidebar` have their own tag for the same
-reason, and so does `studio/stimulus`, whose only imports are Stimulus,
+`studio/toast`, `studio/link_sidebar` and `studio/transition_snapshot` have their
+own tag for the same reason, and so does `studio/stimulus`, whose only imports are Stimulus,
 `studio/lazy_controllers` and the hold button's controller: a failure elsewhere
 in the boot's graph leaves a page its hold button. `studio/alpine_scopes` has
 its own tag too; its imports are the modules that own a factory, and those
