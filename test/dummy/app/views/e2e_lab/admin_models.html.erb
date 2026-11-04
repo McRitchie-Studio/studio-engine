@@ -1,0 +1,6 @@
+<%# The real /admin/models under the real chrome (E2eLabAdminModelsController). The
+    row, the tabs and the table are the engine's; ?timeline=1 puts the header on the
+    scroll-driven collapse. %>
+<%= render "studio/banners/stack", devnet: @lab_devnet %>
+<%= render "layouts/navbar", balance_html: nil, scroll_timeline: params[:timeline].present? %>
+<%= render template: "studio/admin_models/show" %>

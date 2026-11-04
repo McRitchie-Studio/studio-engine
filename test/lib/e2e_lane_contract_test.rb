@@ -280,6 +280,7 @@ class E2eLaneContractTest < Minitest::Test
       # The sticky table clone is placed off this chrome; a hand-rolled header
       # would grade the lab's header, not the stack the clone reads.
       "sticky_table.html.erb" => ["studio/banners/stack", "layouts/navbar"],
+      "admin_models.html.erb" => ["studio/banners/stack", "layouts/navbar", "studio/admin_models/show"],
       "toast_over_banner.html.erb" => [
         "studio/banners/stack", "layouts/navbar", "layouts/studio/flash",
         "studio/modals/host"
