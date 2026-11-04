@@ -116,7 +116,10 @@ test("a link sidebar anchor that arrives after load registers the flag through i
   expect(errors).toEqual([]);
 });
 
-// The emoji swap is the row that sat 3px low: the plain emoji misses by about 1px either way.
+// The emoji swap is the row that sat low: half the height its box has over the label's line.
+// That is (30 - 24) / 2 = 3px on the hub's type scale and (22.5 - 20) / 2 = 1.25px here. The
+// plain emoji misses by about 1px either way. It measures boxes, not text ranges: a text range
+// moves 0.5px with a font's rounding, and read 0.75px on items-start in Georgia.
 test("a one-line row centers its icon on its label", async ({ page }) => {
   await blockOffsiteRequests(page);
   await page.goto("/lab/sidebar_panels?sidebar=1");
@@ -125,14 +128,12 @@ test("a one-line row centers its icon on its label", async ({ page }) => {
   await expect(panel(page)).toBeVisible();
   const gap = await panel(page).locator('nav a[href="/up"]').evaluate((row) => {
     const middle = (el) => {
-      const range = document.createRange();
-      range.selectNodeContents(el);
-      const box = range.getBoundingClientRect();
+      const box = el.getBoundingClientRect();
       return box.top + box.height / 2;
     };
-    return Math.abs(middle(row.querySelector(".studio-emoji-swap-base")) - middle(row.children[1].firstElementChild));
+    return Math.abs(middle(row.children[0]) - middle(row.children[1].firstElementChild));
   });
-  expect(gap).toBeLessThanOrEqual(1);
+  expect(gap).toBeLessThanOrEqual(0.5);
 });
 
 test("the sidebar opens and closes when the boot fails to load", async ({ page }) => {
