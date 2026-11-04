@@ -76,6 +76,32 @@ test("the theme toggle leads the gear, and both sit a size down", async ({ page 
   expect(rail.glyph).toBe(16);
 });
 
+// One order at every width, signed in or out: the theme toggle, then the gear
+// (navbar-gear-and-name-hover). The x of the visible copies, since the phone row
+// and the rail each draw their own.
+const visibleXs = (page, selector) => page.evaluate((s) => [...document.querySelectorAll(s)]
+  .map((el) => el.getBoundingClientRect())
+  .filter((r) => r.width > 0)
+  .map((r) => r.x), selector);
+
+for (const [label, path] of [
+  ["signed in", ONE_ROW],
+  ["signed out", "/lab/bar_stack?sidebar=1"],
+]) {
+  for (const [band, viewport] of [["desktop", DESKTOP], ["phone", { width: 390, height: 844 }]]) {
+    test(`${label}, ${band}: the theme toggle draws left of the gear`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto(path);
+
+      const moons = await visibleXs(page, "header button[title='Toggle theme']");
+      const gears = await visibleXs(page, "header [data-link-sidebar-trigger]");
+      expect(moons.length, "one visible toggle").toBe(1);
+      expect(gears.length, "one visible gear").toBe(1);
+      expect(moons[0]).toBeLessThan(gears[0]);
+    });
+  }
+}
+
 test("moon, gear, name and avatar are one gap apart, at rest and scrolled", async ({ page }) => {
   await page.setViewportSize(DESKTOP);
   await page.goto(ONE_ROW);

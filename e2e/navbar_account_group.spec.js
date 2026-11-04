@@ -25,6 +25,15 @@ const lit = (page) => page.evaluate(([gear, name, avatar]) => {
   };
 }, [GEAR, NAME, AVATAR]);
 
+const primaryColour = (page) => page.evaluate(() => {
+  const probe = document.createElement("span");
+  probe.style.color = "var(--color-primary)";
+  document.body.appendChild(probe);
+  const primary = getComputedStyle(probe).color;
+  probe.remove();
+  return primary;
+});
+
 test("pointing at the gear, the name or the avatar lights all three", async ({ page }) => {
   await blockOffsiteRequests(page);
   const errors = watchPageErrors(page);
@@ -52,6 +61,50 @@ test("pointing at the gear, the name or the avatar lights all three", async ({ p
     await expect.poll(async () => (await lit(page)).glow).toBe("none");
   }
   expect(errors).toEqual([]);
+});
+
+// Keyboard focus lights the group where pointing does: the account control is
+// one tab stop, and it takes the highlight the name's hover gives.
+test("keyboard focus on the account lights the group as hovering the name does", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.setViewportSize(DESKTOP);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/lab/bar_stack?one_row=1&sidebar=1");
+  await page.mouse.move(5, 400);
+
+  await page.hover(NAME);
+  await expect.poll(async () => (await lit(page)).name).toBe((await lit(page)).primary);
+  const hovered = await lit(page);
+  await page.mouse.move(5, 400);
+  await expect.poll(async () => (await lit(page)).glow).toBe("none");
+
+  for (let tab = 0; tab < 40; tab++) {
+    await page.keyboard.press("Tab");
+    if (await page.evaluate(() => document.activeElement.matches("header [data-nav-account]"))) break;
+  }
+  expect(await page.evaluate(() => document.activeElement.matches("header [data-nav-account]:focus-visible"))).toBe(true);
+  await expect.poll(() => lit(page)).toEqual(hovered);
+});
+
+// AN ACCOUNT LINK (no sidebar): the name and avatar are one link, and pointing at
+// either lights the name. There is no avatar glow to share in this shape.
+test("an account link lights the name from the name and from the avatar", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.setViewportSize(DESKTOP);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/lab/bar_stack?one_row=1");
+  const color = () => page.evaluate((name) => getComputedStyle(document.querySelector(name)).color, NAME);
+  const primary = await primaryColour(page);
+
+  await page.mouse.move(5, 400);
+  const rest = await color();
+  expect(rest).not.toBe(primary);
+  for (const target of [NAME, AVATAR]) {
+    await page.hover(target);
+    await expect.poll(color, { message: target }).toBe(primary);
+    await page.mouse.move(5, 400);
+    await expect.poll(color).toBe(rest);
+  }
 });
 
 // A HOST SIDEBAR (Turf Monster's shape): the host's gear in the menu trigger
