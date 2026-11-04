@@ -75,6 +75,23 @@ class StylePageTest < ActiveSupport::TestCase
     assert_includes links.last["class"].split, "btn-neutral"
   end
 
+  test "the row is the engine's page header, in the stack, and the guide shows the primitive" do
+    doc = Nokogiri::HTML.fragment(render_index)
+    row = doc.at_css("nav[aria-label='Style guide sections']")
+
+    assert_includes row["class"].split, "page-header"
+    assert_equal "page", row["data-pin"]
+    assert_includes row["style"], "--pin-page-top"
+    assert_equal ["page"], doc.css("[data-pin]").map { |el| el["data-pin"] }, "a specimen must not join the stack"
+    assert_equal "scroller", row.at_css(".page-header-tabs")["data-style-section-nav-target"]
+    assert_includes row.at_css(".page-header-lead .page-header-meta").text, Studio::VERSION
+
+    specimen = doc.at_css("[data-page-header-specimen]")
+    assert specimen, "the Tricks section documents the primitive"
+    assert_equal 1, specimen.css(".page-header[data-stuck]").size
+    assert_equal 2, specimen.css(".page-header").size
+  end
+
   test "the Theme section shows the app's logos" do
     before = Studio.theme_logos
     Studio.theme_logos = [{ file: "brand/mark.svg", title: "The Mark" }]

@@ -4,6 +4,25 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **`components/_page_header`, and the triple stack as a standard.** A page title,
+  optional meta beside it and optional tabs on the right. At rest it has no
+  background and no border; once stuck under the navbar it takes the bar. It joins
+  the pinned stack (`data-pin="page"`), so a sticky table header sits under it:
+  navbar, page row, table header, with no overlap. `/admin/style`, `/admin/models`,
+  `/admin/surveys`, the geo settings and the link preview pages use it.
+  [`docs/PAGE_HEADER.md`](docs/PAGE_HEADER.md) carries the rule and the locals. New:
+  `studio/page_header` and the lazy `page-header` controller.
+
+### Fixed
+
+- **A table's sticky header no longer sits on top of the page row on `/admin/models`.**
+- **The open tab on `/admin/models` is scrolled into view at phone width.**
+- **`studio/pinned_stack` places a header with no `data-pin` at its place in the
+  document.** It was appended, so it read as below every other layer, and a layer
+  under it composed a top of 0.
+
 ## 0.123.0 — 2026-11-03
 
 ### Added

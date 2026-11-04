@@ -13,6 +13,10 @@ toast host (`layouts/studio/_flash`) and the footer (`studio/site_footer`). A
 page view composes components and passes them data; it draws no chrome of its
 own, holds no script, and picks no colour.
 
+An admin page's title is `components/_page_header`, so its pinned chrome is one
+stack: navbar, page row, table header, each below the last
+([`PAGE_HEADER.md`](PAGE_HEADER.md)).
+
 ## Components
 
 **Rule.** A shared component is a ViewComponent class in the engine,

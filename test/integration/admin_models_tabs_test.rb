@@ -104,6 +104,15 @@ class AdminModelsTabsTest < ActionDispatch::IntegrationTest
     assert_select "a", text: "Back to dashboard", count: 0
   end
 
+  test "the row is the engine's page header, in the stack" do
+    get "/admin/models"
+
+    row = css_select("nav[aria-label='Models']").first
+    assert_includes row["class"].split, "page-header"
+    assert_equal "page", row["data-pin"]
+    assert_equal "page-header", css_select(".page-header-sentinel").first["data-studio-controller"]
+  end
+
   test "each tab opens its own table and is the one highlighted" do
     get "/admin/models/widgets"
     assert_equal ["Widgets"], open_tabs

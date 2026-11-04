@@ -72,6 +72,41 @@
     </div>
   </section>
 
+  <!-- Page header -->
+  <section class="space-y-5" data-page-header-specimen>
+    <div class="space-y-1">
+      <h3 class="text-xl font-bold text-heading">Page header</h3>
+      <p class="text-muted text-sm">
+        <code class="font-mono text-2xs">components/_page_header</code>: the title, optional meta beside
+        it and optional tabs on the right. This page's own title row is one: scroll to see it take the bar.
+        It joins the pinned stack, so a table's sticky header sits under it: navbar, page row, table
+        header, each below the last. The rule is in <code class="font-mono text-2xs">docs/PAGE_HEADER.md</code>.
+      </p>
+    </div>
+    <div class="grid gap-4 lg:grid-cols-2">
+      <%# The classes alone, not the partial: the partial's row is sticky, joins the
+          pinned stack and holds the page's h1, and a page has one of each. %>
+      <% [["At rest", {}], ["Stuck", { stuck: "" }]].each do |state, data| %>
+        <%= render layout: "style/specimen",
+              locals: { klass: "components/_page_header (#{state.downcase})",
+                        usage: %(<%= render "components/page_header",\n      title: "Models", meta: "v1.2.3", label: "Models",\n      tabs: [{ label: "Users", href: users_path, current: "page" }, { label: "Teams", href: teams_path }] %\>) } do %>
+          <%= tag.div(class: "page-header w-full px-4", data: data) do %>
+            <div class="page-header-lead">
+              <p class="page-header-title">Models</p>
+              <p class="page-header-meta label-upper">v1.2.3</p>
+            </div>
+            <div class="page-header-tabs">
+              <div class="page-header-track">
+                <a href="#tricks" class="btn btn-sm btn-primary">Users</a>
+                <a href="#tricks" class="btn btn-sm btn-neutral">Teams</a>
+              </div>
+            </div>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+  </section>
+
   <!-- Surfaces, text and form -->
   <section class="space-y-5">
     <div class="space-y-1">

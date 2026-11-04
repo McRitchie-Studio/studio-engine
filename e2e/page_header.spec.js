@@ -11,12 +11,12 @@ const { watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive } = requ
 //
 // CONTROLS, each run against this file with the lab server restarted:
 //   - data-pin removed from the row: the clone sits at the navbar's bottom, on top
-//     of the row, and every "no overlap" spec fails.
-//   - the row positioned off --pin-stack-bottom: the row chases its own edge, and
-//     the same specs fail.
-//   - page-header's rule for [data-stuck] applied always: the rest specs fail.
-//   - "page-header" removed from LAZY: the stuck specs fail, and the failed-load
-//     spec stays green only because it never asks the row to scroll.
+//     of the row. 3 red, every spec that reads the clone.
+//   - the row positioned off --pin-stack-bottom: the row chases its own edge. 4 red.
+//   - the row's background not transparent: 3 red, every spec that reads the rest.
+//   - "page-header" removed from LAZY: 7 red, every spec that needs the controller.
+//   - revealOpenTab not called: 1 red, the open tab.
+//   - the failed-load selector dropped from the bar's rule: 1 red, the failed load.
 
 const DESKTOP = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
@@ -94,43 +94,49 @@ async function open(page, url, viewport) {
   await expectStickyChromeIsLive(page, expect);
 }
 
-for (const [name, viewport] of [["desktop", DESKTOP], ["phone", PHONE]]) {
-  test.describe(`at ${name} width`, () => {
-    test("the row is a plain header at rest and takes the bar once stuck", async ({ page }) => {
-      const errors = watchPageErrors(page);
-      await open(page, MODELS, viewport);
-      await expectAtRest(modelsRow(page));
+// Each spec walks both widths inside one test: the lane's static guard counts
+// test() calls in the source, so a loop around test() would not match the lister.
+const WIDTHS = [["desktop", DESKTOP], ["phone", PHONE]];
 
-      await page.evaluate(() => window.scrollTo({ top: 400, behavior: "instant" }));
-      await expectBar(modelsRow(page));
+test("the row is a plain header at rest and takes the bar once stuck, at both widths", async ({ page }) => {
+  const errors = watchPageErrors(page);
+  for (const [, viewport] of WIDTHS) {
+    await open(page, MODELS, viewport);
+    await expectAtRest(modelsRow(page));
 
-      // A transition, both ways: the bar leaves again at the top.
-      await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-      await expectAtRest(modelsRow(page));
-      expect(errors).toEqual([]);
-    });
+    await page.evaluate(() => window.scrollTo({ top: 400, behavior: "instant" }));
+    await expectBar(modelsRow(page));
 
-    test("navbar, row and table header stack with no overlap on every frame", async ({ page }) => {
-      await open(page, MODELS, viewport);
-      const rows = await scrollAndSample(page, STEPS);
-      expectStacked(rows, name);
+    // A transition, both ways: the bar leaves again at the top.
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await expectAtRest(modelsRow(page));
+  }
+  expect(errors).toEqual([]);
+});
 
-      const last = rows[rows.length - 1];
-      expect(Math.abs(last.rowTop - last.nav), "the row's top is the navbar's bottom").toBeLessThanOrEqual(1);
-    });
+test("navbar, row and table header stack with no overlap on every frame, at both widths", async ({ page }) => {
+  for (const [name, viewport] of WIDTHS) {
+    await open(page, MODELS, viewport);
+    const rows = await scrollAndSample(page, STEPS);
+    expectStacked(rows, name);
 
-    test("the style guide's row rests plain and takes the bar", async ({ page }) => {
-      await blockOffsiteRequests(page);
-      await page.setViewportSize(viewport);
-      await page.goto(STYLE);
-      await expectAtRest(styleRow(page));
+    const last = rows[rows.length - 1];
+    expect(Math.abs(last.rowTop - last.nav), `${name}: the row's top is the navbar's bottom`).toBeLessThanOrEqual(1);
+  }
+});
 
-      await page.evaluate(() => window.scrollTo({ top: 600, behavior: "instant" }));
-      await expectBar(styleRow(page));
-      expect((await styleRow(page).boundingBox()).y).toBeLessThanOrEqual(1);
-    });
-  });
-}
+test("the style guide's row rests plain and takes the bar, at both widths", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  for (const [, viewport] of WIDTHS) {
+    await page.setViewportSize(viewport);
+    await page.goto(STYLE);
+    await expectAtRest(styleRow(page));
+
+    await page.evaluate(() => window.scrollTo({ top: 600, behavior: "instant" }));
+    await expectBar(styleRow(page));
+    expect((await styleRow(page).boundingBox()).y).toBeLessThanOrEqual(1);
+  }
+});
 
 test("on a scroll-timeline header the stack holds too", async ({ page }) => {
   await open(page, TIMELINE, DESKTOP);
