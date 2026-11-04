@@ -130,6 +130,10 @@ async function expectChromeHoldsStill(page) {
   await expect(stack).toBeVisible();
   const stackBox = await stack.boundingBox();
   const headerBox = await page.locator(".vt-pinned-header").boundingBox();
+  // Paint the stack as a visit does, named: a stacking context changes how text is
+  // antialiased on the CI's Linux, which would read as motion (2 to 5% of pixels).
+  await page.evaluate(() => { document.documentElement.dataset.pageTransitionVisit = ""; });
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   const before = {
     stack: await page.screenshot({ clip: stackBox }),
     header: await page.screenshot({ clip: headerBox }),
