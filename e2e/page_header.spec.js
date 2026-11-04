@@ -73,7 +73,8 @@ const scrollAndSample = (page, steps, tail = 16) => page.evaluate(async ({ steps
   return rows;
 }, { steps, tail, readSrc: READ.toString() });
 
-const STEPS = Array(50).fill(14);
+// Small steps through the collapse, then a flick.
+const STEPS = [...Array(40).fill(14), 90, 140, 200];
 
 function expectStacked(rows, label) {
   const shown = rows.filter((r) => r.clone !== null);
