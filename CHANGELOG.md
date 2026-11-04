@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+- Link sidebar: a one-line row centers its icon on its label. It sat 3px low. A row with a
+  description keeps its icon at the top. The navbar baseline is regenerated for it.
 - Page transitions: an advance visit to the same path keeps a shared `data-vt-morph` name, so
   a launch panel still morphs into the chat at its own address. A refresh stays silent.
 - Page transitions: a GET that redirects moves the page once. It played the move twice, because
