@@ -22,6 +22,9 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **A Turbo visit answered by `turbo-visit-control: reload` no longer plays the engine's fade**
   before the full load. Turbo opens its view transition before it reads the meta, so that
   transition now draws nothing.
+- **The navbar no longer draws twice during a page transition** when the old header is taller
+  than the new one, as on Back to a scrolled page. This changes Turbo visits too: only the new
+  navbar draws.
 
 - Page transitions: an advance visit to the same path keeps a shared `data-vt-morph` name, so
   a launch panel still morphs into the chat at its own address. A refresh stays silent.

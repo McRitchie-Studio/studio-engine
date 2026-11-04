@@ -45,7 +45,13 @@ function installRecorder(context, randomValue = 0) {
       }
       if (document.documentElement.hasAttribute("data-page-transition")) {
         const read = (pseudo) => getComputedStyle(document.documentElement, pseudo).transform;
-        window.__frames.push({ root: read("::view-transition-old(root)"), stack: read("::view-transition-group(studio-bar-stack)") });
+        window.__frames.push({
+          root: read("::view-transition-old(root)"),
+          stack: read("::view-transition-group(studio-bar-stack)"),
+          oldHeader: getComputedStyle(document.documentElement, "::view-transition-old(studio-header)").opacity,
+          live: document.documentElement.dataset.pageTransition !== "still"
+            && document.getAnimations().some((a) => (a.effect?.pseudoElement || "").startsWith("::view-transition-old(root)")),
+        });
       }
       requestAnimationFrame(tick);
     };
@@ -344,6 +350,43 @@ test("leaving a page scrolled, the stack does not slide in", async ({ page }) =>
   expect(await logged(page)).not.toContain("::view-transition-group(studio-bar-stack) -ua-view-transition-group-anim-studio-bar-stack");
 });
 
+test("arriving scrolled by a full load, the taller old navbar does not draw under the new one", async ({ page }) => {
+  await open(page, STRICT, 0);
+  await page.evaluate(() => window.scrollTo(0, 800));
+  await page.waitForTimeout(200);
+  const shorter = await page.locator(".vt-pinned-header").evaluate((el) => el.offsetHeight);
+  await page.evaluate(() => document.querySelector('[data-test="other-full"]').click());
+  await settled(page, "b");
+  const taller = await page.locator(".vt-pinned-header").evaluate((el) => el.offsetHeight);
+  expect(taller, "the old navbar is not taller, so this measured nothing").toBeGreaterThan(shorter);
+  await page.evaluate(() => sessionStorage.removeItem("pt-log"));
+  await page.goBack();
+  await settled(page, "a");
+  expect(await page.evaluate(() => window.scrollY), "Back did not arrive scrolled").toBe(800);
+  expectOneMotion(await logged(page), "pt-out-left", "pt-in-from-right");
+  const live = (await page.evaluate(() => window.__frames)).filter((frame) => frame.live);
+  expect(live.length).toBeGreaterThan(3);
+  expect(new Set(live.map((frame) => frame.oldHeader))).toEqual(new Set(["0"]));
+});
+
+test("the same arrival by a Turbo visit, Back from a scrolled page, draws one navbar", async ({ page }) => {
+  await open(page, "direction=left", 0.99);
+  await page.evaluate(() => window.scrollTo(0, 800));
+  await page.waitForTimeout(200);
+  const leave = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
+  await page.evaluate(() => document.querySelector('[data-test="other"]').click());
+  await leave;
+  await page.waitForTimeout(200);
+  await page.evaluate(() => { window.__frames.length = 0; });
+  const back = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
+  await page.goBack();
+  await back;
+  expect(await page.evaluate(() => window.scrollY), "Back did not arrive scrolled").toBe(800);
+  const live = (await page.evaluate(() => window.__frames)).filter((frame) => frame.live);
+  expect(live.length).toBeGreaterThan(3);
+  expect(new Set(live.map((frame) => frame.oldHeader))).toEqual(new Set(["0"]));
+});
+
 test("two stacks and a chat head on both pages: one name each, so the direction still plays", async ({ page }) => {
   await open(page, `${STRICT}&twice=1&morph=both`, 0);
   await expect(page.locator(".studio-bar-stack")).toHaveCount(2);
@@ -401,6 +444,22 @@ test("a body that arrives in two chunks is whole before the new page's picture",
   expect(lines).toContain("revealed true true");
   expectOneMotion(lines, "pt-out-left", "pt-in-from-right");
   expect(lines.filter((line) => line.includes("studio-header") && /-(old|new)\(/.test(line))).toEqual([]);
+});
+
+test("a body slower than the cap paints at the cap, and the motion still plays", async ({ page }) => {
+  await open(page, `${STRICT}&split=5000`, 0);
+  await page.addInitScript(() => window.addEventListener("pagereveal", () => {
+    window.ptLog(`revealed ${!!document.querySelector('[data-test="page-b"]')}`);
+  }));
+  await fullLoad(page);
+  await page.locator('[data-test="page-b"]').waitFor({ timeout: 10000 });
+  await settled(page, "b");
+  const paint = await page.evaluate(() => performance.getEntriesByName("first-contentful-paint")[0].startTime);
+  expect(paint).toBeGreaterThan(2500);
+  expect(paint).toBeLessThan(4000);
+  const lines = await logged(page);
+  expect(lines, "the body arrived before the cap, so this measured nothing").toContain("revealed false");
+  expectOneMotion(lines, "pt-out-left", "pt-in-from-right");
 });
 
 test("with no direction, a full load has no sheet, no script, no at-rule and nothing acting", async ({ page }) => {

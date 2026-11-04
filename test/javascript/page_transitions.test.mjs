@@ -152,12 +152,12 @@ test("a full load with no activation entry, or no direction, plans nothing", () 
 
 test("the style goes to the next document, and a refusal reads as a plain load", () => {
   const store = new Map()
-  const storage = { setItem: (key, value) => store.set(key, value), removeItem: (key) => store.delete(key) }
-  assert.equal(leaveStyle(storage, "fade-left"), true)
+  const sessionStorage = { setItem: (key, value) => store.set(key, value), removeItem: (key) => store.delete(key) }
+  assert.equal(leaveStyle({ sessionStorage }, "fade-left"), true)
   assert.equal(store.get(FULL_LOAD_STYLE_KEY), "fade-left")
-  assert.equal(leaveStyle(storage, null), false)
+  assert.equal(leaveStyle({ sessionStorage }, null), false)
   assert.equal(store.size, 0)
-  assert.equal(leaveStyle({ setItem() { throw new Error("full") }, removeItem() {} }, "fade-left"), false)
+  assert.equal(leaveStyle({ sessionStorage: { setItem() { throw new Error("full") } } }, "fade-left"), false)
 })
 
 // A module-level flag lets one document install once, so each case imports its own copy.
@@ -201,6 +201,14 @@ test("pageswap with no transition leaves nothing, and clears a stale style", asy
   store.set(FULL_LOAD_STYLE_KEY, "fade-left")
   on.win.pageswap({ viewTransition: null, activation: activation("/b") })
   assert.equal(store.size, 0)
+  assert.equal(root.dataset.pageTransitionVisit, undefined)
+})
+
+test("pageswap with blocked storage throws nothing, and the load is plain", async () => {
+  const { on, win, root, swap } = await installed()
+  Object.defineProperty(win, "sessionStorage", { get() { throw new Error("SecurityError") } })
+  on.win.pageswap({ viewTransition: null, activation: activation("/b") })
+  assert.equal(swap("/b"), true)
   assert.equal(root.dataset.pageTransitionVisit, undefined)
 })
 
@@ -275,18 +283,20 @@ function reveal({ style = null, storage, stack = {} } = {}) {
   const document = {
     documentElement: root,
     head: { appendChild: (el) => appended.push(el) },
-    createElement: () => ({ setAttribute(name, value) { this[name] = value } }),
+    createElement: () => ({ setAttribute(name, value) { this[name] = value }, remove() { this.removed = true } }),
     querySelector: (selector) => (selector.startsWith("meta") ? { content: "left" } : element),
   }
+  const timers = []
   const window = {
     addEventListener: (name, handler) => { listeners[name] = handler },
+    setTimeout: (fn, ms) => timers.push({ fn, ms }),
     sessionStorage: storage ?? {
       getItem: (key) => store.get(key) ?? null,
       removeItem: (key) => store.delete(key),
     },
   }
   runInNewContext(revealSource, { window, document })
-  return { listeners, root, store, attributes, appended }
+  return { listeners, root, store, attributes, appended, timers }
 }
 
 function transition() {
@@ -364,10 +374,15 @@ test("storage that throws reads as a plain load, and nothing escapes", () => {
   assert.equal(root.dataset.pageTransition, undefined)
 })
 
-test("the first render waits for the whole page only on a planned arrival", () => {
+test("the first render waits for the whole page only on a planned arrival, up to the cap", () => {
   assert.equal(reveal().appended.length, 0)
-  const [link] = reveal({ style: "fade-left" }).appended
+  assert.equal(reveal().timers.length, 0)
+  const { appended: [link], timers: [timer] } = reveal({ style: "fade-left" })
   assert.equal(link.rel, "expect")
   assert.equal(link.blocking, "render")
   assert.match(link.href, /^#/)
+  assert.equal(timer.ms, 3000)
+  assert.equal(link.removed, undefined)
+  timer.fn()
+  assert.equal(link.removed, true)
 })

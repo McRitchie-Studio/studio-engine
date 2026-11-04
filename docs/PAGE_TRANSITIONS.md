@@ -110,13 +110,20 @@ nothing, and the full load after it plays the one motion.
 | A browser without cross-document view transitions | The plain load. Nothing throws |
 
 **A slow page.** The old page stays live until the response commits. After that the browser
-holds its last frame until the new page's first render, as it does for any load. Past the
-browser's own limit it gives up on the transition and the page loads plainly: in Chromium 151
-a page that took 3 seconds to parse played, and one that took 4.5 seconds did not. The first render waits for the end
-of parsing, through `<link rel="expect" blocking="render">`, and only on a planned arrival: a
-render of half a body has no navbar or stack to hold still. Chromium prints one console warning
-for that link on each arrival ("Did not find element expected to be parsed"). It is expected: no
-element has that id, so the hold lasts to the end of parsing.
+holds its last frame until the new page's first render, as it does for any load.
+
+The first render waits for the end of parsing, through `<link rel="expect" blocking="render">`,
+and only on a planned arrival: a render of half a body has no navbar or stack to hold still. The
+browser sets no limit on this hold, so the script removes the link after 3 seconds. A body slower
+than that paints at 3 seconds, and the motion plays with the page as far as it has arrived.
+
+The browser has its own limit on the transition, and it does not release the hold. In Chromium
+151, with no cap, a page that held for 3 seconds played, and one that held for 4.5 seconds loaded
+with no motion. A hold with no cap reached 15 seconds to first paint on a 15-second body. The cap
+sits inside that limit.
+
+Chromium prints one console warning for that link on each arrival ("Did not find element expected
+to be parsed"). It is expected: no element has that id, so the hold lasts to the end of parsing.
 
 **Images do not wait across a full load.** The 500ms image cap in [Images and fonts](#images-and-fonts)
 applies only to a Turbo visit. There, the script holds the swap and loads the images from the
@@ -135,6 +142,10 @@ stack in the page, through a `data-vt-held` mark, so a page that renders two sta
 one name. A duplicate name silently cancels the whole transition. The name lasts for the
 visit: from `turbo:visit` to `turbo:load`. At rest the stack has no name, because a name
 makes it a stacking context, and its tooltip then paints under the navbar.
+
+When the old navbar is taller than the new one, as on Back to a scrolled page, only the new one
+draws. On a visit that plays a style, the rule hides the old navbar's picture. A shared-name visit
+plays the engine's fade and keeps its old behaviour there.
 
 ## Images and fonts
 
@@ -222,4 +233,4 @@ after the gem ships.
 `e2e/page_transitions_full_load.spec.js` for a full load under an enforced strict policy.
 Playwright cannot drive the back/forward cache: its flag turns the cache off, and without the
 flag its calls hang on the restored page. The restored page's cleanup is a unit test here, and
-the behaviour was measured once by hand in Chromium 151, with no debugger attached.
+the behaviour was measured twice by hand in Chromium 151, with no debugger attached.

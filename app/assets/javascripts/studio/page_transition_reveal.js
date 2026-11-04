@@ -10,9 +10,12 @@
 // module had not run, or it was the same path), so the load is plain, not the browser's fade.
 (function () {
   var STYLE_KEY = "studio-page-transition-style"
+  var HOLD_CAP_MS = 3000
 
   // Holds the first render to the end of parsing, on an arrival only (nothing has this id). A
-  // render of half a body would give the new picture no navbar or stack to hold still.
+  // render of half a body would give the new picture no navbar or stack to hold still. The
+  // browser sets no limit on this hold, so the timer does: a slow body paints at the cap. The
+  // cap sits inside the browser's own limit on the transition, so the motion still plays.
   function holdForTheWholePage() {
     try {
       if (!window.sessionStorage.getItem(STYLE_KEY)) return
@@ -24,6 +27,7 @@
     link.href = "#studio-page-transition-end-of-parse"
     link.setAttribute("blocking", "render")
     document.head.appendChild(link)
+    window.setTimeout(function () { link.remove() }, HOLD_CAP_MS)
   }
 
   function takeStyle() {

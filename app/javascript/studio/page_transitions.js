@@ -57,10 +57,10 @@ export function planFullLoad({ direction, from, activation }, random = Math.rand
 }
 
 // Hands the style to the next document. Storage can refuse, and then the load is plain.
-export function leaveStyle(storage, style) {
+export function leaveStyle(win, style) {
   try {
-    if (style) storage.setItem(FULL_LOAD_STYLE_KEY, style)
-    else storage.removeItem(FULL_LOAD_STYLE_KEY)
+    if (style) win.sessionStorage.setItem(FULL_LOAD_STYLE_KEY, style)
+    else win.sessionStorage.removeItem(FULL_LOAD_STYLE_KEY)
     return !!style
   } catch {
     return false
@@ -236,7 +236,7 @@ export function installPageTransitions(doc) {
   win.addEventListener("pageswap", (event) => {
     const transition = event.viewTransition
     const style = transition && planFullLoad({ direction: readDirection(doc), from, activation: event.activation })
-    const left = leaveStyle(win.sessionStorage, style)
+    const left = leaveStyle(win, style)
     if (!transition) return
     if (!left) {
       transition.skipTransition()
