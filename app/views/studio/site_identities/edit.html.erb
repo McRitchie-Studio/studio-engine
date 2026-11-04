@@ -62,7 +62,7 @@
 <div class="max-w-3xl mx-auto" x-data data-link-preview-page data-studio-controller="link-preview-card"
      data-fallback-title="<%= fallback_title %>"
      data-fallback-description="<%= fallback_desc %>">
-  <h1 class="text-2xl font-extrabold text-heading mb-2">Link Preview</h1>
+  <%= render "components/page_header", title: "Link Preview", row_class: "mb-2" %>
   <p class="text-sm text-muted mb-6">
     What a link to <%= Studio.app_name %> shows when it is pasted into Messages, Slack, Discord or X.
     Any page can override it with its own picture and words (a contest banner, a profile photo);

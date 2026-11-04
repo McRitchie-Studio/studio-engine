@@ -57,7 +57,7 @@
   data-geo-country="<%= geo_country %>"
   data-geo-subdivision="<%= geo_state %>"
   data-geo-fail-closed="<%= Studio.geo_fail_closed %>">
-  <h1 class="text-2xl font-extrabold text-heading mb-6">Geo Settings</h1>
+  <%= render "components/page_header", title: "Geo Settings", row_class: "mb-6" %>
 
   <%# -- What the server thinks of THIS visitor ---------------------------- %>
   <div class="card p-6 mb-6">

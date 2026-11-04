@@ -1,23 +1,15 @@
 <% content_for(:title, "#{@config.fetch(:label)} - Models - Admin") %>
 
-<div class="max-w-7xl mx-auto px-4 pb-8 space-y-6">
-  <%# The title and a tab per model, one sticky row, as on /admin/style. A tab is a
-      link, so the open one is the page's own model. %>
-  <nav class="sticky -mx-4 mt-6 px-4 py-2 bg-surface border-y border-subtle flex items-center gap-2"
-       style="top: var(--pin-stack-bottom, var(--nav-bottom, var(--nav-h, 0px))); z-index: var(--z-sticky, 30)"
-       aria-label="Models">
-    <h1 class="text-xl font-bold text-heading shrink-0">Models</h1>
-    <div class="overflow-x-auto min-w-0 flex-1">
-      <div class="flex items-center gap-2 min-w-max pl-4">
-        <% admin_model_configs.each do |key, config| %>
-          <% open = key.to_s == @key %>
-          <%= link_to config.fetch(:label), admin_model_path(key),
-                class: "btn btn-sm #{open ? 'btn-primary' : 'btn-neutral'}",
-                aria: { current: (open ? "page" : nil) } %>
-        <% end %>
-      </div>
-    </div>
-  </nav>
+<div class="max-w-7xl mx-auto px-4 pt-6 pb-8 space-y-6">
+  <%# The title and a tab per model: components/_page_header, as on /admin/style. A
+      tab is a link, so the open one is the page's own model. The table's sticky
+      header sits under this row (docs/PAGE_HEADER.md). %>
+  <%= render "components/page_header",
+        title: "Models",
+        label: "Models",
+        tabs: admin_model_configs.map { |key, config|
+          { label: config.fetch(:label), href: admin_model_path(key), current: (key.to_s == @key ? "page" : nil) }
+        } %>
 
   <p class="text-muted text-sm">
     <%= @config.fetch(:description) %>.

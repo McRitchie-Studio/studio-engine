@@ -1,0 +1,62 @@
+<%# locals: (title:, meta: nil, meta_title: nil, label: nil, tabs: [], tabs_data: {}, actions_html: nil, data: {}, row_class: "-mx-4 px-4") %>
+<%# THE PAGE HEADER: the second layer of the triple stack (docs/PAGE_HEADER.md).
+    navbar, then this row, then a table's sticky header, each below the last.
+
+    AT REST it has no background and no border: a title on the left, tabs on the
+    right. ONCE STUCK under the navbar it takes the bar. Its box never changes
+    between the two, so a state change moves nothing and republishes nothing.
+
+      title         the page's one h1.
+      meta          short text beside the title, such as the version. Hidden on a
+                    phone, where the tabs need the width.
+      meta_title    the meta's title attribute.
+      label         the nav's accessible name. A row with tabs needs it.
+      tabs          [{ label:, href:, current:, data: }]. `current` is the
+                    aria-current value ("page" or "true"), and blank on the others.
+      tabs_data     data attributes for the tabs' scroller.
+      actions_html  a control on the right, for a row with no tabs.
+      data          data attributes for the row, such as the page's own controller.
+      row_class     the bleed. The default fits a container with px-4; pass "" in a
+                    container with no gutter of its own.
+
+    THE ROW IS NEVER A <header>. studio/pinned_stack takes the document's first
+    <header> as the navbar, so on a page with no navbar this row would publish as
+    --nav-bottom.
+
+    IT JOINS THE STACK WITH data-pin="page" AND POSITIONS OFF --pin-page-top, the
+    bottom of everything above it. --pin-stack-bottom includes the row's own edge,
+    so a row positioned off it would chase itself down the page. Anything below,
+    such as the sticky table header's clone, sits under the row with no edit.
+
+    THE SENTINEL stays at the row's place in the flow, and the row's distance from
+    it is what "stuck" means, on every kind of header. It is absolutely positioned,
+    so a space-y parent adds nothing for it. It carries the controller, so the row
+    keeps its data-studio-controller for the page's own. So the row carries no top
+    margin: the space above it belongs to its container. %>
+<div class="page-header-sentinel" data-studio-controller="page-header" aria-hidden="true"></div>
+<%= content_tag(tabs.any? ? :nav : :div,
+      class: "page-header sticky #{row_class}".strip,
+      style: "top: var(--pin-page-top, var(--nav-bottom, var(--nav-h, 0px))); z-index: var(--z-sticky, 30)",
+      aria: { label: label.presence },
+      data: data.merge(pin: "page")) do %>
+  <div class="page-header-lead">
+    <h1 class="page-header-title"><%= title %></h1>
+    <% if meta.present? %>
+      <p class="page-header-meta label-upper"<%= %( title="#{ERB::Util.h(meta_title)}").html_safe if meta_title.present? %>><%= meta %></p>
+    <% end %>
+  </div>
+  <% if tabs.any? %>
+    <%= tag.div(class: "page-header-tabs", data: tabs_data) do %>
+      <div class="page-header-track">
+        <% tabs.each do |tab| %>
+          <%= link_to tab.fetch(:label), tab.fetch(:href),
+                class: "btn btn-sm #{tab[:current].present? ? 'btn-primary' : 'btn-neutral'}",
+                aria: { current: tab[:current].presence },
+                data: tab.fetch(:data, {}) %>
+        <% end %>
+      </div>
+    <% end %>
+  <% elsif actions_html.present? %>
+    <div class="page-header-actions"><%= actions_html %></div>
+  <% end %>
+<% end %>
