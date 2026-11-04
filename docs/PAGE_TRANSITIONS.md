@@ -103,15 +103,16 @@ nothing, and the full load after it plays the one motion.
 | Action | What plays |
 |---|---|
 | Reload | Nothing (`viewTransition` is null on both sides) |
-| Back or Forward, the page loads fresh | The direction. Turbo does not restore the scroll position on this path |
+| Back or Forward, the page loads fresh | The direction, and the scroll position returns |
 | Back or Forward, the page returns from the back/forward cache | The direction. `pagereveal` fires on the restored page, and the script first removes what it wore when it left |
 | Reduced motion | Nothing |
 | The old page's module has not run yet (a very fast click) | The plain load, not the browser's own fade |
 | A browser without cross-document view transitions | The plain load. Nothing throws |
 
-**A slow page.** The old page stays live and clickable until the response commits. After that
-the browser holds its last frame until the new page's first render, as it does for any load,
-and it gives up on the transition after about four seconds. The first render waits for the end
+**A slow page.** The old page stays live until the response commits. After that the browser
+holds its last frame until the new page's first render, as it does for any load. Past the
+browser's own limit it gives up on the transition and the page loads plainly: in Chromium 151
+a page that took 3 seconds to parse played, and one that took 4.5 seconds did not. The first render waits for the end
 of parsing, through `<link rel="expect" blocking="render">`, and only on a planned arrival: a
 render of half a body has no navbar or stack to hold still.
 
