@@ -37,7 +37,7 @@
       <% section[:links].each do |link| %>
         <% target = link[:target].presence %>
         <%= link_to link[:href],
-              class: "group flex items-start gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition",
+              class: "group flex #{link[:desc].present? ? "items-start" : "items-center"} gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition",
               target: target,
               rel: target == "_blank" ? "noopener" : nil,
               "@click": close_action do %>

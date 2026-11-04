@@ -14,7 +14,8 @@
 # aria-pressed (/tasks/engine-theme-toggle-labels); a signed-out visitor's link
 # sidebar lost its Links title (/tasks/sidebar-drops-links-title); the theme toggle
 # draws before the gear signed out and in the phone row
-# (/tasks/navbar-gear-and-name-hover).
+# (/tasks/navbar-gear-and-name-hover); a one-line sidebar row centers its icon
+# (/tasks/sidebar-rows-center-icon-and-label).
 
 require "bundler/setup"
 
