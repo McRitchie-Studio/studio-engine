@@ -4,6 +4,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **A signed-out visitor's link sidebar has no "Links" title.** Signed-in and admin titles
+  are unchanged, and the panel keeps its accessible name.
+
 ## 0.123.0 — 2026-11-03
 
 ### Added

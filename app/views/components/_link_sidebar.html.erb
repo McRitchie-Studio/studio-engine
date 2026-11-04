@@ -6,6 +6,9 @@
     this automatically when sections are declared. %>
 <% sections = studio_sidebar_sections %>
 <% sidebar_admin = respond_to?(:admin?) && admin? %>
+<%# A signed-out visitor's panel has no title: its links say what it is. It keeps its
+    accessible name (aria_label) and its close button. %>
+<% sidebar_title = if sidebar_admin then "Admin Menu" elsif respond_to?(:logged_in?) && logged_in? then "Links" end %>
 <% close_action = "$store.sidebars.linkTreeOpen = false" %>
 
 <style>
@@ -113,7 +116,7 @@
 
 <%= render "components/sidebar_panel",
       id: "studio-link-sidebar",
-      title: sidebar_admin ? "Admin Menu" : "Links",
+      title: sidebar_title,
       open: "$store.sidebars.linkTreeOpen",
       body_html: body_html,
       footer_html: footer_html,
@@ -126,7 +129,7 @@
 
 <%= render "components/sidebar_panel",
       id: "studio-link-sidebar-mobile",
-      title: sidebar_admin ? "Admin Menu" : "Links",
+      title: sidebar_title,
       open: "$store.sidebars.linkTreeOpen",
       body_html: body_html,
       footer_html: footer_html,
