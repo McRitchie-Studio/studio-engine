@@ -103,6 +103,11 @@ Studio.configure do |config|
   # `vt-pinned-header` on the sticky header (exactly one per page).
   # config.smooth_load = true
   # config.nav_spinner_min_ms = 300            # default 2500
+  # App-to-app page transition (default nil, docs/PAGE_TRANSITIONS.md): the way
+  # this app's pages move, :left, :right, :top or :bottom. The one switch: a set
+  # direction also turns smooth-load on, with its cost above. Mark any inline
+  # view-transition-name with data-vt-morph.
+  # config.page_transition_direction = :left
   # Branded loader (docs/LOADER.md): the app's own icon in its theme colours
   # for page loads, long waits and pending buttons. Breathe by default; put
   # `<%= studio_loader_overlay %>` once in the layout body to get page loads.
