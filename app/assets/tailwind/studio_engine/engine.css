@@ -1092,7 +1092,9 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
        It is a pseudo-element of the panel: it moves with the slide, it leaves with the
        panel, and it takes no clicks, so an outside click still reaches the page. A
        transform on the panel does not start a new backdrop root, so it blurs the page.
-       40px wide, an 8px blur, held for the 16px nearest the panel, then fading to sharp.
+       40px wide, a 6px blur, held for the 10px nearest the panel, then fading to sharp.
+       right: 100% measures from the padding box, so the band runs over the panel's 1px
+       border. Stopping short of it left the border as a lit line beside the blur.
 
        FROM md UP ONLY. Below that the link sidebar fills the width, so nothing sits
        beside it, and a phone does not pay for a backdrop filter through the slide. A
@@ -1103,13 +1105,12 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
         position: absolute;
         inset-block: 0;
         right: 100%;
-        margin-right: 1px;
         width: 2.5rem;
         pointer-events: none;
-        -webkit-backdrop-filter: blur(8px);
-        backdrop-filter: blur(8px);
-        -webkit-mask-image: linear-gradient(to left, #000 40%, transparent);
-        mask-image: linear-gradient(to left, #000 40%, transparent);
+        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(6px);
+        -webkit-mask-image: linear-gradient(to left, #000 25%, transparent);
+        mask-image: linear-gradient(to left, #000 25%, transparent);
       }
     }
 

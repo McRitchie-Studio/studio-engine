@@ -7,7 +7,7 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 ### Changed
 
 - **Sidebar panels: a soft blurred edge.** Every panel through `components/_sidebar_panel`
-  draws a band along its inner edge from `md` up: 40px wide, an 8px blur, fading out into the
+  draws a band along its inner edge from `md` up: 40px wide, a 6px blur, fading out into the
   page. It is a pseudo-element of the panel, so it slides with it, leaves with it and takes no
   clicks. It adds no scrim and no darkening. Below `md` there is no band. A browser with no
   `backdrop-filter` shows the panel plain. The navbar baseline is regenerated for the new

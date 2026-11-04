@@ -7,7 +7,7 @@ const { blockOffsiteRequests } = require("./helpers");
 //
 // CONTROLS, each red for its reason: no backdrop-filter (first two specs, the strip beside
 // the panel reads the same with the band off); the band as wide as the page (first spec, the
-// far strip differs); pointer-events: auto (click spec, the panel stays open); the media
+// far strip differs); margin-right: 1px (first spec, the border column); pointer-events: auto (click spec, the panel stays open); the media
 // query dropped (phone spec, the band has content).
 
 const BUSY = "/lab/sidebar_panels?sidebar=1&busy=1";
@@ -48,11 +48,13 @@ test("the band blurs the page beside the panel and leaves the page beyond it sha
   const { x: left } = await panel(page).boundingBox();
   const beside = { x: left - 24, y: 200, width: 22, height: 300 };
   const beyond = { x: left - 120, y: 200, width: 60, height: 300 };
+  const border = { x: left, y: 200, width: 1, height: 300 };
 
   for (const theme of ["dark", "light"]) {
     if (theme === "light") await page.evaluate(() => document.documentElement.classList.remove("dark"));
     expect(await stripsDiffer(page, beside), `${theme}: blurred beside the panel`).toBe(true);
     expect(await stripsDiffer(page, beyond), `${theme}: sharp beyond the band`).toBe(false);
+    expect(await stripsDiffer(page, border), `${theme}: the band runs over the panel's border, leaving no line`).toBe(true);
   }
 });
 

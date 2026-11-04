@@ -32,7 +32,7 @@ class SidebarPanelLeadAndCloseHookTest < ActiveSupport::TestCase
     css = File.read(File.expand_path("../../app/assets/tailwind/studio_engine/engine.css", __dir__))
     rule = css[/\[data-sidebar-edge\]::before \{(.*?)\}/m, 1]
     assert_includes rule, "pointer-events: none;"
-    assert_includes rule, "backdrop-filter: blur(8px);"
+    assert_includes rule, "backdrop-filter: blur(6px);"
   end
 
   test "title_html renders in the title's place, before the actions, and names nothing" do
