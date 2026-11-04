@@ -1,0 +1,33 @@
+<%# The app-to-app page transition (e2e/page_transitions.spec.js, docs/PAGE_TRANSITIONS.md).
+    Two pages at two paths, each the other's destination, carrying the same query. The
+    knobs: direction; img=ok|hung|failed, an eager image on page b; twice=1, a second
+    banner stack; morph=both|a, the chat head on both pages or on page a alone; overlay=1,
+    the page-load overlay with a short delay; modal=1, the modal host; sidebar=1, the
+    link sidebar. The spec answers the image URLs itself. %>
+<%= render "studio/banners/stack", devnet: true %>
+<% if params[:twice].present? %>
+  <%= render "studio/banners/stack", devnet: true %>
+<% end %>
+<%= render "layouts/navbar" %>
+<main class="p-8 grid gap-4" x-data data-test="page-<%= @lab_page %>">
+  <h2 class="text-2xl font-bold">Page <%= @lab_page %></h2>
+  <a href="<%= @lab_other_url %>" data-test="other">The other page</a>
+  <a href="<%= request.fullpath %>" data-test="same">This page again</a>
+  <% if params[:morph] == "both" || (params[:morph] == "a" && @lab_page == "a") %>
+    <%= render "studio/agent_chat/header", name: "Ada" %>
+  <% end %>
+  <% if @lab_page == "b" && params[:img].present? %>
+    <img src="/e2e/img/pt-<%= params[:img] %>.png" width="200" height="100" alt="" data-test="eager-image">
+  <% end %>
+  <% if params[:overlay].present? %>
+    <%= studio_loader_overlay(delay: 20) %>
+  <% end %>
+  <% if params[:modal].present? %>
+    <%= render "studio/modals/host" do %>
+      <template x-if="$store.modals.current().id === 'lab-first'">
+        <div class="p-6"><h2 x-text="$store.modals.current().props.title"></h2></div>
+      </template>
+    <% end %>
+  <% end %>
+  <div style="height: 3000px"></div>
+</main>

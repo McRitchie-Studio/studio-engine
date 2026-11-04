@@ -98,6 +98,8 @@ Rails.application.routes.draw do
   get "lab/sidebar_panels", to: "e2e_lab#sidebar_panels"
   get "lab/sidebar_panels_turbo", to: "e2e_lab#sidebar_panels_turbo"
   get "lab/bar_stack_turbo", to: "e2e_lab#bar_stack_turbo"
+  get "lab/page_transitions", to: "e2e_lab#page_transitions"
+  get "lab/page_transitions_b", to: "e2e_lab#page_transitions_b"
   # A recording beside its transcript: the page with the lazy frame, and the frame.
   get "lab/knowledge_transcript", to: "e2e_lab#knowledge_transcript"
   get "lab/knowledge_transcript/frame", to: "e2e_lab#knowledge_transcript_frame"

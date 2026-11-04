@@ -660,11 +660,9 @@ body.modal-open .studio-app-banner {
    Codrops Page Transitions demo, at its values; the keyframes were written fresh.
 
    Black behind the pages gives the shading: a page at opacity 0.3 darkens as it
-   moves. Pointer events pass through to the page underneath, so 700ms of motion
-   never swallows a click. */
+   moves. */
 html[data-page-transition]:not([data-page-transition="still"])::view-transition {
   background: #000;
-  pointer-events: none;
 }
 
 html[data-page-transition]::view-transition-old(root),
