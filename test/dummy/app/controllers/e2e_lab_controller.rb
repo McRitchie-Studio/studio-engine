@@ -830,6 +830,20 @@ class E2eLabController < ActionController::Base
   # come Back.
   def sidebar_panels_turbo = render(:sidebar_panels, layout: "survey_turbo_lab")
 
+  # Two pages under Turbo whose panels link to each other, so a spec can catch
+  # Turbo's snapshot while a panel is sliding out, then come Back to that snapshot.
+  # `direction` turns the page transition on, as the page_transitions lab does.
+  def sidebar_snapshot = sidebar_snapshot_lab("a", "/lab/sidebar_snapshot_b")
+  def sidebar_snapshot_b = sidebar_snapshot_lab("b", "/lab/sidebar_snapshot")
+
+  private def sidebar_snapshot_lab(name, other_path)
+    @lab_page = name
+    @lab_other_url = [other_path, request.query_string.presence].compact.join("?")
+    @studio_page_transition_direction = params[:direction].presence_in(Studio::PAGE_TRANSITION_DIRECTIONS.map(&:to_s))
+    @lab_sidebar_sections = [{ title: "Site", links: [{ label: "Other page", href: @lab_other_url, emoji: "🏠" }] }]
+    render(:sidebar_snapshot, layout: "survey_turbo_lab")
+  end
+
   # The navbar under Turbo, so a spec can leave it scrolled and come Back: Turbo
   # restores a CLONE of the page from its snapshot cache, header and all.
   def bar_stack_turbo
