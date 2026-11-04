@@ -330,6 +330,17 @@ class UserNavTest < Minitest::Test
     assert icons < gear, "the app's icons must come before the gear"
   end
 
+  # Signed out, the rail keeps the signed-in order: the toggle, then the gear
+  # (navbar-gear-and-name-hover).
+  def test_signed_out_rail_keeps_the_theme_toggle_before_the_gear
+    html = render_nav(logged_in: false, admin: true)
+    moon = html.index(%(data-nav-theme-toggle="desktop"))
+    gear = html.index("data-nav-admin-gear")
+
+    refute_nil gear, "expected the admin gear for an admin"
+    assert moon < gear, "the theme toggle must come before the gear"
+  end
+
   # studio_account_opens_sidebar? (StudioSidebarHelper answers studio_sidebar?)
   # turns the name and avatar into the link sidebar's toggle: a button, since
   # it opens a dialog rather than navigating, which studio/link_sidebar claims

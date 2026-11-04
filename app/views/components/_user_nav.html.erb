@@ -329,13 +329,14 @@
     <div data-nav-avatar-badge><%= studio_navbar_slot_tag(avatar_badge) %></div>
     <% end %>
   <% else %>
+    <%# The signed-in rail's order: the theme toggle, then the gear. Desktop
+        only, as above: the phone row carries the toggle below md. %>
+    <span class="hidden md:flex" data-nav-theme-toggle="desktop"><%= render "components/theme_toggle_morph" %></span>
     <% if menu_trigger %>
     <span class="hidden md:block" data-nav-menu-trigger><%= studio_navbar_slot_tag(menu_trigger) %></span>
     <% else %>
     <%= render "components/admin_dropdown", display_class: "hidden md:block" unless respond_to?(:studio_sidebar_replaces_admin_menu?) && studio_sidebar_replaces_admin_menu? %>
     <% end %>
-    <%# Desktop only, as above: the phone row carries the toggle below md. %>
-    <span class="hidden md:flex" data-nav-theme-toggle="desktop"><%= render "components/theme_toggle_morph" %></span>
     <div class="flex items-center gap-3 ml-auto">
       <%= link_to Studio.sign_in_label, login_path, class: "text-heading hover:text-primary text-sm font-semibold transition" %>
       <%= link_to "Sign up", signup_path, class: "btn btn-primary btn-sm" %>
