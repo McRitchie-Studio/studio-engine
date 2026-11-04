@@ -1170,7 +1170,9 @@ pointing at or focusing any of the gear, the name or the avatar lights all three
 (the primary colour, a turn of the gear, a primary glow on the avatar). The
 same holds for a host sidebar: a host that sets both `navbar_menu_trigger` and
 `navbar_account_sidebar` gets its gear and account lit as one menu. An account
-link is never grouped (`engine.css`, *THE ACCOUNT GROUP*).
+link is never grouped (`engine.css`, *THE ACCOUNT GROUP*). Pointing needs a
+pointer: the hover half sits inside `@media (hover: hover)`, so a tap on a touch
+screen lights nothing, and a keyboard still does.
 
 ## Transactional emails
 

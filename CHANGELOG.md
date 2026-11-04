@@ -37,6 +37,11 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **A tap no longer leaves the navbar's account group lit.** On a touch screen a tap
+  leaves `:hover` on what was tapped, so the gear, the name and the avatar (THE ACCOUNT
+  GROUP in `engine.css`) stayed lit after the sidebar closed. Every `:hover` of the
+  group now sits inside `@media (hover: hover)`; `:focus-visible` stays outside it, so
+  a keyboard still lights the group. A mouse sees no change.
 - **The theme toggle draws left of the gear at every width, signed in or out.** The
   signed-in desktop rail already did. The signed-out rail (`layouts/_navbar` and the
   signed-out branch of `components/_user_nav`) and the phone row drew the gear first.

@@ -13,10 +13,56 @@ class NavbarAccountGroupCssTest < Minitest::Test
   GROUP = ':has(> [data-nav-tools]):has(> [data-nav-account][aria-controls~="studio-link-sidebar"])'
   # [data-nav-name-trigger] is the name as its own control in row 1
   # (Studio.navbar_name_in_rows); pointing at it lights the group too.
-  LIT = "#{GROUP}:has([data-link-sidebar-trigger]:hover, [data-nav-account]:hover, [data-nav-name-trigger]:hover, " \
-        "[data-link-sidebar-trigger]:focus-visible, [data-nav-account]:focus-visible, [data-nav-name-trigger]:focus-visible)"
+  GEAR = "[data-link-sidebar-trigger]"
+  LIT = "#{GROUP}:has(#{GEAR}:hover, [data-nav-account]:hover, [data-nav-name-trigger]:hover)"
+  FOCUS_LIT = "#{GROUP}:has(#{GEAR}:focus-visible, [data-nav-account]:focus-visible, [data-nav-name-trigger]:focus-visible)"
 
-  def lit_rule(target) = CSS[/^\s*#{Regexp.escape("#{LIT} #{target}")}[^{]*\{[^}]*\}/]
+  def lit_rule(target, lit = LIT) = CSS[/^\s*#{Regexp.escape("#{lit} #{target}")}[^{]*\{[^}]*\}/]
+
+  # The group's rules: from its comment to the next section's, comments dropped.
+  def section
+    CSS[%r{/\* THE ACCOUNT GROUP.*?(?=/\* THE ACCOUNT ROW)}m].gsub(%r{/\*.*?\*/}m, "")
+  end
+
+  # The bodies of every @media (hover: hover) block in text, and text without them.
+  def split_hover_blocks(text)
+    inside = +""
+    outside = text.dup
+    while (start = outside.index("@media (hover: hover)"))
+      open_at = outside.index("{", start)
+      depth = 1
+      cursor = open_at + 1
+      while depth.positive?
+        depth += { "{" => 1, "}" => -1 }.fetch(outside[cursor], 0)
+        cursor += 1
+      end
+      inside << outside[(open_at + 1)...(cursor - 1)]
+      outside[start...cursor] = ""
+    end
+    [inside, outside]
+  end
+
+  def test_every_hover_in_the_group_sits_inside_the_hover_guard
+    inside, outside = split_hover_blocks(section)
+
+    refute_includes outside, ":hover", "a tap leaves :hover on a touch screen, so this rule stays lit there"
+    assert_includes inside, ":hover"
+    assert_includes CSS, "POINTING NEEDS A POINTER"
+  end
+
+  def test_keyboard_focus_stays_outside_the_hover_guard
+    inside, outside = split_hover_blocks(section)
+
+    refute_includes inside, ":focus-visible", "a keyboard on a touch device must still light the group"
+    assert_includes outside, "#{FOCUS_LIT} #{GEAR},"
+    assert_includes outside, "#{FOCUS_LIT} [data-nav-name] { color: var(--color-primary); }"
+    assert_includes outside, "#{FOCUS_LIT} [data-nav-account] > [aria-hidden] > * {"
+    assert_includes outside, "#{FOCUS_LIT} #{GEAR} svg { transform: rotate(45deg); }"
+    assert_includes outside, "#{HOST_FOCUS_LIT} #{HOST_GEAR},"
+    assert_includes outside, "#{HOST_FOCUS_LIT} [data-nav-name] { color: var(--color-primary); }"
+    assert_includes outside, "#{HOST_FOCUS_LIT} [data-nav-account] > [aria-hidden] > * {"
+    assert_includes outside, "#{HOST_FOCUS_LIT} #{HOST_GEAR} svg { transform: rotate(45deg); }"
+  end
 
   def test_any_of_the_three_lights_the_gear_and_the_name
     rule = lit_rule("[data-link-sidebar-trigger],")
@@ -45,8 +91,8 @@ class NavbarAccountGroupCssTest < Minitest::Test
   HOST = ':has(> [data-nav-tools] [data-nav-menu-trigger]):has(> [data-nav-account][data-profile-image-toggle]' \
          ':not([aria-controls~="studio-link-sidebar"]))'
   HOST_GEAR = "[data-nav-menu-trigger] [aria-controls]"
-  HOST_LIT = "#{HOST}:has(#{HOST_GEAR}:hover, [data-nav-account]:hover, [data-nav-name-trigger]:hover, " \
-             "#{HOST_GEAR}:focus-visible, [data-nav-account]:focus-visible, [data-nav-name-trigger]:focus-visible)"
+  HOST_LIT = "#{HOST}:has(#{HOST_GEAR}:hover, [data-nav-account]:hover, [data-nav-name-trigger]:hover)"
+  HOST_FOCUS_LIT = "#{HOST}:has(#{HOST_GEAR}:focus-visible, [data-nav-account]:focus-visible, [data-nav-name-trigger]:focus-visible)"
 
   def test_a_host_sidebar_groups_the_menu_trigger_with_the_account
     rule = CSS[/^\s*#{Regexp.escape("#{HOST_LIT} #{HOST_GEAR},")}[^{]*\{[^}]*\}/]
