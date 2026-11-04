@@ -161,6 +161,23 @@ test("pinnedAt honours data-pin-order and settles", () => {
   assert.deepEqual(pins.map((p) => [p.top, p.bottom]), [[40, 104], [0, 40]])
 })
 
+test("a header adopted with no data-pin takes its place in the document, so a layer under it stacks under it", () => {
+  const row = fakeEl({ name: "page", h: 50, bottom: 200 })
+  const banner = fakeEl({ name: "banner", h: 30, bottom: 30 })
+  const header = fakeEl({ h: 64, bottom: 94 })
+  // The banner precedes the header (PRECEDING = 2); the row follows it (FOLLOWING = 4).
+  header.compareDocumentPosition = (other) => (other === row ? 4 : 2)
+  const had = globalThis.document
+  globalThis.document = fakeDocument(header, [banner, row])
+  try {
+    const { layers } = stackReading()
+    assert.equal(layers.nav.top, 30, "the banner is above the header")
+    assert.equal(layers.page.top, 94, "the row is under the header, not at the top of the window")
+  } finally {
+    globalThis.document = had
+  }
+})
+
 test("a timeline header measures as its compact bar and reads no rect", () => {
   const header = fakeEl({ name: "nav", h: 104, bottom: 140, attrs: { "data-nav-timeline-on": "" }, style: { "--nav-band": "40px" } })
   header.getBoundingClientRect = () => { throw new Error("read a rect on the timeline") }

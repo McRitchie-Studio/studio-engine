@@ -222,6 +222,9 @@ edge is `bottom + max(0, travel - scrollY)`, which is what `data-pin-edge` does
 in CSS. The sticky table header (`config.sticky_table_headers`) places its clone
 this way; see `app/javascript/studio/sticky_table_header.js`.
 
+A page's own title row joins the stack the same way: see
+[`PAGE_HEADER.md`](PAGE_HEADER.md), the navbar, page row and table header standard.
+
 ## CSS Class Hooks
 
 These classes are available for preview CSS targeting:

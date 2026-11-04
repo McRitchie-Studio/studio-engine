@@ -65,6 +65,8 @@ export const schema = {
 // says recording did not load (data-studio-controller-failed="voice-recorder").
 // So is the chat's mic: a mic whose controller failed says voice did not load,
 // and the box still types (data-studio-controller-failed="agent-chat-voice").
+// So is the page header: its tabs are links, and a row whose controller failed
+// keeps its bar at all times (data-studio-controller-failed="page-header").
 export const LAZY = {
   "board": () => import("studio/controllers/board_controller"),
   "geo-settings": () => import("studio/controllers/geo_settings_controller"),
@@ -78,7 +80,8 @@ export const LAZY = {
   "agent-chat-voice": () => import("studio/controllers/agent_chat_voice_controller"),
   "voice-profile": () => import("studio/controllers/voice_profile_controller"),
   "microphone-chip": () => import("studio/controllers/microphone_chip_controller"),
-  "voice-recorder": () => import("studio/controllers/voice_recorder_controller")
+  "voice-recorder": () => import("studio/controllers/voice_recorder_controller"),
+  "page-header": () => import("studio/controllers/page_header_controller")
 }
 
 export const application = Application.start(document.documentElement, schema)
