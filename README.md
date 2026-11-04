@@ -1092,6 +1092,10 @@ config.navbar_account_sidebar = { flag: "gearOpen", controls: %w[gear-sidebar ge
 
 ### Sidebar panel lead and close hook
 
+Every panel draws a soft blurred band along its inner edge from `md` up, from a
+`data-sidebar-edge` hook and engine.css. It takes no clicks. A host overriding
+`components/_sidebar_panel` drops the band with that attribute.
+
 `components/_sidebar_panel` takes two opt-in locals; unset, the panel renders
 as before:
 
