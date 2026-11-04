@@ -54,14 +54,14 @@
   ]
 %>
 <div class="max-w-6xl mx-auto px-4 pt-6 pb-16">
-  <%# The page's title and its section tabs: components/_page_header, the row of the
+  <%# The page's title and its section tabs: studio/_page_header, the row of the
       triple stack (docs/PAGE_HEADER.md). It sits at --z-sticky, above --z-raised,
       so the live hold button's portal bubbles scroll under it rather than over it.
 
       The style-section-nav controller moves the highlight as the page scrolls
       (studio/style_section_nav). Theme starts active, so the first paint is
       right before the module loads. %>
-  <%= render "components/page_header",
+  <%= render "studio/page_header",
         title: "Style",
         meta: "v#{Studio::VERSION}",
         meta_title: "studio-engine",

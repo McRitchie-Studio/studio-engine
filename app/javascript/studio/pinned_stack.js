@@ -143,7 +143,7 @@ export function measurePin(el, name, legacy, timeline) {
 
 // WHERE AN ADOPTED HEADER GOES: its place in the document, since order is
 // document order (composed). Appended, it read as below every layer, so a layer
-// under it (components/_page_header) composed a top of 0 and pinned over it.
+// under it (studio/_page_header) composed a top of 0 and pinned over it.
 export function documentIndex(list, el) {
   var FOLLOWING = 4; // Node.DOCUMENT_POSITION_FOLLOWING
   for (var i = 0; i < list.length; i++) {

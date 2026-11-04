@@ -19,6 +19,9 @@
       row_class     the bleed. The default fits a container with px-4; pass "" in a
                     container with no gutter of its own.
 
+    NOT components/_page_header: a host's view wins over the engine's at the same
+    path, and the hub has its own with other locals.
+
     THE ROW IS NEVER A <header>. studio/pinned_stack takes the document's first
     <header> as the navbar, so on a page with no navbar this row would publish as
     --nav-bottom.

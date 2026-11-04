@@ -4,7 +4,7 @@ require "test_helper"
 require "action_view"
 require "nokogiri"
 
-# [unit] components/_page_header: what the row renders. Its behaviour is a browser's
+# [unit] studio/_page_header: what the row renders. Its behaviour is a browser's
 # (e2e/page_header.spec.js); this tier pins the seams: the title, meta and tabs, the
 # stack's attributes, and the row's element.
 class PageHeaderRenderTest < Minitest::Test
@@ -14,7 +14,7 @@ class PageHeaderRenderTest < Minitest::Test
     view = ActionView::Base.with_empty_template_cache.new(
       ActionView::LookupContext.new([VIEWS]), {}, nil
     )
-    Nokogiri::HTML.fragment(view.render(partial: "components/page_header", locals: locals))
+    Nokogiri::HTML.fragment(view.render(partial: "studio/page_header", locals: locals))
   end
 
   TABS = [

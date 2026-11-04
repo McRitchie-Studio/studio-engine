@@ -223,7 +223,7 @@ body.modal-open .studio-app-banner {
   line-height: 1.4;
 }
 
-/* -- The page header (components/_page_header, docs/PAGE_HEADER.md) ---------
+/* -- The page header (studio/_page_header, docs/PAGE_HEADER.md) ---------
    A normal page header at rest and a bar once stuck. The border is there in
    both states, in transparent at rest, so the row's height never changes and
    the pinned stack has nothing to republish. The layout is owned here: the

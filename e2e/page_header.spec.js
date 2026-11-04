@@ -1,7 +1,7 @@
 const { test, expect } = require("@playwright/test");
 const { watchPageErrors, blockOffsiteRequests, expectStickyChromeIsLive } = require("./helpers");
 
-// [e2e] THE TRIPLE STACK (components/_page_header, docs/PAGE_HEADER.md): navbar,
+// [e2e] THE TRIPLE STACK (studio/_page_header, docs/PAGE_HEADER.md): navbar,
 // page row, table header, each below the last, on the real /admin/models and the
 // real style guide. Alex McRitchie's QA note of 2026-11-03: the row was a grey bar
 // at rest, and on /admin/models the table's sticky header sat on top of the row.

@@ -6,12 +6,12 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
-- **`components/_page_header`, and the triple stack as a standard.** A page title,
+- **`studio/_page_header`, and the triple stack as a standard.** A page title,
   optional meta beside it and optional tabs on the right. At rest it has no
   background and no border; once stuck under the navbar it takes the bar. It joins
   the pinned stack (`data-pin="page"`), so a sticky table header sits under it:
-  navbar, page row, table header, with no overlap. `/admin/style`, `/admin/models`,
-  `/admin/surveys`, the geo settings and the link preview pages use it.
+  navbar, page row, table header, with no overlap. `/admin/style`, `/admin/models`
+  and `/admin/surveys` use it.
   [`docs/PAGE_HEADER.md`](docs/PAGE_HEADER.md) carries the rule and the locals. New:
   `studio/page_header` and the lazy `page-header` controller.
 

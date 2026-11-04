@@ -3,7 +3,7 @@
     first answer, never on a page view. %>
 <% content_for(:title, "Surveys") %>
 <div class="max-w-4xl mx-auto px-4 py-6" data-admin-surveys>
-  <%= render "components/page_header", title: "Surveys" %>
+  <%= render "studio/page_header", title: "Surveys" %>
   <p class="text-sm text-secondary mt-1 mb-6">Defined in <code>config/surveys/</code>. A response counts as started at its first answer.</p>
 
   <% if @rows.empty? %>

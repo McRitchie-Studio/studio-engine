@@ -13,7 +13,7 @@ toast host (`layouts/studio/_flash`) and the footer (`studio/site_footer`). A
 page view composes components and passes them data; it draws no chrome of its
 own, holds no script, and picks no colour.
 
-An admin page's title is `components/_page_header`, so its pinned chrome is one
+An admin page's title is `studio/_page_header`, so its pinned chrome is one
 stack: navbar, page row, table header, each below the last
 ([`PAGE_HEADER.md`](PAGE_HEADER.md)).
 
@@ -243,6 +243,7 @@ components:
 | Behaviour | Module | Bound by | Shim kept for consumers |
 |---|---|---|---|
 | Navbar collapse | `studio/nav_collapse` | `nav-collapse` | `x-data="navCollapse()"` |
+| Page header (`studio/_page_header`, docs/PAGE_HEADER.md) | `studio/page_header` | `page-header`, lazy | none |
 | Pinned stack (`--pin-*`, `--nav-h`, `--nav-bottom`) | `studio/pinned_stack` | the boot | none needed in CSS; a script reads `window.studioPinnedStack.bottom()`, never the root, and re-places on `studio:pinned-stack-refresh` and `studio:pinned-stack-published` (the sticky table header does) |
 | Theme and dev mode | `studio/alpine_stores` | its own module tag, and the boot | `$store.theme`, `$store.devMode` |
 | Nav spinner, success confetti | `studio/head_chrome` | the boot | `showNavSpinner`, `hideNavSpinner`, `fireSuccessConfetti` |

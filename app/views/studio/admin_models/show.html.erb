@@ -1,10 +1,10 @@
 <% content_for(:title, "#{@config.fetch(:label)} - Models - Admin") %>
 
 <div class="max-w-7xl mx-auto px-4 pt-6 pb-8 space-y-6">
-  <%# The title and a tab per model: components/_page_header, as on /admin/style. A
+  <%# The title and a tab per model: studio/_page_header, as on /admin/style. A
       tab is a link, so the open one is the page's own model. The table's sticky
       header sits under this row (docs/PAGE_HEADER.md). %>
-  <%= render "components/page_header",
+  <%= render "studio/page_header",
         title: "Models",
         label: "Models",
         tabs: admin_model_configs.map { |key, config|

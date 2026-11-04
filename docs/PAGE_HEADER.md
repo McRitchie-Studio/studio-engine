@@ -5,10 +5,10 @@
 A page has three pinned layers, each below the last, and none overlaps another:
 
 1. The navbar (`layouts/_navbar`).
-2. The page row (`components/_page_header`): the title, then optional meta and tabs.
+2. The page row (`studio/_page_header`): the title, then optional meta and tabs.
 3. A table's sticky header (`config.sticky_table_headers`).
 
-An admin page uses `components/_page_header` for its title. It does not draw its
+An admin page uses `studio/_page_header` for its title. It does not draw its
 own sticky row, and it does not write a pixel height. Each layer takes its place
 from the pinned stack ([`NAVBAR_SETUP.md`](NAVBAR_SETUP.md#reading-the-pinned-stack)).
 
@@ -16,7 +16,7 @@ from the pinned stack ([`NAVBAR_SETUP.md`](NAVBAR_SETUP.md#reading-the-pinned-st
 
 ```erb
 <div class="max-w-7xl mx-auto px-4 pt-6 pb-8 space-y-6">
-  <%= render "components/page_header",
+  <%= render "studio/page_header",
         title: "Models",
         label: "Models",
         tabs: configs.map { |key, config|
@@ -77,10 +77,13 @@ sees no difference. A `fixed` reader that must sit right under the navbar reads
 The row is never a `<header>`: the publisher takes the document's first `<header>` as
 the navbar.
 
+The partial is `studio/_page_header`, not `components/_page_header`. A host's view
+wins over the engine's at the same path, and the hub has its own
+`components/_page_header` with other locals.
+
 ## Who has adopted it
 
-`style/index`, `studio/admin_models/show`, `studio/admin_surveys/index`,
-`studio/geo_settings/edit` and `studio/site_identities/edit`.
+`style/index`, `studio/admin_models/show` and `studio/admin_surveys/index`.
 
 These engine pages have not. Each needs more than the row has today:
 
@@ -88,6 +91,9 @@ These engine pages have not. Each needs more than the row has today:
 - `studio/models/show`: an eyebrow and a mono subtitle.
 - `studio/knowledge_docs/_browser`, `_coverage_table` and `show`: a title with a live
   badge, filters that wrap, a subtitle.
+- `studio/emails/index`: an eyebrow and a long description in its `<header>`.
+- `studio/geo_settings/edit` and `studio/site_identities/edit`: a title only, but no
+  gutter of their own. The bar needs one, or a stuck title meets its left edge.
 - `navbar/show`: a review page for the navbar itself, with its own controls.
 
 Public pages (`studio/bookings/show`, `studio/public_users/show`, `studio/surveys/*`)

@@ -1,4 +1,4 @@
-// page-header: says when components/_page_header is stuck, marks which ends of its
+// page-header: says when studio/_page_header is stuck, marks which ends of its
 // tabs hide a tab, and shows the open tab on a narrow screen. It sits on the row's
 // sentinel, so the row keeps its data-studio-controller for the page's own.
 //
