@@ -51,7 +51,8 @@ If your app doesn't create its own `app/views/layouts/_navbar.html.erb`, the eng
   is the viewer's name (`Studio.navbar_user_name`), or a greeting by the
   browser's local time when signed out. A section's `title` is its group's
   accessible name, not a visible label: a divider separates the groups. A row
-  is one line: a link's `desc:` is accepted and does not show.
+  is one line at rest. A link's optional `desc:` fades in on hover or keyboard
+  focus and moves nothing; a touch screen does not show it, so keep it extra.
 
 ## How to Override
 

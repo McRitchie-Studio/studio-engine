@@ -9,7 +9,7 @@ require "nokogiri"
 # dual desktop/mobile panels driven by the `sidebars` Alpine store, the anchor
 # for the link-sidebar controller (the store flag and the click handlers are
 # studio/link_sidebar), the panel's title and name, section/link rendering (groups
-# with no label word, one line a row, emoji swap), and the trigger's aria wiring.
+# with no label word, one line a row at rest, emoji swap), and the trigger's aria wiring.
 class LinkSidebarTest < Minitest::Test
   SECTIONS = [
     { title: "Site", links: [
@@ -87,28 +87,48 @@ class LinkSidebarTest < Minitest::Test
     assert_equal %w[Site Last], doc.css('#studio-link-sidebar nav > [role="group"]').map { |group| group["aria-label"] }
   end
 
-  # --- one line a row --------------------------------------------------------
+  # --- one line a row at rest ------------------------------------------------
 
-  def test_a_row_is_one_line_and_a_desc_is_accepted_but_not_shown
-    html = render_sidebar(sections: SECTIONS, admin: true)
-    doc = Nokogiri::HTML5.fragment(html)
+  def test_every_row_centers_its_icon_and_a_desc_rides_absolute_for_the_hover
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: SECTIONS, admin: true))
 
-    refute_includes html, "Front door", "a host may still pass desc:"
     %w[/ /docs /error_logs].each do |href|
       row = doc.at_css(%(#studio-link-sidebar a[href="#{href}"]))["class"].split
       assert_includes row, "items-center", href
       refute_includes row, "items-start", href
     end
+
+    described = doc.at_css(%(#studio-link-sidebar a[href="/"]))
+    refute_nil described["data-sidebar-row-described"]
+    assert_equal "Front door", described.at_css("[data-sidebar-row-desc]").text
+    assert_includes described.at_css("[data-sidebar-row-desc]")["class"].split, "truncate"
   end
 
-  # The live row is one line, like every other. Its gloss moves to a hover title.
-  def test_the_live_geo_row_is_one_line
+  def test_a_row_with_no_desc_has_nothing_to_show_on_hover
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: SECTIONS, admin: true))
+    row = doc.at_css(%(#studio-link-sidebar a[href="/error_logs"]))
+
+    assert_nil row["data-sidebar-row-described"]
+    assert_nil row.at_css("[data-sidebar-row-label]")
+    assert_nil row.at_css("[data-sidebar-row-desc]")
+  end
+
+  def test_the_description_stays_out_of_layout_in_the_stylesheet
+    css = File.read(File.expand_path("../../app/assets/tailwind/studio_engine/engine.css", __dir__))
+    rule = css[/^\s*\[data-sidebar-row-desc\] \{(.*?)\}/m, 1]
+
+    assert_includes rule, "position: absolute;"
+    assert_includes rule, "opacity: 0;"
+  end
+
+  def test_the_live_geo_row_is_one_line_with_its_gloss_on_hover
     doc = Nokogiri::HTML5.fragment(render_sidebar(sections: SECTIONS, admin: true, geo_flag: true, geo_routes: true))
     row = doc.at_css(%(#studio-link-sidebar a[href="/admin/geo"]))
 
     assert_includes row["class"].split, "items-center"
-    assert_equal "Geo", row.text.split.last
-    assert_equal "Country and subdivision blocking", row["title"]
+    refute_nil row["data-sidebar-row-described"]
+    assert_equal "Geo", row.at_css("[data-sidebar-row-label]").text
+    assert_equal "Country and subdivision blocking", row.at_css("[data-sidebar-row-desc]").text
   end
 
   # The row that cannot link keeps its second line: it is the fix the operator has to

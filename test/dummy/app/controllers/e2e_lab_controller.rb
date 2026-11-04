@@ -837,11 +837,15 @@ class E2eLabController < ActionController::Base
   end
 
   # This page's own knobs, for this request alone. `sidebar` draws groups enough to
-  # show what separates them, the admin one for an admin only, and one link passing
-  # a desc: that must not show. `signed_in` and `admin` choose the panel's title;
+  # show what separates them, the admin one for an admin only, and two links with a
+  # desc: for the hover, one too long for its line. `signed_in` and `admin` choose the panel's title;
   # `long_name` is the name that must truncate.
   LAB_SIDEBAR_PANEL_SECTIONS = (LAB_SIDEBAR_SECTIONS + [
-    { title: "Help", links: [{ label: "Terms", href: "/site_footer/terms", emoji: "📜", desc: "A description that must not show" }] },
+    { title: "Help", links: [
+      { label: "Terms", href: "/site_footer/terms", emoji: "📜", desc: "What you agree to" },
+      { label: "Privacy", href: "/site_footer/privacy", emoji: "🔒",
+        desc: "What this app keeps about you, for how long, and how to ask for all of it to be removed" }
+    ] },
     { title: "Ops", admin: true, links: [{ label: "Errors", href: "/up", emoji: "🚨" }] }
   ]).freeze
 

@@ -1084,6 +1084,61 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
         font-size: calc(var(--nav-avatar) / 3 / 0.7);
       }
     }
+
+    /* THE SIDEBAR ROW'S DESCRIPTION (components/_link_sidebar, _geo_signpost). At rest
+       a row with a description is one line, the height of any other row. On hover or
+       keyboard focus the description fades in under the label, and no layout changes:
+       it is absolute, inside the row's padding, and the label lifts by a transform.
+
+       THE LIFT is half the description's 16px line, which centres the two lines on the
+       row. It comes in over 200ms after 60ms, so a pointer sweeping down the list does
+       not flash every row it crosses, and it goes in 140ms.
+
+       POINTING NEEDS A POINTER: :hover sits inside @media (hover: hover), and
+       :focus-visible stays outside it, as in THE ACCOUNT GROUP. Under reduced motion
+       nothing slides: the description fades in where it will sit and the label moves
+       to its place at once. */
+    [data-sidebar-row-desc] {
+      position: absolute;
+      inset-inline: 0;
+      top: 100%;
+      opacity: 0;
+      transform: translateY(-0.25rem);
+      pointer-events: none;
+      transition: opacity 140ms ease-in, transform 140ms ease-in;
+    }
+    [data-sidebar-row-label] { transition: transform 140ms ease-in; }
+    [data-sidebar-row-described]:focus-visible [data-sidebar-row-label] {
+      transform: translateY(-0.5rem);
+      transition: transform 200ms ease-out 60ms;
+    }
+    [data-sidebar-row-described]:focus-visible [data-sidebar-row-desc] {
+      opacity: 1;
+      transform: translateY(-0.5rem);
+      transition: opacity 200ms ease-out 60ms, transform 200ms ease-out 60ms;
+    }
+    @media (hover: hover) {
+      [data-sidebar-row-described]:hover [data-sidebar-row-label] {
+        transform: translateY(-0.5rem);
+        transition: transform 200ms ease-out 60ms;
+      }
+      [data-sidebar-row-described]:hover [data-sidebar-row-desc] {
+        opacity: 1;
+        transform: translateY(-0.5rem);
+        transition: opacity 200ms ease-out 60ms, transform 200ms ease-out 60ms;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      [data-sidebar-row-label],
+      [data-sidebar-row-described]:hover [data-sidebar-row-label],
+      [data-sidebar-row-described]:focus-visible [data-sidebar-row-label] { transition: none; }
+      [data-sidebar-row-desc],
+      [data-sidebar-row-described]:hover [data-sidebar-row-desc],
+      [data-sidebar-row-described]:focus-visible [data-sidebar-row-desc] {
+        transform: translateY(-0.5rem);
+        transition: opacity 200ms ease-out;
+      }
+    }
 }
 
 /* THE SCROLL-DRIVEN COLLAPSE (opt-in: config.navbar_scroll_timeline, which puts

@@ -23,9 +23,9 @@
 //
 // THE GREETING. A signed-out panel's title is a greeting by the browser's local
 // time. components/_link_sidebar renders a default; this writes the right word
-// over it on load, into the incoming body of a Turbo visit or snapshot restore, on
-// a bfcache restore, as the trigger opens the panel, and once a minute for a panel
-// left open past a boundary.
+// over it on load, after a Turbo visit or snapshot restore (turbo:load), on a bfcache
+// restore, as the trigger opens the panel, and once a minute for a panel left open
+// past a boundary.
 //
 // THE DOCUMENT HANDLERS run in the capture phase, so the trigger works for a
 // click that lands before Alpine has bound it. They are installed once, on
@@ -172,7 +172,6 @@ export function installLinkSidebar({ win, doc, now = () => new Date() } = {}) {
   root.addEventListener("turbo:load", register)
   root.addEventListener("turbo:before-render", (event) => {
     registerLinkSidebar(host.Alpine, event.detail && event.detail.newBody)
-    paint(event.detail && event.detail.newBody)
   })
   // A page restored from Turbo's cache or the bfcache comes back closed.
   root.addEventListener("turbo:before-cache", () => closeLinkSidebar(host.Alpine))

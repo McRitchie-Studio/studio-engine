@@ -385,17 +385,6 @@ test("install paints with Alpine not yet present", () => {
   assert.equal(node.textContent, "Good afternoon")
 })
 
-test("a Turbo visit or snapshot restore paints the incoming body before it renders", () => {
-  const { doc } = greetingPage(9)
-  const incoming = { textContent: "stale" }
-  const newBody = fakeDocument()
-  newBody.querySelectorAll = () => [incoming]
-
-  doc.fire("turbo:before-render", { detail: { newBody } })
-
-  assert.equal(incoming.textContent, "Good morning")
-})
-
 test("a bfcache restore paints; an ordinary pageshow does not", () => {
   const { node, win, clock } = greetingPage(9)
 

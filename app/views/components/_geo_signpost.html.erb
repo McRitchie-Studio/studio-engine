@@ -83,17 +83,19 @@
   <% if local_assigns[:variant].presence&.to_sym == :sidebar %>
     <%# Sidebar variant: the wide emoji row the link sidebar's own sections use,
         so an engine-owned row is indistinguishable from a host-declared one: one
-        line when it links. The row that cannot link keeps its second line. That line is
-        the fix the operator has to copy, and a title is mouse-only and cannot be
-        selected, so it stays visible text. %>
+        line at rest when it links, its description on hover or focus. The row that
+        cannot link keeps its second line. That line is the fix the operator has to
+        copy, this row takes no keyboard focus, and a touch screen has no hover, so
+        only visible text reaches all three. %>
     <% if geo_live %>
       <%= link_to admin_geo_path,
             class: "group flex items-center gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition",
-            title: "Country and subdivision blocking",
+            "data-sidebar-row-described": "",
             "@click": geo_close do %>
         <span class="text-lg leading-none flex-shrink-0">🌍</span>
-        <span class="min-w-0">
-          <span class="block font-medium truncate">Geo</span>
+        <span class="relative min-w-0 flex-1">
+          <span class="block font-medium truncate" data-sidebar-row-label>Geo</span>
+          <span class="block truncate text-xs text-muted" data-sidebar-row-desc>Country and subdivision blocking</span>
         </span>
       <% end %>
     <% else %>

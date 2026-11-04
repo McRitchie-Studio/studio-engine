@@ -57,8 +57,7 @@ module Studio
       return [] unless profile_link?(view)
 
       [{ title: "You", links: [
-        { label: "Profile", href: view.profile_path, emoji: "👤",
-          desc: "Your name, email and photo" }
+        { label: "Profile", href: view.profile_path, emoji: "👤" }
       ] }]
     end
 

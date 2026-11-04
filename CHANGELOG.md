@@ -6,12 +6,14 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Changed
 
-- **Link sidebar: no section labels, a calmer title, one line a row.** No section shows a label
-  word or the ADMIN chip at any level; a subtle divider separates the groups, and each group
-  keeps its words as its accessible name. A row is one line: `desc:` is still accepted and no
-  longer shows, so every row centers its icon. The live Geo row moves its gloss to a hover title;
-  the Geo row that cannot link keeps its second line, because that line is the fix to copy. The
-  title is `type-subhead`: signed in, admin included, the name the navbar shows
+- **Link sidebar: no section labels, a calmer title, one line a row at rest.** No section shows
+  a label word or the ADMIN chip at any level; a subtle divider separates the groups, and each
+  group keeps its words as its accessible name. Every row is one line and one height at rest. A
+  link's `desc:` fades in on hover or keyboard focus with no layout change: 200ms after 60ms in,
+  140ms out, the label lifting 8px by a transform. A touch screen shows none, and reduced motion
+  slides nothing. The engine's Profile row no longer passes a `desc:`. The live Geo row's gloss
+  behaves the same; the Geo row that cannot link keeps its second line, because that line is the
+  fix to copy. The title is `type-subhead`: signed in, admin included, the name the navbar shows
   (`Studio.navbar_user_name`); signed out, Good morning, Good afternoon or Good evening by the
   browser's local time, written by `studio/link_sidebar`. The panel's accessible name stays
   "Admin menu" or "Links menu". The navbar baseline is regenerated for it.

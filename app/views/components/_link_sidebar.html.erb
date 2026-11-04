@@ -29,8 +29,10 @@
     reader still announces them. An empty section draws no group, or its two dividers
     would touch.
 
-    A ROW IS ONE LINE. A section may still pass a link's desc:, and it does not show: a
-    second line broke the rows' spacing. %>
+    A ROW IS ONE LINE AT REST, with or without a desc:, so the spacing never changes. A
+    desc: fades in on hover or keyboard focus, and nothing moves to make room: it sits
+    absolutely in the row's padding as the label lifts by a transform. engine.css, THE
+    SIDEBAR ROW'S DESCRIPTION, holds the rules. A row with no desc: gains no attribute. %>
 <% sidebar_group = lambda do |title:, admin:, first:, &block|
      name = [title.presence, ("admin" if admin)].compact.join(", ").presence
      tag.div(role: "group", aria: { label: name }, class: ["py-1", ("border-t border-subtle" unless first)], &block)
@@ -60,6 +62,7 @@
               class: "group flex items-center gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition",
               target: target,
               rel: target == "_blank" ? "noopener" : nil,
+              "data-sidebar-row-described": (link[:desc].present? ? "" : nil),
               "@click": close_action do %>
           <% if link[:hover_emoji].present? %>
             <%= render "components/emoji_swap",
@@ -69,9 +72,16 @@
           <% else %>
             <span class="text-lg leading-none flex-shrink-0"><%= link[:emoji] %></span>
           <% end %>
-          <span class="min-w-0">
-            <span class="block font-medium truncate"><%= link[:label] %></span>
-          </span>
+          <% if link[:desc].present? %>
+            <span class="relative min-w-0 flex-1">
+              <span class="block font-medium truncate" data-sidebar-row-label><%= link[:label] %></span>
+              <span class="block truncate text-xs text-muted" data-sidebar-row-desc><%= link[:desc] %></span>
+            </span>
+          <% else %>
+            <span class="min-w-0">
+              <span class="block font-medium truncate"><%= link[:label] %></span>
+            </span>
+          <% end %>
         <% end %>
       <% end %>
       <% end %>
