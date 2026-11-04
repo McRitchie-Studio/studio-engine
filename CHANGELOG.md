@@ -4,6 +4,25 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **Page transitions across full page loads.** With `Studio.page_transition_direction` set,
+  a same-origin full load plays the app's direction through the browser's cross-document
+  view transition: the same pair of styles, keyframes and timing as a Turbo visit, with the
+  navbar and banners held still. This reaches strict-policy pages, which must stay their
+  own documents. New files, linked only with a direction: `studio/page_transition_full_load.css`
+  and the classic `studio/page_transition_reveal.js`, which carries the request's nonce. A
+  reload, a same-path load, reduced motion and a browser without support load plainly. A full
+  load has no morph, and it cannot wait for images, so the 500ms image cap does not apply.
+  With no direction, a host renders no new tag.
+  [`docs/PAGE_TRANSITIONS.md`](docs/PAGE_TRANSITIONS.md).
+
+### Fixed
+
+- **A Turbo visit answered by `turbo-visit-control: reload` no longer plays the engine's fade**
+  before the full load. Turbo opens its view transition before it reads the meta, so that
+  transition now draws nothing.
+
 - Page transitions: an advance visit to the same path keeps a shared `data-vt-morph` name, so
   a launch panel still morphs into the chat at its own address. A refresh stays silent.
 - Page transitions: a GET that redirects moves the page once. It played the move twice, because

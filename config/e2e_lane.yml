@@ -1153,7 +1153,15 @@
 # refused form, both ways. The morph, redirect and refused-form specs verified RED with the
 # fix removed or the render flag unscoped; the refresh spec by Carl's mutation.
 #   npx playwright test --list                                             -> 485
-total_specs: 485
+# 485 -> 509: e2e/page_transitions_full_load.spec.js (23) and one in e2e/page_transitions.spec.js,
+# page-transitions-across-full-loads. A real full load under an enforced strict policy: what
+# each document's pseudo ran, across both documents, with no violation; a Turbo visit answered
+# by a reload plays once; reload, same path, reduced motion and no browser support play nothing;
+# the setting off has no tag and no at-rule. Each verified RED by a mutation of its own. The one
+# in page_transitions.spec.js is Carl's ask: a replace visit after a refused form still moves,
+# RED with `rendered = true`.
+#   npx playwright test --list                                             -> 509
+total_specs: 509
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1453,7 +1461,10 @@ total_specs: 485
 #
 # 480 -> 485: e2e/page_transitions.spec.js, named above.
 #   npx playwright test --list                                             -> 485 tests, 71 files
-executed: 485
+#
+# 485 -> 509: e2e/page_transitions_full_load.spec.js and one more, named above.
+#   npx playwright test --list                                             -> 509 tests, 72 files
+executed: 509
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

@@ -252,6 +252,8 @@ export function installPageTransitions(doc) {
     if (!event.persisted) return
     from = win.location.pathname
     target = null
+    advance = false
+    rendered = false
   })
   return true
 }

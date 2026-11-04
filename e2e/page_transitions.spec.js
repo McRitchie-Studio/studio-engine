@@ -394,6 +394,15 @@ test("after a refused form, the next link still moves the page", async ({ page }
   expectPlayed(await seen(page), "pt-out-left", "pt-in-from-right");
 });
 
+test("after a refused form, a replace visit to another path still moves the page", async ({ page }) => {
+  await open(page, "direction=left", 0);
+  await refuseForm(page);
+  const load = page.evaluate(() => new Promise((done) => document.addEventListener("turbo:load", done, { once: true })));
+  await page.evaluate(() => window.Turbo.visit(document.querySelector('[data-test="other"]').href, { action: "replace" }));
+  await load;
+  expectPlayed(await seen(page), "pt-out-left", "pt-in-from-right");
+});
+
 test("after a refused form, an advance to the same path still morphs", async ({ page }) => {
   await open(page, "direction=left&morph=both", 0);
   await refuseForm(page);
