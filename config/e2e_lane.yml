@@ -1402,7 +1402,7 @@ total_specs: 440
 #   npx playwright test --list --grep-invert "@devnet" --project=chromium  -> 409
 # And for the style guide's sticky row: 2 more tests (412 -> 414), 1 new file:
 # e2e/style_section_nav.spec.js, on the new /lab/style_nav page.
-# And for the page header (components/_page_header): 9 more tests (431 -> 440), 1 new
+# And for the page header (studio/_page_header): 9 more tests (431 -> 440), 1 new
 # file, e2e/page_header.spec.js, on the new /lab/admin_models page, which renders the
 # real studio/admin_models/show under the real navbar. Rest, stuck and no overlap are
 # computed styles and boxes, so only a browser can read them. Six controls, each red
