@@ -93,7 +93,7 @@ class GeoSignpostRouterTest < ActiveSupport::TestCase
     doc = render_sidebar(with_routes: false)
 
     refute_nil doc.at_css("[data-test='geo-signpost-disabled']")
-    assert_includes doc.text, "Draw the geo routes first"
+    assert_includes doc.text, "config.draw_geo_routes = true"
     # The host's own sections are untouched — this row must not cost the others.
     assert_includes doc.to_html, "/error_logs"
   end

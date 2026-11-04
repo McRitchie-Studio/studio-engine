@@ -3,6 +3,9 @@
 module Studio
   module UiPrimitives
     EMOJI_SWAP_CSS = <<~CSS
+      /* .studio-emoji-box is a plain emoji in the swap's box, so a row with a plain
+         emoji and a row with a swap are one height and their labels line up. */
+      .studio-emoji-box,
       .studio-emoji-swap,
       .nav-emoji-swap {
         position: relative;

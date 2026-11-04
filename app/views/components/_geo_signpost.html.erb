@@ -82,33 +82,38 @@
       `nil.to_sym` raised NoMethodError inside admin chrome on every page. %>
   <% if local_assigns[:variant].presence&.to_sym == :sidebar %>
     <%# Sidebar variant: the wide emoji row the link sidebar's own sections use,
-        so an engine-owned row is indistinguishable from a host-declared one. %>
+        so an engine-owned row is indistinguishable from a host-declared one: one
+        line at rest, its description on hover or focus. %>
     <% if geo_live %>
       <%= link_to admin_geo_path,
-            class: "group flex items-start gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition",
+            class: "group flex items-center gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition",
+            "data-sidebar-row-described": "",
             "@click": geo_close do %>
-        <span class="text-lg leading-none flex-shrink-0">🌍</span>
-        <span class="min-w-0">
-          <span class="block font-medium truncate">Geo</span>
-          <span class="block text-xs text-muted leading-snug mt-0.5">Country and subdivision blocking</span>
+        <span class="studio-emoji-box text-lg leading-none flex-shrink-0">🌍</span>
+        <span class="relative min-w-0 flex-1">
+          <span class="block font-medium truncate" data-sidebar-row-label>Geo</span>
+          <span class="block truncate text-xs text-muted" data-sidebar-row-desc>Country and subdivision blocking</span>
         </span>
       <% end %>
     <% else %>
-      <%# No `select-none` here, and that is the fix rather than an omission: the
-          row's whole job in this state is to hand over the string below, and
-          select-none made it unselectable. role/aria-disabled give a screen
-          reader the "unavailable destination" this paints for a sighted eye. %>
-      <span class="flex items-start gap-3 px-4 py-3 text-sm text-muted cursor-not-allowed"
+      <%# The row that cannot link holds the string to copy as its description. A title
+          alone failed on touch (THE HINT, above), so tabindex lets a tap and a key
+          focus the row, and engine.css reveals it on :focus. The long form stays in
+          the title. No `select-none` here, and that is the fix rather than an
+          omission: the row's whole job in this state is to hand over the string, and
+          select-none made it unselectable. role/aria-disabled give a screen reader
+          the "unavailable destination" this paints for a sighted eye. %>
+      <span class="flex items-center gap-3 px-4 py-3 text-sm text-muted cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset"
             role="link"
             aria-disabled="true"
+            tabindex="0"
             data-test="geo-signpost-disabled"
+            data-sidebar-row-described
             title="<%= geo_title %>">
-        <span class="text-lg leading-none flex-shrink-0">🌍</span>
-        <span class="min-w-0">
-          <span class="block font-medium truncate">Geo</span>
-          <span class="block text-xs text-muted leading-snug mt-0.5"><%= geo_lead %>
-            <code class="font-mono break-all"><%= geo_code %></code>
-          </span>
+        <span class="studio-emoji-box text-lg leading-none flex-shrink-0">🌍</span>
+        <span class="relative min-w-0 flex-1">
+          <span class="block font-medium truncate" data-sidebar-row-label>Geo</span>
+          <span class="block truncate text-xs text-muted" data-sidebar-row-desc><code class="font-mono"><%= geo_code %></code></span>
         </span>
       </span>
     <% end %>
