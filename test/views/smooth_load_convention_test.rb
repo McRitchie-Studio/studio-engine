@@ -169,6 +169,14 @@ class SmoothLoadConventionTest < ActiveSupport::TestCase
     refute_includes css, '[style*="view-transition-name'
   end
 
+  # A host with Studio.smooth_load and no direction runs the engine's fade with this navbar, and
+  # no browser spec plays that fade, so only this test stops the rule losing its attribute.
+  test "engine.css hides the old navbar's picture only on a visit that plays a style" do
+    hiding = File.read(CSS_PATH).scan(/^([^\n{}]*::view-transition-old\(studio-header\)[^\n{}]*)\{[^}]*opacity/).flatten.map(&:strip)
+
+    assert_equal [%(html[data-page-transition]:not([data-page-transition="still"])::view-transition-old(studio-header))], hiding
+  end
+
   test "engine.css ships the full transition choreography" do
     css = File.read(CSS_PATH)
 
