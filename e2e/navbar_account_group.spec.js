@@ -27,6 +27,7 @@ const lit = (page) => page.evaluate(([gear, name, avatar]) => {
     gear: getComputedStyle(document.querySelector(gear)).color,
     name: getComputedStyle(document.querySelector(name)).color,
     glow: getComputedStyle(document.querySelector(avatar)).boxShadow,
+    turn: getComputedStyle(document.querySelector(`${gear} svg`)).transform,
   };
 }, [GEAR, NAME, AVATAR]);
 
@@ -58,6 +59,15 @@ const rewireToHostSidebar = (page) => page.evaluate((gear) => {
   engineGear.replaceWith(seat);
   document.querySelector("header [data-nav-account]").setAttribute("aria-controls", "gear-sidebar gear-sidebar-mobile");
 }, GEAR);
+
+// Tabs forward to a control and proves it took keyboard focus.
+const tabTo = async (page, target) => {
+  for (let tab = 0; tab < 40; tab++) {
+    await page.keyboard.press("Tab");
+    if (await page.evaluate((selector) => document.activeElement.matches(selector), target)) break;
+  }
+  expect(await page.evaluate((selector) => document.activeElement.matches(`${selector}:focus-visible`), target), target).toBe(true);
+};
 
 const primaryColour = (page) => page.evaluate(() => {
   const probe = document.createElement("span");
@@ -112,11 +122,10 @@ test("keyboard focus on the account lights the group as hovering the name does",
   await page.mouse.move(5, 400);
   await expect.poll(async () => (await lit(page)).glow).toBe("none");
 
-  for (let tab = 0; tab < 40; tab++) {
-    await page.keyboard.press("Tab");
-    if (await page.evaluate(() => document.activeElement.matches("header [data-nav-account]"))) break;
-  }
-  expect(await page.evaluate(() => document.activeElement.matches("header [data-nav-account]:focus-visible"))).toBe(true);
+  // The rail's gear comes before the account in the tab order.
+  await tabTo(page, GEAR);
+  await expect.poll(() => lit(page)).toEqual(hovered);
+  await tabTo(page, ACCOUNT);
   await expect.poll(() => lit(page)).toEqual(hovered);
 });
 
@@ -180,7 +189,7 @@ test("a host sidebar's gear and account light together too", async ({ page }) =>
 
 // Keyboard focus is not pointing, so it stays outside the hover guard for a host
 // sidebar as for the link sidebar above.
-test("keyboard focus on a host sidebar's account lights the group too", async ({ page }) => {
+test("keyboard focus on a host sidebar's gear or account lights the group too", async ({ page }) => {
   await blockOffsiteRequests(page);
   await page.setViewportSize(DESKTOP);
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -194,20 +203,19 @@ test("keyboard focus on a host sidebar's account lights the group too", async ({
   }), [HOST_GEAR, NAME, AVATAR]);
   const primary = await primaryColour(page);
 
-  for (let tab = 0; tab < 40; tab++) {
-    await page.keyboard.press("Tab");
-    if (await page.evaluate((account) => document.activeElement.matches(account), ACCOUNT)) break;
+  for (const target of [HOST_GEAR, ACCOUNT]) {
+    await tabTo(page, target);
+    await expect.poll(async () => { const on = await read(); return [on.gear, on.name]; }, { message: target }).toEqual([primary, primary]);
+    expect((await read()).glow, target).not.toBe("none");
   }
-  expect(await page.evaluate((account) => document.activeElement.matches(`${account}:focus-visible`), ACCOUNT)).toBe(true);
-  await expect.poll(async () => { const on = await read(); return [on.gear, on.name]; }).toEqual([primary, primary]);
-  expect((await read()).glow).not.toBe("none");
 });
 
 // THE TOUCH SCREEN. Alex McRitchie, 2026-11-03: "after you close the modal on mobile
 // the class should be removed... there is no hover on phones." Each spec first
 // proves its premise: the browser reports no hover, and the tapped control really
 // does still match :hover. Without that, a browser that clears :hover on its own
-// would pass these specs with the guard gone.
+// would pass these specs with the guard gone. They leave motion at its default, so
+// the gear's turn is read as well.
 const expectNoHoverDevice = async (page) => {
   expect(await page.evaluate(() => matchMedia("(hover: none)").matches), "the device reports no hover").toBe(true);
 };
@@ -220,7 +228,6 @@ test.describe("on a touch tablet, where the rail shows the gear and the name", (
   test("tapping a control open and closed leaves nothing lit", async ({ page }) => {
     await blockOffsiteRequests(page);
     const errors = watchPageErrors(page);
-    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/lab/bar_stack?one_row=1&sidebar=1");
     await expectNoHoverDevice(page);
     const rest = await settled(page);
@@ -242,7 +249,6 @@ test.describe("on a touch tablet, where the rail shows the gear and the name", (
 
   test("tapping a host sidebar's gear or account leaves nothing lit", async ({ page }) => {
     await blockOffsiteRequests(page);
-    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/lab/bar_stack?one_row=1&sidebar=1");
     await expectNoHoverDevice(page);
     await rewireToHostSidebar(page);
@@ -250,6 +256,7 @@ test.describe("on a touch tablet, where the rail shows the gear and the name", (
       gear: getComputedStyle(document.querySelector(gear)).color,
       name: getComputedStyle(document.querySelector(name)).color,
       glow: getComputedStyle(document.querySelector(avatar)).boxShadow,
+      turn: getComputedStyle(document.querySelector(`${gear} svg`)).transform,
     }), [HOST_GEAR, NAME, AVATAR]);
     const rest = await read();
 
@@ -268,7 +275,6 @@ test.describe("on a phone, where the avatar stands alone", () => {
   test("tapping the avatar open and closed leaves nothing lit", async ({ page }) => {
     await blockOffsiteRequests(page);
     const errors = watchPageErrors(page);
-    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/lab/bar_stack?one_row=1&sidebar=1");
     await expectNoHoverDevice(page);
     const rest = await settled(page);
