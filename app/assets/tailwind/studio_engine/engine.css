@@ -652,6 +652,87 @@ body.modal-open .studio-app-banner {
   animation: none;
 }
 
+/* -- App-to-app page transitions --------------------------------------------
+   Studio.page_transition_direction (studio/page_transitions, docs/PAGE_TRANSITIONS.md).
+   Every rule is gated on an attribute only that script sets, so an app without
+   the setting keeps the fade above. Attribute selectors outrank the bare
+   ::view-transition-*(root) rules, here and in a host. The effects are from the
+   Codrops Page Transitions demo, at its values; the keyframes were written fresh.
+
+   Black behind the pages gives the shading: a page at opacity 0.3 darkens as it
+   moves. */
+html[data-page-transition]:not([data-page-transition="still"])::view-transition {
+  background: #000;
+}
+
+html[data-page-transition]::view-transition-old(root),
+html[data-page-transition]::view-transition-new(root) {
+  mix-blend-mode: normal;
+  animation-duration: 700ms;
+  animation-timing-function: ease;
+  animation-fill-mode: both;
+  backface-visibility: hidden;
+}
+
+/* A same-page visit (a refresh, a poll) draws nothing. */
+html[data-page-transition="still"]::view-transition-old(root),
+html[data-page-transition="still"]::view-transition-new(root) {
+  animation: none;
+}
+
+/* The banner stack holds still with the navbar. The name goes on the one element
+   the script marks, since a duplicate name silently cancels the transition. It
+   lasts for the visit alone: a name at rest makes the stack a stacking context,
+   and its tooltip then paints under the navbar. No group animation either: a page
+   left scrolled has the stack above the viewport, and it would slide down. */
+html[data-page-transition-direction][data-page-transition-visit] [data-vt-held] {
+  view-transition-name: studio-bar-stack;
+}
+
+::view-transition-group(studio-bar-stack),
+::view-transition-old(studio-bar-stack),
+::view-transition-new(studio-bar-stack) {
+  animation: none;
+}
+
+/* A named element moves with the page, unless both pages share its name. The
+   script decides that before the old page's picture, and only then is the name let
+   through, so the morph stands. data-vt-morph carries the name it marks. */
+html[data-page-transition-direction]:not([data-page-transition-morph]) [data-vt-morph] {
+  view-transition-name: none !important;
+}
+
+html[data-page-transition="fade-left"]::view-transition-old(root) { animation-name: pt-out-left; }
+html[data-page-transition="fade-left"]::view-transition-new(root) { animation-name: pt-in-from-right; }
+html[data-page-transition="fade-right"]::view-transition-old(root) { animation-name: pt-out-right; }
+html[data-page-transition="fade-right"]::view-transition-new(root) { animation-name: pt-in-from-left; }
+html[data-page-transition="fade-top"]::view-transition-old(root) { animation-name: pt-out-top; }
+html[data-page-transition="fade-top"]::view-transition-new(root) { animation-name: pt-in-from-bottom; }
+html[data-page-transition="fade-bottom"]::view-transition-old(root) { animation-name: pt-out-bottom; }
+html[data-page-transition="fade-bottom"]::view-transition-new(root) { animation-name: pt-in-from-top; }
+
+html[data-page-transition="unfold-right"]::view-transition-old(root) { animation-name: pt-out-left; }
+html[data-page-transition="unfold-right"]::view-transition-new(root) { animation-name: pt-unfold-right; transform-origin: 0% 50%; }
+html[data-page-transition="unfold-left"]::view-transition-old(root) { animation-name: pt-out-right; }
+html[data-page-transition="unfold-left"]::view-transition-new(root) { animation-name: pt-unfold-left; transform-origin: 100% 50%; }
+html[data-page-transition="unfold-bottom"]::view-transition-old(root) { animation-name: pt-out-top; }
+html[data-page-transition="unfold-bottom"]::view-transition-new(root) { animation-name: pt-unfold-bottom; transform-origin: 50% 0%; }
+html[data-page-transition="unfold-top"]::view-transition-old(root) { animation-name: pt-out-bottom; }
+html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-name: pt-unfold-top; transform-origin: 50% 100%; }
+
+@keyframes pt-out-left { to { opacity: 0.3; transform: translateX(-100%); } }
+@keyframes pt-out-right { to { opacity: 0.3; transform: translateX(100%); } }
+@keyframes pt-out-top { to { opacity: 0.3; transform: translateY(-100%); } }
+@keyframes pt-out-bottom { to { opacity: 0.3; transform: translateY(100%); } }
+@keyframes pt-in-from-right { from { opacity: 0.3; transform: translateX(100%); } }
+@keyframes pt-in-from-left { from { opacity: 0.3; transform: translateX(-100%); } }
+@keyframes pt-in-from-bottom { from { opacity: 0.3; transform: translateY(100%); } }
+@keyframes pt-in-from-top { from { opacity: 0.3; transform: translateY(-100%); } }
+@keyframes pt-unfold-right { from { opacity: 0; transform: perspective(1200px) translateX(100%) rotateY(90deg); } }
+@keyframes pt-unfold-left { from { opacity: 0; transform: perspective(1200px) translateX(-100%) rotateY(-90deg); } }
+@keyframes pt-unfold-bottom { from { opacity: 0; transform: perspective(1200px) translateY(100%) rotateX(-90deg); } }
+@keyframes pt-unfold-top { from { opacity: 0; transform: perspective(1200px) translateY(-100%) rotateX(90deg); } }
+
 /* Turbo's progress bar is the slow-load feedback under no-preview (the old
    page holds until the fresh response). Theme it so every app's bar matches
    its brand instead of Turbo's default. The fallback (#0076ff, Turbo's own

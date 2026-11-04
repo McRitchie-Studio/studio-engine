@@ -6,6 +6,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **App-to-app page transitions: `Studio.page_transition_direction`** (`:left`, `:right`,
+  `:top`, `:bottom`, default nil). Each app moves its pages one way, and each page change
+  draws that direction's fade or unfold at random, at the Codrops demo's values. It is the
+  one switch: a set direction turns smooth-load on, metas and navbar pin included. The
+  navbar and banner stack hold still; eager images load before the swap, capped at 500ms;
+  a same-page visit, reduced motion and a browser without view transitions play nothing.
+  With nil, the HTML is unchanged except one more import map entry that nothing fetches.
+  New: `studio/page_transitions`, loaded by its own tag only with the setting on, and the
+  `data-vt-morph` marker for a named element (the `agent_chat` portrait and composer carry
+  it; a host marks its own when it sets a direction). No host changes here. The doc holds
+  a proposed assignment. [`docs/PAGE_TRANSITIONS.md`](docs/PAGE_TRANSITIONS.md).
 - **The marketing kit: every app has a public `/marketing-kit`, and its footer links
   it, with no setup.** `Studio.routes` draws the page (`Studio.draw_marketing_kit_routes`,
   default true; helper `studio_marketing_kit_path`) with no sign-in, and a host's own

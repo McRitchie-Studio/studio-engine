@@ -833,6 +833,20 @@ class E2eLabController < ActionController::Base
     render(:bar_stack, layout: "survey_turbo_lab")
   end
 
+  # Two paths under Turbo for the app-to-app page transition
+  # (e2e/page_transitions.spec.js). `direction` sets the setting for this request
+  # alone, through the ivar layouts/studio/_smooth_load reads, never by writing
+  # Studio.page_transition_direction (one slot for the whole process).
+  def page_transitions = page_transition_lab("a", "/lab/page_transitions_b")
+  def page_transitions_b = page_transition_lab("b", "/lab/page_transitions")
+
+  private def page_transition_lab(name, other_path)
+    @studio_page_transition_direction = params[:direction].presence_in(Studio::PAGE_TRANSITION_DIRECTIONS.map(&:to_s))
+    @lab_page = name
+    @lab_other_url = "#{other_path}?#{request.query_string}"
+    render(:page_transitions, layout: "survey_turbo_lab")
+  end
+
   # ---- The site footer and the booking primitives (docs/SITE_FOOTER.md) ------
   #
   # The facts a host would declare in config.site_footer. test/dummy's

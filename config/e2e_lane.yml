@@ -1144,7 +1144,11 @@
 # 453 -> 457: the account group on a touch screen (account-group-skips-touch-hover), four
 # tests; named below.
 #   npx playwright test --list                                             -> 457
-total_specs: 457
+# 457 -> 480: e2e/page_transitions.spec.js (23), page-transition-directions. Which animation
+# each view-transition pseudo ran, chrome that holds still in pixels, a paused render, and
+# reduced motion exist only in a browser. Each verified RED by a mutation of its own.
+#   npx playwright test --list                                             -> 480
+total_specs: 480
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1438,7 +1442,10 @@ total_specs: 457
 # hover and the tapped control still matches :hover. Keyboard focus on a host sidebar's
 # account is the fourth: RED with its :focus-visible rules dropped.
 #   npx playwright test --list                                             -> 457 tests, 70 files
-executed: 457
+#
+# 457 -> 480: e2e/page_transitions.spec.js, named above.
+#   npx playwright test --list                                             -> 480 tests, 71 files
+executed: 480
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report

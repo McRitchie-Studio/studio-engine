@@ -208,6 +208,12 @@
     controllers, the pinned stack, and the Alpine shims. A module tag, so it
     carries the nonce. %>
 <%= javascript_import_module_tag "studio/application" %>
+<%# THE PAGE TRANSITION, BY ITS OWN DOOR, only with the setting on: an app without
+    it fetches nothing and renders these bytes as before. Not in the boot graph, so
+    it is not preloaded either. Its listeners are bound before the first visit. %>
+<% if @studio_page_transition_direction || Studio.page_transition_direction %>
+  <%= javascript_import_module_tag "studio/page_transitions" %>
+<% end %>
 <%# THE STIMULUS APPLICATION, BY ITS OWN DOOR. studio/stimulus starts the engine's
     Stimulus application and registers the hold button on it. Its only imports
     are Stimulus, studio/lazy_controllers and the hold button's controller, so

@@ -72,12 +72,93 @@ class SmoothLoadConventionTest < ActiveSupport::TestCase
     refute_includes html, "<meta"
   end
 
+  # --- the page transition direction is the one switch -----------------------
+
+  def with_direction(value)
+    original = Studio.page_transition_direction
+    Studio.page_transition_direction = value
+    yield
+  ensure
+    Studio.page_transition_direction = original
+  end
+
+  test "the direction defaults to nil" do
+    assert_nil Studio.page_transition_direction
+  end
+
+  test "with no direction, smooth_load on renders exactly the two metas it always did" do
+    html = with_smooth_load(true) { render_smooth_load }
+
+    assert_equal %(  <meta name="view-transition" content="same-origin">\n  <meta name="turbo-cache-control" content="no-preview">\n),
+                 html.sub(/\A.*?(?=  <meta)/m, "")
+    refute_includes html, "page-transition"
+  end
+
+  test "with no direction and smooth_load off, the partial renders nothing but whitespace" do
+    assert_empty with_smooth_load(false) { render_smooth_load }.strip
+  end
+
+  test "a direction alone turns the metas on, with smooth_load off" do
+    html = with_smooth_load(false) { with_direction(:top) { render_smooth_load } }
+
+    assert_equal 1, html.scan('<meta name="view-transition" content="same-origin">').size
+    assert_equal 1, html.scan('<meta name="turbo-cache-control" content="no-preview">').size
+    assert_equal 1, html.scan('<meta name="page-transition-direction" content="top">').size
+  end
+
+  test "a direction with smooth_load on renders each meta once" do
+    html = with_smooth_load(true) { with_direction(:left) { render_smooth_load } }
+
+    assert_equal 1, html.scan('name="view-transition"').size
+    assert_equal 1, html.scan('name="page-transition-direction"').size
+  end
+
+  test "a direction alone pins the navbar once, and a preview navbar never" do
+    assert_equal 1, with_smooth_load(false) { with_direction(:left) { render_navbar } }.scan("vt-pinned-header").size
+    assert_equal 0, with_smooth_load(false) { with_direction(:left) { render_navbar(preview: true) } }.scan("vt-pinned-header").size
+  end
+
+  test "the head loads the module only with a direction, below the import map" do
+    head = File.read(HEAD_ERB)
+    gate = head.index('<% if @studio_page_transition_direction || Studio.page_transition_direction %>')
+
+    assert gate, "the module tag must sit behind the setting"
+    assert_operator head.index("<%= javascript_importmap_tags %>"), :<, gate
+    assert_match(/\A<% if [^\n]+%>\n  <%= javascript_import_module_tag "studio\/page_transitions" %>\n<% end %>/, head[gate..])
+  end
+
+  test "every view-transition name an engine view sets inline carries the morph marker" do
+    named = Dir[File.join(ENGINE_ROOT, "app/views/**/*.erb")].flat_map do |path|
+      source = File.read(path)
+      source.scan(/view-transition-name: ([\w-]+);/).flatten.map do |name|
+        assert_match(/data-vt-morph="#{name}"|vt_morph: \(?"#{name}"/, source, "#{path}: #{name}")
+        name
+      end
+    end
+    assert_includes named, "agent-portrait", "the scan found nothing, so it proved nothing"
+    assert_includes named, "agent-composer"
+  end
+
   test "head renders the convention partial and the configurable spinner minimum" do
     head = File.read(HEAD_ERB)
 
     assert_includes head, 'render "layouts/studio/smooth_load"'
     assert_includes head, "Studio.nav_spinner_min_ms"
     refute_includes head, "_navSpinnerMinMs = 2500"
+  end
+
+  test "engine.css draws all eight page transition styles, each behind its attribute" do
+    css = File.read(CSS_PATH)
+
+    %w[fade-left unfold-right fade-right unfold-left fade-top unfold-bottom fade-bottom unfold-top].each do |style|
+      assert_includes css, %(html[data-page-transition="#{style}"]::view-transition-old(root))
+      assert_includes css, %(html[data-page-transition="#{style}"]::view-transition-new(root))
+    end
+    assert_match(/animation-duration: 700ms;\s*\n\s*animation-timing-function: ease;/, css)
+    assert_equal 4, css.scan("perspective(1200px)").size
+    assert_match(/^html\[data-page-transition-direction\]\[data-page-transition-visit\] \[data-vt-held\] \{/, css, "the stack's name lasts for the visit, behind the setting")
+    refute_match(/^\.studio-bar-stack \{[^}]*view-transition-name/, css)
+    refute_includes css, '[style*="view-transition-name'
   end
 
   test "engine.css ships the full transition choreography" do

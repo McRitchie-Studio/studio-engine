@@ -160,6 +160,23 @@ module Studio
   # no-preview holds the old page until the fresh response arrives.
   mattr_accessor :smooth_load,          default: false
 
+  # ---- App-to-app page transitions -----------------------------------------
+  # One of :left, :right, :top, :bottom, or nil (the default: nothing changes).
+  # The way this app's pages move on every page change (docs/PAGE_TRANSITIONS.md).
+  # It is THE one switch: a set direction also turns smooth-load on, whatever
+  # Studio.smooth_load says, because the view transition is what it styles.
+  PAGE_TRANSITION_DIRECTIONS = %i[left right top bottom].freeze
+  mattr_reader :page_transition_direction, default: nil
+
+  def self.page_transition_direction=(value)
+    direction = value.presence&.to_sym
+    unless direction.nil? || PAGE_TRANSITION_DIRECTIONS.include?(direction)
+      raise ArgumentError, "Studio.page_transition_direction must be one of " \
+                           "#{PAGE_TRANSITION_DIRECTIONS.join(', ')} or nil (got #{value.inspect})"
+    end
+    @@page_transition_direction = direction
+  end
+
   # Minimum ms the nav spinner stays visible once shown (_head.html.erb).
   # Apps wrapping multi-second operations in the spinner (e.g. Solana RPC)
   # keep the high default to avoid flicker; smooth-load apps typically drop
