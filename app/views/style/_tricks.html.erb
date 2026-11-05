@@ -34,14 +34,22 @@
 <section id="tricks" class="space-y-12" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
   <div class="space-y-1">
     <h2 class="type-h3 text-heading">Tricks</h2>
-    <p class="text-muted text-sm max-w-2xl">Each specimen gives its class name and a usage snippet to copy.</p>
+    <p class="text-muted text-sm max-w-2xl">
+      A board of style tricks you can see and hand to an agent to use out of the box.
+      Each specimen surfaces the rendered primitive, its <strong>class name (one-click
+      copy)</strong>, and a copyable usage snippet - the button, surface, scrim, motion,
+      effect, and leveling primitives. The color tokens live in <a href="#theme" class="underline">Theme</a>.
+    </p>
   </div>
 
   <!-- Buttons -->
   <section class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Buttons</h3>
-      <p class="text-muted text-sm"><code class="font-mono text-2xs">.btn</code> plus one role variant.</p>
+      <p class="text-muted text-sm">
+        <code class="font-mono text-2xs">.btn</code> base plus one role variant, and the
+        <code class="font-mono text-2xs">.btn-sm</code> / <code class="font-mono text-2xs">.btn-lg</code> sizes.
+      </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <% button_variants.each do |name, label| %>
@@ -68,7 +76,12 @@
   <section class="space-y-5" data-page-header-specimen>
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Page header</h3>
-      <p class="text-muted text-sm">This page&rsquo;s own title row is one.</p>
+      <p class="text-muted text-sm">
+        <code class="font-mono text-2xs">studio/_page_header</code>: the title, optional meta beside
+        it and optional tabs on the right. This page's own title row is one: scroll to see it take the bar.
+        It joins the pinned stack, so a table's sticky header sits under it: navbar, page row, table
+        header, each below the last. The rule is in <code class="font-mono text-2xs">docs/PAGE_HEADER.md</code>.
+      </p>
     </div>
     <div class="grid gap-4 lg:grid-cols-2">
       <%# The classes alone, not the partial: the partial's row is sticky, joins the
@@ -98,6 +111,7 @@
   <section class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Surfaces, text &amp; form</h3>
+      <p class="text-muted text-sm">Cards, badges, inputs, the empty state, and the uppercase meta label.</p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%= render layout: "style/specimen",
@@ -145,8 +159,13 @@
   <!-- Time stamps: the "at" format -->
   <section class="space-y-5">
     <div class="space-y-1">
-      <h3 class="type-h4 text-heading">Time stamps: the &ldquo;at&rdquo; format</h3>
-      <p class="text-muted text-sm">Hover a stamp for the relative time and your zone.</p>
+      <h3 class="type-h4 text-heading">Time stamps — the &ldquo;at&rdquo; format</h3>
+      <p class="text-muted text-sm">
+        <code class="font-mono text-2xs">at_time_tag</code> stamps WHEN something happened, on
+        the reader&rsquo;s own clock. The stamps below are live: the server rendered them in this
+        app&rsquo;s timezone and <code class="font-mono text-2xs">studio/at_time_script</code>
+        re-stamped them in yours. Hover one for the relative time and your zone.
+      </p>
     </div>
     <%# An ERB snippet cannot be written literally inside an ERB template: the
         scanner closes the tag at the first `%` + `>` it sees, whatever Ruby string
@@ -162,13 +181,13 @@
       <%# The date joins only when the stamp is not today — the rule is easiest to
           read as two specimens side by side. %>
       <%= render layout: "style/specimen",
-            locals: { klass: "at_time_tag, not today",
+            locals: { klass: "at_time_tag — not today",
                       usage: erb.call("at_time_tag(task.created_at)") + "\n# the date joins only when it is not today" } do %>
         <span class="text-sm text-body"><%= at_time_tag(3.days.ago) %></span>
       <% end %>
 
       <%= render layout: "style/specimen",
-            locals: { klass: "at_time_tag, another year",
+            locals: { klass: "at_time_tag — another year",
                       usage: erb.call("at_time_tag(old_record.created_at)") + "\n# the year joins only when it differs" } do %>
         <span class="text-sm text-body"><%= at_time_tag(1.year.ago) %></span>
       <% end %>
@@ -183,7 +202,7 @@
           the flag, so a live specimen cannot show them what it looks like. Hand-built
           to match the hydrated markup exactly (clock, then ml-2, then the flag). %>
       <%= render layout: "style/specimen",
-            locals: { klass: "outside the US: the flag trails",
+            locals: { klass: "outside the US — the flag trails",
                       usage: %(# The flag is added CLIENT-side from the browser's IANA zone.\n# Inside the US there is no flag at all, and its margin collapses with it.) } do %>
         <div class="flex flex-col items-start gap-1.5 text-sm text-body">
           <span class="whitespace-nowrap"><span>at 6:50a</span><span class="ml-2">🇯🇵</span></span>
@@ -215,7 +234,12 @@
   <section id="loader" class="space-y-5" style="scroll-margin-top: calc(var(--nav-h, 0px) + 5rem)">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Branded loader</h3>
-      <p class="text-muted text-sm max-w-2xl">This app&rsquo;s icon in the <strong><%= loader_config[:style].to_s.tr("_", " ") %></strong> style.</p>
+      <p class="text-muted text-sm max-w-2xl">
+        This app's own icon in its theme colours, in the style <code class="font-mono text-2xs">config.loader</code>
+        names (<strong><%= loader_config[:style].to_s.tr("_", " ") %></strong>). Page loads, long waits and pending
+        buttons all draw it. One class, <code class="font-mono text-2xs">.studio-loader</code>, sized by
+        <code class="font-mono text-2xs">--studio-loader-size</code>. studio-engine docs/LOADER.md.
+      </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%= render layout: "style/specimen",
@@ -261,7 +285,10 @@
   <section class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Motion primitives</h3>
-      <p class="text-muted text-sm">Each knob is a CSS variable you can set inline.</p>
+      <p class="text-muted text-sm">
+        The seven <code class="font-mono text-2xs">engine-motion.css</code> primitives. Each knob is a themeable
+        CSS variable - tune it inline with <code class="font-mono text-2xs">style="--knob: value"</code>.
+      </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%= render layout: "style/specimen",
@@ -345,6 +372,12 @@
   <section class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Effects</h3>
+      <p class="text-muted text-sm">
+        The <code class="font-mono text-2xs">engine-motion.css</code> visual-effect primitives beyond motion -
+        gradient text, a soft glow halo, a one- or two-color rotating <strong>selection glow</strong>
+        (ported from Turf Monster's selected-team-card ring), frosted glass, and a conic wash. Each is
+        themed through the role tokens and tunable via CSS-var knobs.
+      </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%= render layout: "style/specimen",
@@ -404,7 +437,18 @@
   <section class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Hold to confirm</h3>
-      <p class="text-muted text-sm max-w-2xl">A press-and-hold button for an action you do not want taken by accident.</p>
+      <p class="text-muted text-sm max-w-2xl">
+        A press-and-hold CTA for an action you do not want taken by accident, and the
+        carbonation behind it. Ported from Turf Monster, where it confirms a contest entry.
+        The bubbles sit <em>behind</em> the button and show only where they escape its edges;
+        they simmer at rest, boil on hover and through the hold, then burst outward on
+        success. The whole thing themes off the primary role token, so it wears this app&rsquo;s
+        brand — and every color also reads a <code class="font-mono text-2xs">--hold-*</code>
+        input, so one instance can be re-themed from any ancestor.
+        <code class="font-mono text-2xs">prefers-reduced-motion</code> switches the bubbles off.
+        Inside a card that clips, pass <code class="font-mono text-2xs">fizz_portal: true</code>
+        and the bubbles rise past the card&rsquo;s edge instead of stopping at it.
+      </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%# 1. The fizz on its own: no button, just the layers. %>
@@ -456,6 +500,15 @@
   <section class="space-y-5">
     <div class="space-y-1">
       <h3 class="type-h4 text-heading">Confetti &amp; pulse</h3>
+      <p class="text-muted text-sm max-w-2xl">
+        Celebration effects lifted from Turf Monster into the engine. Confetti is
+        <code class="font-mono text-2xs">window.studioConfetti</code> - a zero-dependency,
+        no-CDN effect (canvas-confetti is vendored into the engine and shipped through the
+        asset pipeline). Two callable variants, both honoring
+        <code class="font-mono text-2xs">prefers-reduced-motion</code>. The pulse is the
+        <code class="font-mono text-2xs">.pulse-cta</code> attention beat. Fire the confetti
+        with the buttons below.
+      </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%= render layout: "style/specimen",
@@ -500,7 +553,15 @@
           <span class="badge" style="color: var(--color-warning); border-color: var(--color-warning)">disabled on this app</span>
         <% end %>
       </div>
-      <p class="text-muted text-sm max-w-2xl">The real <code class="font-mono text-2xs">.level-badge</code> tiers, gated by <code class="font-mono text-2xs">Studio.feature?(:leveling)</code>.</p>
+      <p class="text-muted text-sm max-w-2xl">
+        The real <code class="font-mono text-2xs">.level-badge</code> tiers, gated by
+        <code class="font-mono text-2xs">Studio.feature?(:leveling)</code>. Ported into the engine
+        (<code class="font-mono text-2xs">engine-motion.css</code>) from Turf Monster's leveling - the
+        outline starter through the holographic Level 10 - so any consumer with leveling on ships the
+        polished ladder. The tiers theme off <code class="font-mono text-2xs">--color-primary-*</code>, so
+        they restyle per app. Leveling is <strong><%= leveling_on ? "on" : "off" %></strong> here, so these
+        render <%= leveling_on ? "live" : "disabled-but-present - visible and previewable, but greyed and flagged" %>.
+      </p>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <%= render layout: "style/specimen",
