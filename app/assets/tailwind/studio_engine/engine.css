@@ -424,11 +424,13 @@ body.modal-open .studio-app-banner {
   text-overflow: ellipsis;
 }
 
-/* Where a jump lands. A section's top on the header's line: its title shows, stuck or about
-   to be. A target inside a section: a bar's height lower, clear of the section's own bar.
-   The fallback is for a page the publisher has not reached. */
+/* Where a jump lands. A section's top one pixel past the header's line: the header has left
+   its place, so its title shows on the bar. A target inside a section: a bar's height lower,
+   clear of the section's own bar. The fallback is for a page the publisher has not reached.
+   A jump from the top of the page reads this while the line is still low, and studio/pinned_stack
+   lands it again once the line has risen. */
 @utility section-target {
-  scroll-margin-top: var(--pin-section-top, calc(var(--nav-h, 0px) + 5rem));
+  scroll-margin-top: calc(var(--pin-section-top, calc(var(--nav-h, 0px) + 5rem)) - 1px);
 }
 
 @utility section-subtarget {

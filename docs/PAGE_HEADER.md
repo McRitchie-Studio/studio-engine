@@ -156,14 +156,16 @@ The publisher puts `data-stuck` on the stuck header, and `data-pin-section-stuck
 
 | Class | On | Lands |
 |-------|----|-------|
-| `section-target` | A `<section>` with a section header | The section's top on `--pin-section-top`, so the title shows, stuck or about to be. |
+| `section-target` | A `<section>` with a section header | The section's top one pixel past `--pin-section-top`, so its title shows on the bar. |
 | `section-subtarget` | An anchor inside such a section | One `--section-header-h` lower, clear of the section's bar. |
 
 Do not write `scroll-margin-top` by hand: `--nav-h + 5rem` does not know the page row or the bar.
 
-A jump from the top of the page reads the margin while the row is still at rest, so the title
-lands up to the row's own rise below the line, in the gap above the section. The title shows,
-and it sticks on the next scroll.
+A jump from the top of the page reads the margin while the row is at rest and the navbar tall.
+The line then rises, and the section above would keep its bar over a gap. So the publisher runs
+the same jump once more when the line has held still, about a third of a second later. It does
+this only for these two classes, on a `hashchange` or a load with a hash, and a reader who scrolls,
+taps or types first keeps their place.
 
 The style guide's tab highlight changes when a section's top is within 80px of the page row
 (`LINE_SLACK`, `style_section_nav_controller.js`). So a tab can change up to 80px of scroll

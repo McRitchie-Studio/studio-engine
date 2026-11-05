@@ -174,19 +174,36 @@ export function documentIndex(list, el) {
 // bar still below the layers above, so a header being pushed out gives its room back
 // frame by frame.
 //
-// rects are { top, bottom, parentTop }, in page order; line is --pin-section-top. A
-// header is stuck once it has left its place in the flow and part of it still shows
-// below the line. Its section's top is that place, since it is the section's first child
-// and the section has no top padding. Not its distance from the line: while the navbar
-// collapses the line moves first and the header's own `top` follows a frame later, so
-// the bar would drop for the whole collapse.
+// rects are { top, bottom, parentTop, parentBottom }, in page order; line is
+// --pin-section-top. A header is stuck once it has left its place in the flow and part
+// of it still shows below the line. Its section's top is that place, since it is the
+// section's first child and the section has no top padding.
+//
+// NEITHER FACT READS THE HEADER'S OWN EDGE AGAINST THE LINE. While the navbar collapses
+// the line moves first and the header's `top` follows a publish later, so a comparison
+// would drop the bar for the whole collapse, and a bottom read off the rect would be
+// published one step stale, with nothing left to correct it once the page is still. So
+// the bar's bottom is what sticky will make it: one height under the line, or the end of
+// its section while that pushes it out.
+export function sectionBottom(r, line) {
+  return Math.min(line + (r.bottom - r.top), r.parentBottom);
+}
+
 export function stuckSection(rects, line) {
   var found = -1;
   for (var i = 0; i < rects.length; i++) {
     var r = rects[i];
-    if (r.top - r.parentTop > 0.5 && r.bottom > line + 0.5) found = i;
+    if (r.top - r.parentTop > 0.5 && sectionBottom(r, line) > line + 0.5) found = i;
   }
   return found;
+}
+
+// The line a section sits under: the composed top of the section layer.
+export function sectionLine(reading) {
+  for (var i = 0; i < reading.pins.length; i++) {
+    if (reading.pins[i].name === 'section') return reading.pins[i].top;
+  }
+  return null;
 }
 
 function measureSections(nodes, line) {
@@ -197,10 +214,11 @@ function measureSections(nodes, line) {
   var rects = [];
   for (var i = 0; i < nodes.length; i++) {
     var r = nodes[i].getBoundingClientRect();
-    rects.push({ top: r.top, bottom: r.bottom, parentTop: nodes[i].parentElement.getBoundingClientRect().top });
+    var parent = nodes[i].parentElement.getBoundingClientRect();
+    rects.push({ top: r.top, bottom: r.bottom, parentTop: parent.top, parentBottom: parent.bottom });
   }
   var at = stuckSection(rects, line);
-  return at < 0 ? null : { el: nodes[at], bottom: rects[at].bottom };
+  return at < 0 ? null : { el: nodes[at], bottom: sectionBottom(rects[at], line) };
 }
 
 // THE REGISTRY IS DERIVED, NEVER CACHED — and that is a correctness rule.
@@ -588,6 +606,7 @@ export function startPinnedStack() {
   }
 
   var lastPublished = null;
+  var lastTops = null;
   function publishAll() {
     // What lets a section header stick at all (engine.css): with no publisher its bar
     // would never come, and it would lay a clear title over the page. Before the read,
@@ -599,6 +618,12 @@ export function startPinnedStack() {
     write(pins, reading.stack, reading.timeline, reading.travel);
     syncSections(reading);
     syncObserver(pins);
+    // A LAYER UNDER A LAYER SETTLES ONE PUBLISH LATER. A new --pin-page-top moves the page
+    // row without resizing it, so nothing wakes the publisher to read the row's new edge,
+    // and the layer under the row would keep a stale line once the page is still. So a
+    // publish that moved any layer's top asks for one more frame. It ends when none moved.
+    var tops = pins.map(function (p) { return p.top; }).join('|');
+    if (tops !== lastTops) { lastTops = tops; schedule(); }
     var key = publishedKey(reading);
     if (key !== lastPublished) {
       lastPublished = key;
@@ -676,6 +701,41 @@ export function startPinnedStack() {
     window.requestAnimationFrame(function () { queued = false; publishAll(); });
   }
 
+  // A JUMP FROM THE TOP OF THE PAGE LANDS LOW, AND IS LANDED AGAIN. The browser reads a
+  // section's scroll margin while the page row is at rest and the navbar tall. The row
+  // then sticks and the navbar collapses, so the line rises well above the title (114px
+  // on the style guide), and the section above keeps its bar over a gap. So for a moment
+  // after a jump to a section-target, or a load with a hash, a section that sits below
+  // its line is moved onto it. A reader who scrolls, taps or types first keeps their
+  // place, and a jump that was already right moves nothing.
+  var LANDING_MS = 1500;
+  var landing = 0;
+  function landAgain() {
+    var ticket = ++landing;
+    var id = decodeURIComponent(window.location.hash.slice(1));
+    var target = id && document.getElementById(id);
+    if (!target || !target.matches('.section-target')) return;
+    var loaded = null;
+    function frame() {
+      if (ticket !== landing) return;
+      // On a load the browser makes its own jump as loading ends, so the clock starts then.
+      if (loaded === null && document.readyState === 'complete') loaded = performance.now();
+      if (loaded !== null && performance.now() - loaded > LANDING_MS) return;
+      if (loaded !== null) {
+        var line = sectionLine(readStack());
+        var by = line === null ? 0 : target.getBoundingClientRect().top - (line - 1);
+        if (by > 0.5) window.scrollBy({ top: by, behavior: 'instant' });
+      }
+      window.requestAnimationFrame(frame);
+    }
+    window.requestAnimationFrame(frame);
+  }
+  function cancelLanding() { landing++; }
+  window.addEventListener('hashchange', landAgain);
+  ['wheel', 'touchstart', 'keydown', 'pointerdown'].forEach(function (type) {
+    window.addEventListener(type, cancelLanding, { passive: true });
+  });
+
   function invalidate() { forceWrite = true; publishAll(); }
   document.addEventListener('DOMContentLoaded', invalidate);
   document.addEventListener('turbo:load', invalidate);
@@ -706,4 +766,5 @@ export function startPinnedStack() {
   // there: publish now rather than wait for DOMContentLoaded, which also
   // covers a host that imports this after that event has fired.
   invalidate();
+  if (window.location && window.location.hash) landAgain();
 }

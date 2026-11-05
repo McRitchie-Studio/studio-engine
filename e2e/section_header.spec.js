@@ -45,6 +45,8 @@ const scrollTo = (page, selector, offset) => page.evaluate(async ({ selector, of
 const bottomOf = (locator) => locator.evaluate((el) => el.getBoundingClientRect().bottom);
 const topOf = (locator) => locator.evaluate((el) => el.getBoundingClientRect().top);
 const stack = (page) => page.evaluate(() => window.studioPinnedStack.read());
+// Polled: the navbar's collapse takes a moment to settle after a jump.
+const expectUnder = (lower, upper) => expect.poll(async () => Math.abs((await topOf(lower)) - (await bottomOf(upper)))).toBeLessThanOrEqual(1);
 
 test("the style guide: Style stays, Modals sits directly under it, and Tricks takes its place", async ({ page }) => {
   const errors = watchPageErrors(page);
@@ -56,7 +58,7 @@ test("the style guide: Style stays, Modals sits directly under it, and Tricks ta
     const modals = header(page, "modals");
     await expect(modals).toHaveAttribute("data-stuck", "");
     await expect(modals).toHaveText("Modals");
-    expect(Math.abs((await topOf(modals)) - (await bottomOf(row)))).toBeLessThanOrEqual(1);
+    await expectUnder(modals, row);
     await expect(row).toHaveAttribute("data-stuck", "");
 
     // The last of Modals: still its header.
@@ -70,31 +72,58 @@ test("the style guide: Style stays, Modals sits directly under it, and Tricks ta
     const tricks = header(page, "tricks");
     await expect(tricks).toHaveAttribute("data-stuck", "");
     await expect(modals).not.toHaveAttribute("data-stuck", "");
-    expect(Math.abs((await topOf(tricks)) - (await bottomOf(row)))).toBeLessThanOrEqual(1);
+    await expectUnder(tricks, row);
     expect(await page.locator("[data-pin-section][data-stuck]").count()).toBe(1);
     await expect(row.locator("a[aria-current='true']")).toHaveText("Tricks");
 
-    const noSideScroll = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
-    expect(noSideScroll, "the bleed does not make the page scroll sideways").toBe(true);
+    const bleed = await tricks.boundingBox();
+    expect(bleed.x, "the bar's bleed stays on the page").toBeGreaterThanOrEqual(0);
+    expect(bleed.x + bleed.width, "the bar's bleed stays on the page").toBeLessThanOrEqual(await page.evaluate(() => window.innerWidth));
   }
   expect(errors).toEqual([]);
 });
 
-test("a tab's jump lands with the section's title in view, below the stack, at both widths", async ({ page }) => {
+test("a tab's jump lands the section's title on the bar under the row, at both widths", async ({ page }) => {
   for (const viewport of [DESKTOP, PHONE]) {
     await open(page, STYLE, viewport);
     const row = styleRow(page);
+    // Modals first: the jump from the top of the page is the one whose line rises after it.
     for (const [label, id] of [["Modals", "modals"], ["Tricks", "tricks"], ["Tasks", "tasks"], ["Components", "components"], ["Theme", "theme"]]) {
       await row.locator("a", { hasText: label }).click();
       await page.waitForFunction((want) => location.hash === `#${want}`, id);
-      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 200))));
-      const title = header(page, id).locator("h2");
-      const top = await topOf(title);
-      expect(top, `${label}: the title is not behind the row`).toBeGreaterThanOrEqual((await bottomOf(row)) - 1);
-      expect(top, `${label}: the title is on the screen`).toBeLessThan(viewport.height / 2);
+      const bar = header(page, id);
       await expect(row.locator("a[aria-current='true']"), `${label}: the highlight`).toHaveText(label);
+      if (id === "components") {
+        // The last section is too short to reach the line, so the one above keeps its bar.
+        await expect.poll(async () => (await topOf(bar)) >= (await bottomOf(page.locator("[data-pin-section][data-stuck]"))) - 1, `${label}: in view under the bar`).toBe(true);
+        expect(await topOf(bar)).toBeLessThan(viewport.height - 40);
+        continue;
+      }
+      await expect(page.locator("[data-pin-section][data-stuck]"), `${label}: only its own bar`).toHaveText(label);
+      await expectUnder(bar, row);
     }
   }
+});
+
+test("a reader who scrolls right after a jump keeps their place", async ({ page }) => {
+  await open(page, STYLE, DESKTOP);
+  await styleRow(page).locator("a", { hasText: "Modals" }).click();
+  await page.mouse.move(400, 500);
+  await page.mouse.wheel(0, 300);
+  await page.waitForTimeout(800);
+  const held = await page.evaluate(() => window.scrollY);
+  await page.waitForTimeout(800);
+  expect(await page.evaluate(() => window.scrollY)).toBe(held);
+  const modalsTop = await page.locator("#modals").evaluate((el) => el.getBoundingClientRect().top);
+  expect(modalsTop, "not hauled back to the section's top").toBeLessThan(0);
+});
+
+test("a load with a hash lands the title on the bar too", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.setViewportSize(DESKTOP);
+  await page.goto(`${STYLE}#modals`);
+  await expect(page.locator("[data-pin-section][data-stuck]")).toHaveText("Modals");
+  await expectUnder(header(page, "modals"), styleRow(page));
 });
 
 test("a jump to a target inside a section lands below the section's bar", async ({ page }) => {
@@ -163,11 +192,10 @@ test("a table's sticky header sits under the stuck bar, and the stack's bottom i
     await scrollTo(page, "[data-test='lab-table']", -400);
     await expect(bar).toHaveAttribute("data-stuck", "");
 
-    const barBottom = await bottomOf(bar);
-    expect(Math.abs((await stack(page)).bottom - barBottom), `${url}: the stack`).toBeLessThanOrEqual(1);
+    await expect.poll(async () => Math.abs((await stack(page)).bottom - (await bottomOf(bar))), `${url}: the stack`).toBeLessThanOrEqual(1);
     const clone = page.locator(".sticky-table-header-clone");
     await expect(clone).toBeVisible();
-    await expect.poll(async () => Math.abs((await topOf(clone)) - barBottom), `${url}: the clone`).toBeLessThanOrEqual(1);
+    await expect.poll(async () => Math.abs((await topOf(clone)) - (await bottomOf(bar))), `${url}: the clone`).toBeLessThanOrEqual(1);
 
     // Pushed out at the section's end, the bar gives its room back.
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
