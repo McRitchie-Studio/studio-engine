@@ -65,7 +65,7 @@
             <p class="text-muted text-xs font-medium mb-1">Indexes</p>
             <% table[:indexes].each do |idx| %>
               <div class="flex items-center gap-2 text-xs py-0.5">
-                <span class="text-secondary font-mono truncate flex-1"><%= idx.columns.join(", ") %></span>
+                <span class="text-secondary font-mono truncate flex-1"><%= Array(idx.columns).join(", ") %></span>
                 <% if idx.unique %>
                   <span class="text-primary font-medium shrink-0">UNIQUE</span>
                 <% end %>
