@@ -1309,8 +1309,9 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       --lit-rings: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000);
     }
     html.dark[data-surface-style="glass"] {
+      --lit-bottom: inset 0 -2px 0 rgb(0 0 0 / 0.3);
       --lit-contact: 0 1px 2px rgb(0 0 0 / 0.65);
-      --lit-glow: 0 8px 28px -6px;
+      --lit-glow: 0 12px 28px -10px;
       --lit-glow-alpha: 0.8;
       --lit-soft-top: inset 0 1px 0 rgb(255 255 255 / 0.12);
       --lit-soft-bottom: inset 0 -1px 0 rgb(0 0 0 / 0.25);
@@ -1335,6 +1336,7 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
     html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(:disabled, [aria-disabled="true"]) {
       border: 1px solid transparent;
       background-origin: border-box;
+      background-repeat: no-repeat;
       background-image: linear-gradient(var(--lit-top-stop), var(--lit-low-stop));
       --lit-inset: var(--lit-top), var(--lit-bottom);
       --lit-inset-pressed: var(--lit-pressed);

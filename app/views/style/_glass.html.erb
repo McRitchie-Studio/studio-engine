@@ -46,16 +46,16 @@
                     usage: %(.btn-primary, .btn-danger, .btn-neutral, .badge, .input-field),
                     disabled: !surface_on, disabled_label: "surface style is off on this app" } do %>
       <div class="w-full overflow-x-auto" data-test="style-lit-states">
-        <table class="text-xs text-muted border-separate border-spacing-2">
+        <table class="text-xs text-muted">
           <thead><tr><th></th><% %w[rest hover pressed focus disabled].each do |state| %><th class="font-medium text-left"><%= state %></th><% end %></tr></thead>
           <tbody>
             <% [["btn-primary", "Primary"], ["btn-primary btn-sm", "Small"], ["btn-danger btn-sm", "Danger"], ["btn-secondary btn-sm", "Success"], ["btn-neutral btn-sm", "Neutral"], ["btn-outline btn-sm", "Outline"]].each do |classes, label| %>
               <tr>
-                <th class="font-medium text-left"><%= label %></th>
+                <th class="font-medium text-left pr-2"><%= label %></th>
                 <% [nil, "hover", "pressed", "focus"].each do |state| %>
-                  <td><button type="button" class="btn <%= classes %>" tabindex="-1" <%= %(data-lit-state="#{state}").html_safe if state %>>Go</button></td>
+                  <td class="p-1.5"><button type="button" class="btn <%= classes %>" tabindex="-1" <%= %(data-lit-state="#{state}").html_safe if state %>>Go</button></td>
                 <% end %>
-                <td><button type="button" class="btn <%= classes %>" disabled>Go</button></td>
+                <td class="p-1.5"><button type="button" class="btn <%= classes %>" disabled>Go</button></td>
               </tr>
             <% end %>
           </tbody>
