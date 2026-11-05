@@ -183,7 +183,9 @@ form only when `:password` is enabled and the User has `authenticate`
 (`Studio.password_login_available?`); otherwise they render the email-only
 sign-in-link form when `:magic_link` is enabled, and the Google button only with
 `:google`. A passwordless signup stores nothing from the form: it mails a link,
-and using the link creates the account. So `registration_params`' `:name` shows a
+and using the link creates the account. If the link cannot be minted or mailed,
+the failure is logged to ErrorLog and the visitor is sent back to `/signup` with
+one alert, the same for every address. So `registration_params`' `:name` shows a
 Name field only on a password app.
 
 `POST /login`, the password exchange, is drawn only when `auth_methods` includes
