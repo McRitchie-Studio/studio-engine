@@ -19,6 +19,13 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   Detail: `docs/PAGE_HEADER.md`.
 ### Changed
 
+- **A lit button's gradient centers on its own colour.** Every lit variant steps lightness 0.06 up
+  and 0.06 down from its fill, with chroma and hue unchanged, so the painted midpoint is the token.
+  The lit primary now centers on `--color-cta`, the violet a `text-primary` word paints, instead of
+  sitting darker and more saturated. White on the default primary is about 3.1:1 at the midpoint;
+  Alex McRitchie accepted that so the button and the brand word read as one purple. The semantic
+  fills still hold 4.5:1 there. `/lab/hero_button` shows a `text-primary` word beside the button.
+
 - **Tricks starts with the buttons, then what you can add to them.** A new Button tricks group
   sits directly under Buttons: rotating edge glow, border glow, sheen, pulse, fizz, hold to confirm,
   confetti burst and cannons. Each sits on a real `.btn` or fires from one, with its code to copy.
