@@ -88,6 +88,7 @@
       <%= link_to admin_geo_path,
             class: "group flex items-center gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition",
             "data-sidebar-row-described": "",
+            "aria-current": (Studio.sidebar_style == :glass && respond_to?(:request) && request&.path == admin_geo_path ? "page" : nil),
             "@click": geo_close do %>
         <span class="studio-emoji-box text-lg leading-none flex-shrink-0">🌍</span>
         <span class="relative min-w-0 flex-1">

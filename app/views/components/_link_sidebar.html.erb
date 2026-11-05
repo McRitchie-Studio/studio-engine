@@ -5,6 +5,15 @@
     positions against the header, not the viewport); the engine navbar does
     this automatically when sections are declared. %>
 <% sections = studio_sidebar_sections %>
+<%# THE PANEL'S STYLE (Studio.sidebar_style). Under :glass a row draws its link's line icon
+    and the row for this page says aria-current, which is what lights it. The default style
+    reads neither, so an app that stays on it renders what it did. A caller may pass
+    sidebar_style: for one render; the engine lab does, since the setting is process-wide. %>
+<% glass = (local_assigns[:sidebar_style] || Studio.sidebar_style) == :glass %>
+<% sidebar_request = glass && respond_to?(:request) ? request : nil %>
+<%# The engine's Geo row counts too, so no section row above it claims /admin/geo as its own. %>
+<% current_rows = respond_to?(:admin_geo_path) ? sections + [{ links: [{ href: admin_geo_path }] }] : sections %>
+<% current_href = sidebar_request && Studio::SidebarSections.current_href(current_rows, sidebar_request.path, host: sidebar_request.host) %>
 <% sidebar_admin = respond_to?(:admin?) && admin? %>
 <%# THE PANEL'S TITLE. Signed in, admin included: the name the navbar shows, from the
     same call. Signed out: a greeting by the browser's local time, which the server
@@ -43,7 +52,7 @@
 <% sidebar_group = lambda do |title:, admin:, first:, header: false, &block|
      name = [title.presence, ("admin" if admin && !title.to_s.match?(/\badmin\b/i))].compact.join(", ").presence
      header_html = tag.div(title, class: "px-4 pt-3 pb-1 label-upper font-bold truncate", aria: { hidden: true }, data: { sidebar_group_header: "" }) if header && title.present?
-     tag.div(role: "group", aria: { label: name }, class: ["py-1", ("border-t border-subtle" unless first)]) do
+     tag.div(role: "group", aria: { label: name }, class: ["py-1", ("border-t border-subtle" unless first || glass)]) do
        safe_join([header_html, capture(&block)].compact)
      end
    end %>
@@ -68,13 +77,17 @@
       <%= sidebar_group.call(title: section[:title], admin: section[:admin], first: index.zero?, header: section[:header]) do %>
       <% section[:links].each do |link| %>
         <% target = link[:target].presence %>
+        <% line_icon = (studio_icon(link[:icon]) if glass && link[:icon].present?) %>
         <%= link_to link[:href],
               class: "group flex items-center gap-3 px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset transition",
               target: target,
               rel: target == "_blank" ? "noopener" : nil,
               "data-sidebar-row-described": (link[:desc].present? ? "" : nil),
+              "aria-current": (current_href.present? && link[:href] == current_href ? "page" : nil),
               "@click": close_action do %>
-          <% if link[:hover_emoji].present? %>
+          <% if line_icon %>
+            <span class="flex-shrink-0" data-sidebar-row-icon><%= line_icon %></span>
+          <% elsif link[:hover_emoji].present? %>
             <%= render "components/emoji_swap",
                   base: link[:emoji],
                   hover: link[:hover_emoji],
@@ -143,11 +156,11 @@
 
 <% footer_html = capture do %>
   <% if logged_in? %>
-    <div class="border-t border-subtle p-2">
+    <div class="border-t border-subtle p-2"<% if glass %> data-sidebar-glass-foot<% end %>>
       <%= link_to logout_path,
             class: "flex items-center gap-3 rounded-md px-4 py-3 text-sm text-body hover:text-heading hover:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition",
             "@click": close_action do %>
-        <span>👋</span><span>Log out</span>
+        <% if glass %><span class="flex-shrink-0" data-sidebar-row-icon><%= studio_icon("log-out") %></span><% else %><span>👋</span><% end %><span>Log out</span>
       <% end %>
     </div>
   <% end %>
@@ -164,6 +177,7 @@
       escape_action: close_action,
       display_class: "hidden md:flex",
       edge: true,
+      glass: glass,
       role: "navigation",
       aria_label: sidebar_admin ? "Admin menu" : "Links menu" %>
 
@@ -179,5 +193,6 @@
       display_class: "flex md:hidden",
       width_class: "w-full",
       edge: true,
+      glass: glass,
       role: "navigation",
       aria_label: sidebar_admin ? "Admin menu" : "Links menu" %>

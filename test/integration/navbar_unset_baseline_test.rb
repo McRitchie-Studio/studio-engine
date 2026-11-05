@@ -34,7 +34,7 @@ class NavbarUnsetBaselineTest < ActiveSupport::TestCase
 
   # The settings added after 0.113.0, at their defaults.
   DEFAULTS = {
-    navbar_header_bars: [], navbar_menu_trigger: nil, navbar_account_sidebar: nil,
+    sidebar_style: :default, navbar_header_bars: [], navbar_menu_trigger: nil, navbar_account_sidebar: nil,
     navbar_phone_name: false, navbar_name_in_rows: false, navbar_brand: nil, navbar_root_hook: false,
     navbar_z_tier: false, page_transition_direction: nil
   }.freeze

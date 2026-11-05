@@ -26,6 +26,7 @@ require_relative "../lib/studio/geo"
 require_relative "../lib/studio/geo/lookup"
 require_relative "../lib/studio/environment_banner"
 require_relative "../lib/studio/sidebar_sections"
+require_relative "../lib/studio/icons"
 require_relative "../lib/studio/site_footer"
 require_relative "../lib/studio/booking"
 require_relative "../lib/studio/marketing_kit"
@@ -94,6 +95,8 @@ module Studio
   mattr_accessor :nav_spinner_min_ms,   default: 2500
   mattr_accessor :sidebar_sections,     default: []
   mattr_accessor :sidebar_geo_signpost, default: true
+  # Mirrors lib/studio.rb (whose writer validates; the mirror does not).
+  mattr_accessor :sidebar_style,        default: :default
   mattr_accessor :navbar_links,         default: []
   # Mirrors lib/studio.rb (whose writers validate; the mirror does not).
   mattr_accessor :navbar_user_name,     default: nil

@@ -823,7 +823,9 @@ of `app/views/style/_host.html.erb`.
 Two seams, both empty by default, so the navbar is unchanged until an app opts in.
 
 - `sidebar_sections` fills the slide-out link sidebar (the cog trigger in the icon
-  rail). Rules: `lib/studio/sidebar_sections.rb`.
+  rail). Rules: `lib/studio/sidebar_sections.rb`. `Studio.sidebar_style = :glass` floats it
+  as an inset translucent panel with line icons (`studio_icon`, `lib/studio/icons/README.md`);
+  see `docs/NAVBAR_SETUP.md`.
 - `navbar_links` fills the navbar's own link slots: the desktop bar beside the
   logo and the phone row under it. Rules: `lib/studio/navbar_links.rb`.
 
