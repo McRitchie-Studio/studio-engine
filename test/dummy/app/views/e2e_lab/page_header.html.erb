@@ -9,7 +9,9 @@
         title: params[:title].presence || "Models",
         meta: (params[:meta].present? ? "v1.2.3" : nil),
         label: "Lab",
-        tabs: (@lab_right == "tabs" ? E2eLabController::PAGE_HEADER_TABS.map { |name| { label: name, href: "#" } } : []),
+        crumbs: (params[:crumbs].present? ? E2eLabController::PAGE_HEADER_CRUMBS : []),
+        links: (params[:links].present? ? E2eLabController::PAGE_HEADER_LINKS : []),
+        tabs: (@lab_right == "tabs" ? E2eLabController::PAGE_HEADER_TABS.each_with_index.map { |name, index| { label: name, href: "#", current: (index.to_s == params[:current] ? "true" : nil) } } : []),
         actions_html: (@lab_right == "actions" ? link_to("Export", "#", class: "btn btn-sm btn-neutral") : nil) %>
   <div style="height: 2400px">The page.</div>
 </div>

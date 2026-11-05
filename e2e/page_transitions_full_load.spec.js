@@ -354,7 +354,7 @@ test("arriving scrolled by a full load, the taller old navbar does not draw unde
   await page.goBack();
   await settled(page, "a");
   expect(await page.evaluate(() => window.scrollY), "Back did not arrive scrolled").toBe(800);
-  expectOneMotion(await logged(page), "pt-out-left", "pt-in-from-right");
+  expectOneMotion(await logged(page), "pt-out-right", "pt-in-from-left");
   const live = (await page.evaluate(() => window.__frames)).filter((frame) => frame.live);
   expect(live.length).toBeGreaterThan(3);
   expect(new Set(live.map((frame) => frame.oldHeader))).toEqual(new Set(["0"]));
@@ -389,14 +389,14 @@ test("two stacks and a chat head on both pages: one name each, so the direction 
   await expect(page.locator("[data-vt-held]")).toHaveCount(1);
 });
 
-test("Back and Forward across a full load, as fresh documents, each play the direction", async ({ page }) => {
+test("Back across a full load plays the move the other way, and Forward the direction", async ({ page }) => {
   await open(page, STRICT);
   await fullLoad(page);
   await settled(page, "b");
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
   await page.goBack();
   await settled(page, "a");
-  expectOneMotion(await logged(page), "pt-out-left", "pt-in-from-right");
+  expectOneMotion(await logged(page), "pt-out-right", "pt-in-from-left");
   await page.evaluate(() => sessionStorage.removeItem("pt-log"));
   await page.goForward();
   await settled(page, "b");
@@ -512,4 +512,11 @@ test.describe("with reduced motion", () => {
     expect(await page.evaluate(() => sessionStorage.getItem("studio-page-transition-style"))).toBeNull();
     expect(errors).toEqual([]);
   });
+});
+
+test("a back link that loads the page fully plays the move the other way", async ({ page }) => {
+  await open(page, STRICT);
+  await fullLoad(page, "other-back-full");
+  await settled(page, "b");
+  expectOneMotion(await logged(page), "pt-out-right", "pt-in-from-left");
 });
