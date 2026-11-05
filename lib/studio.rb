@@ -370,6 +370,10 @@ module Studio
   #                     art: "/brand/loader-sparkle.svg" }
   mattr_reader :loader, default: Loader.normalize(nil)
 
+  # The page-load overlay reaches every page through layouts/studio/_head, at the one
+  # standard pace in Studio::Loader. false opts this app out. docs/LOADER.md.
+  mattr_accessor :loader_overlay, default: true
+
   def self.loader=(config)
     @@loader = Loader.normalize(config)
   end

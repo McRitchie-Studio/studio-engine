@@ -175,3 +175,173 @@ test("a Turbo visit is never capped: a slow page keeps its overlay", async () =>
   assert.equal(overlay.hidden, false, "the cap hid a page that was still loading")
   settle(fakeDoc(overlay))
 })
+
+// ---- the pace: 350ms to show, 750ms once shown ------------------------------
+
+const pace = await import(`data:text/javascript,${encodeURIComponent(`${source}\n// the pace`)}`)
+
+function paceDoc(overlay) {
+  const root = {}
+  return {
+    documentElement: root,
+    querySelector: () => overlay,
+    querySelectorAll: () => [],
+    defaultView: { requestAnimationFrame: (fn) => fn(), setTimeout: (fn) => fn() }
+  }
+}
+const htmlResponse = (html = "<html></html>", more = {}) => ({ succeeded: true, isHTML: true, responseHTML: Promise.resolve(html), ...more })
+const responseEvent = (doc, fetchResponse, target = doc.documentElement) => ({ target, detail: { fetchResponse } })
+const flush = async () => { for (let i = 0; i < 8; i += 1) await Promise.resolve() }
+
+// A visit under a fake clock. It returns the moment the response's HTML reached Turbo,
+// or null with the wait not finished, and when the overlay went.
+async function visitAt(t, responseAt, { delay = "350", minShow = "750", html } = {}) {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 })
+  const overlay = fakeOverlay(delay)
+  overlay.setAttribute("data-min-show", minShow)
+  const doc = paceDoc(overlay)
+  pace.showSoon("", doc)
+  t.mock.timers.tick(responseAt)
+  const response = htmlResponse(html)
+  const held = pace.holdVisitResponse(responseEvent(doc, response), doc)
+  let turboGotIt = null
+  Promise.resolve(response.responseHTML).then(() => { turboGotIt = Date.now() })
+  await flush()
+  return { overlay, doc, response, held, shownAtResponse: !overlay.hidden, turboAt: () => turboGotIt, tick: async (ms) => { t.mock.timers.tick(ms); await flush() } }
+}
+
+for (const [responseAt, expectedRelease] of [[360, 1100], [400, 1100]]) {
+  test(`shown at 350, a response at ${responseAt} reaches Turbo at ${expectedRelease}, with the overlay gone`, async (t) => {
+    const visit = await visitAt(t, responseAt)
+    assert.equal(visit.held, true)
+    assert.equal(visit.overlay.hidden, false)
+    assert.equal(visit.turboAt(), null)
+    await visit.tick(expectedRelease - responseAt - 1)
+    assert.equal(visit.turboAt(), null, "released early")
+    assert.equal(visit.overlay.hidden, false, "hidden early")
+    await visit.tick(1)
+    assert.equal(visit.turboAt(), expectedRelease)
+    assert.equal(visit.overlay.hidden, true, "the old picture must not hold the overlay")
+    pace.hide(visit.doc)
+  })
+}
+
+test("shown at 350, a response at 1200 is past the minimum and waits for nothing", async (t) => {
+  const visit = await visitAt(t, 1200)
+  assert.equal(visit.held, false)
+  assert.equal(visit.turboAt(), 1200)
+  pace.hide(visit.doc)
+})
+
+test("a response before the delay never shows the overlay and is not delayed", async (t) => {
+  const visit = await visitAt(t, 200)
+  assert.equal(visit.held, false)
+  assert.equal(visit.turboAt(), 200)
+  await visit.tick(5000)
+  assert.equal(visit.overlay.hidden, true, "the overlay showed after its response had come")
+})
+
+test("min_show of zero waits for nothing", async (t) => {
+  const visit = await visitAt(t, 360, { minShow: "0" })
+  assert.equal(visit.held, false)
+  pace.hide(visit.doc)
+})
+
+test("a frame, a form and a prefetch have their own target, and never wait", async (t) => {
+  const visit = await visitAt(t, 1200)
+  const again = fakeOverlay("350")
+  const doc = paceDoc(again)
+  t.mock.timers.setTime(0)
+  pace.showSoon("", doc)
+  t.mock.timers.tick(360)
+  assert.equal(pace.holdVisitResponse(responseEvent(doc, htmlResponse(), { tagName: "TURBO-FRAME" }), doc), false)
+  assert.equal(pace.holdVisitResponse(responseEvent(doc, htmlResponse(), { tagName: "FORM" }), doc), false)
+  pace.hide(doc)
+  pace.hide(visit.doc)
+})
+
+test("a failure and a download pass straight through", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 })
+  const overlay = fakeOverlay("350")
+  const doc = paceDoc(overlay)
+  pace.showSoon("", doc)
+  t.mock.timers.tick(360)
+  assert.equal(pace.holdVisitResponse(responseEvent(doc, htmlResponse("x", { succeeded: false })), doc), false)
+  assert.equal(pace.holdVisitResponse(responseEvent(doc, htmlResponse("x", { isHTML: false })), doc), false)
+  pace.hide(doc)
+})
+
+test("a page that answers with a full load does not wait: its second load is the one that paints", async (t) => {
+  for (const html of ['<meta name="turbo-visit-control" content="reload">', '<META content="reload" name="turbo-visit-control">']) {
+    const visit = await visitAt(t, 360, { html })
+    assert.equal(visit.turboAt(), 360, html)
+    pace.hide(visit.doc)
+    t.mock.timers.reset()
+  }
+  assert.equal(pace.answersWithFullLoad('<meta name="turbo-visit-control" content="advance">'), false)
+  assert.equal(pace.answersWithFullLoad(undefined), false)
+})
+
+test("StudioLoader.hide ends a wait at once", async (t) => {
+  const visit = await visitAt(t, 360)
+  assert.equal(visit.turboAt(), null)
+  pace.hide(visit.doc)
+  await flush()
+  assert.equal(visit.turboAt(), 360)
+  assert.equal(visit.overlay.hidden, true)
+})
+
+test("a caller's show has no minimum", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 })
+  const overlay = fakeOverlay("350")
+  const doc = paceDoc(overlay)
+  pace.show("Signing", doc)
+  assert.equal(pace.minShowLeft(overlay, 10), 0)
+  assert.equal(pace.holdVisitResponse(responseEvent(doc, htmlResponse()), doc), false)
+  pace.hide(doc)
+})
+
+test("a form's overlay stays up for the rest of its minimum, and hide still cuts that short", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 })
+  const overlay = fakeOverlay("350")
+  const doc = paceDoc(overlay)
+  pace.showSoon("Saving", doc)
+  t.mock.timers.tick(400)
+  pace.hideAfterMinimum(doc)
+  t.mock.timers.tick(699)
+  assert.equal(overlay.hidden, false)
+  t.mock.timers.tick(1)
+  assert.equal(overlay.hidden, true)
+
+  pace.showSoon("Saving", doc)
+  t.mock.timers.tick(400)
+  pace.hideAfterMinimum(doc)
+  pace.hide(doc)
+  assert.equal(overlay.hidden, true)
+})
+
+test("with no overlay in the body, it comes once from the head's template; a host's own wins", () => {
+  const added = []
+  const made = fakeOverlay("350")
+  const doc = {
+    body: { appendChild: (node) => { added.push(node) } },
+    importNode: (content) => content,
+    querySelector: (selector) => {
+      if (selector === "[data-studio-loader-overlay]") return added.length ? made : null
+      if (selector.startsWith("template[")) return { content: "the overlay" }
+      return null
+    },
+    defaultView: { requestAnimationFrame: (fn) => fn(), setTimeout: (fn) => fn() }
+  }
+  pace.showSoon("", doc)
+  pace.showSoon("", doc)
+  assert.deepEqual(added, ["the overlay"])
+  pace.hide(doc)
+
+  const own = fakeOverlay("350")
+  let imported = 0
+  const hostDoc = { body: {}, importNode: () => { imported += 1 }, querySelector: () => own, defaultView: doc.defaultView }
+  pace.showSoon("", hostDoc)
+  assert.equal(imported, 0)
+  pace.hide(hostDoc)
+})

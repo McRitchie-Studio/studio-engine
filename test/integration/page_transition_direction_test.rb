@@ -131,6 +131,22 @@ class PageTransitionDirectionTest < ActionDispatch::IntegrationTest
     assert_includes response.body, 'data-vt-morph="agent-composer"'
   end
 
+  test "every page's head carries the loader overlay in a template, and the setting takes it away" do
+    get "/lab/page_transitions"
+    head = Nokogiri::HTML(response.body).at_css("head")
+    template = head.at_css("template[data-studio-loader-overlay-template]")
+    assert template, "no overlay template in the head"
+    assert_includes template.inner_html, "data-min-show=\"750\""
+    assert_includes template.inner_html, "data-delay=\"350\""
+    assert_nil Nokogiri::HTML(response.body).at_css("body [data-studio-loader-overlay]"), "a page with no overlay of its own has none in the body"
+
+    Studio.loader_overlay = false
+    get "/lab/page_transitions"
+    refute_includes response.body, "data-studio-loader-overlay-template"
+  ensure
+    Studio.loader_overlay = true
+  end
+
   test "the module is pinned for a host, and not preloaded on every page" do
     refute_includes Studio::Engine.javascript_boot_graph, "studio/page_transitions"
     assert_includes Studio::Engine.javascript_module_logical_paths, "studio/page_transitions.js"
