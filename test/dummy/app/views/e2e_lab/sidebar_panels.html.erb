@@ -14,7 +14,10 @@
 <main class="p-8" x-data="{ hostOpen: false }">
   <p data-test="lab-body">sidebar panels lab</p>
 
-  <% if params[:busy].present? %>
+  <% if params[:busy] == "photo" %>
+    <%# A photo behind the panel, which shows a line in the blur that small text hides. %>
+    <div class="fixed inset-0 -z-10 bg-cover bg-center" style="background-image: url('/e2e/img/lab-photo.avif')" data-test="lab-photo"></div>
+  <% elsif params[:busy].present? %>
     <%# A busy page behind the panel, standing in for a board: small text and hard
         edges, which is what a blur has to separate the panel from. %>
     <button type="button" class="rounded border border-subtle px-3 py-2 text-sm" data-test="lab-theme"

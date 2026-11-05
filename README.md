@@ -1095,7 +1095,7 @@ config.navbar_account_sidebar = { flag: "gearOpen", controls: %w[gear-sidebar ge
 `components/_sidebar_panel` takes three opt-in locals; unset, the panel renders
 as before:
 
-- `edge: true` draws a soft blurred band along the panel's inner edge from `md`
+- `edge: true` draws a soft blurred band, 100px wide, along the panel's inner edge from `md`
   up, through a `data-sidebar-edge` hook and engine.css. It takes no clicks. The
   link sidebar passes it. It softens the page beside the panel, so leave it off
   a panel kept open beside live content.

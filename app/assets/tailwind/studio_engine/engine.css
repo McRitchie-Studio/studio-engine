@@ -1107,7 +1107,10 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
        It is a pseudo-element of the panel: it moves with the slide, it leaves with the
        panel, and it takes no clicks, so an outside click still reaches the page. A
        transform on the panel does not start a new backdrop root, so it blurs the page.
-       40px wide, a 6px blur, held for the 10px nearest the panel, then fading to sharp.
+       100px wide, a 6px blur, on an eased mask: whole at the panel, half at 60px, nothing
+       at the far end, and flat at both ends, so no stop shows as a line where the blur
+       ends. A hold and a straight fade showed that line over a photo. A blur reads only
+       above about half strength, so the 50% stop sits past the middle to carry it out.
        right: 100% measures from the padding box, so the band runs over the panel's 1px
        border. Stopping short of it left the border as a lit line beside the blur.
 
@@ -1120,12 +1123,12 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
         position: absolute;
         inset-block: 0;
         right: 100%;
-        width: 2.5rem;
+        width: 6.25rem;
         pointer-events: none;
         -webkit-backdrop-filter: blur(6px);
         backdrop-filter: blur(6px);
-        -webkit-mask-image: linear-gradient(to left, #000 25%, transparent);
-        mask-image: linear-gradient(to left, #000 25%, transparent);
+        -webkit-mask-image: linear-gradient(to left, #000, rgb(0 0 0 / 0.99) 10%, rgb(0 0 0 / 0.96) 20%, rgb(0 0 0 / 0.9) 30%, rgb(0 0 0 / 0.8) 40%, rgb(0 0 0 / 0.66) 50%, rgb(0 0 0 / 0.5) 60%, rgb(0 0 0 / 0.33) 70%, rgb(0 0 0 / 0.17) 80%, rgb(0 0 0 / 0.05) 90%, transparent);
+        mask-image: linear-gradient(to left, #000, rgb(0 0 0 / 0.99) 10%, rgb(0 0 0 / 0.96) 20%, rgb(0 0 0 / 0.9) 30%, rgb(0 0 0 / 0.8) 40%, rgb(0 0 0 / 0.66) 50%, rgb(0 0 0 / 0.5) 60%, rgb(0 0 0 / 0.33) 70%, rgb(0 0 0 / 0.17) 80%, rgb(0 0 0 / 0.05) 90%, transparent);
       }
     }
 

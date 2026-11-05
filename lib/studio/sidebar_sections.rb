@@ -8,7 +8,7 @@
 # context) for dynamic data: route helpers, logged_in? walls, model-backed
 # link lists. Each section normalizes to symbol keys:
 #
-#   { title: "Site", admin: true, links: [
+#   { title: "Site", admin: true, header: true, links: [
 #     { label: "Dashboard", href: "/admin", emoji: "📊",
 #       hover_emoji: "🔬", desc: "Users + logs", target: "_blank" } ] }
 #
@@ -16,8 +16,9 @@
 # trigger and panel stay invisible to everyone else even when the host
 # declares nothing but admin links.
 #
-# A section's title is its group's accessible name; the panel shows no label word. A
-# link's desc is optional and shows only on hover or keyboard focus.
+# A section's title is its group's accessible name. By default the panel shows no label
+# word; a section with header: true also shows its title above its rows. A link's desc is
+# optional and shows only on hover or keyboard focus.
 #
 # THE ENGINE PREPENDS ONE SECTION OF ITS OWN — "You", linking to /profile. The
 # engine ships that page, so it ships the way in rather than asking five apps to
