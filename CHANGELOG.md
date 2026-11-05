@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.128.0 — 2026-11-05
+
 ### Fixed
 
 - **The modified-click booking spec no longer waits on a Playwright event that can stay silent.**
