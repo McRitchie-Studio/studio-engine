@@ -155,7 +155,7 @@
          x-data="{}" @ds-modal-close.window="$store.dsModals.close()"
          @age-verified.window="$store.dsModals.open('entry-confirmed', { txSignature: null, lobbyUrl: null, seedsEarned: 0 })">
   <div class="space-y-1">
-    <h2 class="text-2xl font-bold text-heading">Modals</h2>
+    <h2 class="text-base font-extrabold text-heading">Modals</h2>
     <p class="text-muted text-sm">
       The shared modal host and the reusable modal partials, ported from Turf
       Monster into the engine. Each tile is a <strong>visual representation, not
@@ -461,7 +461,7 @@
   <%# ===================================================================== %>
   <section id="modals-auth" class="space-y-5">
     <div class="space-y-1">
-      <h3 class="text-xl font-bold text-heading">Auth</h3>
+      <h3 class="label-upper font-bold">Auth</h3>
       <p class="text-muted text-sm">
         <strong>The engine ships no sign-in card.</strong> A sign-in modal is a
         product decision &mdash; which methods, what terms, whose legal copy
@@ -523,7 +523,7 @@
       cannot show, now that the wallet step lives with the wallet cards. %>
   <section id="modals-profile" class="space-y-5">
     <div class="space-y-1">
-      <h3 class="text-xl font-bold text-heading">Profile</h3>
+      <h3 class="label-upper font-bold">Profile</h3>
       <p class="text-muted text-sm">
         Who the account IS &mdash; the name it goes by, the birthday that decides
         eligibility, and the picture. The first three cards are asked at signup
@@ -711,7 +711,7 @@
   <section id="modals-profile-leveling" class="space-y-5">
     <div class="space-y-1">
       <div class="flex flex-wrap items-center gap-3">
-        <h3 class="text-xl font-bold text-heading">Profile Leveling</h3>
+        <h3 class="label-upper font-bold">Profile Leveling</h3>
         <% if leveling_on %>
           <span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">leveling on</span>
         <% else %>
@@ -865,7 +865,7 @@
   <section id="modals-web3" class="space-y-5">
     <div class="space-y-1">
       <div class="flex flex-wrap items-center gap-3">
-        <h3 class="text-xl font-bold text-heading">Web3</h3>
+        <h3 class="label-upper font-bold">Web3</h3>
         <% if web3_on %>
           <span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">enabled on this app</span>
         <% else %>
@@ -1035,7 +1035,7 @@
   <section id="modals-contest-entry" class="space-y-5">
     <div class="space-y-1">
       <div class="flex flex-wrap items-center gap-3">
-        <h3 class="text-xl font-bold text-heading">Contest entry &amp; eligibility</h3>
+        <h3 class="label-upper font-bold">Contest entry &amp; eligibility</h3>
         <% if age_gate_on %>
           <span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">age gate on</span>
         <% else %>
@@ -1133,7 +1133,7 @@
   <%# ===================================================================== %>
   <section id="modals-system-status" class="space-y-5">
     <div class="space-y-1">
-      <h3 class="text-xl font-bold text-heading">System &amp; status</h3>
+      <h3 class="label-upper font-bold">System &amp; status</h3>
       <p class="text-muted text-sm">
         The reusable card blocks under <code class="font-mono text-2xs">studio/modals/blocks/</code> &mdash;
         the studio-canonical processing, success, error, and countdown states.
@@ -1283,7 +1283,7 @@
   <%# ===================================================================== %>
   <section id="modals-templates" class="space-y-5">
     <div class="space-y-1">
-      <h3 class="text-xl font-bold text-heading">Templates</h3>
+      <h3 class="label-upper font-bold">Templates</h3>
       <p class="text-muted text-sm">
         Reusable archetypes under <code class="font-mono text-2xs">studio/modals/templates/</code> &mdash;
         the copy-from reference cards for a new modal (wizard, form, action,
@@ -1318,7 +1318,7 @@
   <section id="modals-rewards" class="space-y-5">
     <div class="space-y-1">
       <div class="flex flex-wrap items-center gap-3">
-        <h3 class="text-xl font-bold text-heading">Rewards</h3>
+        <h3 class="label-upper font-bold">Rewards</h3>
         <% if leveling_on %>
           <span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">enabled on this app</span>
         <% else %>
@@ -1395,7 +1395,7 @@
   <%# ===================================================================== %>
   <section id="modals-motion-registry" class="space-y-5">
     <div class="space-y-1">
-      <h3 class="text-xl font-bold text-heading">Enter &amp; leave animations</h3>
+      <h3 class="label-upper font-bold">Enter &amp; leave animations</h3>
       <p class="text-muted text-sm">
         The per-modal entrance/exit registry &mdash;
         <code class="font-mono text-2xs">window.ModalAnimations</code>, published by
@@ -1461,7 +1461,7 @@
   <%# ===================================================================== %>
   <section id="modals-stack-mechanics" class="space-y-5">
     <div class="space-y-1">
-      <h3 class="text-xl font-bold text-heading">Stack behaviour</h3>
+      <h3 class="label-upper font-bold">Stack behaviour</h3>
       <p class="text-muted text-sm">
         The engine modal-stack mechanics, poked at directly on
         <code class="font-mono text-2xs">$store.dsModals</code>:
