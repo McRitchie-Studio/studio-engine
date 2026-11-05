@@ -98,6 +98,10 @@ class StyleHostSectionTest < ActiveSupport::TestCase
     node = Nokogiri::HTML.fragment(host_html).at_css("##{ANCHOR}")
 
     assert_equal Studio.app_name, node.at_css("h2")&.text&.strip
+    # turf-monster's own suite asserts this path on the rendered page. Pinned here too,
+    # so the engine's suite goes red first if the intro stops naming the file.
+    assert_includes node.at_css("h2 + p").text, "app/views/style/host/_modals.html.erb",
+                    "the intro names the file that contributed the section"
   end
 
   def test_the_section_lands_between_modals_and_tricks
