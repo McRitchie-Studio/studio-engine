@@ -1254,7 +1254,9 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
     }
     [data-sidebar-glass-shell] nav > [role="group"] > a[aria-current="page"],
     [data-sidebar-glass-shell] nav > [role="group"] > a[aria-current="page"]:hover {
-      background-color: var(--color-primary);
+      /* A step down the primary's own scale: white on the hub's primary is 3.1:1, and this
+         mix holds 4.5:1 and still reads as the brand's violet. */
+      background-color: color-mix(in srgb, var(--color-primary-600) 65%, var(--color-primary-700));
       box-shadow: 0 4px 14px rgb(var(--color-primary-rgb) / 0.4);
       color: #fff;
     }
