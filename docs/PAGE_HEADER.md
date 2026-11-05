@@ -156,23 +156,26 @@ The publisher puts `data-stuck` on the stuck header, and `data-pin-section-stuck
 
 | Class | On | Lands |
 |-------|----|-------|
-| `section-target` | A `<section>` with a section header | The section's top one pixel past `--pin-section-top`, so its title shows on the bar. |
-| `section-subtarget` | An anchor inside such a section | One `--section-header-h` lower, clear of the section's bar. It takes no second landing. |
+| `section-target` | A `<section>` with a section header | Its top just past the pinned line, `--nav-h` plus `--pin-page-h`, so its title shows on its bar. |
+| `section-subtarget` | An anchor inside such a section | One `--section-header-h` lower, clear of the section's bar. |
 
 Do not write `scroll-margin-top` by hand: `--nav-h + 5rem` does not know the page row or the bar.
 
-A jump from the top of the page reads the margin while the row is at rest and the navbar tall.
-The line then rises, and the section above would keep its bar over a gap. So for 1.5 seconds
-after the jump, the publisher moves a `section-target` that sits below its line onto the line. It
-does this on a `hashchange` and on a load with a hash, and not on a reload or a Back, where the
-browser restores the reader's place. A reader who scrolls, taps or types first keeps their place.
+These are CSS alone. No script moves the page after a jump, so a Back, a reload, a Turbo visit
+and a scroll by the reader or the app all keep their place.
 
-A short last section cannot reach the line, so the section above it keeps its bar, and the title
-shows lower on the screen.
+**A first jump from the top of the page lands low.** The navbar is still tall when the browser
+reads the margin, and it collapses after the jump. So the title lands by the collapse below the
+line: 75px on the hub at 390px, 38px on Turf, and 0 on both at desktop width. The title shows and
+the bar comes on the next scroll. Later jumps land on the line.
 
-The style guide's tab highlight changes when a section's top is within 80px of the page row
-(`LINE_SLACK`, `style_section_nav_controller.js`). So a tab can change up to 80px of scroll
-before the bar swaps. The slack is what holds the highlight on a clicked tab after the row rises.
+**Keep the sections further apart than that.** If the gap between two sections is smaller than the
+collapse, the section above still shows a sliver of its bar after the jump. The style guide's gap
+is 6rem for this reason. Its tab highlight has the same margin, `LINE_SLACK`, 80px, so a tab can
+change up to 80px of scroll before the bar swaps.
+
+A short last section cannot reach the line, so the section above it can keep its bar, with the
+title lower on the screen.
 
 ## Who has adopted it
 

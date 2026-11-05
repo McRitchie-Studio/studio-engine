@@ -422,13 +422,14 @@ body.modal-open .studio-app-banner {
    navbar compact and the page row stuck: heights, not --pin-section-top, whose value at the
    top of the page holds the row's rest place and whatever scrolls away above it. So this one
    composes, which a thing placed on screen must not: a margin is read once, at the jump. Less
-   the pixel that lets the header leave its place, so its title shows on the bar.
+   two pixels, so the header has left its place on a fractional height and its title shows on
+   the bar.
 
    A JUMP FROM THE TOP OF THE PAGE reads the navbar still tall, and lands by the navbar's
    collapse below the line. Landing short is safe, the title shows. Landing past is safe too,
    since the bar holds the title. A target inside a section: a bar's height lower. */
 @utility section-target {
-  scroll-margin-top: calc(var(--nav-h, 5rem) + var(--pin-page-h, 0px) - 1px);
+  scroll-margin-top: calc(var(--nav-h, 5rem) + var(--pin-page-h, 0px) - 2px);
 }
 
 @utility section-subtarget {

@@ -13,11 +13,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   including a host's own. It joins the pinned stack as one layer, `section`: a new
   `data-pin-section`, and `--pin-section-top`, `-h` and `-bottom`. Only the stuck header
   counts, so `--pin-stack-bottom` and a table's sticky header sit under it. New classes:
-  `section-header`, `section-header-title`, `section-target` and `section-subtarget`, which
-  replace a hand-written `scroll-margin-top`. A jump from the top of the page is landed again
-  once the line has risen, and the publisher now reads the layers once more after a settle and
-  after a layer's top moves, so a layer under a layer does not keep a stale line. Detail:
-  `docs/PAGE_HEADER.md`.
+  `section-header`, `section-target` and `section-subtarget`, which
+  replace a hand-written `scroll-margin-top`. The publisher now reads the layers once more after
+  a settle and after a layer's top moves, so a layer under a layer does not keep a stale line.
+  Detail: `docs/PAGE_HEADER.md`.
 
 ### Changed
 

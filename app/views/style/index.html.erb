@@ -78,7 +78,10 @@
             data: { style_section_nav_target: "link" } }
         } %>
 
-  <div class="space-y-16 pt-10">
+  <%# 6rem between sections: a first jump from the top of the page lands by the navbar's
+      collapse below the line, and the section above must be gone from the bar by then
+      (76px on the hub at phone width). %>
+  <div class="space-y-24 pt-10">
     <%= render "style/theme" %>
     <%= render "style/modals" %>
     <% if host_modals %>

@@ -11,10 +11,10 @@ import { activeIndex } from "studio/style_section_nav"
 
 const ACTIVE = "btn-primary"
 const REST = "btn-neutral"
-// A jump lands a section by its scroll-margin (--pin-section-top), read while the
-// row may still be at rest and the header tall; the row then sticks and the header
-// collapses, so the row rises and the section does not. The slack keeps the clicked
-// section past the line, with that rise to spare, for any later scroll or resize.
+// A jump lands a section by its scroll margin, the stack's pinned heights, read while the
+// header may still be tall; the header then collapses, so the row rises and the section
+// does not (76px on the hub at phone width). The slack keeps the clicked section past the
+// line, for any later scroll or resize.
 const LINE_SLACK = 80
 
 export default class extends Controller {
