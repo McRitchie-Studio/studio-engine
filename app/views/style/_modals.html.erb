@@ -953,10 +953,11 @@
           signs the mint, came across in that move. %>
       <div class="mt-2 rounded-lg border border-subtle bg-surface p-3 text-xs text-secondary leading-snug">
         <p class="text-heading font-semibold mb-1">Web2 vs web3</p>
-        <p class="mb-1">Web2 mints one prepaid entry token per credit after payment clears, then consumes one to enter.</p>
-        <p class="mb-1">Web3 funds USDC directly and mints no token, so the mint and consume steps are web2-only.</p>
-        <p class="mb-1">A token is a program-owned on-chain credit, not a wallet SPL token. The mint is server-signed once payment clears.</p>
-        <p>Both create the same on-chain Entry PDA and end on the same Entry Confirmed card.</p>
+        <p class="mb-1">Web2 (card, Stripe, Coinflow, PayPal) mints one prepaid entry token per credit after payment clears, then consumes one to enter.</p>
+        <p class="mb-1">Web3 (wallet, USDC) funds USDC directly and mints no token, so the mint and consume steps are web2-only.</p>
+        <p class="mb-1">An entry token is a program-owned prepaid credit on-chain, not a wallet SPL token.</p>
+        <p class="mb-1">The mint is server-signed once payment clears, never on the buyer&rsquo;s click.</p>
+        <p>Both paths create the same on-chain Entry PDA and end on the same Entry Confirmed card.</p>
       </div>
     </div>
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
