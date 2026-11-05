@@ -20,7 +20,8 @@
     Recorded because the head partial's theme store, named above, reads as though
     the toggle works on these pages; it does not. %>
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<%# ?surface=glass turns on the lit buttons and glass surfaces, as a host's root does. %>
+<html lang="en" class="dark"<%= %( data-surface-style="glass").html_safe if params[:surface] == "glass" %>>
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">

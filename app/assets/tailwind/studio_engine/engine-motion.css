@@ -169,6 +169,13 @@
   transform: translateZ(0);
 }
 
+/* On a button the halo needs room: 10px of reach ends an 18px blur on a hard line,
+   which reads as a box around so small a host. Twice the blur lets it fade out. */
+.btn.studio-border-glow::after {
+  inset: -36px;
+  padding: 36px;
+}
+
 @keyframes studioBorderGlowSteam {
   0% {
     background-position: var(--studio-border-glow-offset, 0%) 0;

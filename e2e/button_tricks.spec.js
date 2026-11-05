@@ -143,8 +143,7 @@ test("fizz runs behind a plain button, and hover adds a layer", async ({ page })
 test("the tricks keep a lit button lit", async ({ page }) => {
   await blockOffsiteRequests(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto(LAB);
-  await page.evaluate(() => { document.documentElement.dataset.surfaceStyle = "glass"; });
+  await page.goto(`${LAB}?surface=glass`);
 
   const after = (selector, property) => page.locator(selector).first().evaluate(
     (el, name) => getComputedStyle(el, "::after")[name], property);
@@ -157,7 +156,7 @@ test("the tricks keep a lit button lit", async ({ page }) => {
   expect(await after(glow, "top")).toBe("-28px");
   expect(await after(glow, "boxShadow")).toBe("none");
   expect(await host(glow, "boxShadow")).toContain("inset");
-  expect(await after("section#button-tricks button.studio-border-glow", "top")).toBe("-10px");
+  expect(await after("section#button-tricks button.studio-border-glow", "top")).toBe("-36px");
 
   // The inset light still rides ::after on a sheen, and overflow does not cut it.
   const sheen = "section#button-tricks button.sheen";
@@ -175,8 +174,7 @@ test("the tricks keep a lit button lit", async ({ page }) => {
 test("the pulse keeps the lit shadow through its beat", async ({ page }) => {
   await blockOffsiteRequests(page);
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto(LAB);
-  await page.evaluate(() => { document.documentElement.dataset.surfaceStyle = "glass"; });
+  await page.goto(`${LAB}?surface=glass`);
 
   const pulse = page.locator("section#button-tricks button.pulse-cta").first();
   const shadowLayers = () => pulse.evaluate((el) => getComputedStyle(el).boxShadow.split(/,(?![^(]*\))/).length);
@@ -198,4 +196,16 @@ test("confetti fires from the button itself", async ({ page }) => {
   await page.locator("section#button-tricks button", { hasText: "Burst" }).click();
   await page.locator("section#button-tricks button", { hasText: "Cannons" }).click();
   expect(await page.evaluate(() => window.__fired)).toEqual([["burst", "BUTTON"], ["cannons"]]);
+});
+
+test("the hero button trials a thinner fill, and the photo shows through", async ({ page }) => {
+  await blockOffsiteRequests(page);
+  await page.goto("/lab/hero_button?surface=glass");
+
+  const trial = page.locator("[data-test=hero-trial]");
+  await expect(trial).toHaveText("Launch Your Website");
+  expect(await trial.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain("/ 0.85");
+  expect(await trial.evaluate((el) => getComputedStyle(el).backdropFilter)).toContain("blur");
+  expect(await page.locator("[data-test=hero-was]").evaluate((el) => getComputedStyle(el).backgroundImage)).toContain("/ 0.94");
+  expect(await page.locator("[data-test=hero-photo]").evaluate((el) => getComputedStyle(el).backgroundImage)).toContain("lab-photo");
 });

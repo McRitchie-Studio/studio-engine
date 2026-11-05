@@ -90,6 +90,7 @@ Rails.application.routes.draw do
   get "lab/style_modals", to: "e2e_lab#style_modals"
   get "lab/style_theme", to: "e2e_lab#style_theme"
   get "lab/style_nav", to: "e2e_lab#style_nav"
+  get "lab/hero_button", to: "e2e_lab#hero_button"
   get "lab/page_header", to: "e2e_lab#page_header"
   get "lab/admin_models/:key", to: "e2e_lab_admin_models#show"
   get "lab/board", to: "e2e_lab#board"

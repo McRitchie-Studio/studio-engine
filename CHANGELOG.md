@@ -6,6 +6,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Changed
 
+- **Tricks starts with the buttons, then what you can add to them.** A new Button tricks group
+  sits directly under Buttons: rotating edge glow, border glow, sheen, pulse, fizz, hold to confirm,
+  confetti burst and cannons. Each sits on a real `.btn` or fires from one, with its code to copy.
+  The other groups keep their order, with one short sentence each at most.
+- **`.studio-team-glow` is now `.edge-rotate-glow`, with `--edge-rotate-glow-*` knobs.** The old class
+  and knobs are a deprecated alias and paint the same, so no host has to change.
+- **Fizz works around any button.** `render layout: "studio/fizz", locals: { seed: "save" }` wraps a
+  button in a `.fizz-stack`. The hold button's markup and selectors are unchanged. The only tie was
+  the `.hold-stack` selector.
+- **Trial: a dark, full-size lit button's fill drops from 0.94 to 0.85 alpha** (`--lit-fill-alpha`).
+
 - **A bad or missing CSRF token on a JSON or `Accept: */*` request is now a 422 with no ErrorLog
   row, on every controller using `Studio::ErrorHandling`.** The catch-all answered JSON 500 and
   wrote a row. It now answers `422 {error, reason: "invalid_token"}` in every environment, and a
@@ -13,6 +24,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
   now asserts the 422. An HTML form is unchanged: the redirect home with its alert, and the row.
 
 ### Fixed
+
+- **The button tricks keep a lit button lit.** A lit button's `::after` closed the hole in the glow's
+  bloom, which washed its whole face. The sheen clipped the top highlight, and the pulse dropped the
+  lit shadow. `.studio-border-glow` on a button no longer ends its halo on a hard box edge.
 
 - **The agent chat at phone width.** Measured at 390x844 and 320x568, light and dark:
   - No blank tail. A turn's `sr-only` name escaped the log, which had no positioned ancestor,
