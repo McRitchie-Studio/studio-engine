@@ -209,21 +209,4 @@
     </div>
   </div>
   
-  <%# Type in this app's own font, named by role: the font itself is the host's. %>
-  <div class="space-y-3">
-    <p class="label-upper">Typography</p>
-    <div class="card p-6 space-y-4">
-      <p class="text-heading text-3xl font-extrabold">Heading</p>
-      <p class="text-heading text-xl font-bold">Subheading</p>
-      <p class="text-body text-base">Body text. The quick brown fox jumps over the lazy dog.</p>
-      <p class="text-secondary text-sm">Secondary text. Additional context and metadata.</p>
-      <p class="text-muted text-xs">Muted text. Timestamps, hints and fine print.</p>
-      <hr class="border-subtle">
-      <div class="flex flex-wrap gap-4">
-        <% [400, 500, 600, 700, 800, 900].each do |weight| %>
-          <span class="text-heading text-lg" style="font-weight: <%= weight %>"><%= weight %></span>
-        <% end %>
-      </div>
-    </div>
-  </div>
   </section>

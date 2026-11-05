@@ -1,5 +1,6 @@
-<%# The type ladder, on trial on this page: each named role, its pixel size at this page's
-    density, and what it is for. A role sets size, not the tag. Body and fine print follow the
+<%# Typography, in this app's own font. The type ladder, on trial on this page: each named
+    role, its pixel size at this page's density, and what it is for; then the text inks and
+    the weights. A role sets size, not the tag. Body and fine print follow the
     page's base, so they read 14 and 10.5 on a dense admin page and 16 and 12 on a public one. %>
 <% dense = respond_to?(:type_dense_page?) && type_dense_page? %>
 <%
@@ -13,11 +14,20 @@
   ]
 %>
 <div class="card p-4 space-y-2" data-test="style-type-ladder">
-  <h3 class="type-h4 text-heading">Type</h3>
+  <h3 class="type-h4 text-heading">Typography</h3>
   <% ladder.each do |role, size, use| %>
     <div class="flex flex-col sm:flex-row sm:items-baseline gap-x-3 min-w-0" data-type-role="<%= role %>">
       <code class="text-xs text-muted shrink-0 sm:w-36"><%= role %> · <%= size %></code>
       <span class="<%= role %> text-heading min-w-0"><%= use %></span>
     </div>
   <% end %>
+  <hr class="border-subtle">
+  <p class="text-body text-sm">Body ink. The quick brown fox jumps over the lazy dog.</p>
+  <p class="text-secondary text-sm">Secondary ink. Additional context and metadata.</p>
+  <p class="text-muted text-xs">Muted ink. Timestamps, hints and fine print.</p>
+  <div class="flex flex-wrap gap-4 pt-1">
+    <% [400, 500, 600, 700, 800, 900].each do |weight| %>
+      <span class="type-h4 text-heading" style="font-weight: <%= weight %>"><%= weight %></span>
+    <% end %>
+  </div>
 </div>
