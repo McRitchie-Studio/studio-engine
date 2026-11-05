@@ -4,6 +4,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+## 0.127.0 — 2026-11-04
+
 ### Added
 
 - **Link sidebar: a soft blurred edge.** `components/_sidebar_panel` takes `edge:`, default
