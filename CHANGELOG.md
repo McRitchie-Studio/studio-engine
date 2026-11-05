@@ -4,6 +4,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Added
+
+- **Link sidebar: a soft blurred edge.** `components/_sidebar_panel` takes `edge:`, default
+  false, and `components/_link_sidebar` passes `edge: true`. From `md` up, the panel draws a band
+  along its inner edge: 40px wide, a 6px blur, fading out into the page. It is a pseudo-element
+  of the panel, so it slides with it, leaves with it and takes no clicks. It adds no scrim and no
+  darkening. A browser with no `backdrop-filter` shows the panel plain. A host panel keeps its
+  plain edge unless it opts in. The navbar baseline is regenerated for the link sidebar's
+  `data-sidebar-edge` attribute.
+
 ### Fixed
 
 - **`studio/_page_header` takes a long title, and any parent.** A long title used to squeeze

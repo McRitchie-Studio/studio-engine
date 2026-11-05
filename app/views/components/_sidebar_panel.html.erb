@@ -19,13 +19,17 @@
     would cover the expanded header. engine.css (THE PINNED EDGE ON THE SCROLL
     TIMELINE) moves it with the header on the scroll timeline instead.
 
-    Two opt-in locals (unset, the panel renders as it did in 0.113.0):
+    Three opt-in locals (unset, the panel renders as it did in 0.113.0):
       title_html  the header's LEAD SLOT: HTML in the title's place, for a panel
                   whose lead is a live status line rather than a label. It is
                   content, NOT a name: it never feeds aria-labelledby or
                   aria-label, so a caller that passes it instead of `title` must
                   pass aria_label, or the panel has no accessible name. `title`
                   wins when both are passed. Escaped unless html_safe.
+      edge        true stamps data-sidebar-edge, the soft blurred band along the
+                  panel's inner edge, drawn by engine.css (THE SIDEBAR'S EDGE) from md
+                  up. It softens the page beside the panel, so it suits a menu that
+                  opens over the page, not a panel kept open beside live content.
       close_hook  true stamps the close button data-sidebar-panel-close="<id>"
                   too, so a host's own document handler can match the button
                   to its panel by id. Needs `id`; without one it adds nothing.
@@ -49,6 +53,7 @@
 <% aria_label     = local_assigns.fetch(:aria_label, title) %>
 <% labelledby     = id.present? && title.present? ? "#{id}-title" : nil %>
 <% close_hook     = local_assigns.fetch(:close_hook, false) && id.present? %>
+<% edge           = local_assigns.fetch(:edge, false) %>
 
 <aside
   <% if id.present? %>id="<%= id %>"<% end %>
@@ -76,6 +81,9 @@
   class="<%= display_class %> fixed right-0 <%= width_class %> bg-surface border-l border-subtle shadow-2xl <%= z_class %> flex-col <%= panel_class %>"
   style="top:var(--nav-bottom, var(--nav-h, 6rem));height:calc(100% - var(--nav-bottom, var(--nav-h, 6rem)))"
   data-pin-edge
+  <% if edge %>
+  data-sidebar-edge
+  <% end %>
   role="<%= role %>"
   <% if labelledby %>aria-labelledby="<%= labelledby %>"<% elsif aria_label.present? %>aria-label="<%= aria_label %>"<% end %>>
   <div class="flex flex-col h-full">

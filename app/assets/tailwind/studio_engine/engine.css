@@ -1100,6 +1100,35 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       }
     }
 
+    /* THE SIDEBAR'S EDGE (components/_sidebar_panel, edge: true). A soft band along the panel's
+       inner edge, where the page behind is blurred and fades out to sharp, so the panel
+       stands off a busy page with no scrim and no darkening.
+
+       It is a pseudo-element of the panel: it moves with the slide, it leaves with the
+       panel, and it takes no clicks, so an outside click still reaches the page. A
+       transform on the panel does not start a new backdrop root, so it blurs the page.
+       40px wide, a 6px blur, held for the 10px nearest the panel, then fading to sharp.
+       right: 100% measures from the padding box, so the band runs over the panel's 1px
+       border. Stopping short of it left the border as a lit line beside the blur.
+
+       FROM md UP ONLY. Below that the link sidebar fills the width, so nothing sits
+       beside it, and a phone does not pay for a backdrop filter through the slide. A
+       browser with no backdrop-filter gets an empty box, so the panel is plain. */
+    @media (min-width: 768px) {
+      [data-sidebar-edge]::before {
+        content: "";
+        position: absolute;
+        inset-block: 0;
+        right: 100%;
+        width: 2.5rem;
+        pointer-events: none;
+        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(6px);
+        -webkit-mask-image: linear-gradient(to left, #000 25%, transparent);
+        mask-image: linear-gradient(to left, #000 25%, transparent);
+      }
+    }
+
     /* THE SIDEBAR ROW'S DESCRIPTION (components/_link_sidebar, _geo_signpost). At rest
        a row with a description is one line, the height of any other row. On hover or
        keyboard focus the description fades in under the label, and no layout changes:

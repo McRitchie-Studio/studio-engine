@@ -344,6 +344,14 @@ class LinkSidebarTest < Minitest::Test
     assert_equal "$store.sidebars.linkTreeOpen = false", row["@click"]
   end
 
+  def test_both_panels_ask_for_the_blurred_edge
+    doc = Nokogiri::HTML5.fragment(render_sidebar(sections: SECTIONS, admin: true))
+
+    %w[#studio-link-sidebar #studio-link-sidebar-mobile].each do |panel|
+      assert_equal "", doc.at_css(panel)["data-sidebar-edge"], panel
+    end
+  end
+
   # THE SIDEBAR CLAIMS ONLY THE CLOSE BUTTONS IT RENDERED.
   #
   # components/_sidebar_panel is shared and stamps `data-link-sidebar-close` on every

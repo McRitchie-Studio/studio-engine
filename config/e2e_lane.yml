@@ -1178,7 +1178,10 @@
 # the bar at rest in a flex or grid parent, depend on layout and a measured place, so neither is
 # in the response bytes. Their controls are listed at the top of that file.
 #   npx playwright test --list                                             -> 538
-total_specs: 538
+#
+# 538 -> 542: e2e/sidebar_edge.spec.js, sidebar-edge-blur, named below.
+#   npx playwright test --list                                             -> 542
+total_specs: 542
 
 # What the lane MUST execute — asserted against the runner's own report, so no
 # source-level spelling on any axis can move it without moving this line. With no
@@ -1496,7 +1499,12 @@ total_specs: 538
 #
 # 536 -> 538: e2e/page_header.spec.js, named above.
 #   npx playwright test --list                                             -> 538 tests, 74 files
-executed: 538
+#
+# 538 -> 542: e2e/sidebar_edge.spec.js. Whether a backdrop filter blurs the page, moves with a
+# sliding panel, lets a click through and stays off a phone is in no response bytes. Each RED
+# by the control named at the top of that file.
+#   npx playwright test --list                                             -> 542 tests, 75 files
+executed: 542
 
 # The shard matrix in .github/workflows/engine-ci.yml. The lane is small enough to run
 # unsharded, so this is 1 — which makes the runtime gate assert "exactly one report
