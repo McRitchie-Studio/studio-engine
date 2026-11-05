@@ -308,6 +308,13 @@ body.modal-open .studio-app-banner {
   font-size: calc(var(--type-base, 16px) * 1.5);
   font-weight: var(--type-display-weight, 800);
   line-height: 1.25;
+
+  /* From 40rem, the h2 of the type scale (type-h2), Alex McRitchie's "H2 header"
+     (2026-11-05). A phone keeps 1.5x, so a long title leaves the tabs room. */
+  @media (width >= 40rem) {
+    font-size: 30px;
+    line-height: 1.2;
+  }
   min-width: 0;
   overflow-wrap: anywhere;
   display: -webkit-box;
@@ -366,6 +373,185 @@ body.modal-open .studio-app-banner {
 @utility page-header-actions {
   flex-shrink: 0;
   margin-left: auto;
+
+  /* After the tabs, the tabs' own auto margin already pushes both right. */
+  .page-header-tabs + & {
+    margin-left: 0;
+  }
+}
+
+/* THE TRAIL: the page's ancestors above the title (docs/PAGE_HEADER.md, "Crumbs"). It takes
+   the row's whole first line, so the title, the tabs and the actions share the next one.
+   Ancestors are muted links, the page itself is bold, and a chevron sits between. Below
+   40rem the trail gives way to one link to the parent. The negative margin brings the
+   title up to the trail: the row's gap is for the title and the tabs. */
+@utility page-header-trail {
+  flex: 1 0 100%;
+  min-width: 0;
+  margin-bottom: -0.5rem;
+  font-size: calc(var(--type-base, 16px) * 0.8125);
+  line-height: 1.25;
+}
+
+@utility page-header-crumbs {
+  min-width: 0;
+
+  & ol {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 0.5rem;
+    row-gap: 0.125rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  & li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  /* The chevron is CSS, with empty alt text, so a reader hears the names alone. */
+  & li + li::before {
+    content: "\203A";
+    content: "\203A" / "";
+    @apply text-muted;
+    opacity: 0.6;
+  }
+
+  @media (width < 40rem) {
+    display: none;
+  }
+}
+
+@utility page-header-crumb {
+  @apply text-muted;
+  text-decoration: none;
+  transition: color 150ms ease;
+
+  &:hover,
+  &:focus-visible {
+    @apply text-heading;
+  }
+}
+
+@utility page-header-crumb-current {
+  @apply text-heading;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+@utility page-header-parent {
+  display: none;
+  @apply text-muted;
+  font-size: calc(var(--type-base, 16px) * 0.875);
+  text-decoration: none;
+
+  &:hover,
+  &:focus-visible {
+    @apply text-heading;
+  }
+
+  @media (width < 40rem) {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: baseline;
+  }
+}
+
+/* THE LINKS LINE: the page's other links, on a line of their own at the foot of the row, so
+   they stick with it. Muted, small, one line; on a phone it scrolls sideways inside the row. */
+@utility page-header-links {
+  flex: 1 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+  margin-top: -0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  white-space: nowrap;
+  font-size: calc(var(--type-base, 16px) * 0.8125);
+}
+
+@utility page-header-link {
+  @apply text-muted;
+  text-decoration: none;
+  transition: color 150ms ease;
+
+  &:hover,
+  &:focus-visible,
+  &[aria-current] {
+    @apply text-heading;
+  }
+}
+
+/* The tab's label sits above the gliding pill. */
+@utility page-header-tab-label {
+  position: relative;
+  z-index: 2;
+}
+
+/* The pill is hidden until the browser can anchor it (below). */
+@utility page-header-glide {
+  display: none;
+}
+
+/* -- The gliding pill -------------------------------------------------------
+   Alex McRitchie, 2026-11-05: the current tab's pill glides to the next current tab, as
+   one highlight, instead of each tab switching its own fill. One pill per row
+   (.page-header-glide, the lit primary button's own classes, so it keeps that look in
+   light, dark and glass) is anchored with CSS anchor positioning to whichever tab carries
+   aria-current. aria-current stays the one source of truth: the scroll spy and a page's
+   own markup set it, and the pill follows with no script measuring anything. Its insets
+   transition, so a change of anchor slides it. Reduced motion jumps.
+
+   The tab with aria-current gives up its own fill so the pill shows through, and the
+   labels sit above the pill. !important on the fill: the glass lit button's selectors are
+   heavier than any a row should repeat.
+
+   Where anchor positioning or :has is missing, nothing in this block applies and each tab
+   keeps its own fill, as before. */
+@supports (anchor-name: --a) and (position-anchor: --a) and selector(:has(a)) {
+  .page-header-track {
+    position: relative;
+  }
+
+  .page-header-track > [aria-current] {
+    anchor-name: --page-header-current;
+  }
+
+  .page-header-track:has(> .page-header-tab[aria-current]) > .page-header-glide {
+    display: block;
+    position: absolute;
+    position-anchor: --page-header-current;
+    top: anchor(top);
+    right: anchor(right);
+    bottom: anchor(bottom);
+    left: anchor(left);
+    z-index: 1;
+    margin: 0;
+    padding: 0;
+    pointer-events: none;
+    transition: top 320ms cubic-bezier(0.2, 0.8, 0.2, 1), right 320ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      bottom 320ms cubic-bezier(0.2, 0.8, 0.2, 1), left 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .page-header-track:has(> .page-header-glide) > .page-header-tab[aria-current] {
+    background-color: transparent !important;
+    background-image: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .page-header-track > .page-header-glide {
+      transition: none !important;
+    }
+  }
 }
 
 /* -- The section header (studio/_section_header, docs/PAGE_HEADER.md) --------
