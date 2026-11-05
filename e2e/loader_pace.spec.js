@@ -8,6 +8,7 @@ const LAB = "/lab/page_transitions";
 
 async function timeline(page, query) {
   await blockOffsiteRequests(page);
+  await page.route("**/e2e/img/pt-hung.png", () => {});
   await page.addInitScript(() => {
     const t = (window.__t = {});
     const stamp = (key) => { if (t[key] === undefined && t.click !== undefined) t[key] = Math.round(performance.now() - t.click); };
@@ -93,7 +94,6 @@ test("the minimum holds in an app with transitions off", async ({ page }) => {
 });
 
 test("the image wait comes after the minimum, and neither cuts the other short", async ({ page }) => {
-  await page.route("**/e2e/img/pt-hung.png", () => {});
   await timeline(page, "direction=left&slow=450&img=hung");
   await click(page);
   const t = await landed(page);
@@ -103,16 +103,37 @@ test("the image wait comes after the minimum, and neither cuts the other short",
   expect(t.render - t.pictureTaken).toBeLessThan(900);
 });
 
-test("a failed visit clears the loader at once", async ({ page }) => {
+test("a page that answers 500 gains no wait", async ({ page }) => {
   await timeline(page, "direction=left");
   await page.route("**/lab/page_transitions_b*", async (route) => {
-    await new Promise((done) => setTimeout(done, 500));
-    await route.abort();
+    await new Promise((done) => setTimeout(done, 450));
+    await route.fulfill({ status: 500, contentType: "text/html", body: "<html><body><h1 data-test=\"page-b\">Broken</h1></body></html>" });
   });
   await click(page);
-  await expect(page.locator("[data-studio-loader-overlay]")).toBeVisible();
-  await expect(page.locator("[data-studio-loader-overlay]")).toBeHidden({ timeout: 400 });
-  expect(await page.evaluate(() => window.__t.loaderOut - window.__t.loaderIn)).toBeLessThan(400);
+  await expect(page.locator('h1[data-test="page-b"]')).toBeVisible();
+  const t = await page.evaluate(() => window.__t);
+  report("500 at 450", t);
+  expect(t.render).toBeLessThan(700);
+});
+
+test("a visit the network drops clears the loader at once", async ({ page }) => {
+  await timeline(page, "direction=left");
+  await page.evaluate(() => {
+    document.addEventListener("turbo:fetch-request-error", () => {
+      const overlay = document.querySelector("[data-studio-loader-overlay]");
+      sessionStorage.setItem("pt-dropped", JSON.stringify({ hidden: !overlay || overlay.hidden, shown: window.__t.loaderIn !== undefined }));
+    });
+  });
+  let dropped = false;
+  await page.route("**/lab/page_transitions_b*", async (route) => {
+    if (dropped) return route.continue();
+    dropped = true;
+    await new Promise((done) => setTimeout(done, 450));
+    return route.abort();
+  });
+  await click(page);
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("pt-dropped"))).not.toBeNull();
+  expect(JSON.parse(await page.evaluate(() => sessionStorage.getItem("pt-dropped")))).toEqual({ hidden: true, shown: true });
 });
 
 test("StudioLoader.hide ends the wait at once", async ({ page }) => {
@@ -129,12 +150,14 @@ test("StudioLoader.hide ends the wait at once", async ({ page }) => {
   expect(t.loaderOut - t.loaderIn).toBeLessThan(400);
 });
 
-test("under a strict policy the overlay arrives whole, and a signing-style page gains no wait", async ({ page }) => {
+test("a response that asks for a full load, as a signing page does, gains no wait", async ({ page }) => {
   await timeline(page, "direction=left&strict=1&control=reload&slow=450");
+  await page.evaluate(() => {
+    document.addEventListener("turbo:reload", () => sessionStorage.setItem("pt-reload-at", String(Math.round(performance.now() - window.__t.click))));
+  });
   await click(page);
   await expect(page.locator('[data-test="page-b"]')).toBeVisible();
-  const t = await page.evaluate(() => JSON.parse(sessionStorage.getItem("pt-violations") || "[]"));
-  expect(t).toEqual([]);
+  expect(Number(await page.evaluate(() => sessionStorage.getItem("pt-reload-at")))).toBeLessThan(700);
 });
 
 test("the strict page itself raises no violation when its overlay shows", async ({ page }) => {

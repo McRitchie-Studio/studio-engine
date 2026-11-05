@@ -201,7 +201,8 @@ async function visitAt(t, responseAt, { delay = "350", minShow = "750", html } =
   overlay.setAttribute("data-min-show", minShow)
   const doc = paceDoc(overlay)
   pace.showSoon("", doc)
-  t.mock.timers.tick(responseAt)
+  // The mock clock reads the end of a tick inside its timers, so the show gets its own.
+  if (responseAt >= 350) { t.mock.timers.tick(350); t.mock.timers.tick(responseAt - 350) } else t.mock.timers.tick(responseAt)
   const response = htmlResponse(html)
   const held = pace.holdVisitResponse(responseEvent(doc, response), doc)
   let turboGotIt = null
@@ -306,7 +307,8 @@ test("a form's overlay stays up for the rest of its minimum, and hide still cuts
   const overlay = fakeOverlay("350")
   const doc = paceDoc(overlay)
   pace.showSoon("Saving", doc)
-  t.mock.timers.tick(400)
+  t.mock.timers.tick(350)
+  t.mock.timers.tick(50)
   pace.hideAfterMinimum(doc)
   t.mock.timers.tick(699)
   assert.equal(overlay.hidden, false)
@@ -314,7 +316,8 @@ test("a form's overlay stays up for the rest of its minimum, and hide still cuts
   assert.equal(overlay.hidden, true)
 
   pace.showSoon("Saving", doc)
-  t.mock.timers.tick(400)
+  t.mock.timers.tick(350)
+  t.mock.timers.tick(50)
   pace.hideAfterMinimum(doc)
   pace.hide(doc)
   assert.equal(overlay.hidden, true)
