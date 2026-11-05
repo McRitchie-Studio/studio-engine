@@ -283,6 +283,7 @@ class E2eLaneContractTest < Minitest::Test
       # The page transition holds this chrome still and moves the chat head with the page.
       "page_transitions.html.erb" => ["studio/banners/stack", "layouts/navbar", "studio/agent_chat/header"],
       "admin_models.html.erb" => ["studio/banners/stack", "layouts/navbar"],
+      "page_header.html.erb" => ["studio/banners/stack", "layouts/navbar", "studio/page_header"],
       "toast_over_banner.html.erb" => [
         "studio/banners/stack", "layouts/navbar", "layouts/studio/flash",
         "studio/modals/host"
