@@ -398,7 +398,8 @@ test("the publisher puts the bar on the stuck header alone, and a swap keeps the
   second.setAttribute("data-stuck", "") // a Turbo snapshot's leftover
   const { doc, win } = withSections([first, second])
   toggled(doc.documentElement)
-  const saved = ["window", "document", "ResizeObserver", "performance"].map((k) => [k, globalThis[k]])
+  const saved = ["window", "document", "ResizeObserver", "performance", "setTimeout"].map((k) => [k, globalThis[k]])
+  globalThis.setTimeout = () => 0 // the settle timer, which would outlive the test
   const scroll = []
   globalThis.document = doc
   globalThis.performance = { now: () => 1000 }
@@ -425,7 +426,8 @@ test("the publisher puts the bar on the stuck header alone, and a swap keeps the
 })
 
 test("a publish that moved a layer's top asks for one more frame, and it ends", async () => {
-  const saved = ["window", "document", "ResizeObserver", "performance"].map((k) => [k, globalThis[k]])
+  const saved = ["window", "document", "ResizeObserver", "performance", "setTimeout"].map((k) => [k, globalThis[k]])
+  globalThis.setTimeout = () => 0 // the settle timer, which would outlive the test
   const nav = fakeEl({ name: "nav", h: 64, bottom: 64 })
   const page = fakeEl({ name: "page", h: 56, bottom: 120 })
   const doc = fakeDocument(nav, [page])
