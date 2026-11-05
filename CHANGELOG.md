@@ -4,6 +4,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **`studio/_page_header` takes a long title, and any parent.** A long title used to squeeze
+  the tabs out and overflow the page. It now wraps and stops at three lines, and the tabs move
+  to their own line when it leaves them less than 6rem, so a page has no sideways overflow at
+  any width. A short title's row is unchanged. In a flex or grid parent with a sibling above
+  it, the row no longer shows its bar at rest: the controller measures the row's place from
+  the row there, because the sentinel sits at the parent's start. `docs/PAGE_HEADER.md` loses
+  both limits.
+
 ## 0.126.0 — 2026-11-04
 
 ### Changed
