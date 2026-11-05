@@ -16,8 +16,8 @@
 <div class="card p-4 space-y-2" data-test="style-type-ladder">
   <h3 class="type-h4 text-heading">Typography</h3>
   <% ladder.each do |role, size, use| %>
-    <div class="flex flex-col sm:flex-row sm:items-baseline gap-x-3 min-w-0" data-type-role="<%= role %>">
-      <code class="text-xs text-muted shrink-0 sm:w-36"><%= role %> · <%= size %></code>
+    <div class="flex flex-col gap-0.5 min-w-0" data-type-role="<%= role %>">
+      <code class="text-xs text-muted shrink-0"><%= role %> · <%= size %></code>
       <span class="<%= role %> text-heading min-w-0"><%= use %></span>
     </div>
   <% end %>

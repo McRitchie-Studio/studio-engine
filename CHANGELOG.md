@@ -29,6 +29,8 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **`/admin/style` Theme: logos first, Typography beside the editor, a preview that waits for an edit.** A
+  host may supply its own logo block in `app/views/style/host/_logos.html.erb`.
 - **`Studio.surface_style = :glass`: opt-in translucent cards over a soft ambient page.** A host
   sets it and writes `data-surface-style` on its root. It reaches `.card`, `.card-hover`,
   `.empty-state` and `.bg-surface.rounded-xl.border`. Menus stay solid. Real blur is only on

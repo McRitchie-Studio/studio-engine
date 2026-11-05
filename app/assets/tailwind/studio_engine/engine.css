@@ -1325,12 +1325,12 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
     /* Stops: the app's primary is often too light for white, so it steps down its own lightness;
        the semantic fills already hold 4.5:1, so the midpoint stays on the fill. */
     html[data-surface-style="glass"] .btn-primary {
-      --lit-top-stop: oklch(from var(--color-cta) calc(l - 0.03) calc(c + 0.03) h);
-      --lit-low-stop: oklch(from var(--color-cta) calc(l - 0.18) calc(c + 0.05) h);
+      --lit-top-stop: oklch(from var(--color-cta) calc(l - 0.03) calc(c + 0.03) h / var(--lit-fill-alpha, 1));
+      --lit-low-stop: oklch(from var(--color-cta) calc(l - 0.18) calc(c + 0.05) h / var(--lit-fill-alpha, 1));
     }
     html[data-surface-style="glass"] :is(.btn-secondary, .btn-danger, .btn-warning, .btn-success) {
-      --lit-top-stop: oklch(from var(--lit-fill) calc(l + 0.075) calc(c + 0.03) h);
-      --lit-low-stop: oklch(from var(--lit-fill) calc(l - 0.075) calc(c + 0.03) h);
+      --lit-top-stop: oklch(from var(--lit-fill) calc(l + 0.075) calc(c + 0.03) h / var(--lit-fill-alpha, 1));
+      --lit-low-stop: oklch(from var(--lit-fill) calc(l - 0.075) calc(c + 0.03) h / var(--lit-fill-alpha, 1));
     }
     html[data-surface-style="glass"] .btn-secondary { --lit-fill: var(--btn-secondary-bg, var(--color-success)); }
     html[data-surface-style="glass"] .btn-danger { --lit-fill: var(--color-danger-fill, var(--color-danger)); }
@@ -1352,6 +1352,17 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
     /* On a dark page a deep green, red or orange glow disappears, so these glow from the top
        stop. The violet is already bright enough at its low stop. */
     html.dark[data-surface-style="glass"] :is(.btn-secondary, .btn-danger, .btn-warning, .btn-success) { --lit-glow-stop: var(--lit-top-stop); }
+    /* A TOUCH OF TRANSPARENCY on a full-size filled button, dark theme only: a photo behind it
+       shows subtly, and white text holds 4.5:1 at the midpoint. An outer shadow is not painted
+       under its own box, so the glow never brightens the fill. On a light page the backdrop would
+       lift the fill and cost contrast, so it stays solid there. Without a blur it stays solid. */
+    @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      html.dark[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(.btn-sm, :disabled, [aria-disabled="true"]) {
+        --lit-fill-alpha: 0.88;
+        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(6px);
+      }
+    }
     html[data-surface-style="glass"] .btn-primary:not(:disabled, [aria-disabled="true"]):is(:hover, [data-lit-state="hover"]) {
       filter: brightness(0.94);
     }

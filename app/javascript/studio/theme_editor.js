@@ -82,7 +82,11 @@ export function dsThemeEditor(seed) {
     }, seed || {}),
     saving: false,
 
+    // The preview block shows once a role has been edited: before that it only repeats the page.
+    edited: false,
+
     updatePreview() {
+      this.edited = true
       applyProperties(document.documentElement.style, stylePreviewProperties(this.colors))
     },
 
