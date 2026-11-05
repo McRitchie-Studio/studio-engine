@@ -275,6 +275,22 @@ module Studio
     @@sidebar_style = SidebarSections.style!(value)
   end
 
+  # ---- Surfaces ----
+  # How cards look. :glass makes them translucent over a soft ambient page, once the host
+  # layout says so on its root: <html data-surface-style="<%= Studio.surface_style %>">.
+  # :default is what every app has today. engine.css, THE GLASS SURFACES, holds the look.
+  SURFACE_STYLES = %i[default glass].freeze
+  mattr_reader :surface_style, default: :default
+
+  def self.surface_style=(value)
+    style = value.respond_to?(:to_sym) ? value.to_sym : value
+    unless SURFACE_STYLES.include?(style)
+      raise ArgumentError, "Studio.surface_style must be one of #{SURFACE_STYLES.join(', ')}, got #{value.inspect}"
+    end
+
+    @@surface_style = style
+  end
+
   # ---- Navbar links ----
   # Links for the engine navbar's desktop bar and phone row. The default []
   # renders nothing, so the navbar stays byte-identical until an app opts in.

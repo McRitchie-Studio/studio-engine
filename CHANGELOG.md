@@ -6,6 +6,10 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Added
 
+- **`Studio.surface_style = :glass`: opt-in translucent cards over a soft ambient page.** A host
+  sets it and writes `data-surface-style` on its root. It reaches `.card`, `.card-hover`,
+  `.empty-state` and `.bg-surface.rounded-xl.border`. Menus stay solid. Real blur is only on
+  `.surface-glass-blur`, because a dense board cannot afford it on every card.
 - **`Studio.sidebar_style = :glass`: an opt-in floating panel for the link sidebar.** The panel
   insets from the page's edge with the page blurred through it, in both themes, with a nearly
   solid fill where `backdrop-filter` is missing. It draws a link's `icon:`, marks the current page's

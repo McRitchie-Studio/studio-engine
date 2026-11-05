@@ -35,6 +35,17 @@ class LinkSidebarHeaderRenderTest < ActionDispatch::IntegrationTest
     assert_equal :glass, Studio.sidebar_style, "a refused value leaves the setting alone"
   end
 
+  test "the surface style defaults to today's cards, and the real writer validates" do
+    prior = Studio.surface_style
+    assert_equal :default, prior
+    Studio.surface_style = "glass"
+    assert_equal :glass, Studio.surface_style
+    assert_raises(ArgumentError) { Studio.surface_style = :frosted }
+    assert_equal :glass, Studio.surface_style
+  ensure
+    Studio.surface_style = prior
+  end
+
   test "a glass panel reaches a real page with the helper the host never wired" do
     Studio.sidebar_sections = [{ title: "Admin", header: true, links: [{ label: "Errors", href: "/up", emoji: "*", icon: "activity" }] }]
     Studio.sidebar_style = :glass
