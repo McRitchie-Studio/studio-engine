@@ -730,6 +730,10 @@ class E2eLabController < ActionController::Base
     @lab_marketing_kit = LAB_MARKETING_KIT
   end
 
+  # A lit primary over the hub's hero photo: the fill alpha at its value today, and
+  # beside it at the value before it, for the eye. A view, no inputs.
+  def hero_button; end
+
   # The whole style guide, for its sticky title row and the tabs that follow the
   # scroll. It reads what StyleController sets.
   def style_nav

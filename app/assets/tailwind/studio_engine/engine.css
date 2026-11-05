@@ -1697,7 +1697,7 @@ html[data-theme-flip]::view-transition-new(*) {
        oklch (the gradient would drop out and leave white text on nothing), it stays solid. */
     @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) and (color: oklch(from red l c h)) {
       html.dark[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(.btn-sm, :disabled, [aria-disabled="true"], [class*=" bg-"], [class^="bg-"]) {
-        --lit-fill-alpha: 0.94;
+        --lit-fill-alpha: 0.85;
         background-color: transparent;
         -webkit-backdrop-filter: blur(6px);
         backdrop-filter: blur(6px);
@@ -1744,6 +1744,46 @@ html[data-theme-flip]::view-transition-new(*) {
     }
     html[data-surface-style="glass"] .badge { box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-badge); }
     html[data-surface-style="glass"] .input-field { box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--lit-input); }
+
+    /* BUTTON TRICKS ON A LIT BUTTON (the lit rules above).
+       A lit button already uses its box-shadow for its contact shadow and glow, and
+       its ::after for its inset light. These rules sit in the utilities layer and the
+       tricks in engine-motion.css sit in components, so the lit rules win, and each trick
+       that shares one of them makes room here. Keep a trick on a real .btn lit.
+
+       --btn-lit-rest is the lit button's outer shadow at rest. The pulse's keyframes
+       replace box-shadow for the whole animation, so they put it back themselves. */
+    html[data-surface-style="glass"] .btn:not(:disabled, [aria-disabled="true"]) {
+      --btn-lit-rest: var(--lit-contact);
+    }
+    html[data-surface-style="glass"] .btn:is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(.btn-sm, :disabled, [aria-disabled="true"]) {
+      --btn-lit-rest: var(--lit-contact),
+        var(--lit-glow) oklch(from var(--lit-glow-stop, var(--lit-low-stop)) l c h / var(--lit-glow-alpha));
+    }
+
+    /* The glows need ::after for their bloom, so the inset light moves to the host and
+       the bloom gets its own box back. Without this the lit rule's inset: -1px closes
+       the bloom's hole and it washes the whole face. .btn-outline has no lit ::after. */
+    html[data-surface-style="glass"] .btn:is(.edge-rotate-glow, .studio-team-glow, .studio-border-glow):not(.btn-outline, :disabled, [aria-disabled="true"]) {
+      box-shadow: var(--lit-inset), var(--btn-lit-rest);
+    }
+    html[data-surface-style="glass"] .btn:is(.edge-rotate-glow, .studio-team-glow, .studio-border-glow):not(.btn-outline, :disabled, [aria-disabled="true"]):active {
+      box-shadow: var(--lit-inset-pressed);
+    }
+    html[data-surface-style="glass"] .btn:is(.edge-rotate-glow, .studio-team-glow):not(.btn-outline, :disabled, [aria-disabled="true"])::after {
+      inset: calc(-1 * (var(--edge-rotate-glow-thickness) + 4px + var(--edge-rotate-glow-bloom) * 2));
+      box-shadow: none;
+    }
+    html[data-surface-style="glass"] .btn.studio-border-glow:not(.btn-outline, :disabled, [aria-disabled="true"])::after {
+      inset: -46px;
+      box-shadow: none;
+    }
+
+    /* The sheen's band already stops at its own rounded box, and overflow: hidden would
+       cut the lit ::after's outer pixel, the top highlight. */
+    html[data-surface-style="glass"] .btn.sheen:not(:disabled, [aria-disabled="true"]) {
+      overflow: visible;
+    }
 
     /* LESS TRANSPARENCY: every surface above goes solid and drops its blur. Last, to win on order;
        both spellings of the root, since html.dark outranks a bare html[...] on specificity. */

@@ -92,6 +92,7 @@ Rails.application.routes.draw do
   get "lab/style_nav", to: "e2e_lab#style_nav"
   get "lab/section_header", to: "e2e_lab#section_header"
   get "lab/style_chrome", to: "e2e_lab#style_chrome"
+  get "lab/hero_button", to: "e2e_lab#hero_button"
   get "lab/page_header", to: "e2e_lab#page_header"
   get "lab/admin_models/:key", to: "e2e_lab_admin_models#show"
   get "lab/board", to: "e2e_lab#board"

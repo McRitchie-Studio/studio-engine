@@ -6,6 +6,7 @@
        klass          (String, required) - the class label, shown prominently with a
                        copy button so an agent can grab the exact class list.
        usage          (String, optional) - a copyable usage snippet.
+       note           (String, optional) - one short sentence on what it does.
        disabled       (Boolean, optional) - render "disabled but present": the
                        primitive stays visible + previewable but is muted/greyed
                        and flagged, for a capability the host app has turned off
@@ -38,6 +39,9 @@
     <% end %>
   </div>
   <div class="border-t border-subtle p-3 space-y-2">
+    <% if local_assigns[:note].present? %>
+      <p class="text-sm text-body"><%= local_assigns[:note] %></p>
+    <% end %>
     <%# Class name — prominent, with a one-click copy so an agent can grab it. %>
     <div class="flex items-start justify-between gap-2" x-data="{ copied: false }">
       <code x-ref="klass" class="font-mono text-xs font-bold text-heading break-all leading-relaxed flex-1 min-w-0"><%= local_assigns[:klass] %></code>
