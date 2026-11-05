@@ -38,6 +38,18 @@
 //            that still reports it as "failed" gets the failed line.
 //   TYPING   the typing line shows while the hub says an answer is pending:
 //            "thinking", then "typing" once a turn's status is "typing".
+//   OPENER   data-agent-chat-opener on the section: words the chat sends as the
+//            visitor's first message once its thread has loaded, so the agent
+//            starts answering at once (studio/talk_to_agent sets it as its modal
+//            opens). Sent once per data-agent-chat-opener-key per tab
+//            (sessionStorage): opening the same topic again shows the thread and
+//            sends nothing. A send the app refuses puts the words in the box.
+//   TYPE-IN  data-agent-chat-reveal="true" on the section: an agent answer that
+//            arrives while the chat is open types itself in (revealPlan, about
+//            REVEAL_CPS characters a second, REVEAL_MIN_MS to REVEAL_MAX_MS), as
+//            the hub's agent_reveal does. The thread loaded on open, and every
+//            answer under prefers-reduced-motion, shows at once. While it types
+//            the log is aria-busy, so a screen reader hears the answer once.
 //
 // It imports nothing, so test/javascript/agent_chat.test.mjs loads it as a
 // data: module; studio/controllers/agent_chat_controller mounts it.
@@ -56,6 +68,11 @@ export const RECORDER_STATE_EVENT = "studio:voice-recorder:state"
 const HOLDING = "[data-voice-recorder-state='recording'],[data-voice-recorder-state='starting']"
 export const REFRESH_EVENT = "studio:agent-chat:refresh"
 export const SENT_EVENT = "studio:agent-chat:sent"
+export const OPENER_STORAGE_PREFIX = "studio:agent-chat:opener:"
+export const REVEAL_CPS = 420
+export const REVEAL_MIN_MS = 450
+export const REVEAL_MAX_MS = 2600
+export const REVEAL_FRAME_MS = 32
 const UNSETTLED = new Set(["pending", "typing"])
 
 export function settled(turn) {
@@ -127,6 +144,31 @@ export function csrfToken(form, doc = globalThis.document) {
   return meta ? meta.getAttribute("content") : null
 }
 
+// How a new answer of `length` characters types in: its duration in ms, clamped
+// to REVEAL_MIN_MS..REVEAL_MAX_MS, and how many characters show `elapsed` ms in.
+export function revealPlan(length, elapsed) {
+  const total = Math.max(0, Number(length) || 0)
+  const duration = Math.min(REVEAL_MAX_MS, Math.max(REVEAL_MIN_MS, Math.round((total / REVEAL_CPS) * 1000)))
+  const shown = elapsed >= duration ? total : Math.floor((total * Math.max(0, elapsed)) / duration)
+  return { duration, shown }
+}
+
+// The sessionStorage key an opener is remembered under; null with no key.
+export function openerStorageKey(key) {
+  const name = String(key ?? "").trim()
+  return name ? `${OPENER_STORAGE_PREFIX}${name}` : null
+}
+
+// sessionStorage, or null where the browser refuses it (a private window, a
+// sandboxed frame): the opener is then sent on every open.
+function sessionStore() {
+  try { return globalThis.sessionStorage || null } catch (_error) { return null }
+}
+
+function prefersReducedMotion() {
+  try { return Boolean(globalThis.matchMedia && globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches) } catch (_error) { return false }
+}
+
 export function turnsUrl(base, { soul, after, limit = LIMIT }) {
   const params = new URLSearchParams({ soul, limit: String(limit) })
   if (after != null) params.set("after", after)
@@ -139,7 +181,9 @@ export function mountAgentChat(root, {
   now = () => Date.now(),
   setTimer = (fn, ms) => globalThis.setTimeout(fn, ms),
   clearTimer = (id) => globalThis.clearTimeout(id),
-  CustomEventClass = globalThis.CustomEvent
+  CustomEventClass = globalThis.CustomEvent,
+  storage = sessionStore(),
+  reducedMotion = prefersReducedMotion
 } = {}) {
   const $ = (selector) => root.querySelector(selector)
   const log = $("[data-agent-chat-log]")
@@ -154,8 +198,11 @@ export function mountAgentChat(root, {
   const status = $("[data-agent-chat-status]")
   const soul = root.dataset.agentChatSoul
   const name = root.dataset.agentChatName || "The agent"
+  const opener = String(root.dataset.agentChatOpener || "").trim()
+  const openerKey = openerStorageKey(root.dataset.agentChatOpenerKey)
+  const typeIn = root.dataset.agentChatReveal === "true"
 
-  const state = { turns: [], pending: false, waitingSince: null, offline: false, inFlight: false, pollAgain: false, sending: false, timer: null, alive: true, following: true, revealFollowing: true, revealOwed: false }
+  const state = { turns: [], pending: false, waitingSince: null, offline: false, inFlight: false, pollAgain: false, sending: false, timer: null, alive: true, following: true, revealFollowing: true, revealOwed: false, loaded: false, typing: new Map() }
 
   const onScroll = () => { state.following = isFollowing(log) }
   log.addEventListener("scroll", onScroll, { passive: true })
@@ -237,7 +284,13 @@ export function mountAgentChat(root, {
       }
       node.dataset.status = turn.status || ""
       const text = node.querySelector("[data-agent-chat-text]")
-      if (text && text.textContent !== String(turn.text ?? "")) text.textContent = String(turn.text ?? "")
+      const words = String(turn.text ?? "")
+      if (text && state.typing.has(key)) {
+        if (state.typing.get(key).words !== words) { stopTyping(key); text.textContent = words }
+      } else if (text && text.textContent !== words) {
+        if (typeIn && state.loaded && turn.role === "agent" && words && !reducedMotion()) startTyping(key, text, words)
+        else text.textContent = words
+      }
       const failed = node.querySelector("[data-agent-chat-failed]")
       if (failed) failed.hidden = turn.status !== "failed"
       const held = node.querySelector("[data-agent-chat-held]")
@@ -250,6 +303,32 @@ export function mountAgentChat(root, {
       toEnd()
       if (state.revealFollowing) revealEnd()
     }
+  }
+
+  // TYPE-IN: one answer's words, filled in REVEAL_FRAME_MS steps.
+  function startTyping(key, el, words) {
+    const started = now()
+    const entry = { words, timer: null }
+    state.typing.set(key, entry)
+    el.textContent = ""
+    if (log && log.setAttribute) log.setAttribute("aria-busy", "true")
+    const step = () => {
+      if (!state.alive || state.typing.get(key) !== entry) return
+      const { shown } = revealPlan(words.length, now() - started)
+      el.textContent = words.slice(0, shown)
+      if (state.following) toEnd()
+      if (shown >= words.length) { stopTyping(key); return }
+      entry.timer = setTimer(step, REVEAL_FRAME_MS)
+    }
+    step()
+  }
+
+  function stopTyping(key) {
+    const entry = state.typing.get(key)
+    if (!entry) return
+    clearTimer(entry.timer)
+    state.typing.delete(key)
+    if (!state.typing.size && log && log.removeAttribute) log.removeAttribute("aria-busy")
   }
 
   function schedule() {
@@ -276,6 +355,10 @@ export function mountAgentChat(root, {
       state.pending = data.pending === true
       setOffline(false)
       render()
+      if (!state.loaded) {
+        state.loaded = true
+        sendOpener()
+      }
     } catch (_error) {
       setOffline(true)
     } finally {
@@ -315,10 +398,41 @@ export function mountAgentChat(root, {
     refresh(event.detail || {})
   }
 
+  // OPENER: the section's opener, once per key per tab, after the thread loaded.
+  function sendOpener() {
+    if (!opener) return undefined
+    if (openerKey && storage) {
+      try {
+        if (storage.getItem(openerKey)) return undefined
+        storage.setItem(openerKey, "1")
+      } catch (_error) { /* a refused store sends it anyway */ }
+    }
+    return post(opener, { typed: false })
+  }
+
+  function forgetOpener() {
+    if (!openerKey || !storage) return
+    try { storage.removeItem(openerKey) } catch (_error) { /* nothing to forget */ }
+  }
+
+  // A refused or failed opener goes into the box, after anything already typed,
+  // so the visitor can send it themselves.
+  function keepWords(text) {
+    if (!input) return
+    const typed = (input.value || "").trim()
+    input.value = typed ? `${typed} ${text}` : text
+  }
+
   async function submit(event) {
     if (event) event.preventDefault()
     const text = (input.value || "").trim()
     if (!text || state.sending) return
+    await post(text, { typed: true })
+  }
+
+  // One message to the app: the composer's words (typed) or the opener.
+  async function post(text, { typed }) {
+    if (state.sending) return
     state.sending = true
     if (send) send.disabled = true
     showError("")
@@ -333,7 +447,7 @@ export function mountAgentChat(root, {
       let data = {}
       try { data = await response.json() } catch (_e) { data = {} }
       if (response.status === 201 && data.turn) {
-        input.value = ""
+        if (typed) input.value = ""
         state.turns = mergeTurns(state.turns, [data.turn])
         state.pending = data.turn.status !== "held"
         state.following = true
@@ -347,10 +461,12 @@ export function mountAgentChat(root, {
         clearTimer(state.timer)
         state.timer = setTimer(poll, POLL_MS)
       } else {
+        if (!typed) { forgetOpener(); keepWords(text) }
         showError(data.reason === INVALID_TOKEN ? EXPIRED_MESSAGE : data.error || `Couldn't send that to ${name}. Try again.`)
         if (status) status.textContent = ""
       }
     } catch (_error) {
+      if (!typed) { forgetOpener(); keepWords(text) }
       showError(`Can't reach ${name} right now. Your message is still here; try again in a moment.`)
       if (status) status.textContent = ""
     } finally {
@@ -391,9 +507,11 @@ export function mountAgentChat(root, {
     poll,
     refresh,
     submit,
+    sendOpener,
     destroy() {
       state.alive = false
       clearTimer(state.timer)
+      for (const key of Array.from(state.typing.keys())) stopTyping(key)
       log.removeEventListener("scroll", onScroll)
       form && form.removeEventListener("submit", submit)
       input && input.removeEventListener("keydown", onKeydown)

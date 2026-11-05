@@ -1,0 +1,58 @@
+<%# locals: (soul:, name:, portrait: nil, role: nil, store: "studioTalkToAgent") %>
+<%#
+  The talk-to-agent modal (docs/AGENT_CHAT.md, "Talk to an agent in a modal"):
+  the shared agent chat (studio/agent_chat/_chat) in a card on the page-scoped
+  modal host (studio/modals/_scoped_host). Render it ONCE per page, then mark any
+  link with studio_talk_to_agent_link (Studio::AgentChatHelper), or by hand with
+  data-studio-talk-to-agent, data-talk-soul, data-talk-topic and an optional
+  data-talk-opener.
+
+  soul      the agent's slug; must be on Studio.agent_chat_souls.
+  name      the agent's display name.
+  portrait  ready markup for a small round portrait (40px works); nil shows the initial.
+  role      ready markup or text beside the name.
+  store     the Alpine store the host registers; unique on the page, never "modals".
+
+  A click opens the card and studio/talk_to_agent clones the chat out of the
+  <template> below into it, with the link's opener: the chat loads the thread
+  and sends the opener, so the agent is already answering as the card animates
+  in, and each new answer types itself in. The chat is the same one as anywhere
+  else (one thread per person and soul, held by the hub): this partial adds a
+  card and an opener, never a second chat. One page holds one chat, so the page
+  that renders this modal renders no other studio/agent_chat/chat.
+
+  A viewer Studio.agent_chat_allowed refuses gets nothing here, and every link
+  then opens its href. The x-data on the wrapper is load-bearing: the scoped host
+  declares no Alpine scope of its own.
+%>
+<% souls = Studio.agent_chat_soul_list %>
+<% raise ArgumentError, "studio/agent_chat/talk_modal: soul #{soul.inspect} is not in Studio.agent_chat_souls (#{souls.inspect})" unless souls.include?(soul.to_s) %>
+<% if Studio.agent_chat_allowed?(studio_agent_chat_viewer) %>
+<div x-data data-studio-controller="talk-to-agent" data-test="talk-to-agent"
+     data-talk-to-agent-soul="<%= soul %>" data-talk-to-agent-name="<%= name %>" data-talk-to-agent-store="<%= store %>">
+  <%= render "studio/modals/scoped_host", store: store,
+             card_class: "bg-surface rounded-2xl border border-subtle shadow-2xl w-full max-w-lg p-4 sm:p-5" do %>
+    <template x-if="$store.<%= store %>.current()?.id === 'talk-to-agent'">
+      <div class="flex flex-col gap-3 min-w-0" data-talk-to-agent-panel data-test="talk-to-agent-panel"
+           x-init="$nextTick(() => $dispatch('studio:talk-to-agent:panel'))">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="w-10 h-10 shrink-0 rounded-full overflow-hidden bg-inset border border-subtle flex items-center justify-center text-heading font-bold [&>img]:w-full [&>img]:h-full [&>img]:object-cover" aria-hidden="true">
+            <% if portrait.present? %><%= portrait %><% else %><%= name.to_s.first.to_s.upcase %><% end %>
+          </span>
+          <div class="min-w-0 flex-1">
+            <p class="font-semibold text-heading break-words" data-talk-to-agent-title data-test="talk-to-agent-title">Talk to <%= name %></p>
+            <% if role.present? %><p class="text-xs text-secondary break-words"><%= role %></p><% end %>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm shrink-0" aria-label="Close"
+                  @click="$store.<%= store %>.close()" data-test="talk-to-agent-close">
+            <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>
+          </button>
+        </div>
+        <div class="min-w-0" data-talk-to-agent-slot data-test="talk-to-agent-slot"></div>
+      </div>
+    </template>
+  <% end %>
+  <template data-talk-to-agent-chat><%= render "studio/agent_chat/chat", soul: soul, name: name, portrait: portrait, compact: true,
+                                                empty: "#{name} will answer here in a moment." %></template>
+</div>
+<% end %>

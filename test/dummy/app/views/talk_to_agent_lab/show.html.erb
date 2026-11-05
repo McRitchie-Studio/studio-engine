@@ -1,0 +1,8 @@
+<%# The talk-to-agent modal on a host page: the modal rendered once, and two links that open it with a topic. The second link's href is where a click lands when the modal cannot take it. %>
+<main class="p-6 flex flex-col gap-4 max-w-md">
+  <%= studio_talk_to_agent_link "Talk to us about Pro", href: "/agent_chat_lab", soul: "alex", topic: "Pro",
+        opener: "Tell me about the Pro plan.", class: "btn btn-primary", data: { test: "talk-pro" } %>
+  <%= studio_talk_to_agent_link "Become a Builder", href: "/agent_chat_lab", soul: "alex", topic: "Builder",
+        class: "btn btn-neutral", data: { test: "talk-builder" } %>
+</main>
+<%= render "studio/agent_chat/talk_modal", soul: "alex", name: "Alex", role: "Fractional CTO" %>

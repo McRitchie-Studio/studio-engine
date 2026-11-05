@@ -170,6 +170,8 @@ Rails.application.routes.draw do
   # which the browser lane does not stand up.
   get "agent_chat_lab", to: "agent_chat_lab#show"
   get "agent_chat_voice_lab", to: "agent_chat_voice_lab#show"
+  # The talk-to-agent modal on a host page (TalkToAgentLabController), same hub.
+  get "talk_to_agent_lab", to: "talk_to_agent_lab#show"
   get "agent_chat_voice_lab/sign_in", to: "agent_chat_voice_lab#sign_in"
 
   get "lab/session", to: "session_lab#show"

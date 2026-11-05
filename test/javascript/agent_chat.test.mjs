@@ -8,7 +8,8 @@ import { readFileSync } from "node:fs"
 const source = readFileSync(new URL("../../app/javascript/studio/agent_chat.js", import.meta.url), "utf8")
 const {
   settled, mergeTurns, turnKey, afterCursor, pollDelay, typingPhase, isFollowing, csrfToken, turnsUrl, mountAgentChat, coveredPx,
-  REVEAL_GAP_PX, RECORDER_STATE_EVENT, EXPIRED_MESSAGE, POLL_MS, SLOW_MS, SLOW_AFTER_MS, IDLE_MS, OFFLINE_MS, LIMIT, REFRESH_EVENT, SENT_EVENT
+  REVEAL_GAP_PX, RECORDER_STATE_EVENT, EXPIRED_MESSAGE, POLL_MS, SLOW_MS, SLOW_AFTER_MS, IDLE_MS, OFFLINE_MS, LIMIT, REFRESH_EVENT, SENT_EVENT,
+  revealPlan, openerStorageKey, OPENER_STORAGE_PREFIX, REVEAL_MIN_MS, REVEAL_MAX_MS, REVEAL_CPS
 } = await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 const turn = (id, status = "answered", role = "user") => ({ id, role, status, text: `t${id}` })
@@ -462,4 +463,146 @@ test("a typed send refused for its token keeps the words and says to reload", as
   assert.equal(input.value, "my words")
   assert.equal(error.textContent, EXPIRED_MESSAGE)
   assert.match(error.textContent, /reload/i)
+})
+
+// ---- the opener and the type-in (studio/talk_to_agent) ---------------------------
+
+test("revealPlan: about REVEAL_CPS a second, clamped, and whole at the end", () => {
+  assert.equal(revealPlan(42, 0).duration, REVEAL_MIN_MS, "a short answer still takes the floor")
+  assert.equal(revealPlan(100000, 0).duration, REVEAL_MAX_MS, "a long one never takes longer than the cap")
+  assert.equal(revealPlan(REVEAL_CPS, 0).duration, 1000)
+  assert.equal(revealPlan(420, 500).shown, 210)
+  assert.equal(revealPlan(420, 5000).shown, 420)
+  assert.equal(revealPlan(420, -5).shown, 0)
+})
+
+test("openerStorageKey: prefixed, and null with no key", () => {
+  assert.equal(openerStorageKey("alex:Pro"), `${OPENER_STORAGE_PREFIX}alex:Pro`)
+  assert.equal(openerStorageKey(""), null)
+  assert.equal(openerStorageKey(undefined), null)
+})
+
+function memoryStorage() {
+  const items = new Map()
+  return { items, getItem: (k) => (items.has(k) ? items.get(k) : null), setItem: (k, v) => items.set(k, String(v)), removeItem: (k) => items.delete(k) }
+}
+
+// A stand-in with a composer whose POSTs are recorded and answered with `answer`.
+function openerPage(answer, dataset = {}) {
+  const page = standIn()
+  Object.assign(page.root.dataset, { agentChatOpener: "Tell me about Pro.", agentChatOpenerKey: "alex:Pro" }, dataset)
+  const input = { value: "", addEventListener() {}, removeEventListener() {} }
+  const form = { getAttribute: () => "/agent_chat/messages", querySelector: () => null, addEventListener() {}, removeEventListener() {} }
+  const query = page.root.querySelector
+  page.root.querySelector = (s) => (s === "[data-agent-chat-form]" ? form : s === "[data-agent-chat-input]" ? input : query(s))
+  page.root.dispatchEvent = () => {}
+  const posts = []
+  const fetcher = async (url, init) => {
+    if (init && init.method === "POST") { posts.push(JSON.parse(init.body)); return answer }
+    return { ok: true, json: async () => ({ turns: [], pending: false }) }
+  }
+  return { page, input, posts, fetcher }
+}
+
+const mountOpener = (setup, storage) => mountAgentChat(setup.page.root, {
+  fetch: setup.fetcher, doc: null, storage, CustomEventClass: SentEvent, setTimer: () => 0, clearTimer: () => {}
+})
+
+// CONTROL: remove the sendOpener() call from poll and the first assert fails:
+// the modal opens on a silent chat.
+test("the opener is sent once the thread loads, and once per key per tab", async () => {
+  const storage = memoryStorage()
+  const first = openerPage({ status: 201, json: async () => ({ turn: turn(5, "pending") }) })
+  const chat = mountOpener(first, storage)
+  await flush()
+  await flush()
+  assert.deepEqual(first.posts, [{ soul: "alex", text: "Tell me about Pro." }])
+  assert.equal(chat.state.pending, true, "the agent is answering: the typing line shows")
+
+  const again = openerPage({ status: 201, json: async () => ({ turn: turn(6, "pending") }) })
+  mountOpener(again, storage)
+  await flush()
+  await flush()
+  assert.deepEqual(again.posts, [], "the same topic opened again shows the thread and sends nothing")
+
+  const other = openerPage({ status: 201, json: async () => ({ turn: turn(7, "pending") }) }, { agentChatOpenerKey: "alex:Team", agentChatOpener: "Team?" })
+  mountOpener(other, storage)
+  await flush()
+  await flush()
+  assert.deepEqual(other.posts.map((p) => p.text), ["Team?"], "another topic sends its own")
+})
+
+test("no opener, nothing sent", async () => {
+  const setup = openerPage({ status: 201, json: async () => ({ turn: turn(5) }) }, { agentChatOpener: "" })
+  mountOpener(setup, memoryStorage())
+  await flush()
+  await flush()
+  assert.deepEqual(setup.posts, [])
+})
+
+test("a refused opener goes into the box and is not remembered", async () => {
+  const storage = memoryStorage()
+  const setup = openerPage({ status: 429, json: async () => ({ error: "Slow down." }) })
+  mountOpener(setup, storage)
+  await flush()
+  await flush()
+  assert.equal(setup.posts.length, 1)
+  assert.equal(setup.input.value, "Tell me about Pro.", "the visitor can send it themselves")
+  assert.equal(storage.items.size, 0, "the next open tries again")
+})
+
+// A chat with one agent turn node, the type-in on, and a clock the test moves.
+function typingPage({ reveal = "true", reduced = false } = {}) {
+  const { page, lines } = withTurnNode()
+  page.root.dataset.agentChatReveal = reveal
+  const log = page.root.querySelector("[data-agent-chat-log]")
+  log.setAttribute = (k, v) => { log[k] = v }
+  log.removeAttribute = (k) => { delete log[k] }
+  let clock = 0
+  const timers = []
+  const { asks, fetcher } = deferredFetch()
+  const chat = mountAgentChat(page.root, {
+    fetch: fetcher, doc: null, now: () => clock, storage: null, reducedMotion: () => reduced,
+    setTimer: (fn, ms) => { timers.push({ fn, ms }); return timers.length }, clearTimer: () => {}
+  })
+  return { chat, asks, lines, log, timers, advance: (ms) => { clock += ms } }
+}
+
+const answer = (text) => ({ id: 1, role: "agent", status: "answered", text })
+
+// CONTROL: make startTyping set the whole text at once and the "part way" assert fails.
+test("an answer that arrives after the load types itself in; the log is busy until it is done", async () => {
+  const t = typingPage()
+  t.asks[0].answer([])
+  await flush()
+  t.chat.refresh()
+  t.asks[1].answer([answer("x".repeat(420))])
+  await flush()
+  const text = t.lines["[data-agent-chat-text]"]
+  assert.equal(text.textContent, "", "the first frame shows nothing yet")
+  assert.equal(t.log["aria-busy"], "true")
+  t.advance(500)
+  t.timers.filter((x) => x.ms === 32).at(-1).fn()
+  assert.equal(text.textContent.length, 210, "part way")
+  t.advance(1000)
+  t.timers.filter((x) => x.ms === 32).at(-1).fn()
+  assert.equal(text.textContent.length, 420, "whole at the end")
+  assert.equal(t.log["aria-busy"], undefined)
+})
+
+test("the thread loaded on open, a reveal that is off, and reduced motion all show at once", async () => {
+  const loaded = typingPage()
+  loaded.asks[0].answer([answer("history")])
+  await flush()
+  assert.equal(loaded.lines["[data-agent-chat-text]"].textContent, "history")
+
+  for (const options of [{ reveal: "false" }, { reduced: true }]) {
+    const t = typingPage(options)
+    t.asks[0].answer([])
+    await flush()
+    t.chat.refresh()
+    t.asks[1].answer([answer("now")])
+    await flush()
+    assert.equal(t.lines["[data-agent-chat-text]"].textContent, "now", JSON.stringify(options))
+  }
 })
