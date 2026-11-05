@@ -4,6 +4,16 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **The browser lane counts its own specs.** `bin/lib/e2e_spec_census.rb` computes the spec count
+  from `e2e/`, as the hub does, and `bin/e2e-executed-set-check` reads it. `config/e2e_lane.yml`
+  loses `total_specs` and `executed`, so adding a spec moves no number and two PRs no longer
+  conflict on them. `bin/e2e-census-check` compares Playwright's `--list` with the census.
+- **`CHANGELOG.md` merges with `merge=union`,** so parallel PRs stop conflicting on it. A branch
+  forked before a roll can land an entry under the rolled heading: `docs/RELEASE.md`, *Rolling
+  `Unreleased` into a version*, says how to read and fix that.
+
 ## 0.127.0 — 2026-11-04
 
 ### Added

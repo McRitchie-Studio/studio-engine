@@ -51,8 +51,24 @@ class ChangelogStructureTest < Minitest::Test
   # exists to catch.
   MAX_MINOR_DRIFT = 2
 
+  # The rules about the file's own shape, which hold for any tree. The drift guard is
+  # not here: it compares the file with this checkout's Studio::VERSION.
+  # test/docs/changelog_union_merge_test.rb runs these over merged text.
+  SHAPE_RULES = %i[
+    test_parses_enough_headings_to_be_meaningful
+    test_unreleased_appears_once_and_leads_the_file
+    test_version_headings_are_strictly_decreasing
+    test_no_version_appears_twice
+    test_every_subsection_sits_under_a_version_heading
+    test_a_heading_is_followed_by_a_blank_line
+  ].freeze
+
   def setup
-    @lines = File.readlines(CHANGELOG_PATH, chomp: true)
+    read_changelog(File.read(CHANGELOG_PATH))
+  end
+
+  def read_changelog(text)
+    @lines = text.lines(chomp: true)
     @headings = @lines.each_with_index.filter_map do |line, i|
       next unless line.start_with?("## ")
 
@@ -112,6 +128,22 @@ class ChangelogStructureTest < Minitest::Test
       "line #{i + 1}: #{line}"
     end
     assert_empty orphans, "'### ' subsections found above the first '## ' heading"
+  end
+
+  # WHAT `merge=union` WOULD OTHERWISE HIDE. The file merges with union (.gitattributes),
+  # so a branch forked before a roll no longer conflicts when it merges after one. An entry
+  # from its bucket lands directly beneath the heading the roll wrote, under a version that
+  # shipped without it. The roll always leaves a blank line after a heading, and a union
+  # across a roll leaves none, so this is that merge's fingerprint.
+  def test_a_heading_is_followed_by_a_blank_line
+    crowded = @headings.filter_map do |h|
+      following = @lines[h[:number]]
+      "line #{h[:number]}: #{h[:line]}" unless following.nil? || following.strip.empty?
+    end
+    assert_empty crowded,
+                 "these '## ' headings have text directly beneath them: a merge across a roll filed " \
+                 "an entry under a version that shipped without it. Move it back under " \
+                 "'#{UNRELEASED}' (see docs/RELEASE.md, 'Rolling Unreleased into a version')."
   end
 
   # THE DRIFT GUARD, and the one that would have caught the original defect.

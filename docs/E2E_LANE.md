@@ -32,7 +32,9 @@ The second one is the whole argument for this lane. The guard written to catch
 | Lab controller | `test/dummy/app/controllers/e2e_lab_controller.rb` | Sets up partial locals; supplies the host's asset delivery |
 | Server | `e2e/boot.rb` | Compiles Tailwind, copies the engine's served assets (Alpine among them), boots Puma |
 | Config | `playwright.config.js` | One chromium project, `workers: 1`, webServer |
-| Contract | `config/e2e_lane.yml` | How many specs the lane must execute |
+| Census | `bin/lib/e2e_spec_census.rb` | How many specs the lane must execute, computed from `e2e/` |
+| Contract | `config/e2e_lane.yml` | What the tree cannot compute: the shard count |
+| Census check | `bin/e2e-census-check` | Compares Playwright's `--list` with the census, about a second |
 | Runtime gate | `bin/e2e-executed-set-check` | Reads Playwright's own receipt and asserts the executed set |
 | Static guard | `test/lib/e2e_lane_contract_test.rb` | Refuses any edit that could narrow the set |
 | Isolation guard | `test/integration/e2e_lab_isolation_test.rb` | Refuses a lab request that writes a `Studio` process global |
@@ -47,6 +49,12 @@ npx playwright test --headed        # watch it
 ```
 
 The lane is **not** in `bin/release-check`. That is deliberate — see *Cost*.
+
+Adding or deleting a spec moves no number. The census counts the bare `test(`
+declarations under `e2e/`, the way mcritchie-studio's lane does. Write each spec as
+its own bare `test("title", ...)`: a `test(` in a loop is one declaration to the
+census and many specs to Playwright, so the gate goes red. `bin/e2e-census-check`
+says so in about a second, before you push.
 
 ## The invariant that keeps it honest
 
@@ -399,8 +407,9 @@ Also not covered:
 
 - **Cross-engine rendering and CSS-support divergence.** Adding projects to
   `playwright.config.js` is a three-line change if a real defect ever needs it.
-  Note it doubles `executed:` in the contract — Playwright counts one test per spec
-  per project.
+  Note it doubles what the lane executes while the census stays put, because
+  Playwright counts one test per spec per project. The census must learn to multiply
+  in the same change.
 - **Turbo navigation, except on the site footer pages and one survey spec.** The
   lab serves Alpine but no Turbo, so `turbo:load` / `turbo:render` listeners never
   fire and specs assert the synchronous first pass. The exceptions load the real
@@ -501,9 +510,8 @@ the quarantine anyway would hand a lane with nothing to exclude a documented,
 tested, reviewed way to exclude things — and the first inconvenient spec would find
 it.
 
-There is deliberately no third option: a spec that cannot be fixed gets **deleted**,
-with `total_specs` and `executed` lowered in the same commit. That is a diff a
-reviewer reads as exactly what it is.
+There is deliberately no third option: a spec that cannot be fixed gets **deleted**.
+That is a diff a reviewer reads as exactly what it is.
 
 ## What this unlocks
 

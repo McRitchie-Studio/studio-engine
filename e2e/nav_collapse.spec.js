@@ -227,7 +227,7 @@ async function flickAndWatch(page, steps) {
 const DOWN = [90, 78, 66, 55, 45, 36, 28, 21, 15, 10, 6, 3];
 const UP = DOWN.map((s) => -s);
 
-// Written out per width rather than looped: config/e2e_lane.yml's count reads
+// Written out per width rather than looped: bin/lib/e2e_spec_census.rb reads
 // the test() calls in the source.
 async function expectFlickHoldsThePage(page, viewport) {
     await blockOffsiteRequests(page);

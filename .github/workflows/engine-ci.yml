@@ -270,8 +270,8 @@ jobs:
           if-no-files-found: ignore
 
   # THE VERDICT GATE. The lane above can say its specs PASSED; it cannot say it RAN
-  # THEM ALL. This job reads the receipt and asserts the executed set against
-  # config/e2e_lane.yml.
+  # THEM ALL. This job reads the receipt and asserts the executed set against the
+  # census of e2e/ (bin/lib/e2e_spec_census.rb).
   #
   # `if: always()` is LOAD-BEARING and is the only condition this job may carry:
   # on `needs: playwright` alone, a red lane SKIPS this job, and a skipped required

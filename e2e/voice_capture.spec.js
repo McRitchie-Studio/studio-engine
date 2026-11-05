@@ -288,8 +288,8 @@ test("hold to talk: pressing records, letting go hands over the take", async ({ 
 
 // THE LAB IS DARK-ONLY (layouts/e2e_lab hard-codes class="dark"), so the
 // light pass strips the class after load and grades the light palette itself.
-// One body, two literal test() calls: config/e2e_lane.yml counts test( in the
-// source, so a loop would count one spec and run two.
+// One body, two literal test() calls: bin/lib/e2e_spec_census.rb counts test( in
+// the source, so a loop would count one spec and run two.
 async function gradeScheme(page, scheme) {
   await blockOffsiteRequests(page);
   await page.emulateMedia({ colorScheme: scheme });

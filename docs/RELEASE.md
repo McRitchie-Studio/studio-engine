@@ -236,12 +236,18 @@ still carried 0.74.7. Two rules follow.
 
 - **Check every merge that crosses a roll.** Until the rolled file reaches
   `accepted`, entries written there sit in the old bucket, and git's three-way
-  merge of the two is not safe. Measured with the real roll on this file: a
-  bullet added inside an existing `###` subsection merges CLEAN and lands under
-  the newly rolled version heading, a version that shipped without it; a new
-  subsection at the top of the bucket CONFLICTS. After such a merge, make sure
-  the newest version heading holds only what that version shipped, and move
-  anything else back under `## Unreleased`.
+  merge of the two is not safe. `.gitattributes` sets `merge=union` on this file,
+  so parallel PRs do not conflict on it, and no merge across a roll conflicts
+  either. Measured with the real roll on this file: when the rolled file is the side
+  merged INTO (a branch forked before the roll, merged into `accepted` after it),
+  the branch's entry merges CLEAN and lands under the newly rolled version heading,
+  a version that shipped without it. Merging the rolled file into the branch keeps a
+  new subsection under `## Unreleased`. `test/docs/changelog_structure_test.rb` goes
+  red only when the entry lands directly under the heading, with no blank line
+  between. `bin/pr-review` reports the rest after the merge, once the version is
+  tagged (`UPSTREAM CHANGELOG MISFILE`), and it does not stop the merge. After such
+  a merge, make sure the newest version heading holds only what that version
+  shipped, and move anything else back under `## Unreleased`.
 
 **By hand, when a case above sends you here.** On a docs PR into `accepted`, or
 in the same commit as a hand-set version:

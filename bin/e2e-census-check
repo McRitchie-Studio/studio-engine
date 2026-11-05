@@ -1,0 +1,59 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# bin/e2e-census-check — PREDICT THE BROWSER GATE BEFORE CI DOES.
+#
+# CI's gate (bin/e2e-executed-set-check) compares the specs Playwright EXECUTED with the
+# census of e2e/, which counts bare `test(` declarations in the source
+# (bin/lib/e2e_spec_census.rb). A `test(` written inside a loop is one declaration to
+# the census and N specs to Playwright, so the gate goes red on a suite that is green,
+# a full CI cycle later.
+#
+# This asks Playwright to LIST the lane (about a second: no server, no browser) and
+# compares that with the same census. A disagreement is the gate's red, printed with
+# the gate's own diagnosis.
+#
+#   Usage:  bin/e2e-census-check [--root DIR]
+#
+# Exit 0 = Playwright lists exactly what the census counts, or Playwright is not
+# installed here (said so; CI is then the only check). Exit 1 = they disagree.
+
+require_relative "lib/e2e_spec_census"
+require_relative "lib/e2e_executed_set"
+
+root = File.expand_path("..", __dir__)
+args = ARGV.dup
+until args.empty?
+  case (arg = args.shift)
+  when "--root" then root = File.expand_path(args.shift.to_s)
+  when "-h", "--help"
+    puts "usage: bin/e2e-census-check [--root DIR]"
+    exit 0
+  else abort "bin/e2e-census-check: unknown argument #{arg.inspect}"
+  end
+end
+
+census = E2eSpecCensus.count(File.join(root, "e2e"))
+bin = ENV["E2E_CENSUS_PLAYWRIGHT_BIN"] || E2eSpecCensus.playwright_bin(root)
+listed, why = E2eSpecCensus.listed(root, bin: bin)
+
+unless listed
+  puts "E2E CENSUS: NOT CHECKED — #{why}."
+  puts "  source census: #{census.executed} spec(s). CI's gate is the only check of it on this run."
+  exit 0
+end
+
+summary = "Playwright lists #{listed.executed}; census: #{census.executed}"
+if listed.executed == census.executed
+  puts "E2E CENSUS: GREEN"
+  puts "  #{summary}"
+  exit 0
+end
+
+warn "E2E CENSUS: RED — CI's executed-set gate will fail on this tree"
+warn "  #{summary}"
+warn ""
+warn "  ✗ #{E2eExecutedSet.count_mismatch(listed.executed, census.executed, verb: 'WILL EXECUTE (Playwright --list)')}"
+warn "  A `test(` inside a loop or a helper is ONE declaration to the census and many specs to " \
+     "Playwright: write each spec as its own bare `test(\"title\", ...)`."
+exit 1

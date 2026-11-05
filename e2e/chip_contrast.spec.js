@@ -127,7 +127,7 @@ async function openLab(page, palette) {
 const hueDistance = (a, b) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
 
 // One test over every palette, written out as one declaration: the lane's
-// contract counts declarations in source (config/e2e_lane.yml).
+// census counts declarations in source (bin/lib/e2e_spec_census.rb).
 test("every graded chip clears AA on its painted tint, in dark and light, in every palette", async ({ page }) => {
   const failing = [];
 
