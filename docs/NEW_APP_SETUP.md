@@ -121,6 +121,9 @@ Studio.configure do |config|
   # logged_in? walls); sections flagged admin: true show to admins only. A group
   # shows a divider and no word; header: true also shows its title above its rows.
   # config.sidebar_style = :glass               # a floating panel; a link's icon: draws a line icon
+  # config.surface_style = :glass               # glass cards and lit buttons; also write
+  #                                             # data-surface-style on the layout's <html>. Check
+  #                                             # white on a light primary first: it is untuned.
   # config.sidebar_sections = ->(view) {
   #   [ { title: "Site", links: [
   #         { label: "Home", href: view.root_path, emoji: "🏠", desc: "Front door" } ] },

@@ -1,0 +1,83 @@
+<%# The glass surfaces, the glass sidebar and the line icons (Studio.surface_style,
+    Studio.sidebar_style, studio_icon). Real classes and the real helper, so a change to any
+    of them shows here. The stage has a hard-edged backing because glass needs something
+    behind it: on a flat page it looks like a flat tint. Each specimen says whether this app
+    has turned its switch on, because the surface rules only apply when it has. %>
+<%
+  glass_backing = "rounded-xl p-4 [background-image:repeating-linear-gradient(135deg,rgb(var(--color-primary-rgb)/0.55)_0_14px,transparent_14px_28px)]"
+  surface_on = Studio.surface_style == :glass
+  sidebar_on = Studio.sidebar_style == :glass
+%>
+<section class="space-y-4" data-test="style-glass">
+  <div>
+    <h3 class="type-h4 text-heading">Glass</h3>
+    <p class="text-sm text-secondary mt-1">Translucent surfaces and the floating sidebar. Each is opt-in, so an app moves only when it asks.</p>
+  </div>
+  <div class="grid gap-4 md:grid-cols-2">
+    <%= render layout: "style/specimen",
+          locals: { klass: "Studio.surface_style = :glass",
+                    usage: %(config.surface_style = :glass, and <html data-surface-style="glass">),
+                    disabled: !surface_on, disabled_label: "surface style is off on this app" } do %>
+      <div class="<%= glass_backing %> w-full space-y-2" data-test="style-glass-surfaces">
+        <div class="card p-3 text-sm text-heading">.card, the dense tier: no blur</div>
+        <div class="card surface-glass-blur p-3 text-sm text-heading">.card.surface-glass-blur</div>
+      </div>
+    <% end %>
+    <%= render layout: "style/specimen",
+          locals: { klass: "Studio.sidebar_style = :glass",
+                    usage: %(config.sidebar_style = :glass),
+                    disabled: !sidebar_on, disabled_label: "glass sidebar is off on this app" } do %>
+      <div class="<%= glass_backing %> w-full" data-test="style-glass-sidebar">
+        <div class="flex flex-col" data-sidebar-glass-shell>
+          <nav aria-label="Glass sidebar specimen">
+            <div role="group" class="pt-2.5">
+              <a href="#tricks" class="group flex items-center" aria-current="page"><span class="flex-shrink-0" data-sidebar-row-icon><%= studio_icon("chart-column") %></span><span class="min-w-0"><span class="block truncate">Current page</span></span></a>
+              <a href="#tricks" class="group flex items-center" data-sidebar-row-described><span class="flex-shrink-0" data-sidebar-row-icon><%= studio_icon("rocket") %></span><span class="relative min-w-0 flex-1"><span class="block truncate" data-sidebar-row-label>Hover this row</span><span class="block truncate text-xs text-muted" data-sidebar-row-desc>Its description moves nothing</span></span></a>
+            </div>
+          </nav>
+        </div>
+      </div>
+      <% if respond_to?(:studio_sidebar?) && studio_sidebar? %>
+        <button type="button" class="btn btn-sm btn-outline mt-3" @click="$store.sidebars.linkTreeOpen = true" data-test="style-glass-open">Open the real sidebar</button>
+      <% end %>
+    <% end %>
+    <%= render layout: "style/specimen",
+          locals: { klass: "Lit from above, under surface_style = :glass",
+                    usage: %(.btn-primary, .btn-danger, .btn-neutral, .badge, .input-field),
+                    disabled: !surface_on, disabled_label: "surface style is off on this app" } do %>
+      <div class="w-full overflow-x-auto" data-test="style-lit-states">
+        <table class="text-xs text-muted">
+          <thead><tr><th></th><% %w[rest hover pressed focus disabled].each do |state| %><th class="font-medium text-left"><%= state %></th><% end %></tr></thead>
+          <tbody>
+            <% [["btn-primary", "Primary"], ["btn-secondary", "Secondary"], ["btn-success", "Success"], ["btn-danger", "Danger"], ["btn-warning", "Warning"], ["btn-primary btn-sm", "Small"], ["btn-neutral btn-sm", "Neutral"], ["btn-outline btn-sm", "Outline"]].each do |classes, label| %>
+              <tr>
+                <th class="font-medium text-left pr-2"><%= label %></th>
+                <% [nil, "hover", "pressed", "focus"].each do |state| %>
+                  <td class="p-1.5"><button type="button" class="btn <%= classes %>" tabindex="-1" <%= %(data-lit-state="#{state}").html_safe if state %>>Go</button></td>
+                <% end %>
+                <td class="p-1.5"><button type="button" class="btn <%= classes %>" disabled>Go</button></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+        <div class="flex flex-wrap items-center gap-2 mt-3">
+          <span class="badge text-heading border-subtle">Badge</span>
+          <span class="badge" style="color: var(--color-success-ink); border-color: var(--color-success)">Live</span>
+          <input class="input-field max-w-[12rem]" type="text" value="Input, pressed in" aria-label="Input specimen" readonly>
+        </div>
+      </div>
+    <% end %>
+    <%= render layout: "style/specimen",
+          locals: { klass: "studio_icon(name, size: 18)",
+                    usage: %(studio_icon("rocket", size: 22)) } do %>
+      <ul class="grid grid-cols-4 gap-3 w-full text-heading" data-test="style-glass-icons">
+        <% Studio::Icons.names.each do |name| %>
+          <li class="flex flex-col items-center gap-1 min-w-0" title="<%= name %>">
+            <%= studio_icon(name, size: 22) %>
+            <span class="text-3xs text-muted truncate max-w-full"><%= name %></span>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </div>
+</section>
