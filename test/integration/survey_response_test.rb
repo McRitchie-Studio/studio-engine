@@ -174,7 +174,7 @@ class SurveyResponseTest < ActiveSupport::TestCase
     response = open!
     stale = Studio::SurveyResponse.find(response.id)
     response.record_answer(survey.question(:overall), 5)
-    response.record_answer(survey.question(:rules), 4)
+    response.record_answer(survey.question(:more), "x")
     assert response.complete!(survey)
     finished = Studio::SurveyResponse.find(response.id).answers
 
