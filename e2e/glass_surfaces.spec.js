@@ -131,8 +131,7 @@ const lum = ([r, g, b]) => {
   return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
 };
 
-for (const dark of [false, true]) {
-  test(`white text holds 4.5:1 at each filled button's midpoint, ${dark ? "dark" : "light"}`, async ({ page, browser }) => {
+const holdsContrast = async (page, browser, dark) => {
     await open(page);
     await page.evaluate(() => document.body.insertAdjacentHTML("beforeend", ["secondary", "success", "warning"].map((v) =>
       `<button id="${v}" class="btn btn-${v}">Go</button>`).join("")));
@@ -156,8 +155,10 @@ for (const dark of [false, true]) {
       expect(1.05 / (lum(pixel) + 0.05), `${id} ${pixel}`).toBeGreaterThanOrEqual(4.5);
     }
     await reader.close();
-  });
-}
+};
+
+test("white text holds 4.5:1 at each filled button's midpoint, light", async ({ page, browser }) => holdsContrast(page, browser, false));
+test("white text holds 4.5:1 at each filled button's midpoint, dark", async ({ page, browser }) => holdsContrast(page, browser, true));
 
 test("cards turn translucent, while a modal and a menu stay solid", async ({ page }) => {
   await open(page);
