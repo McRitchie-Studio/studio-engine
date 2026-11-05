@@ -522,7 +522,7 @@ class LinkSidebarTest < Minitest::Test
       { label: "Team Voice Notes to Webhook", href: "/apps/voice", emoji: "🐶", hover_emoji: "🚀" }
     ] },
     { title: "Admin", header: true, links: [
-      { label: "Dashboard", href: "/admin", emoji: "📊", hover_emoji: "🔬", icon: "chart-column", desc: "Users + logs", exact: true },
+      { label: "Dashboard", href: "/admin", emoji: "📊", hover_emoji: "🔬", icon: "chart-column", desc: "Users + logs" },
       { label: "Odd", href: "/odd", emoji: "🦄", icon: "no-such-icon" }
     ] }
   ].freeze

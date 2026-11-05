@@ -6,7 +6,6 @@ require "test_helper"
 class SidebarStyleTest < Minitest::Test
   LINKS = [
     { title: "Admin", links: [
-      { label: "Dashboard", href: "/admin", exact: true },
       { label: "Design", href: "/admin/style" },
       { label: "Requests", href: "/build/requests" },
       { label: "Books", href: "/books" }
@@ -53,12 +52,6 @@ class SidebarStyleTest < Minitest::Test
     assert_equal "/build/requests", current("/build/requests")
     assert_equal "/build/requests", current("/build/requests/9")
     assert_equal "/build", current("/build/9")
-  end
-
-  def test_exact_keeps_a_row_off_the_pages_beneath_it
-    assert_equal "/admin", current("/admin")
-    assert_equal "/admin/style", current("/admin/style/components")
-    assert_nil current("/admin/schema"), "no Dashboard row on a page that has no row of its own"
   end
 
   def test_root_only_matches_itself

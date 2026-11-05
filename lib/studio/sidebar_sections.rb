@@ -24,8 +24,7 @@ require "uri"
 #
 # Under Studio.sidebar_style = :glass a link may also carry icon: "rocket", a Studio::Icons
 # name: the row draws that line icon in place of its emoji, with no hover swap. The emoji
-# stays the fallback for a name the set does not hold. A link with exact: true is current
-# only on its own address, not on the pages beneath it (see current_href).
+# stays the fallback for a name the set does not hold.
 #
 # THE ENGINE PREPENDS ONE SECTION OF ITS OWN — "You", linking to /profile. The
 # engine ships that page, so it ships the way in rather than asking five apps to
@@ -48,8 +47,7 @@ module Studio
 
     # The href of the row for the page at `path`, or nil. One row at most: the longest
     # match wins, so /build/requests lights App Requests and not Build. A row also owns
-    # the pages beneath it (/books/2026 lights Books) unless it says exact: true. "/" only
-    # ever matches itself. An absolute href counts only on `host`, so a satellite's /docs
+    # the pages beneath it (/books/2026 lights Books). "/" only ever matches itself. An absolute href counts only on `host`, so a satellite's /docs
     # never lights here.
     def current_href(sections, path, host: nil)
       return nil if path.to_s.empty?
@@ -58,7 +56,7 @@ module Studio
       best = Array(sections).flat_map { |section| Array(section[:links]) }.filter_map do |link|
         target = link_path(link[:href], host)
         next if target.nil?
-        next unless target == here || (!link[:exact] && !target.empty? && here.start_with?("#{target}/"))
+        next unless target == here || (!target.empty? && here.start_with?("#{target}/"))
 
         [target.length, link[:href]]
       end.max_by(&:first)
