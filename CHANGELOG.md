@@ -4,6 +4,26 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Changed
+
+- **A bad or missing CSRF token on a JSON or `Accept: */*` request is now a 422 with no ErrorLog
+  row, on every controller using `Studio::ErrorHandling`.** The catch-all answered JSON 500 and
+  wrote a row. It now answers `422 {error, reason: "invalid_token"}` in every environment, and a
+  test on such a route that asserted `assert_raises(ActionController::InvalidAuthenticityToken)`
+  now asserts the 422. An HTML form is unchanged: the redirect home with its alert, and the row.
+
+### Fixed
+
+- **The agent chat at phone width.** Measured at 390x844 and 320x568, light and dark:
+  - No blank tail. A turn's `sr-only` name escaped the log, which had no positioned ancestor,
+    and stretched the document to 1933px where `main` ended at 977px. The log is now
+    `position: relative`.
+  - The newest turn shows above the composer, on load and after a new turn. The page scrolls
+    the thread's end clear of the stuck composer; not for an empty thread, not for a reader
+    scrolled up in the log or the page, and not during a hold, when it waits for the button
+    to be let go.
+  - A stale page says so. A refused token reads "This page has expired" with a reload hint on
+    the voice line and the typed error, and a refused send keeps its words in the box.
 ## 0.128.0 — 2026-11-05
 
 ### Fixed

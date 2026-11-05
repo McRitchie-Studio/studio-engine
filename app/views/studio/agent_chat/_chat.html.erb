@@ -42,8 +42,9 @@
     <div class="flex flex-col gap-3 min-w-0" data-agent-chat-cards data-test="agent-chat-cards"><%= cards %></div>
   <% end %>
   <div class="flex flex-col gap-3 min-w-0">
+    <%# relative: a turn's sr-only name is absolutely positioned. With no positioned ancestor it escapes this scroller, is not clipped by it, and stretches the document by the thread's whole scrolled height. %>
     <div role="log" aria-live="polite" aria-label="Conversation with <%= name %>"
-         class="flex flex-col gap-4 px-1 py-2 overflow-y-auto overscroll-contain max-h-[60vh] min-w-0"
+         class="relative flex flex-col gap-4 px-1 py-2 overflow-y-auto overscroll-contain max-h-[60vh] min-w-0"
          data-agent-chat-log data-test="agent-chat-messages">
       <p class="hidden only:block text-center text-secondary text-sm py-6" data-test="agent-chat-empty"><%= empty.presence || "Say hello to #{name}." %></p>
     </div>

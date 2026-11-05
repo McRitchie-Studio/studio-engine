@@ -7,6 +7,8 @@ module Studio
     # methods only.
     include Studio::SessionDrift
 
+    INVALID_TOKEN_MESSAGE = "This page has expired. Reload it, then try again."
+
     included do
       # ORDER IS LOAD-BEARING — ActiveSupport::Rescuable resolves handlers with
       # `reverse_each`, so the LAST matching rescue_from registered wins. The
@@ -19,6 +21,7 @@ module Studio
       rescue_from ActiveRecord::RecordNotFound, with: :handle_not_found
       # A string, so including this concern does not load the model concern.
       rescue_from "Sluggable::SlugRefused", with: :handle_slug_refused
+      rescue_from ActionController::InvalidAuthenticityToken, with: :handle_invalid_authenticity_token
 
       before_action :require_authentication
       after_action :track_user_session
@@ -268,6 +271,20 @@ module Studio
         format.html { redirect_back_or_to root_path, alert: reason }
         format.json { render json: { error: reason }, status: :unprocessable_entity }
         format.any  { render plain: reason, status: :unprocessable_entity }
+      end
+    end
+
+    # Layer 1: a bad or missing CSRF token on a fetch is a 422 the page can read, with
+    # no ErrorLog row: anyone can send one, and the catch-all answered it 500.
+    #
+    # HTML stays with the catch-all on purpose. Its redirect home hands a stale login or
+    # magic-link form a fresh token and a way on, where public/422.html is a dead end
+    # with no link (Back shows the same stale form). Its row is what the health report
+    # sees when a session config breaks every form at once.
+    def handle_invalid_authenticity_token(exception)
+      respond_to do |format|
+        format.json { render json: { error: INVALID_TOKEN_MESSAGE, reason: "invalid_token" }, status: :unprocessable_entity }
+        format.any { handle_unexpected_error(exception) }
       end
     end
 

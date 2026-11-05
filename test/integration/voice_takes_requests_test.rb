@@ -254,7 +254,9 @@ class VoiceTakesRequestsTest < ActionDispatch::IntegrationTest
   test "a post without the page's authenticity token is refused" do
     sign_in @pat
     ActionController::Base.allow_forgery_protection = true
-    assert_raises(ActionController::InvalidAuthenticityToken) { post_take }
+    post_take
+    assert_response :unprocessable_entity
+    assert_equal "invalid_token", json["reason"]
     assert_empty VT::Mock.calls
   end
 

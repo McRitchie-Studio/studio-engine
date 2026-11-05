@@ -66,7 +66,8 @@ take is a paid vendor call). Route name `studio_voice_takes`.
 
 - **Signed in only**: the host's `require_authentication` (a JSON `401` when
   signed out).
-- **CSRF-protected**: send the page's token as `X-CSRF-Token`.
+- **CSRF-protected**: send the page's token as `X-CSRF-Token`. A bad or missing one is
+  `422 {error, reason: "invalid_token"}` with no ErrorLog row (`Studio::ErrorHandling`).
 - **JSON answers**, `Cache-Control: no-store`.
 - **Rate-limited per user**: at most `Studio.voice_takes_rate_limit` takes
   (default 20 in any 10-minute window, a fixed window per user id). Over it,
