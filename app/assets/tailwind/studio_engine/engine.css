@@ -1274,8 +1274,9 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
        what mutes a button. White text is held to 4.5:1 against the midpoint behind it, so the
        top stop reads lower, as it does in the rule this follows.
 
-       WHO GETS WHAT. Filled buttons: gradient, top, bottom, contact. The glow only on a full-size
-       .btn-primary, since a tab or a small primary in a toolbar is not the main action. Neutral,
+       WHO GETS WHAT. Every full-size filled button: gradient, top, bottom, contact and a glow in
+       its own color, on the same 0.15 lightness range. A .btn-sm has no glow, since a toolbar or
+       a board of them would be noise. Neutral,
        outline and google, which includes a resting tab: top, bottom, contact, softer. Badges: a
        small top light and contact, no press. Inputs read pressed in. Disabled is flat.
 
@@ -1326,8 +1327,8 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       --lit-low-stop: oklch(from var(--color-cta) calc(l - 0.18) calc(c + 0.05) h);
     }
     html[data-surface-style="glass"] :is(.btn-secondary, .btn-danger, .btn-warning, .btn-success) {
-      --lit-top-stop: oklch(from var(--lit-fill) calc(l + 0.05) calc(c + 0.02) h);
-      --lit-low-stop: oklch(from var(--lit-fill) calc(l - 0.08) calc(c + 0.02) h);
+      --lit-top-stop: oklch(from var(--lit-fill) calc(l + 0.075) calc(c + 0.03) h);
+      --lit-low-stop: oklch(from var(--lit-fill) calc(l - 0.075) calc(c + 0.03) h);
     }
     html[data-surface-style="glass"] .btn-secondary { --lit-fill: var(--btn-secondary-bg, var(--color-success)); }
     html[data-surface-style="glass"] .btn-danger { --lit-fill: var(--color-danger-fill, var(--color-danger)); }
@@ -1342,7 +1343,7 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       --lit-inset-pressed: var(--lit-pressed);
       box-shadow: var(--lit-rings), var(--lit-contact);
     }
-    html[data-surface-style="glass"] .btn-primary:not(.btn-sm, :disabled, [aria-disabled="true"]) {
+    html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(.btn-sm, :disabled, [aria-disabled="true"]) {
       box-shadow: var(--lit-rings), var(--lit-contact),
         var(--lit-glow) oklch(from var(--lit-low-stop) l c h / var(--lit-glow-alpha));
     }
