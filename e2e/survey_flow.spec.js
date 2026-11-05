@@ -183,6 +183,74 @@ test("the whole survey by keyboard reaches the thank-you screen", async ({ page 
   expect(errors).toEqual([]);
 });
 
+// The race behind a flake of the test above. A save still in flight when the form
+// submits could reach the server after the POST completed the survey, and its 409
+// then reached the page. The route holds the PATCH until the POST has answered, and
+// holds the thank-you page until the PATCH has settled, so the page is still there
+// to hear it. No timing is involved. RED with the abort removed from survey.js.
+test("a save in flight at submit is cancelled, and no 409 reaches the page", async ({ page }) => {
+  const errors = watchPageErrors(page);
+  const statuses = [];
+  let postAnswered;
+  let patchSettled;
+  const untilPostAnswered = new Promise((resolve) => { postAnswered = resolve; });
+  const untilPatchSettled = new Promise((resolve) => { patchSettled = resolve; });
+  const isPatch = (request) => request.url().endsWith("/answers/one_word");
+
+  page.on("response", (r) => {
+    if (r.request().method() === "POST" && r.url().endsWith(SURVEY)) postAnswered();
+    if (isPatch(r.request())) { statuses.push(r.status()); patchSettled(); }
+  });
+  page.on("requestfailed", (request) => { if (isPatch(request)) patchSettled(); });
+  await page.route("**/answers/one_word", async (route) => {
+    await untilPostAnswered;
+    await route.continue().catch(() => {}); // the page cancelled it, as it should
+  });
+  await page.route("**/thanks", async (route) => {
+    await untilPatchSettled;
+    await route.continue();
+  });
+
+  await start(page);
+  await keyTo(page, "4", "rules");
+  await keyTo(page, "5", "found_us");
+  await keyTo(page, "2", "liked");
+  await page.keyboard.press("Enter");
+  await expect(activeStep(page)).toHaveAttribute("data-key", "one_word");
+  await page.locator("[data-key=one_word] input").fill("Tense");
+  await keyTo(page, "Enter", "anything_else");
+  await page.keyboard.press("Control+Enter");
+
+  await expect(page).toHaveURL(/\/surveys\/first-game\/thanks$/);
+  expect(statuses).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+// A second tab finished the survey, so this one gets the real 409. Chromium logs
+// any failed fetch to the console and a page cannot stop it, so this one does not
+// use watchPageErrors: it asserts what the visitor reads.
+test("a save the server refuses as already complete shows the visitor no error", async ({ page, context }) => {
+  await start(page);
+
+  const other = await context.newPage();
+  await blockOffsiteRequests(other);
+  await other.goto(SURVEY);
+  await expect(other.locator("[data-studio-survey].is-enhanced")).toHaveCount(1);
+  await other.keyboard.press("4");
+  await expect(other.locator("[data-survey-step].is-active")).toHaveAttribute("data-key", "rules");
+  await other.locator("[data-survey-form]").evaluate((form) => form.requestSubmit());
+  await expect(other).toHaveURL(/\/thanks$/);
+  await other.close();
+
+  const refused = waitForSave(page, "overall");
+  await page.keyboard.press("4");
+  expect((await refused).status()).toBe(409);
+
+  await expect(page.locator("[data-survey-status]")).toHaveText("");
+  await expect(page.locator(".is-invalid")).toHaveCount(0);
+  await expect(page.locator("[data-survey-error]:visible")).toHaveCount(0);
+});
+
 test("a reload resumes at the first unanswered question", async ({ page }) => {
   await start(page);
   let saved = waitForSave(page, "overall");

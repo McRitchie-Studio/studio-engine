@@ -128,6 +128,8 @@ the definition no longer has.
   screen with a fine pointer, never on a phone or touch screen.
 - **Autosave and resume**: each answer is saved as it is given. A respondent who
   leaves and comes back lands on their first unanswered question.
+  A submit cancels any autosave still in flight. A save that reaches a completed
+  response changes nothing and answers 409, which the stepper does not show.
 - **Accessible**: each question is a `fieldset` whose `legend` takes focus on
   every step you move to, errors are announced, a required question says so, and
   `prefers-reduced-motion` turns the transitions off.
