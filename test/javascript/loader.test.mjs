@@ -304,6 +304,19 @@ test("a visit Turbo cancelled during its wait never reaches Turbo: the page it l
   note(null)
 })
 
+test("a body that fails after the headers clears the overlay: Turbo fires nothing for it", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 })
+  const overlay = fakeOverlay("350")
+  const doc = paceDoc(overlay)
+  pace.show("", doc)
+  const failed = Promise.reject(new TypeError("network error"))
+  const event = responseEvent(doc, htmlResponse("x", { responseHTML: failed }))
+  pace.holdVisitResponse(event, doc)
+  failed.catch(() => {})
+  await flush()
+  assert.equal(overlay.hidden, true)
+})
+
 test("a caller's show has no minimum", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 })
   const overlay = fakeOverlay("350")

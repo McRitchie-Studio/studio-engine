@@ -128,6 +128,8 @@ export function holdVisitResponse(event, doc) {
   clearTimeout(pendingTimer)
   pendingTimer = null
   var response = event.detail && event.detail.fetchResponse
+  // A body that fails after its headers rejects here, and Turbo fires nothing for it.
+  if (response) Promise.resolve(response.responseHTML).catch(function () { hide(doc) })
   if (!response || !response.succeeded || !response.isHTML) return false
   var overlay = findOverlay(doc)
   if (minShowLeft(overlay, Date.now()) <= 0) return false
