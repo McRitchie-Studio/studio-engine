@@ -38,9 +38,10 @@ const { blockOffsiteRequests, watchPageErrors } = require("./helpers");
 //     spec fails (a route exists, so the mic renders for a visitor).
 //   - drop the TAP_MS check in finish() (studio/voice_recorder): the tap spec fails
 //     at "silent", then at the help opening on the second tap.
-//   - put min-height back to 1.25rem on .studio-agent-voice-status: the 390px spec
-//     fails at the quiet hint. Drop the .studio-mic-name nowrap, or restore the longer
-//     prompt: it fails at the first hold.
+//   - put min-height back to 1.25rem on .studio-agent-voice-status: the 390px specs
+//     fail at the quiet hint, clipped to the height holdLine fixed. Restore the longer
+//     prompt: they fail at the first hold. Drop the .studio-mic-name nowrap: the
+//     long-name spec fails.
 //   - drop holdLine in onState: the long-old-line spec fails.
 //   - delete onDialogKey's listeners (studio/microphone_chip): the held-key spec fails.
 //   - delete the studio:agent-chat:sent dispatch in submit (studio/agent_chat): the
@@ -57,10 +58,10 @@ const RECORDER = "[data-studio-controller='voice-recorder']";
 const MOCK_TEXT = "This is a mock transcript of your voice.";
 const PRIVACY = "When you speak to an agent, your recording is sent to OpenAI to turn it into text, then deleted. We never keep the audio.";
 
-async function stubMicrophone(page, { gain = 0.3, denied = false, spareMics = 0 } = {}) {
-  await page.addInitScript(({ gain, denied, spareMics }) => {
+async function stubMicrophone(page, { gain = 0.3, denied = false, spareMics = 0, label = "MacBook Pro Microphone (Built-in)" } = {}) {
+  await page.addInitScript(({ gain, denied, spareMics, label }) => {
     window.stubGain = gain;
-    const mic = { deviceId: "mbp", label: "MacBook Pro Microphone (Built-in)" };
+    const mic = { deviceId: "mbp", label };
     const granted = () => sessionStorage.getItem("stub-mic-granted") === "1";
     const media = navigator.mediaDevices;
     const spares = Array.from({ length: spareMics }, (_, i) => ({ kind: "audioinput", groupId: "", deviceId: `spare-${i}`, label: `Spare Microphone ${i + 1}` }));
@@ -87,7 +88,7 @@ async function stubMicrophone(page, { gain = 0.3, denied = false, spareMics = 0 
       track.getSettings = () => ({ deviceId: mic.deviceId });
       return out.stream;
     };
-  }, { gain, denied, spareMics });
+  }, { gain, denied, spareMics, label });
 }
 
 async function openSignedIn(page, options = {}) {
@@ -360,38 +361,55 @@ async function setTheme(page, theme) {
   await page.waitForTimeout(400);
 }
 
-for (const theme of ["dark", "light"]) {
-  test(`at 390px outside a stuck composer, in ${theme}: the first hold and the quiet hint leave the button where it is`, async ({ page }) => {
-    await openSignedIn(page, { gain: 0 });
-    await setTheme(page, theme);
-    const recorder = page.locator(RECORDER);
-    const button = recorder.locator("[data-voice-recorder-button]");
-    const chip = page.locator(`${MIC} .studio-mic-chip`);
-    const form = await page.locator('form[data-test="agent-chat-form"]').boundingBox();
-    expect(form.y + form.height, "this composer sits in the page, not stuck to the bottom").toBeLessThan(844 - 13);
-    // The first hold: the chip still says the prompt, whole, on one line.
-    await expect(chip.locator("[data-microphone-label]")).toHaveText("Microphone: hold to allow");
-    expect(await chip.locator("[data-microphone-label]").evaluate((el) => el.scrollWidth <= el.clientWidth), "the prompt fits at 390px").toBe(true);
+async function expectSteadyAt390(page, theme) {
+  await openSignedIn(page, { gain: 0 });
+  await setTheme(page, theme);
+  const recorder = page.locator(RECORDER);
+  const button = recorder.locator("[data-voice-recorder-button]");
+  const chip = page.locator(`${MIC} .studio-mic-chip`);
+  const form = await page.locator('form[data-test="agent-chat-form"]').boundingBox();
+  expect(form.y + form.height, "this composer sits in the page, not stuck to the bottom").toBeLessThan(844 - 13);
+  // The first hold: the chip still says the prompt, whole, on one line.
+  await expect(chip.locator("[data-microphone-label]")).toHaveText("Microphone: hold to allow");
+  expect(await chip.locator("[data-microphone-label]").evaluate((el) => el.scrollWidth <= el.clientWidth), "the prompt fits at 390px").toBe(true);
 
-    const before = await button.boundingBox();
-    await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
-    await page.mouse.down();
-    await expect(recorder).toHaveAttribute("data-voice-recorder-state", "recording");
-    // The chip names the microphone the take opened.
-    await expect(chip.locator("[data-microphone-label]")).toHaveText("MacBook Pro Microphone");
-    expectSameBox(await button.boundingBox(), before, "recording, the chip's label changed");
-    await expect(page.locator(STATUS)).toHaveText("I can't hear anything yet. Is your microphone on?", { timeout: 6000 });
-    const line = await page.locator(STATUS).boundingBox();
-    expect(line.height, "the hint really wraps at this width: the reserve is what is being measured").toBeGreaterThan(30);
-    expectSameBox(await button.boundingBox(), before, "the quiet hint wrapped");
-    await page.mouse.up();
-    await expect(page.locator(MIC)).toHaveAttribute("data-agent-chat-voice-state", "silent");
-    expect(await sideways(page)).toBeLessThanOrEqual(0);
-  });
+  const before = await button.boundingBox();
+  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+  await page.mouse.down();
+  await expect(recorder).toHaveAttribute("data-voice-recorder-state", "recording");
+  // The chip names the microphone the take opened.
+  await expect(chip.locator("[data-microphone-label]")).toHaveText("MacBook Pro Microphone");
+  expectSameBox(await button.boundingBox(), before, "recording, the chip's label changed");
+  await expect(page.locator(STATUS)).toHaveText("I can't hear anything yet. Is your microphone on?", { timeout: 6000 });
+  const line = await page.locator(STATUS).boundingBox();
+  expect(line.height, "the hint really wraps at this width: the reserve is what is being measured").toBeGreaterThan(30);
+  expectSameBox(await button.boundingBox(), before, "the quiet hint wrapped");
+  await page.mouse.up();
+  await expect(page.locator(MIC)).toHaveAttribute("data-agent-chat-voice-state", "silent");
+  expect(await sideways(page)).toBeLessThanOrEqual(0);
 }
 
-test("a long old line clearing under the finger does not move the button, stuck or not", async ({ page }) => {
-  await openStuck(page);
+test("at 390px outside a stuck composer, in dark: the first hold and the quiet hint leave the button where it is", async ({ page }) => { await expectSteadyAt390(page, "dark"); });
+test("at 390px outside a stuck composer, in light: the first hold and the quiet hint leave the button where it is", async ({ page }) => { await expectSteadyAt390(page, "light"); });
+
+test("a microphone name too long for the chip stays on one line, and does not move a held button", async ({ page }) => {
+  await openSignedIn(page, { label: "A Very Long Wireless Conference Room Microphone Array With A Name Nobody Chose" });
+  const recorder = page.locator(RECORDER);
+  const button = recorder.locator("[data-voice-recorder-button]");
+  const before = await button.boundingBox();
+  await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+  await page.mouse.down();
+  await expect(recorder).toHaveAttribute("data-voice-recorder-state", "recording");
+  await expect(page.locator(`${MIC} .studio-mic-chip [data-microphone-label]`)).toContainText("A Very Long");
+  expectSameBox(await button.boundingBox(), before, "the chip named the long microphone");
+  await page.waitForTimeout(400);
+  await page.mouse.up();
+});
+
+// Not stuck: the page's top anchors the composer, so a line above the button shrinking
+// pulls the button up. (Stuck, the window's bottom anchors it, and the button stays.)
+test("a long old line clearing under the finger does not move the button outside a stuck composer", async ({ page }) => {
+  await openSignedIn(page);
   await page.route("**/voice/takes", (route) => route.fulfill({
     status: 429, contentType: "application/json", headers: { "Retry-After": "40" }, body: JSON.stringify({ error: "Too many." })
   }));
@@ -462,26 +480,27 @@ test("a refused microphone still opens the help, and says so on the one line", a
   await expect(page.locator(`${MIC} .studio-recorder-status`)).toBeHidden();
 });
 
-for (const key of [" ", "Enter"]) {
-  test(`a key held on the talk button does not dismiss the refused-microphone help: ${key === " " ? "Space" : key}`, async ({ page }) => {
-    await openSignedIn(page, { denied: true });
-    const recorder = page.locator(RECORDER);
-    const dialog = page.locator(`${MIC} [data-microphone-dialog]`);
-    await recorder.locator("[data-voice-recorder-button]").focus();
-    await page.keyboard.down(key);
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Close" }), "focus lands on Close, under the held key").toBeFocused();
-    // Playwright sends a second down of a held key as a repeat, as the OS does.
-    for (let i = 0; i < 3; i += 1) await page.keyboard.down(key);
-    await page.keyboard.up(key);
-    await page.waitForTimeout(200);
-    await expect(dialog, "repeats and the keyup leave it open").toBeVisible();
+async function expectHeldKeyKeepsHelp(page, key) {
+  await openSignedIn(page, { denied: true });
+  const recorder = page.locator(RECORDER);
+  const dialog = page.locator(`${MIC} [data-microphone-dialog]`);
+  await recorder.locator("[data-voice-recorder-button]").focus();
+  await page.keyboard.down(key);
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Close" }), "focus lands on Close, under the held key").toBeFocused();
+  // Playwright sends a second down of a held key as a repeat, as the OS does.
+  for (let i = 0; i < 3; i += 1) await page.keyboard.down(key);
+  await page.keyboard.up(key);
+  await page.waitForTimeout(200);
+  await expect(dialog, "repeats and the keyup leave it open").toBeVisible();
 
-    // A new press is a person answering it.
-    await page.keyboard.press(key);
-    await expect(dialog).toBeHidden();
-  });
+  // A new press is a person answering it.
+  await page.keyboard.press(key);
+  await expect(dialog).toBeHidden();
 }
+
+test("a key held on the talk button does not dismiss the refused-microphone help: Space", async ({ page }) => { await expectHeldKeyKeepsHelp(page, " "); });
+test("a key held on the talk button does not dismiss the refused-microphone help: Enter", async ({ page }) => { await expectHeldKeyKeepsHelp(page, "Enter"); });
 
 test("a later typed send clears the line a take left, through the real proxy", async ({ page }) => {
   await openSignedIn(page);
@@ -508,47 +527,58 @@ test("a typed send the app refuses keeps the line a take left", async ({ page })
   await expect(page.locator(STATUS)).toHaveText("Sent. Spoken by Someone new.");
 });
 
-for (const theme of ["dark", "light"]) {
-  test(`a held turn says it was received and never asks for a resend, in ${theme}; a hub still saying failed keeps its line`, async ({ page }) => {
-    const at = new Date().toISOString();
-    await openSignedIn(page);
-    await page.route("**/agent_chat/turns**", (route) => route.fulfill({
-      status: 200, contentType: "application/json",
-      body: JSON.stringify({
-        pending: false,
-        turns: [
-          { id: 1, role: "user", text: "A held message", status: "held", created_at: at },
-          { id: 2, role: "user", text: "A failed message", status: "failed", created_at: at }
-        ]
-      })
-    }));
-    await page.reload();
-    await expect(page.locator(CHAT)).toHaveAttribute("data-agent-chat-ready", "true");
-    await setTheme(page, theme);
-    const held = page.locator('[data-turn-key="1:user"]');
-    const failed = page.locator('[data-turn-key="2:user"]');
-    await expect(held.locator('[data-test="agent-chat-held"]')).toHaveText("Your message was received, but it won't get an automatic answer.");
-    await expect(held.locator('[data-test="agent-chat-failed"]')).toBeHidden();
-    expect(await held.innerText(), "what a person can read").not.toContain("Send it again");
-    await expect(failed.locator('[data-test="agent-chat-failed"]')).toBeVisible();
-    await expect(failed.locator('[data-test="agent-chat-held"]')).toBeHidden();
-    await expect(page.locator('[data-test="agent-chat-typing"]')).toBeHidden();
-    const ratio = await held.locator('[data-test="agent-chat-held"]').evaluate((el) => {
-      const channels = (css) => css.match(/[\d.]+/g).slice(0, 3).map(Number);
-      const luminance = (rgb) => {
-        const [r, g, b] = rgb.map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
-        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      };
-      const [hi, lo] = [luminance(channels(getComputedStyle(el).color)), luminance(channels(getComputedStyle(document.body).backgroundColor))].sort((a, b) => b - a);
-      return (hi + 0.05) / (lo + 0.05);
-    });
-    expect(ratio, "the held line reads on the page (AA)").toBeGreaterThanOrEqual(4.5);
-    expect(await sideways(page)).toBeLessThanOrEqual(0);
+async function expectHeldTurn(page, theme) {
+  const at = new Date().toISOString();
+  await openSignedIn(page);
+  await page.route("**/agent_chat/turns**", (route) => route.fulfill({
+    status: 200, contentType: "application/json",
+    body: JSON.stringify({
+      pending: false,
+      turns: [
+        { id: 1, role: "user", text: "A held message", status: "held", created_at: at },
+        { id: 2, role: "user", text: "A failed message", status: "failed", created_at: at }
+      ]
+    })
+  }));
+  await page.reload();
+  await expect(page.locator(CHAT)).toHaveAttribute("data-agent-chat-ready", "true");
+  await setTheme(page, theme);
+  const held = page.locator('[data-turn-key="1:user"]');
+  const failed = page.locator('[data-turn-key="2:user"]');
+  await expect(held.locator('[data-test="agent-chat-held"]')).toBeVisible();
+  await expect(held.locator('[data-test="agent-chat-held"]')).toHaveText("Your message was received, but it won't get an automatic answer.");
+  await expect(held.locator('[data-test="agent-chat-failed"]')).toBeHidden();
+  expect(await held.innerText(), "what a person can read").not.toContain("Send it again");
+  await expect(failed.locator('[data-test="agent-chat-failed"]')).toBeVisible();
+  await expect(failed.locator('[data-test="agent-chat-held"]')).toBeHidden();
+  await expect(page.locator('[data-test="agent-chat-typing"]')).toBeHidden();
+  const ratio = await held.locator('[data-test="agent-chat-held"]').evaluate((el) => {
+    const channels = (css) => css.match(/[\d.]+/g).slice(0, 3).map(Number);
+    const luminance = (rgb) => {
+      const [r, g, b] = rgb.map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const [hi, lo] = [luminance(channels(getComputedStyle(el).color)), luminance(channels(getComputedStyle(document.body).backgroundColor))].sort((a, b) => b - a);
+    return (hi + 0.05) / (lo + 0.05);
   });
+  expect(ratio, "the held line reads on the page (AA)").toBeGreaterThanOrEqual(4.5);
+  expect(await sideways(page)).toBeLessThanOrEqual(0);
 }
 
+test("a held turn says it was received and never asks for a resend, in dark; a hub still saying failed keeps its line", async ({ page }) => { await expectHeldTurn(page, "dark"); });
+test("a held turn says it was received and never asks for a resend, in light; a hub still saying failed keeps its line", async ({ page }) => { await expectHeldTurn(page, "light"); });
+
 test("the picker fits a short stuck window: the chip stays on screen and every microphone is reachable", async ({ page }) => {
-  await openStuck(page, { spareMics: 10 });
+  await openSignedIn(page, { spareMics: 10 });
+  // A long thread, so the composer's own place is below the window and only sticking holds
+  // it there: it grows upward when the picker opens, and the top of it is what goes.
+  const at = new Date().toISOString();
+  const turns = Array.from({ length: 30 }, (_, i) => ({ id: i + 1, role: "user", text: `Message ${i + 1}`, status: "answered", created_at: at }));
+  await page.route("**/agent_chat/turns**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ pending: false, turns }) }));
+  await page.reload();
+  await expect(page.locator('[data-test="agent-chat-sent"]')).toHaveCount(30);
+  await page.setViewportSize({ width: 390, height: 460 });
+  await page.evaluate(() => window.scrollTo(0, 0));
   await holdToTalk(page);
   await expect(page.locator(MIC)).toHaveAttribute("data-agent-chat-voice-state", "sent");
   const chip = page.locator(`${MIC} .studio-mic-chip`);
@@ -556,8 +586,14 @@ test("the picker fits a short stuck window: the chip stays on screen and every m
   const last = page.locator(`${MIC} [data-microphone-option="spare-9"]`);
   await expect(last).toHaveCount(1);
 
-  const form = await page.locator('form[data-test="agent-chat-form"]').boundingBox();
-  expect(form.y, "the composer's top is on screen").toBeGreaterThanOrEqual(0);
+  // The whole composer fits the window at once, so no scroll position cuts off the chip.
+  const composer = page.locator('form[data-test="agent-chat-form"]');
+  const open = await composer.boundingBox();
+  expect(open.height, "the composer with the picker open fits the window").toBeLessThanOrEqual(460 - 12);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const settled = await composer.boundingBox();
+  expect(settled.y, "the composer's top is on screen").toBeGreaterThanOrEqual(0);
+  expect(settled.y + settled.height, "and its bottom").toBeLessThanOrEqual(460);
   const chipBox = await chip.boundingBox();
   expect(chipBox.y, "the chip stays on screen").toBeGreaterThanOrEqual(0);
   expect(chipBox.y + chipBox.height).toBeLessThanOrEqual(460);

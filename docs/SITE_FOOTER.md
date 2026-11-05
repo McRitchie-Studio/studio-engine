@@ -436,7 +436,7 @@ config.site_footer_chat_path = "/chat"             # or ->(view) { view.chat_pat
 
 | Setting | Meaning | Unset |
 |---------|---------|-------|
-| `site_footer_chat_path` | A path, or a callable taking the view (route helpers do not exist yet in an initializer). It answers nil to show no link on this page | No link |
+| `site_footer_chat_path` | A path, or a callable taking the view (route helpers do not exist yet in an initializer). It answers nil to show no link on this page; one that raises hides the link and reports it (the log on each render, `ErrorLog` once per error class), and the page still renders | No link |
 | `site_footer_chat_label` | The link's words | "Chat" |
 | `site_footer_chat_allowed` | A callable taking the viewer: `current_user`, **nil when signed out**, so write `user&.admin?` | `Studio.agent_chat_allowed` (everyone, by default) |
 

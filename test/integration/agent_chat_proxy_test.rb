@@ -302,7 +302,7 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
     assert_equal "Alex", mic.first["data-agent-chat-voice-name"]
     assert_nil mic.first["data-agent-chat-voice-embedder"], "no saved voice, no model to download"
     assert_select "#{MIC} [data-studio-controller='voice-recorder'][data-voice-recorder-mode='hold'] button", text: "Hold to talk"
-    assert_select "#{MIC} [data-studio-controller='microphone-chip'] .studio-mic-chip", text: /Microphone: hold to talk to allow/
+    assert_select "#{MIC} [data-studio-controller='microphone-chip'] .studio-mic-chip", text: /Microphone: hold to allow/
     assert_select "#{MIC} [data-test='agent-chat-voice-status'][role='status']", 1
     assert_select "#{MIC} .studio-agent-voice-failed", 1
     assert_select '[data-test="agent-chat-voice-privacy"]', text: PRIVACY, count: 1
@@ -582,6 +582,30 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
     sign_in(@sam)
     post "/agent_chat/messages", params: { soul: "alex", text: "Hi" }.to_json, headers: json_headers
     assert_equal ["anon_token"], @hub.requests.last.json["person"].keys, "the hook answered nil: anonymous"
+  end
+
+  def test_a_held_turn_reaches_the_page_as_the_hub_said_it
+    sign_in(@sam)
+    held = TURN.merge("status" => "held")
+    @hub.respond { |_request| [200, { "turns" => [held], "pending" => false }] }
+    get "/agent_chat/turns", params: { soul: "alex" }
+
+    assert_response :ok
+    assert_equal({ "turns" => [held], "pending" => false }, response.parsed_body)
+  end
+
+  def test_a_held_turn_rendered_by_the_partial_says_so_and_never_asks_for_a_resend
+    page = lambda do |status|
+      Nokogiri::HTML5.fragment(ActionController::Base.render(partial: "studio/agent_chat/turn",
+                                                             locals: { turn: { "id" => 1, "role" => "user", "text" => "Hi", "status" => status }, name: "Alex" }))
+    end
+    held = page.call("held")
+    assert_nil held.at_css("[data-agent-chat-held]")["hidden"]
+    assert held.at_css("[data-agent-chat-failed]").key?("hidden")
+
+    failed = page.call("failed")
+    assert failed.at_css("[data-agent-chat-held]").key?("hidden")
+    assert_nil failed.at_css("[data-agent-chat-failed]")["hidden"]
   end
 
   def test_signed_in_turns_are_asked_for_by_email_with_after_and_limit
