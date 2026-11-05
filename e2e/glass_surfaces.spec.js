@@ -248,3 +248,12 @@ test("less transparency makes every surface solid, in both themes", async ({ pag
     expect(await css(page, "primary", "backgroundImage")).not.toContain("/ 0.94");
   }
 });
+
+test("disabling a filled button keeps its box", async ({ page }) => {
+  await open(page);
+  await optIn(page);
+  const box = () => page.evaluate(() => { const b = document.getElementById("primary").getBoundingClientRect(); return [b.width, b.height]; });
+  const before = await box();
+  await page.evaluate(() => { document.getElementById("primary").disabled = true; });
+  expect(await box()).toEqual(before);
+});

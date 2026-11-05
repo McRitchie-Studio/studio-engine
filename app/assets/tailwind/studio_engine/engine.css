@@ -1530,8 +1530,9 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
     html[data-surface-style="glass"] .btn-danger { --lit-fill: var(--color-danger-fill, var(--color-danger)); }
     html[data-surface-style="glass"] .btn-warning { --lit-fill: var(--color-warning-fill, var(--color-warning)); }
     html[data-surface-style="glass"] .btn-success { --lit-fill: var(--color-success); }
+    /* The spacer holds in every state, so a submit that disables its button moves nothing. */
+    html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not([class*=" bg-"], [class^="bg-"]) { border: 1px solid transparent; }
     html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(:disabled, [aria-disabled="true"], [class*=" bg-"], [class^="bg-"]) {
-      border: 1px solid transparent;
       background-origin: border-box;
       background-repeat: no-repeat;
       background-image: linear-gradient(var(--lit-top-stop), var(--lit-low-stop));
