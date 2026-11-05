@@ -96,6 +96,8 @@ test("the old glow class and old knobs paint exactly as the new names do", async
     el.classList.add("consumer-rule");
     el.style.setProperty("--studio-team-glow-opacity", "0");
   });
+  // Turf's e2e reads this computed value, so the old knob stays declared on the old class.
+  expect(await page.locator("#old-plain").evaluate((el) => getComputedStyle(el).getPropertyValue("--studio-team-glow-opacity").trim())).toBe("0");
   const moved = await paint("#old-plain")(page);
   expect(moved.before[1]).toBe("7px");
   // Opacity crosses over 0.4s, as it always has.
