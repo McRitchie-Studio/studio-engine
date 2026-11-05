@@ -14,6 +14,17 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ### Fixed
 
+- **A theme toggle is one crossfade.** `$store.theme.toggle()` added `theme-transition` for 300ms, and
+  in a host with that rule about 210 elements ran their own 200ms transition while gradients and
+  the page background snapped. It now flips the whole page in one 160ms view transition with no
+  movement. No element runs its own transition, and no named element keeps its own picture. A
+  browser with no view transitions, a reduced-motion reader, and a toggle during a Turbo visit
+  flip at once, and the visit's motion plays on. Under the crossfade the class, the store value
+  and localStorage change together in the transition's callback, so all three still read the old
+  theme for up to a frame after the call: a caller that reads them in the same tick must wait.
+  `toggleTheme` is no longer exported. `$store.theme.set("dark" | "light")` is the one setter, and
+  `toggle()` stays. The `theme-transition` rule in a host is now dead.
+
 - **The agent chat at phone width.** Measured at 390x844 and 320x568, light and dark:
   - No blank tail. A turn's `sr-only` name escaped the log, which had no positioned ancestor,
     and stretched the document to 1933px where `main` ended at 977px. The log is now

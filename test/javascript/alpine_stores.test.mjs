@@ -7,7 +7,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/alpine_stores.js", import.meta.url), "utf8")
-const { storedTheme, toggleTheme, registerStudioStores, installStudioStores } =
+const { storedTheme, themeStore, registerStudioStores, installStudioStores } =
   await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 const storage = (initial = {}) => {
@@ -19,11 +19,10 @@ const root = (classes) => {
   const set = new Set(classes)
   return {
     set,
+    dataset: {},
     classList: {
-      add: (c) => set.add(c),
-      remove: (c) => set.delete(c),
       contains: (c) => set.has(c),
-      toggle: (c) => (set.has(c) ? (set.delete(c), false) : (set.add(c), true))
+      toggle: (c, on) => (on ? (set.add(c), true) : (set.delete(c), false))
     }
   }
 }
@@ -62,20 +61,233 @@ test("the stored theme is dark unless the reader chose light", () => {
   assert.equal(storedTheme(storage({ theme: "light" })), "light")
 })
 
-test("toggling flips the root, stores the result, and clears the transition later", () => {
-  const html = root(["dark"])
-  const store = storage({ theme: "dark" })
-  const later = []
-  assert.equal(toggleTheme(html, store, (fn, ms) => later.push([fn, ms])), "light")
-  assert.equal(html.set.has("dark"), false)
-  assert.equal(store.values.theme, "light")
-  assert.equal(html.set.has("theme-transition"), true, "the transition class is on while the colours move")
-  assert.equal(later[0][1], 300)
-  later[0][0]()
-  assert.equal(html.set.has("theme-transition"), false)
+// A document with view transitions. Each one holds its callback until the test takes the old
+// picture, and a new one skips the one before it, flushing its callback, as the browser does.
+const fakeDoc = () => {
+  const transitions = []
+  const doc = {
+    transitions,
+    startViewTransition(callback) {
+      const last = transitions.at(-1)
+      if (last && !last.done) last.skip()
+      const transition = {
+        ran: false,
+        done: false,
+        run() { if (!this.ran) { this.ran = true; callback() } },
+        finish() { this.run(); this.done = true; this.resolve() },
+        skip() { this.run(); this.done = true; this.rejectReady(new Error("AbortError")); this.resolve() }
+      }
+      transition.finished = new Promise((resolve) => { transition.resolve = resolve })
+      transition.ready = new Promise((_, reject) => { transition.rejectReady = reject })
+      transition.updateCallbackDone = Promise.resolve()
+      transitions.push(transition)
+      return transition
+    }
+  }
+  return doc
+}
 
-  assert.equal(toggleTheme(html, store, () => {}), "dark")
-  assert.equal(store.values.theme, "dark")
+const fakeWin = ({ reduced = false } = {}) => ({
+  flushed: [],
+  matchMedia: () => ({ matches: reduced }),
+  getComputedStyle(el) { this.flushed.push(el); return {} }
+})
+
+// The store, on a page in `theme`, with a view of everything that must agree.
+const page = (theme = "dark", { doc = fakeDoc(), win = fakeWin() } = {}) => {
+  const html = root(theme === "dark" ? ["dark"] : [])
+  const store = storage({ theme })
+  const later = []
+  const theme_ = themeStore({ root: html, storage: store, later: (fn, ms) => later.push([fn, ms]), doc, win })
+  return {
+    html, store, later, doc, win, theme: theme_,
+    state: () => ({ value: theme_.value, isDark: theme_.isDark, dark: html.set.has("dark"), stored: store.values.theme })
+  }
+}
+const DARK = { value: "dark", isDark: true, dark: true, stored: "dark" }
+const LIGHT = { value: "light", isDark: false, dark: false, stored: "light" }
+const settled = () => new Promise((resolve) => setImmediate(resolve))
+
+test("the old transition class is gone from the source", () => {
+  assert.doesNotMatch(source, /theme-transition/)
+})
+
+test("crossfade: nothing changes before the old picture, then all three change in one step", async () => {
+  const p = page("dark")
+  p.theme.toggle()
+  assert.equal(p.doc.transitions.length, 1)
+  assert.equal(p.html.dataset.themeFlip, "", "the rules must be on before the old picture")
+  assert.deepEqual(p.state(), DARK, "the old picture must hold the old theme")
+
+  p.doc.transitions[0].run()
+  assert.deepEqual(p.state(), LIGHT)
+  assert.equal(p.html.dataset.themeFlip, "", "the attribute stays for the whole crossfade")
+
+  p.doc.transitions[0].finish()
+  await settled()
+  assert.equal(p.html.dataset.themeFlip, undefined)
+  assert.deepEqual(p.later, [], "the crossfade needs no timer")
+})
+
+test("crossfade: a skipped transition clears the attribute and rejects nothing unhandled", async () => {
+  const unhandled = []
+  const hear = (error) => unhandled.push(error)
+  process.on("unhandledRejection", hear)
+  try {
+    const p = page("dark")
+    p.theme.toggle()
+    p.doc.transitions[0].skip()
+    await settled()
+    await settled()
+    assert.equal(p.html.dataset.themeFlip, undefined)
+    assert.deepEqual(p.state(), LIGHT, "the callback still runs on a skip")
+    assert.deepEqual(unhandled, [])
+  } finally {
+    process.off("unhandledRejection", hear)
+  }
+})
+
+test("crossfade: a throw in the step leaves no attribute and no unhandled rejection", async () => {
+  const unhandled = []
+  const hear = (error) => unhandled.push(error)
+  process.on("unhandledRejection", hear)
+  try {
+    const failed = Promise.reject(new Error("quota"))
+    const doc = {
+      startViewTransition: () => ({ finished: failed, ready: failed, updateCallbackDone: failed })
+    }
+    const p = page("dark", { doc })
+    p.theme.toggle()
+    await settled()
+    await settled()
+    assert.equal(p.html.dataset.themeFlip, undefined)
+    assert.deepEqual(unhandled, [])
+  } finally {
+    process.off("unhandledRejection", hear)
+  }
+})
+
+test("a second toggle before the first picture ends on the first theme, and the three agree", async () => {
+  const p = page("dark")
+  p.theme.toggle()
+  p.theme.toggle()
+  assert.equal(p.doc.transitions[0].done, true, "the browser skipped the first")
+  assert.deepEqual(p.state(), DARK, "the skipped flip's late callback must not act")
+
+  await settled()
+  assert.equal(p.html.dataset.themeFlip, "", "the skipped flip must not clear the live flip's attribute")
+
+  p.doc.transitions[1].finish()
+  await settled()
+  assert.deepEqual(p.state(), DARK)
+  assert.equal(p.html.dataset.themeFlip, undefined)
+})
+
+test("a second toggle during the first crossfade flips back, and the first's end clears nothing", async () => {
+  const p = page("dark")
+  p.theme.toggle()
+  p.doc.transitions[0].run()
+  assert.deepEqual(p.state(), LIGHT)
+
+  p.theme.toggle()
+  await settled()
+  assert.equal(p.html.dataset.themeFlip, "")
+  p.doc.transitions[1].finish()
+  await settled()
+  assert.deepEqual(p.state(), DARK)
+  assert.equal(p.html.dataset.themeFlip, undefined)
+})
+
+for (const [name, options] of [
+  ["a browser with no view transitions", { doc: {} }],
+  ["a reduced-motion reader", { win: fakeWin({ reduced: true }) }]
+]) {
+  test(`instant: ${name} flips at once, with the rules on until the new styles are computed`, () => {
+    const p = page("dark", options)
+    p.theme.toggle()
+    assert.deepEqual(p.state(), LIGHT)
+    assert.equal(p.html.dataset.themeFlip, "", "the new styles must compute under the rules")
+    assert.deepEqual(p.win.flushed, [p.html])
+    assert.equal(p.later[0][1], 0)
+    p.later[0][0]()
+    assert.equal(p.html.dataset.themeFlip, undefined)
+  })
+}
+
+for (const attribute of ["turboVisitDirection", "pageTransition"]) {
+  test(`instant: during a visit (${attribute}) a toggle leaves Turbo's transition alone`, () => {
+    const p = page("dark")
+    p.html.dataset[attribute] = "forward"
+    p.theme.toggle()
+    assert.equal(p.doc.transitions.length, 0, "a second transition would cut the visit's motion short")
+    assert.deepEqual(p.state(), LIGHT)
+  })
+}
+
+test("an instant flip outruns a crossfade still waiting for its picture", async () => {
+  const p = page("dark")
+  p.theme.toggle()
+  p.html.dataset.turboVisitDirection = "forward"
+  p.theme.toggle()
+  assert.deepEqual(p.state(), DARK)
+  p.doc.transitions[0].finish()
+  await settled()
+  assert.deepEqual(p.state(), DARK, "the older flip's callback must not undo the newer")
+  assert.equal(p.html.dataset.themeFlip, "", "only the newest flip clears the attribute")
+  p.later[0][0]()
+  assert.equal(p.html.dataset.themeFlip, undefined)
+})
+
+test("set by value reaches that theme from either side and from a pending flip", async () => {
+  const p = page("dark")
+  p.theme.set("light")
+  p.doc.transitions[0].finish()
+  await settled()
+  assert.deepEqual(p.state(), LIGHT)
+
+  p.theme.set("dark")
+  p.theme.set("dark")
+  assert.equal(p.doc.transitions.length, 2, "asking again for the theme on its way opens nothing")
+  p.doc.transitions[1].finish()
+  await settled()
+  assert.deepEqual(p.state(), DARK)
+})
+
+test("set to the theme the page is in opens no transition, and mends a drifted store", () => {
+  const p = page("dark")
+  p.theme.value = "light" // a host wrote the class and storage directly
+  p.store.values.theme = "light"
+  p.theme.set("dark")
+  assert.equal(p.doc.transitions.length, 0)
+  assert.deepEqual(p.state(), DARK)
+  assert.equal(p.html.dataset.themeFlip, undefined)
+})
+
+test("set to the shown theme during its crossfade leaves the crossfade's attribute on", async () => {
+  const p = page("dark")
+  p.theme.set("light")
+  p.doc.transitions[0].run()
+  p.theme.set("light")
+  assert.equal(p.html.dataset.themeFlip, "", "clearing it mid-crossfade would swap in the page motions")
+  p.doc.transitions[0].finish()
+  await settled()
+  assert.equal(p.html.dataset.themeFlip, undefined)
+})
+
+test("set refuses anything but the two themes", () => {
+  const p = page("dark")
+  for (const bad of ["watermark", "", null, undefined]) p.theme.set(bad)
+  assert.equal(p.doc.transitions.length, 0)
+  assert.deepEqual(p.state(), DARK)
+})
+
+test("toggle reads the root's class, so a host's direct write counts", async () => {
+  const p = page("dark")
+  p.html.set.delete("dark") // logo_gallery's fallback, and hub theme_context
+  p.theme.toggle()
+  p.doc.transitions[0].finish()
+  await settled()
+  assert.deepEqual(p.state(), DARK)
 })
 
 test("registration installs theme and devMode from storage", () => {
@@ -87,7 +299,7 @@ test("registration installs theme and devMode from storage", () => {
   assert.equal(Alpine.store("theme").value, "light")
   assert.equal(Alpine.store("theme").isDark, false)
 
-  Alpine.store("theme").toggle()
+  Alpine.store("theme").toggle() // no document in env: the instant path
   assert.equal(Alpine.store("theme").value, "dark")
   assert.equal(Alpine.store("theme").isDark, true)
 })
@@ -116,7 +328,7 @@ test("a host's own store of the same name wins", () => {
 
 test("installing from both paths adds one alpine:init listener, which registers both stores", () => {
   const doc = fakeDocument()
-  const win = { localStorage: storage(), setTimeout: () => {} }
+  const win = { localStorage: storage(), setTimeout: () => {}, matchMedia: () => ({ matches: false }), getComputedStyle: () => ({}) }
   installStudioStores(doc, win)
   installStudioStores(doc, win)
   assert.equal(doc.listeners["alpine:init"].length, 1)
