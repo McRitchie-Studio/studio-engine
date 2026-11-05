@@ -13,6 +13,15 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 - **`CHANGELOG.md` merges with `merge=union`,** so parallel PRs stop conflicting on it. A branch
   forked before a roll can land an entry under the rolled heading: `docs/RELEASE.md`, *Rolling
   `Unreleased` into a version*, says how to read and fix that.
+### Added
+
+- **Link sidebar: a section may show its header.** A section in `Studio.sidebar_sections` with
+  `header: true` shows its title above its rows, in the `label-upper` style. The default stays no
+  header, so an app changes only when it opts in. The divider stays, and there is no ADMIN chip.
+  The group keeps its accessible name and the word on screen is `aria-hidden`, so a screen reader
+  announces the title once. The header is plain text outside the rows: it takes no click, and a
+  row keeps its height, its centering and its no-jump description. A section with a blank title
+  draws no header. The engine lab shows the case at `/lab/sidebar_panels?sidebar=1&headers=1`.
 
 ## 0.127.0 — 2026-11-04
 

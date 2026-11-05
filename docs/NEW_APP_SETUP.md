@@ -116,7 +116,8 @@ Studio.configure do |config|
   # Out-of-the-box navigation (default OFF — empty sections render nothing):
   # declare link sections and the engine navbar mounts a link-sidebar trigger
   # + slide-out panel. A callable receives the view context (route helpers,
-  # logged_in? walls); sections flagged admin: true show to admins only.
+  # logged_in? walls); sections flagged admin: true show to admins only. A group
+  # shows a divider and no word; header: true also shows its title above its rows.
   # config.sidebar_sections = ->(view) {
   #   [ { title: "Site", links: [
   #         { label: "Home", href: view.root_path, emoji: "🏠", desc: "Front door" } ] },
