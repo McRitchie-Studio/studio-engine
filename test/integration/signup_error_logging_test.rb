@@ -82,9 +82,13 @@ end
 # password cases give it `authenticate` for the length of one test only.
 class User < ApplicationRecord
   cattr_accessor :explode_on_save, default: false
+  cattr_accessor :save_attempts, default: 0
 
   validates :email, presence: true
-  before_save { raise ActiveRecord::StatementInvalid, "lab: the users table is gone" if self.class.explode_on_save }
+  before_save do
+    self.class.save_attempts += 1
+    raise ActiveRecord::StatementInvalid, "lab: the users table is gone" if self.class.explode_on_save
+  end
 
   def display_name
     name.presence || email.split("@").first
@@ -109,6 +113,7 @@ class SignupErrorLoggingTest < ActionDispatch::IntegrationTest
     Studio.auth_methods = @prior_auth
     Studio.registration_params = @prior_params
     User.explode_on_save = false
+    User.save_attempts = 0
     User.send(:remove_method, :authenticate) if User.method_defined?(:authenticate, false)
   end
 
@@ -198,6 +203,8 @@ class SignupErrorLoggingTest < ActionDispatch::IntegrationTest
     assert_equal "lab: the users table is gone", error.message
     assert_equal ["lab: the users table is gone"], ErrorLog.pluck(:message),
       "logged once, by rescue_and_log; the catch-all does not write a second row"
+    assert_equal 1, User.save_attempts,
+      "the logger must not retry the failing save (an unsaved target would be autosaved)"
   end
 
   test "a valid password signup signs the visitor in" do

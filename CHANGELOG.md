@@ -4,6 +4,20 @@ The format is [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). This pro
 
 ## Unreleased
 
+### Fixed
+
+- **A signup that cannot send its email no longer fails silently.** `RegistrationsController#create`
+  ended in a `rescue StandardError` that logged nothing and rendered `registrations/new`. On a
+  passwordless app `@user` was never set, so a failed link mint or mail raised `NoMethodError` on
+  nil in that view, and no ErrorLog row named the first failure. Now a passwordless failure is
+  logged through `rescue_and_log` and redirects to `/signup` with one friendly alert for every
+  address, so it reveals nothing about which emails have accounts. The account is still created
+  only when the link is used. A password signup re-renders the form on a validation error and
+  writes no ErrorLog row. A POST with no `user` params gets the form too, not a
+  `ParameterMissing`. Any other raise is logged once and goes to the catch-all. The rescue no
+  longer names the unsaved user as its target: ErrorLog's `belongs_to` autosaved it, which ran the
+  failing save again inside the logger and lost the row.
+
 ## 0.130.0 — 2026-11-05
 
 ### Added
