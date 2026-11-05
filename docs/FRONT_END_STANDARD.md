@@ -295,8 +295,8 @@ console error naming the attribute and its event.
 **Today.** The shared head carries three inline
 scripts, all nonced: the pre-paint theme, the hold button's guard and the
 x-data factories' guard; its behaviour is the modules above. The engine
-vendors Alpine and loads it as a module, with `javascript_include_tag` and
-`type: "module"`, after the import map. Every app pins its
+vendors Alpine and loads it as a module, with `javascript_include_tag`,
+`type: "module"` and `preload_links_header: false`, after the import map. Every app pins its
 modules with importmap.
 Cyvasse and Industries pin Stimulus; the hub has `stimulus-rails` in its
 Gemfile but no Stimulus pin and no controllers, four modules in
