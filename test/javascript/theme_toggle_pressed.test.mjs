@@ -21,11 +21,10 @@ const storage = (initial = {}) => {
 const root = (classes) => {
   const set = new Set(classes)
   return {
+    dataset: {},
     classList: {
-      add: (c) => set.add(c),
-      remove: (c) => set.delete(c),
       contains: (c) => set.has(c),
-      toggle: (c) => (set.has(c) ? (set.delete(c), false) : (set.add(c), true))
+      toggle: (c, on) => (on ? (set.add(c), true) : (set.delete(c), false))
     }
   }
 }

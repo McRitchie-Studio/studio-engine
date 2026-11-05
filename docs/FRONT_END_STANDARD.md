@@ -271,7 +271,10 @@ components:
 The stores load by their own nonced module tag as well as the boot, because
 every host's `<body>` binds `$store.devMode`: a boot that fails to load must
 not make that binding throw. `studio/alpine_stores` imports nothing, and
-registers a store only where Alpine has none of that name. `studio/modal_host`,
+registers a store only where Alpine has none of that name. `$store.theme.set`
+is the one theme setter: the root class, the store value and localStorage change
+together, up to a frame after the call under a crossfade. Only the head's pre-paint
+script writes the class another way. `studio/modal_host`,
 `studio/toast`, `studio/link_sidebar` and `studio/transition_snapshot` have their
 own tag for the same reason, and so does `studio/stimulus`, whose only imports are Stimulus,
 `studio/lazy_controllers` and the hold button's controller: a failure elsewhere

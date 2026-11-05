@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { blockOffsiteRequests } = require("./helpers");
+const { watchPageErrors, blockOffsiteRequests } = require("./helpers");
 
 // [e2e] One theme flip ($store.theme, studio/alpine_stores; the rules in engine.css under
 // data-theme-flip). Which animations ran is observable only in a browser. No host rule lives in
@@ -181,8 +181,7 @@ test("a pointer click during the crossfade leaves the three agreeing, and the ne
 });
 
 test("two toggles in one tick skip a transition with no rejection reaching the console", async ({ page }) => {
-  const errors = [];
-  page.on("pageerror", (error) => errors.push(error.message));
+  const errors = watchPageErrors(page);
   await open(page);
   await page.evaluate(() => {
     const theme = window.Alpine.store("theme");

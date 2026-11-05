@@ -7,7 +7,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 
 const source = readFileSync(new URL("../../app/javascript/studio/alpine_stores.js", import.meta.url), "utf8")
-const { storedTheme, themeStore, registerStudioStores, installStudioStores } =
+const { themeStore, registerStudioStores, installStudioStores } =
   await import(`data:text/javascript,${encodeURIComponent(source)}`)
 
 const storage = (initial = {}) => {
@@ -56,9 +56,11 @@ test("the source imports nothing, so no other module's failure can stop it", () 
   assert.doesNotMatch(source, /^\s*import\s/m)
 })
 
-test("the stored theme is dark unless the reader chose light", () => {
-  assert.equal(storedTheme(storage()), "dark")
-  assert.equal(storedTheme(storage({ theme: "light" })), "light")
+test("the store starts from the root's class, which the pre-paint script set", () => {
+  // The pre-paint script reads anything but "light" as dark. The store used to read that word itself.
+  assert.equal(themeStore({ root: root(["dark"]), storage: storage({ theme: "sepia" }) }).isDark, true)
+  assert.equal(themeStore({ root: root([]), storage: storage({ theme: "light" }) }).value, "light")
+  assert.equal(themeStore({ root: root(["dark"]), storage: storage() }).value, "dark")
 })
 
 // A document with view transitions. Each one holds its callback until the test takes the old

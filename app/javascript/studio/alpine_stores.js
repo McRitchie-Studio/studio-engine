@@ -27,12 +27,8 @@
 // inline, nonced script in the head: it must run before the stylesheet paints,
 // which no deferred module can.
 
-// The stored theme, dark unless the reader chose light.
-export function storedTheme(storage) {
-  return storage.getItem('theme') || 'dark'
-}
-
-// The theme the root's class shows.
+// The theme the root's class shows. The store starts here, not from storage: the pre-paint script
+// reads storage by its own rule, and it decides what the reader already sees.
 function classTheme(root) {
   return root.classList.contains('dark') ? 'dark' : 'light'
 }
@@ -53,7 +49,8 @@ function canCrossfade(env) {
 // The theme store. set(value) is the one setter: the root class, the store value and localStorage
 // change together, in one step, so they agree at every moment. Under a crossfade that step runs
 // in the transition's callback, after the old picture: for up to a frame after set() all three
-// still read the old theme.
+// still read the old theme. The pre-paint script is the one writer that cannot use this: it runs
+// before any module does.
 //
 // data-theme-flip is on the root from before the old picture until the crossfade ends. engine.css
 // reads it: the page is one picture, no element runs its own transition, and the page-transition
@@ -64,7 +61,7 @@ export function themeStore(env) {
   var wanted = null // the theme asked for, while its step has not run
 
   return {
-    value: storedTheme(env.storage),
+    value: classTheme(root),
     get isDark() { return this.value === 'dark' },
     set: function (value) {
       if (value !== 'dark' && value !== 'light') return
