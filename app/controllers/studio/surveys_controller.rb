@@ -53,10 +53,10 @@ module Studio
       submitted = submitted_answers
       @errors = {}
       completed = false
-      # One lock from the first answer to the completion, so a late autosave cannot
-      # change an answer between the two. The hook runs after the commit.
+      # One transaction, so record_answer's row lock holds from the first answer to
+      # the completion and a late autosave cannot change an answer between the two.
+      # The hook runs after the commit.
       Studio::SurveyResponse.transaction do
-        response.lock!
         @survey.questions.each do |question|
           next unless submitted.key?(question.key)
 

@@ -85,7 +85,7 @@ export function enhanceSurvey(root, win = window, doc = document) {
   var reduce = win.matchMedia && win.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var saved = {};
   var timers = {};
-  var inFlight = new Set();
+  var requests = [];
   var current = -1;
   var pointerPick = false;
   var submitting = false;
@@ -124,7 +124,7 @@ export function enhanceSurvey(root, win = window, doc = document) {
     var url = root.dataset.answerBase + encodeURIComponent(key);
     status.textContent = "Saving…";
     var request = new win.AbortController();
-    inFlight.add(request);
+    requests.push(request);
     return win.fetch(url, {
       method: "PATCH",
       body: body,
@@ -132,7 +132,6 @@ export function enhanceSurvey(root, win = window, doc = document) {
       signal: request.signal,
       headers: { "Accept": "application/json", "X-CSRF-Token": csrf }
     }).then(function (res) {
-      if (submitting) return false;
       // Completed elsewhere, such as in a second tab. There is nothing to fix here.
       if (res.status === 409) {
         status.textContent = "";
@@ -154,8 +153,6 @@ export function enhanceSurvey(root, win = window, doc = document) {
       if (submitting) return false;
       status.textContent = "Offline? Your answers still go in when you submit.";
       return false;
-    }).finally(function () {
-      inFlight.delete(request);
     });
   }
 
@@ -237,7 +234,7 @@ export function enhanceSurvey(root, win = window, doc = document) {
     }
     Object.keys(timers).forEach(function (key) { win.clearTimeout(timers[key]); });
     submitting = true;
-    inFlight.forEach(function (request) { request.abort(); });
+    requests.forEach(function (request) { request.abort(); });
     submit.disabled = true;
     submit.textContent = "Sending…";
   });

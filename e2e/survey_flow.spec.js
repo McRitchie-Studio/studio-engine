@@ -206,8 +206,10 @@ test("a save in flight at submit is cancelled, and no 409 reaches the page", asy
     await untilPostAnswered;
     await route.continue().catch(() => {}); // the page cancelled it, as it should
   });
+  let statusWhileLeaving;
   await page.route("**/thanks", async (route) => {
     await untilPatchSettled;
+    statusWhileLeaving = await page.locator("[data-survey-status]").textContent();
     await route.continue();
   });
 
@@ -223,6 +225,7 @@ test("a save in flight at submit is cancelled, and no 409 reaches the page", asy
 
   await expect(page).toHaveURL(/\/surveys\/first-game\/thanks$/);
   expect(statuses).toEqual([]);
+  expect(statusWhileLeaving).not.toContain("Offline");
   expect(errors).toEqual([]);
 });
 
