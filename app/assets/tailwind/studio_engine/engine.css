@@ -1246,6 +1246,105 @@ html[data-page-transition="unfold-top"]::view-transition-new(root) { animation-n
       }
     }
 
+    /* THE STICKY PAGE HEADER UNDER GLASS. Stuck, the shared rule fills it with surface grey.
+       Here it is a bar like the sidebar: square against the navbar, round at the bottom, a
+       hairline edge and the same top light. Opaque page color without a blur; thin with one.
+       A failed page-header controller takes the same bar, as it takes the grey one today. */
+    html[data-surface-style="glass"] .page-header:is([data-stuck], [data-studio-controller-failed~="page-header"] + .page-header) {
+      background-color: var(--color-page);
+      border-top-color: transparent;
+      border-bottom-color: var(--surface-glass-line);
+      border-radius: 0 0 0.875rem 0.875rem;
+      box-shadow: var(--surface-glass-highlight), var(--surface-glass-shadow);
+    }
+    @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      html[data-surface-style="glass"] .page-header:is([data-stuck], [data-studio-controller-failed~="page-header"] + .page-header) {
+        background-color: color-mix(in srgb, var(--color-page) 62%, transparent);
+        -webkit-backdrop-filter: blur(18px) saturate(140%);
+        backdrop-filter: blur(18px) saturate(140%);
+      }
+    }
+
+    /* LIT FROM ABOVE, under the same opt-in: one light for buttons, badges and inputs, from the
+       direction of the cards' top highlight. Four shadows: top light, bottom shade, contact, and
+       a glow in the button's own color.
+
+       THE GRADIENT NEVER GOES LIGHTER THAN THE FILL. It starts at the token and falls to 84% of
+       it, so white on the top stop is exactly the contrast the fill already had.
+
+       WHO GETS WHAT. Filled buttons: gradient, top, bottom, contact. The glow only on a full-size
+       .btn-primary, since a tab or a small primary in a toolbar is not the main action. Neutral,
+       outline and google, which includes a resting tab: top, bottom, contact, softer. Badges: a
+       small top light and contact, no press. Inputs read pressed in. Disabled is flat.
+
+       THE PRESS flips the shadow to inset. Only a full-size button also moves 1px: translate
+       takes no layout, but a toolbar row of small buttons should not jitter, and reduced motion
+       never moves.
+
+       FOCUS IS AN OUTLINE on .btn, which no box-shadow here touches. The ring variables stay in
+       each list, for an element a host gave a ring utility, such as a selected summary card.
+
+       HEIGHT. A filled button gets a clear 1px border, so a selected tab is as tall as the
+       neutral tabs beside it. The gradient paints under that border.
+
+       data-lit-state forces a state, for the specimens on the style guide. */
+    html[data-surface-style="glass"] {
+      --lit-top: inset 0 1px 0 rgb(255 255 255 / 0.35);
+      --lit-bottom: inset 0 -2px 0 rgb(0 0 0 / 0.2);
+      --lit-contact: 0 1px 2px rgb(29 24 50 / 0.32);
+      --lit-soft-top: inset 0 1px 0 rgb(255 255 255 / 0.8);
+      --lit-soft-bottom: inset 0 -1px 0 rgb(29 24 50 / 0.08);
+      --lit-pressed: inset 0 2px 4px rgb(0 0 0 / 0.3);
+      --lit-soft-pressed: inset 0 2px 3px rgb(29 24 50 / 0.16);
+      --lit-badge: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 1px 1px rgb(29 24 50 / 0.12);
+      --lit-input: inset 0 1px 2px rgb(29 24 50 / 0.14), inset 0 -1px 0 rgb(255 255 255 / 0.6);
+      --lit-rings: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000);
+    }
+    html.dark[data-surface-style="glass"] {
+      --lit-contact: 0 1px 2px rgb(0 0 0 / 0.6);
+      --lit-soft-top: inset 0 1px 0 rgb(255 255 255 / 0.12);
+      --lit-soft-bottom: inset 0 -1px 0 rgb(0 0 0 / 0.25);
+      --lit-soft-pressed: inset 0 2px 3px rgb(0 0 0 / 0.4);
+      --lit-badge: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 1px rgb(0 0 0 / 0.35);
+      --lit-input: inset 0 1px 2px rgb(0 0 0 / 0.4), inset 0 -1px 0 rgb(255 255 255 / 0.06);
+    }
+    html[data-surface-style="glass"] .btn-primary { --lit-fill: var(--color-cta-fill, var(--color-cta)); --lit-hover-fill: var(--color-cta-hover); }
+    html[data-surface-style="glass"] .btn-secondary { --lit-fill: var(--btn-secondary-bg, var(--color-success)); }
+    html[data-surface-style="glass"] .btn-danger { --lit-fill: var(--color-danger-fill, var(--color-danger)); }
+    html[data-surface-style="glass"] .btn-warning { --lit-fill: var(--color-warning-fill, var(--color-warning)); }
+    html[data-surface-style="glass"] .btn-success { --lit-fill: var(--color-success); }
+    html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(:disabled, [aria-disabled="true"]) {
+      border: 1px solid transparent;
+      background-origin: border-box;
+      background-image: linear-gradient(var(--lit-fill), color-mix(in srgb, var(--lit-fill) 84%, #000));
+      box-shadow: var(--lit-rings), var(--lit-top), var(--lit-bottom), var(--lit-contact);
+    }
+    html[data-surface-style="glass"] .btn-primary:not(.btn-sm, :disabled, [aria-disabled="true"]) {
+      box-shadow: var(--lit-rings), var(--lit-top), var(--lit-bottom), var(--lit-contact),
+        0 8px 24px -6px color-mix(in srgb, var(--lit-fill) 60%, transparent);
+    }
+    html[data-surface-style="glass"] .btn-primary:not(:disabled, [aria-disabled="true"]):is(:hover, [data-lit-state="hover"]) {
+      background-image: linear-gradient(var(--lit-hover-fill), color-mix(in srgb, var(--lit-hover-fill) 84%, #000));
+    }
+    html[data-surface-style="glass"] :is(.btn-neutral, .btn-outline, .btn-google):not(:disabled, [aria-disabled="true"]) {
+      box-shadow: var(--lit-rings), var(--lit-soft-top), var(--lit-soft-bottom), var(--lit-contact);
+    }
+    html[data-surface-style="glass"] :is(.btn-primary, .btn-secondary, .btn-danger, .btn-warning, .btn-success):not(:disabled, [aria-disabled="true"]):is(:active, [data-lit-state="pressed"]) {
+      box-shadow: var(--lit-rings), var(--lit-pressed);
+    }
+    html[data-surface-style="glass"] :is(.btn-neutral, .btn-outline, .btn-google):not(:disabled, [aria-disabled="true"]):is(:active, [data-lit-state="pressed"]) {
+      box-shadow: var(--lit-rings), var(--lit-soft-pressed);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      html[data-surface-style="glass"] .btn:not(.btn-sm, :disabled, [aria-disabled="true"]):is(:active, [data-lit-state="pressed"]) { translate: 0 1px; }
+    }
+    html[data-surface-style="glass"] .btn[data-lit-state="focus"] {
+      outline: 2px solid color-mix(in srgb, var(--color-cta) 70%, transparent);
+      outline-offset: 2px;
+    }
+    html[data-surface-style="glass"] .badge { box-shadow: var(--lit-badge); }
+    html[data-surface-style="glass"] .input-field { box-shadow: var(--lit-rings), var(--lit-input); }
+
     /* THE GLASS SIDEBAR (Studio.sidebar_style = :glass, components/_sidebar_panel glass: true).
        A rounded panel floats off the page's edge with the page blurred through it.
 
