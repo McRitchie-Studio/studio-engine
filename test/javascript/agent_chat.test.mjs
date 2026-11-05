@@ -606,3 +606,27 @@ test("the thread loaded on open, a reveal that is off, and reduced motion all sh
     assert.equal(t.lines["[data-agent-chat-text]"].textContent, "now", JSON.stringify(options))
   }
 })
+
+test("an opener the thread already ends with is not sent again (another tab sent it)", async () => {
+  const setup = openerPage({ status: 201, json: async () => ({ turn: turn(9, "pending") }) })
+  setup.fetcher = ((post) => async (url, init) => (init && init.method === "POST"
+    ? post(url, init)
+    : { ok: true, json: async () => ({ turns: [{ id: 3, role: "user", status: "answered", text: "Tell me about Pro." }], pending: false }) }))(setup.fetcher)
+  mountOpener(setup, memoryStorage())
+  await flush()
+  await flush()
+  assert.deepEqual(setup.posts, [])
+})
+
+test("a closed chat stops: destroy clears its poll and any answer still typing", async () => {
+  const t = typingPage()
+  t.asks[0].answer([])
+  await flush()
+  t.chat.refresh()
+  t.asks[1].answer([answer("x".repeat(420))])
+  await flush()
+  t.chat.destroy()
+  assert.equal(t.chat.state.typing.size, 0)
+  assert.equal(t.chat.state.alive, false)
+  assert.equal(t.log["aria-busy"], undefined)
+})

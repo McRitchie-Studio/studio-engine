@@ -43,7 +43,7 @@
             <p class="font-semibold text-heading break-words" data-talk-to-agent-title data-test="talk-to-agent-title">Talk to <%= name %></p>
             <% if role.present? %><p class="text-xs text-secondary break-words"><%= role %></p><% end %>
           </div>
-          <button type="button" class="btn btn-ghost btn-sm shrink-0" aria-label="Close"
+          <button type="button" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-secondary hover:bg-inset hover:text-heading transition-colors" aria-label="Close"
                   @click="$store.<%= store %>.close()" data-test="talk-to-agent-close">
             <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg>
           </button>

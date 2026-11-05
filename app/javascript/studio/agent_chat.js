@@ -401,6 +401,10 @@ export function mountAgentChat(root, {
   // OPENER: the section's opener, once per key per tab, after the thread loaded.
   function sendOpener() {
     if (!opener) return undefined
+    // The thread already ends with these words from the visitor (another tab
+    // sent them): showing it is enough.
+    const last = state.turns.filter((turn) => turn.role !== "agent").at(-1)
+    if (last && String(last.text ?? "").trim() === opener) return undefined
     if (openerKey && storage) {
       try {
         if (storage.getItem(openerKey)) return undefined

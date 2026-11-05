@@ -252,7 +252,7 @@ Set `Studio.draw_survey_routes = true` to add the public survey pages (`/surveys
 
 **Magic links need the `studio_links` table.** Install it with `bin/rails studio_engine:install:migrations && bin/rails db:migrate` (install all of them) before enabling `:magic_link` — never by hand-copying the migration, which collides with the task's own copy on `class CreateStudioLinks`. Without the table, the first sign-in raises `Studio::Link::MissingTable`.
 
-Set `Studio.agent_chat_souls = %w[alex]` to add the shared agent chat's proxy (`POST /agent_chat/messages`, `GET /agent_chat/turns`), which forwards to the McRitchie Studio hub with the app's `AGENT_CHAT_TOKEN`; then `render "studio/agent_chat/chat", soul: "alex", name: "Alex", portrait: ...` on any page, with `voice: true` for hold to talk in the composer ([`docs/AGENT_CHAT.md`](docs/AGENT_CHAT.md)).
+Set `Studio.agent_chat_souls = %w[alex]` to add the shared agent chat's proxy (`POST /agent_chat/messages`, `GET /agent_chat/turns`), which forwards to the McRitchie Studio hub with the app's `AGENT_CHAT_TOKEN`; then `render "studio/agent_chat/chat", soul: "alex", name: "Alex", portrait: ...` on any page, with `voice: true` for hold to talk in the composer ([`docs/AGENT_CHAT.md`](docs/AGENT_CHAT.md)). To open that chat in a modal from any button, render `studio/agent_chat/talk_modal` once and mark the buttons with `studio_talk_to_agent_link` ([`docs/AGENT_CHAT.md`](docs/AGENT_CHAT.md), "Talk to an agent in a modal").
 
 In non-production local requests, this also draws `/_studio/local_emails`, a local email inbox for agent/worktree proof flows. Set `LOCAL_EMAIL_CAPTURE=1` or run with `AGENT_WORKTREE=1` to record outbox rows without sending real email.
 
