@@ -94,7 +94,8 @@ config.agent_chat_allowed = ->(user) { user&.admin? }   # admins only, while tes
 
 The POST is CSRF-protected (the host's `protect_from_forgery`, forced to
 `:exception` on this controller); the composer's form carries the token and the
-script sends it as `X-CSRF-Token`. Every answer is JSON with `Cache-Control: no-store`.
+script sends it as `X-CSRF-Token`. Every answer the action gives is JSON with
+`Cache-Control: no-store`. A refused token never reaches the action: see the 422 below.
 
 ## Answers
 
@@ -103,6 +104,7 @@ script sends it as `X-CSRF-Token`. Every answer is JSON with `Cache-Control: no-
 | `201 {turn}` | the hub stored the message; `{turn, voice}` when it answered what it kept of a spoken one |
 | `200 {turns, pending}` | the thread after `after` (a turn id), at most `limit` (≤ 50) |
 | `422 {error}` | a blank or over-4,000-character message, a malformed `voice`, or the hub's own refusal (its reason) |
+| `422 {error, reason: "invalid_token"}` | a bad or missing authenticity token, from `Studio::ErrorHandling`: no ErrorLog row, and the hub was not asked. The page says to copy the words and reload. |
 | `429 {error, retry_after}` | the hub's cap; `Retry-After` is passed on |
 | `403 {error, reason: "not_allowed"}` | `Studio.agent_chat_allowed` refused this viewer; the hub was not asked |
 | `404 {error}` | a soul off the list, or one the hub has no web chat for |
@@ -178,19 +180,26 @@ answers no `voice`. On the hub the same two paths are answered in-process
 | `no_speech` | `/voice/takes` heard no words (422). |
 | `not_configured` | No voice key on this app (503). |
 | `rate_limited` | 429 on the take or the send, with the wait when the server gives one. |
-| `refused` | 401 ("Sign in again to talk."), 403, 413, 415, another 422, or the browser refused the microphone (the help opens too). |
+| `refused` | 401 ("Sign in again to talk."), 403, 413, 415, another 422, a refused authenticity token (the line says to reload), or the browser refused the microphone (the help opens too). |
 | `failed` | The microphone would not open, the transcriber failed, the network failed, or the send failed. |
 
 **The held button does not move.** At phone width, stuck or not, its whole box stays
 through a hold: the line reserves the two lines the quiet hint wraps to (one once the
 composer is 36rem wide) and fixes its height for the hold, the chip is always one line,
 and the timer sits on the button. A reply landing above a composer that is NOT stuck
-still moves it, as any new content in the page does.
+still moves it, as any new content in the page does. The page itself never scrolls
+during a hold ("The page's script", the reveal).
 
 **The token.** The script sends the page's `csrf_meta_tags` token and falls back to
 the form's only without one: the form's is per-form under `load_defaults` 8.1, bound
 to `/agent_chat/messages`, and `POST /voice/takes` refuses it. So the page's head must
 carry `csrf_meta_tags`, as `layouts/studio/_head` does.
+
+**A stale page.** A refused token can't pass on a retry from this page, so the line says
+to reload. A take refused at `/voice/takes` says "This page has expired. Reload it, then
+hold to talk again."; a send refused after the take keeps the words in the box and says to
+copy them first, because a reload clears the box. Rails' own `{status: 422, error}` from a
+host that answers it reads the same, never its words.
 
 **No words are lost.** A send that fails puts the words in the box, after anything
 already typed, and says so; press send to try again.
@@ -276,6 +285,13 @@ machine (a developer's local hub).
 - Enter sends, Shift+Enter is a new line; the words stay in the box until the
   app answers 201, and a refusal shows its reason above them;
 - keeps the thread at its end while the reader is within 20px of it;
+- **the reveal.** The composer sticks over the window's bottom, so on a short window
+  the thread's end sits under it. On load and after a new turn the page scrolls that end
+  (the log, or the typing line or offline notice while one shows) clear of the composer,
+  by `scrollIntoView`, so a host's inner scroller works too. It does not scroll for an
+  empty thread (a card slot stays in view), for a reader scrolled up in the log, or for a
+  reader who scrolled the page up; their own send brings them back. During a hold it
+  waits, and scrolls when the button is let go;
 - answers **the public refresh hook**: dispatch `studio:agent-chat:refresh` on the
   chat's section, optionally with `{ detail: { turn } }` (a turn your code just
   got from the app). The turn shows at once with the typing line, the thread
@@ -289,7 +305,9 @@ machine (a developer's local hub).
 - dispatches `studio:agent-chat:sent` on the chat's section, `{ detail: { turn } }`,
   after a typed send the app took.
 
-Turn text is set as text, never HTML. The look is the partials under
+Turn text is set as text, never HTML. The log is `position: relative` on purpose: a turn's
+screen-reader name is absolutely positioned, and with no positioned ancestor it escapes
+the scroller and stretches the document by the thread's scrolled height. The look is the partials under
 `app/views/studio/agent_chat/` and `.studio-agent-typing` in `engine-motion.css`,
 all on theme tokens, so dark mode follows the host theme. The typing line needs
 the motion layer, which the default Tailwind entry (`host.css`) imports; a host
@@ -311,4 +329,9 @@ that imports only `engine.css` sees both of its labels.
 - `e2e/agent_chat_voice.spec.js`: a real hold at 390px, light and dark, through the
   mock transcriber and the proxy to the stand-in hub, and the footer's Chat link. It
   measures the held button's box stuck and not, and drives a tap, a held key on the
-  refused-microphone help, a held turn, a typed send and the picker in a short window.
+  refused-microphone help, a held turn, a typed send and the picker in a short window. A
+  long thread at 390x844 and 320x568, light and dark: the document ends with `main`, the
+  newest turn clears the composer, on load and after a turn, a reader who scrolled up is
+  left there, and a turn landing during a hold moves nothing. A stale page's lines.
+- `test/integration/agent_chat_proxy_test.rb` also runs a forged post under production's
+  handling (`Rails.env` production, exceptions app on, forgery on): 422, no ErrorLog row.

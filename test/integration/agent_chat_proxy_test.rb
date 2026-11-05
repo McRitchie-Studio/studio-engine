@@ -749,8 +749,10 @@ class AgentChatProxyTest < ActionDispatch::IntegrationTest
 
   def test_a_post_without_the_authenticity_token_is_refused
     ActionController::Base.allow_forgery_protection = true
+    ErrorLog.delete_all
     post "/agent_chat/messages", params: { soul: "alex", text: "Hi" }.to_json, headers: json_headers
     assert_response :unprocessable_entity
+    assert_equal 0, ErrorLog.count
     assert_empty @hub.requests
   end
 

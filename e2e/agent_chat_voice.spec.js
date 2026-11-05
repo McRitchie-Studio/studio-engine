@@ -785,22 +785,34 @@ async function expectNewestInView(page) {
   return at;
 }
 
-for (const [width, height] of [[390, 844], [320, 568]]) {
-  for (const theme of ["light", "dark"]) {
-    test(`a long thread at ${width}x${height} in ${theme}: no blank tail, and the newest turn shows above the composer`, async ({ page }) => {
-      const errors = watchPageErrors(page);
-      await openLongThread(page, { width, height, theme });
-      expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(theme === "dark");
+async function expectLongThreadFits(page, { width, height, theme }) {
+  const errors = watchPageErrors(page);
+  await openLongThread(page, { width, height, theme });
+  expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(theme === "dark");
 
-      const before = await layout(page);
-      expect(before.document, "the document ends where main ends").toBeLessThanOrEqual(Math.max(before.mainEnd, before.window));
-      const at = await expectNewestInView(page);
-      expect(at.threadShown, "the thread is on show, not only its last line").toBeGreaterThan(100);
-      expect(await sideways(page)).toBeLessThanOrEqual(0);
-      expect(errors).toEqual([]);
-    });
-  }
+  const before = await layout(page);
+  expect(before.document, "the document ends where main ends").toBeLessThanOrEqual(Math.max(before.mainEnd, before.window));
+  const at = await expectNewestInView(page);
+  expect(at.threadShown, "the thread is on show, not only its last line").toBeGreaterThan(100);
+  expect(await sideways(page)).toBeLessThanOrEqual(0);
+  expect(errors).toEqual([]);
 }
+
+test("a long thread at 390x844 in light: no blank tail, and the newest turn shows above the composer", async ({ page }) => {
+  await expectLongThreadFits(page, { width: 390, height: 844, theme: "light" });
+});
+
+test("a long thread at 390x844 in dark: no blank tail, and the newest turn shows above the composer", async ({ page }) => {
+  await expectLongThreadFits(page, { width: 390, height: 844, theme: "dark" });
+});
+
+test("a long thread at 320x568 in light: no blank tail, and the newest turn shows above the composer", async ({ page }) => {
+  await expectLongThreadFits(page, { width: 320, height: 568, theme: "light" });
+});
+
+test("a long thread at 320x568 in dark: no blank tail, and the newest turn shows above the composer", async ({ page }) => {
+  await expectLongThreadFits(page, { width: 320, height: 568, theme: "dark" });
+});
 
 test("the typed chat at 320x568: no blank tail, and the newest turn shows above the composer", async ({ page }) => {
   await openLongThread(page, { width: 320, height: 568, url: "/agent_chat_lab" });
@@ -883,10 +895,16 @@ test("a spoken turn landing during the next hold moves nothing; it shows once th
 });
 
 test("an empty thread does not scroll the page: the card slot and the header stay in view", async ({ page }) => {
-  await openLongThread(page, { width: 320, height: 568, turns: [], url: "/agent_chat_lab" });
-  await expect(page.locator('[data-test="agent-chat-empty"]')).toBeVisible();
+  // Short enough that the composer covers the empty line, so a reveal has work to refuse.
+  await openLongThread(page, { width: 320, height: 380, turns: [], url: "/agent_chat_lab" });
   await page.waitForTimeout(200);
-  expect((await layout(page)).scrollY).toBe(0);
+  const at = await page.evaluate(([log, form]) => ({
+    scrollY: window.scrollY,
+    logEnd: document.querySelector(log).getBoundingClientRect().bottom,
+    formTop: document.querySelector(form).getBoundingClientRect().top
+  }), [LOG, FORM]);
+  expect(at.logEnd, "the composer does cover the thread's end here").toBeGreaterThan(at.formTop);
+  expect(at.scrollY).toBe(0);
 });
 
 // ---- A stale page ------------------------------------------------------------------
