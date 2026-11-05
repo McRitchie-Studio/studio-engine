@@ -48,6 +48,7 @@ const { blockOffsiteRequests, watchPageErrors } = require("./helpers");
 //     typed-send spec fails at the old line.
 //   - hide no held line (`held.hidden = true`): the held spec fails.
 //   - drop the picker's max-height in _voice: the short-window spec fails at the chip.
+//   - put .studio-recorder's flex-basis back to 10rem in _voice: the timer spec fails at 450px.
 
 const PAGE = "/agent_chat_voice_lab";
 const SIGN_IN = "/agent_chat_voice_lab/sign_in";
@@ -391,6 +392,21 @@ async function expectSteadyAt390(page, theme) {
 
 test("at 390px outside a stuck composer, in dark: the first hold and the quiet hint leave the button where it is", async ({ page }) => { await expectSteadyAt390(page, "dark"); });
 test("at 390px outside a stuck composer, in light: the first hold and the quiet hint leave the button where it is", async ({ page }) => { await expectSteadyAt390(page, "light"); });
+
+test("the timer on a held button clears its label at every width, the chip beside it or above it", async ({ page }) => {
+  await openSignedIn(page);
+  const button = page.locator(`${RECORDER} [data-voice-recorder-button]`);
+  const box = await button.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await expect(page.locator(RECORDER)).toHaveAttribute("data-voice-recorder-state", "recording");
+  for (let width = 320; width <= 640; width += 10) {
+    await page.setViewportSize({ width, height: 844 });
+    const gap = await page.evaluate(() => document.querySelector("[data-voice-recorder-timer]").getBoundingClientRect().left - document.querySelector("[data-voice-recorder-label]").getBoundingClientRect().right);
+    expect(gap, `at ${width}px`).toBeGreaterThanOrEqual(0);
+  }
+  await page.mouse.up();
+});
 
 test("a microphone name too long for the chip stays on one line, and does not move a held button", async ({ page }) => {
   await openSignedIn(page, { label: "A Very Long Wireless Conference Room Microphone Array With A Name Nobody Chose" });

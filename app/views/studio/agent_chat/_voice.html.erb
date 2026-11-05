@@ -34,7 +34,8 @@
   .studio-agent-voice-row .studio-mic-panel { flex: 1 0 100%; max-width: none; order: 3; align-content: start; overflow-y: auto; overscroll-behavior: contain;
     max-height: max(6rem, calc(100vh - 20rem)); max-height: max(6rem, calc(100dvh - 20rem)); }
   .studio-agent-voice-row .studio-mic-failed { flex: 1 0 100%; order: 4; }
-  .studio-agent-voice-row .studio-recorder { flex: 1 1 10rem; min-width: 0; flex-flow: row wrap; justify-content: flex-end; gap: .5rem; }
+  /* 14rem: the label and, either side of it, the timer's room. Narrower, the two overlap. */
+  .studio-agent-voice-row .studio-recorder { flex: 1 1 14rem; min-width: 0; flex-flow: row wrap; justify-content: flex-end; gap: .5rem; }
   .studio-agent-voice-row .studio-recorder-button { flex: 1 1 10rem; min-width: 0; padding: .625rem 1rem; }
   .studio-agent-voice-row .studio-recorder-timer { display: none; }
   /* On the button, not beside it: beside it, it took 40px off a held button. */
